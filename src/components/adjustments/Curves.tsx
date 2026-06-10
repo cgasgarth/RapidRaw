@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { ActiveChannel, Adjustments, Coord, ParametricCurveSettings } from '../../utils/adjustments';
+import { ActiveChannel, Adjustments, Coord, MaskAdjustments, ParametricCurveSettings } from '../../utils/adjustments';
 import { Theme, OPTION_SEPARATOR } from '../ui/AppProperties';
 import { useContextMenu } from '../../context/ContextMenuContext';
 import Text from '../ui/Text';
@@ -11,6 +11,14 @@ import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 let curveClipboard: Array<Coord> | null = null;
 let parametricClipboard: any = null;
+
+const CURVE_CHANNELS = [ActiveChannel.Luma, ActiveChannel.Red, ActiveChannel.Green, ActiveChannel.Blue] as const;
+const CURVE_CHANNEL_LABEL_FALLBACKS: Record<ActiveChannel, string> = {
+  [ActiveChannel.Blue]: 'Blue',
+  [ActiveChannel.Green]: 'Green',
+  [ActiveChannel.Luma]: 'Luma',
+  [ActiveChannel.Red]: 'Red',
+};
 
 export interface ChannelConfig {
   [index: string]: ColorData;
@@ -26,7 +34,7 @@ interface ColorData {
 }
 
 interface CurveGraphProps {
-  adjustments: Adjustments | any;
+  adjustments: Adjustments | MaskAdjustments;
   histogram: ChannelConfig | null;
   isForMask?: boolean;
   setAdjustments(updater: (prev: any) => any): void;
@@ -487,7 +495,7 @@ export default function CurveGraph({
 
   const activePoints = isParametricMode
     ? buildParametricPoints(activeParametricSettings)
-    : (localPoints ?? adjustments?.curves?.[activeChannel]);
+    : (localPoints ?? adjustments.curves[activeChannel]);
 
   const { color, data: histogramData } = channelConfig[activeChannel];
 
@@ -571,7 +579,9 @@ export default function CurveGraph({
     e.preventDefault();
     e.stopPropagation();
 
-    const channelLabel = t(`adjustments.curves.channels.${activeChannel}`);
+    const channelLabel = t(`adjustments.curves.channels.${activeChannel}`, {
+      defaultValue: CURVE_CHANNEL_LABEL_FALLBACKS[activeChannel],
+    });
 
     if (isParametricMode) {
       const handleCopyParametric = () => {
@@ -805,9 +815,11 @@ export default function CurveGraph({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {Object.keys(channelConfig).map((channel: any) => {
+          {CURVE_CHANNELS.map((channel) => {
             const selected = activeChannel === channel;
-            const channelLabel = t(`adjustments.curves.channels.${channel}`);
+            const channelLabel = t(`adjustments.curves.channels.${channel}`, {
+              defaultValue: CURVE_CHANNEL_LABEL_FALLBACKS[channel],
+            });
             return (
               <button
                 key={channel}
