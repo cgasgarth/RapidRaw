@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { Invokes, SupportedTypes, ImageFile } from '../ui/AppProperties';
-import { INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import { Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import Dropdown from '../ui/Dropdown';
@@ -17,7 +17,7 @@ const DEFAULT_PREVIEW_IMAGE_URL = 'https://raw.githubusercontent.com/CyberTimon/
 interface CommunityPreset {
   name: string;
   creator: string;
-  adjustments: Record<string, any>;
+  adjustments: Partial<Adjustments>;
   includeMasks?: boolean;
   includeCropTransform?: boolean;
   presetType?: 'tool' | 'style';
@@ -48,11 +48,11 @@ interface CommunityPageProps {
   currentFolderPath: string | null;
 }
 
-const shuffleArray = (array: any[]) => {
+const shuffleArray = <T,>(array: T[]) => {
   const newArray = [...array];
   for (let i = newArray.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    [newArray[i], newArray[j]] = [newArray[j]!, newArray[i]!];
   }
   return newArray;
 };
