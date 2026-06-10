@@ -18,12 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.3.13'
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun-deps
 
       - name: Build frontend
         run: bun run build
@@ -38,15 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.3.13'
-
-      - name: Check Bun version
-        run: bun --version
-
-      - name: Install dependencies with Bun
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun-deps
 
   frontend-typecheck:
     name: 'frontend: typecheck baseline'
@@ -55,12 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.3.13'
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun-deps
 
       - id: typecheck
         name: Typecheck
@@ -85,12 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.3.13'
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun-deps
 
       - id: eslint
         name: Lint
@@ -115,12 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.3.13'
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun-deps
 
       - id: prettier
         name: Check formatting
@@ -145,12 +117,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.3.13'
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup-bun-deps
 
       - id: i18n-lint
         name: Lint translations
@@ -197,9 +164,24 @@ jobs:
           rustflags: ''
           rust-src-dir: src-tauri
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ runner.os }}-rust-check-macos
+          cache-on-failure: true
+
+      - name: Cache ONNX Runtime library
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/resources/libonnxruntime.dylib
+          key: ${{ runner.os }}-onnxruntime-macos-${{ hashFiles('src-tauri/build.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-onnxruntime-macos-
+
       - name: Cargo check
         working-directory: src-tauri
-        run: cargo check
+        run: cargo check --locked
 
   rust-clippy:
     name: 'rust: clippy baseline macOS'
@@ -214,11 +196,26 @@ jobs:
           rustflags: ''
           rust-src-dir: src-tauri
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ runner.os }}-rust-clippy-macos
+          cache-on-failure: true
+
+      - name: Cache ONNX Runtime library
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/resources/libonnxruntime.dylib
+          key: ${{ runner.os }}-onnxruntime-macos-${{ hashFiles('src-tauri/build.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-onnxruntime-macos-
+
       - id: clippy
         name: Clippy
         continue-on-error: true
         working-directory: src-tauri
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
       - name: Record baseline status
         if: always()

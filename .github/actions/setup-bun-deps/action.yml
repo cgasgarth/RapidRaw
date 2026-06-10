@@ -1,0 +1,58 @@
+name: Setup Bun dependencies
+description: Set up Bun, restore the Bun package cache, and install frontend dependencies.
+
+inputs:
+  node-version:
+    description: Optional Node.js version to install before Bun.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      if: ${{ inputs.node-version != '' }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: package.json
+
+    - name: Restore Bun package cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', 'package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-bun-
+
+    - name: Check Bun version
+      shell: bash
+      run: bun --version
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        cache_dir="${BUN_INSTALL_CACHE_DIR:-$HOME/.bun/install/cache}"
+
+        for attempt in 1 2 3; do
+          if bun install --frozen-lockfile; then
+            exit 0
+          fi
+
+          status="$?"
+          if [[ "$attempt" == "3" ]]; then
+            exit "$status"
+          fi
+
+          if [[ -d "$cache_dir" ]]; then
+            find "$cache_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
+
+          sleep "$((attempt * 5))"
+        done

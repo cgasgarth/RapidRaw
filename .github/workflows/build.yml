@@ -45,7 +45,7 @@ jobs:
         with:
           repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -56,17 +56,25 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          key: ${{ inputs.mobile == '' && inputs.platform || format('{0}-{1}', inputs.platform, inputs.mobile) }}
+          key: ${{ inputs.platform }}-${{ inputs.target }}-${{ inputs.mobile }}
+          cache-on-failure: true
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Cache ONNX Runtime library
+        uses: actions/cache@v4
+        with:
+          path: |
+            src-tauri/resources/libonnxruntime.dylib
+            src-tauri/resources/libonnxruntime.so
+            src-tauri/resources/onnxruntime.dll
+            src-tauri/libs/arm64-v8a/libonnxruntime.so
+          key: ${{ runner.os }}-onnxruntime-${{ inputs.target }}-${{ inputs.mobile }}-${{ hashFiles('src-tauri/build.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-onnxruntime-${{ inputs.target }}-${{ inputs.mobile }}-
+
+      - name: Install frontend dependencies
+        uses: ./.github/actions/setup-bun-deps
         with:
           node-version: '22'
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.3.13'
 
       - name: Install additional system dependencies (Linux)
         if: runner.os == 'Linux' && inputs.mobile == ''
@@ -102,9 +110,6 @@ jobs:
         with:
           ndk-version: r26d
           link-to-sdk: true
-
-      - name: Install frontend dependencies
-        run: bun install --frozen-lockfile
 
       - name: Setup Android signing
         if: inputs.mobile == 'android' && github.event_name != 'pull_request'
