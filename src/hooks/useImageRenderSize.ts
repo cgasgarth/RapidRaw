@@ -16,7 +16,7 @@ export interface RenderSize {
 const DEFAULT_SIZE: RenderSize = { width: 0, height: 0, scale: 1, offsetX: 0, offsetY: 0 };
 
 export const useImageRenderSize = (
-  containerRef: React.RefObject<HTMLElement>,
+  containerRef: React.RefObject<HTMLElement | null>,
   imageDimensions: ImageDimensions | null,
 ) => {
   const [renderSize, setRenderSize] = useState<RenderSize>(DEFAULT_SIZE);
