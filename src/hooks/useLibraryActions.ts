@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type MouseEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'react-toastify';
 import { useLibraryStore } from '../store/useLibraryStore';
@@ -8,6 +8,20 @@ import { Invokes, ImageFile, AlbumItem, Album, AlbumGroup } from '../components/
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { computeSortedLibrary } from './useSortedLibrary';
+
+type LibraryClickEvent = Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>;
+
+interface MultiSelectOptions {
+  onSimpleClick(path: string): void;
+  shiftAnchor: string | null;
+  updateLibraryActivePath: boolean;
+}
+
+interface FolderTreeNode {
+  children?: FolderTreeNode[];
+  path?: string;
+  [key: string]: unknown;
+}
 
 export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   const handleRate = useCallback((newRating: number, paths?: string[]) => {
@@ -86,7 +100,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
   }, []);
 
   const handleUpdateExif = useCallback(async (paths: Array<string> | undefined, updates: Record<string, string>) => {
-    const { multiSelectedPaths, imageList, setLibrary } = useLibraryStore.getState();
+    const { multiSelectedPaths, setLibrary } = useLibraryStore.getState();
     const { selectedImage, setEditor } = useEditorStore.getState();
 
     const pathsToUpdate =
@@ -142,70 +156,62 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     }
   }, []);
 
-  const handleMultiSelectClick = useCallback(
-    (
-      path: string,
-      event: any,
-      options: { onSimpleClick(p: any): void; updateLibraryActivePath: boolean; shiftAnchor: string | null },
-    ) => {
-      const libraryState = useLibraryStore.getState();
-      const { multiSelectedPaths, setLibrary } = libraryState;
-      const { ctrlKey, metaKey, shiftKey } = event;
-      const isCtrlPressed = ctrlKey || metaKey;
-      const { shiftAnchor, onSimpleClick, updateLibraryActivePath } = options;
+  const handleMultiSelectClick = useCallback((path: string, event: LibraryClickEvent, options: MultiSelectOptions) => {
+    const libraryState = useLibraryStore.getState();
+    const { multiSelectedPaths, setLibrary } = libraryState;
+    const { ctrlKey, metaKey, shiftKey } = event;
+    const isCtrlPressed = ctrlKey || metaKey;
+    const { shiftAnchor, onSimpleClick, updateLibraryActivePath } = options;
 
-      if (shiftKey && shiftAnchor) {
-        const sortedImageList = computeSortedLibrary(libraryState, useSettingsStore.getState());
-        const anchorIndex = sortedImageList.findIndex((f) => f.path === shiftAnchor);
-        const currentIndex = sortedImageList.findIndex((f) => f.path === path);
+    if (shiftKey && shiftAnchor) {
+      const sortedImageList = computeSortedLibrary(libraryState, useSettingsStore.getState());
+      const anchorIndex = sortedImageList.findIndex((f) => f.path === shiftAnchor);
+      const currentIndex = sortedImageList.findIndex((f) => f.path === path);
 
-        if (anchorIndex !== -1 && currentIndex !== -1) {
-          const start = Math.min(anchorIndex, currentIndex);
-          const end = Math.max(anchorIndex, currentIndex);
-          const range = sortedImageList.slice(start, end + 1).map((f) => f.path);
-          const baseSelection = isCtrlPressed ? multiSelectedPaths : [];
-          const newSelection = Array.from(new Set([...baseSelection, ...range]));
+      if (anchorIndex !== -1 && currentIndex !== -1) {
+        const start = Math.min(anchorIndex, currentIndex);
+        const end = Math.max(anchorIndex, currentIndex);
+        const range = sortedImageList.slice(start, end + 1).map((f) => f.path);
+        const baseSelection = isCtrlPressed ? multiSelectedPaths : [];
+        const newSelection = Array.from(new Set([...baseSelection, ...range]));
 
-          setLibrary({ multiSelectedPaths: newSelection, selectionAnchorPath: path });
-          if (updateLibraryActivePath) setLibrary({ libraryActivePath: path });
-        }
-      } else if (isCtrlPressed) {
-        const newSelection = new Set(multiSelectedPaths);
-        if (newSelection.has(path)) newSelection.delete(path);
-        else newSelection.add(path);
-
-        const newSelectionArray = Array.from(newSelection);
-        setLibrary({ multiSelectedPaths: newSelectionArray, selectionAnchorPath: path });
-
-        if (updateLibraryActivePath) {
-          if (newSelectionArray.includes(path)) setLibrary({ libraryActivePath: path });
-          else if (newSelectionArray.length > 0)
-            setLibrary({ libraryActivePath: newSelectionArray[newSelectionArray.length - 1] ?? null });
-          else setLibrary({ libraryActivePath: null });
-        }
-      } else {
-        onSimpleClick(path);
-        setLibrary({ selectionAnchorPath: path });
+        setLibrary({ multiSelectedPaths: newSelection, selectionAnchorPath: path });
+        if (updateLibraryActivePath) setLibrary({ libraryActivePath: path });
       }
-    },
-    [],
-  );
+    } else if (isCtrlPressed) {
+      const newSelection = new Set(multiSelectedPaths);
+      if (newSelection.has(path)) newSelection.delete(path);
+      else newSelection.add(path);
+
+      const newSelectionArray = Array.from(newSelection);
+      setLibrary({ multiSelectedPaths: newSelectionArray, selectionAnchorPath: path });
+
+      if (updateLibraryActivePath) {
+        if (newSelectionArray.includes(path)) setLibrary({ libraryActivePath: path });
+        else if (newSelectionArray.length > 0)
+          setLibrary({ libraryActivePath: newSelectionArray[newSelectionArray.length - 1] ?? null });
+        else setLibrary({ libraryActivePath: null });
+      }
+    } else {
+      onSimpleClick(path);
+      setLibrary({ selectionAnchorPath: path });
+    }
+  }, []);
 
   const handleLibraryImageSingleClick = useCallback(
-    (path: string, event: any) => {
+    (path: string, event: LibraryClickEvent) => {
       const { selectionAnchorPath, libraryActivePath, setLibrary } = useLibraryStore.getState();
       handleMultiSelectClick(path, event, {
         shiftAnchor: selectionAnchorPath ?? libraryActivePath,
         updateLibraryActivePath: true,
-        onSimpleClick: (p: any) =>
-          setLibrary({ multiSelectedPaths: [p], libraryActivePath: p, selectionAnchorPath: p }),
+        onSimpleClick: (p) => setLibrary({ multiSelectedPaths: [p], libraryActivePath: p, selectionAnchorPath: p }),
       });
     },
     [handleMultiSelectClick],
   );
 
   const handleImageClick = useCallback(
-    (path: string, event: any) => {
+    (path: string, event: LibraryClickEvent) => {
       const { selectionAnchorPath, libraryActivePath, setLibrary } = useLibraryStore.getState();
       const { selectedImage } = useEditorStore.getState();
       const inEditor = !!selectedImage;
@@ -231,10 +237,10 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     const expandedArray = Array.from(expandedFolders);
 
     try {
-      const updates: any = {};
+      const updates: { folderTrees?: FolderTreeNode[]; pinnedFolderTrees?: FolderTreeNode[] } = {};
 
       if (rootPaths && rootPaths.length > 0) {
-        const treesData = await invoke(Invokes.GetPinnedFolderTrees, {
+        const treesData = await invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
           paths: rootPaths,
           expandedFolders: expandedArray,
           showImageCounts,
@@ -245,7 +251,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
       }
 
       if (pinnedFolders && pinnedFolders.length > 0) {
-        const pinnedTreesData = await invoke(Invokes.GetPinnedFolderTrees, {
+        const pinnedTreesData = await invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
           paths: pinnedFolders,
           expandedFolders: expandedArray,
           showImageCounts,
@@ -277,7 +283,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     handleSettingsChange({ ...appSettings, pinnedFolders: newPins });
 
     try {
-      const trees = await invoke<any[]>(Invokes.GetPinnedFolderTrees, {
+      const trees = await invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
         paths: newPins,
         expandedFolders: Array.from(expandedFolders),
         showImageCounts: appSettings.enableFolderImageCounts ?? false,
