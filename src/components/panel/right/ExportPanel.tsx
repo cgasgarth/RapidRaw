@@ -499,7 +499,7 @@ export default function ExportPanel({
           : ((await open({
               title: t('export.dialog.selectFolderTitle', { count: numImages }),
               directory: true,
-              defaultPath: lastExportPath ?? undefined,
+              ...(lastExportPath ? { defaultPath: lastExportPath } : {}),
             })) as string);
       }
 

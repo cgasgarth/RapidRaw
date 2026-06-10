@@ -12,7 +12,7 @@ interface LUTControlProps {
   onLutSelect: (path: string) => void;
   onIntensityChange: (intensity: number) => void;
   onClear: () => void;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
 export default function LUTControl({

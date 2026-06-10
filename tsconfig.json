@@ -11,6 +11,7 @@
     "moduleResolution": "nodenext",
     "noImplicitOverride": true,
     "noPropertyAccessFromIndexSignature": true,
+    "exactOptionalPropertyTypes": true,
     "noUncheckedSideEffectImports": true,
     "resolveJsonModule": true,
     "rootDir": "./src",

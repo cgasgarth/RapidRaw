@@ -23,7 +23,7 @@ interface ColorPanelProps {
   isForMask?: boolean;
   isWbPickerActive?: boolean;
   toggleWbPicker?: () => void;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
 interface ColorSwatchProps {

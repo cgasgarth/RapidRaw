@@ -25,9 +25,9 @@ interface ItemData {
   selectedPath: string | undefined;
   multiSelectedPaths: string[];
   thumbnailAspectRatio: ThumbnailAspectRatio;
-  onRequestThumbnails?: (paths: string[]) => void;
-  onContextMenu?: (event: any, path: string) => void;
-  onImageSelect?: (path: string, event: any) => void;
+  onRequestThumbnails?: ((paths: string[]) => void) | undefined;
+  onContextMenu?: ((event: any, path: string) => void) | undefined;
+  onImageSelect?: ((path: string, event: any) => void) | undefined;
   itemHeight: number;
   setRatio: (index: number, ratio: number) => void;
 }
@@ -609,11 +609,11 @@ interface FilmStripProps {
   imageRatings: any;
   isLoading: boolean;
   multiSelectedPaths: Array<string>;
-  onClearSelection?(): void;
-  onContextMenu?(event: any, path: string): void;
-  onImageSelect?(path: string, event: any): void;
-  onRequestThumbnails?(paths: string[]): void;
-  selectedImage?: SelectedImage;
+  onClearSelection?: (() => void) | undefined;
+  onContextMenu?: ((event: any, path: string) => void) | undefined;
+  onImageSelect?: ((path: string, event: any) => void) | undefined;
+  onRequestThumbnails?: ((paths: string[]) => void) | undefined;
+  selectedImage?: SelectedImage | undefined;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   totalImages?: number;
 }

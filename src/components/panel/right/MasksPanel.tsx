@@ -151,7 +151,7 @@ const BrushTools = ({
 }: {
   settings: any;
   onSettingsChange: any;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }) => {
   const { t } = useTranslation();
 
@@ -208,7 +208,7 @@ const FlowBrushTool = ({
   onFlowChange: (flow: number) => void;
   settings: any;
   onSettingsChange: any;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }) => {
   const { t } = useTranslation();
 
@@ -243,7 +243,7 @@ function DepthRangePicker({
   minFade: number;
   maxFade: number;
   onChange: (values: { minDepth: number; maxDepth: number; minFade: number; maxFade: number }) => void;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }) {
   const { t } = useTranslation();
   const trackRef = useRef<HTMLDivElement>(null);

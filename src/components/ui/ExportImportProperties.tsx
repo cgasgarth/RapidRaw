@@ -45,8 +45,8 @@ export interface ExportSettings {
   } | null;
   stripGps: boolean;
   watermark: WatermarkSettings | null;
-  exportMasks?: boolean;
-  preserveFolders?: boolean;
+  exportMasks?: boolean | undefined;
+  preserveFolders?: boolean | undefined;
 }
 
 export enum WatermarkAnchor {

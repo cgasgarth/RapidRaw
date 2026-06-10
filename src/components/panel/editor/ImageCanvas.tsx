@@ -204,7 +204,7 @@ const MaskOverlay = memo(
       onMaskInteractionEnd();
     }, [onMaskInteractionEnd]);
 
-    const handleSelect = isToolActive ? undefined : onSelect;
+    const selectHandlers = isToolActive ? {} : { onClick: onSelect, onTap: onSelect };
 
     useEffect(() => {
       if (isSelected && trRef.current && shapeRef.current) {
@@ -573,8 +573,7 @@ const MaskOverlay = memo(
 
     const commonProps = {
       dash: [4, 4],
-      onClick: handleSelect,
-      onTap: handleSelect,
+      ...selectHandlers,
       opacity: isSelected ? 1 : 0.7,
       stroke: isSelected
         ? '#0ea5e9'
@@ -600,8 +599,7 @@ const MaskOverlay = memo(
               stroke={isSelected ? '#0ea5e9' : 'white'}
               strokeWidth={2}
               listening={!isToolActive}
-              onClick={handleSelect}
-              onTap={handleSelect}
+              {...selectHandlers}
               onTouchEnd={handleMaskTouchEnd}
               onTouchStart={handleMaskTouchStart}
               onMouseEnter={onMaskMouseEnter}
@@ -633,12 +631,7 @@ const MaskOverlay = memo(
     if (subMask.type === Mask.Brush || subMask.type === Mask.Flow) {
       const { lines = [] } = p;
       return (
-        <Group
-          onClick={handleSelect}
-          onTap={handleSelect}
-          onTouchEnd={handleMaskTouchEnd}
-          onTouchStart={handleMaskTouchStart}
-        >
+        <Group {...selectHandlers} onTouchEnd={handleMaskTouchEnd} onTouchStart={handleMaskTouchStart}>
           {lines.map((line: DrawnLine, i: number) => (
             <OptimizedBrushLine key={i} line={line} scale={scale} cropX={cropX} cropY={cropY} />
           ))}
@@ -807,8 +800,7 @@ const MaskOverlay = memo(
             onDragStart={handleLinearGroupDragStart}
             onDragMove={handleLinearGroupDragMove}
             onDragEnd={handleLinearGroupDragEnd}
-            onClick={handleSelect}
-            onTap={handleSelect}
+            {...selectHandlers}
             onTouchEnd={handleMaskTouchEnd}
             onTouchStart={handleMaskTouchStart}
             onMouseEnter={(e: any) => {
@@ -925,8 +917,6 @@ const MaskOverlay = memo(
                 opacity={0.7}
                 stroke="white"
                 listening={true}
-                onClick={handleSelect}
-                onTap={handleSelect}
                 onTouchEnd={handleMaskTouchEnd}
                 onTouchStart={handleMaskTouchStart}
                 onMouseEnter={(e: any) => {
@@ -944,8 +934,6 @@ const MaskOverlay = memo(
                 opacity={0.7}
                 stroke="white"
                 listening={true}
-                onClick={handleSelect}
-                onTap={handleSelect}
                 onTouchEnd={handleMaskTouchEnd}
                 onTouchStart={handleMaskTouchStart}
                 onMouseEnter={(e: any) => {
@@ -2556,7 +2544,7 @@ const ImageCanvas = memo(
 
               {isStraightenActive && (
                 <Stage
-                  height={uncroppedImageRenderSize.height}
+                  height={uncroppedImageRenderSize.height ?? 0}
                   onMouseDown={handleStraightenMouseDown}
                   onTouchStart={handleStraightenMouseDown}
                   onMouseLeave={handleStraightenMouseLeave}
@@ -2572,7 +2560,7 @@ const ImageCanvas = memo(
                     cursor: 'crosshair',
                     touchAction: 'none',
                   }}
-                  width={uncroppedImageRenderSize.width}
+                  width={uncroppedImageRenderSize.width ?? 0}
                 >
                   <Layer>
                     {straightenLine && (
