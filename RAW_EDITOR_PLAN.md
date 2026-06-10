@@ -1,124 +1,81 @@
 # RawEngine Product And Execution Plan
 
-Status: planning draft, consult incorporated, not yet committed  
+Status: implementation active, maintained plan artifact
 Base application: RapidRAW public fork  
 Primary platform: macOS first, with upstream cross-platform structure preserved where practical  
 Target: a high-polish RAW editor that can credibly compete with Capture One and Lightroom while remaining open, scriptable, and agent-controllable
 
 ## Active Codex Goal
 
-Current planning goal: create a complete, well-defined RawEngine product and execution plan. The plan must be detailed enough that future Codex sessions can work autonomously through the public RapidRAW-based fork, GitHub milestones/issues, strict shift-left validation gates, and small to medium PRs after the user explicitly moves from planning to implementation.
+Current implementation goal: continuously implement RawEngine in the public `cgasgarth/RapidRaw` fork until June 11, 2026 at 5:00 PM Central Time, using this plan as the source of truth for product scope, implementation order, validation requirements, and follow-up work.
 
-Success for the current goal is this markdown document only. It must include the product requirements, source verification plan, architecture decisions, governance rules, milestone plan, issue/PR sizing rules, GitHub Actions quality gates, local hook expectations, self-validation loops, tool usage policy, risk register, and implementation order. No fork, clone, branch protection, GitHub issues, GitHub Actions, code edits, package migration, or product implementation should happen during this planning goal.
+Success for the current goal is continuous shipped progress through small or medium pull requests. Each completed work item should have a linked GitHub issue, a focused branch, a merged PR, validation evidence, and follow-up issues for intentional gaps. If one area blocks, document the blocker with evidence and immediately continue on other unblocked work from the roadmap.
 
-The future implementation goal will begin only after the user explicitly approves moving beyond the planning document.
-
-If progress on the planning document becomes blocked, the blocker report must include evidence gathered, attempted paths, the exact blocker, and the next input or external-state change needed.
+The goal is not complete merely because the current backlog slice feels exhausted. If the next task is unclear, refine issues, create missing validation work, update this plan, or choose the next unblocked milestone item until the user stops the run or the time box is reached.
 
 ### Goal Operating Rules
 
-- Keep this goal active only while producing and refining this plan.
-- Use the plan as the source of truth for future ordering, constraints, and completion evidence.
-- During this planning goal, do not edit RapidRAW source, clone the fork, create GitHub issues, create branch protection, or implement CI.
-- Do not mark the planning goal complete until the document is internally consistent and includes enough detail to drive future autonomous implementation.
+- Work from the next ready unclosed GitHub issue in milestone order unless the user explicitly redirects.
+- Keep `main` protected: no direct commits or pushes to `main`; all substantive work goes through PRs.
+- Keep PRs small to medium and tied to one coherent validation story.
+- Use this plan as the source of truth for ordering, constraints, and completion evidence.
+- Update this plan in the same PR when product direction, architecture, validation policy, or execution order changes.
+- Record exact local commands, CI runs, screenshots, render artifacts, skipped checks, and residual risk in every PR.
+- Use the consult skill for major design decisions and high-risk color science, negative processing, panorama, HDR, focus stacking, super-resolution, agent, or UI architecture work.
+- Use Browser/Chrome and sample internet images only with source/license/provenance care. Use image generation when synthetic visual assets or controlled visual test material are appropriate.
 - Do not mark the goal blocked unless the same blocker has repeated across the required blocked audit and no meaningful progress is possible without user input or external-state change.
 - If the user changes direction, update the plan first, then continue from the revised source of truth.
 - If the work resumes after compaction or interruption, re-read this goal section, the current milestone, and the newest user request before acting.
 
-### Planning Goal Completion Checklist
+### Planning History
 
-The current planning goal is finished only when this document includes:
+The original planning goal produced this document, the milestone fleet, issue seed index, validation map, governance policy, and first documentation PR. That planning-only phase is complete. This section now records the active implementation operating model.
 
-- Current scope clearly limited to planning only.
-- RapidRaw public fork repository plus local `/Users/cgas/Documents/RawEngine` parent workspace topology.
-- Maintained PRD/technical plan artifact policy.
-- First future PR defined as documentation-only.
-- Product requirements covering RapidRAW, darktable, Ansel, RawTherapee, Capture One, and Lightroom inspirations.
-- Architecture direction for edit graph, color pipeline, layers/masks, GPU/CPU validation, sidecars/catalog, API, and app-server agent.
-- ADR fleet for future architecture decisions.
-- GitHub milestone fleet.
-- GitHub issue seed index.
-- Issue labels and dependency conventions.
-- Issue template with PR size budget, acceptance criteria, and validation requirements.
-- PR template with validation evidence ledger.
-- Branch protection and local main-guard hook requirements.
-- TypeScript, ESLint, Bun, Rust, Tauri, docs, license, and security gate targets.
-- Validation placement map showing shift-left layers.
-- RAW-editor-specific validation gates for color, layers, masks, HDR, panorama, focus stacking, super-resolution, and film simulation.
-- Agent/app-server validation gates.
-- Consult, Chrome, and image generation usage policy.
-- Risk register.
-- Open decisions.
-- Source verification log.
-- Consult output checked and either incorporated or explicitly recorded as outstanding with a reminder.
+### Implementation Execution Rule
 
-### Future Implementation Execution Rule
-
-After the user explicitly approves implementation work, future Codex sessions should work only the next unclosed GitHub issue in milestone order unless the user explicitly steers otherwise. Each autonomous implementation cycle should end after one merged PR, one blocked issue report, or one completed milestone summary. Before starting implementation work, identify the active issue, its milestone, dependencies, branch name, expected PR size, and validation commands.
+Before starting a work item, identify the active issue, milestone, dependencies, branch name, expected PR size, and validation commands. Each autonomous implementation cycle should end with one merged PR, one evidence-backed blocked report, or one completed milestone summary, then continue to the next unblocked issue while the active goal remains in force.
 
 ## Current Repo State
 
-- Path: `/Users/cgas/Documents/RawEngine`
-- Current state: empty Git repo with this planning artifact.
-- Immediate deliverable for this planning turn: this markdown document only.
-- Intended base: public fork of `CyberTimon/RapidRAW`.
-- Fork checkout plan: clone the user's public RapidRAW fork under `/Users/cgas/Documents/RawEngine/RapidRaw` as a subfolder. RawEngine remains the parent planning/orchestration workspace.
+- Parent workspace: `/Users/cgas/Documents/RawEngine`
+- Fork checkout: `/Users/cgas/Documents/RawEngine/RapidRaw`
+- Public fork: `cgasgarth/RapidRaw`
+- Upstream source: `CyberTimon/RapidRAW`
+- Current state: implementation active through protected-branch pull requests.
+- Current deliverables: issue-linked PRs, baseline evidence, validation hardening, and plan updates when scope changes.
+- Repository topology: RawEngine remains the parent planning/orchestration workspace; the fork checkout lives under `RapidRaw/`. Inside `RapidRaw/`, `origin` points at the user's public RapidRAW fork and `upstream` points at `CyberTimon/RapidRAW`.
 - Practical target: macOS first.
 - Long-range target: preserve cross-platform architecture where it does not slow the macOS-first path.
 
 ## Maintained Planning Artifact
 
-This document is not throwaway planning text. It should become a maintained repository artifact.
+This document is not throwaway planning text. It is a maintained repository artifact.
 
-Future repository rule:
+Current repository rule:
 
-- The first future pull request should add this mega PRD/technical plan markdown document to the public `RapidRaw` fork repository.
-- That first PR should not clone RapidRAW, migrate packages, change CI, create product code, or implement features.
-- The first PR should establish this document as the authoritative plan, plus any minimal repo metadata needed to maintain it.
-- Every later milestone or issue that changes product direction, architecture, validation policy, or execution order must update this document in the same PR or link a follow-up issue.
+- The first documentation PR added this mega PRD/technical plan markdown document to the public `RapidRaw` fork repository.
+- This document is the authoritative plan for RawEngine work unless superseded by a newer issue, PR, or user instruction that is then folded back into the plan.
+- Every milestone or issue that changes product direction, architecture, validation policy, or execution order must update this document in the same PR or link a follow-up issue.
 - The document should be reviewed like code: diffs should be intentional, scoped, and tied to an issue.
-- The document should have a changelog section once implementation begins, recording major planning decisions and dates.
+- The document should gain a changelog section as implementation proceeds, recording major planning decisions and dates.
 
-Future first PR scope:
+Completed bootstrap scope:
 
-- Add `RAW_EDITOR_PLAN.md`.
-- Add a short `README.md` pointing to the plan if the repo has no better README yet.
-- Add a `docs/adr/` placeholder only if the project chooses separate ADR files.
-- Add a PR template that requires validation evidence.
-- Add an issue template that mirrors the issue format in this plan.
-- Do not add implementation files unless the user explicitly expands the first PR.
+- `RAW_EDITOR_PLAN.md` exists in the public fork.
+- Repository templates, governance notes, security policy, AGPL compliance note, baseline docs, labels, milestones, and issues are being added through PRs.
+- Baseline and validation work is underway before major product feature work.
 
 Repository bootstrap note:
 
-- A GitHub repository needs an initial base branch before pull requests can target it.
-- If an initial commit is unavoidable during repo creation, it should be minimal:
-  - empty or near-empty README.
-  - license file if legally required at creation time.
-  - no implementation code.
-- Immediately after the base branch exists, protect `main`.
-- The first substantive PR should still be the documentation-only plan PR.
-- Do not use the bootstrap exception for convenience commits.
+- The public fork has an active protected `main` branch.
+- Direct commits to `main` are disallowed by process and local hooks should reinforce that.
+- Bootstrap exceptions should not be used for convenience commits.
 
-Future first PR acceptance criteria:
+Plan maintenance validation:
 
-- The plan exists in the public repo.
-- The plan states that RawEngine is the parent project and `RapidRaw/` is the future nested fork checkout.
-- The plan states that implementation is deferred until the user approves it.
-- The plan includes milestones, issue templates, validation gates, branch protection requirements, hook requirements, and self-validation loops.
-- The PR is small, reviewable, and documentation-only.
-
-Current local source-control note:
-
-- As of this planning pass, `RAW_EDITOR_PLAN.md` is local and untracked.
-- Do not commit it directly to `main` in the current local repo.
-- When the user approves implementation/repo setup, add it through the first future documentation-only PR.
-
-Plan validation before the first future PR:
-
-- Confirm the goal says planning-only.
-- Confirm `RawEngine` parent workspace and `RapidRaw/` nested fork topology.
-- Confirm first future PR is documentation-only.
-- Confirm implementation sequence puts plan PR before RapidRAW clone.
+- Confirm the active goal section matches the current operating model.
+- Confirm `RawEngine` parent workspace and `RapidRaw/` nested fork topology remain explicit.
+- Confirm implementation sequencing still protects validation and baseline work before large product feature work.
 - Confirm all consult outputs are incorporated or intentionally rejected.
 - Confirm no stale "running consult" markers remain.
 - Confirm headings are internally consistent.
@@ -169,11 +126,10 @@ RawEngine should be public from the start. The process should be designed so fut
 
 These are not product non-goals forever. They are constraints to keep early execution disciplined.
 
-- No implementation during the current planning goal.
-- No RapidRAW clone until the user approves implementation/repo setup.
-- No product feature work before the maintained plan artifact exists in the repo.
-- No product feature work before the no-change RapidRAW baseline snapshot.
-- No product feature work before strict local/CI gates exist.
+- No large product feature work before the maintained plan, baseline snapshot, and shift-left validation foundation are in place.
+- No product feature work that bypasses issue tracking, pull requests, or validation evidence.
+- No direct `main` commits for convenience work.
+- No broad feature implementation while known baseline failures are undocumented or untracked.
 - No Capture One or Adobe clone claims.
 - No proprietary color-profile reverse engineering.
 - No copied UI, icons, LUTs, ICCs, film looks, or assets from competitors.
@@ -185,8 +141,8 @@ These are not product non-goals forever. They are constraints to keep early exec
 
 ### 2.1 Repository And Governance
 
-- Create a public GitHub repository for RawEngine.
-- Fork RapidRAW publicly and clone the fork under `/Users/cgas/Documents/RawEngine/RapidRaw` as a subfolder when implementation begins.
+- Use the public `cgasgarth/RapidRaw` fork as the RawEngine implementation repository.
+- Keep the RapidRAW fork cloned under `/Users/cgas/Documents/RawEngine/RapidRaw` as the implementation checkout.
 - Repository topology: the public GitHub repository is the user's `RapidRaw` fork of `CyberTimon/RapidRAW`. The local parent workspace is `/Users/cgas/Documents/RawEngine`, and the fork checkout lives under `/Users/cgas/Documents/RawEngine/RapidRaw`. Inside `RapidRaw/`, keep `origin` pointed at the user's RapidRAW fork and `upstream` pointed at `CyberTimon/RapidRAW`. Record the upstream RapidRAW commit SHA used for each baseline audit. Sync upstream only through pull requests, never by direct pushes to `main`.
 - Treat RapidRAW's AGPL-3.0 license as a hard project constraint:
   - Keep RawEngine open source.
@@ -354,9 +310,9 @@ An issue is done when:
 
 ### 2.2 Engineering Standards
 
-- No implementation occurs during the current planning goal.
-- When implementation begins, the first step is a no-change RapidRAW baseline snapshot.
-- The first code-changing implementation step after the baseline snapshot is linting, type strictness, local hooks, and CI hardening.
+- Implementation is active and should continue through issue-linked pull requests.
+- The no-change RapidRAW baseline snapshot is the first comparison point for implementation work.
+- The first code-changing implementation steps after baseline documentation are linting, type strictness, local hooks, and CI hardening.
 - TypeScript should use the strictest practical compiler settings.
 - ESLint should use strict type-aware rules, React rules, hooks rules, import rules, accessibility rules, and zero-warning CI.
 - Bun should be used for TypeScript/React package management, scripts, test execution, and CI where compatible.
@@ -1409,7 +1365,7 @@ Target architecture:
 
 ### 8.1.1 Architecture Decision Records To Create
 
-The plan should be converted into explicit ADRs as implementation begins. ADRs may live inside this document at first, then move to `docs/adr/` when that becomes easier to maintain.
+The plan should be converted into explicit ADRs as implementation proceeds. ADRs may live inside this document at first, then move to `docs/adr/` when that becomes easier to maintain.
 
 Required ADR fleet:
 
@@ -3309,7 +3265,7 @@ Issues:
   - Scope: add `RAW_EDITOR_PLAN.md` to the public `RapidRaw` fork repo.
   - Out of scope: clone RapidRAW, implement tooling, create CI, create product code.
   - PR budget: documentation-only, ideally under 500 changed non-generated lines if the plan is split later; the initial mega doc can exceed this only because it is the founding artifact.
-  - Acceptance criteria: plan includes product scope, architecture, milestones, issue rules, validation gates, source references, and current planning goal.
+  - Acceptance criteria: plan includes product scope, architecture, milestones, issue rules, validation gates, source references, and the active Codex goal.
   - Validation evidence: markdown renders, links reviewed, git diff only contains intended docs.
 - `docs(readme): point contributors to the RawEngine plan`
   - Labels: `area:docs`, `type:docs`, `priority:p1`, `pr:size-small`, `validation:docs`.
@@ -4036,7 +3992,7 @@ Describe risky areas and rollback path.
 
 ## 15. Autonomous Work Protocol
 
-For future implementation work, the agent should follow this protocol:
+For implementation work, the agent should follow this protocol:
 
 1. Confirm the active milestone and issue.
 2. Read relevant code before proposing changes.
@@ -4164,13 +4120,13 @@ Mitigation:
 - Use Git LFS or download scripts.
 - Prefer open and vendor-provided samples.
 
-## 17. First Implementation Sequence
+## 17. Implementation Sequence
 
-When implementation begins, do this in order:
+Implementation is active. Historical bootstrap items are retained for context, and uncompleted items remain the early roadmap order:
 
 1. Use the public `RapidRaw` fork as the project repository.
 2. Create a feature branch with `codex/` prefix.
-3. Open the first future PR: add and establish this maintained PRD/technical plan as a documentation-only artifact.
+3. Open the first PR: add and establish this maintained PRD/technical plan as a documentation-only artifact.
 4. Add minimal README, issue template, and PR template only if included in the approved first PR scope.
 5. Merge the plan PR through review.
 6. Add branch protection to `main`.
