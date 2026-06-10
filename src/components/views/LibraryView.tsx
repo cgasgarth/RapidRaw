@@ -13,29 +13,29 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { ImageFile, LibraryViewMode, ThumbnailAspectRatio, ThumbnailSize } from '../ui/AppProperties';
 
 interface LibraryViewProps {
-  sortedImageList: ImageFile[];
-  thumbnailSize: ThumbnailSize;
-  thumbnailAspectRatio: ThumbnailAspectRatio;
-  libraryViewMode: LibraryViewMode;
-  isAndroid: boolean;
-  setThumbnailSize: (size: ThumbnailSize) => void;
-  setThumbnailAspectRatio: (ratio: ThumbnailAspectRatio) => void;
-  setLibraryViewMode: (mode: LibraryViewMode) => void;
   handleClearSelection: () => void;
-  handleLibraryImageSingleClick: (...args: any) => void;
-  handleImageSelect: (...args: any) => void;
-  handleRate: (...args: any) => void;
-  handleThumbnailContextMenu: (...args: any) => void;
-  handleMainLibraryContextMenu: (...args: any) => void;
-  handleContinueSession: (...args: any) => void;
-  handleGoHome: (...args: any) => void;
-  handleOpenFolder: (...args: any) => void;
-  handleImportClick: (path: string) => void;
-  handleLibraryRefresh: () => Promise<void>;
+  handleContinueSession: () => void;
   handleCopyAdjustments: () => void;
+  handleGoHome: () => void;
+  handleImageSelect: (path: string) => void;
+  handleImportClick: (path: string) => void;
+  handleLibraryImageSingleClick: (path: string, event: unknown) => void;
+  handleLibraryRefresh: () => Promise<void>;
+  handleMainLibraryContextMenu: (event: unknown) => void;
+  handleOpenFolder: () => Promise<void> | void;
   handlePasteAdjustments: () => void;
+  handleRate: (rate: number, paths?: string[]) => void;
   handleResetAdjustments: () => void;
-  requestThumbnails: any;
+  handleThumbnailContextMenu: (event: unknown, path: string) => void;
+  isAndroid: boolean;
+  libraryViewMode: LibraryViewMode;
+  requestThumbnails: (paths: string[]) => void;
+  setLibraryViewMode: (mode: LibraryViewMode) => void;
+  setThumbnailAspectRatio: (ratio: ThumbnailAspectRatio) => void;
+  setThumbnailSize: (size: ThumbnailSize) => void;
+  sortedImageList: ImageFile[];
+  thumbnailAspectRatio: ThumbnailAspectRatio;
+  thumbnailSize: ThumbnailSize;
 }
 
 export default function LibraryView({
