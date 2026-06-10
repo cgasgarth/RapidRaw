@@ -3408,8 +3408,8 @@ Issues:
 - `baseline(render): capture representative baseline screenshots and render outputs`
   - Labels: `area:render`, `type:test`, `priority:p1`, `pr:size-medium`, `validation:render`.
   - Blocked by: build baseline.
-  - Scope: use legally safe sample files to capture initial outputs.
-  - Acceptance criteria: artifacts recorded with source/license metadata.
+  - Scope: capture the current render-testability state before UI/runtime changes. If the Vite browser surface cannot render because of Tauri coupling, document the blocker with console evidence and a screenshot artifact instead of faking a successful render baseline.
+  - Acceptance criteria: artifacts recorded with source/license metadata where images are used; browser/Tauri render blocker documented if present; follow-up issue created for a real macOS screenshot or Tauri-aware visual harness (#292).
 
 Definition of done:
 
