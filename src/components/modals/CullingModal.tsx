@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle, XCircle, Loader2, Users, Trash2, Star, Tag } from 'lucide-react';
@@ -25,7 +25,15 @@ interface CullingModalProps {
 
 type CullAction = 'reject' | 'rate_zero' | 'delete';
 
-function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: any) {
+interface ImageThumbnailProps {
+  children?: ReactNode;
+  isSelected: boolean;
+  onToggle(): void;
+  path: string;
+  thumbnails: Record<string, string>;
+}
+
+function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: ImageThumbnailProps) {
   const thumbnailUrl = thumbnails[path];
   return (
     <div
