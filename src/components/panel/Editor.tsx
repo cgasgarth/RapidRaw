@@ -451,7 +451,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         const dt = Math.min(time - lastTime, 32);
         lastTime = time;
 
-        let { positionX: x, positionY: y, scale } = transformStateRef.current;
+        const { scale } = transformStateRef.current;
+        let { positionX: x, positionY: y } = transformStateRef.current;
         const bounds = getTransformBounds(scale);
 
         x += vx * dt;
@@ -773,8 +774,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         lastPanPos.current = { x: e.clientX, y: e.clientY };
 
         const bounds = getTransformBounds(transformStateRef.current.scale);
-        let curX = transformStateRef.current.positionX;
-        let curY = transformStateRef.current.positionY;
+        const curX = transformStateRef.current.positionX;
+        const curY = transformStateRef.current.positionY;
 
         if (curX < bounds.minX && dx < 0) dx *= 0.35;
         if (curX > bounds.maxX && dx > 0) dx *= 0.35;
@@ -803,8 +804,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           const panX = midX - lastPinch.current.midX;
           const panY = midY - lastPinch.current.midY;
 
-          let newX = mouseX - (mouseX - transformStateRef.current.positionX) * ratio + panX;
-          let newY = mouseY - (mouseY - transformStateRef.current.positionY) * ratio + panY;
+          const newX = mouseX - (mouseX - transformStateRef.current.positionX) * ratio + panX;
+          const newY = mouseY - (mouseY - transformStateRef.current.positionY) * ratio + panY;
 
           const bounded = clampToBounds(newX, newY, newScale);
           applyTransform(bounded.x, bounded.y, bounded.scale);
@@ -902,7 +903,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        let zoomTarget = savedZoomState.current
+        const zoomTarget = savedZoomState.current
           ? savedZoomState.current.scale
           : Math.min(currentScale * 2, maxScaleRef.current);
         const ratio = zoomTarget / currentScale;
@@ -1501,12 +1502,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           let bestCrop = currentAdjCrop;
 
           for (let i = 0; i < 10; i++) {
-            let mid = (low + high) / 2;
-            let cx = currentAdjCrop.x + currentAdjCrop.width / 2;
-            let cy = currentAdjCrop.y + currentAdjCrop.height / 2;
-            let nw = currentAdjCrop.width * mid;
-            let nh = currentAdjCrop.height * mid;
-            let testCrop = {
+            const mid = (low + high) / 2;
+            const cx = currentAdjCrop.x + currentAdjCrop.width / 2;
+            const cy = currentAdjCrop.y + currentAdjCrop.height / 2;
+            const nw = currentAdjCrop.width * mid;
+            const nh = currentAdjCrop.height * mid;
+            const testCrop = {
               unit: 'px' as const,
               x: cx - nw / 2,
               y: cy - nh / 2,
@@ -1823,14 +1824,14 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         const expandEdge = (edge: 'L' | 'T' | 'R' | 'B', target: number) => {
           let low = 0,
             high = 1;
-          let startVal = edge === 'L' ? currL : edge === 'T' ? currT : edge === 'R' ? currR : currB;
+          const startVal = edge === 'L' ? currL : edge === 'T' ? currT : edge === 'R' ? currR : currB;
           let bestVal = startVal;
 
           for (let i = 0; i < 15; i++) {
-            let mid = (low + high) / 2;
-            let testVal = startVal + (target - startVal) * mid;
+            const mid = (low + high) / 2;
+            const testVal = startVal + (target - startVal) * mid;
 
-            let testCrop: PercentCrop = {
+            const testCrop: PercentCrop = {
               unit: '%',
               x: edge === 'L' ? testVal : currL,
               y: edge === 'T' ? testVal : currT,

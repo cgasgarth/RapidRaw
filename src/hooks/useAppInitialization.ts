@@ -343,7 +343,7 @@ export const useAppInitialization = ({
       THEMES.find((t: ThemeProps) => t.id === DEFAULT_THEME_ID);
     if (!baseTheme) return;
 
-    let finalCssVariables: any = { ...baseTheme.cssVariables };
+    const finalCssVariables: any = { ...baseTheme.cssVariables };
 
     Object.entries(finalCssVariables).forEach(([key, value]) => {
       root.style.setProperty(key, value as string);
