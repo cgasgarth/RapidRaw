@@ -9,6 +9,12 @@ import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { listen } from '@tauri-apps/api/event';
 
+interface DenoiseBatchProgress {
+  current: number;
+  total: number;
+  path: string;
+}
+
 interface DenoiseModalProps {
   isOpen: boolean;
   onClose(): void;
@@ -244,8 +250,8 @@ export default function DenoiseModal({
   );
 
   useEffect(() => {
-    const unlisten = listen('denoise-batch-progress', (e: any) => {
-      setBatchProgress(e.payload);
+    const unlisten = listen<DenoiseBatchProgress>('denoise-batch-progress', (event) => {
+      setBatchProgress(event.payload);
     });
     return () => {
       unlisten.then((f) => f());
