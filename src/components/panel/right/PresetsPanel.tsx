@@ -45,6 +45,7 @@ import { Invokes, OPTION_SEPARATOR, Panel, Preset, SelectedImage } from '../../u
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
+import { createBlobFromUint8Array } from '../../../utils/blobUtils';
 
 interface DroppableFolderItemProps {
   children: any;
@@ -487,7 +488,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           break;
         }
 
-        const blob = new Blob([imageData], { type: 'image/jpeg' });
+        const blob = createBlobFromUint8Array(imageData, 'image/jpeg');
         const url = URL.createObjectURL(blob);
         setPreviews((prev: Record<string, string | null>) => {
           const oldUrl = prev[preset.id];
@@ -553,7 +554,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
         if (pathAtStart !== currentImagePathRef.current) return;
 
-        const blob = new Blob([imageData], { type: 'image/jpeg' });
+        const blob = createBlobFromUint8Array(imageData, 'image/jpeg');
         const url = URL.createObjectURL(blob);
 
         setPreviews((prev: Record<string, string | null>) => {

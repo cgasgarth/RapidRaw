@@ -21,6 +21,7 @@ import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
 import clsx from 'clsx';
 import { LAYOUTS, type Layout, type LayoutDefinition } from '../../utils/CollageVariants';
+import { createBlobFromUint8Array } from '../../utils/blobUtils';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 
@@ -152,7 +153,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
             path: imageFile.path,
             jsAdjustments: adjustments,
           });
-          const blob = new Blob([imageData], { type: 'image/jpeg' });
+          const blob = createBlobFromUint8Array(imageData, 'image/jpeg');
           const url = URL.createObjectURL(blob);
 
           return new Promise<LoadedImage>((resolve, reject) => {
