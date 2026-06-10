@@ -74,6 +74,13 @@ body:
       description: Any other details that might help us understand the problem?
       placeholder: Any other context, workarounds you've tried, GPU driver version, etc...
 
+  - type: textarea
+    id: validation-evidence
+    attributes:
+      label: Validation evidence
+      description: If you can, include logs, screenshots, sample file details, render artifacts, or exact steps that demonstrate the issue.
+      placeholder: Attach or describe evidence here...
+
   - type: markdown
     attributes:
       value: |
@@ -94,4 +101,6 @@ body:
         - label: I have verified that my camera and lenses are supported by the external libraries listed above, or my issue is unrelated to camera/lens support.
           required: true
         - label: I have searched all existing issues, both open and closed, and did not find a duplicate.
+          required: true
+        - label: I understand that work in this fork is tracked against RAW_EDITOR_PLAN.md where applicable.
           required: true
