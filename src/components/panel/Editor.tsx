@@ -1426,6 +1426,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         );
 
         if (
+          maxCropForReference &&
           Math.abs(currentAdjCrop.x - maxCropForReference.x) <= 2 &&
           Math.abs(currentAdjCrop.y - maxCropForReference.y) <= 2 &&
           Math.abs(currentAdjCrop.width - maxCropForReference.width) <= 2 &&
