@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
+import type { i18n as I18n } from 'i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -6,9 +7,11 @@ import { useUIStore } from '../store/useUIStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from '../utils/themes';
-import { COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
+import { COPYABLE_ADJUSTMENT_KEYS, PasteMode } from '../utils/adjustments';
 import {
+  type AppSettings,
   FilterCriteria,
+  type ImageFile,
   Invokes,
   LibraryViewMode,
   RawStatus,
@@ -16,11 +19,41 @@ import {
   Theme,
   ThumbnailSize,
   ThumbnailAspectRatio,
+  type SupportedTypes,
 } from '../components/ui/AppProperties';
 import { useTranslation } from 'react-i18next';
 
+interface FolderTreeNode {
+  children?: FolderTreeNode[];
+  path?: string;
+  [key: string]: unknown;
+}
+
+interface PreloadedInitializationData {
+  currentPath?: string;
+  images?: Promise<ImageFile[]> | undefined;
+  rootPaths?: string[];
+  trees?: Promise<FolderTreeNode[]> | undefined;
+}
+
+interface PersistedFolderState {
+  activeAlbumId?: string | null;
+  currentFolderPath?: string | null;
+  expandedAlbumGroups?: string[];
+  expandedFolders?: string[];
+}
+
+interface InitializationSettings extends AppSettings {
+  lastFolderState?: PersistedFolderState | null;
+  pinnedFolders?: string[];
+}
+
+interface NavigatorWithUserLanguage extends Navigator {
+  userLanguage?: string;
+}
+
 interface UseAppInitializationProps {
-  preloadedDataRef: React.RefObject<any>;
+  preloadedDataRef: RefObject<PreloadedInitializationData>;
   thumbnailSize: ThumbnailSize;
   setThumbnailSize: (size: ThumbnailSize) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
@@ -29,14 +62,17 @@ interface UseAppInitializationProps {
   setLibraryViewMode: (mode: LibraryViewMode) => void;
 }
 
-const getDefaultLanguage = (i18nInstance: any): string => {
-  const browserLang = navigator.language || (navigator as any).userLanguage || 'en';
-  const shortLang = browserLang.split('-')[0].toLowerCase();
+const getDefaultLanguage = (i18nInstance: I18n): string => {
+  const browserLang = navigator.language || (navigator as NavigatorWithUserLanguage).userLanguage || 'en';
+  const shortLang = (browserLang.split('-')[0] ?? browserLang).toLowerCase();
   const supportedLanguages = Object.keys(i18nInstance.options.resources || {});
+  const fallbackLng = i18nInstance.options.fallbackLng;
   const fallbackLang =
-    typeof i18nInstance.options.fallbackLng === 'string'
-      ? i18nInstance.options.fallbackLng
-      : i18nInstance.options.fallbackLng?.[0] || 'en';
+    typeof fallbackLng === 'string'
+      ? fallbackLng
+      : Array.isArray(fallbackLng) && typeof fallbackLng[0] === 'string'
+        ? fallbackLng[0]
+        : 'en';
 
   // Check full locale first (e.g., 'zh-CN'), then short code (e.g., 'zh')
   return supportedLanguages.includes(browserLang)
@@ -126,20 +162,24 @@ export const useAppInitialization = ({
   }, [initPlatform]);
 
   useEffect(() => {
-    invoke(Invokes.GetSupportedFileTypes)
-      .then((types: any) => setSupportedTypes(types))
+    invoke<SupportedTypes>(Invokes.GetSupportedFileTypes)
+      .then((types) => setSupportedTypes(types))
       .catch((err) => console.error('Failed to load supported file types:', err));
   }, [setSupportedTypes]);
 
   useEffect(() => {
-    invoke(Invokes.LoadSettings)
-      .then(async (settings: any) => {
+    invoke<InitializationSettings>(Invokes.LoadSettings)
+      .then(async (settings) => {
         if (
           !settings.copyPasteSettings ||
           !settings.copyPasteSettings.includedAdjustments ||
           settings.copyPasteSettings.includedAdjustments.length === 0
         ) {
-          settings.copyPasteSettings = { mode: 'merge', includedAdjustments: COPYABLE_ADJUSTMENT_KEYS };
+          settings.copyPasteSettings = {
+            mode: PasteMode.Merge,
+            includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
+            knownAdjustments: COPYABLE_ADJUSTMENT_KEYS,
+          };
         }
 
         if (!settings.language) {
@@ -152,13 +192,14 @@ export const useAppInitialization = ({
 
         if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);
 
-        if (settings?.filterCriteria) {
+        const savedFilterCriteria = settings.filterCriteria;
+        if (savedFilterCriteria) {
           setFilterCriteria((prev: FilterCriteria) => ({
             ...prev,
-            ...settings.filterCriteria,
-            rawStatus: settings.filterCriteria.rawStatus || RawStatus.All,
-            editedStatus: settings.filterCriteria.editedStatus || EditedStatus.All,
-            colors: settings.filterCriteria.colors || [],
+            ...savedFilterCriteria,
+            rawStatus: savedFilterCriteria.rawStatus || RawStatus.All,
+            editedStatus: savedFilterCriteria.editedStatus || EditedStatus.All,
+            colors: savedFilterCriteria.colors || [],
           }));
         }
 
@@ -177,7 +218,7 @@ export const useAppInitialization = ({
 
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
           try {
-            const trees = await invoke<any[]>(Invokes.GetPinnedFolderTrees, {
+            const trees = await invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
               paths: settings.pinnedFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders || [],
               showImageCounts: settings.enableFolderImageCounts ?? false,
@@ -195,7 +236,8 @@ export const useAppInitialization = ({
             : [];
 
         if (!isAndroid && rootFolders.length > 0) {
-          const currentPath = settings.lastFolderState?.currentFolderPath || rootFolders[0];
+          const currentPath = settings.lastFolderState?.currentFolderPath ?? rootFolders[0];
+          if (!currentPath) return;
           const isAlbum = currentPath.startsWith('Album: ');
           const command =
             settings.libraryViewMode === LibraryViewMode.Recursive
@@ -205,12 +247,12 @@ export const useAppInitialization = ({
           preloadedDataRef.current = {
             rootPaths: rootFolders,
             currentPath: currentPath,
-            trees: invoke(Invokes.GetPinnedFolderTrees, {
+            trees: invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
               paths: rootFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders ?? rootFolders,
               showImageCounts: settings.enableFolderImageCounts ?? false,
             }),
-            images: isAlbum ? undefined : invoke(command, { path: currentPath }),
+            images: isAlbum ? undefined : invoke<ImageFile[]>(command, { path: currentPath }),
           };
         }
 
@@ -343,10 +385,10 @@ export const useAppInitialization = ({
       THEMES.find((t: ThemeProps) => t.id === DEFAULT_THEME_ID);
     if (!baseTheme) return;
 
-    const finalCssVariables: any = { ...baseTheme.cssVariables };
+    const finalCssVariables = { ...baseTheme.cssVariables };
 
     Object.entries(finalCssVariables).forEach(([key, value]) => {
-      root.style.setProperty(key, value as string);
+      root.style.setProperty(key, value);
     });
 
     const fontFamily = appSettings?.fontFamily || 'poppins';
