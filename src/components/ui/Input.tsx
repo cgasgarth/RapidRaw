@@ -1,18 +1,9 @@
-import React from 'react';
+import React, { type InputHTMLAttributes } from 'react';
 import clsx from 'clsx';
 
-interface InputProps {
-  autoFocus?: boolean;
-  className?: string;
-  disabled?: boolean;
-  id?: string;
-  onBlur?(e: any): void;
-  onChange(e: any): void;
-  onKeyDown?(e: any): void;
-  placeholder?: string;
-  type?: string;
-  value?: string;
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   bgClassName?: string;
+  className?: string;
 }
 
 /**
@@ -23,24 +14,26 @@ interface InputProps {
  * @param {string} type - The type of the input (e.g., 'text', 'password', 'email').
  * @param {object} props - Other standard input props (value, onChange, placeholder, etc.).
  */
-const Input = React.forwardRef(({ className, type = 'text', bgClassName, ...props }: InputProps, ref: any) => {
-  return (
-    <input
-      className={clsx(
-        'flex h-10 w-full rounded-md border px-3 py-2 text-sm',
-        'border-border-color text-text-primary placeholder:text-text-secondary',
-        'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        'file:border-0 file:bg-transparent file:text-sm file:font-medium',
-        bgClassName || 'bg-surface',
-        className,
-      )}
-      ref={ref}
-      type={type}
-      {...props}
-    />
-  );
-});
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type = 'text', bgClassName, ...props }, ref) => {
+    return (
+      <input
+        className={clsx(
+          'flex h-10 w-full rounded-md border px-3 py-2 text-sm',
+          'border-border-color text-text-primary placeholder:text-text-secondary',
+          'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          'file:border-0 file:bg-transparent file:text-sm file:font-medium',
+          bgClassName || 'bg-surface',
+          className,
+        )}
+        ref={ref}
+        type={type}
+        {...props}
+      />
+    );
+  },
+);
 
 Input.displayName = 'Input';
 

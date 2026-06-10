@@ -1,4 +1,4 @@
-import React from 'react';
+import type { ChangeEvent } from 'react';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
 import Text from './Text';
@@ -10,7 +10,7 @@ interface SwitchProps {
   disabled?: boolean;
   id?: string;
   label: string;
-  onChange(val: boolean): any;
+  onChange(val: boolean): void;
   tooltip?: string;
   trackClassName?: string;
 }
@@ -61,7 +61,7 @@ const Switch = ({
           className="sr-only"
           disabled={disabled}
           id={uniqueId}
-          onChange={(e: any) => !disabled && onChange(e.target.checked)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => !disabled && onChange(e.target.checked)}
           type="checkbox"
         />
         <div className={clsx('w-full h-full bg-card-active/50 rounded-full shadow-inner', trackClassName)}></div>

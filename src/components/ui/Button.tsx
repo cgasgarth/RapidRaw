@@ -1,14 +1,10 @@
+import type { ButtonHTMLAttributes, MouseEventHandler, ReactNode } from 'react';
 import clsx from 'clsx';
 
-interface ButtonProps {
-  autoFocus?: boolean;
-  children: any;
-  className?: string;
-  disabled?: boolean;
-  onClick: any;
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  children: ReactNode;
+  onClick: MouseEventHandler<HTMLButtonElement>;
   size?: string;
-  tabIndex?: number;
-  title?: string;
   variant?: string;
 }
 
