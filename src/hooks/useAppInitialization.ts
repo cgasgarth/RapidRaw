@@ -42,8 +42,8 @@ const getDefaultLanguage = (i18nInstance: any): string => {
   return supportedLanguages.includes(browserLang)
     ? browserLang
     : supportedLanguages.includes(shortLang)
-    ? shortLang
-    : fallbackLang;
+      ? shortLang
+      : fallbackLang;
 };
 
 export const useAppInitialization = ({
@@ -177,7 +177,7 @@ export const useAppInitialization = ({
 
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
           try {
-            const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+            const trees = await invoke<any[]>(Invokes.GetPinnedFolderTrees, {
               paths: settings.pinnedFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders || [],
               showImageCounts: settings.enableFolderImageCounts ?? false,
