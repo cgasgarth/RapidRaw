@@ -1113,7 +1113,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       };
 
       const buildMoveSubmenu = (nodes: AlbumItem[]): Option[] => {
-        let opts: Option[] = [];
+        const opts: Option[] = [];
         nodes.forEach((n) => {
           if (n.type === 'group' && n.id !== item?.id) {
             const isCurrentParent = n.id === currentParentId;

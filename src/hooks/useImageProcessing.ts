@@ -97,10 +97,10 @@ export function useImageProcessing(
       return null;
     }
 
-    let roiX = (intersectLeft - imgLeft) / baseW;
-    let roiY = (intersectTop - imgTop) / baseH;
-    let roiW = (intersectRight - intersectLeft) / baseW;
-    let roiH = (intersectBottom - intersectTop) / baseH;
+    const roiX = (intersectLeft - imgLeft) / baseW;
+    const roiY = (intersectTop - imgTop) / baseH;
+    const roiW = (intersectRight - intersectLeft) / baseW;
+    const roiH = (intersectBottom - intersectTop) / baseH;
 
     const newRoiX = roiX - paddingX;
     const newRoiY = roiY - paddingY;
@@ -477,7 +477,7 @@ export function useImageProcessing(
 
   useEffect(() => {
     if (showOriginal && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
-      let targetRes = calculateTargetRes();
+      const targetRes = calculateTargetRes();
       if (targetRes > currentOriginalResRef.current) {
         requestHiFiOriginalZoom(adjustments, targetRes);
       }

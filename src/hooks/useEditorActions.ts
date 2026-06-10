@@ -87,7 +87,7 @@ export function useEditorActions() {
       const isAndroid = useSettingsStore.getState().osPlatform === 'android';
       try {
         const result: { size: number } = await invoke('load_and_parse_lut', { path });
-        let name = isAndroid
+        const name = isAndroid
           ? await invoke<string>('resolve_android_content_uri_name', { uriStr: path })
           : path.split(/[\\/]/).pop() || 'LUT';
         setAdjustments((prev: Adjustments) => ({

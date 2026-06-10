@@ -113,7 +113,7 @@ function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> 
 
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
 
-  let points = xs.map((x, i) => ({
+  const points = xs.map((x, i) => ({
     x: x * 255,
     y: clamp(ys[i] ?? x) * 255,
   }));
