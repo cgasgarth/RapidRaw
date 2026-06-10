@@ -141,6 +141,9 @@ const SUB_MASK_CONFIG: Record<Mask, any> = {
   [Mask.QuickEraser]: { parameters: [] },
 };
 
+const parameterLabelFallback = (key: string) =>
+  key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
+
 const BrushTools = ({
   settings,
   onSettingsChange,
@@ -1953,7 +1956,8 @@ function SubMaskRow({
     setNodeRef(node);
     setDroppableRef(node);
   };
-  const MaskIcon = MASK_ICON_MAP[subMask.type] || Circle;
+  const maskType = subMask.type as Mask;
+  const MaskIcon = MASK_ICON_MAP[maskType] || Circle;
   const { showContextMenu } = useContextMenu();
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2268,7 +2272,8 @@ function SettingsPanel({
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
-  const subMaskConfig = activeSubMask ? SUB_MASK_CONFIG[activeSubMask.type] || {} : {};
+  const activeSubMaskType = activeSubMask?.type as Mask | undefined;
+  const subMaskConfig = activeSubMaskType ? SUB_MASK_CONFIG[activeSubMaskType] || {} : {};
   const isAiMask = activeSubMask && ['ai-subject', 'ai-foreground', 'ai-sky', 'ai-depth'].includes(activeSubMask.type);
   const isComponentMode = !!activeSubMask;
 
@@ -2482,7 +2487,7 @@ function SettingsPanel({
                   label={
                     param.key === 'feather' && activeSubMask.type === Mask.AiDepth
                       ? t('editor.masks.params.globalFeather')
-                      : t('editor.masks.params.' + param.key)
+                      : t('editor.masks.params.' + param.key, { defaultValue: parameterLabelFallback(param.key) })
                   }
                   min={param.min}
                   max={param.max}
