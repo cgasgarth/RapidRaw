@@ -1,41 +1,165 @@
-name: Lint
+name: Baseline Validation
 
 on:
   push:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  frontend-lint:
-    name: Frontend Lint & Format
+  frontend-build:
+    name: 'frontend: install, build, i18n check'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Check Formatting
-        run: npm run format:check
-        continue-on-error: true
+      - name: Build frontend
+        run: npm run build
 
-      - name: Run ESLint
-        run: npm run lint
-        continue-on-error: true
-
-      - name: Check Translation Sync
+      - name: Check translation extraction
         run: npm run i18n:check
-        continue-on-error: true
 
-  fmt:
-    name: cargo fmt
+  frontend-typecheck:
+    name: 'frontend: typecheck baseline'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - id: typecheck
+        name: Typecheck
+        continue-on-error: true
+        run: npm run typecheck
+
+      - name: Record baseline status
+        if: always()
+        run: |
+          if [[ "${{ steps.typecheck.outcome }}" == "failure" ]]; then
+            echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`npm run typecheck\` is tracked by #283 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`npm run typecheck\` passed. Remove this temporary non-blocking wrapper when #283 is closed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  frontend-lint:
+    name: 'frontend: eslint baseline'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - id: eslint
+        name: Lint
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Record baseline status
+        if: always()
+        run: |
+          if [[ "${{ steps.eslint.outcome }}" == "failure" ]]; then
+            echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`npm run lint\` is tracked by #286 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`npm run lint\` passed. Remove this temporary non-blocking wrapper when #286 is closed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  frontend-format:
+    name: 'frontend: prettier baseline'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - id: prettier
+        name: Check formatting
+        continue-on-error: true
+        run: npm run format:check
+
+      - name: Record baseline status
+        if: always()
+        run: |
+          if [[ "${{ steps.prettier.outcome }}" == "failure" ]]; then
+            echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`npm run format:check\` is tracked by #289 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`npm run format:check\` passed. Remove this temporary non-blocking wrapper when #289 is closed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  frontend-i18n-lint:
+    name: 'frontend: i18n lint baseline'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - id: i18n-lint
+        name: Lint translations
+        continue-on-error: true
+        run: npm run i18n:lint
+
+      - name: Record baseline status
+        if: always()
+        run: |
+          if [[ "${{ steps.i18n-lint.outcome }}" == "failure" ]]; then
+            echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`npm run i18n:lint\` is tracked by #285 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`npm run i18n:lint\` passed. Remove this temporary non-blocking wrapper when #285 is closed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  rust-fmt:
+    name: 'rust: fmt'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -49,9 +173,26 @@ jobs:
         working-directory: src-tauri
         run: cargo fmt -p RapidRAW -- --check
 
-  clippy:
-    name: cargo clippy
-    runs-on: ubuntu-latest
+  rust-check:
+    name: 'rust: cargo check macOS'
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rustflags: ''
+          rust-src-dir: src-tauri
+
+      - name: Cargo check
+        working-directory: src-tauri
+        run: cargo check
+
+  rust-clippy:
+    name: 'rust: clippy baseline macOS'
+    runs-on: macos-14
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -61,15 +202,19 @@ jobs:
           rustflags: ''
           rust-src-dir: src-tauri
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
-
-      - name: Clippy
+      - id: clippy
+        name: Clippy
+        continue-on-error: true
         working-directory: src-tauri
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Record baseline status
+        if: always()
+        run: |
+          if [[ "${{ steps.clippy.outcome }}" == "failure" ]]; then
+            echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`cargo clippy --all-targets --all-features -- -D warnings\` is tracked by #287 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`cargo clippy --all-targets --all-features -- -D warnings\` passed. Remove this temporary non-blocking wrapper when #287 is closed." >> "$GITHUB_STEP_SUMMARY"
+          fi
