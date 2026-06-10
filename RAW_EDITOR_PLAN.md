@@ -1991,6 +1991,12 @@ Future TypeScript issue split:
 - `tooling(tsconfig): audit current TypeScript compiler options`
   - Scope: document current config and failures without changing behavior.
   - Validation: existing typecheck command.
+- `validation(types): fix current RapidRAW typecheck failures`
+  - Scope: make the current `strict: true` TypeScript baseline pass before
+    enabling stricter flags.
+  - Validation: `bun run typecheck`.
+  - Note: strict flag issues below are blocked by this cleanup because new flags
+    are not meaningfully attributable while the baseline already fails.
 - `tooling(tsconfig): enable noUncheckedIndexedAccess`
   - Scope: enable one flag, fix resulting project-owned errors.
   - Validation: typecheck plus targeted tests.
