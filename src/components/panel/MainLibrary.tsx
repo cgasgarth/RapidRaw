@@ -53,11 +53,11 @@ interface MainLibraryProps {
   libraryViewMode: LibraryViewMode;
   multiSelectedPaths: Array<string>;
   onClearSelection(): void;
-  onContextMenu(event: any, path: string): void;
+  onContextMenu(event: React.MouseEvent<HTMLElement>, path: string): void;
   onContinueSession(): void;
-  onEmptyAreaContextMenu(event: any): void;
+  onEmptyAreaContextMenu(event: React.MouseEvent<HTMLElement>): void;
   onGoHome(): void;
-  onImageClick(path: string, event: any): void;
+  onImageClick(path: string, event: React.MouseEvent<HTMLElement>): void;
   onImageDoubleClick(path: string): void;
   onImportClick(): void;
   onLibraryRefresh(): void;
