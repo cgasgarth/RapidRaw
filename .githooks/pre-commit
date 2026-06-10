@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+
+if [ "$branch" = "main" ]; then
+  echo "Direct commits on main are blocked. Create a feature branch and open a PR." >&2
+  exit 1
+fi
