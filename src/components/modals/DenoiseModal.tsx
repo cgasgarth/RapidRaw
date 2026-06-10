@@ -150,7 +150,7 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
           <div className="origin-center" style={imageTransformStyle}>
             <img
               src={denoised}
-              alt="Denoised"
+              alt={t('modals.denoise.denoised')}
               className="max-w-none shadow-xl"
               style={{ height: 'auto' }}
               draggable={false}
@@ -165,7 +165,7 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
           <div className="origin-center" style={imageTransformStyle}>
             <img
               src={original}
-              alt="Original"
+              alt={t('modals.denoise.original')}
               className="max-w-none shadow-xl"
               style={{ height: 'auto' }}
               draggable={false}
@@ -374,7 +374,11 @@ export default function DenoiseModal({
         <div className="flex h-[460px] overflow-hidden rounded-lg border border-surface">
           <div className="w-2/5 relative overflow-hidden shrink-0 bg-[#0a0a0a] flex items-center justify-center">
             {loadingImageUrl ? (
-              <img src={loadingImageUrl} alt="Selected preview" className="w-full h-full object-cover" />
+              <img
+                src={loadingImageUrl}
+                alt={t('modals.denoise.selectedPreviewAlt')}
+                className="w-full h-full object-cover"
+              />
             ) : (
               <div className="w-full h-full bg-surface/50" />
             )}

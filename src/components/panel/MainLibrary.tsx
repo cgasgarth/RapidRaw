@@ -239,7 +239,7 @@ export default function MainLibrary(props: MainLibraryProps) {
           <div className="w-1/2 hidden md:block relative overflow-hidden bg-black">
             <AnimatePresence>
               <motion.img
-                alt="Splash screen background"
+                alt={t('library.splash.backgroundAlt')}
                 className="absolute inset-0 w-full h-full object-cover"
                 key={splashImage}
                 src={splashImage}
@@ -344,7 +344,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        Timon Käch
+                        {t('library.splash.photographerName')}
                       </a>
                     </p>
                     {appVersion && (

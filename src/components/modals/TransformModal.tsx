@@ -495,7 +495,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
                       width: 'auto',
                       height: 'auto',
                     }}
-                    alt="Transform Preview"
+                    alt={t('modals.transform.previewAlt')}
                     draggable={false}
                   />
 

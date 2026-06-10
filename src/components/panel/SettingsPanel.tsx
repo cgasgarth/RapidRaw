@@ -1561,7 +1561,7 @@ export default function SettingsPanel({
                         rel="noopener noreferrer"
                         className="font-semibold text-accent hover:underline"
                       >
-                        rawler
+                        {t('settings.thanks.names.rawler')}
                       </a>
                       : {t('settings.thanks.list.rawler')}
                     </li>
@@ -1572,7 +1572,7 @@ export default function SettingsPanel({
                         rel="noopener noreferrer"
                         className="font-semibold text-accent hover:underline"
                       >
-                        lensfun
+                        {t('settings.thanks.names.lensfun')}
                       </a>
                       : {t('settings.thanks.list.lensfun')}
                     </li>
@@ -1583,7 +1583,7 @@ export default function SettingsPanel({
                         rel="noopener noreferrer"
                         className="font-semibold text-accent hover:underline"
                       >
-                        NegPy
+                        {t('settings.thanks.names.negpy')}
                       </a>
                       : {t('settings.thanks.list.negpy')}
                     </li>
@@ -1594,7 +1594,7 @@ export default function SettingsPanel({
                         rel="noopener noreferrer"
                         className="font-semibold text-accent hover:underline"
                       >
-                        LaMa
+                        {t('settings.thanks.names.lama')}
                       </a>
                       : {t('settings.thanks.list.lama')}
                     </li>
@@ -1605,7 +1605,7 @@ export default function SettingsPanel({
                         rel="noopener noreferrer"
                         className="font-semibold text-accent hover:underline"
                       >
-                        SAM 2
+                        {t('settings.thanks.names.sam2')}
                       </a>
                       : {t('settings.thanks.list.sam2')}
                     </li>
@@ -1616,7 +1616,7 @@ export default function SettingsPanel({
                         rel="noopener noreferrer"
                         className="font-semibold text-accent hover:underline"
                       >
-                        U-2-Net
+                        {t('settings.thanks.names.u2net')}
                       </a>
                       : {t('settings.thanks.list.u2net')}
                     </li>
@@ -1627,7 +1627,7 @@ export default function SettingsPanel({
                         rel="noopener noreferrer"
                         className="font-semibold text-accent hover:underline"
                       >
-                        Depth Anything V2
+                        {t('settings.thanks.names.depth')}
                       </a>
                       : {t('settings.thanks.list.depth')}
                     </li>
@@ -1638,7 +1638,7 @@ export default function SettingsPanel({
                         rel="noopener noreferrer"
                         className="font-semibold text-accent hover:underline"
                       >
-                        nind-denoise
+                        {t('settings.thanks.names.nind')}
                       </a>
                       : {t('settings.thanks.list.nind')}
                     </li>
@@ -1649,7 +1649,7 @@ export default function SettingsPanel({
                         rel="noopener noreferrer"
                         className="font-semibold text-accent hover:underline"
                       >
-                        darktable & co.
+                        {t('settings.thanks.names.darktable')}
                       </a>
                       : {t('settings.thanks.list.darktable')}
                     </li>

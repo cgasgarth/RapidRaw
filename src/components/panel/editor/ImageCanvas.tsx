@@ -3,6 +3,7 @@ import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
 import { PercentCrop, Crop } from 'react-image-crop';
+import { useTranslation } from 'react-i18next';
 import { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
 import { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
@@ -1023,6 +1024,7 @@ const ImageCanvas = memo(
     transformState,
     hasRenderedFirstFrame,
   }: ImageCanvasProps) => {
+    const { t } = useTranslation();
     const [isCropViewVisible, setIsCropViewVisible] = useState(false);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [displayedMaskUrl, setDisplayedMaskUrl] = useState<string | null>(null);
@@ -2332,7 +2334,7 @@ const ImageCanvas = memo(
 
               {originalSrc && (
                 <img
-                  alt="Original"
+                  alt={t('editor.canvas.originalAlt')}
                   className={
                     imageRenderSize.width > 0 && imageRenderSize.height > 0
                       ? 'pointer-events-none'
@@ -2363,7 +2365,7 @@ const ImageCanvas = memo(
               )}
               {displayedMaskUrl && (
                 <img
-                  alt="Mask Overlay"
+                  alt={t('editor.canvas.maskOverlayAlt')}
                   className="absolute object-contain pointer-events-none"
                   src={displayedMaskUrl}
                   style={{
@@ -2528,7 +2530,7 @@ const ImageCanvas = memo(
                 }}
               >
                 <img
-                  alt="Crop preview"
+                  alt={t('editor.canvas.cropPreviewAlt')}
                   ref={cropImageRef}
                   src={cropPreviewUrl}
                   style={{

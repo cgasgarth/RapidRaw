@@ -289,7 +289,7 @@ export default function CullingModal({
           {t('modals.culling.cullingSuggestions')}
         </Text>
         <div className="border-b border-surface mb-4">
-          <nav className="-mb-px flex space-x-4" aria-label="Tabs">
+          <nav className="-mb-px flex space-x-4" aria-label={t('modals.culling.tabs')}>
             {numSimilar > 0 && (
               <button
                 onClick={() => setActiveTab('similar')}
@@ -343,7 +343,7 @@ export default function CullingModal({
                           <div className="relative rounded-md overflow-hidden border-2 border-green-500">
                             <img
                               src={thumbnails[group.representative.path]}
-                              alt="Representative"
+                              alt={t('modals.culling.representative')}
                               className="w-full h-full object-cover"
                             />
                             <Text
