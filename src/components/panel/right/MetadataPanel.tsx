@@ -201,7 +201,14 @@ const EDITABLE_FIELDS = [
   { key: 'Artist', label: 'author' },
   { key: 'Copyright', label: 'copyright' },
   { key: 'UserComment', label: 'comments' },
-];
+] as const;
+
+const EDITABLE_FIELD_LABEL_FALLBACKS: Record<(typeof EDITABLE_FIELDS)[number]['label'], string> = {
+  author: 'Author',
+  comments: 'Comments',
+  copyright: 'Copyright',
+  title: 'Title',
+};
 
 const KEY_CAMERA_SETTINGS_MAP: CameraSettings = {
   FNumber: {
@@ -537,7 +544,9 @@ export default function MetadataPanel() {
                           return (
                             <EditableMetadataItem
                               key={field.key}
-                              label={t(`editor.metadata.fields.${field.label}`)}
+                              label={t(`editor.metadata.fields.${field.label}`, {
+                                defaultValue: EDITABLE_FIELD_LABEL_FALLBACKS[field.label],
+                              })}
                               value={displayValue}
                               onSave={(newVal) => {
                                 handleUpdateExif(targetPaths, { [field.key]: newVal });
