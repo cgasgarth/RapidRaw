@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { Check, RotateCcw, Grid3X3, Eye, EyeOff, Info, LineChart, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
@@ -194,44 +194,45 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
     setPan({ x: newPanX, y: newPanY });
   };
 
-  const handleResetZoom = (e?: React.MouseEvent) => {
+  const handleResetZoom = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
     setZoom(1);
     setPan({ x: 0, y: 0 });
-  };
+  }, []);
 
-  const updatePreview = useCallback(
-    throttle(async (currentParams: TransformParams, linesEnabled: boolean) => {
-      try {
-        const fullParams: GeometryParams = {
-          ...currentParams,
-          lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
-          lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,
-          lens_tca_amount: (currentAdjustments.lensTcaAmount ?? 100) / SLIDER_DIVISOR,
-          lens_dist_k1: currentAdjustments.lensDistortionParams?.k1 ?? 0,
-          lens_dist_k2: currentAdjustments.lensDistortionParams?.k2 ?? 0,
-          lens_dist_k3: currentAdjustments.lensDistortionParams?.k3 ?? 0,
-          lens_model: currentAdjustments.lensDistortionParams?.model ?? 0,
-          tca_vr: currentAdjustments.lensDistortionParams?.tca_vr ?? 1.0,
-          tca_vb: currentAdjustments.lensDistortionParams?.tca_vb ?? 1.0,
-          vig_k1: currentAdjustments.lensDistortionParams?.vig_k1 ?? 0,
-          vig_k2: currentAdjustments.lensDistortionParams?.vig_k2 ?? 0,
-          vig_k3: currentAdjustments.lensDistortionParams?.vig_k3 ?? 0,
-          lens_distortion_enabled: currentAdjustments.lensDistortionEnabled ?? true,
-          lens_tca_enabled: currentAdjustments.lensTcaEnabled ?? true,
-          lens_vignette_enabled: currentAdjustments.lensVignetteEnabled ?? true,
-        };
+  const updatePreview = useMemo(
+    () =>
+      throttle(async (currentParams: TransformParams, linesEnabled: boolean) => {
+        try {
+          const fullParams: GeometryParams = {
+            ...currentParams,
+            lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
+            lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,
+            lens_tca_amount: (currentAdjustments.lensTcaAmount ?? 100) / SLIDER_DIVISOR,
+            lens_dist_k1: currentAdjustments.lensDistortionParams?.k1 ?? 0,
+            lens_dist_k2: currentAdjustments.lensDistortionParams?.k2 ?? 0,
+            lens_dist_k3: currentAdjustments.lensDistortionParams?.k3 ?? 0,
+            lens_model: currentAdjustments.lensDistortionParams?.model ?? 0,
+            tca_vr: currentAdjustments.lensDistortionParams?.tca_vr ?? 1.0,
+            tca_vb: currentAdjustments.lensDistortionParams?.tca_vb ?? 1.0,
+            vig_k1: currentAdjustments.lensDistortionParams?.vig_k1 ?? 0,
+            vig_k2: currentAdjustments.lensDistortionParams?.vig_k2 ?? 0,
+            vig_k3: currentAdjustments.lensDistortionParams?.vig_k3 ?? 0,
+            lens_distortion_enabled: currentAdjustments.lensDistortionEnabled ?? true,
+            lens_tca_enabled: currentAdjustments.lensTcaEnabled ?? true,
+            lens_vignette_enabled: currentAdjustments.lensVignetteEnabled ?? true,
+          };
 
-        const result: string = await invoke('preview_geometry_transform', {
-          params: fullParams,
-          jsAdjustments: currentAdjustments,
-          showLines: linesEnabled,
-        });
-        setPreviewUrl(result);
-      } catch (e) {
-        console.error('Preview transform failed', e);
-      }
-    }, 30),
+          const result: string = await invoke('preview_geometry_transform', {
+            params: fullParams,
+            jsAdjustments: currentAdjustments,
+            showLines: linesEnabled,
+          });
+          setPreviewUrl(result);
+        } catch (e) {
+          console.error('Preview transform failed', e);
+        }
+      }, 30),
     [currentAdjustments],
   );
 
@@ -263,7 +264,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, currentAdjustments]);
+  }, [isOpen, currentAdjustments, handleResetZoom, updatePreview]);
 
   const handleChange = (key: keyof typeof DEFAULT_PARAMS, value: number) => {
     const newParams = { ...params, [key]: value };

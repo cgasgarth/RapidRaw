@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation, Trans } from 'react-i18next';
 import {
@@ -238,11 +238,14 @@ export default function LensCorrectionModal({
     setPan({ x: newPanX, y: newPanY });
   };
 
-  const handleResetZoom = (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
+  const handleResetZoom = useMemo(
+    () => (e?: React.MouseEvent) => {
+      e?.stopPropagation();
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    },
+    [],
+  );
 
   const fetchDistortionParams = async (maker: string, model: string): Promise<LensDistortionParams | null> => {
     try {
@@ -259,48 +262,49 @@ export default function LensCorrectionModal({
     }
   };
 
-  const updatePreview = useCallback(
-    throttle(async (currentParams: LensParams) => {
-      try {
-        const fullParams: GeometryParams = {
-          distortion: currentAdjustments.transformDistortion ?? 0,
-          vertical: currentAdjustments.transformVertical ?? 0,
-          horizontal: currentAdjustments.transformHorizontal ?? 0,
-          rotate: currentAdjustments.transformRotate ?? 0,
-          aspect: currentAdjustments.transformAspect ?? 0,
-          scale: currentAdjustments.transformScale ?? 100,
-          x_offset: currentAdjustments.transformXOffset ?? 0,
-          y_offset: currentAdjustments.transformYOffset ?? 0,
+  const updatePreview = useMemo(
+    () =>
+      throttle(async (currentParams: LensParams) => {
+        try {
+          const fullParams: GeometryParams = {
+            distortion: currentAdjustments.transformDistortion ?? 0,
+            vertical: currentAdjustments.transformVertical ?? 0,
+            horizontal: currentAdjustments.transformHorizontal ?? 0,
+            rotate: currentAdjustments.transformRotate ?? 0,
+            aspect: currentAdjustments.transformAspect ?? 0,
+            scale: currentAdjustments.transformScale ?? 100,
+            x_offset: currentAdjustments.transformXOffset ?? 0,
+            y_offset: currentAdjustments.transformYOffset ?? 0,
 
-          lens_distortion_amount: currentParams.lensDistortionAmount / SLIDER_DIVISOR,
-          lens_vignette_amount: currentParams.lensVignetteAmount / SLIDER_DIVISOR,
-          lens_tca_amount: currentParams.lensTcaAmount / SLIDER_DIVISOR,
+            lens_distortion_amount: currentParams.lensDistortionAmount / SLIDER_DIVISOR,
+            lens_vignette_amount: currentParams.lensVignetteAmount / SLIDER_DIVISOR,
+            lens_tca_amount: currentParams.lensTcaAmount / SLIDER_DIVISOR,
 
-          lens_distortion_enabled: currentParams.lensDistortionEnabled,
-          lens_vignette_enabled: currentParams.lensVignetteEnabled,
-          lens_tca_enabled: currentParams.lensTcaEnabled,
+            lens_distortion_enabled: currentParams.lensDistortionEnabled,
+            lens_vignette_enabled: currentParams.lensVignetteEnabled,
+            lens_tca_enabled: currentParams.lensTcaEnabled,
 
-          lens_dist_k1: currentParams.lensDistortionParams?.k1 ?? 0,
-          lens_dist_k2: currentParams.lensDistortionParams?.k2 ?? 0,
-          lens_dist_k3: currentParams.lensDistortionParams?.k3 ?? 0,
-          lens_model: currentParams.lensDistortionParams?.model ?? 0,
-          tca_vr: currentParams.lensDistortionParams?.tca_vr ?? 1.0,
-          tca_vb: currentParams.lensDistortionParams?.tca_vb ?? 1.0,
-          vig_k1: currentParams.lensDistortionParams?.vig_k1 ?? 0,
-          vig_k2: currentParams.lensDistortionParams?.vig_k2 ?? 0,
-          vig_k3: currentParams.lensDistortionParams?.vig_k3 ?? 0,
-        };
+            lens_dist_k1: currentParams.lensDistortionParams?.k1 ?? 0,
+            lens_dist_k2: currentParams.lensDistortionParams?.k2 ?? 0,
+            lens_dist_k3: currentParams.lensDistortionParams?.k3 ?? 0,
+            lens_model: currentParams.lensDistortionParams?.model ?? 0,
+            tca_vr: currentParams.lensDistortionParams?.tca_vr ?? 1.0,
+            tca_vb: currentParams.lensDistortionParams?.tca_vb ?? 1.0,
+            vig_k1: currentParams.lensDistortionParams?.vig_k1 ?? 0,
+            vig_k2: currentParams.lensDistortionParams?.vig_k2 ?? 0,
+            vig_k3: currentParams.lensDistortionParams?.vig_k3 ?? 0,
+          };
 
-        const result: string = await invoke('preview_geometry_transform', {
-          params: fullParams,
-          jsAdjustments: currentAdjustments,
-          showLines: false,
-        });
-        setPreviewUrl(result);
-      } catch (e) {
-        console.error('Lens correction preview failed', e);
-      }
-    }, 50),
+          const result: string = await invoke('preview_geometry_transform', {
+            params: fullParams,
+            jsAdjustments: currentAdjustments,
+            showLines: false,
+          });
+          setPreviewUrl(result);
+        } catch (e) {
+          console.error('Lens correction preview failed', e);
+        }
+      }, 50),
     [currentAdjustments],
   );
 
@@ -353,7 +357,7 @@ export default function LensCorrectionModal({
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, currentAdjustments]);
+  }, [isOpen, currentAdjustments, handleResetZoom, updatePreview]);
 
   const handleMakerChange = (maker: string) => {
     const newParams = {

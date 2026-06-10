@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -113,25 +113,26 @@ export default function NegativeConversionModal({
     setPan({ x: newPanX, y: newPanY });
   };
 
-  const updatePreview = useCallback(
-    throttle(async (currentParams: NegativeParams, isInitialLoad: boolean = false) => {
-      if (!selectedImagePath) return;
-      try {
-        const result: string = await invoke('preview_negative_conversion', {
-          path: selectedImagePath,
-          params: currentParams,
-        });
-        setPreviewUrl(result);
-        if (isInitialLoad) {
-          setIsLoading(false);
+  const updatePreview = useMemo(
+    () =>
+      throttle(async (currentParams: NegativeParams, isInitialLoad: boolean = false) => {
+        if (!selectedImagePath) return;
+        try {
+          const result: string = await invoke('preview_negative_conversion', {
+            path: selectedImagePath,
+            params: currentParams,
+          });
+          setPreviewUrl(result);
+          if (isInitialLoad) {
+            setIsLoading(false);
+          }
+        } catch (e) {
+          console.error('Negative preview failed', e);
+          if (isInitialLoad) {
+            setIsLoading(false);
+          }
         }
-      } catch (e) {
-        console.error('Negative preview failed', e);
-        if (isInitialLoad) {
-          setIsLoading(false);
-        }
-      }
-    }, 100),
+      }, 100),
     [selectedImagePath],
   );
 
