@@ -2786,6 +2786,8 @@ Future CI should call the same named commands developers run locally. Exact impl
 
 If a command cannot exist exactly because of RapidRAW's structure, create the closest equivalent and document the reason in the plan.
 
+Known dependency advisories that are intentionally deferred must be recorded in `docs/security/deferred-rust-advisories.md` before a blocking vulnerability gate is enabled. A deferred advisory is not fixed; each entry must include the canonical issue, current evidence, exit criteria, and revisit triggers.
+
 ### 10.4 CI Topology
 
 The workflow graph should make dependencies explicit.
@@ -4213,8 +4215,8 @@ Issues:
 - `ci(security): add dependency vulnerability checks`
   - Labels: `area:ci`, `type:security`, `priority:p1`, `validation:security`.
   - Blocked by: package manager baseline.
-  - Scope: JS and Rust vulnerability checks.
-  - Acceptance criteria: vulnerability reports uploaded or linked.
+  - Scope: JS and Rust vulnerability checks, including the deferred-advisory register for accepted temporary gaps.
+  - Acceptance criteria: vulnerability reports uploaded or linked, and any non-blocking advisory has a documented owner, issue, exit criteria, and revisit trigger.
 - `ci(license): add dependency license checks`
   - Labels: `area:ci`, `type:security`, `priority:p1`, `risk:critical`, `validation:license`.
   - Blocked by: package manager baseline.
