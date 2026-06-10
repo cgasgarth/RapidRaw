@@ -113,11 +113,11 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
       setName(initialPreset?.name || '');
       setIncludeMasks(
         initialPreset?.includeMasks ??
-          (initialPreset?.adjustments?.masks && initialPreset.adjustments.masks.length > 0) ??
+          (initialPreset?.adjustments?.['masks'] && initialPreset.adjustments['masks'].length > 0) ??
           false,
       );
 
-      const GEOMETRY_KEYS = ADJUSTMENT_GROUPS.geometry.flatMap((group) => group.keys);
+      const GEOMETRY_KEYS = ADJUSTMENT_GROUPS['geometry'].flatMap((group) => group.keys);
       const hasGeometry =
         initialPreset?.adjustments && Object.keys(initialPreset.adjustments).some((key) => GEOMETRY_KEYS.includes(key));
       setIncludeCropTransform(initialPreset?.includeCropTransform ?? hasGeometry ?? false);

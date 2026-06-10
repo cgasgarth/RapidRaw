@@ -598,7 +598,7 @@ export default function ColorPanel({
         />
       </div>
 
-      {!isForMask && adjustmentVisibility.colorCalibration !== false && (
+      {!isForMask && adjustmentVisibility['colorCalibration'] !== false && (
         <ColorCalibrationPanel
           adjustments={adjustments}
           setAdjustments={setAdjustments}

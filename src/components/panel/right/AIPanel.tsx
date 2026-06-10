@@ -300,7 +300,7 @@ export default function AIPanel() {
 
   const { user, isSignedIn } = useUser();
   const { getToken } = useAuth();
-  const isPro = user?.publicMetadata?.plan === 'pro';
+  const isPro = user?.publicMetadata?.['plan'] === 'pro';
   const [cloudUsage, setCloudUsage] = useState<{ requests: number; limit: number; month: string } | null>(null);
 
   const isGenerativeAvailable =

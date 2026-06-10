@@ -60,8 +60,8 @@ export function usePresets(currentAdjustments: Adjustments) {
     includeCropTransform: boolean = false,
     presetType: 'tool' | 'style' = 'style',
   ) => {
-    const GEOMETRY_KEYS = ADJUSTMENT_GROUPS.geometry.flatMap((group) => group.keys);
-    const MASK_KEYS = ADJUSTMENT_GROUPS.masks.flatMap((group) => group.keys);
+    const GEOMETRY_KEYS = ADJUSTMENT_GROUPS['geometry'].flatMap((group) => group.keys);
+    const MASK_KEYS = ADJUSTMENT_GROUPS['masks'].flatMap((group) => group.keys);
 
     const presetAdjustments: Record<string, any> = {};
 
@@ -205,8 +205,8 @@ export function usePresets(currentAdjustments: Adjustments) {
     let newAdjustments: Record<string, any> = { ...existingPreset.adjustments };
     const oldType = existingPreset.presetType || 'style';
 
-    const GEOMETRY_KEYS = ADJUSTMENT_GROUPS.geometry.flatMap((group) => group.keys);
-    const MASK_KEYS = ADJUSTMENT_GROUPS.masks.flatMap((group) => group.keys);
+    const GEOMETRY_KEYS = ADJUSTMENT_GROUPS['geometry'].flatMap((group) => group.keys);
+    const MASK_KEYS = ADJUSTMENT_GROUPS['masks'].flatMap((group) => group.keys);
 
     if (oldType !== presetType) {
       if (presetType === 'tool') {
@@ -294,12 +294,12 @@ export function usePresets(currentAdjustments: Adjustments) {
 
     if (!existingPreset) return null;
 
-    const GEOMETRY_KEYS = ADJUSTMENT_GROUPS.geometry.flatMap((group) => group.keys);
-    const MASK_KEYS = ADJUSTMENT_GROUPS.masks.flatMap((group) => group.keys);
+    const GEOMETRY_KEYS = ADJUSTMENT_GROUPS['geometry'].flatMap((group) => group.keys);
+    const MASK_KEYS = ADJUSTMENT_GROUPS['masks'].flatMap((group) => group.keys);
 
     const includeMasks =
       existingPreset.includeMasks ??
-      (existingPreset.adjustments?.masks && existingPreset.adjustments.masks.length > 0) ??
+      (existingPreset.adjustments?.['masks'] && existingPreset.adjustments['masks'].length > 0) ??
       false;
     const includeCropTransform =
       existingPreset.includeCropTransform ??

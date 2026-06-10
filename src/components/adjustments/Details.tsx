@@ -31,7 +31,7 @@ export default function DetailsPanel({
 
   return (
     <div className="space-y-4">
-      {adjustmentVisibility.sharpening !== false && (
+      {adjustmentVisibility['sharpening'] !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
           <Text variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.sharpening')}
@@ -59,7 +59,7 @@ export default function DetailsPanel({
         </div>
       )}
 
-      {adjustmentVisibility.presence !== false && (
+      {adjustmentVisibility['presence'] !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
           <Text variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.presence')}
@@ -105,7 +105,7 @@ export default function DetailsPanel({
         </div>
       )}
 
-      {adjustmentVisibility.noiseReduction !== false && (
+      {adjustmentVisibility['noiseReduction'] !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
           <Text variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.noiseReduction')}
@@ -131,7 +131,7 @@ export default function DetailsPanel({
         </div>
       )}
 
-      {!isForMask && adjustmentVisibility.chromaticAberration !== false && (
+      {!isForMask && adjustmentVisibility['chromaticAberration'] !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
           <Text variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.chromaticAberration')}

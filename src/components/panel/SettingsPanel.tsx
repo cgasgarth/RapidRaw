@@ -327,7 +327,7 @@ const CloudDashboard = () => {
     fetchUsage();
   }, [getToken]);
 
-  const isPro = user?.publicMetadata?.plan === 'pro';
+  const isPro = user?.publicMetadata?.['plan'] === 'pro';
 
   return (
     <div className="space-y-4">
