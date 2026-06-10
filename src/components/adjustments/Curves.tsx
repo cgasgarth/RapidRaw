@@ -20,13 +20,7 @@ const CURVE_CHANNEL_LABEL_FALLBACKS: Record<ActiveChannel, string> = {
   [ActiveChannel.Red]: 'Red',
 };
 
-export interface ChannelConfig {
-  [index: string]: ColorData;
-  [ActiveChannel.Luma]: ColorData;
-  [ActiveChannel.Red]: ColorData;
-  [ActiveChannel.Green]: ColorData;
-  [ActiveChannel.Blue]: ColorData;
-}
+export type ChannelConfig = Record<ActiveChannel, ColorData>;
 
 interface ColorData {
   color: string;
@@ -54,14 +48,14 @@ const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
   split3: 75,
 };
 
-const DEFAULT_PARAMETRIC_CURVE = {
+const DEFAULT_PARAMETRIC_CURVE: Record<ActiveChannel, ParametricCurveSettings> = {
   luma: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
   red: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
   green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
   blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
 };
 
-const DEFAULT_POINT_CURVES = {
+const DEFAULT_POINT_CURVES: Record<ActiveChannel, Array<Coord>> = {
   blue: [
     { x: 0, y: 0 },
     { x: 255, y: 255 },
@@ -121,14 +115,17 @@ function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> 
 
   let points = xs.map((x, i) => ({
     x: x * 255,
-    y: clamp(ys[i]) * 255,
+    y: clamp(ys[i] ?? x) * 255,
   }));
 
   if (points.length >= 2) {
-    points[0].y = Math.max(0, Math.min(255, points[0].y + blackYOffset));
-
+    const firstPoint = points[0];
     const lastIndex = points.length - 1;
-    points[lastIndex].y = Math.max(0, Math.min(255, points[lastIndex].y + whiteYOffset));
+    const lastPoint = points[lastIndex];
+    if (firstPoint && lastPoint) {
+      firstPoint.y = Math.max(0, Math.min(255, firstPoint.y + blackYOffset));
+      lastPoint.y = Math.max(0, Math.min(255, lastPoint.y + whiteYOffset));
+    }
   }
 
   return points;
@@ -142,8 +139,12 @@ function getCurvePath(points: Array<Coord>) {
   const ms = [];
 
   for (let i = 0; i < n - 1; i++) {
-    const dx = points[i + 1].x - points[i].x;
-    const dy = points[i + 1].y - points[i].y;
+    const currentPoint = points[i];
+    const nextPoint = points[i + 1];
+    if (!currentPoint || !nextPoint) continue;
+
+    const dx = nextPoint.x - currentPoint.x;
+    const dy = nextPoint.y - currentPoint.y;
     if (dx === 0) {
       deltas.push(dy > 0 ? 1e6 : dy < 0 ? -1e6 : 0);
     } else {
@@ -151,41 +152,55 @@ function getCurvePath(points: Array<Coord>) {
     }
   }
 
-  ms.push(deltas[0]);
+  const firstDelta = deltas[0];
+  if (firstDelta === undefined) return '';
+
+  ms.push(firstDelta);
 
   for (let i = 1; i < n - 1; i++) {
-    if (deltas[i - 1] * deltas[i] <= 0) {
+    const previousDelta = deltas[i - 1] ?? 0;
+    const currentDelta = deltas[i] ?? 0;
+    if (previousDelta * currentDelta <= 0) {
       ms.push(0);
     } else {
-      ms.push((deltas[i - 1] + deltas[i]) / 2);
+      ms.push((previousDelta + currentDelta) / 2);
     }
   }
 
-  ms.push(deltas[n - 2]);
+  ms.push(deltas[n - 2] ?? 0);
 
   for (let i = 0; i < n - 1; i++) {
-    if (deltas[i] === 0) {
+    const delta = deltas[i];
+    const currentSlope = ms[i];
+    const nextSlope = ms[i + 1];
+    if (delta === undefined || currentSlope === undefined || nextSlope === undefined) continue;
+
+    if (delta === 0) {
       ms[i] = 0;
       ms[i + 1] = 0;
     } else {
-      const alpha: number = ms[i] / deltas[i];
-      const beta: number = ms[i + 1] / deltas[i];
+      const alpha: number = currentSlope / delta;
+      const beta: number = nextSlope / delta;
 
       const tau = alpha * alpha + beta * beta;
       if (tau > 9) {
         const scale = 3.0 / Math.sqrt(tau);
-        ms[i] = scale * alpha * deltas[i];
-        ms[i + 1] = scale * beta * deltas[i];
+        ms[i] = scale * alpha * delta;
+        ms[i + 1] = scale * beta * delta;
       }
     }
   }
 
   let path = '';
 
-  if (points[0].x > 0) {
-    path += `M 0 ${255 - points[0].y} L ${points[0].x} ${255 - points[0].y}`;
+  const firstPoint = points[0];
+  const lastPoint = points[n - 1];
+  if (!firstPoint || !lastPoint) return '';
+
+  if (firstPoint.x > 0) {
+    path += `M 0 ${255 - firstPoint.y} L ${firstPoint.x} ${255 - firstPoint.y}`;
   } else {
-    path += `M ${points[0].x} ${255 - points[0].y}`;
+    path += `M ${firstPoint.x} ${255 - firstPoint.y}`;
   }
 
   for (let i = 0; i < n - 1; i++) {
@@ -193,6 +208,8 @@ function getCurvePath(points: Array<Coord>) {
     const p1 = points[i + 1];
     const m0 = ms[i];
     const m1 = ms[i + 1];
+    if (!p0 || !p1 || m0 === undefined || m1 === undefined) continue;
+
     const dx = p1.x - p0.x;
 
     const cp1x = p0.x + dx / 3.0;
@@ -205,8 +222,8 @@ function getCurvePath(points: Array<Coord>) {
     }, ${p1.x} ${255 - p1.y}`;
   }
 
-  if (points[n - 1].x < 255) {
-    path += ` L 255 ${255 - points[n - 1].y}`;
+  if (lastPoint.x < 255) {
+    path += ` L 255 ${255 - lastPoint.y}`;
   }
 
   return path;
@@ -233,6 +250,7 @@ function getZeroHistogramPath(data: Array<any>) {
 function isDefaultCurve(points: Array<Coord> | undefined) {
   if (!points || points.length !== 2) return false;
   const [p1, p2] = points;
+  if (!p1 || !p2) return false;
   return p1.x === 0 && p1.y === 0 && p2.x === 255 && p2.y === 255;
 }
 
@@ -270,6 +288,19 @@ function convertParametricToPoints(settings: ParametricCurveSettings): Array<Coo
   return buildParametricPoints(settings);
 }
 
+function getEventPoint(event: any): { clientX: number; clientY: number } | null {
+  const touch = event.touches?.[0];
+  if (touch) {
+    return { clientX: touch.clientX, clientY: touch.clientY };
+  }
+
+  if (typeof event.clientX === 'number' && typeof event.clientY === 'number') {
+    return { clientX: event.clientX, clientY: event.clientY };
+  }
+
+  return null;
+}
+
 export default function CurveGraph({
   adjustments,
   setAdjustments,
@@ -295,7 +326,8 @@ export default function CurveGraph({
   const localParametricSettingsRef = useRef<ParametricCurveSettings | null>(null);
   const isParametricMode = curveMode === 'parametric';
 
-  const parametricCurves = adjustments?.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
+  const parametricCurves: Record<ActiveChannel, ParametricCurveSettings> =
+    adjustments?.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
   const parametricCurvesRef = useRef(parametricCurves);
 
   useEffect(() => {
@@ -386,7 +418,9 @@ export default function CurveGraph({
         if (!container) return;
 
         const rect = container.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const eventPoint = getEventPoint(e);
+        if (!eventPoint) return;
+        const clientX = eventPoint.clientX;
         const rawX = ((clientX - rect.left) / rect.width) * 100;
 
         const minGap = 10;
@@ -415,14 +449,19 @@ export default function CurveGraph({
 
       if (!isParametricMode && draggingIndexRef.current !== null) {
         const index = draggingIndexRef.current;
-        const currentPoints = localPointsRef.current || adjustments?.curves?.[activeChannelRef.current];
+        const currentPoints =
+          localPointsRef.current ||
+          adjustments.curves[activeChannelRef.current] ||
+          DEFAULT_POINT_CURVES[activeChannelRef.current];
         if (!currentPoints) return;
+        if (index < 0 || index >= currentPoints.length) return;
 
         const svg = svgRef.current;
         if (!svg) return;
 
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const eventPoint = getEventPoint(e);
+        if (!eventPoint) return;
+        const { clientX, clientY } = eventPoint;
 
         const rect = svg.getBoundingClientRect();
         let x = Math.max(0, Math.min(255, ((clientX - rect.left) / rect.width) * 255));
@@ -433,8 +472,8 @@ export default function CurveGraph({
         if (x < SNAP_THRESHOLD) x = 0;
         if (x > 255 - SNAP_THRESHOLD) x = 255;
 
-        const prevX = index > 0 ? currentPoints[index - 1].x : 0;
-        const nextX = index < currentPoints.length - 1 ? currentPoints[index + 1].x : 255;
+        const prevX = index > 0 ? (currentPoints[index - 1]?.x ?? 0) : 0;
+        const nextX = index < currentPoints.length - 1 ? (currentPoints[index + 1]?.x ?? 255) : 255;
         const minX = index === 0 ? 0 : prevX + 0.01;
         const maxX = index === currentPoints.length - 1 ? 255 : nextX - 0.01;
 
@@ -495,7 +534,7 @@ export default function CurveGraph({
 
   const activePoints = isParametricMode
     ? buildParametricPoints(activeParametricSettings)
-    : (localPoints ?? adjustments.curves[activeChannel]);
+    : (localPoints ?? adjustments.curves[activeChannel] ?? DEFAULT_POINT_CURVES[activeChannel]);
 
   const { color, data: histogramData } = channelConfig[activeChannel];
 
@@ -532,8 +571,9 @@ export default function CurveGraph({
 
     const svg = svgRef.current;
     if (!svg) return;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const eventPoint = getEventPoint(e);
+    if (!eventPoint) return;
+    const { clientX, clientY } = eventPoint;
     const rect = svg.getBoundingClientRect();
     const x = Math.max(0, Math.min(255, ((clientX - rect.left) / rect.width) * 255));
     const y = Math.max(0, Math.min(255, 255 - ((clientY - rect.top) / rect.height) * 255));
