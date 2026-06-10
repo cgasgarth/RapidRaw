@@ -4,3 +4,6 @@ src-tauri/target
 src-tauri/gen
 src-tauri/rawler
 data
+# Generated Flatpak source manifests.
+packaging/cargo-sources.json
+packaging/node-sources.json

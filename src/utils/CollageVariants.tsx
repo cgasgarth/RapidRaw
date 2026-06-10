@@ -36,57 +36,797 @@ export const LAYOUTS: Record<number, LayoutDefinition[]> = {
     { layout: [{ x: 0, y: 0, width: 1, height: 1 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 1 }]} /> },
   ],
   2: [
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 1 }, { x: 0.5, y: 0, width: 0.5, height: 1 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 1 }, { x: 0.5, y: 0, width: 0.5, height: 1 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1, height: 0.5 }, { x: 0, y: 0.5, width: 1, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 0.5 }, { x: 0, y: 0.5, width: 1, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 2/3, height: 1 }, { x: 2/3, y: 0, width: 1/3, height: 1 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 2/3, height: 1 }, { x: 2/3, y: 0, width: 1/3, height: 1 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1, height: 2/3 }, { x: 0, y: 2/3, width: 1, height: 1/3 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 2/3 }, { x: 0, y: 2/3, width: 1, height: 1/3 }]} /> },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 1 },
+        { x: 0.5, y: 0, width: 0.5, height: 1 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 1 },
+            { x: 0.5, y: 0, width: 0.5, height: 1 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 0.5 },
+        { x: 0, y: 0.5, width: 1, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 0.5 },
+            { x: 0, y: 0.5, width: 1, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 2 / 3, height: 1 },
+        { x: 2 / 3, y: 0, width: 1 / 3, height: 1 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 2 / 3, height: 1 },
+            { x: 2 / 3, y: 0, width: 1 / 3, height: 1 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 2 / 3 },
+        { x: 0, y: 2 / 3, width: 1, height: 1 / 3 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 2 / 3 },
+            { x: 0, y: 2 / 3, width: 1, height: 1 / 3 },
+          ]}
+        />
+      ),
+    },
   ],
   3: [
-    { layout: [{ x: 0, y: 0, width: 1/3, height: 1 }, { x: 1/3, y: 0, width: 1/3, height: 1 }, { x: 2/3, y: 0, width: 1/3, height: 1 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1/3, height: 1 }, { x: 1/3, y: 0, width: 1/3, height: 1 }, { x: 2/3, y: 0, width: 1/3, height: 1 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1, height: 1/3 }, { x: 0, y: 1/3, width: 1, height: 1/3 }, { x: 0, y: 2/3, width: 1, height: 1/3 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 1/3 }, { x: 0, y: 1/3, width: 1, height: 1/3 }, { x: 0, y: 2/3, width: 1, height: 1/3 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 1 }, { x: 0.5, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 1 }, { x: 0.5, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 1 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 1 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1, height: 0.5 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 0.5 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 0.5 }, { x: 0, y: 0.5, width: 1, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 0.5 }, { x: 0, y: 0.5, width: 1, height: 0.5 }]} /> },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1 / 3, height: 1 },
+        { x: 1 / 3, y: 0, width: 1 / 3, height: 1 },
+        { x: 2 / 3, y: 0, width: 1 / 3, height: 1 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1 / 3, height: 1 },
+            { x: 1 / 3, y: 0, width: 1 / 3, height: 1 },
+            { x: 2 / 3, y: 0, width: 1 / 3, height: 1 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 1 / 3 },
+        { x: 0, y: 1 / 3, width: 1, height: 1 / 3 },
+        { x: 0, y: 2 / 3, width: 1, height: 1 / 3 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 1 / 3 },
+            { x: 0, y: 1 / 3, width: 1, height: 1 / 3 },
+            { x: 0, y: 2 / 3, width: 1, height: 1 / 3 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 1 },
+        { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0.5, width: 0.5, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 1 },
+            { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0.5, width: 0.5, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 0.5 },
+        { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0, width: 0.5, height: 1 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 0.5 },
+            { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0, width: 0.5, height: 1 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 0.5 },
+        { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0.5, width: 0.5, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 0.5 },
+            { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0.5, width: 0.5, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+        { x: 0, y: 0.5, width: 1, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+            { x: 0, y: 0.5, width: 1, height: 0.5 },
+          ]}
+        />
+      ),
+    },
   ],
   4: [
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 0.5 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 0.5 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1, height: 0.5 }, { x: 0, y: 0.5, width: 1/3, height: 0.5 }, { x: 1/3, y: 0.5, width: 1/3, height: 0.5 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 0.5 }, { x: 0, y: 0.5, width: 1/3, height: 0.5 }, { x: 1/3, y: 0.5, width: 1/3, height: 0.5 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 1 }, { x: 0.5, y: 0, width: 0.5, height: 1/3 }, { x: 0.5, y: 1/3, width: 0.5, height: 1/3 }, { x: 0.5, y: 2/3, width: 0.5, height: 1/3 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 1 }, { x: 0.5, y: 0, width: 0.5, height: 1/3 }, { x: 0.5, y: 1/3, width: 0.5, height: 1/3 }, { x: 0.5, y: 2/3, width: 0.5, height: 1/3 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1/3, height: 1 }, { x: 1/3, y: 0, width: 1/3, height: 1 }, { x: 2/3, y: 0, width: 1/3, height: 0.5 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1/3, height: 1 }, { x: 1/3, y: 0, width: 1/3, height: 1 }, { x: 2/3, y: 0, width: 1/3, height: 0.5 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1, height: 1/4 }, { x: 0, y: 1/4, width: 1, height: 1/4 }, { x: 0, y: 2/4, width: 1, height: 1/4 }, { x: 0, y: 3/4, width: 1, height: 1/4 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 1/4 }, { x: 0, y: 1/4, width: 1, height: 1/4 }, { x: 0, y: 2/4, width: 1, height: 1/4 }, { x: 0, y: 3/4, width: 1, height: 1/4 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1/4, height: 1 }, { x: 1/4, y: 0, width: 1/4, height: 1 }, { x: 2/4, y: 0, width: 1/4, height: 1 }, { x: 3/4, y: 0, width: 1/4, height: 1 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1/4, height: 1 }, { x: 1/4, y: 0, width: 1/4, height: 1 }, { x: 2/4, y: 0, width: 1/4, height: 1 }, { x: 3/4, y: 0, width: 1/4, height: 1 }]} /> },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+        { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0.5, width: 0.5, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+            { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0.5, width: 0.5, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 0.5 },
+        { x: 0, y: 0.5, width: 1 / 3, height: 0.5 },
+        { x: 1 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+        { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 0.5 },
+            { x: 0, y: 0.5, width: 1 / 3, height: 0.5 },
+            { x: 1 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+            { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 1 },
+        { x: 0.5, y: 0, width: 0.5, height: 1 / 3 },
+        { x: 0.5, y: 1 / 3, width: 0.5, height: 1 / 3 },
+        { x: 0.5, y: 2 / 3, width: 0.5, height: 1 / 3 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 1 },
+            { x: 0.5, y: 0, width: 0.5, height: 1 / 3 },
+            { x: 0.5, y: 1 / 3, width: 0.5, height: 1 / 3 },
+            { x: 0.5, y: 2 / 3, width: 0.5, height: 1 / 3 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1 / 3, height: 1 },
+        { x: 1 / 3, y: 0, width: 1 / 3, height: 1 },
+        { x: 2 / 3, y: 0, width: 1 / 3, height: 0.5 },
+        { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1 / 3, height: 1 },
+            { x: 1 / 3, y: 0, width: 1 / 3, height: 1 },
+            { x: 2 / 3, y: 0, width: 1 / 3, height: 0.5 },
+            { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 1 / 4 },
+        { x: 0, y: 1 / 4, width: 1, height: 1 / 4 },
+        { x: 0, y: 2 / 4, width: 1, height: 1 / 4 },
+        { x: 0, y: 3 / 4, width: 1, height: 1 / 4 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 1 / 4 },
+            { x: 0, y: 1 / 4, width: 1, height: 1 / 4 },
+            { x: 0, y: 2 / 4, width: 1, height: 1 / 4 },
+            { x: 0, y: 3 / 4, width: 1, height: 1 / 4 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1 / 4, height: 1 },
+        { x: 1 / 4, y: 0, width: 1 / 4, height: 1 },
+        { x: 2 / 4, y: 0, width: 1 / 4, height: 1 },
+        { x: 3 / 4, y: 0, width: 1 / 4, height: 1 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1 / 4, height: 1 },
+            { x: 1 / 4, y: 0, width: 1 / 4, height: 1 },
+            { x: 2 / 4, y: 0, width: 1 / 4, height: 1 },
+            { x: 3 / 4, y: 0, width: 1 / 4, height: 1 },
+          ]}
+        />
+      ),
+    },
   ],
   5: [
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 0.5 }, { x: 0, y: 0.5, width: 1/3, height: 0.5 }, { x: 1/3, y: 0.5, width: 1/3, height: 0.5 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 0.5 }, { x: 0, y: 0.5, width: 1/3, height: 0.5 }, { x: 1/3, y: 0.5, width: 1/3, height: 0.5 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1/3, height: 0.5 }, { x: 1/3, y: 0, width: 1/3, height: 0.5 }, { x: 2/3, y: 0, width: 1/3, height: 0.5 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1/3, height: 0.5 }, { x: 1/3, y: 0, width: 1/3, height: 0.5 }, { x: 2/3, y: 0, width: 1/3, height: 0.5 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.25, height: 0.25 }, { x: 0.75, y: 0, width: 0.25, height: 0.25 }, { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }, { x: 0, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.75, y: 0.75, width: 0.25, height: 0.25 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.25, height: 0.25 }, { x: 0.75, y: 0, width: 0.25, height: 0.25 }, { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }, { x: 0, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.75, y: 0.75, width: 0.25, height: 0.25 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1, height: 0.5 }, { x: 0, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.25, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.75, y: 0.5, width: 0.25, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 0.5 }, { x: 0, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.25, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.75, y: 0.5, width: 0.25, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 1 }, { x: 0.5, y: 0, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.25, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.75, width: 0.5, height: 0.25 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 1 }, { x: 0.5, y: 0, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.25, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.75, width: 0.5, height: 0.25 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1/3, height: 1 }, { x: 1/3, y: 0, width: 2/3, height: 0.5 }, { x: 1/3, y: 0.5, width: 1/3, height: 0.5 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.25 }, { x: 2/3, y: 0.75, width: 1/3, height: 0.25 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1/3, height: 1 }, { x: 1/3, y: 0, width: 2/3, height: 0.5 }, { x: 1/3, y: 0.5, width: 1/3, height: 0.5 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.25 }, { x: 2/3, y: 0.75, width: 1/3, height: 0.25 }]} /> },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+        { x: 0, y: 0.5, width: 1 / 3, height: 0.5 },
+        { x: 1 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+        { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+            { x: 0, y: 0.5, width: 1 / 3, height: 0.5 },
+            { x: 1 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+            { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1 / 3, height: 0.5 },
+        { x: 1 / 3, y: 0, width: 1 / 3, height: 0.5 },
+        { x: 2 / 3, y: 0, width: 1 / 3, height: 0.5 },
+        { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0.5, width: 0.5, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1 / 3, height: 0.5 },
+            { x: 1 / 3, y: 0, width: 1 / 3, height: 0.5 },
+            { x: 2 / 3, y: 0, width: 1 / 3, height: 0.5 },
+            { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0.5, width: 0.5, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.25, height: 0.25 },
+        { x: 0.75, y: 0, width: 0.25, height: 0.25 },
+        { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+        { x: 0, y: 0.75, width: 0.25, height: 0.25 },
+        { x: 0.75, y: 0.75, width: 0.25, height: 0.25 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.25, height: 0.25 },
+            { x: 0.75, y: 0, width: 0.25, height: 0.25 },
+            { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+            { x: 0, y: 0.75, width: 0.25, height: 0.25 },
+            { x: 0.75, y: 0.75, width: 0.25, height: 0.25 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 0.5 },
+        { x: 0, y: 0.5, width: 0.25, height: 0.5 },
+        { x: 0.25, y: 0.5, width: 0.25, height: 0.5 },
+        { x: 0.5, y: 0.5, width: 0.25, height: 0.5 },
+        { x: 0.75, y: 0.5, width: 0.25, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 0.5 },
+            { x: 0, y: 0.5, width: 0.25, height: 0.5 },
+            { x: 0.25, y: 0.5, width: 0.25, height: 0.5 },
+            { x: 0.5, y: 0.5, width: 0.25, height: 0.5 },
+            { x: 0.75, y: 0.5, width: 0.25, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 1 },
+        { x: 0.5, y: 0, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0.25, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0.5, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0.75, width: 0.5, height: 0.25 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 1 },
+            { x: 0.5, y: 0, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0.25, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0.5, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0.75, width: 0.5, height: 0.25 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1 / 3, height: 1 },
+        { x: 1 / 3, y: 0, width: 2 / 3, height: 0.5 },
+        { x: 1 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+        { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.25 },
+        { x: 2 / 3, y: 0.75, width: 1 / 3, height: 0.25 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1 / 3, height: 1 },
+            { x: 1 / 3, y: 0, width: 2 / 3, height: 0.5 },
+            { x: 1 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+            { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.25 },
+            { x: 2 / 3, y: 0.75, width: 1 / 3, height: 0.25 },
+          ]}
+        />
+      ),
+    },
   ],
   6: [
-    { layout: [{ x: 0, y: 0, width: 1/3, height: 0.5 }, { x: 1/3, y: 0, width: 1/3, height: 0.5 }, { x: 2/3, y: 0, width: 1/3, height: 0.5 }, { x: 0, y: 0.5, width: 1/3, height: 0.5 }, { x: 1/3, y: 0.5, width: 1/3, height: 0.5 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1/3, height: 0.5 }, { x: 1/3, y: 0, width: 1/3, height: 0.5 }, { x: 2/3, y: 0, width: 1/3, height: 0.5 }, { x: 0, y: 0.5, width: 1/3, height: 0.5 }, { x: 1/3, y: 0.5, width: 1/3, height: 0.5 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 1/3 }, { x: 0.5, y: 0, width: 0.5, height: 1/3 }, { x: 0, y: 1/3, width: 0.5, height: 1/3 }, { x: 0.5, y: 1/3, width: 0.5, height: 1/3 }, { x: 0, y: 2/3, width: 0.5, height: 1/3 }, { x: 0.5, y: 2/3, width: 0.5, height: 1/3 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 1/3 }, { x: 0.5, y: 0, width: 0.5, height: 1/3 }, { x: 0, y: 1/3, width: 0.5, height: 1/3 }, { x: 0.5, y: 1/3, width: 0.5, height: 1/3 }, { x: 0, y: 2/3, width: 0.5, height: 1/3 }, { x: 0.5, y: 2/3, width: 0.5, height: 1/3 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 2/3, height: 2/3 }, { x: 2/3, y: 0, width: 1/3, height: 1/3 }, { x: 2/3, y: 1/3, width: 1/3, height: 1/3 }, { x: 0, y: 2/3, width: 1/3, height: 1/3 }, { x: 1/3, y: 2/3, width: 1/3, height: 1/3 }, { x: 2/3, y: 2/3, width: 1/3, height: 1/3 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 2/3, height: 2/3 }, { x: 2/3, y: 0, width: 1/3, height: 1/3 }, { x: 2/3, y: 1/3, width: 1/3, height: 1/3 }, { x: 0, y: 2/3, width: 1/3, height: 1/3 }, { x: 1/3, y: 2/3, width: 1/3, height: 1/3 }, { x: 2/3, y: 2/3, width: 1/3, height: 1/3 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.25, width: 0.5, height: 0.25 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.75, width: 0.5, height: 0.25 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.25, width: 0.5, height: 0.25 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.75, width: 0.5, height: 0.25 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1, height: 1/3 }, { x: 0, y: 1/3, width: 1, height: 1/3 }, { x: 0, y: 2/3, width: 0.25, height: 1/3 }, { x: 0.25, y: 2/3, width: 0.25, height: 1/3 }, { x: 0.5, y: 2/3, width: 0.25, height: 1/3 }, { x: 0.75, y: 2/3, width: 0.25, height: 1/3 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 1/3 }, { x: 0, y: 1/3, width: 1, height: 1/3 }, { x: 0, y: 2/3, width: 0.25, height: 1/3 }, { x: 0.25, y: 2/3, width: 0.25, height: 1/3 }, { x: 0.5, y: 2/3, width: 0.25, height: 1/3 }, { x: 0.75, y: 2/3, width: 0.25, height: 1/3 }]} /> },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1 / 3, height: 0.5 },
+        { x: 1 / 3, y: 0, width: 1 / 3, height: 0.5 },
+        { x: 2 / 3, y: 0, width: 1 / 3, height: 0.5 },
+        { x: 0, y: 0.5, width: 1 / 3, height: 0.5 },
+        { x: 1 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+        { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1 / 3, height: 0.5 },
+            { x: 1 / 3, y: 0, width: 1 / 3, height: 0.5 },
+            { x: 2 / 3, y: 0, width: 1 / 3, height: 0.5 },
+            { x: 0, y: 0.5, width: 1 / 3, height: 0.5 },
+            { x: 1 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+            { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 1 / 3 },
+        { x: 0.5, y: 0, width: 0.5, height: 1 / 3 },
+        { x: 0, y: 1 / 3, width: 0.5, height: 1 / 3 },
+        { x: 0.5, y: 1 / 3, width: 0.5, height: 1 / 3 },
+        { x: 0, y: 2 / 3, width: 0.5, height: 1 / 3 },
+        { x: 0.5, y: 2 / 3, width: 0.5, height: 1 / 3 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 1 / 3 },
+            { x: 0.5, y: 0, width: 0.5, height: 1 / 3 },
+            { x: 0, y: 1 / 3, width: 0.5, height: 1 / 3 },
+            { x: 0.5, y: 1 / 3, width: 0.5, height: 1 / 3 },
+            { x: 0, y: 2 / 3, width: 0.5, height: 1 / 3 },
+            { x: 0.5, y: 2 / 3, width: 0.5, height: 1 / 3 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 2 / 3, height: 2 / 3 },
+        { x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+        { x: 2 / 3, y: 1 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 0, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 1 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 2 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 2 / 3, height: 2 / 3 },
+            { x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+            { x: 2 / 3, y: 1 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 0, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 1 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 2 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0.25, width: 0.5, height: 0.25 },
+        { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0.5, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0.75, width: 0.5, height: 0.25 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0.25, width: 0.5, height: 0.25 },
+            { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0.5, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0.75, width: 0.5, height: 0.25 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 1 / 3 },
+        { x: 0, y: 1 / 3, width: 1, height: 1 / 3 },
+        { x: 0, y: 2 / 3, width: 0.25, height: 1 / 3 },
+        { x: 0.25, y: 2 / 3, width: 0.25, height: 1 / 3 },
+        { x: 0.5, y: 2 / 3, width: 0.25, height: 1 / 3 },
+        { x: 0.75, y: 2 / 3, width: 0.25, height: 1 / 3 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 1 / 3 },
+            { x: 0, y: 1 / 3, width: 1, height: 1 / 3 },
+            { x: 0, y: 2 / 3, width: 0.25, height: 1 / 3 },
+            { x: 0.25, y: 2 / 3, width: 0.25, height: 1 / 3 },
+            { x: 0.5, y: 2 / 3, width: 0.25, height: 1 / 3 },
+            { x: 0.75, y: 2 / 3, width: 0.25, height: 1 / 3 },
+          ]}
+        />
+      ),
+    },
   ],
   7: [
-    { layout: [{ x: 0, y: 0, width: 1, height: 0.5 }, { x: 0, y: 0.5, width: 1/3, height: 0.25 }, { x: 1/3, y: 0.5, width: 1/3, height: 0.25 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.25 }, { x: 0, y: 0.75, width: 1/3, height: 0.25 }, { x: 1/3, y: 0.75, width: 1/3, height: 0.25 }, { x: 2/3, y: 0.75, width: 1/3, height: 0.25 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 0.5 }, { x: 0, y: 0.5, width: 1/3, height: 0.25 }, { x: 1/3, y: 0.5, width: 1/3, height: 0.25 }, { x: 2/3, y: 0.5, width: 1/3, height: 0.25 }, { x: 0, y: 0.75, width: 1/3, height: 0.25 }, { x: 1/3, y: 0.75, width: 1/3, height: 0.25 }, { x: 2/3, y: 0.75, width: 1/3, height: 0.25 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1/3, height: 1/3 }, { x: 1/3, y: 0, width: 1/3, height: 1/3 }, { x: 2/3, y: 0, width: 1/3, height: 1/3 }, { x: 0, y: 1/3, width: 1, height: 1/3 }, { x: 0, y: 2/3, width: 1/3, height: 1/3 }, { x: 1/3, y: 2/3, width: 1/3, height: 1/3 }, { x: 2/3, y: 2/3, width: 1/3, height: 1/3 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1/3, height: 1/3 }, { x: 1/3, y: 0, width: 1/3, height: 1/3 }, { x: 2/3, y: 0, width: 1/3, height: 1/3 }, { x: 0, y: 1/3, width: 1, height: 1/3 }, { x: 0, y: 2/3, width: 1/3, height: 1/3 }, { x: 1/3, y: 2/3, width: 1/3, height: 1/3 }, { x: 2/3, y: 2/3, width: 1/3, height: 1/3 }]} /> },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 0.5 },
+        { x: 0, y: 0.5, width: 1 / 3, height: 0.25 },
+        { x: 1 / 3, y: 0.5, width: 1 / 3, height: 0.25 },
+        { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.25 },
+        { x: 0, y: 0.75, width: 1 / 3, height: 0.25 },
+        { x: 1 / 3, y: 0.75, width: 1 / 3, height: 0.25 },
+        { x: 2 / 3, y: 0.75, width: 1 / 3, height: 0.25 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 0.5 },
+            { x: 0, y: 0.5, width: 1 / 3, height: 0.25 },
+            { x: 1 / 3, y: 0.5, width: 1 / 3, height: 0.25 },
+            { x: 2 / 3, y: 0.5, width: 1 / 3, height: 0.25 },
+            { x: 0, y: 0.75, width: 1 / 3, height: 0.25 },
+            { x: 1 / 3, y: 0.75, width: 1 / 3, height: 0.25 },
+            { x: 2 / 3, y: 0.75, width: 1 / 3, height: 0.25 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1 / 3, height: 1 / 3 },
+        { x: 1 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+        { x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+        { x: 0, y: 1 / 3, width: 1, height: 1 / 3 },
+        { x: 0, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 1 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 2 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1 / 3, height: 1 / 3 },
+            { x: 1 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+            { x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+            { x: 0, y: 1 / 3, width: 1, height: 1 / 3 },
+            { x: 0, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 1 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 2 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+          ]}
+        />
+      ),
+    },
   ],
   8: [
-    { layout: [{ x: 0, y: 0, width: 0.25, height: 0.5 }, { x: 0.25, y: 0, width: 0.25, height: 0.5 }, { x: 0.5, y: 0, width: 0.25, height: 0.5 }, { x: 0.75, y: 0, width: 0.25, height: 0.5 }, { x: 0, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.25, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.75, y: 0.5, width: 0.25, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.25, height: 0.5 }, { x: 0.25, y: 0, width: 0.25, height: 0.5 }, { x: 0.5, y: 0, width: 0.25, height: 0.5 }, { x: 0.75, y: 0, width: 0.25, height: 0.5 }, { x: 0, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.25, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.75, y: 0.5, width: 0.25, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 0.25 }, { x: 0.5, y: 0, width: 0.5, height: 0.25 }, { x: 0, y: 0.25, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.25, width: 0.5, height: 0.25 }, { x: 0, y: 0.5, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.25 }, { x: 0, y: 0.75, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.75, width: 0.5, height: 0.25 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 0.25 }, { x: 0.5, y: 0, width: 0.5, height: 0.25 }, { x: 0, y: 0.25, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.25, width: 0.5, height: 0.25 }, { x: 0, y: 0.5, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.25 }, { x: 0, y: 0.75, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.75, width: 0.5, height: 0.25 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1/3, height: 1/3 }, { x: 1/3, y: 0, width: 1/3, height: 1/3 }, { x: 2/3, y: 0, width: 1/3, height: 1/3 }, { x: 0, y: 1/3, width: 1/3, height: 2/3 }, { x: 1/3, y: 1/3, width: 1/3, height: 1/3 }, { x: 1/3, y: 2/3, width: 1/3, height: 1/3 }, { x: 2/3, y: 1/3, width: 1/3, height: 2/3 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1/3, height: 1/3 }, { x: 1/3, y: 0, width: 1/3, height: 1/3 }, { x: 2/3, y: 0, width: 1/3, height: 1/3 }, { x: 0, y: 1/3, width: 1/3, height: 2/3 }, { x: 1/3, y: 1/3, width: 1/3, height: 1/3 }, { x: 1/3, y: 2/3, width: 1/3, height: 1/3 }, { x: 2/3, y: 1/3, width: 1/3, height: 2/3 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1, height: 0.25 }, { x: 0, y: 0.25, width: 1, height: 0.25 }, { x: 0, y: 0.5, width: 1, height: 0.25 }, { x: 0, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.25, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.5, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.75, y: 0.75, width: 0.25, height: 0.25 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 0.25 }, { x: 0, y: 0.25, width: 1, height: 0.25 }, { x: 0, y: 0.5, width: 1, height: 0.25 }, { x: 0, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.25, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.5, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.75, y: 0.75, width: 0.25, height: 0.25 }]} /> }
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.25, height: 0.5 },
+        { x: 0.25, y: 0, width: 0.25, height: 0.5 },
+        { x: 0.5, y: 0, width: 0.25, height: 0.5 },
+        { x: 0.75, y: 0, width: 0.25, height: 0.5 },
+        { x: 0, y: 0.5, width: 0.25, height: 0.5 },
+        { x: 0.25, y: 0.5, width: 0.25, height: 0.5 },
+        { x: 0.5, y: 0.5, width: 0.25, height: 0.5 },
+        { x: 0.75, y: 0.5, width: 0.25, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.25, height: 0.5 },
+            { x: 0.25, y: 0, width: 0.25, height: 0.5 },
+            { x: 0.5, y: 0, width: 0.25, height: 0.5 },
+            { x: 0.75, y: 0, width: 0.25, height: 0.5 },
+            { x: 0, y: 0.5, width: 0.25, height: 0.5 },
+            { x: 0.25, y: 0.5, width: 0.25, height: 0.5 },
+            { x: 0.5, y: 0.5, width: 0.25, height: 0.5 },
+            { x: 0.75, y: 0.5, width: 0.25, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0, width: 0.5, height: 0.25 },
+        { x: 0, y: 0.25, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0.25, width: 0.5, height: 0.25 },
+        { x: 0, y: 0.5, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0.5, width: 0.5, height: 0.25 },
+        { x: 0, y: 0.75, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0.75, width: 0.5, height: 0.25 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0, width: 0.5, height: 0.25 },
+            { x: 0, y: 0.25, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0.25, width: 0.5, height: 0.25 },
+            { x: 0, y: 0.5, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0.5, width: 0.5, height: 0.25 },
+            { x: 0, y: 0.75, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0.75, width: 0.5, height: 0.25 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1 / 3, height: 1 / 3 },
+        { x: 1 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+        { x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+        { x: 0, y: 1 / 3, width: 1 / 3, height: 2 / 3 },
+        { x: 1 / 3, y: 1 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 1 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 2 / 3, y: 1 / 3, width: 1 / 3, height: 2 / 3 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1 / 3, height: 1 / 3 },
+            { x: 1 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+            { x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+            { x: 0, y: 1 / 3, width: 1 / 3, height: 2 / 3 },
+            { x: 1 / 3, y: 1 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 1 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 2 / 3, y: 1 / 3, width: 1 / 3, height: 2 / 3 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 0.25 },
+        { x: 0, y: 0.25, width: 1, height: 0.25 },
+        { x: 0, y: 0.5, width: 1, height: 0.25 },
+        { x: 0, y: 0.75, width: 0.25, height: 0.25 },
+        { x: 0.25, y: 0.75, width: 0.25, height: 0.25 },
+        { x: 0.5, y: 0.75, width: 0.25, height: 0.25 },
+        { x: 0.75, y: 0.75, width: 0.25, height: 0.25 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 0.25 },
+            { x: 0, y: 0.25, width: 1, height: 0.25 },
+            { x: 0, y: 0.5, width: 1, height: 0.25 },
+            { x: 0, y: 0.75, width: 0.25, height: 0.25 },
+            { x: 0.25, y: 0.75, width: 0.25, height: 0.25 },
+            { x: 0.5, y: 0.75, width: 0.25, height: 0.25 },
+            { x: 0.75, y: 0.75, width: 0.25, height: 0.25 },
+          ]}
+        />
+      ),
+    },
   ],
   9: [
-    { layout: [{ x: 0, y: 0, width: 1/3, height: 1/3 }, { x: 1/3, y: 0, width: 1/3, height: 1/3 }, { x: 2/3, y: 0, width: 1/3, height: 1/3 }, { x: 0, y: 1/3, width: 1/3, height: 1/3 }, { x: 1/3, y: 1/3, width: 1/3, height: 1/3 }, { x: 2/3, y: 1/3, width: 1/3, height: 1/3 }, { x: 0, y: 2/3, width: 1/3, height: 1/3 }, { x: 1/3, y: 2/3, width: 1/3, height: 1/3 }, { x: 2/3, y: 2/3, width: 1/3, height: 1/3 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1/3, height: 1/3 }, { x: 1/3, y: 0, width: 1/3, height: 1/3 }, { x: 2/3, y: 0, width: 1/3, height: 1/3 }, { x: 0, y: 1/3, width: 1/3, height: 1/3 }, { x: 1/3, y: 1/3, width: 1/3, height: 1/3 }, { x: 2/3, y: 1/3, width: 1/3, height: 1/3 }, { x: 0, y: 2/3, width: 1/3, height: 1/3 }, { x: 1/3, y: 2/3, width: 1/3, height: 1/3 }, { x: 2/3, y: 2/3, width: 1/3, height: 1/3 }]} /> },
-    { layout: [{ x: 0.25, y: 0, width: 0.5, height: 0.25 }, { x: 0, y: 0.25, width: 0.25, height: 0.5 }, { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }, { x: 0.75, y: 0.25, width: 0.25, height: 0.5 }, { x: 0.25, y: 0.75, width: 0.5, height: 0.25 }, { x: 0, y: 0, width: 0.25, height: 0.25 }, { x: 0.75, y: 0, width: 0.25, height: 0.25 }, { x: 0, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.75, y: 0.75, width: 0.25, height: 0.25 }], icon: <SvgIcon layout={[{ x: 0.25, y: 0, width: 0.5, height: 0.25 }, { x: 0, y: 0.25, width: 0.25, height: 0.5 }, { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }, { x: 0.75, y: 0.25, width: 0.25, height: 0.5 }, { x: 0.25, y: 0.75, width: 0.5, height: 0.25 }, { x: 0, y: 0, width: 0.25, height: 0.25 }, { x: 0.75, y: 0, width: 0.25, height: 0.25 }, { x: 0, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.75, y: 0.75, width: 0.25, height: 0.25 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 0.5 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 }, { x: 0, y: 0, width: 0.25, height: 0.25 }, { x: 0.75, y: 0, width: 0.25, height: 0.25 }, { x: 0, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.75, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.5, height: 0.5 }, { x: 0.5, y: 0, width: 0.5, height: 0.5 }, { x: 0, y: 0.5, width: 0.5, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 }, { x: 0, y: 0, width: 0.25, height: 0.25 }, { x: 0.75, y: 0, width: 0.25, height: 0.25 }, { x: 0, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.75, y: 0.75, width: 0.25, height: 0.25 }, { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 0.25, height: 1 }, { x: 0.25, y: 0, width: 0.5, height: 0.5 }, { x: 0.75, y: 0, width: 0.25, height: 1 }, { x: 0.25, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.25, y: 0, width: 0.25, height: 0.25 }, { x: 0.5, y: 0, width: 0.25, height: 0.25 }, { x: 0.25, y: 0.25, width: 0.25, height: 0.25 }, { x: 0.5, y: 0.25, width: 0.25, height: 0.25 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 0.25, height: 1 }, { x: 0.25, y: 0, width: 0.5, height: 0.5 }, { x: 0.75, y: 0, width: 0.25, height: 1 }, { x: 0.25, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.5, y: 0.5, width: 0.25, height: 0.5 }, { x: 0.25, y: 0, width: 0.25, height: 0.25 }, { x: 0.5, y: 0, width: 0.25, height: 0.25 }, { x: 0.25, y: 0.25, width: 0.25, height: 0.25 }, { x: 0.5, y: 0.25, width: 0.25, height: 0.25 }]} /> },
-    { layout: [{ x: 0, y: 0, width: 1, height: 0.25 }, { x: 0, y: 0.25, width: 0.25, height: 0.5 }, { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }, { x: 0.75, y: 0.25, width: 0.25, height: 0.5 }, { x: 0, y: 0.75, width: 1, height: 0.25 }, { x: 0, y: 0, width: 0.5, height: 0.25 }, { x: 0.5, y: 0, width: 0.5, height: 0.25 }, { x: 0, y: 0.75, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.75, width: 0.5, height: 0.25 }], icon: <SvgIcon layout={[{ x: 0, y: 0, width: 1, height: 0.25 }, { x: 0, y: 0.25, width: 0.25, height: 0.5 }, { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }, { x: 0.75, y: 0.25, width: 0.25, height: 0.5 }, { x: 0, y: 0.75, width: 1, height: 0.25 }, { x: 0, y: 0, width: 0.5, height: 0.25 }, { x: 0.5, y: 0, width: 0.5, height: 0.25 }, { x: 0, y: 0.75, width: 0.5, height: 0.25 }, { x: 0.5, y: 0.75, width: 0.5, height: 0.25 }]} /> },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1 / 3, height: 1 / 3 },
+        { x: 1 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+        { x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+        { x: 0, y: 1 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 1 / 3, y: 1 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 2 / 3, y: 1 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 0, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 1 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+        { x: 2 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1 / 3, height: 1 / 3 },
+            { x: 1 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+            { x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 3 },
+            { x: 0, y: 1 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 1 / 3, y: 1 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 2 / 3, y: 1 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 0, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 1 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+            { x: 2 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0.25, y: 0, width: 0.5, height: 0.25 },
+        { x: 0, y: 0.25, width: 0.25, height: 0.5 },
+        { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+        { x: 0.75, y: 0.25, width: 0.25, height: 0.5 },
+        { x: 0.25, y: 0.75, width: 0.5, height: 0.25 },
+        { x: 0, y: 0, width: 0.25, height: 0.25 },
+        { x: 0.75, y: 0, width: 0.25, height: 0.25 },
+        { x: 0, y: 0.75, width: 0.25, height: 0.25 },
+        { x: 0.75, y: 0.75, width: 0.25, height: 0.25 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0.25, y: 0, width: 0.5, height: 0.25 },
+            { x: 0, y: 0.25, width: 0.25, height: 0.5 },
+            { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+            { x: 0.75, y: 0.25, width: 0.25, height: 0.5 },
+            { x: 0.25, y: 0.75, width: 0.5, height: 0.25 },
+            { x: 0, y: 0, width: 0.25, height: 0.25 },
+            { x: 0.75, y: 0, width: 0.25, height: 0.25 },
+            { x: 0, y: 0.75, width: 0.25, height: 0.25 },
+            { x: 0.75, y: 0.75, width: 0.25, height: 0.25 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+        { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+        { x: 0.5, y: 0.5, width: 0.5, height: 0.5 },
+        { x: 0, y: 0, width: 0.25, height: 0.25 },
+        { x: 0.75, y: 0, width: 0.25, height: 0.25 },
+        { x: 0, y: 0.75, width: 0.25, height: 0.25 },
+        { x: 0.75, y: 0.75, width: 0.25, height: 0.25 },
+        { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+            { x: 0, y: 0.5, width: 0.5, height: 0.5 },
+            { x: 0.5, y: 0.5, width: 0.5, height: 0.5 },
+            { x: 0, y: 0, width: 0.25, height: 0.25 },
+            { x: 0.75, y: 0, width: 0.25, height: 0.25 },
+            { x: 0, y: 0.75, width: 0.25, height: 0.25 },
+            { x: 0.75, y: 0.75, width: 0.25, height: 0.25 },
+            { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 0.25, height: 1 },
+        { x: 0.25, y: 0, width: 0.5, height: 0.5 },
+        { x: 0.75, y: 0, width: 0.25, height: 1 },
+        { x: 0.25, y: 0.5, width: 0.25, height: 0.5 },
+        { x: 0.5, y: 0.5, width: 0.25, height: 0.5 },
+        { x: 0.25, y: 0, width: 0.25, height: 0.25 },
+        { x: 0.5, y: 0, width: 0.25, height: 0.25 },
+        { x: 0.25, y: 0.25, width: 0.25, height: 0.25 },
+        { x: 0.5, y: 0.25, width: 0.25, height: 0.25 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 0.25, height: 1 },
+            { x: 0.25, y: 0, width: 0.5, height: 0.5 },
+            { x: 0.75, y: 0, width: 0.25, height: 1 },
+            { x: 0.25, y: 0.5, width: 0.25, height: 0.5 },
+            { x: 0.5, y: 0.5, width: 0.25, height: 0.5 },
+            { x: 0.25, y: 0, width: 0.25, height: 0.25 },
+            { x: 0.5, y: 0, width: 0.25, height: 0.25 },
+            { x: 0.25, y: 0.25, width: 0.25, height: 0.25 },
+            { x: 0.5, y: 0.25, width: 0.25, height: 0.25 },
+          ]}
+        />
+      ),
+    },
+    {
+      layout: [
+        { x: 0, y: 0, width: 1, height: 0.25 },
+        { x: 0, y: 0.25, width: 0.25, height: 0.5 },
+        { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+        { x: 0.75, y: 0.25, width: 0.25, height: 0.5 },
+        { x: 0, y: 0.75, width: 1, height: 0.25 },
+        { x: 0, y: 0, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0, width: 0.5, height: 0.25 },
+        { x: 0, y: 0.75, width: 0.5, height: 0.25 },
+        { x: 0.5, y: 0.75, width: 0.5, height: 0.25 },
+      ],
+      icon: (
+        <SvgIcon
+          layout={[
+            { x: 0, y: 0, width: 1, height: 0.25 },
+            { x: 0, y: 0.25, width: 0.25, height: 0.5 },
+            { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+            { x: 0.75, y: 0.25, width: 0.25, height: 0.5 },
+            { x: 0, y: 0.75, width: 1, height: 0.25 },
+            { x: 0, y: 0, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0, width: 0.5, height: 0.25 },
+            { x: 0, y: 0.75, width: 0.5, height: 0.25 },
+            { x: 0.5, y: 0.75, width: 0.5, height: 0.25 },
+          ]}
+        />
+      ),
+    },
   ],
 };
