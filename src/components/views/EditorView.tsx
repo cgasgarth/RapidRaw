@@ -172,7 +172,7 @@ export default function EditorView({
       onRequestThumbnails={requestThumbnails}
       onZoomChange={handleZoomChange}
       rating={imageRatings[selectedImage?.path || ''] || 0}
-      selectedImage={selectedImage}
+      selectedImage={selectedImage ?? undefined}
       setIsFilmstripVisible={(value: boolean) =>
         setUI((state) => ({ uiVisibility: { ...state.uiVisibility, filmstrip: value } }))
       }
