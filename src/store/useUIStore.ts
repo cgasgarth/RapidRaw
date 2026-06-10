@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ImageFile, LibraryViewMode, Panel, UiVisibility, CullingSuggestions } from '../components/ui/AppProperties';
+import { ImageFile, Panel, UiVisibility, CullingSuggestions } from '../components/ui/AppProperties';
 
 const RIGHT_PANEL_ORDER = [
   Panel.Metadata,

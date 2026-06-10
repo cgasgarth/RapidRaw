@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowLeft, CheckCircle2, ChevronDown, Loader2, Search, Users, Layers, Crop } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Loader2, Search, Users } from 'lucide-react';
 import { siGithub } from 'simple-icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -66,7 +66,6 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [downloadStatus, setDownloadStatus] = useState<Record<string, 'idle' | 'downloading' | 'success'>>({});
-  const [allPreviewsLoaded, setAllPreviewsLoaded] = useState(false);
 
   const sortMethods = useMemo(() => [{ value: 'name', label: t('library.community.sortMethods.name') }], [t]);
 
@@ -144,7 +143,6 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
     }
 
     const generateAllPreviews = async () => {
-      setAllPreviewsLoaded(false);
       try {
         const previewDataMap: Record<string, number[]> = await invoke(Invokes.GenerateAllCommunityPreviews, {
           imagePaths: previewImagePaths,
@@ -166,8 +164,6 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
         });
       } catch (error) {
         console.error(`Failed to generate previews:`, error);
-      } finally {
-        setAllPreviewsLoaded(true);
       }
     };
 
