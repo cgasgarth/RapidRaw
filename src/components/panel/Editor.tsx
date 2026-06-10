@@ -1330,7 +1330,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     return JSON.stringify({
       id: activeMaskDef.id,
       invert: activeMaskDef.invert,
-      opacity: activeMaskDef.opacity,
+      opacity: 'opacity' in activeMaskDef ? activeMaskDef.opacity : 100,
       subMasks,
       geometry,
       renderSize: { w: imageRenderSize.width, h: imageRenderSize.height },
