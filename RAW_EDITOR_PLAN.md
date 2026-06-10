@@ -712,6 +712,9 @@ Every major capability should eventually become one or more GitHub issues. This 
 | REQ-FILM-002 | Film | Film negative conversion | RapidRAW, RawTherapee | P1 | Yes | film base sampling and inversion workflow | negative scan fixtures |
 | REQ-NEG-001 | Negative Lab | Dedicated negative processing lab UI | User requirement, film scan workflows | P1 | Yes | purpose-built workflow for converting, profiling, correcting, and batch processing scanned negatives | negative scan fixtures, UI artifacts |
 | REQ-NEG-002 | Negative Lab | Presets for major film stocks | User requirement, film workflows | P1 | Yes | legally safe presets for major color and black-and-white film stocks, with provenance and trademark-safe naming policy | preset review, before/after fixtures |
+| REQ-NEG-003 | Negative Lab | Roll/session model | Film scan workflows, batch consistency | P1 | Yes | scans can be grouped into roll sessions with shared base samples, anchor frames, per-frame overrides, and positive variant provenance | roll consistency fixtures, sidecar roundtrip |
+| REQ-NEG-004 | Negative Lab | Density-domain inversion pipeline | Film scanning tools, color science | P1 | Yes | negative conversion operates in a defined density/transmittance model with explicit input profile and process assumptions | CPU/GPU parity, color fixtures |
+| REQ-NEG-005 | Negative Lab | API-callable negative lab commands | User requirement, app-server agent | P1 | Yes | every negative lab operation is command/API-callable, serializable, undoable, batchable, and safe for agent tooling | command replay, dry-run, provenance tests |
 | REQ-HDR-001 | HDR | HDR merge from brackets | Capture One, Lightroom, RapidRAW | P1 | Yes | bracketed files merge into editable artifact | HDR fixtures, deghost/alignment |
 | REQ-PANO-001 | Panorama | Panorama stitching | Capture One, Lightroom, RapidRAW | P1 | Yes | projections and boundary controls produce editable artifact | pano fixtures, memory budget |
 | REQ-FOCUS-001 | Focus | Focus stacking | professional macro workflow | P2 | Yes | focus brackets align and blend to editable artifact | sharpness map, focus fixtures |
@@ -1052,60 +1055,168 @@ Consult requirement:
 Dedicated UI requirements:
 
 - Negative Lab workspace/tab.
-- Film strip or batch queue optimized for scans.
-- One-image guided conversion mode.
-- Batch conversion mode for a roll.
-- Before/after and positive/negative split views.
-- Film base sampling controls.
+- Left rail roll/frame queue optimized for scans.
+- Center viewer with positive/negative split, before/after split, density view, channel view, clipping overlays, crop/border overlays, and sample-point overlays.
+- Right control stack grouped by Input, Frame Detection, Base, Inversion, Color, Roll Sync, Preset, QC, and Output.
+- Bottom filmstrip with applied-state badges, warning badges, crop status, base-sample status, and roll-sync status.
+- One-image guided conversion mode for new users.
+- Batch conversion mode for full rolls.
+- Advanced mode that exposes the full density/inversion model.
+- Preset browser with generic built-ins, verified project profiles, user profiles, and reference mappings.
+- Side-by-side preset comparison for the current frame and anchor frames.
+- Save, version, duplicate, and share custom negative profiles.
+- Export converted positives as normal editable RawEngine variants.
+
+Supported negative lab input modes:
+
+- Camera-scanned RAW or DNG negative captures.
+- Camera-scanned TIFF/PNG/JPEG derived from RAW.
+- Flatbed-scanned TIFF with optional scanner ICC/input profile.
+- Lab-scanned TIFF/JPEG with explicit limitation notes when scanner profile and raw capture data are unavailable.
+- Multi-frame/contact-sheet scans that need frame splitting.
+- Single-frame scans with visible rebate/borders.
+- Cropped scans without borders where base detection must rely on manual or roll-level base samples.
+- Color negative, black-and-white silver negative, chromogenic black-and-white negative, ECN-2/cinema color negative, redscale/creative color negative, and E-6 slide/reversal helper modes.
+
+Roll/session model requirements:
+
+- Negative Lab creates a roll/session entity, not just independent per-image edits.
+- A roll stores input mode, process family, scanner/camera profile, light-source assumptions, film holder/copy setup notes, shared base samples, frame list, anchor frames, roll-level defaults, per-frame overrides, rejected samples, and validation warnings.
+- Each frame stores crop, rotation, perspective correction, base sample links, conversion operation parameters, QC status, and provenance to the original scan.
+- Roll-level settings can be applied to all frames, selected frames, or frames matching warning states.
+- Per-frame overrides must be explicit and reversible.
+- Copy/paste and sync must support all, selected, and safe-only operations.
+- Converted positives must remain linked to the original negative scan and roll/session settings.
+
+Primary workflow:
+
+1. Import scans: choose source type, roll/session, scanner/camera profile, light-table white balance, process family, and expected frame format.
+2. Detect frames: split multi-frame scans, crop, rotate, straighten, detect borders/rebate, and flag ambiguous crops.
+3. Calibrate base: run auto base detection, collect manual multi-point samples, reject contaminated samples, and save roll-level base/fog statistics.
+4. Convert: choose process mode and preset tier, then tune inversion, density, RGB balance, black point, white point, contrast, and color cast.
+5. Normalize roll: select anchor frames, sync exposure/color/density, apply per-frame overrides, and flag outliers.
+6. QC: inspect clipping, density, channels, skin sample readouts, neutral sample readouts, crop warnings, and batch consistency warnings.
+7. Output: save positive variants with provenance, continue editing in the normal RawEngine editor, or export with recipes.
+
+Frame detection and crop requirements:
+
+- Detect single frames, strips, contact sheets, and scans with uneven borders.
+- Support manual crop and rotation correction when detection is wrong.
+- Avoid using rebate/border text as film base.
+- Flag likely contaminated base samples near edges, dust, sprocket holes, light leaks, and frame numbers.
+- Preserve original negative scan orientation and allow non-destructive display rotation.
+- Store crop and split operations as versioned edit graph operations.
+
+Film base and calibration requirements:
+
 - Manual film base picker.
-- Auto film base detection.
-- Orange mask removal.
-- Per-channel inversion curves.
-- RGB balance after inversion.
-- Density/exposure normalization.
-- Black point and white point controls.
-- Contrast curve controls.
-- Color cast correction.
+- Auto film base detection with confidence score.
+- Multi-point base sampling.
+- Rejected base sample list.
+- Roll-level base/fog model.
+- Per-frame base override.
+- Light-table/camera white balance input.
 - Scanner profile input.
 - Camera scanning profile input.
-- Border/crop detection for scanned frames.
-- Frame-to-frame consistency tools.
-- Roll-level settings.
-- Copy/paste conversion settings across a roll.
-- Preset browser.
-- Preset strength/mix control.
-- Side-by-side preset comparison.
-- Save custom negative profiles.
-- Export converted positives as normal editable RawEngine variants.
+- Lens correction and illumination correction handoff for camera-scanned negatives.
+- Calibration notes for copy stand, macro lens, light source, holder, and scanner.
+
+Image processing and color-science requirements:
+
+- Convert input to a known linear working space before negative conversion.
+- Separate capture/scanner correction from creative post-inversion color correction.
+- Model film base as per-channel Dmin/base/fog using robust multi-sample statistics.
+- Perform inversion in a defined density/transmittance domain, not arbitrary display RGB.
+- Support process-specific conversion profiles for C-41, ECN-2, black-and-white silver, chromogenic black-and-white, redscale/creative color, and E-6 slide helper mode.
+- E-6 slide/reversal helper mode must not run negative inversion; it should provide profile/display correction and scan cleanup.
+- Define characteristic curve parameters: toe, linear section, shoulder, gamma/contrast index, per-channel dye behavior, and output contrast curve.
+- Provide per-channel inversion curves.
+- Provide RGB balance after inversion.
+- Provide density/exposure normalization.
+- Provide black point and white point controls.
+- Provide color cast correction.
+- Preserve highlight and shadow recovery opportunities after conversion where the source data allows it.
+- Define where negative conversion lives in the edit graph relative to RAW decode, lens correction, scene-referred color, film simulation, grain, halation, and creative grading.
+- Film grain and halation controls are creative post-conversion operations unless a future ADR proves a better model.
+- CPU and GPU renders must have explicit parity tolerances before the feature ships.
+
+Professional edge cases:
+
+- Expired film.
+- Pushed or pulled film.
+- Underdeveloped or overdeveloped negatives.
+- Dense negatives.
+- Thin negatives.
+- Uneven illumination.
+- Light leaks.
+- Dust and scratches.
+- Rebate contamination.
+- Mixed-exposure rolls.
+- Mixed-light rolls.
+- Cross-processed film.
+- Remjet/cinema-stock assumptions.
+- Lab scans with unknown correction baked in.
+- Creative/specialty stocks where exact color is not objectively recoverable.
 
 Film stock preset requirements:
 
 - Include presets for major film stock families where legally safe.
 - Avoid bundled proprietary LUTs, ICCs, or trademark-infringing assets.
-- Use neutral or descriptive names if exact stock names create legal risk.
+- Use neutral or descriptive names for built-in presets unless legal review approves exact stock names.
 - Track preset provenance and licensing.
 - Support color negative, black-and-white negative, and slide/reversal scan helper workflows.
+- Do not claim exact emulation of a branded film stock unless RawEngine has project-owned measurements, fixture IDs, scan setup notes, and legal approval.
+- Presets should be starting points for inversion and scan normalization, not final creative promises.
+- Every preset must be serializable, API-callable, versioned, and deterministic.
 - Preset metadata should include:
   - stock family.
   - process type.
+  - preset tier.
   - intended scanner/camera-scan assumptions.
   - base color assumptions.
   - contrast curve.
   - color correction model.
   - grain/texture defaults where appropriate.
+  - measured fixture references where available.
+  - reference stock-family notes where legally safe.
   - version.
   - legal/provenance note.
 
-Major stock families to research for legally safe preset coverage:
+Preset tier model:
 
-- Kodak color negative families.
-- Fuji color negative families.
-- CineStill-style color negative workflows, with naming/legal review.
-- Ilford black-and-white families.
-- Kodak black-and-white families.
-- Foma black-and-white families.
-- Rollei/Agfa-style black-and-white families, with naming/legal review.
+- Generic built-ins: safe descriptive presets such as `C-41 Neutral 100`, `C-41 Portrait 160`, `C-41 Portrait 400`, `C-41 High-Speed 800`, `C-41 Saturated 100`, `ECN-2 Daylight`, `ECN-2 Tungsten`, `Black-and-White Classic Grain`, `Black-and-White Tabular Grain`, `Black-and-White Ortho`, `Black-and-White Chromogenic`, and `Slide/Reversal Helper`.
+- Verified profiles: project-measured profiles tied to RawEngine-owned test rolls, fixture IDs, scan/camera setup, process lab or process chemistry, version, and legal status.
+- User profiles: user-created profiles built from their own scans and saved with local provenance.
+- Reference mappings: optional researched metadata that maps a generic preset to stock families after legal review; these are not exact emulation claims.
+
+Major stock-family research coverage:
+
+- Kodak still color negative, including Portra, Ektar, Gold, and UltraMax-style families.
+- Kodak still black-and-white, including Tri-X and T-Max-style families.
+- Kodak motion/cinema families, including Vision3 daylight/tungsten color negative, Double-X black-and-white negative, Ektachrome reversal, Tri-X reversal, and newer motion families where current.
+- Fujifilm color negative, slide/reversal, and black-and-white families where still relevant to users and archival scans.
+- Ilford and Kentmere black-and-white families, including classic cubic-grain, tabular-grain, chromogenic, infrared/specialty, and ortho families.
+- Foma black-and-white families, including classic, creative/action, retropan, cine, ortho, and reversal families.
+- Harman color and creative color families, including Phoenix/Switch/Red-style workflows.
+- CineStill-style still-photo cinema-derived color negative workflows, with naming and trademark review.
+- Lomography standard color negative and LomoChrome-style creative color families.
+- Adox black-and-white, specialty, and reversal families.
+- Ferrania P30-style black-and-white workflows.
+- Rollei/Agfa-style black-and-white families, with naming and trademark review.
 - Slide/reversal helper profiles as a separate mode, not negative inversion.
+
+Preset research seed sources:
+
+- Kodak Alaris professional still-film resources: <https://kodakprofessional.com/photographers/resources>
+- Kodak motion camera films: <https://www.kodak.com/en/motion/products/camera-films/>
+- Fujifilm negative and reversal films: <https://www.fujifilm.com/uk/en/consumer/films/negative-and-reversal>
+- Ilford technical data: <https://www.ilfordphoto.com/technical-data/>
+- Foma black-and-white film catalog: <https://www.foma.cz/en/catalogue-bw-film-324>
+- Harman Phoenix/color-film range: <https://www.harmanphoto.co.uk/phoenix/>
+- CineStill film stock guide: <https://cinestillfilm.com/blogs/news/cinestill-film-stock-primer>
+- Lomography film catalog: <https://shop.lomography.com/film/all>
+- Adox support and film families: <https://www.adox.de/support/>
+- Ferrania P30 information: <https://www.filmferrania.com/p30-info>
 
 Negative lab validation:
 
@@ -1122,22 +1233,89 @@ Negative lab validation:
 - Batch consistency fixture.
 - Skin tone fixture after inversion.
 - Neutral gray fixture after inversion.
+- Camera RAW negative fixture with visible border.
+- Camera TIFF negative fixture with known light-source white balance.
+- Flatbed TIFF negative fixture with scanner profile.
+- Multi-frame strip/contact-sheet fixture.
+- Lab scan fixture with baked-in correction warning.
+- Pushed and pulled film fixtures.
+- Expired film fixture.
+- Uneven illumination fixture.
+- Dust/scratch and contaminated-base fixture.
+- ECN-2 daylight and tungsten fixtures.
+- Black-and-white ortho/specialty fixture.
+- Slide/reversal positive scan helper fixture.
+- Creative color fixture with explicit non-exact-emulation warning.
+
+Negative lab validation matrix:
+
+| Case | Inputs | Required evidence |
+| --- | --- | --- |
+| C-41 camera scan | RAW/DNG with visible border | base sample record, positive render, parameter snapshot, CPU/GPU parity result |
+| C-41 flatbed scan | TIFF plus scanner profile | profile record, positive render, neutral patch notes |
+| Lab scan | TIFF/JPEG with unknown lab correction | limitation warning, positive variant provenance |
+| Dense/thin negatives | known hard fixtures | clipping report, density report, before/after artifact |
+| Mixed roll | 6+ frames | anchor frame, sync deltas, per-frame overrides |
+| Black-and-white panchromatic | silver negative | tonal curve, grain/detail crop |
+| Black-and-white ortho/specialty | ortho or specialty fixture | spectral/look note, manual adjustment evidence |
+| ECN-2/cinema negative | daylight and tungsten cases | process assumption, halation/remjet note, render artifact |
+| Creative color | Harman/Lomo-style fixtures | warning that output is profile-assisted, not exact emulation |
+| Slide/reversal helper | E-6 positive scan | no inversion operation, profile/display helper only |
+| Multi-frame scan | strip/contact-sheet input | frame split artifact, crop warnings, replayable operations |
+
+API and app-server agent requirements:
+
+- Every negative lab operation must be callable through typed command APIs.
+- Commands must be replayable, serializable, undoable, and batchable.
+- The UI and app-server agent must use the same command envelope.
+- Agent tools may propose or apply roll/session settings, base samples, frame crops, preset choices, and per-frame overrides only through non-destructive operations.
+- Agent tools must return preview artifacts, warnings, and parameter diffs before destructive exports or bulk operations.
+- Agent tools must never overwrite original scans.
+- Agent tools must preserve provenance from original negative scan to positive variant.
+- Agent tools must expose safe read-only inspection commands for density, clipping, channels, sample points, and roll consistency.
+- Bulk agent operations must support dry-run, selected-frame scope, and rollback.
+
+Negative lab ADRs:
+
+- `ADR-NEG-001: Negative lab architecture and edit graph integration`
+- `ADR-NEG-002: Density-domain inversion model`
+- `ADR-NEG-003: Input profile strategy for camera, flatbed, and lab scans`
+- `ADR-NEG-004: Film base sampling and roll-level calibration`
+- `ADR-NEG-005: Roll consistency and batch application semantics`
+- `ADR-NEG-006: Preset naming, trademark, provenance, and legal policy`
+- `ADR-NEG-007: Built-in preset taxonomy and stock refresh cadence`
+- `ADR-NEG-008: Positive variant/export provenance`
+- `ADR-NEG-009: Negative fixture corpus and validation thresholds`
 
 Negative lab issue split:
 
 - `consult(negative-lab): get negative processing lab design review`
 - `negative-lab(adr): define negative processing architecture`
+- `negative-lab(adr): define density-domain inversion model`
+- `negative-lab(adr): define preset naming and legal policy`
 - `negative-lab(ui): design dedicated negative lab workspace`
+- `negative-lab(ui): add roll setup and frame queue design`
+- `negative-lab(ui): add QC overlays and sample readouts design`
 - `negative-lab(schema): define negative conversion operation schema`
+- `negative-lab(api): expose negative lab command surface`
+- `agent(negative-lab): expose safe app-server tools for negative lab`
+- `negative-lab(import): support scan input modes and roll sessions`
+- `negative-lab(import): add frame splitting and border detection`
 - `negative-lab(base): add film base sampling controls`
 - `negative-lab(inversion): add per-channel inversion curves`
+- `negative-lab(color): add density normalization and process profiles`
 - `negative-lab(batch): add roll-level batch consistency workflow`
 - `negative-lab(presets): define film stock preset metadata and legal policy`
-- `negative-lab(presets): add legally safe major stock preset set`
+- `negative-lab(presets): add generic legally safe built-in presets`
+- `negative-lab(presets): add stock-family research mappings after legal review`
+- `negative-lab(presets): add measured-profile fixture format`
 - `negative-lab(crop): add frame border and crop detection`
 - `negative-lab(profiles): add scanner and camera-scan profile inputs`
+- `negative-lab(output): add positive variant provenance`
 - `validation(negative-lab): add negative scan fixture manifest`
+- `validation(negative-lab): add fixture licensing and provenance policy`
 - `validation(negative-lab): add color and black-and-white negative render tests`
+- `validation(negative-lab): add roll consistency and QC overlay tests`
 - `docs(negative-lab): add user guide for negative workflow`
 
 ### 7.6 Export And Delivery
@@ -2974,17 +3152,31 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(film): add film simulation fixture outputs`
 - `consult(negative-lab): get negative processing lab design review`
 - `negative-lab(adr): define negative processing architecture`
+- `negative-lab(adr): define density-domain inversion model`
+- `negative-lab(adr): define preset naming and legal policy`
 - `negative-lab(ui): design dedicated negative lab workspace`
+- `negative-lab(ui): add roll setup and frame queue design`
+- `negative-lab(ui): add QC overlays and sample readouts design`
 - `negative-lab(schema): define negative conversion operation schema`
+- `negative-lab(api): expose negative lab command surface`
+- `agent(negative-lab): expose safe app-server tools for negative lab`
+- `negative-lab(import): support scan input modes and roll sessions`
+- `negative-lab(import): add frame splitting and border detection`
 - `negative-lab(base): add film base sampling controls`
 - `negative-lab(inversion): add per-channel inversion curves`
+- `negative-lab(color): add density normalization and process profiles`
 - `negative-lab(batch): add roll-level batch consistency workflow`
 - `negative-lab(presets): define film stock preset metadata and legal policy`
-- `negative-lab(presets): add legally safe major stock preset set`
+- `negative-lab(presets): add generic legally safe built-in presets`
+- `negative-lab(presets): add stock-family research mappings after legal review`
+- `negative-lab(presets): add measured-profile fixture format`
 - `negative-lab(crop): add frame border and crop detection`
 - `negative-lab(profiles): add scanner and camera-scan profile inputs`
+- `negative-lab(output): add positive variant provenance`
 - `validation(negative-lab): add negative scan fixture manifest`
+- `validation(negative-lab): add fixture licensing and provenance policy`
 - `validation(negative-lab): add color and black-and-white negative render tests`
+- `validation(negative-lab): add roll consistency and QC overlay tests`
 - `docs(negative-lab): add user guide for negative workflow`
 
 #### Milestone 10: HDR Merge
@@ -3520,17 +3712,31 @@ Issues:
 - Add film simulation fixture outputs.
 - Consult on the full negative processing lab before design or implementation.
 - Define negative processing architecture.
+- Define density-domain inversion model.
+- Define preset naming and legal policy.
 - Design dedicated negative lab workspace.
+- Design roll setup and frame queue.
+- Design QC overlays and sample readouts.
 - Define negative conversion operation schema.
+- Expose negative lab command surface.
+- Expose safe app-server tools for negative lab.
+- Support scan input modes and roll sessions.
+- Add frame splitting and border detection.
 - Add film base sampling controls.
 - Add per-channel inversion curves.
+- Add density normalization and process profiles.
 - Add roll-level batch consistency workflow.
 - Define film stock preset metadata and legal policy.
-- Add legally safe major stock preset set.
+- Add generic legally safe built-in presets.
+- Add stock-family research mappings after legal review.
+- Add measured-profile fixture format.
 - Add frame border and crop detection.
 - Add scanner and camera-scan profile inputs.
+- Add positive variant provenance.
 - Add negative scan fixture manifest.
+- Add fixture licensing and provenance policy.
 - Add color and black-and-white negative render tests.
+- Add roll consistency and QC overlay tests.
 - Add negative workflow user guide.
 
 Definition of done:
@@ -3540,7 +3746,10 @@ Definition of done:
 - Film simulations are API-callable and regression tested.
 - Negative processing has a dedicated UI plan and implementation path.
 - Major film stock presets have provenance and legal review.
-- Negative conversions are validated against color and black-and-white scan fixtures.
+- Negative conversion uses a documented density-domain model with input profile assumptions.
+- Roll/session workflows support shared base samples, anchor frames, per-frame overrides, and positive variant provenance.
+- Negative lab commands are API-callable, replayable, undoable, batchable, and safe for app-server agent tools.
+- Negative conversions are validated against color, black-and-white, ECN-2, slide-helper, dense/thin, mixed-roll, and multi-frame scan fixtures.
 
 ### Milestone 10: HDR Merge
 
