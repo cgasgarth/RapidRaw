@@ -35,6 +35,31 @@ The original planning goal produced this document, the milestone fleet, issue se
 
 Before starting a work item, identify the active issue, milestone, dependencies, branch name, expected PR size, and validation commands. Each autonomous implementation cycle should end with one merged PR, one evidence-backed blocked report, or one completed milestone summary, then continue to the next unblocked issue while the active goal remains in force.
 
+### Final Goal Review Artifact
+
+Before the active implementation goal can be considered finished, RawEngine must include a local HTML review page that the user can open in a browser to inspect the work completed during the goal.
+
+Required artifact:
+
+- A local HTML page committed or generated from committed source, with a stable documented path.
+- It must summarize every new user-visible feature, UI change, validation surface, and major technical capability added during the goal.
+- It must link each feature or validation area back to its GitHub issue, PR, milestone, relevant ADR or plan section, and validation evidence.
+- It must include screenshots or render artifacts for user-visible features, UI flows, dialogs, panels, editor states, generated artifacts, and any visual image-processing behavior that was added or changed.
+- It must include a test/validation section that lists local commands, GitHub Actions checks, fixture/golden-image checks, UI screenshots, render comparisons, skipped checks with reasons, and residual risks.
+- It must include design decisions the user would want to know: command/API choices, color-management choices, validation-gate choices, AI/app-server boundaries, UI tradeoffs, data/provenance model choices, and any feature limitations.
+- It must include a spec coverage section that maps completed work back to this plan's requirement IDs, milestones, and open follow-up issues.
+- It must be usable offline for local review except for external links to GitHub, documentation, or source provenance pages.
+- It must avoid marketing language and should read as an engineering review dashboard: concrete, evidence-backed, and easy to scan.
+
+Screenshot requirements:
+
+- Each user-visible feature should have at least one screenshot or rendered artifact unless the PR explicitly documents why that is not applicable.
+- Screenshots should show the feature working, not only static UI shells.
+- For image-processing features, include before/after or source/output artifacts when licensing and storage policy allow.
+- For agent/app-server tools, include dry-run/apply/audit screenshots or captured HTML-rendered logs showing the tool path and safety boundary.
+
+This review page is part of the completion definition for the long-running implementation goal. If the page cannot be fully completed before the time box, the page must still exist and clearly list missing sections, missing screenshots, and follow-up issues.
+
 ### Consult-Backed Contract Freeze Gate
 
 The 2026-06-10 RapidRaw project consult recommended adding a contract-freeze milestone before serious feature work in layers, color, computational photography, Negative Lab, app-server tools, or AI migration. This is now a planning rule:
