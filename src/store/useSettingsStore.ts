@@ -18,6 +18,8 @@ interface SettingsState {
   handleSettingsChange: (newSettings: AppSettings) => Promise<void>;
 }
 
+type AppSettingsWithTransientSearch = AppSettings & { searchCriteria?: unknown };
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   appSettings: null,
   theme: DEFAULT_THEME_ID,
@@ -48,7 +50,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       set({ theme: newSettings.theme });
     }
 
-    const { searchCriteria: _searchCriteria, ...settingsToSave } = newSettings as any;
+    const { searchCriteria: _searchCriteria, ...settingsToSave } = newSettings as AppSettingsWithTransientSearch;
     set({ appSettings: newSettings });
 
     try {
