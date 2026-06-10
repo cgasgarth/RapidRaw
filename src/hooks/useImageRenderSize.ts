@@ -5,6 +5,13 @@ export interface ImageDimensions {
   width: number;
 }
 
+export interface BaseRenderSize extends ImageDimensions {
+  containerHeight: number;
+  containerWidth: number;
+  offsetX: number;
+  offsetY: number;
+}
+
 export interface RenderSize {
   height: number;
   offsetX: number;

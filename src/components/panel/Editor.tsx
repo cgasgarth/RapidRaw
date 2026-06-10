@@ -220,7 +220,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           containerWidth: size.containerWidth || 0,
           containerHeight: size.containerHeight || 0,
         };
-        setEditor({ baseRenderSize: newSize as any });
+        setEditor({ baseRenderSize: newSize });
       }
     },
     [setEditor],
