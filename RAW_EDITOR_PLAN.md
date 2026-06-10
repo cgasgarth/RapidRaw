@@ -1013,6 +1013,7 @@ Product bar:
 
 - Own top-level Negative Lab workspace or mode, with its own navigation, layouts, state, shortcuts, command API namespace, validation fixtures, and documentation.
 - Handles one-off negative conversions, full roll/contact-sheet workflows, archival lab scans, camera-scanned RAW workflows, flatbed scan workflows, and agent-driven batch work.
+- Treats acquisition metadata as durable session state, not just an import-time warning, because negative quality depends on the camera/scanner/light-source chain.
 - Treats presets for major film stocks as a governed product catalog with provenance, legality, versioning, fixture coverage, and refresh cadence.
 - Produces editable positive variants that remain linked to original negative scans and roll/session settings.
 - Makes every lab operation available through the same typed command surface used by UI, automation, and the OpenAI app-server agent.
@@ -1070,6 +1071,21 @@ Required UI affordances:
 - Preset provenance inspector that shows tier, process family, naming/legal status, fixture IDs, source notes, intended scan assumptions, algorithm version, and confidence.
 - Non-destructive "compare recipes" view that can show multiple preset/profile candidates without committing them to the edit graph.
 
+Dedicated workspace UX requirements:
+
+- Persistent roll cockpit visible across lab stages, showing roll status, frame count, process family, acquisition profile, current base strategy, current roll anchor, current stock/profile, warnings by severity, unsynced frame overrides, batch operation status, and export readiness.
+- Frame health grid/table with frame number, thumbnail, detected process/profile, base confidence, exposure density, clipping status, color-balance confidence, focus/sharpness estimate, dust/scratch score, roll-match status, override status, QC status, and export status.
+- Frame health interactions for sorting by warning severity, filtering low-confidence frames, selecting anchor candidates, grouping frames into scenes, excluding frames from export, and applying roll operations only to selected groups.
+- Expert densitometer inspector with hover readouts for linear RGB, transmittance, density, post-inversion RGB, Lab/XYZ where available, clipping flags, sampled-patch mean/median/standard deviation/min/max, per-channel density histograms, base/fog statistics, neutral-candidate statistics, and curve-contribution views.
+- Base Sampling Studio with automatic base candidate overlays, manual point samples, rectangular samples, polygon/brush samples, rejected contaminated samples, multiple samples per frame, roll-shared samples, frame-only samples, confidence scoring, sample history, and contamination warnings for rebate text, dust, sprocket holes, lab borders, or scanner bed artifacts.
+- Roll Matching Console with anchor frame lane, suggested anchor candidates, scene grouping, exposure normalization, neutral balance normalization, contrast normalization, saturation/rendering normalization, objective-only sync, opt-in creative sync, per-frame override diffs, frame-deviation heatmaps, and one-click revert to roll baseline.
+- Profile comparison matrix where rows can be frames or anchor frames, columns can be candidate profiles/presets, and cells show rendered thumbnails plus confidence, warnings, and touched-parameter badges.
+- Negative/positive synchronized viewer modes: original negative, base-corrected negative, density view, objective positive conversion, creative positive render, vertical split, horizontal split, wipe, difference view, channel solo, gamut warning, clipping warning, base-sample overlay, frame-boundary overlay, dust/scratch overlay, and roll-match deviation overlay.
+- QC Proof checklist statuses: `needs_review`, `approved`, `approved_with_warnings`, `rejected`, and `excluded_from_export`.
+- QC Proof checklist items: base sample verified, no severe clipping, neutral balance acceptable, skin/gray/known neutral checked where available, frame boundary checked, roll consistency checked, output profile selected, filename/export policy checked, and provenance complete.
+- Agent Activity panel showing commands applied, command source (`user`, `ui`, `agent`, `server`, or `batch`), dry-run versus committed state, parameter diff, affected frames, warnings raised, previews generated, undo point, and provenance entry.
+- WGPU/React overlay acceptance criteria: base-sample overlays stay pixel-aligned at all zoom levels, frame-boundary handles align with rendered image coordinates, wipe/split comparison does not drift, density readouts sample exact rendered coordinates, Retina scale factor is handled, P3/sRGB proof modes do not shift overlays, and contact-sheet rectangles remain stable through pan/zoom/rotate.
+
 Supported negative lab input modes:
 
 - Camera-scanned RAW or DNG negative captures.
@@ -1092,6 +1108,32 @@ Acquisition quality and scan setup requirements:
 - Provide scanner export guidance in docs and UI: prefer 16-bit TIFF/DNG or camera RAW, disable auto color/auto contrast where possible, preserve borders when possible, and avoid pre-inverted positives for Negative Lab conversion.
 - Warn when conversion confidence is low because the input is already heavily processed or lacks enough film base data.
 
+Negative Lab acquisition contract:
+
+- Acquisition metadata is part of the roll/session schema and sidecar, not transient UI state.
+- Required acquisition fields: acquisition method, capture device, scanner/camera model where known, lens where known, scanner software where known, light source, light-source confidence, visible base state, rebate/border state, suspected scanner auto adjustment, compression artifact score, channel clipping score, uneven illumination score, input color space status, suspected pre-inversion/lab correction, and confidence notes.
+- `acquisition_method` values should include `camera_raw`, `camera_tiff`, `flatbed_tiff`, `lab_tiff`, `lab_jpeg`, `contact_sheet`, and `unknown`.
+- `input_color_space_status` values should include `embedded_icc`, `assumed_srgb`, `assumed_scanner_rgb`, and `unknown`.
+- Acquisition profiles must be serializable, versioned, diffable, reusable across rolls, and separable from process/stock profiles.
+- Unknown acquisition assumptions should remain visible in the UI, command dry-runs, output reports, and app-server agent responses.
+- Acquisition confidence must affect whether auto base, roll normalization, named-stock profile application, or batch operations can proceed without explicit user approval.
+
+Negative Lab failure-mode taxonomy:
+
+| Failure mode                            | Detection signal                                            | Product behavior                                                        |
+| --------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
+| No clear film base visible              | base candidate search fails                                 | block auto base and require manual, roll-level, or reference sample     |
+| Clipped orange mask/base                | per-channel clipping near base samples                      | warn that color recovery is limited and lower conversion confidence     |
+| Lab JPEG already color-corrected        | histogram, metadata, compression, or baked-in clues         | allow creative edit, but label objective conversion as low confidence   |
+| Scanner auto exposure/auto color        | inconsistent base/neutral behavior across frames            | warn before roll normalization and require dry-run evidence             |
+| Mixed process in one roll/contact       | incompatible frame solves or process metadata               | prevent global roll match by default                                    |
+| Cross-processed film                    | process/stock mismatch or abnormal channel behavior         | switch to experimental profile mode with explicit warnings              |
+| Dense underexposed negative             | low transmittance and shadow-channel noise                  | recommend exposure/base override and flag shadow recovery limits        |
+| Thin overexposed negative               | low density separation and highlight fragility              | reduce confidence and protect highlights                                |
+| Expired or poorly stored film           | inconsistent base/fog/color across frames                   | allow frame-local overrides and avoid broad roll assumptions            |
+| Redscale or creative color negative     | abnormal channel relationships                              | require creative/experimental profile and avoid exact-stock language    |
+| Rebate, sprocket, or dust contamination | base sample overlaps border text, dust, holes, or scratches | reject/flag sample and require replacement or lower-confidence override |
+
 Roll/session model requirements:
 
 - Negative Lab creates a roll/session entity, not just independent per-image edits.
@@ -1101,6 +1143,15 @@ Roll/session model requirements:
 - Per-frame overrides must be explicit and reversible.
 - Copy/paste and sync must support all, selected, and safe-only operations.
 - Converted positives must remain linked to the original negative scan and roll/session settings.
+
+Profile class boundaries:
+
+- `AcquisitionProfile`: camera/scanner/light-source/input-transform assumptions, including input profile, light source, lens/copy-stand correction, scanner software assumptions, and capture limitations.
+- `ProcessProfile`: process-family conversion assumptions such as C-41, black-and-white silver, chromogenic black-and-white, ECN-2, E-6 helper, redscale, or creative/experimental negative handling.
+- `StockProfile`: stock-family or measured-stock rendering/profile data, including default conversion/rendering choices and provenance.
+- Film stock profiles must not encode scanner correction, light-source correction, lens shading correction, or lab-specific baked-in assumptions. Those belong to acquisition profiles.
+- The command API, sidecar schema, preset registry, UI, and app-server tools must expose the profile class touched by each operation.
+- Profile migrations must preserve these boundaries so old stock presets cannot silently become acquisition corrections or vice versa.
 
 Primary workflow:
 
@@ -1167,6 +1218,33 @@ Image processing and color-science requirements:
 - Use documented, open, vendor-neutral color-management primitives. RawEngine may interoperate with ICC, ColorSync on macOS, ACES/OCIO-style transforms, and DNG/ICC metadata, but must not depend on proprietary Adobe/Capture One transforms, profiles, or LUTs.
 - macOS preview must be display-profile aware where appropriate and must not assume every display is sRGB.
 - Include sRGB, Display P3, and future HDR-display preview validation paths even if HDR export is deferred.
+
+Negative Lab edit graph placement:
+
+- Exact placement must be finalized by ADR before implementation, but the starting architecture target is: RAW decode/demosaic, raw black/white normalization, bounded lens shading or vignetting correction when needed, acquisition input transform, film base/fog estimation, density/transmittance conversion, process/stock profile transform, roll normalization, objective positive rendering, normal RawEngine edit graph, then display/output transform.
+- User creative edits, masks, sharpening, LUTs, HSL, general tone tools, film grain, halation, and creative color grading must not run before objective negative inversion unless an ADR explicitly allows a bounded pre-inversion operation.
+- Denoise before objective inversion is prohibited unless an ADR defines a bounded raw-domain or scanner-domain noise model and fixture gates.
+- The normal editor may operate on generated positive variants after Negative Lab creates a linked, provenance-bearing positive operation.
+- A positive variant must remain traceable to original scan, acquisition profile, process profile, stock/profile selection, base samples, roll/session parameters, command log, and output profile.
+
+Negative math invariants:
+
+- All density-domain operations must operate on linearized input.
+- Density/transmittance buffers must reject or explicitly guard NaN, infinity, zero/negative transmittance, and unbounded log-domain values.
+- Per-channel base/fog estimates must be versioned, reproducible, and tied to accepted sample regions.
+- Per-channel objective curves must be monotonic unless a creative/experimental mode explicitly opts out and is labeled as such.
+- CPU reference output is canonical for correctness; GPU output must match within documented tolerances.
+- Every profile must declare which parameters it touches and whether those parameters are objective, semi-objective, or creative.
+- Every command must produce a parameter diff, warning list, provenance entry, and deterministic replay record.
+- Expert mode and API responses should be able to expose intermediate debug artifacts: linear input preview, estimated base map, transmittance preview, density preview, per-channel curve preview, objective positive preview, creative positive preview, and final rendered positive.
+- Numeric invariant failures must fail early and visibly rather than being hidden behind a visually plausible render.
+
+Clean-room and inherited-code boundary:
+
+- Existing upstream negative-conversion code must be audited before extension.
+- RawEngine may retain compatible open-source code according to license obligations, but the new Negative Lab architecture must document which pieces are inherited, rewritten, isolated, or replaced.
+- Any algorithmic borrowing from external projects must be license-compatible, cited in source/docs, and validated against RawEngine's CPU reference and fixture gates.
+- Professional Negative Lab requirements should drive the architecture; inherited hobby-grade inversion behavior must not become an implicit product constraint.
 
 Measurement and processing boundary requirements:
 
@@ -1246,6 +1324,43 @@ Major stock preset governance:
 - Profile confidence tiers must be explicit: generic process preset, stock-family starting point, measured project profile, user profile, and reference mapping.
 - Profile imports must warn on missing license/provenance, unsafe claims, unsupported binary LUT/profile payloads, or ambiguous trademark/affiliation language.
 
+Stock-aware registry model:
+
+- RawEngine will maintain a stock-aware registry for major still, cinema, black-and-white, and reversal film families.
+- Registry entries support organization, metadata, search, compatibility checks, and safe preset mapping. They do not by themselves imply exact manufacturer emulation.
+- Built-in presets are generic or measured/provenanced profiles; they do not claim exact manufacturer emulation unless legal review and measurement data allow it.
+- A stock registry entry is factual metadata. A preset/profile is RawEngine-created conversion/rendering data.
+- Official product pages and manufacturer technical data sheets may be used to populate factual metadata such as stock name, ISO, format, process family, and availability. They must not be used to copy proprietary color rendering, hidden transforms, manufacturer branding assets, logos, packaging, or claims of exact emulation.
+- Registry entries must store source citations and last-reviewed dates because stock availability and manufacturer catalogs change over time.
+- Registry updates should be split by function first, then manufacturer/stock family: schema and validator, source citation model, process-family compatibility map, generic preset mapping, manufacturer entries, discontinued/region-limited status, unsafe-name lint, and UI badges.
+
+Stock registry schema targets:
+
+- `stock_id`.
+- `manufacturer_display_name`.
+- `stock_display_name`.
+- `process_family`.
+- `film_class`.
+- `speed_iso`.
+- supported formats.
+- status: `active`, `discontinued`, `region_limited`, or `unknown`.
+- registry purpose: metadata, compatibility, search, preset mapping, or fixture planning.
+- built-in profile status: `none`, `generic_family_mapping`, `measured_project_profile`, or `licensed_profile`.
+- default safe profile ID.
+- trademark usage status.
+- claim level.
+- official/source references.
+- last reviewed date.
+- marketing/release review requirement.
+
+Stock coverage tiers:
+
+- Tier A, registry-only: factual metadata, no built-in profile, optional generic process mapping.
+- Tier B, generic family mapping: maps a stock family to a RawEngine generic profile such as `C-41 Portrait Natural 400` with no exact emulation claim.
+- Tier C, project-measured profile: built from project-owned or properly licensed scans with measurement method, fixture IDs, scanner/camera assumptions, and review.
+- Tier D, licensed profile: distributed under explicit rights from a profile creator, lab, manufacturer, or partner, with naming and claims limited to license terms.
+- Tier E, user/community profile: user-imported or community-created; not bundled unless provenance, license, and review are complete.
+
 Legally safe product wording:
 
 - RawEngine will provide stock-aware negative processing through a legally reviewed profile registry.
@@ -1260,6 +1375,7 @@ Legally safe product wording:
 Preset tier model:
 
 - Generic built-ins: safe descriptive presets such as `C-41 Neutral 100`, `C-41 Portrait 160`, `C-41 Portrait 400`, `C-41 High-Speed 800`, `C-41 Saturated 100`, `ECN-2 Daylight`, `ECN-2 Tungsten`, `Black-and-White Classic Grain`, `Black-and-White Tabular Grain`, `Black-and-White Ortho`, `Black-and-White Chromogenic`, and `Slide/Reversal Helper`.
+- Expanded safe built-in families should include portrait-natural C-41 variants, consumer-warm C-41 variants, vivid fine-grain C-41 variants, muted consumer C-41 variants, panchromatic classic BW variants, fine-grain BW variants, tabular/T-grain BW variants, high-speed BW variants, ortho BW variants, chromogenic BW variants, ECN-2 daylight/tungsten variants, E-6 neutral/vivid helper variants, creative redscale, and expired-color-negative helper profiles.
 - Verified profiles: project-measured profiles tied to RawEngine-owned test rolls, fixture IDs, scan/camera setup, process lab or process chemistry, version, and legal status.
 - User profiles: user-created profiles built from their own scans and saved with local provenance.
 - Reference mappings: optional researched metadata that maps a generic preset to stock families after legal review; these are not exact emulation claims.
@@ -1334,16 +1450,21 @@ Negative lab shift-left gates:
 
 - `validation:negative-lab:schema`: command schema, sidecar schema, preset metadata schema, registry schema, migrations, and provenance roundtrip.
 - `validation:negative-lab:fixtures`: fixture manifest lint, license/provenance lint, expected input profile checks, and missing-fixture failure modes.
+- `validation:negative-lab:fixture-storage`: public/private fixture location checks, redistribution flags, public-repo permission checks, private-CI-only flags, and manifest/storage consistency.
 - `validation:negative-lab:cpu-reference`: CPU reference conversion for small fixtures with pinned algorithm versions and reproducible artifacts.
 - `validation:negative-lab:gpu-parity`: GPU preview/render comparison against CPU reference within documented tolerances.
 - `validation:negative-lab:preset-registry`: major-stock registry coverage, tier labels, legal naming status, source references, and stale-source warnings.
+- `validation:negative-lab:profile-scope`: every preset/profile declares touched parameters, objective/semi-objective/creative scope, confidence tier, profile class, and migration behavior.
 - `validation:negative-lab:ui-artifacts`: screenshot/contact-sheet artifacts for guided mode, batch mode, Preset Studio, QC Proof, and warning states.
+- `validation:negative-lab:ui-alignment`: WGPU/React overlay coordinate checks for sample points, frame boundaries, split/wipe views, Retina scale factors, and density readout pixel accuracy.
 - `validation:negative-lab:agent`: app-server dry-run, preview, diff, selected-frame scope, rollback, and no-original-overwrite tests.
 - `validation:negative-lab:synthetic`: synthetic negative generator with known positives, known base/fog, known per-channel curves, exposure offsets, scanner/camera matrices, gray ramps, color ramps, and skin-tone patches.
 - `validation:negative-lab:numeric`: no NaN/Inf, monotonic objective curves, CPU deterministic hash, CPU/GPU patch tolerance, clipping warning correctness, schema migration, and undo/replay equivalence.
+- `validation:negative-lab:warnings`: warning stability checks so missing-base, clipped-channel, lab-JPEG, auto-corrected-scan, mixed-process, mixed-stock, profile-mismatch, unsafe-profile, and no-overwrite warnings cannot be weakened accidentally.
 - `validation:negative-lab:claims`: prohibited LUT/profile/binary additions, unsafe trademark/emulation claims, and unapproved exact-match quality claims.
 - `validation:negative-lab:performance`: macOS preview latency, preset switch latency, base recalibration time, full-resolution render time, batch throughput, memory ceiling, fallback behavior, and cancellation latency.
 - Heavy fixtures can live in an optional artifact pack, but each PR must still run a small deterministic fixture set locally and in CI.
+- Public CI should run synthetic and redistributable real fixtures. Release gates should be able to run private/proprietary fixture packs from approved artifact storage without placing restricted images in the public repository.
 
 Negative lab validation matrix:
 
@@ -1364,12 +1485,14 @@ Negative lab validation matrix:
 Negative lab fixture manifest requirements:
 
 - No real scan, target image, profile, LUT, ICC, or rendered golden artifact should enter the repository or artifact store without a manifest.
-- Manifest fields should include fixture ID, source URL or local acquisition record, rights/license status, contributor, hash, capture method, scanner/camera/lens profile, light source, process family, film stock or stock family where known, development notes where known, bit depth, color profile, compression, border visibility, frame count, expected warnings, allowed use, and review status.
+- Manifest fields should include fixture ID, source URL or local acquisition record, rights/license status, copyright owner, photographer or lab, contributor, hash, redistribution permission, public repository permission, private-CI-only flag, capture method, scanner/camera/lens profile, light source, scanner software, scan settings, embedded profile, process family, film stock or stock family where known, development notes where known, bit depth, color profile, compression, border visibility, frame count, known defects, expected warnings, allowed use, reviewer, review date, and review status.
 - Calibration-target fixtures should also record target type, target batch or reference data where legally usable, patch geometry, measurement device or reference source, expected DeltaE thresholds, and reviewer.
 - Negative-specific fixtures should record known base/fog sample regions, rejected sample regions, anchor frames, expected density range, dense/thin/clipping expectations, and expected process/profile assumptions.
 - Golden fixtures should record algorithm/profile version, command sequence hash, CPU reference hash, GPU tolerance, expected output hash or perceptual hash, reviewer, review date, and whether a golden-output update requires explicit approval.
 - Fixture manifests must distinguish synthetic fixtures, project-owned measured scans, public sample images, user-provided fixtures, and restricted local-only fixtures.
 - Heavy or restricted fixtures may live outside the git repository, but their manifests, hashes, and validation purpose should still be tracked.
+- CI must fail if any fixture image lacks a manifest or if a manifest does not permit the configured storage location.
+- Golden output updates must require an explicit review path or approval label.
 
 Numeric and perceptual quality gates:
 
@@ -1379,7 +1502,21 @@ Numeric and perceptual quality gates:
 - Color-target gates where reference data exists: DeltaE2000 thresholds for neutral patches, ColorChecker patches, gray ramp neutrality, highlight/shadow clipping tolerance, saturation preservation, and hue rotation tolerance for memory colors.
 - Non-target gates where reference data does not exist: perceptual hash or SSIM against approved goldens, histogram-shape tolerance, density-summary stability, warning stability, and human-reviewed golden approval for intentional visual changes.
 - Preset gates: registry coverage, tier labeling, source references, legal naming status, stale-source warnings, deterministic output, migration behavior, and prohibited-claim lint.
+- Profile/preset gates: every preset has a provenance manifest, every profile declares parameter scope and confidence tier, every measured profile references fixture IDs, every named-stock measured profile references legal/review approval, and no bundled profile contains unapproved binary LUT/ICC/profile payloads.
+- Prohibited preset/profile wording should include unsafe strings such as `exact`, `official`, `manufacturer approved`, `Capture One`, `Lightroom`, `Adobe`, `NLP`, `Negative Lab Pro`, `VSCO`, `RNI`, `Mastin`, `Dehancer`, `Fuji simulation`, and `Kodak LUT` unless explicitly approved by legal/provenance review.
 - Batch gates: single-frame command equivalence to batch command output, roll normalization repeatability, selected-frame scope enforcement, cancellation latency, no-original-overwrite behavior, and positive variant provenance.
+- Preview/full-resolution consistency gates must catch mismatches between the interactive preview path and export path.
+
+UI alignment regression gates:
+
+- Overlay coordinate equals sampled image coordinate.
+- Base sample rectangle stays aligned after zoom.
+- Frame boundary stays aligned after rotate.
+- Split/wipe view stays aligned after pan.
+- Retina scale factor does not shift overlays.
+- WGPU image does not bleed under panels.
+- Density readout samples the intended pixel.
+- Contact-sheet frame rectangles remain stable through pan, zoom, rotate, and crop replay.
 
 UI workflow regression gates:
 
@@ -1413,6 +1550,20 @@ Output and roundtrip requirements:
 - Re-import RawEngine negative profiles into another project with migration checks.
 - Use no-overwrite defaults, atomic export writes, batch dry-run summaries, and visible provenance.
 
+Professional lab deliverables:
+
+- Roll proof sheet.
+- Frame-by-frame QC report.
+- Conversion confidence report.
+- Profile/provenance report.
+- Sidecar/session export.
+- Profile export.
+- Before/after contact sheet.
+- Per-frame warnings CSV/JSON.
+- Reproducible command log.
+- Archive package containing inputs, session metadata, profile manifests, output checksums, and compatibility notes where rights allow packaging inputs.
+- Public-facing claim/limitation report that explains low-confidence inputs, unsupported stock claims, and conversion assumptions.
+
 API and app-server agent requirements:
 
 - Every negative lab operation must be callable through typed command APIs.
@@ -1427,6 +1578,7 @@ API and app-server agent requirements:
 - Agent tools must expose warning severity, progress events, cancellation, output overwrite policy, batch job IDs, content-hashed preview artifacts, and parameter diffs.
 - Agent tools must require explicit human approval for low-confidence calibration, destructive exports, profile imports with missing provenance, and large batch changes.
 - Agent tools must operate within user-granted input/output roots and must never silently expand file scope.
+- Integration tests must prove dry-run is required before batch apply, dry-run includes affected frames, parameter diffs, and warnings, no-overwrite is default, cancellation leaves no partial sidecar mutation, failed export leaves no corrupt output, agent actions are recorded in provenance, replay after app restart is deterministic, and command schema version mismatch fails safely.
 
 Agent-specific negative lab workflows:
 
@@ -1458,20 +1610,28 @@ Negative lab ADRs:
 - `ADR-NEG-016: Named stock-profile measurement methodology and claims policy`
 - `ADR-NEG-017: Dedicated Negative Lab UI workflow architecture`
 - `ADR-NEG-018: Negative Lab performance budgets and macOS benchmark matrix`
+- `ADR-NEG-019: AcquisitionProfile, ProcessProfile, and StockProfile separation`
+- `ADR-NEG-020: WGPU overlay coordinate contract`
+- `ADR-NEG-021: Upstream negative-conversion audit`
+- `ADR-NEG-022: Negative Lab profile schema versioning and migration`
 
 Negative lab implementation order:
 
 1. Consult and ADRs: complete design review, architecture ADRs, density model ADR, preset naming/legal ADR, fixture policy, and command namespace.
-2. Schemas and validation first: add roll/session schema, command schema, preset registry schema, fixture manifest, metadata lint, and dry-run command replay tests before UI work.
-3. CPU reference path: implement a small deterministic CPU inversion path for curated fixtures so UI and GPU behavior has a stable baseline.
-4. UI shell: add Negative Lab navigation, workspace modes, empty states, roll/frame queue, viewer states, Preset Studio shell, and QC Proof shell without complex algorithms.
-5. Input and frame handling: support camera RAW/DNG, TIFF, flatbed/lab scan metadata, contact-sheet splitting, crop/rotation, and contaminated-base warnings.
-6. Base and inversion tools: add manual/auto base sampling, density-domain inversion controls, per-channel curves, black/white point, neutral/skin sample targets, and stage-labeled operations.
-7. Roll normalization: add anchors, shared roll settings, per-frame overrides, outlier reports, contact-sheet artifacts, and batch-safe sync operations.
-8. Preset registry: ship generic safe presets first, then measured verified profiles, user profiles, and reference mappings through small stock-family issues.
-9. GPU and performance: port validated CPU stages to GPU with parity tolerances, preview latency budgets, and fallback behavior.
-10. Agent tools: expose inspect, plan, dry-run, compare, apply, QC, rollback, and export tools through the app-server command layer.
-11. Release hardening: add fixture packs, large/nightly validation, documentation, migration tests, accessibility checks, and manual editing workflow sign-off.
+2. Foundations with no pixel changes: add operating principles, non-goals, acquisition contract, failure-mode taxonomy, profile class boundaries, session/profile/provenance schemas, schema snapshots, unsafe-name lint, and fixture manifest lint.
+3. Lab shell and command bus: add Negative Lab route behind a feature flag, stage navigator, roll cockpit placeholder, frame health grid placeholder, expert inspector placeholder, command envelope, dry-run response type, warning severity model, parameter diff model, command provenance model, and serialization roundtrip tests.
+4. Acquisition diagnostics: classify camera/scanner/lab inputs, detect embedded profile status, likely JPEG/lab-processed inputs, clipping, visible-base candidates, uneven illumination, and acquisition warning overlays.
+5. CPU reference path: implement a small deterministic CPU inversion path for curated fixtures so UI and GPU behavior has a stable baseline.
+6. Viewer and expert tools: add density view, base-corrected negative view, objective positive view, split/wipe comparison, channel solo, clipping/gamut overlays, densitometer readout, base sample tool, and overlay coordinate alignment tests.
+7. Input and frame handling: support camera RAW/DNG, TIFF, flatbed/lab scan metadata, contact-sheet splitting, crop/rotation, and contaminated-base warnings.
+8. Base and inversion tools: add manual/auto base sampling, density-domain inversion controls, per-channel curves, black/white point, neutral/skin sample targets, and stage-labeled operations.
+9. Roll operations: add anchor selection, scene grouping, exposure/density/color sync, frame override diffs, roll matching console, normalize-roll dry-run, outlier reports, contact-sheet artifacts, and batch-safe sync operations.
+10. Stock registry without measured-profile overclaims: add stock registry schema, source citation model, claim-level enum, generic process preset mapping, manufacturer metadata entries, profile confidence badges, stock registry browser, and stock registry authoring docs.
+11. Preset/profile expansion: ship generic safe presets first, then measured verified profiles, user profiles, and reference mappings through small stock-family issues.
+12. GPU and performance: port validated CPU stages to GPU with parity tolerances, preview latency budgets, memory ceilings, contact-sheet benchmarks, and fallback behavior.
+13. Agent tools: expose inspect, plan, dry-run, compare, apply, QC, rollback, and export tools through the app-server command layer with no-overwrite and provenance gates.
+14. Output and audit: add positive exports, proof sheets, QC reports, session archives, preview artifacts, atomic failure handling, and migration tests.
+15. Release hardening: add fixture packs, large/nightly validation, documentation, migration tests, accessibility checks, and manual editing workflow sign-off.
 
 Negative lab issue split:
 
@@ -1479,14 +1639,29 @@ Negative lab issue split:
 - `negative-lab(adr): define negative processing architecture`
 - `negative-lab(adr): define density-domain inversion model`
 - `negative-lab(adr): define preset naming and legal policy`
+- `negative-lab(adr): define acquisition process and stock profile boundaries`
+- `negative-lab(adr): define WGPU overlay coordinate contract`
+- `negative-lab(adr): audit upstream negative conversion logic`
+- `negative-lab(adr): define profile schema versioning and migration`
 - `negative-lab(ui): design dedicated negative lab workspace`
 - `negative-lab(ui): add roll setup and frame queue design`
 - `negative-lab(ui): add QC overlays and sample readouts design`
+- `negative-lab(ui): add roll cockpit and frame health grid design`
+- `negative-lab(ui): add expert densitometer inspector design`
+- `negative-lab(ui): add base sampling studio design`
+- `negative-lab(ui): add roll matching console design`
+- `negative-lab(ui): add profile comparison matrix design`
+- `negative-lab(ui): add agent activity and command provenance panel`
 - `negative-lab(schema): define negative conversion operation schema`
+- `negative-lab(schema): define acquisition profile schema`
+- `negative-lab(schema): define process and stock profile schemas`
+- `negative-lab(schema): define negative lab provenance record schema`
 - `negative-lab(api): expose negative lab command surface`
 - `agent(negative-lab): expose safe app-server tools for negative lab`
 - `negative-lab(acquisition): add scan setup health model`
 - `negative-lab(acquisition): detect auto-corrected and lossy inputs`
+- `negative-lab(acquisition): add durable acquisition contract`
+- `negative-lab(acquisition): add failure-mode taxonomy`
 - `negative-lab(import): support scan input modes and roll sessions`
 - `negative-lab(import): add frame splitting and border detection`
 - `negative-lab(format): support half-frame panoramic medium-format and sheet-film scans`
@@ -1501,6 +1676,9 @@ Negative lab issue split:
 - `negative-lab(batch): add roll-level batch consistency workflow`
 - `negative-lab(presets): define film stock preset metadata and legal policy`
 - `negative-lab(presets): create major film stock registry schema`
+- `negative-lab(registry): define stock coverage tiers and claim levels`
+- `negative-lab(registry): add stock source citation and review model`
+- `negative-lab(registry): add generic process preset mapping`
 - `negative-lab(presets): add stock registry refresh workflow`
 - `negative-lab(presets): add preset provenance inspector requirements`
 - `negative-lab(presets): add generic legally safe built-in presets`
@@ -1525,6 +1703,10 @@ Negative lab issue split:
 - `validation(negative-lab): add DeltaE gray-ramp and ColorChecker gates`
 - `validation(negative-lab): add GPU parity tolerance checks`
 - `validation(negative-lab): add prohibited asset and claim lint`
+- `validation(negative-lab): add public/private fixture storage lint`
+- `validation(negative-lab): add warning stability gates`
+- `validation(negative-lab): add profile scope and confidence tier lint`
+- `validation(negative-lab): add WGPU overlay alignment tests`
 - `validation(negative-lab): add color and black-and-white negative render tests`
 - `validation(negative-lab): add roll consistency and QC overlay tests`
 - `validation(negative-lab): add full lab UI workflow regression tests`
@@ -3114,6 +3296,17 @@ Current planning consults:
     - Add fixture manifest requirements for real scans, synthetic fixtures, calibration targets, profile data, and golden artifacts.
     - Add numeric, perceptual, warning-stability, UI workflow, batch, agent, and macOS performance gates.
     - Add ADR and issue splits for stock-profile methodology, profile provenance, calibration fixtures, DeltaE/gray-ramp/ColorChecker gates, and full lab workflow regression tests.
+- Negative Lab acquisition, profile, and registry gap review:
+  - Status: completed and incorporated.
+  - Response checked time: 2026-06-10.
+  - Incorporated advice:
+    - Add a durable acquisition contract so scan/camera/light-source assumptions live in roll/session state and command responses.
+    - Add explicit failure-mode taxonomy for no visible base, clipped orange mask, lab JPEGs, scanner auto correction, mixed process, dense/thin negatives, expired film, redscale, and contaminated samples.
+    - Separate AcquisitionProfile, ProcessProfile, and StockProfile so scanner/camera correction cannot be hidden inside stock presets.
+    - Add edit-graph placement requirements, negative math invariants, intermediate debug artifacts, and a clean audit boundary for inherited upstream negative-conversion logic.
+    - Expand the dedicated workspace with roll cockpit, frame health grid, expert densitometer, base sampling studio, roll matching console, profile comparison matrix, synchronized viewer modes, QC statuses, agent activity panel, and WGPU overlay alignment acceptance criteria.
+    - Convert "presets for all major film stocks" into a stock-aware registry with coverage tiers, claim levels, source citations, review dates, safe generic profile mappings, and no exact-emulation overclaims.
+    - Strengthen validation with public/private fixture storage lint, profile scope lint, warning stability gates, overlay alignment tests, app-server safety tests, and atomic output failure checks.
 
 Future consult tracking entry format:
 
@@ -3982,14 +4175,29 @@ Issues:
 - Define negative processing architecture.
 - Define density-domain inversion model.
 - Define preset naming and legal policy.
+- Define AcquisitionProfile, ProcessProfile, and StockProfile boundaries.
+- Define WGPU overlay coordinate contract.
+- Audit inherited upstream negative conversion logic.
+- Define profile schema versioning and migration policy.
 - Design dedicated negative lab workspace.
 - Design roll setup and frame queue.
 - Design QC overlays and sample readouts.
+- Design roll cockpit and frame health grid.
+- Design expert densitometer inspector.
+- Design base sampling studio.
+- Design roll matching console.
+- Design profile comparison matrix.
+- Design agent activity and command provenance panel.
 - Define negative conversion operation schema.
+- Define acquisition profile schema.
+- Define process and stock profile schemas.
+- Define negative lab provenance record schema.
 - Expose negative lab command surface.
 - Expose safe app-server tools for negative lab.
 - Add scan setup health model.
 - Detect auto-corrected and lossy inputs.
+- Add durable acquisition contract.
+- Add failure-mode taxonomy.
 - Support scan input modes and roll sessions.
 - Add frame splitting and border detection.
 - Support half-frame, panoramic, medium-format, and sheet-film scans.
@@ -4004,6 +4212,9 @@ Issues:
 - Add roll-level batch consistency workflow.
 - Define film stock preset metadata and legal policy.
 - Create major film stock registry schema.
+- Define stock coverage tiers and claim levels.
+- Add stock source citation and review model.
+- Add generic process preset mapping.
 - Add stock registry refresh workflow.
 - Add preset provenance inspector requirements.
 - Add generic legally safe built-in presets.
@@ -4028,6 +4239,10 @@ Issues:
 - Add DeltaE, gray-ramp, and ColorChecker gates.
 - Add GPU parity tolerance checks.
 - Add prohibited asset and claim lint.
+- Add public/private fixture storage lint.
+- Add warning stability gates.
+- Add profile scope and confidence tier lint.
+- Add WGPU overlay alignment tests.
 - Add color and black-and-white negative render tests.
 - Add roll consistency and QC overlay tests.
 - Add full lab UI workflow regression tests.
@@ -4042,12 +4257,16 @@ Definition of done:
 - Film simulations are API-callable and regression tested.
 - Negative processing has a dedicated UI plan and implementation path.
 - Major film stock presets have provenance and legal review.
+- Acquisition, process, and stock profile boundaries are explicit and enforced by schemas, UI copy, and validation.
+- Acquisition assumptions persist in roll/session state, dry-runs, reports, and app-server responses.
 - Named-stock profiles are measured, fixture-backed, legally reviewed, and separated from generic/user/reference profile tiers.
 - Negative conversion uses a documented density-domain model with input profile assumptions.
 - Roll/session workflows support shared base samples, anchor frames, per-frame overrides, and positive variant provenance.
 - Negative lab commands are API-callable, replayable, undoable, batchable, and safe for app-server agent tools.
 - The major-stock preset registry is versioned, provenance-backed, legally reviewed, and split into small stock-family issues.
 - Preset Studio and QC Proof produce reviewable artifacts that make batch conversion decisions auditable.
+- Roll cockpit, frame health grid, expert densitometer, base sampling studio, roll matching console, profile comparison matrix, and agent activity panels have UI designs and validation plans.
+- WGPU/React sample overlays, frame boundaries, split views, and density readouts have coordinate-alignment tests before expert lab UI ships.
 - Acquisition health, objective inversion, roll normalization, creative rendering, and output are separately inspectable and testable.
 - Dedicated Negative Lab workflows are regression-tested from import through QC, positive variant creation, app-server dry-run, and export.
 - The app-server agent cannot perform low-confidence calibration, destructive exports, unsafe profile imports, or broad batch operations without explicit dry-run evidence and user approval.
