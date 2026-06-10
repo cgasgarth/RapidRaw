@@ -5,12 +5,14 @@ import debounce from 'lodash.debounce';
 import { useTranslation } from 'react-i18next';
 import { Row } from './LibraryItems';
 import { useLibraryStore } from '../../../store/useLibraryStore';
-import { LibraryViewMode, SortDirection, ThumbnailSize } from '../../ui/AppProperties';
+import { ImageFile, LibraryViewMode, SortDirection, ThumbnailSize } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+
+const VirtualizedRow = Row as unknown as (props: any) => React.ReactElement | null;
 
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
   const { t } = useTranslation();
@@ -157,7 +159,7 @@ const groupImagesByFolder = (images: any[], baseFolderPath: string | null) => {
 
 export default function LibraryGrid(props: any) {
   const {
-    imageList,
+    imageList: rawImageList,
     libraryViewMode,
     thumbnailSize,
     currentFolderPath,
@@ -172,6 +174,7 @@ export default function LibraryGrid(props: any) {
     thumbnailSizeOptions,
     onThumbnailSizeChange,
   } = props;
+  const imageList = rawImageList as ImageFile[];
   const { listColumnWidths, setLibrary, sortCriteria, setSortCriteria } = useLibraryStore();
   const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
   const [listHandle, setListHandle] = useListCallbackRef();
@@ -516,7 +519,7 @@ export default function LibraryGrid(props: any) {
             rowHeight={getItemSize}
             onScroll={(e: React.UIEvent<HTMLElement>) => handleScroll(e.currentTarget.scrollTop)}
             className="custom-scrollbar"
-            rowComponent={Row}
+            rowComponent={VirtualizedRow}
             rowProps={memoizedRowProps}
           />
         </div>
