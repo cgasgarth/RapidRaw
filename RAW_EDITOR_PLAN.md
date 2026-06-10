@@ -383,23 +383,23 @@ This plan is based on public documentation and source references from:
 
 Feature claims from competitors are planning inputs, not marketing claims. Before implementation depends on a claim, Codex should verify it from primary/current sources or the cloned source code.
 
-| Area | Source To Verify | Why It Matters | Current Status |
-| --- | --- | --- | --- |
-| RapidRAW license | `LICENSE`, README, repo metadata | AGPL/public-fork obligations | Public source checked, code audit pending |
-| RapidRAW build stack | `package.json`, lockfiles, Tauri config, `src-tauri/Cargo.toml` | Bun migration, Rust toolchain, CI shape | Public source checked, fork audit pending |
-| RapidRAW edit graph | Sidecar format, adjustment structs, renderer order | Non-destructive architecture | Pending clone/code audit |
-| RapidRAW GPU path | WGSL shader pipeline, wgpu setup | macOS performance and color precision | Pending clone/code audit |
-| RapidRAW masks/layers | UI state, mask data structures, renderer integration | Layer and mask roadmap | Pending clone/code audit |
-| RapidRAW HDR/panorama | Implementation, tests, memory behavior | Avoid duplicate work and regressions | Public changelog checked, code audit pending |
-| RapidRAW CI | `.github/workflows` | Quality-gate baseline | Public source checked, fork audit pending |
-| darktable | Official manual | Scene-referred workflow, masks, color modules | Public docs checked |
-| Ansel | Official site/docs | scene-referred and perceptual color references | Public docs checked |
-| RawTherapee | RawPedia | film simulation, local adjustments, wavelets | Public docs checked |
-| Capture One | Official support docs | layers, masks, color editor, HDR, panorama | Public docs checked |
-| Lightroom | Adobe help docs | masking, enhance, panorama/HDR workflows | Public docs checked |
-| OpenAI app-server | OpenAI developer docs | agent integration and tool calls | Public docs checked |
-| Bun | Bun docs | CI/package manager migration | Public docs checked |
-| TypeScript/ESLint | Official TS and typescript-eslint docs | strictness/lint target | Public docs checked |
+| Area                  | Source To Verify                                                | Why It Matters                                 | Current Status                               |
+| --------------------- | --------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------- |
+| RapidRAW license      | `LICENSE`, README, repo metadata                                | AGPL/public-fork obligations                   | Public source checked, code audit pending    |
+| RapidRAW build stack  | `package.json`, lockfiles, Tauri config, `src-tauri/Cargo.toml` | Bun migration, Rust toolchain, CI shape        | Public source checked, fork audit pending    |
+| RapidRAW edit graph   | Sidecar format, adjustment structs, renderer order              | Non-destructive architecture                   | Pending clone/code audit                     |
+| RapidRAW GPU path     | WGSL shader pipeline, wgpu setup                                | macOS performance and color precision          | Pending clone/code audit                     |
+| RapidRAW masks/layers | UI state, mask data structures, renderer integration            | Layer and mask roadmap                         | Pending clone/code audit                     |
+| RapidRAW HDR/panorama | Implementation, tests, memory behavior                          | Avoid duplicate work and regressions           | Public changelog checked, code audit pending |
+| RapidRAW CI           | `.github/workflows`                                             | Quality-gate baseline                          | Public source checked, fork audit pending    |
+| darktable             | Official manual                                                 | Scene-referred workflow, masks, color modules  | Public docs checked                          |
+| Ansel                 | Official site/docs                                              | scene-referred and perceptual color references | Public docs checked                          |
+| RawTherapee           | RawPedia                                                        | film simulation, local adjustments, wavelets   | Public docs checked                          |
+| Capture One           | Official support docs                                           | layers, masks, color editor, HDR, panorama     | Public docs checked                          |
+| Lightroom             | Adobe help docs                                                 | masking, enhance, panorama/HDR workflows       | Public docs checked                          |
+| OpenAI app-server     | OpenAI developer docs                                           | agent integration and tool calls               | Public docs checked                          |
+| Bun                   | Bun docs                                                        | CI/package manager migration                   | Public docs checked                          |
+| TypeScript/ESLint     | Official TS and typescript-eslint docs                          | strictness/lint target                         | Public docs checked                          |
 
 ## 5. Competitive Feature Map
 
@@ -652,34 +652,38 @@ RawEngine should learn from Lightroom's speed and simplicity while keeping stron
 
 Every major capability should eventually become one or more GitHub issues. This matrix provides stable requirement IDs for tracking.
 
-| ID | Domain | Requirement | Source Inspiration | Priority | API Required | Acceptance Criteria | Validation |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| REQ-BASE-001 | Base | Non-destructive RAW editing | RapidRAW, Lightroom, Capture One | P0 | Yes | Original files never modified; edits replay from sidecar/graph | original hash, sidecar roundtrip |
-| REQ-BASE-002 | Base | GPU-accelerated interactive pipeline | RapidRAW, darktable | P0 | Indirect | previews update interactively on macOS | render latency, GPU/CPU parity |
-| REQ-BASE-003 | Base | RAW decode and camera profile foundation | RapidRAW, RawTherapee, Capture One | P0 | Yes | supported RAWs open with correct metadata/profile path | fixture open tests, color chart |
-| REQ-COLOR-001 | Color | Scene-referred color pipeline | darktable, Ansel | P0 | Yes | edits occur in defined scene-referred space with explicit display transform | ColorChecker, clipping, gamut tests |
-| REQ-COLOR-002 | Color | Capture One-class selective color editor | Capture One | P0 | Yes | smooth range selection and HSL-style adjustment with masks | color fixtures, render artifacts |
-| REQ-COLOR-003 | Color | Skin tone uniformity | Capture One | P1 | Yes | hue/saturation/lightness uniformity controls work locally and globally | skin tone fixtures |
-| REQ-COLOR-004 | Color | Advanced color grading controls | darktable, Ansel, Capture One | P1 | Yes | color balance/wheels/channel controls serialize and replay | schema and render tests |
-| REQ-LAYER-001 | Layers | Full adjustment layer support | Capture One, RapidRAW | P0 | Yes | add/reorder/rename/duplicate/delete/toggle/opacity | graph, undo, render tests |
-| REQ-MASK-001 | Masks | Brush, gradient, range, and AI masks | Lightroom, Capture One, RapidRAW | P0 | Yes | masks combine, serialize, replay, and render correctly | mask artifacts, IoU where possible |
-| REQ-MASK-002 | Masks | Add/subtract/intersect mask composition | Lightroom, Capture One | P0 | Yes | compositing works across mask types | mask composition fixtures |
-| REQ-FILM-001 | Film | High-quality film simulation engine | RawTherapee, film workflows | P1 | Yes | LUT plus grain/halation/curve/look controls | before/after fixtures, legal provenance |
-| REQ-FILM-002 | Film | Film negative conversion | RapidRAW, RawTherapee | P1 | Yes | film base sampling and inversion workflow | negative scan fixtures |
-| REQ-NEG-001 | Negative Lab | Dedicated negative processing lab UI | User requirement, film scan workflows | P1 | Yes | purpose-built workflow for converting, profiling, correcting, and batch processing scanned negatives | negative scan fixtures, UI artifacts |
-| REQ-NEG-002 | Negative Lab | Presets for major film stocks | User requirement, film workflows | P1 | Yes | legally safe presets for major color and black-and-white film stocks, with provenance and trademark-safe naming policy | preset review, before/after fixtures |
-| REQ-NEG-003 | Negative Lab | Roll/session model | Film scan workflows, batch consistency | P1 | Yes | scans can be grouped into roll sessions with shared base samples, anchor frames, per-frame overrides, and positive variant provenance | roll consistency fixtures, sidecar roundtrip |
-| REQ-NEG-004 | Negative Lab | Density-domain inversion pipeline | Film scanning tools, color science | P1 | Yes | negative conversion operates in a defined density/transmittance model with explicit input profile and process assumptions | CPU/GPU parity, color fixtures |
-| REQ-NEG-005 | Negative Lab | API-callable negative lab commands | User requirement, app-server agent | P1 | Yes | every negative lab operation is command/API-callable, serializable, undoable, batchable, and safe for agent tooling | command replay, dry-run, provenance tests |
-| REQ-HDR-001 | HDR | HDR merge from brackets | Capture One, Lightroom, RapidRAW | P1 | Yes | bracketed files merge into editable artifact | HDR fixtures, deghost/alignment |
-| REQ-PANO-001 | Panorama | Panorama stitching | Capture One, Lightroom, RapidRAW | P1 | Yes | projections and boundary controls produce editable artifact | pano fixtures, memory budget |
-| REQ-FOCUS-001 | Focus | Focus stacking | professional macro workflow | P2 | Yes | focus brackets align and blend to editable artifact | sharpness map, focus fixtures |
-| REQ-SR-001 | Super-resolution | Multi-image super-resolution/stitching | Lightroom, computational photo | P2 | Yes | conservative high-res output avoids hallucinated detail | chart fixtures, crop comparisons |
-| REQ-LIB-001 | Library | Professional culling/library workflow | Lightroom, Capture One, darktable | P1 | Yes | ratings, labels, filters, compare/survey, virtual copies | library tests, UI artifacts |
-| REQ-EXPORT-001 | Export | Export recipes and batch queue | Lightroom, Capture One | P1 | Yes | repeatable recipes with color/size/metadata controls | export tests, metadata checks |
-| REQ-API-001 | API | All editing surfaces callable through typed API | User requirement, OpenAI app-server | P0 | Yes | UI and agent use same command layer | schema drift, command replay |
-| REQ-AGENT-001 | Agent | Expert chat agent through app-server tools | OpenAI app-server | P1 | Yes | agent inspects, edits, previews, and logs through tools | replay, approval, injection tests |
-| REQ-MAC-001 | macOS | Polished macOS-first app | User requirement | P0 | N/A | app feels native enough for daily use | macOS build, UI QA, performance |
+| ID             | Domain           | Requirement                                     | Source Inspiration                               | Priority | API Required | Acceptance Criteria                                                                                                                   | Validation                                        |
+| -------------- | ---------------- | ----------------------------------------------- | ------------------------------------------------ | -------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| REQ-BASE-001   | Base             | Non-destructive RAW editing                     | RapidRAW, Lightroom, Capture One                 | P0       | Yes          | Original files never modified; edits replay from sidecar/graph                                                                        | original hash, sidecar roundtrip                  |
+| REQ-BASE-002   | Base             | GPU-accelerated interactive pipeline            | RapidRAW, darktable                              | P0       | Indirect     | previews update interactively on macOS                                                                                                | render latency, GPU/CPU parity                    |
+| REQ-BASE-003   | Base             | RAW decode and camera profile foundation        | RapidRAW, RawTherapee, Capture One               | P0       | Yes          | supported RAWs open with correct metadata/profile path                                                                                | fixture open tests, color chart                   |
+| REQ-COLOR-001  | Color            | Scene-referred color pipeline                   | darktable, Ansel                                 | P0       | Yes          | edits occur in defined scene-referred space with explicit display transform                                                           | ColorChecker, clipping, gamut tests               |
+| REQ-COLOR-002  | Color            | Capture One-class selective color editor        | Capture One                                      | P0       | Yes          | smooth range selection and HSL-style adjustment with masks                                                                            | color fixtures, render artifacts                  |
+| REQ-COLOR-003  | Color            | Skin tone uniformity                            | Capture One                                      | P1       | Yes          | hue/saturation/lightness uniformity controls work locally and globally                                                                | skin tone fixtures                                |
+| REQ-COLOR-004  | Color            | Advanced color grading controls                 | darktable, Ansel, Capture One                    | P1       | Yes          | color balance/wheels/channel controls serialize and replay                                                                            | schema and render tests                           |
+| REQ-LAYER-001  | Layers           | Full adjustment layer support                   | Capture One, RapidRAW                            | P0       | Yes          | add/reorder/rename/duplicate/delete/toggle/opacity                                                                                    | graph, undo, render tests                         |
+| REQ-MASK-001   | Masks            | Brush, gradient, range, and AI masks            | Lightroom, Capture One, RapidRAW                 | P0       | Yes          | masks combine, serialize, replay, and render correctly                                                                                | mask artifacts, IoU where possible                |
+| REQ-MASK-002   | Masks            | Add/subtract/intersect mask composition         | Lightroom, Capture One                           | P0       | Yes          | compositing works across mask types                                                                                                   | mask composition fixtures                         |
+| REQ-FILM-001   | Film             | High-quality film simulation engine             | RawTherapee, film workflows                      | P1       | Yes          | LUT plus grain/halation/curve/look controls                                                                                           | before/after fixtures, legal provenance           |
+| REQ-FILM-002   | Film             | Film negative conversion                        | RapidRAW, RawTherapee                            | P1       | Yes          | film base sampling and inversion workflow                                                                                             | negative scan fixtures                            |
+| REQ-NEG-001    | Negative Lab     | Dedicated negative processing lab UI            | User requirement, film scan workflows            | P1       | Yes          | purpose-built workflow for converting, profiling, correcting, and batch processing scanned negatives                                  | negative scan fixtures, UI artifacts              |
+| REQ-NEG-002    | Negative Lab     | Presets for major film stocks                   | User requirement, film workflows                 | P1       | Yes          | legally safe presets for major color and black-and-white film stocks, with provenance and trademark-safe naming policy                | preset review, before/after fixtures              |
+| REQ-NEG-003    | Negative Lab     | Roll/session model                              | Film scan workflows, batch consistency           | P1       | Yes          | scans can be grouped into roll sessions with shared base samples, anchor frames, per-frame overrides, and positive variant provenance | roll consistency fixtures, sidecar roundtrip      |
+| REQ-NEG-004    | Negative Lab     | Density-domain inversion pipeline               | Film scanning tools, color science               | P1       | Yes          | negative conversion operates in a defined density/transmittance model with explicit input profile and process assumptions             | CPU/GPU parity, color fixtures                    |
+| REQ-NEG-005    | Negative Lab     | API-callable negative lab commands              | User requirement, app-server agent               | P1       | Yes          | every negative lab operation is command/API-callable, serializable, undoable, batchable, and safe for agent tooling                   | command replay, dry-run, provenance tests         |
+| REQ-NEG-006    | Negative Lab     | Major film stock preset registry                | User requirement, film scan workflows            | P1       | Yes          | maintained registry covers major current and archival stock families with legal status, provenance, fixture status, and preset tier   | registry lint, provenance review, coverage matrix |
+| REQ-NEG-007    | Negative Lab     | Negative lab QC proofing                        | Film scan workflows, professional batch delivery | P1       | Yes          | lab can generate reviewable contact sheets, warnings, density summaries, and preset comparison artifacts for a roll/session           | artifact snapshots, UI tests, batch reports       |
+| REQ-NEG-008    | Negative Lab     | Acquisition health checks                       | Consult-backed film scan workflow                | P1       | Yes          | scan setup quality and upstream correction risks are visible before conversion                                                        | warning fixtures, UI artifacts, metadata checks   |
+| REQ-NEG-009    | Negative Lab     | Objective versus creative operation contract    | Consult-backed color science                     | P1       | Yes          | acquisition, inversion, roll normalization, and creative rendering commands are stage-labeled and separately testable                 | schema lint, command replay, render artifacts     |
+| REQ-HDR-001    | HDR              | HDR merge from brackets                         | Capture One, Lightroom, RapidRAW                 | P1       | Yes          | bracketed files merge into editable artifact                                                                                          | HDR fixtures, deghost/alignment                   |
+| REQ-PANO-001   | Panorama         | Panorama stitching                              | Capture One, Lightroom, RapidRAW                 | P1       | Yes          | projections and boundary controls produce editable artifact                                                                           | pano fixtures, memory budget                      |
+| REQ-FOCUS-001  | Focus            | Focus stacking                                  | professional macro workflow                      | P2       | Yes          | focus brackets align and blend to editable artifact                                                                                   | sharpness map, focus fixtures                     |
+| REQ-SR-001     | Super-resolution | Multi-image super-resolution/stitching          | Lightroom, computational photo                   | P2       | Yes          | conservative high-res output avoids hallucinated detail                                                                               | chart fixtures, crop comparisons                  |
+| REQ-LIB-001    | Library          | Professional culling/library workflow           | Lightroom, Capture One, darktable                | P1       | Yes          | ratings, labels, filters, compare/survey, virtual copies                                                                              | library tests, UI artifacts                       |
+| REQ-EXPORT-001 | Export           | Export recipes and batch queue                  | Lightroom, Capture One                           | P1       | Yes          | repeatable recipes with color/size/metadata controls                                                                                  | export tests, metadata checks                     |
+| REQ-API-001    | API              | All editing surfaces callable through typed API | User requirement, OpenAI app-server              | P0       | Yes          | UI and agent use same command layer                                                                                                   | schema drift, command replay                      |
+| REQ-AGENT-001  | Agent            | Expert chat agent through app-server tools      | OpenAI app-server                                | P1       | Yes          | agent inspects, edits, previews, and logs through tools                                                                               | replay, approval, injection tests                 |
+| REQ-MAC-001    | macOS            | Polished macOS-first app                        | User requirement                                 | P0       | N/A          | app feels native enough for daily use                                                                                                 | macOS build, UI QA, performance                   |
 
 Requirement rules:
 
@@ -1000,13 +1004,24 @@ Requirements:
 
 ### 7.5.1 Negative Processing Lab
 
-RawEngine should include a full negative processing lab as a distinct editing surface, not just a checkbox inside film simulation.
+RawEngine should include a full negative processing lab as a first-class product surface, not just a checkbox inside film simulation. It should feel like a dedicated professional scanning and conversion room inside the app: import scans, split frames, calibrate the film base, convert negatives, normalize rolls, compare stock presets, inspect QC warnings, generate positives, and continue non-destructive editing from the same project.
 
-Consult requirement:
+Product bar:
 
-- When this area reaches active design/implementation, use the consult skill heavily before architecture and UI decisions.
-- Consult should cover film scanning workflows, color negative inversion, black-and-white negative workflows, film stock preset strategy, UI flow, color science, legal/trademark risk, and validation fixtures.
-- Do not implement a large negative lab feature without a consult-backed design pass and linked ADR or design issue.
+- Own top-level Negative Lab workspace or mode, with its own navigation, layouts, state, shortcuts, command API namespace, validation fixtures, and documentation.
+- Handles one-off negative conversions, full roll/contact-sheet workflows, archival lab scans, camera-scanned RAW workflows, flatbed scan workflows, and agent-driven batch work.
+- Treats presets for major film stocks as a governed product catalog with provenance, legality, versioning, fixture coverage, and refresh cadence.
+- Produces editable positive variants that remain linked to original negative scans and roll/session settings.
+- Makes every lab operation available through the same typed command surface used by UI, automation, and the OpenAI app-server agent.
+- Does not ship broad "exact stock emulation" claims unless the profile is measured by the project, reproducible, fixture-backed, and cleared by the legal/provenance policy.
+
+Mandatory consult and design gate:
+
+- When this area reaches active design/implementation, use the consult skill heavily before architecture, UI, color-science, preset-taxonomy, validation, and app-server agent decisions.
+- The first implementation issue for this area must be `consult(negative-lab): get negative processing lab design review`, and no architecture/UI/pipeline PR should begin until the consult output is summarized in this document or a linked ADR.
+- Consult should cover film scanning workflows, color negative inversion, black-and-white negative workflows, ECN-2/cinema workflows, slide/reversal helper workflows, film stock preset strategy, UI flow, color science, legal/trademark risk, fixture acquisition, and validation thresholds.
+- For each high-risk phase, open a follow-up consult before implementation if the existing ADR does not answer the design question: density model, stock preset registry, color-management integration, GPU parity, roll normalization, agent bulk operations, and QC metrics.
+- Do not implement a large negative lab feature without a consult-backed design pass, linked ADR or design issue, acceptance criteria, and planned validation fixtures.
 
 Dedicated UI requirements:
 
@@ -1023,6 +1038,26 @@ Dedicated UI requirements:
 - Save, version, duplicate, and share custom negative profiles.
 - Export converted positives as normal editable RawEngine variants.
 
+Dedicated UI modes:
+
+- Intake: choose scan source type, roll/session, process family, capture/scanner profile, light source, frame format, and expected preset family.
+- Frame Split: detect, correct, and approve frame crops from strips, sheets, and single-frame scans.
+- Base Calibrate: inspect candidate base samples, add manual samples, reject contaminated samples, and view confidence metrics.
+- Convert: tune density-domain inversion, per-channel curves, RGB balance, output contrast, black/white point, and neutral/skin sample targets.
+- Roll Match: select anchors, synchronize exposure/density/color across frames, view outliers, and apply safe roll-level operations.
+- Preset Studio: browse major-stock presets, compare generic/profile/user/reference tiers, inspect provenance, save custom profiles, and test profile variants against anchor frames.
+- QC Proof: generate contact sheets, warning reports, density summaries, crop warnings, clipping reports, before/after grids, and preset comparison artifacts.
+- Output: create positive variants, send to the normal editor, batch export, or hand commands to the app-server agent with dry-run and rollback support.
+
+Required UI affordances:
+
+- Density histogram and RGB channel histograms before and after inversion.
+- Sample-point readouts for negative RGB, estimated density, inverted RGB, Lab/LCH where available, clipping state, and assigned role such as base, neutral, skin, highlight, or shadow.
+- Per-frame warning badges for missing base sample, low-confidence base sample, contaminated sample, crop ambiguity, blown channel, dense negative, thin negative, mixed light, unknown scan correction, and missing profile.
+- Roll health summary showing anchor frames, outliers, per-frame overrides, shared settings, fixture/profile status, and batch readiness.
+- Preset provenance inspector that shows tier, process family, naming/legal status, fixture IDs, source notes, intended scan assumptions, algorithm version, and confidence.
+- Non-destructive "compare recipes" view that can show multiple preset/profile candidates without committing them to the edit graph.
+
 Supported negative lab input modes:
 
 - Camera-scanned RAW or DNG negative captures.
@@ -1033,6 +1068,17 @@ Supported negative lab input modes:
 - Single-frame scans with visible rebate/borders.
 - Cropped scans without borders where base detection must rely on manual or roll-level base samples.
 - Color negative, black-and-white silver negative, chromogenic black-and-white negative, ECN-2/cinema color negative, redscale/creative color negative, and E-6 slide/reversal helper modes.
+
+Acquisition quality and scan setup requirements:
+
+- Negative Lab must make scan acquisition quality observable before conversion so users can separate scan problems from inversion problems.
+- Record capture method: camera scan, flatbed, lab scanner, minilab JPEG/TIFF, contact sheet, or unknown.
+- Record scanner/camera/lens profile, light source, approximate CCT where known, diffuser, copy-stand notes, film holder, border visibility, frame spacing, skew, curl, and Newton-ring risk.
+- Record scanner software assumptions where known: auto exposure, auto color, sharpening, dust removal, infrared cleaning, embedded profile, output color space, bit depth, and compression.
+- Record camera scan capture metadata where available: exposure, ISO, aperture, lens, RAW white balance, black level, clipping state, and light-source white balance.
+- Add a Scan Setup Check panel before conversion that reports missing profile, clipped channels, auto-white-balanced files, auto-contrast files, unknown lab correction, missing clear film base, uneven illumination, severe light-source casts, per-channel underexposure, lab JPEG compression, and flatbed sharpening artifacts.
+- Provide scanner export guidance in docs and UI: prefer 16-bit TIFF/DNG or camera RAW, disable auto color/auto contrast where possible, preserve borders when possible, and avoid pre-inverted positives for Negative Lab conversion.
+- Warn when conversion confidence is low because the input is already heavily processed or lacks enough film base data.
 
 Roll/session model requirements:
 
@@ -1062,6 +1108,7 @@ Frame detection and crop requirements:
 - Flag likely contaminated base samples near edges, dust, sprocket holes, light leaks, and frame numbers.
 - Preserve original negative scan orientation and allow non-destructive display rotation.
 - Store crop and split operations as versioned edit graph operations.
+- Support half-frame, panoramic frames, 110/126/APS formats, medium format, sheet film, mixed orientation strips, overlapping frames, contact sheets containing multiple film stocks or processes, and scans containing both negatives and positives.
 
 Film base and calibration requirements:
 
@@ -1076,6 +1123,10 @@ Film base and calibration requirements:
 - Camera scanning profile input.
 - Lens correction and illumination correction handoff for camera-scanned negatives.
 - Calibration notes for copy stand, macro lens, light source, holder, and scanner.
+- Optional ColorChecker, IT8, gray card, step wedge, and densitometer/spectrophotometer metadata workflows.
+- Known-target calibration mode when a scan includes a usable reference target.
+- No-target calibration mode with lower confidence and stronger warnings.
+- Saved scanner/camera/light-source profile independent from film stock profile.
 
 Image processing and color-science requirements:
 
@@ -1093,8 +1144,33 @@ Image processing and color-science requirements:
 - Provide color cast correction.
 - Preserve highlight and shadow recovery opportunities after conversion where the source data allows it.
 - Define where negative conversion lives in the edit graph relative to RAW decode, lens correction, scene-referred color, film simulation, grain, halation, and creative grading.
+- Define exact pipeline placement relative to demosaic, lens correction, white balance, denoise, sharpening, global edits, masks, display transform, and export before implementation.
+- Lens and illumination correction usually need to happen before base sampling for camera scans, but coordinate transforms for crops and frame boundaries must remain replayable.
+- Sharpening should not happen before objective inversion.
+- Denoise should not happen before objective inversion unless an ADR defines a bounded raw-domain or scanner-domain noise model.
+- Capture-light correction may happen before density conversion; creative white balance belongs after inversion.
 - Film grain and halation controls are creative post-conversion operations unless a future ADR proves a better model.
 - CPU and GPU renders must have explicit parity tolerances before the feature ships.
+- Intermediate math must define numeric ranges, clamping policy, NaN/Inf behavior, monotonicity rules for objective curves, deterministic replay rules, and canonical CPU reference output.
+- Use documented, open, vendor-neutral color-management primitives. RawEngine may interoperate with ICC, ColorSync on macOS, ACES/OCIO-style transforms, and DNG/ICC metadata, but must not depend on proprietary Adobe/Capture One transforms, profiles, or LUTs.
+- macOS preview must be display-profile aware where appropriate and must not assume every display is sRGB.
+- Include sRGB, Display P3, and future HDR-display preview validation paths even if HDR export is deferred.
+
+Measurement and processing boundary requirements:
+
+- Acquisition calibration, objective inversion, roll normalization, and creative rendering must be separate stages in the edit graph, command API, UI, and validation artifacts.
+- Acquisition calibration covers scanner/camera input profile, light source, white balance, lens/copy-stand corrections, flat-field/illumination correction, and scan-source limitations.
+- Objective inversion covers film base/fog estimation, density/transmittance conversion, per-channel inversion, characteristic curves, process-family assumptions, and output neutralization targets.
+- Roll normalization covers anchor frames, shared base samples, exposure/density/color sync, outlier detection, and explicit per-frame overrides.
+- Creative rendering covers post-conversion contrast, color style, film simulation, grain, halation, bloom, and user looks.
+- Commands and sidecars must label which stage each operation belongs to so app-server tools, validation, and future migrations can reason about the workflow safely.
+- Validation artifacts should be able to show failures at each stage separately instead of only comparing final rendered pixels.
+- Each command must declare whether it is `objective`, `semi_objective`, or `creative`.
+- Objective commands include acquisition correction, base/fog estimation, density conversion, and process profile application.
+- Semi-objective commands include roll normalization, anchor-frame sync, and neutral/skin target matching.
+- Creative commands include film look, contrast style, grain, halation, split tone, bloom, and user looks.
+- Batch normalization may only change objective and semi-objective parameters unless the user explicitly enables creative sync.
+- Presets must declare which objective, semi-objective, and creative parameters they touch.
 
 Professional edge cases:
 
@@ -1113,6 +1189,12 @@ Professional edge cases:
 - Remjet/cinema-stock assumptions.
 - Lab scans with unknown correction baked in.
 - Creative/specialty stocks where exact color is not objectively recoverable.
+- Mixed film stocks or process families on one contact sheet.
+- Auto-corrected scanner files with unknown positive conversion or baked-in correction.
+- Half-frame, panoramic, medium-format, sheet-film, 110, 126, and APS scans.
+- Black-and-white panchromatic, orthochromatic, infrared, stained/tanned, chromogenic, pushed, pulled, and specialty cases.
+- ECN-2 remjet removed, remjet unknown, C-41 cross-processed cinema film, tungsten/daylight stock assumptions, and still-photo cinema-derived workflows.
+- Curled film, uneven focus, Newton rings, sprocket/perf contamination, and scanner-bed border contamination.
 
 Film stock preset requirements:
 
@@ -1138,6 +1220,20 @@ Film stock preset requirements:
   - version.
   - legal/provenance note.
 
+Major stock preset governance:
+
+- Create a project-owned film stock registry before shipping stock-family presets.
+- Treat "major film stocks" as a maintained coverage target, not a one-time hard-coded list.
+- Registry entries should include manufacturer/brand owner, stock family, process type, speed, color/BW/reversal category, current/discontinued/archival status, trademark status, legal naming status, preset tier, fixture status, source references, and refresh date.
+- The registry must distinguish current production stocks, discontinued but common archival stocks, cinema stocks commonly scanned by still photographers, creative/specialty stocks, and slide/reversal stocks that use helper profiles rather than inversion.
+- Built-in presets should be legally safe stock-family starting points unless a measured profile has project-owned test rolls, scan setup notes, fixture IDs, reproducibility notes, and legal approval.
+- Stock-family preset coverage must be visible in the UI and docs as "generic", "verified profile", "user profile", or "reference mapping"; the app must not blur these tiers.
+- Each preset needs deterministic output, command/API serialization, semantic versioning, migration behavior, provenance notes, and a deprecation path.
+- Preset catalog updates require validation artifacts and review, not only visual preference.
+- A scheduled research issue should refresh the registry against official manufacturer sources before each major release.
+- Profile confidence tiers must be explicit: generic process preset, stock-family starting point, measured project profile, user profile, and reference mapping.
+- Profile imports must warn on missing license/provenance, unsafe claims, unsupported binary LUT/profile payloads, or ambiguous trademark/affiliation language.
+
 Preset tier model:
 
 - Generic built-ins: safe descriptive presets such as `C-41 Neutral 100`, `C-41 Portrait 160`, `C-41 Portrait 400`, `C-41 High-Speed 800`, `C-41 Saturated 100`, `ECN-2 Daylight`, `ECN-2 Tungsten`, `Black-and-White Classic Grain`, `Black-and-White Tabular Grain`, `Black-and-White Ortho`, `Black-and-White Chromogenic`, and `Slide/Reversal Helper`.
@@ -1160,6 +1256,14 @@ Major stock-family research coverage:
 - Ferrania P30-style black-and-white workflows.
 - Rollei/Agfa-style black-and-white families, with naming and trademark review.
 - Slide/reversal helper profiles as a separate mode, not negative inversion.
+
+Preset coverage backlog:
+
+- Create one registry coverage issue per manufacturer or stock family when this milestone starts, instead of one oversized preset PR.
+- Initial registry must cover at least color negative, black-and-white silver, chromogenic black-and-white, ECN-2/cinema negative, creative color negative, and slide/reversal helper categories.
+- Each stock-family issue should decide whether the output is a generic built-in, measured verified profile, user-profile template, or reference mapping only.
+- Each stock-family issue should include fixture needs, legal naming decision, expected scan assumptions, preset tier, validation artifacts, UI copy, and agent/API command examples.
+- Stock-family issues should be allowed to close as "reference mapping only" when legal or measurement evidence is insufficient.
 
 Preset research seed sources:
 
@@ -1203,21 +1307,45 @@ Negative lab validation:
 - Slide/reversal positive scan helper fixture.
 - Creative color fixture with explicit non-exact-emulation warning.
 
+Negative lab shift-left gates:
+
+- `validation:negative-lab:schema`: command schema, sidecar schema, preset metadata schema, registry schema, migrations, and provenance roundtrip.
+- `validation:negative-lab:fixtures`: fixture manifest lint, license/provenance lint, expected input profile checks, and missing-fixture failure modes.
+- `validation:negative-lab:cpu-reference`: CPU reference conversion for small fixtures with pinned algorithm versions and reproducible artifacts.
+- `validation:negative-lab:gpu-parity`: GPU preview/render comparison against CPU reference within documented tolerances.
+- `validation:negative-lab:preset-registry`: major-stock registry coverage, tier labels, legal naming status, source references, and stale-source warnings.
+- `validation:negative-lab:ui-artifacts`: screenshot/contact-sheet artifacts for guided mode, batch mode, Preset Studio, QC Proof, and warning states.
+- `validation:negative-lab:agent`: app-server dry-run, preview, diff, selected-frame scope, rollback, and no-original-overwrite tests.
+- `validation:negative-lab:synthetic`: synthetic negative generator with known positives, known base/fog, known per-channel curves, exposure offsets, scanner/camera matrices, gray ramps, color ramps, and skin-tone patches.
+- `validation:negative-lab:numeric`: no NaN/Inf, monotonic objective curves, CPU deterministic hash, CPU/GPU patch tolerance, clipping warning correctness, schema migration, and undo/replay equivalence.
+- `validation:negative-lab:claims`: prohibited LUT/profile/binary additions, unsafe trademark/emulation claims, and unapproved exact-match quality claims.
+- `validation:negative-lab:performance`: macOS preview latency, preset switch latency, base recalibration time, full-resolution render time, batch throughput, memory ceiling, fallback behavior, and cancellation latency.
+- Heavy fixtures can live in an optional artifact pack, but each PR must still run a small deterministic fixture set locally and in CI.
+
 Negative lab validation matrix:
 
-| Case | Inputs | Required evidence |
-| --- | --- | --- |
-| C-41 camera scan | RAW/DNG with visible border | base sample record, positive render, parameter snapshot, CPU/GPU parity result |
-| C-41 flatbed scan | TIFF plus scanner profile | profile record, positive render, neutral patch notes |
-| Lab scan | TIFF/JPEG with unknown lab correction | limitation warning, positive variant provenance |
-| Dense/thin negatives | known hard fixtures | clipping report, density report, before/after artifact |
-| Mixed roll | 6+ frames | anchor frame, sync deltas, per-frame overrides |
-| Black-and-white panchromatic | silver negative | tonal curve, grain/detail crop |
-| Black-and-white ortho/specialty | ortho or specialty fixture | spectral/look note, manual adjustment evidence |
-| ECN-2/cinema negative | daylight and tungsten cases | process assumption, halation/remjet note, render artifact |
-| Creative color | Harman/Lomo-style fixtures | warning that output is profile-assisted, not exact emulation |
-| Slide/reversal helper | E-6 positive scan | no inversion operation, profile/display helper only |
-| Multi-frame scan | strip/contact-sheet input | frame split artifact, crop warnings, replayable operations |
+| Case                            | Inputs                                | Required evidence                                                              |
+| ------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ |
+| C-41 camera scan                | RAW/DNG with visible border           | base sample record, positive render, parameter snapshot, CPU/GPU parity result |
+| C-41 flatbed scan               | TIFF plus scanner profile             | profile record, positive render, neutral patch notes                           |
+| Lab scan                        | TIFF/JPEG with unknown lab correction | limitation warning, positive variant provenance                                |
+| Dense/thin negatives            | known hard fixtures                   | clipping report, density report, before/after artifact                         |
+| Mixed roll                      | 6+ frames                             | anchor frame, sync deltas, per-frame overrides                                 |
+| Black-and-white panchromatic    | silver negative                       | tonal curve, grain/detail crop                                                 |
+| Black-and-white ortho/specialty | ortho or specialty fixture            | spectral/look note, manual adjustment evidence                                 |
+| ECN-2/cinema negative           | daylight and tungsten cases           | process assumption, halation/remjet note, render artifact                      |
+| Creative color                  | Harman/Lomo-style fixtures            | warning that output is profile-assisted, not exact emulation                   |
+| Slide/reversal helper           | E-6 positive scan                     | no inversion operation, profile/display helper only                            |
+| Multi-frame scan                | strip/contact-sheet input             | frame split artifact, crop warnings, replayable operations                     |
+
+Output and roundtrip requirements:
+
+- Export positive TIFF/JPEG/PNG with embedded profile where applicable.
+- Export sidecar/session/profile data independently from rendered positives.
+- Export contact-sheet proofs and diagnostic before/after reports for roll review.
+- Export negative conversion parameters as JSON for debugging and reproducibility.
+- Re-import RawEngine negative profiles into another project with migration checks.
+- Use no-overwrite defaults, atomic export writes, batch dry-run summaries, and visible provenance.
 
 API and app-server agent requirements:
 
@@ -1230,6 +1358,19 @@ API and app-server agent requirements:
 - Agent tools must preserve provenance from original negative scan to positive variant.
 - Agent tools must expose safe read-only inspection commands for density, clipping, channels, sample points, and roll consistency.
 - Bulk agent operations must support dry-run, selected-frame scope, and rollback.
+- Agent tools must expose warning severity, progress events, cancellation, output overwrite policy, batch job IDs, content-hashed preview artifacts, and parameter diffs.
+- Agent tools must require explicit human approval for low-confidence calibration, destructive exports, profile imports with missing provenance, and large batch changes.
+- Agent tools must operate within user-granted input/output roots and must never silently expand file scope.
+
+Agent-specific negative lab workflows:
+
+- Inspect scan: report input profile, process-family guess, frame count, base-sample candidates, density range, crop warnings, and fixture/provenance gaps.
+- Plan conversion: propose roll/session settings, preset tier, base sampling strategy, anchor frames, and validation checks without applying changes.
+- Apply conversion: create non-destructive operations only after a dry-run diff and selected-frame scope are explicit.
+- Compare presets: render a bounded comparison grid for selected generic, verified, user, or reference presets.
+- Normalize roll: propose exposure/density/color sync from anchor frames, list outliers, and require explicit scope for bulk changes.
+- QC roll: return warnings, contact-sheet artifacts, clipping/density summaries, and suggested manual review points.
+- Export positives: produce positive variants or export recipes without overwriting originals and with provenance attached.
 
 Negative lab ADRs:
 
@@ -1242,6 +1383,25 @@ Negative lab ADRs:
 - `ADR-NEG-007: Built-in preset taxonomy and stock refresh cadence`
 - `ADR-NEG-008: Positive variant/export provenance`
 - `ADR-NEG-009: Negative fixture corpus and validation thresholds`
+- `ADR-NEG-010: Negative Lab node placement and allowed upstream operations`
+- `ADR-NEG-011: Open color management, display profile, and export profile policy`
+- `ADR-NEG-012: Objective, semi-objective, and creative operation contract`
+- `ADR-NEG-013: Synthetic negative generator and numeric quality gates`
+- `ADR-NEG-014: App-server safety model, file scope, dry-run, and rollback`
+
+Negative lab implementation order:
+
+1. Consult and ADRs: complete design review, architecture ADRs, density model ADR, preset naming/legal ADR, fixture policy, and command namespace.
+2. Schemas and validation first: add roll/session schema, command schema, preset registry schema, fixture manifest, metadata lint, and dry-run command replay tests before UI work.
+3. CPU reference path: implement a small deterministic CPU inversion path for curated fixtures so UI and GPU behavior has a stable baseline.
+4. UI shell: add Negative Lab navigation, workspace modes, empty states, roll/frame queue, viewer states, Preset Studio shell, and QC Proof shell without complex algorithms.
+5. Input and frame handling: support camera RAW/DNG, TIFF, flatbed/lab scan metadata, contact-sheet splitting, crop/rotation, and contaminated-base warnings.
+6. Base and inversion tools: add manual/auto base sampling, density-domain inversion controls, per-channel curves, black/white point, neutral/skin sample targets, and stage-labeled operations.
+7. Roll normalization: add anchors, shared roll settings, per-frame overrides, outlier reports, contact-sheet artifacts, and batch-safe sync operations.
+8. Preset registry: ship generic safe presets first, then measured verified profiles, user profiles, and reference mappings through small stock-family issues.
+9. GPU and performance: port validated CPU stages to GPU with parity tolerances, preview latency budgets, and fallback behavior.
+10. Agent tools: expose inspect, plan, dry-run, compare, apply, QC, rollback, and export tools through the app-server command layer.
+11. Release hardening: add fixture packs, large/nightly validation, documentation, migration tests, accessibility checks, and manual editing workflow sign-off.
 
 Negative lab issue split:
 
@@ -1255,23 +1415,46 @@ Negative lab issue split:
 - `negative-lab(schema): define negative conversion operation schema`
 - `negative-lab(api): expose negative lab command surface`
 - `agent(negative-lab): expose safe app-server tools for negative lab`
+- `negative-lab(acquisition): add scan setup health model`
+- `negative-lab(acquisition): detect auto-corrected and lossy inputs`
 - `negative-lab(import): support scan input modes and roll sessions`
 - `negative-lab(import): add frame splitting and border detection`
+- `negative-lab(format): support half-frame panoramic medium-format and sheet-film scans`
+- `negative-lab(calibration): add target and step-wedge workflows`
 - `negative-lab(base): add film base sampling controls`
 - `negative-lab(inversion): add per-channel inversion curves`
+- `negative-lab(contract): classify objective semi-objective and creative operations`
+- `negative-lab(color-management): define display and export profile behavior`
 - `negative-lab(color): add density normalization and process profiles`
+- `negative-lab(bw): add black-and-white process model`
+- `negative-lab(ecn2): add remjet and cinema scan assumptions`
 - `negative-lab(batch): add roll-level batch consistency workflow`
 - `negative-lab(presets): define film stock preset metadata and legal policy`
+- `negative-lab(presets): create major film stock registry schema`
+- `negative-lab(presets): add stock registry refresh workflow`
+- `negative-lab(presets): add preset provenance inspector requirements`
 - `negative-lab(presets): add generic legally safe built-in presets`
 - `negative-lab(presets): add stock-family research mappings after legal review`
 - `negative-lab(presets): add measured-profile fixture format`
+- `negative-lab(presets): split major stock-family coverage issues`
 - `negative-lab(crop): add frame border and crop detection`
 - `negative-lab(profiles): add scanner and camera-scan profile inputs`
+- `negative-lab(qc): add contact sheet proofing reports`
+- `negative-lab(qc): add density and clipping warning reports`
 - `negative-lab(output): add positive variant provenance`
+- `negative-lab(output): add conversion report and profile roundtrip exports`
 - `validation(negative-lab): add negative scan fixture manifest`
 - `validation(negative-lab): add fixture licensing and provenance policy`
+- `validation(negative-lab): add preset registry lint`
+- `validation(negative-lab): add CPU reference conversion fixtures`
+- `validation(negative-lab): add synthetic negative generator`
+- `validation(negative-lab): add numeric quality gates`
+- `validation(negative-lab): add GPU parity tolerance checks`
+- `validation(negative-lab): add prohibited asset and claim lint`
 - `validation(negative-lab): add color and black-and-white negative render tests`
 - `validation(negative-lab): add roll consistency and QC overlay tests`
+- `validation(negative-lab): add app-server dry-run and rollback tests`
+- `validation(negative-lab): add macOS performance benchmarks`
 - `docs(negative-lab): add user guide for negative workflow`
 
 ### 7.6 Export And Delivery
@@ -1885,19 +2068,19 @@ Future ESLint issue split:
 
 Target ESLint rule families:
 
-| Rule Family | Intent | Future Gate |
-| --- | --- | --- |
-| Type safety | prevent unsafe `any`, unsafe calls, unsafe member access, unsafe returns | required PR lint |
-| Promise safety | prevent floating promises, missing awaits, swallowed async errors | required PR lint |
-| Exhaustiveness | force switch/union exhaustiveness in edit graph and tool handling | required for API/core |
-| React hooks | catch invalid hooks usage and missing dependencies | required frontend lint |
-| React refresh | keep Vite/React refresh constraints healthy | required frontend lint |
-| Accessibility | catch missing labels, roles, keyboard traps, invalid ARIA | required UI lint |
-| Imports/boundaries | prevent cycles and forbidden cross-layer imports | required once architecture is mapped |
-| No direct mutation | protect edit graph immutability and React state predictability | required for edit graph/UI |
-| No console in production | route logs through structured logger | required after logger exists |
-| No untranslated user text | preserve i18n direction if inherited from RapidRAW | required if i18n remains |
-| No unrestricted disables | require reason comments for lint disables | required immediately after strict lint |
+| Rule Family               | Intent                                                                   | Future Gate                            |
+| ------------------------- | ------------------------------------------------------------------------ | -------------------------------------- |
+| Type safety               | prevent unsafe `any`, unsafe calls, unsafe member access, unsafe returns | required PR lint                       |
+| Promise safety            | prevent floating promises, missing awaits, swallowed async errors        | required PR lint                       |
+| Exhaustiveness            | force switch/union exhaustiveness in edit graph and tool handling        | required for API/core                  |
+| React hooks               | catch invalid hooks usage and missing dependencies                       | required frontend lint                 |
+| React refresh             | keep Vite/React refresh constraints healthy                              | required frontend lint                 |
+| Accessibility             | catch missing labels, roles, keyboard traps, invalid ARIA                | required UI lint                       |
+| Imports/boundaries        | prevent cycles and forbidden cross-layer imports                         | required once architecture is mapped   |
+| No direct mutation        | protect edit graph immutability and React state predictability           | required for edit graph/UI             |
+| No console in production  | route logs through structured logger                                     | required after logger exists           |
+| No untranslated user text | preserve i18n direction if inherited from RapidRAW                       | required if i18n remains               |
+| No unrestricted disables  | require reason comments for lint disables                                | required immediately after strict lint |
 
 Allowed escape hatch policy:
 
@@ -2136,23 +2319,23 @@ Suggested final required check set:
 
 Future CI should call the same named commands developers run locally. Exact implementation may change after the RapidRAW audit, but the command contract should aim for:
 
-| Command | Purpose | Expected Scope |
-| --- | --- | --- |
-| `bun run check` | full local validation mirror for ordinary PRs | lint, typecheck, tests, build smoke where practical |
-| `bun run check:quick` | pre-push fast gate | fast lint/type/unit checks only |
-| `bun run lint` | frontend lint | ESLint with `--max-warnings 0` |
-| `bun run typecheck` | TypeScript typecheck | project references if applicable |
-| `bun run format:check` | formatting check | frontend/docs formatting |
-| `bun run test` | frontend/unit tests | TS/React utilities and components |
-| `bun run build` | frontend build | Vite/Tauri frontend build |
-| `bun run schema:check` | schema generation drift | edit graph/API/tool schemas |
-| `bun run docs:check` | docs lint/link check | markdown and links |
-| `bun run fixtures:check` | fixture manifest validation | license/source/hash metadata |
-| `cargo fmt --all --check` | Rust formatting | Rust workspace |
-| `cargo clippy --workspace --all-targets --all-features -- -D warnings` | Rust lint | warnings-as-errors |
-| `cargo test --workspace` | Rust tests | Rust workspace |
-| `cargo audit` or chosen equivalent | Rust vulnerabilities | dependencies |
-| `cargo deny` or chosen equivalent | Rust license/security policy | dependencies |
+| Command                                                                | Purpose                                       | Expected Scope                                      |
+| ---------------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
+| `bun run check`                                                        | full local validation mirror for ordinary PRs | lint, typecheck, tests, build smoke where practical |
+| `bun run check:quick`                                                  | pre-push fast gate                            | fast lint/type/unit checks only                     |
+| `bun run lint`                                                         | frontend lint                                 | ESLint with `--max-warnings 0`                      |
+| `bun run typecheck`                                                    | TypeScript typecheck                          | project references if applicable                    |
+| `bun run format:check`                                                 | formatting check                              | frontend/docs formatting                            |
+| `bun run test`                                                         | frontend/unit tests                           | TS/React utilities and components                   |
+| `bun run build`                                                        | frontend build                                | Vite/Tauri frontend build                           |
+| `bun run schema:check`                                                 | schema generation drift                       | edit graph/API/tool schemas                         |
+| `bun run docs:check`                                                   | docs lint/link check                          | markdown and links                                  |
+| `bun run fixtures:check`                                               | fixture manifest validation                   | license/source/hash metadata                        |
+| `cargo fmt --all --check`                                              | Rust formatting                               | Rust workspace                                      |
+| `cargo clippy --workspace --all-targets --all-features -- -D warnings` | Rust lint                                     | warnings-as-errors                                  |
+| `cargo test --workspace`                                               | Rust tests                                    | Rust workspace                                      |
+| `cargo audit` or chosen equivalent                                     | Rust vulnerabilities                          | dependencies                                        |
+| `cargo deny` or chosen equivalent                                      | Rust license/security policy                  | dependencies                                        |
 
 If a command cannot exist exactly because of RapidRAW's structure, create the closest equivalent and document the reason in the plan.
 
@@ -2224,19 +2407,19 @@ RawEngine needs validation loops strong enough that autonomous implementation ca
 
 Validation should be placed as far left as practical. The same requirement can appear in multiple layers when the feedback loop is cheap enough.
 
-| Validation Layer | Purpose | Examples | Future Blocking Level |
-| --- | --- | --- | --- |
-| Editor/IDE | Catch mistakes while typing | TypeScript language service, ESLint in editor, Rust analyzer, format on save | Developer convenience |
-| Pre-commit | Block obvious local mistakes before a commit exists | Main branch guard, staged lint, format check, generated schema drift, forbidden large files | Hard local block |
-| Commit message | Keep work traceable | Issue reference, conventional commit if adopted, no vague messages | Soft or hard after convention |
-| Pre-push | Avoid wasting CI | Main ref push guard, fast `check:quick`, no direct `HEAD:main` push | Hard local block |
-| Local full check | Mirror CI before PR | `bun run check`, Rust checks, Tauri smoke, docs lint | Required PR evidence |
-| PR fast CI | Protect review loop | lint, typecheck, unit tests, schema drift, license, security, docs | Required branch protection |
-| PR app CI | Prove buildability | macOS Tauri build, frontend build, Rust integration tests | Required for app-impacting PRs |
-| PR visual/image CI | Catch renderer and UI regressions | golden smoke renders, screenshot comparisons, fixture artifacts | Required for image/UI PRs |
-| Nightly CI | Run expensive confidence checks | full fixture corpus, performance, large panorama/HDR, agent evals | Blocking before release |
-| Release CI | Prove shippability | signing/notarization, SBOM, full build matrix, release notes | Required for release |
-| Manual QA | Catch taste and workflow failures | color review, UI polish pass, editing workflow checklist | Required for major feature completion |
+| Validation Layer   | Purpose                                             | Examples                                                                                    | Future Blocking Level                 |
+| ------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Editor/IDE         | Catch mistakes while typing                         | TypeScript language service, ESLint in editor, Rust analyzer, format on save                | Developer convenience                 |
+| Pre-commit         | Block obvious local mistakes before a commit exists | Main branch guard, staged lint, format check, generated schema drift, forbidden large files | Hard local block                      |
+| Commit message     | Keep work traceable                                 | Issue reference, conventional commit if adopted, no vague messages                          | Soft or hard after convention         |
+| Pre-push           | Avoid wasting CI                                    | Main ref push guard, fast `check:quick`, no direct `HEAD:main` push                         | Hard local block                      |
+| Local full check   | Mirror CI before PR                                 | `bun run check`, Rust checks, Tauri smoke, docs lint                                        | Required PR evidence                  |
+| PR fast CI         | Protect review loop                                 | lint, typecheck, unit tests, schema drift, license, security, docs                          | Required branch protection            |
+| PR app CI          | Prove buildability                                  | macOS Tauri build, frontend build, Rust integration tests                                   | Required for app-impacting PRs        |
+| PR visual/image CI | Catch renderer and UI regressions                   | golden smoke renders, screenshot comparisons, fixture artifacts                             | Required for image/UI PRs             |
+| Nightly CI         | Run expensive confidence checks                     | full fixture corpus, performance, large panorama/HDR, agent evals                           | Blocking before release               |
+| Release CI         | Prove shippability                                  | signing/notarization, SBOM, full build matrix, release notes                                | Required for release                  |
+| Manual QA          | Catch taste and workflow failures                   | color review, UI polish pass, editing workflow checklist                                    | Required for major feature completion |
 
 Shift-left principle:
 
@@ -2284,27 +2467,27 @@ Every future issue should declare which categories it touches:
 
 Each milestone should define the minimum gates needed before it can be called complete.
 
-| Milestone | Minimum Required Gates |
-| --- | --- |
-| 0: Maintained Plan Artifact | markdown render check, link review, plan consistency scan, documentation-only diff |
-| 0.1: Project Charter And Fork Governance | branch protection verified, repo visibility verified, issue/PR templates present, AGPL note present |
-| 0.5: RapidRAW Baseline Snapshot | upstream SHA recorded, existing commands run, failures captured as issues, baseline artifacts saved |
-| 1: Shift-Left Quality Foundation | Bun install, strict lint/type gates, hooks, Rust checks, license/security checks, zero warning required CI |
-| 2: CI Build Matrix And Release Skeleton | parallel PR jobs, required macOS build, artifact upload, cache behavior, release skeleton dry run |
-| 3: Baseline Audit And Regression Harness | sidecar roundtrip, history replay, render smoke, fixture manifest, performance smoke |
-| 4: Versioned Edit Graph And API Foundation | schema validation, migration tests, undo/redo tests, CLI/headless render, API docs |
-| 5: Color Pipeline Foundation | ColorChecker fixtures, DeltaE harness, white balance tests, camera profile tests, CPU/GPU parity |
-| 6: Capture One-Class Color Editing | selective color tests, skin tone fixtures, color mask tests, API command tests, UI artifact |
-| 7: Layers And Masking | layer graph tests, mask composition tests, sidecar roundtrip, undo/redo, render artifacts |
-| 8: Detail Denoise And Wavelet Tools | high ISO fixtures, edge/detail fixtures, performance budget, artifact review |
-| 9: Film Simulation Lab | legal provenance, LUT import tests, grain/halation fixtures, before/after artifacts |
-| 10: HDR Merge | bracket manifest, alignment/deghost tests, editable merge artifact, memory/time budget |
-| 11: Panorama Stitching | projection fixtures, seam/alignment checks, editable panorama artifact, large-file memory budget |
-| 12: Focus Stacking | focus bracket fixtures, sharpness map artifact, blend artifact review, memory/time budget |
-| 13: Super-Resolution | resolution chart fixtures, real-photo crops, hallucination/artifact review, memory/time budget |
-| 14: OpenAI App-Server Agent | strict tool schemas, replay tests, approval tests, prompt-injection tests, audit logs |
-| 15: Professional Workflow Polish | screenshot matrix, accessibility pass, keyboard workflow, batch/export workflow artifacts |
-| 16: Release Hardening | signed/notarized plan, SBOM, checksums, release notes, privacy/security docs |
+| Milestone                                  | Minimum Required Gates                                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| 0: Maintained Plan Artifact                | markdown render check, link review, plan consistency scan, documentation-only diff                         |
+| 0.1: Project Charter And Fork Governance   | branch protection verified, repo visibility verified, issue/PR templates present, AGPL note present        |
+| 0.5: RapidRAW Baseline Snapshot            | upstream SHA recorded, existing commands run, failures captured as issues, baseline artifacts saved        |
+| 1: Shift-Left Quality Foundation           | Bun install, strict lint/type gates, hooks, Rust checks, license/security checks, zero warning required CI |
+| 2: CI Build Matrix And Release Skeleton    | parallel PR jobs, required macOS build, artifact upload, cache behavior, release skeleton dry run          |
+| 3: Baseline Audit And Regression Harness   | sidecar roundtrip, history replay, render smoke, fixture manifest, performance smoke                       |
+| 4: Versioned Edit Graph And API Foundation | schema validation, migration tests, undo/redo tests, CLI/headless render, API docs                         |
+| 5: Color Pipeline Foundation               | ColorChecker fixtures, DeltaE harness, white balance tests, camera profile tests, CPU/GPU parity           |
+| 6: Capture One-Class Color Editing         | selective color tests, skin tone fixtures, color mask tests, API command tests, UI artifact                |
+| 7: Layers And Masking                      | layer graph tests, mask composition tests, sidecar roundtrip, undo/redo, render artifacts                  |
+| 8: Detail Denoise And Wavelet Tools        | high ISO fixtures, edge/detail fixtures, performance budget, artifact review                               |
+| 9: Film Simulation Lab                     | legal provenance, LUT import tests, grain/halation fixtures, before/after artifacts                        |
+| 10: HDR Merge                              | bracket manifest, alignment/deghost tests, editable merge artifact, memory/time budget                     |
+| 11: Panorama Stitching                     | projection fixtures, seam/alignment checks, editable panorama artifact, large-file memory budget           |
+| 12: Focus Stacking                         | focus bracket fixtures, sharpness map artifact, blend artifact review, memory/time budget                  |
+| 13: Super-Resolution                       | resolution chart fixtures, real-photo crops, hallucination/artifact review, memory/time budget             |
+| 14: OpenAI App-Server Agent                | strict tool schemas, replay tests, approval tests, prompt-injection tests, audit logs                      |
+| 15: Professional Workflow Polish           | screenshot matrix, accessibility pass, keyboard workflow, batch/export workflow artifacts                  |
+| 16: Release Hardening                      | signed/notarized plan, SBOM, checksums, release notes, privacy/security docs                               |
 
 Milestone completion rule:
 
@@ -2323,14 +2506,14 @@ GitHub milestone URL:
 
 ## Closed Issues
 
-| Issue | PR | Validation Evidence | Notes |
-| --- | --- | --- | --- |
-| # | # | link/path | |
+| Issue | PR  | Validation Evidence | Notes |
+| ----- | --- | ------------------- | ----- |
+| #     | #   | link/path           |       |
 
 ## Required Gates
 
-| Gate | Result | Evidence |
-| --- | --- | --- |
+| Gate      | Result             | Evidence  |
+| --------- | ------------------ | --------- |
 | gate name | pass/fail/deferred | link/path |
 
 ## Artifacts
@@ -2345,8 +2528,8 @@ GitHub milestone URL:
 ## Deferred Work
 
 | Follow-up Issue | Reason | Risk |
-| --- | --- | --- |
-| # | | |
+| --------------- | ------ | ---- |
+| #               |        |      |
 
 ## Residual Risk
 
@@ -2401,8 +2584,8 @@ Copyable PR ledger:
 
 ### Local Commands
 
-| Command | Result | Notes |
-| --- | --- | --- |
+| Command        | Result            | Notes                   |
+| -------------- | ----------------- | ----------------------- |
 | `command here` | pass/fail/skipped | reason or artifact path |
 
 ### CI
@@ -2525,20 +2708,20 @@ Initial performance budget targets:
 
 These are planning targets, not promises. They should be measured and revised after the RapidRAW baseline snapshot.
 
-| Operation | Initial Target | Gate Type |
-| --- | --- | --- |
-| App cold start | track baseline, then block regressions over 10 percent without rationale | nightly/performance |
-| Open 24MP RAW first preview | under 2 seconds after baseline feasibility review | PR smoke/nightly |
-| Slider preview update | under 100 ms for preview/ROI path where feasible | performance smoke |
-| Brush stroke feedback | visually continuous at normal brush sizes | UI/performance QA |
-| Export 24MP JPEG | track baseline and regressions | nightly |
-| Export 24MP 16-bit TIFF | track baseline and regressions | nightly |
-| Import 1,000 RAW folder | track wall time and memory | nightly |
-| HDR merge 3 x 24MP | track wall time and peak memory | computational nightly |
-| Panorama 6 x 24MP | track wall time and peak memory | computational nightly |
-| Focus stack 10 x 24MP | track wall time and peak memory | computational nightly |
-| Super-resolution 24MP input | track wall time, memory, output dimensions | computational nightly |
-| Very large panorama stress | must fail gracefully or complete without crash | release gate |
+| Operation                   | Initial Target                                                           | Gate Type             |
+| --------------------------- | ------------------------------------------------------------------------ | --------------------- |
+| App cold start              | track baseline, then block regressions over 10 percent without rationale | nightly/performance   |
+| Open 24MP RAW first preview | under 2 seconds after baseline feasibility review                        | PR smoke/nightly      |
+| Slider preview update       | under 100 ms for preview/ROI path where feasible                         | performance smoke     |
+| Brush stroke feedback       | visually continuous at normal brush sizes                                | UI/performance QA     |
+| Export 24MP JPEG            | track baseline and regressions                                           | nightly               |
+| Export 24MP 16-bit TIFF     | track baseline and regressions                                           | nightly               |
+| Import 1,000 RAW folder     | track wall time and memory                                               | nightly               |
+| HDR merge 3 x 24MP          | track wall time and peak memory                                          | computational nightly |
+| Panorama 6 x 24MP           | track wall time and peak memory                                          | computational nightly |
+| Focus stack 10 x 24MP       | track wall time and peak memory                                          | computational nightly |
+| Super-resolution 24MP input | track wall time, memory, output dimensions                               | computational nightly |
+| Very large panorama stress  | must fail gracefully or complete without crash                           | release gate          |
 
 Performance evidence should include:
 
@@ -2830,6 +3013,17 @@ Current planning consults:
     - Add command envelope, read/write separation, dry-run, approval, and idempotency planning.
     - Add plugin capability/signing/safe-mode planning.
     - Add macOS signing, notarization, hardened runtime, entitlements, security-scoped bookmark, Gatekeeper, and update rollback planning.
+- Negative Lab requirements refinement consult:
+  - Status: completed and incorporated.
+  - Response checked time: 2026-06-10.
+  - Incorporated advice:
+    - Make acquisition quality observable before conversion through scan setup checks and warning states.
+    - Separate acquisition calibration, objective inversion, roll normalization, creative rendering, and output into explicit workflow stages.
+    - Add objective, semi-objective, and creative command classification so presets and batch operations cannot silently mix scientific and creative controls.
+    - Add pipeline placement, open color management, display profile, synthetic fixture, numeric gate, and app-server safety ADRs.
+    - Strengthen film stock preset governance with confidence tiers, provenance, legal naming, refresh cadence, and prohibited claim checks.
+    - Add synthetic negative generation, numeric gates, prohibited asset/claim lint, UI artifacts, and macOS performance validation.
+    - Expand app-server agent safety around dry-run, low-confidence approval, file scope, cancellation, warning severity, and no-overwrite output.
 
 Future consult tracking entry format:
 
@@ -3116,23 +3310,46 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `negative-lab(schema): define negative conversion operation schema`
 - `negative-lab(api): expose negative lab command surface`
 - `agent(negative-lab): expose safe app-server tools for negative lab`
+- `negative-lab(acquisition): add scan setup health model`
+- `negative-lab(acquisition): detect auto-corrected and lossy inputs`
 - `negative-lab(import): support scan input modes and roll sessions`
 - `negative-lab(import): add frame splitting and border detection`
+- `negative-lab(format): support half-frame panoramic medium-format and sheet-film scans`
+- `negative-lab(calibration): add target and step-wedge workflows`
 - `negative-lab(base): add film base sampling controls`
 - `negative-lab(inversion): add per-channel inversion curves`
+- `negative-lab(contract): classify objective semi-objective and creative operations`
+- `negative-lab(color-management): define display and export profile behavior`
 - `negative-lab(color): add density normalization and process profiles`
+- `negative-lab(bw): add black-and-white process model`
+- `negative-lab(ecn2): add remjet and cinema scan assumptions`
 - `negative-lab(batch): add roll-level batch consistency workflow`
 - `negative-lab(presets): define film stock preset metadata and legal policy`
+- `negative-lab(presets): create major film stock registry schema`
+- `negative-lab(presets): add stock registry refresh workflow`
+- `negative-lab(presets): add preset provenance inspector requirements`
 - `negative-lab(presets): add generic legally safe built-in presets`
 - `negative-lab(presets): add stock-family research mappings after legal review`
 - `negative-lab(presets): add measured-profile fixture format`
+- `negative-lab(presets): split major stock-family coverage issues`
 - `negative-lab(crop): add frame border and crop detection`
 - `negative-lab(profiles): add scanner and camera-scan profile inputs`
+- `negative-lab(qc): add contact sheet proofing reports`
+- `negative-lab(qc): add density and clipping warning reports`
 - `negative-lab(output): add positive variant provenance`
+- `negative-lab(output): add conversion report and profile roundtrip exports`
 - `validation(negative-lab): add negative scan fixture manifest`
 - `validation(negative-lab): add fixture licensing and provenance policy`
+- `validation(negative-lab): add preset registry lint`
+- `validation(negative-lab): add CPU reference conversion fixtures`
+- `validation(negative-lab): add synthetic negative generator`
+- `validation(negative-lab): add numeric quality gates`
+- `validation(negative-lab): add GPU parity tolerance checks`
+- `validation(negative-lab): add prohibited asset and claim lint`
 - `validation(negative-lab): add color and black-and-white negative render tests`
 - `validation(negative-lab): add roll consistency and QC overlay tests`
+- `validation(negative-lab): add app-server dry-run and rollback tests`
+- `validation(negative-lab): add macOS performance benchmarks`
 - `docs(negative-lab): add user guide for negative workflow`
 
 #### Milestone 10: HDR Merge
@@ -3676,23 +3893,46 @@ Issues:
 - Define negative conversion operation schema.
 - Expose negative lab command surface.
 - Expose safe app-server tools for negative lab.
+- Add scan setup health model.
+- Detect auto-corrected and lossy inputs.
 - Support scan input modes and roll sessions.
 - Add frame splitting and border detection.
+- Support half-frame, panoramic, medium-format, and sheet-film scans.
+- Add target and step-wedge calibration workflows.
 - Add film base sampling controls.
 - Add per-channel inversion curves.
+- Classify objective, semi-objective, and creative operations.
+- Define display and export profile behavior.
 - Add density normalization and process profiles.
+- Add black-and-white process model.
+- Add remjet and cinema scan assumptions.
 - Add roll-level batch consistency workflow.
 - Define film stock preset metadata and legal policy.
+- Create major film stock registry schema.
+- Add stock registry refresh workflow.
+- Add preset provenance inspector requirements.
 - Add generic legally safe built-in presets.
 - Add stock-family research mappings after legal review.
 - Add measured-profile fixture format.
+- Split major stock-family coverage into small issues.
 - Add frame border and crop detection.
 - Add scanner and camera-scan profile inputs.
+- Add contact sheet proofing reports.
+- Add density and clipping warning reports.
 - Add positive variant provenance.
+- Add conversion report and profile roundtrip exports.
 - Add negative scan fixture manifest.
 - Add fixture licensing and provenance policy.
+- Add preset registry lint.
+- Add CPU reference conversion fixtures.
+- Add synthetic negative generator.
+- Add numeric quality gates.
+- Add GPU parity tolerance checks.
+- Add prohibited asset and claim lint.
 - Add color and black-and-white negative render tests.
 - Add roll consistency and QC overlay tests.
+- Add app-server dry-run and rollback tests.
+- Add macOS performance benchmarks.
 - Add negative workflow user guide.
 
 Definition of done:
@@ -3705,6 +3945,10 @@ Definition of done:
 - Negative conversion uses a documented density-domain model with input profile assumptions.
 - Roll/session workflows support shared base samples, anchor frames, per-frame overrides, and positive variant provenance.
 - Negative lab commands are API-callable, replayable, undoable, batchable, and safe for app-server agent tools.
+- The major-stock preset registry is versioned, provenance-backed, legally reviewed, and split into small stock-family issues.
+- Preset Studio and QC Proof produce reviewable artifacts that make batch conversion decisions auditable.
+- Acquisition health, objective inversion, roll normalization, creative rendering, and output are separately inspectable and testable.
+- The app-server agent cannot perform low-confidence calibration, destructive exports, unsafe profile imports, or broad batch operations without explicit dry-run evidence and user approval.
 - Negative conversions are validated against color, black-and-white, ECN-2, slide-helper, dense/thin, mixed-roll, and multi-frame scan fixtures.
 
 ### Milestone 10: HDR Merge
