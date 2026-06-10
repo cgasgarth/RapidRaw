@@ -675,6 +675,9 @@ Every major capability should eventually become one or more GitHub issues. This 
 | REQ-NEG-007    | Negative Lab     | Negative lab QC proofing                        | Film scan workflows, professional batch delivery | P1       | Yes          | lab can generate reviewable contact sheets, warnings, density summaries, and preset comparison artifacts for a roll/session           | artifact snapshots, UI tests, batch reports       |
 | REQ-NEG-008    | Negative Lab     | Acquisition health checks                       | Consult-backed film scan workflow                | P1       | Yes          | scan setup quality and upstream correction risks are visible before conversion                                                        | warning fixtures, UI artifacts, metadata checks   |
 | REQ-NEG-009    | Negative Lab     | Objective versus creative operation contract    | Consult-backed color science                     | P1       | Yes          | acquisition, inversion, roll normalization, and creative rendering commands are stage-labeled and separately testable                 | schema lint, command replay, render artifacts     |
+| REQ-NEG-010    | Negative Lab     | Measured stock-profile methodology              | Consult-backed preset governance                 | P1       | Yes          | named-stock profiles require project-owned measurement data, fixture IDs, reproducible methodology, and approved claims language      | preset registry lint, fixture manifests           |
+| REQ-NEG-011    | Negative Lab     | Negative lab fixture and numeric gates          | Consult-backed validation strategy               | P1       | Indirect     | negative conversion changes are guarded by fixture manifests, color/numeric gates, golden artifacts, and warning stability checks     | DeltaE, gray ramp, CPU/GPU, golden approvals      |
+| REQ-NEG-012    | Negative Lab     | Lab workflow regression suite                   | User requirement, professional lab workflow      | P1       | Yes          | full lab workflows are UI-tested from import through QC, positive variant creation, agent dry-run, and export                         | Playwright/UI artifacts, app-server replay        |
 | REQ-HDR-001    | HDR              | HDR merge from brackets                         | Capture One, Lightroom, RapidRAW                 | P1       | Yes          | bracketed files merge into editable artifact                                                                                          | HDR fixtures, deghost/alignment                   |
 | REQ-PANO-001   | Panorama         | Panorama stitching                              | Capture One, Lightroom, RapidRAW                 | P1       | Yes          | projections and boundary controls produce editable artifact                                                                           | pano fixtures, memory budget                      |
 | REQ-FOCUS-001  | Focus            | Focus stacking                                  | professional macro workflow                      | P2       | Yes          | focus brackets align and blend to editable artifact                                                                                   | sharpness map, focus fixtures                     |
@@ -1015,6 +1018,15 @@ Product bar:
 - Makes every lab operation available through the same typed command surface used by UI, automation, and the OpenAI app-server agent.
 - Does not ship broad "exact stock emulation" claims unless the profile is measured by the project, reproducible, fixture-backed, and cleared by the legal/provenance policy.
 
+Non-negotiable product interpretation:
+
+- Negative Lab is a peer workspace to Library, Editor, Export, and future Merge workspaces. It must not be implemented as a small film-simulation panel, a single "invert negative" checkbox, or a hidden advanced control group.
+- The lab owns a complete workflow: acquisition check, roll setup, frame split, base calibration, density-domain conversion, roll normalization, preset/profile comparison, QC proofing, positive variant creation, and handoff to the normal editor.
+- Every workflow step must have a UI affordance, typed command, undo/replay behavior, validation artifact, and app-server tool story before the feature is considered complete.
+- The user-facing language should frame stock-aware profiles as conversion starting points and measured project profiles, not as unofficial copies of manufacturer or commercial preset products.
+- Lab UI should be dense, professional, and inspection-oriented: the viewer, scopes, warnings, sample readouts, frame queue, and provenance panels should help users diagnose scans, not just choose looks.
+- Batch and agent workflows should be designed from the start, with dry-run, selected-frame scope, cancellation, warning severity, and no-overwrite output defaults.
+
 Mandatory consult and design gate:
 
 - When this area reaches active design/implementation, use the consult skill heavily before architecture, UI, color-science, preset-taxonomy, validation, and app-server agent decisions.
@@ -1234,6 +1246,17 @@ Major stock preset governance:
 - Profile confidence tiers must be explicit: generic process preset, stock-family starting point, measured project profile, user profile, and reference mapping.
 - Profile imports must warn on missing license/provenance, unsafe claims, unsupported binary LUT/profile payloads, or ambiguous trademark/affiliation language.
 
+Legally safe product wording:
+
+- RawEngine will provide stock-aware negative processing through a legally reviewed profile registry.
+- Built-in profiles should initially be generic process and stock-family starting points.
+- Named-stock or measured profiles require documented source material, RawEngine-owned or properly licensed scans, reproducible measurement methodology, fixture manifests, legal/provenance review, and approved UI/marketing copy.
+- User and community profiles may store commercial stock names as user metadata where permitted, but the app must clearly separate user-supplied metadata from RawEngine-provided claims.
+- RawEngine must not imply manufacturer endorsement, official status, exact emulation, commercial preset compatibility, or equivalence to Adobe, Capture One, Negative Lab Pro, VSCO, RNI, Mastin, Dehancer, or manufacturer profiles.
+- Built-in preset UI must avoid manufacturer logos, packaging art, copied swatches, copied LUTs, copied ICC profiles, copied marketing descriptions, and "exact match" language.
+- Preset names and descriptions should be linted for unsafe claims before merge, especially terms such as `exact`, `official`, `manufacturer-approved`, `Capture One`, `Lightroom profile`, `Negative Lab Pro`, and `identical`.
+- When a stock-family issue closes as reference mapping only, the UI may show that stock as a research/reference target but must not expose it as a verified RawEngine profile.
+
 Preset tier model:
 
 - Generic built-ins: safe descriptive presets such as `C-41 Neutral 100`, `C-41 Portrait 160`, `C-41 Portrait 400`, `C-41 High-Speed 800`, `C-41 Saturated 100`, `ECN-2 Daylight`, `ECN-2 Tungsten`, `Black-and-White Classic Grain`, `Black-and-White Tabular Grain`, `Black-and-White Ortho`, `Black-and-White Chromogenic`, and `Slide/Reversal Helper`.
@@ -1338,6 +1361,49 @@ Negative lab validation matrix:
 | Slide/reversal helper           | E-6 positive scan                     | no inversion operation, profile/display helper only                            |
 | Multi-frame scan                | strip/contact-sheet input             | frame split artifact, crop warnings, replayable operations                     |
 
+Negative lab fixture manifest requirements:
+
+- No real scan, target image, profile, LUT, ICC, or rendered golden artifact should enter the repository or artifact store without a manifest.
+- Manifest fields should include fixture ID, source URL or local acquisition record, rights/license status, contributor, hash, capture method, scanner/camera/lens profile, light source, process family, film stock or stock family where known, development notes where known, bit depth, color profile, compression, border visibility, frame count, expected warnings, allowed use, and review status.
+- Calibration-target fixtures should also record target type, target batch or reference data where legally usable, patch geometry, measurement device or reference source, expected DeltaE thresholds, and reviewer.
+- Negative-specific fixtures should record known base/fog sample regions, rejected sample regions, anchor frames, expected density range, dense/thin/clipping expectations, and expected process/profile assumptions.
+- Golden fixtures should record algorithm/profile version, command sequence hash, CPU reference hash, GPU tolerance, expected output hash or perceptual hash, reviewer, review date, and whether a golden-output update requires explicit approval.
+- Fixture manifests must distinguish synthetic fixtures, project-owned measured scans, public sample images, user-provided fixtures, and restricted local-only fixtures.
+- Heavy or restricted fixtures may live outside the git repository, but their manifests, hashes, and validation purpose should still be tracked.
+
+Numeric and perceptual quality gates:
+
+- Blocking math gates: no NaN/Inf outputs, guarded zero/negative transmittance handling, no unintended negative density, monotonic objective curves unless a creative mode explicitly opts out, deterministic CPU reference output, stable schema migration, and undo/replay equivalence.
+- Blocking warning gates: clipped-channel warnings, missing-base warnings, contaminated-base warnings, lossy-input warnings, baked-in scanner correction warnings, and low-confidence calibration warnings must fire predictably on fixtures.
+- CPU/GPU gates: small fixtures must compare against the CPU reference within documented per-channel and patch-level tolerances; shader changes require parity evidence before merge.
+- Color-target gates where reference data exists: DeltaE2000 thresholds for neutral patches, ColorChecker patches, gray ramp neutrality, highlight/shadow clipping tolerance, saturation preservation, and hue rotation tolerance for memory colors.
+- Non-target gates where reference data does not exist: perceptual hash or SSIM against approved goldens, histogram-shape tolerance, density-summary stability, warning stability, and human-reviewed golden approval for intentional visual changes.
+- Preset gates: registry coverage, tier labeling, source references, legal naming status, stale-source warnings, deterministic output, migration behavior, and prohibited-claim lint.
+- Batch gates: single-frame command equivalence to batch command output, roll normalization repeatability, selected-frame scope enforcement, cancellation latency, no-original-overwrite behavior, and positive variant provenance.
+
+UI workflow regression gates:
+
+- Open the Negative Lab workspace from the app shell.
+- Import a single-frame camera scan and a multi-frame strip/contact-sheet fixture.
+- Create or select a roll/session.
+- Detect frames, manually adjust a frame boundary, and persist the operation.
+- Pick, reject, and re-pick base samples with confidence feedback.
+- Apply a generic C-41 profile, a black-and-white profile, and a slide/reversal helper profile.
+- Compare presets in Preset Studio without committing all variants to the edit graph.
+- Save a user profile and verify provenance.
+- Create a positive variant linked to the original negative and roll/session.
+- Run a batch dry-run and inspect warnings before applying.
+- Generate a QC proof/contact sheet and conversion report.
+- Invoke the app-server dry-run path for inspect, plan, compare, apply, QC, rollback, and export commands.
+- Verify low-confidence calibration, unsafe profile import, destructive export, and broad batch actions require explicit approval.
+
+macOS performance and reliability gates:
+
+- Benchmark matrix should include an Apple Silicon baseline Mac, an Intel Mac only if still supported, a 24MP RAW camera scan, a 45-60MP RAW camera scan, a large 100MP stitched/contact-sheet TIFF, a 12-frame roll batch, and a 36-frame roll batch.
+- Track initial preview time, base recalibration time, preset switch time, frame-boundary adjustment latency, full-resolution render time, contact-sheet generation time, batch export throughput, peak memory, GPU fallback behavior, cancellation latency, and app-server progress-event latency.
+- Performance regressions should be visible in PR artifacts even when they are not yet blocking.
+- Interactive preview targets should be set per milestone before implementation starts; do not accept a UI shell that hides slow conversion behind blocking spinners.
+
 Output and roundtrip requirements:
 
 - Export positive TIFF/JPEG/PNG with embedded profile where applicable.
@@ -1388,6 +1454,10 @@ Negative lab ADRs:
 - `ADR-NEG-012: Objective, semi-objective, and creative operation contract`
 - `ADR-NEG-013: Synthetic negative generator and numeric quality gates`
 - `ADR-NEG-014: App-server safety model, file scope, dry-run, and rollback`
+- `ADR-NEG-015: Acquisition fixture manifest and provenance contract`
+- `ADR-NEG-016: Named stock-profile measurement methodology and claims policy`
+- `ADR-NEG-017: Dedicated Negative Lab UI workflow architecture`
+- `ADR-NEG-018: Negative Lab performance budgets and macOS benchmark matrix`
 
 Negative lab implementation order:
 
@@ -1436,6 +1506,8 @@ Negative lab issue split:
 - `negative-lab(presets): add generic legally safe built-in presets`
 - `negative-lab(presets): add stock-family research mappings after legal review`
 - `negative-lab(presets): add measured-profile fixture format`
+- `negative-lab(presets): define named stock measurement methodology`
+- `negative-lab(presets): add user and community profile provenance rules`
 - `negative-lab(presets): split major stock-family coverage issues`
 - `negative-lab(crop): add frame border and crop detection`
 - `negative-lab(profiles): add scanner and camera-scan profile inputs`
@@ -1445,14 +1517,17 @@ Negative lab issue split:
 - `negative-lab(output): add conversion report and profile roundtrip exports`
 - `validation(negative-lab): add negative scan fixture manifest`
 - `validation(negative-lab): add fixture licensing and provenance policy`
+- `validation(negative-lab): add calibration target fixture manifest`
 - `validation(negative-lab): add preset registry lint`
 - `validation(negative-lab): add CPU reference conversion fixtures`
 - `validation(negative-lab): add synthetic negative generator`
 - `validation(negative-lab): add numeric quality gates`
+- `validation(negative-lab): add DeltaE gray-ramp and ColorChecker gates`
 - `validation(negative-lab): add GPU parity tolerance checks`
 - `validation(negative-lab): add prohibited asset and claim lint`
 - `validation(negative-lab): add color and black-and-white negative render tests`
 - `validation(negative-lab): add roll consistency and QC overlay tests`
+- `validation(negative-lab): add full lab UI workflow regression tests`
 - `validation(negative-lab): add app-server dry-run and rollback tests`
 - `validation(negative-lab): add macOS performance benchmarks`
 - `docs(negative-lab): add user guide for negative workflow`
@@ -3030,6 +3105,15 @@ Current planning consults:
     - Strengthen film stock preset governance with confidence tiers, provenance, legal naming, refresh cadence, and prohibited claim checks.
     - Add synthetic negative generation, numeric gates, prohibited asset/claim lint, UI artifacts, and macOS performance validation.
     - Expand app-server agent safety around dry-run, low-confidence approval, file scope, cancellation, warning severity, and no-overwrite output.
+- Negative Lab full-lab refinement:
+  - Status: completed and incorporated.
+  - Response checked time: 2026-06-10.
+  - Incorporated advice:
+    - Reaffirm Negative Lab as its own first-class professional workspace, not a film-simulation subpanel.
+    - Add measured named-stock profile methodology, legal claim boundaries, user/community profile separation, and prohibited UI/marketing claims.
+    - Add fixture manifest requirements for real scans, synthetic fixtures, calibration targets, profile data, and golden artifacts.
+    - Add numeric, perceptual, warning-stability, UI workflow, batch, agent, and macOS performance gates.
+    - Add ADR and issue splits for stock-profile methodology, profile provenance, calibration fixtures, DeltaE/gray-ramp/ColorChecker gates, and full lab workflow regression tests.
 
 Future consult tracking entry format:
 
@@ -3337,6 +3421,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `negative-lab(presets): add generic legally safe built-in presets`
 - `negative-lab(presets): add stock-family research mappings after legal review`
 - `negative-lab(presets): add measured-profile fixture format`
+- `negative-lab(presets): define named stock measurement methodology`
+- `negative-lab(presets): add user and community profile provenance rules`
 - `negative-lab(presets): split major stock-family coverage issues`
 - `negative-lab(crop): add frame border and crop detection`
 - `negative-lab(profiles): add scanner and camera-scan profile inputs`
@@ -3346,14 +3432,17 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `negative-lab(output): add conversion report and profile roundtrip exports`
 - `validation(negative-lab): add negative scan fixture manifest`
 - `validation(negative-lab): add fixture licensing and provenance policy`
+- `validation(negative-lab): add calibration target fixture manifest`
 - `validation(negative-lab): add preset registry lint`
 - `validation(negative-lab): add CPU reference conversion fixtures`
 - `validation(negative-lab): add synthetic negative generator`
 - `validation(negative-lab): add numeric quality gates`
+- `validation(negative-lab): add DeltaE gray-ramp and ColorChecker gates`
 - `validation(negative-lab): add GPU parity tolerance checks`
 - `validation(negative-lab): add prohibited asset and claim lint`
 - `validation(negative-lab): add color and black-and-white negative render tests`
 - `validation(negative-lab): add roll consistency and QC overlay tests`
+- `validation(negative-lab): add full lab UI workflow regression tests`
 - `validation(negative-lab): add app-server dry-run and rollback tests`
 - `validation(negative-lab): add macOS performance benchmarks`
 - `docs(negative-lab): add user guide for negative workflow`
@@ -3920,6 +4009,8 @@ Issues:
 - Add generic legally safe built-in presets.
 - Add stock-family research mappings after legal review.
 - Add measured-profile fixture format.
+- Define named stock measurement methodology.
+- Add user and community profile provenance rules.
 - Split major stock-family coverage into small issues.
 - Add frame border and crop detection.
 - Add scanner and camera-scan profile inputs.
@@ -3929,14 +4020,17 @@ Issues:
 - Add conversion report and profile roundtrip exports.
 - Add negative scan fixture manifest.
 - Add fixture licensing and provenance policy.
+- Add calibration target fixture manifest.
 - Add preset registry lint.
 - Add CPU reference conversion fixtures.
 - Add synthetic negative generator.
 - Add numeric quality gates.
+- Add DeltaE, gray-ramp, and ColorChecker gates.
 - Add GPU parity tolerance checks.
 - Add prohibited asset and claim lint.
 - Add color and black-and-white negative render tests.
 - Add roll consistency and QC overlay tests.
+- Add full lab UI workflow regression tests.
 - Add app-server dry-run and rollback tests.
 - Add macOS performance benchmarks.
 - Add negative workflow user guide.
@@ -3948,12 +4042,14 @@ Definition of done:
 - Film simulations are API-callable and regression tested.
 - Negative processing has a dedicated UI plan and implementation path.
 - Major film stock presets have provenance and legal review.
+- Named-stock profiles are measured, fixture-backed, legally reviewed, and separated from generic/user/reference profile tiers.
 - Negative conversion uses a documented density-domain model with input profile assumptions.
 - Roll/session workflows support shared base samples, anchor frames, per-frame overrides, and positive variant provenance.
 - Negative lab commands are API-callable, replayable, undoable, batchable, and safe for app-server agent tools.
 - The major-stock preset registry is versioned, provenance-backed, legally reviewed, and split into small stock-family issues.
 - Preset Studio and QC Proof produce reviewable artifacts that make batch conversion decisions auditable.
 - Acquisition health, objective inversion, roll normalization, creative rendering, and output are separately inspectable and testable.
+- Dedicated Negative Lab workflows are regression-tested from import through QC, positive variant creation, app-server dry-run, and export.
 - The app-server agent cannot perform low-confidence calibration, destructive exports, unsafe profile imports, or broad batch operations without explicit dry-run evidence and user approval.
 - Negative conversions are validated against color, black-and-white, ECN-2, slide-helper, dense/thin, mixed-roll, and multi-frame scan fixtures.
 
