@@ -14,6 +14,11 @@ export interface InteractivePatch {
   normH: number;
 }
 
+export interface CopiedSectionAdjustments {
+  section: string;
+  values: Partial<Adjustments>;
+}
+
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
@@ -67,9 +72,9 @@ interface EditorState {
   patchesSentToBackend: Set<string>;
 
   // Clipboard
-  copiedSectionAdjustments: any | null;
+  copiedSectionAdjustments: CopiedSectionAdjustments | null;
   copiedMask: MaskContainer | null;
-  copiedAdjustments: Adjustments | null;
+  copiedAdjustments: Partial<Adjustments> | null;
 
   // Actions
   setEditor: (updater: Partial<EditorState> | ((state: EditorState) => Partial<EditorState>)) => void;

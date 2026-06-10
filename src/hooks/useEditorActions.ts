@@ -29,6 +29,12 @@ export const debouncedSave = debounce((path: string, adjustmentsToSave: Adjustme
   });
 }, 300);
 
+type LoadedMetadataAdjustments = Adjustments & { is_null?: boolean };
+
+interface MetadataResponse {
+  adjustments?: LoadedMetadataAdjustments | null;
+}
+
 export function useEditorActions() {
   const setEditor = useEditorStore((s) => s.setEditor);
 
@@ -132,11 +138,11 @@ export function useEditorActions() {
     [setEditor],
   );
 
-  const handleCopyAdjustments = useCallback(async (pathOrEvent?: string | any) => {
+  const handleCopyAdjustments = useCallback(async (pathOrEvent?: unknown) => {
     const pathOverride = typeof pathOrEvent === 'string' ? pathOrEvent : undefined;
     const { selectedImage, adjustments } = useEditorStore.getState();
     const { libraryActivePath, multiSelectedPaths } = useLibraryStore.getState();
-    let sourceAdjustments: any = null;
+    let sourceAdjustments: Adjustments | null = null;
 
     if (selectedImage) {
       sourceAdjustments = adjustments;
@@ -144,7 +150,7 @@ export function useEditorActions() {
       const pathToCopyFrom = pathOverride || libraryActivePath || multiSelectedPaths[0];
       if (pathToCopyFrom) {
         try {
-          const meta: any = await invoke(Invokes.LoadMetadata, { path: pathToCopyFrom });
+          const meta = await invoke<MetadataResponse>(Invokes.LoadMetadata, { path: pathToCopyFrom });
           if (meta?.adjustments && !meta.adjustments.is_null) {
             sourceAdjustments = normalizeLoadedAdjustments(meta.adjustments);
           } else {
@@ -159,11 +165,12 @@ export function useEditorActions() {
 
     if (!sourceAdjustments) return;
 
-    const adjustmentsToCopy: any = {};
+    const adjustmentsToCopy: Partial<Adjustments> = {};
 
     for (const key of COPYABLE_ADJUSTMENT_KEYS) {
       if (Object.prototype.hasOwnProperty.call(sourceAdjustments, key)) {
-        adjustmentsToCopy[key] = structuredClone(sourceAdjustments[key]);
+        const adjustmentKey = key as keyof Adjustments;
+        adjustmentsToCopy[adjustmentKey] = structuredClone(sourceAdjustments[adjustmentKey]);
       }
     }
     useEditorStore.getState().setEditor({ copiedAdjustments: adjustmentsToCopy });
@@ -222,13 +229,14 @@ export function useEditorActions() {
       invoke(Invokes.ApplyAdjustmentsToPaths, { paths: pathsToUpdate, adjustments: adjustmentsToApply })
         .then(() => {
           if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-            invoke('load_metadata', { path: selectedImage.path }).then((meta: any) => {
-              if (meta.adjustments) {
-                setAdjustments((prev: any) => ({
+            invoke<MetadataResponse>(Invokes.LoadMetadata, { path: selectedImage.path }).then((meta) => {
+              const loadedAdjustments = meta.adjustments;
+              if (loadedAdjustments) {
+                setAdjustments((prev: Adjustments) => ({
                   ...prev,
-                  lensMaker: meta.adjustments.lensMaker,
-                  lensModel: meta.adjustments.lensModel,
-                  lensDistortionParams: meta.adjustments.lensDistortionParams,
+                  lensMaker: loadedAdjustments.lensMaker,
+                  lensModel: loadedAdjustments.lensModel,
+                  lensDistortionParams: loadedAdjustments.lensDistortionParams,
                 }));
               }
             });
