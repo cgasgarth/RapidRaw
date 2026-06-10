@@ -30,7 +30,7 @@ If progress on the planning document becomes blocked, the blocker report must in
 The current planning goal is finished only when this document includes:
 
 - Current scope clearly limited to planning only.
-- RawEngine parent repo and future `RapidRaw/` nested fork topology.
+- RapidRaw public fork repository plus local `/Users/cgas/Documents/RawEngine` parent workspace topology.
 - Maintained PRD/technical plan artifact policy.
 - First future PR defined as documentation-only.
 - Product requirements covering RapidRAW, darktable, Ansel, RawTherapee, Capture One, and Lightroom inspirations.
@@ -72,7 +72,7 @@ This document is not throwaway planning text. It should become a maintained repo
 
 Future repository rule:
 
-- The first future pull request should add this mega PRD/technical plan markdown document to the public RawEngine repository.
+- The first future pull request should add this mega PRD/technical plan markdown document to the public `RapidRaw` fork repository.
 - That first PR should not clone RapidRAW, migrate packages, change CI, create product code, or implement features.
 - The first PR should establish this document as the authoritative plan, plus any minimal repo metadata needed to maintain it.
 - Every later milestone or issue that changes product direction, architecture, validation policy, or execution order must update this document in the same PR or link a follow-up issue.
@@ -187,7 +187,7 @@ These are not product non-goals forever. They are constraints to keep early exec
 
 - Create a public GitHub repository for RawEngine.
 - Fork RapidRAW publicly and clone the fork under `/Users/cgas/Documents/RawEngine/RapidRaw` as a subfolder when implementation begins.
-- Repository topology: RawEngine is the parent planning/orchestration repository. The nested `RapidRaw/` checkout is the public GitHub fork of `CyberTimon/RapidRAW`. Inside `RapidRaw/`, keep `origin` pointed at the user's RapidRAW fork and `upstream` pointed at `CyberTimon/RapidRAW`. Record the upstream RapidRAW commit SHA used for each baseline audit. Sync upstream only through pull requests, never by direct pushes to `main`.
+- Repository topology: the public GitHub repository is the user's `RapidRaw` fork of `CyberTimon/RapidRAW`. The local parent workspace is `/Users/cgas/Documents/RawEngine`, and the fork checkout lives under `/Users/cgas/Documents/RawEngine/RapidRaw`. Inside `RapidRaw/`, keep `origin` pointed at the user's RapidRAW fork and `upstream` pointed at `CyberTimon/RapidRAW`. Record the upstream RapidRAW commit SHA used for each baseline audit. Sync upstream only through pull requests, never by direct pushes to `main`.
 - Treat RapidRAW's AGPL-3.0 license as a hard project constraint:
   - Keep RawEngine open source.
   - Preserve required license notices.
@@ -1235,8 +1235,8 @@ The plan should be converted into explicit ADRs as implementation begins. ADRs m
 
 Required ADR fleet:
 
-- `ADR-001: RawEngine parent repository with nested RapidRAW fork checkout`
-  - Decision: RawEngine is the parent planning/orchestration repo; the RapidRAW fork is cloned later under `RapidRaw/`.
+- `ADR-001: RapidRaw public fork with local RawEngine parent workspace`
+  - Decision: the public project repo is the user's `RapidRaw` fork; `/Users/cgas/Documents/RawEngine` is the local parent workspace; the fork checkout lives under `RapidRaw/`.
   - Validation: repo topology docs, remote policy, no ambiguous root build assumptions.
 - `ADR-002: API-first editing engine`
   - Decision: every edit operation is a typed command and edit-graph mutation.
@@ -2800,7 +2800,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 
 #### Milestone 0.1: Project Charter And Fork Governance
 
-- `repo(github): create public RawEngine repository`
+- `repo(github): use public RapidRaw fork as project repository`
 - `repo(fork): create public RapidRAW fork for nested checkout`
 - `repo(topology): document origin/upstream remote policy`
 - `repo(governance): protect main and require pull requests`
@@ -3107,14 +3107,14 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 
 ### Milestone 0: Maintained Plan Artifact
 
-Goal: add the mega PRD/technical plan as the first maintained RawEngine repository artifact.
+Goal: add the mega PRD/technical plan as the first maintained `RapidRaw` fork repository artifact.
 
 Issues:
 
 - `docs(plan): add maintained RawEngine product and technical plan`
   - Labels: `area:docs`, `type:plan`, `priority:p0`, `pr:size-small`, `validation:docs`.
   - Blocked by: none.
-  - Scope: add `RAW_EDITOR_PLAN.md` to the public RawEngine repo.
+  - Scope: add `RAW_EDITOR_PLAN.md` to the public `RapidRaw` fork repo.
   - Out of scope: clone RapidRAW, implement tooling, create CI, create product code.
   - PR budget: documentation-only, ideally under 500 changed non-generated lines if the plan is split later; the initial mega doc can exceed this only because it is the founding artifact.
   - Acceptance criteria: plan includes product scope, architecture, milestones, issue rules, validation gates, source references, and current planning goal.
@@ -3143,11 +3143,11 @@ Goal: establish the public project, fork strategy, and work tracking.
 
 Issues:
 
-- `repo(github): create public RawEngine repository`
+- `repo(github): use public RapidRaw fork as project repository`
   - Labels: `area:repo`, `type:implementation`, `priority:p0`, `pr:size-small`.
   - Blocked by: completion of planning goal.
-  - Scope: create public parent RawEngine repo.
-  - Acceptance criteria: repo is public, empty or docs-only, no RapidRAW clone yet unless separately approved.
+  - Scope: use the public `RapidRaw` fork as the project repository.
+  - Acceptance criteria: fork is public, points back to `CyberTimon/RapidRAW`, and contains the maintained plan artifact.
 - `repo(fork): create public RapidRAW fork for nested checkout`
   - Labels: `area:repo`, `type:implementation`, `priority:p0`, `pr:size-small`.
   - Blocked by: public repo decision.
@@ -3959,7 +3959,7 @@ Mitigation:
 
 When implementation begins, do this in order:
 
-1. Create public RawEngine repo.
+1. Use the public `RapidRaw` fork as the project repository.
 2. Create a feature branch with `codex/` prefix.
 3. Open the first future PR: add and establish this maintained PRD/technical plan as a documentation-only artifact.
 4. Add minimal README, issue template, and PR template only if included in the approved first PR scope.
