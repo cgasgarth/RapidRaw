@@ -553,7 +553,7 @@ export default function MainLibrary(props: MainLibraryProps) {
       {props.isAndroid && (
         <Button
           className="absolute bottom-18 right-8 h-12 w-12 bg-accent text-button-text shadow-lg p-0 flex items-center justify-center z-50 border border-border-color/50"
-          onClick={(e) => {
+          onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
             e.stopPropagation();
             props.onImportClick();
           }}
