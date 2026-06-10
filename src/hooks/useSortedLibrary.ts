@@ -161,12 +161,12 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
       let qVal = parseFloat(value);
 
       if (field === 'iso')
-        imgVal = parseInt(image.exif?.PhotographicSensitivity || image.exif?.ISOSpeedRatings || '0', 10) || 0;
-      else if (field === 'aperture' || field === 'f') imgVal = parseAperture(image.exif?.FNumber);
-      else if (field === 'focal' || field === 'mm') imgVal = parseFocalLength(image.exif?.FocalLength);
+        imgVal = parseInt(image.exif?.['PhotographicSensitivity'] || image.exif?.['ISOSpeedRatings'] || '0', 10) || 0;
+      else if (field === 'aperture' || field === 'f') imgVal = parseAperture(image.exif?.['FNumber']);
+      else if (field === 'focal' || field === 'mm') imgVal = parseFocalLength(image.exif?.['FocalLength']);
       else if (field === 'rating') imgVal = imageRatings[image.path] || 0;
       else if (field === 'shutter' || field === 's') {
-        imgVal = parseShutter(image.exif?.ExposureTime);
+        imgVal = parseShutter(image.exif?.['ExposureTime']);
         qVal = parseShutter(value);
       }
 
@@ -188,10 +188,10 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     } else {
       let imgStr = '';
       if (field === 'camera' || field === 'make' || field === 'model') {
-        imgStr = `${image.exif?.Make || ''} ${image.exif?.Model || ''}`.toLowerCase();
+        imgStr = `${image.exif?.['Make'] || ''} ${image.exif?.['Model'] || ''}`.toLowerCase();
       } else if (field === 'lens') {
         imgStr = String(
-          `${image.exif?.LensModel || ''} ${image.exif?.Lens || ''} ${image.exif?.LensMake || ''}`,
+          `${image.exif?.['LensModel'] || ''} ${image.exif?.['Lens'] || ''} ${image.exif?.['LensMake'] || ''}`,
         ).toLowerCase();
       } else if (field === 'color') {
         imgStr = (image.tags || []).find((t: string) => t.startsWith('color:'))?.substring(6) || '';

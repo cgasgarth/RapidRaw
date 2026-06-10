@@ -103,7 +103,7 @@ export default function EffectsPanel({
             />
           </div>
 
-          {adjustmentVisibility.vignette !== false && (
+          {adjustmentVisibility['vignette'] !== false && (
             <div className="p-2 bg-bg-tertiary rounded-md">
               <Text variant={TextVariants.heading} className="mb-2">
                 {t('adjustments.effects.vignette')}
@@ -151,7 +151,7 @@ export default function EffectsPanel({
             </div>
           )}
 
-          {adjustmentVisibility.grain !== false && (
+          {adjustmentVisibility['grain'] !== false && (
             <div className="p-2 bg-bg-tertiary rounded-md">
               <Text variant={TextVariants.heading} className="mb-2">
                 {t('adjustments.effects.grain')}
