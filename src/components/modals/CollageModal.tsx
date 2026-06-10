@@ -24,6 +24,7 @@ import { LAYOUTS, type Layout, type LayoutDefinition } from '../../utils/Collage
 import { createBlobFromUint8Array } from '../../utils/blobUtils';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
+import { type Adjustments } from '../../utils/adjustments';
 
 interface CollageModalProps {
   isOpen: boolean;
@@ -52,10 +53,26 @@ interface AspectRatioPreset {
   value: number | null;
 }
 
+type CollageAdjustmentsPayload = Partial<Adjustments> & { is_null?: boolean };
+
+interface LoadedCollageMetadata {
+  adjustments?: CollageAdjustmentsPayload | null;
+}
+
 const DEFAULT_EXPORT_WIDTH = 3000;
 const INITIAL_SPACING = 15;
 const INITIAL_BORDER_RADIUS = 0;
 const DEFAULT_ASPECT_RATIO_PRESET: AspectRatioPreset = { id: '1_1', name: '1:1', value: 1 };
+
+const getErrorMessage = (err: unknown, fallback: string) => {
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  if (typeof err === 'string' && err.length > 0) {
+    return err;
+  }
+  return fallback;
+};
 
 export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: CollageModalProps) {
   const { t } = useTranslation();
@@ -147,10 +164,10 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       setError(null);
       try {
         const imagePromises = sourceImages.map(async (imageFile) => {
-          const metadata: any = await invoke(Invokes.LoadMetadata, { path: imageFile.path });
+          const metadata = await invoke<LoadedCollageMetadata>(Invokes.LoadMetadata, { path: imageFile.path });
           const adjustments = metadata.adjustments && !metadata.adjustments.is_null ? metadata.adjustments : {};
 
-          const imageData: Uint8Array = await invoke(Invokes.GeneratePreviewForPath, {
+          const imageData = await invoke<Uint8Array>(Invokes.GeneratePreviewForPath, {
             path: imageFile.path,
             jsAdjustments: adjustments,
           });
@@ -183,9 +200,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
           initialStates[img.path] = { offsetX: 0, offsetY: 0, scale: 1 };
         });
         setImageStates(initialStates);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to load images:', err);
-        setError(err.message || 'Could not load images.');
+        setError(getErrorMessage(err, 'Could not load images.'));
       } finally {
         setIsLoading(false);
       }
@@ -432,8 +449,8 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       const base64Data = offscreenCanvas.toDataURL('image/png');
       const path = await onSave(base64Data, firstSourceImage.path);
       setSavedPath(path);
-    } catch (err: any) {
-      setError(err.message || 'Could not save the collage.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Could not save the collage.'));
     } finally {
       setIsSaving(false);
     }
