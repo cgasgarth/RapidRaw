@@ -23,6 +23,17 @@ import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
 
+const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'color', 'details', 'effects'] as const;
+type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
+
+const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> = {
+  basic: 'Basic',
+  color: 'Color',
+  curves: 'Curves',
+  details: 'Details',
+  effects: 'Effects',
+};
+
 export default function Controls() {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
@@ -93,7 +104,7 @@ export default function Controls() {
     [setUI],
   );
 
-  const handleToggleVisibility = (sectionName: string) => {
+  const handleToggleVisibility = (sectionName: AdjustmentSectionName) => {
     setAdjustments((prev: Adjustments) => {
       const currentVisibility: SectionVisibility = prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
       return {
@@ -109,17 +120,15 @@ export default function Controls() {
   const handleResetAdjustments = () => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      ...Object.keys(ADJUSTMENT_SECTIONS)
-        .flatMap((s) => ADJUSTMENT_SECTIONS[s])
-        .reduce((acc: any, key: string) => {
-          acc[key] = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
-          return acc;
-        }, {}),
+      ...ADJUSTMENT_SECTION_NAMES.flatMap((s) => ADJUSTMENT_SECTIONS[s]).reduce((acc: any, key: string) => {
+        acc[key] = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
+        return acc;
+      }, {}),
       sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility },
     }));
   };
 
-  const handleToggleSection = (section: string) => {
+  const handleToggleSection = (section: AdjustmentSectionName) => {
     setCollapsibleState((prev: any) => {
       const isOpening = !prev[section];
       if (appSettings?.enableFocusMode && isOpening) {
@@ -134,7 +143,7 @@ export default function Controls() {
     });
   };
 
-  const handleSectionContextMenu = (event: any, sectionName: string) => {
+  const handleSectionContextMenu = (event: any, sectionName: AdjustmentSectionName) => {
     event.preventDefault();
     event.stopPropagation();
 
@@ -183,7 +192,9 @@ export default function Controls() {
     };
 
     const isPasteAllowed = copiedSectionAdjustments && copiedSectionAdjustments.section === sectionName;
-    const translatedSection = t(`editor.adjustments.sections.${sectionName}`);
+    const translatedSection = t(`editor.adjustments.sections.${sectionName}`, {
+      defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS[sectionName],
+    });
 
     const pasteLabel = copiedSectionAdjustments
       ? t('editor.adjustments.actions.pasteLabel', { section: translatedSection })
@@ -272,7 +283,7 @@ export default function Controls() {
       </AnimatePresence>
 
       <div className="grow overflow-y-auto p-4 flex flex-col gap-2">
-        {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName: string) => {
+        {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
           const SectionComponent: any = {
             basic: BasicAdjustments,
             curves: CurveGraph,
@@ -281,7 +292,9 @@ export default function Controls() {
             effects: EffectsPanel,
           }[sectionName];
 
-          const title = t(`editor.adjustments.sections.${sectionName}`);
+          const title = t(`editor.adjustments.sections.${sectionName}`, {
+            defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS[sectionName],
+          });
           const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
 
           return (
