@@ -12,7 +12,7 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 
-const VirtualizedRow = Row as unknown as (props: any) => React.ReactElement | null;
+const VirtualizedRow = Row as (props: any) => React.ReactElement | null;
 
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
   const { t } = useTranslation();

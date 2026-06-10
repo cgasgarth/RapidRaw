@@ -41,6 +41,10 @@ function getRecordField<T>(record: Record<string, unknown>, key: string): T | un
   return record[key] as T | undefined;
 }
 
+function getObjectProperty(record: object, key: string): unknown {
+  return Reflect.get(record, key);
+}
+
 function isViteLikeError(value: unknown): value is Record<string, unknown> {
   if (!isPlainRecord(value)) {
     return false;
@@ -156,7 +160,7 @@ function serializeValue(value: unknown, depth: number, seen: WeakSet<object>): u
       ...Object.fromEntries(
         Object.getOwnPropertyNames(value).map((key) => [
           key,
-          serializeValue((value as unknown as Record<string, unknown>)[key], depth + 1, seen),
+          serializeValue(getObjectProperty(value, key), depth + 1, seen),
         ]),
       ),
     };
@@ -172,7 +176,7 @@ function serializeValue(value: unknown, depth: number, seen: WeakSet<object>): u
     };
 
     for (const key of Object.getOwnPropertyNames(value)) {
-      eventRecord[key] = serializeValue((value as unknown as Record<string, unknown>)[key], depth + 1, seen);
+      eventRecord[key] = serializeValue(getObjectProperty(value, key), depth + 1, seen);
     }
 
     return eventRecord;
