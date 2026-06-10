@@ -1,7 +1,15 @@
 import { useMemo } from 'react';
-import { useLibraryStore } from '../store/useLibraryStore';
+import { type SearchCriteria, useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { RawStatus, EditedStatus, SortDirection, ImageFile } from '../components/ui/AppProperties';
+import {
+  EditedStatus,
+  type FilterCriteria,
+  type ImageFile,
+  RawStatus,
+  type SortCriteria,
+  SortDirection,
+  type SupportedTypes,
+} from '../components/ui/AppProperties';
 
 export const ADVANCED_QUERY_REGEX =
   /^(iso|aperture|f|shutter|s|focal|mm|rating|color|camera|make|model|lens)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
@@ -19,6 +27,18 @@ type ParsedSearchTag =
       type: 'normal';
       value: string;
     };
+
+interface SortedLibraryState {
+  filterCriteria: FilterCriteria;
+  imageList: ImageFile[];
+  imageRatings: Record<string, number>;
+  searchCriteria: SearchCriteria;
+  sortCriteria: SortCriteria;
+}
+
+interface SortedLibrarySettingsState {
+  supportedTypes: SupportedTypes | null;
+}
 
 export const parseShutter = (val: string | undefined): number => {
   if (!val) return 0;
@@ -49,9 +69,12 @@ export const parseFocalLength = (val: string | undefined): number => {
   return isNaN(numVal) ? 0 : numVal;
 };
 
-export function computeSortedLibrary(libraryState: any, settingsState: any): ImageFile[] {
+export function computeSortedLibrary(
+  libraryState: SortedLibraryState,
+  settingsState: SortedLibrarySettingsState,
+): ImageFile[] {
   const { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria } = libraryState;
-  const { appSettings, supportedTypes } = settingsState;
+  const { supportedTypes } = settingsState;
 
   const getParentDir = (filePath: string): string => {
     const separator = filePath.includes('/') ? '/' : '\\';
@@ -244,28 +267,28 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
 
     switch (key) {
       case 'date_taken': {
-        const dateA = a.exif?.DateTimeOriginal || '';
-        const dateB = b.exif?.DateTimeOriginal || '';
+        const dateA = a.exif?.['DateTimeOriginal'] || '';
+        const dateB = b.exif?.['DateTimeOriginal'] || '';
         if (dateA !== dateB) comparison = dateA < dateB ? -1 : 1;
         else comparison = a.modified - b.modified;
         break;
       }
       case 'iso': {
-        const isoA = parseInt(a.exif?.PhotographicSensitivity || a.exif?.ISOSpeedRatings || '0', 10) || 0;
-        const isoB = parseInt(b.exif?.PhotographicSensitivity || b.exif?.ISOSpeedRatings || '0', 10) || 0;
+        const isoA = parseInt(a.exif?.['PhotographicSensitivity'] || a.exif?.['ISOSpeedRatings'] || '0', 10) || 0;
+        const isoB = parseInt(b.exif?.['PhotographicSensitivity'] || b.exif?.['ISOSpeedRatings'] || '0', 10) || 0;
         comparison = isoA - isoB;
         break;
       }
       case 'shutter_speed': {
-        comparison = parseShutter(a.exif?.ExposureTime) - parseShutter(b.exif?.ExposureTime);
+        comparison = parseShutter(a.exif?.['ExposureTime']) - parseShutter(b.exif?.['ExposureTime']);
         break;
       }
       case 'aperture': {
-        comparison = parseAperture(a.exif?.FNumber) - parseAperture(b.exif?.FNumber);
+        comparison = parseAperture(a.exif?.['FNumber']) - parseAperture(b.exif?.['FNumber']);
         break;
       }
       case 'focal_length': {
-        comparison = parseFocalLength(a.exif?.FocalLength) - parseFocalLength(b.exif?.FocalLength);
+        comparison = parseFocalLength(a.exif?.['FocalLength']) - parseFocalLength(b.exif?.['FocalLength']);
         break;
       }
       case 'date':
@@ -304,15 +327,14 @@ export function useSortedLibrary() {
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
   const sortCriteria = useLibraryStore((state) => state.sortCriteria);
 
-  const appSettings = useSettingsStore((state) => state.appSettings);
   const supportedTypes = useSettingsStore((state) => state.supportedTypes);
 
   const sortedImageList = useMemo(() => {
     return computeSortedLibrary(
       { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria },
-      { appSettings, supportedTypes },
+      { supportedTypes },
     );
-  }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria, appSettings]);
+  }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria]);
 
   return sortedImageList;
 }
