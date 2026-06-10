@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Aperture,
   FlipHorizontal,
@@ -42,6 +42,14 @@ interface OverlayOption {
   name: string;
   tooltip: string;
 }
+
+type SliderChangeEvent =
+  | ChangeEvent<HTMLInputElement>
+  | {
+      target: {
+        value: number | string;
+      };
+    };
 
 export default function CropPanel() {
   const { t } = useTranslation();
@@ -385,8 +393,8 @@ export default function CropPanel() {
 
   const displayRotation = localRotation !== null ? localRotation : fineRotation;
 
-  const handleFineRotationChange = (e: any) => {
-    const newFineRotation = parseFloat(e.target.value);
+  const handleFineRotationChange = (e: SliderChangeEvent) => {
+    const newFineRotation = parseFloat(String(e.target.value));
     if (isRotationActive) {
       updateLocalRotation(newFineRotation);
     } else {
