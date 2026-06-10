@@ -15,7 +15,35 @@ interface WaveformProps {
   theme?: string;
 }
 
-const modeButtons = [
+type WaveformTooltipKey =
+  | 'ui.waveform.tooltips.histogram'
+  | 'ui.waveform.tooltips.luma'
+  | 'ui.waveform.tooltips.parade'
+  | 'ui.waveform.tooltips.rgb'
+  | 'ui.waveform.tooltips.vectorscope';
+
+interface ModeButton {
+  mode: DisplayMode;
+  label: string;
+  tooltip: WaveformTooltipKey;
+  bgClass: string;
+  textActiveClass: string;
+}
+
+interface Particle {
+  active: boolean;
+  b: number;
+  g: number;
+  life: number;
+  maxLife: number;
+  r: number;
+  targetX: number;
+  targetY: number;
+  x: number;
+  y: number;
+}
+
+const modeButtons: ReadonlyArray<ModeButton> = [
   {
     mode: DisplayMode.Luma,
     label: 'L',
@@ -226,7 +254,7 @@ const FakeWaveformLoader = ({ mode }: { mode: string }) => {
   const spawnAccumulatorRef = useRef<number>(0);
 
   const MAX_PARTICLES = 10000;
-  const particles = useRef(
+  const particles = useRef<Array<Particle>>(
     Array.from({ length: MAX_PARTICLES }, () => ({
       x: 0,
       y: 0,
@@ -317,8 +345,9 @@ const FakeWaveformLoader = ({ mode }: { mode: string }) => {
         spawnAccumulatorRef.current -= dotsToSpawn;
         let spawnedCount = 0;
 
-        for (let i = 0; i < MAX_PARTICLES && spawnedCount < dotsToSpawn; i++) {
-          const p = particles[i];
+        for (const p of particles) {
+          if (spawnedCount >= dotsToSpawn) break;
+
           if (!p.active) {
             p.active = true;
 
@@ -390,8 +419,7 @@ const FakeWaveformLoader = ({ mode }: { mode: string }) => {
       const speedMultiplier = 1;
       const interpolation = 1 - Math.exp(-speedMultiplier * frameDt);
 
-      for (let i = 0; i < MAX_PARTICLES; i++) {
-        const p = particles[i];
+      for (const p of particles) {
         if (p.active) {
           p.life -= frameDt;
 
@@ -424,10 +452,10 @@ const FakeWaveformLoader = ({ mode }: { mode: string }) => {
 
               if (cx >= 0 && cx < WIDTH && cy >= 0 && cy < HEIGHT) {
                 const idx = (cy * WIDTH + cx) * 4;
-                data[idx] = Math.min(255, data[idx] + p.r * alpha);
-                data[idx + 1] = Math.min(255, data[idx + 1] + p.g * alpha);
-                data[idx + 2] = Math.min(255, data[idx + 2] + p.b * alpha);
-                data[idx + 3] = Math.min(255, data[idx + 3] + alpha * 255);
+                data[idx] = Math.min(255, (data[idx] ?? 0) + p.r * alpha);
+                data[idx + 1] = Math.min(255, (data[idx + 1] ?? 0) + p.g * alpha);
+                data[idx + 2] = Math.min(255, (data[idx + 2] ?? 0) + p.b * alpha);
+                data[idx + 3] = Math.min(255, (data[idx + 3] ?? 0) + alpha * 255);
               }
             }
           }
