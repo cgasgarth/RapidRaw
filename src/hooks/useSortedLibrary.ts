@@ -24,9 +24,10 @@ export const parseShutter = (val: string | undefined): number => {
   if (!val) return 0;
   const cleanVal = val.replace(/s/i, '').trim();
   const parts = cleanVal.split('/');
-  if (parts.length === 2) {
-    const num = parseFloat(parts[0]);
-    const den = parseFloat(parts[1]);
+  const [numerator, denominator] = parts;
+  if (numerator !== undefined && denominator !== undefined) {
+    const num = parseFloat(numerator);
+    const den = parseFloat(denominator);
     return den !== 0 ? num / den : 0;
   }
   const numVal = parseFloat(cleanVal);
@@ -67,7 +68,7 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     const rawBaseNames = new Set<string>();
 
     for (const image of imageList) {
-      const pathWithoutVC = image.path.split('?vc=')[0];
+      const pathWithoutVC = image.path.split('?vc=')[0] ?? image.path;
       const filename = pathWithoutVC.split(/[\\/]/).pop() || '';
       const lastDotIndex = filename.lastIndexOf('.');
       const extension = lastDotIndex !== -1 ? filename.substring(lastDotIndex + 1).toLowerCase() : '';
@@ -82,7 +83,7 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
 
     if (rawBaseNames.size > 0) {
       processedList = imageList.filter((image: ImageFile) => {
-        const pathWithoutVC = image.path.split('?vc=')[0];
+        const pathWithoutVC = image.path.split('?vc=')[0] ?? image.path;
         const filename = pathWithoutVC.split(/[\\/]/).pop() || '';
         const lastDotIndex = filename.lastIndexOf('.');
         const extension = lastDotIndex !== -1 ? filename.substring(lastDotIndex + 1).toLowerCase() : '';
@@ -117,7 +118,7 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
       filterCriteria.rawStatus !== RawStatus.RawOverNonRaw &&
       supportedTypes
     ) {
-      const pathWithoutVC = image.path.split('?vc=')[0];
+      const pathWithoutVC = image.path.split('?vc=')[0] ?? image.path;
       const extension = pathWithoutVC.split('.').pop()?.toLowerCase() || '';
       const isRaw = supportedTypes.raw?.includes(extension);
 
@@ -148,7 +149,9 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     const match = tag.match(ADVANCED_QUERY_REGEX);
     if (match) {
       const operator = match[2] || '=';
-      return { type: 'query', field: match[1].toLowerCase(), operator, value: match[3].toLowerCase(), raw: tag };
+      const field = match[1] ?? '';
+      const value = match[3] ?? '';
+      return { type: 'query', field: field.toLowerCase(), operator, value: value.toLowerCase(), raw: tag };
     }
     return { type: 'normal', value: tag.toLowerCase(), raw: tag };
   });

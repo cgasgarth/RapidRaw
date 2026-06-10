@@ -475,7 +475,8 @@ export default function ExportPanel({
 
       let outputFolderOrFile = '';
       if (numImages === 1) {
-        const originalFilename = pathsToExport[0].split(/[\\/]/).pop() || '';
+        const firstPath = pathsToExport[0] ?? '';
+        const originalFilename = firstPath.split(/[\\/]/).pop() || '';
         const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
         const suggestedName = finalFilenameTemplate.replace('{original_filename}', stem);
         const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;

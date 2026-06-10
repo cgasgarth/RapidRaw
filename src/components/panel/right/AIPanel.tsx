@@ -840,6 +840,7 @@ export default function AIPanel() {
         if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
           const newPatches = [...prev.aiPatches];
           const [movedItem] = newPatches.splice(oldIndex, 1);
+          if (!movedItem) return prev;
           newPatches.splice(newIndex, 0, movedItem);
           return { ...prev, aiPatches: newPatches };
         }
@@ -861,6 +862,7 @@ export default function AIPanel() {
           if (subMaskIndex === -1) return prev;
 
           const [movedSubMask] = sourceContainer.subMasks.splice(subMaskIndex, 1);
+          if (!movedSubMask) return prev;
 
           const newContainer: AiPatch = {
             id: uuidv4(),
@@ -898,6 +900,7 @@ export default function AIPanel() {
           const sourceIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === dragData.item!.id);
           if (sourceIndex === -1) return prev;
           const [movedSubMask] = sourceContainer.subMasks.splice(sourceIndex, 1);
+          if (!movedSubMask) return prev;
 
           if (sourceContainerId === targetContainerId) {
             if (overData?.type === 'SubMask') {

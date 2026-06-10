@@ -107,6 +107,7 @@ export function useFileOperations(
 
     const selectionHasVirtualCopies =
       isSingle &&
+      pathsToDelete[0] !== undefined &&
       !pathsToDelete[0].includes('?vc=') &&
       imageList.some((image) => image.path.startsWith(`${pathsToDelete[0]}?vc=`));
 
@@ -331,6 +332,7 @@ export function useFileOperations(
 
           const validFiles = selected.filter((originalPath, index) => {
             const resolvedName = resolvedFiles[index];
+            if (!resolvedName) return false;
             const ext = resolvedName.split('.').pop()?.toLowerCase() || 'unknown';
 
             if (!allowedExtensions.has(ext)) {

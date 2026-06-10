@@ -300,8 +300,8 @@ export default function Controls() {
           return (
             <div className="shrink-0 group" key={sectionName}>
               <CollapsibleSection
-                isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility]}
-                isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
+                isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility] ?? true}
+                isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState] ?? true}
                 onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
                 onToggle={() => handleToggleSection(sectionName)}
                 onToggleVisibility={() => handleToggleVisibility(sectionName)}

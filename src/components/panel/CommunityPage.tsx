@@ -126,7 +126,8 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
       const shuffled = shuffleArray(imageList);
 
       if (imageList.length === 1) {
-        setPreviewImagePaths([imageList[0].path]);
+        const image = imageList[0];
+        if (image) setPreviewImagePaths([image.path]);
       } else if (imageList.length >= 2 && imageList.length <= 3) {
         setPreviewImagePaths(shuffled.slice(0, 2).map((img) => img.path));
       } else if (imageList.length >= 4) {

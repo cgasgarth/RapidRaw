@@ -1169,6 +1169,7 @@ export default function MasksPanel() {
         if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
           const newMasks = [...prev.masks];
           const [movedItem] = newMasks.splice(oldIndex, 1);
+          if (!movedItem) return prev;
           newMasks.splice(newIndex, 0, movedItem);
           return { ...prev, masks: newMasks };
         }
@@ -1189,6 +1190,7 @@ export default function MasksPanel() {
           const subMaskIndex = sourceContainer.subMasks.findIndex((sm: SubMask) => sm.id === dragData.item!.id);
           if (subMaskIndex === -1) return prev;
           const [movedSubMask] = sourceContainer.subMasks.splice(subMaskIndex, 1);
+          if (!movedSubMask) return prev;
 
           const newContainer = {
             ...INITIAL_MASK_CONTAINER,
@@ -1224,6 +1226,7 @@ export default function MasksPanel() {
           if (sourceSubMaskIndex === -1) return prev;
 
           const [movedSubMask] = sourceContainer.subMasks.splice(sourceSubMaskIndex, 1);
+          if (!movedSubMask) return prev;
 
           if (sourceContainerId === targetContainerId) {
             if (overData?.type === 'SubMask') {

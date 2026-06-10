@@ -18,7 +18,9 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
       paths || (multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : []);
     if (pathsToRate.length === 0) return;
 
-    const currentRating = imageRatings[pathsToRate[0]] || 0;
+    const firstPath = pathsToRate[0];
+    if (!firstPath) return;
+    const currentRating = imageRatings[firstPath] || 0;
     const finalRating = newRating === currentRating ? 0 : newRating;
 
     setLibrary((state) => {
@@ -178,7 +180,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
         if (updateLibraryActivePath) {
           if (newSelectionArray.includes(path)) setLibrary({ libraryActivePath: path });
           else if (newSelectionArray.length > 0)
-            setLibrary({ libraryActivePath: newSelectionArray[newSelectionArray.length - 1] });
+            setLibrary({ libraryActivePath: newSelectionArray[newSelectionArray.length - 1] ?? null });
           else setLibrary({ libraryActivePath: null });
         }
       } else {

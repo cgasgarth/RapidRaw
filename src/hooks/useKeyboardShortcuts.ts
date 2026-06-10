@@ -98,7 +98,8 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
           s.library.setLibrary({ multiSelectedPaths: sortedListRef.current.map((f: ImageFile) => f.path) });
           if (!s.editor.selectedImage) {
-            s.library.setLibrary({ libraryActivePath: sortedListRef.current[sortedListRef.current.length - 1].path });
+            const lastImage = sortedListRef.current[sortedListRef.current.length - 1];
+            if (lastImage) s.library.setLibrary({ libraryActivePath: lastImage.path });
           }
         },
       },
@@ -116,7 +117,8 @@ export const useKeyboardShortcuts = ({
           const currentIndex = sortedListRef.current.findIndex((img) => img.path === s.editor.selectedImage!.path);
           if (currentIndex === -1) return;
           let nextIndex = currentIndex - 1 < 0 ? sortedListRef.current.length - 1 : currentIndex - 1;
-          handleImageSelect(sortedListRef.current[nextIndex].path);
+          const nextImage = sortedListRef.current[nextIndex];
+          if (nextImage) handleImageSelect(nextImage.path);
         },
       },
       preview_next: {
@@ -126,7 +128,8 @@ export const useKeyboardShortcuts = ({
           const currentIndex = sortedListRef.current.findIndex((img) => img.path === s.editor.selectedImage!.path);
           if (currentIndex === -1) return;
           let nextIndex = currentIndex + 1 >= sortedListRef.current.length ? 0 : currentIndex + 1;
-          handleImageSelect(sortedListRef.current[nextIndex].path);
+          const nextImage = sortedListRef.current[nextIndex];
+          if (nextImage) handleImageSelect(nextImage.path);
         },
       },
       zoom_in_step: {

@@ -163,8 +163,9 @@ function AlbumTreeNode({
   const isSelected = item.id === selectedAlbumId;
 
   let ItemIcon = isGroup ? (isExpanded ? FolderOpen : Folder) : AlbumIcon;
-  if (item.icon && ALBUM_ICONS[item.icon]) {
-    ItemIcon = ALBUM_ICONS[item.icon];
+  const customIcon = item.icon ? ALBUM_ICONS[item.icon] : undefined;
+  if (customIcon) {
+    ItemIcon = customIcon;
   }
   const iconKey = item.icon || (isGroup ? (isExpanded ? 'group-open' : 'group-closed') : 'album');
 

@@ -142,7 +142,8 @@ export const useEditorStore = create<EditorState>((set) => ({
     set((state) => {
       if (state.historyIndex > 0) {
         const newIndex = state.historyIndex - 1;
-        return { historyIndex: newIndex, adjustments: state.history[newIndex] };
+        const adjustments = state.history[newIndex];
+        return adjustments ? { historyIndex: newIndex, adjustments } : state;
       }
       return state;
     }),
@@ -151,7 +152,8 @@ export const useEditorStore = create<EditorState>((set) => ({
     set((state) => {
       if (state.historyIndex < state.history.length - 1) {
         const newIndex = state.historyIndex + 1;
-        return { historyIndex: newIndex, adjustments: state.history[newIndex] };
+        const adjustments = state.history[newIndex];
+        return adjustments ? { historyIndex: newIndex, adjustments } : state;
       }
       return state;
     }),
@@ -166,7 +168,8 @@ export const useEditorStore = create<EditorState>((set) => ({
   goToHistoryIndex: (index) =>
     set((state) => {
       if (index >= 0 && index < state.history.length) {
-        return { historyIndex: index, adjustments: state.history[index] };
+        const adjustments = state.history[index];
+        return adjustments ? { historyIndex: index, adjustments } : state;
       }
       return state;
     }),

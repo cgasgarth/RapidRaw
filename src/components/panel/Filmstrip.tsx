@@ -90,7 +90,7 @@ const FilmstripThumbnail = memo(
     const hasRating = rating > 0;
     const hasAnyOverlay = hasEditIcon || hasColorLabel || hasRating;
 
-    const cleanPath = path.split('?')[0];
+    const cleanPath = path.split('?')[0] ?? path;
     const filename = cleanPath.split(/[\\/]/).pop() || '';
 
     const truncatedTitle =

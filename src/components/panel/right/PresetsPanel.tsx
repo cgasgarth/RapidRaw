@@ -102,7 +102,7 @@ const itemVariants = {
 
 function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetItemDisplayProps) {
   const { t } = useTranslation();
-  const geometryKeys = ADJUSTMENT_GROUPS['geometry'].flatMap((g) => g.keys);
+  const geometryKeys = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((g) => g.keys);
 
   const supportsMasks =
     preset.includeMasks ?? (preset.adjustments?.['masks'] && preset.adjustments['masks'].length > 0);

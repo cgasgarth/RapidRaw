@@ -376,6 +376,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
       const selectionHasVirtualCopies =
         isSingleSelection &&
+        finalSelection[0] !== undefined &&
         !finalSelection[0].includes('?vc=') &&
         imageList.some((image) => image.path.startsWith(`${finalSelection[0]}?vc=`));
 
@@ -543,7 +544,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 disabled: !isSingleSelection,
                 icon: Edit,
                 label: t('contextMenus.editor.editImage'),
-                onClick: () => props.handleImageSelect(finalSelection[0]),
+                onClick: () => {
+                  const selectedPath = finalSelection[0];
+                  if (selectedPath) props.handleImageSelect(selectedPath);
+                },
               },
               { icon: FileInput, label: exportLabel, onClick: onExportClick },
               { type: OPTION_SEPARATOR },
@@ -688,7 +692,10 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             {
               label: t('contextMenus.thumbnail.virtualCopy'),
               icon: CopyPlus,
-              onClick: () => handleCreateVirtualCopy(finalSelection[0]),
+              onClick: () => {
+                const selectedPath = finalSelection[0];
+                if (selectedPath) handleCreateVirtualCopy(selectedPath);
+              },
             },
           ],
         },
@@ -1059,9 +1066,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
         const removeAndGet = (nodes: AlbumItem[], id: string): AlbumItem | null => {
           for (let i = 0; i < nodes.length; i++) {
-            if (nodes[i].id === id) return nodes.splice(i, 1)[0];
-            if (nodes[i].type === 'group') {
-              const res = removeAndGet((nodes[i] as AlbumGroup).children, id);
+            const node = nodes[i];
+            if (!node) continue;
+            if (node.id === id) return nodes.splice(i, 1)[0] ?? null;
+            if (node.type === 'group') {
+              const res = removeAndGet((node as AlbumGroup).children, id);
               if (res) return res;
             }
           }

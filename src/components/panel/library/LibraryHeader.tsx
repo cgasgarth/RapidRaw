@@ -135,6 +135,7 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
     } else if (e.key === 'Backspace' && !text && tags.length > 0) {
       e.preventDefault();
       const lastTag = tags[tags.length - 1];
+      if (!lastTag) return;
       setSearchCriteria((prev) => ({
         ...prev,
         tags: prev.tags.slice(0, -1),
