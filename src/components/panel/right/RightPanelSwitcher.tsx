@@ -39,6 +39,16 @@ const panelGroups: Array<Array<PanelOptions>> = [
   ],
 ];
 
+const PANEL_TOOLTIP_FALLBACKS: Record<Panel, string> = {
+  [Panel.Adjustments]: 'Adjust',
+  [Panel.Ai]: 'Inpaint',
+  [Panel.Crop]: 'Crop',
+  [Panel.Export]: 'Export',
+  [Panel.Masks]: 'Masks',
+  [Panel.Metadata]: 'Info',
+  [Panel.Presets]: 'Presets',
+};
+
 export default function RightPanelSwitcher({
   activePanel,
   onPanelSelect,
@@ -66,7 +76,7 @@ export default function RightPanelSwitcher({
               }`}
               key={id}
               onClick={() => onPanelSelect(id)}
-              data-tooltip={t(title)}
+              data-tooltip={t(title, { defaultValue: PANEL_TOOLTIP_FALLBACKS[id] })}
             >
               {activePanel === id && (
                 <motion.div
