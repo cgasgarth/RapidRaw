@@ -27,10 +27,10 @@ interface BottomBarProps {
   isResizing?: boolean;
   multiSelectedPaths?: Array<string>;
   onClearSelection?: (() => void) | undefined;
-  onContextMenu?: ((event: any, path: string) => void) | undefined;
+  onContextMenu?: ((event: unknown, path: string) => void) | undefined;
   onCopy(): void;
   onExportClick?(): void;
-  onImageSelect?: ((path: string, event: any) => void) | undefined;
+  onImageSelect?: ((path: string, event: unknown) => void) | undefined;
   onOpenCopyPasteSettings?(): void;
   onRequestThumbnails?: ((paths: string[]) => void) | undefined;
   onPaste(): void;

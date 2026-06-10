@@ -53,11 +53,11 @@ interface MainLibraryProps {
   libraryViewMode: LibraryViewMode;
   multiSelectedPaths: Array<string>;
   onClearSelection(): void;
-  onContextMenu(event: any, path: string): void;
+  onContextMenu(event: unknown, path: string): void;
   onContinueSession(): void;
-  onEmptyAreaContextMenu(event: any): void;
+  onEmptyAreaContextMenu(event: unknown): void;
   onGoHome(): void;
-  onImageClick(path: string, event: any): void;
+  onImageClick(path: string, event: unknown): void;
   onImageDoubleClick(path: string): void;
   onImportClick(): void;
   onLibraryRefresh(): void;
