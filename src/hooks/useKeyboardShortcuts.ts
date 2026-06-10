@@ -19,6 +19,24 @@ interface KeyboardShortcutsProps {
   handleZoomChange(zoomValue: number, fitToWindow?: boolean): void;
 }
 
+interface KeyboardStoreState {
+  editor: ReturnType<typeof useEditorStore.getState>;
+  library: ReturnType<typeof useLibraryStore.getState>;
+  process: ReturnType<typeof useProcessStore.getState>;
+  settings: ReturnType<typeof useSettingsStore.getState>;
+  ui: ReturnType<typeof useUIStore.getState>;
+}
+
+interface ShortcutAction {
+  execute(event: KeyboardEvent, state: KeyboardStoreState): void;
+  shouldFire?: (state: KeyboardStoreState) => boolean;
+}
+
+interface BuiltinShortcut {
+  execute(event: KeyboardEvent, state: KeyboardStoreState): void;
+  match(event: KeyboardEvent, state: KeyboardStoreState): boolean;
+}
+
 export const useKeyboardShortcuts = ({
   sortedImageList,
   handleBackToLibrary,
@@ -37,7 +55,7 @@ export const useKeyboardShortcuts = ({
   }, [sortedImageList]);
 
   useEffect(() => {
-    const getStoreState = () => ({
+    const getStoreState = (): KeyboardStoreState => ({
       editor: useEditorStore.getState(),
       library: useLibraryStore.getState(),
       ui: useUIStore.getState(),
@@ -56,45 +74,45 @@ export const useKeyboardShortcuts = ({
       }
     }
 
-    const actions: Record<string, any> = {
+    const actions: Record<string, ShortcutAction> = {
       open_image: {
-        shouldFire: (s: any) => !s.editor.selectedImage && s.library.libraryActivePath !== null,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !s.editor.selectedImage && s.library.libraryActivePath !== null,
+        execute: (e, s) => {
           e.preventDefault();
           handleImageSelect(s.library.libraryActivePath!);
         },
       },
       copy_adjustments: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleCopyAdjustments();
         },
       },
       paste_adjustments: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handlePasteAdjustments();
         },
       },
       copy_files: {
-        shouldFire: (s: any) => s.library.multiSelectedPaths.length > 0,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => s.library.multiSelectedPaths.length > 0,
+        execute: (e, s) => {
           e.preventDefault();
           s.process.setProcess({ copiedFilePaths: s.library.multiSelectedPaths });
         },
       },
       paste_files: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handlePasteFiles('copy');
         },
       },
       select_all: {
         shouldFire: () => sortedListRef.current.length > 0,
-        execute: (e: any, s: any) => {
+        execute: (e, s) => {
           e.preventDefault();
           s.library.setLibrary({ multiSelectedPaths: sortedListRef.current.map((f: ImageFile) => f.path) });
           if (!s.editor.selectedImage) {
@@ -104,15 +122,15 @@ export const useKeyboardShortcuts = ({
         },
       },
       delete_selected: {
-        shouldFire: (s: any) => !s.editor.activeMaskContainerId && !s.editor.activeAiPatchContainerId,
-        execute: (e: any) => {
+        shouldFire: (s) => !s.editor.activeMaskContainerId && !s.editor.activeAiPatchContainerId,
+        execute: (e) => {
           e.preventDefault();
           handleDeleteSelected();
         },
       },
       preview_prev: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           const currentIndex = sortedListRef.current.findIndex((img) => img.path === s.editor.selectedImage!.path);
           if (currentIndex === -1) return;
@@ -122,8 +140,8 @@ export const useKeyboardShortcuts = ({
         },
       },
       preview_next: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           const currentIndex = sortedListRef.current.findIndex((img) => img.path === s.editor.selectedImage!.path);
           if (currentIndex === -1) return;
@@ -133,8 +151,8 @@ export const useKeyboardShortcuts = ({
         },
       },
       zoom_in_step: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
           const currentPercent =
@@ -145,8 +163,8 @@ export const useKeyboardShortcuts = ({
         },
       },
       zoom_out_step: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
           const currentPercent =
@@ -157,8 +175,8 @@ export const useKeyboardShortcuts = ({
         },
       },
       cycle_zoom: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
           const { originalSize, displaySize, baseRenderSize } = s.editor;
@@ -188,8 +206,8 @@ export const useKeyboardShortcuts = ({
         },
       },
       zoom_in: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
           const currentPercent =
@@ -200,8 +218,8 @@ export const useKeyboardShortcuts = ({
         },
       },
       zoom_out: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
           const currentPercent =
@@ -212,133 +230,136 @@ export const useKeyboardShortcuts = ({
         },
       },
       zoom_fit: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e) => {
           e.preventDefault();
           handleZoomChange(0, true);
         },
       },
       zoom_100: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e) => {
           e.preventDefault();
           handleZoomChange(1.0);
         },
       },
       rotate_left: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e) => {
           e.preventDefault();
           handleRotate(-90);
         },
       },
       rotate_right: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e) => {
           e.preventDefault();
           handleRotate(90);
         },
       },
       undo: {
-        shouldFire: (s: any) => !!s.editor.selectedImage && s.editor.historyIndex > 0,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage && s.editor.historyIndex > 0,
+        execute: (e, s) => {
           e.preventDefault();
           s.editor.undo();
         },
       },
       redo: {
-        shouldFire: (s: any) => !!s.editor.selectedImage && s.editor.historyIndex < s.editor.history.length - 1,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage && s.editor.historyIndex < s.editor.history.length - 1,
+        execute: (e, s) => {
           e.preventDefault();
           s.editor.redo();
         },
       },
       toggle_fullscreen: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e) => {
           e.preventDefault();
           handleToggleFullScreen();
         },
       },
       show_original: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           s.editor.setEditor({ showOriginal: !s.editor.showOriginal });
         },
       },
       toggle_adjustments: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           s.ui.setRightPanel(Panel.Adjustments);
         },
       },
       toggle_crop_panel: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           s.ui.setRightPanel(Panel.Crop);
         },
       },
       toggle_masks: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           s.ui.setRightPanel(Panel.Masks);
         },
       },
       toggle_ai: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           s.ui.setRightPanel(Panel.Ai);
         },
       },
       toggle_presets: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           s.ui.setRightPanel(Panel.Presets);
         },
       },
       toggle_metadata: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           s.ui.setRightPanel(Panel.Metadata);
         },
       },
       toggle_analytics: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           s.editor.setEditor({ isWaveformVisible: !s.editor.isWaveformVisible });
         },
       },
       toggle_export: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           s.ui.setRightPanel(Panel.Export);
         },
       },
       toggle_library_exif: {
-        shouldFire: (s: any) => !s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
-          const current = s.settings.appSettings?.exifOverlay || ExifOverlay.Off;
+          const { appSettings } = s.settings;
+          if (!appSettings) return;
+
+          const current = appSettings.exifOverlay || ExifOverlay.Off;
           const nextState = {
             [ExifOverlay.Off]: ExifOverlay.Hover,
             [ExifOverlay.Hover]: ExifOverlay.Always,
             [ExifOverlay.Always]: ExifOverlay.Off,
           }[current as ExifOverlay];
-          s.settings.handleSettingsChange({ ...s.settings.appSettings, exifOverlay: nextState });
+          s.settings.handleSettingsChange({ ...appSettings, exifOverlay: nextState });
         },
       },
       toggle_crop: {
-        shouldFire: (s: any) => !!s.editor.selectedImage,
-        execute: (e: any, s: any) => {
+        shouldFire: (s) => !!s.editor.selectedImage,
+        execute: (e, s) => {
           e.preventDefault();
           if (s.ui.activeRightPanel === Panel.Crop) {
             s.editor.setEditor({ isStraightenActive: !s.editor.isStraightenActive });
@@ -350,112 +371,118 @@ export const useKeyboardShortcuts = ({
       },
       rate_0: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleRate(0);
         },
       },
       rate_1: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleRate(1);
         },
       },
       rate_2: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleRate(2);
         },
       },
       rate_3: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleRate(3);
         },
       },
       rate_4: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleRate(4);
         },
       },
       rate_5: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleRate(5);
         },
       },
       color_label_none: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleSetColorLabel(null);
         },
       },
       color_label_red: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleSetColorLabel('red');
         },
       },
       color_label_yellow: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleSetColorLabel('yellow');
         },
       },
       color_label_green: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleSetColorLabel('green');
         },
       },
       color_label_blue: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleSetColorLabel('blue');
         },
       },
       color_label_purple: {
         shouldFire: () => true,
-        execute: (e: any) => {
+        execute: (e) => {
           e.preventDefault();
           handleSetColorLabel('purple');
         },
       },
       brush_size_up: {
-        shouldFire: (s: any) =>
+        shouldFire: (s) =>
           !!s.editor.selectedImage && !!s.editor.brushSettings && s.ui.activeRightPanel === Panel.Masks,
-        execute: (e: any, s: any) => {
+        execute: (e, s) => {
           e.preventDefault();
-          const newSize = Math.min((s.editor.brushSettings.size || 50) + 10, 200);
-          s.editor.setEditor({ brushSettings: { ...s.editor.brushSettings, size: newSize } });
+          const { brushSettings } = s.editor;
+          if (!brushSettings) return;
+
+          const newSize = Math.min((brushSettings.size || 50) + 10, 200);
+          s.editor.setEditor({ brushSettings: { ...brushSettings, size: newSize } });
         },
       },
       brush_size_down: {
-        shouldFire: (s: any) =>
+        shouldFire: (s) =>
           !!s.editor.selectedImage && !!s.editor.brushSettings && s.ui.activeRightPanel === Panel.Masks,
-        execute: (e: any, s: any) => {
+        execute: (e, s) => {
           e.preventDefault();
-          const newSize = Math.max((s.editor.brushSettings.size || 50) - 10, 1);
-          s.editor.setEditor({ brushSettings: { ...s.editor.brushSettings, size: newSize } });
+          const { brushSettings } = s.editor;
+          if (!brushSettings) return;
+
+          const newSize = Math.max((brushSettings.size || 50) - 10, 1);
+          s.editor.setEditor({ brushSettings: { ...brushSettings, size: newSize } });
         },
       },
     };
 
-    const builtinShortcuts = [
+    const builtinShortcuts: Array<BuiltinShortcut> = [
       {
         match: (e: KeyboardEvent) => e.code === 'Escape',
-        execute: (e: KeyboardEvent, s: any) => {
+        execute: (e, s) => {
           e.preventDefault();
           if (s.editor.isStraightenActive) s.editor.setEditor({ isStraightenActive: false });
           else if (s.ui.customEscapeHandler) s.ui.customEscapeHandler();
@@ -469,26 +496,26 @@ export const useKeyboardShortcuts = ({
         },
       },
       {
-        match: (e: KeyboardEvent, s: any) => {
+        match: (e, s) => {
           const isDeleteKey = s.settings.osPlatform === 'macos' ? e.code === 'Backspace' : e.code === 'Delete';
           return isDeleteKey && (!!s.editor.activeMaskContainerId || !!s.editor.activeAiPatchContainerId);
         },
-        execute: (e: KeyboardEvent, s: any) => {
+        execute: (e, s) => {
           e.preventDefault();
           if (s.editor.activeMaskContainerId) {
-            s.editor.setEditor((state: any) => ({
+            s.editor.setEditor((state) => ({
               adjustments: {
                 ...state.adjustments,
-                masks: state.adjustments.masks.filter((c: any) => c.id !== s.editor.activeMaskContainerId),
+                masks: state.adjustments.masks.filter((c) => c.id !== s.editor.activeMaskContainerId),
               },
               activeMaskContainerId: null,
               activeMaskId: null,
             }));
           } else if (s.editor.activeAiPatchContainerId) {
-            s.editor.setEditor((state: any) => ({
+            s.editor.setEditor((state) => ({
               adjustments: {
                 ...state.adjustments,
-                aiPatches: state.adjustments.aiPatches.filter((c: any) => c.id !== s.editor.activeAiPatchContainerId),
+                aiPatches: state.adjustments.aiPatches.filter((c) => c.id !== s.editor.activeAiPatchContainerId),
               },
               activeAiPatchContainerId: null,
               activeAiSubMaskId: null,
@@ -497,9 +524,9 @@ export const useKeyboardShortcuts = ({
         },
       },
       {
-        match: (e: KeyboardEvent, s: any) =>
+        match: (e, s) =>
           !s.editor.selectedImage && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code),
-        execute: (e: KeyboardEvent, s: any) => {
+        execute: (e, s) => {
           e.preventDefault();
           const isNext = e.code === 'ArrowRight' || e.code === 'ArrowDown';
           const activePath = s.library.libraryActivePath;
