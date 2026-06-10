@@ -1,6 +1,7 @@
 const js = require('@eslint/js');
 const tseslint = require('typescript-eslint');
 const react = require('eslint-plugin-react');
+const reactHooks = require('eslint-plugin-react-hooks');
 const i18next = require('eslint-plugin-i18next');
 
 const tsFiles = ['**/*.{ts,tsx,mts}'];
@@ -31,6 +32,7 @@ module.exports = [
     files: tsFiles,
     plugins: {
       react,
+      'react-hooks': reactHooks,
       i18next,
     },
     languageOptions: {
@@ -53,6 +55,9 @@ module.exports = [
         'warn',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
+      'react-hooks/rules-of-hooks': 'error',
+      // Enable after the existing dependency-array warnings are fixed in a focused lint PR.
+      'react-hooks/exhaustive-deps': 'off',
       'i18next/no-literal-string': [
         'warn',
         {
