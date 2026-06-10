@@ -58,6 +58,13 @@ module.exports = [
       'react-hooks/rules-of-hooks': 'error',
       // Enable after the existing dependency-array warnings are fixed in a focused lint PR.
       'react-hooks/exhaustive-deps': 'off',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "TSAsExpression[expression.type='TSAsExpression']",
+          message: 'Do not use chained type assertions; add a real type guard or typed adapter.',
+        },
+      ],
       'i18next/no-literal-string': [
         'warn',
         {
