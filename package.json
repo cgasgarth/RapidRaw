@@ -21,6 +21,7 @@
     "check:i18n": "i18next-cli extract --ci --dry-run",
     "check:lint": "eslint . --max-warnings 0",
     "check:format": "prettier --check .",
+    "check:actions": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml",
     "check:rust": "bun run check:rust:fmt && bun run check:rust:check",
     "check:rust:fmt": "cd src-tauri && cargo fmt -p RapidRAW -- --check",
     "check:rust:check": "cd src-tauri && cargo check",
