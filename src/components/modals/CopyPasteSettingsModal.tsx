@@ -16,6 +16,7 @@ interface CopyPasteSettingsModalProps {
 }
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const labelFallback = (labelKey: string) => capitalize(labelKey.split('.').pop() ?? labelKey);
 
 const DEFAULT_SETTINGS: CopyPasteSettings = {
   mode: PasteMode.Merge,
@@ -245,7 +246,7 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
                       return (
                         <div key={group.label} className="mb-1.5 last:mb-0">
                           <Switch
-                            label={t(group.label)}
+                            label={t(group.label, { defaultValue: labelFallback(group.label) })}
                             checked={isFullyChecked}
                             onChange={(checked) => handleGroupToggle(group.keys, checked)}
                           />
