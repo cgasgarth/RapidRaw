@@ -1,3 +1,4 @@
+import { type MouseEvent } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import CommunityPage from '../panel/CommunityPage';
@@ -19,14 +20,14 @@ interface LibraryViewProps {
   handleGoHome: () => void;
   handleImageSelect: (path: string) => void;
   handleImportClick: (path: string) => void;
-  handleLibraryImageSingleClick: (path: string, event: unknown) => void;
+  handleLibraryImageSingleClick: (path: string, event: MouseEvent<HTMLElement>) => void;
   handleLibraryRefresh: () => Promise<void>;
-  handleMainLibraryContextMenu: (event: unknown) => void;
+  handleMainLibraryContextMenu: (event: MouseEvent<HTMLElement>) => void;
   handleOpenFolder: () => Promise<void> | void;
   handlePasteAdjustments: () => void;
   handleRate: (rate: number, paths?: string[]) => void;
   handleResetAdjustments: () => void;
-  handleThumbnailContextMenu: (event: unknown, path: string) => void;
+  handleThumbnailContextMenu: (event: MouseEvent<HTMLElement>, path: string) => void;
   isAndroid: boolean;
   libraryViewMode: LibraryViewMode;
   requestThumbnails: (paths: string[]) => void;

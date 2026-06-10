@@ -1,4 +1,4 @@
-import { type RefObject, type PointerEvent as ReactPointerEvent } from 'react';
+import { type MouseEvent, type RefObject, type PointerEvent as ReactPointerEvent } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import clsx from 'clsx';
@@ -58,9 +58,9 @@ interface EditorViewProps {
   sortedImageList: ImageFile[];
   createResizeHandler: (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => void;
   handleBackToLibrary: () => void;
-  handleEditorContextMenu: (event: unknown) => void;
-  handleThumbnailContextMenu: (event: unknown, path: string) => void;
-  handleImageClick: (path: string, event: unknown) => void;
+  handleEditorContextMenu: (event: MouseEvent<HTMLElement>) => void;
+  handleThumbnailContextMenu: (event: MouseEvent<HTMLElement>, path: string) => void;
+  handleImageClick: (path: string, event: MouseEvent<HTMLElement>) => void;
   handleClearSelection: () => void;
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;

@@ -8,6 +8,7 @@ import { Invokes, ImageFile, AlbumItem, Album, AlbumGroup } from '../components/
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { computeSortedLibrary } from './useSortedLibrary';
+import type { FolderTree } from '../components/panel/FolderTree';
 
 type LibraryClickEvent = Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>;
 
@@ -15,12 +16,6 @@ interface MultiSelectOptions {
   onSimpleClick(path: string): void;
   shiftAnchor: string | null;
   updateLibraryActivePath: boolean;
-}
-
-interface FolderTreeNode {
-  children?: FolderTreeNode[];
-  path?: string;
-  [key: string]: unknown;
 }
 
 export function useLibraryActions(handleImageSelect?: (path: string) => void) {
@@ -237,10 +232,10 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     const expandedArray = Array.from(expandedFolders);
 
     try {
-      const updates: { folderTrees?: FolderTreeNode[]; pinnedFolderTrees?: FolderTreeNode[] } = {};
+      const updates: { folderTrees?: FolderTree[]; pinnedFolderTrees?: FolderTree[] } = {};
 
       if (rootPaths && rootPaths.length > 0) {
-        const treesData = await invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
+        const treesData = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
           paths: rootPaths,
           expandedFolders: expandedArray,
           showImageCounts,
@@ -251,7 +246,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
       }
 
       if (pinnedFolders && pinnedFolders.length > 0) {
-        const pinnedTreesData = await invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
+        const pinnedTreesData = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
           paths: pinnedFolders,
           expandedFolders: expandedArray,
           showImageCounts,
@@ -283,7 +278,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     handleSettingsChange({ ...appSettings, pinnedFolders: newPins });
 
     try {
-      const trees = await invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
+      const trees = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
         paths: newPins,
         expandedFolders: Array.from(expandedFolders),
         showImageCounts: appSettings.enableFolderImageCounts ?? false,
