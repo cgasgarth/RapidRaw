@@ -387,6 +387,11 @@
         "useBasicInpaint": "Einfaches Reparieren verwenden"
       }
     },
+    "canvas": {
+      "cropPreviewAlt": "Zuschnittvorschau",
+      "maskOverlayAlt": "Maskenuberlagerung",
+      "originalAlt": "Original"
+    },
     "crop": {
       "aspectRatioHeading": "Seitenverhältnis",
       "custom": {
@@ -613,7 +618,8 @@
         "dimensionsNoMp": "{{width}} × {{height}} px",
         "emptyDimensions": "- × - px",
         "title": "Dateiinformationen",
-        "virtualCopy": "Virtuelle Kopie"
+        "virtualCopy": "Virtuelle Kopie",
+        "virtualCopyAbbreviation": "VK"
       },
       "gps": {
         "altitude": "Höhe",
@@ -945,6 +951,7 @@
     },
     "splash": {
       "addFolder": "Ordner hinzufügen",
+      "backgroundAlt": "Startbildschirm-Hintergrund",
       "brand": "RapidRAW",
       "continueSession": "Sitzung fortsetzen",
       "contribute": "Auf GitHub beitragen",
@@ -959,6 +966,7 @@
       "openFolder": "Ordner öffnen",
       "openLibrary": "Bibliothek öffnen",
       "or": "oder",
+      "photographerName": "Timon Käch",
       "version": "Version {{version}}",
       "welcomeBack": "Willkommen zurück!",
       "welcomeBackDesc": "Sitzung fortsetzen oder neu starten."
@@ -1031,6 +1039,9 @@
       "saving": "Wird gespeichert...",
       "shuffleTooltip": "Bilder mischen",
       "spacing": "Abstand"
+    },
+    "common": {
+      "sourcePreviewAlt": "Quellvorschau"
     },
     "configurePreset": {
       "cancel": "Abbrechen",
@@ -1119,6 +1130,7 @@
       "groupSimilar": "Ähnliche Bilder gruppieren",
       "noIssuesDesc": "Alle Bilder scheinen einzigartig und scharf zu sein.",
       "noIssuesFound": "Keine Probleme gefunden!",
+      "representative": "Reprasentatives Bild",
       "score": "Punktzahl: {{score}}",
       "sharpness": "Schärfe: {{sharpness}}",
       "similarGroupsTab": "Ähnliche Gruppen",
@@ -1126,6 +1138,7 @@
       "similarityThresholdDesc": "Niedriger ist strenger (exakte Duplikate). Höher ist lockerer. 24-32 wird empfohlen.",
       "startCulling": "Aussortieren starten",
       "starting": "Wird gestartet...",
+      "tabs": "Tabs",
       "title": "Bilder aussortieren"
     },
     "denoise": {
@@ -1152,6 +1165,7 @@
       "qualityTileSizeLabel": "Qualität / Kachelgröße",
       "reset": "Zurücksetzen",
       "saveSuccess": "Bild erfolgreich gespeichert!",
+      "selectedPreviewAlt": "Ausgewahlte Vorschau",
       "speedNotice": "Dies kann einige Minuten dauern, je nach Bildgröße und Methode.",
       "strengthLabel": "Stärke",
       "titleBatch": "Bilder entrauschen",
@@ -1166,6 +1180,7 @@
       "descriptionWithCount_other": "Kombinieren Sie {{count}} Belichtungen zu einem einzigen High Dynamic Range Bild.",
       "failed": "HDR-Zusammenfügung fehlgeschlagen",
       "initializing": "Wird initialisiert...",
+      "mergedAlt": "Zusammengefuhrtes HDR",
       "merging": "HDR wird zusammengefügt",
       "openInEditor": "Im Editor öffnen",
       "retry": "Wiederholen",
@@ -1211,6 +1226,7 @@
       "modeManual": "Manuell",
       "notFound": "Nicht gefunden",
       "original": "Original",
+      "previewAlt": "Objektivkorrektur-Vorschau",
       "resetTooltip": "Objektivkorrektur zurücksetzen",
       "resetZoomTooltip": "Zoom zurücksetzen",
       "selectLensModel": "Objektivmodell auswählen",
@@ -1237,6 +1253,7 @@
       "greenWeight": "Grün (Magenta)",
       "noticeText": "Inversionslogik inspiriert von <0>NegPy</0> erstellt von marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Original Negativ",
+      "previewAlt": "Vorschau",
       "printGrade": "Print Grade",
       "redWeight": "Rot (Cyan)",
       "resetTooltip": "Zurücksetzen",
@@ -1260,6 +1277,7 @@
       "savedSuccess": "Panorama erfolgreich gespeichert!",
       "speedNotice": "Dies kann je nach Anzahl und Größe der Bilder einige Minuten dauern.",
       "start": "Start",
+      "stitchedAlt": "Zusammengesetztes Panorama",
       "stitchingProgress": "Panorama wird zusammengefügt",
       "title": "Panorama zusammenfügen"
     },
@@ -1297,6 +1315,7 @@
       "offset": "Versatz",
       "original": "Original",
       "perspective": "Perspektive",
+      "previewAlt": "Transformationsvorschau",
       "resetTooltip": "Transformation zurücksetzen",
       "resetZoomTooltip": "Zoom zurücksetzen",
       "rotate": "Drehen",
@@ -1665,6 +1684,17 @@
         "you": "Dafür, dass Sie RapidRAW nutzen. Ihr Interesse hält dieses Projekt am Leben.",
         "youLabel": "Ihnen"
       },
+      "names": {
+        "darktable": "darktable & co.",
+        "depth": "Depth Anything V2",
+        "lama": "LaMa",
+        "lensfun": "lensfun",
+        "negpy": "NegPy",
+        "nind": "nind-denoise",
+        "rawler": "rawler",
+        "sam2": "SAM 2",
+        "u2net": "U-2-Net"
+      },
       "title": "Besonderer Dank"
     },
     "themes": {
@@ -1753,6 +1783,13 @@
         "showClipping": "Clipping-Warnungen anzeigen",
         "vectorscope": "Vektorskop"
       }
+    }
+  },
+  "window": {
+    "titleBar": {
+      "close": "Fenster schliessen",
+      "maximize": "Fenster maximieren",
+      "minimize": "Fenster minimieren"
     }
   }
 }

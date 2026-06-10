@@ -387,6 +387,11 @@
         "useBasicInpaint": "Use basic inpainting"
       }
     },
+    "canvas": {
+      "cropPreviewAlt": "Crop preview",
+      "maskOverlayAlt": "Mask Overlay",
+      "originalAlt": "Original"
+    },
     "crop": {
       "aspectRatioHeading": "Aspect Ratio",
       "custom": {
@@ -613,7 +618,8 @@
         "dimensionsNoMp": "{{width}} × {{height}} px",
         "emptyDimensions": "- × - px",
         "title": "File Information",
-        "virtualCopy": "Virtual Copy"
+        "virtualCopy": "Virtual Copy",
+        "virtualCopyAbbreviation": "VC"
       },
       "gps": {
         "altitude": "Altitude",
@@ -945,6 +951,7 @@
     },
     "splash": {
       "addFolder": "Add Folder",
+      "backgroundAlt": "Splash screen background",
       "brand": "RapidRAW",
       "continueSession": "Continue Session",
       "contribute": "Contribute on GitHub",
@@ -959,6 +966,7 @@
       "openFolder": "Open Folder",
       "openLibrary": "Open Library",
       "or": "or",
+      "photographerName": "Timon Käch",
       "version": "Version {{version}}",
       "welcomeBack": "Welcome back!",
       "welcomeBackDesc": "Continue where you left off or start a new session."
@@ -1031,6 +1039,9 @@
       "saving": "Saving...",
       "shuffleTooltip": "Shuffle Images",
       "spacing": "Spacing"
+    },
+    "common": {
+      "sourcePreviewAlt": "Source preview"
     },
     "configurePreset": {
       "cancel": "Cancel",
@@ -1119,6 +1130,7 @@
       "groupSimilar": "Group Similar Images",
       "noIssuesDesc": "All images seem to be unique and sharp.",
       "noIssuesFound": "No issues found!",
+      "representative": "Representative",
       "score": "Score: {{score}}",
       "sharpness": "Sharpness: {{sharpness}}",
       "similarGroupsTab": "Similar Groups",
@@ -1126,6 +1138,7 @@
       "similarityThresholdDesc": "Lower is stricter (exact duplicates). Higher is looser (near duplicates). A value of 24-32 is recommended.",
       "startCulling": "Start Culling",
       "starting": "Starting...",
+      "tabs": "Tabs",
       "title": "Cull Images"
     },
     "denoise": {
@@ -1152,6 +1165,7 @@
       "qualityTileSizeLabel": "Quality / Tile Size",
       "reset": "Reset",
       "saveSuccess": "Image Saved Successfully!",
+      "selectedPreviewAlt": "Selected preview",
       "speedNotice": "This may take a few minutes depending on image size and selected method.",
       "strengthLabel": "Strength",
       "titleBatch": "Denoise Images",
@@ -1166,6 +1180,7 @@
       "descriptionWithCount_other": "Combine {{count}} bracketed exposures into a single High Dynamic Range image.",
       "failed": "HDR Merge Failed",
       "initializing": "Initializing...",
+      "mergedAlt": "Merged HDR",
       "merging": "Merging HDR",
       "openInEditor": "Open in Editor",
       "retry": "Retry",
@@ -1211,6 +1226,7 @@
       "modeManual": "Manual",
       "notFound": "Not Found",
       "original": "Original",
+      "previewAlt": "Lens Correction Preview",
       "resetTooltip": "Reset Lens Correction",
       "resetZoomTooltip": "Reset Zoom",
       "selectLensModel": "Select Lens Model",
@@ -1237,6 +1253,7 @@
       "greenWeight": "Green (Magenta)",
       "noticeText": "Inversion logic inspired by <0>NegPy</0> created by marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Original Negative",
+      "previewAlt": "Preview",
       "printGrade": "Print Grade",
       "redWeight": "Red (Cyan)",
       "resetTooltip": "Reset",
@@ -1260,6 +1277,7 @@
       "savedSuccess": "Panorama Saved Successfully!",
       "speedNotice": "This may take a few minutes depending on the number and size of images.",
       "start": "Start",
+      "stitchedAlt": "Stitched Panorama",
       "stitchingProgress": "Stitching Panorama",
       "title": "Stitch Panorama"
     },
@@ -1297,6 +1315,7 @@
       "offset": "Offset",
       "original": "Original",
       "perspective": "Perspective",
+      "previewAlt": "Transform Preview",
       "resetTooltip": "Reset Transform",
       "resetZoomTooltip": "Reset Zoom",
       "rotate": "Rotate",
@@ -1665,6 +1684,17 @@
         "you": "For using and supporting RapidRAW. Your interest keeps this project alive and evolving.",
         "youLabel": "You"
       },
+      "names": {
+        "darktable": "darktable & co.",
+        "depth": "Depth Anything V2",
+        "lama": "LaMa",
+        "lensfun": "lensfun",
+        "negpy": "NegPy",
+        "nind": "nind-denoise",
+        "rawler": "rawler",
+        "sam2": "SAM 2",
+        "u2net": "U-2-Net"
+      },
       "title": "Special Thanks"
     },
     "themes": {
@@ -1753,6 +1783,13 @@
         "showClipping": "Show Clipping Warnings",
         "vectorscope": "Vectorscope"
       }
+    }
+  },
+  "window": {
+    "titleBar": {
+      "close": "Close window",
+      "maximize": "Maximize window",
+      "minimize": "Minimize window"
     }
   }
 }

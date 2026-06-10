@@ -420,7 +420,7 @@ export default function MetadataPanel() {
                         className="bg-bg-primary/80 backdrop-blur-md text-text-secondary font-bold text-[10px] rounded-md px-2 py-1 tracking-wider uppercase shadow-sm border border-surface/50"
                         data-tooltip={t('editor.metadata.fileInfo.virtualCopy')}
                       >
-                        VC
+                        {t('editor.metadata.fileInfo.virtualCopyAbbreviation')}
                       </div>
                     )}
                     <div className="bg-bg-primary/80 backdrop-blur-md text-text-secondary font-bold text-[10px] rounded-md px-2 py-1 tracking-wider uppercase shadow-sm border border-surface/50">
