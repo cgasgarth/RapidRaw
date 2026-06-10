@@ -1,11 +1,25 @@
+import { type RefObject } from 'react';
 import { useImageProcessing } from '../../hooks/useImageProcessing';
+import { type Adjustments } from '../../utils/adjustments';
 
 interface Props {
-  transformWrapperRef: React.RefObject<any>;
-  prevAdjustmentsRef: React.RefObject<any>;
-  previewJobIdRef: React.RefObject<number>;
-  latestRenderedJobIdRef: React.RefObject<number>;
-  currentResRef: React.RefObject<number>;
+  transformWrapperRef: RefObject<TransformController | null>;
+  prevAdjustmentsRef: RefObject<PreviousAdjustments | null>;
+  previewJobIdRef: RefObject<number>;
+  latestRenderedJobIdRef: RefObject<number>;
+  currentResRef: RefObject<number>;
+}
+
+interface TransformController {
+  resetTransform(time?: number): void;
+  setTransform(x: number, y: number, scale: number, time?: number): void;
+  zoomIn(factor: number, time?: number): void;
+  zoomOut(factor: number, time?: number): void;
+}
+
+interface PreviousAdjustments {
+  adjustments: Adjustments;
+  path: string;
 }
 
 export default function ImageProcessingManager(props: Props) {
