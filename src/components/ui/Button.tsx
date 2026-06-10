@@ -7,6 +7,7 @@ interface ButtonProps {
   disabled?: boolean;
   onClick: any;
   size?: string;
+  tabIndex?: number;
   title?: string;
   variant?: string;
 }
