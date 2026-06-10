@@ -13,6 +13,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "hooks:verify": "test \"$(git config --get core.hooksPath)\" = \".githooks\"",
     "check": "bun run check:quick && bun run build:frontend",
     "check:quick": "bun run check:types && bun run check:i18n",
     "check:types": "tsc --noEmit --pretty false",
