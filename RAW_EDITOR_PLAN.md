@@ -1,0 +1,4008 @@
+# RawEngine Product And Execution Plan
+
+Status: planning draft, consult incorporated, not yet committed  
+Base application: RapidRAW public fork  
+Primary platform: macOS first, with upstream cross-platform structure preserved where practical  
+Target: a high-polish RAW editor that can credibly compete with Capture One and Lightroom while remaining open, scriptable, and agent-controllable
+
+## Active Codex Goal
+
+Current planning goal: create a complete, well-defined RawEngine product and execution plan. The plan must be detailed enough that future Codex sessions can work autonomously through the public RapidRAW-based fork, GitHub milestones/issues, strict shift-left validation gates, and small to medium PRs after the user explicitly moves from planning to implementation.
+
+Success for the current goal is this markdown document only. It must include the product requirements, source verification plan, architecture decisions, governance rules, milestone plan, issue/PR sizing rules, GitHub Actions quality gates, local hook expectations, self-validation loops, tool usage policy, risk register, and implementation order. No fork, clone, branch protection, GitHub issues, GitHub Actions, code edits, package migration, or product implementation should happen during this planning goal.
+
+The future implementation goal will begin only after the user explicitly approves moving beyond the planning document.
+
+If progress on the planning document becomes blocked, the blocker report must include evidence gathered, attempted paths, the exact blocker, and the next input or external-state change needed.
+
+### Goal Operating Rules
+
+- Keep this goal active only while producing and refining this plan.
+- Use the plan as the source of truth for future ordering, constraints, and completion evidence.
+- During this planning goal, do not edit RapidRAW source, clone the fork, create GitHub issues, create branch protection, or implement CI.
+- Do not mark the planning goal complete until the document is internally consistent and includes enough detail to drive future autonomous implementation.
+- Do not mark the goal blocked unless the same blocker has repeated across the required blocked audit and no meaningful progress is possible without user input or external-state change.
+- If the user changes direction, update the plan first, then continue from the revised source of truth.
+- If the work resumes after compaction or interruption, re-read this goal section, the current milestone, and the newest user request before acting.
+
+### Planning Goal Completion Checklist
+
+The current planning goal is finished only when this document includes:
+
+- Current scope clearly limited to planning only.
+- RawEngine parent repo and future `RapidRaw/` nested fork topology.
+- Maintained PRD/technical plan artifact policy.
+- First future PR defined as documentation-only.
+- Product requirements covering RapidRAW, darktable, Ansel, RawTherapee, Capture One, and Lightroom inspirations.
+- Architecture direction for edit graph, color pipeline, layers/masks, GPU/CPU validation, sidecars/catalog, API, and app-server agent.
+- ADR fleet for future architecture decisions.
+- GitHub milestone fleet.
+- GitHub issue seed index.
+- Issue labels and dependency conventions.
+- Issue template with PR size budget, acceptance criteria, and validation requirements.
+- PR template with validation evidence ledger.
+- Branch protection and local main-guard hook requirements.
+- TypeScript, ESLint, Bun, Rust, Tauri, docs, license, and security gate targets.
+- Validation placement map showing shift-left layers.
+- RAW-editor-specific validation gates for color, layers, masks, HDR, panorama, focus stacking, super-resolution, and film simulation.
+- Agent/app-server validation gates.
+- Consult, Chrome, and image generation usage policy.
+- Risk register.
+- Open decisions.
+- Source verification log.
+- Consult output checked and either incorporated or explicitly recorded as outstanding with a reminder.
+
+### Future Implementation Execution Rule
+
+After the user explicitly approves implementation work, future Codex sessions should work only the next unclosed GitHub issue in milestone order unless the user explicitly steers otherwise. Each autonomous implementation cycle should end after one merged PR, one blocked issue report, or one completed milestone summary. Before starting implementation work, identify the active issue, its milestone, dependencies, branch name, expected PR size, and validation commands.
+
+## Current Repo State
+
+- Path: `/Users/cgas/Documents/RawEngine`
+- Current state: empty Git repo with this planning artifact.
+- Immediate deliverable for this planning turn: this markdown document only.
+- Intended base: public fork of `CyberTimon/RapidRAW`.
+- Fork checkout plan: clone the user's public RapidRAW fork under `/Users/cgas/Documents/RawEngine/RapidRaw` as a subfolder. RawEngine remains the parent planning/orchestration workspace.
+- Practical target: macOS first.
+- Long-range target: preserve cross-platform architecture where it does not slow the macOS-first path.
+
+## Maintained Planning Artifact
+
+This document is not throwaway planning text. It should become a maintained repository artifact.
+
+Future repository rule:
+
+- The first future pull request should add this mega PRD/technical plan markdown document to the public RawEngine repository.
+- That first PR should not clone RapidRAW, migrate packages, change CI, create product code, or implement features.
+- The first PR should establish this document as the authoritative plan, plus any minimal repo metadata needed to maintain it.
+- Every later milestone or issue that changes product direction, architecture, validation policy, or execution order must update this document in the same PR or link a follow-up issue.
+- The document should be reviewed like code: diffs should be intentional, scoped, and tied to an issue.
+- The document should have a changelog section once implementation begins, recording major planning decisions and dates.
+
+Future first PR scope:
+
+- Add `RAW_EDITOR_PLAN.md`.
+- Add a short `README.md` pointing to the plan if the repo has no better README yet.
+- Add a `docs/adr/` placeholder only if the project chooses separate ADR files.
+- Add a PR template that requires validation evidence.
+- Add an issue template that mirrors the issue format in this plan.
+- Do not add implementation files unless the user explicitly expands the first PR.
+
+Repository bootstrap note:
+
+- A GitHub repository needs an initial base branch before pull requests can target it.
+- If an initial commit is unavoidable during repo creation, it should be minimal:
+  - empty or near-empty README.
+  - license file if legally required at creation time.
+  - no implementation code.
+- Immediately after the base branch exists, protect `main`.
+- The first substantive PR should still be the documentation-only plan PR.
+- Do not use the bootstrap exception for convenience commits.
+
+Future first PR acceptance criteria:
+
+- The plan exists in the public repo.
+- The plan states that RawEngine is the parent project and `RapidRaw/` is the future nested fork checkout.
+- The plan states that implementation is deferred until the user approves it.
+- The plan includes milestones, issue templates, validation gates, branch protection requirements, hook requirements, and self-validation loops.
+- The PR is small, reviewable, and documentation-only.
+
+Current local source-control note:
+
+- As of this planning pass, `RAW_EDITOR_PLAN.md` is local and untracked.
+- Do not commit it directly to `main` in the current local repo.
+- When the user approves implementation/repo setup, add it through the first future documentation-only PR.
+
+Plan validation before the first future PR:
+
+- Confirm the goal says planning-only.
+- Confirm `RawEngine` parent workspace and `RapidRaw/` nested fork topology.
+- Confirm first future PR is documentation-only.
+- Confirm implementation sequence puts plan PR before RapidRAW clone.
+- Confirm all consult outputs are incorporated or intentionally rejected.
+- Confirm no stale "running consult" markers remain.
+- Confirm headings are internally consistent.
+- Confirm source links are present for major claims.
+- Confirm issue/milestone index covers every major feature family.
+- Confirm validation gates exist for every high-risk feature family.
+- Confirm no accidental implementation files are included.
+
+## Codex Autonomy Contract
+
+Codex may proceed without asking the user when:
+
+- The task preserves public AGPL compliance.
+- The task improves lint, type, test, hook, or CI quality.
+- The task adds tests, docs, issue templates, PR templates, validation scripts, or source verification.
+- The task implements an already-approved requirement in this document.
+- The task uses reversible migrations with clear rollback.
+- The task is scoped to the next ready GitHub issue in milestone order.
+
+Codex must stop or escalate when:
+
+- A change could violate license obligations.
+- A dependency has unclear license compatibility.
+- A destructive data migration is proposed.
+- A cloud service key, paid provider, or external account is required.
+- A product claim would imply Capture One or Adobe equivalence without objective validation.
+- A browser/plugin workflow fails and the only fallback would require OS-level automation. In that case, repair the intended plugin path or ask for explicit permission before using OS automation.
+- The next issue is not ready and cannot be made ready by reading local code, public docs, or existing GitHub state.
+
+## 1. Product Intent
+
+RawEngine should become a professional, non-destructive RAW editor built from a RapidRAW fork, with image quality, workflow speed, and polish high enough to be taken seriously by working photographers.
+
+The goal is not to copy proprietary products. The goal is to build an independent editor with comparable capabilities:
+
+- Capture One-level color control and layer workflow.
+- Lightroom-level library, masking, merge, enhance, and batch workflow.
+- darktable/Ansel-level scene-referred color science and advanced technical control.
+- RawTherapee-level detail, wavelet, film simulation, and local adjustment depth.
+- RapidRAW-level modern base, GPU acceleration, Rust/TypeScript stack, and practical UX momentum.
+- A first-class API and OpenAI app-server based expert editing agent so every meaningful edit operation can be invoked by software, not only by UI gestures.
+
+RawEngine should be public from the start. The process should be designed so future implementation work can proceed autonomously through small or medium pull requests, each tied to a GitHub issue and milestone, with strict validation shifted as far left as possible.
+
+## 2. Hard Requirements
+
+### 2.0 Non-Goals For Early Passes
+
+These are not product non-goals forever. They are constraints to keep early execution disciplined.
+
+- No implementation during the current planning goal.
+- No RapidRAW clone until the user approves implementation/repo setup.
+- No product feature work before the maintained plan artifact exists in the repo.
+- No product feature work before the no-change RapidRAW baseline snapshot.
+- No product feature work before strict local/CI gates exist.
+- No Capture One or Adobe clone claims.
+- No proprietary color-profile reverse engineering.
+- No copied UI, icons, LUTs, ICCs, film looks, or assets from competitors.
+- No agent UI automation as a substitute for typed edit tools.
+- No destructive metadata writes until metadata policy and tests exist.
+- No bundled internet sample images without license/source/hash metadata.
+- No cloud or paid service dependency without explicit user approval.
+- No weakening quality gates to make unrelated work pass.
+
+### 2.1 Repository And Governance
+
+- Create a public GitHub repository for RawEngine.
+- Fork RapidRAW publicly and clone the fork under `/Users/cgas/Documents/RawEngine/RapidRaw` as a subfolder when implementation begins.
+- Repository topology: RawEngine is the parent planning/orchestration repository. The nested `RapidRaw/` checkout is the public GitHub fork of `CyberTimon/RapidRAW`. Inside `RapidRaw/`, keep `origin` pointed at the user's RapidRAW fork and `upstream` pointed at `CyberTimon/RapidRAW`. Record the upstream RapidRAW commit SHA used for each baseline audit. Sync upstream only through pull requests, never by direct pushes to `main`.
+- Treat RapidRAW's AGPL-3.0 license as a hard project constraint:
+  - Keep RawEngine open source.
+  - Preserve required license notices.
+  - Preserve upstream copyright notices, `LICENSE`, `COPYING`, `NOTICE` files, and attribution where present.
+  - Publish source for network-accessible app-server behavior when AGPL obligations apply.
+  - Run dependency license checks in CI.
+  - Treat hosted agent/cloud behavior as a license review item before deployment.
+  - Do not import proprietary Capture One, Lightroom, or film-stock assets, algorithms, ICCs, LUTs, UI art, or branding.
+- Protect `main`:
+  - No direct pushes.
+  - Require pull requests.
+  - Require required status checks.
+  - Require branches to be up to date before merge.
+  - Require at least one approval once collaborators exist.
+  - Require signed commits if practical.
+  - Require conversation resolution before merge.
+  - Disallow force pushes and deletions.
+- Configure public repo safety settings:
+  - Enable secret scanning.
+  - Enable push protection for secrets where available.
+  - Enable Dependabot alerts.
+  - Enable Dependabot security updates if compatible with the workflow.
+  - Enable CodeQL or equivalent static analysis.
+  - Enable branch deletion after merge if desired.
+  - Disable or restrict GitHub Actions write permissions by default.
+  - Use least-privilege workflow permissions.
+  - Pin third-party GitHub Actions by SHA for sensitive/release workflows where practical.
+  - Require manual approval for first-time contributors if the repo is public.
+- Add local commit protection:
+  - A pre-commit hook must block commits while on `main`.
+  - A pre-push hook must block pushes to `main`.
+  - Hooks should also run fast local validation where practical.
+  - Hook installation must be documented and preferably automated through a repo script.
+- Use GitHub issues and milestones as the execution system:
+  - Every planned body of work maps to a milestone.
+  - Every implementation task maps to a GitHub issue.
+  - Issues should normally map to one pull request.
+  - PRs should be small to medium sized where possible.
+  - Large work should be split by vertical capability, validation harness, UI surface, and follow-up polish.
+- Maintain a GitHub project board if useful:
+  - Backlog.
+  - Ready.
+  - In progress.
+  - In review.
+  - Blocked.
+  - Done.
+- Suggested project fields:
+  - Milestone.
+  - Area.
+  - Priority.
+  - Risk.
+  - PR size.
+  - Validation category.
+  - Blocked by.
+  - Target PR.
+  - Evidence required.
+  - Consult required.
+  - Chrome/sample-image required.
+  - Image generation required.
+  - Plan update required.
+- Pull requests must include:
+  - What changed.
+  - Why it matters.
+  - Validation run locally.
+  - Screenshots or image outputs for UI and image-processing changes.
+  - Linked issue.
+  - Known limitations or follow-ups.
+
+### 2.1.1 Branch Protection Checklist
+
+Future branch protection should require:
+
+- Pull request before merge.
+- Required status checks.
+- Stable required check names matching Section 10.
+- Branch up to date before merge.
+- Conversation resolution.
+- Linear history if the project chooses squash/rebase-only.
+- No force pushes.
+- No branch deletion.
+- No bypass for administrators unless emergency policy is documented.
+- At least one review after collaborators exist.
+- Dismiss stale approvals after new commits once collaborators exist.
+- Restrict who can push to matching branches.
+
+Required check rollout:
+
+- Start with docs/plan checks for the first PR if no code exists yet.
+- Add baseline checks after RapidRAW is cloned.
+- Add strict checks after Milestone 1.
+- Do not mark a check required until it exists and is stable.
+- Once a check is required, do not weaken it without a tracked issue and explicit rationale.
+
+### 2.1.2 Issue And PR Sizing Rules
+
+Issue scope should be designed so Codex can complete it safely in one branch and one PR.
+
+Good issue shapes:
+
+- Add or tighten one validation gate.
+- Convert one script family from npm to Bun.
+- Add one schema and its tests.
+- Add one UI panel with mocked or existing backend support.
+- Add one API command family.
+- Add one image-processing fixture set.
+- Add one rendering regression test path.
+- Refactor one bounded module behind an unchanged interface.
+
+Avoid issue shapes:
+
+- "Implement layers."
+- "Make color like Capture One."
+- "Add all CI."
+- "Build the agent."
+- "Rewrite the pipeline."
+
+Split broad features into:
+
+- Design issue.
+- Schema issue.
+- Backend/core issue.
+- UI issue.
+- API issue.
+- Test fixture issue.
+- Regression harness issue.
+- Documentation issue.
+- Follow-up polish issue.
+
+Each issue should include a "PR budget":
+
+- Small: one to three files or one narrow behavior.
+- Medium: one bounded subsystem, tests included.
+- Large: requires explicit split plan before work starts.
+
+PR size target: one issue, one behavior change, and one validation story. Prefer under about 500 changed lines excluding lockfiles, generated schemas, and approved snapshots. Split any PR that changes both tooling and product behavior, changes more than one major subsystem, requires more than one design decision, or cannot be validated with one coherent command/artifact set.
+
+### 2.1.3 Definition Of Ready
+
+An issue is ready for implementation when it has:
+
+- Milestone.
+- Priority label.
+- Area label.
+- Type label.
+- Clear goal.
+- Explicit out-of-scope section.
+- Expected validation commands.
+- Expected screenshots/image artifacts if visual or image-processing work.
+- Known dependencies.
+- Acceptance criteria.
+
+### 2.1.4 Definition Of Done
+
+An issue is done when:
+
+- The linked PR is merged.
+- Required CI is green.
+- Local validation is recorded in the PR.
+- Tests or documented justification are included.
+- UI or image-processing artifacts are attached when relevant.
+- Documentation is updated when behavior or workflow changes.
+- Follow-up issues exist for intentional gaps.
+- No direct commit landed on `main`.
+
+### 2.2 Engineering Standards
+
+- No implementation occurs during the current planning goal.
+- When implementation begins, the first step is a no-change RapidRAW baseline snapshot.
+- The first code-changing implementation step after the baseline snapshot is linting, type strictness, local hooks, and CI hardening.
+- TypeScript should use the strictest practical compiler settings.
+- ESLint should use strict type-aware rules, React rules, hooks rules, import rules, accessibility rules, and zero-warning CI.
+- Bun should be used for TypeScript/React package management, scripts, test execution, and CI where compatible.
+- Rust should retain first-class validation:
+  - `cargo fmt --check`
+  - `cargo clippy --all-targets --all-features -- -D warnings`
+  - `cargo test`
+  - dependency/security checks
+- All GitHub Actions jobs should run in parallel where dependency ordering is not required.
+- CI must fail on warnings for project-owned code.
+- CI should include full build coverage, not only linting.
+- Validation should be local-first:
+  - Hooks catch obvious mistakes before commit.
+  - Local scripts mirror CI commands.
+  - CI is the authoritative gate.
+  - Nightly jobs cover expensive image-quality and performance checks.
+
+### 2.3 Product Scope
+
+RawEngine must support, or have planned implementation for:
+
+- Non-destructive RAW editing.
+- High-quality demosaic and camera-profile pipeline.
+- Scene-referred editing pipeline.
+- Display-referred output transforms.
+- Full layer support.
+- Full mask support.
+- Capture One-style color editing.
+- Lightroom-style library and batch workflow.
+- Darktable/Ansel-style technical color controls.
+- RawTherapee-style detail, wavelet, local adjustments, and film simulation depth.
+- Advanced film simulations with high-quality color transforms.
+- Full negative processing lab with its own dedicated UI and presets for major film stocks.
+- Panorama stitching.
+- HDR image stacking and merge.
+- Focus stacking.
+- Super-resolution via single-image enhancement and multi-image stitching/stacking.
+- GPU acceleration for interactive editing.
+- Sidecar-based non-destructive edits.
+- Public editing API.
+- OpenAI app-server based chat editing agent.
+- Migration plan for RapidRAW's existing built-in AI tools to RawEngine typed APIs and Codex app-server tools where practical.
+- Tool-callable editing operations.
+- Test image corpus and image-quality validation.
+- macOS polish as the first platform priority.
+
+## 3. Source Baseline
+
+This plan is based on public documentation and source references from:
+
+- RapidRAW GitHub: <https://github.com/CyberTimon/RapidRAW>
+- RapidRAW website: <https://www.getrapidraw.com/>
+- RapidRAW license: <https://github.com/CyberTimon/RapidRAW/blob/main/LICENSE>
+- darktable manual: <https://docs.darktable.org/usermanual/development/en/>
+- Ansel: <https://ansel.photos/en/>
+- RawTherapee RawPedia: <https://rawpedia.rawtherapee.com/Main_Page>
+- Capture One support docs: <https://support.captureone.com/hc/en-us>
+- Lightroom Classic help: <https://helpx.adobe.com/lightroom-classic/help.html>
+- OpenAI Codex goals cookbook: <https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex>
+- OpenAI Codex app server docs: <https://developers.openai.com/codex/app-server>
+- OpenAI function calling docs: <https://developers.openai.com/api/docs/guides/function-calling>
+- Bun docs: <https://bun.com/docs>
+- TypeScript TSConfig reference: <https://www.typescriptlang.org/tsconfig/>
+- typescript-eslint docs: <https://typescript-eslint.io/>
+- GitHub Actions docs: <https://docs.github.com/actions>
+
+## 4. Source Verification Log
+
+Feature claims from competitors are planning inputs, not marketing claims. Before implementation depends on a claim, Codex should verify it from primary/current sources or the cloned source code.
+
+| Area | Source To Verify | Why It Matters | Current Status |
+| --- | --- | --- | --- |
+| RapidRAW license | `LICENSE`, README, repo metadata | AGPL/public-fork obligations | Public source checked, code audit pending |
+| RapidRAW build stack | `package.json`, lockfiles, Tauri config, `src-tauri/Cargo.toml` | Bun migration, Rust toolchain, CI shape | Public source checked, fork audit pending |
+| RapidRAW edit graph | Sidecar format, adjustment structs, renderer order | Non-destructive architecture | Pending clone/code audit |
+| RapidRAW GPU path | WGSL shader pipeline, wgpu setup | macOS performance and color precision | Pending clone/code audit |
+| RapidRAW masks/layers | UI state, mask data structures, renderer integration | Layer and mask roadmap | Pending clone/code audit |
+| RapidRAW HDR/panorama | Implementation, tests, memory behavior | Avoid duplicate work and regressions | Public changelog checked, code audit pending |
+| RapidRAW CI | `.github/workflows` | Quality-gate baseline | Public source checked, fork audit pending |
+| darktable | Official manual | Scene-referred workflow, masks, color modules | Public docs checked |
+| Ansel | Official site/docs | scene-referred and perceptual color references | Public docs checked |
+| RawTherapee | RawPedia | film simulation, local adjustments, wavelets | Public docs checked |
+| Capture One | Official support docs | layers, masks, color editor, HDR, panorama | Public docs checked |
+| Lightroom | Adobe help docs | masking, enhance, panorama/HDR workflows | Public docs checked |
+| OpenAI app-server | OpenAI developer docs | agent integration and tool calls | Public docs checked |
+| Bun | Bun docs | CI/package manager migration | Public docs checked |
+| TypeScript/ESLint | Official TS and typescript-eslint docs | strictness/lint target | Public docs checked |
+
+## 5. Competitive Feature Map
+
+### 5.1 RapidRAW Baseline To Preserve And Extend
+
+RapidRAW is the intended base because it already aligns with the desired stack and direction:
+
+- Rust, TypeScript, React, Tauri, WGSL-oriented GPU work.
+- Non-destructive `.rrdata` sidecar model.
+- GPU-accelerated 32-bit editing pipeline.
+- RAW support through `rawler`.
+- Lens correction through Lensfun.
+- Library and folder navigation.
+- Filmstrip workflow.
+- Virtual copies.
+- Ratings, labels, tags, metadata, and recursive folder workflow.
+- Batch operations.
+- Tonal controls:
+  - Exposure.
+  - AgX.
+  - Contrast.
+  - Highlights.
+  - Shadows.
+  - Whites.
+  - Blacks.
+  - Curves.
+- Color controls:
+  - Temperature.
+  - Tint.
+  - Vibrance.
+  - Saturation.
+  - Color wheels.
+  - HSL.
+- Detail and effects:
+  - Sharpening.
+  - Clarity.
+  - Structure.
+  - Noise reduction.
+  - LUT support.
+  - Dehaze.
+  - Vignette.
+  - Glow.
+  - Halation.
+  - Flares.
+  - Grain.
+- Geometry:
+  - Perspective.
+  - Rotation.
+  - Straightening.
+  - Crop.
+  - Warping.
+- Masking:
+  - Layer-based masking.
+  - AI subject masks.
+  - Depth masks.
+  - Sky and foreground masks.
+  - Color and luminance masks in recent releases.
+- AI and generative editing hooks.
+- Presets.
+- Copy/paste adjustments.
+- History.
+- Panorama stitcher.
+- HDR merge.
+- Film negative workflow.
+- Export controls.
+
+RawEngine should keep these strengths, then harden the engineering foundation and broaden the professional feature set.
+
+### 5.2 darktable Features To Learn From
+
+darktable is important for technical depth and scene-referred design:
+
+- Scene-referred workflow using linear-light processing before display transform.
+- Filmic-style dynamic range mapping.
+- Exposure as a central scene-referred control.
+- Robust chromatic adaptation and color calibration.
+- Parametric masks and drawn masks.
+- Module stack with non-destructive ordering.
+- Color balance RGB style grading:
+  - Lift.
+  - Gamma.
+  - Gain.
+  - Offset.
+  - Power.
+  - Slope.
+  - Hue-preserving chroma/saturation control.
+- Tone equalizer for dodge and burn with local contrast preservation.
+- Diffuse/sharpen style physically inspired detail processing.
+- Denoise profiled.
+- Highlight reconstruction.
+- Scopes:
+  - Histogram.
+  - Waveform.
+  - Parade.
+  - Vectorscope.
+- Color assessment mode.
+- Lens correction.
+- Keyboard and controller-driven workflow.
+
+RawEngine should adopt the useful concepts while keeping a more polished and less intimidating UI.
+
+### 5.3 Ansel Features To Learn From
+
+Ansel is important for a focused, modernized darktable-derived philosophy:
+
+- Precision-oriented color science.
+- Scene-referred workflow as the backbone for compositing and HDR.
+- CIE CAT 2016 chromatic adaptation.
+- JzAzBz and perceptual color spaces.
+- darktable UCS-style color work.
+- Color calibration and color matching.
+- Hue qualifying and keying.
+- Zone-system editing.
+- HDR tone mapping.
+- Lens deblur.
+- Dehaze.
+- Denoise.
+- Highlight reconstruction.
+- Automatic perspective correction.
+- Leaner UI focused on edit quality instead of exposing every internal module at once.
+
+RawEngine should use this as a signal: expose professional depth, but organize it into a cleaner product experience.
+
+### 5.4 RawTherapee Features To Learn From
+
+RawTherapee is important for RAW development depth:
+
+- Multiple demosaic and RAW preprocessing options.
+- Dark-frame and flat-field correction.
+- Capture sharpening.
+- Wavelet levels for detail by scale.
+- Retinex.
+- Local adjustments with RT-spots and U-Point-like behavior.
+- Local Lab, CAM, wavelet, color, tone, denoise, and retinex controls.
+- Film simulation through HaldCLUTs.
+- Film negative conversion.
+- Defringe.
+- Haze removal.
+- Color management depth.
+- HSV and RGB curves.
+- Color toning.
+- Channel mixer.
+- Black-and-white conversion.
+- Metadata handling.
+
+RawEngine should not expose every expert option at once, but should have an "Advanced" surface where these controls can exist without harming the main workflow.
+
+### 5.5 Capture One Features To Match Conceptually
+
+Capture One is the quality and professional workflow reference:
+
+- Layer-centric local editing.
+- Multiple mask types:
+  - Brush.
+  - Eraser.
+  - Linear gradient.
+  - Radial gradient.
+  - Heal.
+  - Clone.
+  - AI subject.
+  - AI background.
+  - AI people.
+  - AI select.
+  - AI eraser.
+  - Luma range.
+  - Color range.
+- Mask combinations:
+  - Add.
+  - Subtract.
+  - Intersect.
+  - Invert.
+  - Feather.
+  - Refine.
+  - Rasterize/freeze when needed.
+- Professional color editor:
+  - Basic color ranges.
+  - Advanced selective color ranges.
+  - Skin tone uniformity.
+  - Hue, saturation, lightness, and smoothness-style controls.
+  - Color masks from selections.
+  - ICC/profile creation or export path where legally and technically feasible.
+- Base characteristics:
+  - Camera profile.
+  - Tone curve.
+  - Film-like response controls.
+  - Product-specific default looks.
+- Tethered capture.
+- Sessions and catalogs.
+- Smart albums.
+- Capture naming and ingest templates.
+- High-quality tether workflow.
+- HDR merge to linear DNG-like editable output.
+- Panorama stitching to editable output.
+- High-resolution panorama output.
+- Pro-grade export recipes.
+- Fast keyboard workflow and high-density UI polish.
+
+RawEngine should aim for comparable workflow outcomes without copying proprietary implementation or UI.
+
+### 5.6 Lightroom Features To Match Conceptually
+
+Lightroom is the workflow, ecosystem, and AI-enhancement reference:
+
+- Library/catalog workflow.
+- Albums/collections.
+- Presets and adaptive presets.
+- Batch editing.
+- Syncable edit model in the long term.
+- Masking:
+  - Subject.
+  - Sky.
+  - Background.
+  - Objects.
+  - People.
+  - People parts.
+  - Brush.
+  - Linear gradient.
+  - Radial gradient.
+  - Color range.
+  - Luminance range.
+  - Depth range.
+- Add/subtract/intersect mask composition.
+- Denoise.
+- Raw details.
+- Super resolution.
+- Panorama merge.
+- HDR merge.
+- HDR panorama merge.
+- Boundary warp/fill edges/auto crop-style controls.
+- Non-destructive merge output.
+
+RawEngine should learn from Lightroom's speed and simplicity while keeping stronger local control and API openness.
+
+## 6. Product Principles
+
+- Original RAWs are immutable.
+- Every edit is non-destructive and serializable.
+- Every UI operation has an equivalent API command.
+- Every API command is schema-validated.
+- Every edit can be undone, redone, copied, pasted, versioned, and replayed.
+- The editing pipeline should be deterministic for the same inputs, versions, and settings.
+- Scene-referred editing should be the default internal model.
+- Display/output transforms should be explicit and testable.
+- GPU acceleration should make interaction fast, but CPU/headless paths should exist for validation and batch rendering.
+- Professional features should be discoverable without making the default UI feel like a lab instrument.
+- macOS should feel native and polished even if the foundation remains cross-platform.
+- Automation and the agent are first-class product surfaces, not afterthoughts.
+
+## 6.1 Requirement Matrix Seed
+
+Every major capability should eventually become one or more GitHub issues. This matrix provides stable requirement IDs for tracking.
+
+| ID | Domain | Requirement | Source Inspiration | Priority | API Required | Acceptance Criteria | Validation |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| REQ-BASE-001 | Base | Non-destructive RAW editing | RapidRAW, Lightroom, Capture One | P0 | Yes | Original files never modified; edits replay from sidecar/graph | original hash, sidecar roundtrip |
+| REQ-BASE-002 | Base | GPU-accelerated interactive pipeline | RapidRAW, darktable | P0 | Indirect | previews update interactively on macOS | render latency, GPU/CPU parity |
+| REQ-BASE-003 | Base | RAW decode and camera profile foundation | RapidRAW, RawTherapee, Capture One | P0 | Yes | supported RAWs open with correct metadata/profile path | fixture open tests, color chart |
+| REQ-COLOR-001 | Color | Scene-referred color pipeline | darktable, Ansel | P0 | Yes | edits occur in defined scene-referred space with explicit display transform | ColorChecker, clipping, gamut tests |
+| REQ-COLOR-002 | Color | Capture One-class selective color editor | Capture One | P0 | Yes | smooth range selection and HSL-style adjustment with masks | color fixtures, render artifacts |
+| REQ-COLOR-003 | Color | Skin tone uniformity | Capture One | P1 | Yes | hue/saturation/lightness uniformity controls work locally and globally | skin tone fixtures |
+| REQ-COLOR-004 | Color | Advanced color grading controls | darktable, Ansel, Capture One | P1 | Yes | color balance/wheels/channel controls serialize and replay | schema and render tests |
+| REQ-LAYER-001 | Layers | Full adjustment layer support | Capture One, RapidRAW | P0 | Yes | add/reorder/rename/duplicate/delete/toggle/opacity | graph, undo, render tests |
+| REQ-MASK-001 | Masks | Brush, gradient, range, and AI masks | Lightroom, Capture One, RapidRAW | P0 | Yes | masks combine, serialize, replay, and render correctly | mask artifacts, IoU where possible |
+| REQ-MASK-002 | Masks | Add/subtract/intersect mask composition | Lightroom, Capture One | P0 | Yes | compositing works across mask types | mask composition fixtures |
+| REQ-FILM-001 | Film | High-quality film simulation engine | RawTherapee, film workflows | P1 | Yes | LUT plus grain/halation/curve/look controls | before/after fixtures, legal provenance |
+| REQ-FILM-002 | Film | Film negative conversion | RapidRAW, RawTherapee | P1 | Yes | film base sampling and inversion workflow | negative scan fixtures |
+| REQ-NEG-001 | Negative Lab | Dedicated negative processing lab UI | User requirement, film scan workflows | P1 | Yes | purpose-built workflow for converting, profiling, correcting, and batch processing scanned negatives | negative scan fixtures, UI artifacts |
+| REQ-NEG-002 | Negative Lab | Presets for major film stocks | User requirement, film workflows | P1 | Yes | legally safe presets for major color and black-and-white film stocks, with provenance and trademark-safe naming policy | preset review, before/after fixtures |
+| REQ-HDR-001 | HDR | HDR merge from brackets | Capture One, Lightroom, RapidRAW | P1 | Yes | bracketed files merge into editable artifact | HDR fixtures, deghost/alignment |
+| REQ-PANO-001 | Panorama | Panorama stitching | Capture One, Lightroom, RapidRAW | P1 | Yes | projections and boundary controls produce editable artifact | pano fixtures, memory budget |
+| REQ-FOCUS-001 | Focus | Focus stacking | professional macro workflow | P2 | Yes | focus brackets align and blend to editable artifact | sharpness map, focus fixtures |
+| REQ-SR-001 | Super-resolution | Multi-image super-resolution/stitching | Lightroom, computational photo | P2 | Yes | conservative high-res output avoids hallucinated detail | chart fixtures, crop comparisons |
+| REQ-LIB-001 | Library | Professional culling/library workflow | Lightroom, Capture One, darktable | P1 | Yes | ratings, labels, filters, compare/survey, virtual copies | library tests, UI artifacts |
+| REQ-EXPORT-001 | Export | Export recipes and batch queue | Lightroom, Capture One | P1 | Yes | repeatable recipes with color/size/metadata controls | export tests, metadata checks |
+| REQ-API-001 | API | All editing surfaces callable through typed API | User requirement, OpenAI app-server | P0 | Yes | UI and agent use same command layer | schema drift, command replay |
+| REQ-AGENT-001 | Agent | Expert chat agent through app-server tools | OpenAI app-server | P1 | Yes | agent inspects, edits, previews, and logs through tools | replay, approval, injection tests |
+| REQ-MAC-001 | macOS | Polished macOS-first app | User requirement | P0 | N/A | app feels native enough for daily use | macOS build, UI QA, performance |
+
+Requirement rules:
+
+- `API Required` defaults to `Yes` for all editing, metadata, library, render, export, and agent-visible operations.
+- Any `API Required: No` entry needs written justification.
+- A requirement is not complete until it has at least one linked issue, validation method, and acceptance criteria.
+- Marketing claims must not use competitor names as quality claims until objective validation exists.
+
+## 7. Target Product Surfaces
+
+### 7.1 Library
+
+Required capabilities:
+
+- Folder browser.
+- Recursive folder import.
+- Session-style project mode.
+- Catalog-style database mode, later phase.
+- Filmstrip.
+- Grid.
+- Compare view.
+- Survey view.
+- Loupe view.
+- Before/after view.
+- Reference image view.
+- Metadata panel.
+- EXIF/IPTC/XMP view and edit where safe.
+- Ratings.
+- Color labels.
+- Pick/reject flags.
+- Tags.
+- Smart filters.
+- Search.
+- Saved searches.
+- Virtual copies.
+- Stacks.
+- Version history.
+- Batch rename.
+- Batch move/copy.
+- Missing file relink.
+- Duplicate detection.
+- External editor round-trip, later phase.
+
+### 7.2 Develop
+
+Core editing groups:
+
+- Base:
+  - Camera profile.
+  - Tone curve.
+  - White balance.
+  - Exposure.
+  - Contrast.
+  - Highlight recovery.
+  - Shadow recovery.
+  - Whites.
+  - Blacks.
+  - Black point.
+  - Midtone placement.
+  - Dynamic range compression.
+- Color:
+  - White balance picker.
+  - Tint.
+  - Vibrance.
+  - Saturation.
+  - HSL.
+  - HSV.
+  - Color wheels.
+  - Split toning.
+  - Channel mixer.
+  - Color balance RGB-style grading.
+  - Selective color ranges.
+  - Skin tone uniformity.
+  - Color calibration.
+  - Camera matching profiles.
+  - Custom profile authoring/export path.
+- Tone and curves:
+  - RGB curve.
+  - Luma curve.
+  - Per-channel curves.
+  - Parametric curve.
+  - Filmic/scene-to-display transform.
+  - Zone/tone equalizer.
+- Detail:
+  - Capture sharpening.
+  - Creative sharpening.
+  - Deconvolution/lens deblur.
+  - Texture.
+  - Clarity.
+  - Structure.
+  - Local contrast.
+  - Noise reduction.
+  - AI denoise, later phase.
+  - Defringe.
+  - Chromatic aberration correction.
+- Geometry:
+  - Crop.
+  - Rotate.
+  - Straighten.
+  - Perspective correction.
+  - Automatic perspective correction.
+  - Lens profile correction.
+  - Manual distortion.
+  - Vignetting correction.
+- Effects:
+  - Film grain.
+  - Halation.
+  - Bloom/glow.
+  - Vignette.
+  - Dehaze.
+  - LUT.
+  - Film simulation.
+- Retouch:
+  - Heal.
+  - Clone.
+  - Content-aware remove, later phase.
+  - Dust spot visualization.
+
+### 7.3 Layers And Masks
+
+Layer model requirements:
+
+- Multiple edit layers.
+- Adjustment layers.
+- Pixel/retouch layers where necessary.
+- Merge output layers for HDR/panorama/focus/super-resolution.
+- Layer opacity.
+- Layer visibility.
+- Layer enable/disable.
+- Layer naming.
+- Layer reorder.
+- Layer duplication.
+- Layer copy/paste.
+- Layer presets.
+- Layer blend modes where technically meaningful:
+  - Normal.
+  - Multiply.
+  - Screen.
+  - Overlay.
+  - Soft light.
+  - Color.
+  - Luminosity.
+  - Hue.
+  - Saturation.
+- Per-layer masks.
+- Per-layer adjustment stack.
+- Layer-scoped history.
+
+Mask model requirements:
+
+- Brush mask.
+- Eraser.
+- Linear gradient.
+- Radial gradient.
+- Luminance range.
+- Color range.
+- Depth range when source data or model output exists.
+- Subject mask.
+- Sky mask.
+- Background mask.
+- Foreground mask.
+- People mask.
+- Face/skin/eyes/lips/hair/clothes parts, later phase.
+- Object select.
+- AI eraser/refine.
+- Mask add/subtract/intersect.
+- Invert.
+- Feather.
+- Density.
+- Flow.
+- Opacity.
+- Edge refine.
+- Mask blur.
+- Mask contrast.
+- Mask visualization overlays.
+- Rasterize/freeze dynamic masks.
+- Recompute dynamic masks after crop/transform.
+- Copy masks between images.
+- Paste masks with remapping when geometry differs.
+
+### 7.4 Computational Photography
+
+#### Panorama Stitching
+
+Requirements:
+
+- Stitch multiple RAW or rendered linear inputs.
+- Output an editable non-destructive merge artifact.
+- Auto align.
+- Manual control point correction, later phase.
+- Projection modes:
+  - Spherical.
+  - Cylindrical.
+  - Perspective.
+  - Panini.
+- Boundary handling:
+  - Auto crop.
+  - Fill edges, later phase.
+  - Warp/boundary adjustment.
+- Multi-row panorama support.
+- Gigapixel-aware tiling strategy.
+- Exposure and white-balance normalization.
+- Lens correction before stitch where appropriate.
+- Ghost handling, later phase.
+- Super-resolution from stitched overlap where possible.
+- Validation with known panorama test sets.
+
+#### HDR Merge
+
+Requirements:
+
+- Merge bracketed RAW files.
+- Auto align.
+- Deghost.
+- Exposure bracket detection.
+- Output editable scene-referred high-dynamic-range merge artifact.
+- Preserve metadata.
+- Preserve camera/lens profile data when possible.
+- Produce a merged source that behaves like a RAW-like image in the editor.
+- Validate against bracket test sets with motion, highlights, and low-light scenes.
+
+#### Focus Stacking
+
+Requirements:
+
+- Align focus-bracketed images.
+- Estimate sharpness maps.
+- Blend all-in-focus output.
+- Retain editable source stack metadata.
+- Support retouching stack artifacts.
+- Validate with macro and product photography test sets.
+
+#### Super-Resolution
+
+Requirements:
+
+- Single-image super-resolution, later phase if model-based.
+- Multi-image super-resolution from burst or shifted images.
+- Panorama-style super-resolution through overlap and stitching.
+- Preserve natural texture.
+- Avoid hallucinated detail in professional modes unless explicitly requested.
+- Provide conservative, standard, and aggressive modes.
+- Validate with resolution charts and real photographs.
+
+#### Derived Artifact Model
+
+HDR, panorama, focus stack, and super-resolution outputs should not be treated as ordinary exports. They are derived assets that can become editable sources in the normal pipeline.
+
+Derived artifact requirements:
+
+- Artifact type:
+  - HDR merge.
+  - Panorama.
+  - Focus stack.
+  - Super-resolution.
+  - HDR panorama, later phase.
+- Source asset list with stable IDs.
+- Source file hashes.
+- Source edit graph revisions used as inputs.
+- Operation settings.
+- Algorithm version.
+- Model version if AI/model-based.
+- Alignment/control data where applicable.
+- Intermediate cache references where applicable.
+- Output dimensions and color space.
+- Editable output reference.
+- Missing-input behavior.
+- Invalidation behavior when source edits change.
+- Regenerate command.
+- Export command.
+- Provenance visible in UI and API.
+
+Derived artifact issues:
+
+- `api(artifact): define DerivedAsset and ArtifactNode schema`
+- `api(artifact): define missing-input and invalidation behavior`
+- `api(artifact): add regenerate command contract`
+- `validation(artifact): add provenance roundtrip tests`
+- `ui(artifact): show source provenance for derived outputs`
+
+### 7.5 Film Simulation
+
+Film simulation must be treated as a serious color product, not a simple LUT picker.
+
+Requirements:
+
+- HaldCLUT and LUT import.
+- Built-in open, legally safe simulation looks.
+- Camera/profile-aware transforms.
+- Scene-referred friendly looks where possible.
+- Output-referred creative looks where appropriate.
+- Film grain model:
+  - Size.
+  - Roughness.
+  - Chroma/luma separation.
+  - Highlight/shadow behavior.
+  - ISO-like presets.
+- Halation model:
+  - Threshold.
+  - Radius.
+  - Color.
+  - Intensity.
+  - Channel behavior.
+- Bloom/glow model.
+- Color response controls.
+- Contrast curve controls.
+- Print film style output transforms.
+- Black-and-white film simulations.
+- Negative conversion:
+  - Film base sampling.
+  - Orange mask removal.
+  - Per-channel curve correction.
+  - Inversion workflow.
+- Side-by-side simulation comparison.
+- Film look browser with favorites.
+- Simulation strength and mix controls.
+- Ability to create, save, version, and share looks.
+
+### 7.5.1 Negative Processing Lab
+
+RawEngine should include a full negative processing lab as a distinct editing surface, not just a checkbox inside film simulation.
+
+Consult requirement:
+
+- When this area reaches active design/implementation, use the consult skill heavily before architecture and UI decisions.
+- Consult should cover film scanning workflows, color negative inversion, black-and-white negative workflows, film stock preset strategy, UI flow, color science, legal/trademark risk, and validation fixtures.
+- Do not implement a large negative lab feature without a consult-backed design pass and linked ADR or design issue.
+
+Dedicated UI requirements:
+
+- Negative Lab workspace/tab.
+- Film strip or batch queue optimized for scans.
+- One-image guided conversion mode.
+- Batch conversion mode for a roll.
+- Before/after and positive/negative split views.
+- Film base sampling controls.
+- Manual film base picker.
+- Auto film base detection.
+- Orange mask removal.
+- Per-channel inversion curves.
+- RGB balance after inversion.
+- Density/exposure normalization.
+- Black point and white point controls.
+- Contrast curve controls.
+- Color cast correction.
+- Scanner profile input.
+- Camera scanning profile input.
+- Border/crop detection for scanned frames.
+- Frame-to-frame consistency tools.
+- Roll-level settings.
+- Copy/paste conversion settings across a roll.
+- Preset browser.
+- Preset strength/mix control.
+- Side-by-side preset comparison.
+- Save custom negative profiles.
+- Export converted positives as normal editable RawEngine variants.
+
+Film stock preset requirements:
+
+- Include presets for major film stock families where legally safe.
+- Avoid bundled proprietary LUTs, ICCs, or trademark-infringing assets.
+- Use neutral or descriptive names if exact stock names create legal risk.
+- Track preset provenance and licensing.
+- Support color negative, black-and-white negative, and slide/reversal scan helper workflows.
+- Preset metadata should include:
+  - stock family.
+  - process type.
+  - intended scanner/camera-scan assumptions.
+  - base color assumptions.
+  - contrast curve.
+  - color correction model.
+  - grain/texture defaults where appropriate.
+  - version.
+  - legal/provenance note.
+
+Major stock families to research for legally safe preset coverage:
+
+- Kodak color negative families.
+- Fuji color negative families.
+- CineStill-style color negative workflows, with naming/legal review.
+- Ilford black-and-white families.
+- Kodak black-and-white families.
+- Foma black-and-white families.
+- Rollei/Agfa-style black-and-white families, with naming/legal review.
+- Slide/reversal helper profiles as a separate mode, not negative inversion.
+
+Negative lab validation:
+
+- Color negative scan fixtures.
+- Black-and-white negative fixtures.
+- Camera-scanned negative fixtures.
+- Flatbed-scanned negative fixtures.
+- Lab-scanned negative fixtures where license permits.
+- Mixed-exposure roll fixtures.
+- Dense negative fixture.
+- Thin negative fixture.
+- Strong orange mask fixture.
+- Border/crop detection fixture.
+- Batch consistency fixture.
+- Skin tone fixture after inversion.
+- Neutral gray fixture after inversion.
+
+Negative lab issue split:
+
+- `consult(negative-lab): get negative processing lab design review`
+- `negative-lab(adr): define negative processing architecture`
+- `negative-lab(ui): design dedicated negative lab workspace`
+- `negative-lab(schema): define negative conversion operation schema`
+- `negative-lab(base): add film base sampling controls`
+- `negative-lab(inversion): add per-channel inversion curves`
+- `negative-lab(batch): add roll-level batch consistency workflow`
+- `negative-lab(presets): define film stock preset metadata and legal policy`
+- `negative-lab(presets): add legally safe major stock preset set`
+- `negative-lab(crop): add frame border and crop detection`
+- `negative-lab(profiles): add scanner and camera-scan profile inputs`
+- `validation(negative-lab): add negative scan fixture manifest`
+- `validation(negative-lab): add color and black-and-white negative render tests`
+- `docs(negative-lab): add user guide for negative workflow`
+
+### 7.6 Export And Delivery
+
+Required export capabilities:
+
+- JPEG.
+- TIFF.
+- PNG.
+- AVIF, later phase.
+- HEIF/HEIC, macOS later phase if licensing/tooling is safe.
+- DNG or DNG-like linear export where feasible.
+- 8/16/32-bit export depending on format.
+- Color space selection:
+  - sRGB.
+  - Display P3.
+  - Adobe RGB.
+  - ProPhoto RGB.
+  - Custom ICC.
+- Embed ICC.
+- Resize.
+- Sharpen for output.
+- Watermark, later phase.
+- Metadata include/exclude.
+- Export recipes.
+- Batch export.
+- Background export queue.
+- Export validation previews.
+
+### 7.7 macOS Polish
+
+macOS is the first-class target.
+
+Requirements:
+
+- Native-feeling app bundle.
+- Apple Silicon optimization.
+- Intel Mac support if practical.
+- Color-managed display rendering.
+- Retina-safe rendering.
+- Trackpad and keyboard workflow.
+- macOS menu conventions.
+- File association, later phase.
+- Quick Look preview, later phase.
+- Finder drag/drop.
+- Sandboxing/notarization plan for release.
+- Crash reporting strategy that respects privacy.
+- Local-first behavior.
+
+macOS release/security decisions:
+
+- Decide Developer ID distribution versus Mac App Store strategy.
+- Define signing certificate custody.
+- Define notarization and stapling workflow.
+- Define hardened runtime settings.
+- Define entitlements.
+- Define file access permissions.
+- Define security-scoped bookmark policy if sandboxing is used.
+- Define update mechanism and signing-key rotation.
+- Define clean-machine Gatekeeper install test.
+- Define Apple Silicon GPU/Metal compatibility test.
+- Define rollback behavior for auto-update failures.
+
+macOS release issues:
+
+- `release(macos): choose Developer ID versus Mac App Store strategy`
+- `release(macos): define signing notarization and stapling pipeline`
+- `release(macos): define hardened runtime and entitlements`
+- `release(macos): define filesystem permissions and security-scoped bookmark policy`
+- `release(update): define updater signing-key custody and rotation`
+- `validation(macos): add clean-machine Gatekeeper install test`
+- `validation(macos): add Apple Silicon GPU compatibility test`
+- `validation(update): add auto-update rollback test`
+
+## 8. Architecture Direction
+
+### 8.1 High-Level Shape
+
+RawEngine should keep RapidRAW's Rust/Tauri/TypeScript/React direction unless the fork audit reveals a strong reason not to.
+
+Target architecture:
+
+- React/TypeScript UI.
+- Tauri app shell.
+- Rust core for IO, RAW decode orchestration, image operations, sidecar/catalog, and performance-sensitive services.
+- WGSL/GPU path for interactive pixel pipeline.
+- CPU/headless path for tests, export, and deterministic validation.
+- Shared schema package for edit commands, sidecars, API, agent tools, and test fixtures.
+- Local service boundary for editor operations.
+- Optional app-server process for chat agent integration.
+
+### 8.1.1 Architecture Decision Records To Create
+
+The plan should be converted into explicit ADRs as implementation begins. ADRs may live inside this document at first, then move to `docs/adr/` when that becomes easier to maintain.
+
+Required ADR fleet:
+
+- `ADR-001: RawEngine parent repository with nested RapidRAW fork checkout`
+  - Decision: RawEngine is the parent planning/orchestration repo; the RapidRAW fork is cloned later under `RapidRaw/`.
+  - Validation: repo topology docs, remote policy, no ambiguous root build assumptions.
+- `ADR-002: API-first editing engine`
+  - Decision: every edit operation is a typed command and edit-graph mutation.
+  - Validation: representative edit works through UI, CLI/test harness, and future agent tool.
+- `ADR-003: Versioned non-destructive edit graph`
+  - Decision: originals are immutable; sidecars store versioned graph operations.
+  - Validation: original hash tests, sidecar roundtrip, migration tests.
+- `ADR-004: Scene-referred color pipeline`
+  - Decision: internal editing defaults to scene-referred processing with explicit display/output transforms.
+  - Validation: ColorChecker metrics, CPU/GPU parity, gamut tests, clipping tests.
+- `ADR-005: GPU pipeline with CPU/reference validation path`
+  - Decision: GPU rendering is primary for interaction; CPU/reference path exists for tests or reduced deterministic checks.
+  - Validation: shader compile tests, parity tolerances, golden renders.
+- `ADR-006: Graph-native layers and masks`
+  - Decision: layers and masks are edit graph nodes, not UI-only overlays.
+  - Validation: layer reorder tests, mask composition tests, render determinism.
+- `ADR-007: Merge artifacts as editable sources`
+  - Decision: HDR, panorama, focus stack, and super-resolution outputs become explicit merge artifacts that enter the normal edit pipeline.
+  - Validation: artifact schema tests, provenance tracking, output editability tests.
+- `ADR-008: Sidecar plus catalog model`
+  - Decision: sidecars are portable source of truth; catalog/index is rebuildable workflow acceleration.
+  - Validation: catalog rebuild tests, missing file tests, sidecar import/export tests.
+- `ADR-009: Strict schema-generated API and tool registry`
+  - Decision: UI, CLI, tests, plugins, and agent use generated schemas from the same command definitions.
+  - Validation: schema drift CI, strict JSON Schema tests, tool replay tests.
+- `ADR-010: OpenAI app-server agent safety boundary`
+  - Decision: agent edits only through typed tools and never through UI automation.
+  - Validation: tool-call audit log, prompt injection tests, approval boundary tests.
+- `ADR-011: macOS-first release posture`
+  - Decision: macOS quality gates are mandatory first; inherited cross-platform support is preserved where practical.
+  - Validation: macOS Tauri build, high-DPI UI QA, signing/notarization plan.
+- `ADR-012: Plugin and extension isolation`
+  - Decision: plugin system waits until core API stabilizes and should prefer isolated/WASM or process boundaries.
+  - Validation: permission model, license declaration, failure behavior.
+
+### 8.2 Non-Destructive Edit Graph
+
+The edit graph is the core contract.
+
+It should model:
+
+- Source image.
+- RAW decode parameters.
+- Camera profile.
+- Working color space.
+- Ordered global operations.
+- Layers.
+- Masks.
+- Layer-scoped operations.
+- Merge/stack artifacts.
+- Output transforms.
+- Export recipes.
+- History entries.
+- Version metadata.
+- Graph revision IDs.
+- Conflict policy for concurrent UI/API/agent edits.
+- Derived assets from computational operations.
+
+Each operation should have:
+
+- Stable operation type.
+- Versioned schema.
+- Parameters.
+- Defaults.
+- Valid ranges.
+- UI metadata.
+- API metadata.
+- Serialization tests.
+- Migration logic.
+- Deterministic render tests.
+
+Edit graph invariants:
+
+- Every graph mutation is a transaction.
+- Every transaction has a before revision and after revision.
+- Concurrent edits must either merge safely or fail with a clear revision conflict.
+- UI, API, CLI, batch jobs, plugins, and agent tools all use the same command envelope.
+- Presets are represented as graph command history, graph fragments, or explicit preset nodes, not untracked UI macros.
+- Missing inputs make affected nodes invalid but should not corrupt unrelated graph state.
+- Derived artifacts keep provenance back to source assets and settings.
+
+Example operation families:
+
+- `raw.decode`
+- `profile.camera`
+- `tone.exposure`
+- `tone.curve`
+- `tone.filmic`
+- `color.whiteBalance`
+- `color.hsl`
+- `color.selectiveRange`
+- `color.skinUniformity`
+- `detail.sharpen`
+- `detail.denoise`
+- `geometry.crop`
+- `geometry.perspective`
+- `effect.grain`
+- `effect.halation`
+- `mask.brush`
+- `mask.luminanceRange`
+- `mask.aiSubject`
+- `layer.adjustment`
+- `merge.hdr`
+- `merge.panorama`
+- `merge.focusStack`
+- `merge.superResolution`
+- `export.recipe`
+
+### 8.3 Color Pipeline
+
+The color pipeline should be explicit and testable:
+
+1. RAW decode and linearization.
+2. Black/white level correction.
+3. Demosaic.
+4. Camera color transform.
+5. Chromatic adaptation.
+6. Scene-referred working space.
+7. Lens and optical corrections where appropriate.
+8. Global and local scene-referred operations.
+9. Layer compositing in a defined color space.
+10. Display transform.
+11. Output color space transform.
+12. Quantization/export.
+
+Required design decisions:
+
+- Choose a working scene-referred color space.
+- Decide how much of RapidRAW's existing AgX path to retain or evolve.
+- Define profile lookup and camera matching strategy.
+- Define ICC handling.
+- Define perceptual color spaces for UI controls.
+- Define gamut mapping.
+- Define HDR display roadmap separately from HDR merge.
+
+### 8.4 Public Editing API
+
+Every editing surface should be invokable through an API.
+
+API principles:
+
+- UI calls the same command layer as automation.
+- Commands are schema-validated.
+- Commands are undoable.
+- Commands are idempotent where possible.
+- Commands return structured results.
+- Commands expose previews and validation errors.
+- Destructive operations require explicit confirmation.
+- Batch operations are first-class.
+- Headless rendering is supported.
+
+Command envelope requirements:
+
+- Command ID.
+- Command type.
+- Schema version.
+- Target asset ID.
+- Expected graph revision.
+- Parameters.
+- Dry-run flag.
+- Approval requirement.
+- Actor:
+  - UI.
+  - CLI.
+  - batch.
+  - plugin.
+  - agent.
+- Timestamp.
+- Correlation ID.
+- Idempotency key where applicable.
+- Result:
+  - success.
+  - validation error.
+  - revision conflict.
+  - approval required.
+  - render failed.
+  - dependency missing.
+
+Read/write separation:
+
+- Read commands inspect project, image, graph, metadata, previews, histograms, scopes, and artifacts.
+- Write commands mutate graph, sidecars, catalog state, derived artifacts, or exports.
+- Write commands must be undoable where possible.
+- Destructive file commands must support dry-run and approval.
+- Agent tools must expose write risk clearly in tool descriptions.
+
+Future API issues:
+
+- `api(commands): define RawEngine command envelope v1`
+- `api(commands): define read write and dry-run semantics`
+- `api(commands): define graph revision conflict policy`
+- `api(commands): define idempotency and correlation IDs`
+- `api(commands): generate Rust TypeScript and JSON Schema types`
+- `api(commands): add command replay test harness`
+
+API surfaces:
+
+- Local TypeScript API for UI.
+- Rust command API through Tauri.
+- Local HTTP or IPC API for app-server integration, if needed.
+- CLI for validation, batch rendering, and automation.
+- OpenAI app-server dynamic tools for agent use.
+
+### 8.4.1 File And Metadata Safety
+
+RawEngine must treat originals as immutable and metadata writes as high-risk operations.
+
+Rules:
+
+- Never modify original RAW files.
+- Prefer sidecars for RawEngine-native edit state.
+- Treat XMP/IPTC/EXIF writes as explicit operations with confirmation and tests.
+- Catalog/cache/previews must be disposable or rebuildable.
+- Batch move/copy/rename/delete operations require dry-run output.
+- Agent-driven file operations require approval.
+- Export overwrite requires explicit policy.
+- Sidecar writes should be atomic:
+  - write temp file.
+  - fsync where practical.
+  - rename into place.
+  - keep backup or recovery path when migrating.
+- Sidecar migrations must be versioned and tested.
+- Failed writes must not corrupt the previous valid sidecar.
+
+Safety validation issues:
+
+- `safety(originals): add original hash immutability tests`
+- `safety(sidecars): add atomic sidecar write tests`
+- `safety(sidecars): add sidecar migration rollback tests`
+- `safety(metadata): define XMP IPTC EXIF write policy`
+- `safety(batch): add dry-run for move copy rename delete`
+- `safety(export): define overwrite and collision policy`
+- `safety(agent): require approval for file operations`
+
+### 8.5 OpenAI App-Server Agent
+
+RawEngine should include a full-featured expert editing agent built on the OpenAI Codex app-server.
+
+RapidRAW AI migration requirement:
+
+- Audit every built-in AI feature inherited from RapidRAW.
+- Keep useful AI capabilities, but move them behind RawEngine's typed command/API layer.
+- Expose AI capabilities through Codex app-server tools where practical.
+- Do not leave AI functionality as UI-only actions.
+- Preserve local/offline AI paths when useful and legally compatible.
+- Keep self-hosted/external AI backends behind explicit provider abstractions.
+- Require approval and clear disclosure for cloud AI calls.
+- Record model/backend provenance in sidecars or artifact metadata when AI output affects edits.
+- Make AI outputs reproducible where possible, or explicitly mark them non-deterministic.
+- Add fallback behavior when AI providers are unavailable.
+- Add tests for AI tool schemas, approvals, provenance, and replay.
+
+Agent goals:
+
+- Understand photographic editing goals.
+- Inspect metadata and rendered previews.
+- Suggest edit plans.
+- Apply edits through tool calls.
+- Compare before/after states.
+- Iterate with user feedback.
+- Explain changes in professional photo-editing language.
+- Never modify originals.
+- Ask for confirmation before expensive, destructive, or ambiguous batch operations.
+
+App-server requirements:
+
+- Implement app-server lifecycle:
+  - initialize.
+  - thread start/resume.
+  - turn start/steer.
+  - stream updates.
+  - completion events.
+- Expose dynamic editing tools with strict schemas.
+- Use strict function/tool schemas:
+  - `additionalProperties: false`.
+  - Required fields explicit.
+  - Optional values represented safely.
+- Namespace tools to avoid collisions with built-ins.
+- Log every tool call in an audit trail.
+- Make every agent edit replayable through the edit graph.
+- Support approvals for:
+  - batch changes.
+  - export/delete/move operations.
+  - external model calls.
+  - cloud services.
+
+Initial agent tool groups:
+
+- Project:
+  - open project.
+  - list images.
+  - get selected image.
+  - get metadata.
+  - set rating/label/tag.
+- Preview:
+  - render preview.
+  - sample pixels.
+  - get histogram.
+  - get scopes.
+  - compare variants.
+- Edit graph:
+  - list operations.
+  - add operation.
+  - update operation.
+  - remove operation.
+  - reorder operation.
+  - undo.
+  - redo.
+  - create virtual copy.
+- Tone:
+  - set exposure.
+  - set contrast.
+  - recover highlights.
+  - lift shadows.
+  - set curve.
+  - set filmic/display transform.
+- Color:
+  - set white balance.
+  - adjust HSL.
+  - create color range.
+  - apply selective color.
+  - apply skin tone uniformity.
+  - apply color grading.
+- Masks:
+  - create brush mask.
+  - create range mask.
+  - create subject/sky/background mask.
+  - combine masks.
+  - refine mask.
+- Layers:
+  - create layer.
+  - set layer opacity.
+  - attach mask.
+  - apply layer adjustment.
+- Computational:
+  - create HDR merge.
+  - create panorama.
+  - create focus stack.
+  - create super-resolution output.
+- Export:
+  - create recipe.
+  - render export.
+  - validate export.
+
+AI migration tool groups:
+
+- AI masks:
+  - subject mask.
+  - sky mask.
+  - background mask.
+  - foreground mask.
+  - depth mask.
+  - people/parts masks, later phase.
+- AI enhancement:
+  - denoise.
+  - super-resolution, if model-based.
+  - object removal/heal, if implemented.
+- AI generation/inpainting:
+  - optional and approval-gated.
+  - must create graph transactions or derived artifacts.
+  - must preserve provenance.
+- AI provider management:
+  - local model availability.
+  - self-hosted backend status.
+  - cloud backend status.
+  - consent/approval state.
+
+AI migration issues:
+
+- `ai(audit): inventory RapidRAW built-in AI features`
+- `ai(api): define provider abstraction for local self-hosted and cloud AI`
+- `ai(app-server): expose AI mask tools through Codex app-server`
+- `ai(app-server): expose AI enhancement tools through Codex app-server`
+- `ai(provenance): record model backend and settings in sidecars`
+- `ai(approval): require approval for cloud AI and generative edits`
+- `validation(ai): add AI tool schema and replay tests`
+- `validation(ai): add unavailable-provider fallback tests`
+
+### 8.6 Plugin And Extension Boundary
+
+Plugins should not be implemented until the edit graph and command API are stable, but the safety boundary should be planned now.
+
+Plugin principles:
+
+- Plugins register commands or graph nodes through a typed manifest.
+- Plugins declare permissions.
+- Plugins declare license.
+- Plugins declare supported RawEngine API versions.
+- Plugins cannot mutate originals directly.
+- Plugin edit nodes must serialize and fail gracefully when missing.
+- Native plugins are high-risk and require explicit approval.
+- WASM or isolated-process plugins are preferred.
+- Shader/plugin operations must declare color-domain assumptions.
+- Plugin failures should not prevent safe startup.
+- Safe mode should disable third-party plugins.
+
+Plugin issues:
+
+- `plugin(adr): define capability-based plugin architecture`
+- `plugin(manifest): define plugin manifest v1`
+- `plugin(api): define operation registration contract`
+- `plugin(color): define plugin color-domain contract`
+- `plugin(security): define WASM versus native plugin tiers`
+- `plugin(security): define signing permissions and safe mode`
+
+## 9. Tooling, Linting, And Bun Plan
+
+Tooling hardening is the first code-changing implementation milestone because it determines how confidently future work can move. It must happen after the no-change RapidRAW baseline snapshot, so RawEngine can distinguish existing upstream failures from regressions introduced by strictness or Bun migration.
+
+### 9.1 TypeScript Strictness
+
+RapidRAW already has `strict` enabled in its current `tsconfig`. RawEngine should harden beyond that where compatible:
+
+- `strict: true`
+- `noUncheckedIndexedAccess: true`
+- `exactOptionalPropertyTypes: true`
+- `noImplicitOverride: true`
+- `noPropertyAccessFromIndexSignature: true`
+- `useUnknownInCatchVariables: true`
+- `noFallthroughCasesInSwitch: true`
+- `noImplicitReturns: true`
+- `noUnusedLocals: true`
+- `noUnusedParameters: true`, with intentional underscore convention if used
+- `allowUnreachableCode: false`
+- `allowUnusedLabels: false`
+- `forceConsistentCasingInFileNames: true`
+- `isolatedModules: true`
+- `verbatimModuleSyntax: true`
+- `skipLibCheck` should be audited and reduced if practical
+
+If a flag creates too much churn in the first PR, split into follow-up issues. Do not weaken the final target.
+
+Future TypeScript issue split:
+
+- `tooling(tsconfig): audit current TypeScript compiler options`
+  - Scope: document current config and failures without changing behavior.
+  - Validation: existing typecheck command.
+- `tooling(tsconfig): enable noUncheckedIndexedAccess`
+  - Scope: enable one flag, fix resulting project-owned errors.
+  - Validation: typecheck plus targeted tests.
+- `tooling(tsconfig): enable exactOptionalPropertyTypes`
+  - Scope: enable one flag, fix optional-field modeling.
+  - Validation: typecheck plus sidecar/schema tests if touched.
+- `tooling(tsconfig): enable noImplicitOverride`
+  - Scope: add required override annotations.
+  - Validation: typecheck.
+- `tooling(tsconfig): enforce noPropertyAccessFromIndexSignature`
+  - Scope: make dynamic object access explicit.
+  - Validation: typecheck.
+- `tooling(tsconfig): audit skipLibCheck`
+  - Scope: decide whether to keep, narrow, or remove `skipLibCheck`.
+  - Validation: typecheck in CI.
+- `tooling(types): add generated type drift checks`
+  - Scope: ensure generated schemas/types are current.
+  - Validation: generation command plus clean git diff.
+
+### 9.2 ESLint Target
+
+Use ESLint flat config and type-aware linting:
+
+- `typescript-eslint` strict type-checked config.
+- `typescript-eslint` stylistic type-checked config where useful.
+- React rules.
+- React Hooks rules.
+- React Refresh rules.
+- JSX accessibility rules.
+- Import/order rules.
+- No floating promises.
+- No unsafe assignment/call/member access except fenced legacy areas with issues.
+- No implicit `any`.
+- No unused variables except explicit underscore convention.
+- No console in production paths, except approved logging wrappers.
+- Exhaustive switch checks where possible.
+- Strict boolean expressions where practical.
+- Prefer readonly data where practical.
+- No unhandled promises.
+- No direct DOM escape hatches without comment.
+- No warnings in CI:
+  - `eslint . --max-warnings 0`
+
+Formatting should be handled by Prettier or the project's chosen formatter, not by large ESLint formatting rule churn.
+
+Future ESLint issue split:
+
+- `tooling(eslint): audit current config and warning inventory`
+  - Scope: run current lint, classify current warnings/errors, document baseline.
+  - Validation: lint output captured in issue/PR.
+- `tooling(eslint): adopt type-aware parser project service`
+  - Scope: enable type-aware lint infrastructure without broad rule churn.
+  - Validation: lint runtime acceptable, CI stable.
+- `tooling(eslint): enable strict type-checked rules`
+  - Scope: enable strict preset, fix or explicitly fence legacy violations.
+  - Validation: `eslint . --max-warnings 0`.
+- `tooling(eslint): add React and hooks rules`
+  - Scope: enforce component and hooks correctness.
+  - Validation: lint plus representative UI tests.
+- `tooling(eslint): add accessibility rules`
+  - Scope: catch missing labels, roles, keyboard hazards.
+  - Validation: lint plus manual UI checklist for changed components.
+- `tooling(eslint): add import/order and boundary rules`
+  - Scope: prevent architecture drift and circular dependency growth.
+  - Validation: lint.
+- `tooling(eslint): add no-floating-promises and async safety`
+  - Scope: prevent unhandled async failures in UI/API.
+  - Validation: lint plus tests around affected async paths.
+- `tooling(eslint): fail CI on warnings`
+  - Scope: remove `continue-on-error` and enforce `--max-warnings 0`.
+  - Validation: required PR check fails on any warning.
+- `tooling(eslint): define allowed escape hatches`
+  - Scope: document when `eslint-disable` is allowed and require reason comments.
+  - Validation: lint rule or grep check for disable comments without reasons.
+
+Target ESLint rule families:
+
+| Rule Family | Intent | Future Gate |
+| --- | --- | --- |
+| Type safety | prevent unsafe `any`, unsafe calls, unsafe member access, unsafe returns | required PR lint |
+| Promise safety | prevent floating promises, missing awaits, swallowed async errors | required PR lint |
+| Exhaustiveness | force switch/union exhaustiveness in edit graph and tool handling | required for API/core |
+| React hooks | catch invalid hooks usage and missing dependencies | required frontend lint |
+| React refresh | keep Vite/React refresh constraints healthy | required frontend lint |
+| Accessibility | catch missing labels, roles, keyboard traps, invalid ARIA | required UI lint |
+| Imports/boundaries | prevent cycles and forbidden cross-layer imports | required once architecture is mapped |
+| No direct mutation | protect edit graph immutability and React state predictability | required for edit graph/UI |
+| No console in production | route logs through structured logger | required after logger exists |
+| No untranslated user text | preserve i18n direction if inherited from RapidRAW | required if i18n remains |
+| No unrestricted disables | require reason comments for lint disables | required immediately after strict lint |
+
+Allowed escape hatch policy:
+
+- Every `eslint-disable` must include a reason.
+- Every `@ts-expect-error` must include a reason and should fail if unused.
+- `@ts-ignore` should be forbidden unless an issue explicitly approves it.
+- Unsafe interop with external libraries should be fenced in adapter modules.
+- Generated files should be excluded or linted with generated-file overrides, not ad hoc disables.
+- Legacy violations should be tracked by issue and fenced by path only when a same-PR fix is too risky.
+
+### 9.3 Bun Migration
+
+Use Bun where applicable:
+
+- Add `packageManager` field for Bun.
+- Add `bun.lock`.
+- Replace npm CI install paths with `bun install --frozen-lockfile`.
+- Run frontend scripts through `bun run`.
+- Use Bun test runner for TS utility tests where compatible.
+- Keep Vite/Tauri integration if already working.
+- Keep Node only where a tool requires Node specifically.
+- Do not change Rust/Tauri behavior just to force Bun.
+- CI should use `oven-sh/setup-bun@v2`.
+
+Migration order:
+
+1. Audit current scripts.
+2. Add Bun install and lockfile.
+3. Run existing scripts through Bun.
+4. Fix script compatibility.
+5. Update CI.
+6. Remove obsolete npm lockfiles only after Bun CI is green.
+
+### 9.4 Hooks
+
+Use a hook system such as Lefthook, Husky, or a lightweight repo script. Pick the tool that best fits the fork after audit.
+
+Required hooks:
+
+- `pre-commit`:
+  - fail on `main`.
+  - run staged formatting/lint checks.
+  - run lightweight type-aware checks where practical.
+  - block oversized accidental binary additions unless explicitly allowed.
+- `commit-msg`:
+  - encourage issue reference.
+  - optionally enforce conventional commits after the project chooses a convention.
+- `pre-push`:
+  - fail when pushing `main`.
+  - run broader local validation or point to `bun run check`.
+
+The block-main logic must be simple and reliable:
+
+Pre-commit branch guard:
+
+```sh
+branch="$(git symbolic-ref --short HEAD 2>/dev/null || true)"
+if [ "$branch" = "main" ]; then
+  echo "Direct commits on main are blocked. Create a feature branch and open a PR."
+  exit 1
+fi
+```
+
+Pre-push remote ref guard:
+
+```sh
+while read local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "Pushes to main are blocked. Push a feature branch and open a PR."
+    exit 1
+  fi
+done
+```
+
+## 10. GitHub Actions Quality Gates
+
+GitHub Actions should be treated as the product's quality firewall.
+
+### 10.1 Required Workflows
+
+#### PR Validation
+
+Runs on pull requests and pushes to protected branches.
+
+Parallel jobs:
+
+- Frontend install/cache.
+- Frontend lint.
+- Frontend typecheck.
+- Frontend tests.
+- Frontend build.
+- Rust format.
+- Rust clippy.
+- Rust tests.
+- Tauri config validation.
+- macOS app build.
+- Schema validation.
+- Sidecar roundtrip tests.
+- Documentation link check.
+- License check.
+- Dependency audit.
+- Secret scan.
+- Image fixture smoke tests.
+
+#### Full Build
+
+Runs on PRs that touch build/app code and on `main`.
+
+Parallel jobs:
+
+- macOS Apple Silicon build.
+- macOS Intel build if runner/support is practical.
+- Linux build if inherited support remains.
+- Windows build if inherited support remains.
+- Android build if inherited support remains.
+
+For RawEngine's current priority, macOS builds are mandatory. Other platforms can be allowed to fail only if explicitly marked non-blocking and documented.
+
+#### Image Quality Regression
+
+Runs nightly and on demand.
+
+Jobs:
+
+- Render golden corpus.
+- Compare image hashes.
+- Compute SSIM/PSNR where appropriate.
+- Compute color chart DeltaE metrics.
+- Compare histograms/scopes.
+- Validate mask outputs.
+- Validate HDR merge outputs.
+- Validate panorama stitching outputs.
+- Validate focus stack outputs.
+- Validate super-resolution outputs.
+- Upload artifacts.
+
+#### Performance Regression
+
+Runs nightly and before release.
+
+Jobs:
+
+- Cold import timing.
+- First preview timing.
+- Slider interaction latency.
+- GPU render timing.
+- Export timing.
+- Batch export timing.
+- Memory usage.
+- Large panorama memory behavior.
+- HDR merge memory behavior.
+
+#### Release
+
+Runs only from tags or approved release branches.
+
+Jobs:
+
+- Re-run required validation.
+- Build signed/notarized macOS app when credentials exist.
+- Build release artifacts.
+- Generate checksums.
+- Generate SBOM.
+- Publish GitHub release draft.
+
+### 10.2 Branch Protection Required Checks
+
+Initial required checks:
+
+- `frontend-lint`
+- `frontend-typecheck`
+- `frontend-test`
+- `frontend-build`
+- `rust-fmt`
+- `rust-clippy`
+- `rust-test`
+- `tauri-build-macos`
+- `schema-validation`
+- `sidecar-roundtrip`
+- `license-check`
+- `dependency-audit`
+
+Later required checks:
+
+- `image-quality-smoke`
+- `performance-smoke`
+- `agent-tool-schema`
+- `app-server-integration`
+- `visual-regression`
+
+Stable check-name policy:
+
+- Required checks should use stable kebab-case names.
+- Renaming a required check requires a branch protection update issue.
+- New checks can run as non-required until stable.
+- Required checks must not use `continue-on-error`.
+- Required checks must not silently skip because of path filters when workflow files or shared configs change.
+- If a required check is temporarily disabled, the disabling PR must include:
+  - issue link.
+  - reason.
+  - restoration condition.
+  - risk.
+  - owner.
+
+Suggested final required check set:
+
+- `docs-check`
+- `frontend-lint`
+- `frontend-typecheck`
+- `frontend-test`
+- `frontend-build`
+- `rust-fmt`
+- `rust-clippy`
+- `rust-test`
+- `schema-drift`
+- `sidecar-roundtrip`
+- `tauri-build-macos`
+- `license-audit`
+- `dependency-audit`
+- `secret-scan`
+- `image-quality-smoke`
+- `agent-tool-schema`
+
+### 10.3 CI Rules
+
+- No `continue-on-error` for required quality gates.
+- Use matrix builds for parallelism.
+- Use `fail-fast: false` when it helps collect all failures on PRs.
+- Use `max-parallel` only when resource limits require it.
+- Cache Bun, Cargo, Tauri, and build artifacts carefully.
+- Keep expensive tests split from fast PR checks.
+- Upload artifacts for failed visual/image tests.
+- Keep CI commands mirrored by local scripts.
+
+### 10.3.1 Local Command Contract
+
+Future CI should call the same named commands developers run locally. Exact implementation may change after the RapidRAW audit, but the command contract should aim for:
+
+| Command | Purpose | Expected Scope |
+| --- | --- | --- |
+| `bun run check` | full local validation mirror for ordinary PRs | lint, typecheck, tests, build smoke where practical |
+| `bun run check:quick` | pre-push fast gate | fast lint/type/unit checks only |
+| `bun run lint` | frontend lint | ESLint with `--max-warnings 0` |
+| `bun run typecheck` | TypeScript typecheck | project references if applicable |
+| `bun run format:check` | formatting check | frontend/docs formatting |
+| `bun run test` | frontend/unit tests | TS/React utilities and components |
+| `bun run build` | frontend build | Vite/Tauri frontend build |
+| `bun run schema:check` | schema generation drift | edit graph/API/tool schemas |
+| `bun run docs:check` | docs lint/link check | markdown and links |
+| `bun run fixtures:check` | fixture manifest validation | license/source/hash metadata |
+| `cargo fmt --all --check` | Rust formatting | Rust workspace |
+| `cargo clippy --workspace --all-targets --all-features -- -D warnings` | Rust lint | warnings-as-errors |
+| `cargo test --workspace` | Rust tests | Rust workspace |
+| `cargo audit` or chosen equivalent | Rust vulnerabilities | dependencies |
+| `cargo deny` or chosen equivalent | Rust license/security policy | dependencies |
+
+If a command cannot exist exactly because of RapidRAW's structure, create the closest equivalent and document the reason in the plan.
+
+### 10.4 CI Topology
+
+The workflow graph should make dependencies explicit.
+
+PR workflow topology:
+
+- `changes`
+  - Detect changed paths.
+  - Emit booleans for frontend, rust, tauri, docs, workflows, schemas, fixtures, and agent.
+- `frontend-install`
+  - Depends on `changes`.
+  - Runs only when frontend or lockfiles changed.
+  - Restores Bun cache.
+- `frontend-lint`
+  - Depends on `frontend-install`.
+  - Required when frontend changed.
+- `frontend-typecheck`
+  - Depends on `frontend-install`.
+  - Required when frontend changed.
+- `frontend-test`
+  - Depends on `frontend-install`.
+  - Required when frontend changed.
+- `frontend-build`
+  - Depends on `frontend-install`.
+  - Required when frontend/app changed.
+- `rust-fmt`
+  - Depends on `changes`.
+  - Required when Rust changed.
+- `rust-clippy`
+  - Depends on `changes`.
+  - Required when Rust changed.
+- `rust-test`
+  - Depends on `changes`.
+  - Required when Rust changed.
+- `schema-drift`
+  - Required when API/schema/tool definitions changed.
+- `docs-links`
+  - Required when markdown/docs changed.
+- `license-audit`
+  - Required when dependencies changed.
+- `security-scan`
+  - Required for all PRs.
+- `tauri-build-macos`
+  - Depends on frontend build and Rust checks when app code changed.
+  - Required for app-impacting PRs.
+- `image-quality-smoke`
+  - Required for renderer/image-processing PRs.
+  - Uploads rendered artifacts on failure.
+- `agent-tool-schema`
+  - Required for agent/API tool changes.
+
+Workflow-level rules:
+
+- Use concurrency cancellation for superseded PR pushes.
+- Keep required check names stable so branch protection does not drift.
+- Upload failed test artifacts with retention long enough for review.
+- Use path filters for cost, but never skip checks when workflow/config changes.
+- Nightly workflows should run the expensive full image-quality and performance suite even when PR path filters skip it.
+- Release workflows must re-run required checks instead of trusting stale PR results.
+
+## 11. Self-Validation Loops
+
+RawEngine needs validation loops strong enough that autonomous implementation can proceed safely.
+
+### 11.0 Validation Placement Map
+
+Validation should be placed as far left as practical. The same requirement can appear in multiple layers when the feedback loop is cheap enough.
+
+| Validation Layer | Purpose | Examples | Future Blocking Level |
+| --- | --- | --- | --- |
+| Editor/IDE | Catch mistakes while typing | TypeScript language service, ESLint in editor, Rust analyzer, format on save | Developer convenience |
+| Pre-commit | Block obvious local mistakes before a commit exists | Main branch guard, staged lint, format check, generated schema drift, forbidden large files | Hard local block |
+| Commit message | Keep work traceable | Issue reference, conventional commit if adopted, no vague messages | Soft or hard after convention |
+| Pre-push | Avoid wasting CI | Main ref push guard, fast `check:quick`, no direct `HEAD:main` push | Hard local block |
+| Local full check | Mirror CI before PR | `bun run check`, Rust checks, Tauri smoke, docs lint | Required PR evidence |
+| PR fast CI | Protect review loop | lint, typecheck, unit tests, schema drift, license, security, docs | Required branch protection |
+| PR app CI | Prove buildability | macOS Tauri build, frontend build, Rust integration tests | Required for app-impacting PRs |
+| PR visual/image CI | Catch renderer and UI regressions | golden smoke renders, screenshot comparisons, fixture artifacts | Required for image/UI PRs |
+| Nightly CI | Run expensive confidence checks | full fixture corpus, performance, large panorama/HDR, agent evals | Blocking before release |
+| Release CI | Prove shippability | signing/notarization, SBOM, full build matrix, release notes | Required for release |
+| Manual QA | Catch taste and workflow failures | color review, UI polish pass, editing workflow checklist | Required for major feature completion |
+
+Shift-left principle:
+
+- If a check is deterministic and fast, put it in pre-commit or PR fast CI.
+- If a check is deterministic but slower, put it in local full check and PR app CI.
+- If a check is expensive or fixture-heavy, put it in nightly CI and require it before release.
+- If a check is subjective, define a human review checklist and attach evidence to the PR.
+- If a check protects originals, licenses, branch protection, or schema compatibility, make it a hard gate.
+
+### 11.0.1 Required Validation Categories
+
+Every future issue should declare which categories it touches:
+
+- `validation:types`
+- `validation:lint`
+- `validation:rust`
+- `validation:tauri`
+- `validation:build`
+- `validation:schema`
+- `validation:sidecar`
+- `validation:render`
+- `validation:gpu-cpu-parity`
+- `validation:color`
+- `validation:mask`
+- `validation:layer`
+- `validation:hdr`
+- `validation:panorama`
+- `validation:focus-stack`
+- `validation:super-resolution`
+- `validation:film-simulation`
+- `validation:metadata`
+- `validation:library`
+- `validation:export`
+- `validation:ui`
+- `validation:accessibility`
+- `validation:performance`
+- `validation:memory`
+- `validation:security`
+- `validation:license`
+- `validation:agent-tools`
+- `validation:app-server`
+- `validation:docs`
+
+### 11.0.2 Milestone Gate Matrix
+
+Each milestone should define the minimum gates needed before it can be called complete.
+
+| Milestone | Minimum Required Gates |
+| --- | --- |
+| 0: Maintained Plan Artifact | markdown render check, link review, plan consistency scan, documentation-only diff |
+| 0.1: Project Charter And Fork Governance | branch protection verified, repo visibility verified, issue/PR templates present, AGPL note present |
+| 0.5: RapidRAW Baseline Snapshot | upstream SHA recorded, existing commands run, failures captured as issues, baseline artifacts saved |
+| 1: Shift-Left Quality Foundation | Bun install, strict lint/type gates, hooks, Rust checks, license/security checks, zero warning required CI |
+| 2: CI Build Matrix And Release Skeleton | parallel PR jobs, required macOS build, artifact upload, cache behavior, release skeleton dry run |
+| 3: Baseline Audit And Regression Harness | sidecar roundtrip, history replay, render smoke, fixture manifest, performance smoke |
+| 4: Versioned Edit Graph And API Foundation | schema validation, migration tests, undo/redo tests, CLI/headless render, API docs |
+| 5: Color Pipeline Foundation | ColorChecker fixtures, DeltaE harness, white balance tests, camera profile tests, CPU/GPU parity |
+| 6: Capture One-Class Color Editing | selective color tests, skin tone fixtures, color mask tests, API command tests, UI artifact |
+| 7: Layers And Masking | layer graph tests, mask composition tests, sidecar roundtrip, undo/redo, render artifacts |
+| 8: Detail Denoise And Wavelet Tools | high ISO fixtures, edge/detail fixtures, performance budget, artifact review |
+| 9: Film Simulation Lab | legal provenance, LUT import tests, grain/halation fixtures, before/after artifacts |
+| 10: HDR Merge | bracket manifest, alignment/deghost tests, editable merge artifact, memory/time budget |
+| 11: Panorama Stitching | projection fixtures, seam/alignment checks, editable panorama artifact, large-file memory budget |
+| 12: Focus Stacking | focus bracket fixtures, sharpness map artifact, blend artifact review, memory/time budget |
+| 13: Super-Resolution | resolution chart fixtures, real-photo crops, hallucination/artifact review, memory/time budget |
+| 14: OpenAI App-Server Agent | strict tool schemas, replay tests, approval tests, prompt-injection tests, audit logs |
+| 15: Professional Workflow Polish | screenshot matrix, accessibility pass, keyboard workflow, batch/export workflow artifacts |
+| 16: Release Hardening | signed/notarized plan, SBOM, checksums, release notes, privacy/security docs |
+
+Milestone completion rule:
+
+- A milestone is not complete if any required gate is missing without a linked follow-up issue and explicit deferral rationale.
+- A milestone summary should list every merged PR, every skipped validation, every known risk, and every follow-up issue.
+- Major feature milestones must include at least one real-world workflow artifact, not only unit tests.
+
+Copyable milestone summary:
+
+```md
+## Milestone Completion Summary
+
+Milestone:
+Date:
+GitHub milestone URL:
+
+## Closed Issues
+
+| Issue | PR | Validation Evidence | Notes |
+| --- | --- | --- | --- |
+| # | # | link/path | |
+
+## Required Gates
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| gate name | pass/fail/deferred | link/path |
+
+## Artifacts
+
+- CI runs:
+- Screenshots:
+- Render outputs:
+- Fixture manifests:
+- Benchmark results:
+- Release artifacts:
+
+## Deferred Work
+
+| Follow-up Issue | Reason | Risk |
+| --- | --- | --- |
+| # | | |
+
+## Residual Risk
+
+- Risk:
+- Mitigation:
+- Owner:
+
+## Decision Log Updates
+
+- ADRs added/changed:
+- Plan sections updated:
+```
+
+### 11.1 Standard Change Loop
+
+For each issue/PR:
+
+1. Read the relevant source and tests.
+2. Confirm the exact desired behavior.
+3. Make the smallest coherent change.
+4. Run local checks matching the PR scope.
+5. Add or update tests.
+6. For UI or image changes, capture before/after screenshots or rendered outputs.
+7. Check git diff before finalizing.
+8. Open PR linked to issue.
+9. Wait for CI.
+10. Fix CI failures.
+11. Keep PR scope tight.
+
+### 11.1.1 Validation Evidence Ledger
+
+Every implementation PR should include a validation evidence ledger. The goal is to make the result auditable without asking what was run.
+
+Required fields:
+
+- Local commands run, copied exactly.
+- Local command result summary.
+- CI run URL.
+- Required checks that passed.
+- Checks intentionally skipped, with reason.
+- Screenshot paths for UI changes.
+- Rendered artifact paths for image-processing changes.
+- Before/after comparison path when applicable.
+- Fixture/source image manifest changes when applicable.
+- Known residual risk.
+- Follow-up issue links for accepted gaps.
+
+Copyable PR ledger:
+
+```md
+## Validation Evidence Ledger
+
+### Local Commands
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| `command here` | pass/fail/skipped | reason or artifact path |
+
+### CI
+
+- CI run:
+- Required checks passed:
+- Required checks failed:
+- Checks skipped:
+- Skip rationale:
+
+### Artifacts
+
+- UI screenshots:
+- Render outputs:
+- Before/after comparisons:
+- Fixture manifests:
+- Logs:
+
+### Safety
+
+- Original file hash check:
+- Sidecar roundtrip:
+- Schema drift:
+- License/dependency impact:
+- Security impact:
+
+### Residual Risk
+
+- Known risk:
+- Follow-up issue:
+```
+
+### 11.2 Image Processing Validation
+
+Maintain a versioned image corpus:
+
+- Public sample RAW files from camera vendors and open test sets.
+- ColorChecker shots.
+- Skin tone portraits with permissive licenses.
+- High dynamic range bracket sets.
+- Handheld bracket sets with motion.
+- Panorama sequences.
+- Multi-row panorama sequences.
+- Focus bracket sequences.
+- Burst/shifting sequences for super-resolution.
+- High ISO noise samples.
+- Lens distortion samples.
+- Chromatic aberration samples.
+- Film negative scans.
+- Sky gradients.
+- Deep shadows.
+- Saturated colors.
+- Mixed lighting.
+
+Image source policy:
+
+- Use legally usable internet sample images.
+- Prefer public domain, Creative Commons, camera-vendor sample files, and project-owned captures.
+- Record source URL, license, camera, lens, and allowed use.
+- Use the Chrome plugin when browsing and downloading sample images for local validation, especially when manual verification of source/license/download behavior is needed.
+- Capture evidence for downloaded samples: source URL, license text or license page URL, download URL, file hash, and date accessed.
+- If Chrome/plugin workflows fail, repair the intended plugin path or ask before using any OS-level browser automation fallback.
+- Do not add samples to the repo unless license and size are acceptable.
+- Prefer Git LFS or external fixture download scripts for large assets.
+
+Fixture manifest fields:
+
+- Fixture ID.
+- File name.
+- File type.
+- Source URL.
+- Download URL.
+- License name.
+- License URL.
+- Date accessed.
+- SHA-256 hash.
+- File size.
+- Camera.
+- Lens.
+- ISO.
+- Shutter speed.
+- Aperture.
+- Focal length.
+- Dimensions.
+- Color profile.
+- Intended validation use.
+- Allowed repository storage:
+  - committed.
+  - Git LFS.
+  - external download.
+  - local only.
+- Privacy concerns.
+- Notes.
+
+Fixture governance issues:
+
+- `validation(fixtures): define fixture manifest schema`
+- `validation(fixtures): add fixture license review checklist`
+- `validation(fixtures): add fixture hash verification command`
+- `validation(fixtures): add external download cache policy`
+- `validation(fixtures): add Chrome source-verification workflow`
+- `validation(fixtures): decide Git LFS policy`
+- `validation(fixtures): add fixture pruning policy`
+
+Validation metrics:
+
+- Sidecar roundtrip equality.
+- Render determinism.
+- Histogram delta.
+- Perceptual hash delta.
+- SSIM/PSNR for operations where reference output is stable.
+- DeltaE for color chart patches.
+- Mask IoU for known masks.
+- Alignment error for panorama/HDR/focus stacks.
+- Render time budget.
+- Peak memory budget.
+- GPU/CPU parity tolerance.
+
+Initial performance budget targets:
+
+These are planning targets, not promises. They should be measured and revised after the RapidRAW baseline snapshot.
+
+| Operation | Initial Target | Gate Type |
+| --- | --- | --- |
+| App cold start | track baseline, then block regressions over 10 percent without rationale | nightly/performance |
+| Open 24MP RAW first preview | under 2 seconds after baseline feasibility review | PR smoke/nightly |
+| Slider preview update | under 100 ms for preview/ROI path where feasible | performance smoke |
+| Brush stroke feedback | visually continuous at normal brush sizes | UI/performance QA |
+| Export 24MP JPEG | track baseline and regressions | nightly |
+| Export 24MP 16-bit TIFF | track baseline and regressions | nightly |
+| Import 1,000 RAW folder | track wall time and memory | nightly |
+| HDR merge 3 x 24MP | track wall time and peak memory | computational nightly |
+| Panorama 6 x 24MP | track wall time and peak memory | computational nightly |
+| Focus stack 10 x 24MP | track wall time and peak memory | computational nightly |
+| Super-resolution 24MP input | track wall time, memory, output dimensions | computational nightly |
+| Very large panorama stress | must fail gracefully or complete without crash | release gate |
+
+Performance evidence should include:
+
+- Machine model.
+- macOS version.
+- CPU/GPU.
+- RAM.
+- Build mode.
+- Input fixture IDs.
+- Wall time.
+- Peak memory.
+- Output dimensions.
+- Notes on cache warm/cold state.
+
+### 11.2.1 RAW Editor Image-Quality Gates
+
+Future image-processing PRs should declare one or more gates:
+
+#### Color Gates
+
+- ColorChecker render baseline.
+- Median DeltaE trend.
+- 95th percentile DeltaE trend.
+- Neutral patch drift.
+- Skin tone fixture review.
+- Saturated color clipping check.
+- Out-of-gamut behavior check.
+- White balance picker fixture.
+- Camera profile lookup fixture.
+- Scene-to-display transform fixture.
+
+Required evidence:
+
+- Fixture IDs.
+- Render command.
+- Before/after outputs.
+- Metric table.
+- Explanation for expected drift.
+
+#### Layer Gates
+
+- Layer add/delete/reorder replay.
+- Layer opacity render comparison.
+- Blend mode smoke outputs.
+- Per-layer adjustment isolation.
+- Layer copy/paste.
+- Undo/redo across layer edits.
+- Sidecar roundtrip with layers.
+- Export with layers enabled/disabled.
+
+Required evidence:
+
+- Edit graph snapshot.
+- Render artifact.
+- Undo/redo test result.
+- Sidecar migration result if schema changed.
+
+#### Mask Gates
+
+- Brush stroke serialization.
+- Gradient coordinate behavior after crop/rotate.
+- Luminance range mask fixture.
+- Color range mask fixture.
+- AI mask provenance and model version recording.
+- Add/subtract/intersect mask composition.
+- Feather/refine output comparison.
+- Mask copy/paste across similar images.
+- Mask invalidation after geometry change.
+
+Required evidence:
+
+- Mask preview artifact.
+- Mask histogram or coverage percentage.
+- Known-mask IoU when a reference exists.
+- Render output using the mask.
+
+#### HDR Gates
+
+- Bracket detection.
+- Exposure normalization.
+- Alignment error.
+- Deghosting fixture.
+- Highlight recovery fixture.
+- Moving subject fixture.
+- Metadata preservation.
+- Editable merge artifact roundtrip.
+- Memory and timing budget.
+
+Required evidence:
+
+- Source bracket manifest.
+- Merge settings.
+- Merged artifact metadata.
+- Render output.
+- Timing and peak memory.
+
+#### Panorama Gates
+
+- Feature matching smoke.
+- Projection mode smoke:
+  - spherical.
+  - cylindrical.
+  - perspective.
+  - Panini.
+- Multi-row fixture.
+- Boundary/crop behavior.
+- Exposure/vignetting compensation.
+- Seam artifact review.
+- Large panorama memory budget.
+- Editable panorama artifact roundtrip.
+
+Required evidence:
+
+- Source image manifest.
+- Projection/settings.
+- Alignment/seam metrics where available.
+- Output dimensions.
+- Timing and peak memory.
+
+#### Focus Stack Gates
+
+- Alignment fixture.
+- Sharpness map fixture.
+- Blend artifact fixture.
+- Macro/product fixture.
+- Retouch path for bad regions.
+- Editable focus artifact roundtrip.
+- Timing and memory budget.
+
+Required evidence:
+
+- Source focus bracket manifest.
+- Sharpness map preview.
+- Final render.
+- Artifact notes.
+
+#### Super-Resolution Gates
+
+- Resolution chart fixture.
+- Real photo fixture.
+- Single-image mode, if implemented.
+- Multi-image alignment mode.
+- Conservative/professional mode with no hallucinated detail.
+- Edge artifact review.
+- Texture preservation review.
+- Timing and memory budget.
+
+Required evidence:
+
+- Scale factor.
+- Source manifest.
+- Output dimensions.
+- Crop comparisons at 100 percent and 200 percent.
+- Artifact notes.
+
+#### Film Simulation Gates
+
+- LUT/HaldCLUT import validation.
+- Built-in look legal provenance.
+- Tone curve fixture.
+- Skin tone fixture.
+- Over/under-exposure fixture.
+- Grain behavior fixture.
+- Halation threshold fixture.
+- Black-and-white conversion fixture.
+- Negative conversion fixture.
+
+Required evidence:
+
+- Look ID/version.
+- Source license/provenance.
+- Before/after renders.
+- Parameter snapshot.
+- Legal status for bundled assets.
+
+### 11.3 UI Validation
+
+For UI changes:
+
+- Use screenshots at desktop and laptop-sized viewports.
+- Check text overflow.
+- Check keyboard navigation.
+- Check focus states.
+- Check hover/disabled/loading states.
+- Check dark and light modes if both exist.
+- Check high-DPI rendering.
+- Check panel resizing.
+- Check drag/drop surfaces.
+- Check tooltips for icon buttons.
+- Use image generation skill when new visual assets, film-look thumbnails, hero-quality mock imagery, icons not covered by the existing system, or illustrative UI test material is needed.
+- Use consult skill for new UI architecture, high-risk workflow design, or design decisions where a second model can expose tradeoffs.
+- Store UI validation evidence as PR artifacts or attached screenshots with viewport, OS, and build information.
+
+### 11.4 Agent Validation
+
+Agent changes require:
+
+- Tool schema tests.
+- Strict schema validation.
+- Tool call replay tests.
+- Approval boundary tests.
+- No-original-modification tests.
+- Undo/redo after agent edit.
+- Batch operation dry-run tests.
+- Prompt injection tests for metadata and filenames.
+- Tool audit log snapshot.
+- Before/after image artifact.
+
+Agent shift-left gates:
+
+- `agent:schema`
+  - Every tool has generated TypeScript type, JSON Schema, Rust-side command mapping if applicable, and docs.
+  - Strict schema mode: no unbounded arbitrary objects unless explicitly justified.
+  - Tool names are namespaced and stable.
+- `agent:dry-run`
+  - Every mutating tool supports dry-run or preview where practical.
+  - Batch edits produce an operation plan before apply.
+- `agent:approval`
+  - Delete, overwrite, move, export, cloud, external model, and batch operations require explicit approval policy.
+  - Approval bypass requires a test fixture proving it is impossible or intentional.
+- `agent:immutability`
+  - Original files are never modified.
+  - Agent edits create graph transactions, sidecars, virtual copies, or derived artifacts.
+- `agent:replay`
+  - Tool call logs can replay a representative edit.
+  - Replay uses the same edit graph commands as UI and CLI.
+- `agent:prompt-injection`
+  - Malicious filenames, metadata, sidecar text, and image-embedded text cannot cause destructive tool calls.
+  - Tool descriptions remind the model not to trust untrusted metadata as instructions.
+- `agent:visual-proof`
+  - Any edit claim includes before/after preview artifacts.
+  - Agent cannot claim an edit is complete if render/export failed.
+
+Agent issue split:
+
+- `agent(schema): define tool naming and schema policy`
+- `agent(schema): generate tool schemas from edit command definitions`
+- `agent(audit): add tool-call audit log format`
+- `agent(approval): define approval policy for mutating tools`
+- `agent(eval): add prompt injection fixtures`
+- `agent(eval): add replay tests for representative edits`
+- `agent(eval): add before-after artifact requirement`
+- `agent(app-server): add lifecycle integration design`
+- `agent(app-server): add dynamic tools adapter`
+- `agent(app-server): add cancellation and error propagation policy`
+
+### 11.5 Consult Usage Policy
+
+Use the consult skill for:
+
+- Product architecture decisions with long-term consequences.
+- New UI feature design where workflow tradeoffs matter.
+- Color science changes.
+- Scene-referred/display-referred pipeline changes.
+- Camera profile strategy.
+- Film simulation design.
+- Panorama stitching implementation strategy.
+- HDR merge implementation strategy.
+- Focus stacking implementation strategy.
+- Super-resolution stitching/stacking strategy.
+- Agent tool design and app-server architecture.
+- Risky refactors where a second design pass is useful.
+
+Do not use consult as a substitute for reading the code, running tests, or validating real output. Treat it as a second design review.
+
+### 11.6 Consult Tracking
+
+Consultations should be tracked when they affect the plan.
+
+Current planning consults:
+
+- Initial RawEngine product plan consult:
+  - Status: completed.
+  - Incorporated advice:
+    - Treat this document as PRD, ADR index, backlog, and validation contract.
+    - Make the typed edit API the central invariant.
+    - Add source verification log.
+    - Add autonomy contract.
+    - Add validation evidence requirements.
+    - Add no-change RapidRAW baseline before code-changing strictness work.
+- RawEngine validation/architecture follow-up consult:
+  - Status: completed and incorporated.
+  - Reminder: temporary Codex thread heartbeat `check-rawengine-consult-outputs` was created while the response was running and deleted after the response was incorporated.
+  - Incorporated advice:
+    - Treat RapidRAW as the fork base, not the final architecture contract.
+    - RawEngine owns graph determinism, sidecar migration, render parity, color, safety, APIs, and licensing.
+    - Add graph revision/conflict policy.
+    - Add derived asset/artifact model for computational photography outputs.
+    - Add command envelope, read/write separation, dry-run, approval, and idempotency planning.
+    - Add plugin capability/signing/safe-mode planning.
+    - Add macOS signing, notarization, hardened runtime, entitlements, security-scoped bookmark, Gatekeeper, and update rollback planning.
+
+Future consult tracking entry format:
+
+- Topic.
+- Prompt purpose.
+- Status.
+- Response checked time.
+- Advice incorporated.
+- Advice rejected with reason.
+- Follow-up issues created.
+
+## 12. GitHub Milestone Plan
+
+Milestones and issues are planned in this document now. They should be created in GitHub later, after the public repo exists and before feature implementation starts. Each issue should be scoped so one PR can normally close it.
+
+### 12.1 Issue Fleet Conventions
+
+All future GitHub issues should use stable, searchable titles:
+
+```text
+area(scope): imperative task
+```
+
+Examples:
+
+- `docs(plan): add maintained RawEngine product and technical plan`
+- `repo(governance): protect main and require pull requests`
+- `tooling(eslint): enable strict type-aware rules`
+- `validation(render): add golden render smoke command`
+- `api(edit-graph): define versioned edit operation schema`
+
+Recommended labels:
+
+- Area:
+  - `area:docs`
+  - `area:repo`
+  - `area:ci`
+  - `area:tooling`
+  - `area:frontend`
+  - `area:rust`
+  - `area:tauri`
+  - `area:render`
+  - `area:color`
+  - `area:layers`
+  - `area:masks`
+  - `area:library`
+  - `area:metadata`
+  - `area:export`
+  - `area:computational-photo`
+  - `area:agent`
+  - `area:release`
+- Type:
+  - `type:plan`
+  - `type:adr`
+  - `type:implementation`
+  - `type:test`
+  - `type:ci`
+  - `type:refactor`
+  - `type:research`
+  - `type:docs`
+  - `type:security`
+- Priority:
+  - `priority:p0`
+  - `priority:p1`
+  - `priority:p2`
+  - `priority:p3`
+- Risk:
+  - `risk:low`
+  - `risk:medium`
+  - `risk:high`
+  - `risk:critical`
+- PR size:
+  - `pr:size-small`
+  - `pr:size-medium`
+  - `pr:split-required`
+- Validation:
+  - Use the `validation:*` labels from the validation category list.
+- Status:
+  - `status:blocked`
+  - `status:ready`
+  - `status:needs-design`
+  - `status:needs-validation`
+
+Issue dependency syntax:
+
+- Each issue should include `Blocked by:` and `Blocks:` fields.
+- If no dependency exists, write `Blocked by: none`.
+- If an issue is research-only, it must produce one of:
+  - an ADR,
+  - a follow-up implementation issue list,
+  - a decision to close with no action.
+
+### 12.2 Roadmap Issue Index
+
+This index is the seed list for future GitHub issue creation. Detailed issue bodies should follow the template in Section 13.
+
+#### Milestone 0: Maintained Plan Artifact
+
+- `docs(plan): add maintained RawEngine product and technical plan`
+- `docs(readme): point contributors to the RawEngine plan`
+- `docs(process): add plan maintenance rule`
+
+#### Milestone 0.1: Project Charter And Fork Governance
+
+- `repo(github): create public RawEngine repository`
+- `repo(fork): create public RapidRAW fork for nested checkout`
+- `repo(topology): document origin/upstream remote policy`
+- `repo(governance): protect main and require pull requests`
+- `repo(templates): add issue templates`
+- `repo(templates): add PR template with validation evidence ledger`
+- `repo(labels): create labels for area type priority risk validation and PR size`
+- `repo(security): add security policy`
+- `repo(license): add AGPL compliance note for RapidRAW fork`
+
+#### Milestone 0.5: RapidRAW Baseline Snapshot
+
+- `baseline(upstream): record RapidRAW upstream commit and dependency state`
+- `baseline(build): run existing RapidRAW install lint test and build commands`
+- `baseline(ci): create minimal CI mirror of existing upstream commands`
+- `baseline(render): capture representative baseline screenshots and render outputs`
+- `baseline(debt): create issues for upstream baseline failures`
+
+#### Milestone 1: Shift-Left Quality Foundation
+
+- `tooling(scripts): audit RapidRAW package scripts and CI entrypoints`
+- `tooling(bun): add Bun package manager support`
+- `tooling(bun): migrate frontend CI install and script execution to Bun`
+- `tooling(tsconfig): audit current TypeScript compiler options`
+- `tooling(tsconfig): enable noUncheckedIndexedAccess`
+- `tooling(tsconfig): enable exactOptionalPropertyTypes`
+- `tooling(tsconfig): enable noImplicitOverride`
+- `tooling(tsconfig): enforce noPropertyAccessFromIndexSignature`
+- `tooling(types): add generated type drift checks`
+- `tooling(eslint): audit current config and warning inventory`
+- `tooling(eslint): adopt type-aware parser project service`
+- `tooling(eslint): enable strict type-checked rules`
+- `tooling(eslint): add React and hooks rules`
+- `tooling(eslint): add accessibility rules`
+- `tooling(eslint): add import and boundary rules`
+- `tooling(eslint): add async safety rules`
+- `tooling(eslint): fail CI on warnings`
+- `tooling(eslint): define allowed escape hatches`
+- `tooling(check): add local check scripts mirroring CI`
+- `tooling(hooks): add pre-commit main guard`
+- `tooling(hooks): add pre-push main ref guard`
+- `tooling(hooks): add staged lint and format checks`
+- `ci(quality): remove continue-on-error from required checks`
+- `ci(rust): enforce rustfmt clippy warnings-as-errors and tests`
+- `ci(security): add dependency vulnerability checks`
+- `ci(license): add dependency license checks`
+- `ci(docs): add markdown and link checks`
+
+#### Milestone 2: CI Build Matrix And Release Skeleton
+
+- `ci(topology): split validation full-build image-quality performance and release workflows`
+- `ci(paths): add path filters without skipping workflow changes`
+- `ci(concurrency): cancel superseded PR runs`
+- `ci(cache): add Bun Cargo Tauri and build caches`
+- `ci(macos): add required macOS app build`
+- `ci(matrix): add optional inherited platform build matrix`
+- `ci(artifacts): upload build and failure artifacts`
+- `ci(release): add unsigned release artifact workflow`
+- `ci(release): add SBOM and checksum generation`
+- `ci(release): document signing and notarization placeholders`
+
+#### Milestone 3: Baseline Audit And Regression Harness
+
+- `audit(architecture): document current RapidRAW architecture`
+- `audit(pipeline): document current image pipeline`
+- `audit(sidecar): document current sidecar format`
+- `audit(gpu): document current GPU and shader pipeline`
+- `audit(layers): document current layer and mask model`
+- `audit(ai): document current AI and generative hooks`
+- `validation(sidecar): add sidecar roundtrip tests`
+- `validation(history): add edit history replay tests`
+- `validation(render): add baseline render smoke tests`
+- `validation(fixtures): add fixture download policy`
+- `validation(fixtures): create public fixture manifest`
+- `validation(render): add golden render command`
+- `validation(render): add image artifact comparison script`
+- `validation(performance): add performance smoke script`
+
+#### Milestone 4: Versioned Edit Graph And API Foundation
+
+- `api(edit-graph): define versioned edit operation schema`
+- `api(layers): define layer schema`
+- `api(masks): define mask schema`
+- `api(merge): define merge artifact schema`
+- `api(export): define export recipe schema`
+- `api(schema): add schema validation`
+- `api(schema): add schema migration mechanism`
+- `api(commands): add edit command bus`
+- `api(commands): route representative UI operations through command bus`
+- `api(history): add undo redo command tests`
+- `api(cli): add headless render command`
+- `docs(api): document edit command API`
+
+#### Milestone 5: Color Pipeline Foundation
+
+- `color(audit): audit current RapidRAW color pipeline`
+- `color(adr): decide working color space`
+- `color(adr): decide scene-to-display transform strategy`
+- `color(adr): decide camera profile strategy`
+- `color(docs): add color pipeline design doc`
+- `validation(color): add ColorChecker fixture set`
+- `validation(color): add DeltaE measurement harness`
+- `validation(color): add histogram and scope validation`
+- `color(wb): add white balance picker tests`
+- `color(profile): add camera profile lookup tests`
+- `color(cat): add chromatic adaptation plan`
+- `color(gamut): add gamut mapping plan`
+- `validation(color): add CPU GPU parity checks for core color operations`
+
+#### Milestone 6: Capture One-Class Color Editing
+
+- `color(selective): add advanced selective color ranges`
+- `color(selective): add range smoothness and falloff controls`
+- `color(skin): add skin tone uniformity controls`
+- `color(mask): create color masks from selected ranges`
+- `color(grading): refine color grading wheels`
+- `color(balance-rgb): add color balance RGB style module`
+- `color(channel-mixer): add channel mixer`
+- `color(bw): add black and white mixer`
+- `color(profile): add profile and tone curve controls`
+- `color(presets): add saved color style presets`
+- `color(icc): research ICC profile export path`
+- `ui(color): polish advanced color tools`
+
+#### Milestone 7: Layers And Masking
+
+- `layers(ux): define final layer workflow model`
+- `ui(layers): add polished layer stack UI`
+- `layers(core): add opacity visibility reorder duplicate delete`
+- `layers(core): add per-layer adjustments`
+- `masks(brush): improve brush and eraser masks`
+- `masks(gradient): add linear and radial gradients`
+- `masks(range): add luminance range masks`
+- `masks(range): add color range masks`
+- `masks(compose): add add subtract intersect`
+- `masks(refine): add feather density and edge refine`
+- `masks(overlay): add mask overlay modes`
+- `masks(copy): add mask copy paste`
+- `masks(ai): audit subject sky background masks`
+- `masks(ai): research people and parts masks`
+- `validation(masks): add mask schema and render tests`
+
+#### Milestone 8: Detail Denoise And Wavelet Tools
+
+- `detail(audit): audit current sharpening and noise tools`
+- `detail(sharpen): add capture sharpening`
+- `detail(sharpen): add output sharpening`
+- `detail(deblur): research deconvolution and lens deblur`
+- `detail(local-contrast): refine local contrast`
+- `detail(wavelet): design detail-by-scale controls`
+- `detail(wavelet): implement detail-by-scale controls`
+- `detail(noise): separate chroma and luma noise`
+- `validation(noise): add high ISO fixture set`
+- `detail(defringe): improve defringe controls`
+- `detail(dust): add dust spot visualization`
+- `detail(ai-denoise): research AI denoise path`
+
+#### Milestone 9: Film Simulation Lab
+
+- `film(architecture): define film simulation architecture`
+- `film(lut): add HaldCLUT import validation`
+- `film(looks): add legally safe built-in look collection`
+- `film(grain): add film grain model`
+- `film(halation): add halation model`
+- `film(glow): add bloom and glow model`
+- `film(bw): add black and white film controls`
+- `film(negative): improve negative conversion`
+- `ui(film): add film look browser`
+- `ui(film): add side-by-side film comparison`
+- `film(presets): add film preset save and share`
+- `film(legal): add bundled-look legal review checklist`
+- `validation(film): add film simulation fixture outputs`
+- `consult(negative-lab): get negative processing lab design review`
+- `negative-lab(adr): define negative processing architecture`
+- `negative-lab(ui): design dedicated negative lab workspace`
+- `negative-lab(schema): define negative conversion operation schema`
+- `negative-lab(base): add film base sampling controls`
+- `negative-lab(inversion): add per-channel inversion curves`
+- `negative-lab(batch): add roll-level batch consistency workflow`
+- `negative-lab(presets): define film stock preset metadata and legal policy`
+- `negative-lab(presets): add legally safe major stock preset set`
+- `negative-lab(crop): add frame border and crop detection`
+- `negative-lab(profiles): add scanner and camera-scan profile inputs`
+- `validation(negative-lab): add negative scan fixture manifest`
+- `validation(negative-lab): add color and black-and-white negative render tests`
+- `docs(negative-lab): add user guide for negative workflow`
+
+#### Milestone 10: HDR Merge
+
+- `consult(hdr): get HDR architecture review`
+- `hdr(audit): audit existing RapidRAW HDR merge`
+- `hdr(schema): define HDR merge artifact schema`
+- `hdr(brackets): add bracket detection`
+- `hdr(align): add auto alignment tests`
+- `hdr(merge): add merge weighting strategy`
+- `hdr(deghost): add deghosting strategy`
+- `validation(hdr): add HDR fixture set`
+- `hdr(pipeline): make merged output editable source`
+- `ui(hdr): add HDR merge UI`
+- `api(hdr): add HDR merge API tools`
+- `validation(hdr): add HDR performance tests`
+
+#### Milestone 11: Panorama Stitching
+
+- `consult(panorama): get panorama architecture review`
+- `panorama(audit): audit existing RapidRAW panorama stitcher`
+- `panorama(schema): define panorama artifact schema`
+- `panorama(projection): add projection options`
+- `panorama(boundary): add auto crop and boundary controls`
+- `panorama(exposure): add exposure normalization`
+- `panorama(multiraw): audit multi-row support`
+- `panorama(tiling): add large panorama tiling strategy`
+- `validation(panorama): add panorama fixture set`
+- `ui(panorama): add panorama UI`
+- `api(panorama): add panorama API tools`
+- `validation(panorama): add panorama performance tests`
+
+#### Milestone 12: Focus Stacking
+
+- `consult(focus-stack): get focus stacking architecture review`
+- `focus(schema): define focus stack artifact schema`
+- `focus(align): add alignment path`
+- `focus(sharpness): add sharpness map generation`
+- `focus(blend): add blending strategy`
+- `focus(retouch): add artifact retouch strategy`
+- `validation(focus): add focus bracket fixture set`
+- `ui(focus): add focus stack UI`
+- `api(focus): add focus stack API tools`
+- `validation(focus): add focus stack performance tests`
+
+#### Milestone 13: Super-Resolution
+
+- `consult(super-resolution): get super-resolution strategy review`
+- `sr(modes): define single-image and multi-image modes`
+- `sr(policy): define conservative professional output policy`
+- `sr(align): add multi-image alignment path`
+- `sr(detail): add detail reconstruction strategy`
+- `validation(sr): add resolution chart fixtures`
+- `validation(sr): add real photo fixtures`
+- `ui(sr): add super-resolution UI`
+- `api(sr): add super-resolution API tools`
+- `validation(sr): add performance tests`
+- `validation(sr): add visual artifact review checklist`
+
+#### Milestone 14: OpenAI App-Server Agent
+
+- `consult(agent): get app-server architecture review`
+- `ai(audit): inventory RapidRAW built-in AI features`
+- `ai(api): define provider abstraction for local self-hosted and cloud AI`
+- `agent(docs): add app-server design doc`
+- `agent(schema): add dynamic tool schema package`
+- `agent(schema): add tool call validator`
+- `agent(project): add project and library tools`
+- `agent(preview): add preview histogram and scope tools`
+- `agent(edit-graph): add edit graph tools`
+- `agent(tone-color): add tone and color tools`
+- `agent(layers-masks): add layer and mask tools`
+- `agent(computational): add merge tools`
+- `ai(app-server): expose AI mask tools through Codex app-server`
+- `ai(app-server): expose AI enhancement tools through Codex app-server`
+- `ai(provenance): record model backend and settings in sidecars`
+- `ai(approval): require approval for cloud AI and generative edits`
+- `agent(export): add export tools`
+- `agent(approval): add approval boundaries`
+- `agent(audit): add tool-call audit log`
+- `validation(agent): add agent replay tests`
+- `validation(ai): add AI tool schema and replay tests`
+- `validation(ai): add unavailable-provider fallback tests`
+- `validation(agent): add prompt injection fixtures`
+- `agent(demo): add agent demo workflow`
+
+#### Milestone 15: Professional Workflow Polish
+
+- `ui(shortcuts): add keyboard shortcut editor`
+- `ui(command-palette): add command palette`
+- `ui(compare): add compare and survey views`
+- `ui(reference): add reference image workflow`
+- `export(recipes): add export recipes UI`
+- `export(queue): add batch export queue`
+- `tethering(research): research tethering support`
+- `library(sessions): add sessions workflow`
+- `library(filters): add smart albums and filters`
+- `import(presets): add import presets`
+- `metadata(templates): add metadata templates`
+- `ui(workspaces): add custom workspace layouts`
+- `validation(ui): add high-DPI visual QA`
+- `validation(a11y): add accessibility pass`
+- `docs(sample): add onboarding sample project`
+
+#### Milestone 16: Release Hardening
+
+- `release(crash): add crash and error reporting strategy`
+- `release(privacy): add privacy policy`
+- `release(telemetry): decide telemetry opt-in`
+- `release(macos): add signing plan`
+- `release(macos): add notarization workflow`
+- `release(update): research update mechanism`
+- `release(notes): add release notes automation`
+- `docs(site): add documentation site`
+- `docs(user-guide): add user guide`
+- `docs(api-guide): add developer API guide`
+- `docs(agent-guide): add sample agent guide`
+- `release(benchmarks): add benchmark report`
+- `docs(limitations): add known limitations page`
+
+### Milestone 0: Maintained Plan Artifact
+
+Goal: add the mega PRD/technical plan as the first maintained RawEngine repository artifact.
+
+Issues:
+
+- `docs(plan): add maintained RawEngine product and technical plan`
+  - Labels: `area:docs`, `type:plan`, `priority:p0`, `pr:size-small`, `validation:docs`.
+  - Blocked by: none.
+  - Scope: add `RAW_EDITOR_PLAN.md` to the public RawEngine repo.
+  - Out of scope: clone RapidRAW, implement tooling, create CI, create product code.
+  - PR budget: documentation-only, ideally under 500 changed non-generated lines if the plan is split later; the initial mega doc can exceed this only because it is the founding artifact.
+  - Acceptance criteria: plan includes product scope, architecture, milestones, issue rules, validation gates, source references, and current planning goal.
+  - Validation evidence: markdown renders, links reviewed, git diff only contains intended docs.
+- `docs(readme): point contributors to the RawEngine plan`
+  - Labels: `area:docs`, `type:docs`, `priority:p1`, `pr:size-small`, `validation:docs`.
+  - Blocked by: `docs(plan): add maintained RawEngine product and technical plan`.
+  - Scope: minimal README that explains current planning state and links to the plan.
+  - Acceptance criteria: README does not overclaim implementation status.
+- `docs(process): add plan maintenance rule`
+  - Labels: `area:docs`, `type:docs`, `priority:p1`, `pr:size-small`, `validation:docs`.
+  - Blocked by: `docs(plan): add maintained RawEngine product and technical plan`.
+  - Scope: document that major architecture/product/validation changes must update the plan.
+  - Acceptance criteria: PR template or contribution note includes plan update checkbox.
+
+Definition of done:
+
+- The public repo contains the plan.
+- The plan is explicitly maintained.
+- The first PR is documentation-only unless the user expands scope.
+- No implementation work has started.
+
+### Milestone 0.1: Project Charter And Fork Governance
+
+Goal: establish the public project, fork strategy, and work tracking.
+
+Issues:
+
+- `repo(github): create public RawEngine repository`
+  - Labels: `area:repo`, `type:implementation`, `priority:p0`, `pr:size-small`.
+  - Blocked by: completion of planning goal.
+  - Scope: create public parent RawEngine repo.
+  - Acceptance criteria: repo is public, empty or docs-only, no RapidRAW clone yet unless separately approved.
+- `repo(fork): create public RapidRAW fork for nested checkout`
+  - Labels: `area:repo`, `type:implementation`, `priority:p0`, `pr:size-small`.
+  - Blocked by: public repo decision.
+  - Scope: create public fork of `CyberTimon/RapidRAW`.
+  - Acceptance criteria: fork exists and license metadata remains visible.
+- `repo(topology): document origin/upstream remote policy`
+  - Labels: `area:repo`, `type:docs`, `priority:p0`, `pr:size-small`, `validation:docs`.
+  - Blocked by: fork creation.
+  - Scope: document `RawEngine` parent repo and nested `RapidRaw/` fork checkout.
+  - Acceptance criteria: no ambiguity between parent repo and nested fork.
+- `repo(governance): protect main and require pull requests`
+  - Labels: `area:repo`, `type:implementation`, `priority:p0`, `risk:high`.
+  - Blocked by: public repo creation.
+  - Scope: configure branch protection.
+  - Acceptance criteria: no direct pushes, required checks configured as they become available, force pushes disabled.
+- `repo(templates): add issue templates`
+  - Labels: `area:repo`, `type:docs`, `priority:p1`, `pr:size-small`, `validation:docs`.
+  - Blocked by: plan artifact.
+  - Scope: create issue templates matching this plan.
+- `repo(templates): add PR template with validation evidence ledger`
+  - Labels: `area:repo`, `type:docs`, `priority:p1`, `pr:size-small`, `validation:docs`.
+  - Blocked by: plan artifact.
+  - Scope: create PR template requiring how/why/validation/risk.
+- `repo(labels): create labels for area type priority risk validation and PR size`
+  - Labels: `area:repo`, `type:implementation`, `priority:p1`, `pr:size-small`.
+  - Blocked by: public repo creation.
+  - Scope: create labels listed in this plan.
+- `repo(security): add security policy`
+  - Labels: `area:repo`, `type:security`, `priority:p1`, `pr:size-small`, `validation:security`.
+  - Blocked by: public repo creation.
+  - Scope: add security policy and reporting expectations.
+- `repo(license): add AGPL compliance note for RapidRAW fork`
+  - Labels: `area:repo`, `type:docs`, `priority:p0`, `risk:critical`, `validation:license`.
+  - Blocked by: fork decision.
+  - Scope: document AGPL expectations, notices, source-publication obligations, and dependency license gates.
+
+Definition of done:
+
+- Public repo exists.
+- `main` is protected.
+- Direct pushes to `main` are blocked by GitHub.
+- Project issues and milestones exist.
+- Initial planning document is committed by PR, not direct main commit after protection exists.
+
+### Milestone 0.5: RapidRAW Baseline Snapshot
+
+Goal: prove the public fork builds and behaves like the selected upstream baseline before hardening or migration work.
+
+Issues:
+
+- `baseline(upstream): record RapidRAW upstream commit and dependency state`
+  - Labels: `area:repo`, `type:docs`, `priority:p0`, `pr:size-small`, `validation:docs`.
+  - Blocked by: nested fork checkout.
+  - Scope: record upstream SHA, fork SHA, package manager files, Rust toolchain, Tauri version, workflow files.
+  - Acceptance criteria: baseline note exists and source state is reproducible.
+- `baseline(build): run existing RapidRAW install lint test and build commands`
+  - Labels: `area:tooling`, `type:test`, `priority:p0`, `pr:size-small`, `validation:build`.
+  - Blocked by: upstream commit record.
+  - Scope: run existing commands without changing tooling.
+  - Acceptance criteria: results documented; failures become issues instead of being silently mixed into migration PRs.
+- `baseline(ci): create minimal CI mirror of existing upstream commands`
+  - Labels: `area:ci`, `type:ci`, `priority:p0`, `pr:size-medium`, `validation:build`.
+  - Blocked by: baseline command run.
+  - Scope: add CI that mirrors current upstream commands before strictness.
+  - Acceptance criteria: CI reports baseline pass/fail clearly.
+- `baseline(render): capture representative baseline screenshots and render outputs`
+  - Labels: `area:render`, `type:test`, `priority:p1`, `pr:size-medium`, `validation:render`.
+  - Blocked by: build baseline.
+  - Scope: use legally safe sample files to capture initial outputs.
+  - Acceptance criteria: artifacts recorded with source/license metadata.
+
+Definition of done:
+
+- The fork baseline is documented.
+- Existing failures are tracked as baseline debt.
+- Later strictness and Bun changes have a known comparison point.
+
+### Milestone 1: Shift-Left Quality Foundation
+
+Goal: make the fork safe to change.
+
+Issues:
+
+- `tooling(scripts): audit RapidRAW package scripts and CI entrypoints`
+  - Labels: `area:tooling`, `type:docs`, `priority:p0`, `pr:size-small`, `validation:docs`.
+  - Blocked by: Milestone 0.5.
+  - Scope: map current npm/Bun/Vite/Tauri/Rust commands and workflow usage.
+  - Acceptance criteria: command inventory exists, current failures linked to issues.
+  - Validation evidence: command list and baseline outputs.
+- `tooling(bun): add Bun package manager support`
+  - Labels: `area:tooling`, `type:implementation`, `priority:p0`, `pr:size-medium`, `validation:build`.
+  - Blocked by: script audit.
+  - Scope: add Bun support without broad package churn beyond required lockfile changes.
+  - Acceptance criteria: `bun install --frozen-lockfile` works locally and in CI.
+  - Validation evidence: install logs, lockfile diff, CI run.
+- `tooling(bun): migrate frontend CI install and script execution to Bun`
+  - Labels: `area:ci`, `area:tooling`, `type:ci`, `priority:p0`, `pr:size-medium`, `validation:build`.
+  - Blocked by: Bun package manager support.
+  - Scope: use `oven-sh/setup-bun@v2`, `bun install`, and `bun run` for compatible frontend jobs.
+  - Acceptance criteria: CI uses Bun for frontend path; any Node exceptions are documented.
+- `tooling(tsconfig): harden TypeScript compiler flags in small slices`
+  - Labels: `area:tooling`, `type:implementation`, `priority:p0`, `risk:medium`, `validation:types`.
+  - Blocked by: script audit.
+  - Scope: enable strict flags through the split issues listed in Section 9.1.
+  - Acceptance criteria: typecheck passes with each flag; no broad unrelated refactors.
+- `tooling(eslint): adopt strict type-aware ESLint`
+  - Labels: `area:tooling`, `type:implementation`, `priority:p0`, `risk:medium`, `validation:lint`.
+  - Blocked by: script audit and TypeScript project service readiness.
+  - Scope: use strict type-checked rules and parser project service.
+  - Acceptance criteria: lint passes with no warnings.
+- `tooling(eslint): add React hooks accessibility import and async safety rules`
+  - Labels: `area:frontend`, `area:tooling`, `type:implementation`, `priority:p0`, `validation:lint`, `validation:accessibility`.
+  - Blocked by: strict ESLint foundation.
+  - Scope: add React/hooks/a11y/import/no-floating-promises style checks.
+  - Acceptance criteria: lint passes, rule exceptions documented.
+- `tooling(check): add local check scripts mirroring CI`
+  - Labels: `area:tooling`, `type:implementation`, `priority:p0`, `pr:size-small`, `validation:build`.
+  - Blocked by: script audit.
+  - Scope: define `check`, `check:quick`, `typecheck`, `lint`, `test`, `format:check`, Rust checks.
+  - Acceptance criteria: local commands match CI job commands.
+- `tooling(hooks): add pre-commit main guard`
+  - Labels: `area:tooling`, `type:implementation`, `priority:p0`, `pr:size-small`.
+  - Blocked by: local check scripts.
+  - Scope: block commits while on `main`.
+  - Acceptance criteria: attempted commit on `main` fails with clear message.
+- `tooling(hooks): add pre-push main ref guard`
+  - Labels: `area:tooling`, `type:implementation`, `priority:p0`, `pr:size-small`.
+  - Blocked by: local check scripts.
+  - Scope: block pushes to `refs/heads/main`, including `HEAD:main` from feature branches.
+  - Acceptance criteria: attempted push to main fails locally.
+- `tooling(hooks): add staged lint and format checks`
+  - Labels: `area:tooling`, `type:implementation`, `priority:p1`, `validation:lint`.
+  - Blocked by: ESLint and formatter decision.
+  - Scope: run fast staged checks without making commits painfully slow.
+  - Acceptance criteria: staged violations fail before commit.
+- `ci(quality): remove continue-on-error from required checks`
+  - Labels: `area:ci`, `type:ci`, `priority:p0`, `risk:high`, `validation:build`.
+  - Blocked by: baseline CI and local check scripts.
+  - Scope: required quality gates fail hard.
+  - Acceptance criteria: no required quality gate has `continue-on-error: true`.
+- `ci(rust): enforce rustfmt clippy warnings-as-errors and tests`
+  - Labels: `area:rust`, `area:ci`, `type:ci`, `priority:p0`, `validation:rust`.
+  - Blocked by: baseline CI.
+  - Scope: Rust formatting, clippy `-D warnings`, tests.
+  - Acceptance criteria: CI fails on Rust warnings/errors.
+- `ci(security): add dependency vulnerability checks`
+  - Labels: `area:ci`, `type:security`, `priority:p1`, `validation:security`.
+  - Blocked by: package manager baseline.
+  - Scope: JS and Rust vulnerability checks.
+  - Acceptance criteria: vulnerability reports uploaded or linked.
+- `ci(license): add dependency license checks`
+  - Labels: `area:ci`, `type:security`, `priority:p1`, `risk:critical`, `validation:license`.
+  - Blocked by: package manager baseline.
+  - Scope: license allow/deny policy.
+  - Acceptance criteria: incompatible licenses fail CI.
+- `ci(docs): add markdown and link checks`
+  - Labels: `area:ci`, `area:docs`, `type:ci`, `priority:p1`, `validation:docs`.
+  - Blocked by: plan artifact.
+  - Scope: markdown lint and link validation.
+  - Acceptance criteria: broken internal docs links fail CI.
+
+Definition of done:
+
+- Local `bun run check` passes.
+- CI required gates pass.
+- Hook blocks local commits on `main`.
+- Hook blocks local pushes to `main`.
+- No warnings are allowed in required lint jobs.
+
+### Milestone 2: CI Build Matrix And Release Skeleton
+
+Goal: make full builds reliable and parallelized.
+
+Issues:
+
+- Split GitHub Actions into fast validation, full build, image quality, performance, and release workflows.
+- Add macOS app build as required check.
+- Add matrix strategy for platform builds.
+- Add caching for Bun, Cargo, Tauri, and build artifacts.
+- Add build artifact upload for PRs.
+- Add release workflow skeleton.
+- Add SBOM/checksum generation.
+- Add notarization/signing placeholder documentation.
+- Add failure artifact uploads.
+
+Definition of done:
+
+- PR validation jobs run in parallel.
+- macOS build is required and green.
+- Non-required platform builds are clearly marked.
+- Release workflow can produce unsigned draft artifacts.
+
+### Milestone 3: Baseline Audit And Regression Harness
+
+Goal: understand RapidRAW's current behavior and lock it down before changing internals.
+
+Issues:
+
+- Document current RapidRAW architecture.
+- Document current image pipeline.
+- Document current sidecar format.
+- Document current GPU pipeline.
+- Document current mask/layer model.
+- Document current AI hooks.
+- Add sidecar roundtrip tests.
+- Add edit history replay tests.
+- Add baseline render smoke tests.
+- Add fixture download policy.
+- Create initial public fixture manifest.
+- Add golden render command.
+- Add image artifact comparison script.
+- Add performance smoke script.
+
+Definition of done:
+
+- Baseline behavior is documented.
+- Core existing features have smoke tests.
+- Render outputs can be regenerated and compared.
+- Fixtures have license/source metadata.
+
+### Milestone 4: Versioned Edit Graph And API Foundation
+
+Goal: make UI, CLI, tests, and agent share one editing contract.
+
+Issues:
+
+- Define versioned edit operation schema.
+- Define layer schema.
+- Define mask schema.
+- Define merge artifact schema.
+- Define export recipe schema.
+- Add schema validation.
+- Add schema migration mechanism.
+- Add command bus for edit operations.
+- Route representative UI operations through command bus.
+- Add undo/redo command tests.
+- Add CLI command for headless render.
+- Add API documentation.
+
+Definition of done:
+
+- A representative edit can be applied through UI, API, CLI, and test harness.
+- Edit commands serialize and replay deterministically.
+- Schema changes require tests.
+
+### Milestone 5: Color Pipeline Foundation
+
+Goal: establish a professional color architecture.
+
+Issues:
+
+- Audit current RapidRAW color pipeline.
+- Decide working color space.
+- Decide display transform strategy.
+- Decide camera profile strategy.
+- Add color pipeline design doc.
+- Add ColorChecker fixture set.
+- Add DeltaE measurement harness.
+- Add histogram/scope validation.
+- Add white balance picker tests.
+- Add camera profile lookup tests.
+- Add chromatic adaptation module or integration plan.
+- Add gamut mapping plan.
+- Add CPU/GPU parity checks for core color operations.
+
+Definition of done:
+
+- The color pipeline is documented and testable.
+- Color chart renders have measurable baselines.
+- Future color changes fail CI/nightly when they drift unexpectedly.
+
+### Milestone 6: Capture One-Class Color Editing
+
+Goal: build the core professional color tools.
+
+Issues:
+
+- Add advanced selective color ranges.
+- Add range smoothness/falloff controls.
+- Add skin tone uniformity controls.
+- Add color mask creation from selected range.
+- Add color grading wheels refinement.
+- Add color balance RGB-style module.
+- Add channel mixer.
+- Add black-and-white mixer.
+- Add profile/tone curve controls.
+- Add saved color style presets.
+- Add ICC/profile export research issue.
+- Add UI polish for color tools.
+
+Definition of done:
+
+- User can isolate and adjust specific color ranges precisely.
+- User can normalize skin tone variation.
+- Color edits can be saved, copied, pasted, and invoked through API.
+- Tests cover schema, render smoke, and representative output.
+
+### Milestone 7: Layers And Masking
+
+Goal: make local editing a first-class pro workflow.
+
+Issues:
+
+- Define final layer UX model.
+- Add layer stack UI polish.
+- Add layer opacity and visibility.
+- Add per-layer adjustments.
+- Add layer reorder/duplicate/delete.
+- Add brush mask improvements.
+- Add linear/radial gradient masks.
+- Add luminance range masks.
+- Add color range masks.
+- Add mask add/subtract/intersect.
+- Add mask feather/density/refine.
+- Add mask overlay modes.
+- Add mask copy/paste.
+- Add AI subject/sky/background mask audit.
+- Add people/parts mask research issue.
+- Add mask schema/API tests.
+
+Definition of done:
+
+- User can build multi-layer local edits with combined masks.
+- All layer/mask operations are API-callable.
+- Mask edits are undoable, replayable, and tested.
+
+### Milestone 8: Detail, Denoise, And Wavelet Tools
+
+Goal: compete on fine detail and image cleanup.
+
+Issues:
+
+- Audit current sharpening/noise tools.
+- Add capture sharpening.
+- Add output sharpening.
+- Add deconvolution/lens deblur research.
+- Add local contrast refinement.
+- Add wavelet/detail-by-scale design.
+- Add wavelet/detail-by-scale implementation.
+- Add chroma/luma noise separation.
+- Add high ISO fixture set.
+- Add defringe improvements.
+- Add dust spot visualization.
+- Add AI denoise research issue.
+
+Definition of done:
+
+- Detail controls are strong enough for real RAW finishing.
+- Changes are tested on high ISO, fine texture, and edge fixtures.
+- Performance remains interactive for common files.
+
+### Milestone 9: Film Simulation Lab
+
+Goal: make film looks and negative processing high quality, controllable, legally safe, and workflow-complete.
+
+Issues:
+
+- Define film simulation architecture.
+- Add HaldCLUT import validation.
+- Add open built-in look collection.
+- Add film grain model.
+- Add halation model.
+- Add bloom/glow model.
+- Add black-and-white film controls.
+- Add negative conversion improvements.
+- Add film look browser UI.
+- Add side-by-side film comparison view.
+- Add film preset save/share.
+- Add legal review checklist for bundled looks.
+- Add film simulation fixture outputs.
+- Consult on the full negative processing lab before design or implementation.
+- Define negative processing architecture.
+- Design dedicated negative lab workspace.
+- Define negative conversion operation schema.
+- Add film base sampling controls.
+- Add per-channel inversion curves.
+- Add roll-level batch consistency workflow.
+- Define film stock preset metadata and legal policy.
+- Add legally safe major stock preset set.
+- Add frame border and crop detection.
+- Add scanner and camera-scan profile inputs.
+- Add negative scan fixture manifest.
+- Add color and black-and-white negative render tests.
+- Add negative workflow user guide.
+
+Definition of done:
+
+- Film looks are controllable beyond a simple LUT.
+- Built-in looks are legally safe.
+- Film simulations are API-callable and regression tested.
+- Negative processing has a dedicated UI plan and implementation path.
+- Major film stock presets have provenance and legal review.
+- Negative conversions are validated against color and black-and-white scan fixtures.
+
+### Milestone 10: HDR Merge
+
+Goal: produce editable high-quality HDR merge outputs.
+
+Issues:
+
+- Consult on HDR merge architecture.
+- Audit existing RapidRAW HDR merge.
+- Define HDR merge artifact schema.
+- Add bracket detection.
+- Add auto alignment tests.
+- Add merge weighting strategy.
+- Add deghosting strategy.
+- Add HDR fixture set.
+- Add merged output as editable source.
+- Add HDR merge UI.
+- Add HDR merge API tools.
+- Add HDR merge performance tests.
+
+Definition of done:
+
+- User can merge bracketed RAWs into an editable high-dynamic-range result.
+- The output enters the normal edit pipeline.
+- Motion and alignment cases are validated.
+
+### Milestone 11: Panorama Stitching
+
+Goal: produce professional editable panorama outputs.
+
+Issues:
+
+- Consult on panorama architecture.
+- Audit existing RapidRAW panorama stitcher.
+- Define panorama artifact schema.
+- Add projection options.
+- Add auto crop/boundary controls.
+- Add exposure normalization.
+- Add multi-row support audit.
+- Add large panorama tiling strategy.
+- Add panorama fixture set.
+- Add panorama UI.
+- Add panorama API tools.
+- Add panorama performance tests.
+
+Definition of done:
+
+- User can stitch RAW sequences into an editable panorama.
+- Projection and boundary controls are available.
+- Large files have bounded memory behavior.
+
+### Milestone 12: Focus Stacking
+
+Goal: support all-in-focus merges for macro/product workflows.
+
+Issues:
+
+- Consult on focus stacking architecture.
+- Define focus stack artifact schema.
+- Add alignment path.
+- Add sharpness map generation.
+- Add blending strategy.
+- Add artifact retouch strategy.
+- Add focus bracket fixture set.
+- Add focus stack UI.
+- Add focus stack API tools.
+- Add focus stack performance tests.
+
+Definition of done:
+
+- User can create an editable focus stack merge.
+- Stack artifacts can be inspected and corrected.
+- Results are validated against macro/product fixtures.
+
+### Milestone 13: Super-Resolution
+
+Goal: support high-quality resolution enhancement without irresponsible hallucination.
+
+Issues:
+
+- Consult on super-resolution strategy.
+- Define single-image vs multi-image modes.
+- Define conservative/professional output policy.
+- Add multi-image alignment path.
+- Add detail reconstruction strategy.
+- Add resolution chart fixtures.
+- Add real photo fixtures.
+- Add super-resolution UI.
+- Add super-resolution API tools.
+- Add performance tests.
+- Add visual artifact review checklist.
+
+Definition of done:
+
+- User can create higher-resolution outputs from suitable input.
+- Professional mode avoids hallucinated detail.
+- Outputs are benchmarked against charts and real photos.
+
+### Milestone 14: OpenAI App-Server Agent
+
+Goal: make RawEngine controllable by a high-performance expert editing agent.
+
+Issues:
+
+- Consult on app-server architecture.
+- Audit RapidRAW built-in AI features.
+- Define provider abstraction for local, self-hosted, and cloud AI.
+- Add app-server design doc.
+- Add dynamic tool schema package.
+- Add tool call validator.
+- Add project/library tools.
+- Add preview/histogram/scope tools.
+- Add edit graph tools.
+- Add tone/color tools.
+- Add layer/mask tools.
+- Add computational merge tools.
+- Expose inherited AI mask tools through app-server tools where practical.
+- Expose inherited AI enhancement tools through app-server tools where practical.
+- Add AI provenance and provider metadata to sidecars/artifacts.
+- Add approval gates for cloud AI and generative edits.
+- Add export tools.
+- Add approval boundaries.
+- Add audit log.
+- Add agent replay tests.
+- Add AI tool schema and replay tests.
+- Add unavailable-provider fallback tests.
+- Add prompt injection test fixtures.
+- Add agent demo workflow.
+
+Definition of done:
+
+- Agent can inspect an image, propose a plan, apply edits through tools, and show before/after output.
+- Every agent operation is logged and replayable.
+- Ambiguous or expensive actions require approval.
+
+### Milestone 15: Professional Workflow Polish
+
+Goal: make RawEngine feel like a polished working tool.
+
+Issues:
+
+- Add keyboard shortcut editor.
+- Add command palette.
+- Add compare/survey view.
+- Add reference image workflow.
+- Add export recipes UI.
+- Add batch export queue.
+- Add tethering research issue.
+- Add sessions workflow.
+- Add smart albums/filters.
+- Add import presets.
+- Add metadata templates.
+- Add custom workspace layouts.
+- Add high-DPI visual QA.
+- Add accessibility pass.
+- Add onboarding sample project.
+
+Definition of done:
+
+- Common professional workflows are fast and coherent.
+- UI polish is validated with screenshots and manual checklist.
+- The editor feels like an app, not a tech demo.
+
+### Milestone 16: Release Hardening
+
+Goal: prepare credible public releases.
+
+Issues:
+
+- Add crash/error reporting strategy.
+- Add privacy policy.
+- Add telemetry opt-in decision.
+- Add macOS signing plan.
+- Add notarization workflow.
+- Add update mechanism research.
+- Add release notes automation.
+- Add documentation site.
+- Add user guide.
+- Add developer API guide.
+- Add sample agent guide.
+- Add benchmark report.
+- Add known limitations page.
+
+Definition of done:
+
+- A public macOS release artifact can be produced.
+- Users can install, run, and understand limitations.
+- Contributors can work from issues and docs.
+
+## 13. Initial Issue Template
+
+Each implementation issue should include:
+
+```md
+## Goal
+
+What user-visible or engineering capability this issue adds.
+
+## Milestone
+
+The milestone this issue belongs to.
+
+## Labels
+
+Area, type, priority, PR size, risk, and validation labels.
+
+## Blocked By
+
+List dependencies, or `none`.
+
+## Blocks
+
+List follow-on issues, or `none`.
+
+## PR Size Budget
+
+Small, medium, or split-required. Explain why.
+
+## Scope
+
+What is included.
+
+## Out Of Scope
+
+What is intentionally deferred.
+
+## Implementation Notes
+
+Relevant code areas, docs, risks, or design constraints.
+
+## Acceptance Criteria
+
+- [ ] Concrete outcome 1
+- [ ] Concrete outcome 2
+- [ ] Concrete outcome 3
+
+## Validation
+
+- [ ] Exact local commands listed
+- [ ] Tests added or updated
+- [ ] Screenshots/artifacts added if UI or image output changed
+- [ ] Validation evidence ledger completed
+- [ ] CI green
+- [ ] Skipped checks listed with reason
+
+## Definition Of Done
+
+Concrete completion criteria.
+```
+
+## 14. Initial PR Template
+
+```md
+## How
+
+Describe the implementation approach.
+
+## Why
+
+Explain why this benefits RawEngine.
+
+## Validation
+
+- Linked issue:
+- Local commands run:
+- CI run:
+- Required checks:
+- Skipped checks and reason:
+- UI screenshots:
+- Image/render artifacts:
+- Before/after comparison:
+- Fixture/source manifest updates:
+
+## Risk
+
+Describe risky areas and rollback path.
+
+## Plan Impact
+
+- [ ] No plan update needed
+- [ ] `RAW_EDITOR_PLAN.md` updated
+- [ ] Follow-up issue created for plan drift
+```
+
+## 15. Autonomous Work Protocol
+
+For future implementation work, the agent should follow this protocol:
+
+1. Confirm the active milestone and issue.
+2. Read relevant code before proposing changes.
+3. Use consult for high-risk design, UI workflow, color science, stitching, HDR, focus stacking, super-resolution, or app-server tool design.
+4. Use Chrome plugin for internet sample image gathering and source/license verification when local testing needs external images.
+5. Use image generation skill when artificial visual assets or controlled test imagery are useful.
+6. Create or switch to a feature branch.
+7. Make a small to medium scoped change.
+8. Run local validation.
+9. Attach artifacts for UI/image changes.
+10. Open PR.
+11. Watch CI.
+12. Fix failures.
+13. Keep issue/PR status updated.
+
+Do not bypass protected `main`. Do not weaken gates to get a PR green unless the weakening itself is explicitly approved and tracked as technical debt.
+
+## 16. Risk Register
+
+### License Risk
+
+RapidRAW is AGPL-3.0. A public fork is compatible with the user's intent, but RawEngine must keep source distribution and notices clean, including any networked app-server integration.
+
+Mitigation:
+
+- Add license audit.
+- Track third-party dependency licenses.
+- Avoid proprietary assets.
+- Document AGPL obligations.
+
+Dependency/license policy:
+
+- Maintain an allow/deny/review list.
+- Clearly compatible licenses can be allowed after review:
+  - AGPL/GPL-compatible dependencies where appropriate.
+  - MIT.
+  - Apache-2.0.
+  - BSD variants.
+  - MPL-2.0 only after review.
+- Require explicit review for:
+  - GPL/AGPL boundary-sensitive libraries.
+  - native binary dependencies.
+  - model weights.
+  - LUTs, ICCs, DCPs, film simulation assets.
+  - AI services or SDKs.
+  - font/icon/media assets.
+- Forbid unless explicitly approved:
+  - proprietary Capture One/Adobe assets.
+  - copied competitor UI assets.
+  - unlicensed film stock profiles.
+  - sample images without usable license.
+  - dependencies with unclear source availability.
+- CI should fail on:
+  - denied licenses.
+  - unknown licenses after the allowlist is mature.
+  - missing notices for bundled assets.
+  - missing source/license metadata for fixtures.
+
+### Scope Risk
+
+The requested feature set is larger than most open RAW editors.
+
+Mitigation:
+
+- Use milestones.
+- Keep PRs small/medium.
+- Build validation before major feature work.
+- Prioritize foundations before polish-heavy feature expansion.
+
+### Color Science Risk
+
+Professional color quality is difficult and easy to regress.
+
+Mitigation:
+
+- Create a documented color pipeline.
+- Use measured fixtures.
+- Add DeltaE/color chart tests.
+- Use consult for color architecture.
+- Keep CPU/GPU parity tests.
+
+### Performance Risk
+
+Layers, masks, HDR, panorama, and super-resolution can blow up memory and latency.
+
+Mitigation:
+
+- Add performance budgets.
+- Use tiled processing for large outputs.
+- Separate preview and final render paths.
+- Track memory in CI/nightly tests.
+
+### UI Complexity Risk
+
+Professional features can make the UI ugly or overwhelming.
+
+Mitigation:
+
+- Keep a polished default surface.
+- Move expert controls into advanced panels.
+- Use progressive disclosure.
+- Validate screenshots regularly.
+- Use consult for workflow design.
+
+### Agent Safety Risk
+
+An agent that can edit images and files can make large unintended changes.
+
+Mitigation:
+
+- Make originals immutable.
+- Require approvals for batch/export/delete/move/cloud operations.
+- Log every tool call.
+- Make edits undoable and replayable.
+- Add prompt injection tests.
+
+### Test Asset Risk
+
+RAW files and sample photos may have licensing or size problems.
+
+Mitigation:
+
+- Maintain fixture manifest.
+- Verify sources with Chrome when needed.
+- Use Git LFS or download scripts.
+- Prefer open and vendor-provided samples.
+
+## 17. First Implementation Sequence
+
+When implementation begins, do this in order:
+
+1. Create public RawEngine repo.
+2. Create a feature branch with `codex/` prefix.
+3. Open the first future PR: add and establish this maintained PRD/technical plan as a documentation-only artifact.
+4. Add minimal README, issue template, and PR template only if included in the approved first PR scope.
+5. Merge the plan PR through review.
+6. Add branch protection to `main`.
+7. Add issue labels, templates, PR template, milestones, and initial issues if not already done in the first PR.
+8. Fork RapidRAW publicly.
+9. Clone the fork under `/Users/cgas/Documents/RawEngine/RapidRaw`.
+10. Run the no-change RapidRAW baseline snapshot.
+11. Audit RapidRAW scripts, lint config, TS config, Rust checks, and workflows.
+12. Add Bun support.
+13. Add strict lint/typecheck gates.
+14. Add local hooks blocking `main`.
+15. Add parallel GitHub Actions required checks.
+16. Add baseline sidecar/render validation.
+17. Only then begin feature work.
+
+## 18. Open Decisions
+
+These decisions are not blockers for this planning document, but they should become issues:
+
+- Exact repository name: `RawEngine`, `rawengine`, or another public name.
+- Whether to keep RapidRAW branding during early fork work or immediately rebrand.
+- Hook tool choice: Lefthook, Husky, pre-commit, or custom scripts.
+- Formatter choice if RapidRAW's current formatter is insufficient.
+- Required platform matrix beyond macOS.
+- Whether to require signed commits immediately.
+- Whether to use Git LFS for fixtures from day one.
+- Whether app-server runs in-process, as a sidecar process, or as a separate local service.
+- Whether to use a catalog database immediately or start with sidecars/folders only.
+- Which open sample RAW corpus to standardize on first.
+
+## 19. Glossary
+
+- API-first editing engine: the rule that UI, CLI, batch jobs, plugins, tests, and agent tools all mutate images through the same typed command layer.
+- ArtifactNode: an edit graph node representing a derived output such as HDR merge, panorama, focus stack, or super-resolution result.
+- Catalog: a searchable/indexed database for library workflow, previews, metadata, and collections. It should be rebuildable where practical.
+- Command envelope: the versioned wrapper around an edit/API command, including actor, target, expected graph revision, parameters, dry-run, approval, and result.
+- DerivedAsset: an editable output generated from one or more source assets through computational photography operations.
+- Edit graph: the versioned non-destructive graph of RAW decode settings, operations, layers, masks, derived artifacts, and output transforms.
+- Fixture manifest: a tracked record of test images and sample assets, including source URL, license, hash, metadata, and validation purpose.
+- Graph revision: the version identifier used to detect concurrent or stale edits.
+- Sidecar: portable edit-state file stored next to or associated with originals; source of truth for non-destructive edits when no catalog is present.
+- Source asset: an original image or RAW file that RawEngine must not modify.
+- Tool schema: strict JSON Schema or equivalent typed definition for an agent/API tool.
+- Validation evidence ledger: the PR section that records exact commands, CI, artifacts, skipped checks, and residual risk.
