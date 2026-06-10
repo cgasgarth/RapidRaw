@@ -24,6 +24,7 @@ on:
       upload-artifacts:
         required: false
         type: boolean
+        default: true
       repository:
         required: false
         type: string
@@ -203,7 +204,7 @@ jobs:
           gh release upload "$tag_name" "$RUNNER_TEMP"/android-release-assets/* --clobber
 
       - name: Upload Android Artifacts
-        if: ${{ inputs.mobile == 'android' && inputs.release-id == '' }}
+        if: ${{ inputs.upload-artifacts && inputs.mobile == 'android' && inputs.release-id == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.asset-prefix }}_android${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
@@ -215,7 +216,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload Windows Artifacts
-        if: ${{ startsWith(inputs.platform, 'windows') && inputs.release-id == '' && inputs.mobile == '' }}
+        if: ${{ inputs.upload-artifacts && startsWith(inputs.platform, 'windows') && inputs.release-id == '' && inputs.mobile == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
@@ -227,7 +228,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload Linux/macOS Artifacts
-        if: ${{ !startsWith(inputs.platform, 'windows') && inputs.release-id == '' && inputs.mobile == '' }}
+        if: ${{ inputs.upload-artifacts && !startsWith(inputs.platform, 'windows') && inputs.release-id == '' && inputs.mobile == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
