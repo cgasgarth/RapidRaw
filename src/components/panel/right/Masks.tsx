@@ -13,6 +13,7 @@ import {
   User,
   Sun,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import i18n from 'i18next';
 
 export enum Mask {
@@ -46,7 +47,7 @@ export enum ToolType {
 
 export interface MaskType {
   disabled: boolean;
-  icon: any;
+  icon: LucideIcon;
   id?: string;
   name: string;
   type: Mask;
@@ -58,6 +59,7 @@ export interface SubMask {
   mode: SubMaskMode;
   name?: string;
   opacity: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy mask tools use a dynamic parameter bag; type per-mask shapes when ImageCanvas and mask controls are tightened together.
   parameters?: any;
   type: Mask;
   visible: boolean;
@@ -91,7 +93,7 @@ export function getSubMaskName(subMask: Pick<SubMask, 'name' | 'type'>) {
   return subMask.name?.trim() || formatMaskTypeName(subMask.type);
 }
 
-export const MASK_ICON_MAP: Record<Mask, any> = {
+export const MASK_ICON_MAP: Record<Mask, LucideIcon> = {
   [Mask.AiDepth]: BringToFront,
   [Mask.AiForeground]: User,
   [Mask.AiSky]: Cloud,
@@ -142,7 +144,7 @@ export const MASK_PANEL_CREATION_TYPES: Array<MaskType> = [
     icon: MoreHorizontal,
     id: 'others',
     name: 'Others',
-    type: null as any,
+    type: Mask.All,
   },
 ];
 
@@ -221,7 +223,7 @@ export const SUB_MASK_COMPONENT_TYPES: Array<MaskType> = [
     icon: MoreHorizontal,
     id: 'others',
     name: 'Others',
-    type: null as any,
+    type: Mask.All,
   },
 ];
 
