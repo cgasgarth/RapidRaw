@@ -26,6 +26,13 @@ body:
       description: Add any other context, screenshots, mockups, or examples
       placeholder: Any additional information, images, or examples that would help illustrate your request...
 
+  - type: textarea
+    id: plan-alignment
+    attributes:
+      label: Plan alignment
+      description: If this maps to RAW_EDITOR_PLAN.md, include the requirement, milestone, issue, or validation category.
+      placeholder: e.g. REQ-COLOR-002, Milestone 7, validation:render...
+
   - type: checkboxes
     id: similar-requests
     attributes:
@@ -33,4 +40,6 @@ body:
       description: Have you checked for similar feature requests?
       options:
         - label: I have searched existing issues and discussions and didn't find a duplicate
+          required: true
+        - label: I understand that accepted roadmap changes should update RAW_EDITOR_PLAN.md when they alter product scope, architecture, validation policy, or execution order.
           required: true
