@@ -35,6 +35,48 @@ The original planning goal produced this document, the milestone fleet, issue se
 
 Before starting a work item, identify the active issue, milestone, dependencies, branch name, expected PR size, and validation commands. Each autonomous implementation cycle should end with one merged PR, one evidence-backed blocked report, or one completed milestone summary, then continue to the next unblocked issue while the active goal remains in force.
 
+### Final Goal Review Artifact
+
+Before the active implementation goal can be considered finished, RawEngine must include a local HTML review page that the user can open in a browser to inspect the work completed during the goal.
+
+Required artifact:
+
+- A local HTML page committed or generated from committed source, with a stable documented path.
+- It must summarize every new user-visible feature, UI change, validation surface, and major technical capability added during the goal.
+- It must link each feature or validation area back to its GitHub issue, PR, milestone, relevant ADR or plan section, and validation evidence.
+- It must include screenshots or render artifacts for user-visible features, UI flows, dialogs, panels, editor states, generated artifacts, and any visual image-processing behavior that was added or changed.
+- It must include a test/validation section that lists local commands, GitHub Actions checks, fixture/golden-image checks, UI screenshots, render comparisons, skipped checks with reasons, and residual risks.
+- It must include design decisions the user would want to know: command/API choices, color-management choices, validation-gate choices, AI/app-server boundaries, UI tradeoffs, data/provenance model choices, and any feature limitations.
+- It must include a spec coverage section that maps completed work back to this plan's requirement IDs, milestones, and open follow-up issues.
+- It must be usable offline for local review except for external links to GitHub, documentation, or source provenance pages.
+- It must avoid marketing language and should read as an engineering review dashboard: concrete, evidence-backed, and easy to scan.
+
+Screenshot requirements:
+
+- Each user-visible feature should have at least one screenshot or rendered artifact unless the PR explicitly documents why that is not applicable.
+- Screenshots should show the feature working, not only static UI shells.
+- For image-processing features, include before/after or source/output artifacts when licensing and storage policy allow.
+- For agent/app-server tools, include dry-run/apply/audit screenshots or captured HTML-rendered logs showing the tool path and safety boundary.
+
+This review page is part of the completion definition for the long-running implementation goal. If the page cannot be fully completed before the time box, the page must still exist and clearly list missing sections, missing screenshots, and follow-up issues.
+
+### Consult-Backed Contract Freeze Gate
+
+The 2026-06-10 RapidRaw project consult recommended adding a contract-freeze milestone before serious feature work in layers, color, computational photography, Negative Lab, app-server tools, or AI migration. This is now a planning rule:
+
+- No UI-only edit paths: every meaningful edit, merge, layer, mask, Negative Lab, export, and agent operation must be represented as a typed command or read-only query.
+- No direct app-server access to raw Tauri invokes: app-server tools call the same typed command layer as the UI and must support dry-run, approval boundaries, audit logging, cancellation, and replay.
+- No implicit sRGB/display assumptions: color, preview, export, and proofing PRs must name the working space, display/output transform, and macOS color-management expectation they touch.
+- No schema-changing PR without migration policy: edit graph, sidecar, catalog, command, tool, fixture, preset, artifact, layer, mask, and AI provenance schemas require versioning and migration tests.
+- Warnings are validation outputs: image-quality warnings, fixture warnings, AI confidence warnings, color-management warnings, and legal/provenance warnings must be testable and stable enough to review.
+- High-risk issues must name their blocking ADR and validation gate before implementation starts.
+- Nondeterministic AI/provider operations require provenance: provider, model/version, prompt/tool input, seed when available, source asset hash, generated output hash, approval state, and fallback path.
+- Derived computational outputs are first-class artifacts, not anonymous rendered files: HDR, panorama, focus-stack, super-resolution, generated positives, denoise/enhance outputs, and AI edits need provenance, invalidation, and editability policy.
+- RapidRAW's current `jsAdjustments`-style broad payload seams should be wrapped behind a typed command envelope before agent, layer, mask, or large color work depends on them.
+- Future masks and layers should move behind discriminated schemas instead of inheriting broad `any` or UI-only shape seams.
+
+Contract-freeze work should produce ADRs, schema stubs, validation scripts, and GitHub issues before large feature PRs. It does not block narrow lint/type/CI hardening work, baseline audits, or plan/backlog refinement.
+
 ## Current Repo State
 
 - Parent workspace: `/Users/cgas/Documents/RawEngine`
@@ -1803,6 +1845,86 @@ Target architecture:
 - Local service boundary for editor operations.
 - Optional app-server process for chat agent integration.
 
+### 8.1.0 Downstream Validation Architecture
+
+Contract-first architecture should be added before large feature work without requiring an immediate rewrite of every existing RapidRAW adjustment.
+
+Target module layout:
+
+- `packages/rawengine-schema/`
+  - Source of truth for TypeBox-authored command, query, graph, artifact, fixture, bridge error, provenance, and app-server tool schemas.
+  - Generates JSON Schema, TypeScript types, OpenAI/app-server tool schemas, sample payloads, manifest hashes, and schema-drift snapshots.
+  - Uses Ajv for TypeScript/runtime validation.
+- `src-tauri/src/edit_core/`
+  - Pure Rust edit graph and command core with no Tauri, React, or UI coupling.
+  - Owns command replay, graph mutation, migration, typed errors, derived artifact records, and deterministic validation entrypoints.
+- `src-tauri/src/bridge/`
+  - Tauri adapter layer only.
+  - Validates incoming JSON against generated contract artifacts, maps typed errors, manages task lifecycle, progress events, cancellation, and artifact/cache handles.
+- UI/Zustand client facade:
+  - UI becomes a command/query bus client.
+  - Existing adjustment snapshot history can remain as a migration facade while command-backed graph nodes are introduced incrementally.
+- Future CLI and app-server:
+  - Use the same `CommandEnvelopeV1`, query envelope, graph schema, artifact handles, and typed errors as the UI path.
+
+Schema policy:
+
+- TypeBox plus JSON Schema plus Ajv is the schema source of truth for TypeScript-facing contracts.
+- Rust uses serde structs generated from or contract-tested against the same schema samples; Rust and TypeScript must not become independent schema authorities.
+- Rust bridge structs should use `deny_unknown_fields` where practical and sample contract tests where generated parity is not yet automated.
+- Schema artifacts must include stable sample payloads for command, query, error, graph, artifact, fixture, and app-server tool cases.
+- Schema manifests should record hashes so CI can detect uncommitted generated-output drift.
+
+Bridge policy:
+
+- No new editing bridge should return `Result<T, String>`.
+- New bridge calls return typed `BridgeResult<T>` or a typed error envelope with error code, message, severity, retryability, source, validation path, and optional remediation.
+- New command results should not return large base64 image payloads. They should return artifact IDs, cache handles, paths controlled by the app, preview handles, or streamed/progress handles.
+- Every mutating command needs `expectedGraphRevision`, actor metadata, approval metadata, dry-run/preview options, provenance, and typed result/errors.
+- Long-running operations need task IDs, progress events, cancellation, cleanup, and artifact invalidation behavior.
+- Sidecars should dual-write legacy RapidRAW adjustments plus `rawengineGraph` until a migration ADR and tests exist.
+
+App-server tool policy:
+
+- App-server tools are generated from the command/query schema registry.
+- The app-server must never expose raw Tauri invokes or UI automation as editing tools.
+- Mutating tools require dry-run and scoped approval paths before apply.
+- Tool outputs should include audit IDs, command IDs, graph revisions, warnings, artifact handles, and follow-up suggestions.
+- Tool schema drift, approval enforcement, prompt-injection fixtures, and replay behavior are required validation surfaces.
+
+Edit architecture PR split rule:
+
+- PRs that introduce contracts should be split in this order where practical:
+  1. ADR/index documentation.
+  2. schema source package or schema file.
+  3. generated artifacts and drift check.
+  4. sample payloads and contract tests.
+  5. Rust serde mirror or generated Rust bindings.
+  6. bridge adapter and typed error mapping.
+  7. command bus integration.
+  8. one representative UI route migration.
+  9. replay/headless/app-server exposure.
+- Do not combine schema source, bridge adapter, UI migration, and app-server tool exposure in one large PR unless there is no safe intermediate state.
+- Every schema PR must document migration, compatibility, generated artifacts, and validation commands.
+
+Downstream contract validation commands to add:
+
+- `bun run schema:check`: validate generated schema artifacts are current.
+- `bun run schema:samples`: validate sample command/query/error/graph/artifact/tool payloads.
+- `bun run validate:commands`: replay sample commands against the in-memory command bus.
+- `bun run validate:bridge`: validate bridge result/error samples and Rust contract fixtures.
+- `bun run validate:fixtures`: lint fixture manifests, hashes, storage class, source URLs, and license fields.
+- `bun run validate:golden`: run synthetic golden/reference render smoke checks.
+- `bun run validate:tools`: validate generated app-server tool schemas and approval metadata.
+- `bun run validate:artifacts`: validate derived artifact provenance and invalidation samples.
+
+Fixture and golden image policy:
+
+- Start with synthetic fixtures for schema, coordinate, mask, artifact, warning, and golden-reference validation.
+- Add real RAW/image fixtures only after fixture license, hash, provenance, storage, and privacy policy lands.
+- Synthetic fixtures are still first-class: they need generation source, deterministic parameters, expected warnings, and output hashes where applicable.
+- Real fixtures must not enter the repo or CI cache without manifest entries and legal/storage review.
+
 ### 8.1.1 Architecture Decision Records To Create
 
 The plan should be converted into explicit ADRs as implementation proceeds. ADRs may live inside this document at first, then move to `docs/adr/` when that becomes easier to maintain.
@@ -1845,6 +1967,51 @@ Required ADR fleet:
 - `ADR-012: Plugin and extension isolation`
   - Decision: plugin system waits until core API stabilizes and should prefer isolated/WASM or process boundaries.
   - Validation: permission model, license declaration, failure behavior.
+
+Contract-freeze ADRs to add before major feature implementation:
+
+- `ADR-API-001: Typed command envelope and query envelope`
+  - Decision: every mutating edit path uses a versioned command envelope with command ID, target scope, before revision, dry-run flag, provenance, and expected warnings.
+  - Validation: command schema drift CI, representative replay smoke, dry-run snapshot, approval-boundary test, and no raw Tauri invoke exposure in app-server tools.
+- `ADR-GRAPH-001: Edit graph schema, migration, and replay contract`
+  - Decision: graph operations are discriminated, versioned, migratable, and replayable across UI, CLI, tests, and app-server tools.
+  - Validation: sidecar roundtrip, migration fixture, graph replay smoke, revision-conflict test, and schema-diff failure on unreviewed changes.
+- `ADR-COLOR-001: Working-space, display-transform, and proofing policy`
+  - Decision: RawEngine names its internal working space, scene/display boundary, display proofing policy, export profile behavior, and out-of-gamut warning semantics.
+  - Validation: ColorChecker metrics, neutral drift, gamut warnings, macOS display-profile smoke, and CPU/GPU parity fixtures.
+- `ADR-MAC-001: macOS color management and display proofing`
+  - Decision: macOS preview/export behavior explicitly accounts for display profiles, high-DPI rendering, wide-gamut displays, and screenshots used as validation artifacts.
+  - Validation: macOS fixture machine metadata, display-profile smoke, screenshot/render artifact policy, and export-profile tests.
+- `ADR-GPU-001: WGPU/CPU reference parity`
+  - Decision: GPU is the interactive path, CPU/reference renders are the deterministic oracle for selected fixtures, and tolerances are operation-specific.
+  - Validation: shader compile, CPU/GPU golden comparison, tolerance manifest, fallback behavior, and precision-regression budget.
+- `ADR-COORD-001: Coordinate spaces and overlay mapping`
+  - Decision: all crops, masks, brush strokes, gradients, transforms, previews, WGPU overlays, and UI hit tests declare their coordinate space and transform chain.
+  - Validation: crop/rotate/zoom overlay smoke, mask alignment fixtures, WGPU overlay parity, and app-server command coordinate roundtrip.
+- `ADR-MASK-001: Layer and mask discriminated schemas`
+  - Decision: layers, masks, AI masks, ranges, gradients, brushes, and composite operations use discriminated schemas with explicit coordinate and provenance fields.
+  - Validation: schema lint, mask composition fixtures, layer reorder replay, AI mask provenance, and geometry invalidation tests.
+- `ADR-MASK-002: Mask/layer render order and blend semantics`
+  - Decision: layer stack order, blend modes, per-layer adjustments, mask composition, and invalidation are graph-native and deterministic.
+  - Validation: blend-mode smoke renders, opacity fixtures, undo/redo replay, export roundtrip, and CPU/GPU parity.
+- `ADR-ART-001: Derived artifact provenance and invalidation`
+  - Decision: HDR, panorama, focus-stack, super-resolution, generated positives, denoise/enhance outputs, and AI results are first-class derived artifacts.
+  - Validation: artifact schema test, source hash/provenance roundtrip, stale-artifact invalidation, editable-source smoke, and no-original-overwrite test.
+- `ADR-AI-001: AI provider migration and provenance`
+  - Decision: RapidRAW built-in AI features migrate behind typed RawEngine APIs where practical, with provider provenance, fallback semantics, and confidence warnings.
+  - Validation: provider fallback test, audit log, warning stability, local/offline behavior, and model/version fixture.
+- `ADR-AGENT-001: OpenAI app-server tools, approvals, and replay`
+  - Decision: the app-server expert agent uses generated tool schemas from the command/query registry and cannot mutate files without scoped approval and replayable audit.
+  - Validation: schema generation, app-server approval tests, prompt-injection fixtures, dry-run/apply replay, cancellation, rollback, and audit-log snapshots.
+- `ADR-FIX-001: Fixture manifest, corpus, and legal provenance`
+  - Decision: every committed or downloaded validation asset has source, license, hash, intended use, storage class, and privacy/legal metadata.
+  - Validation: fixture manifest lint, hash verification, license allowlist, sample download cache policy, and prohibited-asset checks.
+- `ADR-VALID-001: Shift-left validation gate naming and ownership`
+  - Decision: each high-risk feature family declares named local/CI/nightly gates before implementation.
+  - Validation: changed-file-to-gate mapping, PR evidence ledger, required-check mapping, skipped-check rationale, and milestone gate summary.
+- `ADR-LIC-001: Legal claims, preset naming, and provenance`
+  - Decision: RawEngine avoids overclaiming equivalence to competitors, manufacturer endorsement, exact film-stock emulation, or proprietary profile compatibility.
+  - Validation: claim lint, preset registry provenance review, license scan, AGPL compliance review, and banned wording tests.
 
 ### 8.2 Non-Destructive Edit Graph
 
@@ -2967,6 +3134,23 @@ Validation metrics:
 - Peak memory budget.
 - GPU/CPU parity tolerance.
 
+Contract-freeze validation gates:
+
+- `validation:command-schema-drift`: generated TypeScript/Rust/JSON schemas match committed command/query definitions.
+- `validation:command-replay-smoke`: representative edit, layer, mask, merge, Negative Lab, export, and AI commands dry-run and replay from fixture inputs.
+- `validation:graph-migration`: sidecar/edit graph migrations are versioned, fixture-backed, and reversible or explicitly one-way with fallback documentation.
+- `validation:fixture-manifest`: fixture entries include source URL, license, hash, intended use, storage class, and privacy/legal notes.
+- `validation:legal-claims`: preset/profile/UI/marketing strings avoid banned exact-emulation, endorsement, competitor-compatibility, and proprietary-profile claims.
+- `validation:cpu-reference-render`: selected operations produce deterministic CPU/reference artifacts for comparison.
+- `validation:gpu-cpu-parity`: WGPU preview/output stays within documented tolerances against reference fixtures.
+- `validation:macos-proofing`: macOS display/export proofing behavior is checked with machine/display-profile metadata.
+- `validation:overlay-coordinates`: crop, rotate, zoom, mask, gradient, brush, and WGPU overlay coordinates roundtrip through UI and command payloads.
+- `validation:mask-composition`: layer/mask blend order, add/subtract/intersect behavior, opacity, and invalidation remain deterministic.
+- `validation:derived-artifact-staleness`: HDR, panorama, focus-stack, super-resolution, generated-positive, denoise/enhance, and AI artifacts become stale when sources or settings change.
+- `validation:ai-provenance`: provider/model/version/prompt/tool input/source hash/output hash/confidence/fallback fields are present for nondeterministic operations.
+- `validation:app-server-tools`: generated app-server tools expose dry-run, approval, audit, replay, cancellation, rollback, and no-original-overwrite behavior.
+- `validation:warnings`: image-quality, acquisition, AI confidence, legal/provenance, fixture, and color-management warnings are stable reviewable outputs.
+
 Initial performance budget targets:
 
 These are planning targets, not promises. They should be measured and revised after the RapidRAW baseline snapshot.
@@ -3307,6 +3491,33 @@ Current planning consults:
     - Expand the dedicated workspace with roll cockpit, frame health grid, expert densitometer, base sampling studio, roll matching console, profile comparison matrix, synchronized viewer modes, QC statuses, agent activity panel, and WGPU overlay alignment acceptance criteria.
     - Convert "presets for all major film stocks" into a stock-aware registry with coverage tiers, claim levels, source citations, review dates, safe generic profile mappings, and no exact-emulation overclaims.
     - Strengthen validation with public/private fixture storage lint, profile scope lint, warning stability gates, overlay alignment tests, app-server safety tests, and atomic output failure checks.
+- Contract-freeze roadmap refinement consult:
+  - Status: completed and incorporated.
+  - Response checked time: 2026-06-10.
+  - Project/data-source note: run from the RapidRaw ChatGPT project with Extended Pro. The ChatGPT UI exposed the GitHub app and `cgasgarth/RapidRaw` as active in the GitHub menu; the composer chip remained generically labeled `GitHub`.
+  - Incorporated advice:
+    - Add a contract-freeze milestone before major layer, mask, color, Negative Lab, computational photography, AI migration, and app-server work.
+    - Treat the current broad `jsAdjustments` style payload seam as a migration target that must be wrapped behind a typed command envelope before agent/layer work depends on it.
+    - Require discriminated schemas for future masks, layers, AI masks, derived artifacts, command envelopes, fixture manifests, and app-server tools.
+    - Add explicit ADRs for command envelope, edit graph, color/display policy, macOS proofing, GPU/CPU parity, coordinates, masks/layers, derived artifacts, AI provenance, app-server approvals, fixtures, validation gate ownership, and legal claims.
+    - Add PRD rules that there are no UI-only edit paths, no implicit display assumptions, no raw app-server Tauri invokes, no schema changes without migration policy, warning outputs are test artifacts, and high-risk issues name their ADR and gate.
+    - Add named gates for command schema drift, graph migration, fixture manifest/license lint, replay smoke, CPU reference render, GPU/CPU parity, overlay coordinates, mask composition, derived artifact staleness, AI provenance, app-server tools, warning stability, and legal claim lint.
+    - Add issue slices that start with read-only seam audits, ADRs, schema stubs, replay harnesses, fixture lint, CPU reference smoke, changed-file validation mapping, and follow-up issue creation before feature implementation.
+- Downstream schema/bridge/app-server validation consult:
+  - Status: completed and incorporated.
+  - Response checked time: 2026-06-10.
+  - Project/data-source note: run from the RapidRaw ChatGPT project with Extended Pro. The GitHub app and `cgasgarth/RapidRaw` repo were visible in the selector; the composer showed a generic GitHub chip and the completed answer showed `Sources: GitHub`.
+  - Incorporated advice:
+    - Build contract-first command graph architecture before major feature work while allowing existing RapidRAW adjustments to remain behind a migration facade.
+    - Add `packages/rawengine-schema/` as the TypeBox, JSON Schema, TypeScript type, OpenAI tool schema, sample payload, and manifest-hash source of truth.
+    - Add `src-tauri/src/edit_core/` as pure Rust graph/command core and `src-tauri/src/bridge/` as a Tauri adapter with typed validation, task lifecycle, progress, cancellation, and artifact handles.
+    - Use TypeBox plus JSON Schema plus Ajv as the TypeScript-facing contract source and Rust serde structs with `deny_unknown_fields` plus sample contract tests; do not allow independent Rust and TypeScript schema sources.
+    - Add policy that new editing bridges avoid `Result<T, String>`, avoid large base64 result payloads, and return typed bridge results/errors and artifact/cache handles.
+    - Require mutating commands to carry expected graph revision, actor metadata, approval metadata, dry-run/preview options, typed results/errors, and provenance.
+    - Dual-write legacy adjustments plus `rawengineGraph` until sidecar migration policy and tests exist.
+    - Treat HDR, panorama, focus-stack, super-resolution, generated positives, denoise/enhance outputs, and AI outputs as graph artifact nodes with provenance and invalidation.
+    - Start validation with synthetic fixtures, and add real RAW fixtures only after license/hash/provenance policy lands.
+    - Add downstream validation architecture, contract validation commands, edit architecture PR split rule, app-server tool schema policy, and fixture/golden image policy to this plan.
 
 Future consult tracking entry format:
 
@@ -3488,6 +3699,42 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(render): add golden render command`
 - `validation(render): add image artifact comparison script`
 - `validation(performance): add performance smoke script`
+
+#### Milestone 3.5: Contract Freeze And Validation Contracts
+
+- `audit(seams): document current jsAdjustments command payload seams`
+- `audit(ai): document current RapidRAW AI provider and command seams`
+- `audit(negative): quarantine current negative conversion behavior behind an explicit legacy boundary`
+- `adr(api): define typed command and query envelope`
+- `adr(graph): define edit graph schema migration and replay contract`
+- `adr(color): define working space display transform and proofing policy`
+- `adr(macos): define macOS color-management proofing policy`
+- `adr(gpu): define WGPU and CPU reference parity contract`
+- `adr(coord): define coordinate spaces and overlay mapping`
+- `adr(mask): define layer and mask discriminated schemas`
+- `adr(artifact): define derived artifact provenance and invalidation`
+- `adr(ai): define AI provider migration and provenance`
+- `adr(agent): define app-server tool approval audit and replay boundary`
+- `adr(fixtures): define fixture manifest and legal provenance policy`
+- `adr(validation): define shift-left validation gate naming and ownership`
+- `adr(legal): define legal claims preset naming and provenance policy`
+- `api(schema): add command schema generation spike`
+- `api(commands): add command envelope type stubs`
+- `validation(commands): add read-only command replay smoke harness`
+- `validation(fixtures): add fixture manifest schema lint`
+- `validation(reference): add CPU reference render smoke fixture`
+- `validation(paths): add changed-file to validation-gate mapping`
+- `validation(agent): add app-server tool schema drift placeholder`
+- `issues(contract-freeze): create follow-up issues for every high-risk ADR`
+- `docs(adr): add downstream validation architecture ADR index`
+- `ci(pr): add PR quality workflow skeleton`
+- `api(schema): define command envelope and bridge error v1`
+- `api(graph): define edit graph skeleton and legacy adjustment node`
+- `rust(schema): add serde mirror and contract sample tests`
+- `bridge(errors): add typed BridgeResult and RawEngineError adapter`
+- `api(commands): add in-memory command bus with no-op and scalar edit`
+- `api(cli): add headless validate and replay command`
+- `validation(render): add synthetic golden harness`
 
 #### Milestone 4: Versioned Edit Graph And API Foundation
 
@@ -4020,6 +4267,41 @@ Definition of done:
 - Core existing features have smoke tests.
 - Render outputs can be regenerated and compared.
 - Fixtures have license/source metadata.
+
+### Milestone 3.5: Contract Freeze And Validation Contracts
+
+Goal: freeze the architecture contracts that would be expensive to change after layers, color, Negative Lab, merge artifacts, AI migration, and app-server tools are implemented.
+
+Issues:
+
+- Audit current broad edit payload seams, especially `jsAdjustments`, sidecar writes, mask/layer data, and current AI/native command boundaries.
+- Audit current negative conversion behavior and decide whether it is wrapped, quarantined, replaced, or allowed only as a legacy compatibility path.
+- Write `ADR-API-001`, `ADR-GRAPH-001`, `ADR-COLOR-001`, `ADR-MAC-001`, `ADR-GPU-001`, `ADR-COORD-001`, `ADR-MASK-001`, `ADR-MASK-002`, `ADR-ART-001`, `ADR-AI-001`, `ADR-AGENT-001`, `ADR-FIX-001`, `ADR-VALID-001`, and `ADR-LIC-001`.
+- Add command/query envelope type stubs and schema generation spike.
+- Add `packages/rawengine-schema/` with TypeBox schemas, JSON Schema generation, TypeScript types, OpenAI/app-server tool schema generation, sample payloads, and schema manifest hashes.
+- Add a pure Rust `edit_core` skeleton with no Tauri/UI coupling.
+- Add a `bridge` adapter skeleton with typed `BridgeResult` and `RawEngineError` responses.
+- Add an edit graph skeleton with a legacy adjustment node so existing RapidRAW adjustment snapshots can migrate incrementally.
+- Add an in-memory command bus with no-op and scalar edit examples.
+- Add a headless validate/replay command.
+- Add read-only command replay smoke harness.
+- Add fixture manifest schema lint and hash verification stub.
+- Add CPU reference render smoke fixture and gate name.
+- Add synthetic golden harness before introducing real RAW fixtures.
+- Add changed-file to validation-gate mapping so PRs know which gates they owe.
+- Add app-server tool schema drift placeholder.
+- Create follow-up GitHub issues for ADR implementation gaps.
+
+Definition of done:
+
+- Every high-risk feature family has a named blocking ADR or an explicit decision that no ADR is needed.
+- Every high-risk feature family has a named validation gate and an owner path for local, CI, nightly, or release validation.
+- The command envelope, query envelope, edit graph schema, fixture manifest, derived artifact, AI provenance, and app-server tool registry have initial versioned schemas or tracked issues.
+- New bridge contracts avoid `Result<T, String>`, large base64 result payloads, and untyped native errors.
+- Mutating command samples include `expectedGraphRevision`, actor metadata, approval metadata, dry-run or preview options, provenance, and typed result/error samples.
+- HDR, panorama, focus-stack, super-resolution, generated-positive, denoise/enhance, and AI output planning treats results as graph artifact nodes with provenance and invalidation rules.
+- UI-only edit paths are either routed through commands, documented as temporary seams, or tracked with removal issues.
+- The plan and GitHub issues make it clear which validations are required before layer, mask, color, Negative Lab, merge, AI, or agent implementation begins.
 
 ### Milestone 4: Versioned Edit Graph And API Foundation
 
