@@ -229,7 +229,7 @@ jobs:
           fi
 
   pr-macos-app-build:
-    name: macOS app build baseline
+    name: macOS app no-bundle smoke
     if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
@@ -242,6 +242,7 @@ jobs:
     with:
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
+      build-args: --ci --no-bundle
       asset-prefix: ${{ matrix.asset-prefix }}
 
   pr-ci-required:
