@@ -21,7 +21,7 @@
 
 > A beautiful, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
 
-> **RawEngine fork note:** This fork is being developed from the maintained roadmap in [`RAW_EDITOR_PLAN.md`](RAW_EDITOR_PLAN.md). Product, architecture, validation, issue, and PR work should stay aligned with that plan.
+> **RawEngine fork note:** This fork is being developed from the maintained roadmap in [`RAW_EDITOR_PLAN.md`](RAW_EDITOR_PLAN.md). Product, architecture, validation, issue, and PR work should stay aligned with that plan. This fork remains under AGPL-3.0; see [`AGPL_COMPLIANCE.md`](AGPL_COMPLIANCE.md).
 
 RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a simple, beautiful editing experience in a lightweight package (under 20MB) for Windows, macOS, Linux, and Android.
 
