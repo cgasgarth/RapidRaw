@@ -120,7 +120,8 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       }
 
       const cached = globalImageCache.get(path);
-      const isFrontendCached = Boolean(cached && cached.selectedImage?.isReady);
+      const cachedReadyEntry = cached?.selectedImage?.isReady ? cached : undefined;
+      const isFrontendCached = cachedReadyEntry !== undefined;
       const isCachedInBackend = isFrontendCached
         ? await invoke<boolean>('is_image_cached', { path }).catch(() => false)
         : false;
@@ -152,23 +153,23 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         compactEditorPanelHeightOverride: null,
       });
 
-      if (isFrontendCached) {
+      if (cachedReadyEntry) {
         setEditor({
           selectedImage: {
-            ...cached.selectedImage,
-            thumbnailUrl: useProcessStore.getState().thumbnails[path] || cached.selectedImage.thumbnailUrl,
+            ...cachedReadyEntry.selectedImage,
+            thumbnailUrl: useProcessStore.getState().thumbnails[path] || cachedReadyEntry.selectedImage.thumbnailUrl,
           },
-          originalSize: cached.originalSize,
-          previewSize: cached.previewSize,
-          histogram: cached.histogram,
-          waveform: cached.waveform,
-          finalPreviewUrl: cached.finalPreviewUrl,
-          uncroppedAdjustedPreviewUrl: cached.uncroppedPreviewUrl,
+          originalSize: cachedReadyEntry.originalSize,
+          previewSize: cachedReadyEntry.previewSize,
+          histogram: cachedReadyEntry.histogram,
+          waveform: cachedReadyEntry.waveform,
+          finalPreviewUrl: cachedReadyEntry.finalPreviewUrl,
+          uncroppedAdjustedPreviewUrl: cachedReadyEntry.uncroppedPreviewUrl,
         });
 
-        setEditor({ adjustments: cached.adjustments });
-        resetHistory(cached.adjustments);
-        prevAdjustmentsRef.current = { path, adjustments: cached.adjustments };
+        setEditor({ adjustments: cachedReadyEntry.adjustments });
+        resetHistory(cachedReadyEntry.adjustments);
+        prevAdjustmentsRef.current = { path, adjustments: cachedReadyEntry.adjustments };
 
         setLibrary({ isViewLoading: false });
 
@@ -199,11 +200,14 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             } else {
               freshAdjustments = { ...INITIAL_ADJUSTMENTS };
             }
-            if (!isSliderDragging && JSON.stringify(cached.adjustments) !== JSON.stringify(freshAdjustments)) {
+            if (
+              !isSliderDragging &&
+              JSON.stringify(cachedReadyEntry.adjustments) !== JSON.stringify(freshAdjustments)
+            ) {
               setEditor({ adjustments: freshAdjustments });
               resetHistory(freshAdjustments);
               prevAdjustmentsRef.current = { path, adjustments: freshAdjustments };
-              globalImageCache.set(path, { ...cached, adjustments: freshAdjustments });
+              globalImageCache.set(path, { ...cachedReadyEntry, adjustments: freshAdjustments });
             }
           })
           .catch((err) => console.error('Failed background metadata sync on cache hit:', err));
