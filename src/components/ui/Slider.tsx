@@ -84,7 +84,7 @@ const Slider = ({
   }, [fillOrigin, defaultValue, min, max]);
 
   const stepStr = String(step);
-  const decimalPlaces = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
+  const decimalPlaces = stepStr.includes('.') ? (stepStr.split('.')[1] ?? '').length : 0;
 
   const snapToStep = useCallback(
     (val: number): number => {
@@ -164,7 +164,9 @@ const Slider = ({
 
       if ('touches' in e) {
         if (e.touches.length === 0) return;
-        clientX = e.touches[0].clientX;
+        const touch = e.touches[0];
+        if (!touch) return;
+        clientX = touch.clientX;
         shiftKey = e.shiftKey || e.altKey;
         if (e.cancelable) e.preventDefault();
       } else {
@@ -337,6 +339,7 @@ const Slider = ({
     if (e.touches.length === 0) return;
 
     const touch = e.touches[0];
+    if (!touch) return;
     suppressTouchChangeRef.current = true;
 
     const inputEl = rangeInputRef.current;
@@ -363,6 +366,7 @@ const Slider = ({
     if (isDragging || !pendingTouchRef.current || e.touches.length === 0) return;
 
     const touch = e.touches[0];
+    if (!touch) return;
     const pendingTouch = pendingTouchRef.current;
     pendingTouch.latestX = touch.clientX;
 

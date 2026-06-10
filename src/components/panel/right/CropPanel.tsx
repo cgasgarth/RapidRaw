@@ -156,7 +156,8 @@ export default function CropPanel() {
         } else {
           const currentIndex = OVERLAYS.findIndex((o) => o.id === activeOverlay);
           const nextIndex = (currentIndex + 1) % OVERLAYS.length;
-          setOverlay(OVERLAYS[nextIndex].id);
+          const nextOverlay = OVERLAYS[nextIndex];
+          if (nextOverlay) setOverlay(nextOverlay.id);
         }
       }
     };
@@ -414,7 +415,8 @@ export default function CropPanel() {
   const handleOverlayCycle = () => {
     const currentIndex = OVERLAYS.findIndex((o) => o.id === activeOverlay);
     const nextIndex = (currentIndex + 1) % OVERLAYS.length;
-    setOverlay(OVERLAYS[nextIndex].id);
+    const nextOverlay = OVERLAYS[nextIndex];
+    if (nextOverlay) setOverlay(nextOverlay.id);
   };
 
   const getOverlayTooltip = () => {

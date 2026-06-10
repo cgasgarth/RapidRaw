@@ -51,9 +51,9 @@ function parseDms(dmsString: string) {
   if (!dmsString) return null;
   const parts = dmsString.match(/(\d+\.?\d*)\s+deg\s+(\d+\.?\d*)\s+min\s+(\d+\.?\d*)\s+sec/);
   if (!parts) return null;
-  const degrees = parseFloat(parts[1]);
-  const minutes = parseFloat(parts[2]);
-  const seconds = parseFloat(parts[3]);
+  const degrees = parseFloat(parts[1] ?? '0');
+  const minutes = parseFloat(parts[2] ?? '0');
+  const seconds = parseFloat(parts[3] ?? '0');
   return degrees + minutes / 60 + seconds / 3600;
 }
 
@@ -276,15 +276,11 @@ export default function MetadataPanel() {
                 ? t('editor.metadata.camera.focalLength')
                 : '';
 
+      const cameraSetting = KEY_CAMERA_SETTINGS_MAP[key];
       return {
         key: key,
         label: translatedLabel,
-        value:
-          hasValue && KEY_CAMERA_SETTINGS_MAP[key].format
-            ? KEY_CAMERA_SETTINGS_MAP[key].format!(value as number)
-            : hasValue
-              ? value
-              : '-',
+        value: hasValue && cameraSetting?.format ? cameraSetting.format(value as number) : hasValue ? value : '-',
       };
     });
 
@@ -341,7 +337,7 @@ export default function MetadataPanel() {
   const hasGps = gpsData.lat !== null && gpsData.lon !== null;
   const fullPath = selectedImage?.path || '';
   const isVirtualCopy = fullPath.includes('?vc=');
-  const basePath = fullPath.split('?vc=')[0];
+  const basePath = fullPath.split('?vc=')[0] ?? fullPath;
   const fileName = basePath.split(/[\\/]/).pop() || '';
   const fileExtension = fileName.split('.').pop()?.toUpperCase() || 'FILE';
   const megapixels =

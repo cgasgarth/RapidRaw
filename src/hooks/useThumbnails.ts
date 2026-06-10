@@ -15,7 +15,11 @@ export function useThumbnails() {
 
           for (let i = pathsToSend.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [pathsToSend[i], pathsToSend[j]] = [pathsToSend[j], pathsToSend[i]];
+            const currentPath = pathsToSend[i];
+            const swapPath = pathsToSend[j];
+            if (currentPath === undefined || swapPath === undefined) continue;
+            pathsToSend[i] = swapPath;
+            pathsToSend[j] = currentPath;
           }
 
           invoke('update_thumbnail_queue', { paths: pathsToSend }).catch((err) => {

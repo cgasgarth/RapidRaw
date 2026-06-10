@@ -226,7 +226,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           metadata: null,
           originalUrl: null,
           path,
-          thumbnailUrl: useProcessStore.getState().thumbnails[path],
+          thumbnailUrl: useProcessStore.getState().thumbnails[path] ?? '',
           width: 0,
         },
         originalSize: { width: 0, height: 0 },
@@ -564,14 +564,17 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             if (album) {
               await handleSelectAlbum(album.id, album.name, album.images);
             } else {
-              await handleSelectSubfolder(rootFolders[0], false, undefined, false);
+              const fallbackRoot = rootFolders[0];
+              if (fallbackRoot) await handleSelectSubfolder(fallbackRoot, false, undefined, false);
             }
           } catch (e) {
             console.error('Failed to restore album session:', e);
-            await handleSelectSubfolder(rootFolders[0], false, undefined, false);
+            const fallbackRoot = rootFolders[0];
+            if (fallbackRoot) await handleSelectSubfolder(fallbackRoot, false, undefined, false);
           }
         } else {
-          await handleSelectSubfolder(rootFolders[0], false, undefined, false);
+          const fallbackRoot = rootFolders[0];
+          if (fallbackRoot) await handleSelectSubfolder(fallbackRoot, false, undefined, false);
         }
       } else {
         await handleSelectSubfolder(pathToSelect, false, preloadedImages, false);

@@ -155,7 +155,9 @@ export default function AppModals(props: AppModalsProps) {
         loadingImageUrl={
           panoramaModalState.stitchingSourcePaths.length > 0
             ? thumbnails[
-                panoramaModalState.stitchingSourcePaths[Math.floor(panoramaModalState.stitchingSourcePaths.length / 2)]
+                panoramaModalState.stitchingSourcePaths[
+                  Math.floor(panoramaModalState.stitchingSourcePaths.length / 2)
+                ] ?? ''
               ] || null
             : null
         }
@@ -185,7 +187,7 @@ export default function AppModals(props: AppModalsProps) {
         loadingImageUrl={
           hdrModalState.stitchingSourcePaths.length > 0
             ? thumbnails[
-                hdrModalState.stitchingSourcePaths[Math.floor(hdrModalState.stitchingSourcePaths.length / 2)]
+                hdrModalState.stitchingSourcePaths[Math.floor(hdrModalState.stitchingSourcePaths.length / 2)] ?? ''
               ] || null
             : null
         }
@@ -213,7 +215,8 @@ export default function AppModals(props: AppModalsProps) {
         onSave={(savedPaths) => {
           props.refreshImageList().then(() => {
             if (selectedImage && negativeModalState.targetPaths.includes(selectedImage.path) && savedPaths.length > 0) {
-              props.handleImageSelect(savedPaths[0]);
+              const savedPath = savedPaths[0];
+              if (savedPath) props.handleImageSelect(savedPath);
             }
           });
         }}
@@ -235,7 +238,7 @@ export default function AppModals(props: AppModalsProps) {
         targetPaths={denoiseModalState.targetPaths}
         loadingImageUrl={
           denoiseModalState.targetPaths.length > 0
-            ? thumbnails[denoiseModalState.targetPaths[0]] ||
+            ? thumbnails[denoiseModalState.targetPaths[0] ?? ''] ||
               (selectedImage?.path === denoiseModalState.targetPaths[0] ? finalPreviewUrl : null)
             : null
         }

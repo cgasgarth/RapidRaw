@@ -40,7 +40,8 @@ function SubMenu({ cancelCloseSubmenu, closeSubmenu, hideContextMenu, options, p
   const [style, setStyle] = useState<any>({ opacity: 0 });
   const [safeAreaPath, setSafeAreaPath] = useState<string | null>(null);
 
-  const customOption = options.length === 1 && options[0].customComponent ? options[0] : null;
+  const firstOption = options[0];
+  const customOption = options.length === 1 && firstOption?.customComponent ? firstOption : null;
   const CustomComponent = customOption?.customComponent;
   const isInteractiveSubmenu = Boolean(customOption);
 

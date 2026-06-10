@@ -299,16 +299,17 @@ export default function LibraryGrid(props: any) {
     if (libraryViewMode === LibraryViewMode.Recursive) {
       const groups = groupImagesByFolder(imageList, currentFolderPath);
       groups.forEach((group) => {
-        if (group.images.length === 0) return;
+        const groupImages = group.images ?? [];
+        if (groupImages.length === 0) return;
 
         const isExpanded = !collapsedRecursiveFolders.has(group.path);
-        rows.push({ type: 'header', path: group.path, count: group.images.length, isExpanded });
+        rows.push({ type: 'header', path: group.path, count: groupImages.length, isExpanded });
 
         if (isExpanded) {
-          for (let i = 0; i < group.images.length; i += columnCount) {
+          for (let i = 0; i < groupImages.length; i += columnCount) {
             rows.push({
               type: 'images',
-              images: group.images.slice(i, i + columnCount),
+              images: groupImages.slice(i, i + columnCount),
               startIndex: i,
             });
           }
@@ -379,11 +380,12 @@ export default function LibraryGrid(props: any) {
     if (libraryViewMode === LibraryViewMode.Recursive) {
       const groups = groupImagesByFolder(imageList, currentFolderPath);
       for (const group of groups) {
-        if (group.images.length === 0) continue;
+        const groupImages = group.images ?? [];
+        if (groupImages.length === 0) continue;
 
         targetTop += headerHeight;
 
-        const imageIndex = group.images.findIndex((img) => img.path === activePath);
+        const imageIndex = groupImages.findIndex((img) => img.path === activePath);
         if (imageIndex !== -1) {
           const rowIndex = Math.floor(imageIndex / columnCount);
           targetTop += rowIndex * rowHeight;
@@ -391,7 +393,7 @@ export default function LibraryGrid(props: any) {
           break;
         }
 
-        const rowsInGroup = Math.ceil(group.images.length / columnCount);
+        const rowsInGroup = Math.ceil(groupImages.length / columnCount);
         targetTop += rowsInGroup * rowHeight;
       }
     } else {

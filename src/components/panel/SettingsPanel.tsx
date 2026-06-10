@@ -157,7 +157,8 @@ const KeybindRow = ({
       }
       e.preventDefault();
       const parts = normalizeCombo(e, osPlatform);
-      if (parts.length > 0 && !['ctrl', 'shift', 'alt'].includes(parts[parts.length - 1])) {
+      const lastPart = parts[parts.length - 1];
+      if (parts.length > 0 && lastPart !== undefined && !['ctrl', 'shift', 'alt'].includes(lastPart)) {
         onSave(def.action, parts);
         onStartRecording('');
       }

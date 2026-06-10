@@ -84,7 +84,8 @@ const Dropdown = <T extends React.Key>({
       if (isOpen && filteredOptions.length === 1) {
         e.stopPropagation();
         e.preventDefault();
-        handleSelect(filteredOptions[0]);
+        const option = filteredOptions[0];
+        if (option) handleSelect(option);
       }
       return;
     }

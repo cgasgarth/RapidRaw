@@ -318,7 +318,7 @@ export function normalizeCombo(event: KeyboardEvent, osPlatform?: string): strin
 
 export function codeToDisplayLabel(code: string): string | null {
   if (/^Key[A-Z]$/.test(code) || /^Digit[0-9]$/.test(code)) {
-    return code[code.length - 1].toUpperCase();
+    return (code[code.length - 1] ?? '').toUpperCase();
   }
   if (/^Numpad[0-9]$/.test(code)) {
     return `Numpad ${code.slice(-1)}`;
