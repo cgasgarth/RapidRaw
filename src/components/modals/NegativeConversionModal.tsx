@@ -19,6 +19,12 @@ interface NegativeParams {
   exposure: number;
 }
 
+interface NegativeBatchProgress {
+  current: number;
+  total: number;
+  path: string;
+}
+
 const DEFAULT_PARAMS: NegativeParams = {
   red_weight: 1.0,
   green_weight: 1.0,
@@ -60,8 +66,8 @@ export default function NegativeConversionModal({
   const selectedImagePath = targetPaths.length > 0 ? targetPaths[0] : null;
 
   useEffect(() => {
-    const unlisten = listen('negative-batch-progress', (e: any) => {
-      setProgress(e.payload);
+    const unlisten = listen<NegativeBatchProgress>('negative-batch-progress', (event) => {
+      setProgress(event.payload);
     });
     return () => {
       unlisten.then((f) => f());
@@ -141,11 +147,11 @@ export default function NegativeConversionModal({
       updatePreview(DEFAULT_PARAMS, true);
 
       if (selectedImagePath) {
-        invoke('generate_preview_for_path', {
+        invoke<number[]>('generate_preview_for_path', {
           path: selectedImagePath,
           jsAdjustments: {},
         })
-          .then((res: any) => {
+          .then((res) => {
             const blob = new Blob([new Uint8Array(res)], { type: 'image/jpeg' });
             setOriginalUrl(URL.createObjectURL(blob));
           })
