@@ -366,7 +366,7 @@ const FilmstripList = ({
 }) => {
   const [gridHandle, setGridHandle] = useGridCallbackRef();
   const ratioMapRef = useRef<Record<number, number>>({});
-  const [ratioMapVersion, setRatioMapVersion] = useState(0);
+  const [ratioMapSnapshot, setRatioMapSnapshot] = useState<Record<number, number>>({});
   const visibleRange = useRef({ start: 0, stop: 0 });
   const prevSelectedPath = useRef<string | null>(null);
   const isReadyForSmooth = useRef(false);
@@ -386,7 +386,7 @@ const FilmstripList = ({
 
     let totalWidthExpanded = HORIZONTAL_PADDING * 2;
     for (let i = 0; i < data.imageList.length; i++) {
-      const ratio = data.thumbnailAspectRatio === ThumbnailAspectRatio.Cover ? 1 : ratioMapRef.current[i] || 1.5;
+      const ratio = data.thumbnailAspectRatio === ThumbnailAspectRatio.Cover ? 1 : ratioMapSnapshot[i] || 1.5;
       totalWidthExpanded += expandedHeight * ratio + ITEM_GAP;
     }
 
@@ -395,14 +395,14 @@ const FilmstripList = ({
     }
 
     return baseHeight;
-  }, [data.imageList.length, data.thumbnailAspectRatio, height, width, ratioMapVersion]);
+  }, [data.imageList.length, data.thumbnailAspectRatio, height, width, ratioMapSnapshot]);
 
   const getColumnWidth = useCallback(
     (index: number) => {
-      const ratio = data.thumbnailAspectRatio === ThumbnailAspectRatio.Cover ? 1 : ratioMapRef.current[index] || 1.5;
+      const ratio = data.thumbnailAspectRatio === ThumbnailAspectRatio.Cover ? 1 : ratioMapSnapshot[index] || 1.5;
       return itemHeight * ratio + ITEM_GAP;
     },
-    [data.thumbnailAspectRatio, itemHeight, ratioMapVersion],
+    [data.thumbnailAspectRatio, itemHeight, ratioMapSnapshot],
   );
 
   useEffect(() => {
@@ -449,7 +449,7 @@ const FilmstripList = ({
 
   useEffect(() => {
     ratioMapRef.current = {};
-    setRatioMapVersion((v) => v + 1);
+    setRatioMapSnapshot({});
   }, [data.thumbnailAspectRatio]);
 
   const onCellsRendered = useCallback(
@@ -581,7 +581,7 @@ const FilmstripList = ({
             if (typeof resettableGridHandle?.resetAfterColumnIndex === 'function') {
               resettableGridHandle.resetAfterColumnIndex(lowestPendingIndexRef.current);
             }
-            setRatioMapVersion((v) => v + 1);
+            setRatioMapSnapshot({ ...ratioMapRef.current });
             lowestPendingIndexRef.current = Infinity;
             pendingResizeRef.current = null;
           });
