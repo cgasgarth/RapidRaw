@@ -58,6 +58,27 @@ module.exports = [
       'react-hooks/rules-of-hooks': 'error',
       // Enable after the existing dependency-array warnings are fixed in a focused lint PR.
       'react-hooks/exhaustive-deps': 'off',
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'ajv',
+              message: 'Use Zod for TypeScript-facing runtime schemas and validation.',
+            },
+            {
+              name: '@sinclair/typebox',
+              message: 'Use Zod for TypeScript-facing runtime schemas and validation.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['ajv/*', '@sinclair/typebox/*'],
+              message: 'Use Zod for TypeScript-facing runtime schemas and validation.',
+            },
+          ],
+        },
+      ],
       'no-restricted-syntax': [
         'error',
         {
