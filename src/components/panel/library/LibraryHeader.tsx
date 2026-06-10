@@ -19,9 +19,12 @@ import {
   RawStatus,
   EditedStatus,
   LibraryViewMode,
+  Progress,
   SortCriteria,
   SortDirection,
   ExifOverlay,
+  ThumbnailAspectRatio,
+  ThumbnailSize,
 } from '../../ui/AppProperties';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import Text from '../../ui/Text';
@@ -30,13 +33,72 @@ import Button from '../../ui/Button';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { ADVANCED_QUERY_REGEX } from '../../../hooks/useSortedLibrary';
 
-function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName = 'w-56' }: any) {
+interface DropdownMenuProps {
+  buttonContent: React.ReactNode;
+  buttonTitle: string;
+  children: React.ReactNode;
+  contentClassName?: string;
+}
+
+interface SearchInputProps {
+  indexingProgress: Progress;
+  isIndexing: boolean;
+}
+
+interface ThumbnailSizeOption {
+  id: ThumbnailSize;
+  label: string;
+  size: number;
+}
+
+interface ThumbnailAspectRatioOption {
+  id: ThumbnailAspectRatio;
+  label: string;
+}
+
+interface RatingFilterOption {
+  label: string;
+  value: number;
+}
+
+interface RawStatusOption {
+  key: RawStatus;
+  label: string;
+}
+
+interface EditedStatusOption {
+  key: EditedStatus;
+  label: string;
+}
+
+interface SortOption {
+  disabled?: boolean;
+  key: string;
+  label: string;
+}
+
+interface ViewOptionsDropdownProps {
+  editedStatusOptions: EditedStatusOption[];
+  libraryViewMode: LibraryViewMode;
+  onSelectAspectRatio(aspectRatio: ThumbnailAspectRatio): void;
+  onSelectSize(size: ThumbnailSize): void;
+  ratingFilterOptions: RatingFilterOption[];
+  rawStatusOptions: RawStatusOption[];
+  setLibraryViewMode(mode: LibraryViewMode): void;
+  sortOptions: SortOption[];
+  thumbnailAspectRatio: ThumbnailAspectRatio;
+  thumbnailAspectRatioOptions: ThumbnailAspectRatioOption[];
+  thumbnailSize: ThumbnailSize;
+  thumbnailSizeOptions: ThumbnailSizeOption[];
+}
+
+function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName = 'w-56' }: DropdownMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<any>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const handleClickOutside = (event: any) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && event.target instanceof Node && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     };
@@ -78,7 +140,7 @@ function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName =
   );
 }
 
-export function SearchInput({ indexingProgress, isIndexing }: any) {
+export function SearchInput({ indexingProgress, isIndexing }: SearchInputProps) {
   const { t } = useTranslation();
   const { searchCriteria, setSearchCriteria } = useLibraryStore(
     useShallow((state) => ({ searchCriteria: state.searchCriteria, setSearchCriteria: state.setSearchCriteria })),
@@ -98,8 +160,14 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
   }, [isSearchActive]);
 
   useEffect(() => {
-    function handleClickOutside(event: any) {
-      if (containerRef.current && !containerRef.current.contains(event.target) && tags.length === 0 && !text) {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        event.target instanceof Node &&
+        !containerRef.current.contains(event.target) &&
+        tags.length === 0 &&
+        !text
+      ) {
         setIsSearchActive(false);
       }
     }
@@ -312,7 +380,7 @@ export function ViewOptionsDropdown({
   rawStatusOptions,
   editedStatusOptions,
   sortOptions,
-}: any) {
+}: ViewOptionsDropdownProps) {
   const { t } = useTranslation();
   const { filterCriteria, setFilterCriteria, sortCriteria, setSortCriteria } = useLibraryStore(
     useShallow((state) => ({
@@ -347,7 +415,7 @@ export function ViewOptionsDropdown({
     [t],
   );
 
-  const handleColorClick = (colorName: string, event: any) => {
+  const handleColorClick = (colorName: string, event: React.MouseEvent<HTMLButtonElement>) => {
     const { ctrlKey, metaKey, shiftKey } = event;
     const isCtrlPressed = ctrlKey || metaKey;
     const currentColors = filterCriteria.colors || [];
@@ -392,7 +460,7 @@ export function ViewOptionsDropdown({
             <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
               {t('library.header.viewOptions.thumbnailSize')}
             </Text>
-            {thumbnailSizeOptions.map((option: any) => {
+            {thumbnailSizeOptions.map((option) => {
               const isSelected = thumbnailSize === option.id;
               return (
                 <button
@@ -421,7 +489,7 @@ export function ViewOptionsDropdown({
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
                 {t('library.header.viewOptions.thumbnailFit')}
               </Text>
-              {thumbnailAspectRatioOptions.map((option: any) => {
+              {thumbnailAspectRatioOptions.map((option) => {
                 const isSelected = thumbnailAspectRatio === option.id;
                 return (
                   <button
@@ -526,8 +594,8 @@ export function ViewOptionsDropdown({
               </Text>
 
               {ratingFilterOptions
-                .filter((option: any) => option.value <= 0)
-                .map((option: any) => {
+                .filter((option) => option.value <= 0)
+                .map((option) => {
                   const isSelected = filterCriteria.rating === option.value;
                   return (
                     <button
@@ -560,7 +628,7 @@ export function ViewOptionsDropdown({
                     {[...Array(5)].map((_, index: number) => {
                       const starValue = index + 1;
                       const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
-                      const optionLabel = ratingFilterOptions.find((o: any) => o.value === starValue)?.label;
+                      const optionLabel = ratingFilterOptions.find((option) => option.value === starValue)?.label;
 
                       return (
                         <button
@@ -599,7 +667,7 @@ export function ViewOptionsDropdown({
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
                 {t('library.header.viewOptions.filterByFileType')}
               </Text>
-              {rawStatusOptions.map((option: any) => {
+              {rawStatusOptions.map((option) => {
                 const isSelected = (filterCriteria.rawStatus || RawStatus.All) === option.key;
                 return (
                   <button
@@ -627,7 +695,7 @@ export function ViewOptionsDropdown({
               <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
                 {t('library.header.viewOptions.filterByEdited', 'Filter by Edit Status')}
               </Text>
-              {editedStatusOptions.map((option: any) => {
+              {editedStatusOptions.map((option) => {
                 const isSelected = (filterCriteria.editedStatus || EditedStatus.All) === option.key;
                 return (
                   <button
@@ -671,7 +739,7 @@ export function ViewOptionsDropdown({
                   <button
                     key={color.name}
                     data-tooltip={title}
-                    onClick={(e: any) => handleColorClick(color.name, e)}
+                    onClick={(e) => handleColorClick(color.name, e)}
                     className="w-6 h-6 rounded-full focus:outline-hidden focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface transition-transform hover:scale-110"
                     role="menuitem"
                   >
@@ -713,7 +781,7 @@ export function ViewOptionsDropdown({
                 {sortCriteria.order === SortDirection.Ascending ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
             </div>
-            {sortOptions.map((option: any) => {
+            {sortOptions.map((option) => {
               const isSelected = sortCriteria.key === option.key;
               return (
                 <button
