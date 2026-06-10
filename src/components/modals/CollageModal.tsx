@@ -55,13 +55,14 @@ interface AspectRatioPreset {
 const DEFAULT_EXPORT_WIDTH = 3000;
 const INITIAL_SPACING = 15;
 const INITIAL_BORDER_RADIUS = 0;
+const DEFAULT_ASPECT_RATIO_PRESET: AspectRatioPreset = { id: '1_1', name: '1:1', value: 1 };
 
 export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: CollageModalProps) {
   const { t } = useTranslation();
 
   const ASPECT_RATIO_PRESETS: AspectRatioPreset[] = useMemo(
     () => [
-      { id: '1_1', name: '1:1', value: 1 },
+      DEFAULT_ASPECT_RATIO_PRESET,
       { id: '5_4', name: '5:4', value: 5 / 4 },
       { id: '4_3', name: '4:3', value: 4 / 3 },
       { id: '3_2', name: '3:2', value: 3 / 2 },
@@ -80,7 +81,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
 
   const [availableLayouts, setAvailableLayouts] = useState<LayoutDefinition[]>([]);
   const [activeLayout, setActiveLayout] = useState<Layout | null>(null);
-  const [activeAspectRatio, setActiveAspectRatio] = useState<AspectRatioPreset>(ASPECT_RATIO_PRESETS[0]);
+  const [activeAspectRatio, setActiveAspectRatio] = useState<AspectRatioPreset>(DEFAULT_ASPECT_RATIO_PRESET);
   const [keepOriginalRatio, setKeepOriginalRatio] = useState(false);
 
   const [spacing, setSpacing] = useState(INITIAL_SPACING);
@@ -88,7 +89,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   const [backgroundColor, setBackgroundColor] = useState('#FFFFFF');
   const [exportWidth, setExportWidth] = useState(DEFAULT_EXPORT_WIDTH);
   const [exportHeight, setExportHeight] = useState(
-    Math.round(DEFAULT_EXPORT_WIDTH / (ASPECT_RATIO_PRESETS[0].value || 1)),
+    Math.round(DEFAULT_EXPORT_WIDTH / (DEFAULT_ASPECT_RATIO_PRESET.value ?? 1)),
   );
 
   const [loadedImages, setLoadedImages] = useState<LoadedImage[]>([]);
@@ -128,7 +129,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
         setImageStates({});
         imageElementsRef.current = {};
         setActiveLayout(null);
-        setActiveAspectRatio(ASPECT_RATIO_PRESETS[0]);
+        setActiveAspectRatio(DEFAULT_ASPECT_RATIO_PRESET);
         setKeepOriginalRatio(false);
         setBackgroundColor('#FFFFFF');
         setSpacing(INITIAL_SPACING);
@@ -170,6 +171,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
         const results = await Promise.all(imagePromises);
         if (results.length === 1) {
           const img = results[0];
+          if (!img) return;
           const ratio = img.width / img.height;
           setActiveAspectRatio({ id: 'original', name: t('modals.collage.original'), value: ratio });
           setExportHeight(Math.round(DEFAULT_EXPORT_WIDTH / ratio));
@@ -201,8 +203,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       const layoutsForCount = LAYOUTS[loadedImages.length] || [];
       setAvailableLayouts(layoutsForCount);
       if (activeLayout === null) {
-        if (layoutsForCount.length > 0) {
-          setActiveLayout(layoutsForCount[0].layout);
+        const firstLayout = layoutsForCount[0];
+        if (firstLayout) {
+          setActiveLayout(firstLayout.layout);
         } else if (loadedImages.length === 1) {
           setActiveLayout([{ x: 0, y: 0, width: 1, height: 1 }]);
         }
@@ -372,6 +375,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   const handleOriginalAspectRatio = () => {
     if (loadedImages.length !== 1) return;
     const img = loadedImages[0];
+    if (!img) return;
     const ratio = img.width / img.height;
 
     setActiveAspectRatio({ id: 'original', name: t('modals.collage.original'), value: ratio });
@@ -405,7 +409,11 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       const shuffled = [...prev];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        const currentImage = shuffled[i];
+        const swapImage = shuffled[j];
+        if (!currentImage || !swapImage) continue;
+        shuffled[i] = swapImage;
+        shuffled[j] = currentImage;
       }
       return shuffled;
     });
@@ -414,12 +422,15 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
 
   const handleSave = async () => {
     if (isSaving || !activeLayout) return;
+    const firstSourceImage = sourceImages[0];
+    if (!firstSourceImage) return;
+
     setIsSaving(true);
     try {
       const offscreenCanvas = document.createElement('canvas');
       drawCanvas(offscreenCanvas, true);
       const base64Data = offscreenCanvas.toDataURL('image/png');
-      const path = await onSave(base64Data, sourceImages[0].path);
+      const path = await onSave(base64Data, firstSourceImage.path);
       setSavedPath(path);
     } catch (err: any) {
       setError(err.message || 'Could not save the collage.');
@@ -438,7 +449,10 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     if (!activeLayout || keepOriginalRatio) return;
     e.preventDefault();
 
-    const path = loadedImages[index].path;
+    const image = loadedImages[index];
+    if (!image) return;
+
+    const path = image.path;
     const currentState = imageStates[path] || { offsetX: 0, offsetY: 0, scale: 1 };
 
     const oldScale = currentState.scale || 1;
@@ -498,10 +512,14 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   useEffect(() => {
     const handleWindowMouseMove = (e: MouseEvent) => {
       if (panningImage && activeLayout) {
-        const imagePath = loadedImages[panningImage.index].path;
-        const imageState = imageStates[imagePath];
-        const img = imageElementsRef.current[imagePath];
+        const image = loadedImages[panningImage.index];
         const cell = activeLayout[panningImage.index];
+        if (!image || !cell) return;
+
+        const imagePath = image.path;
+        const imageState = imageStates[imagePath] || { offsetX: 0, offsetY: 0, scale: 1 };
+        const img = imageElementsRef.current[imagePath];
+        if (!img) return;
 
         const x1 = cell.x * previewSize.width;
         const y1 = cell.y * previewSize.height;
@@ -536,7 +554,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
 
         setImageStates((prev) => ({
           ...prev,
-          [imagePath]: { ...prev[imagePath], offsetX: newOffsetX, offsetY: newOffsetY },
+          [imagePath]: { ...imageState, offsetX: newOffsetX, offsetY: newOffsetY },
         }));
         setPanningImage({ ...panningImage, startX: e.clientX, startY: e.clientY });
       }
@@ -573,15 +591,17 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
             const sourceIndex = currentImages.findIndex((img) => img.path === thumbnailDrag.path);
             if (sourceIndex === -1 || sourceIndex === hoveredCellIndex) return currentImages;
             const newImages = [...currentImages];
-            [newImages[sourceIndex], newImages[hoveredCellIndex]] = [
-              newImages[hoveredCellIndex],
-              newImages[sourceIndex],
-            ];
+            const sourceImage = newImages[sourceIndex];
+            const targetImage = newImages[hoveredCellIndex];
+            if (!sourceImage || !targetImage) return currentImages;
+
+            newImages[sourceIndex] = targetImage;
+            newImages[hoveredCellIndex] = sourceImage;
 
             setImageStates((prev) => ({
               ...prev,
-              [newImages[sourceIndex].path]: { offsetX: 0, offsetY: 0, scale: 1 },
-              [newImages[hoveredCellIndex].path]: { offsetX: 0, offsetY: 0, scale: 1 },
+              [sourceImage.path]: { offsetX: 0, offsetY: 0, scale: 1 },
+              [targetImage.path]: { offsetX: 0, offsetY: 0, scale: 1 },
             }));
             return newImages;
           });
