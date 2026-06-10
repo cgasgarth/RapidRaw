@@ -1,13 +1,13 @@
 name: Feature Request
 description: Suggest a new feature or enhancement for RapidRAW
-title: "FEATURE: "
-labels: ["enhancement"]
+title: 'FEATURE: '
+labels: ['enhancement']
 body:
   - type: markdown
     attributes:
       value: |
         Thanks for taking the time to suggest a new feature! Please fill out the information below to help us understand your idea.
-        
+
         > **Note:** This template is for feature requests only. For bug reports, please use the [Bug Report template](../../issues/new/choose) instead.
 
   - type: textarea

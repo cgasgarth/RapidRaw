@@ -82,7 +82,7 @@ export function useExportSettings() {
       watermarkScale,
       watermarkSpacing,
       watermarkOpacity,
-    ]
+    ],
   );
 
   return {
