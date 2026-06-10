@@ -20,6 +20,17 @@ import CollageModal from './CollageModal';
 import { AppSettings, AlbumItem, AlbumGroup } from '../ui/AppProperties';
 import { CopyPasteSettings } from '../../utils/adjustments';
 
+interface DeleteOptions {
+  includeAssociated: boolean;
+}
+
+interface ImportSettings {
+  dateFolderFormat: string;
+  deleteAfterImport: boolean;
+  filenameTemplate: string;
+  organizeByDate: boolean;
+}
+
 export interface AppModalsProps {
   handleImageSelect: (path: string) => void;
   handleSavePanorama: () => Promise<string>;
@@ -33,10 +44,10 @@ export interface AppModalsProps {
   handleCreateFolder: (folderName: string) => Promise<void>;
   handleRenameFolder: (newName: string) => Promise<void>;
   handleSaveRename: (nameTemplate: string) => Promise<void>;
-  handleStartImport: (settings: any) => Promise<void>;
+  handleStartImport: (settings: ImportSettings) => Promise<void>;
   handleSetColorLabel: (color: string | null, paths?: string[]) => Promise<void>;
   handleRate: (rating: number, paths?: string[]) => void;
-  executeDelete: (paths: string[], options: any) => Promise<void>;
+  executeDelete: (paths: string[], options: DeleteOptions) => Promise<void>;
   handleSaveCollage: (base64Data: string, firstPath: string) => Promise<string>;
   handleCreateAlbumItem: (name: string, type: 'album' | 'group') => Promise<void>;
   handleRenameAlbumItem: (newName: string) => Promise<void>;
