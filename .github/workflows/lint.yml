@@ -227,3 +227,60 @@ jobs:
             echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
             echo "\`cargo clippy --all-targets --all-features -- -D warnings\` passed. Remove this temporary non-blocking wrapper when #287 is closed." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  pr-macos-app-build:
+    name: macOS app build baseline
+    if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-14'
+            target: aarch64-apple-darwin
+            asset-prefix: '02'
+    uses: ./.github/workflows/build.yml
+    with:
+      platform: ${{ matrix.platform }}
+      target: ${{ matrix.target }}
+      asset-prefix: ${{ matrix.asset-prefix }}
+
+  pr-ci-required:
+    name: PR CI / required
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'pull_request'
+    needs:
+      - frontend-build
+      - frontend-bun-install
+      - frontend-typecheck
+      - frontend-lint
+      - frontend-format
+      - frontend-i18n-lint
+      - rust-fmt
+      - rust-check
+      - rust-clippy
+      - pr-macos-app-build
+    steps:
+      - name: Check required job results
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          set -euo pipefail
+
+          echo "$NEEDS_JSON"
+
+          failures="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | "\(.key)=\(.value.result)"
+            ' <<< "$NEEDS_JSON"
+          )"
+
+          if [[ -n "$failures" ]]; then
+            echo "Blocking PR because required jobs did not all succeed:"
+            echo "$failures"
+            exit 1
+          fi
+
+          echo "All required PR jobs succeeded."
