@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -249,33 +250,63 @@ jobs:
     name: PR CI / required
     runs-on: ubuntu-latest
     if: always() && github.event_name == 'pull_request'
-    needs:
-      - frontend-build
-      - frontend-bun-install
-      - frontend-typecheck
-      - frontend-lint
-      - frontend-format
-      - frontend-i18n-lint
-      - rust-fmt
-      - rust-check
-      - rust-clippy
-      - pr-macos-app-build
+    timeout-minutes: 60
     steps:
-      - name: Check required job results
+      - name: Wait for required peer jobs
         shell: bash
         env:
-          NEEDS_JSON: ${{ toJson(needs) }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
-          echo "$NEEDS_JSON"
+          required_jobs=(
+            "frontend: install, build, i18n check"
+            "frontend: bun install baseline"
+            "frontend: typecheck baseline"
+            "frontend: eslint baseline"
+            "frontend: prettier baseline"
+            "frontend: i18n lint baseline"
+            "rust: fmt"
+            "rust: cargo check macOS"
+            "rust: clippy baseline macOS"
+            "macOS app no-bundle smoke (macos-14, aarch64-apple-darwin, 02) / build"
+          )
+
+          required_jobs_json="$(printf '%s\n' "${required_jobs[@]}" | jq -R . | jq -s .)"
+
+          echo "Waiting for required peer jobs:"
+          printf ' - %s\n' "${required_jobs[@]}"
+
+          while true; do
+            jobs_json="$(gh run view "$RUN_ID" --repo "$REPO" --json jobs --jq '.jobs')"
+
+            pending="$(
+              jq -r --argjson required "$required_jobs_json" '
+                $required[] as $name
+                | first(.[] | select(.name == $name)) as $job
+                | select($job == null or ($job.status != "completed"))
+                | if $job == null then "\($name)=missing" else "\($name)=\($job.status)" end
+              ' <<< "$jobs_json"
+            )"
+
+            if [[ -z "$pending" ]]; then
+              break
+            fi
+
+            echo "Still waiting on:"
+            echo "$pending"
+            sleep 30
+          done
 
           failures="$(
-            jq -r '
-              to_entries[]
-              | select(.value.result != "success")
-              | "\(.key)=\(.value.result)"
-            ' <<< "$NEEDS_JSON"
+            jq -r --argjson required "$required_jobs_json" '
+              $required[] as $name
+              | first(.[] | select(.name == $name)) as $job
+              | select($job == null or $job.conclusion != "success")
+              | if $job == null then "\($name)=missing" else "\($name)=\($job.conclusion)" end
+            ' <<< "$jobs_json"
           )"
 
           if [[ -n "$failures" ]]; then
