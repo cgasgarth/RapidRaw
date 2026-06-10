@@ -16,6 +16,7 @@ interface SliderProps {
   max: number;
   min: number;
   onChange(event: SliderChangeEvent): void;
+  disabled?: boolean;
   onDragStateChange?(state: boolean): void;
   step: number;
   value: number;
@@ -35,6 +36,7 @@ const Slider = ({
   max,
   min,
   onChange,
+  disabled = false,
   onDragStateChange = () => {},
   step = 1,
   value,
@@ -276,6 +278,10 @@ const Slider = ({
   }, [isEditing]);
 
   const handleReset = () => {
+    if (disabled) {
+      return;
+    }
+
     const syntheticEvent = {
       target: {
         value: defaultValue,
@@ -285,6 +291,10 @@ const Slider = ({
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) {
+      return;
+    }
+
     if (suppressTouchChangeRef.current) {
       return;
     }
@@ -296,6 +306,10 @@ const Slider = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLInputElement>) => {
+    if (disabled) {
+      return;
+    }
+
     if (Date.now() - lastUpTime.current < DOUBLE_CLICK_THRESHOLD_MS) {
       e.preventDefault();
       return;
@@ -316,6 +330,10 @@ const Slider = ({
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLInputElement>) => {
+    if (disabled) {
+      return;
+    }
+
     if (e.touches.length === 0) return;
 
     const touch = e.touches[0];
@@ -386,6 +404,10 @@ const Slider = ({
   };
 
   const handleValueClick = () => {
+    if (disabled) {
+      return;
+    }
+
     setIsEditing(true);
   };
 
@@ -465,9 +487,9 @@ const Slider = ({
     <div className="mb-2 group" ref={containerRef}>
       <div className="flex justify-between items-center mb-1">
         <div
-          className={`grid ${typeof label === 'string' ? 'cursor-pointer' : ''}`}
-          onClick={typeof label === 'string' ? handleReset : undefined}
-          onDoubleClick={typeof label === 'string' ? handleReset : undefined}
+          className={`grid ${typeof label === 'string' && !disabled ? 'cursor-pointer' : ''}`}
+          onClick={typeof label === 'string' && !disabled ? handleReset : undefined}
+          onDoubleClick={typeof label === 'string' && !disabled ? handleReset : undefined}
           onMouseEnter={typeof label === 'string' ? () => setIsLabelHovered(true) : undefined}
           onMouseLeave={typeof label === 'string' ? () => setIsLabelHovered(false) : undefined}
         >
@@ -494,6 +516,7 @@ const Slider = ({
           {isEditing ? (
             <input
               className="w-full text-sm text-right bg-card-active border border-gray-500 rounded-sm px-1 py-0 outline-none focus:ring-1 focus:ring-blue-500 text-text-primary"
+              disabled={disabled}
               max={max}
               min={min}
               onBlur={handleInputCommit}
@@ -506,7 +529,7 @@ const Slider = ({
             />
           ) : (
             <span
-              className="text-sm text-text-primary w-full text-right select-none cursor-text"
+              className={`text-sm text-text-primary w-full text-right select-none ${disabled ? '' : 'cursor-text'}`}
               onClick={handleValueClick}
               onDoubleClick={handleReset}
               data-tooltip={t('ui.slider.clickToEdit')}
@@ -533,9 +556,10 @@ const Slider = ({
         />
         <input
           ref={rangeInputRef}
-          className={`absolute top-1/2 left-0 w-full h-1.5 appearance-none bg-transparent cursor-pointer m-0 p-0 slider-input z-10 ${
-            isDragging ? 'slider-thumb-active' : ''
-          }`}
+          className={`absolute top-1/2 left-0 w-full h-1.5 appearance-none bg-transparent m-0 p-0 slider-input z-10 ${
+            disabled ? 'cursor-not-allowed' : 'cursor-pointer'
+          } ${isDragging ? 'slider-thumb-active' : ''}`}
+          disabled={disabled}
           style={{ margin: 0, touchAction: isDragging ? 'none' : 'pan-y' }}
           max={String(max)}
           min={String(min)}
