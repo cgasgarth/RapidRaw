@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ChangeEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
@@ -48,7 +48,7 @@ export default function CreateFolderModal({
   }, [name, onSave, onClose]);
 
   const handleKeyDown = useCallback(
-    (e: any) => {
+    (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
         handleSave();
       } else if (e.key === 'Escape') {
@@ -80,7 +80,7 @@ export default function CreateFolderModal({
           transform transition-all duration-300 ease-out
           ${show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'}
         `}
-        onClick={(e: any) => e.stopPropagation()}
+        onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
       >
         <Text variant={TextVariants.title} className="mb-4">
           {title || t('modals.createFolder.title')}
@@ -88,7 +88,7 @@ export default function CreateFolderModal({
         <input
           autoFocus
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-accent"
-          onChange={(e: any) => setName(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder || t('modals.createFolder.placeholder')}
           type="text"
