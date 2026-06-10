@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, type KeyboardEvent, type MouseEvent } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
@@ -147,7 +147,7 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
   }, [name, includeMasks, includeCropTransform, presetType, onSave, onClose]);
 
   const handleKeyDown = useCallback(
-    (e: any) => {
+    (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
         handleSave();
       } else if (e.key === 'Escape') {
@@ -179,7 +179,7 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
           transform transition-all duration-300 ease-out
           ${show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'}
         `}
-        onClick={(e: any) => e.stopPropagation()}
+        onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
       >
         <Text variant={TextVariants.title} className="mb-4">
           {initialPreset ? t('modals.configurePreset.titleConfigure') : t('modals.configurePreset.titleSave')}
@@ -187,7 +187,7 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
         <input
           autoFocus
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-          onChange={(e: any) => setName(e.target.value)}
+          onChange={(e) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('modals.configurePreset.placeholder')}
           type="text"
