@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, type MouseEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   Aperture,
@@ -59,8 +59,15 @@ import {
   Album,
   AlbumGroup,
   ImageFile,
+  AppSettings,
 } from '../components/ui/AppProperties';
-import { Color, COLOR_LABELS, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
+import {
+  type Adjustments,
+  type Color,
+  COLOR_LABELS,
+  INITIAL_ADJUSTMENTS,
+  normalizeLoadedAdjustments,
+} from '../utils/adjustments';
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
@@ -74,11 +81,40 @@ export interface UseAppContextMenusProps {
   handleLibraryRefresh: () => Promise<void>;
   refreshAllFolderTrees: () => Promise<void>;
   refreshImageList: () => Promise<void>;
-  executeDelete: (paths: string[], options: any) => Promise<void>;
+  executeDelete: (paths: string[], options: DeleteOptions) => Promise<void>;
   handleTogglePinFolder: (path: string) => Promise<void>;
 }
 
+interface DeleteOptions {
+  includeAssociated: boolean;
+}
+
+interface LoadedMetadata {
+  adjustments?: Adjustments | null;
+}
+
+interface FolderTreeRoot {
+  path?: string;
+}
+
+type ContextMenuEvent = MouseEvent<HTMLElement>;
+
 const colorLabelFallback = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
+
+const findAlbumById = (items: AlbumItem[], albumId: string): Album | null => {
+  for (const item of items) {
+    if (item.type === 'album' && item.id === albumId) {
+      return item;
+    }
+
+    if (item.type === 'group') {
+      const found = findAlbumById(item.children, albumId);
+      if (found) return found;
+    }
+  }
+
+  return null;
+};
 
 export function useAppContextMenus(props: UseAppContextMenusProps) {
   const { t } = useTranslation();
@@ -154,7 +190,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               invoke(Invokes.AddToAlbum, { albumId: item.id, paths: pathsToAdd })
                 .then(() => {
                   console.log(`Added image(s) to ${item.name}`);
-                  invoke(Invokes.GetAlbums).then((res: any) =>
+                  invoke<AlbumItem[]>(Invokes.GetAlbums).then((res) =>
                     useLibraryStore.getState().setLibrary({ albumTree: res }),
                   );
                 })
@@ -168,7 +204,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   );
 
   const handleEditorContextMenu = useCallback(
-    (event: any) => {
+    (event: ContextMenuEvent) => {
       event.preventDefault();
       event.stopPropagation();
 
@@ -342,7 +378,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   );
 
   const handleThumbnailContextMenu = useCallback(
-    (event: any, path: string) => {
+    (event: ContextMenuEvent, path: string) => {
       event.preventDefault();
       event.stopPropagation();
 
@@ -462,16 +498,16 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         invoke(Invokes.ApplyAutoAdjustmentsToPaths, { paths: finalSelection })
           .then(async () => {
             if (selectedImage && finalSelection.includes(selectedImage.path)) {
-              const metadata: any = await invoke(Invokes.LoadMetadata, { path: selectedImage.path });
-              if (metadata.adjustments && !metadata.adjustments.is_null) {
+              const metadata = await invoke<LoadedMetadata>(Invokes.LoadMetadata, { path: selectedImage.path });
+              if (metadata.adjustments && !metadata.adjustments['is_null']) {
                 const normalized = normalizeLoadedAdjustments(metadata.adjustments);
                 setEditor({ adjustments: normalized });
                 useEditorStore.getState().resetHistory(normalized);
               }
             }
             if (libraryActivePath && finalSelection.includes(libraryActivePath)) {
-              const metadata: any = await invoke(Invokes.LoadMetadata, { path: libraryActivePath });
-              if (metadata.adjustments && !metadata.adjustments.is_null) {
+              const metadata = await invoke<LoadedMetadata>(Invokes.LoadMetadata, { path: libraryActivePath });
+              if (metadata.adjustments && !metadata.adjustments['is_null']) {
                 const normalized = normalizeLoadedAdjustments(metadata.adjustments);
                 setLibrary({ libraryActiveAdjustments: normalized });
               }
@@ -518,15 +554,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             const sortedTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
             setLibrary({ albumTree: sortedTree });
 
-            const albumObj = sortedTree.reduce((acc: any, cur: any) => {
-              const find = (n: any): any =>
-                n.id === activeAlbumId
-                  ? n
-                  : n.type === 'group'
-                    ? n.children.reduce((a: any, c: any) => a || find(c), null)
-                    : null;
-              return acc || find(cur);
-            }, null) as Album;
+            const albumObj = findAlbumById(sortedTree, activeAlbumId);
 
             if (albumObj) {
               setLibrary({ imageList: imageList.filter((i) => albumObj.images.includes(i.path)) });
@@ -807,7 +835,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   );
 
   const handleFolderTreeContextMenu = useCallback(
-    (event: any, path: string | null, isCurrentlyPinned?: boolean) => {
+    (event: ContextMenuEvent, path: string | null, isCurrentlyPinned?: boolean) => {
       event.preventDefault();
       event.stopPropagation();
 
@@ -849,37 +877,40 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 isDestructive: true,
                 onClick: () => {
                   const newRoots = rootPaths.filter((r: string) => r !== targetPath);
-                  const newFolderTrees = folderTrees.filter((t: any) => t.path !== targetPath);
+                  const newFolderTrees = folderTrees.filter((tree: FolderTreeRoot) => tree.path !== targetPath);
 
                   const isCurrentInTarget =
                     currentFolderPath === targetPath ||
                     currentFolderPath?.startsWith(targetPath + '/') ||
                     currentFolderPath?.startsWith(targetPath + '\\');
 
-                  const updates: any = {
-                    rootPaths: newRoots,
-                    folderTrees: newFolderTrees,
-                  };
+                  const updates = isCurrentInTarget
+                    ? {
+                        rootPaths: newRoots,
+                        folderTrees: newFolderTrees,
+                        currentFolderPath: null,
+                        imageList: [],
+                        libraryActivePath: null,
+                        multiSelectedPaths: [],
+                        selectionAnchorPath: null,
+                      }
+                    : {
+                        rootPaths: newRoots,
+                        folderTrees: newFolderTrees,
+                      };
 
-                  if (isCurrentInTarget) {
-                    updates.currentFolderPath = null;
-                    updates.imageList = [];
-                    updates.libraryActivePath = null;
-                    updates.multiSelectedPaths = [];
-                    updates.selectionAnchorPath = null;
-                    props.handleBackToLibrary();
-                  }
+                  if (isCurrentInTarget) props.handleBackToLibrary();
 
                   setLibrary(updates);
 
                   const { appSettings, handleSettingsChange } = useSettingsStore.getState();
                   if (appSettings) {
-                    const newSettings = { ...appSettings, rootFolders: newRoots } as any;
+                    const newSettings: AppSettings = { ...appSettings, rootFolders: newRoots };
                     if (newRoots.length === 0) {
                       newSettings.lastRootPath = null;
                       newSettings.lastFolderState = null;
                     } else if (newSettings.lastRootPath === targetPath) {
-                      newSettings.lastRootPath = newRoots[0];
+                      newSettings.lastRootPath = newRoots[0] ?? null;
                     }
 
                     if (isCurrentInTarget) {
@@ -1016,7 +1047,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
                     const { appSettings, handleSettingsChange } = useSettingsStore.getState();
                     if (appSettings) {
-                      handleSettingsChange({ ...appSettings, lastFolderState: null } as any);
+                      handleSettingsChange({ ...appSettings, lastFolderState: null });
                     }
                   }
 
@@ -1035,7 +1066,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   );
 
   const handleAlbumTreeContextMenu = useCallback(
-    (event: any, item: AlbumItem | null) => {
+    (event: ContextMenuEvent, item: AlbumItem | null) => {
       event.preventDefault();
       event.stopPropagation();
 
@@ -1107,8 +1138,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         }
 
         invoke(Invokes.SaveAlbums, { tree: newTree })
-          .then(() => invoke(Invokes.GetAlbums))
-          .then((sortedTree: any) => setLibrary({ albumTree: sortedTree }))
+          .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
+          .then((sortedTree) => setLibrary({ albumTree: sortedTree }))
           .catch((err) => toast.error(t('contextMenus.toasts.failedMoveError', { err })));
       };
 
@@ -1199,8 +1230,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
                     if (updateIcon(newTree)) {
                       invoke(Invokes.SaveAlbums, { tree: newTree })
-                        .then(() => invoke(Invokes.GetAlbums))
-                        .then((sorted: any) => setLibrary({ albumTree: sorted }))
+                        .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
+                        .then((sorted) => setLibrary({ albumTree: sorted }))
                         .catch((err) => toast.error(t('contextMenus.toasts.failedChangeIcon', { err })));
                     }
                   },
@@ -1251,8 +1282,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       };
                       del(newTree);
                       invoke(Invokes.SaveAlbums, { tree: newTree })
-                        .then(() => invoke(Invokes.GetAlbums))
-                        .then((sorted: any) => setLibrary({ albumTree: sorted }))
+                        .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
+                        .then((sorted) => setLibrary({ albumTree: sorted }))
                         .catch((err) => toast.error(t('contextMenus.toasts.failedDelete', { err })));
                     },
                   },
@@ -1268,7 +1299,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   );
 
   const handleMainLibraryContextMenu = useCallback(
-    (event: any) => {
+    (event: ContextMenuEvent) => {
       event.preventDefault();
       event.stopPropagation();
 
