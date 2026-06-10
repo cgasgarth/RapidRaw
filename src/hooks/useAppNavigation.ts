@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type RefObject } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
@@ -8,25 +8,97 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { Invokes, LibraryViewMode, ImageFile } from '../components/ui/AppProperties';
-import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
-import { globalImageCache } from '../utils/ImageLRUCache';
+import {
+  Invokes,
+  LibraryViewMode,
+  type Album,
+  type AlbumItem,
+  type AppSettings,
+  type ImageFile,
+} from '../components/ui/AppProperties';
+import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
+import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
+
+interface TransformController {
+  resetTransform(time?: number): void;
+}
+
+interface PreloadedNavigationData {
+  currentPath?: string;
+  images?: Promise<ImageFile[]> | undefined;
+  rootPaths?: string[];
+  trees?: Promise<FolderTreeNode[]> | undefined;
+}
+
+interface FolderTreeNode {
+  children?: FolderTreeNode[];
+  path: string;
+  [key: string]: unknown;
+}
+
+interface PreviousAdjustments {
+  adjustments: Adjustments;
+  path: string;
+}
+
+interface LoadImageResult {
+  height: number;
+  width: number;
+}
+
+interface LoadedMetadata {
+  adjustments?: Adjustments | null;
+}
+
+type ExifDataMap = Record<string, Record<string, string>>;
+
+interface PersistedFolderState {
+  activeAlbumId?: string | null;
+  currentFolderPath?: string | null;
+  expandedAlbumGroups?: string[];
+  expandedFolders?: string[];
+}
+
+interface NavigationSettings extends AppSettings {
+  enableFolderImageCounts?: boolean;
+  lastFolderState?: PersistedFolderState | null;
+  libraryViewMode?: LibraryViewMode;
+  pinnedFolders?: string[];
+  rootFolders?: string[];
+}
 
 export interface AppNavigationProps {
   clearThumbnailQueue: () => void;
   refs: {
-    transformWrapperRef: React.RefObject<any>;
-    preloadedDataRef: React.RefObject<any>;
-    cachedEditStateRef: React.RefObject<any>;
-    selectedImagePathRef: React.RefObject<string | null>;
-    isBackendReadyRef: React.RefObject<boolean>;
-    latestRenderedJobIdRef: React.RefObject<number>;
-    previewJobIdRef: React.RefObject<number>;
-    currentResRef: React.RefObject<number>;
-    prevAdjustmentsRef: React.RefObject<any>;
+    transformWrapperRef: RefObject<TransformController | null>;
+    preloadedDataRef: RefObject<PreloadedNavigationData>;
+    cachedEditStateRef: RefObject<ImageCacheEntry | null>;
+    selectedImagePathRef: RefObject<string | null>;
+    isBackendReadyRef: RefObject<boolean>;
+    latestRenderedJobIdRef: RefObject<number>;
+    previewJobIdRef: RefObject<number>;
+    currentResRef: RefObject<number>;
+    prevAdjustmentsRef: RefObject<PreviousAdjustments | null>;
   };
 }
+
+const getNavigationSettings = (): NavigationSettings | null => useSettingsStore.getState().appSettings;
+
+const findAlbumById = (nodes: AlbumItem[], albumId: string): Album | null => {
+  for (const node of nodes) {
+    if (node.type === 'album' && node.id === albumId) {
+      return node;
+    }
+
+    if (node.type === 'group') {
+      const found = findAlbumById(node.children, albumId);
+      if (found) return found;
+    }
+  }
+
+  return null;
+};
 
 export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationProps) {
   const {
@@ -177,25 +249,25 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         isBackendReadyRef.current = false;
         currentResRef.current = Infinity;
 
-        invoke(Invokes.LoadImage, { path })
-          .then((_result: any) => {
+        invoke<LoadImageResult>(Invokes.LoadImage, { path })
+          .then((result) => {
             if (selectedImagePathRef.current !== path) return;
             isBackendReadyRef.current = true;
             currentResRef.current = 0;
-            setEditor({ originalSize: { width: _result.width, height: _result.height } });
+            setEditor({ originalSize: { width: result.width, height: result.height } });
           })
-          .catch((err: any) => {
+          .catch((err) => {
             if (String(err).includes('cancelled')) return;
             console.error('Background load_image failed on cache hit:', err);
             isBackendReadyRef.current = true;
             currentResRef.current = 0;
           });
 
-        invoke(Invokes.LoadMetadata, { path })
-          .then((metadata: any) => {
+        invoke<LoadedMetadata>(Invokes.LoadMetadata, { path })
+          .then((metadata) => {
             if (selectedImagePathRef.current !== path) return;
-            let freshAdjustments: any;
-            if (metadata.adjustments && !metadata.adjustments.is_null) {
+            let freshAdjustments: Adjustments;
+            if (metadata.adjustments && !metadata.adjustments['is_null']) {
               freshAdjustments = normalizeLoadedAdjustments(metadata.adjustments);
             } else {
               freshAdjustments = { ...INITIAL_ADJUSTMENTS };
@@ -266,8 +338,9 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       expandParents = true,
       preserveEditor = false,
     ) => {
-      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-      const { pinnedFolders } = appSettings || { pinnedFolders: [] };
+      const { handleSettingsChange } = useSettingsStore.getState();
+      const appSettings = getNavigationSettings();
+      const pinnedFolders = appSettings?.pinnedFolders ?? [];
       const { setLibrary, sortCriteria, rootPaths, expandedFolders } = useLibraryStore.getState();
       const { setUI } = useUIStore.getState();
       const { setProcess } = useProcessStore.getState();
@@ -292,7 +365,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         if (isNewRoot && path) {
           newExpandedFolders = new Set([path]);
           if (appSettings) {
-            handleSettingsChange({ ...appSettings, lastRootPath: path } as any);
+            handleSettingsChange({ ...appSettings, lastRootPath: path });
           }
         } else if (path && expandParents) {
           const allRoots = [...(rootPaths || []), ...(pinnedFolders || [])].filter(Boolean) as string[];
@@ -336,7 +409,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         if (preloadedImages) {
           files = preloadedImages;
         } else {
-          files = await invoke(command, { path });
+          files = await invoke<ImageFile[]>(command, { path });
         }
 
         const initialRatings: Record<string, number> = {};
@@ -354,7 +427,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           const paths = files.map((f: ImageFile) => f.path);
 
           if (isExifSortActive) {
-            const exifDataMap: Record<string, any> = await invoke(Invokes.ReadExifForPaths, { paths });
+            const exifDataMap = await invoke<ExifDataMap>(Invokes.ReadExifForPaths, { paths });
             const finalImageList = files.map((image) => ({
               ...image,
               exif: exifDataMap[image.path] || image.exif || null,
@@ -362,8 +435,8 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             setLibrary({ imageList: finalImageList });
           } else {
             setLibrary({ imageList: files });
-            invoke(Invokes.ReadExifForPaths, { paths })
-              .then((exifDataMap: any) => {
+            invoke<ExifDataMap>(Invokes.ReadExifForPaths, { paths })
+              .then((exifDataMap) => {
                 setLibrary((state) => ({
                   imageList: state.imageList.map((image) => ({
                     ...image,
@@ -459,7 +532,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           setLibrary({ rootPaths: newRootPaths });
 
           if (appSettings) {
-            handleSettingsChange({ ...appSettings, rootFolders: newRootPaths } as any);
+            handleSettingsChange({ ...appSettings, rootFolders: newRootPaths });
           }
 
           setLibrary({ isTreeLoading: true });
@@ -486,7 +559,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
   const handleContinueSession = () => {
     const restore = async () => {
-      const { appSettings } = useSettingsStore.getState();
+      const appSettings = getNavigationSettings();
       const { setLibrary } = useLibraryStore.getState();
 
       const rootFolders = appSettings?.rootFolders?.length
@@ -498,7 +571,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       if (rootFolders.length === 0) return;
 
       const folderState = appSettings?.lastFolderState;
-      const pathToSelect = folderState?.currentFolderPath || rootFolders[0];
+      const pathToSelect = folderState?.currentFolderPath ?? rootFolders[0] ?? null;
 
       setLibrary({ rootPaths: rootFolders });
 
@@ -511,7 +584,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
       setLibrary({ isTreeLoading: true });
       try {
-        let treesData;
+        let treesData: FolderTreeNode[];
         if (preloadedDataRef.current?.rootPaths?.join() === rootFolders.join() && preloadedDataRef.current.trees) {
           treesData = await preloadedDataRef.current.trees;
           preloadedDataRef.current.trees = undefined;
@@ -519,7 +592,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           const expandedArr = folderState?.expandedFolders
             ? Array.from(new Set(folderState.expandedFolders))
             : rootFolders;
-          treesData = await invoke(Invokes.GetPinnedFolderTrees, {
+          treesData = await invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
             paths: rootFolders,
             expandedFolders: expandedArr,
             showImageCounts: appSettings?.enableFolderImageCounts ?? false,
@@ -546,21 +619,10 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         const activeAlbumId = folderState?.activeAlbumId;
         if (activeAlbumId) {
           try {
-            const albumTree: any = await invoke(Invokes.GetAlbums);
+            const albumTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
             setLibrary({ albumTree });
 
-            const findObj = (nodes: any[]): any => {
-              for (const n of nodes) {
-                if (n.id === activeAlbumId) return n;
-                if (n.type === 'group') {
-                  const f = findObj(n.children);
-                  if (f) return f;
-                }
-              }
-              return null;
-            };
-
-            const album = findObj(albumTree);
+            const album = findAlbumById(albumTree, activeAlbumId);
             if (album) {
               await handleSelectAlbum(album.id, album.name, album.images);
             } else {
