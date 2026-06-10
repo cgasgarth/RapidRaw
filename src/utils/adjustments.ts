@@ -2,6 +2,9 @@ import { Crop } from 'react-image-crop';
 import { v4 as uuidv4 } from 'uuid';
 import { SubMask, SubMaskMode } from '../components/panel/right/Masks';
 
+export type JsonPrimitive = boolean | null | number | string;
+export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | Array<JsonValue>;
+
 export enum ActiveChannel {
   Blue = 'blue',
   Green = 'green',
@@ -147,6 +150,7 @@ export interface ParametricCurve {
 }
 
 export interface Adjustments {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy adjustment setter props rely on this dynamic index accepting updater functions; tighten after setter contracts are typed.
   [index: string]: any;
   aiPatches: Array<AiPatch>;
   aspectRatio: number | null;
@@ -237,7 +241,7 @@ export interface AiPatch {
   isLoading: boolean;
   invert: boolean;
   name: string;
-  patchData: any | null;
+  patchData: JsonValue | null;
   prompt: string;
   subMasks: Array<SubMask>;
   visible: boolean;
@@ -290,6 +294,7 @@ interface Hsl {
 }
 
 export interface MaskAdjustments {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Mask adjustments share the legacy dynamic adjustment map contract until mask setter props are typed.
   [index: string]: any;
   blacks: number;
   brightness: number;
@@ -324,6 +329,7 @@ export interface MaskAdjustments {
 
 export interface MaskContainer {
   adjustments: MaskAdjustments;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Existing mask hydration tolerates absent ids and normalizes them at load boundaries.
   id?: any;
   invert: boolean;
   name: string;
@@ -562,7 +568,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   whites: 0,
 };
 
-const deepCloneCurves = (curves: any): Curves => ({
+const deepCloneCurves = (curves?: Partial<Curves> | null): Curves => ({
   blue: curves?.blue?.map((p: Coord) => ({ ...p })) || [
     { x: 0, y: 0 },
     { x: 255, y: 255 },
@@ -581,26 +587,29 @@ const deepCloneCurves = (curves: any): Curves => ({
   ],
 });
 
-const deepCloneParametric = (pCurve: any): ParametricCurve => ({
+const deepCloneParametric = (pCurve?: Partial<ParametricCurve> | null): ParametricCurve => ({
   luma: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS, ...(pCurve?.luma || {}) },
   red: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS, ...(pCurve?.red || {}) },
   green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS, ...(pCurve?.green || {}) },
   blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS, ...(pCurve?.blue || {}) },
 });
 
-export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any => {
+export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments | null | undefined): Adjustments => {
   if (!loadedAdjustments) {
     return INITIAL_ADJUSTMENTS;
   }
 
-  const normalizeSubMasks = (subMasks: any[]) => {
-    return (subMasks || []).map((subMask: Partial<SubMask>) => ({
-      visible: true,
-      mode: SubMaskMode.Additive,
-      invert: false,
-      opacity: 100,
-      ...subMask,
-    }));
+  const normalizeSubMasks = (subMasks?: Array<Partial<SubMask>>): Array<SubMask> => {
+    return (subMasks || []).map(
+      (subMask: Partial<SubMask>) =>
+        ({
+          visible: true,
+          mode: SubMaskMode.Additive,
+          invert: false,
+          opacity: 100,
+          ...subMask,
+        }) as SubMask,
+    );
   };
 
   const normalizedMasks = (loadedAdjustments.masks || []).map((maskContainer: MaskContainer) => {
@@ -609,8 +618,8 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
 
     return {
       ...INITIAL_MASK_CONTAINER,
-      id: maskContainer.id || uuidv4(),
       ...maskContainer,
+      id: maskContainer.id || uuidv4(),
       adjustments: {
         ...INITIAL_MASK_ADJUSTMENTS,
         ...containerAdjustments,
@@ -626,7 +635,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
         parametricCurve: containerAdjustments.parametricCurve
           ? deepCloneParametric(containerAdjustments.parametricCurve)
           : getDefaultParametricCurve(),
-        curveMode: containerAdjustments.curveMode || INITIAL_MASK_ADJUSTMENTS.curveMode,
+        curveMode: containerAdjustments.curveMode ?? 'point',
         sectionVisibility: {
           ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
           ...(containerAdjustments.sectionVisibility || {}),
@@ -634,14 +643,17 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
         sharpnessThreshold: containerAdjustments.sharpnessThreshold ?? INITIAL_MASK_ADJUSTMENTS.sharpnessThreshold,
       },
       subMasks: normalizedSubMasks,
-    };
+    } as MaskContainer;
   });
 
-  const normalizedAiPatches = (loadedAdjustments.aiPatches || []).map((patch: any) => ({
-    visible: true,
-    ...patch,
-    subMasks: normalizeSubMasks(patch.subMasks),
-  }));
+  const normalizedAiPatches = (loadedAdjustments.aiPatches || []).map(
+    (patch: Partial<AiPatch>) =>
+      ({
+        visible: true,
+        ...patch,
+        subMasks: normalizeSubMasks(patch.subMasks),
+      }) as AiPatch,
+  );
 
   return {
     ...INITIAL_ADJUSTMENTS,
@@ -675,7 +687,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     parametricCurve: loadedAdjustments.parametricCurve
       ? deepCloneParametric(loadedAdjustments.parametricCurve)
       : getDefaultParametricCurve(),
-    curveMode: loadedAdjustments.curveMode || INITIAL_ADJUSTMENTS.curveMode,
+    curveMode: loadedAdjustments.curveMode ?? 'point',
     masks: normalizedMasks,
     aiPatches: normalizedAiPatches,
     sectionVisibility: {

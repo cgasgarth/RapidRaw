@@ -1,7 +1,7 @@
 import { Theme } from '../components/ui/AppProperties';
 
 export interface ThemeProps {
-  cssVariables: any;
+  cssVariables: Record<string, string>;
   id: Theme;
   name: string;
   splashImage: string;
