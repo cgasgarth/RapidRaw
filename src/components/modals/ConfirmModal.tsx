@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { type KeyboardEvent, type MouseEvent, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import Text from '../ui/Text';
@@ -56,7 +56,7 @@ export default function ConfirmModal({
   }, [onConfirm, onClose]);
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>) => {
+    (e: KeyboardEvent<HTMLDivElement>) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
@@ -95,7 +95,7 @@ export default function ConfirmModal({
           transform transition-all duration-300 ease-out
           ${show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'}
         `}
-        onClick={(e: any) => e.stopPropagation()}
+        onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
         <Text variant={TextVariants.title} id="confirm-modal-title" className="mb-4">
