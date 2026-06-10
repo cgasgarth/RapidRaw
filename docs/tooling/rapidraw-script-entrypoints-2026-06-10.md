@@ -4,25 +4,27 @@
 - Issue: #20 `tooling(scripts): audit RapidRAW package scripts and CI entrypoints`
 - Repository: `cgasgarth/RapidRaw`
 - Baseline commit before this audit: `a4f408a`
+- Last updated by: #22 `tooling(bun): migrate frontend CI install and script execution to Bun`
 
 ## Purpose
 
 This document maps the current RapidRAW package scripts, config files, and
-GitHub Actions entrypoints before RawEngine migrates frontend execution toward
-Bun and tightens TypeScript, ESLint, hooks, and CI quality gates.
+GitHub Actions entrypoints as RawEngine migrates frontend execution toward Bun
+and tightens TypeScript, ESLint, hooks, and CI quality gates.
 
-The audit is intentionally descriptive. It does not change package management,
-workflow behavior, lint rules, TypeScript settings, or Tauri build behavior.
+The audit is intentionally descriptive. Behavior-changing PRs should update it
+when package management, workflow behavior, lint rules, TypeScript settings, or
+Tauri build behavior changes.
 
 ## Package Manager State
 
-| Item                    | Current value              | Notes                                      |
-| ----------------------- | -------------------------- | ------------------------------------------ |
-| `packageManager` field  | Not set                    | Must be decided before Bun CI hardening.   |
-| Primary lockfile        | `package-lock.json`        | npm lockfile v3 is the only lockfile.      |
-| Bun lockfile            | Not present                | Planned by #21/#22.                        |
-| CI frontend install     | `npm ci` and `npm install` | Mixed between validation and build paths.  |
-| GitHub Actions Node use | Node `22`                  | Used by validation and reusable app build. |
+| Item                    | Current value                   | Notes                                                          |
+| ----------------------- | ------------------------------- | -------------------------------------------------------------- |
+| `packageManager` field  | `bun@1.3.13`                    | Bun is the declared frontend package manager.                  |
+| Primary lockfile        | `bun.lock`                      | Bun text lockfile is the frontend CI source of truth.          |
+| Transitional lockfile   | `package-lock.json`             | Preserved temporarily as npm fallback until removal is proven. |
+| CI frontend install     | `bun install --frozen-lockfile` | Used by validation and reusable app-build paths.               |
+| GitHub Actions Node use | Node `22`                       | Kept only for workflow helper scripts that invoke Node.        |
 
 ## `package.json` Scripts
 
@@ -66,12 +68,12 @@ Important current gaps:
 
 `src-tauri/tauri.conf.json` currently wires Tauri to npm scripts:
 
-| Tauri field          | Current value           | Migration implication                        |
-| -------------------- | ----------------------- | -------------------------------------------- |
-| `beforeDevCommand`   | `npm run dev`           | Must move or adapt when Bun becomes primary. |
-| `devUrl`             | `http://localhost:1420` | Matches Vite server port.                    |
-| `beforeBuildCommand` | `npm run build`         | Must move or adapt when Bun becomes primary. |
-| `frontendDist`       | `../dist`               | Produced by `vite build`.                    |
+| Tauri field          | Current value           | Migration implication                      |
+| -------------------- | ----------------------- | ------------------------------------------ |
+| `beforeDevCommand`   | `bun run dev`           | Bun is the primary frontend script runner. |
+| `devUrl`             | `http://localhost:1420` | Matches Vite server port.                  |
+| `beforeBuildCommand` | `bun run build`         | Bun is the primary frontend script runner. |
+| `frontendDist`       | `../dist`               | Produced by `vite build`.                  |
 
 #18 recorded that the Vite browser surface currently loads but does not mount the
 React app outside Tauri because `TitleBar` calls Tauri window APIs immediately.
@@ -90,17 +92,23 @@ Rust commands are run from `src-tauri`. The package declares `rust-version =
 
 ## GitHub Actions Entrypoints
 
-| Workflow                        | Trigger                              | Primary entrypoints                                                                                                                                                           | Current gate behavior                                                                                                          |
-| ------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `.github/workflows/lint.yml`    | push to `main`, pull request, manual | `npm ci`, `npm run build`, `npm run i18n:check`, `npm run typecheck`, `npm run lint`, `npm run format:check`, `npm run i18n:lint`, `cargo fmt`, `cargo check`, `cargo clippy` | Passing baseline commands are blocking; known debt commands are visible but non-blocking until #283/#285/#286/#287/#289 close. |
-| `.github/workflows/pr-ci.yml`   | pull request                         | reusable `build.yml` with `macos-14`/`aarch64-apple-darwin`                                                                                                                   | Apple Silicon macOS app packaging is blocking.                                                                                 |
-| `.github/workflows/build.yml`   | workflow call                        | `npm install`, `rustup target add`, `tauri-apps/tauri-action`, Android `npx tauri android build`                                                                              | Reusable package build workflow.                                                                                               |
-| `.github/workflows/ci.yml`      | push to `main`                       | reusable `build.yml` matrix for Windows, macOS, Linux, Android                                                                                                                | Inherited full matrix still present.                                                                                           |
-| `.github/workflows/release.yml` | GitHub release creation              | reusable `build.yml` matrix for Windows, macOS, Linux, Android                                                                                                                | Release packaging matrix still inherited.                                                                                      |
+| Workflow                        | Trigger                              | Primary entrypoints                                                                                                                                                                                  | Current gate behavior                                                                                                          |
+| ------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `.github/workflows/lint.yml`    | push to `main`, pull request, manual | `bun install --frozen-lockfile`, `bun run build`, `bun run i18n:check`, `bun run typecheck`, `bun run lint`, `bun run format:check`, `bun run i18n:lint`, `cargo fmt`, `cargo check`, `cargo clippy` | Passing baseline commands are blocking; known debt commands are visible but non-blocking until #283/#285/#286/#287/#289 close. |
+| `.github/workflows/pr-ci.yml`   | pull request                         | reusable `build.yml` with `macos-14`/`aarch64-apple-darwin`                                                                                                                                          | Apple Silicon macOS app packaging is blocking.                                                                                 |
+| `.github/workflows/build.yml`   | workflow call                        | `bun install --frozen-lockfile`, `rustup target add`, `tauri-apps/tauri-action`, Android `npx tauri android build`                                                                                   | Reusable package build workflow.                                                                                               |
+| `.github/workflows/ci.yml`      | push to `main`                       | reusable `build.yml` matrix for Windows, macOS, Linux, Android                                                                                                                                       | Inherited full matrix still present.                                                                                           |
+| `.github/workflows/release.yml` | GitHub release creation              | reusable `build.yml` matrix for Windows, macOS, Linux, Android                                                                                                                                       | Release packaging matrix still inherited.                                                                                      |
 
 ## Workflow Findings
 
-- `lint.yml` now uses `npm ci`; `build.yml` still uses `npm install`.
+- Frontend CI and reusable app-build install paths now use
+  `bun install --frozen-lockfile`.
+- Frontend script execution in CI and Tauri config now uses `bun run ...`.
+- `build.yml` still sets up Node.js 22 because Node remains an explicit runtime
+  exception for workflow helper scripts such as the Android release asset
+  version extraction and the inherited Android packaging command. Android matrix
+  behavior remains deferred to #52.
 - `pr-ci.yml` has been narrowed to Apple Silicon macOS for required PR app
   packaging. The inherited full platform matrix is deferred to #52.
 - `ci.yml` and `release.yml` still contain inherited Windows, Intel macOS,
@@ -134,16 +142,23 @@ Future PRs should add named scripts so local and CI behavior can converge:
 
 ## Bun Migration Notes
 
-Before #21/#22 change install or script execution:
+#21 established the package-manager baseline:
 
-- Decide and set the `packageManager` field.
-- Generate and review a Bun lockfile without deleting `package-lock.json` until
-  Bun CI is green.
-- Keep Tauri `beforeDevCommand` and `beforeBuildCommand` aligned with whatever
-  package manager is authoritative.
-- Convert `build.yml`, `lint.yml`, `pr-ci.yml`, and local docs together so
-  package-manager behavior is not split across npm and Bun.
-- Preserve npm fallback only if explicitly documented as a transition path.
+- `packageManager` points at Bun.
+- `bun.lock` exists and is verified by CI.
+- `package-lock.json` remains only as a transition fallback until a dedicated
+  removal PR proves all required paths are Bun-clean.
+
+#22 migrates compatible frontend CI install and script execution:
+
+- Frontend validation jobs use `oven-sh/setup-bun@v2`.
+- Frontend validation jobs install with `bun install --frozen-lockfile`.
+- Frontend validation jobs execute package scripts with `bun run ...`.
+- Tauri `beforeDevCommand` and `beforeBuildCommand` execute through Bun.
+- Reusable package builds install frontend dependencies through Bun before
+  Tauri packaging.
+- Node.js remains documented only where workflow helper scripts still invoke
+  `node` or `npx` directly.
 
 ## Follow-Up Tracking
 

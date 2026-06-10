@@ -62,7 +62,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -105,7 +104,7 @@ jobs:
           link-to-sdk: true
 
       - name: Install frontend dependencies
-        run: npm install
+        run: bun install --frozen-lockfile
 
       - name: Setup Android signing
         if: inputs.mobile == 'android' && github.event_name != 'pull_request'
