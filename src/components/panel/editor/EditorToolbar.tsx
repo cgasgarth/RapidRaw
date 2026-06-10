@@ -64,7 +64,8 @@ const EditorToolbar = memo(
     const { baseName, isVirtualCopy, vcId, exifData, hasExif } = useMemo(() => {
       const path = selectedImage.path;
       const parts = path.split('?vc=');
-      const fullFileName = parts[0].split(/[\\/]/).pop() || '';
+      const imagePath = parts[0] ?? path;
+      const fullFileName = imagePath.split(/[\\/]/).pop() || '';
 
       const exif = selectedImage.exif || {};
 
@@ -100,7 +101,7 @@ const EditorToolbar = memo(
       return {
         baseName: fullFileName,
         isVirtualCopy: parts.length > 1,
-        vcId: parts.length > 1 ? parts[1] : null,
+        vcId: parts.length > 1 ? (parts[1] ?? null) : null,
         exifData: data,
         hasExif: hasData,
       };

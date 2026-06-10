@@ -108,10 +108,10 @@ const OptimizedBrushLine = memo(
   ({ line, scale, cropX, cropY }: { line: DrawnLine; scale: number; cropX: number; cropY: number }) => {
     const flattenedPoints = useMemo(() => {
       const pts = new Float32Array(line.points.length * 2);
-      for (let i = 0; i < line.points.length; i++) {
-        pts[i * 2] = (line.points[i].x - cropX) * scale;
-        pts[i * 2 + 1] = (line.points[i].y - cropY) * scale;
-      }
+      line.points.forEach((point, index) => {
+        pts[index * 2] = (point.x - cropX) * scale;
+        pts[index * 2 + 1] = (point.y - cropY) * scale;
+      });
       return Array.from(pts);
     }, [line.points, scale, cropX, cropY]);
 
@@ -1399,9 +1399,9 @@ const ImageCanvas = memo(
           let count = 0;
 
           for (let i = 0; i < data.length; i += 4) {
-            rTotal += data[i];
-            gTotal += data[i + 1];
-            bTotal += data[i + 2];
+            rTotal += data[i] ?? 0;
+            gTotal += data[i + 1] ?? 0;
+            bTotal += data[i + 2] ?? 0;
             count++;
           }
 
