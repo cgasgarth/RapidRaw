@@ -51,7 +51,7 @@ const modeButtons = [
     bgClass: 'bg-accent',
     textActiveClass: 'text-button-text',
   },
-];
+] as const;
 
 const HistogramView = ({ histogram }: { histogram: any }) => {
   if (!histogram || !histogram.red || !histogram.green || !histogram.blue) return null;
@@ -625,7 +625,7 @@ export default function Waveform({
                   <button
                     key={mode}
                     onClick={() => setDisplayMode(mode)}
-                    data-tooltip={t(tooltip)}
+                    data-tooltip={t(tooltip, { defaultValue: label })}
                     className={`${baseButtonClass} ${displayMode === mode ? textActiveClass : inactiveButtonClass}`}
                   >
                     {displayMode === mode && (
