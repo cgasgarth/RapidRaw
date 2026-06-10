@@ -21,19 +21,14 @@ import {
   ThumbnailAspectRatio,
   type SupportedTypes,
 } from '../components/ui/AppProperties';
+import type { FolderTree } from '../components/panel/FolderTree';
 import { useTranslation } from 'react-i18next';
-
-interface FolderTreeNode {
-  children?: FolderTreeNode[];
-  path?: string;
-  [key: string]: unknown;
-}
 
 interface PreloadedInitializationData {
   currentPath?: string;
   images?: Promise<ImageFile[]> | undefined;
   rootPaths?: string[];
-  trees?: Promise<FolderTreeNode[]> | undefined;
+  trees?: Promise<FolderTree[]> | undefined;
 }
 
 interface PersistedFolderState {
@@ -218,7 +213,7 @@ export const useAppInitialization = ({
 
         if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
           try {
-            const trees = await invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
+            const trees = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
               paths: settings.pinnedFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders || [],
               showImageCounts: settings.enableFolderImageCounts ?? false,
@@ -247,7 +242,7 @@ export const useAppInitialization = ({
           preloadedDataRef.current = {
             rootPaths: rootFolders,
             currentPath: currentPath,
-            trees: invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
+            trees: invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
               paths: rootFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders ?? rootFolders,
               showImageCounts: settings.enableFolderImageCounts ?? false,

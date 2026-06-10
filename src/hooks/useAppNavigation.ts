@@ -16,6 +16,7 @@ import {
   type AppSettings,
   type ImageFile,
 } from '../components/ui/AppProperties';
+import type { FolderTree } from '../components/panel/FolderTree';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
@@ -28,13 +29,7 @@ interface PreloadedNavigationData {
   currentPath?: string;
   images?: Promise<ImageFile[]> | undefined;
   rootPaths?: string[];
-  trees?: Promise<FolderTreeNode[]> | undefined;
-}
-
-interface FolderTreeNode {
-  children?: FolderTreeNode[];
-  path: string;
-  [key: string]: unknown;
+  trees?: Promise<FolderTree[]> | undefined;
 }
 
 interface PreviousAdjustments {
@@ -537,7 +532,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
           setLibrary({ isTreeLoading: true });
           try {
-            const newTree = await invoke(Invokes.GetFolderTree, {
+            const newTree = await invoke<FolderTree>(Invokes.GetFolderTree, {
               path: selectedPath,
               expandedFolders: [selectedPath],
               showImageCounts: appSettings?.enableFolderImageCounts ?? false,
@@ -584,7 +579,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
       setLibrary({ isTreeLoading: true });
       try {
-        let treesData: FolderTreeNode[];
+        let treesData: FolderTree[];
         if (preloadedDataRef.current?.rootPaths?.join() === rootFolders.join() && preloadedDataRef.current.trees) {
           treesData = await preloadedDataRef.current.trees;
           preloadedDataRef.current.trees = undefined;
@@ -592,7 +587,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           const expandedArr = folderState?.expandedFolders
             ? Array.from(new Set(folderState.expandedFolders))
             : rootFolders;
-          treesData = await invoke<FolderTreeNode[]>(Invokes.GetPinnedFolderTrees, {
+          treesData = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
             paths: rootFolders,
             expandedFolders: expandedArr,
             showImageCounts: appSettings?.enableFolderImageCounts ?? false,
