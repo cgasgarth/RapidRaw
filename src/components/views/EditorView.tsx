@@ -1,5 +1,5 @@
 import { type RefObject, type PointerEvent as ReactPointerEvent } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import clsx from 'clsx';
 
@@ -23,7 +23,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 
 import { ImageFile, Orientation, Panel, ThumbnailAspectRatio } from '../ui/AppProperties';
 
-const panelVariants: any = {
+const panelVariants: Variants = {
   animate: (direction: number) => ({
     opacity: 1,
     y: 0,
@@ -40,8 +40,15 @@ const panelVariants: any = {
   }),
 };
 
+interface TransformController {
+  resetTransform(time?: number): void;
+  setTransform(x: number, y: number, scale: number, time?: number): void;
+  zoomIn(factor: number, time?: number): void;
+  zoomOut(factor: number, time?: number): void;
+}
+
 interface EditorViewProps {
-  transformWrapperRef: RefObject<any>;
+  transformWrapperRef: RefObject<TransformController | null>;
   isResizing: boolean;
   isCompactPortrait: boolean;
   isAndroid: boolean;
@@ -51,16 +58,16 @@ interface EditorViewProps {
   sortedImageList: ImageFile[];
   createResizeHandler: (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => void;
   handleBackToLibrary: () => void;
-  handleEditorContextMenu: (...args: any) => void;
-  handleThumbnailContextMenu: (...args: any) => void;
-  handleImageClick: (...args: any) => void;
+  handleEditorContextMenu: (event: unknown) => void;
+  handleThumbnailContextMenu: (event: unknown, path: string) => void;
+  handleImageClick: (path: string, event: unknown) => void;
   handleClearSelection: () => void;
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;
-  handleRate: (...args: any) => void;
+  handleRate: (rate: number, paths?: string[]) => void;
   handleZoomChange: (zoom: number) => void;
   handleRightPanelSelect: (panelId: Panel) => void;
-  requestThumbnails: any;
+  requestThumbnails: (paths: string[]) => void;
 }
 
 export default function EditorView({
