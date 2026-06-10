@@ -256,7 +256,7 @@ export interface Option {
   icon?: any;
   isDestructive?: boolean;
   label?: string;
-  onClick?(): void;
+  onClick?: (() => void) | undefined;
   onRightClick?(): void;
   submenu?: any;
   type?: string;
@@ -272,9 +272,9 @@ export interface Preset {
   folder?: Folder;
   id: string;
   name: string;
-  includeMasks?: boolean;
-  includeCropTransform?: boolean;
-  presetType?: 'tool' | 'style';
+  includeMasks?: boolean | undefined;
+  includeCropTransform?: boolean | undefined;
+  presetType?: 'tool' | 'style' | undefined;
 }
 
 export interface Progress {

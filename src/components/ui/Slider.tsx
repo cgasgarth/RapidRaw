@@ -17,7 +17,7 @@ interface SliderProps {
   min: number;
   onChange(event: SliderChangeEvent): void;
   disabled?: boolean;
-  onDragStateChange?(state: boolean): void;
+  onDragStateChange?: ((state: boolean) => void) | undefined;
   step: number;
   value: number;
   trackClassName?: string;

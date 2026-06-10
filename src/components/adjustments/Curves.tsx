@@ -39,7 +39,7 @@ interface CurveGraphProps {
   isForMask?: boolean;
   setAdjustments(updater: (prev: any) => any): void;
   theme: string;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
 const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {

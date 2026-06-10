@@ -1176,7 +1176,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     const updateIcon = (nodes: AlbumItem[]) => {
                       for (const n of nodes) {
                         if (n.id === item.id) {
-                          n.icon = iconDef.value;
+                          if (iconDef.value) {
+                            n.icon = iconDef.value;
+                          } else {
+                            delete n.icon;
+                          }
                           return true;
                         }
                         if (n.type === 'group' && updateIcon((n as AlbumGroup).children)) return true;

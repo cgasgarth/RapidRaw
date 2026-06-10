@@ -9,7 +9,7 @@ interface BasicAdjustmentsProps {
   adjustments: Adjustments;
   setAdjustments(adjustments: Partial<Adjustments>): any;
   isForMask?: boolean;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
   appSettings?: any;
 }
 
@@ -18,7 +18,7 @@ interface ToneMapperSwitchProps {
   onMapperChange: (mapper: string) => void;
   evShiftValue: number;
   onEvShiftChange: (value: number) => void;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
 const ToneMapperSwitch = ({

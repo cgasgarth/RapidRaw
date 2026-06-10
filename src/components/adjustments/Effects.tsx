@@ -12,7 +12,7 @@ interface EffectsPanelProps {
   setAdjustments(adjustments: Partial<Adjustments>): any;
   handleLutSelect(path: string): void;
   appSettings: AppSettings | null;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
 export default function EffectsPanel({

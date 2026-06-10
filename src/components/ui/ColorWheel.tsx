@@ -14,8 +14,8 @@ interface ColorWheelProps {
   label: string;
   onChange(hsl: HueSatLum): void;
   value: HueSatLum;
-  onDragStateChange?: (isDragging: boolean) => void;
-  isExpanded?: boolean;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
+  isExpanded?: boolean | undefined;
 }
 
 const ColorWheel = ({

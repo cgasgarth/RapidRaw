@@ -38,7 +38,7 @@ export function useImageProcessing(
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
 
   const inFlightCountRef = useRef(0);
-  const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number } | null>(null);
+  const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number | undefined } | null>(null);
   const currentOriginalResRef = useRef<number>(0);
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeWaveformChannelRef = useRef(activeWaveformChannel);

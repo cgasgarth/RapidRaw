@@ -10,7 +10,7 @@ interface DetailsPanelProps {
   setAdjustments(adjustments: Partial<Adjustments>): any;
   appSettings: AppSettings | null;
   isForMask?: boolean;
-  onDragStateChange?: (isDragging: boolean) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
 export default function DetailsPanel({
