@@ -2,9 +2,9 @@
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "io.github.CyberTimon.RapidRAW",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist"
   },
   "app": {

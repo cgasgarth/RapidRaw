@@ -18,19 +18,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '22'
-          cache: 'npm'
+          bun-version: '1.3.13'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Build frontend
-        run: npm run build
+        run: bun run build
 
       - name: Check translation extraction
-        run: npm run i18n:check
+        run: bun run i18n:check
 
   frontend-bun-install:
     name: 'frontend: bun install baseline'
@@ -56,28 +55,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '22'
-          cache: 'npm'
+          bun-version: '1.3.13'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - id: typecheck
         name: Typecheck
         continue-on-error: true
-        run: npm run typecheck
+        run: bun run typecheck
 
       - name: Record baseline status
         if: always()
         run: |
           if [[ "${{ steps.typecheck.outcome }}" == "failure" ]]; then
             echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`npm run typecheck\` is tracked by #283 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
+            echo "\`bun run typecheck\` is tracked by #283 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`npm run typecheck\` passed. Remove this temporary non-blocking wrapper when #283 is closed." >> "$GITHUB_STEP_SUMMARY"
+            echo "\`bun run typecheck\` passed. Remove this temporary non-blocking wrapper when #283 is closed." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   frontend-lint:
@@ -87,28 +85,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '22'
-          cache: 'npm'
+          bun-version: '1.3.13'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - id: eslint
         name: Lint
         continue-on-error: true
-        run: npm run lint
+        run: bun run lint
 
       - name: Record baseline status
         if: always()
         run: |
           if [[ "${{ steps.eslint.outcome }}" == "failure" ]]; then
             echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`npm run lint\` is tracked by #286 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
+            echo "\`bun run lint\` is tracked by #286 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`npm run lint\` passed. Remove this temporary non-blocking wrapper when #286 is closed." >> "$GITHUB_STEP_SUMMARY"
+            echo "\`bun run lint\` passed. Remove this temporary non-blocking wrapper when #286 is closed." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   frontend-format:
@@ -118,28 +115,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '22'
-          cache: 'npm'
+          bun-version: '1.3.13'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - id: prettier
         name: Check formatting
         continue-on-error: true
-        run: npm run format:check
+        run: bun run format:check
 
       - name: Record baseline status
         if: always()
         run: |
           if [[ "${{ steps.prettier.outcome }}" == "failure" ]]; then
             echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`npm run format:check\` is tracked by #289 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
+            echo "\`bun run format:check\` is tracked by #289 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`npm run format:check\` passed. Remove this temporary non-blocking wrapper when #289 is closed." >> "$GITHUB_STEP_SUMMARY"
+            echo "\`bun run format:check\` passed. Remove this temporary non-blocking wrapper when #289 is closed." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   frontend-i18n-lint:
@@ -149,28 +145,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '22'
-          cache: 'npm'
+          bun-version: '1.3.13'
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - id: i18n-lint
         name: Lint translations
         continue-on-error: true
-        run: npm run i18n:lint
+        run: bun run i18n:lint
 
       - name: Record baseline status
         if: always()
         run: |
           if [[ "${{ steps.i18n-lint.outcome }}" == "failure" ]]; then
             echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`npm run i18n:lint\` is tracked by #285 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
+            echo "\`bun run i18n:lint\` is tracked by #285 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`npm run i18n:lint\` passed. Remove this temporary non-blocking wrapper when #285 is closed." >> "$GITHUB_STEP_SUMMARY"
+            echo "\`bun run i18n:lint\` passed. Remove this temporary non-blocking wrapper when #285 is closed." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   rust-fmt:
