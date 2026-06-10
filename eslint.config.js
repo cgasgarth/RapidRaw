@@ -3,7 +3,7 @@ const tseslint = require('typescript-eslint');
 const react = require('eslint-plugin-react');
 const i18next = require('eslint-plugin-i18next');
 
-const tsFiles = ['**/*.{ts,tsx}'];
+const tsFiles = ['**/*.{ts,tsx,mts}'];
 
 const jsRecommendedForTs = {
   ...js.configs.recommended,
