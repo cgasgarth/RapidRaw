@@ -23,8 +23,9 @@ import { useAiMasking } from '../../hooks/useAiMasking';
 
 const parseRgb = (rgbStr: string): [number, number, number, number] => {
   const match = rgbStr.match(/[\d.]+/g);
-  if (match && match.length >= 3) {
-    return [parseFloat(match[0]) / 255, parseFloat(match[1]) / 255, parseFloat(match[2]) / 255, 1.0];
+  const [r, g, b] = match ?? [];
+  if (r !== undefined && g !== undefined && b !== undefined) {
+    return [parseFloat(r) / 255, parseFloat(g) / 255, parseFloat(b) / 255, 1.0];
   }
   return [0, 0, 0, 1.0];
 };
@@ -47,8 +48,7 @@ const checkCropValid = (pixelCrop: Partial<Crop>, imageW: number, imageH: number
     { x: pixelCrop.x + pixelCrop.width, y: pixelCrop.y + pixelCrop.height },
   ];
 
-  for (let i = 0; i < 4; i++) {
-    const p = pts[i];
+  for (const p of pts) {
     const nx = cos * (p.x - cx) - sin * (p.y - cy) + cx;
     const ny = sin * (p.x - cx) + cos * (p.y - cy) + cy;
     if (nx < -1 || nx > imageW + 1 || ny < -1 || ny > imageH + 1) {
@@ -731,10 +731,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         setIsPanningState(true);
       } else if (activePointers.current.size === 2) {
         const pts = Array.from(activePointers.current.values());
+        const [firstPointer, secondPointer] = pts;
+        if (!firstPointer || !secondPointer) return;
         lastPinch.current = {
-          dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
-          midX: (pts[0].x + pts[1].x) / 2,
-          midY: (pts[0].y + pts[1].y) / 2,
+          dist: Math.hypot(firstPointer.x - secondPointer.x, firstPointer.y - secondPointer.y),
+          midX: (firstPointer.x + secondPointer.x) / 2,
+          midY: (firstPointer.y + secondPointer.y) / 2,
         };
       }
 
@@ -782,9 +784,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         applyTransform(curX + dx, curY + dy, transformStateRef.current.scale);
       } else if (activePointers.current.size === 2 && lastPinch.current) {
         const pts = Array.from(activePointers.current.values());
-        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        const midX = (pts[0].x + pts[1].x) / 2;
-        const midY = (pts[0].y + pts[1].y) / 2;
+        const [firstPointer, secondPointer] = pts;
+        if (!firstPointer || !secondPointer) return;
+        const dist = Math.hypot(firstPointer.x - secondPointer.x, firstPointer.y - secondPointer.y);
+        const midX = (firstPointer.x + secondPointer.x) / 2;
+        const midY = (firstPointer.y + secondPointer.y) / 2;
 
         const distDelta = dist / lastPinch.current.dist;
         let newScale = transformStateRef.current.scale * distDelta;
@@ -822,7 +826,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
       if (activePointers.current.size === 1) {
         const pts = Array.from(activePointers.current.values());
-        lastPanPos.current = { x: pts[0].x, y: pts[0].y };
+        const pointer = pts[0];
+        if (!pointer) return;
+        lastPanPos.current = { x: pointer.x, y: pointer.y };
         lastPinch.current = null;
       } else if (activePointers.current.size === 0) {
         lastPanPos.current = null;
@@ -836,6 +842,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         if (history.length > 1) {
           const first = history[0];
           const last = history[history.length - 1];
+          if (!first || !last) return;
           const dt = last.t - first.t;
           if (dt > 0 && performance.now() - last.t < 50) {
             vx = (last.x - first.x) / dt;
