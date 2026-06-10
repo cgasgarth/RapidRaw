@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type ChangeEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
@@ -8,7 +8,7 @@ interface RenameFileModalProps {
   filesToRename: Array<string>;
   isOpen: boolean;
   onClose(): void;
-  onSave(template: any): void;
+  onSave(template: string): void;
 }
 
 export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave }: RenameFileModalProps) {
@@ -57,7 +57,7 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
   }, [nameTemplate, onSave, onClose, isSingleFile]);
 
   const handleKeyDown = useCallback(
-    (e: any) => {
+    (e: KeyboardEvent<HTMLDivElement>) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         handleSave();
@@ -102,7 +102,7 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
         className={`bg-surface rounded-lg shadow-xl p-6 w-full max-w-lg transform transition-all duration-300 ease-out ${
           show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'
         }`}
-        onClick={(e: any) => e.stopPropagation()}
+        onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
         <Text variant={TextVariants.title} className="mb-4">
@@ -119,7 +119,7 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
             <input
               autoFocus
               className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
-              onChange={(e: any) => setNameTemplate(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setNameTemplate(e.target.value)}
               ref={nameInputRef}
               type="text"
               value={nameTemplate}
