@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Adjustments, INITIAL_ADJUSTMENTS, MaskContainer, AiPatch } from '../utils/adjustments';
 import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
 import { ChannelConfig } from '../components/adjustments/Curves';
-import { ImageDimensions } from '../hooks/useImageRenderSize';
+import { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
 import { ToolType } from '../components/panel/right/Masks';
 import { OverlayMode } from '../components/panel/right/CropPanel';
 
@@ -42,7 +42,7 @@ interface EditorState {
   zoom: number;
   displaySize: ImageDimensions;
   previewSize: ImageDimensions;
-  baseRenderSize: ImageDimensions;
+  baseRenderSize: BaseRenderSize;
   originalSize: ImageDimensions;
 
   // Tools State
@@ -105,7 +105,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   zoom: 1,
   displaySize: { width: 0, height: 0 },
   previewSize: { width: 0, height: 0 },
-  baseRenderSize: { width: 0, height: 0 },
+  baseRenderSize: { width: 0, height: 0, offsetX: 0, offsetY: 0, containerWidth: 0, containerHeight: 0 },
   originalSize: { width: 0, height: 0 },
 
   isRotationActive: false,

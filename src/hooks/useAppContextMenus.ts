@@ -50,7 +50,16 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useUIStore } from '../store/useUIStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { Invokes, Option, OPTION_SEPARATOR, Panel, AlbumItem, Album, AlbumGroup } from '../components/ui/AppProperties';
+import {
+  Invokes,
+  Option,
+  OPTION_SEPARATOR,
+  Panel,
+  AlbumItem,
+  Album,
+  AlbumGroup,
+  ImageFile,
+} from '../components/ui/AppProperties';
 import { Color, COLOR_LABELS, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { useEditorActions } from './useEditorActions';
@@ -68,6 +77,8 @@ export interface UseAppContextMenusProps {
   executeDelete: (paths: string[], options: any) => Promise<void>;
   handleTogglePinFolder: (path: string) => Promise<void>;
 }
+
+const colorLabelFallback = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
 export function useAppContextMenus(props: UseAppContextMenusProps) {
   const { t } = useTranslation();
@@ -163,10 +174,21 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
       const { selectedImage, history, historyIndex, undo, redo, resetHistory, copiedAdjustments, setEditor } =
         useEditorStore.getState();
+      const { imageList } = useLibraryStore.getState();
       const { appSettings } = useSettingsStore.getState();
       const { setRightPanel, setUI } = useUIStore.getState();
 
       if (!selectedImage) return;
+
+      const selectedImageFile: ImageFile = imageList.find((image) => image.path === selectedImage.path) ?? {
+        exif: selectedImage.exif ?? null,
+        is_edited: false,
+        is_virtual_copy: false,
+        modified: 0,
+        path: selectedImage.path,
+        rating: 0,
+        tags: null,
+      };
 
       const canUndo = historyIndex > 0;
       const canRedo = historyIndex < history.length - 1;
@@ -235,7 +257,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: LayoutTemplate,
               label: t('contextMenus.editor.frameImage'),
               onClick: () => {
-                setUI({ collageModalState: { isOpen: true, sourceImages: [selectedImage] } });
+                setUI({ collageModalState: { isOpen: true, sourceImages: [selectedImageFile] } });
               },
             },
             { label: t('contextMenus.editor.cullImage'), icon: Users, disabled: true },
@@ -259,7 +281,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           submenu: [
             { label: t('contextMenus.editor.noLabel'), onClick: () => handleSetColorLabel(null) },
             ...COLOR_LABELS.map((label: Color) => ({
-              label: t(`contextMenus.colors.${label.name}`),
+              label: t(`contextMenus.colors.${label.name}`, { defaultValue: colorLabelFallback(label.name) }),
               color: label.color,
               onClick: () => handleSetColorLabel(label.name),
             })),
@@ -689,7 +711,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           submenu: [
             { label: t('contextMenus.editor.noLabel'), onClick: () => handleSetColorLabel(null, finalSelection) },
             ...COLOR_LABELS.map((label: Color) => ({
-              label: t(`contextMenus.colors.${label.name}`),
+              label: t(`contextMenus.colors.${label.name}`, { defaultValue: colorLabelFallback(label.name) }),
               color: label.color,
               onClick: () => handleSetColorLabel(label.name, finalSelection),
             })),

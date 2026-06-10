@@ -115,6 +115,9 @@ const SUB_MASK_CONFIG: any = {
   },
 };
 
+const parameterLabelFallback = (key: string) =>
+  key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
+
 const BrushTools = ({ settings, onSettingsChange }: { settings: any; onSettingsChange: any }) => {
   const { t } = useTranslation();
 
@@ -1515,7 +1518,8 @@ function SubMaskRow({
     setNodeRef(node);
     setDroppableRef(node);
   };
-  const MaskIcon = MASK_ICON_MAP[subMask.type] || Circle;
+  const maskType = subMask.type as Mask;
+  const MaskIcon = MASK_ICON_MAP[maskType] || Circle;
   const { showContextMenu } = useContextMenu();
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1904,7 +1908,7 @@ function SettingsPanel({
               {subMaskConfig.parameters?.map((param: any) => (
                 <Slider
                   key={param.key}
-                  label={t('editor.ai.params.' + param.key)}
+                  label={t('editor.ai.params.' + param.key, { defaultValue: parameterLabelFallback(param.key) })}
                   min={param.min}
                   max={param.max}
                   step={param.step}
