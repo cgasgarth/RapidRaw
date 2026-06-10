@@ -6,6 +6,20 @@ import { RawStatus, EditedStatus, SortDirection, ImageFile } from '../components
 export const ADVANCED_QUERY_REGEX =
   /^(iso|aperture|f|shutter|s|focal|mm|rating|color|camera|make|model|lens)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
 
+type ParsedSearchTag =
+  | {
+      field: string;
+      operator: string;
+      raw: string;
+      type: 'query';
+      value: string;
+    }
+  | {
+      raw: string;
+      type: 'normal';
+      value: string;
+    };
+
 export const parseShutter = (val: string | undefined): number => {
   if (!val) return 0;
   const cleanVal = val.replace(/s/i, '').trim();
@@ -130,7 +144,7 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
   const { tags: searchTags, text: searchText, mode: searchMode } = searchCriteria;
   const lowerCaseSearchText = searchText.trim().toLowerCase();
 
-  const parsedTags = searchTags.map((tag: string) => {
+  const parsedTags: ParsedSearchTag[] = searchTags.map((tag: string) => {
     const match = tag.match(ADVANCED_QUERY_REGEX);
     if (match) {
       const operator = match[2] || '=';
@@ -139,7 +153,7 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     return { type: 'normal', value: tag.toLowerCase(), raw: tag };
   });
 
-  const evaluateQuery = (q: any, image: ImageFile) => {
+  const evaluateQuery = (q: Extract<ParsedSearchTag, { type: 'query' }>, image: ImageFile) => {
     const { field, operator, value } = q;
 
     if (['iso', 'aperture', 'f', 'shutter', 's', 'focal', 'mm', 'rating'].includes(field)) {
@@ -196,7 +210,7 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
 
           let tagsMatch = true;
           if (parsedTags.length > 0) {
-            const evaluateTag = (parsedTag: any) => {
+            const evaluateTag = (parsedTag: ParsedSearchTag) => {
               if (parsedTag.type === 'normal') {
                 return lowerCaseImageTags.some((imgTag) => imgTag.includes(parsedTag.value));
               }
