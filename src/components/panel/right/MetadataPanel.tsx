@@ -16,28 +16,33 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 
 interface CameraSetting {
-  format?(value: number): string | number;
+  format?(value: MetadataValue): string | number;
   label: string;
 }
 
-interface CameraSettings {
-  [index: string]: CameraSetting;
-  ExposureTime: CameraSetting;
-  FNumber: CameraSetting;
-  FocalLengthIn35mmFilm: CameraSetting;
-  LensModel: CameraSetting;
-  PhotographicSensitivity: CameraSetting;
-}
+type CameraSettingKey = 'ExposureTime' | 'FNumber' | 'FocalLengthIn35mmFilm' | 'LensModel' | 'PhotographicSensitivity';
+
+type CameraSettings = Record<CameraSettingKey, CameraSetting>;
+
+type MetadataValue = string | number | null | undefined;
+
+type ExifData = Record<string, MetadataValue>;
 
 interface GPSData {
-  altitude: number | null;
+  altitude: string | number | null;
   lat: number | null;
   lon: number | null;
 }
 
+interface CameraGridSetting {
+  key: CameraSettingKey;
+  label: string;
+  value: MetadataValue;
+}
+
 interface MetaDataItemProps {
   label: string;
-  value: any;
+  value: MetadataValue;
 }
 
 const USER_TAG_PREFIX = 'user:';
@@ -212,26 +217,26 @@ const EDITABLE_FIELD_LABEL_FALLBACKS: Record<(typeof EDITABLE_FIELDS)[number]['l
 
 const KEY_CAMERA_SETTINGS_MAP: CameraSettings = {
   FNumber: {
-    format: (value: number) => {
+    format: (value: MetadataValue) => {
       const fStr = String(value);
       return fStr.toLowerCase().startsWith('f') ? fStr : `f/${fStr}`;
     },
     label: 'Aperture',
   },
   ExposureTime: {
-    format: (value: number) => (String(value).endsWith('s') ? value : `${value}s`),
+    format: (value: MetadataValue) => (String(value).endsWith('s') ? String(value) : `${value}s`),
     label: 'Shutter Speed',
   },
   PhotographicSensitivity: {
-    format: (value: number) => `${value}`,
+    format: (value: MetadataValue) => `${value}`,
     label: 'ISO',
   },
   FocalLengthIn35mmFilm: {
-    format: (value: number) => (String(value).endsWith('mm') ? value : `${value} mm`),
+    format: (value: MetadataValue) => (String(value).endsWith('mm') ? String(value) : `${value} mm`),
     label: 'Focal Length',
   },
   LensModel: {
-    format: (value: number) => String(value).replace(/"/g, ''),
+    format: (value: MetadataValue) => String(value).replace(/"/g, ''),
     label: 'Lens',
   },
 };
@@ -258,10 +263,15 @@ export default function MetadataPanel() {
   const targetPaths = multiSelectedPaths?.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
 
   const { cameraGridSettings, lensSetting, gpsData, otherExifEntries } = useMemo(() => {
-    const exif = selectedImage?.exif || {};
+    const exif = (selectedImage?.exif || {}) as ExifData;
 
-    const cameraGridKeys = ['ExposureTime', 'FNumber', 'PhotographicSensitivity', 'FocalLengthIn35mmFilm'];
-    const cameraGridSettings = cameraGridKeys.map((key) => {
+    const cameraGridKeys: CameraSettingKey[] = [
+      'ExposureTime',
+      'FNumber',
+      'PhotographicSensitivity',
+      'FocalLengthIn35mmFilm',
+    ];
+    const cameraGridSettings: CameraGridSetting[] = cameraGridKeys.map((key) => {
       const value = exif[key];
       const hasValue = value !== undefined && value !== null && value !== '';
 
@@ -280,7 +290,7 @@ export default function MetadataPanel() {
       return {
         key: key,
         label: translatedLabel,
-        value: hasValue && cameraSetting?.format ? cameraSetting.format(value as number) : hasValue ? value : '-',
+        value: hasValue && cameraSetting?.format ? cameraSetting.format(value) : hasValue ? value : '-',
       };
     });
 
@@ -291,24 +301,24 @@ export default function MetadataPanel() {
       label: t('editor.metadata.camera.lens'),
       value:
         hasLensValue && KEY_CAMERA_SETTINGS_MAP['LensModel'].format
-          ? KEY_CAMERA_SETTINGS_MAP['LensModel'].format(lensValue as number)
+          ? KEY_CAMERA_SETTINGS_MAP['LensModel'].format(lensValue)
           : hasLensValue
             ? lensValue
             : '-',
     };
 
-    const latStr = exif.GPSLatitude;
-    const latRef = exif.GPSLatitudeRef;
-    const lonStr = exif.GPSLongitude;
-    const lonRef = exif.GPSLongitudeRef;
+    const latStr = exif['GPSLatitude'];
+    const latRef = exif['GPSLatitudeRef'];
+    const lonStr = exif['GPSLongitude'];
+    const lonRef = exif['GPSLongitudeRef'];
 
-    const gpsData: GPSData = { lat: null, lon: null, altitude: exif.GPSAltitude || null };
+    const gpsData: GPSData = { lat: null, lon: null, altitude: exif['GPSAltitude'] || null };
     if (latStr && latRef && lonStr && lonRef) {
-      const parsedLat = parseDms(latStr);
-      const parsedLon = parseDms(lonStr);
+      const parsedLat = parseDms(String(latStr));
+      const parsedLon = parseDms(String(lonStr));
       if (parsedLat !== null && parsedLon !== null) {
-        gpsData.lat = latRef.toUpperCase() === 'S' ? -parsedLat : parsedLat;
-        gpsData.lon = lonRef.toUpperCase() === 'W' ? -parsedLon : parsedLon;
+        gpsData.lat = String(latRef).toUpperCase() === 'S' ? -parsedLat : parsedLat;
+        gpsData.lon = String(lonRef).toUpperCase() === 'W' ? -parsedLon : parsedLon;
       }
     }
 
@@ -452,7 +462,7 @@ export default function MetadataPanel() {
               </Text>
               <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-2 gap-2">
-                  {cameraGridSettings.map((item: any) => {
+                  {cameraGridSettings.map((item) => {
                     const Icon = CAMERA_ICONS[item.key];
                     return (
                       <div
