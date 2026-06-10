@@ -232,25 +232,56 @@ jobs:
   pr-macos-app-build:
     name: macOS app no-bundle smoke
     if: github.event_name == 'pull_request'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'macos-14'
-            target: aarch64-apple-darwin
-            asset-prefix: '02'
-    uses: ./.github/workflows/build.yml
-    with:
-      platform: ${{ matrix.platform }}
-      target: ${{ matrix.target }}
-      build-args: --ci --no-bundle
-      asset-prefix: ${{ matrix.asset-prefix }}
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rustflags: ''
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: pr-smoke-${{ runner.os }}-aarch64-apple-darwin
+          cache-on-failure: true
+
+      - name: Cache ONNX Runtime library
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/resources/libonnxruntime.dylib
+          key: ${{ runner.os }}-onnxruntime-aarch64-apple-darwin-${{ hashFiles('src-tauri/build.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-onnxruntime-aarch64-apple-darwin-
+
+      - name: Install frontend dependencies
+        uses: ./.github/actions/setup-bun-deps
+        with:
+          node-version: '22'
+
+      - name: Add macOS target
+        run: rustup target add aarch64-apple-darwin
+
+      - id: tauri-build
+        name: Build no-bundle app smoke
+        uses: tauri-apps/tauri-action@cf3eb9b18add8548a40584695215c80ab7274f31
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --verbose --ci --no-bundle --target aarch64-apple-darwin
+          retryAttempts: 3
 
   pr-ci-required:
     name: PR CI / required
     runs-on: ubuntu-latest
     if: always() && github.event_name == 'pull_request'
-    timeout-minutes: 60
+    timeout-minutes: 360
     steps:
       - name: Wait for required peer jobs
         shell: bash
@@ -271,7 +302,7 @@ jobs:
             "rust: fmt"
             "rust: cargo check macOS"
             "rust: clippy baseline macOS"
-            "macOS app no-bundle smoke (macos-14, aarch64-apple-darwin, 02) / build"
+            "macOS app no-bundle smoke"
           )
 
           required_jobs_json="$(printf '%s\n' "${required_jobs[@]}" | jq -R . | jq -s .)"
