@@ -279,7 +279,8 @@ export interface Preset {
 
 export interface Progress {
   completed?: number;
-  current?: number;
+  current: number;
+  stage?: string;
   total: number;
 }
 
