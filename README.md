@@ -287,7 +287,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 **Table of Contents**
 
 - [Key Features](#key-features)
-- [Demo & Screenshots](#demo--screenshots)
+- [Demo & Screenshots](#demo-screenshots)
 - [The Idea](#the-idea)
 - [Current Priorities](#current-priorities)
 - [AI Roadmap](#ai-roadmap)
@@ -297,7 +297,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - [Contributing](#contributing)
 - [Special Thanks](#special-thanks)
 - [Support the Project](#support-the-project)
-- [License & Philosophy](#license--philosophy)
+- [License & Philosophy](#license-philosophy)
 
 ---
 
