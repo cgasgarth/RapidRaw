@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
 import {
@@ -53,18 +53,21 @@ export function usePresets(currentAdjustments: Adjustments) {
     }
   }, []);
 
-  const savePresetsToBackend = useCallback(
-    debounce((presetsToSave: Array<UserPreset>) => {
-      invoke(Invokes.SavePresets, { presets: presetsToSave }).catch((err) =>
-        console.error('Failed to save presets:', err),
-      );
-    }, 500),
+  const savePresetsToBackend = useMemo(
+    () =>
+      debounce((presetsToSave: Array<UserPreset>) => {
+        invoke(Invokes.SavePresets, { presets: presetsToSave }).catch((err) =>
+          console.error('Failed to save presets:', err),
+        );
+      }, 500),
     [],
   );
 
   useEffect(() => {
     loadPresets();
   }, [loadPresets]);
+
+  useEffect(() => () => savePresetsToBackend.cancel(), [savePresetsToBackend]);
 
   const addPreset = (
     name: string,

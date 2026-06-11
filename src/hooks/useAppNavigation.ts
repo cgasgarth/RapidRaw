@@ -169,7 +169,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       if (state.interactivePatch?.url) URL.revokeObjectURL(state.interactivePatch.url);
       return { interactivePatch: null };
     });
-  }, [refs]);
+  }, [cachedEditStateRef, isBackendReadyRef, selectedImagePathRef, transformWrapperRef]);
 
   const handleImageSelect = useCallback(
     async (path: string) => {
@@ -322,7 +322,15 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         return { interactivePatch: null };
       });
     },
-    [refs],
+    [
+      cachedEditStateRef,
+      currentResRef,
+      isBackendReadyRef,
+      latestRenderedJobIdRef,
+      prevAdjustmentsRef,
+      previewJobIdRef,
+      selectedImagePathRef,
+    ],
   );
 
   const handleSelectSubfolder = useCallback(
@@ -459,7 +467,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         useLibraryStore.getState().setLibrary({ isViewLoading: false });
       }
     },
-    [clearThumbnailQueue, refs],
+    [clearThumbnailQueue],
   );
 
   const handleSelectAlbum = useCallback(

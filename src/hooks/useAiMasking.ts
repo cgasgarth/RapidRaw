@@ -42,6 +42,9 @@ const getTransformAdjustments = (adj: Adjustments) => ({
 export function useAiMasking() {
   const { setAdjustments } = useEditorActions();
   const setEditor = useEditorStore((state) => state.setEditor);
+  const activeMaskId = useEditorStore((state) => state.activeMaskId);
+  const activeAiSubMaskId = useEditorStore((state) => state.activeAiSubMaskId);
+  const selectedImagePath = useEditorStore((state) => state.selectedImage?.path);
   const { getToken } = useAuth();
 
   const updateSubMask = useCallback(
@@ -115,7 +118,7 @@ export function useAiMasking() {
         setEditor({ isGeneratingAi: false });
       }
     },
-    [setAdjustments, setEditor],
+    [getToken, setAdjustments, setEditor],
   );
 
   const handleQuickErase = useCallback(
@@ -207,7 +210,7 @@ export function useAiMasking() {
         setEditor({ isGeneratingAi: false });
       }
     },
-    [setAdjustments, setEditor],
+    [getToken, setAdjustments, setEditor],
   );
 
   const handleDeleteMaskContainer = useCallback(
@@ -370,23 +373,19 @@ export function useAiMasking() {
   };
 
   useEffect(() => {
-    const { activeMaskId, activeAiSubMaskId, adjustments, selectedImage } = useEditorStore.getState();
+    const { adjustments } = useEditorStore.getState();
     const activeSubMask =
       adjustments?.masks?.flatMap((m: MaskContainer) => m.subMasks).find((sm: SubMask) => sm.id === activeMaskId) ||
       adjustments?.aiPatches?.flatMap((p: AiPatch) => p.subMasks).find((sm: SubMask) => sm.id === activeAiSubMaskId);
 
-    if (activeSubMask?.type === 'ai-subject' && selectedImage?.path) {
+    if (activeSubMask?.type === 'ai-subject' && selectedImagePath) {
       const transformAdjustments = getTransformAdjustments(adjustments);
       invoke('precompute_ai_subject_mask', {
         jsAdjustments: transformAdjustments,
-        path: selectedImage.path,
+        path: selectedImagePath,
       }).catch((err) => console.error('Failed to precompute AI subject mask:', err));
     }
-  }, [
-    useEditorStore.getState().activeMaskId,
-    useEditorStore.getState().activeAiSubMaskId,
-    useEditorStore.getState().selectedImage?.path,
-  ]);
+  }, [activeMaskId, activeAiSubMaskId, selectedImagePath]);
 
   return {
     updateSubMask,

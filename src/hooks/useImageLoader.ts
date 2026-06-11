@@ -11,6 +11,8 @@ import { isNullAdjustmentSnapshot, parseLoadedMetadata, parseLoadImageResult } f
 
 export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | null>) {
   const selectedImage = useEditorStore((s) => s.selectedImage);
+  const selectedImagePath = selectedImage?.path;
+  const selectedImageIsReady = selectedImage?.isReady;
   const adjustments = useEditorStore((s) => s.adjustments);
   const histogram = useEditorStore((s) => s.histogram);
   const waveform = useEditorStore((s) => s.waveform);
@@ -28,7 +30,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
   const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
 
   useEffect(() => {
-    if (selectedImage && !selectedImage.isReady && selectedImage.path) {
+    if (selectedImagePath && !selectedImageIsReady) {
       let isEffectActive = true;
 
       const loadMetadataEarly = async () => {
@@ -37,7 +39,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
           await invoke('clear_session_caches').catch((e) => console.warn('Cache clear failed:', e));
 
           const metadata = parseLoadedMetadata(
-            await invoke<unknown>(Invokes.LoadMetadata, { path: selectedImage.path }),
+            await invoke<unknown>(Invokes.LoadMetadata, { path: selectedImagePath }),
           );
           if (!isEffectActive) return;
 
@@ -58,7 +60,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
       const loadFullImageData = async () => {
         try {
           const loadImageResult = parseLoadImageResult(
-            await invoke<unknown>(Invokes.LoadImage, { path: selectedImage.path }),
+            await invoke<unknown>(Invokes.LoadImage, { path: selectedImagePath }),
           );
           if (!isEffectActive) return;
 
@@ -83,7 +85,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
           }
 
           setEditor((state) => {
-            if (state.selectedImage && state.selectedImage.path === selectedImage.path) {
+            if (state.selectedImage && state.selectedImage.path === selectedImagePath) {
               return {
                 selectedImage: {
                   ...state.selectedImage,
@@ -135,8 +137,8 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
       };
     }
   }, [
-    selectedImage?.path,
-    selectedImage?.isReady,
+    selectedImagePath,
+    selectedImageIsReady,
     appSettings?.editorPreviewResolution,
     resetHistory,
     setEditor,

@@ -71,13 +71,7 @@ export function useImageProcessing(
     if (!adjustments) return '';
     const { crop, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
     return JSON.stringify({ crop, rotation, flipHorizontal, flipVertical, orientationSteps });
-  }, [
-    adjustments?.crop,
-    adjustments?.rotation,
-    adjustments?.flipHorizontal,
-    adjustments?.flipVertical,
-    adjustments?.orientationSteps,
-  ]);
+  }, [adjustments]);
 
   const calculateROI = useCallback(() => {
     if (!transformWrapperRef.current) return null;
@@ -381,9 +375,11 @@ export function useImageProcessing(
       requestHiFiZoom.cancel();
     };
   }, [
+    adjustments,
     displaySize.width,
     displaySize.height,
     calculateTargetRes,
+    currentResRef,
     selectedImage?.isReady,
     isSliderDragging,
     requestHiFiZoom,
@@ -441,10 +437,13 @@ export function useImageProcessing(
     selectedImage?.path,
     selectedImage?.isReady,
     isSliderDragging,
+    applyAdjustments,
+    calculateTargetRes,
+    currentResRef,
     multiSelectedPaths,
+    prevAdjustmentsRef,
     appSettings?.enableLivePreviews,
     appSettings?.copyPasteSettings?.includedAdjustments,
-    isWaveformVisible,
   ]);
 
   useEffect(() => {
@@ -467,6 +466,7 @@ export function useImageProcessing(
     displaySize.width,
     displaySize.height,
     calculateTargetRes,
+    adjustments,
     selectedImage?.isReady,
     isSliderDragging,
     requestHiFiOriginalZoom,

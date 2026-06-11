@@ -287,6 +287,8 @@ export const useAppInitialization = ({
     setLibraryViewMode,
     setThumbnailSize,
     setThumbnailAspectRatio,
+    handleSettingsChange,
+    i18n,
   ]);
 
   useEffect(() => {
@@ -336,7 +338,7 @@ export const useAppInitialization = ({
     if (appSettings.language && appSettings.language !== i18n.language) {
       i18n.changeLanguage(appSettings.language);
     }
-  }, [appSettings?.language, i18n.language]);
+  }, [appSettings, i18n]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
