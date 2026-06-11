@@ -10,7 +10,7 @@ const nullAdjustmentSnapshotSchema = z
   .object({
     is_null: z.literal(true),
   })
-  .passthrough();
+  .loose();
 
 const exifSchema = z.record(z.string(), z.string()).nullable();
 
@@ -18,17 +18,17 @@ export const loadedMetadataSchema = z
   .object({
     adjustments: z.union([legacyAdjustmentSnapshotSchema, nullAdjustmentSnapshotSchema]).nullable().optional(),
   })
-  .passthrough();
+  .loose();
 
 export const loadImageResultSchema = z
   .object({
     exif: exifSchema.optional(),
-    height: z.number().finite().nonnegative(),
+    height: z.number().nonnegative(),
     is_raw: z.boolean(),
     metadata: z.unknown().optional(),
-    width: z.number().finite().nonnegative(),
+    width: z.number().nonnegative(),
   })
-  .passthrough();
+  .loose();
 
 export type LoadedMetadata = z.infer<typeof loadedMetadataSchema>;
 export type LoadImageResult = z.infer<typeof loadImageResultSchema>;
