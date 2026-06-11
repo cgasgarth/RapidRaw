@@ -649,4 +649,6 @@ const EditorToolbar = memo(
   },
 );
 
+EditorToolbar.displayName = 'EditorToolbar';
+
 export default EditorToolbar;

@@ -15,6 +15,21 @@ const tsStrictTypeChecked = tseslint.configs.strictTypeChecked.map((config) =>
   config.files ? config : { ...config, files: tsFiles },
 );
 
+const reactRecommended = {
+  ...react.configs.flat.recommended,
+  files: tsFiles,
+};
+
+const reactJsxRuntime = {
+  ...react.configs.flat['jsx-runtime'],
+  files: tsFiles,
+};
+
+const reactHooksRecommended = {
+  ...reactHooks.configs.flat.recommended,
+  files: tsFiles,
+};
+
 module.exports = [
   {
     linterOptions: {
@@ -31,6 +46,9 @@ module.exports = [
   },
   jsRecommendedForTs,
   ...tsStrictTypeChecked,
+  reactRecommended,
+  reactJsxRuntime,
+  reactHooksRecommended,
   {
     files: tsFiles,
     plugins: {
@@ -65,6 +83,15 @@ module.exports = [
       'react-hooks/rules-of-hooks': 'error',
       // Enable after the existing dependency-array warnings are fixed in a focused lint PR.
       'react-hooks/exhaustive-deps': 'off',
+      // React compiler rules are enabled through the hooks recommended config,
+      // with legacy violations split into focused cleanup issues.
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/static-components': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/purity': 'off',
+      'react/prop-types': 'off',
       'no-restricted-imports': [
         'error',
         {
