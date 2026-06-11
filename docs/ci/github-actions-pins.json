@@ -1,0 +1,62 @@
+{
+  "actions/cache": {
+    "sha": "27d5ce7f107fe9357f9df03efb73ab90386fccae",
+    "version": "v5.0.5",
+    "versionPrefix": "v"
+  },
+  "actions/checkout": {
+    "sha": "df4cb1c069e1874edd31b4311f1884172cec0e10",
+    "version": "v6.0.3",
+    "versionPrefix": "v"
+  },
+  "actions/setup-go": {
+    "sha": "4a3601121dd01d1626a1e23e37211e3254c1c06c",
+    "version": "v6.4.0",
+    "versionPrefix": "v"
+  },
+  "actions/setup-java": {
+    "sha": "be666c2fcd27ec809703dec50e508c2fdc7f6654",
+    "version": "v5.2.0",
+    "versionPrefix": "v"
+  },
+  "actions/setup-node": {
+    "sha": "48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e",
+    "version": "v6.4.0",
+    "versionPrefix": "v"
+  },
+  "actions/upload-artifact": {
+    "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    "version": "v7.0.1",
+    "versionPrefix": "v"
+  },
+  "actions-rust-lang/setup-rust-toolchain": {
+    "sha": "46268bd060767258de96ed93c1251119784f2ab6",
+    "version": "v1.16.1",
+    "versionPrefix": "v"
+  },
+  "android-actions/setup-android": {
+    "sha": "40fd30fb8d7440372e1316f5d1809ec01dcd3699",
+    "version": "v4.0.1",
+    "versionPrefix": "v"
+  },
+  "nttld/setup-ndk": {
+    "sha": "ed92fe6cadad69be94a966a7ee3271275e62f779",
+    "version": "v1.6.0",
+    "versionPrefix": "v"
+  },
+  "oven-sh/setup-bun": {
+    "sha": "0c5077e51419868618aeaa5fe8019c62421857d6",
+    "version": "v2.2.0",
+    "versionPrefix": "v"
+  },
+  "Swatinem/rust-cache": {
+    "sha": "c19371144df3bb44fab255c43d04cbc2ab54d1c4",
+    "version": "v2.9.1",
+    "versionPrefix": "v"
+  },
+  "tauri-apps/tauri-action": {
+    "sha": "84b9d35b5fc46c1e45415bdb6144030364f7ebc5",
+    "version": "action-v0.6.2",
+    "versionPrefix": "action-v"
+  }
+}
