@@ -4251,7 +4251,8 @@ Issues:
 - Wire reusable build `upload-artifacts` input so PRs can skip uploads when artifacts are not useful and main/release can keep evidence.
 - Add release workflow skeleton. Current unsigned artifact dry-run:
   `docs/release/unsigned-release-artifact-workflow-2026-06-11.md`.
-- Add SBOM/checksum generation.
+- Add SBOM/checksum generation. Current release metadata doc:
+  `docs/release/release-metadata-checksums-sbom-2026-06-11.md`.
 - Add notarization/signing placeholder documentation:
   `docs/release/macos-signing-notarization-placeholders-2026-06-11.md`.
 - Add failure artifact uploads.
