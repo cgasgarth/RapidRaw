@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
 
       - uses: ./.github/actions/setup-bun-deps
 
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
 
       - uses: ./.github/actions/setup-bun-deps
 
@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
 
       - uses: ./.github/actions/setup-bun-deps
 
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
 
       - uses: ./.github/actions/setup-bun-deps
 
@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
 
       - uses: ./.github/actions/setup-bun-deps
 
@@ -132,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
 
       - uses: ./.github/actions/setup-bun-deps
 
@@ -144,9 +144,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           components: rustfmt
           rustflags: ''
@@ -161,22 +161,22 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           rustflags: ''
           rust-src-dir: src-tauri
 
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: src-tauri
           key: ${{ runner.os }}-rust-check-macos
           cache-on-failure: true
 
       - name: Cache ONNX Runtime library
-        uses: actions/cache@v4
+        uses: actions/cache@v5.0.5
         with:
           path: src-tauri/resources/libonnxruntime.dylib
           key: ${{ runner.os }}-onnxruntime-macos-${{ hashFiles('src-tauri/build.rs') }}
@@ -192,23 +192,23 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.3
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           components: clippy
           rustflags: ''
           rust-src-dir: src-tauri
 
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: src-tauri
           key: ${{ runner.os }}-rust-clippy-macos
           cache-on-failure: true
 
       - name: Cache ONNX Runtime library
-        uses: actions/cache@v4
+        uses: actions/cache@v5.0.5
         with:
           path: src-tauri/resources/libonnxruntime.dylib
           key: ${{ runner.os }}-onnxruntime-macos-${{ hashFiles('src-tauri/build.rs') }}
@@ -239,24 +239,24 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 1
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           rustflags: ''
 
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: src-tauri
           key: pr-smoke-${{ runner.os }}-aarch64-apple-darwin
           cache-on-failure: true
 
       - name: Cache ONNX Runtime library
-        uses: actions/cache@v4
+        uses: actions/cache@v5.0.5
         with:
           path: src-tauri/resources/libonnxruntime.dylib
           key: ${{ runner.os }}-onnxruntime-aarch64-apple-darwin-${{ hashFiles('src-tauri/build.rs') }}
@@ -266,7 +266,7 @@ jobs:
       - name: Install frontend dependencies
         uses: ./.github/actions/setup-bun-deps
         with:
-          node-version: '22'
+          node-version: '26'
 
       - name: Add macOS target
         run: rustup target add aarch64-apple-darwin
@@ -301,6 +301,7 @@ jobs:
             "frontend: eslint baseline"
             "frontend: prettier baseline"
             "frontend: i18n lint baseline"
+            "frontend: unsafe cast ban"
             "rust: fmt"
             "rust: cargo check macOS"
             "rust: clippy baseline macOS"
