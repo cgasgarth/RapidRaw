@@ -346,22 +346,9 @@ jobs:
             echo "- ONNX exact hit: \`$onnx_cache_hit\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - id: clippy
-        name: Clippy
-        continue-on-error: true
+      - name: Clippy
         working-directory: src-tauri
         run: cargo clippy --locked --all-targets --all-features -- -D warnings
-
-      - name: Record baseline status
-        if: always()
-        run: |
-          if [[ "${{ steps.clippy.outcome }}" == "failure" ]]; then
-            echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`cargo clippy --all-targets --all-features -- -D warnings\` is tracked by #287 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`cargo clippy --all-targets --all-features -- -D warnings\` passed. Remove this temporary non-blocking wrapper when #287 is closed." >> "$GITHUB_STEP_SUMMARY"
-          fi
 
   pr-macos-app-build:
     name: macOS app no-bundle smoke
