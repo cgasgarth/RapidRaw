@@ -9,8 +9,10 @@ bun run check:generated-types
 ```
 
 The current generated surface is the Tauri capability schema snapshot under
-`src-tauri/gen/schemas/*.json`. The TypeScript declarations under `src/@types`
-are hand-authored compatibility shims, so they are intentionally outside this
+`src-tauri/gen/schemas/*.json`. Tauri ignores that directory by default, so these
+schema snapshots are intentionally force-tracked by this PR to make the drift
+check meaningful in CI. The TypeScript declarations under `src/@types` are
+hand-authored compatibility shims, so they are intentionally outside this
 manifest until a real generator owns them.
 
 The manifest is stored at `docs/tooling/generated-type-drift-manifest.json` and
