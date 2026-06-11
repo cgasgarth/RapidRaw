@@ -93,7 +93,7 @@ jobs:
           fi
 
   frontend-lint:
-    name: 'frontend: eslint baseline'
+    name: 'frontend: eslint zero warnings'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -101,21 +101,8 @@ jobs:
 
       - uses: ./.github/actions/setup-bun-deps
 
-      - id: eslint
-        name: Lint
-        continue-on-error: true
-        run: bun run lint
-
-      - name: Record baseline status
-        if: always()
-        run: |
-          if [[ "${{ steps.eslint.outcome }}" == "failure" ]]; then
-            echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`bun run lint\` is tracked by #286 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`bun run lint\` passed. Remove this temporary non-blocking wrapper when #286 is closed." >> "$GITHUB_STEP_SUMMARY"
-          fi
+      - name: Lint with warnings denied
+        run: bun run check:lint
 
   frontend-format:
     name: 'frontend: prettier baseline'
@@ -534,7 +521,7 @@ jobs:
             "changed paths / macOS smoke routing"
             "frontend: install, build, i18n check"
             "frontend: typecheck baseline"
-            "frontend: eslint baseline"
+            "frontend: eslint zero warnings"
             "frontend: prettier baseline"
             "frontend: i18n lint baseline"
             "frontend: unsafe cast ban"
