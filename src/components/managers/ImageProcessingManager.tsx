@@ -11,6 +11,13 @@ interface Props {
 }
 
 interface TransformController {
+  instance?: {
+    transformState?: {
+      positionX: number;
+      positionY: number;
+      scale: number;
+    } | null;
+  };
   resetTransform(time?: number): void;
   setTransform(x: number, y: number, scale: number, time?: number): void;
   zoomIn(factor: number, time?: number): void;

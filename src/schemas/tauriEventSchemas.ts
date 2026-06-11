@@ -62,6 +62,12 @@ export const base64PayloadSchema = z
   })
   .passthrough();
 
+export const aiConnectorStatusPayloadSchema = z
+  .object({
+    connected: z.boolean(),
+  })
+  .passthrough();
+
 export const cullingProgressPayloadSchema = progressPayloadSchema
   .extend({
     stage: z.string(),
@@ -121,6 +127,7 @@ export const parsePathProgressPayload = (value: unknown) => pathProgressPayloadS
 export const parseDenoiseCompletePayload = (value: unknown) => denoiseCompletePayloadSchema.parse(value);
 export const parseRenderPathPayload = (value: unknown) => renderPathPayloadSchema.parse(value);
 export const parseBase64Payload = (value: unknown) => base64PayloadSchema.parse(value);
+export const parseAiConnectorStatusPayload = (value: unknown) => aiConnectorStatusPayloadSchema.parse(value);
 export const parseCullingProgressPayload = (value: unknown): CullingProgressPayload => {
   const payload = cullingProgressPayloadSchema.parse(value);
   const progress = toProgress(payload);
