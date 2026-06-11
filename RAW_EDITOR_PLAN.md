@@ -2840,7 +2840,9 @@ PR workflow topology:
 
 Workflow-level rules:
 
-- Use concurrency cancellation for superseded PR pushes.
+- Do not cancel superseded PR or `main` runs; keep prior CI evidence available.
+  Improve speed through parallelism, changed-path routing, caching, and smaller
+  validation commands.
 - Keep required check names stable so branch protection does not drift.
 - Upload failed test artifacts with retention long enough for review.
 - Use path filters for cost, but never skip checks when workflow/config changes.
@@ -3692,7 +3694,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 
 - `ci(topology): split validation full-build image-quality performance and release workflows`
 - `ci(paths): add path filters without skipping workflow changes`
-- `ci(concurrency): cancel superseded PR runs`
+- `ci(concurrency): document non-cancelling validation run policy`
 - `ci(cache): add Bun Cargo Tauri and build caches`
 - `ci(macos): add required macOS app build`
 - `ci(matrix): add optional inherited platform build matrix`
@@ -4241,11 +4243,13 @@ Goal: make full builds reliable and parallelized.
 
 Issues:
 
-- Split GitHub Actions into fast validation, full build, image quality, performance, and release workflows.
+- Split GitHub Actions into fast validation, full build, image quality, performance, and release workflows. Current topology:
+  `docs/ci/workflow-topology-2026-06-11.md`.
 - Add stable aggregate PR required gate.
 - Require that aggregate gate in the active `Protect main` ruleset.
 - Add macOS app build as a required dependency of the aggregate gate.
-- Add matrix strategy for platform builds.
+- Add matrix strategy for platform builds. Current optional inherited platform
+  matrix: `docs/ci/optional-platform-build-matrix-2026-06-11.md`.
 - Add caching for Bun, Cargo, Tauri, and build artifacts. Current cache policy:
   `docs/ci/cache-policy-2026-06-11.md`.
 - Replace full PR package builds with a macOS no-bundle smoke path where practical, while keeping full package builds on `main` and release.
