@@ -4255,7 +4255,8 @@ Issues:
   `docs/release/release-metadata-checksums-sbom-2026-06-11.md`.
 - Add notarization/signing placeholder documentation:
   `docs/release/macos-signing-notarization-placeholders-2026-06-11.md`.
-- Add failure artifact uploads.
+- Add failure artifact uploads. Current failure artifact policy:
+  `docs/ci/failure-artifacts-2026-06-11.md`.
 - Evaluate merge queue only after the aggregate required gate and main CI are stable.
 
 Definition of done:
