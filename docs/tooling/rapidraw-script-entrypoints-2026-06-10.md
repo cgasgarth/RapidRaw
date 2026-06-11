@@ -137,6 +137,8 @@ Future PRs should add named scripts so local and CI behavior can converge:
 | `check:format`    | Formatting check.                          | #289          |
 | `check:i18n`      | i18n extract and hardcoded-string checks.  | #285          |
 | `check:rust`      | Rust fmt/check/clippy bundle.              | #43, #287     |
+| `check:security`  | JS and Rust dependency vulnerability gate. | #44, #262     |
+| `check:licenses`  | JS and Rust dependency license gate.       | #45           |
 | `build:frontend`  | Frontend Vite production build.            | #288          |
 | `build:app:macos` | macOS Tauri app package smoke.             | #52           |
 
