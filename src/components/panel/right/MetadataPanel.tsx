@@ -777,9 +777,11 @@ export default function MetadataPanel() {
                       }%2C${gpsData.lon + 0.01}%2C${gpsData.lat + 0.01}&layer=mapnik&marker=${gpsData.lat}%2C${
                         gpsData.lon
                       }`}
+                      title={t('editor.metadata.gps.title')}
                       width="100%"
                     ></iframe>
                     <a
+                      aria-label={t('editor.metadata.gps.clickToOpenTooltip')}
                       className="absolute inset-0 cursor-pointer hover:bg-black/10 transition-colors"
                       href={`https://www.openstreetmap.org/?mlat=${gpsData.lat}&mlon=${gpsData.lon}#map=15/${gpsData.lat}/${gpsData.lon}`}
                       rel="noopener noreferrer"
