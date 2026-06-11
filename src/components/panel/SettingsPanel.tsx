@@ -1,7 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import {
+  type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   ArrowLeft,
-  Cloud,
   Cpu,
   ExternalLink as ExternalLinkIcon,
   Server,
@@ -18,6 +24,7 @@ import {
   Image as ImageIcon,
   Mouse,
   Touchpad,
+  type LucideIcon,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -34,7 +41,7 @@ import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import { useTranslation } from 'react-i18next';
-import { Invokes } from '../ui/AppProperties';
+import { AppSettings, Invokes, Theme } from '../ui/AppProperties';
 import {
   formatKeyCode,
   KeybindDefinition,
@@ -59,9 +66,9 @@ interface ConfirmModalState {
 interface DataActionItemProps {
   buttonAction(): void;
   buttonText: string;
-  description: any;
+  description: ReactNode;
   disabled?: boolean;
-  icon: any;
+  icon: ReactNode;
   isProcessing: boolean;
   message: string;
   title: string;
@@ -69,7 +76,7 @@ interface DataActionItemProps {
 
 interface KeybindRowProps {
   def: KeybindDefinition;
-  currentCombo?: string[];
+  currentCombo?: string[] | undefined;
   osPlatform: string;
   onSave: (action: string, combo: string[]) => void;
   recordingAction: string | null;
@@ -78,16 +85,16 @@ interface KeybindRowProps {
 }
 
 interface SettingItemProps {
-  children: any;
+  children: ReactNode;
   description?: string;
   label: string;
 }
 
 interface SettingsPanelProps {
-  appSettings: any;
+  appSettings: AppSettings;
   onBack(): void;
   onLibraryRefresh(): void;
-  onSettingsChange(settings: any): Promise<void>;
+  onSettingsChange(settings: AppSettings): Promise<void>;
   rootPaths: string[];
 }
 
@@ -101,6 +108,29 @@ interface MyLens {
   maker: string;
   model: string;
 }
+
+interface ProcessingSettings {
+  applyPreprocessingToNonRaws: boolean;
+  editorPreviewResolution: number;
+  highResZoomMultiplier: number;
+  imageCacheSize: number;
+  linuxGpuOptimization: boolean;
+  processingBackend: string;
+  rawHighlightCompression: number;
+  rawPreprocessingColorNr: number;
+  rawPreprocessingSharpening: number;
+  thumbnailResolution: number;
+  thumbnailWorkerThreads: number;
+  useFullDpiRendering: boolean;
+  useWgpuRenderer: boolean;
+}
+
+type ProcessingSettingKey = keyof ProcessingSettings;
+type NumericChangeEvent = ChangeEvent<HTMLInputElement> | { target: { value: number | string } };
+
+const getNumericEventValue = (event: NumericChangeEvent): number => Number(event.target.value);
+const getIntegerEventValue = (event: NumericChangeEvent): number => parseInt(String(event.target.value), 10);
+const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 const EXECUTE_TIMEOUT = 3000;
 const translateDynamicKey = (translate: TFunction, key: string): string =>
@@ -264,7 +294,7 @@ interface AiProviderSwitchProps {
 const AiProviderSwitch = ({ selectedProvider, onProviderChange }: AiProviderSwitchProps) => {
   const { t } = useTranslation();
 
-  const aiProviders = useMemo(
+  const aiProviders = useMemo<Array<{ id: string; label: string; icon: LucideIcon }>>(
     () => [
       { id: 'cpu', label: t('settings.processing.ai.providers.cpu'), icon: Cpu },
       { id: 'ai-connector', label: t('settings.processing.ai.providers.aiConnector'), icon: Server },
@@ -403,7 +433,7 @@ interface CanvasInputModeSwitchProps {
 const CanvasInputModeSwitch = ({ mode, onModeChange }: CanvasInputModeSwitchProps) => {
   const { t } = useTranslation();
 
-  const canvasInputModes = useMemo(
+  const canvasInputModes = useMemo<Array<{ id: 'mouse' | 'trackpad'; label: string; icon: LucideIcon }>>(
     () => [
       { id: 'mouse', label: t('settings.controls.modes.mouse'), icon: Mouse },
       { id: 'trackpad', label: t('settings.controls.modes.trackpad'), icon: Touchpad },
@@ -416,7 +446,7 @@ const CanvasInputModeSwitch = ({ mode, onModeChange }: CanvasInputModeSwitchProp
       {canvasInputModes.map((item) => (
         <button
           key={item.id}
-          onClick={() => onModeChange(item.id as 'mouse' | 'trackpad')}
+          onClick={() => onModeChange(item.id)}
           className={clsx(
             'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
             {
@@ -452,7 +482,7 @@ interface PreviewModeSwitchProps {
 const PreviewModeSwitch = ({ mode, onModeChange }: PreviewModeSwitchProps) => {
   const { t } = useTranslation();
 
-  const previewModes = useMemo(
+  const previewModes = useMemo<Array<{ id: 'static' | 'dynamic'; label: string; icon: LucideIcon }>>(
     () => [
       { id: 'static', label: t('settings.processing.modes.static'), icon: ImageIcon },
       { id: 'dynamic', label: t('settings.processing.modes.dynamic'), icon: Scaling },
@@ -465,7 +495,7 @@ const PreviewModeSwitch = ({ mode, onModeChange }: PreviewModeSwitchProps) => {
       {previewModes.map((item) => (
         <button
           key={item.id}
-          onClick={() => onModeChange(item.id as 'static' | 'dynamic')}
+          onClick={() => onModeChange(item.id)}
           className={clsx(
             'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
             {
@@ -533,7 +563,7 @@ export default function SettingsPanel({
   const [tempLensModel, setTempLensModel] = useState<string>('');
 
   const osPlatform = useOsPlatform();
-  const [processingSettings, setProcessingSettings] = useState({
+  const [processingSettings, setProcessingSettings] = useState<ProcessingSettings>({
     editorPreviewResolution: appSettings?.editorPreviewResolution || 1920,
     thumbnailResolution: appSettings?.thumbnailResolution || 720,
     rawHighlightCompression: appSettings?.rawHighlightCompression ?? 2.5,
@@ -676,7 +706,10 @@ export default function SettingsPanel({
     invoke<string[]>('get_lensfun_makers').then(setLensMakers).catch(console.error);
   }, []);
 
-  const handleProcessingSettingChange = async (key: string, value: any) => {
+  const handleProcessingSettingChange = async <K extends ProcessingSettingKey>(
+    key: K,
+    value: ProcessingSettings[K],
+  ) => {
     setProcessingSettings((prev) => ({ ...prev, [key]: value }));
 
     if (
@@ -722,9 +755,7 @@ export default function SettingsPanel({
     setTempLensModel('');
     setLensModels([]);
     if (maker) {
-      invoke('get_lensfun_lenses_for_maker', { maker })
-        .then((l: any) => setLensModels(l))
-        .catch(console.error);
+      invoke<string[]>('get_lensfun_lenses_for_maker', { maker }).then(setLensModels).catch(console.error);
     }
   };
 
@@ -771,9 +802,9 @@ export default function SettingsPanel({
       }
       setClearMessage(t('settings.data.statuses.sidecarSuccess', { count: totalCount }));
       onLibraryRefresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to clear sidecars:', err);
-      setClearMessage(`Error: ${err}`);
+      setClearMessage(`Error: ${formatUnknownError(err)}`);
     } finally {
       setTimeout(() => {
         setIsClearing(false);
@@ -804,9 +835,9 @@ export default function SettingsPanel({
       }
       setAiTagsClearMessage(t('settings.data.statuses.aiSuccess', { count: totalCount }));
       onLibraryRefresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to clear AI tags:', err);
-      setAiTagsClearMessage(`Error: ${err}`);
+      setAiTagsClearMessage(`Error: ${formatUnknownError(err)}`);
     } finally {
       setTimeout(() => {
         setIsClearingAiTags(false);
@@ -837,9 +868,9 @@ export default function SettingsPanel({
       }
       setTagsClearMessage(t('settings.data.statuses.allSuccess', { count: totalCount }));
       onLibraryRefresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to clear tags:', err);
-      setTagsClearMessage(`Error: ${err}`);
+      setTagsClearMessage(`Error: ${formatUnknownError(err)}`);
     } finally {
       setTimeout(() => {
         setIsClearingTags(false);
@@ -871,9 +902,9 @@ export default function SettingsPanel({
       await invoke(Invokes.ClearThumbnailCache);
       setCacheClearMessage(t('settings.data.statuses.cacheSuccess'));
       onLibraryRefresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to clear thumbnail cache:', err);
-      setCacheClearMessage(`Error: ${err}`);
+      setCacheClearMessage(`Error: ${formatUnknownError(err)}`);
     } finally {
       setTimeout(() => {
         setIsClearingCache(false);
@@ -931,7 +962,7 @@ export default function SettingsPanel({
     onSettingsChange({ ...appSettings, taggingShortcuts: uniqueShortcuts });
   };
 
-  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleInputKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddShortcut();
@@ -956,7 +987,7 @@ export default function SettingsPanel({
     onSettingsChange({ ...appSettings, customAiTags: uniqueTags });
   };
 
-  const handleAiTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleAiTagInputKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddAiTag();
@@ -1055,7 +1086,7 @@ export default function SettingsPanel({
                   <div className="space-y-8">
                     <SettingItem label={t('settings.general.theme')} description={t('settings.general.themeDesc')}>
                       <Dropdown
-                        onChange={(value: any) => onSettingsChange({ ...appSettings, theme: value })}
+                        onChange={(value: Theme) => onSettingsChange({ ...appSettings, theme: value })}
                         options={THEMES.map((theme: ThemeProps) => ({
                           value: theme.id,
                           label: translateDynamicKey(t, theme.name),
@@ -1067,7 +1098,7 @@ export default function SettingsPanel({
 
                     <SettingItem label={t('settings.language')} description={t('settings.languageDesc')}>
                       <Dropdown
-                        onChange={(value: any) => onSettingsChange({ ...appSettings, language: value })}
+                        onChange={(value: string) => onSettingsChange({ ...appSettings, language: value })}
                         options={[
                           { value: 'en', label: 'English' },
                           { value: 'de', label: 'Deutsch' },
@@ -1171,7 +1202,7 @@ export default function SettingsPanel({
 
                     <SettingItem label={t('settings.general.font')} description={t('settings.general.fontDesc')}>
                       <Dropdown
-                        onChange={(value: any) => onSettingsChange({ ...appSettings, fontFamily: value })}
+                        onChange={(value: string) => onSettingsChange({ ...appSettings, fontFamily: value })}
                         options={fontOptions}
                         value={appSettings?.fontFamily || 'poppins'}
                         triggerClassName="bg-bg-primary"
@@ -1205,7 +1236,7 @@ export default function SettingsPanel({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <Switch
                       label={t('settings.adjustments.chromaticAberration')}
-                      checked={appSettings?.adjustmentVisibility?.chromaticAberration ?? false}
+                      checked={appSettings?.adjustmentVisibility?.['chromaticAberration'] ?? false}
                       onChange={(checked) =>
                         onSettingsChange({
                           ...appSettings,
@@ -1218,7 +1249,7 @@ export default function SettingsPanel({
                     />
                     <Switch
                       label={t('settings.adjustments.grain')}
-                      checked={appSettings?.adjustmentVisibility?.grain ?? true}
+                      checked={appSettings?.adjustmentVisibility?.['grain'] ?? true}
                       onChange={(checked) =>
                         onSettingsChange({
                           ...appSettings,
@@ -1231,7 +1262,7 @@ export default function SettingsPanel({
                     />
                     <Switch
                       label={t('settings.adjustments.colorCalibration')}
-                      checked={appSettings?.adjustmentVisibility?.colorCalibration ?? true}
+                      checked={appSettings?.adjustmentVisibility?.['colorCalibration'] ?? true}
                       onChange={(checked) =>
                         onSettingsChange({
                           ...appSettings,
@@ -1244,7 +1275,7 @@ export default function SettingsPanel({
                     />
                     <Switch
                       label={t('settings.adjustments.noiseReduction')}
-                      checked={appSettings?.adjustmentVisibility?.noiseReduction ?? true}
+                      checked={appSettings?.adjustmentVisibility?.['noiseReduction'] ?? true}
                       onChange={(checked) =>
                         onSettingsChange({
                           ...appSettings,
@@ -1367,8 +1398,8 @@ export default function SettingsPanel({
                                   step={1}
                                   value={appSettings?.aiTagCount ?? 10}
                                   defaultValue={10}
-                                  onChange={(e: any) =>
-                                    onSettingsChange({ ...appSettings, aiTagCount: parseInt(e.target.value) })
+                                  onChange={(event: NumericChangeEvent) =>
+                                    onSettingsChange({ ...appSettings, aiTagCount: getIntegerEventValue(event) })
                                   }
                                 />
                               </SettingItem>
@@ -1707,7 +1738,7 @@ export default function SettingsPanel({
                                   label={t('settings.processing.previewRes')}
                                 >
                                   <Dropdown
-                                    onChange={(value: any) =>
+                                    onChange={(value: number) =>
                                       handleProcessingSettingChange('editorPreviewResolution', value)
                                     }
                                     options={resolutions}
@@ -1734,7 +1765,7 @@ export default function SettingsPanel({
                                   label={t('settings.processing.staticPreviewRes')}
                                 >
                                   <Dropdown
-                                    onChange={(value: any) =>
+                                    onChange={(value: number) =>
                                       handleProcessingSettingChange('editorPreviewResolution', value)
                                     }
                                     options={resolutions}
@@ -1748,7 +1779,7 @@ export default function SettingsPanel({
                                   description={t('settings.processing.renderScaleDesc')}
                                 >
                                   <Dropdown
-                                    onChange={(value: any) =>
+                                    onChange={(value: number) =>
                                       handleProcessingSettingChange('highResZoomMultiplier', value)
                                     }
                                     options={zoomMultiplierOptions}
@@ -1812,7 +1843,7 @@ export default function SettingsPanel({
                                 description={t('settings.processing.livePreviewQualityDesc')}
                               >
                                 <Dropdown
-                                  onChange={(value: any) =>
+                                  onChange={(value: string) =>
                                     onSettingsChange({ ...appSettings, livePreviewQuality: value })
                                   }
                                   options={livePreviewQualityOptions}
@@ -1831,7 +1862,7 @@ export default function SettingsPanel({
                       label={t('settings.processing.thumbnailRes')}
                     >
                       <Dropdown
-                        onChange={(value: any) => handleProcessingSettingChange('thumbnailResolution', value)}
+                        onChange={(value: number) => handleProcessingSettingChange('thumbnailResolution', value)}
                         options={thumbnailResolutions}
                         value={processingSettings.thumbnailResolution}
                         triggerClassName="bg-bg-primary"
@@ -1849,8 +1880,8 @@ export default function SettingsPanel({
                         step={1}
                         value={processingSettings.thumbnailWorkerThreads}
                         defaultValue={4}
-                        onChange={(e: any) =>
-                          handleProcessingSettingChange('thumbnailWorkerThreads', parseInt(e.target.value))
+                        onChange={(event: NumericChangeEvent) =>
+                          handleProcessingSettingChange('thumbnailWorkerThreads', getIntegerEventValue(event))
                         }
                         fillOrigin="min"
                       />
@@ -1867,7 +1898,9 @@ export default function SettingsPanel({
                         step={1}
                         value={processingSettings.imageCacheSize}
                         defaultValue={5}
-                        onChange={(e: any) => handleProcessingSettingChange('imageCacheSize', parseInt(e.target.value))}
+                        onChange={(event: NumericChangeEvent) =>
+                          handleProcessingSettingChange('imageCacheSize', getIntegerEventValue(event))
+                        }
                         fillOrigin="min"
                       />
                     </SettingItem>
@@ -1896,7 +1929,7 @@ export default function SettingsPanel({
                       description={t('settings.processing.backendDesc')}
                     >
                       <Dropdown
-                        onChange={(value: any) => handleProcessingSettingChange('processingBackend', value)}
+                        onChange={(value: string) => handleProcessingSettingChange('processingBackend', value)}
                         options={filteredBackendOptions}
                         value={
                           filteredBackendOptions.some((option) => option.value === processingSettings.processingBackend)
@@ -1955,8 +1988,8 @@ export default function SettingsPanel({
                         step={0.1}
                         value={processingSettings.rawHighlightCompression}
                         defaultValue={2.5}
-                        onChange={(e: any) =>
-                          handleProcessingSettingChange('rawHighlightCompression', parseFloat(e.target.value))
+                        onChange={(event: NumericChangeEvent) =>
+                          handleProcessingSettingChange('rawHighlightCompression', getNumericEventValue(event))
                         }
                         fillOrigin="min"
                       />
@@ -1973,8 +2006,8 @@ export default function SettingsPanel({
                         step={0.05}
                         value={processingSettings.rawPreprocessingColorNr}
                         defaultValue={0.5}
-                        onChange={(e: any) =>
-                          handleProcessingSettingChange('rawPreprocessingColorNr', parseFloat(e.target.value))
+                        onChange={(event: NumericChangeEvent) =>
+                          handleProcessingSettingChange('rawPreprocessingColorNr', getNumericEventValue(event))
                         }
                         fillOrigin="min"
                       />
@@ -1991,8 +2024,8 @@ export default function SettingsPanel({
                         step={0.05}
                         value={processingSettings.rawPreprocessingSharpening}
                         defaultValue={0.35}
-                        onChange={(e: any) =>
-                          handleProcessingSettingChange('rawPreprocessingSharpening', parseFloat(e.target.value))
+                        onChange={(event: NumericChangeEvent) =>
+                          handleProcessingSettingChange('rawPreprocessingSharpening', getNumericEventValue(event))
                         }
                         fillOrigin="min"
                       />
@@ -2015,7 +2048,7 @@ export default function SettingsPanel({
                       description={t('settings.processing.preprocessing.linearRawDesc')}
                     >
                       <Dropdown
-                        onChange={(value: any) => onSettingsChange({ ...appSettings, linearRawMode: value })}
+                        onChange={(value: string) => onSettingsChange({ ...appSettings, linearRawMode: value })}
                         options={linearRawOptions}
                         value={appSettings?.linearRawMode || 'auto'}
                         triggerClassName="bg-bg-primary"
@@ -2051,7 +2084,7 @@ export default function SettingsPanel({
                                 description={t('settings.processing.preprocessing.defaultRawTonemapperDesc')}
                               >
                                 <Dropdown
-                                  onChange={(value: any) =>
+                                  onChange={(value: string) =>
                                     onSettingsChange({ ...appSettings, defaultRawTonemapper: value })
                                   }
                                   options={tonemapperOptions}
@@ -2065,7 +2098,7 @@ export default function SettingsPanel({
                                 description={t('settings.processing.preprocessing.defaultNonRawTonemapperDesc')}
                               >
                                 <Dropdown
-                                  onChange={(value: any) =>
+                                  onChange={(value: string) =>
                                     onSettingsChange({ ...appSettings, defaultNonRawTonemapper: value })
                                   }
                                   options={tonemapperOptions}
@@ -2138,8 +2171,10 @@ export default function SettingsPanel({
                                   onBlur={() =>
                                     onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress })
                                   }
-                                  onChange={(e: any) => setAiConnectorAddress(e.target.value)}
-                                  onKeyDown={(e: any) => e.stopPropagation()}
+                                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                    setAiConnectorAddress(event.target.value)
+                                  }
+                                  onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => event.stopPropagation()}
                                   placeholder="127.0.0.1:8188"
                                   type="text"
                                   value={aiConnectorAddress}
@@ -2270,16 +2305,16 @@ export default function SettingsPanel({
                       buttonAction={handleClearSidecars}
                       buttonText={t('settings.data.clearSidecarsButton')}
                       description={
-                        <Text as="span" variant={TextVariants.small}>
-                          {t('settings.data.clearSidecarsDesc')}{' '}
-                          <code className="bg-bg-primary px-1 rounded-sm text-text-primary">.rrdata</code> files
-                          (containing your edits) within your root folders:
+                        <>
+                          <Text as="span" variant={TextVariants.small}>
+                            {t('settings.data.clearSidecarsDesc')}
+                          </Text>
                           <span className="block font-mono bg-bg-primary p-2 rounded-sm mt-2 break-all border border-border-color whitespace-pre-wrap">
                             {effectiveRootPaths.length > 0
                               ? effectiveRootPaths.join('\n')
                               : t('settings.data.noFolders')}
                           </span>
-                        </Text>
+                        </>
                       }
                       disabled={effectiveRootPaths.length === 0}
                       icon={<Trash2 size={16} className="mr-2" />}
@@ -2350,7 +2385,7 @@ export default function SettingsPanel({
                         {t('settings.controls.optimizationDesc')}
                       </Text>
                       <CanvasInputModeSwitch
-                        mode={(appSettings?.canvasInputMode as 'mouse' | 'trackpad') || 'mouse'}
+                        mode={appSettings.canvasInputMode || 'mouse'}
                         onModeChange={(value) => onSettingsChange({ ...appSettings, canvasInputMode: value })}
                       />
                     </div>
@@ -2363,8 +2398,8 @@ export default function SettingsPanel({
                         step={0.1}
                         value={appSettings?.zoomSpeedMultiplier ?? 1.0}
                         defaultValue={1.0}
-                        onChange={(e: any) =>
-                          onSettingsChange({ ...appSettings, zoomSpeedMultiplier: parseFloat(e.target.value) })
+                        onChange={(event: NumericChangeEvent) =>
+                          onSettingsChange({ ...appSettings, zoomSpeedMultiplier: getNumericEventValue(event) })
                         }
                         fillOrigin="min"
                       />
