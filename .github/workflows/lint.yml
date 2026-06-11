@@ -27,15 +27,6 @@ jobs:
       - name: Check translation extraction
         run: bun run i18n:check
 
-  frontend-bun-install:
-    name: 'frontend: bun install baseline'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-bun-deps
-
   frontend-typecheck:
     name: 'frontend: typecheck baseline'
     runs-on: ubuntu-latest
@@ -306,7 +297,6 @@ jobs:
 
           required_jobs=(
             "frontend: install, build, i18n check"
-            "frontend: bun install baseline"
             "frontend: typecheck baseline"
             "frontend: eslint baseline"
             "frontend: prettier baseline"
@@ -319,11 +309,28 @@ jobs:
 
           required_jobs_json="$(printf '%s\n' "${required_jobs[@]}" | jq -R . | jq -s .)"
 
+          echo "All validation jobs are dispatched independently; this job is only the branch-protection aggregate."
+          echo "Queued macOS jobs usually mean waiting for GitHub-hosted macOS runner capacity, not a workflow dependency."
           echo "Waiting for required peer jobs:"
           printf ' - %s\n' "${required_jobs[@]}"
 
           while true; do
             jobs_json="$(gh run view "$RUN_ID" --repo "$REPO" --json jobs --jq '.jobs')"
+
+            completed_failures="$(
+              jq -r --argjson required "$required_jobs_json" '
+                $required[] as $name
+                | first(.[] | select(.name == $name)) as $job
+                | select($job != null and $job.status == "completed" and $job.conclusion != "success")
+                | "\($name)=\($job.conclusion)"
+              ' <<< "$jobs_json"
+            )"
+
+            if [[ -n "$completed_failures" ]]; then
+              echo "Blocking PR because a required peer job has already failed:"
+              echo "$completed_failures"
+              exit 1
+            fi
 
             pending="$(
               jq -r --argjson required "$required_jobs_json" '
@@ -340,7 +347,7 @@ jobs:
 
             echo "Still waiting on:"
             echo "$pending"
-            sleep 30
+            sleep 60
           done
 
           failures="$(
