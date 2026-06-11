@@ -81,11 +81,11 @@ The real visual harness is tracked by #292.
 
 ## Rust Entrypoints
 
-| Command                                                    | Current role                   | Baseline status                            |
-| ---------------------------------------------------------- | ------------------------------ | ------------------------------------------ |
-| `cargo fmt -p RapidRAW -- --check`                         | Rust formatting check.         | Passing.                                   |
-| `cargo check`                                              | macOS Rust compile check.      | Passing.                                   |
-| `cargo clippy --all-targets --all-features -- -D warnings` | Rust lint with warnings fatal. | Failing locally, non-blocking in CI, #287. |
+| Command                                                    | Current role                   | Baseline status             |
+| ---------------------------------------------------------- | ------------------------------ | --------------------------- |
+| `cargo fmt -p RapidRAW -- --check`                         | Rust formatting check.         | Passing.                    |
+| `cargo check`                                              | macOS Rust compile check.      | Passing.                    |
+| `cargo clippy --all-targets --all-features -- -D warnings` | Rust lint with warnings fatal. | Passing and blocking in CI. |
 
 Rust commands are run from `src-tauri`. The package declares `rust-version =
 "1.95"`, and GitHub Actions uses `actions-rust-lang/setup-rust-toolchain@v1`.

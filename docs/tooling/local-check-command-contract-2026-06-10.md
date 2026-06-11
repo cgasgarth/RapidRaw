@@ -42,8 +42,6 @@ Observed on June 10, 2026:
   tracked by #289.
 - `bun run i18n:lint` reports 36 inherited hardcoded-string findings; cleanup is
   tracked by #285.
-- `bun run check:rust:clippy` fails on inherited Rust warnings; cleanup is
-  tracked by #287.
 
 Until those issues close, hooks should call `bun run check:quick` and PR authors
 should run `bun run check` before pushing ordinary frontend changes.
