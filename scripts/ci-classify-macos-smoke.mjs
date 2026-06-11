@@ -3,7 +3,26 @@
 import { readFileSync } from 'node:fs';
 import { EOL } from 'node:os';
 
-const ALWAYS_REQUIRE_PREFIXES = ['.github/actions/', '.github/workflows/', 'src-tauri/'];
+const SMOKE_MODES = {
+  NONE: 'none',
+  DEBUG: 'debug',
+  RELEASE: 'release',
+};
+
+const SMOKE_ARGS = {
+  [SMOKE_MODES.NONE]: '',
+  [SMOKE_MODES.DEBUG]: '--verbose --ci --no-bundle --debug --target aarch64-apple-darwin',
+  [SMOKE_MODES.RELEASE]: '--verbose --ci --no-bundle --target aarch64-apple-darwin',
+};
+
+const MODE_PRIORITY = new Map([
+  [SMOKE_MODES.NONE, 0],
+  [SMOKE_MODES.DEBUG, 1],
+  [SMOKE_MODES.RELEASE, 2],
+]);
+
+const DEBUG_PREFIXES = ['.github/actions/', '.github/workflows/'];
+const RELEASE_PREFIXES = ['src-tauri/'];
 
 const ALWAYS_REQUIRE_FILES = new Set([
   'bun.lock',
@@ -59,34 +78,44 @@ function isSafeValidationScript(path) {
 
 function classifyPath(path) {
   if (ALWAYS_REQUIRE_FILES.has(path)) {
-    return { required: true, reason: 'build configuration changed' };
+    return { mode: SMOKE_MODES.RELEASE, reason: 'build configuration changed' };
   }
 
-  if (ALWAYS_REQUIRE_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-    return { required: true, reason: 'workflow, action, Rust, or Tauri path changed' };
+  if (RELEASE_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+    return { mode: SMOKE_MODES.RELEASE, reason: 'Rust or Tauri path changed' };
+  }
+
+  if (DEBUG_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+    return { mode: SMOKE_MODES.DEBUG, reason: 'workflow or action path changed' };
   }
 
   if (path.startsWith('.github/')) {
-    return { required: true, reason: 'GitHub repository automation changed' };
+    return { mode: SMOKE_MODES.DEBUG, reason: 'GitHub repository automation changed' };
   }
 
   if (path.startsWith('src/') && path.endsWith('.rs')) {
-    return { required: true, reason: 'Rust source changed' };
+    return { mode: SMOKE_MODES.RELEASE, reason: 'Rust source changed' };
+  }
+
+  if (SAFE_TOOLING_FILES.has(path) || isSafeValidationScript(path)) {
+    return { mode: SMOKE_MODES.DEBUG, reason: 'tooling validation path changed' };
   }
 
   if (
     SAFE_ROOT_FILES.has(path) ||
-    SAFE_TOOLING_FILES.has(path) ||
     isMarkdown(path) ||
     path.startsWith('docs/') ||
     path.startsWith('fixtures/docs/') ||
-    isSafeFrontendLeaf(path) ||
-    isSafeValidationScript(path)
+    isSafeFrontendLeaf(path)
   ) {
-    return { required: false, reason: 'safe for frontend/docs validation gates' };
+    return { mode: SMOKE_MODES.NONE, reason: 'covered by faster frontend/docs validation gates' };
   }
 
-  return { required: true, reason: 'unclassified path changed' };
+  return { mode: SMOKE_MODES.RELEASE, reason: 'unclassified path changed' };
+}
+
+function maxMode(left, right) {
+  return MODE_PRIORITY.get(right) > MODE_PRIORITY.get(left) ? right : left;
 }
 
 export function classifyFiles(files) {
@@ -95,6 +124,8 @@ export function classifyFiles(files) {
   if (normalizedFiles.length === 0) {
     return {
       macosSmokeRequired: true,
+      macosSmokeMode: SMOKE_MODES.RELEASE,
+      macosSmokeArgs: SMOKE_ARGS[SMOKE_MODES.RELEASE],
       reason: 'no changed files were reported; failing closed',
       requiredPaths: [],
       safePaths: [],
@@ -103,30 +134,28 @@ export function classifyFiles(files) {
 
   const requiredPaths = [];
   const safePaths = [];
+  let macosSmokeMode = SMOKE_MODES.NONE;
 
   for (const path of normalizedFiles) {
     const classification = classifyPath(path);
     const entry = `${path} (${classification.reason})`;
+    macosSmokeMode = maxMode(macosSmokeMode, classification.mode);
 
-    if (classification.required) {
-      requiredPaths.push(entry);
-    } else {
+    if (classification.mode === SMOKE_MODES.NONE) {
       safePaths.push(entry);
+    } else {
+      requiredPaths.push(entry);
     }
   }
 
-  if (requiredPaths.length > 0) {
-    return {
-      macosSmokeRequired: true,
-      reason: `macOS smoke required for ${requiredPaths.length} changed path(s)`,
-      requiredPaths,
-      safePaths,
-    };
-  }
-
   return {
-    macosSmokeRequired: false,
-    reason: `macOS smoke skipped; ${safePaths.length} changed path(s) are covered by faster gates`,
+    macosSmokeRequired: macosSmokeMode !== SMOKE_MODES.NONE,
+    macosSmokeMode,
+    macosSmokeArgs: SMOKE_ARGS[macosSmokeMode],
+    reason:
+      macosSmokeMode === SMOKE_MODES.NONE
+        ? `macOS smoke skipped; ${safePaths.length} changed path(s) are covered by faster gates`
+        : `macOS ${macosSmokeMode} smoke required for ${requiredPaths.length} changed path(s)`,
     requiredPaths,
     safePaths,
   };
@@ -141,6 +170,8 @@ function writeMultilineOutput(name, value) {
 
 function emitGitHubOutput(result) {
   console.log(`macos_smoke_required=${result.macosSmokeRequired ? 'true' : 'false'}`);
+  console.log(`macos_smoke_mode=${result.macosSmokeMode}`);
+  console.log(`macos_smoke_args=${result.macosSmokeArgs}`);
   writeMultilineOutput('macos_smoke_reason', result.reason);
   writeMultilineOutput('macos_smoke_required_paths', result.requiredPaths.join(EOL));
   writeMultilineOutput('macos_smoke_safe_paths', result.safePaths.join(EOL));
@@ -153,29 +184,51 @@ function readFilesFromArg(path) {
     .filter(Boolean);
 }
 
-function assertClassification(name, files, expectedRequired) {
+function assertClassification(name, files, expectedMode) {
   const result = classifyFiles(files);
+  const expectedRequired = expectedMode !== SMOKE_MODES.NONE;
 
-  if (result.macosSmokeRequired !== expectedRequired) {
+  if (result.macosSmokeRequired !== expectedRequired || result.macosSmokeMode !== expectedMode) {
     throw new Error(
-      `${name}: expected macOS smoke required=${expectedRequired}, got ${result.macosSmokeRequired}. ${result.reason}`,
+      `${name}: expected macOS smoke mode=${expectedMode}, required=${expectedRequired}; got mode=${result.macosSmokeMode}, required=${result.macosSmokeRequired}. ${result.reason}`,
     );
   }
 }
 
 function runSelfTest() {
-  assertClassification('empty file list fails closed', [], true);
-  assertClassification('workflow changes require smoke', ['.github/workflows/lint.yml'], true);
-  assertClassification('github action changes require smoke', ['.github/actions/setup-bun-deps/action.yml'], true);
-  assertClassification('tauri changes require smoke', ['src-tauri/src/main.rs'], true);
-  assertClassification('package changes require smoke', ['package.json'], true);
-  assertClassification('unknown paths require smoke', ['tools/new-helper.sh'], true);
-  assertClassification('frontend leaf changes can skip smoke', ['src/components/panel/library/LibraryGrid.tsx'], false);
-  assertClassification('public styles can skip smoke', ['public/theme.css'], false);
-  assertClassification('lint config changes can skip smoke', ['eslint.config.js'], false);
-  assertClassification('validation scripts can skip smoke', ['scripts/check-eslint-escape-hatches.mjs'], false);
-  assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], false);
-  assertClassification('mixed safe and required paths require smoke', ['README.md', 'src-tauri/Cargo.toml'], true);
+  assertClassification('empty file list fails closed', [], SMOKE_MODES.RELEASE);
+  assertClassification('workflow changes require debug smoke', ['.github/workflows/lint.yml'], SMOKE_MODES.DEBUG);
+  assertClassification(
+    'github action changes require debug smoke',
+    ['.github/actions/setup-bun-deps/action.yml'],
+    SMOKE_MODES.DEBUG,
+  );
+  assertClassification('tauri changes require release smoke', ['src-tauri/src/main.rs'], SMOKE_MODES.RELEASE);
+  assertClassification('package changes require release smoke', ['package.json'], SMOKE_MODES.RELEASE);
+  assertClassification('unknown paths require release smoke', ['tools/new-helper.sh'], SMOKE_MODES.RELEASE);
+  assertClassification(
+    'frontend leaf changes can skip smoke',
+    ['src/components/panel/library/LibraryGrid.tsx'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification('public styles can skip smoke', ['public/theme.css'], SMOKE_MODES.NONE);
+  assertClassification('lint config changes require debug smoke', ['eslint.config.js'], SMOKE_MODES.DEBUG);
+  assertClassification(
+    'validation scripts require debug smoke',
+    ['scripts/check-eslint-escape-hatches.mjs'],
+    SMOKE_MODES.DEBUG,
+  );
+  assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], SMOKE_MODES.NONE);
+  assertClassification(
+    'mixed safe and debug paths require debug smoke',
+    ['README.md', '.github/workflows/lint.yml'],
+    SMOKE_MODES.DEBUG,
+  );
+  assertClassification(
+    'mixed safe and release paths require release smoke',
+    ['README.md', 'src-tauri/Cargo.toml'],
+    SMOKE_MODES.RELEASE,
+  );
   console.log('ci-classify-macos-smoke self-test passed');
 }
 
