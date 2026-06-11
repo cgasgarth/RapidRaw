@@ -16,17 +16,9 @@
     "MIT OR Apache-2.0"
   ],
   "reviewedPackages": {
-    "@swc/core-darwin-arm64@1.15.40": {
-      "licenses": "Apache-2.0 AND MIT",
-      "reason": "macOS native SWC package; both licenses are compatible with RawEngine distribution."
-    },
     "@tauri-apps/api@2.11.0": {
       "licenses": "Apache-2.0 OR MIT",
       "reason": "Tauri runtime API; dual permissive license."
-    },
-    "@tauri-apps/cli-darwin-arm64@2.11.2": {
-      "licenses": "Apache-2.0 OR MIT",
-      "reason": "macOS Tauri CLI binary package; dual permissive license."
     },
     "@tauri-apps/cli@2.11.2": {
       "licenses": "Apache-2.0 OR MIT",
@@ -60,10 +52,6 @@
       "licenses": "CC-BY-4.0",
       "reason": "Browser support dataset used by build tooling; attribution license accepted for metadata data."
     },
-    "lightningcss-darwin-arm64@1.32.0": {
-      "licenses": "MPL-2.0",
-      "reason": "macOS native CSS transformer package; MPL-2.0 is weak copyleft and accepted with notice tracking."
-    },
     "lightningcss@1.32.0": {
       "licenses": "MPL-2.0",
       "reason": "CSS transformer package; MPL-2.0 is weak copyleft and accepted with notice tracking."
@@ -77,6 +65,23 @@
       "reason": "SPDX license metadata used by license tooling; MIT plus attribution data license accepted."
     }
   },
+  "reviewedPackagePatterns": [
+    {
+      "pattern": "^@swc/core-(?:darwin|linux|win32|freebsd)-",
+      "licenses": "Apache-2.0 AND MIT",
+      "reason": "SWC native optional packages; both licenses are compatible with RawEngine distribution."
+    },
+    {
+      "pattern": "^@tauri-apps/cli-(?:darwin|linux|win32)-",
+      "licenses": "Apache-2.0 OR MIT",
+      "reason": "Tauri CLI native optional packages; dual permissive license."
+    },
+    {
+      "pattern": "^lightningcss-(?:darwin|linux|win32)-",
+      "licenses": "MPL-2.0",
+      "reason": "Lightning CSS native optional packages; MPL-2.0 is weak copyleft and accepted with notice tracking."
+    }
+  ],
   "missingLicenseFileAllowed": {
     "@pkgr/core@0.2.9": "Package reports MIT license metadata but does not ship a license file in node_modules; keep explicit until upstream package metadata changes."
   }

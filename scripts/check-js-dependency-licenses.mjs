@@ -15,11 +15,22 @@ const packageReviewSchema = z.object({
 const policySchema = z.object({
   allowedLicenseExpressions: z.array(z.string().min(1)).min(1),
   reviewedPackages: z.record(z.string(), packageReviewSchema),
+  reviewedPackagePatterns: z.array(
+    z.object({
+      pattern: z.string().min(1),
+      licenses: z.string().min(1),
+      reason: z.string().min(1),
+    }),
+  ),
   missingLicenseFileAllowed: z.record(z.string(), z.string().min(1)),
 });
 
 const policy = policySchema.parse(JSON.parse(readFileSync(policyPath, 'utf8')));
 const allowedLicenses = new Set(policy.allowedLicenseExpressions);
+const reviewedPackagePatterns = policy.reviewedPackagePatterns.map((review) => ({
+  ...review,
+  regex: new RegExp(review.pattern, 'u'),
+}));
 
 const scanOutput = execFileSync(
   resolve(repoRoot, 'node_modules/.bin/license-checker-rseidelsohn'),
@@ -43,6 +54,7 @@ const reviewedHits = [];
 for (const [packageKey, metadata] of Object.entries(dependencyLicenses).sort()) {
   const licenseExpression = Array.isArray(metadata.licenses) ? metadata.licenses.join(' OR ') : metadata.licenses;
   const reviewedPackage = policy.reviewedPackages[packageKey];
+  const reviewedPackagePattern = reviewedPackagePatterns.find(({ regex }) => regex.test(packageKey));
 
   if (!licenseExpression || licenseExpression.toLowerCase().includes('unknown')) {
     failures.push(`${packageKey}: unknown license expression "${licenseExpression}"`);
@@ -53,6 +65,14 @@ for (const [packageKey, metadata] of Object.entries(dependencyLicenses).sort()) 
     if (reviewedPackage.licenses !== licenseExpression) {
       failures.push(
         `${packageKey}: reviewed license changed from "${reviewedPackage.licenses}" to "${licenseExpression}"`,
+      );
+    } else {
+      reviewedHits.push(packageKey);
+    }
+  } else if (reviewedPackagePattern) {
+    if (reviewedPackagePattern.licenses !== licenseExpression) {
+      failures.push(
+        `${packageKey}: reviewed pattern ${reviewedPackagePattern.pattern} expected "${reviewedPackagePattern.licenses}" but found "${licenseExpression}"`,
       );
     } else {
       reviewedHits.push(packageKey);
