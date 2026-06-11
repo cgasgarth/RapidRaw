@@ -302,7 +302,7 @@ jobs:
     if: always() && github.event_name == 'pull_request'
     timeout-minutes: 360
     steps:
-      - name: Wait for required peer jobs
+      - name: Wait for parallel peer jobs to finish
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -327,6 +327,8 @@ jobs:
 
           required_jobs_json="$(printf '%s\n' "${required_jobs[@]}" | jq -R . | jq -s .)"
 
+          echo "All validation jobs are dispatched independently; this job is only the branch-protection aggregate."
+          echo "Queued macOS jobs usually mean waiting for GitHub-hosted macOS runner capacity, not a workflow dependency."
           echo "Waiting for required peer jobs:"
           printf ' - %s\n' "${required_jobs[@]}"
 
@@ -348,7 +350,7 @@ jobs:
 
             echo "Still waiting on:"
             echo "$pending"
-            sleep 30
+            sleep 60
           done
 
           failures="$(
