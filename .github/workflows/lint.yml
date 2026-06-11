@@ -284,8 +284,6 @@ jobs:
 
       - name: Install frontend dependencies
         uses: ./.github/actions/setup-bun-deps
-        with:
-          node-version: '26'
 
       - name: Add macOS target
         run: rustup target add aarch64-apple-darwin
