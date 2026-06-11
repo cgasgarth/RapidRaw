@@ -156,6 +156,25 @@ jobs:
         working-directory: src-tauri
         run: cargo fmt -p RapidRAW -- --check
 
+  actions-lint:
+    name: 'github actions: actionlint'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.3
+
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - uses: actions/setup-go@v6.4.0
+        with:
+          go-version: '1.25.3'
+          cache: false
+
+      - name: Lint GitHub Actions workflows
+        run: bun run check:actions
+
   rust-check:
     name: 'rust: cargo check macOS'
     runs-on: macos-14
@@ -303,6 +322,7 @@ jobs:
             "frontend: i18n lint baseline"
             "frontend: unsafe cast ban"
             "rust: fmt"
+            "github actions: actionlint"
             "rust: cargo check macOS"
             "rust: clippy baseline macOS"
             "macOS app no-bundle smoke"
