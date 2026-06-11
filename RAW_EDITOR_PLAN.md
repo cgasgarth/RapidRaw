@@ -4251,7 +4251,8 @@ Issues:
 - Wire reusable build `upload-artifacts` input so PRs can skip uploads when artifacts are not useful and main/release can keep evidence.
 - Add release workflow skeleton.
 - Add SBOM/checksum generation.
-- Add notarization/signing placeholder documentation.
+- Add notarization/signing placeholder documentation:
+  `docs/release/macos-signing-notarization-placeholders-2026-06-11.md`.
 - Add failure artifact uploads.
 - Evaluate merge queue only after the aggregate required gate and main CI are stable.
 
