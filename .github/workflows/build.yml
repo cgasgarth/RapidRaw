@@ -57,10 +57,11 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          key: ${{ inputs.platform }}-${{ inputs.target }}-${{ inputs.mobile }}
+          key: v1-${{ inputs.platform }}-${{ runner.arch }}-${{ inputs.target || 'host' }}-${{ inputs.mobile || 'desktop' }}
           cache-on-failure: true
 
       - name: Cache ONNX Runtime library
+        id: onnx-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
@@ -68,9 +69,26 @@ jobs:
             src-tauri/resources/libonnxruntime.so
             src-tauri/resources/onnxruntime.dll
             src-tauri/libs/arm64-v8a/libonnxruntime.so
-          key: ${{ runner.os }}-onnxruntime-${{ inputs.target }}-${{ inputs.mobile }}-${{ hashFiles('src-tauri/build.rs') }}
+          key: v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-${{ inputs.target || 'host' }}-${{ inputs.mobile || 'desktop' }}-${{ hashFiles('src-tauri/build.rs') }}
           restore-keys: |
-            ${{ runner.os }}-onnxruntime-${{ inputs.target }}-${{ inputs.mobile }}-
+            v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-${{ inputs.target || 'host' }}-${{ inputs.mobile || 'desktop' }}-
+
+      - name: Record build cache status
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          onnx_cache_hit="${{ steps.onnx-cache.outputs.cache-hit }}"
+          if [[ -z "$onnx_cache_hit" ]]; then
+            onnx_cache_hit="miss"
+          fi
+
+          {
+            echo "### Build cache status"
+            echo "- Rust cache key suffix: \`v1-${{ inputs.platform }}-${{ runner.arch }}-${{ inputs.target || 'host' }}-${{ inputs.mobile || 'desktop' }}\`"
+            echo "- ONNX exact hit: \`$onnx_cache_hit\`"
+            echo "- ONNX scope: \`${{ runner.os }}-${{ runner.arch }}-${{ inputs.target || 'host' }}-${{ inputs.mobile || 'desktop' }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install frontend dependencies
         uses: ./.github/actions/setup-bun-deps

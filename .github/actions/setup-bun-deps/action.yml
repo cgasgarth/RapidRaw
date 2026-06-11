@@ -22,12 +22,29 @@ runs:
         bun-version-file: package.json
 
     - name: Restore Bun package cache
+      id: bun-cache
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: ~/.bun/install/cache
         key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ hashFiles('bun.lock', 'package.json') }}
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-bun-
+
+    - name: Record Bun package cache status
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        cache_hit="${{ steps.bun-cache.outputs.cache-hit }}"
+        if [[ -z "$cache_hit" ]]; then
+          cache_hit="miss"
+        fi
+
+        {
+          echo "### Bun package cache"
+          echo "- Exact hit: \`$cache_hit\`"
+          echo "- Scope: \`${{ runner.os }}-${{ runner.arch }}\`"
+        } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Check Bun version
       shell: bash
