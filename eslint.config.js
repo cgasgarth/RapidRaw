@@ -45,6 +45,10 @@ module.exports = [
         ecmaFeatures: {
           jsx: true,
         },
+        projectService: {
+          allowDefaultProject: ['*.ts'],
+        },
+        tsconfigRootDir: __dirname,
       },
     },
     settings: {
