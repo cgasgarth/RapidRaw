@@ -292,6 +292,7 @@ Required check rollout:
 - Do not mark a check required until it exists and is stable.
 - Once a check is required, do not weaken it without a tracked issue and explicit rationale.
 - Do not use top-level `paths` filters on required workflows. Use always-starting workflows with job-level changed-file routing and an always-running aggregate gate.
+- Path-aware CI routing must fail closed. Workflow, action, Rust, Tauri, dependency, build config, unknown, or unclassified paths require the expensive macOS smoke gate. Only explicitly classified docs/frontend-leaf paths may skip the macOS no-bundle smoke, and the routing decision must be represented as its own completed peer job under `PR CI / required`.
 - Do not use workflow concurrency cancellation for PR or main validation unless project governance explicitly changes. Older runs should be allowed to complete.
 
 ### 2.1.2 Issue And PR Sizing Rules
@@ -4258,7 +4259,7 @@ Definition of done:
 
 - PR validation jobs run in parallel.
 - `PR CI / required` exists, is enforced by the `Protect main` ruleset, blocks pending/failing PRs, and allows auto-merge only after success.
-- macOS build is required through the aggregate gate and green.
+- macOS build is required through the aggregate gate and green for workflow/action/Rust/Tauri/build-config/unknown changes. It may be skipped only when the checked-in changed-path classifier proves every changed path is a safe docs/frontend-leaf path.
 - Non-required platform builds are clearly marked.
 - Release workflow can produce unsigned draft artifacts.
 
