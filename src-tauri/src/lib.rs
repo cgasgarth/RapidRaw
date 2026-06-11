@@ -106,7 +106,7 @@ extern "C" fn force_exit(_signal: libc::c_int) {
 #[cfg(target_os = "macos")]
 pub fn register_exit_handler() {
     unsafe {
-        libc::signal(libc::SIGABRT, force_exit as libc::sighandler_t);
+        libc::signal(libc::SIGABRT, force_exit as *const () as libc::sighandler_t);
     }
 }
 
@@ -1815,20 +1815,23 @@ fn frontend_ready(
 
     #[cfg(not(target_os = "android"))]
     {
+        #[cfg(not(any(windows, target_os = "linux")))]
+        let _ = is_first_run;
+
+        #[cfg(any(windows, target_os = "linux"))]
         let mut should_maximize = false;
+        #[cfg(any(windows, target_os = "linux"))]
         let mut should_fullscreen = false;
 
+        #[cfg(any(windows, target_os = "linux"))]
         if is_first_run && let Ok(config_dir) = app_handle.path().app_config_dir() {
             let path = config_dir.join("window_state.json");
 
             if let Ok(contents) = std::fs::read_to_string(&path)
                 && let Ok(saved_state) = serde_json::from_str::<WindowState>(&contents)
             {
-                #[cfg(any(windows, target_os = "linux"))]
-                {
-                    should_maximize = saved_state.maximized;
-                    should_fullscreen = saved_state.fullscreen;
-                }
+                should_maximize = saved_state.maximized;
+                should_fullscreen = saved_state.fullscreen;
 
                 if (should_maximize || should_fullscreen)
                     && let Some(monitor) = window
@@ -1866,6 +1869,7 @@ fn frontend_ready(
         if let Err(e) = window.set_focus() {
             log::error!("Failed to focus window: {}", e);
         }
+        #[cfg(any(windows, target_os = "linux"))]
         if is_first_run {
             if should_maximize {
                 let _ = window.maximize();
@@ -2324,14 +2328,13 @@ pub fn run() {
             match event {
                 #[cfg(target_os = "macos")]
                 tauri::RunEvent::Opened { urls } => {
-                    if let Some(url) = urls.first() {
-                        if let Ok(path) = url.to_file_path() {
-                            if let Some(path_str) = path.to_str() {
-                                let state = app_handle.state::<AppState>();
-                                *state.initial_file_path.lock().unwrap() = Some(path_str.to_string());
-                                log::info!("macOS initial open: Stored path {} for later.", path_str);
-                            }
-                        }
+                    if let Some(url) = urls.first()
+                        && let Ok(path) = url.to_file_path()
+                        && let Some(path_str) = path.to_str()
+                    {
+                        let state = app_handle.state::<AppState>();
+                        *state.initial_file_path.lock().unwrap() = Some(path_str.to_string());
+                        log::info!("macOS initial open: Stored path {} for later.", path_str);
                     }
                 }
                 tauri::RunEvent::ExitRequested { api, .. } => {
