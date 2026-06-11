@@ -462,7 +462,7 @@ export default function AIPanel() {
   };
 
   const createMaskLogic = (type: Mask, mode: SubMaskMode = SubMaskMode.Additive) => {
-    if (!selectedImage) return createSubMask(type, {} as any, mode);
+    if (!selectedImage) return createSubMask(type, { width: 1000, height: 1000 }, mode);
     const subMask = createSubMask(type, selectedImage, mode);
 
     const steps = adjustments?.orientationSteps || 0;

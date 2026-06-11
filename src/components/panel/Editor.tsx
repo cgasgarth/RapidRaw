@@ -1311,9 +1311,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       'lensVignetteEnabled',
     ];
 
-    const geometry: any = {};
+    const geometry: Partial<Adjustments> = {};
     geometryKeys.forEach((k) => {
-      geometry[k] = (adjustments as any)[k];
+      geometry[k] = adjustments[k];
     });
 
     const subMasks = activeMaskDef.subMasks?.map((sm: any) => {
