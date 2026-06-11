@@ -21,6 +21,7 @@
     "check:types": "tsc --noEmit --pretty false",
     "check:i18n": "i18next-cli extract --ci --dry-run",
     "check:unsafe-casts": "bun scripts/check-unsafe-casts.mjs",
+    "check:generated-types": "bun scripts/check-generated-type-drift.mjs",
     "check:lint-escapes": "bun scripts/check-eslint-escape-hatches.mjs",
     "check:lint": "eslint . --max-warnings 0",
     "check:format": "prettier --check .",
