@@ -71,6 +71,7 @@ import {
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
+import { loadAlbumTree } from '../utils/albumTree';
 import { globalImageCache } from '../utils/ImageLRUCache';
 
 export interface UseAppContextMenusProps {
@@ -190,9 +191,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               invoke(Invokes.AddToAlbum, { albumId: item.id, paths: pathsToAdd })
                 .then(() => {
                   console.log(`Added image(s) to ${item.name}`);
-                  invoke<AlbumItem[]>(Invokes.GetAlbums).then((res) =>
-                    useLibraryStore.getState().setLibrary({ albumTree: res }),
-                  );
+                  loadAlbumTree().then((albumTree) => useLibraryStore.getState().setLibrary({ albumTree }));
                 })
                 .catch((err) => toast.error(t('contextMenus.toasts.failedAddToAlbum', { err })));
             },
@@ -482,7 +481,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           });
 
           if (activeAlbumId) {
-            const sortedTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
+            const sortedTree = await loadAlbumTree();
             setLibrary({ albumTree: sortedTree });
           }
           await props.refreshImageList();
@@ -551,7 +550,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         if (removeImages(newTree)) {
           try {
             await invoke(Invokes.SaveAlbums, { tree: newTree });
-            const sortedTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
+            const sortedTree = await loadAlbumTree();
             setLibrary({ albumTree: sortedTree });
 
             const albumObj = findAlbumById(sortedTree, activeAlbumId);
@@ -707,7 +706,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     targetAlbumId: activeAlbumId || null,
                   });
                   if (activeAlbumId) {
-                    const sortedTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
+                    const sortedTree = await loadAlbumTree();
                     setLibrary({ albumTree: sortedTree });
                   }
                   await props.refreshImageList();
@@ -1138,7 +1137,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         }
 
         invoke(Invokes.SaveAlbums, { tree: newTree })
-          .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
+          .then(loadAlbumTree)
           .then((sortedTree) => setLibrary({ albumTree: sortedTree }))
           .catch((err) => toast.error(t('contextMenus.toasts.failedMoveError', { err })));
       };
@@ -1230,7 +1229,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
                     if (updateIcon(newTree)) {
                       invoke(Invokes.SaveAlbums, { tree: newTree })
-                        .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
+                        .then(loadAlbumTree)
                         .then((sorted) => setLibrary({ albumTree: sorted }))
                         .catch((err) => toast.error(t('contextMenus.toasts.failedChangeIcon', { err })));
                     }
@@ -1282,7 +1281,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       };
                       del(newTree);
                       invoke(Invokes.SaveAlbums, { tree: newTree })
-                        .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
+                        .then(loadAlbumTree)
                         .then((sorted) => setLibrary({ albumTree: sorted }))
                         .catch((err) => toast.error(t('contextMenus.toasts.failedDelete', { err })));
                     },
@@ -1322,7 +1321,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               try {
                 await invoke(Invokes.AddToAlbum, { albumId: activeAlbumId, paths: copiedFilePaths });
                 console.log(`Added ${numCopied} image(s) to album`);
-                const updatedTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
+                const updatedTree = await loadAlbumTree();
                 setLibrary({ albumTree: updatedTree });
                 await props.refreshImageList();
               } catch (err) {

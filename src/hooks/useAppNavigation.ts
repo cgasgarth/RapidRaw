@@ -18,6 +18,7 @@ import {
 } from '../components/ui/AppProperties';
 import type { FolderTree } from '../components/panel/FolderTree';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
+import { loadAlbumTree } from '../utils/albumTree';
 import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
 
@@ -614,7 +615,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         const activeAlbumId = folderState?.activeAlbumId;
         if (activeAlbumId) {
           try {
-            const albumTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
+            const albumTree = await loadAlbumTree();
             setLibrary({ albumTree });
 
             const album = findAlbumById(albumTree, activeAlbumId);
