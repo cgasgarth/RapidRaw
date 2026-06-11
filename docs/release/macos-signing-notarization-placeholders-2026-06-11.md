@@ -84,9 +84,8 @@ The first signing implementation PR should keep release behavior explicit:
   artifacts.
 - `validation:gatekeeper`: a clean-machine or fresh-user Gatekeeper smoke opens
   the downloaded artifact without quarantine/signing errors.
-- `validation:checksums`: release artifacts have committed or uploaded checksum
-  manifests.
-- `validation:sbom`: release artifacts have SBOM output once #55 lands.
+- `validation:checksums`: release artifacts have uploaded checksum manifests.
+- `validation:sbom`: release builds upload source dependency SBOM output.
 
 ## Non-Goals For This Placeholder
 

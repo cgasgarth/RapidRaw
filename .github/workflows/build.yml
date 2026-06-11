@@ -189,6 +189,61 @@ jobs:
             cp "$file" "$stage_dir/$asset_name"
           done
 
+      - id: release-metadata
+        name: Generate release checksums
+        if: ${{ inputs.release-id != '' || inputs.upload-artifacts }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          metadata_dir="$RUNNER_TEMP/release-metadata"
+          mkdir -p "$metadata_dir"
+
+          metadata_prefix="${{ inputs.platform }}"
+          if [[ -n "${{ inputs.asset-prefix }}" ]]; then
+            metadata_prefix="${{ inputs.asset-prefix }}_${metadata_prefix}"
+          fi
+          if [[ -n "${{ inputs.target }}" ]]; then
+            metadata_prefix="${metadata_prefix}_${{ inputs.target }}"
+          fi
+          if [[ -n "${{ inputs.mobile }}" ]]; then
+            metadata_prefix="${metadata_prefix}_${{ inputs.mobile }}"
+          fi
+
+          bun scripts/generate-release-metadata.mjs \
+            --output-dir "$metadata_dir" \
+            --prefix "$metadata_prefix" \
+            --root src-tauri/target \
+            --root src-tauri/gen/android/app/build/outputs \
+            --root "$RUNNER_TEMP/android-release-assets"
+
+          echo "metadata-dir=$metadata_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Generate repository SBOM
+        if: ${{ (inputs.release-id != '' || inputs.upload-artifacts) && inputs.platform == 'macos-14' && inputs.target == 'aarch64-apple-darwin' && inputs.mobile == '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/release-metadata"
+          gh api "repos/$GITHUB_REPOSITORY/dependency-graph/sbom" > "$RUNNER_TEMP/release-metadata/source_sbom.spdx.json"
+
+      - name: Upload release metadata
+        if: ${{ inputs.release-id != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          tag_ref="${{ inputs.ref }}"
+          tag_name="${tag_ref#refs/tags/}"
+          if compgen -G "$RUNNER_TEMP/release-metadata/*" > /dev/null; then
+            gh release upload "$tag_name" "$RUNNER_TEMP"/release-metadata/* --clobber
+          else
+            echo "No release metadata files found to upload."
+          fi
+
       - name: Upload Android Release Assets
         if: ${{ inputs.mobile == 'android' && inputs.release-id != '' }}
         shell: bash
@@ -210,6 +265,16 @@ jobs:
             src-tauri/gen/android/app/build/outputs/**/*.apk
             src-tauri/gen/android/app/build/outputs/**/*.aab
           retention-days: 7
+          compression-level: 6
+          if-no-files-found: warn
+
+      - name: Upload Release Metadata Artifacts
+        if: ${{ inputs.upload-artifacts }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}${{ inputs.target && format('_{0}', inputs.target) || '' }}${{ inputs.mobile && format('_{0}', inputs.mobile) || '' }}_release_metadata
+          path: ${{ runner.temp }}/release-metadata/*
+          retention-days: 14
           compression-level: 6
           if-no-files-found: warn
 
