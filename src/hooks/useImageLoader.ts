@@ -87,7 +87,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
               return {
                 selectedImage: {
                   ...state.selectedImage,
-                  exif: loadImageResult.exif,
+                  exif: loadImageResult.exif ?? null,
                   height: loadImageResult.height,
                   isRaw: loadImageResult.is_raw,
                   isReady: true,

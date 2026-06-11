@@ -26,7 +26,7 @@ interface ContextMenuCustomProps {
   [key: string]: unknown;
 }
 
-interface ContextMenuOption extends Omit<AppOption, 'submenu'> {
+interface ContextMenuOption extends Omit<AppOption, 'customComponent' | 'customProps' | 'submenu'> {
   customComponent?: ComponentType<ContextMenuCustomProps>;
   customProps?: Record<string, unknown>;
   submenu?: ContextMenuOption[];
