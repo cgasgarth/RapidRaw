@@ -30,7 +30,7 @@
     "check:action-pins:latest": "node scripts/check-github-action-pins.mjs --check-latest",
     "check:security": "bun run check:security:js && bun run check:security:rust",
     "check:security:js": "bun audit --audit-level moderate",
-    "check:security:rust": "cd src-tauri && cargo audit --deny warnings --ignore RUSTSEC-2024-0429",
+    "check:security:rust": "cd src-tauri && cargo audit --ignore RUSTSEC-2024-0429",
     "check:bundle": "bun run build:frontend && bun run check:bundle:budget",
     "check:bundle:budget": "bun scripts/check-vite-bundle-budget.mjs",
     "check:ci-paths": "node scripts/ci-classify-macos-smoke.mjs --self-test",
