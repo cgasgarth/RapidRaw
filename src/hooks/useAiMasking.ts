@@ -7,6 +7,7 @@ import { Adjustments, AiPatch, MaskContainer, Coord } from '../utils/adjustments
 import { SubMask } from '../components/panel/right/Masks';
 import { Invokes } from '../components/ui/AppProperties';
 import { useAuth } from '@clerk/react';
+import { parseAiPatchDataJson } from '../schemas/aiMaskingSchemas';
 
 type SubMaskParameters = Record<string, unknown>;
 
@@ -87,7 +88,7 @@ export function useAiMasking() {
           token: token || null,
         });
 
-        const newPatchData = JSON.parse(newPatchDataJson);
+        const newPatchData = parseAiPatchDataJson(newPatchDataJson);
         patchesSentToBackend.delete(patchId);
 
         setAdjustments((prev: Adjustments) => ({
@@ -177,7 +178,7 @@ export function useAiMasking() {
           token: token || null,
         });
 
-        const newPatchData = JSON.parse(newPatchDataJson);
+        const newPatchData = parseAiPatchDataJson(newPatchDataJson);
         patchesSentToBackend.delete(patchId);
 
         setAdjustments((prev: Partial<Adjustments>) => ({
