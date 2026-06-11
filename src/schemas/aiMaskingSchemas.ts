@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { JsonValue } from '../utils/adjustments';
 
-const jsonPrimitiveSchema = z.union([z.boolean(), z.null(), z.number().finite(), z.string()]);
+const jsonPrimitiveSchema = z.union([z.boolean(), z.null(), z.number(), z.string()]);
 
 export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([jsonPrimitiveSchema, z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),

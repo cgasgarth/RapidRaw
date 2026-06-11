@@ -8,7 +8,7 @@ const backendSubMaskPayloadSchema = z
     id: z.string().optional(),
     parameters: backendParameterBagSchema.optional(),
   })
-  .passthrough();
+  .loose();
 
 const backendAiPatchPayloadSchema = z
   .object({
@@ -17,20 +17,20 @@ const backendAiPatchPayloadSchema = z
     patchData: jsonValueSchema.nullable().optional(),
     subMasks: z.array(backendSubMaskPayloadSchema).optional(),
   })
-  .passthrough();
+  .loose();
 
 const backendMaskContainerPayloadSchema = z
   .object({
     subMasks: z.array(backendSubMaskPayloadSchema).optional(),
   })
-  .passthrough();
+  .loose();
 
 export const backendAdjustmentPayloadSchema = z
   .object({
     aiPatches: z.array(backendAiPatchPayloadSchema).optional(),
     masks: z.array(backendMaskContainerPayloadSchema).optional(),
   })
-  .passthrough();
+  .loose();
 
 export type BackendAdjustmentPayload = z.infer<typeof backendAdjustmentPayloadSchema>;
 
