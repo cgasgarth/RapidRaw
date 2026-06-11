@@ -2,6 +2,7 @@ const js = require('@eslint/js');
 const tseslint = require('typescript-eslint');
 const react = require('eslint-plugin-react');
 const reactHooks = require('eslint-plugin-react-hooks');
+const jsxA11y = require('eslint-plugin-jsx-a11y');
 const i18next = require('eslint-plugin-i18next');
 
 const tsFiles = ['**/*.{ts,tsx,mts}'];
@@ -30,6 +31,11 @@ const reactHooksRecommended = {
   files: tsFiles,
 };
 
+const jsxA11yRecommended = {
+  ...jsxA11y.flatConfigs.recommended,
+  files: tsFiles,
+};
+
 module.exports = [
   {
     linterOptions: {
@@ -49,6 +55,7 @@ module.exports = [
   reactRecommended,
   reactJsxRuntime,
   reactHooksRecommended,
+  jsxA11yRecommended,
   {
     files: tsFiles,
     plugins: {
@@ -92,6 +99,12 @@ module.exports = [
       'react-hooks/preserve-manual-memoization': 'off',
       'react-hooks/purity': 'off',
       'react/prop-types': 'off',
+      // Accessibility lint is enabled, but legacy interactive element patterns
+      // are tracked separately so this gate can land without broad UI rewrites.
+      'jsx-a11y/no-static-element-interactions': 'off',
+      'jsx-a11y/click-events-have-key-events': 'off',
+      'jsx-a11y/no-autofocus': 'off',
+      'jsx-a11y/no-noninteractive-element-interactions': 'off',
       'no-restricted-imports': [
         'error',
         {
