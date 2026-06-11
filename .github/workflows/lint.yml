@@ -212,6 +212,32 @@ jobs:
           go-version: '1.25.3'
           cache: false
 
+      - name: Cache actionlint Go modules
+        id: actionlint-go-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: v1-${{ runner.os }}-${{ runner.arch }}-actionlint-go-${{ hashFiles('package.json') }}
+          restore-keys: |
+            v1-${{ runner.os }}-${{ runner.arch }}-actionlint-go-
+
+      - name: Record actionlint Go cache status
+        run: |
+          set -euo pipefail
+
+          cache_hit="${{ steps.actionlint-go-cache.outputs.cache-hit }}"
+          if [[ -z "$cache_hit" ]]; then
+            cache_hit="miss"
+          fi
+
+          {
+            echo "### actionlint Go cache"
+            echo "- Exact hit: \`$cache_hit\`"
+            echo "- Scope: \`${{ runner.os }}-${{ runner.arch }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Lint GitHub Actions workflows
         run: bun run check:actions
 
@@ -245,16 +271,32 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          key: ${{ runner.os }}-rust-check-macos
+          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-check-macos-host-desktop
           cache-on-failure: true
 
       - name: Cache ONNX Runtime library
+        id: rust-check-onnx-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: src-tauri/resources/libonnxruntime.dylib
-          key: ${{ runner.os }}-onnxruntime-macos-${{ hashFiles('src-tauri/build.rs') }}
+          key: v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-${{ hashFiles('src-tauri/build.rs') }}
           restore-keys: |
-            ${{ runner.os }}-onnxruntime-macos-
+            v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-
+
+      - name: Record Rust check cache status
+        run: |
+          set -euo pipefail
+
+          onnx_cache_hit="${{ steps.rust-check-onnx-cache.outputs.cache-hit }}"
+          if [[ -z "$onnx_cache_hit" ]]; then
+            onnx_cache_hit="miss"
+          fi
+
+          {
+            echo "### Rust check cache status"
+            echo "- Rust cache key suffix: \`v1-${{ runner.os }}-${{ runner.arch }}-rust-check-macos-host-desktop\`"
+            echo "- ONNX exact hit: \`$onnx_cache_hit\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Cargo check
         working-directory: src-tauri
@@ -277,16 +319,32 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          key: ${{ runner.os }}-rust-clippy-macos
+          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-clippy-macos-host-desktop
           cache-on-failure: true
 
       - name: Cache ONNX Runtime library
+        id: rust-clippy-onnx-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: src-tauri/resources/libonnxruntime.dylib
-          key: ${{ runner.os }}-onnxruntime-macos-${{ hashFiles('src-tauri/build.rs') }}
+          key: v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-${{ hashFiles('src-tauri/build.rs') }}
           restore-keys: |
-            ${{ runner.os }}-onnxruntime-macos-
+            v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-
+
+      - name: Record Rust clippy cache status
+        run: |
+          set -euo pipefail
+
+          onnx_cache_hit="${{ steps.rust-clippy-onnx-cache.outputs.cache-hit }}"
+          if [[ -z "$onnx_cache_hit" ]]; then
+            onnx_cache_hit="miss"
+          fi
+
+          {
+            echo "### Rust clippy cache status"
+            echo "- Rust cache key suffix: \`v1-${{ runner.os }}-${{ runner.arch }}-rust-clippy-macos-host-desktop\`"
+            echo "- ONNX exact hit: \`$onnx_cache_hit\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - id: clippy
         name: Clippy
@@ -327,16 +385,32 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          key: pr-smoke-${{ runner.os }}-aarch64-apple-darwin
+          key: v1-pr-smoke-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop
           cache-on-failure: true
 
       - name: Cache ONNX Runtime library
+        id: pr-smoke-onnx-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: src-tauri/resources/libonnxruntime.dylib
-          key: ${{ runner.os }}-onnxruntime-aarch64-apple-darwin-${{ hashFiles('src-tauri/build.rs') }}
+          key: v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-aarch64-apple-darwin-desktop-${{ hashFiles('src-tauri/build.rs') }}
           restore-keys: |
-            ${{ runner.os }}-onnxruntime-aarch64-apple-darwin-
+            v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-aarch64-apple-darwin-desktop-
+
+      - name: Record macOS smoke cache status
+        run: |
+          set -euo pipefail
+
+          onnx_cache_hit="${{ steps.pr-smoke-onnx-cache.outputs.cache-hit }}"
+          if [[ -z "$onnx_cache_hit" ]]; then
+            onnx_cache_hit="miss"
+          fi
+
+          {
+            echo "### macOS smoke cache status"
+            echo "- Rust cache key suffix: \`v1-pr-smoke-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop\`"
+            echo "- ONNX exact hit: \`$onnx_cache_hit\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install frontend dependencies
         uses: ./.github/actions/setup-bun-deps

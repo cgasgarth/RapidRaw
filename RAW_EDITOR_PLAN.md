@@ -4246,7 +4246,8 @@ Issues:
 - Require that aggregate gate in the active `Protect main` ruleset.
 - Add macOS app build as a required dependency of the aggregate gate.
 - Add matrix strategy for platform builds.
-- Add caching for Bun, Cargo, Tauri, and build artifacts.
+- Add caching for Bun, Cargo, Tauri, and build artifacts. Current cache policy:
+  `docs/ci/cache-policy-2026-06-11.md`.
 - Replace full PR package builds with a macOS no-bundle smoke path where practical, while keeping full package builds on `main` and release.
 - Wire reusable build `upload-artifacts` input so PRs can skip uploads when artifacts are not useful and main/release can keep evidence.
 - Add release workflow skeleton. Current unsigned artifact dry-run:
