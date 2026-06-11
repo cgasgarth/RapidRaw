@@ -31,6 +31,8 @@ corresponding cleanup issues close and the commands are green on main.
 | `bun run check:rust:check`  | Rust cargo check, mirrors current CI.                            |
 | `bun run check:rust:clippy` | Rust clippy warnings-as-errors, tracked by #287 if it regresses. |
 | `bun run check:rust`        | Blocking Rust local bundle for Rust-affecting PRs.               |
+| `bun run check:security`    | Dependency vulnerability checks for JS and Rust.                 |
+| `bun run check:licenses`    | Dependency license policy checks for JS and Rust.                |
 
 ## Known Baseline Gaps
 

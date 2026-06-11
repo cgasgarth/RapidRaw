@@ -24,9 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          node-version: '26'
+          bun-version-file: package.json
 
       - name: Fetch changed files
         env:
@@ -42,7 +42,7 @@ jobs:
 
       - id: classify
         name: Classify macOS smoke requirement
-        run: node scripts/ci-classify-macos-smoke.mjs --files "$RUNNER_TEMP/changed-files.txt" >> "$GITHUB_OUTPUT"
+        run: bun scripts/ci-classify-macos-smoke.mjs --files "$RUNNER_TEMP/changed-files.txt" >> "$GITHUB_OUTPUT"
 
       - name: Record routing decision
         run: |
@@ -271,12 +271,12 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          node-version: '26'
+          bun-version-file: package.json
 
       - name: Validate pinned GitHub Action versions
-        run: node scripts/check-github-action-pins.mjs
+        run: bun run check:action-pins
 
   dependency-security-js:
     name: 'security: JavaScript dependencies'
@@ -308,6 +308,37 @@ jobs:
       - name: Audit Rust dependencies
         working-directory: src-tauri
         run: cargo audit --ignore RUSTSEC-2024-0429
+
+  dependency-license-js:
+    name: 'license: JavaScript dependencies'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Check JavaScript dependency licenses
+        run: bun run check:licenses:js
+
+  dependency-license-rust:
+    name: 'license: Rust dependencies'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
+        with:
+          rustflags: ''
+          rust-src-dir: src-tauri
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked --version 0.19.8
+
+      - name: Check Rust dependency licenses
+        working-directory: src-tauri
+        run: cargo deny check licenses
 
   rust-check:
     name: 'rust: cargo check macOS'
@@ -564,6 +595,8 @@ jobs:
             "github actions: pinned versions"
             "security: JavaScript dependencies"
             "security: Rust dependencies"
+            "license: JavaScript dependencies"
+            "license: Rust dependencies"
             "rust: cargo check macOS"
             "rust: clippy baseline macOS"
           )
