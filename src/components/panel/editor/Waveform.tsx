@@ -4,10 +4,11 @@ import { AlertOctagon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { WaveformData } from '../../ui/AppProperties';
 import { DisplayMode } from '../../../utils/adjustments';
+import type { ChannelConfig } from '../../adjustments/Curves';
 
 interface WaveformProps {
   waveformData: WaveformData | null;
-  histogram?: any;
+  histogram?: ChannelConfig | null;
   displayMode: string;
   setDisplayMode: (mode: string) => void;
   showClipping?: boolean;
@@ -41,6 +42,12 @@ interface Particle {
   targetY: number;
   x: number;
   y: number;
+}
+
+interface HistogramChannel {
+  color: string;
+  data: Array<number>;
+  key: 'red' | 'green' | 'blue';
 }
 
 const modeButtons: ReadonlyArray<ModeButton> = [
@@ -81,12 +88,25 @@ const modeButtons: ReadonlyArray<ModeButton> = [
   },
 ] as const;
 
-const HistogramView = ({ histogram }: { histogram: any }) => {
-  if (!histogram || !histogram.red || !histogram.green || !histogram.blue) return null;
+const getHistogramChannelData = (channel: unknown): Array<number> => {
+  if (Array.isArray(channel)) return channel.filter((value): value is number => typeof value === 'number');
+  if (typeof channel === 'object' && channel !== null && 'data' in channel) {
+    const { data } = channel as { data?: unknown };
+    if (Array.isArray(data)) return data.filter((value): value is number => typeof value === 'number');
+  }
+  return [];
+};
 
-  const redMax = Math.max(...(histogram.red || [0]));
-  const greenMax = Math.max(...(histogram.green || [0]));
-  const blueMax = Math.max(...(histogram.blue || [0]));
+const HistogramView = ({ histogram }: { histogram: ChannelConfig | null | undefined }) => {
+  const redData = getHistogramChannelData(histogram?.red);
+  const greenData = getHistogramChannelData(histogram?.green);
+  const blueData = getHistogramChannelData(histogram?.blue);
+
+  if (redData.length === 0 || greenData.length === 0 || blueData.length === 0) return null;
+
+  const redMax = Math.max(...redData);
+  const greenMax = Math.max(...greenData);
+  const blueMax = Math.max(...blueData);
   const globalMax = Math.max(redMax, greenMax, blueMax, 1);
 
   const getFill = (data: number[]) => {
@@ -98,10 +118,10 @@ const HistogramView = ({ histogram }: { histogram: any }) => {
     return 'M' + data.map((val, i) => `${(i / 255) * 255},${255 - (val / globalMax) * 255}`).join(' L');
   };
 
-  const channels = [
-    { key: 'red', color: '#FF6B6B', data: histogram.red },
-    { key: 'green', color: '#6BCB77', data: histogram.green },
-    { key: 'blue', color: '#4D96FF', data: histogram.blue },
+  const channels: Array<HistogramChannel> = [
+    { key: 'red', color: '#FF6B6B', data: redData },
+    { key: 'green', color: '#6BCB77', data: greenData },
+    { key: 'blue', color: '#4D96FF', data: blueData },
   ];
 
   return (
