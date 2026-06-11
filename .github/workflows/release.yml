@@ -1,6 +1,12 @@
 name: 'Release: Build & Package App'
 
 on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit SHA to build.
+        required: true
+        default: main
   release:
     types: [created]
 
@@ -43,13 +49,15 @@ jobs:
             asset-prefix: '04'
     uses: ./.github/workflows/build.yml
     with:
-      release-id: ${{ github.event.release.id }}
+      release-id: ${{ github.event.release.id || '' }}
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
       build-args: ${{ matrix.args }}
       asset-name-pattern: '[name]_v[version]_[platform]_[arch][ext]'
       asset-prefix: ${{ matrix.asset-prefix }}
       mobile: ${{ matrix.mobile }}
+      ref: ${{ inputs.ref || github.ref }}
+      upload-artifacts: true
     secrets: inherit
     permissions:
       contents: write

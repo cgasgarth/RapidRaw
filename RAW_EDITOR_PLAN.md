@@ -4249,7 +4249,8 @@ Issues:
 - Add caching for Bun, Cargo, Tauri, and build artifacts.
 - Replace full PR package builds with a macOS no-bundle smoke path where practical, while keeping full package builds on `main` and release.
 - Wire reusable build `upload-artifacts` input so PRs can skip uploads when artifacts are not useful and main/release can keep evidence.
-- Add release workflow skeleton.
+- Add release workflow skeleton. Current unsigned artifact dry-run:
+  `docs/release/unsigned-release-artifact-workflow-2026-06-11.md`.
 - Add SBOM/checksum generation.
 - Add notarization/signing placeholder documentation:
   `docs/release/macos-signing-notarization-placeholders-2026-06-11.md`.
