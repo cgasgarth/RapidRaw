@@ -1869,9 +1869,9 @@ Contract-first architecture should be added before large feature work without re
 Target module layout:
 
 - `packages/rawengine-schema/`
-  - Source of truth for TypeBox-authored command, query, graph, artifact, fixture, bridge error, provenance, and app-server tool schemas.
-  - Generates JSON Schema, TypeScript types, OpenAI/app-server tool schemas, sample payloads, manifest hashes, and schema-drift snapshots.
-  - Uses Ajv for TypeScript/runtime validation.
+  - Source of truth for Zod-authored command, query, graph, artifact, fixture, bridge error, provenance, and app-server tool schemas.
+  - Generates or derives JSON Schema, TypeScript types, OpenAI/app-server tool schemas, sample payloads, manifest hashes, and schema-drift snapshots.
+  - Uses Zod for TypeScript/runtime validation.
 - `src-tauri/src/edit_core/`
   - Pure Rust edit graph and command core with no Tauri, React, or UI coupling.
   - Owns command replay, graph mutation, migration, typed errors, derived artifact records, and deterministic validation entrypoints.
@@ -1886,7 +1886,7 @@ Target module layout:
 
 Schema policy:
 
-- TypeBox plus JSON Schema plus Ajv is the schema source of truth for TypeScript-facing contracts.
+- Zod is the schema source of truth for TypeScript-facing contracts.
 - Rust uses serde structs generated from or contract-tested against the same schema samples; Rust and TypeScript must not become independent schema authorities.
 - Rust bridge structs should use `deny_unknown_fields` where practical and sample contract tests where generated parity is not yet automated.
 - Schema artifacts must include stable sample payloads for command, query, error, graph, artifact, fixture, and app-server tool cases.
@@ -3526,9 +3526,9 @@ Current planning consults:
   - Project/data-source note: run from the RapidRaw ChatGPT project with Extended Pro. The GitHub app and `cgasgarth/RapidRaw` repo were visible in the selector; the composer showed a generic GitHub chip and the completed answer showed `Sources: GitHub`.
   - Incorporated advice:
     - Build contract-first command graph architecture before major feature work while allowing existing RapidRAW adjustments to remain behind a migration facade.
-    - Add `packages/rawengine-schema/` as the TypeBox, JSON Schema, TypeScript type, OpenAI tool schema, sample payload, and manifest-hash source of truth.
+    - Add `packages/rawengine-schema/` as the Zod, JSON Schema, TypeScript type, OpenAI tool schema, sample payload, and manifest-hash source of truth.
     - Add `src-tauri/src/edit_core/` as pure Rust graph/command core and `src-tauri/src/bridge/` as a Tauri adapter with typed validation, task lifecycle, progress, cancellation, and artifact handles.
-    - Use TypeBox plus JSON Schema plus Ajv as the TypeScript-facing contract source and Rust serde structs with `deny_unknown_fields` plus sample contract tests; do not allow independent Rust and TypeScript schema sources.
+    - Use Zod as the TypeScript-facing contract source and Rust serde structs with `deny_unknown_fields` plus sample contract tests; do not allow independent Rust and TypeScript schema sources.
     - Add policy that new editing bridges avoid `Result<T, String>`, avoid large base64 result payloads, and return typed bridge results/errors and artifact/cache handles.
     - Require mutating commands to carry expected graph revision, actor metadata, approval metadata, dry-run/preview options, typed results/errors, and provenance.
     - Dual-write legacy adjustments plus `rawengineGraph` until sidecar migration policy and tests exist.
@@ -4300,7 +4300,7 @@ Issues:
 - Audit current negative conversion behavior and decide whether it is wrapped, quarantined, replaced, or allowed only as a legacy compatibility path.
 - Write `ADR-API-001`, `ADR-GRAPH-001`, `ADR-COLOR-001`, `ADR-MAC-001`, `ADR-GPU-001`, `ADR-COORD-001`, `ADR-MASK-001`, `ADR-MASK-002`, `ADR-ART-001`, `ADR-AI-001`, `ADR-AGENT-001`, `ADR-FIX-001`, `ADR-VALID-001`, and `ADR-LIC-001`.
 - Add command/query envelope type stubs and schema generation spike.
-- Add `packages/rawengine-schema/` with TypeBox schemas, JSON Schema generation, TypeScript types, OpenAI/app-server tool schema generation, sample payloads, and schema manifest hashes.
+- Add `packages/rawengine-schema/` with Zod schemas, JSON Schema generation, TypeScript types, OpenAI/app-server tool schema generation, sample payloads, and schema manifest hashes.
 - Add a pure Rust `edit_core` skeleton with no Tauri/UI coupling.
 - Add a `bridge` adapter skeleton with typed `BridgeResult` and `RawEngineError` responses.
 - Add an edit graph skeleton with a legacy adjustment node so existing RapidRAW adjustment snapshots can migrate incrementally.
