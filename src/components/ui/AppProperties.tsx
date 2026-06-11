@@ -158,6 +158,8 @@ export enum ThumbnailAspectRatio {
 export interface AppSettings {
   aiConnectorAddress?: string;
   aiProvider?: string;
+  aiTagCount?: number;
+  applyPreprocessingToNonRaws?: boolean;
   decorations?: boolean;
   editorPreviewResolution?: number;
   enableZoomHifi?: boolean;
@@ -166,6 +168,7 @@ export interface AppSettings {
   enableLivePreviews?: boolean;
   livePreviewQuality?: string;
   enableAiTagging?: boolean;
+  customAiTags?: string[];
   filterCriteria?: FilterCriteria;
   lastFolderState?: PersistedFolderState | null;
   pinnedFolders?: string[];
@@ -180,10 +183,15 @@ export interface AppSettings {
   uiVisibility?: UiVisibility;
   adjustmentVisibility?: { [key: string]: boolean };
   rawHighlightCompression?: number;
+  rawPreprocessingColorNr?: number;
+  rawPreprocessingSharpening?: number;
   processingBackend?: string;
   linuxGpuOptimization?: boolean;
   exportPresets?: ExportPreset[];
   myLenses?: MyLens[];
+  thumbnailResolution?: number;
+  thumbnailWorkerThreads?: number;
+  imageCacheSize?: number;
   enableFolderImageCounts?: boolean;
   displayEditIcon?: boolean;
   linearRawMode?: string;
