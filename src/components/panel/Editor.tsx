@@ -1,20 +1,27 @@
-import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect, useImperativeHandle } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  useLayoutEffect,
+  useImperativeHandle,
+  type MouseEvent,
+  type RefObject,
+} from 'react';
 import { Crop, PercentCrop } from 'react-image-crop';
 import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
-import { toast } from 'react-toastify';
 import debounce from 'lodash.debounce';
 
-import { ImageDimensions, useImageRenderSize } from '../../hooks/useImageRenderSize';
+import { BaseRenderSize, ImageDimensions, RenderSize, useImageRenderSize } from '../../hooks/useImageRenderSize';
 import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { Mask, SubMask } from './right/Masks';
 import { Panel, TransformState, Invokes } from '../ui/AppProperties';
-import Text from '../ui/Text';
-import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -69,10 +76,37 @@ interface WgpuRenderState {
   bgSecondary: [number, number, number, number];
 }
 
+interface TransformController {
+  resetTransform(time?: number): void;
+  setTransform(x: number, y: number, scale: number, time?: number): void;
+  zoomIn(factor: number, time?: number): void;
+  zoomOut(factor: number, time?: number): void;
+}
+
+interface DisplaySizeUpdate extends BaseRenderSize {
+  scale: number;
+}
+
+interface CropGeometryParams {
+  aspectRatio: number | null;
+  orientationSteps: number;
+  rotation: number;
+}
+
+type MaskPreviewDefinition =
+  | (Omit<MaskContainer, 'adjustments'> & { adjustments: Partial<Adjustments> })
+  | (AiPatch & { adjustments?: Partial<Adjustments>; opacity?: number });
+
+interface MaskOverlayRequest {
+  jsAdjustments: Adjustments;
+  maskDef: MaskPreviewDefinition;
+  renderSize: RenderSize;
+}
+
 interface EditorProps {
   onBackToLibrary(): void;
-  onContextMenu(event: any): void;
-  transformWrapperRef: any;
+  onContextMenu(event: MouseEvent<HTMLElement>): void;
+  transformWrapperRef: RefObject<TransformController | null>;
 }
 
 export default function Editor({ onBackToLibrary, onContextMenu, transformWrapperRef }: EditorProps) {
@@ -134,7 +168,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   );
   const { handleGenerateAiMask, handleQuickErase } = useAiMasking();
   const [crop, setCrop] = useState<Crop | null>(null);
-  const prevCropParams = useRef<any>(null);
+  const prevCropParams = useRef<CropGeometryParams | null>(null);
   const lastValidCropRef = useRef<PercentCrop | null>(null);
 
   const [isMaskHovered, setIsMaskHovered] = useState(false);
@@ -159,7 +193,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const isTransitioningRef = useRef(false);
   const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
   const isGeneratingOverlayRef = useRef(false);
-  const pendingOverlayRequestRef = useRef<any>(null);
+  const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
   const animationFrameId = useRef<number | null>(null);
   const physicsFrameId = useRef<number | null>(null);
   const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -207,7 +241,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   }, [isFullScreen, selectedImage, targetZoom, setUI]);
 
   const handleDisplaySizeChange = useCallback(
-    (size: any) => {
+    (size: DisplaySizeUpdate) => {
       setEditor({ displaySize: { width: size.width, height: size.height } });
       if (size.scale) {
         const baseWidth = size.width / size.scale;
@@ -245,7 +279,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   );
 
   const updateSubMaskLocal = useCallback(
-    (subMaskId: string, updatedData: any) => {
+    (subMaskId: string | null, updatedData: Partial<SubMask>) => {
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         masks: prev.masks.map((c: MaskContainer) => ({
@@ -1019,7 +1053,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
       const { patchesSentToBackend } = useEditorStore.getState();
 
-      const stripSubMasks = (subMasks: any[]) => {
+      const stripSubMasks = (subMasks?: Array<SubMask>) => {
         if (!Array.isArray(subMasks)) return;
         subMasks.forEach((sm) => {
           if (sm.id && sm.parameters && patchesSentToBackend.has(sm.id)) {
@@ -1031,10 +1065,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
       const strippedAdjustments = structuredClone(jsAdjustments);
       if (strippedAdjustments.masks) {
-        strippedAdjustments.masks.forEach((m: any) => stripSubMasks(m.subMasks));
+        strippedAdjustments.masks.forEach((m) => stripSubMasks(m.subMasks));
       }
       if (strippedAdjustments.aiPatches) {
-        strippedAdjustments.aiPatches.forEach((p: any) => stripSubMasks(p.subMasks));
+        strippedAdjustments.aiPatches.forEach((p) => stripSubMasks(p.subMasks));
       }
 
       const strippedMaskDef = structuredClone(maskDef);
@@ -1066,7 +1100,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   }, []);
 
   const requestMaskOverlay = useCallback(
-    (maskDef: any, renderSize: any, currentAdjustments: any) => {
+    (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentAdjustments: Adjustments) => {
       pendingOverlayRequestRef.current = { maskDef, renderSize, jsAdjustments: currentAdjustments };
       processOverlayQueue();
     },
@@ -1074,15 +1108,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   );
 
   const handleLiveMaskPreview = useCallback(
-    (maskDef: any) => {
-      let normalizedDef = maskDef;
-      if (maskDef && !maskDef.adjustments) {
-        normalizedDef = {
-          ...maskDef,
-          adjustments: {},
-          opacity: 100,
-        };
-      }
+    (maskDef: MaskContainer | AiPatch) => {
+      const normalizedDef: MaskPreviewDefinition =
+        'adjustments' in maskDef && maskDef.adjustments
+          ? maskDef
+          : {
+              ...maskDef,
+              adjustments: {},
+              opacity: 'opacity' in maskDef ? maskDef.opacity : 100,
+            };
       requestMaskOverlay(normalizedDef, imageRenderSize, adjustments);
     },
     [imageRenderSize, adjustments, requestMaskOverlay],
@@ -1277,7 +1311,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   }, []);
 
   const overlayTriggerHash = useMemo(() => {
-    let activeMaskDef = null;
+    let activeMaskDef: MaskContainer | AiPatch | undefined;
     if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
       activeMaskDef = adjustments.masks?.find((c: MaskContainer) => c.id === activeMaskContainerId);
     } else if (activeRightPanel === Panel.Ai && activeAiPatchContainerId) {
@@ -1316,7 +1350,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       geometry[k] = adjustments[k];
     });
 
-    const subMasks = activeMaskDef.subMasks?.map((sm: any) => {
+    const subMasks = activeMaskDef.subMasks?.map((sm: SubMask) => {
       const { parameters, ...rest } = sm;
       const cleanParams = { ...parameters };
       const maskDataFingerprint = cleanParams.mask_data_base64
@@ -1353,7 +1387,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   ]);
 
   useEffect(() => {
-    let maskDefForOverlay = null;
+    let maskDefForOverlay: MaskPreviewDefinition | null = null;
 
     if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
       const activeMask = adjustments.masks?.find((c: MaskContainer) => c.id === activeMaskContainerId);
@@ -1374,6 +1408,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       }
     }
 
+    if (!maskDefForOverlay) return;
     requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
   }, [
     overlayTriggerHash,
@@ -1882,7 +1917,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   );
 
   const handleCropComplete = useCallback(
-    (_: any, pc: PercentCrop) => {
+    (_crop: Crop, pc: PercentCrop) => {
       if (!pc.width || !pc.height || !selectedImage?.width) {
         return;
       }
