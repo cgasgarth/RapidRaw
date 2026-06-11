@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { CullingSuggestions, Progress } from '../components/ui/AppProperties';
 
-const nonnegativeNumberSchema = z.number().finite().nonnegative();
+const nonnegativeNumberSchema = z.number().nonnegative();
 type ProgressPayload = z.infer<typeof progressPayloadSchema>;
 type CullingProgressPayload = Progress & { stage: string };
 
@@ -15,28 +15,28 @@ export const progressPayloadSchema = z
     stage: z.string().optional(),
     total: nonnegativeNumberSchema,
   })
-  .passthrough();
+  .loose();
 
 export const thumbnailGeneratedPayloadSchema = z
   .object({
     data: z.string().nullable().optional(),
     is_edited: z.boolean().optional(),
     path: z.string(),
-    rating: z.number().finite().optional(),
+    rating: z.number().optional(),
   })
-  .passthrough();
+  .loose();
 
 export const importStartPayloadSchema = z
   .object({
     total: nonnegativeNumberSchema,
   })
-  .passthrough();
+  .loose();
 
 export const pathProgressPayloadSchema = progressPayloadSchema
   .extend({
     path: z.string(),
   })
-  .passthrough();
+  .loose();
 
 export const importProgressPayloadSchema = pathProgressPayloadSchema;
 
@@ -47,51 +47,51 @@ export const denoiseCompletePayloadSchema = z.union([
       denoised: z.string(),
       original: z.string().nullable().optional(),
     })
-    .passthrough(),
+    .loose(),
 ]);
 
 export const renderPathPayloadSchema = z
   .object({
     path: z.string().optional(),
   })
-  .passthrough();
+  .loose();
 
 export const base64PayloadSchema = z
   .object({
     base64: z.string(),
   })
-  .passthrough();
+  .loose();
 
 export const aiConnectorStatusPayloadSchema = z
   .object({
     connected: z.boolean(),
   })
-  .passthrough();
+  .loose();
 
 export const cullingProgressPayloadSchema = progressPayloadSchema
   .extend({
     stage: z.string(),
   })
-  .passthrough();
+  .loose();
 
 const imageAnalysisResultSchema = z
   .object({
-    centerFocusMetric: z.number().finite(),
-    exposureMetric: z.number().finite(),
+    centerFocusMetric: z.number(),
+    exposureMetric: z.number(),
     height: nonnegativeNumberSchema,
     path: z.string(),
-    qualityScore: z.number().finite(),
-    sharpnessMetric: z.number().finite(),
+    qualityScore: z.number(),
+    sharpnessMetric: z.number(),
     width: nonnegativeNumberSchema,
   })
-  .passthrough();
+  .loose();
 
 const cullGroupSchema = z
   .object({
     duplicates: z.array(imageAnalysisResultSchema),
     representative: imageAnalysisResultSchema,
   })
-  .passthrough();
+  .loose();
 
 export const cullingSuggestionsPayloadSchema = z
   .object({
@@ -99,7 +99,7 @@ export const cullingSuggestionsPayloadSchema = z
     failedPaths: z.array(z.string()),
     similarGroups: z.array(cullGroupSchema),
   })
-  .passthrough();
+  .loose();
 
 export const parseStringPayload = (value: unknown): string => stringPayloadSchema.parse(value);
 export const parseCountPayload = (value: unknown): number => countPayloadSchema.parse(value);
