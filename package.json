@@ -23,6 +23,8 @@
     "check:lint": "eslint . --max-warnings 0",
     "check:format": "prettier --check .",
     "check:actions": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 .github/workflows/*.yml",
+    "check:action-pins": "node scripts/check-github-action-pins.mjs",
+    "check:action-pins:latest": "node scripts/check-github-action-pins.mjs --check-latest",
     "check:ci-paths": "node scripts/ci-classify-macos-smoke.mjs --self-test",
     "check:release-metadata": "node scripts/generate-release-metadata.mjs --self-test",
     "check:rust": "bun run check:rust:fmt && bun run check:rust:check",
