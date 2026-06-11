@@ -198,6 +198,8 @@ const OptimizedBrushLine = memo(
   },
 );
 
+OptimizedBrushLine.displayName = 'OptimizedBrushLine';
+
 const MaskOverlay = memo(
   ({
     adjustments,
@@ -1042,6 +1044,8 @@ const MaskOverlay = memo(
     return null;
   },
 );
+
+MaskOverlay.displayName = 'MaskOverlay';
 
 const ImageCanvas = memo(
   ({
@@ -2655,5 +2659,7 @@ const ImageCanvas = memo(
     );
   },
 );
+
+ImageCanvas.displayName = 'ImageCanvas';
 
 export default ImageCanvas;

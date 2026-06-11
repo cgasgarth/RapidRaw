@@ -305,6 +305,8 @@ const FilmstripThumbnail = memo(
   },
 );
 
+FilmstripThumbnail.displayName = 'FilmstripThumbnail';
+
 const FilmstripCell = ({
   columnIndex,
   style,
