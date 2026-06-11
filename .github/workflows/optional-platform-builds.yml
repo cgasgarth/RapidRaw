@@ -1,0 +1,76 @@
+name: Optional Platform Build Matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit SHA to build.
+        required: true
+        default: main
+      upload-artifacts:
+        description: Upload build artifacts from optional platform rows.
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  optional-platform-build:
+    name: optional build (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: windows-x64
+            platform: windows-latest
+            args: '--bundles nsis'
+            target: ''
+            mobile: ''
+            asset-prefix: 'optional-windows'
+          - label: windows-arm64
+            platform: windows-11-arm
+            args: '--bundles nsis'
+            target: aarch64-pc-windows-msvc
+            mobile: ''
+            asset-prefix: 'optional-windows'
+          - label: linux-22.04-x64
+            platform: ubuntu-22.04
+            args: ''
+            target: ''
+            mobile: ''
+            asset-prefix: 'optional-linux'
+          - label: linux-22.04-arm64
+            platform: ubuntu-22.04-arm
+            args: ''
+            target: ''
+            mobile: ''
+            asset-prefix: 'optional-linux'
+          - label: linux-24.04-x64
+            platform: ubuntu-24.04
+            args: ''
+            target: ''
+            mobile: ''
+            asset-prefix: 'optional-linux'
+          - label: linux-24.04-arm64
+            platform: ubuntu-24.04-arm
+            args: ''
+            target: ''
+            mobile: ''
+            asset-prefix: 'optional-linux'
+          - label: android-arm64
+            platform: ubuntu-latest
+            mobile: android
+            target: aarch64-linux-android
+            args: '--target aarch64'
+            asset-prefix: 'optional-android'
+    uses: ./.github/workflows/build.yml
+    with:
+      platform: ${{ matrix.platform }}
+      target: ${{ matrix.target }}
+      build-args: ${{ matrix.args }}
+      asset-prefix: ${{ matrix.asset-prefix }}
+      mobile: ${{ matrix.mobile }}
+      ref: ${{ inputs.ref }}
+      upload-artifacts: ${{ inputs.upload-artifacts }}
+    secrets: inherit
+    permissions:
+      contents: write

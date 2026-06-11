@@ -4248,7 +4248,8 @@ Issues:
 - Add stable aggregate PR required gate.
 - Require that aggregate gate in the active `Protect main` ruleset.
 - Add macOS app build as a required dependency of the aggregate gate.
-- Add matrix strategy for platform builds.
+- Add matrix strategy for platform builds. Current optional inherited platform
+  matrix: `docs/ci/optional-platform-build-matrix-2026-06-11.md`.
 - Add caching for Bun, Cargo, Tauri, and build artifacts. Current cache policy:
   `docs/ci/cache-policy-2026-06-11.md`.
 - Replace full PR package builds with a macOS no-bundle smoke path where practical, while keeping full package builds on `main` and release.
