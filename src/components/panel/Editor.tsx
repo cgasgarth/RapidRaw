@@ -914,7 +914,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         animateTransform(newPositionX, newPositionY, zoomTarget, clickAnimationTime);
       }
     },
-    [isCropping, isMasking, isAiEditing, isWbPickerActive, animateTransform],
+    [animateTransform, isPanningDisabled],
   );
 
   useEffect(() => {
@@ -925,7 +925,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     if (showOriginal) {
       setEditor({ showOriginal: false });
     }
-  }, [adjustments, setEditor]);
+  }, [adjustments, setEditor, showOriginal]);
 
   useEffect(() => {
     if (!isMasking && !isAiEditing) {
@@ -1375,7 +1375,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     }
 
     requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     overlayTriggerHash,
     requestMaskOverlay,
@@ -1383,6 +1382,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     activeMaskContainerId,
     activeAiPatchContainerId,
     imageRenderSize,
+    adjustments,
   ]);
 
   useEffect(() => {
@@ -1575,6 +1575,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     adjustments.crop,
     adjustments.orientationSteps,
     adjustments.rotation,
+    adjustments,
     liveRotation,
     isCropping,
     selectedImage,
@@ -1609,7 +1610,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       setCrop(pct);
       lastValidCropRef.current = pct;
     }
-  }, [isCropping, adjustments.crop, adjustments.orientationSteps, selectedImage, liveRotation]);
+  }, [isCropping, adjustments, adjustments.crop, adjustments.orientationSteps, selectedImage, liveRotation]);
 
   const handleCropChange = useCallback(
     (_pixelCrop: Crop, percentCrop: PercentCrop) => {

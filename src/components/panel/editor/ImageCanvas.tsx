@@ -1205,7 +1205,7 @@ const ImageCanvas = memo(
           setIsFadingIn(false);
         }
       }
-    }, [finalPreviewUrl, selectedImage.thumbnailUrl, isSliderDragging]);
+    }, [finalPreviewUrl, selectedImage.thumbnailUrl, isSliderDragging, displayState.base]);
 
     useEffect(() => {
       setBaseTool(brushSettings?.tool ?? ToolType.Brush);
@@ -1401,7 +1401,7 @@ const ImageCanvas = memo(
       const selectedMask = activeContainer.subMasks.find((m: SubMask) => m.id === activeId);
       const otherMasks = activeContainer.subMasks.filter((m: SubMask) => m.id !== activeId);
       return selectedMask ? [...otherMasks, selectedMask] : activeContainer.subMasks;
-    }, [activeContainer, activeMaskId, activeAiSubMaskId, isMasking, isAiEditing]);
+    }, [activeContainer, activeMaskId, activeAiSubMaskId, isMasking]);
 
     useEffect(() => {
       if (isCropping && uncroppedAdjustedPreviewUrl) {
@@ -2064,8 +2064,6 @@ const ImageCanvas = memo(
       activeSubMask,
       adjustments.crop,
       brushSettings,
-      imageRenderSize.scale,
-      isAiEditing,
       isBrushActive,
       activeLineFlow,
       isMasking,
@@ -2075,8 +2073,9 @@ const ImageCanvas = memo(
       effectiveImageDimensions,
       localInitialDrawParams,
       brushImageSpaceSize,
-      brushStageSize,
       baseTool,
+      imageRenderSize,
+      isAiSubjectActive,
     ]);
 
     const handleMouseEnter = useCallback(() => {
