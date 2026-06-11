@@ -8,12 +8,7 @@ import Slider from '../ui/Slider';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { listen } from '@tauri-apps/api/event';
-
-interface DenoiseBatchProgress {
-  current: number;
-  total: number;
-  path: string;
-}
+import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 
 interface DenoiseModalProps {
   isOpen: boolean;
@@ -250,8 +245,8 @@ export default function DenoiseModal({
   );
 
   useEffect(() => {
-    const unlisten = listen<DenoiseBatchProgress>('denoise-batch-progress', (event) => {
-      setBatchProgress(event.payload);
+    const unlisten = listen<unknown>('denoise-batch-progress', (event) => {
+      setBatchProgress(parsePathProgressPayload(event.payload));
     });
     return () => {
       unlisten.then((f) => f());

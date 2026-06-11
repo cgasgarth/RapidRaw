@@ -10,6 +10,7 @@ import clsx from 'clsx';
 import throttle from 'lodash.throttle';
 import Text from '../ui/Text';
 import { TextColors, TextVariants } from '../../types/typography';
+import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 
 interface NegativeParams {
   red_weight: number;
@@ -17,12 +18,6 @@ interface NegativeParams {
   blue_weight: number;
   contrast: number;
   exposure: number;
-}
-
-interface NegativeBatchProgress {
-  current: number;
-  total: number;
-  path: string;
 }
 
 const DEFAULT_PARAMS: NegativeParams = {
@@ -66,8 +61,9 @@ export default function NegativeConversionModal({
   const selectedImagePath = targetPaths.length > 0 ? targetPaths[0] : null;
 
   useEffect(() => {
-    const unlisten = listen<NegativeBatchProgress>('negative-batch-progress', (event) => {
-      setProgress(event.payload);
+    const unlisten = listen<unknown>('negative-batch-progress', (event) => {
+      const payload = parsePathProgressPayload(event.payload);
+      setProgress({ current: payload.current, total: payload.total });
     });
     return () => {
       unlisten.then((f) => f());
