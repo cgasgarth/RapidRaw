@@ -451,7 +451,10 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         with:
+          cache: false
           rustflags: ''
+          rust-src-dir: src-tauri
+          target: aarch64-apple-darwin
 
       - name: Rust cache
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -486,9 +489,6 @@ jobs:
 
       - name: Install frontend dependencies
         uses: ./.github/actions/setup-bun-deps
-
-      - name: Add macOS target
-        run: rustup target add aarch64-apple-darwin
 
       - id: tauri-build
         name: Build no-bundle app smoke
