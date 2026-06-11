@@ -17,6 +17,9 @@ const tsRecommended = tseslint.configs.recommended.map((config) =>
 
 module.exports = [
   {
+    linterOptions: {
+      reportUnusedDisableDirectives: 'error',
+    },
     ignores: [
       'dist/**',
       'node_modules/**',

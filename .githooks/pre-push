@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+while read -r local_ref _local_sha remote_ref _remote_sha; do
+  if [ "$local_ref" = "refs/heads/main" ] || [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "Direct pushes to main are blocked. Create a feature branch and open a PR." >&2
+    exit 1
+  fi
+done
+
+exit 0
