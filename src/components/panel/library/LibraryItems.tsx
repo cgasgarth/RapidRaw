@@ -1,12 +1,20 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { Image as ImageIcon, Folder, FolderOpen, Star as StarIcon, SlidersHorizontal } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
-import { ThumbnailAspectRatio, ImageFile, ExifOverlay } from '../../ui/AppProperties';
+import { ThumbnailAspectRatio, type ImageFile, ExifOverlay } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
-import { ColumnWidths } from '../MainLibrary';
+import type { ColumnWidths } from '../MainLibrary';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
@@ -16,6 +24,90 @@ interface ImageLayer {
   url: string;
   opacity: number;
 }
+
+type LibraryItemMouseEvent = ReactMouseEvent<HTMLElement>;
+type LibraryImageContextMenuHandler = (event: LibraryItemMouseEvent, path: string) => void;
+type LibraryImageClickHandler = (path: string, event: LibraryItemMouseEvent) => void;
+type LibraryImageDoubleClickHandler = (path: string) => void;
+type LibraryImageLoadHandler = (path: string) => void;
+
+interface LibraryItemBaseProps {
+  isActive: boolean;
+  isSelected: boolean;
+  onContextMenu: LibraryImageContextMenuHandler;
+  onImageClick: LibraryImageClickHandler;
+  onImageDoubleClick: LibraryImageDoubleClickHandler;
+  onLoad: LibraryImageLoadHandler;
+  path: string;
+  rating: number;
+  tags: ImageFile['tags'];
+  aspectRatio: ThumbnailAspectRatio;
+  exif: ImageFile['exif'];
+}
+
+interface ThumbnailComponentProps extends LibraryItemBaseProps {
+  isEdited: boolean;
+}
+
+interface ListItemComponentProps extends LibraryItemBaseProps {
+  modified: number;
+  columnWidths: ColumnWidths;
+}
+
+export interface LibraryHeaderRow {
+  type: 'header';
+  path: string;
+  count: number;
+  isExpanded: boolean;
+}
+
+export interface LibraryImagesRow {
+  type: 'images';
+  images: ImageFile[];
+  startIndex: number;
+}
+
+export interface LibraryFooterRow {
+  type: 'footer';
+}
+
+export type LibraryRow = LibraryHeaderRow | LibraryImagesRow | LibraryFooterRow;
+
+export interface LibraryRowProps {
+  index: number;
+  style: CSSProperties;
+  rows: LibraryRow[];
+  activePath: string | null;
+  multiSelectedSet: Set<string>;
+  onContextMenu: LibraryImageContextMenuHandler;
+  onImageClick: LibraryImageClickHandler;
+  onImageDoubleClick: LibraryImageDoubleClickHandler;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
+  onImageLoad: LibraryImageLoadHandler;
+  imageRatings?: Record<string, number> | null;
+  baseFolderPath: string | null;
+  itemWidth: number;
+  itemHeight: number;
+  outerPadding: number;
+  gap: number;
+  isListView: boolean;
+  columnWidths: ColumnWidths;
+  queueThumbnailRequest(path: string): void;
+  onToggleRecursiveFolder(path: string): void;
+}
+
+const getExifOverlayValues = (exif: ImageFile['exif']) => {
+  const fNumberValue = exif?.['FNumber'] ?? '';
+  let fNumber = fNumberValue ? String(fNumberValue) : '';
+  if (fNumber && !fNumber.toLowerCase().startsWith('f')) fNumber = `f/${fNumber}`;
+
+  return {
+    shutter: exif?.['ExposureTime'] ?? '',
+    fNumber,
+    iso: exif?.['PhotographicSensitivity'] ?? exif?.['ISOSpeedRatings'] ?? '',
+    focal: exif?.['FocalLengthIn35mmFilm'] ?? exif?.['FocalLength'] ?? '',
+  };
+};
 
 const ThumbnailComponent = ({
   isActive,
@@ -30,7 +122,7 @@ const ThumbnailComponent = ({
   aspectRatio: thumbnailAspectRatio,
   isEdited,
   exif,
-}: any) => {
+}: ThumbnailComponentProps) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
@@ -63,17 +155,7 @@ const ThumbnailComponent = ({
     };
   }, [path]);
 
-  const { shutter, fNumber, iso, focal } = useMemo(() => {
-    const e = exif || {};
-    let fNum = e.FNumber ? String(e.FNumber) : '';
-    if (fNum && !fNum.toLowerCase().startsWith('f')) fNum = `f/${fNum}`;
-    return {
-      shutter: e.ExposureTime || '',
-      fNumber: fNum,
-      iso: e.PhotographicSensitivity || e.ISOSpeedRatings || '',
-      focal: e.FocalLengthIn35mmFilm || e.FocalLength || '',
-    };
-  }, [exif]);
+  const { shutter, fNumber, iso, focal } = useMemo(() => getExifOverlayValues(exif), [exif]);
 
   useEffect(() => {
     if (data) {
@@ -131,7 +213,7 @@ const ThumbnailComponent = ({
       ? 'ring-2 ring-inset ring-gray-400'
       : 'group-hover:ring-2 group-hover:ring-inset group-hover:ring-hover-color';
 
-  const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
+  const colorTag = tags?.find((tag) => tag.startsWith('color:'))?.substring(6);
   const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
 
   const isAlways = exifOverlay === ExifOverlay.Always;
@@ -145,11 +227,11 @@ const ThumbnailComponent = ({
   return (
     <div
       className="aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative flex flex-col transition-all duration-150 transform-gpu [-webkit-mask-image:-webkit-radial-gradient(white,black)]"
-      onClick={(e: any) => {
+      onClick={(e) => {
         e.stopPropagation();
         onImageClick(path, e);
       }}
-      onContextMenu={(e: any) => onContextMenu(e, path)}
+      onContextMenu={(e) => onContextMenu(e, path)}
       onDoubleClick={() => onImageDoubleClick(path)}
     >
       <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
@@ -411,7 +493,7 @@ const ListItemComponent = ({
   aspectRatio: thumbnailAspectRatio,
   columnWidths,
   exif,
-}: any) => {
+}: ListItemComponentProps) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
@@ -442,17 +524,7 @@ const ListItemComponent = ({
     };
   }, [path]);
 
-  const { shutter, fNumber, iso, focal } = useMemo(() => {
-    const e = exif || {};
-    let fNum = e.FNumber ? String(e.FNumber) : '';
-    if (fNum && !fNum.toLowerCase().startsWith('f')) fNum = `f/${fNum}`;
-    return {
-      shutter: e.ExposureTime || '',
-      fNumber: fNum,
-      iso: e.PhotographicSensitivity || e.ISOSpeedRatings || '',
-      focal: e.FocalLengthIn35mmFilm || e.FocalLength || '',
-    };
-  }, [exif]);
+  const { shutter, fNumber, iso, focal } = useMemo(() => getExifOverlayValues(exif), [exif]);
 
   const showExifCols = exifOverlay !== ExifOverlay.Off;
   const totalBase =
@@ -514,7 +586,7 @@ const ListItemComponent = ({
     });
   }, []);
 
-  const colorTag = tags?.find((t: string) => t.startsWith('color:'))?.substring(6);
+  const colorTag = tags?.find((tag) => tag.startsWith('color:'))?.substring(6);
   const colorLabel = COLOR_LABELS.find((c: Color) => c.name === colorTag);
 
   const dateObj = new Date(modified > 1e11 ? modified : modified * 1000);
@@ -532,11 +604,11 @@ const ListItemComponent = ({
   return (
     <div
       className={`flex items-center w-full h-full border-b border-border-color/30 cursor-pointer transition-colors duration-150 ${stateClass}`}
-      onClick={(e: any) => {
+      onClick={(e) => {
         e.stopPropagation();
         onImageClick(path, e);
       }}
-      onContextMenu={(e: any) => onContextMenu(e, path)}
+      onContextMenu={(e) => onContextMenu(e, path)}
       onDoubleClick={() => onImageDoubleClick(path)}
     >
       <div
@@ -679,7 +751,7 @@ const RowComponent = ({
   columnWidths,
   queueThumbnailRequest,
   onToggleRecursiveFolder,
-}: any) => {
+}: LibraryRowProps) => {
   const { t } = useTranslation();
   const row = rows[index];
 
@@ -691,13 +763,16 @@ const RowComponent = ({
     }
   }, [row, queueThumbnailRequest]);
 
-  if (row.type === 'footer') return null;
-  const shiftedStyle = {
+  if (!row || row.type === 'footer') return null;
+
+  const shiftedTransform =
+    typeof style.transform === 'string'
+      ? style.transform.replace(/translateY\(([^)]+)\)/, (_match, y) => `translateY(${parseFloat(y) + outerPadding}px)`)
+      : style.transform;
+
+  const shiftedStyle: CSSProperties = {
     ...style,
-    transform: (style.transform as string).replace(
-      /translateY\(([^)]+)\)/,
-      (_: string, y: string) => `translateY(${parseFloat(y) + outerPadding}px)`,
-    ),
+    transform: shiftedTransform,
   };
 
   if (row.type === 'header') {
