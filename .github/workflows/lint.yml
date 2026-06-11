@@ -179,6 +179,18 @@ jobs:
       - name: Check unsafe casts
         run: bun run check:unsafe-casts
 
+  generated-type-drift:
+    name: 'types: generated artifact drift'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Check generated type drift
+        run: bun run check:generated-types
+
   docs-check:
     name: 'docs: markdown and links'
     runs-on: ubuntu-latest
@@ -514,6 +526,7 @@ jobs:
             "frontend: prettier baseline"
             "frontend: i18n lint baseline"
             "frontend: unsafe cast ban"
+            "types: generated artifact drift"
             "docs: markdown and links"
             "rust: fmt"
             "github actions: actionlint"
