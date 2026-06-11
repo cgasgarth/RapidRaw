@@ -278,6 +278,36 @@ jobs:
       - name: Validate pinned GitHub Action versions
         run: node scripts/check-github-action-pins.mjs
 
+  dependency-security-js:
+    name: 'security: JavaScript dependencies'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Audit JavaScript dependencies
+        run: bun run check:security:js
+
+  dependency-security-rust:
+    name: 'security: Rust dependencies'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
+        with:
+          rustflags: ''
+          rust-src-dir: src-tauri
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked --version 0.22.2
+
+      - name: Audit Rust dependencies
+        run: bun run check:security:rust
+
   rust-check:
     name: 'rust: cargo check macOS'
     runs-on: macos-14
@@ -531,6 +561,8 @@ jobs:
             "rust: fmt"
             "github actions: actionlint"
             "github actions: pinned versions"
+            "security: JavaScript dependencies"
+            "security: Rust dependencies"
             "rust: cargo check macOS"
             "rust: clippy baseline macOS"
           )

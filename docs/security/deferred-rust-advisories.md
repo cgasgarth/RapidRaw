@@ -10,6 +10,8 @@ Dependabot alert: #2
 Manifest: `src-tauri/Cargo.lock`
 Current vulnerable package: `glib 0.18.5`
 Patched version: `glib >= 0.20.0`
+Current audit handling: `bun run check:security:rust` ignores only `RUSTSEC-2024-0429`
+while keeping new RustSec advisories blocking.
 
 ### Reason For Deferral
 
@@ -58,7 +60,7 @@ This advisory is remediated only when all of the following are true:
 Revisit this deferral before any of the following:
 
 - Linux builds or Linux packaging become product-relevant again.
-- A blocking Rust vulnerability gate is enabled with `cargo audit`, `cargo deny`, or an equivalent tool.
+- Any additional Rust advisory needs an ignore entry.
 - Tauri/wry offers a narrow upgrade path that moves the Linux GTK/WebKit stack to `glib >= 0.20.0`.
 
 Candidate future investigation:
