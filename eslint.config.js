@@ -3,6 +3,8 @@ const tseslint = require('typescript-eslint');
 const react = require('eslint-plugin-react');
 const reactHooks = require('eslint-plugin-react-hooks');
 const jsxA11y = require('eslint-plugin-jsx-a11y');
+const importX = require('eslint-plugin-import-x');
+const boundaries = require('eslint-plugin-boundaries');
 const i18next = require('eslint-plugin-i18next');
 
 const tsFiles = ['**/*.{ts,tsx,mts}'];
@@ -36,6 +38,16 @@ const jsxA11yRecommended = {
   files: tsFiles,
 };
 
+const importXRecommended = {
+  ...importX.flatConfigs.recommended,
+  files: tsFiles,
+};
+
+const importXTypeScript = {
+  ...importX.flatConfigs.typescript,
+  files: tsFiles,
+};
+
 module.exports = [
   {
     linterOptions: {
@@ -56,11 +68,14 @@ module.exports = [
   reactJsxRuntime,
   reactHooksRecommended,
   jsxA11yRecommended,
+  importXRecommended,
+  importXTypeScript,
   {
     files: tsFiles,
     plugins: {
       react,
       'react-hooks': reactHooks,
+      boundaries,
       i18next,
     },
     languageOptions: {
@@ -80,6 +95,24 @@ module.exports = [
       react: {
         version: 'detect',
       },
+      'boundaries/elements': [
+        { type: 'entry', pattern: 'src/main.tsx' },
+        { type: 'app', pattern: 'src/App.tsx' },
+        { type: 'views', pattern: 'src/components/views/**' },
+        { type: 'panels', pattern: 'src/components/panel/**' },
+        { type: 'adjustments', pattern: 'src/components/adjustments/**' },
+        { type: 'modals', pattern: 'src/components/modals/**' },
+        { type: 'managers', pattern: 'src/components/managers/**' },
+        { type: 'ui', pattern: 'src/components/ui/**' },
+        { type: 'context', pattern: 'src/context/**' },
+        { type: 'hooks', pattern: 'src/hooks/**' },
+        { type: 'schemas', pattern: 'src/schemas/**' },
+        { type: 'store', pattern: 'src/store/**' },
+        { type: 'types', pattern: 'src/types/**' },
+        { type: 'utils', pattern: 'src/utils/**' },
+        { type: 'i18n', pattern: 'src/i18n/**' },
+        { type: 'window', pattern: 'src/window/**' },
+      ],
     },
     rules: {
       'no-unused-vars': 'off',
@@ -105,6 +138,18 @@ module.exports = [
       'jsx-a11y/click-events-have-key-events': 'off',
       'jsx-a11y/no-autofocus': 'off',
       'jsx-a11y/no-noninteractive-element-interactions': 'off',
+      'import-x/no-duplicates': 'error',
+      'import-x/no-self-import': 'error',
+      'import-x/no-useless-path-segments': ['error', { noUselessIndex: true }],
+      // Import order and boundary enforcement are enabled incrementally after
+      // the current module graph is measured and split into focused PRs.
+      'import-x/no-named-as-default': 'off',
+      'import-x/no-named-as-default-member': 'off',
+      'import-x/order': 'off',
+      'import-x/no-cycle': 'off',
+      'boundaries/element-types': 'off',
+      'boundaries/entry-point': 'off',
+      'boundaries/no-private': 'off',
       'no-restricted-imports': [
         'error',
         {

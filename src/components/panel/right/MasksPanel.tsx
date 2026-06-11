@@ -77,8 +77,14 @@ import {
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { OPTION_SEPARATOR, Orientation, Theme, type AppSettings, type Option } from '../../ui/AppProperties';
-import type { BrushSettings } from '../../ui/AppProperties';
+import {
+  OPTION_SEPARATOR,
+  Orientation,
+  Theme,
+  type AppSettings,
+  type BrushSettings,
+  type Option,
+} from '../../ui/AppProperties';
 import type { LucideIcon } from 'lucide-react';
 import { createSubMask } from '../../../utils/maskUtils';
 import { usePresets, type UserPreset } from '../../../hooks/usePresets';
