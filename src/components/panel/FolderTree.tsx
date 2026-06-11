@@ -443,7 +443,7 @@ export default function FolderTree({
   const [searchQuery, setSearchQuery] = useState('');
   const [isHovering, setIsHovering] = useState(false);
   const pinnedFolders = appSettings?.pinnedFolders || [];
-  const openSections = appSettings?.openTreeSections ?? ['current'];
+  const openSections = useMemo(() => appSettings?.openTreeSections ?? ['current'], [appSettings?.openTreeSections]);
   const showImageCounts = appSettings?.enableFolderImageCounts ?? false;
   const folderIcons = appSettings?.folderIcons || {};
 

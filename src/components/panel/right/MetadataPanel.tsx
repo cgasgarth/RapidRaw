@@ -257,7 +257,10 @@ export default function MetadataPanel() {
   const { handleRate, handleSetColorLabel, handleTagsChanged, handleUpdateExif } = useLibraryActions();
 
   const rating = selectedImage ? imageRatings[selectedImage.path] || 0 : 0;
-  const tags = selectedImage ? imageList.find((img) => img.path === selectedImage.path)?.tags || [] : [];
+  const tags = useMemo(
+    () => (selectedImage ? imageList.find((img) => img.path === selectedImage.path)?.tags || [] : []),
+    [imageList, selectedImage],
+  );
   const liveThumbnailUrl = selectedImage ? thumbnails[selectedImage.path] : undefined;
 
   const targetPaths = multiSelectedPaths?.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];

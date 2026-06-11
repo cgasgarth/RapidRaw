@@ -168,7 +168,7 @@ const KeybindRow = ({
     };
     window.addEventListener('keydown', handler, { capture: true });
     return () => window.removeEventListener('keydown', handler, { capture: true });
-  }, [recording, def.action, onSave, onStartRecording]);
+  }, [recording, def.action, onSave, onStartRecording, osPlatform]);
 
   const displayCombo = currentCombo !== undefined ? (currentCombo.length ? currentCombo : null) : def.defaultCombo;
 
@@ -522,7 +522,7 @@ export default function SettingsPanel({
   const [hasInteractedWithLivePreview, setHasInteractedWithLivePreview] = useState(false);
   const [recordingAction, setRecordingAction] = useState<string | null>(null);
 
-  const [aiProvider, setAiProvider] = useState(appSettings?.aiProvider || 'cpu');
+  const [aiProvider, setAiProvider] = useState<string>(appSettings?.aiProvider || 'cpu');
   const [aiConnectorAddress, setAiConnectorAddress] = useState<string>(appSettings?.aiConnectorAddress || '');
   const [newShortcut, setNewShortcut] = useState('');
   const [newAiTag, setNewAiTag] = useState('');
@@ -635,12 +635,10 @@ export default function SettingsPanel({
   const taggingShortcuts = Array.from(new Set<string>(appSettings?.taggingShortcuts || []));
 
   useEffect(() => {
-    if (appSettings?.aiConnectorAddress !== aiConnectorAddress) {
-      setAiConnectorAddress(appSettings?.aiConnectorAddress || '');
-    }
-    if (appSettings?.aiProvider !== aiProvider) {
-      setAiProvider(appSettings?.aiProvider || 'cpu');
-    }
+    setAiConnectorAddress((current) =>
+      appSettings?.aiConnectorAddress !== current ? appSettings?.aiConnectorAddress || '' : current,
+    );
+    setAiProvider((current) => (appSettings?.aiProvider !== current ? appSettings?.aiProvider || 'cpu' : current));
     setProcessingSettings({
       editorPreviewResolution: appSettings?.editorPreviewResolution || 1920,
       thumbnailResolution: appSettings?.thumbnailResolution || 720,

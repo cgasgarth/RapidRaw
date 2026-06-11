@@ -358,7 +358,7 @@ export default function LibraryGrid(props: any) {
     if (savedTop > 0) {
       element.scrollTop = savedTop;
     }
-  }, [listHandle, currentFolderPath]);
+  }, [listHandle, currentFolderPath, gridData]);
 
   const prevActivePath = useRef<string | null>(null);
 

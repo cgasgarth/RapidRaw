@@ -1734,7 +1734,7 @@ function SettingsPanel({
 
   useEffect(() => {
     if (container) setPrompt(container.prompt || '');
-  }, [container?.id]);
+  }, [container]);
 
   const isQuickErasePatch = displayContainer.subMasks?.some((sm: SubMask) => sm.type === Mask.QuickEraser);
 

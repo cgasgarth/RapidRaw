@@ -291,13 +291,17 @@ export default function ExportPanel({
   const isExporting = status === Status.Exporting;
   const isLibraryContext = !!onClose;
 
-  const pathsToExport = isLibraryContext
-    ? multiSelectedPaths
-    : multiSelectedPaths.length > 0
-      ? multiSelectedPaths
-      : selectedImage
-        ? [selectedImage.path]
-        : [];
+  const pathsToExport = useMemo(
+    () =>
+      isLibraryContext
+        ? multiSelectedPaths
+        : multiSelectedPaths.length > 0
+          ? multiSelectedPaths
+          : selectedImage
+            ? [selectedImage.path]
+            : [],
+    [isLibraryContext, multiSelectedPaths, selectedImage],
+  );
   const numImages = pathsToExport.length;
 
   useEffect(() => {

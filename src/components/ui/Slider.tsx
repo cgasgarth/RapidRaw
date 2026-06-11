@@ -46,6 +46,8 @@ const Slider = ({
 }: SliderProps) => {
   const { t } = useTranslation();
   const [displayValue, setDisplayValue] = useState<number>(value);
+  const displayValueRef = useRef<number>(value);
+  displayValueRef.current = displayValue;
   const [isDragging, setIsDragging] = useState(false);
   const animationFrameRef = useRef<number | undefined>(undefined);
   const [isEditing, setIsEditing] = useState(false);
@@ -234,7 +236,7 @@ const Slider = ({
       return;
     }
 
-    const startValue = displayValue;
+    const startValue = displayValueRef.current;
     const endValue = value;
     const duration = 300;
     let startTime: number | null = null;
