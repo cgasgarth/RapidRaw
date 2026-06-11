@@ -42,26 +42,26 @@ jobs:
     runs-on: ${{ inputs.platform }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6.0.3
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
           fetch-depth: 1
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         with:
           rustflags: ''
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2.9.1
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
           key: ${{ inputs.platform }}-${{ inputs.target }}-${{ inputs.mobile }}
           cache-on-failure: true
 
       - name: Cache ONNX Runtime library
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
             src-tauri/resources/libonnxruntime.dylib
@@ -95,18 +95,18 @@ jobs:
       # ------------- Android Setup -------------
       - name: Set up JDK
         if: inputs.mobile == 'android'
-        uses: actions/setup-java@v5.2.0
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Android SDK
         if: inputs.mobile == 'android'
-        uses: android-actions/setup-android@v4.0.1
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
 
       - name: Setup Android NDK
         if: inputs.mobile == 'android'
-        uses: nttld/setup-ndk@v1.6.0
+        uses: nttld/setup-ndk@ed92fe6cadad69be94a966a7ee3271275e62f779 # v1.6.0
         id: setup-ndk
         with:
           ndk-version: r26d
@@ -205,7 +205,7 @@ jobs:
 
       - name: Upload Android Artifacts
         if: ${{ inputs.upload-artifacts && inputs.mobile == 'android' && inputs.release-id == '' }}
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ inputs.asset-prefix }}_android${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
           path: |
@@ -217,7 +217,7 @@ jobs:
 
       - name: Upload Windows Artifacts
         if: ${{ inputs.upload-artifacts && startsWith(inputs.platform, 'windows') && inputs.release-id == '' && inputs.mobile == '' }}
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
           path: |
@@ -229,7 +229,7 @@ jobs:
 
       - name: Upload Linux/macOS Artifacts
         if: ${{ inputs.upload-artifacts && !startsWith(inputs.platform, 'windows') && inputs.release-id == '' && inputs.mobile == '' }}
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}${{ inputs.target && format('_{0}', inputs.target) || '' }}_artifacts
           path: |
