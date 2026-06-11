@@ -21,8 +21,8 @@ jobs:
 
       - uses: ./.github/actions/setup-bun-deps
 
-      - name: Build frontend
-        run: bun run build
+      - name: Build frontend and enforce bundle budget
+        run: bun run check:bundle
 
       - name: Check translation extraction
         run: bun run i18n:check
