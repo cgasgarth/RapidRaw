@@ -256,11 +256,22 @@ These are not product non-goals forever. They are constraints to keep early exec
 
 ### 2.1.1 Branch Protection Checklist
 
-Future branch protection should require:
+Current branch protection model:
+
+- GitHub ruleset `Protect main` is active for `refs/heads/main`.
+- Ruleset enforcement is active with no bypass actors.
+- Pull requests are required before merge.
+- Deletion and non-fast-forward updates are blocked.
+- Review thread resolution is required.
+- The stable required status check is `PR CI / required`.
+- Auto-merge is allowed, but only after the required gate passes.
+- Repository branch deletion after merge is enabled so merged PR branches do not accumulate.
+
+Branch protection should continue to require:
 
 - Pull request before merge.
 - Required status checks.
-- Stable required check names matching Section 10.
+- Stable required check names matching Section 10. Prefer one durable aggregate check over many volatile internal job names.
 - Branch up to date before merge.
 - Conversation resolution.
 - Linear history if the project chooses squash/rebase-only.
@@ -273,11 +284,15 @@ Future branch protection should require:
 
 Required check rollout:
 
-- Start with docs/plan checks for the first PR if no code exists yet.
-- Add baseline checks after RapidRAW is cloned.
-- Add strict checks after Milestone 1.
+- Use `PR CI / required` as the branch-protection check for ordinary PRs.
+- The aggregate gate must run with `if: always()` and fail if any blocking dependency fails, is cancelled, or is skipped unexpectedly.
+- Internal job names may change as CI is optimized, but the aggregate required check name should remain stable.
+- Add baseline checks under the aggregate gate after RapidRAW is cloned.
+- Add strict checks under the aggregate gate after Milestone 1.
 - Do not mark a check required until it exists and is stable.
 - Once a check is required, do not weaken it without a tracked issue and explicit rationale.
+- Do not use top-level `paths` filters on required workflows. Use always-starting workflows with job-level changed-file routing and an always-running aggregate gate.
+- Do not use workflow concurrency cancellation for PR or main validation unless project governance explicitly changes. Older runs should be allowed to complete.
 
 ### 2.1.2 Issue And PR Sizing Rules
 
@@ -364,6 +379,8 @@ An issue is done when:
   - `cargo test`
   - dependency/security checks
 - All GitHub Actions jobs should run in parallel where dependency ordering is not required.
+- Required PR status should flow through one stable aggregate gate, currently `PR CI / required`.
+- Main and PR workflows should not cancel older queued/running checks; speed work should reduce duplicate work, improve caching, or route jobs by changed files instead of cancelling evidence.
 - CI must fail on warnings for project-owned code.
 - CI should include full build coverage, not only linting.
 - Validation should be local-first:
@@ -4224,19 +4241,24 @@ Goal: make full builds reliable and parallelized.
 Issues:
 
 - Split GitHub Actions into fast validation, full build, image quality, performance, and release workflows.
-- Add macOS app build as required check.
+- Add stable aggregate PR required gate.
+- Require that aggregate gate in the active `Protect main` ruleset.
+- Add macOS app build as a required dependency of the aggregate gate.
 - Add matrix strategy for platform builds.
 - Add caching for Bun, Cargo, Tauri, and build artifacts.
-- Add build artifact upload for PRs.
+- Replace full PR package builds with a macOS no-bundle smoke path where practical, while keeping full package builds on `main` and release.
+- Wire reusable build `upload-artifacts` input so PRs can skip uploads when artifacts are not useful and main/release can keep evidence.
 - Add release workflow skeleton.
 - Add SBOM/checksum generation.
 - Add notarization/signing placeholder documentation.
 - Add failure artifact uploads.
+- Evaluate merge queue only after the aggregate required gate and main CI are stable.
 
 Definition of done:
 
 - PR validation jobs run in parallel.
-- macOS build is required and green.
+- `PR CI / required` exists, is enforced by the `Protect main` ruleset, blocks pending/failing PRs, and allows auto-merge only after success.
+- macOS build is required through the aggregate gate and green.
 - Non-required platform builds are clearly marked.
 - Release workflow can produce unsigned draft artifacts.
 

@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -227,3 +228,122 @@ jobs:
             echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
             echo "\`cargo clippy --all-targets --all-features -- -D warnings\` passed. Remove this temporary non-blocking wrapper when #287 is closed." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  pr-macos-app-build:
+    name: macOS app no-bundle smoke
+    if: github.event_name == 'pull_request'
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          rustflags: ''
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: pr-smoke-${{ runner.os }}-aarch64-apple-darwin
+          cache-on-failure: true
+
+      - name: Cache ONNX Runtime library
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/resources/libonnxruntime.dylib
+          key: ${{ runner.os }}-onnxruntime-aarch64-apple-darwin-${{ hashFiles('src-tauri/build.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-onnxruntime-aarch64-apple-darwin-
+
+      - name: Install frontend dependencies
+        uses: ./.github/actions/setup-bun-deps
+        with:
+          node-version: '22'
+
+      - name: Add macOS target
+        run: rustup target add aarch64-apple-darwin
+
+      - id: tauri-build
+        name: Build no-bundle app smoke
+        uses: tauri-apps/tauri-action@cf3eb9b18add8548a40584695215c80ab7274f31
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --verbose --ci --no-bundle --target aarch64-apple-darwin
+          retryAttempts: 3
+
+  pr-ci-required:
+    name: PR CI / required
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'pull_request'
+    timeout-minutes: 360
+    steps:
+      - name: Wait for required peer jobs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          required_jobs=(
+            "frontend: install, build, i18n check"
+            "frontend: bun install baseline"
+            "frontend: typecheck baseline"
+            "frontend: eslint baseline"
+            "frontend: prettier baseline"
+            "frontend: i18n lint baseline"
+            "rust: fmt"
+            "rust: cargo check macOS"
+            "rust: clippy baseline macOS"
+            "macOS app no-bundle smoke"
+          )
+
+          required_jobs_json="$(printf '%s\n' "${required_jobs[@]}" | jq -R . | jq -s .)"
+
+          echo "Waiting for required peer jobs:"
+          printf ' - %s\n' "${required_jobs[@]}"
+
+          while true; do
+            jobs_json="$(gh run view "$RUN_ID" --repo "$REPO" --json jobs --jq '.jobs')"
+
+            pending="$(
+              jq -r --argjson required "$required_jobs_json" '
+                $required[] as $name
+                | first(.[] | select(.name == $name)) as $job
+                | select($job == null or ($job.status != "completed"))
+                | if $job == null then "\($name)=missing" else "\($name)=\($job.status)" end
+              ' <<< "$jobs_json"
+            )"
+
+            if [[ -z "$pending" ]]; then
+              break
+            fi
+
+            echo "Still waiting on:"
+            echo "$pending"
+            sleep 30
+          done
+
+          failures="$(
+            jq -r --argjson required "$required_jobs_json" '
+              $required[] as $name
+              | first(.[] | select(.name == $name)) as $job
+              | select($job == null or $job.conclusion != "success")
+              | if $job == null then "\($name)=missing" else "\($name)=\($job.conclusion)" end
+            ' <<< "$jobs_json"
+          )"
+
+          if [[ -n "$failures" ]]; then
+            echo "Blocking PR because required jobs did not all succeed:"
+            echo "$failures"
+            exit 1
+          fi
+
+          echo "All required PR jobs succeeded."
