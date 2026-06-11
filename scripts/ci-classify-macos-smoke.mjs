@@ -26,6 +26,8 @@ const ALWAYS_REQUIRE_FILES = new Set([
 
 const SAFE_ROOT_FILES = new Set(['.gitignore', 'AGENTS.md', 'LICENSE', 'README.md', 'RAW_EDITOR_PLAN.md']);
 
+const SAFE_TOOLING_FILES = new Set(['eslint.config.js', 'i18next.config.ts']);
+
 const SAFE_FRONTEND_EXTENSIONS = new Set([
   '.css',
   '.d.ts',
@@ -51,6 +53,10 @@ function isSafeFrontendLeaf(path) {
   return (path.startsWith('src/') || path.startsWith('public/')) && hasExtension(path, SAFE_FRONTEND_EXTENSIONS);
 }
 
+function isSafeValidationScript(path) {
+  return path.startsWith('scripts/') && path.endsWith('.mjs');
+}
+
 function classifyPath(path) {
   if (ALWAYS_REQUIRE_FILES.has(path)) {
     return { required: true, reason: 'build configuration changed' };
@@ -70,12 +76,12 @@ function classifyPath(path) {
 
   if (
     SAFE_ROOT_FILES.has(path) ||
+    SAFE_TOOLING_FILES.has(path) ||
     isMarkdown(path) ||
     path.startsWith('docs/') ||
     path.startsWith('fixtures/docs/') ||
     isSafeFrontendLeaf(path) ||
-    path === 'scripts/check-unsafe-casts.mjs' ||
-    path === 'scripts/ci-classify-macos-smoke.mjs'
+    isSafeValidationScript(path)
   ) {
     return { required: false, reason: 'safe for frontend/docs validation gates' };
   }
@@ -166,6 +172,8 @@ function runSelfTest() {
   assertClassification('unknown paths require smoke', ['tools/new-helper.sh'], true);
   assertClassification('frontend leaf changes can skip smoke', ['src/components/panel/library/LibraryGrid.tsx'], false);
   assertClassification('public styles can skip smoke', ['public/theme.css'], false);
+  assertClassification('lint config changes can skip smoke', ['eslint.config.js'], false);
+  assertClassification('validation scripts can skip smoke', ['scripts/check-eslint-escape-hatches.mjs'], false);
   assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], false);
   assertClassification('mixed safe and required paths require smoke', ['README.md', 'src-tauri/Cargo.toml'], true);
   console.log('ci-classify-macos-smoke self-test passed');
