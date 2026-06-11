@@ -36,11 +36,14 @@ import { useAppNavigation } from './hooks/useAppNavigation';
 import { useEditorActions } from './hooks/useEditorActions';
 import { useLibraryActions } from './hooks/useLibraryActions';
 import { useProductivityActions } from './hooks/useProductivityActions';
+import { parseAiConnectorStatusPayload } from './schemas/tauriEventSchemas';
 
 import { useAppInitialization } from './hooks/useAppInitialization';
 import './i18n';
 
 import {
+  Album,
+  AlbumItem,
   Invokes,
   ImageFile,
   LibraryViewMode,
@@ -50,18 +53,57 @@ import {
   ThumbnailSize,
   ThumbnailAspectRatio,
 } from './components/ui/AppProperties';
+import type { FolderTree as FolderTreeNode } from './components/panel/FolderTree';
+import type { Adjustments } from './utils/adjustments';
+import type { ImageCacheEntry } from './utils/ImageLRUCache';
 
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
 
 const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
 
-const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[]): any => {
-  if (!node) return null;
+interface PreviousAdjustments {
+  adjustments: Adjustments;
+  path: string;
+}
 
+interface TransformController {
+  resetTransform(time?: number): void;
+  setTransform(x: number, y: number, scale: number, time?: number): void;
+  zoomIn(factor: number, time?: number): void;
+  zoomOut(factor: number, time?: number): void;
+}
+
+interface PreloadedAppData {
+  currentPath?: string;
+  images?: Promise<ImageFile[]> | undefined;
+  rootPaths?: string[];
+  trees?: Promise<FolderTreeNode[]> | undefined;
+}
+
+const findAlbumById = (nodes: AlbumItem[], albumId: string): Album | null => {
+  for (const node of nodes) {
+    if (node.type === 'album' && node.id === albumId) {
+      return node;
+    }
+
+    if (node.type === 'group') {
+      const found = findAlbumById(node.children, albumId);
+      if (found) return found;
+    }
+  }
+
+  return null;
+};
+
+const insertChildrenIntoTree = (
+  node: FolderTreeNode,
+  targetPath: string,
+  newChildren: FolderTreeNode[],
+): FolderTreeNode => {
   if (node.path === targetPath) {
-    const mergedChildren = newChildren.map((newChild: any) => {
-      const existingChild = node.children?.find((c: any) => c.path === newChild.path);
+    const mergedChildren = newChildren.map((newChild) => {
+      const existingChild = node.children.find((child) => child.path === newChild.path);
       if (existingChild && existingChild.children && existingChild.children.length > 0) {
         return { ...newChild, children: existingChild.children };
       }
@@ -73,7 +115,7 @@ const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[
   if (node.children && node.children.length > 0) {
     return {
       ...node,
-      children: node.children.map((child: any) => insertChildrenIntoTree(child, targetPath, newChildren)),
+      children: node.children.map((child) => insertChildrenIntoTree(child, targetPath, newChildren)),
     };
   }
 
@@ -158,7 +200,7 @@ function App() {
     selectedImagePathRef.current = selectedImage?.path ?? null;
   }, [selectedImage?.path]);
 
-  const prevAdjustmentsRef = useRef<any>(null);
+  const prevAdjustmentsRef = useRef<PreviousAdjustments | null>(null);
 
   const [viewportSize, setViewportSize] = useState<ImageDimensions>(() => {
     if (typeof window === 'undefined') {
@@ -175,7 +217,7 @@ function App() {
   const previewJobIdRef = useRef<number>(0);
   const latestRenderedJobIdRef = useRef<number>(0);
   const currentResRef = useRef<number>(1280);
-  const cachedEditStateRef = useRef<any | null>(null);
+  const cachedEditStateRef = useRef<ImageCacheEntry | null>(null);
 
   const [libraryViewMode, setLibraryViewMode] = useState<LibraryViewMode>(defaultLibraryViewMode);
   const [isResizing, setIsResizing] = useState(false);
@@ -184,13 +226,8 @@ function App() {
 
   const { requestThumbnails, clearThumbnailQueue, markGenerated } = useThumbnails();
 
-  const transformWrapperRef = useRef<any>(null);
-  const preloadedDataRef = useRef<{
-    trees?: Promise<any>;
-    images?: Promise<ImageFile[]>;
-    rootPaths?: string[];
-    currentPath?: string;
-  }>({});
+  const transformWrapperRef = useRef<TransformController | null>(null);
+  const preloadedDataRef = useRef<PreloadedAppData>({});
 
   useAppInitialization({
     preloadedDataRef,
@@ -289,17 +326,7 @@ function App() {
       if (currentFolderPath.startsWith('Album: ')) {
         const { activeAlbumId, albumTree } = useLibraryStore.getState();
         if (activeAlbumId) {
-          const findObj = (nodes: any[]): any => {
-            for (const n of nodes) {
-              if (n.id === activeAlbumId) return n;
-              if (n.type === 'group') {
-                const f = findObj(n.children);
-                if (f) return f;
-              }
-            }
-            return null;
-          };
-          const album = findObj(albumTree);
+          const album = findAlbumById(albumTree, activeAlbumId);
           if (album) await handleSelectAlbum(album.id, album.name, album.images, true);
         }
       } else {
@@ -436,8 +463,9 @@ function App() {
   }, [activeRightPanel, activeMaskContainerId, activeAiPatchContainerId, setEditor]);
 
   useEffect(() => {
-    const unlisten = listen('ai-connector-status-update', (event: any) => {
-      setEditor({ isAIConnectorConnected: event.payload.connected });
+    const unlisten = listen<unknown>('ai-connector-status-update', (event) => {
+      const payload = parseAiConnectorStatusPayload(event.payload);
+      setEditor({ isAIConnectorConnected: payload.connected });
     });
     invoke(Invokes.CheckAIConnectorStatus);
     const interval = setInterval(() => invoke(Invokes.CheckAIConnectorStatus), 10000);
@@ -518,7 +546,7 @@ function App() {
     checkFullscreen();
     const unlistenPromise = appWindow.onResized(checkFullscreen);
     return () => {
-      unlistenPromise.then((unlisten: any) => unlisten());
+      unlistenPromise.then((unlisten) => unlisten());
     };
   }, [setUI]);
 
@@ -545,12 +573,12 @@ function App() {
       if (!isExpanding) return;
       try {
         const showCounts = appSettings?.enableFolderImageCounts ?? false;
-        const newChildren: any[] = await invoke(Invokes.GetFolderChildren, {
+        const newChildren = await invoke<FolderTreeNode[]>(Invokes.GetFolderChildren, {
           path,
           showImageCounts: showCounts,
         });
         setLibrary((state) => ({
-          folderTrees: state.folderTrees.map((t: any) => insertChildrenIntoTree(t, path, newChildren)),
+          folderTrees: state.folderTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
         }));
         setLibrary((state) => ({
           pinnedFolderTrees: state.pinnedFolderTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
@@ -759,7 +787,7 @@ function App() {
 }
 
 const AppWrapper = () => (
-  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} routerPush={(to) => {}} routerReplace={(to) => {}}>
+  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} routerPush={(_to) => {}} routerReplace={(_to) => {}}>
     <ContextMenuProvider>
       <App />
       <GlobalTooltip />
