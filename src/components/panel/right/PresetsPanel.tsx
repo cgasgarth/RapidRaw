@@ -607,7 +607,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
   );
 
   const generateFolderPreviews = useCallback(
-    async (folderId: string) => {
+    (folderId: string) => {
       if (!selectedImage?.isReady) {
         return;
       }
@@ -628,7 +628,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     [selectedImage?.isReady, presets, enqueuePreviews],
   );
 
-  const generateRootPreviews = useCallback(async () => {
+  const generateRootPreviews = useCallback(() => {
     if (!selectedImage?.isReady) {
       return;
     }

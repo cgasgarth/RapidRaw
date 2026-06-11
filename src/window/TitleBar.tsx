@@ -29,7 +29,7 @@ export default function TitleBar() {
   const appWindow = getCurrentWindow();
 
   useEffect(() => {
-    const getPlatform = async () => {
+    const getPlatform = () => {
       try {
         const p = platform();
         setOsPlatform(p);
