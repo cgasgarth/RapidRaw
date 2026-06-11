@@ -6,6 +6,7 @@ import {
   useRef,
   useEffect,
   useMemo,
+  useCallback,
 } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2 } from 'lucide-react';
@@ -347,6 +348,7 @@ export default function CurveGraph({
   const localPointsRef = useRef<Array<Coord> | null>(null);
   const localParametricSettingsRef = useRef<ParametricCurveSettings | null>(null);
   const isParametricMode = curveMode === 'parametric';
+  const curvesRef = useRef(adjustments.curves);
 
   const parametricCurves: Record<ActiveChannel, ParametricCurveSettings> =
     adjustments?.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
@@ -359,6 +361,10 @@ export default function CurveGraph({
   useEffect(() => {
     setCurveMode(adjustments.curveMode || 'point');
   }, [adjustments.curveMode]);
+
+  useEffect(() => {
+    curvesRef.current = adjustments.curves;
+  }, [adjustments.curves]);
 
   const activeParametricSettings =
     (draggingSplitKey ? localParametricSettings : null) ?? parametricCurves[activeChannel];
@@ -392,25 +398,28 @@ export default function CurveGraph({
     });
   };
 
-  const updateParametricValue = (key: keyof ParametricCurveSettings, value: number) => {
-    setAdjustments((prev: CurveAdjustmentState) => {
-      const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
-      const updatedSettings = { ...pC[activeChannel], [key]: value };
-      const newPoints = buildParametricPoints(updatedSettings);
+  const updateParametricValue = useCallback(
+    (key: keyof ParametricCurveSettings, value: number) => {
+      setAdjustments((prev: CurveAdjustmentState) => {
+        const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
+        const updatedSettings = { ...pC[activeChannel], [key]: value };
+        const newPoints = buildParametricPoints(updatedSettings);
 
-      return {
-        ...prev,
-        parametricCurve: {
-          ...pC,
-          [activeChannel]: updatedSettings,
-        },
-        curves: {
-          ...prev.curves,
-          [activeChannel]: newPoints,
-        },
-      };
-    });
-  };
+        return {
+          ...prev,
+          parametricCurve: {
+            ...pC,
+            [activeChannel]: updatedSettings,
+          },
+          curves: {
+            ...prev.curves,
+            [activeChannel]: newPoints,
+          },
+        };
+      });
+    },
+    [activeChannel, setAdjustments],
+  );
 
   useEffect(() => {
     activeChannelRef.current = activeChannel;
@@ -473,7 +482,7 @@ export default function CurveGraph({
         const index = draggingIndexRef.current;
         const currentPoints =
           localPointsRef.current ||
-          adjustments.curves[activeChannelRef.current] ||
+          curvesRef.current[activeChannelRef.current] ||
           DEFAULT_POINT_CURVES[activeChannelRef.current];
         if (!currentPoints) return;
         if (index < 0 || index >= currentPoints.length) return;
@@ -539,7 +548,14 @@ export default function CurveGraph({
       window.removeEventListener('touchend', handleUp);
       window.removeEventListener('touchcancel', handleUp);
     };
-  }, [draggingPointIndex, draggingSplitKey, isParametricMode]);
+  }, [
+    draggingPointIndex,
+    draggingSplitKey,
+    isParametricMode,
+    onDragStateChange,
+    setAdjustments,
+    updateParametricValue,
+  ]);
 
   const isLightTheme = theme === Theme.Light || theme === Theme.Arctic;
   const histogramOpacity = isLightTheme ? 0.6 : 0.15;
