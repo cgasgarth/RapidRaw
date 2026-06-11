@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
-import ReactCrop from 'react-image-crop';
+import ReactCrop, { PercentCrop, Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
 import type { KonvaEventObject, Node as KonvaNode } from 'konva/lib/Node';
@@ -7,7 +7,6 @@ import type { Ellipse as KonvaEllipse } from 'konva/lib/shapes/Ellipse';
 import type { Transformer as KonvaTransformer } from 'konva/lib/shapes/Transformer';
 import type { Stage as KonvaStage } from 'konva/lib/Stage';
 import type { Vector2d } from 'konva/lib/types';
-import { PercentCrop, Crop } from 'react-image-crop';
 import { useTranslation } from 'react-i18next';
 import { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';

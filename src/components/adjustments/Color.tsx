@@ -4,8 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import Slider from '../ui/Slider';
 import ColorWheel from '../ui/ColorWheel';
-import { ColorAdjustment, ColorCalibration, HueSatLum, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
-import { Adjustments, ColorGrading } from '../../utils/adjustments';
+import {
+  Adjustments,
+  ColorAdjustment,
+  ColorCalibration,
+  ColorGrading,
+  HueSatLum,
+  INITIAL_ADJUSTMENTS,
+} from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
