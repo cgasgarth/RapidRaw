@@ -25,6 +25,7 @@ import { relaunch } from '@tauri-apps/plugin-process';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import clsx from 'clsx';
 import { Show, SignIn, useUser, useAuth, useClerk } from '@clerk/react';
+import type { TFunction } from 'i18next';
 import Button from '../ui/Button';
 import ConfirmModal from '../modals/ConfirmModal';
 import Dropdown, { OptionItem } from '../ui/Dropdown';
@@ -102,6 +103,8 @@ interface MyLens {
 }
 
 const EXECUTE_TIMEOUT = 3000;
+const translateDynamicKey = (translate: TFunction, key: string): string =>
+  String(translate(key, { defaultValue: key }));
 
 const adjustmentVisibilityDefaults = {
   sharpening: true,
@@ -171,7 +174,7 @@ const KeybindRow = ({
 
   return (
     <div className="flex justify-between items-center py-2">
-      <Text variant={TextVariants.label}>{t(def.description as any)}</Text>
+      <Text variant={TextVariants.label}>{translateDynamicKey(t, def.description)}</Text>
       <div className="flex items-center gap-1">
         {isConflicting && <span className="text-yellow-400 text-xs">⚠</span>}
         <button onClick={() => onStartRecording(def.action)} className="flex items-center gap-1 flex-wrap shrink-0">
@@ -1055,7 +1058,10 @@ export default function SettingsPanel({
                     <SettingItem label={t('settings.general.theme')} description={t('settings.general.themeDesc')}>
                       <Dropdown
                         onChange={(value: any) => onSettingsChange({ ...appSettings, theme: value })}
-                        options={THEMES.map((theme: ThemeProps) => ({ value: theme.id, label: t(theme.name as any) }))}
+                        options={THEMES.map((theme: ThemeProps) => ({
+                          value: theme.id,
+                          label: translateDynamicKey(t, theme.name),
+                        }))}
                         value={appSettings?.theme || DEFAULT_THEME_ID}
                         triggerClassName="bg-bg-primary"
                       />
@@ -2379,7 +2385,7 @@ export default function SettingsPanel({
                       const userKb = appSettings?.keybinds || {};
                       return (
                         <div key={section.id}>
-                          <Text variant={TextVariants.heading}>{t(section.label as any)}</Text>
+                          <Text variant={TextVariants.heading}>{translateDynamicKey(t, section.label)}</Text>
                           <div className="divide-y divide-border-color">
                             {sectionDefs.map((def) => (
                               <KeybindRow

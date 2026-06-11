@@ -136,6 +136,18 @@ jobs:
             echo "\`bun run i18n:lint\` passed. Remove this temporary non-blocking wrapper when #285 is closed." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  frontend-unsafe-casts:
+    name: 'frontend: unsafe cast ban'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Check unsafe casts
+        run: bun run check:unsafe-casts
+
   rust-fmt:
     name: 'rust: fmt'
     runs-on: ubuntu-latest
