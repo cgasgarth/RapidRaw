@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import { ExportPreset } from './ExportImportProperties';
 import { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
 import { ToolType } from '../panel/right/Masks';
@@ -157,7 +158,7 @@ export enum ThumbnailAspectRatio {
 export interface AppSettings {
   aiConnectorAddress?: string;
   aiProvider?: string;
-  decorations?: any;
+  decorations?: boolean;
   editorPreviewResolution?: number;
   enableZoomHifi?: boolean;
   useFullDpiRendering?: boolean;
@@ -166,8 +167,8 @@ export interface AppSettings {
   livePreviewQuality?: string;
   enableAiTagging?: boolean;
   filterCriteria?: FilterCriteria;
-  lastFolderState?: any;
-  pinnedFolders?: any;
+  lastFolderState?: PersistedFolderState | null;
+  pinnedFolders?: string[];
   lastRootPath: string | null;
   rootFolders?: string[];
   libraryViewMode?: LibraryViewMode;
@@ -182,7 +183,7 @@ export interface AppSettings {
   processingBackend?: string;
   linuxGpuOptimization?: boolean;
   exportPresets?: ExportPreset[];
-  myLenses?: any;
+  myLenses?: MyLens[];
   enableFolderImageCounts?: boolean;
   displayEditIcon?: boolean;
   linearRawMode?: string;
@@ -233,8 +234,31 @@ export interface FilterCriteria {
   editedStatus?: EditedStatus;
 }
 
+export interface PersistedFolderState {
+  activeAlbumId?: string | null;
+  currentFolderPath?: string | null;
+  expandedAlbumGroups?: string[];
+  expandedFolders?: string[];
+}
+
+export interface MyLens {
+  maker: string;
+  model: string;
+}
+
+export interface ExifData extends Record<string, string> {
+  DateTimeOriginal?: string;
+  ExposureTime?: string;
+  FNumber?: string;
+  FocalLengthIn35mmFilm?: string;
+  ISO?: string;
+  LensModel?: string;
+  Make?: string;
+  PhotographicSensitivity?: string;
+}
+
 export interface Folder {
-  children: any;
+  children: Preset[];
   id?: string | undefined;
   name?: string | undefined;
   imageCount?: number;
@@ -253,12 +277,14 @@ export interface ImageFile {
 export interface Option {
   color?: string;
   disabled?: boolean;
-  icon?: any;
+  customComponent?: unknown;
+  customProps?: unknown;
+  icon?: LucideIcon;
   isDestructive?: boolean;
   label?: string;
   onClick?: (() => void) | undefined;
   onRightClick?(): void;
-  submenu?: any;
+  submenu?: Option[];
   type?: string;
 }
 
@@ -285,11 +311,11 @@ export interface Progress {
 }
 
 export interface SelectedImage {
-  exif: any;
+  exif: ExifData | null;
   height: number;
   isRaw: boolean;
   isReady: boolean;
-  metadata?: any;
+  metadata?: unknown;
   original_base64?: string;
   originalUrl: string | null;
   path: string;
