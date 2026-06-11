@@ -9,10 +9,28 @@ import { Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
 import { Invokes, Panel } from '../components/ui/AppProperties';
 import { debouncedSave } from './useEditorActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { prepareAdjustmentPayloadForBackend } from '../schemas/adjustmentPayloadSchemas';
+
+interface PreviousAdjustments {
+  adjustments: Adjustments;
+  path: string;
+}
+
+interface TransformState {
+  positionX: number;
+  positionY: number;
+  scale: number;
+}
+
+interface TransformWrapperRefValue {
+  instance?: {
+    transformState?: TransformState | null;
+  };
+}
 
 export function useImageProcessing(
-  transformWrapperRef: any,
-  prevAdjustmentsRef: React.RefObject<any>,
+  transformWrapperRef: React.RefObject<TransformWrapperRefValue | null>,
+  prevAdjustmentsRef: React.RefObject<PreviousAdjustments | null>,
   renderRefs: {
     previewJobIdRef: React.RefObject<number>;
     latestRenderedJobIdRef: React.RefObject<number>;
@@ -63,7 +81,7 @@ export function useImageProcessing(
 
   const calculateROI = useCallback(() => {
     if (!transformWrapperRef.current) return null;
-    const state = transformWrapperRef.current.instance.transformState;
+    const state = transformWrapperRef.current.instance?.transformState;
     if (!state) return null;
 
     if (!baseRenderSize) return null;
@@ -122,50 +140,11 @@ export function useImageProcessing(
       const currentPath = selectedImage?.path;
       if (!currentPath) return;
 
-      const payload = structuredClone(currentAdjustments);
       const { patchesSentToBackend } = useEditorStore.getState();
-      const newlySentPatches = new Set<string>();
-
-      const processSubMasks = (subMasks: any[]) => {
-        if (!Array.isArray(subMasks)) return;
-        subMasks.forEach((sm: any) => {
-          if (sm.id && sm.parameters) {
-            const keys = ['mask_data_base64', 'maskDataBase64'];
-            let foundMaskData = false;
-
-            for (const key of keys) {
-              if (sm.parameters[key] !== undefined && sm.parameters[key] !== null) {
-                foundMaskData = true;
-                if (patchesSentToBackend.has(sm.id)) {
-                  sm.parameters[key] = null;
-                }
-              }
-            }
-            if (foundMaskData && !patchesSentToBackend.has(sm.id)) {
-              newlySentPatches.add(sm.id);
-            }
-          }
-        });
-      };
-
-      if (payload.aiPatches && Array.isArray(payload.aiPatches)) {
-        payload.aiPatches.forEach((p: any) => {
-          if (p.id && p.patchData && !p.isLoading) {
-            if (patchesSentToBackend.has(p.id)) {
-              p.patchData = null;
-            } else {
-              newlySentPatches.add(p.id);
-            }
-          }
-          if (p.subMasks) processSubMasks(p.subMasks);
-        });
-      }
-
-      if (payload.masks && Array.isArray(payload.masks)) {
-        payload.masks.forEach((container: any) => {
-          if (container.subMasks) processSubMasks(container.subMasks);
-        });
-      }
+      const { newlySentPatchIds, payload } = prepareAdjustmentPayloadForBackend(
+        structuredClone(currentAdjustments),
+        patchesSentToBackend,
+      );
 
       const jobId = ++previewJobIdRef.current;
       const roi = calculateROI();
@@ -180,8 +159,8 @@ export function useImageProcessing(
           activeWaveformChannel: activeWaveformChannelRef.current || null,
         });
 
-        if (newlySentPatches.size > 0) {
-          newlySentPatches.forEach((id) => patchesSentToBackend.add(id));
+        if (newlySentPatchIds.size > 0) {
+          newlySentPatchIds.forEach((id) => patchesSentToBackend.add(id));
         }
 
         if (currentPath !== selectedImagePathRef.current) return;
@@ -401,7 +380,6 @@ export function useImageProcessing(
     return () => {
       requestHiFiZoom.cancel();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     displaySize.width,
     displaySize.height,
@@ -439,7 +417,7 @@ export function useImageProcessing(
             for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
               if (includedKeys.includes(key as string)) {
                 if (JSON.stringify(adjustments[key]) !== JSON.stringify(prev.adjustments[key])) {
-                  (delta as any)[key] = adjustments[key];
+                  delta[key] = adjustments[key];
                 }
               }
             }
@@ -458,7 +436,6 @@ export function useImageProcessing(
     return () => {
       if (dragIdleTimer.current) clearTimeout(dragIdleTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     adjustments,
     selectedImage?.path,
@@ -485,7 +462,6 @@ export function useImageProcessing(
     return () => {
       requestHiFiOriginalZoom.cancel();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     showOriginal,
     displaySize.width,
