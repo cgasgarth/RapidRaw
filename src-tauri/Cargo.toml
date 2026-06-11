@@ -103,3 +103,8 @@ opt-level = 3
 codegen-units = 1
 lto = true
 strip = true
+
+[lints.rust]
+# The macOS objc::msg_send! macro expands through cfg(feature = "cargo-clippy").
+# Declare that upstream cfg value as expected so checked-cfg stays strict.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
