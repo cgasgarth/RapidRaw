@@ -303,3 +303,57 @@ jobs:
           retention-days: 7
           compression-level: 6
           if-no-files-found: warn
+
+      - name: Collect failure diagnostics
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          diagnostics_dir="$RUNNER_TEMP/failure-diagnostics"
+          mkdir -p "$diagnostics_dir"
+
+          {
+            echo "platform=${{ inputs.platform }}"
+            echo "target=${{ inputs.target }}"
+            echo "mobile=${{ inputs.mobile }}"
+            echo "ref=${{ inputs.ref }}"
+            echo "sha=$GITHUB_SHA"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+          } > "$diagnostics_dir/build-context.txt"
+
+          {
+            echo "## Disk"
+            df -h
+            echo
+            echo "## Workspace sizes"
+            du -sh dist src-tauri/target src-tauri/gen/android 2>/dev/null || true
+          } > "$diagnostics_dir/storage.txt"
+
+          {
+            echo "## Toolchain"
+            rustc --version || true
+            cargo --version || true
+            bun --version || true
+            node --version || true
+            npx tauri --version || true
+          } > "$diagnostics_dir/toolchain.txt"
+
+      - name: Upload failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ inputs.asset-prefix }}_${{ inputs.platform }}${{ inputs.target && format('_{0}', inputs.target) || '' }}${{ inputs.mobile && format('_{0}', inputs.mobile) || '' }}_failure_diagnostics
+          path: |
+            ${{ runner.temp }}/failure-diagnostics/**
+            dist/**
+            src-tauri/target/**/build/*/output
+            src-tauri/target/**/build/*/stderr
+            src-tauri/target/**/build/*/stdout
+            src-tauri/target/**/bundle/**/*.log
+            src-tauri/gen/android/app/build/reports/**
+            src-tauri/gen/android/app/build/outputs/logs/**
+          retention-days: 7
+          compression-level: 6
+          if-no-files-found: warn

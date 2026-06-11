@@ -353,6 +353,56 @@ jobs:
           args: --verbose --ci --no-bundle --target aarch64-apple-darwin
           retryAttempts: 3
 
+      - name: Collect smoke failure diagnostics
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          diagnostics_dir="$RUNNER_TEMP/failure-diagnostics"
+          mkdir -p "$diagnostics_dir"
+
+          {
+            echo "job=macOS app no-bundle smoke"
+            echo "target=aarch64-apple-darwin"
+            echo "sha=$GITHUB_SHA"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+          } > "$diagnostics_dir/build-context.txt"
+
+          {
+            echo "## Disk"
+            df -h
+            echo
+            echo "## Workspace sizes"
+            du -sh dist src-tauri/target 2>/dev/null || true
+          } > "$diagnostics_dir/storage.txt"
+
+          {
+            echo "## Toolchain"
+            rustc --version || true
+            cargo --version || true
+            bun --version || true
+            node --version || true
+            npx tauri --version || true
+          } > "$diagnostics_dir/toolchain.txt"
+
+      - name: Upload smoke failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr_macos_smoke_failure_diagnostics
+          path: |
+            ${{ runner.temp }}/failure-diagnostics/**
+            dist/**
+            src-tauri/target/**/build/*/output
+            src-tauri/target/**/build/*/stderr
+            src-tauri/target/**/build/*/stdout
+            src-tauri/target/**/bundle/**/*.log
+          retention-days: 7
+          compression-level: 6
+          if-no-files-found: warn
+
   pr-ci-required:
     name: PR CI / required
     runs-on: ubuntu-latest
