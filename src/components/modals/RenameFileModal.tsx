@@ -8,8 +8,8 @@ import { useManagedFocus } from '../../hooks/useManagedFocus';
 interface RenameFileModalProps {
   filesToRename: Array<string>;
   isOpen: boolean;
-  onClose(): void;
-  onSave(template: string): void;
+  onClose: () => void;
+  onSave: (template: string) => void;
 }
 
 export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave }: RenameFileModalProps) {

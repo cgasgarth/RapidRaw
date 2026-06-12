@@ -13,10 +13,10 @@ interface PanoramaModalProps {
   isOpen: boolean;
   isProcessing: boolean;
   loadingImageUrl?: string | null;
-  onClose(): void;
-  onOpenFile(path: string): void;
-  onSave(): Promise<string>;
-  onStitch(): void;
+  onClose: () => void;
+  onOpenFile: (path: string) => void;
+  onSave: () => Promise<string>;
+  onStitch: () => void;
   progressMessage: string | null;
 }
 

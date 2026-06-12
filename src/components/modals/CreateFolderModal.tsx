@@ -6,8 +6,8 @@ import { useManagedFocus } from '../../hooks/useManagedFocus';
 
 interface FolderModalProps {
   isOpen: boolean;
-  onClose(): void;
-  onSave(name: string): void;
+  onClose: () => void;
+  onSave: (name: string) => void;
   title?: string;
   placeholder?: string;
   buttonText?: string;
