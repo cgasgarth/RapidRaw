@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Adjustments, INITIAL_ADJUSTMENTS, MaskContainer } from '../utils/adjustments';
+import { Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, MaskContainer } from '../utils/adjustments';
 import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
 import { ChannelConfig } from '../components/adjustments/Curves';
 import { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
@@ -39,7 +39,7 @@ interface EditorState {
   histogram: ChannelConfig | null;
   waveform: WaveformData | null;
   isWaveformVisible: boolean;
-  activeWaveformChannel: string;
+  activeWaveformChannel: DisplayMode;
   waveformHeight: number;
 
   // Interaction State
@@ -97,7 +97,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   histogram: null,
   waveform: null,
   isWaveformVisible: false,
-  activeWaveformChannel: 'luma',
+  activeWaveformChannel: DisplayMode.Luma,
   waveformHeight: 220,
 
   isSliderDragging: false,

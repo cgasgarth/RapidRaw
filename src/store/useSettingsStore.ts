@@ -1,19 +1,19 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { platform } from '@tauri-apps/plugin-os';
-import { AppSettings, SupportedTypes, Invokes } from '../components/ui/AppProperties';
+import { AppSettings, SupportedTypes, Invokes, Theme } from '../components/ui/AppProperties';
 import { DEFAULT_THEME_ID } from '../utils/themes';
 
 interface SettingsState {
   appSettings: AppSettings | null;
-  theme: string;
+  theme: Theme;
   supportedTypes: SupportedTypes | null;
   osPlatform: string;
 
   // Actions
   initPlatform: () => void;
   setAppSettings: (settings: AppSettings | null) => void;
-  setTheme: (theme: string) => void;
+  setTheme: (theme: Theme) => void;
   setSupportedTypes: (types: SupportedTypes | null) => void;
   handleSettingsChange: (newSettings: AppSettings) => Promise<void>;
 }

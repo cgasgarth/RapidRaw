@@ -347,7 +347,7 @@ export default function Controls() {
               <Waveform
                 waveformData={waveform || null}
                 histogram={histogram}
-                displayMode={activeWaveformChannel || 'luma'}
+                displayMode={activeWaveformChannel}
                 setDisplayMode={setActiveWaveformChannel}
                 showClipping={adjustments.showClipping || false}
                 onToggleClipping={() => {
