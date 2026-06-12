@@ -105,7 +105,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
       }
     };
 
-    fetchPresets();
+    void fetchPresets();
 
     return () => {
       Object.values(previewsRef.current).forEach((url) => {
@@ -140,7 +140,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
       }
     };
 
-    setupPreviewImages();
+    void setupPreviewImages();
   }, [imageList, currentFolderPath, fetchDefaultPreviewImage]);
 
   useEffect(() => {
@@ -177,7 +177,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
       }
     };
 
-    generateAllPreviews();
+    void generateAllPreviews();
   }, [presets, previewImagePaths]);
 
   const handleDownloadPreset = async (preset: CommunityPreset) => {
