@@ -9,6 +9,7 @@ import { Invokes } from '../components/ui/AppProperties';
 import { useAuth } from '@clerk/react';
 import { parseAiPatchDataJson } from '../schemas/aiMaskingSchemas';
 import { formatUnknownError } from '../utils/errorFormatting';
+import { mergeMaskParameters } from '../utils/maskParameterAccess';
 
 type SubMaskParameters = Record<string, unknown>;
 
@@ -273,7 +274,7 @@ export function useAiMasking() {
       const subMask = adjustments.aiPatches
         .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
-      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
+      const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
@@ -307,7 +308,7 @@ export function useAiMasking() {
       const subMask = adjustments.aiPatches
         .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
-      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
+      const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
@@ -335,7 +336,7 @@ export function useAiMasking() {
       const subMask = adjustments.aiPatches
         .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
-      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
+      const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
@@ -363,7 +364,7 @@ export function useAiMasking() {
       const subMask = adjustments.aiPatches
         .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
-      const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
+      const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {

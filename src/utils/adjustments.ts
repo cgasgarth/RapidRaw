@@ -1,6 +1,7 @@
 import { Crop } from 'react-image-crop';
 import { v4 as uuidv4 } from 'uuid';
 import { Mask, SubMask, SubMaskMode } from '../components/panel/right/Masks';
+import { toMaskParameterRecord } from './maskParameterAccess';
 
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | Array<JsonValue>;
@@ -608,7 +609,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
       type: subMask.type ?? Mask.Brush,
       visible: subMask.visible ?? true,
       ...(subMask.name !== undefined ? { name: subMask.name } : {}),
-      ...(subMask.parameters !== undefined ? { parameters: subMask.parameters } : {}),
+      ...(subMask.parameters !== undefined ? { parameters: toMaskParameterRecord(subMask.parameters) } : {}),
     }));
   };
 
