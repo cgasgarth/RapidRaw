@@ -361,7 +361,7 @@ export default function CurveGraph({
   const curvesRef = useRef(adjustments.curves);
 
   const parametricCurves: Record<ActiveChannel, ParametricCurveSettings> =
-    adjustments?.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
+    adjustments.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
   const parametricCurvesRef = useRef(parametricCurves);
 
   useEffect(() => {
@@ -444,7 +444,7 @@ export default function CurveGraph({
       setLocalPoints(null);
       localPointsRef.current = null;
     }
-  }, [adjustments?.curves?.[activeChannel], draggingPointIndex]);
+  }, [adjustments.curves[activeChannel], draggingPointIndex]);
 
   useEffect(() => {
     const isDragging = draggingPointIndex !== null || draggingSplitKey !== null;
@@ -474,7 +474,7 @@ export default function CurveGraph({
           nextValue = Math.max(10, Math.min(nextValue, currentSettings.split2 - minGap));
         } else if (draggingSplitKey === 'split2') {
           nextValue = Math.max(currentSettings.split1 + minGap, Math.min(nextValue, currentSettings.split3 - minGap));
-        } else if (draggingSplitKey === 'split3') {
+        } else {
           nextValue = Math.max(currentSettings.split2 + minGap, Math.min(nextValue, 90));
         }
 
@@ -490,11 +490,7 @@ export default function CurveGraph({
 
       if (!isParametricMode && draggingIndexRef.current !== null) {
         const index = draggingIndexRef.current;
-        const currentPoints =
-          localPointsRef.current ||
-          curvesRef.current[activeChannelRef.current] ||
-          DEFAULT_POINT_CURVES[activeChannelRef.current];
-        if (!currentPoints) return;
+        const currentPoints = localPointsRef.current || curvesRef.current[activeChannelRef.current];
         if (index < 0 || index >= currentPoints.length) return;
 
         const svg = svgRef.current;
@@ -572,17 +568,17 @@ export default function CurveGraph({
 
   const channelConfig: ChannelConfig = useMemo(
     () => ({
-      luma: { color: 'var(--color-accent)', data: histogram?.luma?.data },
-      red: { color: '#FF6B6B', data: histogram?.red?.data },
-      green: { color: '#6BCB77', data: histogram?.green?.data },
-      blue: { color: '#4D96FF', data: histogram?.blue?.data },
+      luma: { color: 'var(--color-accent)', data: histogram?.luma.data },
+      red: { color: '#FF6B6B', data: histogram?.red.data },
+      green: { color: '#6BCB77', data: histogram?.green.data },
+      blue: { color: '#4D96FF', data: histogram?.blue.data },
     }),
     [histogram],
   );
 
   const activePoints = isParametricMode
     ? buildParametricPoints(activeParametricSettings)
-    : (localPoints ?? adjustments.curves[activeChannel] ?? DEFAULT_POINT_CURVES[activeChannel]);
+    : (localPoints ?? adjustments.curves[activeChannel]);
 
   const { color, data: histogramData } = channelConfig[activeChannel];
 
@@ -830,7 +826,7 @@ export default function CurveGraph({
       ActiveChannel.Red,
       ActiveChannel.Green,
       ActiveChannel.Blue,
-    ].some((channel) => channel !== activeChannel && !isDefaultCurve(adjustments.curves?.[channel]));
+    ].some((channel) => channel !== activeChannel && !isDefaultCurve(adjustments.curves[channel]));
 
     const options = [
       {
@@ -877,18 +873,6 @@ export default function CurveGraph({
     ],
     [activeParametricSettings.split1, activeParametricSettings.split2, activeParametricSettings.split3],
   );
-
-  if (!activePoints) {
-    return (
-      <Text
-        as="div"
-        variant={TextVariants.small}
-        className="w-full aspect-square bg-surface-secondary p-1 rounded-md flex items-center justify-center"
-      >
-        {t('adjustments.curves.curveDataUnavailable')}
-      </Text>
-    );
-  }
 
   return (
     <div className="select-none touch-none" ref={containerRef}>

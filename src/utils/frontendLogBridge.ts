@@ -82,7 +82,7 @@ function formatViteErrorDetails(value: Record<string, unknown>): string {
     const file = getRecordField<string>(loc, 'file');
     const line = getRecordField<number>(loc, 'line');
     const column = getRecordField<number>(loc, 'column');
-    const locParts = [file, line, column].filter((part) => part !== undefined && part !== null);
+    const locParts = [file, line, column].filter((part) => part !== undefined);
     if (locParts.length > 0) {
       lines.push(`[vite:error] loc: ${locParts.join(':')}`);
     }

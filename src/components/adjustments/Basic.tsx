@@ -214,7 +214,7 @@ export default function BasicAdjustments({
         />
       ) : (
         <ToneMapperSwitch
-          selectedMapper={adjustments.toneMapper || 'agx'}
+          selectedMapper={adjustments.toneMapper}
           onMapperChange={handleToneMapperChange}
           evShiftValue={adjustments.exposure}
           onEvShiftChange={(value) => {
