@@ -273,12 +273,6 @@ const Slider = ({
   }, [value, isDragging]);
 
   useEffect(() => {
-    if (!isEditing) {
-      setInputValue(String(value));
-    }
-  }, [value, isEditing]);
-
-  useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
@@ -418,6 +412,7 @@ const Slider = ({
       return;
     }
 
+    setInputValue(String(value));
     setIsEditing(true);
   };
 
