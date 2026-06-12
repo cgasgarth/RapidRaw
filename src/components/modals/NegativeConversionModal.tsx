@@ -480,7 +480,12 @@ export default function NegativeConversionModal({
               >
                 {t('modals.negativeConversion.cancel')}
               </button>
-              <Button onClick={handleSave} disabled={isSaving || isLoading || !previewUrl}>
+              <Button
+                onClick={() => {
+                  void handleSave();
+                }}
+                disabled={isSaving || isLoading || !previewUrl}
+              >
                 {isSaving ? (
                   <>
                     <Loader2 className="animate-spin mr-2" size={16} />

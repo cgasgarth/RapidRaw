@@ -251,7 +251,13 @@ export default function CullingModal({
         >
           {t('modals.culling.cancel')}
         </button>
-        <Button onClick={handleStartCulling}>{t('modals.culling.startCulling')}</Button>
+        <Button
+          onClick={() => {
+            void handleStartCulling();
+          }}
+        >
+          {t('modals.culling.startCulling')}
+        </Button>
       </div>
     </>
   );
