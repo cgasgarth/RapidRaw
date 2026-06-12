@@ -204,6 +204,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
   const isGeneratingOverlayRef = useRef(false);
   const pendingOverlayRequestRef = useRef<MaskOverlayRequest | null>(null);
+  const processOverlayQueueRef = useRef<() => Promise<void>>(async () => {});
   const animationFrameId = useRef<number | null>(null);
   const physicsFrameId = useRef<number | null>(null);
   const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -1115,11 +1116,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       isGeneratingOverlayRef.current = false;
       requestAnimationFrame(() => {
         if (pendingOverlayRequestRef.current) {
-          void processOverlayQueue();
+          void processOverlayQueueRef.current();
         }
       });
     }
   }, []);
+  processOverlayQueueRef.current = processOverlayQueue;
 
   const requestMaskOverlay = useCallback(
     (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentAdjustments: Adjustments) => {

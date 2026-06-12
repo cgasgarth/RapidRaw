@@ -129,7 +129,7 @@ module.exports = [
       'react-hooks/refs': 'off',
       'react-hooks/static-components': 'error',
       'react-hooks/immutability': 'off',
-      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/preserve-manual-memoization': 'error',
       'react-hooks/purity': 'error',
       'react/prop-types': 'off',
       // Accessibility lint is enabled, but legacy interactive element patterns

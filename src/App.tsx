@@ -638,6 +638,8 @@ function App() {
     [setRightPanel, setEditor],
   );
 
+  const enableFolderImageCounts = appSettings?.enableFolderImageCounts ?? false;
+
   const handleToggleFolder = useCallback(
     async (path: string) => {
       const isExpanding = !expandedFolders.has(path);
@@ -652,10 +654,9 @@ function App() {
       });
       if (!isExpanding) return;
       try {
-        const showCounts = appSettings?.enableFolderImageCounts ?? false;
         const newChildren = await invoke<FolderTreeNode[]>(Invokes.GetFolderChildren, {
           path,
-          showImageCounts: showCounts,
+          showImageCounts: enableFolderImageCounts,
         });
         setLibrary((state) => ({
           folderTrees: state.folderTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
@@ -668,7 +669,7 @@ function App() {
         toast.error(`Failed to load folder: ${message}`);
       }
     },
-    [expandedFolders, appSettings?.enableFolderImageCounts, setLibrary],
+    [expandedFolders, enableFolderImageCounts, setLibrary],
   );
 
   const hasRoots = rootPaths.length > 0;
