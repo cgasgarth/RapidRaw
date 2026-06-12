@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import type { i18n as I18n } from 'i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { useShallow } from 'zustand/react/shallow';
@@ -153,6 +153,14 @@ export const useAppInitialization = ({
   const isAndroid = osPlatform === 'android';
   const defaultThumbnailSize = isAndroid ? ThumbnailSize.Small : ThumbnailSize.Medium;
   const defaultLibraryViewMode = isAndroid ? LibraryViewMode.Recursive : LibraryViewMode.Flat;
+  const persistSettings = useCallback(
+    (settings: AppSettings) => {
+      void handleSettingsChange(settings).catch((err: unknown) => {
+        console.error('Failed to persist settings:', err);
+      });
+    },
+    [handleSettingsChange],
+  );
 
   useEffect(() => {
     initPlatform();
@@ -181,11 +189,11 @@ export const useAppInitialization = ({
 
         if (!settings.language) {
           settings.language = getDefaultLanguage(i18n);
-          handleSettingsChange(settings);
+          await handleSettingsChange(settings);
         }
 
         setAppSettings(settings);
-        i18n.changeLanguage(settings.language);
+        await i18n.changeLanguage(settings.language);
 
         if (settings.sortCriteria) setSortCriteria(settings.sortCriteria);
 
@@ -300,49 +308,51 @@ export const useAppInitialization = ({
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
     if (JSON.stringify(appSettings.uiVisibility) !== JSON.stringify(uiVisibility)) {
-      handleSettingsChange({ ...appSettings, uiVisibility });
+      persistSettings({ ...appSettings, uiVisibility });
     }
-  }, [uiVisibility, appSettings, handleSettingsChange]);
+  }, [uiVisibility, appSettings, persistSettings]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
     if (appSettings.thumbnailSize !== thumbnailSize) {
-      handleSettingsChange({ ...appSettings, thumbnailSize });
+      persistSettings({ ...appSettings, thumbnailSize });
     }
-  }, [thumbnailSize, appSettings, handleSettingsChange]);
+  }, [thumbnailSize, appSettings, persistSettings]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
     if (appSettings.thumbnailAspectRatio !== thumbnailAspectRatio) {
-      handleSettingsChange({ ...appSettings, thumbnailAspectRatio });
+      persistSettings({ ...appSettings, thumbnailAspectRatio });
     }
-  }, [thumbnailAspectRatio, appSettings, handleSettingsChange]);
+  }, [thumbnailAspectRatio, appSettings, persistSettings]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
     if (appSettings.libraryViewMode !== libraryViewMode) {
-      handleSettingsChange({ ...appSettings, libraryViewMode });
+      persistSettings({ ...appSettings, libraryViewMode });
     }
-  }, [libraryViewMode, appSettings, handleSettingsChange]);
+  }, [libraryViewMode, appSettings, persistSettings]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
     if (JSON.stringify(appSettings.sortCriteria) !== JSON.stringify(sortCriteria)) {
-      handleSettingsChange({ ...appSettings, sortCriteria });
+      persistSettings({ ...appSettings, sortCriteria });
     }
-  }, [sortCriteria, appSettings, handleSettingsChange]);
+  }, [sortCriteria, appSettings, persistSettings]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
     if (JSON.stringify(appSettings.filterCriteria) !== JSON.stringify(filterCriteria)) {
-      handleSettingsChange({ ...appSettings, filterCriteria });
+      persistSettings({ ...appSettings, filterCriteria });
     }
-  }, [filterCriteria, appSettings, handleSettingsChange]);
+  }, [filterCriteria, appSettings, persistSettings]);
 
   useEffect(() => {
     if (isInitialMount.current || !appSettings) return;
     if (appSettings.language && appSettings.language !== i18n.language) {
-      i18n.changeLanguage(appSettings.language);
+      void i18n.changeLanguage(appSettings.language).catch((err: unknown) => {
+        console.error('Failed to change language:', err);
+      });
     }
   }, [appSettings, i18n]);
 
@@ -367,7 +377,7 @@ export const useAppInitialization = ({
       JSON.stringify(prevFolderState.expandedAlbumGroups || []) !== JSON.stringify(currentExpandedAlbums);
 
     if (pathChanged || expandedChanged || albumChanged || albumExpandedChanged) {
-      handleSettingsChange({
+      persistSettings({
         ...appSettings,
         lastFolderState: {
           currentFolderPath,
@@ -377,7 +387,7 @@ export const useAppInitialization = ({
         },
       });
     }
-  }, [currentFolderPath, expandedFolders, activeAlbumId, expandedAlbumGroups, appSettings, handleSettingsChange]);
+  }, [currentFolderPath, expandedFolders, activeAlbumId, expandedAlbumGroups, appSettings, persistSettings]);
 
   useEffect(() => {
     const root = document.documentElement;
