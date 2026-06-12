@@ -88,7 +88,7 @@ export const useKeyboardShortcuts = ({
         shouldFire: () => true,
         execute: (e) => {
           e.preventDefault();
-          handleCopyAdjustments();
+          void handleCopyAdjustments();
         },
       },
       paste_adjustments: {
@@ -360,7 +360,9 @@ export const useKeyboardShortcuts = ({
             [ExifOverlay.Hover]: ExifOverlay.Always,
             [ExifOverlay.Always]: ExifOverlay.Off,
           }[current];
-          s.settings.handleSettingsChange({ ...appSettings, exifOverlay: nextState });
+          void s.settings.handleSettingsChange({ ...appSettings, exifOverlay: nextState }).catch((err: unknown) => {
+            console.error('Failed to persist EXIF overlay setting:', err);
+          });
         },
       },
       toggle_crop: {
@@ -421,42 +423,42 @@ export const useKeyboardShortcuts = ({
         shouldFire: () => true,
         execute: (e) => {
           e.preventDefault();
-          handleSetColorLabel(null);
+          void handleSetColorLabel(null);
         },
       },
       color_label_red: {
         shouldFire: () => true,
         execute: (e) => {
           e.preventDefault();
-          handleSetColorLabel('red');
+          void handleSetColorLabel('red');
         },
       },
       color_label_yellow: {
         shouldFire: () => true,
         execute: (e) => {
           e.preventDefault();
-          handleSetColorLabel('yellow');
+          void handleSetColorLabel('yellow');
         },
       },
       color_label_green: {
         shouldFire: () => true,
         execute: (e) => {
           e.preventDefault();
-          handleSetColorLabel('green');
+          void handleSetColorLabel('green');
         },
       },
       color_label_blue: {
         shouldFire: () => true,
         execute: (e) => {
           e.preventDefault();
-          handleSetColorLabel('blue');
+          void handleSetColorLabel('blue');
         },
       },
       color_label_purple: {
         shouldFire: () => true,
         execute: (e) => {
           e.preventDefault();
-          handleSetColorLabel('purple');
+          void handleSetColorLabel('purple');
         },
       },
       brush_size_up: {
