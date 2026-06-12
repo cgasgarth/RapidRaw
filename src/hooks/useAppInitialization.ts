@@ -391,7 +391,7 @@ export const useAppInitialization = ({
 
   useEffect(() => {
     const root = document.documentElement;
-    const currentThemeId = theme || DEFAULT_THEME_ID;
+    const currentThemeId = theme;
 
     const baseTheme =
       THEMES.find((t: ThemeProps) => t.id === currentThemeId) ||
