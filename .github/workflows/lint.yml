@@ -564,16 +564,51 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - changed-paths
+      - frontend-build
+      - frontend-typecheck
+      - frontend-lint
+      - frontend-format
+      - frontend-i18n-lint
+      - frontend-unsafe-casts
+      - generated-type-drift
+      - frontend-lint-escapes
+      - docs-check
+      - rust-fmt
+      - actions-lint
+      - actions-pins
+      - dependency-security-js
+      - dependency-security-rust
+      - dependency-license-js
+      - dependency-license-rust
+      - rust-check
+      - rust-clippy
+      - pr-macos-app-build
     if: always() && github.event_name == 'pull_request'
-    timeout-minutes: 360
+    timeout-minutes: 10
     steps:
-      - name: Wait for required peer jobs
+      - name: Verify required peer jobs
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ github.run_id }}
-          REPO: ${{ github.repository }}
           CHANGED_PATHS_RESULT: ${{ needs.changed-paths.result }}
+          FRONTEND_BUILD_RESULT: ${{ needs.frontend-build.result }}
+          FRONTEND_TYPECHECK_RESULT: ${{ needs.frontend-typecheck.result }}
+          FRONTEND_LINT_RESULT: ${{ needs.frontend-lint.result }}
+          FRONTEND_FORMAT_RESULT: ${{ needs.frontend-format.result }}
+          FRONTEND_I18N_LINT_RESULT: ${{ needs.frontend-i18n-lint.result }}
+          FRONTEND_UNSAFE_CASTS_RESULT: ${{ needs.frontend-unsafe-casts.result }}
+          GENERATED_TYPE_DRIFT_RESULT: ${{ needs.generated-type-drift.result }}
+          FRONTEND_LINT_ESCAPES_RESULT: ${{ needs.frontend-lint-escapes.result }}
+          DOCS_CHECK_RESULT: ${{ needs.docs-check.result }}
+          RUST_FMT_RESULT: ${{ needs.rust-fmt.result }}
+          ACTIONS_LINT_RESULT: ${{ needs.actions-lint.result }}
+          ACTIONS_PINS_RESULT: ${{ needs.actions-pins.result }}
+          DEPENDENCY_SECURITY_JS_RESULT: ${{ needs.dependency-security-js.result }}
+          DEPENDENCY_SECURITY_RUST_RESULT: ${{ needs.dependency-security-rust.result }}
+          DEPENDENCY_LICENSE_JS_RESULT: ${{ needs.dependency-license-js.result }}
+          DEPENDENCY_LICENSE_RUST_RESULT: ${{ needs.dependency-license-rust.result }}
+          RUST_CHECK_RESULT: ${{ needs.rust-check.result }}
+          RUST_CLIPPY_RESULT: ${{ needs.rust-clippy.result }}
+          PR_MACOS_APP_BUILD_RESULT: ${{ needs.pr-macos-app-build.result }}
           MACOS_SMOKE_REQUIRED: ${{ needs.changed-paths.outputs.macos_smoke_required }}
           MACOS_SMOKE_MODE: ${{ needs.changed-paths.outputs.macos_smoke_mode }}
           MACOS_SMOKE_ARGS: ${{ needs.changed-paths.outputs.macos_smoke_args }}
@@ -606,92 +641,48 @@ jobs:
             exit 1
           fi
 
-          required_jobs=(
-            "changed paths / macOS smoke routing"
-            "frontend: install, build, i18n check"
-            "frontend: typecheck baseline"
-            "frontend: eslint zero warnings"
-            "frontend: prettier baseline"
-            "frontend: i18n lint baseline"
-            "frontend: unsafe cast ban"
-            "types: generated artifact drift"
-            "frontend: lint escape hatch policy"
-            "docs: markdown and links"
-            "rust: fmt"
-            "github actions: actionlint"
-            "github actions: pinned versions"
-            "security: JavaScript dependencies"
-            "security: Rust dependencies"
-            "license: JavaScript dependencies"
-            "license: Rust dependencies"
-          )
+          failures=()
+
+          require_success() {
+            local name="$1"
+            local result="$2"
+            if [[ "$result" != "success" ]]; then
+              failures+=("$name=$result")
+            fi
+          }
+
+          echo "All validation jobs are dispatched independently; this job only verifies branch-protection results."
+
+          require_success "changed paths / macOS smoke routing" "$CHANGED_PATHS_RESULT"
+          require_success "frontend: install, build, i18n check" "$FRONTEND_BUILD_RESULT"
+          require_success "frontend: typecheck baseline" "$FRONTEND_TYPECHECK_RESULT"
+          require_success "frontend: eslint zero warnings" "$FRONTEND_LINT_RESULT"
+          require_success "frontend: prettier baseline" "$FRONTEND_FORMAT_RESULT"
+          require_success "frontend: i18n lint baseline" "$FRONTEND_I18N_LINT_RESULT"
+          require_success "frontend: unsafe cast ban" "$FRONTEND_UNSAFE_CASTS_RESULT"
+          require_success "types: generated artifact drift" "$GENERATED_TYPE_DRIFT_RESULT"
+          require_success "frontend: lint escape hatch policy" "$FRONTEND_LINT_ESCAPES_RESULT"
+          require_success "docs: markdown and links" "$DOCS_CHECK_RESULT"
+          require_success "rust: fmt" "$RUST_FMT_RESULT"
+          require_success "github actions: actionlint" "$ACTIONS_LINT_RESULT"
+          require_success "github actions: pinned versions" "$ACTIONS_PINS_RESULT"
+          require_success "security: JavaScript dependencies" "$DEPENDENCY_SECURITY_JS_RESULT"
+          require_success "security: Rust dependencies" "$DEPENDENCY_SECURITY_RUST_RESULT"
+          require_success "license: JavaScript dependencies" "$DEPENDENCY_LICENSE_JS_RESULT"
+          require_success "license: Rust dependencies" "$DEPENDENCY_LICENSE_RUST_RESULT"
 
           if [[ "$MACOS_SMOKE_MODE" != "none" ]]; then
-            required_jobs+=(
-              "rust: cargo check macOS"
-              "rust: clippy baseline macOS"
-              "macOS app no-bundle smoke"
-            )
+            require_success "rust: cargo check macOS" "$RUST_CHECK_RESULT"
+            require_success "rust: clippy baseline macOS" "$RUST_CLIPPY_RESULT"
+            require_success "macOS app no-bundle smoke" "$PR_MACOS_APP_BUILD_RESULT"
           else
-            echo "Skipping macOS Rust check, macOS clippy, and macOS app no-bundle smoke in aggregate wait."
+            echo "Skipping macOS Rust check, macOS clippy, and macOS app no-bundle smoke in aggregate verification."
             echo "Routing reason: $MACOS_SMOKE_REASON"
           fi
 
-          required_jobs_json="$(printf '%s\n' "${required_jobs[@]}" | jq -R . | jq -s .)"
-
-          echo "All validation jobs are dispatched independently; this job is only the branch-protection aggregate."
-          echo "Queued macOS jobs usually mean waiting for GitHub-hosted macOS runner capacity, not a workflow dependency."
-          echo "Waiting for required peer jobs:"
-          printf ' - %s\n' "${required_jobs[@]}"
-
-          while true; do
-            jobs_json="$(gh run view "$RUN_ID" --repo "$REPO" --json jobs --jq '.jobs')"
-
-            completed_failures="$(
-              jq -r --argjson required "$required_jobs_json" '
-                $required[] as $name
-                | first(.[] | select(.name == $name)) as $job
-                | select($job != null and $job.status == "completed" and $job.conclusion != "success")
-                | "\($name)=\($job.conclusion)"
-              ' <<< "$jobs_json"
-            )"
-
-            if [[ -n "$completed_failures" ]]; then
-              echo "Blocking PR because a required peer job has already failed:"
-              echo "$completed_failures"
-              exit 1
-            fi
-
-            pending="$(
-              jq -r --argjson required "$required_jobs_json" '
-                $required[] as $name
-                | first(.[] | select(.name == $name)) as $job
-                | select($job == null or ($job.status != "completed"))
-                | if $job == null then "\($name)=missing" else "\($name)=\($job.status)" end
-              ' <<< "$jobs_json"
-            )"
-
-            if [[ -z "$pending" ]]; then
-              break
-            fi
-
-            echo "Still waiting on:"
-            echo "$pending"
-            sleep 60
-          done
-
-          failures="$(
-            jq -r --argjson required "$required_jobs_json" '
-              $required[] as $name
-              | first(.[] | select(.name == $name)) as $job
-              | select($job == null or $job.conclusion != "success")
-              | if $job == null then "\($name)=missing" else "\($name)=\($job.conclusion)" end
-            ' <<< "$jobs_json"
-          )"
-
-          if [[ -n "$failures" ]]; then
+          if (( ${#failures[@]} > 0 )); then
             echo "Blocking PR because required jobs did not all succeed:"
-            echo "$failures"
+            printf ' - %s\n' "${failures[@]}"
             exit 1
           fi
 
