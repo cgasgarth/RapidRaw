@@ -122,7 +122,7 @@ module.exports = [
       ],
       'react-hooks/rules-of-hooks': 'error',
       // Enable after the existing dependency-array warnings are fixed in a focused lint PR.
-      'react-hooks/exhaustive-deps': 'off',
+      'react-hooks/exhaustive-deps': 'error',
       // React compiler rules are enabled through the hooks recommended config,
       // with legacy violations split into focused cleanup issues.
       'react-hooks/set-state-in-effect': 'off',
