@@ -346,6 +346,9 @@ jobs:
 
   rust-check:
     name: 'rust: cargo check macOS'
+    needs:
+      - changed-paths
+    if: always() && (github.event_name != 'pull_request' || needs.changed-paths.outputs.macos_smoke_mode != 'none')
     runs-on: macos-14
     timeout-minutes: 45
     steps:
@@ -393,6 +396,9 @@ jobs:
 
   rust-clippy:
     name: 'rust: clippy baseline macOS'
+    needs:
+      - changed-paths
+    if: always() && (github.event_name != 'pull_request' || needs.changed-paths.outputs.macos_smoke_mode != 'none')
     runs-on: macos-14
     timeout-minutes: 45
     steps:
@@ -619,14 +625,16 @@ jobs:
             "security: Rust dependencies"
             "license: JavaScript dependencies"
             "license: Rust dependencies"
-            "rust: cargo check macOS"
-            "rust: clippy baseline macOS"
           )
 
           if [[ "$MACOS_SMOKE_MODE" != "none" ]]; then
-            required_jobs+=("macOS app no-bundle smoke")
+            required_jobs+=(
+              "rust: cargo check macOS"
+              "rust: clippy baseline macOS"
+              "macOS app no-bundle smoke"
+            )
           else
-            echo "Skipping macOS app no-bundle smoke in aggregate wait."
+            echo "Skipping macOS Rust check, macOS clippy, and macOS app no-bundle smoke in aggregate wait."
             echo "Routing reason: $MACOS_SMOKE_REASON"
           fi
 
