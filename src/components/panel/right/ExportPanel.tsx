@@ -36,7 +36,7 @@ interface ExportPanelProps {
   exportState: ExportState;
   multiSelectedPaths: Array<string>;
   selectedImage: SelectedImage | null;
-  setExportState(updater: Partial<ExportState> | ((state: ExportState) => Partial<ExportState>)): void;
+  setExportState: (updater: Partial<ExportState> | ((state: ExportState) => Partial<ExportState>)) => void;
   appSettings: AppSettings | null;
   onSettingsChange: (settings: AppSettings) => void;
   rootPaths: string[];

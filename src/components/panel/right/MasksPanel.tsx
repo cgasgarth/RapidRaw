@@ -1,5 +1,4 @@
 import {
-  type ChangeEvent,
   type PointerEvent as ReactPointerEvent,
   type MouseEvent as ReactMouseEvent,
   useState,
@@ -46,7 +45,7 @@ import {
 
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Switch from '../../ui/Switch';
-import Slider from '../../ui/Slider';
+import Slider, { type SliderChangeEvent } from '../../ui/Slider';
 import BasicAdjustments from '../../adjustments/Basic';
 import CurveGraph, { type ChannelConfig } from '../../adjustments/Curves';
 import ColorPanel from '../../adjustments/Color';
@@ -309,7 +308,7 @@ const BrushTools = ({
         label={t('editor.masks.brush.size')}
         max={200}
         min={1}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+        onChange={(e: SliderChangeEvent) => {
           onSettingsChange((settings) => ({
             ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
             size: Number(e.target.value),
@@ -325,7 +324,7 @@ const BrushTools = ({
         label={t('editor.masks.brush.feather')}
         max={100}
         min={0}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+        onChange={(e: SliderChangeEvent) => {
           onSettingsChange((settings) => ({
             ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
             feather: Number(e.target.value),
@@ -386,7 +385,7 @@ const FlowBrushTool = ({
         label={t('editor.masks.brush.flow')}
         max={100}
         min={0}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+        onChange={(e: SliderChangeEvent) => {
           onFlowChange(Number(e.target.value));
         }}
         step={1}
@@ -2803,7 +2802,7 @@ function SettingsPanel({
             max={100}
             min={0}
             value={isComponentMode ? activeSubMask.opacity : displayContainer.opacity}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+            onChange={(e: SliderChangeEvent) => {
               if (isComponentMode) {
                 updateSubMask(activeSubMask.id, { opacity: Number(e.target.value) });
               } else {
@@ -2857,9 +2856,9 @@ function SettingsPanel({
                   step={param.step}
                   defaultValue={param.defaultValue}
                   value={getMaskParameterNumber(activeSubMask.parameters, param.key) * (param.multiplier || 1)}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                  onChange={(e: SliderChangeEvent) => {
                     handleSubMaskParametersChange({
-                      [param.key]: parseFloat(e.target.value) / (param.multiplier || 1),
+                      [param.key]: parseFloat(String(e.target.value)) / (param.multiplier || 1),
                     });
                   }}
                   {...(param.key !== 'grow' && { fillOrigin: 'min' })}

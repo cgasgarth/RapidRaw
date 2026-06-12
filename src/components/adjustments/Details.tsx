@@ -8,7 +8,7 @@ import { TextVariants } from '../../types/typography';
 
 interface DetailsPanelProps {
   adjustments: Adjustments;
-  setAdjustments(adjustments: AdjustmentUpdate): void;
+  setAdjustments: (adjustments: AdjustmentUpdate) => void;
   appSettings: AppSettings | null;
   isForMask?: boolean;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;

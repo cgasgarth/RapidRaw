@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next';
 import { GLOBAL_KEYS } from './AppProperties';
 
-type SliderChangeEvent =
+export type SliderChangeEvent =
   | React.ChangeEvent<HTMLInputElement>
   | {
       target: {
@@ -15,7 +15,7 @@ interface SliderProps {
   label: React.ReactNode;
   max: number;
   min: number;
-  onChange(event: SliderChangeEvent): void;
+  onChange: (event: SliderChangeEvent) => void;
   disabled?: boolean;
   onDragStateChange?: ((state: boolean) => void) | undefined;
   step: number;

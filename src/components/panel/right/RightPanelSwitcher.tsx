@@ -20,7 +20,7 @@ interface PanelOptions {
 
 interface RightPanelSwitcherProps {
   activePanel: Panel | null;
-  onPanelSelect(id: Panel): void;
+  onPanelSelect: (id: Panel) => void;
   isInstantTransition: boolean;
   layout?: 'horizontal' | 'vertical';
 }

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useId } from 'react';
-import Slider from './Slider';
+import Slider, { type SliderChangeEvent } from './Slider';
 import Wheel from '@uiw/react-color-wheel';
 import { ColorResult, HsvaColor, hsvaToHex } from '@uiw/color-convert';
 import { Sun } from 'lucide-react';
@@ -12,7 +12,7 @@ import { TextColors, TextVariants } from '../../types/typography';
 interface ColorWheelProps {
   defaultValue: HueSatLum;
   label: string;
-  onChange(hsl: HueSatLum): void;
+  onChange: (hsl: HueSatLum) => void;
   value: HueSatLum;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
   isExpanded?: boolean | undefined;
@@ -141,16 +141,16 @@ const ColorWheel = ({
     onChange(newValues);
   };
 
-  const handleHueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...effectiveValue, hue: parseFloat(e.target.value) });
+  const handleHueChange = (e: SliderChangeEvent) => {
+    onChange({ ...effectiveValue, hue: parseFloat(String(e.target.value)) });
   };
 
-  const handleSaturationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...effectiveValue, saturation: parseFloat(e.target.value) });
+  const handleSaturationChange = (e: SliderChangeEvent) => {
+    onChange({ ...effectiveValue, saturation: parseFloat(String(e.target.value)) });
   };
 
-  const handleLumChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange({ ...effectiveValue, luminance: parseFloat(e.target.value) });
+  const handleLumChange = (e: SliderChangeEvent) => {
+    onChange({ ...effectiveValue, luminance: parseFloat(String(e.target.value)) });
   };
 
   const handleReset = () => {

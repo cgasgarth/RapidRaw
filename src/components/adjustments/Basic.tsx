@@ -8,7 +8,7 @@ import { type AppSettings } from '../ui/AppProperties';
 
 interface BasicAdjustmentsProps {
   adjustments: Adjustments;
-  setAdjustments(adjustments: AdjustmentUpdate): void;
+  setAdjustments: (adjustments: AdjustmentUpdate) => void;
   isForMask?: boolean;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
   appSettings?: AppSettings | null;
