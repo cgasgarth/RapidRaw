@@ -51,12 +51,12 @@ export default function TitleBar() {
       }
     };
 
-    updateMaximizedState();
+    void updateMaximizedState();
 
     let unlisten: (() => void) | undefined;
     appWindow
       .onResized(() => {
-        updateMaximizedState();
+        void updateMaximizedState();
       })
       .then((u) => {
         unlisten = u;
@@ -67,20 +67,27 @@ export default function TitleBar() {
     };
   }, [appWindow]);
 
-  const handleMinimize = () => appWindow.minimize();
-  const handleClose = () => appWindow.close();
+  const handleMinimize = useCallback(() => {
+    void appWindow.minimize();
+  }, [appWindow]);
 
-  const handleMaximize = useCallback(async () => {
-    try {
-      if (osPlatform === 'macos') {
-        const isFullscreen = await appWindow.isFullscreen();
-        appWindow.setFullscreen(!isFullscreen);
-      } else {
-        appWindow.toggleMaximize();
+  const handleClose = useCallback(() => {
+    void appWindow.close();
+  }, [appWindow]);
+
+  const handleMaximize = useCallback(() => {
+    void (async () => {
+      try {
+        if (osPlatform === 'macos') {
+          const isFullscreen = await appWindow.isFullscreen();
+          await appWindow.setFullscreen(!isFullscreen);
+        } else {
+          await appWindow.toggleMaximize();
+        }
+      } catch (error) {
+        console.error('Failed to toggle maximize:', error);
       }
-    } catch (error) {
-      console.error('Failed to toggle maximize:', error);
-    }
+    })();
   }, [osPlatform, appWindow]);
 
   const isMac = osPlatform === 'macos';

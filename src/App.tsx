@@ -133,6 +133,12 @@ function App() {
       handleSettingsChange: state.handleSettingsChange,
     })),
   );
+  const handleSettingsChangeVoid = useCallback(
+    (settings: Parameters<typeof handleSettingsChange>[0]) => {
+      void handleSettingsChange(settings);
+    },
+    [handleSettingsChange],
+  );
 
   const {
     isFullScreen,
@@ -281,6 +287,12 @@ function App() {
 
   const { handleCopyAdjustments, handlePasteAdjustments, handleResetAdjustments, handleZoomChange } =
     useEditorActions();
+  const handleCopyAdjustmentsVoid = useCallback(() => {
+    void handleCopyAdjustments();
+  }, [handleCopyAdjustments]);
+  const handlePasteAdjustmentsVoid = useCallback(() => {
+    handlePasteAdjustments();
+  }, [handlePasteAdjustments]);
 
   const navigationRefs = {
     transformWrapperRef,
@@ -306,6 +318,27 @@ function App() {
     clearThumbnailQueue,
     refs: navigationRefs,
   });
+  const handleImageSelectVoid = useCallback(
+    (path: string) => {
+      void handleImageSelect(path);
+    },
+    [handleImageSelect],
+  );
+  const handleSelectSubfolderVoid = useCallback(
+    (path: string, isNewRoot?: boolean, preloadedImages?: Array<ImageFile>, expandParents?: boolean) => {
+      void handleSelectSubfolder(path, isNewRoot, preloadedImages, expandParents);
+    },
+    [handleSelectSubfolder],
+  );
+  const handleSelectAlbumVoid = useCallback(
+    (albumId: string, albumName: string, images: string[]) => {
+      void handleSelectAlbum(albumId, albumName, images);
+    },
+    [handleSelectAlbum],
+  );
+  const handleOpenFolderVoid = useCallback(() => {
+    void handleOpenFolder();
+  }, [handleOpenFolder]);
 
   const {
     handleRate,
@@ -317,7 +350,10 @@ function App() {
     handleTogglePinFolder,
     handleCreateAlbumItem,
     handleRenameAlbumItem,
-  } = useLibraryActions(handleImageSelect);
+  } = useLibraryActions(handleImageSelectVoid);
+  const refreshAllFolderTreesVoid = useCallback(() => {
+    void refreshAllFolderTrees();
+  }, [refreshAllFolderTrees]);
 
   const sortedImageList = useSortedLibrary();
 
@@ -348,9 +384,21 @@ function App() {
   } = useFileOperations(
     handleLibraryRefresh,
     refreshAllFolderTrees,
-    handleImageSelect,
+    handleImageSelectVoid,
     handleBackToLibrary,
     sortedImageList,
+  );
+  const handleImportClickVoid = useCallback(
+    (path: string) => {
+      void handleImportClick(path);
+    },
+    [handleImportClick],
+  );
+  const handlePasteFilesVoid = useCallback(
+    (mode: string) => {
+      void handlePasteFiles(mode);
+    },
+    [handlePasteFiles],
   );
 
   const {
@@ -371,11 +419,11 @@ function App() {
     handleAlbumTreeContextMenu,
     handleMainLibraryContextMenu,
   } = useAppContextMenus({
-    handleImageSelect,
+    handleImageSelect: handleImageSelectVoid,
     handleBackToLibrary,
     handleLibraryRefresh,
     handleRenameFiles,
-    handleImportClick,
+    handleImportClick: handleImportClickVoid,
     refreshAllFolderTrees,
     refreshImageList: handleLibraryRefresh,
     executeDelete,
@@ -383,9 +431,11 @@ function App() {
   });
 
   useTauriListeners({
-    refreshAllFolderTrees,
-    handleSelectSubfolder,
-    refreshImageList: handleLibraryRefresh,
+    refreshAllFolderTrees: refreshAllFolderTreesVoid,
+    handleSelectSubfolder: handleSelectSubfolderVoid,
+    refreshImageList: () => {
+      void handleLibraryRefresh();
+    },
     markGenerated,
   });
 
@@ -412,8 +462,8 @@ function App() {
     sortedImageList,
     handleBackToLibrary,
     handleDeleteSelected,
-    handleImageSelect,
-    handlePasteFiles,
+    handleImageSelect: handleImageSelectVoid,
+    handlePasteFiles: handlePasteFilesVoid,
     handleToggleFullScreen,
     handleZoomChange,
   });
@@ -621,12 +671,14 @@ function App() {
           isVisible={uiVisibility.folderTree}
           onContextMenu={handleFolderTreeContextMenu}
           onAlbumContextMenu={handleAlbumTreeContextMenu}
-          onSelectAlbum={handleSelectAlbum}
+          onSelectAlbum={handleSelectAlbumVoid}
           onFolderSelect={(path) => {
-            handleSelectSubfolder(path, false);
+            void handleSelectSubfolder(path, false);
           }}
-          onToggleFolder={handleToggleFolder}
-          onOpenFolder={handleOpenFolder}
+          onToggleFolder={(path) => {
+            void handleToggleFolder(path);
+          }}
+          onOpenFolder={handleOpenFolderVoid}
           setIsVisible={(value: boolean) => {
             setUI((state) => ({ uiVisibility: { ...state.uiVisibility, folderTree: value } }));
           }}
@@ -694,8 +746,8 @@ function App() {
                   handleThumbnailContextMenu={handleThumbnailContextMenu}
                   handleImageClick={handleImageClick}
                   handleClearSelection={handleClearSelection}
-                  handleCopyAdjustments={handleCopyAdjustments}
-                  handlePasteAdjustments={handlePasteAdjustments}
+                  handleCopyAdjustments={handleCopyAdjustmentsVoid}
+                  handlePasteAdjustments={handlePasteAdjustmentsVoid}
                   handleRate={handleRate}
                   handleZoomChange={handleZoomChange}
                   handleRightPanelSelect={handleRightPanelSelect}
@@ -713,17 +765,17 @@ function App() {
                   setLibraryViewMode={setLibraryViewMode}
                   handleClearSelection={handleClearSelection}
                   handleLibraryImageSingleClick={handleLibraryImageSingleClick}
-                  handleImageSelect={handleImageSelect}
+                  handleImageSelect={handleImageSelectVoid}
                   handleRate={handleRate}
                   handleThumbnailContextMenu={handleThumbnailContextMenu}
                   handleMainLibraryContextMenu={handleMainLibraryContextMenu}
                   handleContinueSession={handleContinueSession}
                   handleGoHome={handleGoHome}
                   handleOpenFolder={handleOpenFolder}
-                  handleImportClick={handleImportClick}
+                  handleImportClick={handleImportClickVoid}
                   handleLibraryRefresh={handleLibraryRefresh}
-                  handleCopyAdjustments={handleCopyAdjustments}
-                  handlePasteAdjustments={handlePasteAdjustments}
+                  handleCopyAdjustments={handleCopyAdjustmentsVoid}
+                  handlePasteAdjustments={handlePasteAdjustmentsVoid}
                   handleResetAdjustments={handleResetAdjustments}
                   requestThumbnails={requestThumbnails}
                 />
@@ -745,7 +797,7 @@ function App() {
                 selectedImage={null}
                 setExportState={setExportState}
                 appSettings={appSettings}
-                onSettingsChange={handleSettingsChange}
+                onSettingsChange={handleSettingsChangeVoid}
                 rootPaths={rootPaths}
                 isVisible={isLibraryExportPanelVisible}
                 onClose={() => {
@@ -756,7 +808,7 @@ function App() {
           </div>
         </div>
         <AppModals
-          handleImageSelect={handleImageSelect}
+          handleImageSelect={handleImageSelectVoid}
           handleSavePanorama={handleSavePanorama}
           handleStartPanorama={handleStartPanorama}
           handleSaveHdr={handleSaveHdr}
