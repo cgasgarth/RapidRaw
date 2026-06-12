@@ -1,0 +1,227 @@
+{
+  "snapshotDate": "2026-06-11",
+  "issue": 253,
+  "sections": [
+    {
+      "title": "User Docs",
+      "items": [
+        {
+          "title": "User guide",
+          "path": "docs/user/user-guide-2026-06-11.md"
+        },
+        {
+          "title": "Known limitations",
+          "path": "docs/release/known-limitations-2026-06-11.md"
+        },
+        {
+          "title": "Privacy policy",
+          "path": "docs/release/privacy-policy-2026-06-11.md"
+        },
+        {
+          "title": "Crash and error reporting strategy",
+          "path": "docs/release/crash-error-reporting-strategy-2026-06-11.md"
+        },
+        {
+          "title": "Telemetry opt-in decision",
+          "path": "docs/release/telemetry-opt-in-decision-2026-06-11.md"
+        }
+      ]
+    },
+    {
+      "title": "Developer Docs",
+      "items": [
+        {
+          "title": "Developer API guide",
+          "path": "docs/api/developer-api-guide-2026-06-11.md"
+        },
+        {
+          "title": "Edit command API baseline",
+          "path": "docs/api/edit-command-api-2026-06-11.md"
+        },
+        {
+          "title": "Sample agent guide",
+          "path": "docs/agent/sample-agent-guide-2026-06-11.md"
+        },
+        {
+          "title": "Architecture baseline",
+          "path": "docs/baseline/rapidraw-architecture-baseline-2026-06-11.md"
+        },
+        {
+          "title": "AI hooks baseline",
+          "path": "docs/baseline/rapidraw-ai-hooks-baseline-2026-06-11.md"
+        },
+        {
+          "title": "GPU shader baseline",
+          "path": "docs/baseline/rapidraw-gpu-shader-baseline-2026-06-11.md"
+        },
+        {
+          "title": "Command baseline",
+          "path": "docs/baseline/rapidraw-command-baseline-2026-06-10.md"
+        },
+        {
+          "title": "Sidecar format baseline",
+          "path": "docs/baseline/rapidraw-sidecar-format-baseline-2026-06-11.md"
+        }
+      ]
+    },
+    {
+      "title": "Validation And CI Docs",
+      "items": [
+        {
+          "title": "Cache policy",
+          "path": "docs/ci/cache-policy-2026-06-11.md"
+        },
+        {
+          "title": "Failure artifacts",
+          "path": "docs/ci/failure-artifacts-2026-06-11.md"
+        },
+        {
+          "title": "Optional platform build matrix",
+          "path": "docs/ci/optional-platform-build-matrix-2026-06-11.md"
+        },
+        {
+          "title": "Local check command contract",
+          "path": "docs/tooling/local-check-command-contract-2026-06-10.md"
+        },
+        {
+          "title": "Bun CI script migration",
+          "path": "docs/tooling/bun-ci-script-migration-2026-06-10.md"
+        },
+        {
+          "title": "Bun package manager support",
+          "path": "docs/tooling/bun-package-manager-support-2026-06-10.md"
+        },
+        {
+          "title": "Strict type-checked ESLint",
+          "path": "docs/tooling/eslint-strict-type-checked-2026-06-11.md"
+        },
+        {
+          "title": "ESLint escape hatches",
+          "path": "docs/tooling/eslint-escape-hatches-2026-06-11.md"
+        },
+        {
+          "title": "ESLint accessibility rules",
+          "path": "docs/tooling/eslint-accessibility-rules-2026-06-11.md"
+        },
+        {
+          "title": "ESLint async safety rules",
+          "path": "docs/tooling/eslint-async-safety-rules-2026-06-11.md"
+        },
+        {
+          "title": "ESLint import and boundary rules",
+          "path": "docs/tooling/eslint-import-boundary-rules-2026-06-11.md"
+        },
+        {
+          "title": "ESLint project service",
+          "path": "docs/tooling/eslint-project-service-2026-06-11.md"
+        },
+        {
+          "title": "ESLint React hooks rules",
+          "path": "docs/tooling/eslint-react-hooks-rules-2026-06-11.md"
+        },
+        {
+          "title": "ESLint warning inventory",
+          "path": "docs/tooling/eslint-warning-inventory-2026-06-11.md"
+        },
+        {
+          "title": "ESLint zero-warning CI",
+          "path": "docs/tooling/eslint-zero-warning-ci-2026-06-11.md"
+        },
+        {
+          "title": "Generated type drift checks",
+          "path": "docs/tooling/generated-type-drift-checks-2026-06-11.md"
+        },
+        {
+          "title": "Markdown link checks",
+          "path": "docs/tooling/markdown-link-checks-2026-06-11.md"
+        },
+        {
+          "title": "macOS smoke routing",
+          "path": "docs/tooling/macos-smoke-routing-2026-06-11.md"
+        },
+        {
+          "title": "Pre-commit main guard",
+          "path": "docs/tooling/pre-commit-main-guard-2026-06-10.md"
+        },
+        {
+          "title": "Pre-push main guard",
+          "path": "docs/tooling/pre-push-main-guard-2026-06-11.md"
+        },
+        {
+          "title": "Script entrypoints",
+          "path": "docs/tooling/rapidraw-script-entrypoints-2026-06-10.md"
+        },
+        {
+          "title": "Staged hook checks",
+          "path": "docs/tooling/staged-hook-checks-2026-06-11.md"
+        },
+        {
+          "title": "TypeScript compiler options audit",
+          "path": "docs/tooling/typescript-compiler-options-audit-2026-06-10.md"
+        },
+        {
+          "title": "Vite bundle budget",
+          "path": "docs/tooling/vite-bundle-budget-2026-06-11.md"
+        },
+        {
+          "title": "Workflow topology",
+          "path": "docs/ci/workflow-topology-2026-06-11.md"
+        },
+        {
+          "title": "Deferred Rust advisories",
+          "path": "docs/security/deferred-rust-advisories.md"
+        }
+      ]
+    },
+    {
+      "title": "Fixture And Review Artifacts",
+      "items": [
+        {
+          "title": "Onboarding sample project",
+          "path": "docs/sample/onboarding-sample-project-2026-06-11.md"
+        },
+        {
+          "title": "Fixture download policy",
+          "path": "docs/validation/fixture-download-policy-2026-06-11.md"
+        },
+        {
+          "title": "Public fixture manifest",
+          "path": "docs/validation/public-fixture-manifest-2026-06-11.md"
+        },
+        {
+          "title": "Goal review page",
+          "path": "docs/validation/goal-review-2026-06-11.html"
+        }
+      ]
+    },
+    {
+      "title": "Release Docs",
+      "items": [
+        {
+          "title": "Unsigned release artifact workflow",
+          "path": "docs/release/unsigned-release-artifact-workflow-2026-06-11.md"
+        },
+        {
+          "title": "macOS signing and notarization placeholders",
+          "path": "docs/release/macos-signing-notarization-placeholders-2026-06-11.md"
+        },
+        {
+          "title": "Update mechanism research",
+          "path": "docs/release/update-mechanism-research-2026-06-11.md"
+        },
+        {
+          "title": "macOS signing plan",
+          "path": "docs/release/macos-signing-plan-2026-06-11.md"
+        },
+        {
+          "title": "macOS notarization workflow",
+          "path": "docs/release/macos-notarization-workflow-2026-06-11.md"
+        },
+        {
+          "title": "Release metadata, checksums, and SBOM",
+          "path": "docs/release/release-metadata-checksums-sbom-2026-06-11.md"
+        }
+      ]
+    }
+  ]
+}
