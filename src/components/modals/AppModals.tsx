@@ -153,9 +153,9 @@ export default function AppModals(props: AppModalsProps) {
           setUI({ isCopyPasteSettingsModalOpen: false });
         }}
         settings={appSettings?.copyPasteSettings as CopyPasteSettings}
-        onSave={(newSettings) =>
-          handleSettingsChange({ ...appSettings, copyPasteSettings: newSettings } as AppSettings)
-        }
+        onSave={(newSettings) => {
+          void handleSettingsChange({ ...appSettings, copyPasteSettings: newSettings } as AppSettings);
+        }}
       />
       <PanoramaModal
         error={panoramaModalState.error}
@@ -247,7 +247,9 @@ export default function AppModals(props: AppModalsProps) {
         onClose={() => {
           setUI((state) => ({ denoiseModalState: { ...state.denoiseModalState, isOpen: false } }));
         }}
-        onDenoise={props.handleApplyDenoise}
+        onDenoise={(intensity, method) => {
+          void props.handleApplyDenoise(intensity, method);
+        }}
         onBatchDenoise={props.handleBatchDenoise}
         onSave={props.handleSaveDenoisedImage}
         onOpenFile={props.handleImageSelect}
@@ -271,7 +273,9 @@ export default function AppModals(props: AppModalsProps) {
         onClose={() => {
           setUI({ isCreateFolderModalOpen: false });
         }}
-        onSave={props.handleCreateFolder}
+        onSave={(folderName) => {
+          void props.handleCreateFolder(folderName);
+        }}
       />
       <RenameFolderModal
         currentName={folderActionTarget ? folderActionTarget.split(/[\\/]/).pop() || '' : ''}
@@ -279,14 +283,18 @@ export default function AppModals(props: AppModalsProps) {
         onClose={() => {
           setUI({ isRenameFolderModalOpen: false });
         }}
-        onSave={props.handleRenameFolder}
+        onSave={(newName) => {
+          void props.handleRenameFolder(newName);
+        }}
       />
       <CreateFolderModal
         isOpen={isCreateAlbumModalOpen}
         onClose={() => {
           setUI({ isCreateAlbumModalOpen: false });
         }}
-        onSave={(name) => props.handleCreateAlbumItem(name, 'album')}
+        onSave={(name) => {
+          void props.handleCreateAlbumItem(name, 'album');
+        }}
         title={t('contextMenus.albums.newAlbum')}
         placeholder={t('modals.createAlbum.placeholder')}
         buttonText={t('modals.createFolder.create')}
@@ -296,7 +304,9 @@ export default function AppModals(props: AppModalsProps) {
         onClose={() => {
           setUI({ isCreateAlbumGroupModalOpen: false });
         }}
-        onSave={(name) => props.handleCreateAlbumItem(name, 'group')}
+        onSave={(name) => {
+          void props.handleCreateAlbumItem(name, 'group');
+        }}
         title={t('contextMenus.albums.newGroup')}
         placeholder={t('modals.createGroup.placeholder')}
         buttonText={t('modals.createFolder.create')}
@@ -307,7 +317,9 @@ export default function AppModals(props: AppModalsProps) {
         onClose={() => {
           setUI({ isRenameAlbumModalOpen: false });
         }}
-        onSave={props.handleRenameAlbumItem}
+        onSave={(newName) => {
+          void props.handleRenameAlbumItem(newName);
+        }}
         title={isAlbumGroup ? t('contextMenus.albums.renameGroup') : t('contextMenus.albums.renameAlbum')}
         placeholder={isAlbumGroup ? t('modals.renameGroup.placeholder') : t('modals.renameAlbum.placeholder')}
       />
@@ -317,7 +329,9 @@ export default function AppModals(props: AppModalsProps) {
         onClose={() => {
           setUI({ isRenameFileModalOpen: false });
         }}
-        onSave={props.handleSaveRename}
+        onSave={(nameTemplate) => {
+          void props.handleSaveRename(nameTemplate);
+        }}
       />
       <ConfirmModal {...confirmModalState} onClose={closeConfirmModal} />
       <ImportSettingsModal
@@ -326,7 +340,9 @@ export default function AppModals(props: AppModalsProps) {
         onClose={() => {
           setUI({ isImportModalOpen: false });
         }}
-        onSave={props.handleStartImport}
+        onSave={(settings) => {
+          void props.handleStartImport(settings);
+        }}
       />
       <CullingModal
         isOpen={cullingModalState.isOpen}
@@ -342,11 +358,11 @@ export default function AppModals(props: AppModalsProps) {
         thumbnails={thumbnails}
         onApply={(action, paths) => {
           if (action === 'reject') {
-            props.handleSetColorLabel('red', paths);
+            void props.handleSetColorLabel('red', paths);
           } else if (action === 'rate_zero') {
             props.handleRate(1, paths);
           } else {
-            props.executeDelete(paths, { includeAssociated: false });
+            void props.executeDelete(paths, { includeAssociated: false });
           }
           setUI({
             cullingModalState: { isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] },

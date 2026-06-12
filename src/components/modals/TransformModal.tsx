@@ -609,9 +609,15 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             <div className="w-px h-5 bg-white/20 mx-1"></div>
 
             <button
-              onMouseDown={() => toggleCompare(true)}
-              onMouseUp={() => toggleCompare(false)}
-              onMouseLeave={() => toggleCompare(false)}
+              onMouseDown={() => {
+                void toggleCompare(true);
+              }}
+              onMouseUp={() => {
+                void toggleCompare(false);
+              }}
+              onMouseLeave={() => {
+                void toggleCompare(false);
+              }}
               className={clsx(
                 'p-2 rounded-full transition-colors select-none',
                 isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',

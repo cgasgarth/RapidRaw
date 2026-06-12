@@ -992,7 +992,12 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
                   : t('modals.collage.cancel')}
               </button>
               {!savedPath && !error && (
-                <Button onClick={handleSave} disabled={isSaving || isLoading || !activeLayout}>
+                <Button
+                  onClick={() => {
+                    void handleSave();
+                  }}
+                  disabled={isSaving || isLoading || !activeLayout}
+                >
                   {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save size={16} className="mr-2" />}
                   {isSaving ? t('modals.collage.saving') : t('modals.collage.saveButton')}
                 </Button>

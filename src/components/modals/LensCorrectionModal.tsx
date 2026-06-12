@@ -682,20 +682,26 @@ export default function LensCorrectionModal({
               <Dropdown
                 options={myLensOptions}
                 value=""
-                onChange={handleMyLensSelect}
+                onChange={(value) => {
+                  void handleMyLensSelect(value);
+                }}
                 placeholder={t('modals.lensCorrection.chooseSavedLens')}
               />
               <Dropdown
                 options={makerOptions}
                 value={params.lensMaker}
-                onChange={handleMakerChange}
+                onChange={(maker) => {
+                  handleMakerChange(maker);
+                }}
                 placeholder={t('modals.lensCorrection.selectManufacturer')}
               />
               {params.lensMaker && (
                 <Dropdown
                   options={lensOptions}
                   value={params.lensModel}
-                  onChange={handleModelChange}
+                  onChange={(model) => {
+                    void handleModelChange(model);
+                  }}
                   placeholder={t('modals.lensCorrection.selectLensModel')}
                 />
               )}
