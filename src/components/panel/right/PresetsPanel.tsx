@@ -255,8 +255,12 @@ function DraggablePresetItem({
 
   return (
     <div
-      onClick={() => onApply(preset)}
-      onContextMenu={(e) => onContextMenu(e, { preset })}
+      onClick={() => {
+        onApply(preset);
+      }}
+      onContextMenu={(e) => {
+        onContextMenu(e, { preset });
+      }}
       ref={setCombinedRef}
       style={style}
     >
@@ -304,7 +308,9 @@ function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpa
     >
       <div
         className="flex items-center gap-2 p-2 rounded-lg bg-surface cursor-pointer"
-        onContextMenu={(e) => onContextMenu(e, { folder })}
+        onContextMenu={(e) => {
+          onContextMenu(e, { folder });
+        }}
       >
         <div className="p-1 cursor-grab" ref={setDraggableNodeRef} {...listeners} {...attributes}>
           {isExpanded ? (
@@ -331,7 +337,9 @@ function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpa
           color={TextColors.primary}
           weight={TextWeights.medium}
           className="grow truncate select-none"
-          onClick={() => onToggle(folder.id)}
+          onClick={() => {
+            onToggle(folder.id);
+          }}
         >
           {folder.name}
         </Text>
@@ -883,7 +891,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         {
           icon: Edit,
           label: t('editor.presets.menu.renameFolder'),
-          onClick: () => setRenameFolderState({ isOpen: true, folder: item.folder }),
+          onClick: () => {
+            setRenameFolderState({ isOpen: true, folder: item.folder });
+          },
         },
         {
           icon: FileDown,
@@ -895,7 +905,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           icon: Trash2,
           isDestructive: true,
           label: t('editor.presets.menu.deleteFolder'),
-          onClick: () => handleDeleteItem(data?.id ?? null, true),
+          onClick: () => {
+            handleDeleteItem(data?.id ?? null, true);
+          },
         },
       ];
     } else {
@@ -913,7 +925,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         {
           icon: Settings2,
           label: t('editor.presets.menu.configurePreset'),
-          onClick: () => setConfigureModalState({ isOpen: true, preset: data as Preset }),
+          onClick: () => {
+            setConfigureModalState({ isOpen: true, preset: data as Preset });
+          },
         },
         { type: OPTION_SEPARATOR },
         {
@@ -936,7 +950,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           icon: Trash2,
           isDestructive: true,
           label: t('editor.presets.menu.deletePreset'),
-          onClick: () => handleDeleteItem(data?.id ?? null, false),
+          onClick: () => {
+            handleDeleteItem(data?.id ?? null, false);
+          },
         },
       ];
     }
@@ -953,12 +969,16 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       {
         icon: Plus,
         label: t('editor.presets.menu.newPreset'),
-        onClick: () => setConfigureModalState({ isOpen: true, preset: null }),
+        onClick: () => {
+          setConfigureModalState({ isOpen: true, preset: null });
+        },
       },
       {
         icon: FolderPlus,
         label: t('editor.presets.menu.newFolder'),
-        onClick: () => setIsAddFolderModalOpen(true),
+        onClick: () => {
+          setIsAddFolderModalOpen(true);
+        },
       },
       { type: OPTION_SEPARATOR },
       {
@@ -1006,7 +1026,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
             <button
               className="p-2 rounded-full hover:bg-surface transition-colors"
               disabled={isLoading}
-              onClick={() => setConfigureModalState({ isOpen: true, preset: null })}
+              onClick={() => {
+                setConfigureModalState({ isOpen: true, preset: null });
+              }}
               data-tooltip={t('editor.presets.tooltips.saveNew')}
             >
               <Plus size={18} />
@@ -1058,7 +1080,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
                       <DroppableFolderItem
                         folder={item.folder}
                         isExpanded={expandedFolders.has(item.folder.id)}
-                        onContextMenu={(e) => handleContextMenu(e, item)}
+                        onContextMenu={(e) => {
+                          handleContextMenu(e, item);
+                        }}
                         onToggle={toggleFolder}
                       >
                         <AnimatePresence>
@@ -1073,7 +1097,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
                                 <DraggablePresetItem
                                   isGeneratingPreviews={isGeneratingPreviews}
                                   onApply={handleApplyPreset}
-                                  onContextMenu={(e) => handleContextMenu(e, { preset })}
+                                  onContextMenu={(e) => {
+                                    handleContextMenu(e, { preset });
+                                  }}
                                   preset={preset}
                                   previewUrl={previews[preset.id] || ''}
                                 />
@@ -1100,7 +1126,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
                       <DraggablePresetItem
                         isGeneratingPreviews={isGeneratingPreviews}
                         onApply={handleApplyPreset}
-                        onContextMenu={(e) => handleContextMenu(e, item)}
+                        onContextMenu={(e) => {
+                          handleContextMenu(e, item);
+                        }}
                         preset={item.preset}
                         previewUrl={previews[item.preset.id] || ''}
                       />
@@ -1114,18 +1142,24 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         <ConfigurePresetModal
           isOpen={configureModalState.isOpen}
           initialPreset={configureModalState.preset}
-          onClose={() => setConfigureModalState({ isOpen: false, preset: null })}
+          onClose={() => {
+            setConfigureModalState({ isOpen: false, preset: null });
+          }}
           onSave={handleSaveConfiguredPreset}
         />
         <CreateFolderModal
           isOpen={isAddFolderModalOpen}
-          onClose={() => setIsAddFolderModalOpen(false)}
+          onClose={() => {
+            setIsAddFolderModalOpen(false);
+          }}
           onSave={handleAddFolder}
         />
         <RenameFolderModal
           currentName={renameFolderState.folder?.name ?? ''}
           isOpen={renameFolderState.isOpen}
-          onClose={() => setRenameFolderState({ isOpen: false, folder: null })}
+          onClose={() => {
+            setRenameFolderState({ isOpen: false, folder: null });
+          }}
           onSave={handleRenameFolderSave}
         />
       </div>

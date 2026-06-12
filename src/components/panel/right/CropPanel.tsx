@@ -127,7 +127,12 @@ export default function CropPanel() {
     [setEditor],
   );
 
-  const setOverlay = useCallback((mode: OverlayMode) => setEditor({ overlayMode: mode }), [setEditor]);
+  const setOverlay = useCallback(
+    (mode: OverlayMode) => {
+      setEditor({ overlayMode: mode });
+    },
+    [setEditor],
+  );
 
   const setOverlayRotation = useCallback(
     (updater: React.SetStateAction<number>) => {
@@ -171,7 +176,9 @@ export default function CropPanel() {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [activeOverlay, setOverlay, setOverlayRotation, OVERLAYS]);
 
   useEffect(() => {
@@ -511,7 +518,9 @@ export default function CropPanel() {
                       isPresetActive(preset) ? 'bg-accent' : 'bg-surface hover:bg-card-active',
                     )}
                     key={preset.name}
-                    onClick={() => handlePresetClick(preset)}
+                    onClick={() => {
+                      handlePresetClick(preset);
+                    }}
                     data-tooltip={preset.tooltip}
                     whileTap={{ scale: 0.98 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 17 }}
@@ -642,7 +651,9 @@ export default function CropPanel() {
               <div className="grid grid-cols-2 gap-2">
                 <motion.div
                   className="flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary"
-                  onClick={() => handleStepRotate(-90)}
+                  onClick={() => {
+                    handleStepRotate(-90);
+                  }}
                   data-tooltip={t('editor.crop.tooltips.rotateLeft')}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
@@ -652,7 +663,9 @@ export default function CropPanel() {
                 </motion.div>
                 <motion.div
                   className="flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary"
-                  onClick={() => handleStepRotate(90)}
+                  onClick={() => {
+                    handleStepRotate(90);
+                  }}
                   data-tooltip={t('editor.crop.tooltips.rotateRight')}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
@@ -667,12 +680,12 @@ export default function CropPanel() {
                       ? 'bg-accent text-button-text'
                       : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
                   )}
-                  onClick={() =>
+                  onClick={() => {
                     setAdjustments((prev: Adjustments) => ({
                       ...prev,
                       flipHorizontal: !prev.flipHorizontal,
-                    }))
-                  }
+                    }));
+                  }}
                   data-tooltip={t('editor.crop.tooltips.flipHoriz')}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
@@ -687,7 +700,9 @@ export default function CropPanel() {
                       ? 'bg-accent text-button-text'
                       : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary',
                   )}
-                  onClick={() => setAdjustments((prev: Adjustments) => ({ ...prev, flipVertical: !prev.flipVertical }))}
+                  onClick={() => {
+                    setAdjustments((prev: Adjustments) => ({ ...prev, flipVertical: !prev.flipVertical }));
+                  }}
                   data-tooltip={t('editor.crop.tooltips.flipVert')}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
@@ -705,7 +720,9 @@ export default function CropPanel() {
               <div className="grid grid-cols-2 gap-2">
                 <motion.div
                   className="flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary group"
-                  onClick={() => setIsTransformModalOpen(true)}
+                  onClick={() => {
+                    setIsTransformModalOpen(true);
+                  }}
                   data-tooltip={t('editor.crop.tooltips.transform')}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
@@ -715,7 +732,9 @@ export default function CropPanel() {
                 </motion.div>
                 <motion.div
                   className="flex flex-col items-center justify-center p-3  cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary group"
-                  onClick={() => setIsLensModalOpen(true)}
+                  onClick={() => {
+                    setIsLensModalOpen(true);
+                  }}
                   data-tooltip={t('editor.crop.tooltips.lens')}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
@@ -740,7 +759,9 @@ export default function CropPanel() {
 
       <TransformModal
         isOpen={isTransformModalOpen}
-        onClose={() => setIsTransformModalOpen(false)}
+        onClose={() => {
+          setIsTransformModalOpen(false);
+        }}
         onApply={(newParams) => {
           setAdjustments((prev: Adjustments) => ({
             ...prev,
@@ -759,7 +780,9 @@ export default function CropPanel() {
 
       <LensCorrectionModal
         isOpen={isLensModalOpen}
-        onClose={() => setIsLensModalOpen(false)}
+        onClose={() => {
+          setIsLensModalOpen(false);
+        }}
         onApply={(newParams) => {
           setAdjustments((prev: Adjustments) => ({
             ...prev,

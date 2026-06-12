@@ -82,7 +82,9 @@ function MetadataItem({ label, value }: MetaDataItemProps) {
     try {
       await navigator.clipboard.writeText(strValue);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
     } catch (err) {
       console.error('Failed to copy', err);
     }
@@ -100,7 +102,9 @@ function MetadataItem({ label, value }: MetaDataItemProps) {
       </Text>
       <div
         className="grid cursor-pointer text-right min-w-0 flex-1"
-        onMouseEnter={() => setIsHovered(true)}
+        onMouseEnter={() => {
+          setIsHovered(true);
+        }}
         onMouseLeave={() => {
           setIsHovered(false);
           setCopied(false);
@@ -182,14 +186,18 @@ function EditableMetadataItem({ label, value, onSave }: EditableMetadataItemProp
             autoFocus
             type="text"
             value={localValue}
-            onChange={(e) => setLocalValue(e.target.value)}
+            onChange={(e) => {
+              setLocalValue(e.target.value);
+            }}
             onBlur={handleSave}
             onKeyDown={handleKeyDown}
             className="bg-bg-secondary border border-accent rounded-sm px-2 py-0.5 text-xs text-text-primary text-right outline-hidden w-full shadow-sm focus:ring-1 focus:ring-accent/30"
           />
         ) : (
           <div
-            onClick={() => setIsEditing(true)}
+            onClick={() => {
+              setIsEditing(true);
+            }}
             className="text-xs px-2 py-0.5 min-h-[24px] flex items-center justify-end rounded-sm cursor-text border transition-colors text-right truncate w-full text-text-primary bg-bg-secondary/40 border-surface/50 hover:bg-bg-secondary/80 hover:border-text-tertiary/40"
             data-tooltip={value ? t('editor.metadata.clickToEdit') : t('editor.metadata.emptyClickToAdd')}
           >
@@ -520,7 +528,9 @@ export default function MetadataPanel() {
               </Text>
               <div className="bg-surface rounded-xl overflow-hidden">
                 <button
-                  onClick={() => setIsAuthorExpanded(!isAuthorExpanded)}
+                  onClick={() => {
+                    setIsAuthorExpanded(!isAuthorExpanded);
+                  }}
                   className="w-full flex items-center justify-between p-3 hover:bg-card-active transition-colors"
                 >
                   <Text
@@ -576,7 +586,9 @@ export default function MetadataPanel() {
               </Text>
               <div className="bg-surface rounded-xl overflow-hidden">
                 <button
-                  onClick={() => setIsOrganizationExpanded(!isOrganizationExpanded)}
+                  onClick={() => {
+                    setIsOrganizationExpanded(!isOrganizationExpanded);
+                  }}
                   className="w-full flex items-center justify-between p-3 hover:bg-card-active transition-colors"
                 >
                   <Text
@@ -615,7 +627,9 @@ export default function MetadataPanel() {
                             {[1, 2, 3, 4, 5].map((star) => (
                               <button
                                 key={star}
-                                onClick={() => handleRate(star, targetPaths)}
+                                onClick={() => {
+                                  handleRate(star, targetPaths);
+                                }}
                                 className="focus:outline-hidden transition-transform active:scale-95 hover:scale-110"
                               >
                                 <Star
@@ -721,10 +735,16 @@ export default function MetadataPanel() {
                             <input
                               type="text"
                               value={tagInputValue}
-                              onChange={(e) => setTagInputValue(e.target.value)}
+                              onChange={(e) => {
+                                setTagInputValue(e.target.value);
+                              }}
                               onKeyDown={handleTagInputKeyDown}
-                              onFocus={() => setIsTagInputFocused(true)}
-                              onBlur={() => setIsTagInputFocused(false)}
+                              onFocus={() => {
+                                setIsTagInputFocused(true);
+                              }}
+                              onBlur={() => {
+                                setIsTagInputFocused(false);
+                              }}
                               placeholder={t('editor.metadata.organization.addTagPlaceholder')}
                               className="bg-transparent border-none outline-hidden text-xs w-full text-text-primary placeholder-text-tertiary"
                             />
