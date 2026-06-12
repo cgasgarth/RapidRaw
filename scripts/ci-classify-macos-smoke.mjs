@@ -97,15 +97,13 @@ function classifyPath(path) {
     return { mode: SMOKE_MODES.RELEASE, reason: 'Rust source changed' };
   }
 
-  if (SAFE_TOOLING_FILES.has(path) || isSafeValidationScript(path)) {
-    return { mode: SMOKE_MODES.DEBUG, reason: 'tooling validation path changed' };
-  }
-
   if (
     SAFE_ROOT_FILES.has(path) ||
+    SAFE_TOOLING_FILES.has(path) ||
     isMarkdown(path) ||
     path.startsWith('docs/') ||
     path.startsWith('fixtures/docs/') ||
+    isSafeValidationScript(path) ||
     isSafeFrontendLeaf(path)
   ) {
     return { mode: SMOKE_MODES.NONE, reason: 'covered by faster frontend/docs validation gates' };
@@ -212,11 +210,11 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification('public styles can skip smoke', ['public/theme.css'], SMOKE_MODES.NONE);
-  assertClassification('lint config changes require debug smoke', ['eslint.config.js'], SMOKE_MODES.DEBUG);
+  assertClassification('lint config changes can skip smoke', ['eslint.config.js'], SMOKE_MODES.NONE);
   assertClassification(
-    'validation scripts require debug smoke',
+    'validation scripts can skip smoke',
     ['scripts/check-eslint-escape-hatches.mjs'],
-    SMOKE_MODES.DEBUG,
+    SMOKE_MODES.NONE,
   );
   assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], SMOKE_MODES.NONE);
   assertClassification(
