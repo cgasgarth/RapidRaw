@@ -40,7 +40,7 @@ const Slider = ({
   onChange,
   disabled = false,
   onDragStateChange = () => {},
-  step = 1,
+  step,
   value,
   trackClassName,
   fillOrigin = 'default',

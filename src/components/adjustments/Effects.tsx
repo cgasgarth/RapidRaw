@@ -29,7 +29,7 @@ type SliderChangeEvent =
 export default function EffectsPanel({
   adjustments,
   setAdjustments,
-  isForMask = false,
+  isForMask,
   handleLutSelect,
   appSettings,
   onDragStateChange,
