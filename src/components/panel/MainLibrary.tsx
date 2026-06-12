@@ -28,6 +28,7 @@ import {
   ThumbnailAspectRatio,
   RawStatus,
   EditedStatus,
+  Theme,
 } from '../ui/AppProperties';
 import { ImportState, Status } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
@@ -68,7 +69,7 @@ interface MainLibraryProps {
   onRequestThumbnails?(paths: string[]): void;
   rootPaths: string[];
   setLibraryViewMode(mode: LibraryViewMode): void;
-  theme: string;
+  theme: Theme;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   thumbnailProgress: Progress;
   thumbnailSize: ThumbnailSize;
