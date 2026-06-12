@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useState, useCallback, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import Switch from '../ui/Switch';
 import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface ImportSettings {
   dateFolderFormat: string;
@@ -22,8 +23,7 @@ interface ImportSettingsModalProps {
 
 export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave }: ImportSettingsModalProps) {
   const { t } = useTranslation();
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
 
   const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}');
   const [organizeByDate, setOrganizeByDate] = useState(false);
@@ -32,26 +32,6 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
   const filenameInputRef = useRef<HTMLInputElement>(null);
 
   useManagedFocus(filenameInputRef, show);
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-      }, 300);
-      return () => {
-        clearTimeout(timer);
-      };
-    }
-  }, [isOpen]);
 
   const handleSave = useCallback(() => {
     let finalFilenameTemplate = filenameTemplate;

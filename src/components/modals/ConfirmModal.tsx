@@ -1,9 +1,10 @@
-import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { type KeyboardEvent, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface ConfirmModalProps {
   cancelText?: string;
@@ -27,34 +28,13 @@ export default function ConfirmModal({
   title,
 }: ConfirmModalProps) {
   const { t } = useTranslation();
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   useManagedFocus(confirmButtonRef, show);
 
   const resolvedCancelText = cancelText || t('modals.confirm.cancel');
   const resolvedConfirmText = confirmText || t('modals.confirm.confirm');
-
-  useEffect(() => {
-    if (isOpen) {
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-      }, 300);
-      return () => {
-        clearTimeout(timer);
-      };
-    }
-  }, [isOpen]);
 
   const handleConfirm = useCallback(() => {
     if (onConfirm) {
