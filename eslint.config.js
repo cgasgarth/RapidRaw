@@ -128,7 +128,7 @@ module.exports = [
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/refs': 'off',
       'react-hooks/static-components': 'error',
-      'react-hooks/immutability': 'off',
+      'react-hooks/immutability': 'error',
       'react-hooks/preserve-manual-memoization': 'error',
       'react-hooks/purity': 'error',
       'react/prop-types': 'off',

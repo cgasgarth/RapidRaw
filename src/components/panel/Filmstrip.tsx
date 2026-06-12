@@ -36,6 +36,7 @@ interface ItemData {
   onContextMenu?: ((event: ThumbnailMouseEvent, path: string) => void) | undefined;
   onImageSelect?: ((path: string, event: ThumbnailMouseEvent) => void) | undefined;
   itemHeight: number;
+  consumeClickTriggeredScroll: () => boolean;
   setRatio: (index: number, ratio: number) => void;
 }
 
@@ -368,7 +369,7 @@ const FilmstripList = ({
 }: {
   height: number;
   width: number;
-  data: Omit<ItemData, 'itemHeight' | 'setRatio'> & { clickTriggeredScroll: React.RefObject<boolean> };
+  data: Omit<ItemData, 'itemHeight' | 'setRatio'>;
 }) => {
   const [gridHandle, setGridHandle] = useGridCallbackRef();
   const ratioMapRef = useRef<Record<number, number>>({});
@@ -496,7 +497,7 @@ const FilmstripList = ({
   }, []);
 
   const performSafeScroll = useCallback(
-    (index: number, bypassLock = false) => {
+    function performSafeScroll(index: number, bypassLock = false) {
       if (!gridHandle) return;
 
       if (!bypassLock && isAnimatingScroll.current) {
@@ -533,13 +534,12 @@ const FilmstripList = ({
 
   useEffect(() => {
     const currentPath = data.selectedPath;
+    const consumeClickTriggeredScroll = data.consumeClickTriggeredScroll;
 
     if (currentPath && gridHandle) {
       if (data.multiSelectedPaths.length > 1) {
         prevSelectedPath.current = currentPath;
-        if (data.clickTriggeredScroll.current) {
-          data.clickTriggeredScroll.current = false;
-        }
+        consumeClickTriggeredScroll();
         return;
       }
 
@@ -549,8 +549,7 @@ const FilmstripList = ({
         if (currentPath !== prevSelectedPath.current) {
           const isVisible = isItemVisible(index);
 
-          if (data.clickTriggeredScroll.current) {
-            data.clickTriggeredScroll.current = false;
+          if (consumeClickTriggeredScroll()) {
             performSafeScroll(index, true);
           } else if (!isVisible) {
             performSafeScroll(index);
@@ -569,7 +568,7 @@ const FilmstripList = ({
     data.multiSelectedPaths,
     data.imageList,
     isItemVisible,
-    data.clickTriggeredScroll,
+    data.consumeClickTriggeredScroll,
     performSafeScroll,
     gridHandle,
   ]);
@@ -687,6 +686,12 @@ export default function Filmstrip({
     onImageSelect?.(path, event);
   };
 
+  const consumeClickTriggeredScroll = useCallback(() => {
+    const wasClickTriggered = clickTriggeredScroll.current;
+    clickTriggeredScroll.current = false;
+    return wasClickTriggered;
+  }, []);
+
   return (
     <div ref={containerRef} className="h-full w-full" onClick={onClearSelection}>
       {size.height > 0 && size.width > 0 && (
@@ -702,7 +707,7 @@ export default function Filmstrip({
             onContextMenu,
             onRequestThumbnails,
             onImageSelect: handleImageSelect,
-            clickTriggeredScroll,
+            consumeClickTriggeredScroll,
           }}
         />
       )}

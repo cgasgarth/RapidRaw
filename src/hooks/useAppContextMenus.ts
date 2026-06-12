@@ -167,7 +167,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   }, []);
 
   const buildAddToAlbumMenu = useCallback(
-    (items: AlbumItem[], pathsToAdd: string[]): Option[] => {
+    function buildAddToAlbumMenu(items: AlbumItem[], pathsToAdd: string[]): Option[] {
       return items.map((item) => {
         const customIconDef = item.icon ? albumIcons.find((i) => i.value === item.icon) : null;
         const ResolvedIcon = customIconDef?.icon || (item.type === 'group' ? Folder : AlbumIcon);
