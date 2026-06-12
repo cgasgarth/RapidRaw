@@ -1109,7 +1109,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       isGeneratingOverlayRef.current = false;
       requestAnimationFrame(() => {
         if (pendingOverlayRequestRef.current) {
-          processOverlayQueue();
+          void processOverlayQueue();
         }
       });
     }
@@ -1118,7 +1118,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const requestMaskOverlay = useCallback(
     (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentAdjustments: Adjustments) => {
       pendingOverlayRequestRef.current = { maskDef, renderSize, jsAdjustments: currentAdjustments };
-      processOverlayQueue();
+      void processOverlayQueue();
     },
     [processOverlayQueue],
   );
