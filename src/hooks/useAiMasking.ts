@@ -8,6 +8,7 @@ import { SubMask } from '../components/panel/right/Masks';
 import { Invokes } from '../components/ui/AppProperties';
 import { useAuth } from '@clerk/react';
 import { parseAiPatchDataJson } from '../schemas/aiMaskingSchemas';
+import { formatUnknownError } from '../utils/errorFormatting';
 
 type SubMaskParameters = Record<string, unknown>;
 
@@ -109,7 +110,7 @@ export function useAiMasking() {
         }));
         setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
       } catch (err) {
-        toast.error(`AI Replace Failed: ${err}`);
+        toast.error(`AI Replace Failed: ${formatUnknownError(err)}`);
         setAdjustments((prev: Adjustments) => ({
           ...prev,
           aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
@@ -276,7 +277,7 @@ export function useAiMasking() {
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
-      toast.error(`AI Mask Failed: ${error}`);
+      toast.error(`AI Mask Failed: ${formatUnknownError(error)}`);
     } finally {
       setEditor({ isGeneratingAiMask: false });
     }
@@ -310,7 +311,7 @@ export function useAiMasking() {
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
-      toast.error(`AI Depth Mask Failed: ${error}`);
+      toast.error(`AI Depth Mask Failed: ${formatUnknownError(error)}`);
     } finally {
       setEditor({ isGeneratingAiMask: false });
     }
@@ -338,7 +339,7 @@ export function useAiMasking() {
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
-      toast.error(`AI Mask Failed: ${error}`);
+      toast.error(`AI Mask Failed: ${formatUnknownError(error)}`);
     } finally {
       setEditor({ isGeneratingAiMask: false });
     }
@@ -366,7 +367,7 @@ export function useAiMasking() {
       patchesSentToBackend.delete(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });
     } catch (error) {
-      toast.error(`AI Mask Failed: ${error}`);
+      toast.error(`AI Mask Failed: ${formatUnknownError(error)}`);
     } finally {
       setEditor({ isGeneratingAiMask: false });
     }

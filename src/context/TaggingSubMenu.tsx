@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Invokes, type AppSettings } from '../components/ui/AppProperties';
 import Text from '../components/ui/Text';
 import { TextVariants } from '../types/typography';
+import { formatUnknownError } from '../utils/errorFormatting';
 
 interface TaggingSubMenuProps {
   paths: string[];
@@ -53,7 +54,7 @@ export default function TaggingSubMenu({
         onTagsChanged(paths, newTags);
         setInputValue('');
       } catch (err) {
-        console.error(`Failed to add tag: ${err}`);
+        console.error(`Failed to add tag: ${formatUnknownError(err)}`);
       }
     }
   };
@@ -66,7 +67,7 @@ export default function TaggingSubMenu({
       setTags(newTags);
       onTagsChanged(paths, newTags);
     } catch (err) {
-      console.error(`Failed to remove tag: ${err}`);
+      console.error(`Failed to remove tag: ${formatUnknownError(err)}`);
     }
   };
 

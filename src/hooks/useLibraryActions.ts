@@ -9,6 +9,7 @@ import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { computeSortedLibrary } from './useSortedLibrary';
 import type { FolderTree } from '../components/panel/FolderTree';
+import { formatUnknownError } from '../utils/errorFormatting';
 
 type LibraryClickEvent = Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>;
 
@@ -42,7 +43,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
 
     invoke(Invokes.SetRatingForPaths, { paths: pathsToRate, rating: finalRating }).catch((err) => {
       console.error(err);
-      toast.error(`Failed to apply rating: ${err}`);
+      toast.error(`Failed to apply rating: ${formatUnknownError(err)}`);
     });
   }, []);
 
@@ -76,7 +77,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
         }),
       }));
     } catch (err) {
-      toast.error(`Failed to set color label: ${err}`);
+      toast.error(`Failed to set color label: ${formatUnknownError(err)}`);
     }
   }, []);
 
@@ -138,7 +139,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
         }
       });
     } catch (err) {
-      toast.error(`Failed to update metadata: ${err}`);
+      toast.error(`Failed to update metadata: ${formatUnknownError(err)}`);
     }
   }, []);
 
@@ -285,7 +286,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
       });
       setLibrary({ pinnedFolderTrees: trees });
     } catch (err) {
-      toast.error(`Failed to refresh pinned folders: ${err}`);
+      toast.error(`Failed to refresh pinned folders: ${formatUnknownError(err)}`);
     }
   }, []);
 
@@ -353,7 +354,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
         const sortedTree = await invoke(Invokes.GetAlbums);
         setLibrary({ albumTree: sortedTree as AlbumItem[] });
       } catch (err) {
-        toast.error(`Failed to create: ${err}`);
+        toast.error(`Failed to create: ${formatUnknownError(err)}`);
       }
     }
   }, []);
@@ -382,7 +383,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
         const sortedTree = await invoke(Invokes.GetAlbums);
         setLibrary({ albumTree: sortedTree as AlbumItem[] });
       } catch (err) {
-        toast.error(`Failed to rename: ${err}`);
+        toast.error(`Failed to rename: ${formatUnknownError(err)}`);
       }
     }
   }, []);
