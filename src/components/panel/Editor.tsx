@@ -1362,14 +1362,22 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       'lensVignetteEnabled',
     ];
 
-    const geometry: Partial<Adjustments> = {};
+    const geometry: Record<string, unknown> = {};
     geometryKeys.forEach((k) => {
-      geometry[k] = adjustments[k];
+      geometry[k] = adjustments[k] as unknown;
     });
 
     const subMasks = activeMaskDef.subMasks.map((sm: SubMask) => {
-      const { parameters, ...rest } = sm;
-      const cleanParams: SerializableMaskParameters = { ...parameters };
+      const rest: Omit<SubMask, 'parameters'> = {
+        id: sm.id,
+        invert: sm.invert,
+        mode: sm.mode,
+        opacity: sm.opacity,
+        type: sm.type,
+        visible: sm.visible,
+        ...(sm.name !== undefined ? { name: sm.name } : {}),
+      };
+      const cleanParams: SerializableMaskParameters = toMaskParameterRecord(sm.parameters);
       const maskDataBase64 = cleanParams.mask_data_base64;
       const maskDataCamelBase64 = cleanParams.maskDataBase64;
       const maskDataFingerprint =

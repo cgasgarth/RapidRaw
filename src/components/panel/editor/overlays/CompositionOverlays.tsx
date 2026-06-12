@@ -52,7 +52,7 @@ export default function CompositionOverlays({
         transition: 'opacity 300ms ease-in-out',
       }}
     >
-      {[...Array(17)].map((_, i) => (
+      {Array.from({ length: 17 }, (_, i) => (
         <line
           key={`v-${String(i)}`}
           x1={svgPercent((i + 1) * 5.555)}
@@ -63,7 +63,7 @@ export default function CompositionOverlays({
           strokeWidth="1"
         />
       ))}
-      {[...Array(17)].map((_, i) => (
+      {Array.from({ length: 17 }, (_, i) => (
         <line
           key={`h-${String(i)}`}
           x1={0}

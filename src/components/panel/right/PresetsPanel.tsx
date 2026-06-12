@@ -116,6 +116,11 @@ const isFolderEntry = (item: UserPreset): item is FolderEntry => !!item.folder;
 const toDragId = (id: DragStartEvent['active']['id']): string => String(id);
 const isPresetListType = (value: unknown): value is PresetListType =>
   value === PresetListType.Folder || value === PresetListType.Preset;
+const getPresetDragType = (data: unknown): PresetListType | null => {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const type = (data as Record<string, unknown>)['type'];
+  return isPresetListType(type) ? type : null;
+};
 
 const itemVariants = {
   hidden: { opacity: 0, x: -15 },
@@ -769,8 +774,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
     const activeId = toDragId(active.id);
     const activeParentId = itemParentMap.get(activeId);
-    const activePayloadType = active.data.current?.['type'];
-    const activeType = isPresetListType(activePayloadType) ? activePayloadType : null;
+    const activeType = getPresetDragType(active.data.current);
 
     if (!over) {
       if (activeParentId !== null) {
@@ -785,8 +789,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
     const overId = toDragId(over.id);
     const overParentId = itemParentMap.get(overId);
-    const overPayloadType = over.data.current?.['type'];
-    const overType = isPresetListType(overPayloadType) ? overPayloadType : null;
+    const overType = getPresetDragType(over.data.current);
 
     const targetFolderId = overType === PresetListType.Folder ? overId : overParentId;
 
