@@ -540,8 +540,7 @@ jobs:
             rustc --version || true
             cargo --version || true
             bun --version || true
-            node --version || true
-            npx tauri --version || true
+            bun run tauri --version || true
           } > "$diagnostics_dir/toolchain.txt"
 
       - name: Upload smoke failure diagnostics

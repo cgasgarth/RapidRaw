@@ -241,7 +241,7 @@ if (args.includes('--self-test')) {
   const filesPath = fileArgIndex >= 0 ? args[fileArgIndex + 1] : undefined;
 
   if (!filesPath) {
-    throw new Error('Usage: node scripts/ci-classify-macos-smoke.mjs --files <changed-files.txt>');
+    throw new Error('Usage: bun scripts/ci-classify-macos-smoke.mjs --files <changed-files.txt>');
   }
 
   const result = classifyFiles(readFilesFromArg(filesPath));

@@ -7,9 +7,8 @@
 ## Purpose
 
 #21 made Bun available without forcing every existing command path through it.
-This follow-up moves the compatible frontend validation and macOS app build
-paths to Bun while keeping documented exceptions for inherited non-macOS
-packaging behavior.
+This follow-up moves the compatible frontend validation and app build paths to
+Bun while keeping inherited non-macOS packaging behavior tracked separately.
 
 ## Changes
 
@@ -19,6 +18,9 @@ packaging behavior.
 - Frontend validation jobs run scripts with `bun run ...`.
 - Reusable app builds install frontend dependencies with
   `bun install --frozen-lockfile`.
+- Android packaging invokes the local Tauri CLI through `bun run tauri`.
+- Android release asset version extraction reads Tauri config through `bun
+--print`.
 - Tauri `beforeDevCommand` and `beforeBuildCommand` now use `bun run dev` and
   `bun run build`.
 - `docs/tooling/rapidraw-script-entrypoints-2026-06-10.md` now records Bun as
@@ -28,10 +30,8 @@ packaging behavior.
 
 - `package-lock.json` remains as a transition fallback until a dedicated removal
   PR proves all required paths are Bun-clean.
-- `.github/workflows/build.yml` still sets up Node.js 22 for helper scripts and
-  inherited Android packaging behavior.
-- Android packaging still invokes `npx tauri android build`; Android matrix
-  review remains deferred to #52.
+- Android matrix review remains deferred to #52, but project-authored Android
+  workflow helper commands now run through Bun.
 
 ## Local Validation
 
@@ -41,7 +41,7 @@ Passing checks:
 bun install --frozen-lockfile
 bun run build
 bun run i18n:check
-npx prettier --check .github/workflows/build.yml .github/workflows/lint.yml src-tauri/tauri.conf.json docs/tooling/rapidraw-script-entrypoints-2026-06-10.md docs/tooling/bun-ci-script-migration-2026-06-10.md
+bunx prettier --check .github/workflows/build.yml .github/workflows/lint.yml src-tauri/tauri.conf.json docs/tooling/rapidraw-script-entrypoints-2026-06-10.md docs/tooling/bun-ci-script-migration-2026-06-10.md
 ruby -e 'require "yaml"; ARGV.each { |p| YAML.load_file(p); puts "YAML parsed: #{p}" }' .github/workflows/build.yml .github/workflows/lint.yml
 git diff --check
 bun tauri --version
