@@ -92,8 +92,6 @@ jobs:
 
       - name: Install frontend dependencies
         uses: ./.github/actions/setup-bun-deps
-        with:
-          node-version: ${{ inputs.mobile == 'android' && '26' || '' }}
 
       - name: Install additional system dependencies (Linux)
         if: runner.os == 'Linux' && inputs.mobile == ''
@@ -181,7 +179,7 @@ jobs:
           ORT_LIB_LOCATION: ${{ format('{0}/src-tauri/libs/arm64-v8a', github.workspace) }}
           ORT_STRATEGY: manual
         run: |
-          npx tauri android build --verbose ${{ inputs.build-args }}
+          bun run tauri android build --verbose ${{ inputs.build-args }}
 
       - name: Prepare Android Release Assets
         if: ${{ inputs.mobile == 'android' && inputs.release-id != '' }}
@@ -193,7 +191,7 @@ jobs:
           mkdir -p "$stage_dir"
 
           app_name="RapidRAW"
-          version="$(node -e "const fs=require('fs'); const conf=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8')); process.stdout.write(conf.version || '')")"
+          version="$(bun --print "import { readFileSync } from 'node:fs'; JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')).version ?? ''")"
           arch="${{ inputs.target }}"
           arch="${arch%%-*}"
           template='${{ steps.patch-release-name.outputs.platform }}'
@@ -354,8 +352,7 @@ jobs:
             rustc --version || true
             cargo --version || true
             bun --version || true
-            node --version || true
-            npx tauri --version || true
+            bun run tauri --version || true
           } > "$diagnostics_dir/toolchain.txt"
 
       - name: Upload failure diagnostics

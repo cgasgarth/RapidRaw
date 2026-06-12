@@ -24,7 +24,7 @@ Tauri build behavior changes.
 | Primary lockfile        | `bun.lock`                      | Bun text lockfile is the frontend CI source of truth.          |
 | Transitional lockfile   | `package-lock.json`             | Preserved temporarily as npm fallback until removal is proven. |
 | CI frontend install     | `bun install --frozen-lockfile` | Used by validation and reusable app-build paths.               |
-| GitHub Actions Node use | Node `22`                       | Kept only for workflow helper scripts that invoke Node.        |
+| GitHub Actions Node use | None in project-authored steps  | Workflow helpers run through Bun instead of installing Node.   |
 
 ## `package.json` Scripts
 
@@ -96,7 +96,7 @@ Rust commands are run from `src-tauri`. The package declares `rust-version =
 | ------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `.github/workflows/lint.yml`    | push to `main`, pull request, manual | `bun install --frozen-lockfile`, `bun run build`, `bun run i18n:check`, `bun run typecheck`, `bun run lint`, `bun run format:check`, `bun run i18n:lint`, `cargo fmt`, `cargo check`, `cargo clippy` | Passing baseline commands are blocking; known debt commands are visible but non-blocking until #283/#285/#286/#287/#289 close. |
 | `.github/workflows/pr-ci.yml`   | pull request                         | reusable `build.yml` with `macos-14`/`aarch64-apple-darwin`                                                                                                                                          | Apple Silicon macOS app packaging is blocking.                                                                                 |
-| `.github/workflows/build.yml`   | workflow call                        | `bun install --frozen-lockfile`, `rustup target add`, `tauri-apps/tauri-action`, Android `npx tauri android build`                                                                                   | Reusable package build workflow.                                                                                               |
+| `.github/workflows/build.yml`   | workflow call                        | `bun install --frozen-lockfile`, `rustup target add`, `tauri-apps/tauri-action`, Android `bun run tauri android build`                                                                               | Reusable package build workflow.                                                                                               |
 | `.github/workflows/ci.yml`      | push to `main`                       | reusable `build.yml` matrix for Windows, macOS, Linux, Android                                                                                                                                       | Inherited full matrix still present.                                                                                           |
 | `.github/workflows/release.yml` | GitHub release creation              | reusable `build.yml` matrix for Windows, macOS, Linux, Android                                                                                                                                       | Release packaging matrix still inherited.                                                                                      |
 
@@ -105,8 +105,7 @@ Rust commands are run from `src-tauri`. The package declares `rust-version =
 - Frontend CI and reusable app-build install paths now use
   `bun install --frozen-lockfile`.
 - Frontend script execution in CI and Tauri config now uses `bun run ...`.
-- `build.yml` still sets up Node.js 22 because Node remains an explicit runtime
-  exception for workflow helper scripts such as the Android release asset
+- Workflow helper scripts now run through Bun, including Android release asset
   version extraction and the inherited Android packaging command. Android matrix
   behavior remains deferred to #52.
 - `pr-ci.yml` has been narrowed to Apple Silicon macOS for required PR app
@@ -159,7 +158,7 @@ Future PRs should add named scripts so local and CI behavior can converge:
 - Tauri `beforeDevCommand` and `beforeBuildCommand` execute through Bun.
 - Reusable package builds install frontend dependencies through Bun before
   Tauri packaging.
-- Node.js remains documented only where workflow helper scripts still invoke
+- Project-authored workflow helper scripts run through Bun instead of invoking
   `node` or `npx` directly.
 
 ## Follow-Up Tracking
