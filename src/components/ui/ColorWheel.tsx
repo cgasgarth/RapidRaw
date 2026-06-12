@@ -176,8 +176,8 @@ const ColorWheel = ({
 
   return (
     <div className="relative flex flex-col items-center gap-2" ref={containerRef}>
-      <div
-        className="relative cursor-pointer h-5 w-full overflow-hidden"
+      <button
+        className="relative cursor-pointer h-5 w-full overflow-hidden border-0 bg-transparent p-0 text-inherit"
         onClick={handleReset}
         onDoubleClick={handleReset}
         onMouseEnter={() => {
@@ -186,6 +186,7 @@ const ColorWheel = ({
         onMouseLeave={() => {
           setIsLabelHovered(false);
         }}
+        type="button"
       >
         <Text
           variant={TextVariants.label}
@@ -223,7 +224,7 @@ const ColorWheel = ({
             <span className="w-6 text-right">{Math.round(saturation)}</span>
           </div>
         </Text>
-      </div>
+      </button>
 
       <div ref={sizerRef} className="relative w-full aspect-square">
         {wheelSize > 0 && (

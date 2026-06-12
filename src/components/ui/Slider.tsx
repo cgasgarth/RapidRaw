@@ -490,14 +490,16 @@ const Slider = ({
   };
 
   const numericValue = Number.isNaN(value) ? 0 : value;
+  const canResetFromLabel = typeof label === 'string' && !disabled;
 
   return (
     <div className="mb-2 group" ref={containerRef}>
       <div className="flex justify-between items-center mb-1">
-        <div
-          className={`grid ${typeof label === 'string' && !disabled ? 'cursor-pointer' : ''}`}
-          onClick={typeof label === 'string' && !disabled ? handleReset : undefined}
-          onDoubleClick={typeof label === 'string' && !disabled ? handleReset : undefined}
+        <button
+          className={`grid border-0 bg-transparent p-0 text-left ${canResetFromLabel ? 'cursor-pointer' : 'cursor-default'}`}
+          disabled={!canResetFromLabel}
+          onClick={canResetFromLabel ? handleReset : undefined}
+          onDoubleClick={canResetFromLabel ? handleReset : undefined}
           onMouseEnter={
             typeof label === 'string'
               ? () => {
@@ -512,6 +514,7 @@ const Slider = ({
                 }
               : undefined
           }
+          type="button"
         >
           <span
             aria-hidden={isLabelHovered && typeof label === 'string'}
@@ -531,7 +534,7 @@ const Slider = ({
               {t('ui.slider.reset')}
             </span>
           )}
-        </div>
+        </button>
         <div className="w-12 text-right">
           {isEditing ? (
             <input
@@ -548,15 +551,17 @@ const Slider = ({
               value={inputValue}
             />
           ) : (
-            <span
-              className={`text-sm text-text-primary w-full text-right select-none ${disabled ? '' : 'cursor-text'}`}
+            <button
+              className={`border-0 bg-transparent p-0 text-sm text-text-primary w-full text-right select-none ${disabled ? '' : 'cursor-text'}`}
+              disabled={disabled}
               onClick={handleValueClick}
               onDoubleClick={handleReset}
               data-tooltip={t('ui.slider.clickToEdit')}
+              type="button"
             >
               {decimalPlaces > 0 && numericValue === 0 ? '0' : numericValue.toFixed(decimalPlaces)}
               {suffix && <span className="text-[10px] align-top inline-block mt-0.5 ml-0.5">{suffix}</span>}
-            </span>
+            </button>
           )}
         </div>
       </div>

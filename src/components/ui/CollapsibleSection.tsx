@@ -1,4 +1,12 @@
-import { useRef, useEffect, useState, type MouseEvent, type MouseEventHandler, type ReactNode } from 'react';
+import {
+  useRef,
+  useEffect,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type MouseEventHandler,
+  type ReactNode,
+} from 'react';
 import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -11,7 +19,7 @@ interface CollapsibleSectionProps {
   isContentVisible: boolean;
   isOpen: boolean;
   onContextMenu?: MouseEventHandler<HTMLDivElement>;
-  onToggle: MouseEventHandler<HTMLDivElement>;
+  onToggle: () => void;
   onToggleVisibility?: () => void;
   title: string;
 }
@@ -80,13 +88,25 @@ export default function CollapsibleSection({
     onToggleVisibility();
   };
 
+  const handleHeaderKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+    event.preventDefault();
+    onToggle();
+  };
+
   return (
     <div className="bg-surface rounded-lg overflow-hidden shrink-0" onContextMenu={onContextMenu}>
       <div
         className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-card-active transition-colors duration-200"
+        aria-expanded={isOpen}
         onClick={onToggle}
+        onKeyDown={handleHeaderKeyDown}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        role="button"
+        tabIndex={0}
       >
         <div className="flex items-center gap-2">
           <Text variant={TextVariants.title} weight={TextWeights.normal}>
