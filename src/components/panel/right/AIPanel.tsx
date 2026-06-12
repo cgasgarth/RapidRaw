@@ -1719,7 +1719,7 @@ function SubMaskRow({
     setNodeRef(node);
     setDroppableRef(node);
   };
-  const maskType = subMask.type as Mask;
+  const maskType = subMask.type;
   const MaskIcon = MASK_ICON_MAP[maskType] || Circle;
   const { showContextMenu } = useContextMenu();
   const [isHovered, setIsHovered] = useState(false);

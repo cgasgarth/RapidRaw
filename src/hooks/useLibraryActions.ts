@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
-import { Invokes, ImageFile, AlbumItem, Album, AlbumGroup } from '../components/ui/AppProperties';
+import { Invokes, ImageFile, AlbumItem } from '../components/ui/AppProperties';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { computeSortedLibrary } from './useSortedLibrary';
@@ -297,8 +297,8 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     const newTree = structuredClone(albumTree);
     const newItem: AlbumItem =
       type === 'album'
-        ? ({ type: 'album', id: crypto.randomUUID(), name, images: [] } as Album)
-        : ({ type: 'group', id: crypto.randomUUID(), name, children: [] } as AlbumGroup);
+        ? { type: 'album', id: crypto.randomUUID(), name, images: [] }
+        : { type: 'group', id: crypto.randomUUID(), name, children: [] };
 
     let actualTarget = albumActionTarget;
 
@@ -306,7 +306,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
       for (const n of nodes) {
         if (n.id === id) return n;
         if (n.type === 'group') {
-          const found = findNode((n as AlbumGroup).children, id);
+          const found = findNode(n.children, id);
           if (found) return found;
         }
       }
@@ -317,7 +317,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
       for (const n of nodes) {
         if (n.id === childId) return parentId;
         if (n.type === 'group') {
-          const found = findParentId((n as AlbumGroup).children, childId, n.id);
+          const found = findParentId(n.children, childId, n.id);
           if (found !== undefined) return found;
         }
       }
@@ -339,10 +339,10 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
       }
       for (const n of nodes) {
         if (n.id === target && n.type === 'group') {
-          (n as AlbumGroup).children.push(newItem);
+          n.children.push(newItem);
           return true;
         } else if (n.type === 'group') {
-          if (insert((n as AlbumGroup).children, target)) return true;
+          if (insert(n.children, target)) return true;
         }
       }
       return false;
@@ -372,7 +372,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
           n.name = newName;
           return true;
         }
-        if (n.type === 'group' && rename((n as AlbumGroup).children)) return true;
+        if (n.type === 'group' && rename(n.children)) return true;
       }
       return false;
     };

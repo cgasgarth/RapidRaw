@@ -372,7 +372,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             handleSettingsChange({ ...appSettings, lastRootPath: path });
           }
         } else if (path && expandParents) {
-          const allRoots = [...(rootPaths || []), ...(pinnedFolders || [])].filter(Boolean) as string[];
+          const allRoots = [...(rootPaths || []), ...(pinnedFolders || [])].filter(Boolean);
           const relevantRoot = allRoots.find((r) => path.startsWith(r));
 
           if (relevantRoot) {

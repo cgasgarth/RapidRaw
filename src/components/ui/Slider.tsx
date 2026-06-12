@@ -174,8 +174,8 @@ const Slider = ({
         shiftKey = e.shiftKey || e.altKey;
         if (e.cancelable) e.preventDefault();
       } else {
-        clientX = (e as MouseEvent).clientX;
-        shiftKey = (e as MouseEvent).shiftKey || (e as MouseEvent).altKey;
+        clientX = e.clientX;
+        shiftKey = e.shiftKey || e.altKey;
       }
 
       const deltaX = clientX - lastPointerXRef.current;

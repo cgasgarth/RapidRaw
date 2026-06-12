@@ -455,7 +455,7 @@ function App() {
     };
   }, []);
 
-  const isLightTheme = useMemo(() => [Theme.Light, Theme.Snow, Theme.Arctic].includes(theme as Theme), [theme]);
+  const isLightTheme = useMemo(() => [Theme.Light, Theme.Snow, Theme.Arctic].includes(theme), [theme]);
 
   useEffect(() => {
     if (
