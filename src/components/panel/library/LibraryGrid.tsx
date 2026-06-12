@@ -55,15 +55,15 @@ interface ImageFolderGroup {
 
 interface ListHeaderProps {
   widths: ColumnWidths;
-  setWidths(updater: WidthUpdater): void;
+  setWidths: (updater: WidthUpdater) => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
   sortCriteria: SortCriteria;
-  onSortChange(key: HeaderSortKey): void;
+  onSortChange: (key: HeaderSortKey) => void;
 }
 
 interface HeaderColumnProps {
-  onResize(event: ReactMouseEvent<HTMLDivElement>, leftCol: ColumnWidthKey, rightCol: ColumnWidthKey): void;
-  onSortChange(key: HeaderSortKey): void;
+  onResize: (event: ReactMouseEvent<HTMLDivElement>, leftCol: ColumnWidthKey, rightCol: ColumnWidthKey) => void;
+  onSortChange: (key: HeaderSortKey) => void;
   sortCriteria: SortCriteria;
   title: string;
   totalRawWidth: number;
@@ -92,16 +92,16 @@ interface LibraryGridProps {
   currentFolderPath: string | null;
   activePath: string | null;
   multiSelectedPaths: string[];
-  onContextMenu(event: ReactMouseEvent<HTMLElement>, path: string): void;
-  onImageClick(path: string, event: ReactMouseEvent<HTMLElement>): void;
-  onImageDoubleClick(path: string): void;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>, path: string) => void;
+  onImageClick: (path: string, event: ReactMouseEvent<HTMLElement>) => void;
+  onImageDoubleClick: (path: string) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   imageRatings: Record<string, number>;
-  onRequestThumbnails?(paths: string[]): void;
+  onRequestThumbnails?: (paths: string[]) => void;
   thumbnailSizeOptions: ThumbnailSizeOption[];
-  onThumbnailSizeChange(size: ThumbnailSize): void;
-  onClearSelection(): void;
-  onEmptyAreaContextMenu(event: ReactMouseEvent<HTMLElement>): void;
+  onThumbnailSizeChange: (size: ThumbnailSize) => void;
+  onClearSelection: () => void;
+  onEmptyAreaContextMenu: (event: ReactMouseEvent<HTMLElement>) => void;
 }
 
 const VirtualizedRow = ({ ariaAttributes: _ariaAttributes, ...rowProps }: VirtualizedRowProps): React.ReactElement => (
