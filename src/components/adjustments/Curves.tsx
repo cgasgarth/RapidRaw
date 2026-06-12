@@ -888,7 +888,9 @@ export default function CurveGraph({
             className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
               !isParametricMode ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
             }`}
-            onClick={() => handleToggleMode('point')}
+            onClick={() => {
+              handleToggleMode('point');
+            }}
             data-tooltip={t('adjustments.curves.pointCurve')}
             type="button"
           >
@@ -898,7 +900,9 @@ export default function CurveGraph({
             className={`w-8 h-8 rounded-md flex items-center justify-center transition-all ${
               isParametricMode ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary'
             }`}
-            onClick={() => handleToggleMode('parametric')}
+            onClick={() => {
+              handleToggleMode('parametric');
+            }}
             data-tooltip={t('adjustments.curves.parametricCurve')}
             type="button"
           >
@@ -918,7 +922,9 @@ export default function CurveGraph({
                 className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
                   selected ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent' : 'bg-surface-secondary'
                 } ${channel === ActiveChannel.Luma ? 'text-text-primary' : ''}`}
-                onClick={() => setActiveChannel(channel as ActiveChannel)}
+                onClick={() => {
+                  setActiveChannel(channel as ActiveChannel);
+                }}
                 type="button"
                 style={{
                   backgroundColor:
@@ -1019,9 +1025,15 @@ export default function CurveGraph({
                   cy={255 - p.y}
                   fill={color}
                   key={i}
-                  onMouseDown={(e) => handlePointStart(e, i)}
-                  onTouchStart={(e) => handlePointStart(e, i)}
-                  onContextMenu={(e) => handlePointContextMenu(e, i)}
+                  onMouseDown={(e) => {
+                    handlePointStart(e, i);
+                  }}
+                  onTouchStart={(e) => {
+                    handlePointStart(e, i);
+                  }}
+                  onContextMenu={(e) => {
+                    handlePointContextMenu(e, i);
+                  }}
                   r="6"
                   stroke="#1e1e1e"
                   strokeWidth="2"
@@ -1090,9 +1102,9 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.whiteLevel}
-                  onChange={(e: SliderChangeEvent) =>
-                    updateParametricValue('whiteLevel', parseFloat(String(e.target.value)))
-                  }
+                  onChange={(e: SliderChangeEvent) => {
+                    updateParametricValue('whiteLevel', parseFloat(String(e.target.value)));
+                  }}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -1102,9 +1114,9 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.highlights}
-                  onChange={(e: SliderChangeEvent) =>
-                    updateParametricValue('highlights', parseFloat(String(e.target.value)))
-                  }
+                  onChange={(e: SliderChangeEvent) => {
+                    updateParametricValue('highlights', parseFloat(String(e.target.value)));
+                  }}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -1114,9 +1126,9 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.lights}
-                  onChange={(e: SliderChangeEvent) =>
-                    updateParametricValue('lights', parseFloat(String(e.target.value)))
-                  }
+                  onChange={(e: SliderChangeEvent) => {
+                    updateParametricValue('lights', parseFloat(String(e.target.value)));
+                  }}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -1126,9 +1138,9 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.darks}
-                  onChange={(e: SliderChangeEvent) =>
-                    updateParametricValue('darks', parseFloat(String(e.target.value)))
-                  }
+                  onChange={(e: SliderChangeEvent) => {
+                    updateParametricValue('darks', parseFloat(String(e.target.value)));
+                  }}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -1138,9 +1150,9 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.shadows}
-                  onChange={(e: SliderChangeEvent) =>
-                    updateParametricValue('shadows', parseFloat(String(e.target.value)))
-                  }
+                  onChange={(e: SliderChangeEvent) => {
+                    updateParametricValue('shadows', parseFloat(String(e.target.value)));
+                  }}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -1150,9 +1162,9 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.blackLevel}
-                  onChange={(e: SliderChangeEvent) =>
-                    updateParametricValue('blackLevel', parseFloat(String(e.target.value)))
-                  }
+                  onChange={(e: SliderChangeEvent) => {
+                    updateParametricValue('blackLevel', parseFloat(String(e.target.value)));
+                  }}
                   onDragStateChange={onDragStateChange}
                 />
               </div>

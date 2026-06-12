@@ -178,7 +178,9 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as '3way' | 'global')}
+              onClick={() => {
+                setActiveTab(tab.id as '3way' | 'global');
+              }}
               className={`w-7 h-7 rounded-full flex items-center justify-center transition-all focus:outline-none
                 ${
                   isActive
@@ -194,7 +196,9 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
         <div className="w-px h-5 bg-text-secondary/20 mx-1" />
 
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={() => {
+            setIsExpanded(!isExpanded);
+          }}
           className={`w-7 h-7 rounded-full flex items-center justify-center transition-all focus:outline-none
             ${
               isExpanded
@@ -223,7 +227,9 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
                   <ColorWheel
                     defaultValue={INITIAL_ADJUSTMENTS.colorGrading.midtones}
                     label={t('adjustments.color.grading.midtones')}
-                    onChange={(val: HueSatLum) => handleChange(ColorGrading.Midtones, val)}
+                    onChange={(val: HueSatLum) => {
+                      handleChange(ColorGrading.Midtones, val);
+                    }}
                     value={colorGrading.midtones}
                     onDragStateChange={onDragStateChange}
                     isExpanded={isExpanded}
@@ -235,7 +241,9 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
                   <ColorWheel
                     defaultValue={INITIAL_ADJUSTMENTS.colorGrading.shadows}
                     label={t('adjustments.color.grading.shadows')}
-                    onChange={(val: HueSatLum) => handleChange(ColorGrading.Shadows, val)}
+                    onChange={(val: HueSatLum) => {
+                      handleChange(ColorGrading.Shadows, val);
+                    }}
                     value={colorGrading.shadows}
                     onDragStateChange={onDragStateChange}
                     isExpanded={isExpanded}
@@ -245,7 +253,9 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
                   <ColorWheel
                     defaultValue={INITIAL_ADJUSTMENTS.colorGrading.highlights}
                     label={t('adjustments.color.grading.highlights')}
-                    onChange={(val: HueSatLum) => handleChange(ColorGrading.Highlights, val)}
+                    onChange={(val: HueSatLum) => {
+                      handleChange(ColorGrading.Highlights, val);
+                    }}
                     value={colorGrading.highlights}
                     onDragStateChange={onDragStateChange}
                     isExpanded={isExpanded}
@@ -266,7 +276,9 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
                 <ColorWheel
                   defaultValue={INITIAL_ADJUSTMENTS.colorGrading.global}
                   label={t('adjustments.color.grading.global')}
-                  onChange={(val: HueSatLum) => handleChange(ColorGrading.Global, val)}
+                  onChange={(val: HueSatLum) => {
+                    handleChange(ColorGrading.Global, val);
+                  }}
                   value={colorGrading.global || INITIAL_ADJUSTMENTS.colorGrading.global}
                   onDragStateChange={onDragStateChange}
                   isExpanded={isExpanded}
@@ -283,7 +295,9 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
           label={t('adjustments.color.grading.blending')}
           max={100}
           min={0}
-          onChange={(e: SliderChangeEvent) => handleGlobalChange(ColorGrading.Blending, e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handleGlobalChange(ColorGrading.Blending, e.target.value);
+          }}
           step={1}
           value={colorGrading.blending}
           onDragStateChange={onDragStateChange}
@@ -293,7 +307,9 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
           label={t('adjustments.color.grading.balance')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => handleGlobalChange(ColorGrading.Balance, e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handleGlobalChange(ColorGrading.Balance, e.target.value);
+          }}
           step={1}
           value={colorGrading.balance}
           onDragStateChange={onDragStateChange}
@@ -361,7 +377,9 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
           step={1}
           defaultValue={0}
           value={colorCalibration.shadowsTint}
-          onChange={(e: SliderChangeEvent) => handleShadowsChange(e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handleShadowsChange(e.target.value);
+          }}
           onDragStateChange={onDragStateChange}
           trackClassName="tint-gradient-track"
         />
@@ -389,7 +407,9 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
           step={1}
           defaultValue={0}
           value={currentValues.hue}
-          onChange={(e: SliderChangeEvent) => handlePrimaryChange('Hue', e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handlePrimaryChange('Hue', e.target.value);
+          }}
           onDragStateChange={onDragStateChange}
           trackClassName={`hue-slider-${trackSuffix}`}
         />
@@ -400,7 +420,9 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
           step={1}
           defaultValue={0}
           value={currentValues.saturation}
-          onChange={(e: SliderChangeEvent) => handlePrimaryChange('Saturation', e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handlePrimaryChange('Saturation', e.target.value);
+          }}
           onDragStateChange={onDragStateChange}
           trackClassName={`sat-slider-${trackSuffix}`}
         />
@@ -512,7 +534,9 @@ export default function ColorPanel({
           label={t('adjustments.color.temperature')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => handleGlobalChange(ColorAdjustment.Temperature, e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handleGlobalChange(ColorAdjustment.Temperature, e.target.value);
+          }}
           step={1}
           value={adjustments.temperature || 0}
           trackClassName="temperature-gradient-track"
@@ -522,7 +546,9 @@ export default function ColorPanel({
           label={t('adjustments.color.tint')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => handleGlobalChange(ColorAdjustment.Tint, e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handleGlobalChange(ColorAdjustment.Tint, e.target.value);
+          }}
           step={1}
           value={adjustments.tint || 0}
           trackClassName="tint-gradient-track"
@@ -538,7 +564,9 @@ export default function ColorPanel({
           label={t('adjustments.color.vibrance')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => handleGlobalChange(ColorAdjustment.Vibrance, e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handleGlobalChange(ColorAdjustment.Vibrance, e.target.value);
+          }}
           step={1}
           value={adjustments.vibrance || 0}
           onDragStateChange={onDragStateChange}
@@ -547,7 +575,9 @@ export default function ColorPanel({
           label={t('adjustments.color.saturation')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => handleGlobalChange(ColorAdjustment.Saturation, e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handleGlobalChange(ColorAdjustment.Saturation, e.target.value);
+          }}
           step={1}
           value={adjustments.saturation || 0}
           onDragStateChange={onDragStateChange}
@@ -586,7 +616,9 @@ export default function ColorPanel({
           label={t('adjustments.color.hue')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => handleHslChange(ColorAdjustment.Hue, e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handleHslChange(ColorAdjustment.Hue, e.target.value);
+          }}
           step={1}
           value={currentHsl.hue}
           trackClassName={hue_slider}
@@ -596,7 +628,9 @@ export default function ColorPanel({
           label={t('adjustments.color.saturation')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => handleHslChange(ColorAdjustment.Saturation, e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handleHslChange(ColorAdjustment.Saturation, e.target.value);
+          }}
           step={1}
           value={currentHsl.saturation}
           trackClassName={saturation_slider}
@@ -606,7 +640,9 @@ export default function ColorPanel({
           label={t('adjustments.color.luminance')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => handleHslChange(ColorAdjustment.Luminance, e.target.value)}
+          onChange={(e: SliderChangeEvent) => {
+            handleHslChange(ColorAdjustment.Luminance, e.target.value);
+          }}
           step={1}
           value={currentHsl.luminance}
           trackClassName={luminance_slider}
