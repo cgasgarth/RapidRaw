@@ -48,3 +48,23 @@ PR and `main` validation should not cancel older queued or running checks. GitHu
 Actions is allowed to finish evidence for older commits. Speed work should come
 from parallel jobs, tighter path routing inside always-starting workflows,
 caching, and smaller validation commands.
+
+## Active PR Queue Policy
+
+GitHub Actions latency should be reduced by better workflow topology, not by
+building up a large queue of overlapping pull requests. Shared CI, lint, lockfile,
+generated artifact, and configuration changes should normally have only one
+active implementation PR at a time. Keep follow-up work local until the active
+overlapping PR merges or is closed.
+
+When an open PR is only waiting on required macOS/Rust jobs, do not rebase or
+force-push it unless it has become conflicting, failing, or branch protection
+requires a fresh head. Head churn restarts the slow checks and makes the PR queue
+look stale even when the code is healthy.
+
+Every open PR needs an explicit disposition:
+
+- merge it when branch protection allows;
+- fix it when checks fail;
+- close it when superseded or intentionally deferred;
+- preserve useful closed work in a local branch until the queue has capacity.
