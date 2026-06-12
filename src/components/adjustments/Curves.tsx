@@ -88,6 +88,12 @@ const DEFAULT_POINT_CURVES: Record<ActiveChannel, Array<Coord>> = {
   ],
 };
 
+const formatPercent = (value: number) => `${String(value)}%`;
+const formatSvgNumber = (value: number) => String(value);
+const formatSvgNumberFixed = (value: number) => value.toFixed(2);
+const formatInvertedSvgNumber = (value: number) => String(255 - value);
+const formatInvertedSvgNumberFixed = (value: number) => String(255 - Number(value.toFixed(2)));
+
 function buildParametricPoints(settings: ParametricCurveSettings): Array<Coord> {
   const vH = settings.highlights / 100;
   const vL = settings.lights / 100;
@@ -212,9 +218,9 @@ function getCurvePath(points: Array<Coord>) {
   if (!firstPoint || !lastPoint) return '';
 
   if (firstPoint.x > 0) {
-    path += `M 0 ${255 - firstPoint.y} L ${firstPoint.x} ${255 - firstPoint.y}`;
+    path += `M 0 ${formatInvertedSvgNumber(firstPoint.y)} L ${formatSvgNumber(firstPoint.x)} ${formatInvertedSvgNumber(firstPoint.y)}`;
   } else {
-    path += `M ${firstPoint.x} ${255 - firstPoint.y}`;
+    path += `M ${formatSvgNumber(firstPoint.x)} ${formatInvertedSvgNumber(firstPoint.y)}`;
   }
 
   for (let i = 0; i < n - 1; i++) {
@@ -231,13 +237,13 @@ function getCurvePath(points: Array<Coord>) {
     const cp2x = p1.x - dx / 3.0;
     const cp2y = p1.y - (m1 * dx) / 3.0;
 
-    path += ` C ${cp1x.toFixed(2)} ${255 - Number(cp1y.toFixed(2))}, ${cp2x.toFixed(2)} ${
-      255 - Number(cp2y.toFixed(2))
-    }, ${p1.x} ${255 - p1.y}`;
+    path += ` C ${formatSvgNumberFixed(cp1x)} ${formatInvertedSvgNumberFixed(cp1y)}, ${formatSvgNumberFixed(
+      cp2x,
+    )} ${formatInvertedSvgNumberFixed(cp2y)}, ${formatSvgNumber(p1.x)} ${formatInvertedSvgNumber(p1.y)}`;
   }
 
   if (lastPoint.x < 255) {
-    path += ` L 255 ${255 - lastPoint.y}`;
+    path += ` L 255 ${formatInvertedSvgNumber(lastPoint.y)}`;
   }
 
   return path;
@@ -249,7 +255,11 @@ function getHistogramPath(data: Array<number> | undefined) {
   if (maxVal === 0) return '';
 
   const pathData = data
-    .map((value: number, index: number) => `${(index / 255) * 255},${255 - (value / maxVal) * 255}`)
+    .map((value: number, index: number) => {
+      const x = (index / 255) * 255;
+      const y = 255 - (value / maxVal) * 255;
+      return `${formatSvgNumber(x)},${formatSvgNumber(y)}`;
+    })
     .join(' ');
 
   return `M0,255 L${pathData} L255,255 Z`;
@@ -257,7 +267,7 @@ function getHistogramPath(data: Array<number> | undefined) {
 
 function getZeroHistogramPath(data: Array<number> | undefined) {
   if (!data || data.length === 0) return '';
-  const pathData = data.map((_, index: number) => `${(index / 255) * 255},255`).join(' ');
+  const pathData = data.map((_, index: number) => `${formatSvgNumber((index / 255) * 255)},255`).join(' ');
   return `M0,255 L${pathData} L255,255 Z`;
 }
 
@@ -1083,7 +1093,7 @@ export default function CurveGraph({
                           e.stopPropagation();
                           updateParametricValue(key, DEFAULT_PARAMETRIC_CURVE_SETTINGS[key]);
                         }}
-                        style={{ left: `${value}%` }}
+                        style={{ left: formatPercent(value) }}
                         type="button"
                       >
                         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-white/70 group-hover:bg-white" />

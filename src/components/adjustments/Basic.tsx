@@ -32,6 +32,8 @@ type SliderChangeEvent =
       };
     };
 
+const formatPercent = (value: number) => `${String(value)}%`;
+
 const ToneMapperSwitch = ({
   selectedMapper,
   onMapperChange,
@@ -70,13 +72,13 @@ const ToneMapperSwitch = ({
     const safeIndex = selectedIndex >= 0 ? selectedIndex : 0;
 
     const widthPercent = 100 / toneMapperOptions.length;
-    const targetX = `${safeIndex * 100}%`;
-    const targetWidth = `${widthPercent}%`;
+    const targetX = formatPercent(safeIndex * 100);
+    const targetWidth = formatPercent(widthPercent);
 
     if (isInitialAnimation.current) {
       let initialX;
       if (selectedMapper === 'agx') {
-        initialX = `${toneMapperOptions.length * 100}%`;
+        initialX = formatPercent(toneMapperOptions.length * 100);
       } else {
         initialX = '-25%';
       }

@@ -42,6 +42,8 @@ type SliderChangeEvent =
       };
     };
 
+const formatPercent = (value: number) => `${String(value)}%`;
+
 interface ColorSwatchProps {
   color: string;
   isActive: boolean;
@@ -482,7 +484,7 @@ export default function ColorPanel({
     const effectiveSaturation = (currentHsl.saturation + 100) / 2;
 
     document.documentElement.style.setProperty(`--hsl-mixer-hue-${activeColor}`, normalizedHue.toString());
-    document.documentElement.style.setProperty(`--hsl-mixer-sat-${activeColor}`, `${effectiveSaturation}%`);
+    document.documentElement.style.setProperty(`--hsl-mixer-sat-${activeColor}`, formatPercent(effectiveSaturation));
   }, [effectiveHue, currentHsl.saturation, activeColor]);
 
   const handleGlobalChange = (key: ColorAdjustment, value: number | string) => {
