@@ -53,7 +53,7 @@ export default function TitleBar() {
 
     updateMaximizedState();
 
-    let unlisten: () => void;
+    let unlisten: (() => void) | undefined;
     appWindow
       .onResized(() => {
         updateMaximizedState();

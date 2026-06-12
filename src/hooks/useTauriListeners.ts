@@ -227,13 +227,12 @@ export function useTauriListeners({
       listen<unknown>('denoise-complete', (event) => {
         if (isEffectActive) {
           const payload = parseDenoiseCompletePayload(event.payload);
-          const isObject = typeof payload === 'object' && payload !== null;
           useUIStore.getState().setUI((state) => ({
             denoiseModalState: {
               ...state.denoiseModalState,
               isProcessing: false,
-              previewBase64: isObject ? payload.denoised : payload,
-              originalBase64: isObject ? (payload.original ?? null) : null,
+              previewBase64: typeof payload === 'string' ? payload : payload.denoised,
+              originalBase64: typeof payload === 'string' ? null : (payload.original ?? null),
               progressMessage: null,
             },
           }));
