@@ -605,7 +605,7 @@ export default function ExportPanel({
                   </button>
                 ))}
               </div>
-              {[FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl].includes(fileFormat as FileFormats) && (
+              {[FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl].includes(fileFormat) && (
                 <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
                   <Slider
                     defaultValue={90}
@@ -699,7 +699,7 @@ export default function ExportPanel({
                   )}
                 </Section>
 
-                {fileFormat == FileFormats.Jpeg && (
+                {fileFormat === FileFormats.Jpeg && (
                   <Section title={t('export.sections.metadata')}>
                     <Switch
                       checked={keepMetadata}

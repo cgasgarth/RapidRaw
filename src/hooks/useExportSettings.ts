@@ -1,8 +1,14 @@
 import { useState, useMemo, useCallback } from 'react';
-import { ExportPreset, WatermarkAnchor } from '../components/ui/ExportImportProperties';
+import { ExportPreset, FILE_FORMATS, FileFormats, WatermarkAnchor } from '../components/ui/ExportImportProperties';
+
+const FILE_FORMAT_IDS = new Set<string>(FILE_FORMATS.map((format) => format.id));
+const WATERMARK_ANCHORS = new Set<string>(Object.values(WatermarkAnchor));
+
+const isFileFormat = (value: string): value is FileFormats => FILE_FORMAT_IDS.has(value);
+const isWatermarkAnchor = (value: string): value is WatermarkAnchor => WATERMARK_ANCHORS.has(value);
 
 export function useExportSettings() {
-  const [fileFormat, setFileFormat] = useState('jpeg');
+  const [fileFormat, setFileFormat] = useState<FileFormats>(FileFormats.Jpeg);
   const [jpegQuality, setJpegQuality] = useState(90);
   const [enableResize, setEnableResize] = useState(false);
   const [resizeMode, setResizeMode] = useState('longEdge');
@@ -22,7 +28,7 @@ export function useExportSettings() {
   const [watermarkOpacity, setWatermarkOpacity] = useState(75);
 
   const handleApplyPreset = useCallback((preset: ExportPreset) => {
-    setFileFormat(preset.fileFormat);
+    setFileFormat(isFileFormat(preset.fileFormat) ? preset.fileFormat : FileFormats.Jpeg);
     setJpegQuality(preset.jpegQuality);
     setEnableResize(preset.enableResize);
     setResizeMode(preset.resizeMode);
@@ -36,7 +42,9 @@ export function useExportSettings() {
     setFilenameTemplate(preset.filenameTemplate);
     setEnableWatermark(preset.enableWatermark);
     setWatermarkPath(preset.watermarkPath);
-    setWatermarkAnchor(preset.watermarkAnchor as WatermarkAnchor);
+    setWatermarkAnchor(
+      isWatermarkAnchor(preset.watermarkAnchor) ? preset.watermarkAnchor : WatermarkAnchor.BottomRight,
+    );
     setWatermarkScale(preset.watermarkScale);
     setWatermarkSpacing(preset.watermarkSpacing);
     setWatermarkOpacity(preset.watermarkOpacity);

@@ -77,7 +77,7 @@ export interface ExportState {
 
 export interface FileFormat {
   extensions: Array<string>;
-  id: string;
+  id: FileFormats;
   name: string;
 }
 
