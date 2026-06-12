@@ -20,6 +20,7 @@ import type { FolderTree } from '../components/panel/FolderTree';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';
 import { debouncedSave, debouncedSetHistory } from './useEditorActions';
+import { formatUnknownError } from '../utils/errorFormatting';
 
 interface TransformController {
   resetTransform(time?: number): void;
@@ -505,7 +506,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         });
       } catch (err) {
         console.error('Failed to load album images:', err);
-        toast.error(`Failed to load album: ${err}`);
+        toast.error(`Failed to load album: ${formatUnknownError(err)}`);
       } finally {
         setLibrary({ isViewLoading: false });
       }
@@ -547,7 +548,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             });
             setLibrary({ folderTrees: [...folderTrees, newTree] });
           } catch (e) {
-            toast.error(`Failed to load folder tree: ${e}`);
+            toast.error(`Failed to load folder tree: ${formatUnknownError(e)}`);
           } finally {
             setLibrary({ isTreeLoading: false });
           }

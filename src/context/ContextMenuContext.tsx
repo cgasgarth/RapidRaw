@@ -73,6 +73,8 @@ interface SubMenuProps {
 }
 
 const ContextMenuContext = createContext<ContextMenuValue | undefined>(undefined);
+const cssPx = (value: number): string => `${String(value)}px`;
+const svgNumber = (value: number): string => String(value);
 
 export const useContextMenu = (): ContextMenuValue => {
   const value = useContext(ContextMenuContext);
@@ -121,25 +123,25 @@ function SubMenu({ cancelCloseSubmenu, closeSubmenu, hideContextMenu, options, p
         top = 5;
       }
 
-      setStyle({ top: `${top}px`, left: `${left}px`, opacity: 1 });
+      setStyle({ top: cssPx(top), left: cssPx(left), opacity: 1 });
 
       const isRightSide = left >= parentRect.right - 10;
       let path = '';
 
       if (isRightSide) {
         path = `
-          M ${parentRect.right} ${parentRect.top}
-          L ${left} ${top}
-          L ${left} ${top + subMenuHeight}
-          L ${parentRect.right} ${parentRect.bottom}
+          M ${svgNumber(parentRect.right)} ${svgNumber(parentRect.top)}
+          L ${svgNumber(left)} ${svgNumber(top)}
+          L ${svgNumber(left)} ${svgNumber(top + subMenuHeight)}
+          L ${svgNumber(parentRect.right)} ${svgNumber(parentRect.bottom)}
           Z
         `;
       } else {
         path = `
-          M ${parentRect.left} ${parentRect.top}
-          L ${left + subMenuWidth} ${top}
-          L ${left + subMenuWidth} ${top + subMenuHeight}
-          L ${parentRect.left} ${parentRect.bottom}
+          M ${svgNumber(parentRect.left)} ${svgNumber(parentRect.top)}
+          L ${svgNumber(left + subMenuWidth)} ${svgNumber(top)}
+          L ${svgNumber(left + subMenuWidth)} ${svgNumber(top + subMenuHeight)}
+          L ${svgNumber(parentRect.left)} ${svgNumber(parentRect.bottom)}
           Z
         `;
       }

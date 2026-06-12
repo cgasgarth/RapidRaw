@@ -410,11 +410,12 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const deleteLabel = t('contextMenus.thumbnail.deleteImage', { count: selectionCount });
       const exportLabel = t('contextMenus.thumbnail.exportImage', { count: selectionCount });
 
+      const firstSelectedPath = finalSelection[0];
       const selectionHasVirtualCopies =
         isSingleSelection &&
-        finalSelection[0] !== undefined &&
-        !finalSelection[0].includes('?vc=') &&
-        imageList.some((image) => image.path.startsWith(`${finalSelection[0]}?vc=`));
+        firstSelectedPath !== undefined &&
+        !firstSelectedPath.includes('?vc=') &&
+        imageList.some((image) => image.path.startsWith(`${firstSelectedPath}?vc=`));
 
       const hasAssociatedFiles = finalSelection.some((selectedPath) => {
         const lastDotIndex = selectedPath.lastIndexOf('.');
@@ -1321,7 +1322,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             onClick: async () => {
               try {
                 await invoke(Invokes.AddToAlbum, { albumId: activeAlbumId, paths: copiedFilePaths });
-                console.log(`Added ${numCopied} image(s) to album`);
+                console.log(`Added ${String(numCopied)} image(s) to album`);
                 const updatedTree = await invoke<AlbumItem[]>(Invokes.GetAlbums);
                 setLibrary({ albumTree: updatedTree });
                 await props.refreshImageList();

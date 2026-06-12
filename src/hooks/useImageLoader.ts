@@ -8,6 +8,7 @@ import { Invokes } from '../components/ui/AppProperties';
 import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import type { ImageCacheEntry } from '../utils/ImageLRUCache';
 import { isNullAdjustmentSnapshot, parseLoadedMetadata, parseLoadImageResult } from '../schemas/imageLoaderSchemas';
+import { formatUnknownError } from '../utils/errorFormatting';
 
 export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | null>) {
   const selectedImage = useEditorStore((s) => s.selectedImage);
@@ -113,7 +114,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
         } catch (err) {
           if (isEffectActive) {
             console.error('Failed to load image:', err);
-            toast.error(`Failed to load image: ${err}`);
+            toast.error(`Failed to load image: ${formatUnknownError(err)}`);
             setEditor({ selectedImage: null });
           }
         } finally {

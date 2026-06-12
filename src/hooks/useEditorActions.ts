@@ -17,6 +17,7 @@ import {
 import { calculateCenteredCrop } from '../utils/cropUtils';
 import { Invokes } from '../components/ui/AppProperties';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { formatUnknownError } from '../utils/errorFormatting';
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
   useEditorStore.getState().pushHistory(newAdj);
@@ -25,7 +26,7 @@ export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
 export const debouncedSave = debounce((path: string, adjustmentsToSave: Adjustments) => {
   invoke(Invokes.SaveMetadataAndUpdateThumbnail, { path, adjustments: adjustmentsToSave }).catch((err) => {
     console.error('Auto-save failed:', err);
-    toast.error(`Failed to save changes: ${err}`);
+    toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
   });
 }, 300);
 
@@ -84,7 +85,7 @@ export function useEditorActions() {
         sectionVisibility: { ...prev.sectionVisibility, ...autoAdjustments.sectionVisibility },
       }));
     } catch (err) {
-      toast.error(`Failed to apply auto adjustments: ${err}`);
+      toast.error(`Failed to apply auto adjustments: ${formatUnknownError(err)}`);
     }
   }, [setAdjustments]);
 
@@ -105,7 +106,7 @@ export function useEditorActions() {
           sectionVisibility: { ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility), effects: true },
         }));
       } catch (err) {
-        toast.error(`Failed to load LUT: ${err}`);
+        toast.error(`Failed to load LUT: ${formatUnknownError(err)}`);
       }
     },
     [setAdjustments],
@@ -133,7 +134,7 @@ export function useEditorActions() {
             setEditor({ adjustments: resetData });
           }
         })
-        .catch((err) => toast.error(`Failed to reset adjustments: ${err}`));
+        .catch((err) => toast.error(`Failed to reset adjustments: ${formatUnknownError(err)}`));
     },
     [setEditor],
   );
@@ -157,7 +158,7 @@ export function useEditorActions() {
             sourceAdjustments = INITIAL_ADJUSTMENTS;
           }
         } catch (err) {
-          toast.error(`Failed to load metadata for copying: ${err}`);
+          toast.error(`Failed to load metadata for copying: ${formatUnknownError(err)}`);
           return;
         }
       }
@@ -242,7 +243,7 @@ export function useEditorActions() {
             });
           }
         })
-        .catch((err) => toast.error(`Failed to paste adjustments: ${err}`));
+        .catch((err) => toast.error(`Failed to paste adjustments: ${formatUnknownError(err)}`));
 
       setProcess({ isPasted: true });
     },

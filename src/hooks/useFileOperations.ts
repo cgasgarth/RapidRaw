@@ -9,6 +9,7 @@ import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { AppSettings, ImageFile, Invokes } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
+import { formatUnknownError } from '../utils/errorFormatting';
 
 interface ImportSettings {
   dateFolderFormat: string;
@@ -95,7 +96,7 @@ export function useFileOperations(
         }
       } catch (err) {
         console.error('Failed to delete files:', err);
-        toast.error(`Failed to delete files: ${err}`);
+        toast.error(`Failed to delete files: ${formatUnknownError(err)}`);
       }
     },
     [refreshImageList, handleBackToLibrary, sortedImageList, handleImageSelect],
@@ -112,11 +113,12 @@ export function useFileOperations(
 
     const isSingle = pathsToDelete.length === 1;
 
+    const firstPathToDelete = pathsToDelete[0];
     const selectionHasVirtualCopies =
       isSingle &&
-      pathsToDelete[0] !== undefined &&
-      !pathsToDelete[0].includes('?vc=') &&
-      imageList.some((image) => image.path.startsWith(`${pathsToDelete[0]}?vc=`));
+      firstPathToDelete !== undefined &&
+      !firstPathToDelete.includes('?vc=') &&
+      imageList.some((image) => image.path.startsWith(`${firstPathToDelete}?vc=`));
 
     let modalTitle = 'Confirm Delete';
     let modalMessage = '';
@@ -130,7 +132,7 @@ export function useFileOperations(
       modalMessage = `Are you sure you want to permanently delete this image? This action cannot be undone. Right-click for more options (e.g., deleting associated files).`;
       confirmText = 'Delete Selected Only';
     } else {
-      modalMessage = `Are you sure you want to permanently delete these ${pathsToDelete.length} images? This action cannot be undone. Right-click for more options (e.g., deleting associated files).`;
+      modalMessage = `Are you sure you want to permanently delete these ${String(pathsToDelete.length)} images? This action cannot be undone. Right-click for more options (e.g., deleting associated files).`;
       confirmText = 'Delete Selected Only';
     }
 
@@ -155,7 +157,7 @@ export function useFileOperations(
           await invoke(Invokes.CreateFolder, { path: `${folderActionTarget}/${folderName.trim()}` });
           await refreshAllFolderTrees();
         } catch (err) {
-          toast.error(`Failed to create folder: ${err}`);
+          toast.error(`Failed to create folder: ${formatUnknownError(err)}`);
         }
       }
     },
@@ -208,7 +210,7 @@ export function useFileOperations(
 
           await refreshAllFolderTrees();
         } catch (err) {
-          toast.error(`Failed to rename folder: ${err}`);
+          toast.error(`Failed to rename folder: ${formatUnknownError(err)}`);
         }
       }
     },
@@ -250,7 +252,7 @@ export function useFileOperations(
 
           setLibrary({ multiSelectedPaths: newPaths });
         } catch (err) {
-          toast.error(`Failed to rename files: ${err}`);
+          toast.error(`Failed to rename files: ${formatUnknownError(err)}`);
         }
       }
       setUI({ renameTargetPaths: [] });
@@ -274,7 +276,7 @@ export function useFileOperations(
         console.error('Failed to start import:', err);
         useProcessStore
           .getState()
-          .setImportState({ status: Status.Error, errorMessage: `Failed to start import: ${err}` });
+          .setImportState({ status: Status.Error, errorMessage: `Failed to start import: ${formatUnknownError(err)}` });
       }
     },
     [],
@@ -396,7 +398,7 @@ export function useFileOperations(
         }
         await refreshImageList();
       } catch (err) {
-        toast.error(`Failed to ${mode} files: ${err}`);
+        toast.error(`Failed to ${mode} files: ${formatUnknownError(err)}`);
       }
     },
     [refreshImageList, refreshAllFolderTrees],
