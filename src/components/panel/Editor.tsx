@@ -1445,7 +1445,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       return;
     }
 
-    const { aspectRatio, orientationSteps = 0, crop: currentAdjCrop, rotation = 0 } = adjustments;
+    const { aspectRatio, orientationSteps, crop: currentAdjCrop, rotation } = adjustments;
     const effectiveRotation = liveRotation !== null ? liveRotation : rotation;
 
     const geometryChanged =

@@ -145,7 +145,7 @@ export default function CropPanel() {
 
   const lastSyncedRatio = useRef<number | null>(null);
 
-  const { aspectRatio, rotation = 0, flipHorizontal = false, flipVertical = false, orientationSteps = 0 } = adjustments;
+  const { aspectRatio, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
 
   useEffect(() => {
     if (isStraightenActive) {

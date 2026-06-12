@@ -230,9 +230,6 @@ const MaskOverlay = memo(
     const isPercent = crop?.unit === '%';
     const cropX = crop ? (isPercent ? (crop.x / 100) * imageWidth : crop.x) : 0;
     const cropY = crop ? (isPercent ? (crop.y / 100) * imageHeight : crop.y) : 0;
-    const cropW = crop ? (isPercent ? (crop.width / 100) * imageWidth : crop.width) : imageWidth;
-    const cropH = crop ? (isPercent ? (crop.height / 100) * imageHeight : crop.height) : imageHeight;
-
     const [p, setP] = useState<MaskParameters>(() => toMaskParameters(subMask.parameters));
     const pRef = useRef(p);
     const isDragging = useRef(false);
@@ -807,8 +804,7 @@ const MaskOverlay = memo(
     }
 
     if (subMask.type === Mask.Linear) {
-      const defaultRange = Math.min(cropW, cropH) * 0.1;
-      const { startX, startY, endX, endY, range = defaultRange } = p;
+      const { startX, startY, endX, endY, range } = p;
 
       const flickDistX = startX - endX;
       const flickDistY = startY - endY;
@@ -2151,7 +2147,7 @@ const ImageCanvas = memo(
       }
 
       const { start, end } = straightenLine;
-      const { rotation = 0 } = adjustments;
+      const { rotation } = adjustments;
       const theta_rad = (rotation * Math.PI) / 180;
       const cos_t = Math.cos(theta_rad);
       const sin_t = Math.sin(theta_rad);

@@ -22,7 +22,7 @@ const formatPercent = (value: number) => `${String(value)}%`;
 const formatPx = (value: number) => `${String(value)}px`;
 
 const ColorWheel = ({
-  defaultValue = { hue: 0, saturation: 0, luminance: 0 },
+  defaultValue,
   label,
   onChange,
   value,
