@@ -9,8 +9,8 @@ import type { ChannelConfig } from '../../adjustments/Curves';
 interface WaveformProps {
   waveformData: WaveformData | null;
   histogram?: ChannelConfig | null;
-  displayMode: string;
-  setDisplayMode: (mode: string) => void;
+  displayMode: DisplayMode;
+  setDisplayMode: (mode: DisplayMode) => void;
   showClipping?: boolean;
   onToggleClipping?: () => void;
   theme?: string;
@@ -270,7 +270,7 @@ const WaveformCanvas = ({
   );
 };
 
-const FakeWaveformLoader = ({ mode }: { mode: string }) => {
+const FakeWaveformLoader = ({ mode }: { mode: DisplayMode }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastTimeRef = useRef<number>(0);
   const spawnAccumulatorRef = useRef<number>(0);
@@ -528,7 +528,7 @@ export default function Waveform({
         [DisplayMode.Parade]: waveformData.parade,
         [DisplayMode.Vectorscope]: waveformData.vectorscope,
         [DisplayMode.Histogram]: undefined,
-      }[displayMode as DisplayMode]
+      }[displayMode]
     : '';
 
   const handleMouseEnter = () => {
@@ -563,7 +563,7 @@ export default function Waveform({
     DisplayMode.Parade,
     DisplayMode.Vectorscope,
     DisplayMode.Histogram,
-  ].includes(displayMode as DisplayMode);
+  ].includes(displayMode);
 
   return (
     <div

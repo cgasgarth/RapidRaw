@@ -1,6 +1,7 @@
 import { type PointerEvent as ReactPointerEvent, useState, useCallback } from 'react';
 import { useEditorStore } from '../store/useEditorStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { DisplayMode } from '../utils/adjustments';
 
 export function useWaveformControls() {
   const [isResizingWaveform, setIsResizingWaveform] = useState(false);
@@ -14,7 +15,7 @@ export function useWaveformControls() {
   }, [setEditor]);
 
   const setActiveWaveformChannel = useCallback(
-    (mode: string) => {
+    (mode: DisplayMode) => {
       setEditor({ activeWaveformChannel: mode });
       const { appSettings, handleSettingsChange } = useSettingsStore.getState();
       if (appSettings) handleSettingsChange({ ...appSettings, activeWaveformChannel: mode });

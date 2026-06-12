@@ -7,7 +7,7 @@ import { useUIStore } from '../store/useUIStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from '../utils/themes';
-import { COPYABLE_ADJUSTMENT_KEYS, PasteMode } from '../utils/adjustments';
+import { COPYABLE_ADJUSTMENT_KEYS, DisplayMode, PasteMode } from '../utils/adjustments';
 import {
   type AppSettings,
   FilterCriteria,
@@ -36,6 +36,9 @@ interface PersistedFolderState {
   expandedAlbumGroups?: string[];
   expandedFolders?: string[];
 }
+
+const DISPLAY_MODES = new Set<string>(Object.values(DisplayMode));
+const isDisplayMode = (value: string): value is DisplayMode => DISPLAY_MODES.has(value);
 
 interface InitializationSettings extends AppSettings {
   lastFolderState?: PersistedFolderState | null;
@@ -199,7 +202,9 @@ export const useAppInitialization = ({
           setUI((state) => ({ uiVisibility: { ...state.uiVisibility, ...settings.uiVisibility } }));
 
         if (settings.isWaveformVisible !== undefined) setEditor({ isWaveformVisible: settings.isWaveformVisible });
-        if (settings.activeWaveformChannel) setEditor({ activeWaveformChannel: settings.activeWaveformChannel });
+        if (settings.activeWaveformChannel && isDisplayMode(settings.activeWaveformChannel)) {
+          setEditor({ activeWaveformChannel: settings.activeWaveformChannel });
+        }
         if (typeof settings.waveformHeight === 'number') setEditor({ waveformHeight: settings.waveformHeight });
 
         setLibraryViewMode(settings.libraryViewMode ?? defaultLibraryViewMode);
