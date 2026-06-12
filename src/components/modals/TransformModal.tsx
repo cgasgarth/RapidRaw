@@ -257,7 +257,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
       setParams(initParams);
       setShowLines(false);
       handleResetZoom();
-      updatePreview(initParams, false);
+      void updatePreview(initParams, false);
       return () => {
         clearTimeout(timer);
       };
@@ -277,7 +277,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
   const handleChange = (key: keyof typeof DEFAULT_PARAMS, value: number) => {
     const newParams = { ...params, [key]: value };
     setParams(newParams);
-    updatePreview(newParams, showLines);
+    void updatePreview(newParams, showLines);
   };
 
   const handleApply = () => {
@@ -293,13 +293,13 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
 
   const handleReset = () => {
     setParams(DEFAULT_PARAMS);
-    updatePreview(DEFAULT_PARAMS, showLines);
+    void updatePreview(DEFAULT_PARAMS, showLines);
   };
 
   const handleShowLinesToggle = () => {
     const newShowLines = !showLines;
     setShowLines(newShowLines);
-    updatePreview(params, newShowLines);
+    void updatePreview(params, newShowLines);
   };
 
   const toggleCompare = async (active: boolean) => {
@@ -330,7 +330,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
       });
       setPreviewUrl(result);
     } else {
-      updatePreview(params, showLines);
+      void updatePreview(params, showLines);
     }
   };
 
