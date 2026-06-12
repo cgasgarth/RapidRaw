@@ -144,7 +144,7 @@ module.exports = [
       // Import order and boundary enforcement are enabled incrementally after
       // the current module graph is measured and split into focused PRs.
       'import-x/no-named-as-default': 'off',
-      'import-x/no-named-as-default-member': 'off',
+      'import-x/no-named-as-default-member': 'error',
       'import-x/order': 'off',
       'import-x/no-cycle': 'off',
       'boundaries/element-types': 'off',

@@ -12,7 +12,9 @@ import pt from './locales/pt.json';
 import ja from './locales/ja.json';
 import ru from './locales/ru.json';
 
-i18n.use(initReactI18next).init({
+const installI18nPlugin = i18n['use'].bind(i18n);
+
+installI18nPlugin(initReactI18next).init({
   resources: {
     en: { translation: en },
     de: { translation: de },

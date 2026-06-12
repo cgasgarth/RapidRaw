@@ -1,5 +1,5 @@
 declare module 'react-image-crop' {
-  import type React from 'react';
+  import type { CSSProperties, PureComponent, ReactNode } from 'react';
 
   export type XOrds = 'e' | 'w';
   export type YOrds = 'n' | 's';
@@ -42,7 +42,7 @@ declare module 'react-image-crop' {
     aspect?: number | null;
     circularCrop?: boolean;
     className?: string;
-    children?: React.ReactNode;
+    children?: ReactNode;
     crop?: Crop | null;
     disabled?: boolean;
     keepSelection?: boolean;
@@ -55,12 +55,12 @@ declare module 'react-image-crop' {
     onComplete?: (crop: PixelCrop, percentageCrop: PercentCrop) => void;
     onDragEnd?: (e: PointerEvent) => void;
     onDragStart?: (e: PointerEvent) => void;
-    renderSelectionAddon?: (state: ReactCropState) => React.ReactNode;
+    renderSelectionAddon?: (state: ReactCropState) => ReactNode;
     ruleOfThirds?: boolean;
-    style?: React.CSSProperties;
+    style?: CSSProperties;
   }
 
-  export class ReactCrop extends React.PureComponent<ReactCropProps, ReactCropState> {}
+  export class ReactCrop extends PureComponent<ReactCropProps, ReactCropState> {}
 
   export { ReactCrop as Component };
   export default ReactCrop;
