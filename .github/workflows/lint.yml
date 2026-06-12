@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 10
     outputs:
       macos_smoke_required: ${{ steps.classify.outputs.macos_smoke_required }}
+      macos_smoke_mode: ${{ steps.classify.outputs.macos_smoke_mode }}
+      macos_smoke_args: ${{ steps.classify.outputs.macos_smoke_args }}
       macos_smoke_reason: ${{ steps.classify.outputs.macos_smoke_reason }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -49,6 +51,8 @@ jobs:
           {
             echo "### macOS smoke routing"
             echo "Required: \`${{ steps.classify.outputs.macos_smoke_required }}\`"
+            echo "Mode: \`${{ steps.classify.outputs.macos_smoke_mode }}\`"
+            echo "Args: \`${{ steps.classify.outputs.macos_smoke_args }}\`"
             echo "Reason: ${{ steps.classify.outputs.macos_smoke_reason }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -439,7 +443,7 @@ jobs:
     name: macOS app no-bundle smoke
     needs:
       - changed-paths
-    if: github.event_name == 'pull_request' && needs.changed-paths.outputs.macos_smoke_required == 'true'
+    if: github.event_name == 'pull_request' && needs.changed-paths.outputs.macos_smoke_mode != 'none'
     runs-on: macos-14
     timeout-minutes: 90
     steps:
@@ -460,7 +464,7 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          key: v1-pr-smoke-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop
+          key: v1-pr-smoke-${{ needs.changed-paths.outputs.macos_smoke_mode }}-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop
           cache-on-failure: true
 
       - name: Cache ONNX Runtime library
@@ -483,7 +487,8 @@ jobs:
 
           {
             echo "### macOS smoke cache status"
-            echo "- Rust cache key suffix: \`v1-pr-smoke-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop\`"
+            echo "- Mode: \`${{ needs.changed-paths.outputs.macos_smoke_mode }}\`"
+            echo "- Rust cache key suffix: \`v1-pr-smoke-${{ needs.changed-paths.outputs.macos_smoke_mode }}-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop\`"
             echo "- ONNX exact hit: \`$onnx_cache_hit\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -496,7 +501,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: --verbose --ci --no-bundle --target aarch64-apple-darwin
+          args: ${{ needs.changed-paths.outputs.macos_smoke_args }}
           retryAttempts: 3
 
       - name: Collect smoke failure diagnostics
@@ -565,6 +570,8 @@ jobs:
           REPO: ${{ github.repository }}
           CHANGED_PATHS_RESULT: ${{ needs.changed-paths.result }}
           MACOS_SMOKE_REQUIRED: ${{ needs.changed-paths.outputs.macos_smoke_required }}
+          MACOS_SMOKE_MODE: ${{ needs.changed-paths.outputs.macos_smoke_mode }}
+          MACOS_SMOKE_ARGS: ${{ needs.changed-paths.outputs.macos_smoke_args }}
           MACOS_SMOKE_REASON: ${{ needs.changed-paths.outputs.macos_smoke_reason }}
         run: |
           set -euo pipefail
@@ -576,6 +583,21 @@ jobs:
 
           if [[ "$MACOS_SMOKE_REQUIRED" != "true" && "$MACOS_SMOKE_REQUIRED" != "false" ]]; then
             echo "Blocking PR because changed-path routing produced an invalid macOS smoke decision: $MACOS_SMOKE_REQUIRED"
+            exit 1
+          fi
+
+          if [[ "$MACOS_SMOKE_MODE" != "none" && "$MACOS_SMOKE_MODE" != "debug" && "$MACOS_SMOKE_MODE" != "release" ]]; then
+            echo "Blocking PR because changed-path routing produced an invalid macOS smoke mode: $MACOS_SMOKE_MODE"
+            exit 1
+          fi
+
+          if [[ "$MACOS_SMOKE_MODE" == "none" && -n "$MACOS_SMOKE_ARGS" ]]; then
+            echo "Blocking PR because skipped macOS smoke unexpectedly produced args: $MACOS_SMOKE_ARGS"
+            exit 1
+          fi
+
+          if [[ "$MACOS_SMOKE_MODE" != "none" && -z "$MACOS_SMOKE_ARGS" ]]; then
+            echo "Blocking PR because required macOS smoke did not produce Tauri args."
             exit 1
           fi
 
@@ -601,7 +623,7 @@ jobs:
             "rust: clippy baseline macOS"
           )
 
-          if [[ "$MACOS_SMOKE_REQUIRED" == "true" ]]; then
+          if [[ "$MACOS_SMOKE_MODE" != "none" ]]; then
             required_jobs+=("macOS app no-bundle smoke")
           else
             echo "Skipping macOS app no-bundle smoke in aggregate wait."
