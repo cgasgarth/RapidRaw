@@ -254,7 +254,7 @@ export function useImageProcessing(
 
     inFlightCountRef.current += 1;
 
-    executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
+    void executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
       inFlightCountRef.current -= 1;
       if (pendingApplyRef.current) {
         requestAnimationFrame(() => {
@@ -273,7 +273,7 @@ export function useImageProcessing(
         flushPipeline();
       } else {
         pendingApplyRef.current = null;
-        executeApplyAdjustments(currentAdjustments, false, targetRes);
+        void executeApplyAdjustments(currentAdjustments, false, targetRes);
       }
     },
     [selectedImage?.isReady, flushPipeline, executeApplyAdjustments],
@@ -463,7 +463,7 @@ export function useImageProcessing(
     if (showOriginal && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
       const targetRes = calculateTargetRes();
       if (targetRes > currentOriginalResRef.current) {
-        requestHiFiOriginalZoom(adjustments, targetRes);
+        void requestHiFiOriginalZoom(adjustments, targetRes);
       }
     }
     return () => {
@@ -503,7 +503,7 @@ export function useImageProcessing(
         }
       }
     };
-    generate();
+    void generate();
     return () => {
       isEffectActive = false;
     };
