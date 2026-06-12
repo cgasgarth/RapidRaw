@@ -10,6 +10,9 @@ interface CompositionOverlaysProps {
   denseVisible?: boolean | undefined;
 }
 
+const svgPercent = (value: number): string => `${String(value)}%`;
+const svgNumber = (value: number): string => String(value);
+
 export default function CompositionOverlays({
   width,
   height,
@@ -51,10 +54,10 @@ export default function CompositionOverlays({
     >
       {[...Array(17)].map((_, i) => (
         <line
-          key={`v-${i}`}
-          x1={`${(i + 1) * 5.555}%`}
+          key={`v-${String(i)}`}
+          x1={svgPercent((i + 1) * 5.555)}
           y1={0}
-          x2={`${(i + 1) * 5.555}%`}
+          x2={svgPercent((i + 1) * 5.555)}
           y2={height}
           {...strokeProps}
           strokeWidth="1"
@@ -62,11 +65,11 @@ export default function CompositionOverlays({
       ))}
       {[...Array(17)].map((_, i) => (
         <line
-          key={`h-${i}`}
+          key={`h-${String(i)}`}
           x1={0}
-          y1={`${(i + 1) * 5.555}%`}
+          y1={svgPercent((i + 1) * 5.555)}
           x2={width}
-          y2={`${(i + 1) * 5.555}%`}
+          y2={svgPercent((i + 1) * 5.555)}
           {...strokeProps}
           strokeWidth="1"
         />
@@ -174,7 +177,7 @@ export default function CompositionOverlays({
     const baseH = baseW / PHI;
     const pathData =
       'M 0 618.03 A 618.03 618.03 0 0 1 618.03 0 A 381.97 381.97 0 0 1 1000 381.97 A 236.06 236.06 0 0 1 763.94 618.03 A 145.91 145.91 0 0 1 618.03 472.12 A 90.15 90.15 0 0 1 708.18 381.97 A 55.76 55.76 0 0 1 763.94 437.73 A 34.39 34.39 0 0 1 729.55 472.12 A 21.37 21.37 0 0 1 708.18 450.75 A 13.12 13.12 0 0 1 721.30 437.77 A 8.11 8.11 0 0 1 729.41 445.88 A 5.01 5.01 0 0 1 724.40 450.89';
-    const transform = `translate(${width / 2} ${height / 2}) rotate(${r * 90}) scale(${r % 2 === 0 ? width / baseW : height / baseW}, ${r % 2 === 0 ? height / baseH : width / baseH}) translate(${-baseW / 2} ${-baseH / 2})`;
+    const transform = `translate(${svgNumber(width / 2)} ${svgNumber(height / 2)}) rotate(${svgNumber(r * 90)}) scale(${svgNumber(r % 2 === 0 ? width / baseW : height / baseW)}, ${svgNumber(r % 2 === 0 ? height / baseH : width / baseH)}) translate(${svgNumber(-baseW / 2)} ${svgNumber(-baseH / 2)})`;
 
     return (
       <g style={{ opacity: mode === 'goldenSpiral' ? opacity : 0, transition: 'opacity 300ms ease-in-out' }}>

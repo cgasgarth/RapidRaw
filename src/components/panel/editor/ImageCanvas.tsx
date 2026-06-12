@@ -91,6 +91,10 @@ const setStageCursor = (stage: KonvaStage | null, cursor: string): void => {
   }
 };
 
+const cssPx = (value: number | undefined): string => `${String(value ?? 0)}px`;
+const cssPercent = (value: number): string => `${String(value)}%`;
+const svgNumber = (value: number): string => String(value);
+
 interface ImageCanvasProps {
   appSettings: AppSettings | null;
   activeAiPatchContainerId: string | null;
@@ -160,13 +164,13 @@ interface MaskOverlay {
 
 const getEdgeFadeStyle = (fadeDistancePx: number = 128): React.CSSProperties => ({
   WebkitMaskImage: `
-    linear-gradient(to right, transparent, black ${fadeDistancePx}px, black calc(100% - ${fadeDistancePx}px), transparent),
-    linear-gradient(to bottom, transparent, black ${fadeDistancePx}px, black calc(100% - ${fadeDistancePx}px), transparent)
+    linear-gradient(to right, transparent, black ${cssPx(fadeDistancePx)}, black calc(100% - ${cssPx(fadeDistancePx)}), transparent),
+    linear-gradient(to bottom, transparent, black ${cssPx(fadeDistancePx)}, black calc(100% - ${cssPx(fadeDistancePx)}), transparent)
   `,
   WebkitMaskComposite: 'source-in',
   maskImage: `
-    linear-gradient(to right, transparent, black ${fadeDistancePx}px, black calc(100% - ${fadeDistancePx}px), transparent),
-    linear-gradient(to bottom, transparent, black ${fadeDistancePx}px, black calc(100% - ${fadeDistancePx}px), transparent)
+    linear-gradient(to right, transparent, black ${cssPx(fadeDistancePx)}, black calc(100% - ${cssPx(fadeDistancePx)}), transparent),
+    linear-gradient(to bottom, transparent, black ${cssPx(fadeDistancePx)}, black calc(100% - ${cssPx(fadeDistancePx)}), transparent)
   `,
   maskComposite: 'intersect',
 });
@@ -404,7 +408,7 @@ const MaskOverlay = memo(
         const angle = Math.atan2(pointerPos.y - cy, pointerPos.x - cx) * (180 / Math.PI);
 
         const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.8));">
-          <g transform="rotate(${Math.round(angle)} 16 16)">
+          <g transform="rotate(${svgNumber(Math.round(angle))} 16 16)">
             <path d="M 23 9 A 10 10 0 0 1 23 23" />
             <path d="M 28 9 L 23 9 L 23 14" />
             <path d="M 28 23 L 23 23 L 23 18" />
@@ -2281,7 +2285,7 @@ const ImageCanvas = memo(
 
     const cropImageTransforms = useMemo(() => {
       const rotation = liveRotation !== null && liveRotation !== undefined ? liveRotation : adjustments.rotation || 0;
-      return `rotate(${rotation}deg)`;
+      return `rotate(${svgNumber(rotation)}deg)`;
     }, [adjustments.rotation, liveRotation]);
 
     const getCropDimensions = () => {
@@ -2356,10 +2360,10 @@ const ImageCanvas = memo(
                   imageRenderSize.width > 0 && imageRenderSize.height > 0
                     ? {
                         position: 'absolute',
-                        left: `${imageRenderSize.offsetX}px`,
-                        top: `${imageRenderSize.offsetY}px`,
-                        width: `${imageRenderSize.width}px`,
-                        height: `${imageRenderSize.height}px`,
+                        left: cssPx(imageRenderSize.offsetX),
+                        top: cssPx(imageRenderSize.offsetY),
+                        width: cssPx(imageRenderSize.width),
+                        height: cssPx(imageRenderSize.height),
                         overflow: 'visible',
                       }
                     : {
@@ -2401,10 +2405,10 @@ const ImageCanvas = memo(
                 {visiblePatch && !isWgpuActive && (
                   <image
                     href={visiblePatch.url}
-                    x={`${visiblePatch.normX * 100}%`}
-                    y={`${visiblePatch.normY * 100}%`}
-                    width={`${visiblePatch.normW * 100}%`}
-                    height={`${visiblePatch.normH * 100}%`}
+                    x={cssPercent(visiblePatch.normX * 100)}
+                    y={cssPercent(visiblePatch.normY * 100)}
+                    width={cssPercent(visiblePatch.normW * 100)}
+                    height={cssPercent(visiblePatch.normH * 100)}
                     preserveAspectRatio="none"
                     style={{ imageRendering: isMaxZoom ? 'pixelated' : 'auto' }}
                   />
@@ -2424,10 +2428,10 @@ const ImageCanvas = memo(
                     imageRenderSize.width > 0 && imageRenderSize.height > 0
                       ? {
                           position: 'absolute',
-                          left: `${imageRenderSize.offsetX}px`,
-                          top: `${imageRenderSize.offsetY}px`,
-                          width: `${imageRenderSize.width}px`,
-                          height: `${imageRenderSize.height}px`,
+                          left: cssPx(imageRenderSize.offsetX),
+                          top: cssPx(imageRenderSize.offsetY),
+                          width: cssPx(imageRenderSize.width),
+                          height: cssPx(imageRenderSize.height),
                           imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                           opacity: isShowingOriginal && originalLoaded ? 1 : 0,
                           transition: originalLoaded ? 'opacity 150ms ease-in-out' : 'none',
@@ -2448,13 +2452,13 @@ const ImageCanvas = memo(
                   className="absolute object-contain pointer-events-none"
                   src={displayedMaskUrl}
                   style={{
-                    height: `${imageRenderSize.height}px`,
-                    left: `${imageRenderSize.offsetX}px`,
+                    height: cssPx(imageRenderSize.height),
+                    left: cssPx(imageRenderSize.offsetX),
                     opacity:
                       isShowingOriginal || isMaskControlHovered || isSliderDragging || isMaskInteractionActive ? 0 : 1,
-                    top: `${imageRenderSize.offsetY}px`,
+                    top: cssPx(imageRenderSize.offsetY),
                     transition: 'opacity 300ms ease-in-out',
-                    width: `${imageRenderSize.width}px`,
+                    width: cssPx(imageRenderSize.width),
                     imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                     zIndex: 3,
                   }}
@@ -2470,7 +2474,7 @@ const ImageCanvas = memo(
                 top: stageTop,
                 left: stageLeft,
                 transformOrigin: '0 0',
-                transform: `scale(${1 / maxSafeScale})`,
+                transform: `scale(${svgNumber(1 / maxSafeScale)})`,
                 width: stageWidth * maxSafeScale,
                 height: stageHeight * maxSafeScale,
                 zIndex: 4,
@@ -2626,8 +2630,8 @@ const ImageCanvas = memo(
                   src={cropPreviewUrl}
                   style={{
                     display: 'block',
-                    width: `${uncroppedImageRenderSize.width}px`,
-                    height: `${uncroppedImageRenderSize.height}px`,
+                    width: cssPx(uncroppedImageRenderSize.width),
+                    height: cssPx(uncroppedImageRenderSize.height),
                     objectFit: 'contain',
                     transform: cropImageTransforms,
                     imageRendering: isMaxZoom ? 'pixelated' : 'auto',
