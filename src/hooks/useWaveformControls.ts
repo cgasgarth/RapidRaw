@@ -11,14 +11,14 @@ export function useWaveformControls() {
     const newVal = !useEditorStore.getState().isWaveformVisible;
     setEditor({ isWaveformVisible: newVal });
     const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-    if (appSettings) handleSettingsChange({ ...appSettings, isWaveformVisible: newVal });
+    if (appSettings) void handleSettingsChange({ ...appSettings, isWaveformVisible: newVal });
   }, [setEditor]);
 
   const setActiveWaveformChannel = useCallback(
     (mode: DisplayMode) => {
       setEditor({ activeWaveformChannel: mode });
       const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-      if (appSettings) handleSettingsChange({ ...appSettings, activeWaveformChannel: mode });
+      if (appSettings) void handleSettingsChange({ ...appSettings, activeWaveformChannel: mode });
     },
     [setEditor],
   );
@@ -68,7 +68,7 @@ export function useWaveformControls() {
 
         const { appSettings, handleSettingsChange } = useSettingsStore.getState();
         if (appSettings) {
-          handleSettingsChange({
+          void handleSettingsChange({
             ...appSettings,
             waveformHeight: useEditorStore.getState().waveformHeight,
           });
