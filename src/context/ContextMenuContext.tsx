@@ -47,14 +47,14 @@ interface SubMenuStyle {
 
 interface ContextMenuValue {
   activeSubmenu: number[] | null;
-  cancelCloseSubmenu(): void;
-  closeSubmenu(path: number[]): void;
-  hideContextMenu(): void;
+  cancelCloseSubmenu: () => void;
+  closeSubmenu: (path: number[]) => void;
+  hideContextMenu: () => void;
   menuId: number;
   menuRef: RefObject<HTMLDivElement | null>;
   menuState: MenuState;
-  openSubmenu(path: number[] | null): void;
-  showContextMenu(x: number, y: number, options: AppOption[]): void;
+  openSubmenu: (path: number[] | null) => void;
+  showContextMenu: (x: number, y: number, options: AppOption[]) => void;
 }
 
 interface MenuItemProps {

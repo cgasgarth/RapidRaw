@@ -14,7 +14,7 @@ import { formatUnknownError } from '../utils/errorFormatting';
 type LibraryClickEvent = Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>;
 
 interface MultiSelectOptions {
-  onSimpleClick(path: string): void;
+  onSimpleClick: (path: string) => void;
   shiftAnchor: string | null;
   updateLibraryActivePath: boolean;
 }

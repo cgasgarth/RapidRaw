@@ -10,7 +10,7 @@ interface SwitchProps {
   disabled?: boolean;
   id?: string;
   label: string;
-  onChange(val: boolean): void;
+  onChange: (val: boolean) => void;
   tooltip?: string;
   trackClassName?: string;
 }
