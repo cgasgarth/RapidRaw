@@ -65,20 +65,33 @@ export interface SubMask {
   visible: boolean;
 }
 
-export function formatMaskTypeName(type: string) {
-  if (type === Mask.AiDepth) return t('masks.types.depth');
-  if (type === Mask.AiSubject) return t('masks.types.subject');
-  if (type === Mask.AiForeground) return t('masks.types.foreground');
-  if (type === Mask.AiSky) return t('masks.types.sky');
-  if (type === Mask.All) return t('masks.types.all');
-  if (type === Mask.QuickEraser) return t('masks.types.quickEraser');
-  if (type === Mask.Brush) return t('masks.types.brush');
-  if (type === Mask.Flow) return t('masks.types.flow');
-  if (type === Mask.Color) return t('masks.types.color');
-  if (type === Mask.Linear) return t('masks.types.linear');
-  if (type === Mask.Luminance) return t('masks.types.luminance');
-  if (type === Mask.Radial) return t('masks.types.radial');
-  return type.charAt(0).toUpperCase() + type.slice(1);
+export function formatMaskTypeName(type: Mask) {
+  switch (type) {
+    case Mask.AiDepth:
+      return t('masks.types.depth');
+    case Mask.AiSubject:
+      return t('masks.types.subject');
+    case Mask.AiForeground:
+      return t('masks.types.foreground');
+    case Mask.AiSky:
+      return t('masks.types.sky');
+    case Mask.All:
+      return t('masks.types.all');
+    case Mask.QuickEraser:
+      return t('masks.types.quickEraser');
+    case Mask.Brush:
+      return t('masks.types.brush');
+    case Mask.Flow:
+      return t('masks.types.flow');
+    case Mask.Color:
+      return t('masks.types.color');
+    case Mask.Linear:
+      return t('masks.types.linear');
+    case Mask.Luminance:
+      return t('masks.types.luminance');
+    case Mask.Radial:
+      return t('masks.types.radial');
+  }
 }
 
 export function getMaskTypeName(mask: MaskType) {
