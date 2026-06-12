@@ -133,8 +133,7 @@ const getIntegerEventValue = (event: NumericChangeEvent): number => parseInt(Str
 const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 const EXECUTE_TIMEOUT = 3000;
-const translateDynamicKey = (translate: TFunction, key: string): string =>
-  String(translate(key, { defaultValue: key }));
+const translateDynamicKey = (translate: TFunction, key: string): string => translate(key, { defaultValue: key });
 
 const adjustmentVisibilityDefaults = {
   sharpening: true,

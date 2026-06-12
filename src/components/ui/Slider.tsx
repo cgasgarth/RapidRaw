@@ -489,7 +489,7 @@ const Slider = ({
     }
   };
 
-  const numericValue = isNaN(Number(value)) ? 0 : Number(value);
+  const numericValue = Number.isNaN(value) ? 0 : value;
 
   return (
     <div className="mb-2 group" ref={containerRef}>

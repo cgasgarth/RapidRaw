@@ -165,7 +165,7 @@ function WatermarkPreview({
 }
 
 const formatBytes = (bytes: number, t: TFunction, decimals = 2) => {
-  if (!+bytes) return `0 ${t('export.bytes.bytes')}`;
+  if (!bytes) return `0 ${t('export.bytes.bytes')}`;
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = [

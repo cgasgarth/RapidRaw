@@ -146,7 +146,7 @@ export function useImageProcessing(
           isInteractive: dragging,
           targetResolution: targetRes || null,
           roi: roi || null,
-          computeWaveform: !!isWaveformVisible,
+          computeWaveform: isWaveformVisible,
           activeWaveformChannel: activeWaveformChannelRef.current || null,
         });
 

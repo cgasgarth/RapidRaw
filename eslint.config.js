@@ -196,7 +196,7 @@ module.exports = [
       '@typescript-eslint/no-non-null-assertion': 'error',
       '@typescript-eslint/no-deprecated': 'off',
       '@typescript-eslint/use-unknown-in-catch-callback-variable': 'off',
-      '@typescript-eslint/no-unnecessary-type-conversion': 'off',
+      '@typescript-eslint/no-unnecessary-type-conversion': 'error',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-useless-default-assignment': 'error',
       '@typescript-eslint/no-unsafe-return': 'off',

@@ -99,7 +99,7 @@ export interface LibraryRowProps {
 
 const getExifOverlayValues = (exif: ImageFile['exif']) => {
   const fNumberValue = exif?.['FNumber'] ?? '';
-  let fNumber = fNumberValue ? String(fNumberValue) : '';
+  let fNumber = fNumberValue || '';
   if (fNumber && !fNumber.toLowerCase().startsWith('f')) fNumber = `f/${fNumber}`;
 
   return {
@@ -224,7 +224,7 @@ const ThumbnailComponent = ({
   const isAlways = exifOverlay === ExifOverlay.Always;
   const isHover = exifOverlay === ExifOverlay.Hover;
 
-  const hasEditIcon = !!showEditIcon;
+  const hasEditIcon = showEditIcon;
   const hasColorLabel = !!colorLabel;
   const hasRating = rating > 0;
   const hasAnyOverlay = hasEditIcon || hasColorLabel || hasRating;
@@ -382,7 +382,7 @@ const ThumbnailComponent = ({
               <div className="flex items-center gap-1">
                 <IconFocalLength className="w-2.5 h-2.5" />
                 <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
-                  {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : '-'}
+                  {focal ? (focal.endsWith('mm') ? focal : `${focal}mm`) : '-'}
                 </Text>
               </div>
             </div>
@@ -477,7 +477,7 @@ const ThumbnailComponent = ({
               >
                 <IconFocalLength className="w-2.5 h-2.5" />
                 <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
-                  {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : '-'}
+                  {focal ? (focal.endsWith('mm') ? focal : `${focal}mm`) : '-'}
                 </Text>
               </div>
             </div>
@@ -743,7 +743,7 @@ const ListItemComponent = ({
           </div>
           <div style={{ width: getW('focal') }} className="flex items-center px-3 h-full overflow-hidden">
             <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
-              {focal ? (String(focal).endsWith('mm') ? focal : `${focal}mm`) : ''}
+              {focal ? (focal.endsWith('mm') ? focal : `${focal}mm`) : ''}
             </Text>
           </div>
         </>

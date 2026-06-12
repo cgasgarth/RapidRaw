@@ -102,9 +102,7 @@ export default function PanoramaModal({
           <Text variant={TextVariants.title} className="mb-2 text-center">
             {t('modals.panorama.failed')}
           </Text>
-          <Text className="text-center p-4 rounded-lg bg-bg-primary max-w-md mt-2 leading-relaxed">
-            {String(error)}
-          </Text>
+          <Text className="text-center p-4 rounded-lg bg-bg-primary max-w-md mt-2 leading-relaxed">{error}</Text>
         </div>
       );
     }

@@ -2757,7 +2757,7 @@ function SettingsPanel({
       >
         <div className="space-y-4 pt-2">
           <Switch
-            checked={!!(isComponentMode ? activeSubMask.invert : displayContainer.invert)}
+            checked={isComponentMode ? activeSubMask.invert : displayContainer.invert}
             label={isComponentMode ? t('editor.masks.settings.invertComponent') : t('editor.masks.settings.invertMask')}
             onChange={(v) => {
               if (isComponentMode) {
