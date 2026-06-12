@@ -126,7 +126,7 @@ module.exports = [
       // React compiler rules are enabled through the hooks recommended config,
       // with legacy violations split into focused cleanup issues.
       'react-hooks/set-state-in-effect': 'off',
-      'react-hooks/refs': 'off',
+      'react-hooks/refs': 'error',
       'react-hooks/static-components': 'error',
       'react-hooks/immutability': 'error',
       'react-hooks/preserve-manual-memoization': 'error',

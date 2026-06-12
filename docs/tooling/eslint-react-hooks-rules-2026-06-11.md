@@ -22,20 +22,22 @@ and JSX runtime config. Hooks linting uses the official
   preserving the inherited folder-toggle and mask-overlay memoization patterns.
 - `react-hooks/immutability` is enforced as an error after moving inherited
   recursive callbacks and ref state consumption behind stable local functions.
+- `react-hooks/refs` is enforced as an error after moving inherited render-time
+  ref reads into effects, event handlers, state, or memoized values.
 
 ## Legacy Hook Fences
 
 The first hooks recommended run found 107 problems. The React and hooks configs
-are enabled now. `react-hooks/exhaustive-deps`, `react-hooks/purity`, and
-`react-hooks/preserve-manual-memoization`, and `react-hooks/immutability` have
-since been promoted to hard gates. The remaining high-volume React compiler rule
-families stay fenced so they can be fixed in focused PRs.
+are enabled now. `react-hooks/exhaustive-deps`, `react-hooks/purity`,
+`react-hooks/preserve-manual-memoization`, `react-hooks/immutability`, and
+`react-hooks/refs` have since been promoted to hard gates. The remaining
+high-volume React compiler rule families stay fenced so they can be fixed in
+focused PRs.
 
-| Count | Rule                              | Follow-Up Path                 |
-| ----: | --------------------------------- | ------------------------------ |
-|    48 | `react-hooks/set-state-in-effect` | #526 state/effect cleanup      |
-|    32 | `react-hooks/refs`                | #527 ref render-access cleanup |
-|    10 | `react-hooks/static-components`   | #530 nested/static cleanup     |
+| Count | Rule                              | Follow-Up Path             |
+| ----: | --------------------------------- | -------------------------- |
+|    48 | `react-hooks/set-state-in-effect` | #526 state/effect cleanup  |
+|    10 | `react-hooks/static-components`   | #530 nested/static cleanup |
 
 Resolved hook fences:
 
@@ -45,6 +47,7 @@ Resolved hook fences:
 |            1 | `react-hooks/purity`                      | Enabled as an error after thumbnail hook cleanup.                  |
 |            2 | `react-hooks/preserve-manual-memoization` | Enabled as an error after preserving inherited manual memoization. |
 |            6 | `react-hooks/immutability`                | Enabled as an error after callback and ref-state cleanup.          |
+|           32 | `react-hooks/refs`                        | Enabled as an error after render-time ref reads were removed.      |
 
 Small React recommended findings were fixed in this PR by removing unused
 default React imports and assigning display names to memoized components.
