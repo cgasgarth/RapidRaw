@@ -1006,10 +1006,10 @@ export default function MasksPanel() {
     onSelectMask(subMask.id);
     setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
     if (type === Mask.Brush || type === Mask.Flow) selectBrushToolForNewMask();
-    if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
-    else if (type === Mask.AiSky) handleGenerateAiSkyMask(subMask.id);
+    if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
+    else if (type === Mask.AiSky) void handleGenerateAiSkyMask(subMask.id);
     else if (type === Mask.AiDepth)
-      handleGenerateAiDepthMask(subMask.id, aiDepthMaskParametersSchema.parse(subMask.parameters));
+      void handleGenerateAiDepthMask(subMask.id, aiDepthMaskParametersSchema.parse(subMask.parameters));
   };
 
   const handleAddSubMask = (
@@ -1038,10 +1038,10 @@ export default function MasksPanel() {
     onSelectMask(subMask.id);
     setExpandedContainers((prev) => new Set(prev).add(containerId));
     if (type === Mask.Brush || type === Mask.Flow) selectBrushToolForNewMask();
-    if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
-    else if (type === Mask.AiSky) handleGenerateAiSkyMask(subMask.id);
+    if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
+    else if (type === Mask.AiSky) void handleGenerateAiSkyMask(subMask.id);
     else if (type === Mask.AiDepth)
-      handleGenerateAiDepthMask(subMask.id, aiDepthMaskParametersSchema.parse(subMask.parameters));
+      void handleGenerateAiDepthMask(subMask.id, aiDepthMaskParametersSchema.parse(subMask.parameters));
   };
 
   const handleGridClick = (type: Mask, forceNewMaskContainer: boolean = false) => {
