@@ -192,8 +192,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const contentRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
   const transformStateRef = useRef<TransformState>(transformState);
-  transformStateRef.current = transformState;
   const [isPanningState, setIsPanningState] = useState(false);
+  const [isMiddleMousePanningState, setIsMiddleMousePanningState] = useState(false);
   const isClickAnimating = useRef(false);
   const clickAnimationTime = 250;
   const zoomDebounceTimeoutRef = useRef<number | null>(null);
@@ -342,7 +342,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
   const imageRenderSizeRef = useRef(imageRenderSize);
-  imageRenderSizeRef.current = imageRenderSize;
+  useLayoutEffect(() => {
+    transformStateRef.current = transformState;
+    imageRenderSizeRef.current = imageRenderSize;
+  }, [imageRenderSize, transformState]);
 
   const transformConfig = useMemo(() => {
     if (!selectedImage || !imageRenderSize.scale) {
@@ -769,6 +772,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
       if (isMiddleClick) {
         isMiddleMousePanning.current = true;
+        setIsMiddleMousePanningState(true);
       }
 
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
@@ -807,6 +811,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     panVelocityHistory.current = [];
     mouseDownPos.current = null;
     setIsPanningState(false);
+    setIsMiddleMousePanningState(false);
   }, [isPanningDisabled]);
 
   const handlePointerMove = useCallback(
@@ -887,6 +892,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         lastPinch.current = null;
         setIsPanningState(false);
         isMiddleMousePanning.current = false;
+        setIsMiddleMousePanningState(false);
 
         let vx = 0,
           vy = 0;
@@ -1121,7 +1127,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       });
     }
   }, []);
-  processOverlayQueueRef.current = processOverlayQueue;
+  useLayoutEffect(() => {
+    processOverlayQueueRef.current = processOverlayQueue;
+  }, [processOverlayQueue]);
 
   const requestMaskOverlay = useCallback(
     (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentAdjustments: Adjustments) => {
@@ -1986,10 +1994,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   }
 
   const isZoomActionActive = !isPanningDisabled;
-  const isMaxZoom = transformState.scale >= maxScaleRef.current - 0.5;
+  const isMaxZoom = transformState.scale >= transformConfig.maxScale - 0.5;
 
   let cursorStyle = 'default';
-  if (isPanningState && isMiddleMousePanning.current) {
+  if (isPanningState && isMiddleMousePanningState) {
     cursorStyle = 'grabbing';
   } else if (isZoomActionActive) {
     if (isPanningState) {
