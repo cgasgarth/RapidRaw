@@ -75,7 +75,9 @@ export default function RightPanelSwitcher({
                   : 'text-text-secondary hover:bg-surface hover:text-text-primary'
               }`}
               key={id}
-              onClick={() => onPanelSelect(id)}
+              onClick={() => {
+                onPanelSelect(id);
+              }}
               data-tooltip={t(title, { defaultValue: PANEL_TOOLTIP_FALLBACKS[id] })}
             >
               {activePanel === id && (

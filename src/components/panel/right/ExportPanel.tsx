@@ -403,7 +403,9 @@ export default function ExportPanel({
     };
     const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
     debouncedEstimateSize(pathsToExport, adjustments, selectedImage?.path, exportSettings, format);
-    return () => debouncedEstimateSize.cancel();
+    return () => {
+      debouncedEstimateSize.cancel();
+    };
   }, [
     pathsToExport,
     adjustments,
@@ -593,7 +595,9 @@ export default function ExportPanel({
                     className={`px-2 py-1.5 rounded-md transition-colors ${fileFormat === format.id ? 'bg-accent' : 'bg-surface hover:bg-card-active'} disabled:opacity-50`}
                     disabled={isExporting}
                     key={format.id}
-                    onClick={() => setFileFormat(format.id)}
+                    onClick={() => {
+                      setFileFormat(format.id);
+                    }}
                   >
                     <Text color={fileFormat === format.id ? TextColors.button : TextColors.secondary}>
                       {format.name}
@@ -612,7 +616,9 @@ export default function ExportPanel({
                     }
                     max={100}
                     min={1}
-                    onChange={(e) => setJpegQuality(parseInt(String(e.target.value), 10))}
+                    onChange={(e) => {
+                      setJpegQuality(parseInt(String(e.target.value), 10));
+                    }}
                     step={1}
                     value={jpegQuality}
                     fillOrigin="min"
@@ -626,7 +632,9 @@ export default function ExportPanel({
                 <input
                   className="w-full bg-surface border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
                   disabled={isExporting}
-                  onChange={(e) => setFilenameTemplate(e.target.value)}
+                  onChange={(e) => {
+                    setFilenameTemplate(e.target.value);
+                  }}
                   ref={filenameInputRef}
                   type="text"
                   value={filenameTemplate}
@@ -637,7 +645,9 @@ export default function ExportPanel({
                       className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors disabled:opacity-50"
                       disabled={isExporting}
                       key={variable}
-                      onClick={() => handleVariableClick(variable)}
+                      onClick={() => {
+                        handleVariableClick(variable);
+                      }}
                     >
                       {variable}
                     </button>
@@ -670,7 +680,9 @@ export default function ExportPanel({
                           className="w-24 bg-surface text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent text-text-secondary focus:text-text-primary"
                           disabled={isExporting}
                           min="1"
-                          onChange={(e) => setResizeValue(parseInt(e?.target?.value))}
+                          onChange={(e) => {
+                            setResizeValue(parseInt(e?.target?.value));
+                          }}
                           type="number"
                           value={resizeValue}
                         />
@@ -724,14 +736,18 @@ export default function ExportPanel({
                         label={t('export.watermark.watermarkImage')}
                         imageName={watermarkPath ? watermarkPath.split(/[\\/]/).pop() || null : null}
                         onImageSelect={setWatermarkPath}
-                        onClear={() => setWatermarkPath(null)}
+                        onClear={() => {
+                          setWatermarkPath(null);
+                        }}
                       />
                       {watermarkPath && (
                         <>
                           <Dropdown
                             options={anchorOptions}
                             value={watermarkAnchor}
-                            onChange={(val) => setWatermarkAnchor(val as WatermarkAnchor)}
+                            onChange={(val) => {
+                              setWatermarkAnchor(val as WatermarkAnchor);
+                            }}
                             disabled={isExporting}
                             className="w-full"
                           />
@@ -742,7 +758,9 @@ export default function ExportPanel({
                               max={50}
                               step={1}
                               value={watermarkScale}
-                              onChange={(e) => setWatermarkScale(parseInt(String(e.target.value), 10))}
+                              onChange={(e) => {
+                                setWatermarkScale(parseInt(String(e.target.value), 10));
+                              }}
                               disabled={isExporting}
                               defaultValue={10}
                             />
@@ -752,7 +770,9 @@ export default function ExportPanel({
                               max={25}
                               step={1}
                               value={watermarkSpacing}
-                              onChange={(e) => setWatermarkSpacing(parseInt(String(e.target.value), 10))}
+                              onChange={(e) => {
+                                setWatermarkSpacing(parseInt(String(e.target.value), 10));
+                              }}
                               disabled={isExporting}
                               defaultValue={5}
                             />
@@ -762,7 +782,9 @@ export default function ExportPanel({
                               max={100}
                               step={1}
                               value={watermarkOpacity}
-                              onChange={(e) => setWatermarkOpacity(parseInt(String(e.target.value), 10))}
+                              onChange={(e) => {
+                                setWatermarkOpacity(parseInt(String(e.target.value), 10));
+                              }}
                               disabled={isExporting}
                               defaultValue={75}
                             />
@@ -790,7 +812,9 @@ export default function ExportPanel({
               </Text>
               <div className="bg-surface rounded-xl overflow-hidden">
                 <button
-                  onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
+                  onClick={() => {
+                    setIsAdvancedExpanded(!isAdvancedExpanded);
+                  }}
                   className="w-full flex items-center justify-between p-3.5 hover:bg-card-active transition-colors"
                 >
                   <Text

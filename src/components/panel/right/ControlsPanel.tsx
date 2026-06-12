@@ -117,25 +117,29 @@ export default function Controls() {
   );
 
   const setCopiedSectionAdjustments = useCallback(
-    (val: CopiedSectionAdjustments | null) => setEditor({ copiedSectionAdjustments: val }),
+    (val: CopiedSectionAdjustments | null) => {
+      setEditor({ copiedSectionAdjustments: val });
+    },
     [setEditor],
   );
 
-  const toggleWbPicker = useCallback(
-    () => setEditor((state) => ({ isWbPickerActive: !state.isWbPickerActive })),
-    [setEditor],
-  );
+  const toggleWbPicker = useCallback(() => {
+    setEditor((state) => ({ isWbPickerActive: !state.isWbPickerActive }));
+  }, [setEditor]);
 
   const onDragStateChange = useCallback(
-    (isDragging: boolean) => setEditor({ isSliderDragging: isDragging }),
+    (isDragging: boolean) => {
+      setEditor({ isSliderDragging: isDragging });
+    },
     [setEditor],
   );
 
   const setCollapsibleState = useCallback(
-    (updater: CollapsibleSectionsUpdater) =>
+    (updater: CollapsibleSectionsUpdater) => {
       setUI((state) => ({
         collapsibleSectionsState: typeof updater === 'function' ? updater(state.collapsibleSectionsState) : updater,
-      })),
+      }));
+    },
     [setUI],
   );
 
@@ -380,9 +384,15 @@ export default function Controls() {
               <CollapsibleSection
                 isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility] ?? true}
                 isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState] ?? true}
-                onContextMenu={(event: MouseEvent<HTMLDivElement>) => handleSectionContextMenu(event, sectionName)}
-                onToggle={() => handleToggleSection(sectionName)}
-                onToggleVisibility={() => handleToggleVisibility(sectionName)}
+                onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
+                  handleSectionContextMenu(event, sectionName);
+                }}
+                onToggle={() => {
+                  handleToggleSection(sectionName);
+                }}
+                onToggleVisibility={() => {
+                  handleToggleVisibility(sectionName);
+                }}
                 title={title}
               >
                 {renderSectionComponent(sectionName)}
