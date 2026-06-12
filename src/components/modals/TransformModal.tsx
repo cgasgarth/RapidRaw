@@ -206,9 +206,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         try {
           const fullParams: GeometryParams = {
             ...currentParams,
-            lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
-            lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,
-            lens_tca_amount: (currentAdjustments.lensTcaAmount ?? 100) / SLIDER_DIVISOR,
+            lens_distortion_amount: currentAdjustments.lensDistortionAmount / SLIDER_DIVISOR,
+            lens_vignette_amount: currentAdjustments.lensVignetteAmount / SLIDER_DIVISOR,
+            lens_tca_amount: currentAdjustments.lensTcaAmount / SLIDER_DIVISOR,
             lens_dist_k1: currentAdjustments.lensDistortionParams?.k1 ?? 0,
             lens_dist_k2: currentAdjustments.lensDistortionParams?.k2 ?? 0,
             lens_dist_k3: currentAdjustments.lensDistortionParams?.k3 ?? 0,
@@ -218,9 +218,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             vig_k1: currentAdjustments.lensDistortionParams?.vig_k1 ?? 0,
             vig_k2: currentAdjustments.lensDistortionParams?.vig_k2 ?? 0,
             vig_k3: currentAdjustments.lensDistortionParams?.vig_k3 ?? 0,
-            lens_distortion_enabled: currentAdjustments.lensDistortionEnabled ?? true,
-            lens_tca_enabled: currentAdjustments.lensTcaEnabled ?? true,
-            lens_vignette_enabled: currentAdjustments.lensVignetteEnabled ?? true,
+            lens_distortion_enabled: currentAdjustments.lensDistortionEnabled,
+            lens_tca_enabled: currentAdjustments.lensTcaEnabled,
+            lens_vignette_enabled: currentAdjustments.lensVignetteEnabled,
           };
 
           const result: string = await invoke('preview_geometry_transform', {
@@ -241,14 +241,14 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
       const initParams = {
-        distortion: currentAdjustments.transformDistortion ?? 0,
-        vertical: currentAdjustments.transformVertical ?? 0,
-        horizontal: currentAdjustments.transformHorizontal ?? 0,
-        rotate: currentAdjustments.transformRotate ?? 0,
-        aspect: currentAdjustments.transformAspect ?? 0,
-        scale: currentAdjustments.transformScale ?? 100,
-        x_offset: currentAdjustments.transformXOffset ?? 0,
-        y_offset: currentAdjustments.transformYOffset ?? 0,
+        distortion: currentAdjustments.transformDistortion,
+        vertical: currentAdjustments.transformVertical,
+        horizontal: currentAdjustments.transformHorizontal,
+        rotate: currentAdjustments.transformRotate,
+        aspect: currentAdjustments.transformAspect,
+        scale: currentAdjustments.transformScale,
+        x_offset: currentAdjustments.transformXOffset,
+        y_offset: currentAdjustments.transformYOffset,
       };
       setParams(initParams);
       setShowLines(false);
@@ -299,9 +299,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
     if (active) {
       const fullParams: GeometryParams = {
         ...DEFAULT_PARAMS,
-        lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
-        lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,
-        lens_tca_amount: (currentAdjustments.lensTcaAmount ?? 100) / SLIDER_DIVISOR,
+        lens_distortion_amount: currentAdjustments.lensDistortionAmount / SLIDER_DIVISOR,
+        lens_vignette_amount: currentAdjustments.lensVignetteAmount / SLIDER_DIVISOR,
+        lens_tca_amount: currentAdjustments.lensTcaAmount / SLIDER_DIVISOR,
         lens_dist_k1: currentAdjustments.lensDistortionParams?.k1 ?? 0,
         lens_dist_k2: currentAdjustments.lensDistortionParams?.k2 ?? 0,
         lens_dist_k3: currentAdjustments.lensDistortionParams?.k3 ?? 0,
@@ -311,9 +311,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         vig_k1: currentAdjustments.lensDistortionParams?.vig_k1 ?? 0,
         vig_k2: currentAdjustments.lensDistortionParams?.vig_k2 ?? 0,
         vig_k3: currentAdjustments.lensDistortionParams?.vig_k3 ?? 0,
-        lens_distortion_enabled: currentAdjustments.lensDistortionEnabled ?? true,
-        lens_tca_enabled: currentAdjustments.lensTcaEnabled ?? true,
-        lens_vignette_enabled: currentAdjustments.lensVignetteEnabled ?? true,
+        lens_distortion_enabled: currentAdjustments.lensDistortionEnabled,
+        lens_tca_enabled: currentAdjustments.lensTcaEnabled,
+        lens_vignette_enabled: currentAdjustments.lensVignetteEnabled,
       };
       const result: string = await invoke('preview_geometry_transform', {
         params: fullParams,
@@ -445,7 +445,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         </div>
 
         <div className="mt-auto">
-          {currentAdjustments.masks && currentAdjustments.masks.length > 0 && (
+          {currentAdjustments.masks.length > 0 && (
             <Text
               as="div"
               variant={TextVariants.small}
