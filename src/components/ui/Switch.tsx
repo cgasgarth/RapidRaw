@@ -61,7 +61,11 @@ const Switch = ({
           className="sr-only"
           disabled={disabled}
           id={uniqueId}
-          onChange={(e: ChangeEvent<HTMLInputElement>) => !disabled && onChange(e.target.checked)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => {
+            if (!disabled) {
+              onChange(e.target.checked);
+            }
+          }}
           type="checkbox"
         />
         <div className={clsx('w-full h-full bg-card-active/50 rounded-full shadow-inner', trackClassName)}></div>

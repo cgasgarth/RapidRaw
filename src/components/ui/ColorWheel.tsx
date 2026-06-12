@@ -177,8 +177,12 @@ const ColorWheel = ({
         className="relative cursor-pointer h-5 w-full overflow-hidden"
         onClick={handleReset}
         onDoubleClick={handleReset}
-        onMouseEnter={() => setIsLabelHovered(true)}
-        onMouseLeave={() => setIsLabelHovered(false)}
+        onMouseEnter={() => {
+          setIsLabelHovered(true);
+        }}
+        onMouseLeave={() => {
+          setIsLabelHovered(false);
+        }}
       >
         <Text
           variant={TextVariants.label}

@@ -113,7 +113,9 @@ const Dropdown = <T extends React.Key>({
           'focus:ring-accent focus:border-accent focus:outline-hidden focus:ring-2',
           triggerClassName || 'bg-surface',
         )}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+        }}
         type="button"
       >
         <Text as="span" variant={TextVariants.label} color={TextColors.primary}>
@@ -143,7 +145,9 @@ const Dropdown = <T extends React.Key>({
                 <Input
                   ref={searchInputRef}
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                  }}
                   placeholder={searchPlaceholder}
                   autoFocus={true}
                   className="mb-2"
@@ -155,7 +159,9 @@ const Dropdown = <T extends React.Key>({
                 return (
                   <button
                     key={option.value}
-                    onClick={() => handleSelect(option)}
+                    onClick={() => {
+                      handleSelect(option);
+                    }}
                     className={clsx(
                       'w-full text-left px-3 py-2 rounded-md flex items-center justify-between',
                       'transition-colors duration-150 hover:bg-bg-primary',

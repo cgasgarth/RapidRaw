@@ -53,7 +53,9 @@ export default function CollapsibleSection({
     const resizeObserver = new ResizeObserver(updateMaxHeight);
     resizeObserver.observe(content);
 
-    return () => resizeObserver.disconnect();
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [isOpen]);
 
   const handleMouseEnter = () => {

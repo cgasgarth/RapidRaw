@@ -496,8 +496,20 @@ const Slider = ({
           className={`grid ${typeof label === 'string' && !disabled ? 'cursor-pointer' : ''}`}
           onClick={typeof label === 'string' && !disabled ? handleReset : undefined}
           onDoubleClick={typeof label === 'string' && !disabled ? handleReset : undefined}
-          onMouseEnter={typeof label === 'string' ? () => setIsLabelHovered(true) : undefined}
-          onMouseLeave={typeof label === 'string' ? () => setIsLabelHovered(false) : undefined}
+          onMouseEnter={
+            typeof label === 'string'
+              ? () => {
+                  setIsLabelHovered(true);
+                }
+              : undefined
+          }
+          onMouseLeave={
+            typeof label === 'string'
+              ? () => {
+                  setIsLabelHovered(false);
+                }
+              : undefined
+          }
         >
           <span
             aria-hidden={isLabelHovered && typeof label === 'string'}

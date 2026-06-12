@@ -123,7 +123,9 @@ export default function GlobalTooltip() {
       }
     };
 
-    const dismiss = () => hide();
+    const dismiss = () => {
+      hide();
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') hide();
     };
