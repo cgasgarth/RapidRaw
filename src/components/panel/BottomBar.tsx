@@ -57,7 +57,7 @@ const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
 
   return (
     <div className={clsx('flex items-center gap-1', disabled && 'cursor-not-allowed')}>
-      {[...Array(5)].map((_, index: number) => {
+      {Array.from({ length: 5 }, (_, index) => {
         const starValue = index + 1;
         return (
           <button

@@ -610,15 +610,23 @@ function App() {
       setUI({ isWindowFullScreen: await appWindow.isFullscreen() });
     };
     void checkFullscreen();
-    const unlistenPromise: Promise<UnlistenFn> = appWindow.onResized(checkFullscreen);
+    let unlisten: UnlistenFn | undefined;
+    let didCleanup = false;
+    void appWindow
+      .onResized(checkFullscreen)
+      .then((nextUnlisten: UnlistenFn) => {
+        if (didCleanup) {
+          nextUnlisten();
+          return;
+        }
+        unlisten = nextUnlisten;
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to subscribe to window resize listener:', err);
+      });
     return () => {
-      void unlistenPromise
-        .then((unlisten) => {
-          unlisten();
-        })
-        .catch((err: unknown) => {
-          console.error('Failed to remove window resize listener:', err);
-        });
+      didCleanup = true;
+      unlisten?.();
     };
   }, [setUI]);
 
