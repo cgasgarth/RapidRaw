@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import Button from '../ui/Button';
 import Text from '../ui/Text';
 import { TextColors, TextVariants } from '../../types/typography';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface HdrModalProps {
   error: string | null;
@@ -34,26 +35,15 @@ export default function HdrModal({
   progressMessage,
 }: HdrModalProps) {
   const { t } = useTranslation();
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
 
   const mouseDownTarget = useRef<EventTarget | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setIsMounted(true);
+    if (!isOpen) {
       const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
         setSavedPath(null);
         setIsSaving(false);
       }, 300);

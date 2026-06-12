@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface FolderModalProps {
   isOpen: boolean;
@@ -23,25 +24,14 @@ export default function CreateFolderModal({
 }: FolderModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useManagedFocus(nameInputRef, show);
 
   useEffect(() => {
-    if (isOpen) {
-      setIsMounted(true);
+    if (!isOpen) {
       const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
         setName('');
       }, 300);
       return () => {
