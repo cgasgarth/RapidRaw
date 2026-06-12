@@ -268,7 +268,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: () => {
                 void handleAutoAdjustments();
               },
-              disabled: !selectedImage?.isReady,
+              disabled: !selectedImage.isReady,
             },
             {
               label: t('contextMenus.editor.denoise'),
@@ -282,7 +282,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     error: null,
                     targetPaths: [selectedImage.path],
                     progressMessage: null,
-                    isRaw: selectedImage?.isRaw || false,
+                    isRaw: selectedImage.isRaw,
                   },
                 });
               },
@@ -291,9 +291,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               label: t('contextMenus.editor.convertNegative'),
               icon: Film,
               onClick: () => {
-                if (selectedImage) {
-                  setUI({ negativeModalState: { isOpen: true, targetPaths: [selectedImage.path] } });
-                }
+                setUI({ negativeModalState: { isOpen: true, targetPaths: [selectedImage.path] } });
               },
             },
             { disabled: true, icon: SquaresUnite, label: t('contextMenus.editor.stitchPanorama') },
@@ -1153,24 +1151,19 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         if (!targetId) {
           newTree.push(extractedItem);
         } else {
-          let inserted = false;
-
-          const insert = (nodes: AlbumItem[]) => {
+          const insert = (nodes: AlbumItem[]): boolean => {
             for (const n of nodes) {
               if (n.id === targetId && n.type === 'group') {
                 n.children.push(extractedItem);
-                inserted = true;
-                return;
+                return true;
               } else if (n.type === 'group') {
-                insert(n.children);
-                if (inserted) return;
+                if (insert(n.children)) return true;
               }
             }
+            return false;
           };
 
-          insert(newTree);
-
-          if (!inserted) {
+          if (!insert(newTree)) {
             toast.error(t('contextMenus.toasts.failedMoveInvalid'));
             return;
           }
