@@ -1,0 +1,89 @@
+# RawEngine Documentation
+
+- Snapshot date: 2026-06-11
+- Issue: #253 `docs(site): add documentation site`
+- Repository: `cgasgarth/RapidRaw`
+- Local checkout: `/Users/cgas/Documents/RawEngine/RapidRaw-doc-site`
+- Branch: `codex/docs-site-index`
+
+## Purpose
+
+This page is the documentation-site entry point for RawEngine. It keeps the
+current committed docs discoverable without adding a separate static-site
+generator before the release workflow needs one.
+
+## User Docs
+
+- [User guide](user/user-guide-2026-06-11.md)
+- [Known limitations](release/known-limitations-2026-06-11.md)
+- [Privacy policy](release/privacy-policy-2026-06-11.md)
+- [Crash and error reporting strategy](release/crash-error-reporting-strategy-2026-06-11.md)
+- [Telemetry opt-in decision](release/telemetry-opt-in-decision-2026-06-11.md)
+
+## Developer Docs
+
+- [Developer API guide](api/developer-api-guide-2026-06-11.md)
+- [Edit command API baseline](api/edit-command-api-2026-06-11.md)
+- [Sample agent guide](agent/sample-agent-guide-2026-06-11.md)
+- [Architecture baseline](baseline/rapidraw-architecture-baseline-2026-06-11.md)
+- [AI hooks baseline](baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
+- [GPU shader baseline](baseline/rapidraw-gpu-shader-baseline-2026-06-11.md)
+- [Command baseline](baseline/rapidraw-command-baseline-2026-06-10.md)
+- [Sidecar format baseline](baseline/rapidraw-sidecar-format-baseline-2026-06-11.md)
+
+## Validation And CI Docs
+
+- [Cache policy](ci/cache-policy-2026-06-11.md)
+- [Failure artifacts](ci/failure-artifacts-2026-06-11.md)
+- [Optional platform build matrix](ci/optional-platform-build-matrix-2026-06-11.md)
+- [Local check command contract](tooling/local-check-command-contract-2026-06-10.md)
+- [Bun CI script migration](tooling/bun-ci-script-migration-2026-06-10.md)
+- [Bun package manager support](tooling/bun-package-manager-support-2026-06-10.md)
+- [Strict type-checked ESLint](tooling/eslint-strict-type-checked-2026-06-11.md)
+- [ESLint escape hatches](tooling/eslint-escape-hatches-2026-06-11.md)
+- [ESLint accessibility rules](tooling/eslint-accessibility-rules-2026-06-11.md)
+- [ESLint async safety rules](tooling/eslint-async-safety-rules-2026-06-11.md)
+- [ESLint import and boundary rules](tooling/eslint-import-boundary-rules-2026-06-11.md)
+- [ESLint project service](tooling/eslint-project-service-2026-06-11.md)
+- [ESLint React hooks rules](tooling/eslint-react-hooks-rules-2026-06-11.md)
+- [ESLint warning inventory](tooling/eslint-warning-inventory-2026-06-11.md)
+- [ESLint zero-warning CI](tooling/eslint-zero-warning-ci-2026-06-11.md)
+- [Generated type drift checks](tooling/generated-type-drift-checks-2026-06-11.md)
+- [Markdown link checks](tooling/markdown-link-checks-2026-06-11.md)
+- [macOS smoke routing](tooling/macos-smoke-routing-2026-06-11.md)
+- [Pre-commit main guard](tooling/pre-commit-main-guard-2026-06-10.md)
+- [Pre-push main guard](tooling/pre-push-main-guard-2026-06-11.md)
+- [Script entrypoints](tooling/rapidraw-script-entrypoints-2026-06-10.md)
+- [Staged hook checks](tooling/staged-hook-checks-2026-06-11.md)
+- [TypeScript compiler options audit](tooling/typescript-compiler-options-audit-2026-06-10.md)
+- [Vite bundle budget](tooling/vite-bundle-budget-2026-06-11.md)
+- [Workflow topology](ci/workflow-topology-2026-06-11.md)
+- [Dependency vulnerability checks](ci/dependency-vulnerability-checks-2026-06-11.md)
+- [Dependency license checks](ci/dependency-license-checks-2026-06-11.md)
+- [Deferred Rust advisories](security/deferred-rust-advisories.md)
+
+## Fixture And Review Artifacts
+
+- [Onboarding sample project](sample/onboarding-sample-project-2026-06-11.md)
+- [Fixture download policy](validation/fixture-download-policy-2026-06-11.md)
+- [Public fixture manifest](validation/public-fixture-manifest-2026-06-11.md)
+- [Goal review page](validation/goal-review-2026-06-11.html)
+- [Render baseline](baseline/rapidraw-render-baseline-2026-06-10.md)
+
+## Release Docs
+
+- [Unsigned release artifact workflow](release/unsigned-release-artifact-workflow-2026-06-11.md)
+- [macOS signing and notarization placeholders](release/macos-signing-notarization-placeholders-2026-06-11.md)
+- [Update mechanism research](release/update-mechanism-research-2026-06-11.md)
+- [macOS signing plan](release/macos-signing-plan-2026-06-11.md)
+- [macOS notarization workflow](release/macos-notarization-workflow-2026-06-11.md)
+- [Release metadata, checksums, and SBOM](release/release-metadata-checksums-sbom-2026-06-11.md)
+
+## Site Rules
+
+- Keep `docs/index.md` as the human entry point until a static-site generator is
+  selected.
+- Keep `docs/site-navigation.json` in sync with this page so future tooling can
+  generate a sidebar without scraping Markdown.
+- Link only committed files. Planned docs belong in GitHub issues or
+  `RAW_EDITOR_PLAN.md`, not as broken links.
