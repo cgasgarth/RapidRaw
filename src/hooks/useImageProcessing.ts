@@ -184,7 +184,10 @@ export function useImageProcessing(
 
             setEditor((state) => {
               const previousPatchUrl = state.interactivePatch?.url;
-              if (previousPatchUrl) setTimeout(() => URL.revokeObjectURL(previousPatchUrl), 100);
+              if (previousPatchUrl)
+                setTimeout(() => {
+                  URL.revokeObjectURL(previousPatchUrl);
+                }, 100);
               return {
                 interactivePatch: {
                   url,
@@ -219,7 +222,9 @@ export function useImageProcessing(
             setEditor((state) => {
               const previousPatchUrl = state.interactivePatch?.url;
               if (previousPatchUrl) {
-                setTimeout(() => URL.revokeObjectURL(previousPatchUrl), 500);
+                setTimeout(() => {
+                  URL.revokeObjectURL(previousPatchUrl);
+                }, 500);
               }
               return { interactivePatch: null };
             });
@@ -252,7 +257,9 @@ export function useImageProcessing(
     executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
       inFlightCountRef.current -= 1;
       if (pendingApplyRef.current) {
-        requestAnimationFrame(() => flushPipeline());
+        requestAnimationFrame(() => {
+          flushPipeline();
+        });
       }
     });
   }, [executeApplyAdjustments]);
@@ -275,9 +282,9 @@ export function useImageProcessing(
   const generateUncroppedPreview = useCallback(
     (currentAdjustments: Adjustments) => {
       if (!selectedImage?.isReady) return;
-      invoke(Invokes.GenerateUncroppedPreview, { jsAdjustments: currentAdjustments }).catch((err: unknown) =>
-        console.error('Failed to generate uncropped preview:', err),
-      );
+      invoke(Invokes.GenerateUncroppedPreview, { jsAdjustments: currentAdjustments }).catch((err: unknown) => {
+        console.error('Failed to generate uncropped preview:', err);
+      });
     },
     [selectedImage?.isReady],
   );
@@ -415,7 +422,9 @@ export function useImageProcessing(
               }
             }
             if (Object.keys(delta).length > 0) {
-              otherPaths.forEach((p) => globalImageCache.delete(p));
+              otherPaths.forEach((p) => {
+                globalImageCache.delete(p);
+              });
               invoke(Invokes.ApplyAdjustmentsToPaths, { paths: otherPaths, adjustments: delta }).catch(
                 (err: unknown) => {
                   console.error('Failed to apply adjustments to multi-selection:', err);

@@ -67,7 +67,9 @@ export function useThumbnails() {
   }, [flushQueueToBackend]);
 
   useEffect(() => {
-    return () => flushQueueToBackend.cancel();
+    return () => {
+      flushQueueToBackend.cancel();
+    };
   }, [flushQueueToBackend]);
 
   return { requestThumbnails, clearThumbnailQueue, markGenerated };

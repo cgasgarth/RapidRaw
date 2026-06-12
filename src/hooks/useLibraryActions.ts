@@ -200,7 +200,9 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
       handleMultiSelectClick(path, event, {
         shiftAnchor: selectionAnchorPath ?? libraryActivePath,
         updateLibraryActivePath: true,
-        onSimpleClick: (p) => setLibrary({ multiSelectedPaths: [p], libraryActivePath: p, selectionAnchorPath: p }),
+        onSimpleClick: (p) => {
+          setLibrary({ multiSelectedPaths: [p], libraryActivePath: p, selectionAnchorPath: p });
+        },
       });
     },
     [handleMultiSelectClick],

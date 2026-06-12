@@ -189,9 +189,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               invoke(Invokes.AddToAlbum, { albumId: item.id, paths: pathsToAdd })
                 .then(() => {
                   console.log(`Added image(s) to ${item.name}`);
-                  invoke<AlbumItem[]>(Invokes.GetAlbums).then((res) =>
-                    useLibraryStore.getState().setLibrary({ albumTree: res }),
-                  );
+                  invoke<AlbumItem[]>(Invokes.GetAlbums).then((res) => {
+                    useLibraryStore.getState().setLibrary({ albumTree: res });
+                  });
                 })
                 .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedAddToAlbum', { err })));
             },
@@ -233,7 +233,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           label: t('contextMenus.editor.exportImage'),
           icon: FileInput,
-          onClick: () => setRightPanel(Panel.Export),
+          onClick: () => {
+            setRightPanel(Panel.Export);
+          },
         },
         { type: OPTION_SEPARATOR },
         { label: t('contextMenus.editor.undo'), icon: Undo, onClick: undo, disabled: !canUndo },
@@ -247,7 +249,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           label: t('contextMenus.editor.pasteAdjustments'),
           icon: ClipboardPaste,
-          onClick: () => handlePasteAdjustments(),
+          onClick: () => {
+            handlePasteAdjustments();
+          },
           disabled: copiedAdjustments === null,
         },
         {
@@ -307,7 +311,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               rating === 0
                 ? t('contextMenus.editor.noRating')
                 : t('contextMenus.editor.ratingLabel', { count: rating }),
-            onClick: () => handleRate(rating),
+            onClick: () => {
+              handleRate(rating);
+            },
           })),
         },
         {
@@ -493,7 +499,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
       const handleApplyAutoAdjustmentsToSelection = () => {
         if (finalSelection.length === 0) return;
-        finalSelection.forEach((p) => globalImageCache.delete(p));
+        finalSelection.forEach((p) => {
+          globalImageCache.delete(p);
+        });
 
         invoke(Invokes.ApplyAutoAdjustmentsToPaths, { paths: finalSelection })
           .then(async () => {
@@ -591,7 +599,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           disabled: copiedAdjustments === null,
           icon: ClipboardPaste,
           label: pasteLabel,
-          onClick: () => handlePasteAdjustments(finalSelection),
+          onClick: () => {
+            handlePasteAdjustments(finalSelection);
+          },
         },
         {
           label: t('contextMenus.editor.productivity'),
@@ -670,7 +680,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             {
               label: cullLabel,
               icon: Users,
-              onClick: () =>
+              onClick: () => {
                 setUI({
                   cullingModalState: {
                     isOpen: true,
@@ -679,7 +689,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     error: null,
                     pathsToCull: finalSelection,
                   },
-                }),
+                });
+              },
               disabled: selectionCount < 2,
             },
           ],
@@ -727,7 +738,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             },
           ],
         },
-        { icon: FileEdit, label: renameLabel, onClick: () => props.handleRenameFiles(finalSelection) },
+        {
+          icon: FileEdit,
+          label: renameLabel,
+          onClick: () => {
+            props.handleRenameFiles(finalSelection);
+          },
+        },
         { type: OPTION_SEPARATOR },
         {
           icon: Star,
@@ -737,7 +754,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               rating === 0
                 ? t('contextMenus.editor.noRating')
                 : t('contextMenus.editor.ratingLabel', { count: rating }),
-            onClick: () => handleRate(rating, finalSelection),
+            onClick: () => {
+              handleRate(rating, finalSelection);
+            },
           })),
         },
         {
@@ -806,7 +825,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               label: t('contextMenus.editor.confirmReset'),
               icon: Check,
               isDestructive: true,
-              onClick: () => handleResetAdjustments(finalSelection),
+              onClick: () => {
+                handleResetAdjustments(finalSelection);
+              },
             },
           ],
         },
@@ -1000,7 +1021,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           icon: FolderInput,
           label: t('contextMenus.folders.importImages'),
-          onClick: () => props.handleImportClick(targetPath),
+          onClick: () => {
+            props.handleImportClick(targetPath);
+          },
         },
         { type: OPTION_SEPARATOR },
         {
@@ -1140,7 +1163,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
         invoke(Invokes.SaveAlbums, { tree: newTree })
           .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
-          .then((sortedTree) => setLibrary({ albumTree: sortedTree }))
+          .then((sortedTree) => {
+            setLibrary({ albumTree: sortedTree });
+          })
           .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedMoveError', { err })));
       };
 
@@ -1163,7 +1188,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     label: isCurrentParent ? t('contextMenus.albums.alreadyHere') : t('contextMenus.albums.moveHere'),
                     icon: Check,
                     disabled: isCurrentParent,
-                    onClick: isCurrentParent ? undefined : () => handleMove(n.id),
+                    onClick: isCurrentParent
+                      ? undefined
+                      : () => {
+                          handleMove(n.id);
+                        },
                   },
                   { type: OPTION_SEPARATOR },
                   ...subOpts,
@@ -1174,7 +1203,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 label: isCurrentParent ? `${n.name} (Current)` : n.name,
                 icon: ResolvedIcon,
                 disabled: isCurrentParent,
-                onClick: isCurrentParent ? undefined : () => handleMove(n.id),
+                onClick: isCurrentParent
+                  ? undefined
+                  : () => {
+                      handleMove(n.id);
+                    },
               });
             }
           }
@@ -1190,12 +1223,16 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           label: t('contextMenus.albums.newAlbum'),
           icon: Images,
-          onClick: () => setUI({ albumActionTarget: item?.id || null, isCreateAlbumModalOpen: true }),
+          onClick: () => {
+            setUI({ albumActionTarget: item?.id || null, isCreateAlbumModalOpen: true });
+          },
         },
         {
           label: t('contextMenus.albums.newGroup'),
           icon: FolderPlus,
-          onClick: () => setUI({ albumActionTarget: item?.id || null, isCreateAlbumGroupModalOpen: true }),
+          onClick: () => {
+            setUI({ albumActionTarget: item?.id || null, isCreateAlbumGroupModalOpen: true });
+          },
         },
         ...(item
           ? [
@@ -1204,7 +1241,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 label:
                   item.type === 'group' ? t('contextMenus.albums.renameGroup') : t('contextMenus.albums.renameAlbum'),
                 icon: FileEdit,
-                onClick: () => setUI({ albumActionTarget: item.id, isRenameAlbumModalOpen: true }),
+                onClick: () => {
+                  setUI({ albumActionTarget: item.id, isRenameAlbumModalOpen: true });
+                },
               },
               {
                 label: t('contextMenus.folders.changeIcon'),
@@ -1232,7 +1271,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     if (updateIcon(newTree)) {
                       invoke(Invokes.SaveAlbums, { tree: newTree })
                         .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
-                        .then((sorted) => setLibrary({ albumTree: sorted }))
+                        .then((sorted) => {
+                          setLibrary({ albumTree: sorted });
+                        })
                         .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedChangeIcon', { err })));
                     }
                   },
@@ -1249,7 +1290,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                         label: isAtRoot ? t('contextMenus.albums.alreadyAtRoot') : t('contextMenus.albums.rootDir'),
                         icon: Home,
                         disabled: isAtRoot,
-                        onClick: isAtRoot ? undefined : () => handleMove(null),
+                        onClick: isAtRoot
+                          ? undefined
+                          : () => {
+                              handleMove(null);
+                            },
                       },
                       ...(moveOptions.length > 0 ? [{ type: OPTION_SEPARATOR }, ...moveOptions] : []),
                     ],
@@ -1284,7 +1329,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       del(newTree);
                       invoke(Invokes.SaveAlbums, { tree: newTree })
                         .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
-                        .then((sorted) => setLibrary({ albumTree: sorted }))
+                        .then((sorted) => {
+                          setLibrary({ albumTree: sorted });
+                        })
                         .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedDelete', { err })));
                     },
                   },
@@ -1377,7 +1424,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           icon: FolderInput,
           label: t('contextMenus.folders.importImages'),
-          onClick: () => props.handleImportClick(currentFolderPath as string),
+          onClick: () => {
+            props.handleImportClick(currentFolderPath as string);
+          },
           disabled: !currentFolderPath || isAlbumView,
         },
       ];

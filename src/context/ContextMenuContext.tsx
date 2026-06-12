@@ -170,7 +170,9 @@ function SubMenu({ cancelCloseSubmenu, closeSubmenu, hideContextMenu, options, p
         className="fixed z-101"
         exit={{ opacity: 0, scale: 0.95 }}
         initial={{ opacity: 0, scale: 0.95 }}
-        onContextMenu={(e: ReactMouseEvent<HTMLDivElement>) => e.preventDefault()}
+        onContextMenu={(e: ReactMouseEvent<HTMLDivElement>) => {
+          e.preventDefault();
+        }}
         onMouseEnter={cancelCloseSubmenu}
         onMouseLeave={() => {
           if (!isInteractiveSubmenu) {
@@ -314,7 +316,9 @@ function ContextMenu() {
           exit={{ opacity: 0, scale: 0.95 }}
           initial={{ opacity: 0, scale: 0.95 }}
           key={menuId}
-          onContextMenu={(e: ReactMouseEvent<HTMLDivElement>) => e.preventDefault()}
+          onContextMenu={(e: ReactMouseEvent<HTMLDivElement>) => {
+            e.preventDefault();
+          }}
           ref={menuRef}
           style={{ top: y, left: x }}
           transition={{ duration: 0.1, ease: 'easeOut' }}

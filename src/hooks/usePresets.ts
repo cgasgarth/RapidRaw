@@ -64,9 +64,9 @@ export function usePresets(currentAdjustments: Adjustments) {
   const savePresetsToBackend = useMemo(
     () =>
       debounce((presetsToSave: Array<UserPreset>) => {
-        invoke(Invokes.SavePresets, { presets: presetsToSave }).catch((err: unknown) =>
-          console.error('Failed to save presets:', err),
-        );
+        invoke(Invokes.SavePresets, { presets: presetsToSave }).catch((err: unknown) => {
+          console.error('Failed to save presets:', err);
+        });
       }, 500),
     [],
   );
@@ -75,7 +75,12 @@ export function usePresets(currentAdjustments: Adjustments) {
     loadPresets();
   }, [loadPresets]);
 
-  useEffect(() => () => savePresetsToBackend.cancel(), [savePresetsToBackend]);
+  useEffect(
+    () => () => {
+      savePresetsToBackend.cancel();
+    },
+    [savePresetsToBackend],
+  );
 
   const addPreset = (
     name: string,

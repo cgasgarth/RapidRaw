@@ -278,7 +278,9 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
               globalImageCache.set(path, { ...cachedReadyEntry, adjustments: freshAdjustments });
             }
           })
-          .catch((err: unknown) => console.error('Failed background metadata sync on cache hit:', err));
+          .catch((err: unknown) => {
+            console.error('Failed background metadata sync on cache hit:', err);
+          });
 
         return;
       }
