@@ -230,7 +230,7 @@ export default function MainLibrary(props: MainLibraryProps) {
       }
     };
 
-    checkVersion();
+    void checkVersion();
   }, []);
 
   if (props.rootPaths.length === 0) {
@@ -373,7 +373,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                             }`}
                             onClick={() => {
                               if (isUpdateAvailable) {
-                                open('https://github.com/CyberTimon/RapidRAW/releases/latest');
+                                void open('https://github.com/CyberTimon/RapidRAW/releases/latest');
                               }
                             }}
                             data-tooltip={
