@@ -106,7 +106,7 @@ const Dropdown = <T extends React.Key>({
   };
 
   return (
-    <div className={`relative ${className}`} ref={dropdownRef} onKeyDown={handleContainerKeyDown}>
+    <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         aria-expanded={isOpen}
         aria-haspopup="listbox"
@@ -119,6 +119,7 @@ const Dropdown = <T extends React.Key>({
         onClick={() => {
           setIsOpen(!isOpen);
         }}
+        onKeyDown={handleContainerKeyDown}
         type="button"
       >
         <Text as="span" variant={TextVariants.label} color={TextColors.primary}>
@@ -151,6 +152,7 @@ const Dropdown = <T extends React.Key>({
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
                   }}
+                  onKeyDown={handleContainerKeyDown}
                   placeholder={searchPlaceholder}
                   className="mb-2"
                 />
@@ -164,6 +166,7 @@ const Dropdown = <T extends React.Key>({
                     onClick={() => {
                       handleSelect(option);
                     }}
+                    onKeyDown={handleContainerKeyDown}
                     className={clsx(
                       'w-full text-left px-3 py-2 rounded-md flex items-center justify-between',
                       'transition-colors duration-150 hover:bg-bg-primary',
