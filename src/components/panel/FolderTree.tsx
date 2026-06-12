@@ -467,9 +467,13 @@ export default function FolderTree({
   const folderIcons = appSettings?.folderIcons || {};
 
   useEffect(() => {
-    invoke<Array<AlbumItem>>(Invokes.GetAlbums).then((res) => {
-      useLibraryStore.getState().setLibrary({ albumTree: res });
-    });
+    void invoke<Array<AlbumItem>>(Invokes.GetAlbums)
+      .then((res) => {
+        useLibraryStore.getState().setLibrary({ albumTree: res });
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to load albums:', err);
+      });
   }, []);
 
   const toggleSection = (section: string) => {
@@ -477,7 +481,7 @@ export default function FolderTree({
       const isOpen = openSections.includes(section);
       const newSections = isOpen ? openSections.filter((s) => s !== section) : [...openSections, section];
 
-      handleSettingsChange({ ...appSettings, openTreeSections: newSections });
+      void handleSettingsChange({ ...appSettings, openTreeSections: newSections });
     }
   };
 
@@ -547,7 +551,7 @@ export default function FolderTree({
       }
 
       if (changed) {
-        handleSettingsChange({ ...appSettings, openTreeSections: newSections });
+        void handleSettingsChange({ ...appSettings, openTreeSections: newSections });
       }
     }
   }, [isSearching, filteredTrees, filteredPinnedTrees, openSections, handleSettingsChange, appSettings]);
