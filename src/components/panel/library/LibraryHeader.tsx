@@ -648,7 +648,7 @@ export function ViewOptionsDropdown({
               >
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5">
-                    {[...Array(5)].map((_, index: number) => {
+                    {Array.from({ length: 5 }, (_, index) => {
                       const starValue = index + 1;
                       const isFilled = filterCriteria.rating > 0 && starValue <= filterCriteria.rating;
                       const optionLabel = ratingFilterOptions.find((option) => option.value === starValue)?.label;

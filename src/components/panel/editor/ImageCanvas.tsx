@@ -1993,7 +1993,7 @@ const ImageCanvas = memo(
         if (activeId) {
           updateSubMask(activeId, {
             parameters: {
-              ...activeSubMask.parameters,
+              ...activeSubMaskParameters,
               startX: startPoint.x,
               startY: startPoint.y,
               endX: endPoint.x,
@@ -2068,6 +2068,7 @@ const ImageCanvas = memo(
       activeAiSubMaskId,
       activeMaskId,
       activeSubMask,
+      activeSubMaskParameters,
       adjustments.crop,
       brushSettings,
       isBrushActive,

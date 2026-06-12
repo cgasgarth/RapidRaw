@@ -1,6 +1,7 @@
 import { useCallback, useState, useEffect } from 'react';
 import { platform } from '@tauri-apps/plugin-os';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 import { Minus, Square, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -54,19 +55,25 @@ export default function TitleBar() {
     void updateMaximizedState();
 
     let unlisten: (() => void) | undefined;
+    let didCleanup = false;
     void appWindow
       .onResized(() => {
         void updateMaximizedState();
       })
-      .then((u) => {
-        unlisten = u;
+      .then((nextUnlisten: UnlistenFn) => {
+        if (didCleanup) {
+          nextUnlisten();
+          return;
+        }
+        unlisten = nextUnlisten;
       })
       .catch((error: unknown) => {
         console.error('Failed to subscribe to window resize:', error);
       });
 
     return () => {
-      if (unlisten) unlisten();
+      didCleanup = true;
+      unlisten?.();
     };
   }, [appWindow]);
 
