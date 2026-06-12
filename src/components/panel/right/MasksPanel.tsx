@@ -2332,7 +2332,7 @@ function SubMaskRow({
             ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
             ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''}
             ${isDragging ? 'opacity-40 z-50' : ''}
-            ${parentVisible === false ? 'opacity-50' : ''}
+            ${!parentVisible ? 'opacity-50' : ''}
             ${isDraggingContainer ? 'opacity-30 pointer-events-none' : ''}
             transition-opacity duration-300`}
       onClick={(e) => {
