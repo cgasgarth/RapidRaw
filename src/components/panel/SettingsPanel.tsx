@@ -38,6 +38,7 @@ import Button from '../ui/Button';
 import ConfirmModal from '../modals/ConfirmModal';
 import Dropdown, { OptionItem } from '../ui/Dropdown';
 import Switch from '../ui/Switch';
+import { cloudUsageSchema, type CloudUsage } from '../../schemas/cloudUsageSchemas';
 import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import { ThemeProps, THEMES } from '../../utils/themes';
@@ -349,7 +350,7 @@ const CloudDashboard = () => {
   const { user } = useUser();
   const { getToken } = useAuth();
   const { signOut } = useClerk();
-  const [usage, setUsage] = useState<{ requests: number; limit: number; month: string } | null>(null);
+  const [usage, setUsage] = useState<CloudUsage | null>(null);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -361,7 +362,8 @@ const CloudDashboard = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
-          setUsage(await res.json());
+          const usageJson: unknown = await res.json();
+          setUsage(cloudUsageSchema.parse(usageJson));
         }
       } catch (e) {
         console.error('Failed to fetch cloud usage', e);

@@ -1567,7 +1567,7 @@ const ImageCanvas = memo(
 
           dragStartPointer.current = { x, y };
 
-          let initialParams = { ...activeSubMask.parameters };
+          let initialParams: MaskParameters = { ...toMaskParameters(activeSubMask.parameters) };
 
           if (activeSubMask.type === Mask.Radial) {
             initialParams = {
