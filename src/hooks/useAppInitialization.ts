@@ -14,7 +14,6 @@ import {
   type ImageFile,
   Invokes,
   LibraryViewMode,
-  RawStatus,
   EditedStatus,
   Theme,
   ThumbnailSize,
@@ -165,11 +164,7 @@ export const useAppInitialization = ({
   useEffect(() => {
     invoke<InitializationSettings>(Invokes.LoadSettings)
       .then(async (settings) => {
-        if (
-          !settings.copyPasteSettings ||
-          !settings.copyPasteSettings.includedAdjustments ||
-          settings.copyPasteSettings.includedAdjustments.length === 0
-        ) {
+        if (!settings.copyPasteSettings || settings.copyPasteSettings.includedAdjustments.length === 0) {
           settings.copyPasteSettings = {
             mode: PasteMode.Merge,
             includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
@@ -185,33 +180,33 @@ export const useAppInitialization = ({
         setAppSettings(settings);
         i18n.changeLanguage(settings.language);
 
-        if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);
+        if (settings.sortCriteria) setSortCriteria(settings.sortCriteria);
 
         const savedFilterCriteria = settings.filterCriteria;
         if (savedFilterCriteria) {
           setFilterCriteria((prev: FilterCriteria) => ({
             ...prev,
             ...savedFilterCriteria,
-            rawStatus: savedFilterCriteria.rawStatus || RawStatus.All,
+            rawStatus: savedFilterCriteria.rawStatus,
             editedStatus: savedFilterCriteria.editedStatus || EditedStatus.All,
-            colors: savedFilterCriteria.colors || [],
+            colors: savedFilterCriteria.colors,
           }));
         }
 
-        if (settings?.theme) setTheme(settings.theme);
+        setTheme(settings.theme);
 
-        if (settings?.uiVisibility)
+        if (settings.uiVisibility)
           setUI((state) => ({ uiVisibility: { ...state.uiVisibility, ...settings.uiVisibility } }));
 
-        if (settings?.isWaveformVisible !== undefined) setEditor({ isWaveformVisible: settings.isWaveformVisible });
-        if (settings?.activeWaveformChannel) setEditor({ activeWaveformChannel: settings.activeWaveformChannel });
-        if (typeof settings?.waveformHeight === 'number') setEditor({ waveformHeight: settings.waveformHeight });
+        if (settings.isWaveformVisible !== undefined) setEditor({ isWaveformVisible: settings.isWaveformVisible });
+        if (settings.activeWaveformChannel) setEditor({ activeWaveformChannel: settings.activeWaveformChannel });
+        if (typeof settings.waveformHeight === 'number') setEditor({ waveformHeight: settings.waveformHeight });
 
-        setLibraryViewMode(settings?.libraryViewMode ?? defaultLibraryViewMode);
-        setThumbnailSize(settings?.thumbnailSize ?? defaultThumbnailSize);
-        if (settings?.thumbnailAspectRatio) setThumbnailAspectRatio(settings.thumbnailAspectRatio);
+        setLibraryViewMode(settings.libraryViewMode ?? defaultLibraryViewMode);
+        setThumbnailSize(settings.thumbnailSize ?? defaultThumbnailSize);
+        if (settings.thumbnailAspectRatio) setThumbnailAspectRatio(settings.thumbnailAspectRatio);
 
-        if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
+        if (settings.pinnedFolders && settings.pinnedFolders.length > 0) {
           try {
             const trees = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
               paths: settings.pinnedFolders,
@@ -251,7 +246,7 @@ export const useAppInitialization = ({
           };
         }
 
-        if (settings?.lastFolderState) {
+        if (settings.lastFolderState) {
           setLibrary({
             expandedFolders: new Set(settings.lastFolderState.expandedFolders || []),
             expandedAlbumGroups: new Set(settings.lastFolderState.expandedAlbumGroups || []),
