@@ -557,7 +557,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         .map((preset) => ({ preset, folderId }));
       if (newItems.length > 0) {
         previewQueue.current.push(...newItems);
-        processPreviewQueue();
+        void processPreviewQueue();
       }
     },
     [processPreviewQueue],

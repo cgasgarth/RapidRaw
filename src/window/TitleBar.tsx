@@ -54,12 +54,15 @@ export default function TitleBar() {
     void updateMaximizedState();
 
     let unlisten: (() => void) | undefined;
-    appWindow
+    void appWindow
       .onResized(() => {
         void updateMaximizedState();
       })
       .then((u) => {
         unlisten = u;
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to subscribe to window resize:', error);
       });
 
     return () => {

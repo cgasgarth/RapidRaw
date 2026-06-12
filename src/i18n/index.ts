@@ -14,7 +14,7 @@ import ru from './locales/ru.json';
 
 const installI18nPlugin = i18n['use'].bind(i18n);
 
-installI18nPlugin(initReactI18next).init({
+void installI18nPlugin(initReactI18next).init({
   resources: {
     en: { translation: en },
     de: { translation: de },

@@ -72,7 +72,7 @@ export function usePresets(currentAdjustments: Adjustments) {
   );
 
   useEffect(() => {
-    loadPresets();
+    void loadPresets();
   }, [loadPresets]);
 
   useEffect(

@@ -133,7 +133,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
         }
       };
 
-      loadAll();
+      void loadAll();
 
       return () => {
         isEffectActive = false;
