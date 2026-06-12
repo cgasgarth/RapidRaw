@@ -244,7 +244,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           label: t('contextMenus.editor.copyAdjustments'),
           icon: Copy,
-          onClick: () => handleCopyAdjustments(),
+          onClick: () => {
+            void handleCopyAdjustments();
+          },
         },
         {
           label: t('contextMenus.editor.pasteAdjustments'),
@@ -261,7 +263,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             {
               label: t('contextMenus.editor.autoAdjust'),
               icon: Aperture,
-              onClick: handleAutoAdjustments,
+              onClick: () => {
+                void handleAutoAdjustments();
+              },
               disabled: !selectedImage?.isReady,
             },
             {
@@ -320,11 +324,18 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           label: t('contextMenus.editor.colorLabel'),
           icon: Palette,
           submenu: [
-            { label: t('contextMenus.editor.noLabel'), onClick: () => handleSetColorLabel(null) },
+            {
+              label: t('contextMenus.editor.noLabel'),
+              onClick: () => {
+                void handleSetColorLabel(null);
+              },
+            },
             ...COLOR_LABELS.map((label: Color) => ({
               label: t(`contextMenus.colors.${label.name}`, { defaultValue: colorLabelFallback(label.name) }),
               color: label.color,
-              onClick: () => handleSetColorLabel(label.name),
+              onClick: () => {
+                void handleSetColorLabel(label.name);
+              },
             })),
           ],
         },
@@ -865,7 +876,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           {
             icon: RefreshCw,
             label: t('contextMenus.folders.refresh'),
-            onClick: () => props.refreshAllFolderTrees(),
+            onClick: () => {
+              void props.refreshAllFolderTrees();
+            },
           },
         ]);
         return;
