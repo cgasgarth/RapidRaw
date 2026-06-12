@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "rating": 2,
+  "adjustments": {
+    "contrast": 12,
+    "crop": {
+      "x": 0.1,
+      "y": 0.15,
+      "width": 0.8,
+      "height": 0.7
+    },
+    "rawEngineFutureControl": {
+      "kind": "fixture-virtual-copy-unknown-adjustment",
+      "blendMode": "screen"
+    }
+  },
+  "tags": ["color:purple", "golden hour", "user:select"],
+  "exif": {
+    "Make": "FixtureCam",
+    "Model": "Deterministic 1",
+    "ISO": "200"
+  }
+}
