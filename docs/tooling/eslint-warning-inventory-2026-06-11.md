@@ -34,6 +34,24 @@ Current rule inventory:
 | `@typescript-eslint/no-explicit-any` |    15 |     15 |        0 |
 | `@typescript-eslint/no-unused-vars`  |     5 |      0 |        5 |
 
+Updated status on 2026-06-12:
+
+| Metric              | Count |
+| ------------------- | ----: |
+| Files scanned       |   132 |
+| Files with findings |     0 |
+| Errors              |     0 |
+| Warnings            |     0 |
+
+Current validation command:
+
+```sh
+bun run check:lint
+```
+
+`check:lint` now runs `eslint . --max-warnings 0` and is expected to stay green
+on main.
+
 ## Finding Groups
 
 `Editor.tsx` has five unused imports at the top of the file:
@@ -63,21 +81,20 @@ The current ESLint config is flat-config based and includes:
 - React, React Hooks, and i18next plugins.
 - Unused variables as warnings with an underscore ignore convention.
 - React Hooks rules-of-hooks as an error.
-- React Hooks exhaustive-deps disabled until dependency-array debt has a focused cleanup issue.
+- React Hooks exhaustive-deps and purity as errors.
 - Zod-preferred restrictions that block AJV and TypeBox in TypeScript-facing validation code.
 - A chained type assertion ban.
+- Type-aware project service and strict type-checked rules, including
+  `@typescript-eslint/unbound-method`, `no-unnecessary-condition`, and
+  `restrict-template-expressions`, as hard gates.
 
-The config is not yet type-aware through TypeScript parser project service, so
-strict type-checked rules should wait until the current `Editor.tsx` findings
-are fixed and #30 wires project service cleanly.
+The config is now type-aware through TypeScript parser project service. Future
+lint hardening should update the targeted rule inventory rather than relying on
+this inherited baseline snapshot.
 
 ## Recommended Order
 
-1. Finish #286 by removing the `Editor.tsx` unused imports and replacing the 15
-   explicit `any` sites with named local contracts or existing domain types.
-2. Finish #36 by switching CI and local strict lint paths to `eslint .
---max-warnings 0` once the warning count is zero.
-3. Finish #30 by enabling parser project service after the baseline command is
-   clean.
-4. Then layer #31-#35 in small PRs, starting with rules that have the clearest
-   existing type support and lowest false-positive risk.
+1. Keep `bun run check:lint` at zero warnings on every PR.
+2. Continue enabling remaining fenced React hook, accessibility, import, and
+   boundary rules in focused PRs.
+3. Refresh this inventory whenever a new broad lint family is measured.

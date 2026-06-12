@@ -14,14 +14,17 @@ and JSX runtime config. Hooks linting uses the official
   TypeScript.
 - `react/react-in-jsx-scope` and `react/jsx-uses-react` are disabled by the JSX
   runtime config.
-- `react-hooks/exhaustive-deps` remains fenced until the dependency-array
-  inventory is fixed in a focused follow-up.
+- `react-hooks/exhaustive-deps` is enforced as an error after the focused
+  dependency-array cleanup.
+- `react-hooks/purity` is enforced as an error after moving inherited impure
+  hook construction out of hook bodies.
 
 ## Legacy Hook Fences
 
 The first hooks recommended run found 107 problems. The React and hooks configs
-are enabled now, but high-volume React compiler rule families remain fenced so
-they can be fixed in focused PRs.
+are enabled now. `react-hooks/exhaustive-deps` and `react-hooks/purity` have
+since been promoted to hard gates. The remaining high-volume React compiler rule
+families stay fenced so they can be fixed in focused PRs.
 
 | Count | Rule                                      | Follow-Up Path                 |
 | ----: | ----------------------------------------- | ------------------------------ |
@@ -30,7 +33,13 @@ they can be fixed in focused PRs.
 |    10 | `react-hooks/static-components`           | #530 nested/static cleanup     |
 |     6 | `react-hooks/immutability`                | #529 hook mutation cleanup     |
 |     2 | `react-hooks/preserve-manual-memoization` | #529 memo preservation         |
-|     1 | `react-hooks/purity`                      | #529 render purity cleanup     |
+
+Resolved hook fences:
+
+| Former Count | Rule                          | Resolution                                        |
+| -----------: | ----------------------------- | ------------------------------------------------- |
+|            4 | `react-hooks/exhaustive-deps` | Enabled as an error after dependency cleanup.     |
+|            1 | `react-hooks/purity`          | Enabled as an error after thumbnail hook cleanup. |
 
 Small React recommended findings were fixed in this PR by removing unused
 default React imports and assigning display names to memoized components.

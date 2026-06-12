@@ -18,14 +18,14 @@ the default local gates green on the current inherited RapidRAW baseline.
 
 ## Explicit Strict Commands
 
-These commands are intentionally available by name even when inherited baseline
-work remains. They should become part of `check` or `check:quick` only after the
-corresponding cleanup issues close and the commands are green on main.
+These commands are intentionally available by name even when some inherited
+baseline work remains. Commands that are green on main should be recorded in PR
+validation whenever their scope is relevant.
 
 | Command                           | Current ownership                                                                                                                               |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun run check:lint`              | Strict ESLint gate, tracked by #286 and #29-#37.                                                                                                |
-| `bun run check:format`            | Strict Prettier gate, tracked by #289.                                                                                                          |
+| `bun run check:lint`              | Strict ESLint zero-warning gate.                                                                                                                |
+| `bun run check:format`            | Strict Prettier gate.                                                                                                                           |
 | `bun run i18n:lint`               | Hardcoded-string lint, tracked by #285.                                                                                                         |
 | `bun run check:rust:fmt`          | Rust formatting, mirrors current CI.                                                                                                            |
 | `bun run check:rust:check`        | Rust cargo check, mirrors current CI.                                                                                                           |
@@ -48,3 +48,12 @@ Observed on June 10, 2026:
 
 Until those issues close, hooks should call `bun run check:quick` and PR authors
 should run `bun run check` before pushing ordinary frontend changes.
+
+Updated on June 12, 2026:
+
+- `bun run check:lint` is green on main and should remain a normal PR evidence
+  command for lint-sensitive changes.
+- `bun run check:format` is green on main and should remain a normal PR evidence
+  command for formatting-sensitive changes.
+- `bun run check:quick` remains the fast default local gate; broader PRs should
+  add the named strict commands that match their touched surface.
