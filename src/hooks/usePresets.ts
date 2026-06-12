@@ -24,7 +24,7 @@ export interface UserPreset {
 type PresetAdjustments = Partial<Adjustments>;
 
 function getFolderChildren(folder: Folder): Preset[] {
-  return folder.children as Preset[];
+  return folder.children;
 }
 
 function arrayMove<T>(array: T[], from: number, to: number): T[] {

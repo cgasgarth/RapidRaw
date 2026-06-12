@@ -359,7 +359,7 @@ export const useKeyboardShortcuts = ({
             [ExifOverlay.Off]: ExifOverlay.Hover,
             [ExifOverlay.Hover]: ExifOverlay.Always,
             [ExifOverlay.Always]: ExifOverlay.Off,
-          }[current as ExifOverlay];
+          }[current];
           s.settings.handleSettingsChange({ ...appSettings, exifOverlay: nextState });
         },
       },

@@ -57,7 +57,6 @@ import {
   Panel,
   AlbumItem,
   Album,
-  AlbumGroup,
   ImageFile,
   AppSettings,
 } from '../components/ui/AppProperties';
@@ -178,8 +177,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             label: item.name,
             icon: ResolvedIcon,
             submenu:
-              (item as AlbumGroup).children.length > 0
-                ? buildAddToAlbumMenu((item as AlbumGroup).children, pathsToAdd)
+              item.children.length > 0
+                ? buildAddToAlbumMenu(item.children, pathsToAdd)
                 : [{ label: t('contextMenus.album.emptyGroup'), disabled: true }],
           };
         } else {
@@ -540,7 +539,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         const removeImages = (nodes: AlbumItem[]): boolean => {
           for (const n of nodes) {
             if (n.id === activeAlbumId && n.type === 'album') {
-              (n as Album).images = (n as Album).images.filter((p) => !finalSelection.includes(p));
+              n.images = n.images.filter((p) => !finalSelection.includes(p));
               return true;
             } else if (n.type === 'group') {
               if (removeImages(n.children)) return true;
@@ -1082,7 +1081,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         for (const n of nodes) {
           if (n.id === childId) return parentId;
           if (n.type === 'group') {
-            const found = findParentId((n as AlbumGroup).children, childId, n.id);
+            const found = findParentId(n.children, childId, n.id);
             if (found !== undefined) return found;
           }
         }
@@ -1102,7 +1101,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             if (!node) continue;
             if (node.id === id) return nodes.splice(i, 1)[0] ?? null;
             if (node.type === 'group') {
-              const res = removeAndGet((node as AlbumGroup).children, id);
+              const res = removeAndGet(node.children, id);
               if (res) return res;
             }
           }
@@ -1149,7 +1148,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         nodes.forEach((n) => {
           if (n.type === 'group' && n.id !== item?.id) {
             const isCurrentParent = n.id === currentParentId;
-            const subOpts = buildMoveSubmenu((n as AlbumGroup).children);
+            const subOpts = buildMoveSubmenu(n.children);
 
             const customIconDef = n.icon ? albumIcons.find((i) => i.value === n.icon) : null;
             const ResolvedIcon = customIconDef?.icon || Folder;
@@ -1224,7 +1223,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                           }
                           return true;
                         }
-                        if (n.type === 'group' && updateIcon((n as AlbumGroup).children)) return true;
+                        if (n.type === 'group' && updateIcon(n.children)) return true;
                       }
                       return false;
                     };
@@ -1266,7 +1265,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     label:
                       item.type === 'album'
                         ? t('contextMenus.albums.confirmDeleteAlbum')
-                        : (item as AlbumGroup).children.length > 0
+                        : item.children.length > 0
                           ? t('contextMenus.albums.confirmDeleteGroupNested')
                           : t('contextMenus.albums.confirmDeleteGroupEmpty'),
                     icon: Check,
@@ -1278,7 +1277,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                         if (idx !== -1) nodes.splice(idx, 1);
                         else
                           nodes.forEach((n) => {
-                            if (n.type === 'group') del((n as AlbumGroup).children);
+                            if (n.type === 'group') del(n.children);
                           });
                       };
                       del(newTree);

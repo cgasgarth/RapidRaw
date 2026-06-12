@@ -31,7 +31,7 @@ import Text from '../ui/Text';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { AlbumItem, AlbumGroup, Album, Invokes } from '../ui/AppProperties';
+import { AlbumItem, Invokes } from '../ui/AppProperties';
 
 export interface FolderTree {
   children: FolderTree[];
@@ -182,7 +182,7 @@ function AlbumTreeNode({
           if (isGroup) {
             onToggle(item.id);
           } else {
-            onSelectAlbum(item.id, item.name, (item as Album).images);
+            onSelectAlbum(item.id, item.name, item.images);
           }
         }}
         onContextMenu={(e) => {
@@ -227,7 +227,7 @@ function AlbumTreeNode({
       </div>
 
       <AnimatePresence>
-        {isGroup && isExpanded && (item as AlbumGroup).children.length > 0 && (
+        {isGroup && isExpanded && item.children.length > 0 && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -236,7 +236,7 @@ function AlbumTreeNode({
           >
             <div className="py-1">
               <AnimatePresence>
-                {(item as AlbumGroup).children.map((child) => (
+                {item.children.map((child) => (
                   <motion.div
                     key={child.id}
                     initial={{ opacity: 0, height: 0, x: -10 }}
