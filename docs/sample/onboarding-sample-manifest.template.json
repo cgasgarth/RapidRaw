@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "project": "rawengine-onboarding",
+  "createdDate": "2026-06-11",
+  "storageRoot": ".rawengine-samples/onboarding",
+  "assets": [
+    {
+      "id": "example-raw-001",
+      "kind": "raw",
+      "storageClass": "external-public",
+      "relativePath": "originals/raw/example-raw-001.dng",
+      "sourceUrl": "https://example.invalid/source-page",
+      "downloadUrl": "https://example.invalid/download/example-raw-001.dng",
+      "license": "REPLACE_WITH_VERIFIED_LICENSE",
+      "licenseUrl": "https://example.invalid/license",
+      "sha256": "REPLACE_WITH_SHA256",
+      "bytes": 0,
+      "intendedUse": "Import, thumbnail, metadata, edit, sidecar, and export smoke workflow.",
+      "privacyNotes": "Replace with EXIF/person/location review notes before use."
+    },
+    {
+      "id": "example-sidecar-001",
+      "kind": "sidecar",
+      "storageClass": "generated",
+      "relativePath": "expected/sidecars/example-raw-001.dng.rrdata",
+      "sourceUrl": null,
+      "downloadUrl": null,
+      "license": "project-generated",
+      "licenseUrl": null,
+      "sha256": "REPLACE_WITH_SHA256",
+      "bytes": 0,
+      "intendedUse": "Expected sidecar shape for onboarding workflow validation.",
+      "privacyNotes": "Generated from sample metadata; review before publishing."
+    }
+  ]
+}
