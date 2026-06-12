@@ -102,7 +102,7 @@ const FilmstripThumbnail = memo(
     const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
     const showEditIcon = isEdited && displayEditIcon;
 
-    const hasEditIcon = !!showEditIcon;
+    const hasEditIcon = showEditIcon;
     const hasColorLabel = !!colorLabel;
     const hasRating = rating > 0;
     const hasAnyOverlay = hasEditIcon || hasColorLabel || hasRating;

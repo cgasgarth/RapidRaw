@@ -349,7 +349,7 @@ export default function AIPanel() {
   const [cloudUsage, setCloudUsage] = useState<{ requests: number; limit: number; month: string } | null>(null);
 
   const isGenerativeAvailable =
-    (aiProvider === 'cloud' && !!isSignedIn && !!isPro) || (aiProvider === 'ai-connector' && isAIConnectorConnected);
+    (aiProvider === 'cloud' && isSignedIn && isPro) || (aiProvider === 'ai-connector' && isAIConnectorConnected);
 
   useEffect(() => {
     if (aiProvider !== 'cloud' || !isSignedIn || !isPro) return;
@@ -1049,8 +1049,8 @@ export default function AIPanel() {
                     <ConnectionStatus
                       aiProvider={aiProvider}
                       isAIConnectorConnected={isAIConnectorConnected}
-                      isSignedIn={!!isSignedIn}
-                      isPro={!!isPro}
+                      isSignedIn={isSignedIn ?? false}
+                      isPro={isPro}
                       cloudUsage={cloudUsage}
                     />
                     <Text variant={TextVariants.heading} className="mb-2 mt-8">
@@ -2115,7 +2115,7 @@ function SettingsPanel({
       >
         <div className="space-y-4 pt-2">
           <Switch
-            checked={!!(isComponentMode ? activeSubMask.invert : displayContainer.invert)}
+            checked={isComponentMode ? activeSubMask.invert : displayContainer.invert}
             label={isComponentMode ? t('editor.ai.settings.invertComponent') : t('editor.ai.settings.invertSelection')}
             onChange={(v) => {
               if (isComponentMode && activeSubMask) {

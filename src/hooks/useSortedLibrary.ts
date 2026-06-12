@@ -217,9 +217,9 @@ export function computeSortedLibrary(
       if (field === 'camera' || field === 'make' || field === 'model') {
         imgStr = `${image.exif?.['Make'] || ''} ${image.exif?.['Model'] || ''}`.toLowerCase();
       } else if (field === 'lens') {
-        imgStr = String(
-          `${image.exif?.['LensModel'] || ''} ${image.exif?.['Lens'] || ''} ${image.exif?.['LensMake'] || ''}`,
-        ).toLowerCase();
+        imgStr = `${image.exif?.['LensModel'] || ''} ${image.exif?.['Lens'] || ''} ${
+          image.exif?.['LensMake'] || ''
+        }`.toLowerCase();
       } else if (field === 'color') {
         imgStr = (image.tags || []).find((t: string) => t.startsWith('color:'))?.substring(6) || '';
       }

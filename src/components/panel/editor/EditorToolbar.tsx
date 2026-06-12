@@ -72,7 +72,7 @@ const EditorToolbar = memo(
 
       let fNum = exif.FNumber;
       if (fNum) {
-        const fStr = String(fNum);
+        const fStr = fNum;
         fNum = fStr.toLowerCase().startsWith('f') ? fStr : `f/${fStr}`;
       }
 
@@ -510,7 +510,7 @@ const EditorToolbar = memo(
                       <IconFocalLength />
                     </Text>
                     <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
-                      {String(exifData.focal).endsWith('mm') ? exifData.focal : `${exifData.focal}mm`}
+                      {exifData.focal.endsWith('mm') ? exifData.focal : `${exifData.focal}mm`}
                     </Text>
                   </div>
                 )}
