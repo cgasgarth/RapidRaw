@@ -106,7 +106,9 @@ export default function LUTControl({
           step={1}
           value={lutIntensity}
           defaultValue={100}
-          onChange={(e) => onIntensityChange(parseInt(String(e.target.value), 10))}
+          onChange={(e) => {
+            onIntensityChange(parseInt(String(e.target.value), 10));
+          }}
           onDragStateChange={onDragStateChange}
           fillOrigin="min"
         />
