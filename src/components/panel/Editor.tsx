@@ -293,7 +293,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           ...c,
           subMasks: c.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
         })),
-        aiPatches: (prev.aiPatches || []).map((p: AiPatch) => ({
+        aiPatches: prev.aiPatches.map((p: AiPatch) => ({
           ...p,
           subMasks: p.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
         })),
@@ -322,20 +322,17 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const isAiEditing = activeRightPanel === Panel.Ai;
 
   const croppedDimensions = useMemo<ImageDimensions | null>(() => {
-    if (!selectedImage?.width || !selectedImage?.height) {
+    if (!selectedImage || !selectedImage.width || !selectedImage.height) {
       return null;
     }
     if (adjustments.crop) {
       return { width: adjustments.crop.width, height: adjustments.crop.height } as ImageDimensions;
     }
-    if (selectedImage) {
-      const orientationSteps = adjustments.orientationSteps || 0;
-      const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-      const width = isSwapped ? selectedImage.height : selectedImage.width;
-      const height = isSwapped ? selectedImage.width : selectedImage.height;
-      return { width, height } as ImageDimensions;
-    }
-    return null;
+    const orientationSteps = adjustments.orientationSteps || 0;
+    const isSwapped = orientationSteps === 1 || orientationSteps === 3;
+    const width = isSwapped ? selectedImage.height : selectedImage.width;
+    const height = isSwapped ? selectedImage.width : selectedImage.height;
+    return { width, height } as ImageDimensions;
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps]);
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);
@@ -343,7 +340,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   imageRenderSizeRef.current = imageRenderSize;
 
   const transformConfig = useMemo(() => {
-    if (!selectedImage || !imageRenderSize.scale || !originalSize) {
+    if (!selectedImage || !imageRenderSize.scale) {
       return { minScale: 0.1, maxScale: 20 };
     }
 
@@ -632,7 +629,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       const container = adjustments.aiPatches.find((c: AiPatch) =>
         c.subMasks.some((sm: SubMask) => sm.id === activeAiSubMaskId),
       );
-      return container?.subMasks?.find((sm: SubMask) => sm.id === activeAiSubMaskId);
+      return container?.subMasks.find((sm: SubMask) => sm.id === activeAiSubMaskId);
     }
     return null;
   }, [adjustments.masks, adjustments.aiPatches, activeMaskId, activeAiSubMaskId, isMasking, isAiEditing]);
@@ -1031,7 +1028,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (handleDisplaySizeChange && imageRenderSize.width > 0) {
+      if (imageRenderSize.width > 0) {
         const currentDisplaySize = {
           width: imageRenderSize.width * transformState.scale,
           height: imageRenderSize.height * transformState.scale,
@@ -1055,7 +1052,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     const { maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
     pendingOverlayRequestRef.current = null;
 
-    if (!maskDef || !maskDef.visible || renderSize.width === 0) {
+    if (!maskDef.visible || renderSize.width === 0) {
       setMaskOverlayUrl(null);
       return;
     }
@@ -1077,16 +1074,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       };
 
       const strippedAdjustments = structuredClone(jsAdjustments);
-      if (strippedAdjustments.masks) {
-        strippedAdjustments.masks.forEach((m) => {
-          stripSubMasks(m.subMasks);
-        });
-      }
-      if (strippedAdjustments.aiPatches) {
-        strippedAdjustments.aiPatches.forEach((p) => {
-          stripSubMasks(p.subMasks);
-        });
-      }
+      strippedAdjustments.masks.forEach((m) => {
+        stripSubMasks(m.subMasks);
+      });
+      strippedAdjustments.aiPatches.forEach((p) => {
+        stripSubMasks(p.subMasks);
+      });
 
       const strippedMaskDef = structuredClone(maskDef);
       stripSubMasks(strippedMaskDef.subMasks);
@@ -1110,9 +1103,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       setMaskOverlayUrl(null);
     } finally {
       isGeneratingOverlayRef.current = false;
-      if (pendingOverlayRequestRef.current) {
-        requestAnimationFrame(processOverlayQueue);
-      }
+      requestAnimationFrame(() => {
+        if (pendingOverlayRequestRef.current) {
+          processOverlayQueue();
+        }
+      });
     }
   }, []);
 
@@ -1127,12 +1122,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const handleLiveMaskPreview = useCallback(
     (maskDef: MaskContainer | AiPatch) => {
       const normalizedDef: MaskPreviewDefinition =
-        'adjustments' in maskDef && maskDef.adjustments
+        'adjustments' in maskDef
           ? maskDef
           : {
               ...maskDef,
               adjustments: {},
-              opacity: 'opacity' in maskDef ? maskDef.opacity : 100,
+              opacity: 100,
             };
       requestMaskOverlay(normalizedDef, imageRenderSize, adjustments);
     },
@@ -1192,18 +1187,14 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       const container = imageContainerRef.current;
 
       if (!container) {
-        if (isEffectActive) {
-          wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
-        }
+        wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
         return;
       }
 
       const currentRect = container.getBoundingClientRect();
 
       if (currentRect.width < 10 || currentRect.height < 10) {
-        if (isEffectActive) {
-          wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
-        }
+        wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
         return;
       }
 
@@ -1218,7 +1209,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       const clipH = Math.max((currentRect.height + OVERLAP * 2) * dpr, 1);
 
       if (state.useWgpuRenderer === false || !state.isReady || !state.hasRenderedFirstFrame) {
-        const hiddenTransform = `${windowWidth},${windowHeight},-999999,-999999,1,1,${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
+        const hiddenTransform = `${windowWidth},${windowHeight},-999999,-999999,1,1,${clipX},${clipY},${clipW},${clipH},${state.bgPrimary.join(',')},${state.bgSecondary.join(',')}`;
 
         if (lastWgpuTransformRef.current !== hiddenTransform && !isInvoking) {
           lastWgpuTransformRef.current = hiddenTransform;
@@ -1235,8 +1226,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               clipY,
               clipWidth: clipW,
               clipHeight: clipH,
-              bgPrimary: state.bgPrimary || [0, 0, 0, 1],
-              bgSecondary: state.bgSecondary || [0, 0, 0, 1],
+              bgPrimary: state.bgPrimary,
+              bgSecondary: state.bgSecondary,
               pixelated: false,
             },
           })
@@ -1245,9 +1236,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               isInvoking = false;
             });
         }
-        if (isEffectActive) {
-          wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
-        }
+        wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
         return;
       }
 
@@ -1281,7 +1270,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         screenH = Math.max(screenH, 1);
       }
 
-      const currentTransform = `${windowWidth},${windowHeight},${screenX},${screenY},${screenW},${screenH},${clipX},${clipY},${clipW},${clipH},${state.bgPrimary?.join(',')},${state.bgSecondary?.join(',')}`;
+      const currentTransform = `${windowWidth},${windowHeight},${screenX},${screenY},${screenW},${screenH},${clipX},${clipY},${clipW},${clipH},${state.bgPrimary.join(',')},${state.bgSecondary.join(',')}`;
 
       if (lastWgpuTransformRef.current !== currentTransform && !isInvoking) {
         lastWgpuTransformRef.current = currentTransform;
@@ -1301,8 +1290,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
             clipY,
             clipWidth: clipW,
             clipHeight: clipH,
-            bgPrimary: state.bgPrimary || [0, 0, 0, 1],
-            bgSecondary: state.bgSecondary || [0, 0, 0, 1],
+            bgPrimary: state.bgPrimary,
+            bgSecondary: state.bgSecondary,
             pixelated: isZoomedIn,
           },
         })
@@ -1314,9 +1303,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           });
       }
 
-      if (isEffectActive) {
-        wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
-      }
+      wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
     };
 
     wgpuSyncRef.current = requestAnimationFrame(syncWgpu);
@@ -1332,9 +1319,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const overlayTriggerHash = useMemo(() => {
     let activeMaskDef: MaskContainer | AiPatch | undefined;
     if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
-      activeMaskDef = adjustments.masks?.find((c: MaskContainer) => c.id === activeMaskContainerId);
+      activeMaskDef = adjustments.masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
     } else if (activeRightPanel === Panel.Ai && activeAiPatchContainerId) {
-      activeMaskDef = adjustments.aiPatches?.find((p: AiPatch) => p.id === activeAiPatchContainerId);
+      activeMaskDef = adjustments.aiPatches.find((p: AiPatch) => p.id === activeAiPatchContainerId);
     }
 
     if (!activeMaskDef) return null;
@@ -1369,7 +1356,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       geometry[k] = adjustments[k];
     });
 
-    const subMasks = activeMaskDef.subMasks?.map((sm: SubMask) => {
+    const subMasks = activeMaskDef.subMasks.map((sm: SubMask) => {
       const { parameters, ...rest } = sm;
       const cleanParams = { ...parameters };
       const maskDataFingerprint = cleanParams.mask_data_base64
@@ -1409,7 +1396,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     let maskDefForOverlay: MaskPreviewDefinition | null = null;
 
     if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
-      const activeMask = adjustments.masks?.find((c: MaskContainer) => c.id === activeMaskContainerId);
+      const activeMask = adjustments.masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
       if (activeMask) {
         maskDefForOverlay = {
           ...activeMask,
@@ -1417,7 +1404,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         };
       }
     } else if (activeRightPanel === Panel.Ai && activeAiPatchContainerId) {
-      const activePatch = adjustments.aiPatches?.find((p: AiPatch) => p.id === activeAiPatchContainerId);
+      const activePatch = adjustments.aiPatches.find((p: AiPatch) => p.id === activeAiPatchContainerId);
       if (activePatch) {
         maskDefForOverlay = {
           ...activePatch,
@@ -1459,14 +1446,14 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     }
 
     const { aspectRatio, orientationSteps = 0, crop: currentAdjCrop, rotation = 0 } = adjustments;
-    const effectiveRotation = liveRotation !== null && liveRotation !== undefined ? liveRotation : rotation;
+    const effectiveRotation = liveRotation !== null ? liveRotation : rotation;
 
     const geometryChanged =
       prevCropParams.current?.rotation !== rotation ||
-      prevCropParams.current?.aspectRatio !== aspectRatio ||
-      prevCropParams.current?.orientationSteps !== orientationSteps;
+      prevCropParams.current.aspectRatio !== aspectRatio ||
+      prevCropParams.current.orientationSteps !== orientationSteps;
 
-    const isDraggingRotation = liveRotation !== null && liveRotation !== undefined;
+    const isDraggingRotation = liveRotation !== null;
     const needsRecalc = currentAdjCrop === null || geometryChanged || isDraggingRotation;
 
     if (needsRecalc) {
@@ -1646,7 +1633,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       return;
     }
 
-    if (liveRotation !== null && liveRotation !== undefined) {
+    if (liveRotation !== null) {
       return;
     }
 
@@ -1678,7 +1665,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       const isSwapped = orientationSteps === 1 || orientationSteps === 3;
       const W = isSwapped ? selectedImage.height : selectedImage.width;
       const H = isSwapped ? selectedImage.width : selectedImage.height;
-      const rotation = liveRotation !== null && liveRotation !== undefined ? liveRotation : adjustments.rotation || 0;
+      const rotation = liveRotation !== null ? liveRotation : adjustments.rotation || 0;
 
       const MIN_CROP_PX = 64;
       const minPctW = (MIN_CROP_PX / W) * 100;
@@ -1944,7 +1931,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       if (!pc.width || !pc.height || !selectedImage?.width) {
         return;
       }
-      if (liveRotation !== null && liveRotation !== undefined) {
+      if (liveRotation !== null) {
         return;
       }
 
