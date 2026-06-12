@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -388,14 +389,16 @@ const CloudDashboard = () => {
           <Button
             variant="ghost"
             className="bg-transparent text-text-secondary hover:text-text-primary hover:bg-surface border-none shadow-none"
-            onClick={() => open('https://www.getrapidraw.com/dashboard')}
+            onClick={() => {
+              void open('https://www.getrapidraw.com/dashboard');
+            }}
           >
             {t('settings.processing.ai.cloud.signedIn.manage')} <ExternalLinkIcon size={14} className="ml-1" />
           </Button>
           <Button
             variant="ghost"
-            onClick={async () => {
-              await signOut();
+            onClick={() => {
+              void signOut();
             }}
           >
             {t('settings.processing.ai.cloud.signedIn.logout')}
@@ -424,7 +427,11 @@ const CloudDashboard = () => {
       ) : (
         <div className="bg-red-900/10 border border-red-500/50 p-4 rounded-md text-center">
           <Text className="mb-3">{t('settings.processing.ai.cloud.signedOut.upgradeDesc')}</Text>
-          <Button onClick={() => open('https://www.getrapidraw.com/cloud')}>
+          <Button
+            onClick={() => {
+              void open('https://www.getrapidraw.com/cloud');
+            }}
+          >
             {t('settings.processing.ai.cloud.signedOut.upgradeBtn')}
           </Button>
         </div>
@@ -596,6 +603,12 @@ export default function SettingsPanel({
   const [logPathLoading, setLogPathLoading] = useState(true);
   const [logPathError, setLogPathError] = useState(false);
   const [dpr, setDpr] = useState(() => (typeof window !== 'undefined' ? window.devicePixelRatio : 1));
+  const saveSettings = useCallback(
+    (settings: AppSettings) => {
+      void onSettingsChange(settings);
+    },
+    [onSettingsChange],
+  );
 
   const settingCategories = useMemo(
     () => [
@@ -745,6 +758,10 @@ export default function SettingsPanel({
     }
   };
 
+  const handleProcessingSettingChangeVoid = <K extends ProcessingSettingKey>(key: K, value: ProcessingSettings[K]) => {
+    void handleProcessingSettingChange(key, value);
+  };
+
   const handleSaveAndRelaunch = async () => {
     await onSettingsChange({
       ...appSettings,
@@ -755,12 +772,12 @@ export default function SettingsPanel({
 
   const handleProviderChange = (provider: string) => {
     setAiProvider(provider);
-    onSettingsChange({ ...appSettings, aiProvider: provider });
+    saveSettings({ ...appSettings, aiProvider: provider });
   };
 
   const handlePreviewModeChange = (mode: 'static' | 'dynamic') => {
     const enableZoomHifi = mode === 'dynamic';
-    onSettingsChange({ ...appSettings, enableZoomHifi });
+    saveSettings({ ...appSettings, enableZoomHifi });
   };
 
   const handleTempMakerChange = (maker: string) => {
@@ -784,7 +801,7 @@ export default function SettingsPanel({
           return a.model.localeCompare(b.model);
         });
 
-        onSettingsChange({
+        saveSettings({
           ...appSettings,
           myLenses: newLenses,
         });
@@ -799,7 +816,7 @@ export default function SettingsPanel({
     const currentLenses: MyLens[] = appSettings.myLenses || [];
     const newLenses = [...currentLenses];
     newLenses.splice(index, 1);
-    onSettingsChange({ ...appSettings, myLenses: newLenses });
+    saveSettings({ ...appSettings, myLenses: newLenses });
   };
 
   const effectiveRootPaths = rootPaths.length > 0 ? rootPaths : appSettings.rootFolders || [];
@@ -832,7 +849,9 @@ export default function SettingsPanel({
       confirmVariant: 'destructive',
       isOpen: true,
       message: t('settings.data.modals.sidecarMessage'),
-      onConfirm: executeClearSidecars,
+      onConfirm: () => {
+        void executeClearSidecars();
+      },
       title: t('settings.data.modals.confirmTitle'),
     });
   };
@@ -865,7 +884,9 @@ export default function SettingsPanel({
       confirmVariant: 'destructive',
       isOpen: true,
       message: t('settings.data.modals.aiMessage'),
-      onConfirm: executeClearAiTags,
+      onConfirm: () => {
+        void executeClearAiTags();
+      },
       title: t('settings.data.modals.confirmAiTitle'),
     });
   };
@@ -898,7 +919,9 @@ export default function SettingsPanel({
       confirmVariant: 'destructive',
       isOpen: true,
       message: t('settings.data.modals.allMessage'),
-      onConfirm: executeClearTags,
+      onConfirm: () => {
+        void executeClearTags();
+      },
       title: t('settings.data.modals.confirmAllTitle'),
     });
   };
@@ -932,7 +955,9 @@ export default function SettingsPanel({
       confirmVariant: 'destructive',
       isOpen: true,
       message: t('settings.data.modals.cacheMessage'),
-      onConfirm: executeClearCache,
+      onConfirm: () => {
+        void executeClearCache();
+      },
       title: t('settings.data.modals.confirmCacheTitle'),
     });
   };
@@ -967,14 +992,14 @@ export default function SettingsPanel({
 
     if (parsedTags.length > 0) {
       const uniqueShortcuts = Array.from(new Set([...taggingShortcuts, ...parsedTags])).sort();
-      onSettingsChange({ ...appSettings, taggingShortcuts: uniqueShortcuts });
+      saveSettings({ ...appSettings, taggingShortcuts: uniqueShortcuts });
     }
     setNewShortcut('');
   };
 
   const handleRemoveShortcut = (shortcutToRemove: string) => {
     const uniqueShortcuts = taggingShortcuts.filter((s) => s !== shortcutToRemove);
-    onSettingsChange({ ...appSettings, taggingShortcuts: uniqueShortcuts });
+    saveSettings({ ...appSettings, taggingShortcuts: uniqueShortcuts });
   };
 
   const handleInputKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -992,14 +1017,14 @@ export default function SettingsPanel({
 
     if (parsedTags.length > 0) {
       const uniqueTags = Array.from(new Set([...customAiTags, ...parsedTags])).sort();
-      onSettingsChange({ ...appSettings, customAiTags: uniqueTags });
+      saveSettings({ ...appSettings, customAiTags: uniqueTags });
     }
     setNewAiTag('');
   };
 
   const handleRemoveAiTag = (tagToRemove: string) => {
     const uniqueTags = customAiTags.filter((t) => t !== tagToRemove);
-    onSettingsChange({ ...appSettings, customAiTags: uniqueTags });
+    saveSettings({ ...appSettings, customAiTags: uniqueTags });
   };
 
   const handleAiTagInputKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -1011,7 +1036,7 @@ export default function SettingsPanel({
 
   const handleKeybindSave = (action: string, combo: string[]) => {
     const newKeybinds = { ...(appSettings.keybinds || {}), [action]: combo };
-    onSettingsChange({ ...appSettings, keybinds: newKeybinds });
+    saveSettings({ ...appSettings, keybinds: newKeybinds });
   };
 
   const conflictingKeys = useMemo(() => {
@@ -1107,7 +1132,7 @@ export default function SettingsPanel({
                   <div className="space-y-8">
                     <SettingItem label={t('settings.general.theme')} description={t('settings.general.themeDesc')}>
                       <Dropdown
-                        onChange={(value: Theme) => onSettingsChange({ ...appSettings, theme: value })}
+                        onChange={(value: Theme) => saveSettings({ ...appSettings, theme: value })}
                         options={THEMES.map((theme: ThemeProps) => ({
                           value: theme.id,
                           label: translateDynamicKey(t, theme.name),
@@ -1119,7 +1144,7 @@ export default function SettingsPanel({
 
                     <SettingItem label={t('settings.language')} description={t('settings.languageDesc')}>
                       <Dropdown
-                        onChange={(value: string) => onSettingsChange({ ...appSettings, language: value })}
+                        onChange={(value: string) => saveSettings({ ...appSettings, language: value })}
                         options={[
                           { value: 'en', label: 'English' },
                           { value: 'de', label: 'Deutsch' },
@@ -1151,7 +1176,7 @@ export default function SettingsPanel({
                             if (!checked) {
                               newSettings.createXmpIfMissing = false;
                             }
-                            onSettingsChange(newSettings);
+                            saveSettings(newSettings);
                           }}
                         />
                       </SettingItem>
@@ -1174,9 +1199,7 @@ export default function SettingsPanel({
                                   checked={appSettings.createXmpIfMissing ?? false}
                                   id="create-xmp-missing-toggle"
                                   label={t('settings.general.createXmpMissing')}
-                                  onChange={(checked) =>
-                                    onSettingsChange({ ...appSettings, createXmpIfMissing: checked })
-                                  }
+                                  onChange={(checked) => saveSettings({ ...appSettings, createXmpIfMissing: checked })}
                                 />
                               </SettingItem>
                             </div>
@@ -1193,7 +1216,7 @@ export default function SettingsPanel({
                         checked={appSettings.enableFolderImageCounts ?? false}
                         id="folder-image-counts-toggle"
                         label={t('settings.general.showImageCounts')}
-                        onChange={(checked) => onSettingsChange({ ...appSettings, enableFolderImageCounts: checked })}
+                        onChange={(checked) => saveSettings({ ...appSettings, enableFolderImageCounts: checked })}
                       />
                     </SettingItem>
 
@@ -1205,7 +1228,7 @@ export default function SettingsPanel({
                         checked={appSettings.displayEditIcon ?? true}
                         id="display-edit-icon-toggle"
                         label={t('settings.general.displayEditIcon')}
-                        onChange={(checked) => onSettingsChange({ ...appSettings, displayEditIcon: checked })}
+                        onChange={(checked) => saveSettings({ ...appSettings, displayEditIcon: checked })}
                       />
                     </SettingItem>
 
@@ -1217,13 +1240,13 @@ export default function SettingsPanel({
                         checked={appSettings.enableFocusMode ?? false}
                         id="focus-mode-toggle"
                         label={t('settings.general.enableFocusMode')}
-                        onChange={(checked) => onSettingsChange({ ...appSettings, enableFocusMode: checked })}
+                        onChange={(checked) => saveSettings({ ...appSettings, enableFocusMode: checked })}
                       />
                     </SettingItem>
 
                     <SettingItem label={t('settings.general.font')} description={t('settings.general.fontDesc')}>
                       <Dropdown
-                        onChange={(value: string) => onSettingsChange({ ...appSettings, fontFamily: value })}
+                        onChange={(value: string) => saveSettings({ ...appSettings, fontFamily: value })}
                         options={fontOptions}
                         value={appSettings.fontFamily || 'poppins'}
                         triggerClassName="bg-bg-primary"
@@ -1240,7 +1263,7 @@ export default function SettingsPanel({
                           id="native-titlebar-toggle"
                           label={t('settings.general.enableOsTitlebar')}
                           onChange={(checked) => {
-                            onSettingsChange({ ...appSettings, decorations: checked });
+                            saveSettings({ ...appSettings, decorations: checked });
                             getCurrentWindow().setDecorations(checked).catch(console.error);
                           }}
                         />
@@ -1259,7 +1282,7 @@ export default function SettingsPanel({
                       label={t('settings.adjustments.chromaticAberration')}
                       checked={appSettings.adjustmentVisibility?.['chromaticAberration'] ?? false}
                       onChange={(checked) =>
-                        onSettingsChange({
+                        saveSettings({
                           ...appSettings,
                           adjustmentVisibility: {
                             ...(appSettings.adjustmentVisibility || adjustmentVisibilityDefaults),
@@ -1272,7 +1295,7 @@ export default function SettingsPanel({
                       label={t('settings.adjustments.grain')}
                       checked={appSettings.adjustmentVisibility?.['grain'] ?? true}
                       onChange={(checked) =>
-                        onSettingsChange({
+                        saveSettings({
                           ...appSettings,
                           adjustmentVisibility: {
                             ...(appSettings.adjustmentVisibility || adjustmentVisibilityDefaults),
@@ -1285,7 +1308,7 @@ export default function SettingsPanel({
                       label={t('settings.adjustments.colorCalibration')}
                       checked={appSettings.adjustmentVisibility?.['colorCalibration'] ?? true}
                       onChange={(checked) =>
-                        onSettingsChange({
+                        saveSettings({
                           ...appSettings,
                           adjustmentVisibility: {
                             ...(appSettings.adjustmentVisibility || adjustmentVisibilityDefaults),
@@ -1298,7 +1321,7 @@ export default function SettingsPanel({
                       label={t('settings.adjustments.noiseReduction')}
                       checked={appSettings.adjustmentVisibility?.['noiseReduction'] ?? true}
                       onChange={(checked) =>
-                        onSettingsChange({
+                        saveSettings({
                           ...appSettings,
                           adjustmentVisibility: {
                             ...(appSettings.adjustmentVisibility || adjustmentVisibilityDefaults),
@@ -1396,7 +1419,7 @@ export default function SettingsPanel({
                           checked={appSettings.enableAiTagging ?? false}
                           id="ai-tagging-toggle"
                           label={t('settings.tagging.automaticAiTagging')}
-                          onChange={(checked) => onSettingsChange({ ...appSettings, enableAiTagging: checked })}
+                          onChange={(checked) => saveSettings({ ...appSettings, enableAiTagging: checked })}
                         />
                       </SettingItem>
 
@@ -1422,7 +1445,7 @@ export default function SettingsPanel({
                                   value={appSettings.aiTagCount ?? 10}
                                   defaultValue={10}
                                   onChange={(event: NumericChangeEvent) =>
-                                    onSettingsChange({ ...appSettings, aiTagCount: getIntegerEventValue(event) })
+                                    saveSettings({ ...appSettings, aiTagCount: getIntegerEventValue(event) })
                                   }
                                 />
                               </SettingItem>
@@ -1494,7 +1517,7 @@ export default function SettingsPanel({
                                       </button>
                                     </div>
                                     <button
-                                      onClick={() => onSettingsChange({ ...appSettings, customAiTags: [] })}
+                                      onClick={() => saveSettings({ ...appSettings, customAiTags: [] })}
                                       disabled={customAiTags.length === 0}
                                       className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
                                       data-tooltip={t('settings.tagging.clearCustomTooltip')}
@@ -1576,7 +1599,7 @@ export default function SettingsPanel({
                             </button>
                           </div>
                           <button
-                            onClick={() => onSettingsChange({ ...appSettings, taggingShortcuts: [] })}
+                            onClick={() => saveSettings({ ...appSettings, taggingShortcuts: [] })}
                             disabled={taggingShortcuts.length === 0}
                             className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
                             data-tooltip={t('settings.tagging.clearShortcutsTooltip')}
@@ -1770,7 +1793,7 @@ export default function SettingsPanel({
                                 >
                                   <Dropdown
                                     onChange={(value: number) =>
-                                      handleProcessingSettingChange('editorPreviewResolution', value)
+                                      handleProcessingSettingChangeVoid('editorPreviewResolution', value)
                                     }
                                     options={resolutions}
                                     value={processingSettings.editorPreviewResolution}
@@ -1797,7 +1820,7 @@ export default function SettingsPanel({
                                 >
                                   <Dropdown
                                     onChange={(value: number) =>
-                                      handleProcessingSettingChange('editorPreviewResolution', value)
+                                      handleProcessingSettingChangeVoid('editorPreviewResolution', value)
                                     }
                                     options={resolutions}
                                     value={processingSettings.editorPreviewResolution}
@@ -1811,7 +1834,7 @@ export default function SettingsPanel({
                                 >
                                   <Dropdown
                                     onChange={(value: number) =>
-                                      handleProcessingSettingChange('highResZoomMultiplier', value)
+                                      handleProcessingSettingChangeVoid('highResZoomMultiplier', value)
                                     }
                                     options={zoomMultiplierOptions}
                                     value={processingSettings.highResZoomMultiplier}
@@ -1833,7 +1856,7 @@ export default function SettingsPanel({
                                     id="full-dpi-rendering-toggle"
                                     label={t('settings.processing.nativeDpi')}
                                     onChange={(checked) =>
-                                      handleProcessingSettingChange('useFullDpiRendering', checked)
+                                      handleProcessingSettingChangeVoid('useFullDpiRendering', checked)
                                     }
                                   />
                                 </SettingItem>
@@ -1855,7 +1878,7 @@ export default function SettingsPanel({
                           label={t('settings.processing.enableLivePreviews')}
                           onChange={(checked) => {
                             setHasInteractedWithLivePreview(true);
-                            onSettingsChange({ ...appSettings, enableLivePreviews: checked });
+                            saveSettings({ ...appSettings, enableLivePreviews: checked });
                           }}
                         />
                       </SettingItem>
@@ -1875,7 +1898,7 @@ export default function SettingsPanel({
                               >
                                 <Dropdown
                                   onChange={(value: string) =>
-                                    onSettingsChange({ ...appSettings, livePreviewQuality: value })
+                                    saveSettings({ ...appSettings, livePreviewQuality: value })
                                   }
                                   options={livePreviewQualityOptions}
                                   value={appSettings.livePreviewQuality || 'high'}
@@ -1893,7 +1916,7 @@ export default function SettingsPanel({
                       label={t('settings.processing.thumbnailRes')}
                     >
                       <Dropdown
-                        onChange={(value: number) => handleProcessingSettingChange('thumbnailResolution', value)}
+                        onChange={(value: number) => handleProcessingSettingChangeVoid('thumbnailResolution', value)}
                         options={thumbnailResolutions}
                         value={processingSettings.thumbnailResolution}
                         triggerClassName="bg-bg-primary"
@@ -1912,7 +1935,7 @@ export default function SettingsPanel({
                         value={processingSettings.thumbnailWorkerThreads}
                         defaultValue={4}
                         onChange={(event: NumericChangeEvent) =>
-                          handleProcessingSettingChange('thumbnailWorkerThreads', getIntegerEventValue(event))
+                          handleProcessingSettingChangeVoid('thumbnailWorkerThreads', getIntegerEventValue(event))
                         }
                         fillOrigin="min"
                       />
@@ -1930,7 +1953,7 @@ export default function SettingsPanel({
                         value={processingSettings.imageCacheSize}
                         defaultValue={5}
                         onChange={(event: NumericChangeEvent) =>
-                          handleProcessingSettingChange('imageCacheSize', getIntegerEventValue(event))
+                          handleProcessingSettingChangeVoid('imageCacheSize', getIntegerEventValue(event))
                         }
                         fillOrigin="min"
                       />
@@ -1951,7 +1974,7 @@ export default function SettingsPanel({
                         disabled={osPlatform === 'linux' || osPlatform === 'android'}
                         id="wgpu-renderer-toggle"
                         label={t('settings.processing.wgpuLabel')}
-                        onChange={(checked) => handleProcessingSettingChange('useWgpuRenderer', checked)}
+                        onChange={(checked) => handleProcessingSettingChangeVoid('useWgpuRenderer', checked)}
                       />
                     </SettingItem>
 
@@ -1960,7 +1983,7 @@ export default function SettingsPanel({
                       description={t('settings.processing.backendDesc')}
                     >
                       <Dropdown
-                        onChange={(value: string) => handleProcessingSettingChange('processingBackend', value)}
+                        onChange={(value: string) => handleProcessingSettingChangeVoid('processingBackend', value)}
                         options={filteredBackendOptions}
                         value={
                           filteredBackendOptions.some((option) => option.value === processingSettings.processingBackend)
@@ -1980,7 +2003,7 @@ export default function SettingsPanel({
                           checked={processingSettings.linuxGpuOptimization}
                           id="gpu-compat-toggle"
                           label={t('settings.processing.linuxCompatLabel')}
-                          onChange={(checked) => handleProcessingSettingChange('linuxGpuOptimization', checked)}
+                          onChange={(checked) => handleProcessingSettingChangeVoid('linuxGpuOptimization', checked)}
                         />
                       </SettingItem>
                     )}
@@ -1996,7 +2019,13 @@ export default function SettingsPanel({
                           <p>{t('settings.processing.restartRequired')}</p>
                         </Text>
                         <div className="flex justify-end">
-                          <Button onClick={handleSaveAndRelaunch}>{t('settings.processing.saveRelaunch')}</Button>
+                          <Button
+                            onClick={() => {
+                              void handleSaveAndRelaunch();
+                            }}
+                          >
+                            {t('settings.processing.saveRelaunch')}
+                          </Button>
                         </div>
                       </>
                     )}
@@ -2020,7 +2049,7 @@ export default function SettingsPanel({
                         value={processingSettings.rawHighlightCompression}
                         defaultValue={2.5}
                         onChange={(event: NumericChangeEvent) =>
-                          handleProcessingSettingChange('rawHighlightCompression', getNumericEventValue(event))
+                          handleProcessingSettingChangeVoid('rawHighlightCompression', getNumericEventValue(event))
                         }
                         fillOrigin="min"
                       />
@@ -2038,7 +2067,7 @@ export default function SettingsPanel({
                         value={processingSettings.rawPreprocessingColorNr}
                         defaultValue={0.5}
                         onChange={(event: NumericChangeEvent) =>
-                          handleProcessingSettingChange('rawPreprocessingColorNr', getNumericEventValue(event))
+                          handleProcessingSettingChangeVoid('rawPreprocessingColorNr', getNumericEventValue(event))
                         }
                         fillOrigin="min"
                       />
@@ -2056,7 +2085,7 @@ export default function SettingsPanel({
                         value={processingSettings.rawPreprocessingSharpening}
                         defaultValue={0.35}
                         onChange={(event: NumericChangeEvent) =>
-                          handleProcessingSettingChange('rawPreprocessingSharpening', getNumericEventValue(event))
+                          handleProcessingSettingChangeVoid('rawPreprocessingSharpening', getNumericEventValue(event))
                         }
                         fillOrigin="min"
                       />
@@ -2070,7 +2099,9 @@ export default function SettingsPanel({
                         checked={processingSettings.applyPreprocessingToNonRaws}
                         id="preprocessing-non-raws-toggle"
                         label={t('settings.processing.preprocessing.enablePreprocessingNonRaws')}
-                        onChange={(checked) => handleProcessingSettingChange('applyPreprocessingToNonRaws', checked)}
+                        onChange={(checked) =>
+                          handleProcessingSettingChangeVoid('applyPreprocessingToNonRaws', checked)
+                        }
                       />
                     </SettingItem>
 
@@ -2079,7 +2110,7 @@ export default function SettingsPanel({
                       description={t('settings.processing.preprocessing.linearRawDesc')}
                     >
                       <Dropdown
-                        onChange={(value: string) => onSettingsChange({ ...appSettings, linearRawMode: value })}
+                        onChange={(value: string) => saveSettings({ ...appSettings, linearRawMode: value })}
                         options={linearRawOptions}
                         value={appSettings.linearRawMode || 'auto'}
                         triggerClassName="bg-bg-primary"
@@ -2095,9 +2126,7 @@ export default function SettingsPanel({
                           checked={appSettings.tonemapperOverrideEnabled ?? false}
                           id="tonemapper-override-toggle"
                           label={t('settings.processing.preprocessing.enableTonemapperOverride')}
-                          onChange={(checked) =>
-                            onSettingsChange({ ...appSettings, tonemapperOverrideEnabled: checked })
-                          }
+                          onChange={(checked) => saveSettings({ ...appSettings, tonemapperOverrideEnabled: checked })}
                         />
                       </SettingItem>
 
@@ -2116,7 +2145,7 @@ export default function SettingsPanel({
                               >
                                 <Dropdown
                                   onChange={(value: string) =>
-                                    onSettingsChange({ ...appSettings, defaultRawTonemapper: value })
+                                    saveSettings({ ...appSettings, defaultRawTonemapper: value })
                                   }
                                   options={tonemapperOptions}
                                   value={appSettings.defaultRawTonemapper || 'agx'}
@@ -2130,7 +2159,7 @@ export default function SettingsPanel({
                               >
                                 <Dropdown
                                   onChange={(value: string) =>
-                                    onSettingsChange({ ...appSettings, defaultNonRawTonemapper: value })
+                                    saveSettings({ ...appSettings, defaultNonRawTonemapper: value })
                                   }
                                   options={tonemapperOptions}
                                   value={appSettings.defaultNonRawTonemapper || 'basic'}
@@ -2200,7 +2229,7 @@ export default function SettingsPanel({
                                   className="grow"
                                   id="ai-connector-address"
                                   onBlur={() => {
-                                    onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress });
+                                    saveSettings({ ...appSettings, aiConnectorAddress: aiConnectorAddress });
                                   }}
                                   onChange={(event: ChangeEvent<HTMLInputElement>) => {
                                     setAiConnectorAddress(event.target.value);
@@ -2216,7 +2245,9 @@ export default function SettingsPanel({
                                 <Button
                                   className="w-32"
                                   disabled={testStatus.testing || !aiConnectorAddress}
-                                  onClick={handleTestConnection}
+                                  onClick={() => {
+                                    void handleTestConnection();
+                                  }}
                                 >
                                   {testStatus.testing
                                     ? t('settings.processing.ai.connector.testing')
@@ -2313,7 +2344,9 @@ export default function SettingsPanel({
                                   <Text variant={TextVariants.small}>
                                     {t('settings.processing.ai.cloud.signedOut.noAccount')}{' '}
                                     <button
-                                      onClick={() => open('https://www.getrapidraw.com/dashboard')}
+                                      onClick={() => {
+                                        void open('https://www.getrapidraw.com/dashboard');
+                                      }}
                                       className="text-accent hover:underline focus:outline-none"
                                     >
                                       {t('settings.processing.ai.cloud.signedOut.signup')}
@@ -2367,9 +2400,11 @@ export default function SettingsPanel({
                     />
 
                     <DataActionItem
-                      buttonAction={async () => {
+                      buttonAction={() => {
                         if (logPath && !logPathLoading && !logPathError) {
-                          await invoke(Invokes.ShowInFinder, { path: logPath });
+                          void invoke(Invokes.ShowInFinder, { path: logPath }).catch((err: unknown) => {
+                            console.error('Failed to reveal log file:', err);
+                          });
                         }
                       }}
                       buttonText={t('settings.data.logsButton')}
@@ -2419,7 +2454,7 @@ export default function SettingsPanel({
                       </Text>
                       <CanvasInputModeSwitch
                         mode={appSettings.canvasInputMode || 'mouse'}
-                        onModeChange={(value) => onSettingsChange({ ...appSettings, canvasInputMode: value })}
+                        onModeChange={(value) => saveSettings({ ...appSettings, canvasInputMode: value })}
                       />
                     </div>
 
@@ -2432,7 +2467,7 @@ export default function SettingsPanel({
                         value={appSettings.zoomSpeedMultiplier ?? 1.0}
                         defaultValue={1.0}
                         onChange={(event: NumericChangeEvent) =>
-                          onSettingsChange({ ...appSettings, zoomSpeedMultiplier: getNumericEventValue(event) })
+                          saveSettings({ ...appSettings, zoomSpeedMultiplier: getNumericEventValue(event) })
                         }
                         fillOrigin="min"
                       />
@@ -2470,7 +2505,7 @@ export default function SettingsPanel({
                       );
                     })}
                     <div className="flex justify-end mt-6">
-                      <Button variant="ghost" onClick={() => onSettingsChange({ ...appSettings, keybinds: {} })}>
+                      <Button variant="ghost" onClick={() => saveSettings({ ...appSettings, keybinds: {} })}>
                         {t('settings.controls.resetDefaults')}
                       </Button>
                     </div>
