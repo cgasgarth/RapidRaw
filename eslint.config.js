@@ -184,7 +184,17 @@ module.exports = [
       // burned down by focused follow-up issues so this gate can land cleanly.
       '@typescript-eslint/no-confusing-void-expression': 'error',
       '@typescript-eslint/no-unnecessary-condition': 'error',
-      '@typescript-eslint/restrict-template-expressions': 'off',
+      '@typescript-eslint/restrict-template-expressions': [
+        'error',
+        {
+          allowAny: false,
+          allowBoolean: false,
+          allowNever: false,
+          allowNullish: false,
+          allowNumber: true,
+          allowRegExp: false,
+        },
+      ],
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
