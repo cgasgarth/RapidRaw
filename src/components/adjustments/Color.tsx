@@ -24,7 +24,7 @@ interface ColorProps {
 
 interface ColorPanelProps {
   adjustments: Adjustments;
-  setAdjustments(adjustments: AdjustmentUpdate): void;
+  setAdjustments: (adjustments: AdjustmentUpdate) => void;
   appSettings: AppSettings | null;
   isForMask?: boolean;
   isWbPickerActive?: boolean;

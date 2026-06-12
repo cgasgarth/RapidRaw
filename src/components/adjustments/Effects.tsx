@@ -10,8 +10,8 @@ import { TextVariants } from '../../types/typography';
 interface EffectsPanelProps {
   adjustments: Adjustments;
   isForMask: boolean;
-  setAdjustments(adjustments: AdjustmentUpdate): void;
-  handleLutSelect(path: string): void;
+  setAdjustments: (adjustments: AdjustmentUpdate) => void;
+  handleLutSelect: (path: string) => void;
   appSettings: AppSettings | null;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }

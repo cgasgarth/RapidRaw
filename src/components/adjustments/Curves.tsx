@@ -45,7 +45,7 @@ interface CurveGraphProps {
   adjustments: Adjustments | MaskAdjustments;
   histogram: ChannelConfig | null;
   isForMask?: boolean;
-  setAdjustments(updater: CurveAdjustmentUpdater): void;
+  setAdjustments: (updater: CurveAdjustmentUpdater) => void;
   theme: Theme;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
