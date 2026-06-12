@@ -295,6 +295,15 @@ Required check rollout:
 - Path-aware CI routing must fail closed. Workflow, action, Rust, Tauri, dependency, build config, unknown, or unclassified paths require the expensive macOS smoke gate. Only explicitly classified docs/frontend-leaf paths may skip the macOS no-bundle smoke, and the routing decision must be represented as its own completed peer job under `PR CI / required`.
 - Do not use workflow concurrency cancellation for PR or main validation unless project governance explicitly changes. Older runs should be allowed to complete.
 
+Active PR queue discipline:
+
+- Do not let PRs sit open merely because more local work is available. Every open PR should be actively heading toward merge, or it should be closed with a comment that explains whether the work is superseded, preserved locally, or intentionally deferred.
+- Prefer one active implementation PR at a time for work that touches shared config, validation gates, lockfiles, generated artifacts, or other files likely to conflict with the next similar PR.
+- At most one unrelated infrastructure or documentation PR should be active beside a shared-config implementation PR unless the user explicitly approves a larger queue for a specific reason.
+- Do not stack multiple lint-rule PRs that all touch `eslint.config.js` while required macOS/Rust checks are queued. Keep follow-up lint work local, then open the next PR only after the earlier overlapping PR merges or is closed.
+- After a PR merges, sync `main` before opening the next overlapping PR. Rebase and force-push an open PR only when it is genuinely behind, conflicting, failing, or required by branch protection; avoid needless head updates because they restart required checks.
+- Auto-merge is a convenience, not a parking lot. If required checks are blocked for a long time, inspect the check state and either fix the blocker, keep only the minimal active queue, or close nonessential PRs and preserve the work locally.
+
 ### 2.1.2 Issue And PR Sizing Rules
 
 Issue scope should be designed so Codex can complete it safely in one branch and one PR.
