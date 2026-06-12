@@ -594,11 +594,9 @@ export default function LibraryGrid(props: LibraryGridProps) {
     }
   }, [activePath, gridData, multiSelectedPaths.length, listHandle, currentFolderPath, imageList, libraryViewMode]);
 
-  const memoizedRowProps = useMemo<RowRendererProps | null>(() => {
-    if (!gridData) return null;
-
+  const memoizedRowProps = useMemo<RowRendererProps>(() => {
     return {
-      rows: gridData.rows,
+      rows: gridData?.rows ?? [],
       activePath,
       multiSelectedSet: new Set(multiSelectedPaths),
       onContextMenu,
@@ -608,11 +606,11 @@ export default function LibraryGrid(props: LibraryGridProps) {
       onImageLoad: handleImageLoad,
       imageRatings,
       baseFolderPath: currentFolderPath,
-      itemWidth: gridData.itemWidth,
-      itemHeight: gridData.isListView ? gridData.listRowHeight : gridData.itemWidth,
-      outerPadding: gridData.OUTER_PADDING,
-      gap: gridData.ITEM_GAP,
-      isListView: gridData.isListView,
+      itemWidth: gridData?.itemWidth ?? 0,
+      itemHeight: gridData ? (gridData.isListView ? gridData.listRowHeight : gridData.itemWidth) : 0,
+      outerPadding: gridData?.OUTER_PADDING ?? 0,
+      gap: gridData?.ITEM_GAP ?? 0,
+      isListView: gridData?.isListView ?? false,
       columnWidths: listColumnWidths,
       queueThumbnailRequest,
       onToggleRecursiveFolder: handleToggleRecursiveFolder,
@@ -633,7 +631,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
     handleToggleRecursiveFolder,
   ]);
 
-  if (!gridData || !memoizedRowProps) {
+  if (!gridData) {
     return (
       <div
         ref={libraryContainerRef}

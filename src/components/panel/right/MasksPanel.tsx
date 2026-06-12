@@ -422,22 +422,14 @@ function DepthRangePicker({
     minFade: number;
     maxFade: number;
   } | null>(null);
-  const rafRef = useRef<number>(0);
   const [isLabelHovered, setIsLabelHovered] = useState(false);
 
   const vals = dragValues ?? { minDepth, maxDepth, minFade, maxFade };
   const fadeLeftEdge = Math.max(0, vals.minDepth - vals.minFade);
   const fadeRightEdge = Math.min(100, vals.maxDepth + vals.maxFade);
 
-  useEffect(() => {
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
-
-  const getVal = (e: { clientX: number }): number => {
-    if (!trackRef.current) return 0;
-    const rect = trackRef.current.getBoundingClientRect();
+  const getVal = (trackElement: HTMLDivElement, e: { clientX: number }): number => {
+    const rect = trackElement.getBoundingClientRect();
     return Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
   };
 
@@ -503,16 +495,21 @@ function DepthRangePicker({
     }
   };
 
-  const beginDrag = (handle: string) => (e: ReactPointerEvent<HTMLDivElement>) => {
+  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const handle = e.currentTarget.dataset['handle'];
+    if (!handle) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    const trackElement = trackRef.current;
+    if (!trackElement) return;
     setActiveHandle(handle);
     onDragStateChange?.(true);
 
-    const init = { ...vals, startVal: getVal(e) };
+    const init = { ...vals, startVal: getVal(trackElement, e) };
     let latest = { ...vals };
     let pending = false;
+    let animationFrame: number | null = null;
     const pointerId = e.pointerId;
     const previousTouchAction = document.documentElement.style.touchAction;
     const previousUserSelect = document.documentElement.style.userSelect;
@@ -526,14 +523,15 @@ function DepthRangePicker({
     const onMove = (me: PointerEvent) => {
       if (me.pointerId !== pointerId) return;
       if (me.cancelable) me.preventDefault();
-      latest = compute(handle, getVal(me), init);
+      latest = compute(handle, getVal(trackElement, me), init);
       setDragValues(latest);
 
       if (!pending) {
         pending = true;
-        rafRef.current = requestAnimationFrame(() => {
+        animationFrame = requestAnimationFrame(() => {
           onChange(latest);
           pending = false;
+          animationFrame = null;
         });
       }
     };
@@ -542,7 +540,7 @@ function DepthRangePicker({
       if (upEvent.pointerId !== pointerId) return;
       setActiveHandle(null);
       if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (animationFrame !== null) cancelAnimationFrame(animationFrame);
       onChange(latest);
       onDragStateChange?.(false);
       document.documentElement.style.touchAction = previousTouchAction;
@@ -690,7 +688,8 @@ function DepthRangePicker({
             cursor: activeHandle === 'range' ? 'grabbing' : 'grab',
             zIndex: 5,
           }}
-          onPointerDown={beginDrag('range')}
+          data-handle="range"
+          onPointerDown={handlePointerDown}
         />
 
         {[
@@ -701,7 +700,8 @@ function DepthRangePicker({
             key={key}
             className="absolute flex items-start justify-center cursor-ew-resize"
             style={{ left: `${pos}%`, transform: 'translateX(-50%)', top: 0, height: '50%', width: 28, zIndex: 15 }}
-            onPointerDown={beginDrag(key)}
+            data-handle={key}
+            onPointerDown={handlePointerDown}
           >
             <svg width="8" height="5" viewBox="0 0 8 5" style={{ marginTop: 3 }}>
               <polygon points="4,5 8,0 0,0" fill={handleColor(key, false)} />
@@ -717,7 +717,8 @@ function DepthRangePicker({
             key={key}
             className="absolute flex items-end justify-center cursor-ew-resize"
             style={{ left: `${pos}%`, transform: 'translateX(-50%)', bottom: 0, height: '50%', width: 28, zIndex: 20 }}
-            onPointerDown={beginDrag(key)}
+            data-handle={key}
+            onPointerDown={handlePointerDown}
           >
             <svg width="10" height="6" viewBox="0 0 10 6" style={{ marginBottom: 3 }}>
               <polygon points="5,0 10,6 0,6" fill={handleColor(key, true)} />
