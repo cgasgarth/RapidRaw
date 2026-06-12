@@ -273,7 +273,7 @@ export function installFrontendLogBridge(): void {
   window.addEventListener('error', (event) => {
     const payload: unknown[] = [
       event.message || 'Unhandled window error',
-      event.filename ? `at ${event.filename}:${event.lineno}:${event.colno}` : undefined,
+      event.filename ? `at ${event.filename}:${String(event.lineno)}:${String(event.colno)}` : undefined,
       event.error ?? undefined,
       {
         type: event.type,

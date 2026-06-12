@@ -30,6 +30,8 @@ const FINE_ADJUSTMENT_MULTIPLIER = 0.2;
 const TOUCH_DRAG_THRESHOLD_PX = 10;
 const TOUCH_THUMB_HIT_RADIUS_PX = 24;
 
+const formatPercent = (value: number) => `${String(value)}%`;
+
 const Slider = ({
   defaultValue = 0,
   label,
@@ -568,8 +570,8 @@ const Slider = ({
         <div
           className="absolute top-1/2 h-1.5 -translate-y-1/4 rounded-full pointer-events-none bg-accent/25"
           style={{
-            left: `${Math.min(fillPercentage, originPercentage)}%`,
-            width: `${Math.abs(fillPercentage - originPercentage)}%`,
+            left: formatPercent(Math.min(fillPercentage, originPercentage)),
+            width: formatPercent(Math.abs(fillPercentage - originPercentage)),
           }}
         />
         <input

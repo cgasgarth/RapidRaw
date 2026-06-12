@@ -42,7 +42,7 @@ export default function CollapsibleSection({
     const updateMaxHeight = () => {
       if (isOpen) {
         const contentHeight = content.scrollHeight;
-        wrapper.style.maxHeight = `${contentHeight}px`;
+        wrapper.style.maxHeight = `${String(contentHeight)}px`;
       } else {
         wrapper.style.maxHeight = '0px';
       }

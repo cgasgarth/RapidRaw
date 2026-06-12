@@ -18,6 +18,9 @@ interface ColorWheelProps {
   isExpanded?: boolean | undefined;
 }
 
+const formatPercent = (value: number) => `${String(value)}%`;
+const formatPx = (value: number) => `${String(value)}px`;
+
 const ColorWheel = ({
   defaultValue = { hue: 0, saturation: 0, luminance: 0 },
   label,
@@ -66,7 +69,7 @@ const ColorWheel = ({
 
   useEffect(() => {
     document.documentElement.style.setProperty(`--cg-hue-${instanceId}`, hue.toString());
-    document.documentElement.style.setProperty(`--cg-sat-${instanceId}`, `${saturation}%`);
+    document.documentElement.style.setProperty(`--cg-sat-${instanceId}`, formatPercent(saturation));
   }, [hue, saturation, instanceId]);
 
   useEffect(() => {
@@ -245,7 +248,7 @@ const ColorWheel = ({
                       boxShadow: '0 0 2px rgba(0,0,0,0.5)',
                       height: pointerSize,
                       width: pointerSize,
-                      transform: `translate(-${pointerOffset}px, -${pointerOffset}px)`,
+                      transform: `translate(-${formatPx(pointerOffset)}, -${formatPx(pointerOffset)})`,
                       transition: 'width 150ms ease-out, height 150ms ease-out, transform 150ms ease-out',
                     }}
                   />
