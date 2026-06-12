@@ -1293,7 +1293,11 @@ const ImageCanvas = memo(
 
     const isBrushActive =
       (isMasking || isAiEditing) && (activeSubMask?.type === Mask.Brush || activeSubMask?.type === Mask.Flow);
-    const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMask.parameters?.flow ?? 10) : undefined;
+    const activeSubMaskParameters = useMemo(
+      () => (activeSubMask ? toMaskParameters(activeSubMask.parameters) : null),
+      [activeSubMask],
+    );
+    const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMaskParameters?.flow ?? 10) : undefined;
     const brushCursorPreview = useMemo(() => {
       const radius = Math.max(0.1, brushStageSize / 2);
       const feather = Math.max(0, Math.min(1, (brushSettings?.feather ?? 0) / 100));
@@ -1303,7 +1307,7 @@ const ImageCanvas = memo(
           ? Math.max(0, Math.min(1, activeContainer.opacity / 100))
           : 1;
       const flowOpacity =
-        activeSubMask?.type === Mask.Flow ? Math.max(0, Math.min(1, (activeSubMask.parameters?.flow ?? 10) / 100)) : 1;
+        activeSubMask?.type === Mask.Flow ? Math.max(0, Math.min(1, (activeLineFlow ?? 10) / 100)) : 1;
       const alpha = Math.max(0, Math.min(0.5, 0.5 * subMaskOpacity * containerOpacity * flowOpacity));
 
       const isEraser = isAltPressed ? baseTool !== ToolType.Eraser : baseTool === ToolType.Eraser;
@@ -1339,7 +1343,7 @@ const ImageCanvas = memo(
     }, [
       activeContainer,
       activeSubMask?.opacity,
-      activeSubMask?.parameters?.flow,
+      activeLineFlow,
       activeSubMask?.type,
       brushSettings?.feather,
       brushStageSize,
@@ -1351,7 +1355,7 @@ const ImageCanvas = memo(
       (activeSubMask?.type === Mask.AiSubject || activeSubMask?.type === Mask.QuickEraser);
     const isParametricActive =
       (isMasking || isAiEditing) && (activeSubMask?.type === Mask.Color || activeSubMask?.type === Mask.Luminance);
-    const isInitialDrawing = (isMasking || isAiEditing) && activeSubMask?.parameters?.isInitialDraw === true;
+    const isInitialDrawing = (isMasking || isAiEditing) && activeSubMaskParameters?.isInitialDraw === true;
 
     const isToolActive = isBrushActive || isAiSubjectActive || isInitialDrawing || isParametricActive;
 
@@ -1524,6 +1528,7 @@ const ImageCanvas = memo(
         }
 
         if (isParametricActive) {
+          if (!activeSubMaskParameters) return;
           const pos = getCanvasPointer(e.target.getStage());
           if (!pos) return;
 
@@ -1536,13 +1541,13 @@ const ImageCanvas = memo(
           const x = pos.x / scale + cropX;
           const y = pos.y / scale + cropY;
 
-          const newParams = { ...activeSubMask.parameters };
+          const newParams: MaskParameters = { ...activeSubMaskParameters };
           newParams.targetX = x;
           newParams.targetY = y;
           newParams.rotation = adjustments.rotation || 0;
-          newParams.flipHorizontal = adjustments.flipHorizontal || false;
-          newParams.flipVertical = adjustments.flipVertical || false;
-          newParams.orientationSteps = adjustments.orientationSteps || 0;
+          newParams['flipHorizontal'] = adjustments.flipHorizontal || false;
+          newParams['flipVertical'] = adjustments.flipVertical || false;
+          newParams['orientationSteps'] = adjustments.orientationSteps || 0;
           delete newParams.isInitialDraw;
 
           const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
@@ -1551,6 +1556,7 @@ const ImageCanvas = memo(
         }
 
         if (isInitialDrawing) {
+          if (!activeSubMask) return;
           isDrawing.current = true;
           drawingStageRef.current = e.target.getStage();
           const pos = getCanvasPointer(e.target.getStage());
@@ -1650,17 +1656,17 @@ const ImageCanvas = memo(
             const imageSpaceLine: DrawnLine = {
               brushSize: brushImageSpaceSize,
               feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
-              flow: activeLineFlow,
               points: interpolatedPoints,
               tool: effectiveTool,
+              ...(activeLineFlow !== undefined ? { flow: activeLineFlow } : {}),
             };
 
             const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
-            const existingLines = activeSubMask.parameters?.lines || [];
+            const existingLines = activeSubMaskParameters?.lines || [];
 
             updateSubMask(activeId, {
               parameters: {
-                ...activeSubMask.parameters,
+                ...activeSubMaskParameters,
                 lines: [...existingLines, imageSpaceLine],
               },
             });
@@ -1761,6 +1767,7 @@ const ImageCanvas = memo(
         }
 
         if (isInitialDrawing && dragStartPointer.current && localInitialDrawParams) {
+          if (!activeSubMask) return;
           const stage = drawingStageRef.current || (isKonvaEvent(e) ? e.target.getStage() : null);
           if (!stage) return;
           const pointerPos = getCanvasPointer(stage);
@@ -1868,19 +1875,19 @@ const ImageCanvas = memo(
             const imageSpaceLine: DrawnLine = {
               brushSize: brushImageSpaceSize,
               feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
-              flow: activeLineFlow,
               points: updatedLine.points.map((p: Coord) => ({
                 x: p.x / scale + cropX,
                 y: p.y / scale + cropY,
               })),
               tool: effectiveToolForPreview,
+              ...(activeLineFlow !== undefined ? { flow: activeLineFlow } : {}),
             };
 
-            const existingLines = activeSubMask.parameters?.lines || [];
+            const existingLines = activeSubMaskParameters?.lines || [];
             const previewSubMask = {
               ...activeSubMask,
               parameters: {
-                ...activeSubMask.parameters,
+                ...activeSubMaskParameters,
                 lines: [...existingLines, imageSpaceLine],
               },
             };
@@ -1928,6 +1935,7 @@ const ImageCanvas = memo(
       }
 
       if (isInitialDrawing && localInitialDrawParams && dragStartPointer.current) {
+        if (!activeSubMask) return;
         isDrawing.current = false;
         const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
 
@@ -2030,19 +2038,19 @@ const ImageCanvas = memo(
         const imageSpaceLine: DrawnLine = {
           brushSize: brushImageSpaceSize,
           feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
-          flow: activeLineFlow,
           points: line.points.map((p: Coord) => ({
             x: p.x / scale + cropX,
             y: p.y / scale + cropY,
           })),
           tool: effectiveToolForFinal,
+          ...(activeLineFlow !== undefined ? { flow: activeLineFlow } : {}),
         };
 
-        const existingLines = activeSubMask.parameters.lines || [];
+        const existingLines = activeSubMaskParameters?.lines || [];
 
         updateSubMask(activeId, {
           parameters: {
-            ...activeSubMask.parameters,
+            ...activeSubMaskParameters,
             lines: [...existingLines, imageSpaceLine],
           },
         });
