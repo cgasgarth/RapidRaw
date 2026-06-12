@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import { useEditorStore } from '../store/useEditorStore';
 import { useEditorActions } from './useEditorActions';
 import { Adjustments, AiPatch, MaskContainer, Coord } from '../utils/adjustments';
-import { SubMask } from '../components/panel/right/Masks';
+import { Mask, SubMask } from '../components/panel/right/Masks';
 import { Invokes } from '../components/ui/AppProperties';
 import { useAuth } from '@clerk/react';
 import { parseAiPatchDataJson } from '../schemas/aiMaskingSchemas';
@@ -379,7 +379,7 @@ export function useAiMasking() {
       adjustments.masks.flatMap((m: MaskContainer) => m.subMasks).find((sm: SubMask) => sm.id === activeMaskId) ||
       adjustments.aiPatches.flatMap((p: AiPatch) => p.subMasks).find((sm: SubMask) => sm.id === activeAiSubMaskId);
 
-    if (activeSubMask?.type === 'ai-subject' && selectedImagePath) {
+    if (activeSubMask?.type === Mask.AiSubject && selectedImagePath) {
       const transformAdjustments = getTransformAdjustments(adjustments);
       invoke('precompute_ai_subject_mask', {
         jsAdjustments: transformAdjustments,
