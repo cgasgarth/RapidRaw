@@ -315,11 +315,13 @@ export default function LensCorrectionModal({
         setShow(true);
       }, 10);
 
-      invoke<LensSettings>('load_settings').then((settings) => {
-        if (settings.myLenses) {
-          setMyLenses(settings.myLenses);
-        }
-      });
+      void invoke<LensSettings>('load_settings')
+        .then((settings) => {
+          if (settings.myLenses) {
+            setMyLenses(settings.myLenses);
+          }
+        })
+        .catch(console.error);
 
       const initParams: LensParams = {
         lensCorrectionMode: currentAdjustments.lensCorrectionMode,
@@ -337,16 +339,16 @@ export default function LensCorrectionModal({
       setParams(initParams);
       setDetectionStatus('idle');
       handleResetZoom();
-      updatePreview(initParams);
+      void updatePreview(initParams);
 
-      invoke<Array<string>>('get_lensfun_makers')
+      void invoke<Array<string>>('get_lensfun_makers')
         .then((m) => {
           setMakers(m);
         })
         .catch(console.error);
 
       if (initParams.lensMaker) {
-        invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: initParams.lensMaker })
+        void invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: initParams.lensMaker })
           .then((l) => {
             setLenses(l);
           })
@@ -380,13 +382,13 @@ export default function LensCorrectionModal({
     setLenses([]);
     setDetectionStatus('idle');
 
-    invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker })
+    void invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker })
       .then((l) => {
         setLenses(l);
       })
       .catch(console.error);
 
-    updatePreview(newParams);
+    void updatePreview(newParams);
   };
 
   const handleModelChange = async (model: string) => {
@@ -398,7 +400,7 @@ export default function LensCorrectionModal({
       const distortionParams = await fetchDistortionParams(params.lensMaker, model);
       const finalParams = { ...tempParams, lensDistortionParams: distortionParams };
       setParams(finalParams);
-      updatePreview(finalParams);
+      void updatePreview(finalParams);
     }
   };
 
@@ -412,7 +414,7 @@ export default function LensCorrectionModal({
     setParams(tempParams);
     setDetectionStatus('idle');
 
-    invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: selected.maker })
+    void invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: selected.maker })
       .then((l) => {
         setLenses(l);
       })
@@ -421,19 +423,19 @@ export default function LensCorrectionModal({
     const distortionParams = await fetchDistortionParams(selected.maker, selected.model);
     const finalParams = { ...tempParams, lensDistortionParams: distortionParams };
     setParams(finalParams);
-    updatePreview(finalParams);
+    void updatePreview(finalParams);
   };
 
   const handleAmountChange = (key: keyof LensParams, amount: number) => {
     const newParams = { ...params, [key]: amount };
     setParams(newParams);
-    updatePreview(newParams);
+    void updatePreview(newParams);
   };
 
   const handleToggleChange = (key: keyof LensParams, val: boolean) => {
     const newParams = { ...params, [key]: val };
     setParams(newParams);
-    updatePreview(newParams);
+    void updatePreview(newParams);
   };
 
   const handleAutoDetect = async () => {
@@ -457,7 +459,7 @@ export default function LensCorrectionModal({
       if (result) {
         const [detectedMaker, detectedModel] = result;
 
-        invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: detectedMaker })
+        void invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: detectedMaker })
           .then((l) => {
             setLenses(l);
           })
@@ -472,7 +474,7 @@ export default function LensCorrectionModal({
             lensModel: detectedModel,
             lensDistortionParams: distortionParams,
           };
-          updatePreview(newParams);
+          void updatePreview(newParams);
           return newParams;
         });
 
@@ -489,7 +491,7 @@ export default function LensCorrectionModal({
             lensModel: null,
             lensDistortionParams: null,
           };
-          updatePreview(clearedParams);
+          void updatePreview(clearedParams);
           return clearedParams;
         });
         setDetectionStatus('not_found');
@@ -516,7 +518,7 @@ export default function LensCorrectionModal({
     setParams(resetParams);
     setLenses([]);
     setDetectionStatus('idle');
-    updatePreview(resetParams);
+    void updatePreview(resetParams);
   };
 
   const toggleCompare = (active: boolean) => {
@@ -551,15 +553,17 @@ export default function LensCorrectionModal({
         vig_k3: currentAdjustments.lensDistortionParams?.vig_k3 ?? 0,
       };
 
-      invoke<string>('preview_geometry_transform', {
+      void invoke<string>('preview_geometry_transform', {
         params: fullParams,
         jsAdjustments: currentAdjustments,
         showLines: false,
-      }).then((result) => {
-        setPreviewUrl(result);
-      });
+      })
+        .then((result) => {
+          setPreviewUrl(result);
+        })
+        .catch(console.error);
     } else {
-      updatePreview(params);
+      void updatePreview(params);
     }
   };
 
@@ -587,9 +591,9 @@ export default function LensCorrectionModal({
     setParams(newParams);
 
     if (mode === 'auto') {
-      handleAutoDetect();
+      void handleAutoDetect();
     } else {
-      updatePreview(newParams);
+      void updatePreview(newParams);
     }
   };
 
