@@ -77,7 +77,9 @@ export default function LUTControl({
         <span className="text-sm font-medium text-text-secondary select-none">{t('ui.lut.label')}</span>
         <div className="group flex items-center">
           <button
-            onClick={handleSelectFile}
+            onClick={() => {
+              void handleSelectFile();
+            }}
             className="text-sm text-text-primary text-right select-none cursor-pointer truncate max-w-[150px] hover:text-accent transition-colors"
             data-tooltip={lutName || t('ui.lut.selectLutFile')}
           >

@@ -41,7 +41,9 @@ export default function ImagePicker({ imageName, onImageSelect, onClear, label }
         </Text>
         <div className="group flex items-center">
           <button
-            onClick={handleSelectFile}
+            onClick={() => {
+              void handleSelectFile();
+            }}
             className="text-sm text-text-primary text-right select-none cursor-pointer truncate max-w-[150px] hover:text-accent transition-colors"
             data-tooltip={imageName || t('ui.imagePicker.selectImageFile')}
           >
