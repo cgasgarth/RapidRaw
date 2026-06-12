@@ -41,12 +41,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setSupportedTypes: (types) => set({ supportedTypes: types }),
 
   handleSettingsChange: async (newSettings: AppSettings) => {
-    if (!newSettings) {
-      console.error('handleSettingsChange was called with null settings. Aborting save operation.');
-      return;
-    }
-
-    if (newSettings.theme && newSettings.theme !== get().theme) {
+    if (newSettings.theme !== get().theme) {
       set({ theme: newSettings.theme });
     }
 

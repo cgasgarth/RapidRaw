@@ -613,7 +613,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
   };
 
   const normalizedMasks = (loadedAdjustments.masks || []).map((maskContainer: MaskContainer) => {
-    const containerAdjustments = maskContainer.adjustments || {};
+    const containerAdjustments = maskContainer.adjustments;
     const normalizedSubMasks = normalizeSubMasks(maskContainer.subMasks);
 
     return {
@@ -623,12 +623,12 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
       adjustments: {
         ...INITIAL_MASK_ADJUSTMENTS,
         ...containerAdjustments,
-        flareAmount: containerAdjustments.flareAmount ?? INITIAL_MASK_ADJUSTMENTS.flareAmount,
-        glowAmount: containerAdjustments.glowAmount ?? INITIAL_MASK_ADJUSTMENTS.glowAmount,
-        halationAmount: containerAdjustments.halationAmount ?? INITIAL_MASK_ADJUSTMENTS.halationAmount,
-        colorGrading: { ...INITIAL_MASK_ADJUSTMENTS.colorGrading, ...(containerAdjustments.colorGrading || {}) },
-        hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(containerAdjustments.hsl || {}) },
-        curves: containerAdjustments.curves ? deepCloneCurves(containerAdjustments.curves) : getDefaultCurves(),
+        flareAmount: containerAdjustments.flareAmount,
+        glowAmount: containerAdjustments.glowAmount,
+        halationAmount: containerAdjustments.halationAmount,
+        colorGrading: { ...INITIAL_MASK_ADJUSTMENTS.colorGrading, ...containerAdjustments.colorGrading },
+        hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...containerAdjustments.hsl },
+        curves: deepCloneCurves(containerAdjustments.curves),
         pointCurves: containerAdjustments.pointCurves
           ? deepCloneCurves(containerAdjustments.pointCurves)
           : getDefaultCurves(),
@@ -638,9 +638,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
         curveMode: containerAdjustments.curveMode ?? 'point',
         sectionVisibility: {
           ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
-          ...(containerAdjustments.sectionVisibility || {}),
+          ...containerAdjustments.sectionVisibility,
         },
-        sharpnessThreshold: containerAdjustments.sharpnessThreshold ?? INITIAL_MASK_ADJUSTMENTS.sharpnessThreshold,
+        sharpnessThreshold: containerAdjustments.sharpnessThreshold,
       },
       subMasks: normalizedSubMasks,
     } as MaskContainer;
