@@ -183,10 +183,6 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
   const handleDownloadPreset = async (preset: CommunityPreset) => {
     setDownloadStatus((prev) => ({ ...prev, [preset.name]: 'downloading' }));
     try {
-      if (!preset.adjustments) {
-        throw new Error('Preset adjustments are missing.');
-      }
-
       await invoke(Invokes.SaveCommunityPreset, {
         name: preset.name,
         adjustments: preset.adjustments,

@@ -29,7 +29,7 @@ export function useExportSettings() {
     setResizeValue(preset.resizeValue);
     setDontEnlarge(preset.dontEnlarge);
     setKeepMetadata(preset.keepMetadata);
-    setPreserveTimestamps(preset.preserveTimestamps ?? false);
+    setPreserveTimestamps(preset.preserveTimestamps);
     setStripGps(preset.stripGps);
     setExportMasks(preset.exportMasks ?? false);
     setPreserveFolders(preset.preserveFolders ?? false);

@@ -34,7 +34,7 @@ export function useFileOperations(
 
   const executeDelete = useCallback(
     async (pathsToDelete: Array<string>, options = { includeAssociated: false }) => {
-      if (!pathsToDelete || pathsToDelete.length === 0) return;
+      if (pathsToDelete.length === 0) return;
 
       const { libraryActivePath, setLibrary } = useLibraryStore.getState();
       const { selectedImage } = useEditorStore.getState();
@@ -261,7 +261,7 @@ export function useFileOperations(
   );
 
   const handleRenameFiles = useCallback((paths: Array<string>) => {
-    if (paths && paths.length > 0) {
+    if (paths.length > 0) {
       useUIStore.getState().setUI({ renameTargetPaths: paths, isRenameFileModalOpen: true });
     }
   }, []);
