@@ -133,17 +133,20 @@ export const useEditorStore = create<EditorState>((set) => ({
   hasRenderedFirstFrame: false,
   patchesSentToBackend: new Set<string>(),
 
-  setEditor: (updater) => set((state) => (typeof updater === 'function' ? updater(state) : updater)),
+  setEditor: (updater) => {
+    set((state) => (typeof updater === 'function' ? updater(state) : updater));
+  },
 
-  pushHistory: (newAdj) =>
+  pushHistory: (newAdj) => {
     set((state) => {
       const newHistory = state.history.slice(0, state.historyIndex + 1);
       newHistory.push(newAdj);
       if (newHistory.length > 50) newHistory.shift();
       return { history: newHistory, historyIndex: newHistory.length - 1 };
-    }),
+    });
+  },
 
-  undo: () =>
+  undo: () => {
     set((state) => {
       if (state.historyIndex > 0) {
         const newIndex = state.historyIndex - 1;
@@ -151,9 +154,10 @@ export const useEditorStore = create<EditorState>((set) => ({
         return adjustments ? { historyIndex: newIndex, adjustments } : state;
       }
       return state;
-    }),
+    });
+  },
 
-  redo: () =>
+  redo: () => {
     set((state) => {
       if (state.historyIndex < state.history.length - 1) {
         const newIndex = state.historyIndex + 1;
@@ -161,21 +165,24 @@ export const useEditorStore = create<EditorState>((set) => ({
         return adjustments ? { historyIndex: newIndex, adjustments } : state;
       }
       return state;
-    }),
+    });
+  },
 
-  resetHistory: (initialState) =>
+  resetHistory: (initialState) => {
     set({
       history: [initialState],
       historyIndex: 0,
       adjustments: initialState,
-    }),
+    });
+  },
 
-  goToHistoryIndex: (index) =>
+  goToHistoryIndex: (index) => {
     set((state) => {
       if (index >= 0 && index < state.history.length) {
         const adjustments = state.history[index];
         return adjustments ? { historyIndex: index, adjustments } : state;
       }
       return state;
-    }),
+    });
+  },
 }));

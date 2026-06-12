@@ -94,25 +94,32 @@ export const useLibraryStore = create<LibraryState>((set) => ({
     focal: 15,
   },
 
-  setLibrary: (updater) => set((state) => (typeof updater === 'function' ? updater(state) : updater)),
+  setLibrary: (updater) => {
+    set((state) => (typeof updater === 'function' ? updater(state) : updater));
+  },
 
-  clearSelection: () => set({ multiSelectedPaths: [], libraryActivePath: null }),
+  clearSelection: () => {
+    set({ multiSelectedPaths: [], libraryActivePath: null });
+  },
 
-  setFilterCriteria: (criteria) =>
+  setFilterCriteria: (criteria) => {
     set((state) => ({
       filterCriteria:
         typeof criteria === 'function' ? criteria(state.filterCriteria) : { ...state.filterCriteria, ...criteria },
-    })),
+    }));
+  },
 
-  setSearchCriteria: (criteria) =>
+  setSearchCriteria: (criteria) => {
     set((state) => ({
       searchCriteria:
         typeof criteria === 'function' ? criteria(state.searchCriteria) : { ...state.searchCriteria, ...criteria },
-    })),
+    }));
+  },
 
-  setSortCriteria: (criteria) =>
+  setSortCriteria: (criteria) => {
     set((state) => ({
       sortCriteria:
         typeof criteria === 'function' ? criteria(state.sortCriteria) : { ...state.sortCriteria, ...criteria },
-    })),
+    }));
+  },
 }));

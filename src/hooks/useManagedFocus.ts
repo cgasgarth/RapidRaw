@@ -27,6 +27,8 @@ export function useManagedFocus<T extends HTMLElement>(
       }
     });
 
-    return () => window.cancelAnimationFrame(frameId);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
   }, [preventScroll, ref, selectText, shouldFocus]);
 }

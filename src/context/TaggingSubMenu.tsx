@@ -86,8 +86,12 @@ export default function TaggingSubMenu({
   return (
     <div
       className="bg-surface/95 p-2 w-64 text-text-primary rounded-lg"
-      onClick={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+      }}
     >
       <div className="mb-2">
         <div className="flex flex-wrap gap-1 p-1 bg-surface rounded-md min-h-[32px] items-center">
@@ -136,7 +140,9 @@ export default function TaggingSubMenu({
           ref={inputRef}
           type="text"
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+          }}
           onKeyDown={handleInputKeyDown}
           placeholder={t('menus.tagging.placeholder')}
           className="w-full bg-surface border border-border-color rounded-md pl-2 pr-8 py-1.5 text-sm focus:outline-hidden"

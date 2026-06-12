@@ -380,7 +380,11 @@ export function useTauriListeners({
       }
       thumbnailBuffer.current = {};
       ratingBuffer.current = {};
-      listeners.forEach((p) => p.then((unlisten) => unlisten()));
+      listeners.forEach((p) =>
+        p.then((unlisten) => {
+          unlisten();
+        }),
+      );
     };
   }, []);
 }

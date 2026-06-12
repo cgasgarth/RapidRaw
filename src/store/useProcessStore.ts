@@ -47,11 +47,15 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
     const state = get();
     if (state.isCopied) {
       clearTimeout(copyTimeout);
-      copyTimeout = setTimeout(() => set({ isCopied: false }), 1000);
+      copyTimeout = setTimeout(() => {
+        set({ isCopied: false });
+      }, 1000);
     }
     if (state.isPasted) {
       clearTimeout(pasteTimeout);
-      pasteTimeout = setTimeout(() => set({ isPasted: false }), 1000);
+      pasteTimeout = setTimeout(() => {
+        set({ isPasted: false });
+      }, 1000);
     }
   },
 

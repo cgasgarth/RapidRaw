@@ -37,7 +37,9 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
       const loadMetadataEarly = async () => {
         try {
           useEditorStore.getState().patchesSentToBackend.clear();
-          await invoke('clear_session_caches').catch((e: unknown) => console.warn('Cache clear failed:', e));
+          await invoke('clear_session_caches').catch((e: unknown) => {
+            console.warn('Cache clear failed:', e);
+          });
 
           const metadata = parseLoadedMetadata(
             await invoke<unknown>(Invokes.LoadMetadata, { path: selectedImagePath }),

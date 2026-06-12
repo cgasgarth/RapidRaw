@@ -34,11 +34,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
   },
 
-  setAppSettings: (settings) => set({ appSettings: settings }),
+  setAppSettings: (settings) => {
+    set({ appSettings: settings });
+  },
 
-  setTheme: (theme) => set({ theme }),
+  setTheme: (theme) => {
+    set({ theme });
+  },
 
-  setSupportedTypes: (types) => set({ supportedTypes: types }),
+  setSupportedTypes: (types) => {
+    set({ supportedTypes: types });
+  },
 
   handleSettingsChange: async (newSettings: AppSettings) => {
     if (newSettings.theme !== get().theme) {

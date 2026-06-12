@@ -66,7 +66,9 @@ export const useImageRenderSize = (
 
     resizeObserver.observe(container);
 
-    return () => resizeObserver.disconnect();
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [containerRef, imgWidth, imgHeight]);
 
   return renderSize;

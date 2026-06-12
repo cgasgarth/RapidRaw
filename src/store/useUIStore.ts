@@ -194,7 +194,9 @@ export const useUIStore = create<UIState>((set, get) => ({
   cullingModalState: { isOpen: false, suggestions: null, progress: null, error: null, pathsToCull: [] },
   collageModalState: { isOpen: false, sourceImages: [] },
 
-  setUI: (updater) => set((state) => (typeof updater === 'function' ? updater(state) : updater)),
+  setUI: (updater) => {
+    set((state) => (typeof updater === 'function' ? updater(state) : updater));
+  },
 
   setRightPanel: (panelId) => {
     const current = get().activeRightPanel;
@@ -212,5 +214,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   },
 
   customEscapeHandler: null,
-  setCustomEscapeHandler: (handler) => set({ customEscapeHandler: handler }),
+  setCustomEscapeHandler: (handler) => {
+    set({ customEscapeHandler: handler });
+  },
 }));

@@ -119,7 +119,9 @@ export function useEditorActions() {
       const pathsToReset = paths || multiSelectedPaths;
       if (pathsToReset.length === 0) return;
 
-      pathsToReset.forEach((p) => globalImageCache.delete(p));
+      pathsToReset.forEach((p) => {
+        globalImageCache.delete(p);
+      });
       debouncedSetHistory.cancel();
 
       invoke(Invokes.ResetAdjustmentsForPaths, { paths: pathsToReset })
@@ -221,7 +223,9 @@ export function useEditorActions() {
         paths || (multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : []);
       if (pathsToUpdate.length === 0) return;
 
-      pathsToUpdate.forEach((p) => globalImageCache.delete(p));
+      pathsToUpdate.forEach((p) => {
+        globalImageCache.delete(p);
+      });
 
       if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
         setAdjustments({ ...adjustments, ...adjustmentsToApply });
