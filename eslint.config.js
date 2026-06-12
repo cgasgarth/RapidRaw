@@ -194,7 +194,7 @@ module.exports = [
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-enum-comparison': 'off',
       '@typescript-eslint/no-non-null-assertion': 'error',
-      '@typescript-eslint/no-deprecated': 'off',
+      '@typescript-eslint/no-deprecated': 'error',
       '@typescript-eslint/use-unknown-in-catch-callback-variable': 'off',
       '@typescript-eslint/no-unnecessary-type-conversion': 'error',
       '@typescript-eslint/no-unsafe-call': 'off',
