@@ -555,7 +555,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
       const handleRemoveFromAlbum = async () => {
         if (!activeAlbumId) return;
-        const newTree = JSON.parse(JSON.stringify(albumTree));
+        const newTree: AlbumItem[] = structuredClone(albumTree);
 
         const removeImages = (nodes: AlbumItem[]): boolean => {
           for (const n of nodes) {

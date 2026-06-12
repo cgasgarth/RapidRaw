@@ -792,7 +792,10 @@ const RowComponent = ({
 
   const shiftedTransform =
     typeof style.transform === 'string'
-      ? style.transform.replace(/translateY\(([^)]+)\)/, (_match, y) => `translateY(${parseFloat(y) + outerPadding}px)`)
+      ? style.transform.replace(
+          /translateY\(([^)]+)\)/,
+          (_match: string, y: string) => `translateY(${parseFloat(y) + outerPadding}px)`,
+        )
       : style.transform;
 
   const shiftedStyle: CSSProperties = {
