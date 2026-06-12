@@ -554,7 +554,9 @@ function App() {
     checkFullscreen();
     const unlistenPromise = appWindow.onResized(checkFullscreen);
     return () => {
-      unlistenPromise.then((unlisten) => unlisten());
+      unlistenPromise.then((unlisten) => {
+        unlisten();
+      });
     };
   }, [setUI]);
 

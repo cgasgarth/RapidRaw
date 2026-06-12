@@ -199,7 +199,7 @@ module.exports = [
       '@typescript-eslint/no-unnecessary-type-conversion': 'error',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-useless-default-assignment': 'error',
-      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-return': 'error',
       '@typescript-eslint/no-unnecessary-type-arguments': 'error',
       '@typescript-eslint/no-dynamic-delete': 'off',
       '@typescript-eslint/require-await': 'error',
