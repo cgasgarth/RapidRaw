@@ -11,13 +11,13 @@ import EffectsPanel from '../../adjustments/Effects';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Waveform from '../editor/Waveform';
 import Resizer from '../../ui/Resizer';
-import { Adjustments, SectionVisibility, INITIAL_ADJUSTMENTS, ADJUSTMENT_SECTIONS } from '../../../utils/adjustments';
+import { Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_SECTIONS } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation, type Option } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextVariants } from '../../../types/typography';
 import { useShallow } from 'zustand/react/shallow';
-import { useEditorStore } from '../../../store/useEditorStore';
+import { type CopiedSectionAdjustments, useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { type CollapsibleSectionsState, useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
@@ -28,11 +28,6 @@ type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
 type CollapsibleSectionsUpdater =
   | CollapsibleSectionsState
   | ((prev: CollapsibleSectionsState) => CollapsibleSectionsState);
-
-interface CopiedSectionAdjustments {
-  section: string;
-  values: Partial<Adjustments>;
-}
 
 const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> = {
   basic: 'Basic',
@@ -145,7 +140,7 @@ export default function Controls() {
 
   const handleToggleVisibility = (sectionName: AdjustmentSectionName) => {
     setAdjustments((prev: Adjustments) => {
-      const currentVisibility: SectionVisibility = prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
+      const currentVisibility = prev.sectionVisibility;
       return {
         ...prev,
         sectionVisibility: {
@@ -189,9 +184,6 @@ export default function Controls() {
     event.stopPropagation();
 
     const sectionKeys = ADJUSTMENT_SECTIONS[sectionName];
-    if (!sectionKeys) {
-      return;
-    }
 
     const handleCopy = () => {
       const adjustmentsToCopy = pickAdjustmentValues(sectionKeys, adjustments, true);
@@ -199,7 +191,7 @@ export default function Controls() {
     };
 
     const handlePaste = () => {
-      const copiedSection = copiedSectionAdjustments as CopiedSectionAdjustments | null;
+      const copiedSection = copiedSectionAdjustments;
       if (!copiedSection || copiedSection.section !== sectionName) {
         return;
       }
@@ -207,7 +199,7 @@ export default function Controls() {
         ...prev,
         ...copiedSection.values,
         sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility),
+          ...prev.sectionVisibility,
           [sectionName]: true,
         },
       }));
@@ -219,13 +211,13 @@ export default function Controls() {
         ...prev,
         ...resetValues,
         sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility),
+          ...prev.sectionVisibility,
           [sectionName]: true,
         },
       }));
     };
 
-    const copiedSection = copiedSectionAdjustments as CopiedSectionAdjustments | null;
+    const copiedSection = copiedSectionAdjustments;
     const isPasteAllowed = copiedSection?.section === sectionName;
     const translatedSection = t(`editor.adjustments.sections.${sectionName}`, {
       defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS[sectionName],
@@ -377,13 +369,13 @@ export default function Controls() {
           const title = t(`editor.adjustments.sections.${sectionName}`, {
             defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS[sectionName],
           });
-          const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
+          const sectionVisibility = adjustments.sectionVisibility;
 
           return (
             <div className="shrink-0 group" key={sectionName}>
               <CollapsibleSection
-                isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility] ?? true}
-                isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState] ?? true}
+                isContentVisible={sectionVisibility[sectionName]}
+                isOpen={collapsibleSectionsState[sectionName]}
                 onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
                   handleSectionContextMenu(event, sectionName);
                 }}

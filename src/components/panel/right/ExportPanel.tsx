@@ -540,7 +540,7 @@ export default function ExportPanel({
           exportSettings,
           outputFormat: selectedFormat.extensions[0],
           currentEditPath: selectedImage?.path || null,
-          currentEditAdjustments: adjustments || null,
+          currentEditAdjustments: adjustments,
         });
       }
     } catch (error) {
@@ -681,7 +681,7 @@ export default function ExportPanel({
                           disabled={isExporting}
                           min="1"
                           onChange={(e) => {
-                            setResizeValue(parseInt(e?.target?.value));
+                            setResizeValue(parseInt(e.target.value, 10));
                           }}
                           type="number"
                           value={resizeValue}
