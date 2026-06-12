@@ -1,4 +1,5 @@
-import React, {
+import {
+  memo,
   useState,
   useEffect,
   useCallback,
@@ -727,8 +728,8 @@ const ListItemComponent = ({
   );
 };
 
-export const Thumbnail = React.memo(ThumbnailComponent);
-export const ListItem = React.memo(ListItemComponent);
+export const Thumbnail = memo(ThumbnailComponent);
+export const ListItem = memo(ListItemComponent);
 
 const RowComponent = ({
   index,
@@ -877,4 +878,4 @@ const RowComponent = ({
   );
 };
 
-export const Row = React.memo(RowComponent);
+export const Row = memo(RowComponent);

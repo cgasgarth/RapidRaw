@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import { forwardRef, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
 import clsx from 'clsx';
 import {
   TextWeight,
@@ -9,12 +9,12 @@ import {
   TextVariants,
 } from '../../types/typography';
 
-export interface TextProps extends React.HTMLAttributes<HTMLElement> {
+export interface TextProps extends HTMLAttributes<HTMLElement> {
   variant?: VariantConfig;
   weight?: TextWeight;
   color?: TextColor;
-  as?: React.ElementType;
-  children: React.ReactNode;
+  as?: ElementType;
+  children: ReactNode;
 }
 
 export const Text = forwardRef<HTMLElement, TextProps>(
