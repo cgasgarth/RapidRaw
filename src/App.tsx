@@ -1,6 +1,6 @@
 import { type PointerEvent as ReactPointerEvent, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { ClerkProvider } from '@clerk/react';
 import { ToastContainer, toast, Slide } from 'react-toastify';
@@ -552,7 +552,7 @@ function App() {
       setUI({ isWindowFullScreen: await appWindow.isFullscreen() });
     };
     checkFullscreen();
-    const unlistenPromise = appWindow.onResized(checkFullscreen);
+    const unlistenPromise: Promise<UnlistenFn> = appWindow.onResized(checkFullscreen);
     return () => {
       unlistenPromise.then((unlisten) => {
         unlisten();

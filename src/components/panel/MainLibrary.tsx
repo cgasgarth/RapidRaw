@@ -88,6 +88,10 @@ export interface ColumnWidths {
   focal: number;
 }
 
+interface GitHubReleaseResponse {
+  tag_name?: unknown;
+}
+
 export default function MainLibrary(props: MainLibraryProps) {
   const { t } = useTranslation();
   const [showSettings, setShowSettings] = useState(false);
@@ -211,9 +215,9 @@ export default function MainLibrary(props: MainLibraryProps) {
           console.error('Failed to fetch latest release info from GitHub.');
           return;
         }
-        const data = await response.json();
-        const latestTag = data.tag_name;
-        if (!latestTag) return;
+        const data = (await response.json()) as GitHubReleaseResponse;
+        const latestTag = typeof data.tag_name === 'string' ? data.tag_name : null;
+        if (latestTag === null) return;
 
         const latestVersionStr = latestTag.startsWith('v') ? latestTag.substring(1) : latestTag;
         setLatestVersion(latestVersionStr);

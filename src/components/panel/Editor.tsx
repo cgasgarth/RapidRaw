@@ -96,6 +96,10 @@ interface CropGeometryParams {
 type MaskPreviewDefinition =
   | (Omit<MaskContainer, 'adjustments'> & { adjustments: Partial<Adjustments> })
   | (AiPatch & { adjustments?: Partial<Adjustments>; opacity?: number });
+type SerializableMaskParameters = Record<string, unknown> & {
+  mask_data_base64?: string | null | undefined;
+  maskDataBase64?: string | null | undefined;
+};
 
 interface MaskOverlayRequest {
   jsAdjustments: Adjustments;
@@ -1358,13 +1362,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
     const subMasks = activeMaskDef.subMasks.map((sm: SubMask) => {
       const { parameters, ...rest } = sm;
-      const cleanParams = { ...parameters };
-      const maskDataFingerprint = cleanParams.mask_data_base64
-        ? `${cleanParams.mask_data_base64.length}-${cleanParams.mask_data_base64.slice(-20)}`
-        : null;
-      const maskDataCamelFingerprint = cleanParams.maskDataBase64
-        ? `${cleanParams.maskDataBase64.length}-${cleanParams.maskDataBase64.slice(-20)}`
-        : null;
+      const cleanParams: SerializableMaskParameters = { ...parameters };
+      const maskDataBase64 = cleanParams.mask_data_base64;
+      const maskDataCamelBase64 = cleanParams.maskDataBase64;
+      const maskDataFingerprint =
+        typeof maskDataBase64 === 'string' ? `${maskDataBase64.length}-${maskDataBase64.slice(-20)}` : null;
+      const maskDataCamelFingerprint =
+        typeof maskDataCamelBase64 === 'string'
+          ? `${maskDataCamelBase64.length}-${maskDataCamelBase64.slice(-20)}`
+          : null;
       delete cleanParams.mask_data_base64;
       delete cleanParams.maskDataBase64;
       return {
