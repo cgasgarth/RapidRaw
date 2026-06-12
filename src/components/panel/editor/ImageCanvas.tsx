@@ -82,8 +82,7 @@ const toMaskParameters = (parameters: SubMask['parameters']): MaskParameters => 
 const isNonPrimaryButton = (event: CanvasKonvaEvent): boolean =>
   'button' in event.evt && typeof event.evt.button === 'number' && event.evt.button !== 0;
 
-const isKonvaEvent = (event: CanvasMoveEvent): event is CanvasKonvaEvent =>
-  typeof event === 'object' && event !== null && 'evt' in event && 'target' in event;
+const isKonvaEvent = (event: CanvasMoveEvent): event is CanvasKonvaEvent => 'evt' in event && 'target' in event;
 
 const setStageCursor = (stage: KonvaStage | null, cursor: string): void => {
   if (stage) {
@@ -270,7 +269,7 @@ const MaskOverlay = memo(
 
         onMaskInteractionStart(e);
         if (e.evt.cancelable) e.evt.preventDefault();
-        e.evt.stopPropagation?.();
+        e.evt.stopPropagation();
       },
       [onMaskInteractionStart],
     );
@@ -283,8 +282,8 @@ const MaskOverlay = memo(
 
     useEffect(() => {
       if (isSelected && trRef.current && shapeRef.current) {
-        trRef.current?.nodes([shapeRef.current]);
-        trRef.current?.getLayer()?.batchDraw();
+        trRef.current.nodes([shapeRef.current]);
+        trRef.current.getLayer()?.batchDraw();
       }
     }, [isSelected, isToolActive]);
 
@@ -427,7 +426,7 @@ const MaskOverlay = memo(
         isDragging.current = true;
         onMaskInteractionStart(e);
         e.cancelBubble = true;
-        if (e.evt && e.evt.cancelable) e.evt.preventDefault();
+        if (e.evt.cancelable) e.evt.preventDefault();
 
         const stage = e.target.getStage();
         const pointer = getPointer(stage);
@@ -660,44 +659,40 @@ const MaskOverlay = memo(
 
     if (subMask.type === Mask.AiSubject || subMask.type === Mask.QuickEraser) {
       const { startX, startY, endX, endY } = p;
-      if (startX !== undefined && startY !== undefined && endX !== undefined && endY !== undefined) {
-        const isPoint = Math.abs(startX - endX) < 1e-6 && Math.abs(startY - endY) < 1e-6;
-        if (isPoint) {
-          return (
-            <Circle
-              x={(startX - cropX) * scale}
-              y={(startY - cropY) * scale}
-              radius={5}
-              stroke={isSelected ? '#0ea5e9' : 'white'}
-              strokeWidth={2}
-              listening={!isToolActive}
-              {...selectHandlers}
-              onTouchEnd={handleMaskTouchEnd}
-              onTouchStart={handleMaskTouchStart}
-              onMouseEnter={onMaskMouseEnter}
-              onMouseLeave={onMaskMouseLeave}
-              shadowColor="black"
-              shadowBlur={2}
-              shadowOpacity={0.8}
-            />
-          );
-        } else {
-          return (
-            <Rect
-              height={Math.max(0.1, Math.abs(endY - startY) * scale)}
-              onMouseEnter={onMaskMouseEnter}
-              onMouseLeave={onMaskMouseLeave}
-              onTouchEnd={handleMaskTouchEnd}
-              onTouchStart={handleMaskTouchStart}
-              width={Math.max(0.1, Math.abs(endX - startX) * scale)}
-              x={(Math.min(startX, endX) - cropX) * scale}
-              y={(Math.min(startY, endY) - cropY) * scale}
-              {...commonProps}
-            />
-          );
-        }
+      const isPoint = Math.abs(startX - endX) < 1e-6 && Math.abs(startY - endY) < 1e-6;
+      if (isPoint) {
+        return (
+          <Circle
+            x={(startX - cropX) * scale}
+            y={(startY - cropY) * scale}
+            radius={5}
+            stroke={isSelected ? '#0ea5e9' : 'white'}
+            strokeWidth={2}
+            listening={!isToolActive}
+            {...selectHandlers}
+            onTouchEnd={handleMaskTouchEnd}
+            onTouchStart={handleMaskTouchStart}
+            onMouseEnter={onMaskMouseEnter}
+            onMouseLeave={onMaskMouseLeave}
+            shadowColor="black"
+            shadowBlur={2}
+            shadowOpacity={0.8}
+          />
+        );
       }
-      return null;
+      return (
+        <Rect
+          height={Math.max(0.1, Math.abs(endY - startY) * scale)}
+          onMouseEnter={onMaskMouseEnter}
+          onMouseLeave={onMaskMouseLeave}
+          onTouchEnd={handleMaskTouchEnd}
+          onTouchStart={handleMaskTouchStart}
+          width={Math.max(0.1, Math.abs(endX - startX) * scale)}
+          x={(Math.min(startX, endX) - cropX) * scale}
+          y={(Math.min(startY, endY) - cropY) * scale}
+          {...commonProps}
+        />
+      );
     }
 
     if (subMask.type === Mask.Brush || subMask.type === Mask.Flow) {
@@ -756,7 +751,7 @@ const MaskOverlay = memo(
             }}
             onMouseLeave={(e: CanvasKonvaEvent) => {
               onMaskMouseLeave();
-              if (!isDragging.current && e?.target?.getStage) {
+              if (!isDragging.current) {
                 setStageCursor(e.target.getStage(), '');
               }
             }}
@@ -1029,7 +1024,7 @@ const MaskOverlay = memo(
 
     if (subMask.type === Mask.Color || subMask.type === Mask.Luminance) {
       const { targetX, targetY } = p;
-      if (targetX !== undefined && targetX >= 0 && targetY !== undefined && targetY >= 0) {
+      if (targetX >= 0 && targetY >= 0) {
         return (
           <Circle
             x={(targetX - cropX) * scale}
@@ -1131,7 +1126,7 @@ const ImageCanvas = memo(
     const [isAltPressed, setIsAltPressed] = useState(false);
     const retainedPatchRef = useRef<typeof interactivePatch>(null);
 
-    const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
+    const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage.isReady && hasRenderedFirstFrame;
 
     const paddingX = imageRenderSize.width * 0.5;
     const paddingY = imageRenderSize.height * 0.5;
@@ -1302,7 +1297,7 @@ const ImageCanvas = memo(
 
     const isBrushActive =
       (isMasking || isAiEditing) && (activeSubMask?.type === Mask.Brush || activeSubMask?.type === Mask.Flow);
-    const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMask?.parameters?.flow ?? 10) : undefined;
+    const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMask.parameters?.flow ?? 10) : undefined;
     const brushCursorPreview = useMemo(() => {
       const radius = Math.max(0.1, brushStageSize / 2);
       const feather = Math.max(0, Math.min(1, (brushSettings?.feather ?? 0) / 100));
@@ -1525,14 +1520,14 @@ const ImageCanvas = memo(
           return;
         }
 
-        if (e.evt && e.evt.cancelable) e.evt.preventDefault();
+        if (e.evt.cancelable) e.evt.preventDefault();
 
         if (isWbPickerActive) {
           handleWbClick(e);
           return;
         }
 
-        if (isParametricActive && activeSubMask) {
+        if (isParametricActive) {
           const pos = getCanvasPointer(e.target.getStage());
           if (!pos) return;
 
@@ -1559,7 +1554,7 @@ const ImageCanvas = memo(
           return;
         }
 
-        if (isInitialDrawing && activeSubMask) {
+        if (isInitialDrawing) {
           isDrawing.current = true;
           drawingStageRef.current = e.target.getStage();
           const pos = getCanvasPointer(e.target.getStage());
@@ -1625,9 +1620,7 @@ const ImageCanvas = memo(
           const isAltPressed = e.evt.altKey;
           let effectiveTool;
 
-          if (isAiSubjectActive) {
-            effectiveTool = ToolType.AiSeletor;
-          } else if (isAltPressed) {
+          if (isAltPressed) {
             effectiveTool = baseTool === ToolType.Brush ? ToolType.Eraser : ToolType.Brush;
           } else {
             effectiveTool = baseTool;
@@ -1660,18 +1653,18 @@ const ImageCanvas = memo(
 
             const imageSpaceLine: DrawnLine = {
               brushSize: brushImageSpaceSize,
-              feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
+              feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
               flow: activeLineFlow,
               points: interpolatedPoints,
               tool: effectiveTool,
             };
 
             const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
-            const existingLines = activeSubMask?.parameters?.lines || [];
+            const existingLines = activeSubMask.parameters?.lines || [];
 
             updateSubMask(activeId, {
               parameters: {
-                ...activeSubMask?.parameters,
+                ...activeSubMask.parameters,
                 lines: [...existingLines, imageSpaceLine],
               },
             });
@@ -1771,7 +1764,7 @@ const ImageCanvas = memo(
           return;
         }
 
-        if (isInitialDrawing && dragStartPointer.current && activeSubMask && localInitialDrawParams) {
+        if (isInitialDrawing && dragStartPointer.current && localInitialDrawParams) {
           const stage = drawingStageRef.current || (isKonvaEvent(e) ? e.target.getStage() : null);
           if (!stage) return;
           const pointerPos = getCanvasPointer(stage);
@@ -1816,7 +1809,7 @@ const ImageCanvas = memo(
 
           setLocalInitialDrawParams(updatedParams);
 
-          if (onLiveMaskPreview && activeContainer && activeSubMask) {
+          if (onLiveMaskPreview && activeContainer) {
             const previewSubMask = {
               ...activeSubMask,
               parameters: updatedParams,
@@ -1860,7 +1853,7 @@ const ImageCanvas = memo(
           };
           currentLine.current = updatedLine;
 
-          if (onLiveMaskPreview && activeContainer && activeSubMask && isBrushActive) {
+          if (onLiveMaskPreview && activeContainer && isBrushActive) {
             const { scale } = imageRenderSize;
             const crop = adjustments.crop;
             const isPercent = crop?.unit === '%';
@@ -1878,7 +1871,7 @@ const ImageCanvas = memo(
 
             const imageSpaceLine: DrawnLine = {
               brushSize: brushImageSpaceSize,
-              feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
+              feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
               flow: activeLineFlow,
               points: updatedLine.points.map((p: Coord) => ({
                 x: p.x / scale + cropX,
@@ -1938,7 +1931,7 @@ const ImageCanvas = memo(
         return;
       }
 
-      if (isInitialDrawing && activeSubMask && localInitialDrawParams && dragStartPointer.current) {
+      if (isInitialDrawing && localInitialDrawParams && dragStartPointer.current) {
         isDrawing.current = false;
         const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
 
@@ -1970,16 +1963,11 @@ const ImageCanvas = memo(
       }
 
       if (isAiSubjectActive && previewBoxRef.current) {
-        const wasDrawing = isDrawing.current;
         isDrawing.current = false;
         const box = previewBoxRef.current;
         previewBoxRef.current = null;
         setPreviewBox(null);
         drawingStageRef.current = null;
-
-        if (!wasDrawing || !box) {
-          return;
-        }
 
         const { scale } = imageRenderSize;
         const crop = adjustments.crop;
@@ -2001,7 +1989,7 @@ const ImageCanvas = memo(
         if (activeId) {
           updateSubMask(activeId, {
             parameters: {
-              ...activeSubMask?.parameters,
+              ...activeSubMask.parameters,
               startX: startPoint.x,
               startY: startPoint.y,
               endX: endPoint.x,
@@ -2010,21 +1998,20 @@ const ImageCanvas = memo(
           });
         }
 
-        if (activeSubMask?.type === Mask.QuickEraser && onQuickErase) {
+        if (activeSubMask.type === Mask.QuickEraser) {
           onQuickErase(activeId, startPoint, endPoint);
-        } else if (activeSubMask?.type === Mask.AiSubject && onGenerateAiMask) {
+        } else if (activeSubMask.type === Mask.AiSubject) {
           onGenerateAiMask(activeId, startPoint, endPoint);
         }
         return;
       }
 
-      const wasDrawing = isDrawing.current;
       isDrawing.current = false;
       const line = currentLine.current;
       currentLine.current = null;
       drawingStageRef.current = null;
 
-      if (!wasDrawing || !line) {
+      if (!line) {
         return;
       }
 
@@ -2046,7 +2033,7 @@ const ImageCanvas = memo(
 
         const imageSpaceLine: DrawnLine = {
           brushSize: brushImageSpaceSize,
-          feather: brushSettings?.feather ? brushSettings?.feather / 100 : 0,
+          feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
           flow: activeLineFlow,
           points: line.points.map((p: Coord) => ({
             x: p.x / scale + cropX,
@@ -2055,11 +2042,11 @@ const ImageCanvas = memo(
           tool: effectiveToolForFinal,
         };
 
-        const existingLines = activeSubMask?.parameters.lines || [];
+        const existingLines = activeSubMask.parameters.lines || [];
 
         updateSubMask(activeId, {
           parameters: {
-            ...activeSubMask?.parameters,
+            ...activeSubMask.parameters,
             lines: [...existingLines, imageSpaceLine],
           },
         });
@@ -2147,7 +2134,7 @@ const ImageCanvas = memo(
       const pos = e.target.getStage()?.getPointerPosition() ?? null;
       if (!pos) return;
       setStraightenLine((prev: StraightenLine | null) => (prev ? { ...prev, end: pos } : prev));
-      if (e.evt && e.evt.cancelable) e.evt.preventDefault();
+      if (e.evt.cancelable) e.evt.preventDefault();
     };
 
     const handleStraightenMouseUp = () => {
@@ -2257,7 +2244,7 @@ const ImageCanvas = memo(
     }, [baseIsReady, interactivePatch]);
 
     const uncroppedImageRenderSize = useMemo<Partial<RenderSize> | null>(() => {
-      if (!selectedImage?.width || !selectedImage?.height || !imageRenderSize?.width || !imageRenderSize?.height) {
+      if (!selectedImage.width || !selectedImage.height || !imageRenderSize.width || !imageRenderSize.height) {
         return null;
       }
 
@@ -2281,20 +2268,22 @@ const ImageCanvas = memo(
       const renderHeight = uncroppedEffectiveHeight * scale;
 
       return { width: renderWidth, height: renderHeight };
-    }, [selectedImage?.width, selectedImage?.height, imageRenderSize, adjustments.orientationSteps]);
+    }, [selectedImage.width, selectedImage.height, imageRenderSize, adjustments.orientationSteps]);
 
     const cropImageTransforms = useMemo(() => {
-      const rotation = liveRotation !== null && liveRotation !== undefined ? liveRotation : adjustments.rotation || 0;
+      const rotation = (liveRotation !== null ? liveRotation : adjustments.rotation) ?? 0;
       return `rotate(${svgNumber(rotation)}deg)`;
     }, [adjustments.rotation, liveRotation]);
 
     const getCropDimensions = () => {
-      if (!crop || !uncroppedImageRenderSize?.width || !uncroppedImageRenderSize?.height) {
+      const uncroppedWidth = uncroppedImageRenderSize?.width;
+      const uncroppedHeight = uncroppedImageRenderSize?.height;
+      if (!crop || !uncroppedWidth || !uncroppedHeight) {
         return { width: 0, height: 0 };
       }
 
-      const width = crop.unit === '%' ? uncroppedImageRenderSize.width * (crop.width / 100) : crop.width;
-      const height = crop.unit === '%' ? uncroppedImageRenderSize.height * (crop.height / 100) : crop.height;
+      const width = crop.unit === '%' ? uncroppedWidth * (crop.width / 100) : crop.width;
+      const height = crop.unit === '%' ? uncroppedHeight * (crop.height / 100) : crop.height;
 
       return { width, height };
     };
