@@ -238,15 +238,15 @@ const KEY_CAMERA_SETTINGS_MAP: CameraSettings = {
     label: 'Aperture',
   },
   ExposureTime: {
-    format: (value: MetadataValue) => (String(value).endsWith('s') ? String(value) : `${value}s`),
+    format: (value: MetadataValue) => (String(value).endsWith('s') ? String(value) : `${String(value)}s`),
     label: 'Shutter Speed',
   },
   PhotographicSensitivity: {
-    format: (value: MetadataValue) => `${value}`,
+    format: (value: MetadataValue) => String(value),
     label: 'ISO',
   },
   FocalLengthIn35mmFilm: {
-    format: (value: MetadataValue) => (String(value).endsWith('mm') ? String(value) : `${value} mm`),
+    format: (value: MetadataValue) => (String(value).endsWith('mm') ? String(value) : `${String(value)} mm`),
     label: 'Focal Length',
   },
   LensModel: {
@@ -380,7 +380,7 @@ export default function MetadataPanel() {
         handleTagsChanged(targetPaths, newTags);
         setTagInputValue('');
       } catch (err) {
-        console.error(`Failed to add tag: ${err}`);
+        console.error('Failed to add tag:', err);
       }
     }
   };
@@ -393,7 +393,7 @@ export default function MetadataPanel() {
       const newTags = currentTags.filter((t) => t.tag !== tagToRemove.tag);
       handleTagsChanged(targetPaths, newTags);
     } catch (err) {
-      console.error(`Failed to remove tag: ${err}`);
+      console.error('Failed to remove tag:', err);
     }
   };
 

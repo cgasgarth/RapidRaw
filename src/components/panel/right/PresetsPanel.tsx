@@ -847,7 +847,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
   const handleExport = async (item: UserPreset) => {
     const isFolder = !!item.folder;
-    const name = isFolder ? item.folder?.name : item.preset?.name;
+    const name = (isFolder ? item.folder?.name : item.preset?.name) ?? 'preset';
     const itemsToExport = [item];
 
     try {

@@ -153,6 +153,7 @@ export default function BottomBar({
   const numSelected = multiSelectedPaths.length;
   const total = totalImages ?? 0;
   const showSelectionCounter = numSelected > 1;
+  const visibleFilmstripHeight = filmstripHeight ?? 0;
 
   useEffect(() => {
     if (isZoomReady && !isDraggingSlider.current) {
@@ -252,9 +253,9 @@ export default function BottomBar({
       {!isLibraryView && showFilmstrip && (
         <div
           className={clsx('overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
-          style={{ height: isFilmstripVisible ? `${filmstripHeight}px` : '0px' }}
+          style={{ height: isFilmstripVisible ? `${visibleFilmstripHeight}px` : '0px' }}
         >
-          <div className="w-full p-2" style={{ height: `${filmstripHeight}px` }}>
+          <div className="w-full p-2" style={{ height: `${visibleFilmstripHeight}px` }}>
             <Filmstrip
               imageList={imageList}
               imageRatings={imageRatings}

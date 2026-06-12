@@ -664,7 +664,8 @@ function App() {
           pinnedFolderTrees: state.pinnedFolderTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
         }));
       } catch (err) {
-        toast.error(`Failed to load folder: ${err}`);
+        const message = err instanceof Error ? err.message : String(err);
+        toast.error(`Failed to load folder: ${message}`);
       }
     },
     [expandedFolders, appSettings?.enableFolderImageCounts, setLibrary],
