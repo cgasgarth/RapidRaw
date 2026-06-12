@@ -402,7 +402,9 @@ function App() {
     }
 
     if (currentlyZoomed) {
-      setTimeout(() => setUI({ isInstantTransition: false }), 100);
+      setTimeout(() => {
+        setUI({ isInstantTransition: false });
+      }, 100);
     }
   }, [isFullScreen, setUI]);
 
@@ -448,7 +450,9 @@ function App() {
       event.preventDefault();
     };
     window.addEventListener('contextmenu', handleGlobalContextMenu);
-    return () => window.removeEventListener('contextmenu', handleGlobalContextMenu);
+    return () => {
+      window.removeEventListener('contextmenu', handleGlobalContextMenu);
+    };
   }, []);
 
   const isLightTheme = useMemo(() => [Theme.Light, Theme.Snow, Theme.Arctic].includes(theme as Theme), [theme]);
@@ -468,10 +472,14 @@ function App() {
       setEditor({ isAIConnectorConnected: payload.connected });
     });
     invoke(Invokes.CheckAIConnectorStatus);
-    const interval = setInterval(() => invoke(Invokes.CheckAIConnectorStatus), 10000);
+    const interval = setInterval(() => {
+      invoke(Invokes.CheckAIConnectorStatus);
+    }, 10000);
     return () => {
       clearInterval(interval);
-      unlisten.then((f) => f());
+      unlisten.then((f) => {
+        f();
+      });
     };
   }, [setEditor]);
 
@@ -612,12 +620,14 @@ function App() {
           onContextMenu={handleFolderTreeContextMenu}
           onAlbumContextMenu={handleAlbumTreeContextMenu}
           onSelectAlbum={handleSelectAlbum}
-          onFolderSelect={(path) => handleSelectSubfolder(path, false)}
+          onFolderSelect={(path) => {
+            handleSelectSubfolder(path, false);
+          }}
           onToggleFolder={handleToggleFolder}
           onOpenFolder={handleOpenFolder}
-          setIsVisible={(value: boolean) =>
-            setUI((state) => ({ uiVisibility: { ...state.uiVisibility, folderTree: value } }))
-          }
+          setIsVisible={(value: boolean) => {
+            setUI((state) => ({ uiVisibility: { ...state.uiVisibility, folderTree: value } }));
+          }}
           style={{ width: uiVisibility.folderTree ? `${leftPanelWidth}px` : '32px' }}
           isInstantTransition={isInstantTransition}
         />
@@ -736,7 +746,9 @@ function App() {
                 onSettingsChange={handleSettingsChange}
                 rootPaths={rootPaths}
                 isVisible={isLibraryExportPanelVisible}
-                onClose={() => setUI({ isLibraryExportPanelVisible: false })}
+                onClose={() => {
+                  setUI({ isLibraryExportPanelVisible: false });
+                }}
               />
             </div>
           </div>

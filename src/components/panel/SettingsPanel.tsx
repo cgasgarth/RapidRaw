@@ -197,7 +197,9 @@ const KeybindRow = ({
       }
     };
     window.addEventListener('keydown', handler, { capture: true });
-    return () => window.removeEventListener('keydown', handler, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handler, { capture: true });
+    };
   }, [recording, def.action, onSave, onStartRecording, osPlatform]);
 
   const displayCombo = currentCombo !== undefined ? (currentCombo.length ? currentCombo : null) : def.defaultCombo;
@@ -207,7 +209,12 @@ const KeybindRow = ({
       <Text variant={TextVariants.label}>{translateDynamicKey(t, def.description)}</Text>
       <div className="flex items-center gap-1">
         {isConflicting && <span className="text-yellow-400 text-xs">⚠</span>}
-        <button onClick={() => onStartRecording(def.action)} className="flex items-center gap-1 flex-wrap shrink-0">
+        <button
+          onClick={() => {
+            onStartRecording(def.action);
+          }}
+          className="flex items-center gap-1 flex-wrap shrink-0"
+        >
           {recording ? (
             <Text
               as="kbd"
@@ -308,7 +315,9 @@ const AiProviderSwitch = ({ selectedProvider, onProviderChange }: AiProviderSwit
       {aiProviders.map((provider) => (
         <button
           key={provider.id}
-          onClick={() => onProviderChange(provider.id)}
+          onClick={() => {
+            onProviderChange(provider.id);
+          }}
           className={clsx(
             'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
             {
@@ -446,7 +455,9 @@ const CanvasInputModeSwitch = ({ mode, onModeChange }: CanvasInputModeSwitchProp
       {canvasInputModes.map((item) => (
         <button
           key={item.id}
-          onClick={() => onModeChange(item.id)}
+          onClick={() => {
+            onModeChange(item.id);
+          }}
           className={clsx(
             'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
             {
@@ -495,7 +506,9 @@ const PreviewModeSwitch = ({ mode, onModeChange }: PreviewModeSwitchProps) => {
       {previewModes.map((item) => (
         <button
           key={item.id}
-          onClick={() => onModeChange(item.id)}
+          onClick={() => {
+            onModeChange(item.id);
+          }}
           className={clsx(
             'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
             {
@@ -648,7 +661,9 @@ export default function SettingsPanel({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const updateDpr = () => setDpr(window.devicePixelRatio);
+    const updateDpr = () => {
+      setDpr(window.devicePixelRatio);
+    };
 
     const mediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
     mediaQuery.addEventListener('change', updateDpr);
@@ -936,7 +951,9 @@ export default function SettingsPanel({
       setTestStatus({ testing: false, message: t('settings.processing.ai.connector.failed'), success: false });
       console.error('AI Connector connection test failed:', err);
     } finally {
-      setTimeout(() => setTestStatus({ testing: false, message: '', success: null }), EXECUTE_TIMEOUT);
+      setTimeout(() => {
+        setTestStatus({ testing: false, message: '', success: null });
+      }, EXECUTE_TIMEOUT);
     }
   };
 
@@ -1045,7 +1062,9 @@ export default function SettingsPanel({
             {settingCategories.map((category) => (
               <button
                 key={category.id}
-                onClick={() => setActiveCategory(category.id)}
+                onClick={() => {
+                  setActiveCategory(category.id);
+                }}
                 className={clsx(
                   'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
                   {
@@ -1350,7 +1369,9 @@ export default function SettingsPanel({
                               </div>
                             </div>
                             <button
-                              onClick={() => handleRemoveLens(index)}
+                              onClick={() => {
+                                handleRemoveLens(index);
+                              }}
                               className="p-2 text-text-secondary hover:text-red-400 hover:bg-bg-primary rounded-md transition-colors"
                               data-tooltip={t('settings.lenses.removeTooltip')}
                             >
@@ -1424,7 +1445,9 @@ export default function SettingsPanel({
                                             initial={false}
                                             animate="visible"
                                             exit="exit"
-                                            onClick={() => handleRemoveAiTag(tag)}
+                                            onClick={() => {
+                                              handleRemoveAiTag(tag);
+                                            }}
                                             data-tooltip={t('settings.tagging.removeCustomTooltip', { tag })}
                                             className="flex items-center gap-1 bg-surface px-2 py-1 rounded-sm group cursor-pointer"
                                           >
@@ -1456,7 +1479,9 @@ export default function SettingsPanel({
                                       <Input
                                         type="text"
                                         value={newAiTag}
-                                        onChange={(e) => setNewAiTag(e.target.value)}
+                                        onChange={(e) => {
+                                          setNewAiTag(e.target.value);
+                                        }}
                                         onKeyDown={handleAiTagInputKeyDown}
                                         placeholder={t('settings.tagging.addCustomPlaceholder')}
                                         className="pr-10"
@@ -1503,7 +1528,9 @@ export default function SettingsPanel({
                                   initial={false}
                                   animate="visible"
                                   exit="exit"
-                                  onClick={() => handleRemoveShortcut(shortcut)}
+                                  onClick={() => {
+                                    handleRemoveShortcut(shortcut);
+                                  }}
                                   data-tooltip={t('settings.tagging.removeShortcutTooltip', { shortcut })}
                                   className="flex items-center gap-1 bg-surface px-2 py-1 rounded-sm group cursor-pointer"
                                 >
@@ -1534,7 +1561,9 @@ export default function SettingsPanel({
                             <Input
                               type="text"
                               value={newShortcut}
-                              onChange={(e) => setNewShortcut(e.target.value)}
+                              onChange={(e) => {
+                                setNewShortcut(e.target.value);
+                              }}
                               onKeyDown={handleInputKeyDown}
                               placeholder={t('settings.tagging.addShortcutsPlaceholder')}
                               className="pr-10"
@@ -2172,13 +2201,15 @@ export default function SettingsPanel({
                                 <Input
                                   className="grow"
                                   id="ai-connector-address"
-                                  onBlur={() =>
-                                    onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress })
-                                  }
-                                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                                    setAiConnectorAddress(event.target.value)
-                                  }
-                                  onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => event.stopPropagation()}
+                                  onBlur={() => {
+                                    onSettingsChange({ ...appSettings, aiConnectorAddress: aiConnectorAddress });
+                                  }}
+                                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                                    setAiConnectorAddress(event.target.value);
+                                  }}
+                                  onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => {
+                                    event.stopPropagation();
+                                  }}
                                   placeholder="127.0.0.1:8188"
                                   type="text"
                                   value={aiConnectorAddress}

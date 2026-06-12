@@ -165,7 +165,11 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
         }
 
         setPreviews((prev) => {
-          Object.values(prev).forEach((url) => url?.startsWith('blob:') && URL.revokeObjectURL(url));
+          Object.values(prev).forEach((url) => {
+            if (url?.startsWith('blob:')) {
+              URL.revokeObjectURL(url);
+            }
+          });
           return newPreviews;
         });
       } catch (error) {
@@ -233,7 +237,9 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
         <div className="relative">
           <Input
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+            }}
             placeholder={t('library.community.searchPlaceholder')}
             className="pl-10 w-64"
           />
@@ -241,7 +247,13 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Text variant={TextVariants.label}>{t('library.community.sortBy')}</Text>
-          <Dropdown options={sortMethods} value={sortBy} onChange={(value) => setSortBy(value)} />
+          <Dropdown
+            options={sortMethods}
+            value={sortBy}
+            onChange={(value) => {
+              setSortBy(value);
+            }}
+          />
         </div>
       </div>
 
