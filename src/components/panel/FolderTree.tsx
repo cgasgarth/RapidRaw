@@ -115,7 +115,9 @@ const filterTree = (node: FolderTree | null, query: string): FolderTree | null =
 const getAutoExpandedPaths = (node: FolderTree, paths: Set<string>) => {
   if (node.children && node.children.length > 0) {
     paths.add(node.path);
-    node.children.forEach((child: FolderTree) => getAutoExpandedPaths(child, paths));
+    node.children.forEach((child: FolderTree) => {
+      getAutoExpandedPaths(child, paths);
+    });
   }
 };
 
@@ -176,8 +178,16 @@ function AlbumTreeNode({
           'bg-surface': isSelected,
           'hover:bg-card-active': !isSelected,
         })}
-        onClick={() => (isGroup ? onToggle(item.id) : onSelectAlbum(item.id, item.name, (item as Album).images))}
-        onContextMenu={(e) => onContextMenu(e, item)}
+        onClick={() => {
+          if (isGroup) {
+            onToggle(item.id);
+          } else {
+            onSelectAlbum(item.id, item.name, (item as Album).images);
+          }
+        }}
+        onContextMenu={(e) => {
+          onContextMenu(e, item);
+        }}
       >
         <div className="relative w-5 h-5 flex items-center justify-center p-0.5 rounded-sm text-text-secondary shrink-0">
           <AnimatePresence mode="wait" initial={false}>
@@ -193,7 +203,14 @@ function AlbumTreeNode({
             </motion.div>
           </AnimatePresence>
         </div>
-        <span onDoubleClick={() => isGroup && onToggle(item.id)} className="truncate flex-1 select-none">
+        <span
+          onDoubleClick={() => {
+            if (isGroup) {
+              onToggle(item.id);
+            }
+          }}
+          className="truncate flex-1 select-none"
+        >
           {item.name}
         </span>
         {isGroup && (
@@ -313,7 +330,9 @@ function TreeNode({
           'hover:bg-card-active': !isSelected,
         })}
         onClick={handleNameClick}
-        onContextMenu={(e) => onContextMenu(e, node.path, isPinned)}
+        onContextMenu={(e) => {
+          onContextMenu(e, node.path, isPinned);
+        }}
       >
         <div
           className={clsx(
@@ -448,9 +467,9 @@ export default function FolderTree({
   const folderIcons = appSettings?.folderIcons || {};
 
   useEffect(() => {
-    invoke<Array<AlbumItem>>(Invokes.GetAlbums).then((res) =>
-      useLibraryStore.getState().setLibrary({ albumTree: res }),
-    );
+    invoke<Array<AlbumItem>>(Invokes.GetAlbums).then((res) => {
+      useLibraryStore.getState().setLibrary({ albumTree: res });
+    });
   }, []);
 
   const toggleSection = (section: string) => {
@@ -497,8 +516,12 @@ export default function FolderTree({
   const searchAutoExpandedFolders = useMemo(() => {
     if (!isSearching) return new Set<string>();
     const newExpanded = new Set<string>();
-    filteredTrees.forEach((tree) => getAutoExpandedPaths(tree, newExpanded));
-    filteredPinnedTrees.forEach((pinned) => getAutoExpandedPaths(pinned, newExpanded));
+    filteredTrees.forEach((tree) => {
+      getAutoExpandedPaths(tree, newExpanded);
+    });
+    filteredPinnedTrees.forEach((pinned) => {
+      getAutoExpandedPaths(pinned, newExpanded);
+    });
     return newExpanded;
   }, [isSearching, filteredTrees, filteredPinnedTrees]);
 
@@ -542,13 +565,19 @@ export default function FolderTree({
         !isResizing && 'transition-[width] duration-300 ease-in-out',
       )}
       style={style}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
+      onMouseEnter={() => {
+        setIsHovering(true);
+      }}
+      onMouseLeave={() => {
+        setIsHovering(false);
+      }}
     >
       {!isVisible && (
         <button
           className="absolute top-1/2 -translate-y-1/2 right-1 w-6 h-10 hover:bg-card-active rounded-md flex items-center justify-center z-30"
-          onClick={() => setIsVisible(true)}
+          onClick={() => {
+            setIsVisible(true);
+          }}
           data-tooltip={t('library.folders.tooltips.expand')}
         >
           <ChevronRight size={16} />
@@ -567,7 +596,9 @@ export default function FolderTree({
                     exit={{ width: 0, padding: 0, marginRight: 0, opacity: 0 }}
                     transition={{ duration: 0.2, ease: 'easeInOut' }}
                     className="bg-surface rounded-md hover:bg-card-active flex items-center justify-center shrink-0 overflow-hidden transition-colors"
-                    onClick={() => setIsVisible(false)}
+                    onClick={() => {
+                      setIsVisible(false);
+                    }}
                     data-tooltip={t('library.folders.tooltips.collapse')}
                   >
                     <ChevronLeft size={17.5} className="text-text-secondary shrink-0" />
@@ -580,12 +611,16 @@ export default function FolderTree({
                   type="text"
                   placeholder={t('library.folders.searchPlaceholder')}
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                  }}
                   className="w-full bg-surface border border-transparent rounded-md pl-9 pr-8 py-2 text-sm focus:outline-hidden"
                 />
                 {searchQuery && (
                   <button
-                    onClick={() => setSearchQuery('')}
+                    onClick={() => {
+                      setSearchQuery('');
+                    }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-card-active"
                     data-tooltip={t('library.folders.tooltips.clearSearch')}
                   >
@@ -603,7 +638,9 @@ export default function FolderTree({
                   <SectionHeader
                     title={t('library.folders.sections.pinned')}
                     isOpen={isPinnedOpen}
-                    onToggle={() => toggleSection('pinned')}
+                    onToggle={() => {
+                      toggleSection('pinned');
+                    }}
                   />
                 </div>
                 <AnimatePresence initial={false}>
@@ -664,7 +701,9 @@ export default function FolderTree({
                   <SectionHeader
                     title={t('library.folders.sections.albums')}
                     isOpen={isAlbumsOpen}
-                    onToggle={() => toggleSection('albums')}
+                    onToggle={() => {
+                      toggleSection('albums');
+                    }}
                   />
                 </div>
                 <AnimatePresence>
@@ -722,7 +761,9 @@ export default function FolderTree({
                   <SectionHeader
                     title={t('library.folders.sections.folders')}
                     isOpen={isCurrentOpen}
-                    onToggle={() => toggleSection('current')}
+                    onToggle={() => {
+                      toggleSection('current');
+                    }}
                   />
                 </div>
                 <AnimatePresence initial={false}>

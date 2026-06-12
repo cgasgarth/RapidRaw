@@ -103,7 +103,9 @@ function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName =
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   return (
@@ -112,7 +114,9 @@ function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName =
         aria-expanded={isOpen}
         aria-haspopup="true"
         className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+        }}
         data-tooltip={buttonTitle}
       >
         {buttonContent}
@@ -184,7 +188,9 @@ export function SearchInput({ indexingProgress, isIndexing }: SearchInputProps) 
           setContentWidth(contentRef.current.scrollWidth);
         }
       }, 0);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [tags, text, isSearchActive]);
 
@@ -316,7 +322,9 @@ export function SearchInput({ indexingProgress, isIndexing }: SearchInputProps) 
               if (tags.length === 0 && !text) setIsSearchActive(false);
             }}
             onChange={handleInputChange}
-            onFocus={() => setIsSearchActive(true)}
+            onFocus={() => {
+              setIsSearchActive(true);
+            }}
             onKeyDown={handleKeyDown}
             placeholder={placeholderText}
             ref={inputRef}
@@ -331,7 +339,9 @@ export function SearchInput({ indexingProgress, isIndexing }: SearchInputProps) 
       >
         {tags.length > 0 && (
           <button
-            onMouseDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => {
+              e.preventDefault();
+            }}
             onClick={toggleMode}
             className="p-1.5 rounded-md hover:bg-bg-primary w-10 shrink-0 flex items-center justify-center outline-hidden"
             data-tooltip={mode === 'AND' ? t('library.header.search.matchAll') : t('library.header.search.matchAny')}
@@ -349,7 +359,9 @@ export function SearchInput({ indexingProgress, isIndexing }: SearchInputProps) 
         </div>
         {(tags.length > 0 || text) && !isIndexing && (
           <button
-            onMouseDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => {
+              e.preventDefault();
+            }}
             onClick={clearSearch}
             className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-primary shrink-0 outline-hidden"
             data-tooltip={t('library.header.search.tooltipClearSearch')}
@@ -468,7 +480,9 @@ export function ViewOptionsDropdown({
                     isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
                   }`}
                   key={option.id}
-                  onClick={() => onSelectSize(option.id)}
+                  onClick={() => {
+                    onSelectSize(option.id);
+                  }}
                   role="menuitem"
                 >
                   <Text
@@ -497,7 +511,9 @@ export function ViewOptionsDropdown({
                       isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
                     }`}
                     key={option.id}
-                    onClick={() => onSelectAspectRatio(option.id)}
+                    onClick={() => {
+                      onSelectAspectRatio(option.id);
+                    }}
                     role="menuitem"
                   >
                     <Text
@@ -523,7 +539,9 @@ export function ViewOptionsDropdown({
                 className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
                   libraryViewMode === LibraryViewMode.Flat ? 'bg-card-active' : 'hover:bg-bg-primary'
                 }`}
-                onClick={() => setLibraryViewMode(LibraryViewMode.Flat)}
+                onClick={() => {
+                  setLibraryViewMode(LibraryViewMode.Flat);
+                }}
                 role="menuitem"
               >
                 <Text
@@ -541,7 +559,9 @@ export function ViewOptionsDropdown({
                 className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
                   libraryViewMode === LibraryViewMode.Recursive ? 'bg-card-active' : 'hover:bg-bg-primary'
                 }`}
-                onClick={() => setLibraryViewMode(LibraryViewMode.Recursive)}
+                onClick={() => {
+                  setLibraryViewMode(LibraryViewMode.Recursive);
+                }}
                 role="menuitem"
               >
                 <Text
@@ -606,7 +626,9 @@ export function ViewOptionsDropdown({
                         isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
                       }`}
                       key={option.value}
-                      onClick={() => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rating: option.value }))}
+                      onClick={() => {
+                        setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rating: option.value }));
+                      }}
                       role="menuitem"
                     >
                       <Text
@@ -678,7 +700,9 @@ export function ViewOptionsDropdown({
                       isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
                     }`}
                     key={option.key}
-                    onClick={() => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rawStatus: option.key }))}
+                    onClick={() => {
+                      setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rawStatus: option.key }));
+                    }}
                     role="menuitem"
                   >
                     <Text
@@ -706,7 +730,9 @@ export function ViewOptionsDropdown({
                       isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
                     }`}
                     key={option.key}
-                    onClick={() => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, editedStatus: option.key }))}
+                    onClick={() => {
+                      setFilterCriteria((prev: FilterCriteria) => ({ ...prev, editedStatus: option.key }));
+                    }}
                     role="menuitem"
                   >
                     <Text
@@ -742,7 +768,9 @@ export function ViewOptionsDropdown({
                   <button
                     key={color.name}
                     data-tooltip={title}
-                    onClick={(e) => handleColorClick(color.name, e)}
+                    onClick={(e) => {
+                      handleColorClick(color.name, e);
+                    }}
                     className="w-6 h-6 rounded-full focus:outline-hidden focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface transition-transform hover:scale-110"
                     role="menuitem"
                   >
@@ -768,12 +796,12 @@ export function ViewOptionsDropdown({
                 {t('library.header.viewOptions.sortBy')}
               </Text>
               <button
-                onClick={() =>
+                onClick={() => {
                   setSortCriteria((prev: SortCriteria) => ({
                     ...prev,
                     order: prev.order === SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending,
-                  }))
-                }
+                  }));
+                }}
                 data-tooltip={
                   sortCriteria.order === SortDirection.Ascending
                     ? t('library.header.viewOptions.sortDescending')
@@ -792,9 +820,11 @@ export function ViewOptionsDropdown({
                     isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
                   } ${option.disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                   key={option.key}
-                  onClick={() =>
-                    !option.disabled && setSortCriteria((prev: SortCriteria) => ({ ...prev, key: option.key }))
-                  }
+                  onClick={() => {
+                    if (!option.disabled) {
+                      setSortCriteria((prev: SortCriteria) => ({ ...prev, key: option.key }));
+                    }
+                  }}
                   role="menuitem"
                   disabled={option.disabled}
                   data-tooltip={option.disabled ? t('library.header.viewOptions.exifDisabledTooltip') : undefined}

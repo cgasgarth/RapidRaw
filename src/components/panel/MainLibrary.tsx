@@ -172,12 +172,18 @@ export default function MainLibrary(props: MainLibraryProps) {
     let timer: number | undefined;
 
     if (isBusy) {
-      timer = window.setTimeout(() => setIsBusyDelayed(true), 1000);
+      timer = window.setTimeout(() => {
+        setIsBusyDelayed(true);
+      }, 1000);
     } else {
-      timer = window.setTimeout(() => setIsBusyDelayed(false), 500);
+      timer = window.setTimeout(() => {
+        setIsBusyDelayed(false);
+      }, 500);
     }
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [isBusy]);
 
   useEffect(() => {
@@ -266,7 +272,9 @@ export default function MainLibrary(props: MainLibraryProps) {
               {showSettings ? (
                 <SettingsPanel
                   appSettings={props.appSettings}
-                  onBack={() => setShowSettings(false)}
+                  onBack={() => {
+                    setShowSettings(false);
+                  }}
                   onLibraryRefresh={props.onLibraryRefresh}
                   onSettingsChange={props.onSettingsChange}
                   rootPaths={props.rootPaths}
@@ -320,7 +328,9 @@ export default function MainLibrary(props: MainLibraryProps) {
                         </Button>
                         <Button
                           className="px-3 bg-surface text-text-primary shadow-md h-11"
-                          onClick={() => setShowSettings(true)}
+                          onClick={() => {
+                            setShowSettings(true);
+                          }}
                           size="lg"
                           data-tooltip={t('settings.general.title')}
                           variant="ghost"
@@ -413,8 +423,12 @@ export default function MainLibrary(props: MainLibraryProps) {
     <div className="flex-1 flex flex-col h-full min-w-0 bg-bg-secondary rounded-lg overflow-hidden">
       <header
         className="p-4 shrink-0 flex justify-between items-center border-b border-surface gap-4"
-        onMouseEnter={() => setIsProgressHovered(true)}
-        onMouseLeave={() => setIsProgressHovered(false)}
+        onMouseEnter={() => {
+          setIsProgressHovered(true);
+        }}
+        onMouseLeave={() => {
+          setIsProgressHovered(false);
+        }}
       >
         <div className="min-w-0">
           <Text variant={TextVariants.headline}>{t('library.header.title')}</Text>

@@ -120,7 +120,9 @@ export default function LibraryView({
       <div className="flex-1 flex flex-col min-w-0 gap-2">
         {activeView === 'community' ? (
           <CommunityPage
-            onBackToLibrary={() => setUI({ activeView: 'library' })}
+            onBackToLibrary={() => {
+              setUI({ activeView: 'library' });
+            }}
             supportedTypes={supportedTypes}
             imageList={sortedImageList}
             currentFolderPath={currentFolderPath}
@@ -148,7 +150,9 @@ export default function LibraryView({
             onGoHome={handleGoHome}
             onImageClick={handleLibraryImageSingleClick}
             onImageDoubleClick={handleImageSelect}
-            onImportClick={() => handleImportClick(currentFolderPath as string)}
+            onImportClick={() => {
+              handleImportClick(currentFolderPath as string);
+            }}
             onLibraryRefresh={handleLibraryRefresh}
             onOpenFolder={handleOpenFolder}
             onSettingsChange={handleSettingsChange}
@@ -161,7 +165,9 @@ export default function LibraryView({
             thumbnailAspectRatio={thumbnailAspectRatio}
             thumbnailProgress={thumbnailProgress}
             thumbnailSize={thumbnailSize}
-            onNavigateToCommunity={() => setUI({ activeView: 'community' })}
+            onNavigateToCommunity={() => {
+              setUI({ activeView: 'community' });
+            }}
           />
         )}
         {rootPaths && rootPaths.length > 0 && (
@@ -176,13 +182,19 @@ export default function LibraryView({
             isResetDisabled={multiSelectedPaths.length === 0}
             multiSelectedPaths={multiSelectedPaths}
             onCopy={handleCopyAdjustments}
-            onExportClick={() =>
-              setUI((state) => ({ isLibraryExportPanelVisible: !state.isLibraryExportPanelVisible }))
-            }
-            onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
-            onPaste={() => handlePasteAdjustments()}
+            onExportClick={() => {
+              setUI((state) => ({ isLibraryExportPanelVisible: !state.isLibraryExportPanelVisible }));
+            }}
+            onOpenCopyPasteSettings={() => {
+              setUI({ isCopyPasteSettingsModalOpen: true });
+            }}
+            onPaste={() => {
+              handlePasteAdjustments();
+            }}
             onRate={handleRate}
-            onReset={() => handleResetAdjustments()}
+            onReset={() => {
+              handleResetAdjustments();
+            }}
             rating={imageRatings[libraryActivePath || ''] || 0}
             thumbnailAspectRatio={thumbnailAspectRatio}
             totalImages={imageList.length}

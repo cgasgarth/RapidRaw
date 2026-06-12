@@ -166,7 +166,9 @@ const ThumbnailComponent = ({
     const timer = setTimeout(() => {
       setShowPlaceholder(true);
     }, 500);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [data]);
 
   useEffect(() => {
@@ -196,7 +198,9 @@ const ThumbnailComponent = ({
       const frame = requestAnimationFrame(() => {
         setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
       });
-      return () => cancelAnimationFrame(frame);
+      return () => {
+        cancelAnimationFrame(frame);
+      };
     }
   }, [layers]);
 
@@ -232,8 +236,12 @@ const ThumbnailComponent = ({
         e.stopPropagation();
         onImageClick(path, e);
       }}
-      onContextMenu={(e) => onContextMenu(e, path)}
-      onDoubleClick={() => onImageDoubleClick(path)}
+      onContextMenu={(e) => {
+        onContextMenu(e, path);
+      }}
+      onDoubleClick={() => {
+        onImageDoubleClick(path);
+      }}
     >
       <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
         {layers.length > 0 && (
@@ -246,7 +254,9 @@ const ThumbnailComponent = ({
                   opacity: layer.opacity,
                   transition: 'opacity 300ms ease-in-out',
                 }}
-                onTransitionEnd={() => handleTransitionEnd(layer.id)}
+                onTransitionEnd={() => {
+                  handleTransitionEnd(layer.id);
+                }}
               >
                 <img
                   alt={path.split(/[\\/]/).pop()}
@@ -256,7 +266,9 @@ const ThumbnailComponent = ({
                   decoding="async"
                   loading="lazy"
                   src={layer.url}
-                  onLoad={() => onLoad(path)}
+                  onLoad={() => {
+                    onLoad(path);
+                  }}
                 />
               </div>
             ))}
@@ -545,7 +557,9 @@ const ListItemComponent = ({
     const timer = setTimeout(() => {
       setShowPlaceholder(true);
     }, 500);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [data]);
 
   useEffect(() => {
@@ -575,7 +589,9 @@ const ListItemComponent = ({
       const frame = requestAnimationFrame(() => {
         setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
       });
-      return () => cancelAnimationFrame(frame);
+      return () => {
+        cancelAnimationFrame(frame);
+      };
     }
   }, [layers]);
 
@@ -609,8 +625,12 @@ const ListItemComponent = ({
         e.stopPropagation();
         onImageClick(path, e);
       }}
-      onContextMenu={(e) => onContextMenu(e, path)}
-      onDoubleClick={() => onImageDoubleClick(path)}
+      onContextMenu={(e) => {
+        onContextMenu(e, path);
+      }}
+      onDoubleClick={() => {
+        onImageDoubleClick(path);
+      }}
     >
       <div
         style={{ width: getW('thumbnail') }}
@@ -624,7 +644,9 @@ const ListItemComponent = ({
                   key={layer.id}
                   className="absolute inset-0 w-full h-full"
                   style={{ opacity: layer.opacity, transition: 'opacity 300ms ease-in-out' }}
-                  onTransitionEnd={() => handleTransitionEnd(layer.id)}
+                  onTransitionEnd={() => {
+                    handleTransitionEnd(layer.id);
+                  }}
                 >
                   <img
                     alt={baseName}
@@ -634,7 +656,9 @@ const ListItemComponent = ({
                     decoding="async"
                     loading="lazy"
                     src={layer.url}
-                    onLoad={() => onLoad(path)}
+                    onLoad={() => {
+                      onLoad(path);
+                    }}
                   />
                 </div>
               ))}
