@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronDown } from 'lucide-react';
 import Input from './Input';
@@ -42,28 +42,27 @@ const Dropdown = <T extends React.Key>({
 
   useManagedFocus(searchInputRef, isOpen && showSearch);
 
+  const closeDropdown = useCallback(() => {
+    setIsOpen(false);
+    setSearchTerm('');
+    setShowSearch(false);
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        closeDropdown();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchTerm('');
-      setShowSearch(false);
-    }
-  }, [isOpen]);
+  }, [closeDropdown]);
 
   const handleSelect = (option: OptionItem<T>) => {
     onChange(option.value);
-    setIsOpen(false);
+    closeDropdown();
   };
 
   const filteredOptions = useMemo(() => {
@@ -79,7 +78,7 @@ const Dropdown = <T extends React.Key>({
   const handleContainerKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.stopPropagation();
-      setIsOpen(false);
+      closeDropdown();
       return;
     }
 
@@ -117,7 +116,12 @@ const Dropdown = <T extends React.Key>({
           triggerClassName || 'bg-surface',
         )}
         onClick={() => {
-          setIsOpen(!isOpen);
+          if (isOpen) {
+            closeDropdown();
+            return;
+          }
+
+          setIsOpen(true);
         }}
         onKeyDown={handleContainerKeyDown}
         type="button"
