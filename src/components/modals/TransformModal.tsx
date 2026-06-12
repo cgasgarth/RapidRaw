@@ -96,14 +96,14 @@ const CustomGrid = ({ denseVisible, ruleOfThirdsVisible }: { denseVisible: boole
         denseVisible ? 'opacity-100' : 'opacity-0',
       )}
     >
-      {[...Array(17)].map((_, i) => (
+      {Array.from({ length: 17 }, (_, i) => (
         <div
           key={`v-${i}`}
           className="absolute top-0 bottom-0 border-l border-white/40"
           style={{ left: `${(i + 1) * 5.555}%` }}
         />
       ))}
-      {[...Array(17)].map((_, i) => (
+      {Array.from({ length: 17 }, (_, i) => (
         <div
           key={`h-${i}`}
           className="absolute left-0 right-0 border-t border-white/40"
