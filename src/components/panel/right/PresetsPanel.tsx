@@ -6,6 +6,7 @@ import {
   useCallback,
   useMemo,
   useRef,
+  useLayoutEffect,
 } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
@@ -405,9 +406,11 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
   const [folderPreviewsGenerated, setFolderPreviewsGenerated] = useState<Set<string>>(new Set());
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const previewsRef = useRef(previews);
-  previewsRef.current = previews;
   const expandedFoldersRef = useRef(expandedFolders);
-  expandedFoldersRef.current = expandedFolders;
+  useLayoutEffect(() => {
+    previewsRef.current = previews;
+    expandedFoldersRef.current = expandedFolders;
+  }, [expandedFolders, previews]);
   const previewQueue = useRef<Array<PreviewQueueItem>>([]);
   const isProcessingQueue = useRef(false);
   const currentImagePathRef = useRef<string | null>(selectedImage?.path || null);
