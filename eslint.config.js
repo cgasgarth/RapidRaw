@@ -203,7 +203,7 @@ module.exports = [
       '@typescript-eslint/no-unnecessary-type-arguments': 'error',
       '@typescript-eslint/no-dynamic-delete': 'off',
       '@typescript-eslint/require-await': 'error',
-      '@typescript-eslint/restrict-plus-operands': 'off',
+      '@typescript-eslint/restrict-plus-operands': 'error',
       '@typescript-eslint/no-unnecessary-boolean-literal-compare': 'error',
       '@typescript-eslint/no-unnecessary-type-parameters': 'off',
       'i18next/no-literal-string': [
