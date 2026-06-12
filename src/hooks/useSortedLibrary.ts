@@ -69,6 +69,8 @@ export const parseFocalLength = (val: string | undefined): number => {
   return isNaN(numVal) ? 0 : numVal;
 };
 
+const stripVirtualCopySuffix = (path: string): string => path.split('?vc=')[0] ?? path;
+
 export function computeSortedLibrary(
   libraryState: SortedLibraryState,
   settingsState: SortedLibrarySettingsState,
@@ -91,7 +93,7 @@ export function computeSortedLibrary(
     const rawBaseNames = new Set<string>();
 
     for (const image of imageList) {
-      const pathWithoutVC = image.path.split('?vc=')[0] ?? image.path;
+      const pathWithoutVC = stripVirtualCopySuffix(image.path);
       const filename = pathWithoutVC.split(/[\\/]/).pop() || '';
       const lastDotIndex = filename.lastIndexOf('.');
       const extension = lastDotIndex !== -1 ? filename.substring(lastDotIndex + 1).toLowerCase() : '';
@@ -106,7 +108,7 @@ export function computeSortedLibrary(
 
     if (rawBaseNames.size > 0) {
       processedList = imageList.filter((image: ImageFile) => {
-        const pathWithoutVC = image.path.split('?vc=')[0] ?? image.path;
+        const pathWithoutVC = stripVirtualCopySuffix(image.path);
         const filename = pathWithoutVC.split(/[\\/]/).pop() || '';
         const lastDotIndex = filename.lastIndexOf('.');
         const extension = lastDotIndex !== -1 ? filename.substring(lastDotIndex + 1).toLowerCase() : '';
@@ -136,14 +138,13 @@ export function computeSortedLibrary(
     }
 
     if (
-      filterCriteria.rawStatus &&
       filterCriteria.rawStatus !== RawStatus.All &&
       filterCriteria.rawStatus !== RawStatus.RawOverNonRaw &&
       supportedTypes
     ) {
-      const pathWithoutVC = image.path.split('?vc=')[0] ?? image.path;
+      const pathWithoutVC = stripVirtualCopySuffix(image.path);
       const extension = pathWithoutVC.split('.').pop()?.toLowerCase() || '';
-      const isRaw = supportedTypes.raw?.includes(extension);
+      const isRaw = supportedTypes.raw.includes(extension);
 
       if (filterCriteria.rawStatus === RawStatus.RawOnly && !isRaw) return false;
       if (filterCriteria.rawStatus === RawStatus.NonRawOnly && isRaw) return false;
@@ -154,7 +155,7 @@ export function computeSortedLibrary(
       if (filterCriteria.editedStatus === EditedStatus.UneditedOnly && image.is_edited) return false;
     }
 
-    if (filterCriteria.colors && filterCriteria.colors.length > 0) {
+    if (filterCriteria.colors.length > 0) {
       const imageColor = (image.tags || []).find((tag: string) => tag.startsWith('color:'))?.substring(6);
       const hasMatchingColor = imageColor && filterCriteria.colors.includes(imageColor);
       const matchesNone = !imageColor && filterCriteria.colors.includes('none');
@@ -232,7 +233,7 @@ export function computeSortedLibrary(
       ? filteredList
       : filteredList.filter((image: ImageFile) => {
           const lowerCaseImageTags = (image.tags || []).map((t) => t.toLowerCase().replace('user:', ''));
-          const filename = image?.path?.split(/[\\/]/)?.pop()?.toLowerCase() || '';
+          const filename = image.path.split(/[\\/]/).pop()?.toLowerCase() || '';
 
           let tagsMatch = true;
           if (parsedTags.length > 0) {

@@ -170,7 +170,7 @@ export default function LibraryView({
             }}
           />
         )}
-        {rootPaths && rootPaths.length > 0 && (
+        {rootPaths.length > 0 && (
           <BottomBar
             isCopied={isCopied}
             isCopyDisabled={multiSelectedPaths.length !== 1}

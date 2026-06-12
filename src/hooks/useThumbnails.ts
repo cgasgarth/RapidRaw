@@ -36,16 +36,18 @@ export function useThumbnails() {
 
   const requestThumbnails = useCallback(
     (visiblePaths: string[]) => {
-      let addedToQueue = false;
+      const pathsToQueue: string[] = [];
 
       visiblePaths.forEach((p) => {
         if (!generatedRef.current.has(p) && !pendingQueueRef.current.has(p)) {
-          pendingQueueRef.current.add(p);
-          addedToQueue = true;
+          pathsToQueue.push(p);
         }
       });
 
-      if (addedToQueue) {
+      if (pathsToQueue.length > 0) {
+        pathsToQueue.forEach((p) => {
+          pendingQueueRef.current.add(p);
+        });
         flushQueueToBackend();
       }
     },
