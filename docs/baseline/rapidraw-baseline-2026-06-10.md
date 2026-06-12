@@ -110,7 +110,7 @@ Current workflow shape:
 - `ci.yml` runs the same build matrix on pushes to `main`.
 - `release.yml` builds release assets on GitHub release creation.
 - `lint.yml` runs frontend format, frontend lint, i18n check, cargo fmt, and cargo clippy.
-- Frontend format, frontend lint, and i18n checks in `lint.yml` are currently marked `continue-on-error: true`; this does not meet the future RawEngine shift-left quality target.
+- Follow-up hardening removed the temporary `continue-on-error` wrappers from frontend typecheck, format, and i18n lint after their baseline issues were closed.
 - The build workflow uses Node `22` in GitHub Actions.
 - The lint workflow uses Node `20` in GitHub Actions.
 - The local observed Node version is `26.3.0`.
