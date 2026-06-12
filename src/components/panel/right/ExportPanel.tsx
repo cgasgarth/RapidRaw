@@ -318,7 +318,7 @@ export default function ExportPanel({
         setImageAspectRatio(3 / 2);
       }
     };
-    fetchDims();
+    void fetchDims();
   }, [pathsToExport, isLibraryContext, selectedImage, enableWatermark, numImages, isVisible]);
 
   useEffect(() => {
@@ -336,7 +336,7 @@ export default function ExportPanel({
         setWatermarkImageAspectRatio(1);
       }
     };
-    fetchWatermarkDimensions();
+    void fetchWatermarkDimensions();
   }, [watermarkPath]);
 
   const anchorOptions = useMemo(
@@ -402,7 +402,7 @@ export default function ExportPanel({
           : null,
     };
     const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
-    debouncedEstimateSize(pathsToExport, adjustments, selectedImage?.path, exportSettings, format);
+    void debouncedEstimateSize(pathsToExport, adjustments, selectedImage?.path, exportSettings, format);
     return () => {
       debouncedEstimateSize.cancel();
     };
@@ -914,7 +914,7 @@ export default function ExportPanel({
           disabled={status === Status.Exporting ? false : !canExport}
           onClick={() => {
             if (status === Status.Exporting) {
-              handleCancel();
+              void handleCancel();
             } else {
               void handleExport();
             }
