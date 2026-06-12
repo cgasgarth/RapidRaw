@@ -22,7 +22,7 @@ interface ContextMenuProviderProps {
 }
 
 interface ContextMenuCustomProps {
-  hideContextMenu(): void;
+  hideContextMenu: () => void;
   [key: string]: unknown;
 }
 
@@ -58,15 +58,15 @@ interface ContextMenuValue {
 }
 
 interface MenuItemProps {
-  hideContextMenu(): void;
+  hideContextMenu: () => void;
   path: number[];
   option: ContextMenuOption;
 }
 
 interface SubMenuProps {
-  cancelCloseSubmenu(): void;
-  closeSubmenu(path: number[]): void;
-  hideContextMenu(): void;
+  cancelCloseSubmenu: () => void;
+  closeSubmenu: (path: number[]) => void;
+  hideContextMenu: () => void;
   options: Array<ContextMenuOption>;
   parentRef: RefObject<HTMLElement | null>;
   parentPath: number[];

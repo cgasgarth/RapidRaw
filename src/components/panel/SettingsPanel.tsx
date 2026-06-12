@@ -61,12 +61,12 @@ interface ConfirmModalState {
   confirmVariant: string;
   isOpen: boolean;
   message: string;
-  onConfirm(): void;
+  onConfirm: () => void;
   title: string;
 }
 
 interface DataActionItemProps {
-  buttonAction(): void;
+  buttonAction: () => void;
   buttonText: string;
   description: ReactNode;
   disabled?: boolean;
@@ -94,9 +94,9 @@ interface SettingItemProps {
 
 interface SettingsPanelProps {
   appSettings: AppSettings;
-  onBack(): void;
-  onLibraryRefresh(): void;
-  onSettingsChange(settings: AppSettings): Promise<void>;
+  onBack: () => void;
+  onLibraryRefresh: () => void;
+  onSettingsChange: (settings: AppSettings) => Promise<void>;
   rootPaths: string[];
 }
 
