@@ -80,21 +80,8 @@ jobs:
 
       - uses: ./.github/actions/setup-bun-deps
 
-      - id: typecheck
-        name: Typecheck
-        continue-on-error: true
+      - name: Typecheck
         run: bun run typecheck
-
-      - name: Record baseline status
-        if: always()
-        run: |
-          if [[ "${{ steps.typecheck.outcome }}" == "failure" ]]; then
-            echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`bun run typecheck\` is tracked by #283 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`bun run typecheck\` passed. Remove this temporary non-blocking wrapper when #283 is closed." >> "$GITHUB_STEP_SUMMARY"
-          fi
 
   frontend-lint:
     name: 'frontend: eslint zero warnings'
@@ -117,21 +104,8 @@ jobs:
 
       - uses: ./.github/actions/setup-bun-deps
 
-      - id: prettier
-        name: Check formatting
-        continue-on-error: true
+      - name: Check formatting
         run: bun run format:check
-
-      - name: Record baseline status
-        if: always()
-        run: |
-          if [[ "${{ steps.prettier.outcome }}" == "failure" ]]; then
-            echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`bun run format:check\` is tracked by #289 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`bun run format:check\` passed. Remove this temporary non-blocking wrapper when #289 is closed." >> "$GITHUB_STEP_SUMMARY"
-          fi
 
   frontend-i18n-lint:
     name: 'frontend: i18n lint baseline'
@@ -142,21 +116,8 @@ jobs:
 
       - uses: ./.github/actions/setup-bun-deps
 
-      - id: i18n-lint
-        name: Lint translations
-        continue-on-error: true
+      - name: Lint translations
         run: bun run i18n:lint
-
-      - name: Record baseline status
-        if: always()
-        run: |
-          if [[ "${{ steps.i18n-lint.outcome }}" == "failure" ]]; then
-            echo "### Expected baseline failure" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`bun run i18n:lint\` is tracked by #285 and is non-blocking until that issue is closed." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "### Baseline command passed" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`bun run i18n:lint\` passed. Remove this temporary non-blocking wrapper when #285 is closed." >> "$GITHUB_STEP_SUMMARY"
-          fi
 
   frontend-unsafe-casts:
     name: 'frontend: unsafe cast ban'

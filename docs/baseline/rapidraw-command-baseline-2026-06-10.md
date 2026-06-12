@@ -273,7 +273,7 @@ Safe to enforce after this baseline:
 - `cargo fmt -p RapidRAW -- --check`
 - `cargo check`, with current warnings tracked by #287.
 
-Not safe to enforce as required yet:
+Not safe to enforce as required yet at the initial baseline capture:
 
 - `npm run typecheck`
 - `npm run lint`
@@ -282,5 +282,6 @@ Not safe to enforce as required yet:
 - `cargo clippy --all-targets --all-features -- -D warnings`
 
 The non-enforceable commands should still run in CI as visible, non-blocking
-baseline jobs until their follow-up issues are closed. Once closed, remove any
-`continue-on-error` behavior and make the gates required.
+baseline jobs until their follow-up issues are closed. Follow-up hardening
+removed the temporary frontend `continue-on-error` wrappers after typecheck,
+format, and i18n lint became clean.
