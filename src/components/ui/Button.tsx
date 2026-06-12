@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, MouseEventHandler, ReactNode } from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type MouseEventHandler, type ReactNode } from 'react';
 import clsx from 'clsx';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -8,8 +8,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: string;
 }
 
-const Button = ({ children, onClick, disabled, className = '', ...props }: ButtonProps) => {
-  const baseClasses = `
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ children, onClick, disabled, className = '', ...props }, ref) => {
+    const baseClasses = `
     flex items-center justify-center gap-2 
     font-semibold py-2 px-4 rounded-md 
     text-button-text text-md
@@ -18,22 +19,25 @@ const Button = ({ children, onClick, disabled, className = '', ...props }: Butto
     disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:scale-100
   `;
 
-  const hasSurfaceBg = className.includes('bg-surface');
+    const hasSurfaceBg = className.includes('bg-surface');
 
-  const combinedClasses = clsx(
-    baseClasses,
-    {
-      'bg-accent shadow-shiny': !hasSurfaceBg,
-      'bg-surface': hasSurfaceBg,
-    },
-    className,
-  );
+    const combinedClasses = clsx(
+      baseClasses,
+      {
+        'bg-accent shadow-shiny': !hasSurfaceBg,
+        'bg-surface': hasSurfaceBg,
+      },
+      className,
+    );
 
-  return (
-    <button onClick={onClick} disabled={disabled} className={combinedClasses} {...props}>
-      {children}
-    </button>
-  );
-};
+    return (
+      <button ref={ref} onClick={onClick} disabled={disabled} className={combinedClasses} {...props}>
+        {children}
+      </button>
+    );
+  },
+);
+
+Button.displayName = 'Button';
 
 export default Button;

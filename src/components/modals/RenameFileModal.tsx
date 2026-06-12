@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
+import { useManagedFocus } from '../../hooks/useManagedFocus';
 
 interface RenameFileModalProps {
   filesToRename: Array<string>;
@@ -17,6 +18,8 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useManagedFocus(nameInputRef, show);
 
   const fileCount = filesToRename.length;
   const isSingleFile = fileCount === 1;
@@ -120,7 +123,6 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
               {isSingleFile ? t('modals.renameFile.newName') : t('modals.renameFile.fileNamingTemplate')}
             </Text>
             <input
-              autoFocus
               className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
               onChange={(e: ChangeEvent<HTMLInputElement>) => setNameTemplate(e.target.value)}
               ref={nameInputRef}

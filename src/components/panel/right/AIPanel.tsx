@@ -64,6 +64,7 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useAiMasking } from '../../../hooks/useAiMasking';
+import { useManagedFocus } from '../../../hooks/useManagedFocus';
 
 interface DragData {
   type: 'Container' | 'SubMask' | 'Creation';
@@ -1392,6 +1393,9 @@ function ContainerRow({
     isDragging,
   } = useDraggable({ id: container.id, data: { type: 'Container', item: container } });
   const { showContextMenu } = useContextMenu();
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useManagedFocus(renameInputRef, renamingId === container.id);
 
   const setCombinedRef = (node: HTMLElement | null) => {
     setDroppableRef(node);
@@ -1520,7 +1524,6 @@ function ContainerRow({
         >
           {renamingId === container.id ? (
             <input
-              autoFocus
               className="bg-bg-primary text-sm w-full rounded-sm px-1 outline-hidden border border-accent"
               value={tempName}
               onChange={(e) => {
@@ -1535,6 +1538,7 @@ function ContainerRow({
               onClick={(e) => {
                 e.stopPropagation();
               }}
+              ref={renameInputRef}
             />
           ) : (
             <Text color={TextColors.primary} weight={TextWeights.medium} className="truncate select-none">
@@ -1716,8 +1720,11 @@ function SubMaskRow({
   const { showContextMenu } = useContextMenu();
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const isDraggingContainer = activeDragItem?.type === 'Container';
   const isAnalyzing = subMask.id === analyzingSubMaskId || (isParentLoading && subMask.type === Mask.QuickEraser);
+
+  useManagedFocus(renameInputRef, renamingId === subMask.id);
 
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
@@ -1841,7 +1848,6 @@ function SubMaskRow({
       </Text>
       {renamingId === subMask.id ? (
         <input
-          autoFocus
           className="bg-bg-primary text-sm w-full rounded px-1 outline-none border border-accent"
           value={tempName}
           onChange={(e) => {
@@ -1856,6 +1862,7 @@ function SubMaskRow({
           onClick={(e) => {
             e.stopPropagation();
           }}
+          ref={renameInputRef}
         />
       ) : (
         <Text color={TextColors.primary} className="flex-1 truncate select-none">

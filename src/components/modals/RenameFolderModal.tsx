@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
+import { useManagedFocus } from '../../hooks/useManagedFocus';
 
 interface RenameFolderModalProps {
   currentName: string;
@@ -26,6 +27,9 @@ export default function RenameFolderModal({
   const [name, setName] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useManagedFocus(nameInputRef, show, { selectText: true });
 
   useEffect(() => {
     if (isOpen) {
@@ -93,12 +97,12 @@ export default function RenameFolderModal({
           {title || t('modals.renameFolder.title')}
         </Text>
         <input
-          autoFocus
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-accent"
           onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={(e) => e.target.select()}
           placeholder={placeholder || t('modals.renameFolder.placeholder')}
+          ref={nameInputRef}
           type="text"
           value={name}
         />

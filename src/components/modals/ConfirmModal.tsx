@@ -1,8 +1,9 @@
-import { type KeyboardEvent, useCallback, useEffect, useState } from 'react';
+import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
+import { useManagedFocus } from '../../hooks/useManagedFocus';
 
 interface ConfirmModalProps {
   cancelText?: string;
@@ -28,6 +29,9 @@ export default function ConfirmModal({
   const { t } = useTranslation();
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
+
+  useManagedFocus(confirmButtonRef, show);
 
   const resolvedCancelText = cancelText || t('modals.confirm.cancel');
   const resolvedConfirmText = confirmText || t('modals.confirm.confirm');
@@ -117,7 +121,7 @@ export default function ConfirmModal({
           <Button
             onClick={handleConfirm}
             variant={confirmVariant}
-            autoFocus={true}
+            ref={confirmButtonRef}
             className="focus:outline-hidden focus:ring-0 focus:ring-offset-0"
           >
             {resolvedConfirmText}

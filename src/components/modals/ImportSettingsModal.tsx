@@ -4,6 +4,7 @@ import Switch from '../ui/Switch';
 import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
+import { useManagedFocus } from '../../hooks/useManagedFocus';
 
 interface ImportSettings {
   dateFolderFormat: string;
@@ -29,6 +30,8 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
   const [dateFolderFormat, setDateFolderFormat] = useState('YYYY/MM-DD');
   const [deleteAfterImport, setDeleteAfterImport] = useState(false);
   const filenameInputRef = useRef<HTMLInputElement>(null);
+
+  useManagedFocus(filenameInputRef, show);
 
   useEffect(() => {
     if (isOpen) {
@@ -124,7 +127,6 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
               {t('modals.importSettings.fileNaming')}
             </Text>
             <input
-              autoFocus
               className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
               onChange={(e: ChangeEvent<HTMLInputElement>) => setFilenameTemplate(e.target.value)}
               ref={filenameInputRef}

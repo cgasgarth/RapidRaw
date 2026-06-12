@@ -5,6 +5,7 @@ import Input from './Input';
 import Text from './Text';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 import clsx from 'clsx';
+import { useManagedFocus } from '../../hooks/useManagedFocus';
 
 export interface OptionItem<T extends React.Key> {
   label: string;
@@ -38,6 +39,8 @@ const Dropdown = <T extends React.Key>({
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const selectedOption = options.find((opt) => opt.value === value) || null;
+
+  useManagedFocus(searchInputRef, isOpen && showSearch);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -149,7 +152,6 @@ const Dropdown = <T extends React.Key>({
                     setSearchTerm(e.target.value);
                   }}
                   placeholder={searchPlaceholder}
-                  autoFocus={true}
                   className="mb-2"
                 />
               )}
