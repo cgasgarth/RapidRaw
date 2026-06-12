@@ -58,7 +58,9 @@ export default function TitleBar() {
       .onResized(() => {
         updateMaximizedState();
       })
-      .then((u) => (unlisten = u));
+      .then((u) => {
+        unlisten = u;
+      });
 
     return () => {
       if (unlisten) unlisten();
