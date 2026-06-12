@@ -2,6 +2,17 @@ import { useRef, useCallback, useMemo, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
 
+const shuffleThumbnailPaths = (paths: string[]) => {
+  for (let i = paths.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const currentPath = paths[i];
+    const swapPath = paths[j];
+    if (currentPath === undefined || swapPath === undefined) continue;
+    paths[i] = swapPath;
+    paths[j] = currentPath;
+  }
+};
+
 export function useThumbnails() {
   const generatedRef = useRef<Set<string>>(new Set());
   const pendingQueueRef = useRef<Set<string>>(new Set());
@@ -13,14 +24,7 @@ export function useThumbnails() {
           const pathsToSend = Array.from(pendingQueueRef.current);
           if (pathsToSend.length === 0) return;
 
-          for (let i = pathsToSend.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            const currentPath = pathsToSend[i];
-            const swapPath = pathsToSend[j];
-            if (currentPath === undefined || swapPath === undefined) continue;
-            pathsToSend[i] = swapPath;
-            pathsToSend[j] = currentPath;
-          }
+          shuffleThumbnailPaths(pathsToSend);
 
           invoke('update_thumbnail_queue', { paths: pathsToSend }).catch((err: unknown) => {
             console.error('Failed to update thumbnail queue:', err);
