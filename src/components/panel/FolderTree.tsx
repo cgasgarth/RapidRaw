@@ -45,13 +45,13 @@ export interface FolderTree {
 interface FolderTreeProps {
   isResizing: boolean;
   isVisible: boolean;
-  onContextMenu(event: ReactMouseEvent<HTMLElement>, path: string | null, isPinned?: boolean): void;
-  onAlbumContextMenu(event: ReactMouseEvent<HTMLElement>, item: AlbumItem | null): void;
-  onFolderSelect(folder: string): void;
-  onSelectAlbum(albumId: string, albumName: string, images: string[]): void;
-  onToggleFolder(folder: string): void;
-  onOpenFolder(): void;
-  setIsVisible(visible: boolean): void;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>, path: string | null, isPinned?: boolean) => void;
+  onAlbumContextMenu: (event: ReactMouseEvent<HTMLElement>, item: AlbumItem | null) => void;
+  onFolderSelect: (folder: string) => void;
+  onSelectAlbum: (albumId: string, albumName: string, images: string[]) => void;
+  onToggleFolder: (folder: string) => void;
+  onOpenFolder: () => void;
+  setIsVisible: (visible: boolean) => void;
   style: CSSProperties;
   isInstantTransition: boolean;
 }
@@ -60,9 +60,9 @@ interface TreeNodeProps {
   expandedFolders: Set<string>;
   isExpanded: boolean;
   node: FolderTree;
-  onContextMenu(event: ReactMouseEvent<HTMLElement>, path: string, isPinned?: boolean): void;
-  onFolderSelect(folder: string): void;
-  onToggle(path: string): void;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>, path: string, isPinned?: boolean) => void;
+  onFolderSelect: (folder: string) => void;
+  onToggle: (path: string) => void;
   selectedPath: string | null;
   pinnedFolders: string[];
   showImageCounts: boolean;

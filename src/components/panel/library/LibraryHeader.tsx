@@ -80,11 +80,11 @@ interface SortOption {
 interface ViewOptionsDropdownProps {
   editedStatusOptions: EditedStatusOption[];
   libraryViewMode: LibraryViewMode;
-  onSelectAspectRatio(aspectRatio: ThumbnailAspectRatio): void;
-  onSelectSize(size: ThumbnailSize): void;
+  onSelectAspectRatio: (aspectRatio: ThumbnailAspectRatio) => void;
+  onSelectSize: (size: ThumbnailSize) => void;
   ratingFilterOptions: RatingFilterOption[];
   rawStatusOptions: RawStatusOption[];
-  setLibraryViewMode(mode: LibraryViewMode): void;
+  setLibraryViewMode: (mode: LibraryViewMode) => void;
   sortOptions: SortOption[];
   thumbnailAspectRatio: ThumbnailAspectRatio;
   thumbnailAspectRatioOptions: ThumbnailAspectRatioOption[];

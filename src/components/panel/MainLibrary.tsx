@@ -53,27 +53,27 @@ interface MainLibraryProps {
   isTreeLoading: boolean;
   libraryViewMode: LibraryViewMode;
   multiSelectedPaths: Array<string>;
-  onClearSelection(): void;
-  onContextMenu(event: React.MouseEvent<HTMLElement>, path: string): void;
-  onContinueSession(): void;
-  onEmptyAreaContextMenu(event: React.MouseEvent<HTMLElement>): void;
-  onGoHome(): void;
-  onImageClick(path: string, event: React.MouseEvent<HTMLElement>): void;
-  onImageDoubleClick(path: string): void;
-  onImportClick(): void;
-  onLibraryRefresh(): void;
-  onOpenFolder(): void;
-  onSettingsChange(settings: AppSettings): Promise<void>;
-  onThumbnailAspectRatioChange(aspectRatio: ThumbnailAspectRatio): void;
-  onThumbnailSizeChange(size: ThumbnailSize): void;
-  onRequestThumbnails?(paths: string[]): void;
+  onClearSelection: () => void;
+  onContextMenu: (event: React.MouseEvent<HTMLElement>, path: string) => void;
+  onContinueSession: () => void;
+  onEmptyAreaContextMenu: (event: React.MouseEvent<HTMLElement>) => void;
+  onGoHome: () => void;
+  onImageClick: (path: string, event: React.MouseEvent<HTMLElement>) => void;
+  onImageDoubleClick: (path: string) => void;
+  onImportClick: () => void;
+  onLibraryRefresh: () => void;
+  onOpenFolder: () => void;
+  onSettingsChange: (settings: AppSettings) => Promise<void>;
+  onThumbnailAspectRatioChange: (aspectRatio: ThumbnailAspectRatio) => void;
+  onThumbnailSizeChange: (size: ThumbnailSize) => void;
+  onRequestThumbnails?: (paths: string[]) => void;
   rootPaths: string[];
-  setLibraryViewMode(mode: LibraryViewMode): void;
+  setLibraryViewMode: (mode: LibraryViewMode) => void;
   theme: Theme;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   thumbnailProgress: Progress;
   thumbnailSize: ThumbnailSize;
-  onNavigateToCommunity(): void;
+  onNavigateToCommunity: () => void;
 }
 
 export interface ColumnWidths {

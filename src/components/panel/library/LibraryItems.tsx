@@ -93,8 +93,8 @@ export interface LibraryRowProps {
   gap: number;
   isListView: boolean;
   columnWidths: ColumnWidths;
-  queueThumbnailRequest(path: string): void;
-  onToggleRecursiveFolder(path: string): void;
+  queueThumbnailRequest: (path: string) => void;
+  onToggleRecursiveFolder: (path: string) => void;
 }
 
 const getExifOverlayValues = (exif: ImageFile['exif']) => {
