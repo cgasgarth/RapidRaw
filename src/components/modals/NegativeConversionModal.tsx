@@ -66,7 +66,9 @@ export default function NegativeConversionModal({
       setProgress({ current: payload.current, total: payload.total });
     });
     return () => {
-      unlisten.then((f) => f());
+      unlisten.then((f) => {
+        f();
+      });
     };
   }, []);
 
@@ -78,7 +80,9 @@ export default function NegativeConversionModal({
       setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
-    const handleWindowMouseUp = () => setIsDragging(false);
+    const handleWindowMouseUp = () => {
+      setIsDragging(false);
+    };
     window.addEventListener('mousemove', handleWindowMouseMove);
     window.addEventListener('mouseup', handleWindowMouseUp);
     return () => {
@@ -140,7 +144,9 @@ export default function NegativeConversionModal({
     if (isOpen) {
       setIsMounted(true);
       setIsLoading(true);
-      setTimeout(() => setShow(true), 10);
+      setTimeout(() => {
+        setShow(true);
+      }, 10);
       updatePreview(DEFAULT_PARAMS, true);
 
       if (selectedImagePath) {
@@ -232,7 +238,9 @@ export default function NegativeConversionModal({
               max={2.0}
               step={0.01}
               defaultValue={1}
-              onChange={(e) => handleParamChange('red_weight', Number(e.target.value))}
+              onChange={(e) => {
+                handleParamChange('red_weight', Number(e.target.value));
+              }}
               fillOrigin="min"
             />
             <Slider
@@ -242,7 +250,9 @@ export default function NegativeConversionModal({
               max={2.0}
               step={0.01}
               defaultValue={1}
-              onChange={(e) => handleParamChange('green_weight', Number(e.target.value))}
+              onChange={(e) => {
+                handleParamChange('green_weight', Number(e.target.value));
+              }}
               fillOrigin="min"
             />
             <Slider
@@ -252,7 +262,9 @@ export default function NegativeConversionModal({
               max={2.0}
               step={0.01}
               defaultValue={1}
-              onChange={(e) => handleParamChange('blue_weight', Number(e.target.value))}
+              onChange={(e) => {
+                handleParamChange('blue_weight', Number(e.target.value));
+              }}
               fillOrigin="min"
             />
           </div>
@@ -272,7 +284,9 @@ export default function NegativeConversionModal({
               max={2.0}
               step={0.05}
               defaultValue={0}
-              onChange={(e) => handleParamChange('exposure', Number(e.target.value))}
+              onChange={(e) => {
+                handleParamChange('exposure', Number(e.target.value));
+              }}
             />
             <Slider
               label={t('modals.negativeConversion.contrast')}
@@ -281,7 +295,9 @@ export default function NegativeConversionModal({
               max={2.5}
               step={0.05}
               defaultValue={1}
-              onChange={(e) => handleParamChange('contrast', Number(e.target.value))}
+              onChange={(e) => {
+                handleParamChange('contrast', Number(e.target.value));
+              }}
               fillOrigin="min"
             />
           </div>
@@ -371,10 +387,14 @@ export default function NegativeConversionModal({
 
           <div
             className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/70 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-xl z-20 pointer-events-auto"
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
           >
             <button
-              onClick={() => setZoom((z) => Math.max(0.1, z - 0.25))}
+              onClick={() => {
+                setZoom((z) => Math.max(0.1, z - 0.25));
+              }}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.negativeConversion.zoomOutTooltip')}
             >
@@ -384,7 +404,9 @@ export default function NegativeConversionModal({
               {Math.round(zoom * 100)}%
             </span>
             <button
-              onClick={() => setZoom((z) => Math.min(8, z + 0.25))}
+              onClick={() => {
+                setZoom((z) => Math.min(8, z + 0.25));
+              }}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.negativeConversion.zoomInTooltip')}
             >
@@ -402,9 +424,15 @@ export default function NegativeConversionModal({
             </button>
             <div className="w-px h-5 bg-white/20 mx-1"></div>
             <button
-              onMouseDown={() => setIsCompareActive(true)}
-              onMouseUp={() => setIsCompareActive(false)}
-              onMouseLeave={() => setIsCompareActive(false)}
+              onMouseDown={() => {
+                setIsCompareActive(true);
+              }}
+              onMouseUp={() => {
+                setIsCompareActive(false);
+              }}
+              onMouseLeave={() => {
+                setIsCompareActive(false);
+              }}
               className={clsx(
                 'p-2 rounded-full transition-colors select-none',
                 isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
@@ -438,7 +466,9 @@ export default function NegativeConversionModal({
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
           >
             <div className="grow min-h-0 overflow-hidden">{renderContent()}</div>
 

@@ -134,8 +134,12 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      const timer = setTimeout(() => setShow(true), 10);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        setShow(true);
+      }, 10);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
       const timer = setTimeout(() => {
@@ -154,7 +158,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
         setSpacing(INITIAL_SPACING);
         setBorderRadius(INITIAL_BORDER_RADIUS);
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen, ASPECT_RATIO_PRESETS]);
 
@@ -182,7 +188,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
               imageElementsRef.current[imageFile.path] = img;
               resolve({ path: imageFile.path, url, width: img.width, height: img.height });
             };
-            img.onerror = () => reject(new Error(`Failed to load image: ${imageFile.path}`));
+            img.onerror = () => {
+              reject(new Error(`Failed to load image: ${imageFile.path}`));
+            };
             img.src = url;
           });
         });
@@ -213,7 +221,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     const timerId = setTimeout(loadImages, 300);
     return () => {
       clearTimeout(timerId);
-      Object.values(imageElementsRef.current).forEach((img) => URL.revokeObjectURL(img.src));
+      Object.values(imageElementsRef.current).forEach((img) => {
+        URL.revokeObjectURL(img.src);
+      });
     };
   }, [isOpen, sourceImages, t]);
 
@@ -259,7 +269,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     if (!isLoading) updatePreviewSize();
     const resizeObserver = new ResizeObserver(updatePreviewSize);
     resizeObserver.observe(container);
-    return () => resizeObserver.disconnect();
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [activeAspectRatio, isLoading]);
 
   const drawCanvas = useCallback(
@@ -698,7 +710,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
           {ASPECT_RATIO_PRESETS.map((preset) => (
             <button
               key={preset.id}
-              onClick={() => handleAspectRatioChange(preset)}
+              onClick={() => {
+                handleAspectRatioChange(preset);
+              }}
               className={clsx(
                 'px-2 py-1.5 text-sm rounded-md transition-colors',
                 activeAspectRatio.id === preset.id ? 'bg-accent text-button-text' : 'bg-surface hover:bg-card-active',
@@ -735,7 +749,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
           step={1}
           defaultValue={INITIAL_SPACING}
           value={spacing}
-          onChange={(e) => setSpacing(Number(e.target.value))}
+          onChange={(e) => {
+            setSpacing(Number(e.target.value));
+          }}
           fillOrigin="min"
         />
         <Slider
@@ -745,7 +761,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
           step={1}
           defaultValue={INITIAL_BORDER_RADIUS}
           value={borderRadius}
-          onChange={(e) => setBorderRadius(Number(e.target.value))}
+          onChange={(e) => {
+            setBorderRadius(Number(e.target.value));
+          }}
           fillOrigin="min"
         />
       </div>
@@ -758,13 +776,17 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
           <input
             type="color"
             value={backgroundColor}
-            onChange={(e) => setBackgroundColor(e.target.value)}
+            onChange={(e) => {
+              setBackgroundColor(e.target.value);
+            }}
             className="w-8 h-8 p-0 border-none rounded-sm cursor-pointer bg-transparent"
           />
           <input
             type="text"
             value={backgroundColor}
-            onChange={(e) => setBackgroundColor(e.target.value)}
+            onChange={(e) => {
+              setBackgroundColor(e.target.value);
+            }}
             className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent"
           />
         </div>
@@ -778,7 +800,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
           <input
             type="number"
             value={exportWidth}
-            onChange={(e) => handleExportDimChange(e, 'width')}
+            onChange={(e) => {
+              handleExportDimChange(e, 'width');
+            }}
             className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent"
             placeholder="W"
           />
@@ -786,7 +810,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
           <input
             type="number"
             value={exportHeight}
-            onChange={(e) => handleExportDimChange(e, 'height')}
+            onChange={(e) => {
+              handleExportDimChange(e, 'height');
+            }}
             className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent"
             placeholder="H"
           />
@@ -857,8 +883,12 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
                   activeLayout.map((cell, index) => (
                     <div
                       key={index}
-                      onMouseDown={(e) => handlePanMouseDown(e, index)}
-                      onWheel={(e) => handleWheel(e, index)}
+                      onMouseDown={(e) => {
+                        handlePanMouseDown(e, index);
+                      }}
+                      onWheel={(e) => {
+                        handleWheel(e, index);
+                      }}
                       className={clsx(
                         'absolute group',
                         panningImage?.index === index && !keepOriginalRatio
@@ -913,7 +943,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
                   <button
                     type="button"
                     aria-label={getFileName(sourceImg.path)}
-                    onMouseDown={(e) => handleThumbnailMouseDown(e, sourceImg.path, loadedData.url)}
+                    onMouseDown={(e) => {
+                      handleThumbnailMouseDown(e, sourceImg.path, loadedData.url);
+                    }}
                     className="h-20 w-20 shrink-0 rounded-md cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-accent transition-all select-none shadow-xs overflow-hidden"
                   >
                     <img src={loadedData.url} alt="" className="h-full w-full object-cover" draggable={false} />
@@ -939,7 +971,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
         {show && (
           <motion.div
             className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}

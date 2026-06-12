@@ -311,7 +311,9 @@ export default function LensCorrectionModal({
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      const timer = setTimeout(() => setShow(true), 10);
+      const timer = setTimeout(() => {
+        setShow(true);
+      }, 10);
 
       invoke<LensSettings>('load_settings').then((settings) => {
         if (settings.myLenses) {
@@ -338,16 +340,22 @@ export default function LensCorrectionModal({
       updatePreview(initParams);
 
       invoke<Array<string>>('get_lensfun_makers')
-        .then((m) => setMakers(m))
+        .then((m) => {
+          setMakers(m);
+        })
         .catch(console.error);
 
       if (initParams.lensMaker) {
         invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: initParams.lensMaker })
-          .then((l) => setLenses(l))
+          .then((l) => {
+            setLenses(l);
+          })
           .catch(console.error);
       }
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
       const timer = setTimeout(() => {
@@ -355,7 +363,9 @@ export default function LensCorrectionModal({
         setPreviewUrl(null);
         setIsApplying(false);
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen, currentAdjustments, handleResetZoom, updatePreview]);
 
@@ -371,7 +381,9 @@ export default function LensCorrectionModal({
     setDetectionStatus('idle');
 
     invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker })
-      .then((l) => setLenses(l))
+      .then((l) => {
+        setLenses(l);
+      })
       .catch(console.error);
 
     updatePreview(newParams);
@@ -401,7 +413,9 @@ export default function LensCorrectionModal({
     setDetectionStatus('idle');
 
     invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: selected.maker })
-      .then((l) => setLenses(l))
+      .then((l) => {
+        setLenses(l);
+      })
       .catch(console.error);
 
     const distortionParams = await fetchDistortionParams(selected.maker, selected.model);
@@ -444,7 +458,9 @@ export default function LensCorrectionModal({
         const [detectedMaker, detectedModel] = result;
 
         invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: detectedMaker })
-          .then((l) => setLenses(l))
+          .then((l) => {
+            setLenses(l);
+          })
           .catch(console.error);
 
         const distortionParams = await fetchDistortionParams(detectedMaker, detectedModel);
@@ -539,7 +555,9 @@ export default function LensCorrectionModal({
         params: fullParams,
         jsAdjustments: currentAdjustments,
         showLines: false,
-      }).then((result) => setPreviewUrl(result));
+      }).then((result) => {
+        setPreviewUrl(result);
+      });
     } else {
       updatePreview(params);
     }
@@ -597,7 +615,9 @@ export default function LensCorrectionModal({
               transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
             />
             <button
-              onClick={() => handleModeChange('auto')}
+              onClick={() => {
+                handleModeChange('auto');
+              }}
               className={clsx(
                 'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
                 params.lensCorrectionMode === 'auto' ? 'text-button-text' : 'text-text-primary hover:bg-surface',
@@ -607,7 +627,9 @@ export default function LensCorrectionModal({
               <span className="relative z-10 flex items-center">{t('modals.lensCorrection.modeAuto')}</span>
             </button>
             <button
-              onClick={() => handleModeChange('manual')}
+              onClick={() => {
+                handleModeChange('manual');
+              }}
               className={clsx(
                 'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
                 params.lensCorrectionMode === 'manual' ? 'text-button-text' : 'text-text-primary hover:bg-surface',
@@ -701,7 +723,9 @@ export default function LensCorrectionModal({
                   className="grow"
                   label={t('modals.lensCorrection.distortion')}
                   checked={params.lensDistortionEnabled && availability.distortion}
-                  onChange={(val) => handleToggleChange('lensDistortionEnabled', val)}
+                  onChange={(val) => {
+                    handleToggleChange('lensDistortionEnabled', val);
+                  }}
                   disabled={!availability.distortion}
                 />
               </div>
@@ -721,7 +745,9 @@ export default function LensCorrectionModal({
                       max={200}
                       defaultValue={100}
                       step={1}
-                      onChange={(e) => handleAmountChange('lensDistortionAmount', Number(e.target.value))}
+                      onChange={(e) => {
+                        handleAmountChange('lensDistortionAmount', Number(e.target.value));
+                      }}
                     />
                   </motion.div>
                 )}
@@ -742,7 +768,9 @@ export default function LensCorrectionModal({
                   className="grow"
                   label={t('modals.lensCorrection.chromaticAberration')}
                   checked={params.lensTcaEnabled && availability.tca}
-                  onChange={(val) => handleToggleChange('lensTcaEnabled', val)}
+                  onChange={(val) => {
+                    handleToggleChange('lensTcaEnabled', val);
+                  }}
                   disabled={!availability.tca}
                 />
               </div>
@@ -762,7 +790,9 @@ export default function LensCorrectionModal({
                       max={200}
                       defaultValue={100}
                       step={1}
-                      onChange={(e) => handleAmountChange('lensTcaAmount', Number(e.target.value))}
+                      onChange={(e) => {
+                        handleAmountChange('lensTcaAmount', Number(e.target.value));
+                      }}
                     />
                   </motion.div>
                 )}
@@ -783,7 +813,9 @@ export default function LensCorrectionModal({
                   className="grow"
                   label={t('modals.lensCorrection.vignetting')}
                   checked={params.lensVignetteEnabled && availability.vignetting}
-                  onChange={(val) => handleToggleChange('lensVignetteEnabled', val)}
+                  onChange={(val) => {
+                    handleToggleChange('lensVignetteEnabled', val);
+                  }}
                   disabled={!availability.vignetting}
                 />
               </div>
@@ -803,7 +835,9 @@ export default function LensCorrectionModal({
                       max={200}
                       defaultValue={100}
                       step={1}
-                      onChange={(e) => handleAmountChange('lensVignetteAmount', Number(e.target.value))}
+                      onChange={(e) => {
+                        handleAmountChange('lensVignetteAmount', Number(e.target.value));
+                      }}
                     />
                   </motion.div>
                 )}
@@ -900,10 +934,14 @@ export default function LensCorrectionModal({
 
           <div
             className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/70 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-xl z-20 pointer-events-auto"
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
           >
             <button
-              onClick={() => setZoom((z) => Math.max(0.1, z - 0.25))}
+              onClick={() => {
+                setZoom((z) => Math.max(0.1, z - 0.25));
+              }}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.lensCorrection.zoomOutTooltip')}
             >
@@ -913,7 +951,9 @@ export default function LensCorrectionModal({
               {Math.round(zoom * 100)}%
             </span>
             <button
-              onClick={() => setZoom((z) => Math.min(8, z + 0.25))}
+              onClick={() => {
+                setZoom((z) => Math.min(8, z + 0.25));
+              }}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.lensCorrection.zoomInTooltip')}
             >
@@ -928,9 +968,15 @@ export default function LensCorrectionModal({
             </button>
             <div className="w-px h-5 bg-white/20 mx-1"></div>
             <button
-              onMouseDown={() => toggleCompare(true)}
-              onMouseUp={() => toggleCompare(false)}
-              onMouseLeave={() => toggleCompare(false)}
+              onMouseDown={() => {
+                toggleCompare(true);
+              }}
+              onMouseUp={() => {
+                toggleCompare(false);
+              }}
+              onMouseLeave={() => {
+                toggleCompare(false);
+              }}
               className={clsx(
                 'p-2 rounded-full transition-colors select-none',
                 isCompareActive ? 'bg-accent text-white' : 'text-white/60 hover:bg-white/10 hover:text-white',

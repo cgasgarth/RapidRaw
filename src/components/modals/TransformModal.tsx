@@ -141,7 +141,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
       setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
-    const handleWindowMouseUp = () => setIsDragging(false);
+    const handleWindowMouseUp = () => {
+      setIsDragging(false);
+    };
     window.addEventListener('mousemove', handleWindowMouseMove);
     window.addEventListener('mouseup', handleWindowMouseUp);
     return () => {
@@ -239,7 +241,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      const timer = setTimeout(() => setShow(true), 10);
+      const timer = setTimeout(() => {
+        setShow(true);
+      }, 10);
       const initParams = {
         distortion: currentAdjustments.transformDistortion,
         vertical: currentAdjustments.transformVertical,
@@ -254,7 +258,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
       setShowLines(false);
       handleResetZoom();
       updatePreview(initParams, false);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
       const timer = setTimeout(() => {
@@ -262,7 +268,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         setPreviewUrl(null);
         setIsApplying(false);
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen, currentAdjustments, handleResetZoom, updatePreview]);
 
@@ -352,7 +360,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               max={100}
               defaultValue={0}
               step={1}
-              onChange={(e) => handleChange('distortion', Number(e.target.value))}
+              onChange={(e) => {
+                handleChange('distortion', Number(e.target.value));
+              }}
             />
           </div>
         </div>
@@ -369,7 +379,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               max={100}
               defaultValue={0}
               step={1}
-              onChange={(e) => handleChange('vertical', Number(e.target.value))}
+              onChange={(e) => {
+                handleChange('vertical', Number(e.target.value));
+              }}
             />
             <Slider
               label={t('modals.transform.horizontal')}
@@ -378,7 +390,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               max={100}
               defaultValue={0}
               step={1}
-              onChange={(e) => handleChange('horizontal', Number(e.target.value))}
+              onChange={(e) => {
+                handleChange('horizontal', Number(e.target.value));
+              }}
             />
           </div>
         </div>
@@ -395,7 +409,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               max={45}
               step={0.1}
               defaultValue={0}
-              onChange={(e) => handleChange('rotate', Number(e.target.value))}
+              onChange={(e) => {
+                handleChange('rotate', Number(e.target.value));
+              }}
             />
             <Slider
               label={t('modals.transform.aspect')}
@@ -404,7 +420,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               max={100}
               defaultValue={0}
               step={1}
-              onChange={(e) => handleChange('aspect', Number(e.target.value))}
+              onChange={(e) => {
+                handleChange('aspect', Number(e.target.value));
+              }}
             />
             <Slider
               label={t('modals.transform.scale')}
@@ -413,7 +431,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               max={150}
               defaultValue={100}
               step={1}
-              onChange={(e) => handleChange('scale', Number(e.target.value))}
+              onChange={(e) => {
+                handleChange('scale', Number(e.target.value));
+              }}
             />
           </div>
         </div>
@@ -430,7 +450,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               max={100}
               defaultValue={0}
               step={1}
-              onChange={(e) => handleChange('x_offset', Number(e.target.value))}
+              onChange={(e) => {
+                handleChange('x_offset', Number(e.target.value));
+              }}
             />
             <Slider
               label={t('modals.transform.yAxis')}
@@ -439,7 +461,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               max={100}
               defaultValue={0}
               step={1}
-              onChange={(e) => handleChange('y_offset', Number(e.target.value))}
+              onChange={(e) => {
+                handleChange('y_offset', Number(e.target.value));
+              }}
             />
           </div>
         </div>
@@ -521,10 +545,14 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
 
           <div
             className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/70 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-xl z-20 pointer-events-auto"
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
           >
             <button
-              onClick={() => setShowGrid(!showGrid)}
+              onClick={() => {
+                setShowGrid(!showGrid);
+              }}
               className={clsx(
                 'p-2 rounded-full transition-colors',
                 showGrid ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white',
@@ -547,7 +575,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             <div className="w-px h-5 bg-white/20 mx-1"></div>
 
             <button
-              onClick={() => setZoom((z) => Math.max(0.1, z - 0.25))}
+              onClick={() => {
+                setZoom((z) => Math.max(0.1, z - 0.25));
+              }}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.transform.zoomOutTooltip')}
             >
@@ -559,7 +589,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             </span>
 
             <button
-              onClick={() => setZoom((z) => Math.min(8, z + 0.25))}
+              onClick={() => {
+                setZoom((z) => Math.min(8, z + 0.25));
+              }}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.transform.zoomInTooltip')}
             >
@@ -612,7 +644,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
           >
             <div className="grow min-h-0 overflow-hidden">{renderContent()}</div>
             <div className="shrink-0 p-4 flex justify-end gap-3 border-t border-surface bg-bg-secondary z-20">

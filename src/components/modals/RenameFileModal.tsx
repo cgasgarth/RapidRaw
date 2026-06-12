@@ -36,15 +36,21 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
         setNameTemplate('{original_filename}');
       }
       setIsMounted(true);
-      const timer = setTimeout(() => setShow(true), 10);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        setShow(true);
+      }, 10);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
       const timer = setTimeout(() => {
         setIsMounted(false);
         setNameTemplate('');
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen, filesToRename, isSingleFile]);
 
@@ -124,7 +130,9 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
             </Text>
             <input
               className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setNameTemplate(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                setNameTemplate(e.target.value);
+              }}
               ref={nameInputRef}
               type="text"
               value={nameTemplate}
@@ -135,7 +143,9 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
                   <button
                     className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors"
                     key={variable}
-                    onClick={() => handleVariableClick(variable)}
+                    onClick={() => {
+                      handleVariableClick(variable);
+                    }}
                   >
                     {variable}
                   </button>

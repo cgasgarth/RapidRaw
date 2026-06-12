@@ -95,7 +95,9 @@ const PasteModeSwitch = ({ selectedMode, onModeChange, isVisible }: PasteModeSwi
               }
             }
           }}
-          onClick={() => onModeChange(option.id)}
+          onClick={() => {
+            onModeChange(option.id);
+          }}
           className={clsx(
             'relative flex-1 flex items-center justify-center gap-2 py-1.5 text-sm rounded-md transition-colors',
             {
@@ -122,12 +124,20 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
     if (isOpen) {
       setLocalSettings(settings);
       setIsMounted(true);
-      const timer = setTimeout(() => setShow(true), 10);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        setShow(true);
+      }, 10);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
-      const timer = setTimeout(() => setIsMounted(false), 300);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        setIsMounted(false);
+      }, 300);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen, settings]);
 
@@ -201,7 +211,9 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
             </Text>
             <PasteModeSwitch
               selectedMode={localSettings.mode}
-              onModeChange={(mode) => setLocalSettings((p) => ({ ...p, mode }))}
+              onModeChange={(mode) => {
+                setLocalSettings((p) => ({ ...p, mode }));
+              }}
               isVisible={show}
             />
             <Text variant={TextVariants.small} className="mt-2">
@@ -246,7 +258,9 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
                           <Switch
                             label={t(group.label, { defaultValue: labelFallback(group.label) })}
                             checked={isFullyChecked}
-                            onChange={(checked) => handleGroupToggle(group.keys, checked)}
+                            onChange={(checked) => {
+                              handleGroupToggle(group.keys, checked);
+                            }}
                           />
                         </div>
                       );

@@ -121,11 +121,21 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
           <Move size={14} /> <span>{t('modals.denoise.panZoomEnabled')}</span>
         </Text>
         <Text as="div" variant={TextVariants.small} className="flex items-center gap-2">
-          <button onClick={() => setZoom((z) => Math.max(0.5, z - 0.5))} className="hover:text-text-primary">
+          <button
+            onClick={() => {
+              setZoom((z) => Math.max(0.5, z - 0.5));
+            }}
+            className="hover:text-text-primary"
+          >
             <ZoomOut size={16} />
           </button>
           <span className="w-10 text-center">{(zoom * 100).toFixed(0)}%</span>
-          <button onClick={() => setZoom((z) => Math.min(4, z + 0.5))} className="hover:text-text-primary">
+          <button
+            onClick={() => {
+              setZoom((z) => Math.min(4, z + 0.5));
+            }}
+            className="hover:text-text-primary"
+          >
             <ZoomIn size={16} />
           </button>
           <button
@@ -250,7 +260,9 @@ export default function DenoiseModal({
     });
     return () => {
       void unlisten
-        .then((f) => f())
+        .then((f) => {
+          f();
+        })
         .catch((error: unknown) => {
           console.error('Failed to unlisten denoise progress:', error);
         });
@@ -269,8 +281,12 @@ export default function DenoiseModal({
       setMethod(isRaw ? 'ai' : 'bm3d');
       setIntensity(isRaw ? 50 : 15);
       setIsMounted(true);
-      const timer = setTimeout(() => setShow(true), 10);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        setShow(true);
+      }, 10);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
       const timer = setTimeout(() => {
@@ -279,7 +295,9 @@ export default function DenoiseModal({
         setIsSaving(false);
         setBatchProgress(null);
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen, isRaw]);
 
@@ -490,7 +508,9 @@ export default function DenoiseModal({
               max={100}
               step={1}
               defaultValue={method === 'ai' ? 50 : 15}
-              onChange={(e) => setIntensity(Number(e.target.value))}
+              onChange={(e) => {
+                setIntensity(Number(e.target.value));
+              }}
               trackClassName="bg-bg-secondary"
               fillOrigin="min"
             />
