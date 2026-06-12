@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "rating": 4,
+  "adjustments": {
+    "exposure": 0.35,
+    "temperature": 5200,
+    "hsl": {
+      "red": {
+        "hue": 2,
+        "saturation": 8,
+        "luminance": -3
+      }
+    },
+    "rawEngineFutureControl": {
+      "kind": "fixture-unknown-adjustment",
+      "enabled": true,
+      "weights": [0.25, 0.5, 1]
+    }
+  },
+  "tags": ["city skyline", "color:blue", "user:portfolio"],
+  "exif": {
+    "Make": "FixtureCam",
+    "Model": "Deterministic 1",
+    "ISO": "200"
+  }
+}
