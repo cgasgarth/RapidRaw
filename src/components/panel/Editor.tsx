@@ -330,13 +330,13 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       return null;
     }
     if (adjustments.crop) {
-      return { width: adjustments.crop.width, height: adjustments.crop.height } as ImageDimensions;
+      return { width: adjustments.crop.width, height: adjustments.crop.height };
     }
     const orientationSteps = adjustments.orientationSteps || 0;
     const isSwapped = orientationSteps === 1 || orientationSteps === 3;
     const width = isSwapped ? selectedImage.height : selectedImage.width;
     const height = isSwapped ? selectedImage.width : selectedImage.height;
-    return { width, height } as ImageDimensions;
+    return { width, height };
   }, [selectedImage, adjustments.crop, adjustments.orientationSteps]);
 
   const imageRenderSize = useImageRenderSize(imageContainerRef, croppedDimensions);

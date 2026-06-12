@@ -201,7 +201,7 @@ function serializeValue(value: unknown, depth: number, seen: WeakSet<object>): u
     const output: Record<string, unknown> = {};
     const keys = new Set<string>([...Object.keys(value), ...Object.getOwnPropertyNames(value)]);
     for (const key of keys) {
-      output[key] = serializeValue((value as Record<string, unknown>)[key], depth + 1, seen);
+      output[key] = serializeValue(value[key], depth + 1, seen);
     }
     return output;
   }

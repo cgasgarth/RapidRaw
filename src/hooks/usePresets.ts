@@ -32,7 +32,7 @@ const withoutAdjustmentKeys = (adjustments: PresetAdjustments, keys: ReadonlySet
   }, {});
 
 function getFolderChildren(folder: Folder): Preset[] {
-  return folder.children as Preset[];
+  return folder.children;
 }
 
 function arrayMove<T>(array: T[], from: number, to: number): T[] {

@@ -917,7 +917,7 @@ export default function CurveGraph({
                   selected ? 'ring-2 ring-offset-2 ring-offset-surface ring-accent' : 'bg-surface-secondary'
                 } ${channel === ActiveChannel.Luma ? 'text-text-primary' : ''}`}
                 onClick={() => {
-                  setActiveChannel(channel as ActiveChannel);
+                  setActiveChannel(channel);
                 }}
                 type="button"
                 style={{

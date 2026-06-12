@@ -746,7 +746,7 @@ export default function ExportPanel({
                             options={anchorOptions}
                             value={watermarkAnchor}
                             onChange={(val) => {
-                              setWatermarkAnchor(val as WatermarkAnchor);
+                              setWatermarkAnchor(val);
                             }}
                             disabled={isExporting}
                             className="w-full"
@@ -793,7 +793,7 @@ export default function ExportPanel({
                             imageAspectRatio={imageAspectRatio}
                             watermarkImageAspectRatio={watermarkImageAspectRatio}
                             watermarkPath={watermarkPath}
-                            anchor={watermarkAnchor as WatermarkAnchor}
+                            anchor={watermarkAnchor}
                             scale={watermarkScale}
                             spacing={watermarkSpacing}
                             opacity={watermarkOpacity}

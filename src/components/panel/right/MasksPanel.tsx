@@ -1050,7 +1050,7 @@ export default function MasksPanel() {
 
   const handleAddOthersMask = (event: ReactMouseEvent<HTMLElement>) => {
     event.stopPropagation();
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const rect = event.currentTarget.getBoundingClientRect();
     const options = OTHERS_MASK_TYPES.map((maskType) => ({
       label: getMaskTypeName(maskType),
       icon: maskType.icon,
@@ -1067,7 +1067,7 @@ export default function MasksPanel() {
   const handleAddMaskContextMenu = (event: ReactMouseEvent<HTMLElement>, targetContainerId?: string | null) => {
     event.preventDefault();
     event.stopPropagation();
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const rect = event.currentTarget.getBoundingClientRect();
 
     const buildMenu = (types: MaskType[], mode: SubMaskMode = SubMaskMode.Additive) =>
       types.map((maskType: MaskType) => ({
@@ -2247,7 +2247,7 @@ function SubMaskRow({
     setNodeRef(node);
     setDroppableRef(node);
   };
-  const maskType = subMask.type as Mask;
+  const maskType = subMask.type;
   const MaskIcon = MASK_ICON_MAP[maskType] || Circle;
   const { showContextMenu } = useContextMenu();
   const [isHovered, setIsHovered] = useState(false);
@@ -2582,7 +2582,7 @@ function SettingsPanel({
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
-  const activeSubMaskType = activeSubMask?.type as Mask | undefined;
+  const activeSubMaskType = activeSubMask?.type;
   const subMaskConfig = activeSubMaskType ? SUB_MASK_CONFIG[activeSubMaskType] || {} : {};
   const isAiMask = activeSubMask && ['ai-subject', 'ai-foreground', 'ai-sky', 'ai-depth'].includes(activeSubMask.type);
   const isComponentMode = !!activeSubMask;

@@ -1,6 +1,6 @@
 import { Crop } from 'react-image-crop';
 import { v4 as uuidv4 } from 'uuid';
-import { SubMask, SubMaskMode } from '../components/panel/right/Masks';
+import { Mask, SubMask, SubMaskMode } from '../components/panel/right/Masks';
 
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | Array<JsonValue>;
@@ -600,16 +600,16 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
   }
 
   const normalizeSubMasks = (subMasks?: Array<Partial<SubMask>>): Array<SubMask> => {
-    return (subMasks || []).map(
-      (subMask: Partial<SubMask>) =>
-        ({
-          visible: true,
-          mode: SubMaskMode.Additive,
-          invert: false,
-          opacity: 100,
-          ...subMask,
-        }) as SubMask,
-    );
+    return (subMasks || []).map((subMask: Partial<SubMask>) => ({
+      id: subMask.id || uuidv4(),
+      invert: subMask.invert ?? false,
+      mode: subMask.mode ?? SubMaskMode.Additive,
+      opacity: subMask.opacity ?? 100,
+      type: subMask.type ?? Mask.Brush,
+      visible: subMask.visible ?? true,
+      ...(subMask.name !== undefined ? { name: subMask.name } : {}),
+      ...(subMask.parameters !== undefined ? { parameters: subMask.parameters } : {}),
+    }));
   };
 
   const normalizedMasks = (loadedAdjustments.masks || []).map((maskContainer: MaskContainer) => {
@@ -643,7 +643,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
         sharpnessThreshold: containerAdjustments.sharpnessThreshold,
       },
       subMasks: normalizedSubMasks,
-    } as MaskContainer;
+    };
   });
 
   const normalizedAiPatches = (loadedAdjustments.aiPatches || []).map(

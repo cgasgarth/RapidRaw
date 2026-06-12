@@ -17,7 +17,7 @@ import ConfirmModal from './ConfirmModal';
 import ImportSettingsModal from './ImportSettingsModal';
 import CullingModal from './CullingModal';
 import CollageModal from './CollageModal';
-import { AppSettings, AlbumItem, AlbumGroup } from '../ui/AppProperties';
+import { AppSettings, AlbumItem } from '../ui/AppProperties';
 import { CopyPasteSettings } from '../../utils/adjustments';
 
 interface DeleteOptions {
@@ -133,7 +133,7 @@ export default function AppModals(props: AppModalsProps) {
       for (const n of nodes) {
         if (n.id === albumActionTarget) return n;
         if (n.type === 'group') {
-          const res = findNode((n as AlbumGroup).children);
+          const res = findNode(n.children);
           if (res) return res;
         }
       }
