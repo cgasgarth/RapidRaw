@@ -521,15 +521,23 @@ function App() {
       const payload = parseAiConnectorStatusPayload(event.payload);
       setEditor({ isAIConnectorConnected: payload.connected });
     });
-    invoke(Invokes.CheckAIConnectorStatus);
+    void invoke(Invokes.CheckAIConnectorStatus).catch((err: unknown) => {
+      console.error('Failed to check AI connector status:', err);
+    });
     const interval = setInterval(() => {
-      invoke(Invokes.CheckAIConnectorStatus);
+      void invoke(Invokes.CheckAIConnectorStatus).catch((err: unknown) => {
+        console.error('Failed to check AI connector status:', err);
+      });
     }, 10000);
     return () => {
       clearInterval(interval);
-      unlisten.then((f) => {
-        f();
-      });
+      void unlisten
+        .then((f) => {
+          f();
+        })
+        .catch((err: unknown) => {
+          console.error('Failed to remove AI connector status listener:', err);
+        });
     };
   }, [setEditor]);
 
@@ -601,12 +609,16 @@ function App() {
     const checkFullscreen = async () => {
       setUI({ isWindowFullScreen: await appWindow.isFullscreen() });
     };
-    checkFullscreen();
+    void checkFullscreen();
     const unlistenPromise: Promise<UnlistenFn> = appWindow.onResized(checkFullscreen);
     return () => {
-      unlistenPromise.then((unlisten) => {
-        unlisten();
-      });
+      void unlistenPromise
+        .then((unlisten) => {
+          unlisten();
+        })
+        .catch((err: unknown) => {
+          console.error('Failed to remove window resize listener:', err);
+        });
     };
   }, [setUI]);
 
