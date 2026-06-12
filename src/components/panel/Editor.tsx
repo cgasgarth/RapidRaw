@@ -27,6 +27,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useAiMasking } from '../../hooks/useAiMasking';
+import { toMaskParameterRecord } from '../../utils/maskParameterAccess';
 
 const parseRgb = (rgbStr: string): [number, number, number, number] => {
   const match = rgbStr.match(/[\d.]+/g);
@@ -637,6 +638,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     }
     return null;
   }, [adjustments.masks, adjustments.aiPatches, activeMaskId, activeAiSubMaskId, isMasking, isAiEditing]);
+  const activeSubMaskParameters = useMemo(
+    () => toMaskParameterRecord(activeSubMask?.parameters),
+    [activeSubMask?.parameters],
+  );
 
   const isPanningDisabled =
     isMaskHovered ||
@@ -648,7 +653,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         activeSubMask?.type === Mask.AiSubject ||
         activeSubMask?.type === Mask.Color ||
         activeSubMask?.type === Mask.Luminance ||
-        activeSubMask?.parameters?.isInitialDraw)) ||
+        activeSubMaskParameters['isInitialDraw'] === true)) ||
     (isAiEditing &&
       (activeSubMask?.type === Mask.Brush ||
         activeSubMask?.type === Mask.Flow ||
@@ -656,7 +661,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         activeSubMask?.type === Mask.QuickEraser ||
         activeSubMask?.type === Mask.Color ||
         activeSubMask?.type === Mask.Luminance ||
-        activeSubMask?.parameters?.isInitialDraw)) ||
+        activeSubMaskParameters['isInitialDraw'] === true)) ||
     isWbPickerActive;
 
   useEffect(() => {
@@ -1071,8 +1076,10 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         if (!Array.isArray(subMasks)) return;
         subMasks.forEach((sm) => {
           if (sm.id && sm.parameters && patchesSentToBackend.has(sm.id)) {
-            if (sm.parameters.mask_data_base64 !== undefined) sm.parameters.mask_data_base64 = null;
-            if (sm.parameters.maskDataBase64 !== undefined) sm.parameters.maskDataBase64 = null;
+            const parameters = toMaskParameterRecord(sm.parameters);
+            if (parameters['mask_data_base64'] !== undefined) parameters['mask_data_base64'] = null;
+            if (parameters['maskDataBase64'] !== undefined) parameters['maskDataBase64'] = null;
+            sm.parameters = parameters;
           }
         });
       };

@@ -26,6 +26,7 @@ import { Invokes, SelectedImage, AppSettings } from '../../ui/AppProperties';
 import ExportPresetsList from '../../ui/ExportPresetsList';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
+import type { Adjustments } from '../../../utils/adjustments';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useShallow } from 'zustand/react/shallow';
@@ -356,27 +357,36 @@ export default function ExportPanel({
 
   const debouncedEstimateSize = useMemo(
     () =>
-      debounce(async (paths, currentAdj, currentPath, exportSettings, format) => {
-        if (paths.length === 0 || !isVisible) {
-          setEstimatedSize(null);
-          return;
-        }
-        setIsEstimating(true);
-        try {
-          const size: number = await invoke(Invokes.EstimateExportSizes, {
-            paths,
-            exportSettings,
-            outputFormat: format,
-            currentEditPath: currentPath || null,
-            currentEditAdjustments: currentAdj || null,
-          });
-          setEstimatedSize(size);
-        } catch {
-          setEstimatedSize(null);
-        } finally {
-          setIsEstimating(false);
-        }
-      }, 500),
+      debounce(
+        async (
+          paths: string[],
+          currentAdj: Adjustments | null,
+          currentPath: string | undefined,
+          exportSettings: ExportSettings,
+          format: string,
+        ) => {
+          if (paths.length === 0 || !isVisible) {
+            setEstimatedSize(null);
+            return;
+          }
+          setIsEstimating(true);
+          try {
+            const size: number = await invoke(Invokes.EstimateExportSizes, {
+              paths,
+              exportSettings,
+              outputFormat: format,
+              currentEditPath: currentPath || null,
+              currentEditAdjustments: currentAdj || null,
+            });
+            setEstimatedSize(size);
+          } catch {
+            setEstimatedSize(null);
+          } finally {
+            setIsEstimating(false);
+          }
+        },
+        500,
+      ),
     [isVisible],
   );
 
