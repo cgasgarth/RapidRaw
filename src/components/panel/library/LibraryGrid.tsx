@@ -166,7 +166,11 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
         className={`relative flex items-center px-3 h-full select-none ${
           sortKey ? 'cursor-pointer hover:bg-bg-primary/50 transition-colors' : ''
         }`}
-        onClick={() => sortKey && onSortChange(sortKey)}
+        onClick={() => {
+          if (sortKey) {
+            onSortChange(sortKey);
+          }
+        }}
       >
         <Text
           variant={TextVariants.small}
@@ -184,7 +188,9 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
         {nextKey && (
           <div
             className="absolute right-[-3px] top-1.5 bottom-1.5 w-[6px] cursor-col-resize z-10 group flex items-center justify-center"
-            onMouseDown={(e) => handleResize(e, widthKey, nextKey)}
+            onMouseDown={(e) => {
+              handleResize(e, widthKey, nextKey);
+            }}
           >
             <div className="w-px h-full bg-border-color/40 group-hover:bg-accent transition-colors" />
           </div>
@@ -333,7 +339,12 @@ export default function LibraryGrid(props: LibraryGridProps) {
     [setLibrary],
   );
 
-  useEffect(() => () => handleScroll.cancel(), [handleScroll]);
+  useEffect(
+    () => () => {
+      handleScroll.cancel();
+    },
+    [handleScroll],
+  );
 
   const queueThumbnailRequest = useCallback(
     (path: string) => {
@@ -600,11 +611,11 @@ export default function LibraryGrid(props: LibraryGridProps) {
         {gridData.isListView && (
           <ListHeader
             widths={listColumnWidths}
-            setWidths={(updater) =>
+            setWidths={(updater) => {
               setLibrary({
                 listColumnWidths: typeof updater === 'function' ? updater(listColumnWidths) : updater,
-              })
-            }
+              });
+            }}
             containerRef={libraryContainerRef}
             sortCriteria={sortCriteria}
             onSortChange={handleHeaderSort}
