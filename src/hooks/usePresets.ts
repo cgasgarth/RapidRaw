@@ -56,7 +56,7 @@ export function usePresets(currentAdjustments: Adjustments) {
   const savePresetsToBackend = useMemo(
     () =>
       debounce((presetsToSave: Array<UserPreset>) => {
-        invoke(Invokes.SavePresets, { presets: presetsToSave }).catch((err) =>
+        invoke(Invokes.SavePresets, { presets: presetsToSave }).catch((err: unknown) =>
           console.error('Failed to save presets:', err),
         );
       }, 500),

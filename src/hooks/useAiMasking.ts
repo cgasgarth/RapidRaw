@@ -384,7 +384,7 @@ export function useAiMasking() {
       invoke('precompute_ai_subject_mask', {
         jsAdjustments: transformAdjustments,
         path: selectedImagePath,
-      }).catch((err) => console.error('Failed to precompute AI subject mask:', err));
+      }).catch((err: unknown) => console.error('Failed to precompute AI subject mask:', err));
     }
   }, [activeMaskId, activeAiSubMaskId, selectedImagePath]);
 

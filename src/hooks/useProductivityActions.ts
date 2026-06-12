@@ -17,7 +17,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           progressMessage: 'Starting panorama process...',
         },
       }));
-      invoke(Invokes.StitchPanorama, { paths }).catch((err) => {
+      invoke(Invokes.StitchPanorama, { paths }).catch((err: unknown) => {
         setUI((state) => ({
           panoramaModalState: { ...state.panoramaModalState, isProcessing: false, error: String(err) },
         }));
@@ -57,7 +57,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           progressMessage: 'Starting HDR process...',
         },
       }));
-      invoke(Invokes.MergeHdr, { paths }).catch((err) => {
+      invoke(Invokes.MergeHdr, { paths }).catch((err: unknown) => {
         setUI((state) => ({ hdrModalState: { ...state.hdrModalState, isProcessing: false, error: String(err) } }));
       });
     },
