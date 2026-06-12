@@ -789,20 +789,14 @@ export default function MetadataPanel() {
                 <div className="bg-surface border border-surface rounded-xl p-3 flex flex-col gap-3">
                   <div className="relative rounded-md overflow-hidden shadow-sm">
                     <iframe
-                      className="pointer-events-none"
-                      frameBorder="0"
-                      height="180"
+                      className="pointer-events-none h-[180px] w-full border-0"
                       loading="lazy"
-                      marginHeight={0}
-                      marginWidth={0}
-                      scrolling="no"
                       src={`https://www.openstreetmap.org/export/embed.html?bbox=${gpsData.lon - 0.01}%2C${
                         gpsData.lat - 0.01
                       }%2C${gpsData.lon + 0.01}%2C${gpsData.lat + 0.01}&layer=mapnik&marker=${gpsData.lat}%2C${
                         gpsData.lon
                       }`}
                       title={t('editor.metadata.gps.title')}
-                      width="100%"
                     ></iframe>
                     <a
                       aria-label={t('editor.metadata.gps.clickToOpenTooltip')}
