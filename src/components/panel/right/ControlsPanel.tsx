@@ -37,12 +37,12 @@ const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> 
   effects: 'Effects',
 };
 
-const cloneAdjustmentValue = <T,>(value: T): T => {
+const cloneAdjustmentValue = (value: unknown): unknown => {
   if (typeof structuredClone === 'function') {
     return structuredClone(value);
   }
 
-  return JSON.parse(JSON.stringify(value)) as T;
+  return JSON.parse(JSON.stringify(value)) as unknown;
 };
 
 const pickAdjustmentValues = (
@@ -50,15 +50,14 @@ const pickAdjustmentValues = (
   source: Adjustments,
   requireExistingKey = false,
 ): Partial<Adjustments> => {
-  const values: Partial<Adjustments> = {};
+  const values: Record<string, unknown> = {};
 
   for (const key of keys) {
     if (requireExistingKey && !Object.prototype.hasOwnProperty.call(source, key)) {
       continue;
     }
 
-    const adjustmentKey = key as keyof Adjustments;
-    values[adjustmentKey] = cloneAdjustmentValue(source[adjustmentKey]);
+    values[key] = cloneAdjustmentValue(source[key]);
   }
 
   return values;

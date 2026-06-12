@@ -412,12 +412,14 @@ export function useImageProcessing(
         if (otherPaths.length > 0) {
           const prev = prevAdjustmentsRef.current;
           if (prev && prev.path === selectedImage.path) {
-            const delta: Partial<Adjustments> = {};
+            const delta: Record<string, unknown> = {};
             const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
             for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
               if (includedKeys.includes(key as string)) {
-                if (JSON.stringify(adjustments[key]) !== JSON.stringify(prev.adjustments[key])) {
-                  delta[key] = adjustments[key];
+                const adjustmentValue: unknown = adjustments[key];
+                const previousAdjustmentValue: unknown = prev.adjustments[key];
+                if (JSON.stringify(adjustmentValue) !== JSON.stringify(previousAdjustmentValue)) {
+                  delta[key] = adjustmentValue;
                 }
               }
             }
