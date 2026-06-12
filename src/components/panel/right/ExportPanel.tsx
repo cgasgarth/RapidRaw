@@ -177,7 +177,8 @@ const formatBytes = (bytes: number, t: TFunction, decimals = 2) => {
     t('export.bytes.tb'),
   ];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+  const sizeLabel = sizes[i] ?? sizes[sizes.length - 1] ?? '';
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizeLabel}`;
 };
 
 export default function ExportPanel({
@@ -504,7 +505,8 @@ export default function ExportPanel({
         const originalFilename = firstPath.split(/[\\/]/).pop() || '';
         const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
         const suggestedName = finalFilenameTemplate.replace('{original_filename}', stem);
-        const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
+        const extension = selectedFormat.extensions[0] ?? fileFormat;
+        const outputFileName = `${suggestedName}.${extension}`;
 
         outputFolderOrFile = isAndroid
           ? outputFileName

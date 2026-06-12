@@ -84,7 +84,9 @@ const EditorToolbar = memo(
         captureDate = dateTimeParts[0]?.replace(/:/g, '-') || null;
         if (dateTimeParts[1]) {
           const timeParts = dateTimeParts[1].split(':');
-          captureTime = `${timeParts[0]}:${timeParts[1]}`;
+          const hours = timeParts[0] ?? '00';
+          const minutes = timeParts[1] ?? '00';
+          captureTime = `${hours}:${minutes}`;
         }
       }
 
