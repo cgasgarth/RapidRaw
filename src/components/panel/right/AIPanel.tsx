@@ -373,7 +373,7 @@ export default function AIPanel() {
       }
     };
 
-    fetchUsage();
+    void fetchUsage();
   }, [aiProvider, isSignedIn, isPro, getToken]);
 
   const setBrushSettings = useCallback(
@@ -593,7 +593,7 @@ export default function AIPanel() {
     setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
     if (type === Mask.Brush) selectBrushToolForNewMask();
 
-    if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
+    if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
   };
 
   const handleAddSubMask = (
@@ -619,7 +619,7 @@ export default function AIPanel() {
     onSelectSubMask(subMask.id);
     setExpandedContainers((prev) => new Set(prev).add(containerId));
     if (type === Mask.Brush) selectBrushToolForNewMask();
-    if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
+    if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
   };
 
   const handleAddAiContextMenu = (event: React.MouseEvent, targetContainerId?: string | null) => {
@@ -1990,7 +1990,7 @@ function SettingsPanel({
   const handleGenerateClick = () => {
     if (!container) return;
     updateContainer(container.id, { prompt });
-    onGenerativeReplace(container.id, prompt, useFastInpaint);
+    void onGenerativeReplace(container.id, prompt, useFastInpaint);
   };
 
   const handleToggleSection = (section: keyof AiPanelCollapsibleState) => {
