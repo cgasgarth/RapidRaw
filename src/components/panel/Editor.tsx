@@ -133,7 +133,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const showOriginal = useEditorStore((s) => s.showOriginal);
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
   const targetZoom = useEditorStore((s) => s.zoom);
-  const originalSize = useEditorStore((s) => s.originalSize);
   const isRotationActive = useEditorStore((s) => s.isRotationActive);
   const overlayMode = useEditorStore((s) => s.overlayMode);
   const overlayRotation = useEditorStore((s) => s.overlayRotation);
@@ -359,7 +358,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       minScale: Math.max(0.1, minScale),
       maxScale: Math.max(20, maxScale),
     };
-  }, [selectedImage, imageRenderSize.scale, originalSize]);
+  }, [selectedImage, imageRenderSize.scale]);
 
   const minScaleRef = useRef(transformConfig.minScale);
   const maxScaleRef = useRef(transformConfig.maxScale);

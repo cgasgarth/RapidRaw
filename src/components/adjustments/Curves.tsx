@@ -439,12 +439,14 @@ export default function CurveGraph({
     setDraggingSplitKey(null);
   }, [activeChannel]);
 
+  const activeCurve = adjustments.curves[activeChannel];
+
   useEffect(() => {
     if (draggingPointIndex === null) {
       setLocalPoints(null);
       localPointsRef.current = null;
     }
-  }, [adjustments.curves[activeChannel], draggingPointIndex]);
+  }, [activeCurve, draggingPointIndex]);
 
   useEffect(() => {
     const isDragging = draggingPointIndex !== null || draggingSplitKey !== null;
