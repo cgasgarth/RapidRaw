@@ -404,7 +404,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
     if (libraryViewMode === LibraryViewMode.Recursive) {
       const groups = groupImagesByFolder(imageList, currentFolderPath);
       groups.forEach((group) => {
-        const groupImages = group.images ?? [];
+        const groupImages = group.images;
         if (groupImages.length === 0) return;
 
         const isExpanded = !collapsedRecursiveFolders.has(group.path);
@@ -485,7 +485,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
     if (libraryViewMode === LibraryViewMode.Recursive) {
       const groups = groupImagesByFolder(imageList, currentFolderPath);
       for (const group of groups) {
-        const groupImages = group.images ?? [];
+        const groupImages = group.images;
         if (groupImages.length === 0) continue;
 
         targetTop += headerHeight;

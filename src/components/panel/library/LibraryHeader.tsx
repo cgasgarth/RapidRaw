@@ -411,9 +411,7 @@ export function ViewOptionsDropdown({
   );
 
   const isFilterActive =
-    filterCriteria.rating !== 0 ||
-    (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) ||
-    (filterCriteria.colors && filterCriteria.colors.length > 0);
+    filterCriteria.rating !== 0 || filterCriteria.rawStatus !== RawStatus.All || filterCriteria.colors.length > 0;
 
   const [lastClickedColor, setLastClickedColor] = useState<string | null>(null);
   const allColors = useMemo(() => [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }], []);
@@ -430,7 +428,7 @@ export function ViewOptionsDropdown({
   const handleColorClick = (colorName: string, event: React.MouseEvent<HTMLButtonElement>) => {
     const { ctrlKey, metaKey, shiftKey } = event;
     const isCtrlPressed = ctrlKey || metaKey;
-    const currentColors = filterCriteria.colors || [];
+    const currentColors = filterCriteria.colors;
 
     if (shiftKey && lastClickedColor) {
       const lastIndex = allColors.findIndex((c) => c.name === lastClickedColor);
@@ -693,7 +691,7 @@ export function ViewOptionsDropdown({
                 {t('library.header.viewOptions.filterByFileType')}
               </Text>
               {rawStatusOptions.map((option) => {
-                const isSelected = (filterCriteria.rawStatus || RawStatus.All) === option.key;
+                const isSelected = filterCriteria.rawStatus === option.key;
                 return (
                   <button
                     className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
@@ -757,7 +755,7 @@ export function ViewOptionsDropdown({
             </Text>
             <div className="flex flex-wrap gap-3 px-3 py-2">
               {allColors.map((color: Color) => {
-                const isSelected = (filterCriteria.colors || []).includes(color.name);
+                const isSelected = filterCriteria.colors.includes(color.name);
                 const title =
                   color.name === 'none'
                     ? t('library.header.viewOptions.noLabel')

@@ -131,7 +131,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
 
       pathsToUpdate.forEach((p) => {
         const cached = globalImageCache.get(p);
-        if (cached && cached.selectedImage) {
+        if (cached) {
           globalImageCache.set(p, {
             ...cached,
             selectedImage: { ...cached.selectedImage, exif: { ...(cached.selectedImage.exif || {}), ...updates } },
@@ -235,7 +235,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     try {
       const updates: { folderTrees?: FolderTree[]; pinnedFolderTrees?: FolderTree[] } = {};
 
-      if (rootPaths && rootPaths.length > 0) {
+      if (rootPaths.length > 0) {
         const treesData = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
           paths: rootPaths,
           expandedFolders: expandedArray,
@@ -246,7 +246,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
         updates.folderTrees = [];
       }
 
-      if (pinnedFolders && pinnedFolders.length > 0) {
+      if (pinnedFolders.length > 0) {
         const pinnedTreesData = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
           paths: pinnedFolders,
           expandedFolders: expandedArray,

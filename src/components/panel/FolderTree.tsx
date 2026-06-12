@@ -97,7 +97,7 @@ const filterTree = (node: FolderTree | null, query: string): FolderTree | null =
   const lowerCaseQuery = query.toLowerCase();
   const isMatch = node.name.toLowerCase().includes(lowerCaseQuery);
 
-  if (!node.children || node.children.length === 0) {
+  if (node.children.length === 0) {
     return isMatch ? node : null;
   }
 
@@ -113,7 +113,7 @@ const filterTree = (node: FolderTree | null, query: string): FolderTree | null =
 };
 
 const getAutoExpandedPaths = (node: FolderTree, paths: Set<string>) => {
-  if (node.children && node.children.length > 0) {
+  if (node.children.length > 0) {
     paths.add(node.path);
     node.children.forEach((child: FolderTree) => {
       getAutoExpandedPaths(child, paths);
@@ -276,7 +276,7 @@ function TreeNode({
   isInstantTransition,
   folderIcons,
 }: TreeNodeProps) {
-  const hasChildren = node.hasSubdirs || (node.children && node.children.length > 0);
+  const hasChildren = node.hasSubdirs || node.children.length > 0;
   const isSelected = node.path === selectedPath;
   const isPinned = pinnedFolders.includes(node.path);
 
@@ -388,7 +388,7 @@ function TreeNode({
       </div>
 
       <AnimatePresence initial={false}>
-        {hasChildren && isExpanded && node.children && node.children.length > 0 && (
+        {hasChildren && isExpanded && node.children.length > 0 && (
           <motion.div
             animate="open"
             className="pl-1 border-l-[1.5px] border-border-color/50 ml-3.75 overflow-hidden"
@@ -531,8 +531,8 @@ export default function FolderTree({
 
   useEffect(() => {
     if (isSearching && appSettings) {
-      const hasPinnedResults = filteredPinnedTrees && filteredPinnedTrees.length > 0;
-      const hasBaseResults = filteredTrees && filteredTrees.length > 0;
+      const hasPinnedResults = filteredPinnedTrees.length > 0;
+      const hasBaseResults = filteredTrees.length > 0;
 
       const newSections = [...openSections];
       let changed = false;
@@ -556,7 +556,7 @@ export default function FolderTree({
   const isCurrentOpen = openSections.includes('current');
   const isAlbumsOpen = openSections.includes('albums');
 
-  const hasVisiblePinnedTrees = filteredPinnedTrees && filteredPinnedTrees.length > 0;
+  const hasVisiblePinnedTrees = filteredPinnedTrees.length > 0;
 
   return (
     <div
@@ -755,7 +755,7 @@ export default function FolderTree({
               </>
             )}
 
-            {filteredTrees && filteredTrees.length > 0 && (
+            {filteredTrees.length > 0 && (
               <>
                 <div>
                   <SectionHeader
@@ -845,7 +845,7 @@ export default function FolderTree({
               </>
             )}
 
-            {!filteredTrees?.length && !hasVisiblePinnedTrees && isSearching && (
+            {filteredTrees.length === 0 && !hasVisiblePinnedTrees && isSearching && (
               <Text className="p-2 text-center">{t('library.folders.noFoldersFound')}</Text>
             )}
 
