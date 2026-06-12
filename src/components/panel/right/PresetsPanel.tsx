@@ -422,15 +422,18 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
     if (previewsToDelete.length > 0) {
       setPreviews((prev) => {
-        const newPreviews = { ...prev };
-        previewsToDelete.forEach((id) => {
-          const url = newPreviews[id];
-          if (url && url.startsWith('blob:')) {
-            URL.revokeObjectURL(url);
-          }
-          delete newPreviews[id];
-        });
-        return newPreviews;
+        const deletedPreviewIds = new Set(previewsToDelete);
+
+        return Object.fromEntries(
+          Object.entries(prev).filter(([id, url]) => {
+            if (!deletedPreviewIds.has(id)) return true;
+
+            if (url && url.startsWith('blob:')) {
+              URL.revokeObjectURL(url);
+            }
+            return false;
+          }),
+        );
       });
     }
   }, [presets]);

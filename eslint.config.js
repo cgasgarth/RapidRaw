@@ -201,7 +201,7 @@ module.exports = [
       '@typescript-eslint/no-useless-default-assignment': 'error',
       '@typescript-eslint/no-unsafe-return': 'error',
       '@typescript-eslint/no-unnecessary-type-arguments': 'error',
-      '@typescript-eslint/no-dynamic-delete': 'off',
+      '@typescript-eslint/no-dynamic-delete': 'error',
       '@typescript-eslint/require-await': 'error',
       '@typescript-eslint/restrict-plus-operands': 'error',
       '@typescript-eslint/no-unnecessary-boolean-literal-compare': 'error',

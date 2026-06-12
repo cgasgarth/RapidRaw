@@ -23,6 +23,14 @@ export interface UserPreset {
 
 type PresetAdjustments = Partial<Adjustments>;
 
+const withoutAdjustmentKeys = (adjustments: PresetAdjustments, keys: ReadonlySet<string>): PresetAdjustments =>
+  Object.entries(adjustments).reduce<PresetAdjustments>((filteredAdjustments, [key, value]) => {
+    if (!keys.has(key)) {
+      filteredAdjustments[key as keyof Adjustments] = value;
+    }
+    return filteredAdjustments;
+  }, {});
+
 function getFolderChildren(folder: Folder): Preset[] {
   return folder.children as Preset[];
 }
@@ -220,7 +228,7 @@ export function usePresets(currentAdjustments: Adjustments) {
 
     if (!existingPreset) return null;
 
-    const newAdjustments: PresetAdjustments = { ...existingPreset.adjustments };
+    let newAdjustments: PresetAdjustments = { ...existingPreset.adjustments };
     const oldType = existingPreset.presetType || 'style';
 
     const GEOMETRY_KEYS = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((group) => group.keys);
@@ -228,11 +236,13 @@ export function usePresets(currentAdjustments: Adjustments) {
 
     if (oldType !== presetType) {
       if (presetType === 'tool') {
-        for (const key of Object.keys(newAdjustments)) {
-          if (JSON.stringify(newAdjustments[key]) === JSON.stringify(INITIAL_ADJUSTMENTS[key as keyof Adjustments])) {
-            delete newAdjustments[key];
-          }
-        }
+        const defaultAdjustmentKeys = new Set(
+          Object.keys(newAdjustments).filter(
+            (key) =>
+              JSON.stringify(newAdjustments[key]) === JSON.stringify(INITIAL_ADJUSTMENTS[key as keyof Adjustments]),
+          ),
+        );
+        newAdjustments = withoutAdjustmentKeys(newAdjustments, defaultAdjustmentKeys);
       } else {
         for (const key of COPYABLE_ADJUSTMENT_KEYS) {
           if (!includeMasks && MASK_KEYS.includes(key)) continue;
@@ -245,10 +255,10 @@ export function usePresets(currentAdjustments: Adjustments) {
     }
 
     if (!includeMasks) {
-      for (const k of MASK_KEYS) delete newAdjustments[k];
+      newAdjustments = withoutAdjustmentKeys(newAdjustments, new Set(MASK_KEYS));
     }
     if (!includeCropTransform) {
-      for (const k of GEOMETRY_KEYS) delete newAdjustments[k];
+      newAdjustments = withoutAdjustmentKeys(newAdjustments, new Set(GEOMETRY_KEYS));
     }
 
     let updatedPreset: Preset | null = null;
