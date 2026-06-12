@@ -205,7 +205,7 @@ module.exports = [
       '@typescript-eslint/require-await': 'error',
       '@typescript-eslint/restrict-plus-operands': 'error',
       '@typescript-eslint/no-unnecessary-boolean-literal-compare': 'error',
-      '@typescript-eslint/no-unnecessary-type-parameters': 'off',
+      '@typescript-eslint/no-unnecessary-type-parameters': 'error',
       'i18next/no-literal-string': [
         'warn',
         {

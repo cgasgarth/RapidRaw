@@ -24,7 +24,7 @@ function installViteErrorForwarding(): void {
   void import('./viteHotContext.mjs')
     .then(({ onViteError }) => {
       onViteError((payload: unknown) => {
-        const err = isPlainRecord(payload) ? (getRecordField<unknown>(payload, 'err') ?? payload) : payload;
+        const err = isPlainRecord(payload) ? (getRecordField(payload, 'err') ?? payload) : payload;
         sendToBackend('error', ['[vite:error:event]', err]);
       });
     })
@@ -37,8 +37,18 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function getRecordField<T>(record: Record<string, unknown>, key: string): T | undefined {
-  return record[key] as T | undefined;
+function getRecordField(record: Record<string, unknown>, key: string): unknown {
+  return record[key];
+}
+
+function getStringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = getRecordField(record, key);
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getNumberField(record: Record<string, unknown>, key: string): number | undefined {
+  const value = getRecordField(record, key);
+  return typeof value === 'number' ? value : undefined;
 }
 
 function getObjectProperty(record: object, key: string): unknown {
@@ -51,23 +61,23 @@ function isViteLikeError(value: unknown): value is Record<string, unknown> {
   }
 
   return Boolean(
-    getRecordField<string>(value, 'message') ||
-    getRecordField<string>(value, 'stack') ||
-    getRecordField<string>(value, 'frame') ||
-    getRecordField<string>(value, 'plugin') ||
-    getRecordField<string>(value, 'id') ||
-    getRecordField<Record<string, unknown>>(value, 'loc'),
+    getStringField(value, 'message') ||
+    getStringField(value, 'stack') ||
+    getStringField(value, 'frame') ||
+    getStringField(value, 'plugin') ||
+    getStringField(value, 'id') ||
+    isPlainRecord(getRecordField(value, 'loc')),
   );
 }
 
 function formatViteErrorDetails(value: Record<string, unknown>): string {
   const lines: string[] = [];
-  const message = getRecordField<string>(value, 'message');
-  const plugin = getRecordField<string>(value, 'plugin');
-  const id = getRecordField<string>(value, 'id');
-  const stack = getRecordField<string>(value, 'stack');
-  const frame = getRecordField<string>(value, 'frame');
-  const loc = getRecordField<Record<string, unknown>>(value, 'loc');
+  const message = getStringField(value, 'message');
+  const plugin = getStringField(value, 'plugin');
+  const id = getStringField(value, 'id');
+  const stack = getStringField(value, 'stack');
+  const frame = getStringField(value, 'frame');
+  const loc = getRecordField(value, 'loc');
 
   if (message) {
     lines.push(`[vite:error] ${message}`);
@@ -79,9 +89,9 @@ function formatViteErrorDetails(value: Record<string, unknown>): string {
     lines.push(`[vite:error] file: ${id}`);
   }
   if (isPlainRecord(loc)) {
-    const file = getRecordField<string>(loc, 'file');
-    const line = getRecordField<number>(loc, 'line');
-    const column = getRecordField<number>(loc, 'column');
+    const file = getStringField(loc, 'file');
+    const line = getNumberField(loc, 'line');
+    const column = getNumberField(loc, 'column');
     const locParts = [file, line, column].filter((part) => part !== undefined);
     if (locParts.length > 0) {
       lines.push(`[vite:error] loc: ${locParts.join(':')}`);
