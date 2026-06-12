@@ -951,15 +951,16 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             onClick: () => {
               if (appSettings) {
                 const currentIcons = appSettings.folderIcons || {};
-                const newIcons = { ...currentIcons };
 
                 if (iconDef.value) {
-                  newIcons[targetPath] = iconDef.value;
+                  handleSettingsChange({
+                    ...appSettings,
+                    folderIcons: { ...currentIcons, [targetPath]: iconDef.value },
+                  });
                 } else {
-                  delete newIcons[targetPath];
+                  const { [targetPath]: _removedIcon, ...newIcons } = currentIcons;
+                  handleSettingsChange({ ...appSettings, folderIcons: newIcons });
                 }
-
-                handleSettingsChange({ ...appSettings, folderIcons: newIcons });
               }
             },
           })),
