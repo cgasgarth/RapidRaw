@@ -249,7 +249,11 @@ export default function DenoiseModal({
       setBatchProgress(parsePathProgressPayload(event.payload));
     });
     return () => {
-      unlisten.then((f) => f());
+      void unlisten
+        .then((f) => f())
+        .catch((error: unknown) => {
+          console.error('Failed to unlisten denoise progress:', error);
+        });
     };
   }, []);
 
@@ -504,7 +508,9 @@ export default function DenoiseModal({
           </button>
 
           <Button
-            onClick={handleRunDenoise}
+            onClick={() => {
+              void handleRunDenoise();
+            }}
             disabled={isProcessing || isSaving}
             variant={previewBase64 && !isBatch ? 'secondary' : 'primary'}
           >
@@ -523,7 +529,12 @@ export default function DenoiseModal({
           </Button>
 
           {previewBase64 && !isBatch && (
-            <Button onClick={handleSave} disabled={isSaving || isProcessing}>
+            <Button
+              onClick={() => {
+                void handleSave();
+              }}
+              disabled={isSaving || isProcessing}
+            >
               {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : <Save className="mr-2" size={16} />}
               {t('modals.denoise.btnSave')}
             </Button>

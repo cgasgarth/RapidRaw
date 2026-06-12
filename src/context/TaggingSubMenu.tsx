@@ -74,7 +74,7 @@ export default function TaggingSubMenu({
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleAddTag(inputValue);
+      void handleAddTag(inputValue);
     }
     if (e.key === 'Escape') {
       hideContextMenu();
@@ -101,7 +101,9 @@ export default function TaggingSubMenu({
                   initial={false}
                   animate="visible"
                   exit="exit"
-                  onClick={() => handleRemoveTag(tagItem)}
+                  onClick={() => {
+                    void handleRemoveTag(tagItem);
+                  }}
                   data-tooltip={t('menus.tagging.removeTooltip', { tag: tagItem.tag })}
                   className="flex items-center gap-1 bg-bg-primary text-text-primary text-xs font-medium px-2 py-1 rounded-sm group cursor-pointer"
                 >
@@ -140,7 +142,9 @@ export default function TaggingSubMenu({
           className="w-full bg-surface border border-border-color rounded-md pl-2 pr-8 py-1.5 text-sm focus:outline-hidden"
         />
         <button
-          onClick={() => handleAddTag(inputValue)}
+          onClick={() => {
+            void handleAddTag(inputValue);
+          }}
           className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface"
           data-tooltip={t('menus.tagging.addTagTooltip')}
         >
@@ -155,7 +159,9 @@ export default function TaggingSubMenu({
             {shortcuts.map((shortcut: string) => (
               <button
                 key={shortcut}
-                onClick={() => handleAddTag(shortcut)}
+                onClick={() => {
+                  void handleAddTag(shortcut);
+                }}
                 className="bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary text-xs font-medium px-2 py-1 rounded-sm"
               >
                 {shortcut}

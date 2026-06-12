@@ -249,7 +249,12 @@ export default function HdrModal({
         </Button>
 
         {finalImageBase64 && (
-          <Button onClick={handleSave} disabled={isSaving || isProcessing}>
+          <Button
+            onClick={() => {
+              void handleSave();
+            }}
+            disabled={isSaving || isProcessing}
+          >
             {isSaving ? <Loader2 className="animate-spin mr-2" size={16} /> : <Save className="mr-2" size={16} />}
             {t('modals.hdr.save')}
           </Button>
