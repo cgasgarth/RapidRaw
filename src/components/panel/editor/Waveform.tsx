@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { AlertOctagon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -276,20 +276,22 @@ const FakeWaveformLoader = ({ mode }: { mode: DisplayMode }) => {
   const spawnAccumulatorRef = useRef<number>(0);
 
   const MAX_PARTICLES = 10000;
-  const particles = useRef<Array<Particle>>(
-    Array.from({ length: MAX_PARTICLES }, () => ({
-      x: 0,
-      y: 0,
-      targetX: 0,
-      targetY: 0,
-      life: 0,
-      maxLife: 1,
-      r: 255,
-      g: 255,
-      b: 255,
-      active: false,
-    })),
-  ).current;
+  const particles = useMemo<Array<Particle>>(
+    () =>
+      Array.from({ length: MAX_PARTICLES }, () => ({
+        x: 0,
+        y: 0,
+        targetX: 0,
+        targetY: 0,
+        life: 0,
+        maxLife: 1,
+        r: 255,
+        g: 255,
+        b: 255,
+        active: false,
+      })),
+    [],
+  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -517,7 +519,7 @@ export default function Waveform({
   const isHistogram = displayMode === DisplayMode.Histogram;
   const isVectorscope = displayMode === DisplayMode.Vectorscope;
   const isReady = isHistogram ? !!(histogram && histogram.red) : !!waveformData;
-  const hadDataOnMount = useRef(isReady);
+  const [hadDataOnMount] = useState(isReady);
   const width = waveformData?.width || 256;
   const height = waveformData?.height || 256;
 
@@ -579,7 +581,7 @@ export default function Waveform({
           transition: 'filter 0.3s ease',
         }}
       >
-        <AnimatePresence initial={!hadDataOnMount.current} mode="sync">
+        <AnimatePresence initial={!hadDataOnMount} mode="sync">
           {isReady ? (
             isHistogram ? (
               <motion.div

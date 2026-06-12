@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GLOBAL_KEYS } from './AppProperties';
 
@@ -49,7 +49,6 @@ const Slider = ({
   const { t } = useTranslation();
   const [displayValue, setDisplayValue] = useState<number>(value);
   const displayValueRef = useRef<number>(value);
-  displayValueRef.current = displayValue;
   const [isDragging, setIsDragging] = useState(false);
   const animationFrameRef = useRef<number | undefined>(undefined);
   const [isEditing, setIsEditing] = useState(false);
@@ -103,9 +102,12 @@ const Slider = ({
   const snapToStepRef = useRef(snapToStep);
   const rangeRef = useRef({ min, max });
 
-  onChangeRef.current = onChange;
-  snapToStepRef.current = snapToStep;
-  rangeRef.current = { min, max };
+  useLayoutEffect(() => {
+    displayValueRef.current = displayValue;
+    onChangeRef.current = onChange;
+    snapToStepRef.current = snapToStep;
+    rangeRef.current = { min, max };
+  }, [displayValue, max, min, onChange, snapToStep]);
 
   useEffect(() => {
     onDragStateChange(isDragging);

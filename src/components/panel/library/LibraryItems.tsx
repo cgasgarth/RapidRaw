@@ -5,6 +5,7 @@ import {
   useCallback,
   useMemo,
   useRef,
+  useLayoutEffect,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
@@ -133,19 +134,16 @@ const ThumbnailComponent = ({
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
 
-  const [currentPath, setCurrentPath] = useState(path);
-  if (currentPath !== path) {
-    setCurrentPath(path);
-    setLayers([]);
-  }
-
   const pathRef = useRef(path);
   const hadDataOnPathChange = useRef(!!data);
 
-  if (pathRef.current !== path) {
-    pathRef.current = path;
-    hadDataOnPathChange.current = !!data;
-  }
+  useLayoutEffect(() => {
+    if (pathRef.current !== path) {
+      pathRef.current = path;
+      hadDataOnPathChange.current = !!data;
+      setLayers([]);
+    }
+  }, [data, path]);
 
   const { baseName, isVirtualCopy } = useMemo(() => {
     const fullFileName = path.split(/[\\/]/).pop() || '';
@@ -514,19 +512,16 @@ const ListItemComponent = ({
   const [showPlaceholder, setShowPlaceholder] = useState(false);
   const [layers, setLayers] = useState<ImageLayer[]>([]);
 
-  const [currentPath, setCurrentPath] = useState(path);
-  if (currentPath !== path) {
-    setCurrentPath(path);
-    setLayers([]);
-  }
-
   const pathRef = useRef(path);
   const hadDataOnPathChange = useRef(!!data);
 
-  if (pathRef.current !== path) {
-    pathRef.current = path;
-    hadDataOnPathChange.current = !!data;
-  }
+  useLayoutEffect(() => {
+    if (pathRef.current !== path) {
+      pathRef.current = path;
+      hadDataOnPathChange.current = !!data;
+      setLayers([]);
+    }
+  }, [data, path]);
 
   const { baseName, isVirtualCopy } = useMemo(() => {
     const fullFileName = path.split(/[\\/]/).pop() || '';

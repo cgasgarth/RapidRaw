@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { ArrowLeft, CheckCircle2, Loader2, Search, Users } from 'lucide-react';
 import { siGithub } from 'simple-icons';
@@ -76,7 +76,9 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
   const sortMethods = useMemo(() => [{ value: 'name', label: t('library.community.sortMethods.name') }], [t]);
 
   const previewsRef = useRef(previews);
-  previewsRef.current = previews;
+  useLayoutEffect(() => {
+    previewsRef.current = previews;
+  }, [previews]);
 
   const fetchDefaultPreviewImage = useCallback(async (): Promise<string | null> => {
     try {

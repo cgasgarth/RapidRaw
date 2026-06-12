@@ -1,6 +1,5 @@
-import { useRef, useCallback, useMemo, useEffect } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import debounce from 'lodash.debounce';
 
 const shuffleThumbnailPaths = (paths: string[]) => {
   for (let i = paths.length - 1; i > 0; i--) {
@@ -16,27 +15,47 @@ const shuffleThumbnailPaths = (paths: string[]) => {
 export function useThumbnails() {
   const generatedRef = useRef<Set<string>>(new Set());
   const pendingQueueRef = useRef<Set<string>>(new Set());
+  const flushTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const maxFlushTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
-  const flushQueueToBackend = useMemo(
-    () =>
-      debounce(
-        () => {
-          const pathsToSend = Array.from(pendingQueueRef.current);
-          if (pathsToSend.length === 0) return;
+  const clearScheduledFlush = useCallback(() => {
+    if (flushTimerRef.current !== null) {
+      window.clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
 
-          shuffleThumbnailPaths(pathsToSend);
+    if (maxFlushTimerRef.current !== null) {
+      window.clearTimeout(maxFlushTimerRef.current);
+      maxFlushTimerRef.current = null;
+    }
+  }, []);
 
-          invoke('update_thumbnail_queue', { paths: pathsToSend }).catch((err: unknown) => {
-            console.error('Failed to update thumbnail queue:', err);
-          });
+  const flushQueueToBackend = useCallback(() => {
+    clearScheduledFlush();
 
-          pendingQueueRef.current.clear();
-        },
-        150,
-        { maxWait: 300 },
-      ),
-    [],
-  );
+    const pathsToSend = Array.from(pendingQueueRef.current);
+    if (pathsToSend.length === 0) return;
+
+    shuffleThumbnailPaths(pathsToSend);
+
+    invoke('update_thumbnail_queue', { paths: pathsToSend }).catch((err: unknown) => {
+      console.error('Failed to update thumbnail queue:', err);
+    });
+
+    pendingQueueRef.current.clear();
+  }, [clearScheduledFlush]);
+
+  const scheduleQueueFlush = useCallback(() => {
+    if (flushTimerRef.current !== null) {
+      window.clearTimeout(flushTimerRef.current);
+    }
+
+    flushTimerRef.current = window.setTimeout(flushQueueToBackend, 150);
+
+    if (maxFlushTimerRef.current === null) {
+      maxFlushTimerRef.current = window.setTimeout(flushQueueToBackend, 300);
+    }
+  }, [flushQueueToBackend]);
 
   const requestThumbnails = useCallback(
     (visiblePaths: string[]) => {
@@ -52,10 +71,10 @@ export function useThumbnails() {
         pathsToQueue.forEach((p) => {
           pendingQueueRef.current.add(p);
         });
-        flushQueueToBackend();
+        scheduleQueueFlush();
       }
     },
-    [flushQueueToBackend],
+    [scheduleQueueFlush],
   );
 
   const markGenerated = useCallback((path: string) => {
@@ -66,15 +85,13 @@ export function useThumbnails() {
   const clearThumbnailQueue = useCallback(() => {
     generatedRef.current.clear();
     pendingQueueRef.current.clear();
-    flushQueueToBackend.cancel();
+    clearScheduledFlush();
     invoke('update_thumbnail_queue', { paths: [] }).catch(console.error);
-  }, [flushQueueToBackend]);
+  }, [clearScheduledFlush]);
 
   useEffect(() => {
-    return () => {
-      flushQueueToBackend.cancel();
-    };
-  }, [flushQueueToBackend]);
+    return clearScheduledFlush;
+  }, [clearScheduledFlush]);
 
   return { requestThumbnails, clearThumbnailQueue, markGenerated };
 }
