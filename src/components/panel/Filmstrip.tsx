@@ -130,8 +130,12 @@ const FilmstripThumbnail = memo(
 
     useEffect(() => {
       if (!thumbData) {
-        setLayers([]);
-        return;
+        const frame = requestAnimationFrame(() => {
+          setLayers([]);
+        });
+        return () => {
+          cancelAnimationFrame(frame);
+        };
       }
 
       setLayers((prev) => {
