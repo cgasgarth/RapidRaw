@@ -16,6 +16,8 @@ The first gate enables rules that pass after small local cleanup:
 - `import-x/no-duplicates`
 - `import-x/no-self-import`
 - `import-x/no-useless-path-segments`
+- `boundaries/element-types`
+- `boundaries/entry-point`
 
 The PR also records the boundary element map for app entrypoints, views, panels,
 adjustments, modals, managers, UI primitives, context, hooks, schemas, store,
@@ -32,9 +34,9 @@ focused follow-up PRs rather than hidden inside one large lint change.
 |    21 | `import-x/no-named-as-default-member` | #544 React/i18n member imports     |
 |   TBD | `import-x/order`                      | #539 import ordering cleanup       |
 |    10 | `import-x/no-cycle`                   | #542 dependency cycle audit        |
-|   TBD | `boundaries/element-types`            | #543 cross-layer dependency policy |
-|   TBD | `boundaries/entry-point`              | #543 public entrypoint policy      |
-|   TBD | `boundaries/no-private`               | #543 private module access policy  |
+|   TBD | `boundaries/dependencies`             | #543 cross-layer dependency policy |
+|   516 | `boundaries/no-unknown`               | #543 element map completion        |
+|   516 | `boundaries/no-unknown-files`         | #543 element map completion        |
 
 The duplicate-import findings were fixed in this PR.
 
@@ -78,6 +80,45 @@ Exit criteria before enabling `import-x/no-cycle`:
   modules, or split type-only exports from component/value exports.
 - Re-run `bun run check:lint` with `import-x/no-cycle` set to `error` and update
   this table to zero before removing the rule fence.
+
+## Boundary Policy Audit
+
+Issue #543 enabled the boundary rules that are currently meaningful and green:
+
+- `boundaries/element-types`
+- `boundaries/entry-point`
+
+The deprecated `boundaries/no-private` rule was intentionally not enabled. The
+installed plugin recommends migrating private dependency checks to
+`boundaries/dependencies`, which requires an explicit allow/disallow graph rather
+than a legacy private-module rule.
+
+Measured command:
+
+```sh
+bun run check:lint
+```
+
+Measured findings:
+
+| Rule                          | Result                                                                                                                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `boundaries/element-types`    | 0 findings with the current element map.                                                                                                                         |
+| `boundaries/entry-point`      | 0 findings with the current element map.                                                                                                                         |
+| `boundaries/dependencies`     | Not enabled yet; a real layer graph is required before this rule applies useful pressure.                                                                        |
+| `boundaries/no-unknown`       | 516 findings when enabled. Most current imports resolve as unknown elements until the map covers declaration files, config files, and all dependency categories. |
+| `boundaries/no-unknown-files` | Same 516-finding class; entry/config/declaration files need explicit element coverage before this can be useful.                                                 |
+
+Exit criteria before enabling `boundaries/dependencies`:
+
+- Define the allowed layer graph for entry, app, views, panels, adjustments,
+  modals, managers, UI, context, hooks, schemas, store, types, utils, i18n, and
+  window elements.
+- Add element descriptors for current unknown files such as `src/App.tsx`,
+  `src/main.tsx`, `i18next.config.ts`, and `src/@types/**`.
+- Decide whether type-only imports get a looser graph than value imports.
+- Re-run `bun run check:lint` with `boundaries/dependencies`,
+  `boundaries/no-unknown`, and `boundaries/no-unknown-files` set to `error`.
 
 ## Validation
 

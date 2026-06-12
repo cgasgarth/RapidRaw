@@ -147,9 +147,11 @@ module.exports = [
       'import-x/no-named-as-default-member': 'error',
       'import-x/order': 'off',
       'import-x/no-cycle': 'off',
-      'boundaries/element-types': 'off',
-      'boundaries/entry-point': 'off',
-      'boundaries/no-private': 'off',
+      'boundaries/element-types': 'error',
+      'boundaries/entry-point': 'error',
+      'boundaries/dependencies': 'off',
+      'boundaries/no-unknown': 'off',
+      'boundaries/no-unknown-files': 'off',
       'no-restricted-imports': [
         'error',
         {
