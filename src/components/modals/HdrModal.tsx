@@ -44,8 +44,12 @@ export default function HdrModal({
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      const timer = setTimeout(() => setShow(true), 10);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        setShow(true);
+      }, 10);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
       const timer = setTimeout(() => {
@@ -53,7 +57,9 @@ export default function HdrModal({
         setSavedPath(null);
         setIsSaving(false);
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen]);
 
@@ -277,8 +283,12 @@ export default function HdrModal({
         className={`bg-surface rounded-xl shadow-2xl p-6 w-full max-w-4xl transform transition-all duration-300 ease-out ${
           show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'
         }`}
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+        }}
       >
         <div className="flex flex-col">
           {renderContent()}

@@ -110,8 +110,12 @@ export default function CullingModal({
   useEffect(() => {
     if (isOpen) {
       setIsMounted(true);
-      const timer = setTimeout(() => setShow(true), 10);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        setShow(true);
+      }, 10);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
       const timer = setTimeout(() => {
@@ -119,7 +123,9 @@ export default function CullingModal({
         setStage('settings');
         setSelectedRejects(new Set());
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen]);
 
@@ -185,7 +191,9 @@ export default function CullingModal({
           <Switch
             label={t('modals.culling.groupSimilar')}
             checked={settings.groupSimilar}
-            onChange={(v) => setSettings((s) => ({ ...s, groupSimilar: v }))}
+            onChange={(v) => {
+              setSettings((s) => ({ ...s, groupSimilar: v }));
+            }}
           />
           {settings.groupSimilar && (
             <div className="mt-2 pl-4 border-l-2 border-border-color ml-1">
@@ -196,7 +204,9 @@ export default function CullingModal({
                 step={1}
                 value={settings.similarityThreshold}
                 defaultValue={28}
-                onChange={(e) => setSettings((s) => ({ ...s, similarityThreshold: Number(e.target.value) }))}
+                onChange={(e) => {
+                  setSettings((s) => ({ ...s, similarityThreshold: Number(e.target.value) }));
+                }}
                 fillOrigin="min"
               />
               <Text variant={TextVariants.small} className="mt-1">
@@ -209,7 +219,9 @@ export default function CullingModal({
           <Switch
             label={t('modals.culling.filterBlurry')}
             checked={settings.filterBlurry}
-            onChange={(v) => setSettings((s) => ({ ...s, filterBlurry: v }))}
+            onChange={(v) => {
+              setSettings((s) => ({ ...s, filterBlurry: v }));
+            }}
           />
           {settings.filterBlurry && (
             <div className="mt-2  pl-4 border-l-2 border-border-color ml-1">
@@ -220,7 +232,9 @@ export default function CullingModal({
                 step={25}
                 value={settings.blurThreshold}
                 defaultValue={100.0}
-                onChange={(e) => setSettings((s) => ({ ...s, blurThreshold: Number(e.target.value) }))}
+                onChange={(e) => {
+                  setSettings((s) => ({ ...s, blurThreshold: Number(e.target.value) }));
+                }}
                 fillOrigin="min"
               />
               <Text variant={TextVariants.small} className="mt-1">
@@ -300,7 +314,9 @@ export default function CullingModal({
           <nav className="-mb-px flex space-x-4" aria-label={t('modals.culling.tabs')}>
             {numSimilar > 0 && (
               <button
-                onClick={() => setActiveTab('similar')}
+                onClick={() => {
+                  setActiveTab('similar');
+                }}
                 className={`${
                   activeTab === 'similar'
                     ? 'border-accent text-accent'
@@ -313,7 +329,9 @@ export default function CullingModal({
             )}
             {numBlurry > 0 && (
               <button
-                onClick={() => setActiveTab('blurry')}
+                onClick={() => {
+                  setActiveTab('blurry');
+                }}
                 className={`${
                   activeTab === 'blurry'
                     ? 'border-accent text-accent'
@@ -375,7 +393,9 @@ export default function CullingModal({
                                 path={dup.path}
                                 thumbnails={thumbnails}
                                 isSelected={selectedRejects.has(dup.path)}
-                                onToggle={() => handleToggleReject(dup.path)}
+                                onToggle={() => {
+                                  handleToggleReject(dup.path);
+                                }}
                               >
                                 {t('modals.culling.score', { score: dup.qualityScore.toFixed(2) })}
                               </ImageThumbnail>
@@ -395,7 +415,9 @@ export default function CullingModal({
                       path={img.path}
                       thumbnails={thumbnails}
                       isSelected={selectedRejects.has(img.path)}
-                      onToggle={() => handleToggleReject(img.path)}
+                      onToggle={() => {
+                        handleToggleReject(img.path);
+                      }}
                     >
                       {t('modals.culling.sharpness', { sharpness: img.sharpnessMetric.toFixed(0) })}
                     </ImageThumbnail>
@@ -411,7 +433,9 @@ export default function CullingModal({
             <Dropdown
               options={CULL_ACTIONS.map(({ value, label }) => ({ value, label }))}
               value={action}
-              onChange={(newValue: CullAction) => setAction(newValue)}
+              onChange={(newValue: CullAction) => {
+                setAction(newValue);
+              }}
               className="w-full"
             />
           </div>

@@ -42,13 +42,17 @@ export default function ConfirmModal({
       const timer = setTimeout(() => {
         setShow(true);
       }, 10);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
       const timer = setTimeout(() => {
         setIsMounted(false);
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen]);
 

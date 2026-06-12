@@ -128,8 +128,12 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
 
       setPresetType(initialPreset?.presetType || 'style');
       setIsMounted(true);
-      const timer = setTimeout(() => setShow(true), 10);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        setShow(true);
+      }, 10);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
       const timer = setTimeout(() => {
@@ -139,7 +143,9 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
         setIncludeCropTransform(false);
         setPresetType('style');
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen, initialPreset]);
 
@@ -193,7 +199,9 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
         </Text>
         <input
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+          }}
           onKeyDown={handleKeyDown}
           placeholder={t('modals.configurePreset.placeholder')}
           ref={nameInputRef}

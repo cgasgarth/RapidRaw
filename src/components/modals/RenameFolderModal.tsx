@@ -35,15 +35,21 @@ export default function RenameFolderModal({
     if (isOpen) {
       setName(currentName || '');
       setIsMounted(true);
-      const timer = setTimeout(() => setShow(true), 10);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        setShow(true);
+      }, 10);
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
       setShow(false);
       const timer = setTimeout(() => {
         setIsMounted(false);
         setName('');
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isOpen, currentName]);
 
@@ -98,9 +104,13 @@ export default function RenameFolderModal({
         </Text>
         <input
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-accent"
-          onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => {
+            setName(e.target.value);
+          }}
           onKeyDown={handleKeyDown}
-          onFocus={(e) => e.target.select()}
+          onFocus={(e) => {
+            e.target.select();
+          }}
           placeholder={placeholder || t('modals.renameFolder.placeholder')}
           ref={nameInputRef}
           type="text"
