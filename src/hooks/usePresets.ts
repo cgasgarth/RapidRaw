@@ -21,15 +21,17 @@ export interface UserPreset {
   preset?: Preset;
 }
 
-type PresetAdjustments = Partial<Adjustments>;
+type PresetAdjustments = Record<string, unknown>;
 
 const withoutAdjustmentKeys = (adjustments: PresetAdjustments, keys: ReadonlySet<string>): PresetAdjustments =>
   Object.entries(adjustments).reduce<PresetAdjustments>((filteredAdjustments, [key, value]) => {
     if (!keys.has(key)) {
-      filteredAdjustments[key as keyof Adjustments] = value;
+      filteredAdjustments[key] = value;
     }
     return filteredAdjustments;
   }, {});
+
+const clonePresetAdjustments = (adjustments: Partial<Adjustments>): PresetAdjustments => structuredClone(adjustments);
 
 function getFolderChildren(folder: Folder): Preset[] {
   return folder.children;
@@ -99,8 +101,8 @@ export function usePresets(currentAdjustments: Adjustments) {
       if (!includeCropTransform && GEOMETRY_KEYS.includes(key)) continue;
 
       if (Object.prototype.hasOwnProperty.call(currentAdjustments, key)) {
-        const currentValue = currentAdjustments[key as keyof Adjustments];
-        const defaultValue = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
+        const currentValue: unknown = currentAdjustments[key];
+        const defaultValue: unknown = INITIAL_ADJUSTMENTS[key];
 
         if (presetType === 'tool') {
           if (JSON.stringify(currentValue) !== JSON.stringify(defaultValue)) {
@@ -233,7 +235,7 @@ export function usePresets(currentAdjustments: Adjustments) {
 
     if (!existingPreset) return null;
 
-    let newAdjustments: PresetAdjustments = { ...existingPreset.adjustments };
+    let newAdjustments = clonePresetAdjustments(existingPreset.adjustments);
     const oldType = existingPreset.presetType || 'style';
 
     const GEOMETRY_KEYS = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((group) => group.keys);
@@ -253,7 +255,7 @@ export function usePresets(currentAdjustments: Adjustments) {
           if (!includeMasks && MASK_KEYS.includes(key)) continue;
           if (!includeCropTransform && GEOMETRY_KEYS.includes(key)) continue;
           if (newAdjustments[key] === undefined) {
-            newAdjustments[key] = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
+            newAdjustments[key] = INITIAL_ADJUSTMENTS[key];
           }
         }
       }
@@ -347,10 +349,10 @@ export function usePresets(currentAdjustments: Adjustments) {
       if (!includeCropTransform && GEOMETRY_KEYS.includes(key)) continue;
 
       if (Object.prototype.hasOwnProperty.call(currentAdjustments, key)) {
-        const currentValue = currentAdjustments[key as keyof Adjustments];
+        const currentValue: unknown = currentAdjustments[key];
 
         if (presetType === 'tool') {
-          const defaultValue = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
+          const defaultValue: unknown = INITIAL_ADJUSTMENTS[key];
           if (JSON.stringify(currentValue) !== JSON.stringify(defaultValue)) {
             presetAdjustments[key] = currentValue;
           }
@@ -425,7 +427,7 @@ export function usePresets(currentAdjustments: Adjustments) {
       }
 
       const newPreset: Preset = {
-        adjustments: JSON.parse(JSON.stringify(presetToDuplicate.adjustments)),
+        adjustments: clonePresetAdjustments(presetToDuplicate.adjustments),
         id: crypto.randomUUID(),
         name: `${presetToDuplicate.name} Copy`,
         includeMasks: presetToDuplicate.includeMasks,
