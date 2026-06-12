@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type MouseEvent, useCallback, useEffect, useState } from 'react';
+import { type KeyboardEvent, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import Text from '../ui/Text';
@@ -78,25 +78,28 @@ export default function ConfirmModal({
 
   return (
     <div
-      aria-labelledby="confirm-modal-title"
-      aria-modal="true"
       className={`
         fixed inset-0 flex items-center justify-center z-50
         bg-black/30 backdrop-blur-xs
         transition-opacity duration-300 ease-in-out
         ${show ? 'opacity-100' : 'opacity-0'}
       `}
-      onClick={onClose}
-      role="dialog"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      onKeyDown={handleKeyDown}
     >
       <div
+        aria-labelledby="confirm-modal-title"
+        aria-modal="true"
         className={`
           bg-surface rounded-lg shadow-xl p-6 w-full max-w-md
           transform transition-all duration-300 ease-out
           ${show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'}
         `}
-        onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
-        onKeyDown={handleKeyDown}
+        role="dialog"
       >
         <Text variant={TextVariants.title} id="confirm-modal-title" className="mb-4">
           {title}

@@ -74,6 +74,8 @@ const getErrorMessage = (err: unknown, fallback: string) => {
   return fallback;
 };
 
+const getFileName = (path: string) => path.split(/[\\/]/).pop() || path;
+
 export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: CollageModalProps) {
   const { t } = useTranslation();
 
@@ -521,7 +523,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     }));
   };
 
-  const handleThumbnailMouseDown = (e: React.MouseEvent<HTMLImageElement>, path: string, url: string) => {
+  const handleThumbnailMouseDown = (e: React.MouseEvent<HTMLElement>, path: string, url: string) => {
     e.preventDefault();
     setThumbnailDrag({ path, url, x: e.clientX, y: e.clientY });
   };
@@ -908,12 +910,14 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
                   whileTap={{ scale: 0.95 }}
                   className="relative"
                 >
-                  <img
-                    src={loadedData.url}
-                    alt=""
+                  <button
+                    type="button"
+                    aria-label={getFileName(sourceImg.path)}
                     onMouseDown={(e) => handleThumbnailMouseDown(e, sourceImg.path, loadedData.url)}
-                    className="h-20 w-20 shrink-0 object-cover rounded-md cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-accent transition-all select-none shadow-xs"
-                  />
+                    className="h-20 w-20 shrink-0 rounded-md cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-accent transition-all select-none shadow-xs overflow-hidden"
+                  >
+                    <img src={loadedData.url} alt="" className="h-full w-full object-cover" draggable={false} />
+                  </button>
                 </motion.div>
               );
             })}

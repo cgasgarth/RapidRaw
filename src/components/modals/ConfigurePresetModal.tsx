@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, type KeyboardEvent, type MouseEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
@@ -169,17 +169,20 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
         transition-opacity duration-300 ease-in-out
         ${show ? 'opacity-100' : 'opacity-0'}
       `}
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
+        aria-modal="true"
         className={`
           bg-surface rounded-lg shadow-xl p-6 w-full max-w-sm
           transform transition-all duration-300 ease-out
           ${show ? 'scale-100 opacity-100 translate-y-0' : 'scale-95 opacity-0 -translate-y-4'}
         `}
-        onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
+        role="dialog"
       >
         <Text variant={TextVariants.title} className="mb-4">
           {initialPreset ? t('modals.configurePreset.titleConfigure') : t('modals.configurePreset.titleSave')}
