@@ -66,9 +66,13 @@ export default function NegativeConversionModal({
       setProgress({ current: payload.current, total: payload.total });
     });
     return () => {
-      unlisten.then((f) => {
-        f();
-      });
+      void unlisten
+        .then((f) => {
+          f();
+        })
+        .catch((err: unknown) => {
+          console.error('Failed to remove negative batch progress listener:', err);
+        });
     };
   }, []);
 
@@ -147,7 +151,7 @@ export default function NegativeConversionModal({
       setTimeout(() => {
         setShow(true);
       }, 10);
-      updatePreview(DEFAULT_PARAMS, true);
+      void updatePreview(DEFAULT_PARAMS, true);
 
       if (selectedImagePath) {
         invoke<number[]>('generate_preview_for_path', {
@@ -178,7 +182,7 @@ export default function NegativeConversionModal({
   const handleParamChange = (key: keyof NegativeParams, value: number) => {
     const newParams = { ...params, [key]: value };
     setParams(newParams);
-    updatePreview(newParams);
+    void updatePreview(newParams);
   };
 
   const handleSave = async () => {
@@ -213,7 +217,7 @@ export default function NegativeConversionModal({
         <button
           onClick={() => {
             setParams(DEFAULT_PARAMS);
-            updatePreview(DEFAULT_PARAMS);
+            void updatePreview(DEFAULT_PARAMS);
           }}
           disabled={isSaving}
           data-tooltip={t('modals.negativeConversion.resetTooltip')}
