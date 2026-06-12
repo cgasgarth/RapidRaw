@@ -61,14 +61,14 @@ interface DroppableFolderItemProps {
   children: ReactNode;
   folder: PresetFolder;
   isExpanded: boolean;
-  onContextMenu(event: ReactMouseEvent<HTMLElement>, item: PresetContextItem): void;
-  onToggle(id: string): void;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>, item: PresetContextItem) => void;
+  onToggle: (id: string) => void;
 }
 
 interface DraggablePresetItemProps {
   isGeneratingPreviews: boolean;
-  onApply(preset: Preset): void;
-  onContextMenu(event: ReactMouseEvent<HTMLElement>, item: PresetContextItem): void;
+  onApply: (preset: Preset) => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLElement>, item: PresetContextItem) => void;
   preset: Preset;
   previewUrl: string;
 }
@@ -94,7 +94,7 @@ interface PresetItemDisplayProps {
 }
 
 interface PresetsPanelProps {
-  onNavigateToCommunity(): void;
+  onNavigateToCommunity: () => void;
 }
 
 type PresetFolder = Omit<Folder, 'children' | 'id' | 'name'> & {

@@ -150,7 +150,7 @@ const parameterLabelFallback = (key: string) =>
 
 interface BrushToolsProps {
   settings: BrushSettings;
-  onSettingsChange(updater: BrushSettingsUpdater): void;
+  onSettingsChange: (updater: BrushSettingsUpdater) => void;
 }
 
 const BrushTools = ({ settings, onSettingsChange }: BrushToolsProps) => {
@@ -1280,7 +1280,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
 interface DraggableGridItemProps {
   isGenerating: boolean;
   maskType: MaskType;
-  onClick(): void;
+  onClick: () => void;
 }
 
 function DraggableGridItem({ maskType, isGenerating, onClick }: DraggableGridItemProps) {
@@ -1324,24 +1324,24 @@ interface ContainerRowProps {
   container: AiPatch;
   copiedPatch: AiPatch | null;
   copiedSubMask: SubMask | null;
-  copyPatchToClipboard(container: AiPatch): void;
-  copySubMaskToClipboard(subMask: SubMask): void;
-  handleDelete(id: string): void;
-  handleDeleteSubMask(containerId: string, subMaskId: string): void;
-  handleDuplicate(container: AiPatch): void;
-  handleDuplicateAndInvert(container: AiPatch): void;
-  handleDuplicateAndInvertSubMask(containerId: string, subMask: SubMask): void;
-  handleDuplicateSubMask(containerId: string, subMask: SubMask, insertIndex?: number): void;
-  handlePastePatch(insertAfterContainerId?: string): void;
-  handlePasteSubMask(containerId: string, insertIndex?: number): void;
+  copyPatchToClipboard: (container: AiPatch) => void;
+  copySubMaskToClipboard: (subMask: SubMask) => void;
+  handleDelete: (id: string) => void;
+  handleDeleteSubMask: (containerId: string, subMaskId: string) => void;
+  handleDuplicate: (container: AiPatch) => void;
+  handleDuplicateAndInvert: (container: AiPatch) => void;
+  handleDuplicateAndInvertSubMask: (containerId: string, subMask: SubMask) => void;
+  handleDuplicateSubMask: (containerId: string, subMask: SubMask, insertIndex?: number) => void;
+  handlePastePatch: (insertAfterContainerId?: string) => void;
+  handlePasteSubMask: (containerId: string, insertIndex?: number) => void;
   hasActiveChild: boolean;
   isExpanded: boolean;
   isSelected: boolean;
-  onAddComponent(event: React.MouseEvent): void;
-  onSelect(): void;
-  onSelectContainer(id: string | null): void;
-  onSelectSubMask(id: string | null): void;
-  onToggle(): void;
+  onAddComponent: (event: React.MouseEvent) => void;
+  onSelect: () => void;
+  onSelectContainer: (id: string | null) => void;
+  onSelectSubMask: (id: string | null) => void;
+  onToggle: () => void;
   renamingId: string | null;
   setRenamingId: Dispatch<SetStateAction<string | null>>;
   setTempName: Dispatch<SetStateAction<string>>;
@@ -1660,16 +1660,16 @@ interface SubMaskRowProps {
   activeDragItem: DragData | null;
   analyzingSubMaskId: string | null;
   containerId: string;
-  handleCopy(): void;
-  handleDelete(): void;
-  handleDuplicate(): void;
-  handleDuplicateAndInvert(): void;
-  handlePaste(): void;
+  handleCopy: () => void;
+  handleDelete: () => void;
+  handleDuplicate: () => void;
+  handleDuplicateAndInvert: () => void;
+  handlePaste: () => void;
   hasCopiedSubMask: boolean;
   index: number;
   isActive: boolean;
   isParentLoading: boolean;
-  onSelect(): void;
+  onSelect: () => void;
   parentVisible: boolean;
   renamingId: string | null;
   setRenamingId: Dispatch<SetStateAction<string | null>>;
@@ -1926,8 +1926,8 @@ interface AiSettingsPanelProps {
   isGeneratingAi: boolean;
   isGeneratingAiMask: boolean;
   isGenerativeAvailable: boolean;
-  onGenerativeReplace(containerId: string, prompt: string, useFastInpaint: boolean): void | Promise<void>;
-  setBrushSettings(updater: BrushSettingsUpdater): void;
+  onGenerativeReplace: (containerId: string, prompt: string, useFastInpaint: boolean) => void | Promise<void>;
+  setBrushSettings: (updater: BrushSettingsUpdater) => void;
   setCollapsibleState: Dispatch<SetStateAction<AiPanelCollapsibleState>>;
   updateContainer: UpdatePatch;
   updateSubMask: UpdateSubMask;
