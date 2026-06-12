@@ -98,6 +98,7 @@ import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useUIStore } from '../../../store/useUIStore';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import { aiDepthMaskParametersSchema } from '../../../schemas/maskParameterSchemas';
 interface SubMaskParameterConfig {
   defaultValue: number;
   key: string;
@@ -998,7 +999,8 @@ export default function MasksPanel() {
     if (type === Mask.Brush || type === Mask.Flow) selectBrushToolForNewMask();
     if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
     else if (type === Mask.AiSky) handleGenerateAiSkyMask(subMask.id);
-    else if (type === Mask.AiDepth) handleGenerateAiDepthMask(subMask.id, subMask.parameters);
+    else if (type === Mask.AiDepth)
+      handleGenerateAiDepthMask(subMask.id, aiDepthMaskParametersSchema.parse(subMask.parameters));
   };
 
   const handleAddSubMask = (
@@ -1029,7 +1031,8 @@ export default function MasksPanel() {
     if (type === Mask.Brush || type === Mask.Flow) selectBrushToolForNewMask();
     if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
     else if (type === Mask.AiSky) handleGenerateAiSkyMask(subMask.id);
-    else if (type === Mask.AiDepth) handleGenerateAiDepthMask(subMask.id, subMask.parameters);
+    else if (type === Mask.AiDepth)
+      handleGenerateAiDepthMask(subMask.id, aiDepthMaskParametersSchema.parse(subMask.parameters));
   };
 
   const handleGridClick = (type: Mask, forceNewMaskContainer: boolean = false) => {
@@ -1165,7 +1168,7 @@ export default function MasksPanel() {
     container: MaskContainer,
     options: { invert?: boolean; rename?: boolean; resetAdjustments?: boolean } = {},
   ): MaskContainer => {
-    const clonedContainer = JSON.parse(JSON.stringify(container));
+    const clonedContainer = structuredClone(container);
 
     clonedContainer.id = uuidv4();
     clonedContainer.invert = options.invert ? !clonedContainer.invert : clonedContainer.invert;
@@ -1177,31 +1180,30 @@ export default function MasksPanel() {
     }));
 
     if (options.resetAdjustments) {
-      clonedContainer.adjustments = JSON.parse(JSON.stringify(INITIAL_MASK_ADJUSTMENTS));
+      clonedContainer.adjustments = structuredClone(INITIAL_MASK_ADJUSTMENTS);
     }
 
     return clonedContainer;
   };
 
   const cloneSubMaskData = (subMask: SubMask, options: { invert?: boolean; rename?: boolean } = {}): SubMask => {
-    const clonedSubMask = JSON.parse(JSON.stringify(subMask));
+    const clonedSubMask = structuredClone(subMask);
 
     clonedSubMask.id = uuidv4();
     clonedSubMask.invert = options.invert ? !clonedSubMask.invert : clonedSubMask.invert;
-    clonedSubMask.name =
-      options.rename === false
-        ? clonedSubMask.name
-        : t('editor.masks.patches.copyName', { name: getSubMaskName(subMask) });
+    if (options.rename !== false) {
+      clonedSubMask.name = t('editor.masks.patches.copyName', { name: getSubMaskName(subMask) });
+    }
 
     return clonedSubMask;
   };
 
   const copyMaskToClipboard = (container: MaskContainer) => {
-    setCopiedMask(JSON.parse(JSON.stringify(container)));
+    setCopiedMask(structuredClone(container));
   };
 
   const copySubMaskToClipboard = (subMask: SubMask) => {
-    setCopiedSubMask(JSON.parse(JSON.stringify(subMask)));
+    setCopiedSubMask(structuredClone(subMask));
   };
 
   const insertMaskContainer = (container: MaskContainer, insertIndex?: number) => {
@@ -1388,7 +1390,7 @@ export default function MasksPanel() {
           const draggedItem = dragData.item;
           if (!draggedItem) return prev;
 
-          const newMasks = JSON.parse(JSON.stringify(prev.masks));
+          const newMasks = structuredClone(prev.masks);
           const sourceContainer = newMasks.find((m: MaskContainer) => m.id === sourceContainerId);
           if (!sourceContainer) return prev;
           const subMaskIndex = sourceContainer.subMasks.findIndex((sm: SubMask) => sm.id === draggedItem.id);
@@ -1988,7 +1990,7 @@ function ContainerRow({
         disabled: !copiedMask,
         onClick: () => {
           if (copiedMask) {
-            updateContainer(container.id, { adjustments: JSON.parse(JSON.stringify(copiedMask.adjustments)) });
+            updateContainer(container.id, { adjustments: structuredClone(copiedMask.adjustments) });
           }
         },
       },
@@ -2004,7 +2006,7 @@ function ContainerRow({
         label: t('editor.masks.actions.resetMaskAdjustments'),
         icon: RotateCcw,
         onClick: () => {
-          updateContainer(container.id, { adjustments: JSON.parse(JSON.stringify(INITIAL_MASK_ADJUSTMENTS)) });
+          updateContainer(container.id, { adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS) });
         },
       },
       {
@@ -2630,7 +2632,7 @@ function SettingsPanel({
       const adjustmentsToCopy: MaskAdjustmentPatch = {};
       for (const key of sectionKeys) {
         if (container.adjustments && container.adjustments[key] !== undefined) {
-          adjustmentsToCopy[key] = JSON.parse(JSON.stringify(container.adjustments[key]));
+          adjustmentsToCopy[key] = structuredClone(container.adjustments[key]);
         }
       }
       setCopiedSectionAdjustments({ section: sectionName, values: adjustmentsToCopy });
@@ -2653,7 +2655,7 @@ function SettingsPanel({
       const resetValues: MaskAdjustmentPatch = {};
       for (const key of sectionKeys) {
         if (INITIAL_MASK_ADJUSTMENTS[key] !== undefined) {
-          resetValues[key] = JSON.parse(JSON.stringify(INITIAL_MASK_ADJUSTMENTS[key]));
+          resetValues[key] = structuredClone(INITIAL_MASK_ADJUSTMENTS[key]);
         }
       }
       setMaskContainerAdjustments((prev: Adjustments) => ({

@@ -329,8 +329,7 @@ export interface MaskAdjustments {
 
 export interface MaskContainer {
   adjustments: MaskAdjustments;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Existing mask hydration tolerates absent ids and normalizes them at load boundaries.
-  id?: any;
+  id: string;
   invert: boolean;
   name: string;
   opacity: number;
@@ -471,6 +470,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
 
 export const INITIAL_MASK_CONTAINER: MaskContainer = {
   adjustments: INITIAL_MASK_ADJUSTMENTS,
+  id: '',
   invert: false,
   name: 'New Mask',
   opacity: 100,

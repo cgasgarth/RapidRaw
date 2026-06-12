@@ -65,6 +65,7 @@ import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useAiMasking } from '../../../hooks/useAiMasking';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import { cloudUsageSchema, type CloudUsage } from '../../../schemas/cloudUsageSchemas';
 
 interface DragData {
   type: 'Container' | 'SubMask' | 'Creation';
@@ -215,7 +216,7 @@ interface ConnectionStatusProps {
   isAIConnectorConnected: boolean;
   isSignedIn: boolean;
   isPro: boolean;
-  cloudUsage: { requests: number; limit: number; month: string } | null;
+  cloudUsage: CloudUsage | null;
 }
 
 const ConnectionStatus = ({
@@ -346,7 +347,7 @@ export default function AIPanel() {
   const { user, isSignedIn } = useUser();
   const { getToken } = useAuth();
   const isPro = user?.publicMetadata?.['plan'] === 'pro';
-  const [cloudUsage, setCloudUsage] = useState<{ requests: number; limit: number; month: string } | null>(null);
+  const [cloudUsage, setCloudUsage] = useState<CloudUsage | null>(null);
 
   const isGenerativeAvailable =
     (aiProvider === 'cloud' && isSignedIn && isPro) || (aiProvider === 'ai-connector' && isAIConnectorConnected);
@@ -363,7 +364,8 @@ export default function AIPanel() {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
-          setCloudUsage(await res.json());
+          const usageJson: unknown = await res.json();
+          setCloudUsage(cloudUsageSchema.parse(usageJson));
         }
       } catch (e) {
         console.error('Failed to fetch cloud usage', e);
@@ -701,7 +703,7 @@ export default function AIPanel() {
   };
 
   const clonePatchData = (container: AiPatch, options: { invert?: boolean; rename?: boolean } = {}): AiPatch => {
-    const clonedContainer = JSON.parse(JSON.stringify(container));
+    const clonedContainer = structuredClone(container);
 
     clonedContainer.id = uuidv4();
     clonedContainer.invert = options.invert ? !clonedContainer.invert : clonedContainer.invert;
@@ -717,21 +719,23 @@ export default function AIPanel() {
   };
 
   const cloneSubMaskData = (subMask: SubMask, options: { invert?: boolean; rename?: boolean } = {}): SubMask => {
-    const clonedSubMask = JSON.parse(JSON.stringify(subMask));
+    const clonedSubMask = structuredClone(subMask);
 
     clonedSubMask.id = uuidv4();
     clonedSubMask.invert = options.invert ? !clonedSubMask.invert : clonedSubMask.invert;
-    clonedSubMask.name = options.rename === false ? clonedSubMask.name : `${getSubMaskName(subMask)} Copy`;
+    if (options.rename !== false) {
+      clonedSubMask.name = `${getSubMaskName(subMask)} Copy`;
+    }
 
     return clonedSubMask;
   };
 
   const copyPatchToClipboard = (container: AiPatch) => {
-    setCopiedPatch(JSON.parse(JSON.stringify(container)));
+    setCopiedPatch(structuredClone(container));
   };
 
   const copySubMaskToClipboard = (subMask: SubMask) => {
-    setCopiedSubMask(JSON.parse(JSON.stringify(subMask)));
+    setCopiedSubMask(structuredClone(subMask));
   };
 
   const insertPatchContainer = (container: AiPatch, insertIndex?: number) => {
@@ -929,7 +933,7 @@ export default function AIPanel() {
           const draggedItem = dragData.item;
           if (!draggedItem) return prev;
 
-          const newPatches = JSON.parse(JSON.stringify(prev.aiPatches));
+          const newPatches = structuredClone(prev.aiPatches);
           const sourceContainer = newPatches.find((p: AiPatch) => p.id === sourceContainerId);
           if (!sourceContainer) return prev;
           const subMaskIndex = sourceContainer.subMasks.findIndex((sm: SubMask) => sm.id === draggedItem.id);
