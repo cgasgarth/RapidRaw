@@ -367,7 +367,7 @@ const CloudDashboard = () => {
         console.error('Failed to fetch cloud usage', e);
       }
     };
-    fetchUsage();
+    void fetchUsage();
   }, [getToken]);
 
   const isPro = user?.publicMetadata['plan'] === 'pro';
@@ -725,7 +725,7 @@ export default function SettingsPanel({
         setLogPathLoading(false);
       }
     };
-    fetchLogPath();
+    void fetchLogPath();
   }, []);
 
   useEffect(() => {
