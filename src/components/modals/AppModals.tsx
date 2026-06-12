@@ -317,7 +317,7 @@ export default function AppModals(props: AppModalsProps) {
             props.handleSetColorLabel('red', paths);
           } else if (action === 'rate_zero') {
             props.handleRate(1, paths);
-          } else if (action === 'delete') {
+          } else {
             props.executeDelete(paths, { includeAssociated: false });
           }
           setUI({

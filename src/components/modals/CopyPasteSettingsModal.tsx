@@ -18,12 +18,6 @@ interface CopyPasteSettingsModalProps {
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const labelFallback = (labelKey: string) => capitalize(labelKey.split('.').pop() ?? labelKey);
 
-const DEFAULT_SETTINGS: CopyPasteSettings = {
-  mode: PasteMode.Merge,
-  includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
-  knownAdjustments: [],
-};
-
 interface PasteModeSwitchProps {
   selectedMode: PasteMode;
   onModeChange: (mode: PasteMode) => void;
@@ -122,11 +116,11 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
   const { t } = useTranslation();
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
-  const [localSettings, setLocalSettings] = useState<CopyPasteSettings>(settings || DEFAULT_SETTINGS);
+  const [localSettings, setLocalSettings] = useState<CopyPasteSettings>(settings);
 
   useEffect(() => {
     if (isOpen) {
-      setLocalSettings(settings || DEFAULT_SETTINGS);
+      setLocalSettings(settings);
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
       return () => clearTimeout(timer);

@@ -267,14 +267,14 @@ export default function LensCorrectionModal({
       throttle(async (currentParams: LensParams) => {
         try {
           const fullParams: GeometryParams = {
-            distortion: currentAdjustments.transformDistortion ?? 0,
-            vertical: currentAdjustments.transformVertical ?? 0,
-            horizontal: currentAdjustments.transformHorizontal ?? 0,
-            rotate: currentAdjustments.transformRotate ?? 0,
-            aspect: currentAdjustments.transformAspect ?? 0,
-            scale: currentAdjustments.transformScale ?? 100,
-            x_offset: currentAdjustments.transformXOffset ?? 0,
-            y_offset: currentAdjustments.transformYOffset ?? 0,
+            distortion: currentAdjustments.transformDistortion,
+            vertical: currentAdjustments.transformVertical,
+            horizontal: currentAdjustments.transformHorizontal,
+            rotate: currentAdjustments.transformRotate,
+            aspect: currentAdjustments.transformAspect,
+            scale: currentAdjustments.transformScale,
+            x_offset: currentAdjustments.transformXOffset,
+            y_offset: currentAdjustments.transformYOffset,
 
             lens_distortion_amount: currentParams.lensDistortionAmount / SLIDER_DIVISOR,
             lens_vignette_amount: currentParams.lensVignetteAmount / SLIDER_DIVISOR,
@@ -314,21 +314,21 @@ export default function LensCorrectionModal({
       const timer = setTimeout(() => setShow(true), 10);
 
       invoke<LensSettings>('load_settings').then((settings) => {
-        if (settings?.myLenses) {
+        if (settings.myLenses) {
           setMyLenses(settings.myLenses);
         }
       });
 
       const initParams: LensParams = {
-        lensCorrectionMode: currentAdjustments.lensCorrectionMode || 'manual',
+        lensCorrectionMode: currentAdjustments.lensCorrectionMode,
         lensMaker: currentAdjustments.lensMaker,
         lensModel: currentAdjustments.lensModel,
-        lensDistortionAmount: currentAdjustments.lensDistortionAmount ?? 100,
-        lensVignetteAmount: currentAdjustments.lensVignetteAmount ?? 100,
-        lensTcaAmount: currentAdjustments.lensTcaAmount ?? 100,
-        lensDistortionEnabled: currentAdjustments.lensDistortionEnabled ?? true,
-        lensTcaEnabled: currentAdjustments.lensTcaEnabled ?? true,
-        lensVignetteEnabled: currentAdjustments.lensVignetteEnabled ?? true,
+        lensDistortionAmount: currentAdjustments.lensDistortionAmount,
+        lensVignetteAmount: currentAdjustments.lensVignetteAmount,
+        lensTcaAmount: currentAdjustments.lensTcaAmount,
+        lensDistortionEnabled: currentAdjustments.lensDistortionEnabled,
+        lensTcaEnabled: currentAdjustments.lensTcaEnabled,
+        lensVignetteEnabled: currentAdjustments.lensVignetteEnabled,
         lensDistortionParams: currentAdjustments.lensDistortionParams,
       };
 
@@ -507,18 +507,18 @@ export default function LensCorrectionModal({
     setIsCompareActive(active);
     if (active) {
       const fullParams: GeometryParams = {
-        distortion: currentAdjustments.transformDistortion ?? 0,
-        vertical: currentAdjustments.transformVertical ?? 0,
-        horizontal: currentAdjustments.transformHorizontal ?? 0,
-        rotate: currentAdjustments.transformRotate ?? 0,
-        aspect: currentAdjustments.transformAspect ?? 0,
-        scale: currentAdjustments.transformScale ?? 100,
-        x_offset: currentAdjustments.transformXOffset ?? 0,
-        y_offset: currentAdjustments.transformYOffset ?? 0,
+        distortion: currentAdjustments.transformDistortion,
+        vertical: currentAdjustments.transformVertical,
+        horizontal: currentAdjustments.transformHorizontal,
+        rotate: currentAdjustments.transformRotate,
+        aspect: currentAdjustments.transformAspect,
+        scale: currentAdjustments.transformScale,
+        x_offset: currentAdjustments.transformXOffset,
+        y_offset: currentAdjustments.transformYOffset,
 
-        lens_distortion_amount: (currentAdjustments.lensDistortionAmount ?? 100) / SLIDER_DIVISOR,
-        lens_vignette_amount: (currentAdjustments.lensVignetteAmount ?? 100) / SLIDER_DIVISOR,
-        lens_tca_amount: (currentAdjustments.lensTcaAmount ?? 100) / SLIDER_DIVISOR,
+        lens_distortion_amount: currentAdjustments.lensDistortionAmount / SLIDER_DIVISOR,
+        lens_vignette_amount: currentAdjustments.lensVignetteAmount / SLIDER_DIVISOR,
+        lens_tca_amount: currentAdjustments.lensTcaAmount / SLIDER_DIVISOR,
 
         lens_distortion_enabled: false,
         lens_vignette_enabled: false,
@@ -813,7 +813,7 @@ export default function LensCorrectionModal({
         </div>
 
         <div className="mt-auto space-y-2">
-          {currentAdjustments.masks && currentAdjustments.masks.length > 0 && (
+          {currentAdjustments.masks.length > 0 && (
             <Text
               as="div"
               variant={TextVariants.small}

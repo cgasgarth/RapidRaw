@@ -113,7 +113,7 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
       setName(initialPreset?.name || '');
       setIncludeMasks(
         initialPreset?.includeMasks ??
-          (initialPreset?.adjustments?.['masks'] && initialPreset.adjustments['masks'].length > 0) ??
+          (initialPreset?.adjustments['masks'] && initialPreset.adjustments['masks'].length > 0) ??
           false,
       );
 

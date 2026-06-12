@@ -403,7 +403,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   };
 
   const handleOrientationToggle = () => {
-    if (activeAspectRatio?.value && activeAspectRatio.value !== 1) {
+    if (activeAspectRatio.value !== null && activeAspectRatio.value !== 1) {
       const newRatio = 1 / activeAspectRatio.value;
       setActiveAspectRatio((prev) => ({ ...prev, value: newRatio }));
       setExportHeight(Math.round(exportWidth / newRatio));
