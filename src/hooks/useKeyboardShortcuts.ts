@@ -69,7 +69,7 @@ export const useKeyboardShortcuts = ({
     for (const def of KEYBIND_DEFINITIONS) {
       const userCombo = keybinds?.[def.action];
       const effective = userCombo && userCombo.length > 0 ? userCombo : def.defaultCombo;
-      if (effective) {
+      if (effective.length > 0) {
         comboMap.set(effective.join('+'), def.action);
       }
     }
@@ -162,7 +162,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
           const currentPercent =
-            s.editor.originalSize?.width > 0 && s.editor.displaySize?.width > 0
+            s.editor.originalSize.width > 0 && s.editor.displaySize.width > 0
               ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
               : 1.0;
           handleZoomChange(Math.min(currentPercent + 0.1, 2.0));
@@ -174,7 +174,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
           const currentPercent =
-            s.editor.originalSize?.width > 0 && s.editor.displaySize?.width > 0
+            s.editor.originalSize.width > 0 && s.editor.displaySize.width > 0
               ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
               : 1.0;
           handleZoomChange(Math.max(currentPercent - 0.1, 0.1));
@@ -187,12 +187,12 @@ export const useKeyboardShortcuts = ({
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
           const { originalSize, displaySize, baseRenderSize } = s.editor;
           const currentPercent =
-            originalSize?.width > 0 && displaySize?.width > 0
+            originalSize.width > 0 && displaySize.width > 0
               ? Math.round(((displaySize.width * dpr) / originalSize.width) * 100)
               : 100;
           let fitPercent = 100;
 
-          if (originalSize?.width > 0 && baseRenderSize?.width > 0) {
+          if (originalSize.width > 0 && baseRenderSize.width > 0) {
             const originalAspect = originalSize.width / originalSize.height;
             const baseAspect = baseRenderSize.width / baseRenderSize.height;
             fitPercent =
@@ -217,7 +217,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
           const currentPercent =
-            s.editor.originalSize?.width > 0 && s.editor.displaySize?.width > 0
+            s.editor.originalSize.width > 0 && s.editor.displaySize.width > 0
               ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
               : 1.0;
           handleZoomChange(Math.min(currentPercent * 1.2, 2.0));
@@ -229,7 +229,7 @@ export const useKeyboardShortcuts = ({
           e.preventDefault();
           const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
           const currentPercent =
-            s.editor.originalSize?.width > 0 && s.editor.displaySize?.width > 0
+            s.editor.originalSize.width > 0 && s.editor.displaySize.width > 0
               ? (s.editor.displaySize.width * dpr) / s.editor.originalSize.width
               : 1.0;
           handleZoomChange(Math.max(currentPercent / 1.2, 0.1));
