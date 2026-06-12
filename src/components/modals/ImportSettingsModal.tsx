@@ -16,8 +16,8 @@ interface ImportSettings {
 interface ImportSettingsModalProps {
   fileCount: number;
   isOpen: boolean;
-  onClose(): void;
-  onSave(settings: ImportSettings): void;
+  onClose: () => void;
+  onSave: (settings: ImportSettings) => void;
 }
 
 export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave }: ImportSettingsModalProps) {

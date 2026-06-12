@@ -30,9 +30,9 @@ const DEFAULT_PARAMS: NegativeParams = {
 
 interface NegativeConversionModalProps {
   isOpen: boolean;
-  onClose(): void;
+  onClose: () => void;
   targetPaths: string[];
-  onSave(savedPaths: string[]): void;
+  onSave: (savedPaths: string[]) => void;
 }
 
 export default function NegativeConversionModal({

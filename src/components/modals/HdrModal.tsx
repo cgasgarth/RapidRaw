@@ -13,10 +13,10 @@ interface HdrModalProps {
   isOpen: boolean;
   isProcessing: boolean;
   loadingImageUrl?: string | null;
-  onClose(): void;
-  onOpenFile(path: string): void;
-  onSave(): Promise<string>;
-  onMerge(): void;
+  onClose: () => void;
+  onOpenFile: (path: string) => void;
+  onSave: () => Promise<string>;
+  onMerge: () => void;
   progressMessage: string | null;
 }
 

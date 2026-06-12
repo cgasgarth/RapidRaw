@@ -10,8 +10,8 @@ import { TextVariants } from '../../types/typography';
 
 interface CopyPasteSettingsModalProps {
   isOpen: boolean;
-  onClose(): void;
-  onSave(settings: CopyPasteSettings): void;
+  onClose: () => void;
+  onSave: (settings: CopyPasteSettings) => void;
   settings: CopyPasteSettings;
 }
 

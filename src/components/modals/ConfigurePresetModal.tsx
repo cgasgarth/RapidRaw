@@ -11,8 +11,8 @@ import { useManagedFocus } from '../../hooks/useManagedFocus';
 
 interface ConfigurePresetModalProps {
   isOpen: boolean;
-  onClose(): void;
-  onSave(name: string, includeMasks: boolean, includeCropTransform: boolean, presetType: 'tool' | 'style'): void;
+  onClose: () => void;
+  onSave: (name: string, includeMasks: boolean, includeCropTransform: boolean, presetType: 'tool' | 'style') => void;
   initialPreset?: Preset | null;
 }
 

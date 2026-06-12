@@ -12,11 +12,11 @@ import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 
 interface DenoiseModalProps {
   isOpen: boolean;
-  onClose(): void;
-  onDenoise(intensity: number, method: 'ai' | 'bm3d'): void;
-  onBatchDenoise(intensity: number, method: 'ai' | 'bm3d', paths: string[]): Promise<string[]>;
-  onSave(): Promise<string>;
-  onOpenFile(path: string): void;
+  onClose: () => void;
+  onDenoise: (intensity: number, method: 'ai' | 'bm3d') => void;
+  onBatchDenoise: (intensity: number, method: 'ai' | 'bm3d', paths: string[]) => Promise<string[]>;
+  onSave: () => Promise<string>;
+  onOpenFile: (path: string) => void;
   error: string | null;
   previewBase64: string | null;
   originalBase64: string | null;

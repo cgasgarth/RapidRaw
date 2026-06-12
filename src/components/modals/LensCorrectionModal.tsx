@@ -91,8 +91,8 @@ type ExifData = Record<string, string | number | null | undefined>;
 
 interface LensCorrectionModalProps {
   isOpen: boolean;
-  onClose(): void;
-  onApply(newParams: LensParams): void;
+  onClose: () => void;
+  onApply: (newParams: LensParams) => void;
   currentAdjustments: Adjustments;
   selectedImage: SelectedImage | null;
 }

@@ -28,8 +28,8 @@ import { type Adjustments } from '../../utils/adjustments';
 
 interface CollageModalProps {
   isOpen: boolean;
-  onClose(): void;
-  onSave(base64Data: string, firstPath: string): Promise<string>;
+  onClose: () => void;
+  onSave: (base64Data: string, firstPath: string) => Promise<string>;
   sourceImages: ImageFile[];
   thumbnails: Record<string, string>;
 }

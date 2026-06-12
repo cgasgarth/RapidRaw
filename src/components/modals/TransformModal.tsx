@@ -58,8 +58,8 @@ type TransformParams = Omit<
 
 interface TransformModalProps {
   isOpen: boolean;
-  onClose(): void;
-  onApply(newParams: TransformParams): void;
+  onClose: () => void;
+  onApply: (newParams: TransformParams) => void;
   currentAdjustments: Adjustments;
 }
 

@@ -13,14 +13,14 @@ import { TextColors, TextVariants } from '../../types/typography';
 
 interface CullingModalProps {
   isOpen: boolean;
-  onClose(): void;
+  onClose: () => void;
   progress: Progress | null;
   suggestions: CullingSuggestions | null;
   error: string | null;
   imagePaths: string[];
   thumbnails: Record<string, string>;
-  onApply(action: 'reject' | 'rate_zero' | 'delete', paths: string[]): void;
-  onError(error: string): void;
+  onApply: (action: 'reject' | 'rate_zero' | 'delete', paths: string[]) => void;
+  onError: (error: string) => void;
 }
 
 type CullAction = 'reject' | 'rate_zero' | 'delete';
@@ -28,7 +28,7 @@ type CullAction = 'reject' | 'rate_zero' | 'delete';
 interface ImageThumbnailProps {
   children?: ReactNode;
   isSelected: boolean;
-  onToggle(): void;
+  onToggle: () => void;
   path: string;
   thumbnails: Record<string, string>;
 }
