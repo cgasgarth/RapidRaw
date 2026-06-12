@@ -149,7 +149,7 @@ module.exports = [
       'import-x/no-cycle': 'off',
       'boundaries/element-types': 'error',
       'boundaries/entry-point': 'error',
-      'boundaries/dependencies': 'off',
+      'boundaries/dependencies': 'error',
       'boundaries/no-unknown': 'off',
       'boundaries/no-unknown-files': 'off',
       'no-restricted-imports': [

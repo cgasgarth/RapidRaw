@@ -2508,7 +2508,7 @@ Remaining focused ESLint work:
 - React compiler hook fences: `set-state-in-effect`, `refs`, `immutability`,
   and `preserve-manual-memoization`.
 - Accessibility static interaction and keyboard-event parity rules.
-- Import ordering, import cycle, and boundary dependency enforcement.
+- Import ordering, import cycle, and unknown-file boundary enforcement.
 
 Formatting should be handled by Prettier or the project's chosen formatter, not by large ESLint formatting rule churn.
 
