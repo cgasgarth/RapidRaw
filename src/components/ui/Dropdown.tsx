@@ -71,7 +71,7 @@ const Dropdown = <T extends React.Key>({
     return options.filter((opt) => opt.label.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [options, searchTerm]);
 
-  const isPrintableKey = (e: React.KeyboardEvent<Element>): boolean => {
+  const isPrintableKey = (e: React.KeyboardEvent): boolean => {
     if (e.metaKey || e.ctrlKey || e.altKey) return false;
     return e.key.length === 1;
   };

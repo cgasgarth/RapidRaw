@@ -23,7 +23,7 @@ let parametricClipboard: ParametricCurveSettings | null = null;
 
 type CurveAdjustmentState = Adjustments | MaskAdjustments;
 type CurveAdjustmentUpdater = (prev: CurveAdjustmentState) => CurveAdjustmentState;
-type PointerInputEvent = globalThis.MouseEvent | TouchEvent | ReactMouseEvent<Element> | ReactTouchEvent<Element>;
+type PointerInputEvent = globalThis.MouseEvent | TouchEvent | ReactMouseEvent | ReactTouchEvent;
 type SliderChangeEvent = ChangeEvent<HTMLInputElement> | { target: { value: number | string } };
 
 const CURVE_CHANNELS = [ActiveChannel.Luma, ActiveChannel.Red, ActiveChannel.Green, ActiveChannel.Blue] as const;
@@ -312,11 +312,11 @@ function convertParametricToPoints(settings: ParametricCurveSettings): Array<Coo
   return buildParametricPoints(settings);
 }
 
-function hasTouches(event: PointerInputEvent): event is TouchEvent | ReactTouchEvent<Element> {
+function hasTouches(event: PointerInputEvent): event is TouchEvent | ReactTouchEvent {
   return 'touches' in event;
 }
 
-function hasButton(event: PointerInputEvent): event is globalThis.MouseEvent | ReactMouseEvent<Element> {
+function hasButton(event: PointerInputEvent): event is globalThis.MouseEvent | ReactMouseEvent {
   return 'button' in event;
 }
 
