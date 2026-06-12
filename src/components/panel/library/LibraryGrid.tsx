@@ -525,7 +525,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
     const element = listHandle.element as HTMLElement;
 
     if (savedTop > 0) {
-      element.scrollTop = savedTop;
+      element.scrollTo({ top: savedTop });
     }
   }, [listHandle, currentFolderPath, gridData]);
 

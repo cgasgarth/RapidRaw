@@ -245,24 +245,27 @@ export function useImageProcessing(
     [selectedImage?.path, calculateROI, isWaveformVisible, setEditor, previewJobIdRef, latestRenderedJobIdRef],
   );
 
-  const flushPipeline = useCallback(() => {
-    if (inFlightCountRef.current >= 3) return;
-    if (!pendingApplyRef.current) return;
+  const flushPipeline = useCallback(
+    function flushPipeline() {
+      if (inFlightCountRef.current >= 3) return;
+      if (!pendingApplyRef.current) return;
 
-    const { adjustments, targetRes } = pendingApplyRef.current;
-    pendingApplyRef.current = null;
+      const { adjustments, targetRes } = pendingApplyRef.current;
+      pendingApplyRef.current = null;
 
-    inFlightCountRef.current += 1;
+      inFlightCountRef.current += 1;
 
-    void executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
-      inFlightCountRef.current -= 1;
-      if (pendingApplyRef.current) {
-        requestAnimationFrame(() => {
-          flushPipeline();
-        });
-      }
-    });
-  }, [executeApplyAdjustments]);
+      void executeApplyAdjustments(adjustments, true, targetRes).finally(() => {
+        inFlightCountRef.current -= 1;
+        if (pendingApplyRef.current) {
+          requestAnimationFrame(() => {
+            flushPipeline();
+          });
+        }
+      });
+    },
+    [executeApplyAdjustments],
+  );
 
   const applyAdjustments = useCallback(
     (currentAdjustments: Adjustments, dragging: boolean = false, targetRes?: number) => {
