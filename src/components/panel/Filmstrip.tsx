@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo, useLayoutEffect } from 'react';
 import { Image as ImageIcon, Star, SlidersHorizontal } from 'lucide-react';
 import clsx from 'clsx';
 import { Grid, useGridCallbackRef, type GridImperativeAPI } from 'react-window';
@@ -79,19 +79,16 @@ const FilmstripThumbnail = memo(
 
     const [layers, setLayers] = useState<ImageLayer[]>([]);
 
-    const [currentPath, setCurrentPath] = useState(imageFile.path);
-    if (currentPath !== imageFile.path) {
-      setCurrentPath(imageFile.path);
-      setLayers([]);
-    }
-
     const pathRef = useRef(imageFile.path);
     const hadDataOnPathChange = useRef(!!thumbData);
 
-    if (pathRef.current !== imageFile.path) {
-      pathRef.current = imageFile.path;
-      hadDataOnPathChange.current = !!thumbData;
-    }
+    useLayoutEffect(() => {
+      if (pathRef.current !== imageFile.path) {
+        pathRef.current = imageFile.path;
+        hadDataOnPathChange.current = !!thumbData;
+        setLayers([]);
+      }
+    }, [imageFile.path, thumbData]);
 
     const isInitialLoad = useRef(true);
 
