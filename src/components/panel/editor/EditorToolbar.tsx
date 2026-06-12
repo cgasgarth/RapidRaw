@@ -161,7 +161,7 @@ const EditorToolbar = memo(
     const prevNamesRef = useRef<string[]>(['Initial State']);
 
     const historyNames = useMemo(() => {
-      if (!adjustmentsHistory || adjustmentsHistory.length === 0) return [];
+      if (adjustmentsHistory.length === 0) return [];
 
       const formatKey = (k: string) => {
         const special: Record<string, string> = {
@@ -262,8 +262,8 @@ const EditorToolbar = memo(
           if (prev[key] === curr[key]) continue;
 
           if (key === 'masks') {
-            const prevMasks: Array<MaskContainer> = prev.masks || [];
-            const currMasks: Array<MaskContainer> = curr.masks || [];
+            const prevMasks: Array<MaskContainer> = prev.masks;
+            const currMasks: Array<MaskContainer> = curr.masks;
 
             if (currMasks.length > prevMasks.length) changed.push('Added Mask');
             else if (currMasks.length < prevMasks.length) changed.push('Deleted Mask');
@@ -277,7 +277,7 @@ const EditorToolbar = memo(
                   if (pMask.subMasks !== cMask.subMasks) changed.push('Mask Area / Brush');
 
                   if (pMask.adjustments !== cMask.adjustments) {
-                    for (const adjKey of Object.keys(cMask.adjustments || {})) {
+                    for (const adjKey of Object.keys(cMask.adjustments)) {
                       if (pMask.adjustments[adjKey] !== cMask.adjustments[adjKey]) {
                         changed.push(`Mask ${formatKey(adjKey)}`);
                       }
@@ -287,8 +287,8 @@ const EditorToolbar = memo(
               });
             }
           } else if (key === 'aiPatches') {
-            const prevPatches = prev.aiPatches || [];
-            const currPatches: Array<AiPatch> = curr.aiPatches || [];
+            const prevPatches = prev.aiPatches;
+            const currPatches: Array<AiPatch> = curr.aiPatches;
 
             if (currPatches.length > prevPatches.length) changed.push('Added AI Patch');
             else if (currPatches.length < prevPatches.length) changed.push('Deleted AI Patch');
@@ -577,7 +577,7 @@ const EditorToolbar = memo(
             </button>
 
             <AnimatePresence>
-              {isHistoryVisible && adjustmentsHistory && adjustmentsHistory.length > 1 && (
+              {isHistoryVisible && adjustmentsHistory.length > 1 && (
                 <motion.div
                   ref={historyContainerRef}
                   initial={{ opacity: 0, y: -10 }}

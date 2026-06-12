@@ -131,7 +131,7 @@ const HistogramView = ({ histogram }: { histogram: ChannelConfig | null | undefi
       preserveAspectRatio="none"
     >
       {channels.map((ch) => {
-        if (!ch.data || ch.data.length === 0) return null;
+        if (ch.data.length === 0) return null;
         return (
           <g key={ch.key} style={{ mixBlendMode: 'lighten' }}>
             <path d={getFill(ch.data)} fill={ch.color} fillOpacity={0.4} />
