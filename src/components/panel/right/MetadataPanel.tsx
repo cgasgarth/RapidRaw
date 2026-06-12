@@ -403,7 +403,7 @@ export default function MetadataPanel() {
   const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleAddTag(tagInputValue);
+      void handleAddTag(tagInputValue);
     }
     e.stopPropagation();
   };
@@ -574,7 +574,7 @@ export default function MetadataPanel() {
                               })}
                               value={displayValue}
                               onSave={(newVal) => {
-                                handleUpdateExif(targetPaths, { [field.key]: newVal });
+                                void handleUpdateExif(targetPaths, { [field.key]: newVal });
                               }}
                             />
                           );
