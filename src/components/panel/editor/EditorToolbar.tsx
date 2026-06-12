@@ -14,18 +14,18 @@ interface EditorToolbarProps {
   canUndo: boolean;
   isAndroid: boolean;
   isLoading: boolean;
-  onBackToLibrary(): void;
-  onRedo(): void;
-  onToggleFullScreen(): void;
-  onToggleShowOriginal(): void;
-  onUndo(): void;
+  onBackToLibrary: () => void;
+  onRedo: () => void;
+  onToggleFullScreen: () => void;
+  onToggleShowOriginal: () => void;
+  onUndo: () => void;
   selectedImage: SelectedImage;
   showOriginal: boolean;
   showDateView: boolean;
-  onToggleDateView(): void;
+  onToggleDateView: () => void;
   adjustmentsHistory: Array<Adjustments>;
   adjustmentsHistoryIndex: number;
-  goToAdjustmentsHistoryIndex(index: number): void;
+  goToAdjustmentsHistoryIndex: (index: number) => void;
 }
 
 const EditorToolbar = memo(
