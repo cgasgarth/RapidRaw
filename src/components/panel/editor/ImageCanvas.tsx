@@ -938,7 +938,9 @@ const MaskOverlay = memo(
                 draggable
                 dragBoundFunc={lockDragBoundFunc}
                 onDragStart={handleLinearPointDragStart}
-                onDragMove={(e) => handleLinearPointDragMove(e, 'start')}
+                onDragMove={(e) => {
+                  handleLinearPointDragMove(e, 'start');
+                }}
                 onDragEnd={handleLinearPointDragEnd}
                 onTouchEnd={handleMaskTouchEnd}
                 onTouchStart={handleMaskTouchStart}
@@ -961,7 +963,9 @@ const MaskOverlay = memo(
                 draggable
                 dragBoundFunc={lockDragBoundFunc}
                 onDragStart={handleLinearPointDragStart}
-                onDragMove={(e) => handleLinearPointDragMove(e, 'end')}
+                onDragMove={(e) => {
+                  handleLinearPointDragMove(e, 'end');
+                }}
                 onDragEnd={handleLinearPointDragEnd}
                 onTouchEnd={handleMaskTouchEnd}
                 onTouchStart={handleMaskTouchStart}
@@ -1141,7 +1145,9 @@ const ImageCanvas = memo(
       const timer = setTimeout(() => {
         setSettledScale(transformState.scale);
       }, 150);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }, [transformState.scale]);
 
     const maxDimension = Math.max(stageWidth, stageHeight, 1);
@@ -1408,8 +1414,12 @@ const ImageCanvas = memo(
 
     useEffect(() => {
       if (isCropping && uncroppedAdjustedPreviewUrl) {
-        const timer = setTimeout(() => setIsCropViewVisible(true), 10);
-        return () => clearTimeout(timer);
+        const timer = setTimeout(() => {
+          setIsCropViewVisible(true);
+        }, 10);
+        return () => {
+          clearTimeout(timer);
+        };
       } else {
         setIsCropViewVisible(false);
       }
@@ -2221,7 +2231,9 @@ const ImageCanvas = memo(
         setOriginalLoaded(true);
       } else {
         setOriginalLoaded(false);
-        img.onload = () => setOriginalLoaded(true);
+        img.onload = () => {
+          setOriginalLoaded(true);
+        };
       }
 
       return () => {
@@ -2503,12 +2515,24 @@ const ImageCanvas = memo(
                               key={renderSubMask.id}
                               onMaskInteractionEnd={handleMaskInteractionEnd}
                               onMaskInteractionStart={handleMaskInteractionStart}
-                              onMaskMouseEnter={() => !isToolActive && setIsMaskHovered(true)}
-                              onMaskMouseLeave={() => !isToolActive && setIsMaskHovered(false)}
+                              onMaskMouseEnter={() => {
+                                if (!isToolActive) {
+                                  setIsMaskHovered(true);
+                                }
+                              }}
+                              onMaskMouseLeave={() => {
+                                if (!isToolActive) {
+                                  setIsMaskHovered(false);
+                                }
+                              }}
                               onPreviewUpdate={handlePreviewUpdate}
-                              onSelect={() =>
-                                isMasking ? onSelectMask(renderSubMask.id) : onSelectAiSubMask(renderSubMask.id)
-                              }
+                              onSelect={() => {
+                                if (isMasking) {
+                                  onSelectMask(renderSubMask.id);
+                                } else {
+                                  onSelectAiSubMask(renderSubMask.id);
+                                }
+                              }}
                               onUpdate={updateSubMask}
                               scale={imageRenderSize.scale}
                               subMask={renderSubMask}

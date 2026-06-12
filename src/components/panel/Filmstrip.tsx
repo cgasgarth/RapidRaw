@@ -157,7 +157,9 @@ const FilmstripThumbnail = memo(
         const frame = requestAnimationFrame(() => {
           setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
         });
-        return () => cancelAnimationFrame(frame);
+        return () => {
+          cancelAnimationFrame(frame);
+        };
       }
     }, [layers]);
 
@@ -204,7 +206,9 @@ const FilmstripThumbnail = memo(
                   transition: 'opacity 150ms ease-in-out',
                   willChange: 'opacity',
                 }}
-                onTransitionEnd={() => handleTransitionEnd(layer.id)}
+                onTransitionEnd={() => {
+                  handleTransitionEnd(layer.id);
+                }}
               >
                 {thumbnailAspectRatio === ThumbnailAspectRatio.Contain && (
                   <img
@@ -412,7 +416,9 @@ const FilmstripList = ({
     const timer = setTimeout(() => {
       isReadyForSmooth.current = true;
     }, 500);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -669,7 +675,9 @@ export default function Filmstrip({
       }
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+    };
   }, []);
 
   const handleImageSelect = (path: string, event: ThumbnailMouseEvent) => {

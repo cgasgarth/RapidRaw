@@ -64,7 +64,11 @@ const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
             className="disabled:cursor-not-allowed"
             disabled={disabled}
             key={starValue}
-            onClick={() => !disabled && onRate(starValue === rating ? 0 : starValue)}
+            onClick={() => {
+              if (!disabled) {
+                onRate(starValue === rating ? 0 : starValue);
+              }
+            }}
             data-tooltip={
               disabled
                 ? t('ui.bottomBar.tooltips.selectToRate')
@@ -382,8 +386,12 @@ export default function BottomBar({
               <div
                 className="relative w-12 h-full flex items-center justify-end cursor-pointer"
                 onClick={handleResetZoom}
-                onMouseEnter={() => setIsZoomLabelHovered(true)}
-                onMouseLeave={() => setIsZoomLabelHovered(false)}
+                onMouseEnter={() => {
+                  setIsZoomLabelHovered(true);
+                }}
+                onMouseLeave={() => {
+                  setIsZoomLabelHovered(false);
+                }}
                 data-tooltip={t('ui.bottomBar.tooltips.resetZoom')}
               >
                 <span className="absolute right-0 text-xs text-text-secondary select-none text-right w-max transition-colors hover:text-text-primary">
@@ -418,7 +426,9 @@ export default function BottomBar({
                     ref={percentInputRef}
                     type="text"
                     value={percentInputValue}
-                    onChange={(e) => setPercentInputValue(e.target.value)}
+                    onChange={(e) => {
+                      setPercentInputValue(e.target.value);
+                    }}
                     onKeyDown={handlePercentKeyDown}
                     onBlur={handlePercentSubmit}
                     className="w-full text-xs text-text-primary bg-bg-primary border border-border-color rounded-sm px-1 text-right"

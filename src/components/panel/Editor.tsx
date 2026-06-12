@@ -153,7 +153,13 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
   const isAndroid = osPlatform === 'android';
 
-  const debouncedSetHistory = useMemo(() => debounce((newAdj: Adjustments) => pushHistory(newAdj), 500), [pushHistory]);
+  const debouncedSetHistory = useMemo(
+    () =>
+      debounce((newAdj: Adjustments) => {
+        pushHistory(newAdj);
+      }, 500),
+    [pushHistory],
+  );
 
   const setAdjustments = useCallback(
     (value: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)) => {
@@ -220,10 +226,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const wgpuSyncRef = useRef<number | null>(null);
   const lastWgpuTransformRef = useRef<string | null>(null);
 
-  const toggleShowOriginal = useCallback(
-    () => setEditor((state) => ({ showOriginal: !state.showOriginal })),
-    [setEditor],
-  );
+  const toggleShowOriginal = useCallback(() => {
+    setEditor((state) => ({ showOriginal: !state.showOriginal }));
+  }, [setEditor]);
 
   const handleToggleFullScreen = useCallback(() => {
     const currentlyZoomed = targetZoom > 1.01;
@@ -236,7 +241,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     }
 
     if (currentlyZoomed) {
-      setTimeout(() => setUI({ isInstantTransition: false }), 100);
+      setTimeout(() => {
+        setUI({ isInstantTransition: false });
+      }, 100);
     }
   }, [isFullScreen, selectedImage, targetZoom, setUI]);
 
@@ -304,7 +311,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       const timer = setTimeout(() => {
         setToolbarOverflowVisible(true);
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [isFullScreen]);
 
@@ -730,7 +739,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     };
 
     container.addEventListener('wheel', handleNativeWheel, { passive: false });
-    return () => container.removeEventListener('wheel', handleNativeWheel);
+    return () => {
+      container.removeEventListener('wheel', handleNativeWheel);
+    };
   }, [
     applyTransform,
     clampToBounds,
@@ -1033,7 +1044,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         handleDisplaySizeChange(currentDisplaySize);
       }
     }, 100);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [imageRenderSize, transformState.scale, handleDisplaySizeChange]);
 
   const processOverlayQueue = useCallback(async () => {
@@ -1065,10 +1078,14 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
       const strippedAdjustments = structuredClone(jsAdjustments);
       if (strippedAdjustments.masks) {
-        strippedAdjustments.masks.forEach((m) => stripSubMasks(m.subMasks));
+        strippedAdjustments.masks.forEach((m) => {
+          stripSubMasks(m.subMasks);
+        });
       }
       if (strippedAdjustments.aiPatches) {
-        strippedAdjustments.aiPatches.forEach((p) => stripSubMasks(p.subMasks));
+        strippedAdjustments.aiPatches.forEach((p) => {
+          stripSubMasks(p.subMasks);
+        });
       }
 
       const strippedMaskDef = structuredClone(maskDef);
@@ -1289,7 +1306,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
             pixelated: isZoomedIn,
           },
         })
-          .catch((err) => console.warn('WGPU Sync Error:', err))
+          .catch((err) => {
+            console.warn('WGPU Sync Error:', err);
+          })
           .finally(() => {
             isInvoking = false;
           });
@@ -1425,9 +1444,13 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     if (showSpinner) {
       setIsLoaderVisible(true);
     } else {
-      timer = setTimeout(() => setIsLoaderVisible(false), 300);
+      timer = setTimeout(() => {
+        setIsLoaderVisible(false);
+      }, 300);
     }
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [showSpinner]);
 
   useEffect(() => {
@@ -2002,7 +2025,9 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           selectedImage={selectedImage}
           showOriginal={showOriginal}
           showDateView={showExifDateView}
-          onToggleDateView={() => setShowExifDateView((prev) => !prev)}
+          onToggleDateView={() => {
+            setShowExifDateView((prev) => !prev);
+          }}
           adjustmentsHistory={adjustmentsHistory}
           adjustmentsHistoryIndex={adjustmentsHistoryIndex}
           goToAdjustmentsHistoryIndex={goToHistoryIndex}
@@ -2067,8 +2092,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
             onGenerateAiMask={handleGenerateAiMask}
             onLiveMaskPreview={handleLiveMaskPreview}
             onQuickErase={handleQuickErase}
-            onSelectAiSubMask={(id) => setEditor({ activeAiSubMaskId: id })}
-            onSelectMask={(id) => setEditor({ activeMaskId: id })}
+            onSelectAiSubMask={(id) => {
+              setEditor({ activeAiSubMaskId: id });
+            }}
+            onSelectMask={(id) => {
+              setEditor({ activeMaskId: id });
+            }}
             onStraighten={handleStraighten}
             selectedImage={selectedImage}
             setCrop={handleCropChange}

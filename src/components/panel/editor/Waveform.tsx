@@ -213,7 +213,9 @@ const FakeHistogramLoader = () => {
     };
 
     animationFrameId = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(animationFrameId);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
   }, []);
 
   return <canvas ref={canvasRef} width={256} height={256} className="w-full h-full opacity-60" />;
@@ -488,7 +490,9 @@ const FakeWaveformLoader = ({ mode }: { mode: string }) => {
 
     animationFrameId = requestAnimationFrame(render);
 
-    return () => cancelAnimationFrame(animationFrameId);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
   }, [mode, particles]);
 
   return (
@@ -672,7 +676,9 @@ export default function Waveform({
                 {modeButtons.map(({ mode, label, tooltip, bgClass, textActiveClass }) => (
                   <button
                     key={mode}
-                    onClick={() => setDisplayMode(mode)}
+                    onClick={() => {
+                      setDisplayMode(mode);
+                    }}
                     data-tooltip={t(tooltip, { defaultValue: label })}
                     className={`${baseButtonClass} ${displayMode === mode ? textActiveClass : inactiveButtonClass}`}
                   >
