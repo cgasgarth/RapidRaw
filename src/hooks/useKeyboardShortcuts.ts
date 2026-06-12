@@ -11,12 +11,12 @@ import { useLibraryActions } from './useLibraryActions';
 
 interface KeyboardShortcutsProps {
   sortedImageList: Array<ImageFile>;
-  handleBackToLibrary(): void;
-  handleDeleteSelected(): void;
-  handleImageSelect(path: string): void;
-  handlePasteFiles(str: string): void;
-  handleToggleFullScreen(): void;
-  handleZoomChange(zoomValue: number, fitToWindow?: boolean): void;
+  handleBackToLibrary: () => void;
+  handleDeleteSelected: () => void;
+  handleImageSelect: (path: string) => void;
+  handlePasteFiles: (str: string) => void;
+  handleToggleFullScreen: () => void;
+  handleZoomChange: (zoomValue: number, fitToWindow?: boolean) => void;
 }
 
 interface KeyboardStoreState {
@@ -28,13 +28,13 @@ interface KeyboardStoreState {
 }
 
 interface ShortcutAction {
-  execute(event: KeyboardEvent, state: KeyboardStoreState): void;
+  execute: (event: KeyboardEvent, state: KeyboardStoreState) => void;
   shouldFire?: (state: KeyboardStoreState) => boolean;
 }
 
 interface BuiltinShortcut {
-  execute(event: KeyboardEvent, state: KeyboardStoreState): void;
-  match(event: KeyboardEvent, state: KeyboardStoreState): boolean;
+  execute: (event: KeyboardEvent, state: KeyboardStoreState) => void;
+  match: (event: KeyboardEvent, state: KeyboardStoreState) => boolean;
 }
 
 export const useKeyboardShortcuts = ({

@@ -109,8 +109,8 @@ interface MaskOverlayRequest {
 }
 
 interface EditorProps {
-  onBackToLibrary(): void;
-  onContextMenu(event: MouseEvent<HTMLElement>): void;
+  onBackToLibrary: () => void;
+  onContextMenu: (event: MouseEvent<HTMLElement>) => void;
   transformWrapperRef: RefObject<TransformController | null>;
 }
 
