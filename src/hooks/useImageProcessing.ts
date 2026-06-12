@@ -147,7 +147,7 @@ export function useImageProcessing(
           targetResolution: targetRes || null,
           roi: roi || null,
           computeWaveform: isWaveformVisible,
-          activeWaveformChannel: activeWaveformChannelRef.current || null,
+          activeWaveformChannel: activeWaveformChannelRef.current,
         });
 
         if (newlySentPatchIds.size > 0) {
