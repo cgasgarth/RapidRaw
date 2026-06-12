@@ -195,7 +195,7 @@ module.exports = [
           allowRegExp: false,
         },
       ],
-      '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/unbound-method': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/no-unsafe-member-access': 'error',
