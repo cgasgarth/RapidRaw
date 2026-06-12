@@ -1134,7 +1134,9 @@ export default function SettingsPanel({
                   <div className="space-y-8">
                     <SettingItem label={t('settings.general.theme')} description={t('settings.general.themeDesc')}>
                       <Dropdown
-                        onChange={(value: Theme) => saveSettings({ ...appSettings, theme: value })}
+                        onChange={(value: Theme) => {
+                          saveSettings({ ...appSettings, theme: value });
+                        }}
                         options={THEMES.map((theme: ThemeProps) => ({
                           value: theme.id,
                           label: translateDynamicKey(t, theme.name),
@@ -1146,7 +1148,9 @@ export default function SettingsPanel({
 
                     <SettingItem label={t('settings.language')} description={t('settings.languageDesc')}>
                       <Dropdown
-                        onChange={(value: string) => saveSettings({ ...appSettings, language: value })}
+                        onChange={(value: string) => {
+                          saveSettings({ ...appSettings, language: value });
+                        }}
                         options={[
                           { value: 'en', label: 'English' },
                           { value: 'de', label: 'Deutsch' },
@@ -1201,7 +1205,9 @@ export default function SettingsPanel({
                                   checked={appSettings.createXmpIfMissing ?? false}
                                   id="create-xmp-missing-toggle"
                                   label={t('settings.general.createXmpMissing')}
-                                  onChange={(checked) => saveSettings({ ...appSettings, createXmpIfMissing: checked })}
+                                  onChange={(checked) => {
+                                    saveSettings({ ...appSettings, createXmpIfMissing: checked });
+                                  }}
                                 />
                               </SettingItem>
                             </div>
@@ -1218,7 +1224,9 @@ export default function SettingsPanel({
                         checked={appSettings.enableFolderImageCounts ?? false}
                         id="folder-image-counts-toggle"
                         label={t('settings.general.showImageCounts')}
-                        onChange={(checked) => saveSettings({ ...appSettings, enableFolderImageCounts: checked })}
+                        onChange={(checked) => {
+                          saveSettings({ ...appSettings, enableFolderImageCounts: checked });
+                        }}
                       />
                     </SettingItem>
 
@@ -1230,7 +1238,9 @@ export default function SettingsPanel({
                         checked={appSettings.displayEditIcon ?? true}
                         id="display-edit-icon-toggle"
                         label={t('settings.general.displayEditIcon')}
-                        onChange={(checked) => saveSettings({ ...appSettings, displayEditIcon: checked })}
+                        onChange={(checked) => {
+                          saveSettings({ ...appSettings, displayEditIcon: checked });
+                        }}
                       />
                     </SettingItem>
 
@@ -1242,13 +1252,17 @@ export default function SettingsPanel({
                         checked={appSettings.enableFocusMode ?? false}
                         id="focus-mode-toggle"
                         label={t('settings.general.enableFocusMode')}
-                        onChange={(checked) => saveSettings({ ...appSettings, enableFocusMode: checked })}
+                        onChange={(checked) => {
+                          saveSettings({ ...appSettings, enableFocusMode: checked });
+                        }}
                       />
                     </SettingItem>
 
                     <SettingItem label={t('settings.general.font')} description={t('settings.general.fontDesc')}>
                       <Dropdown
-                        onChange={(value: string) => saveSettings({ ...appSettings, fontFamily: value })}
+                        onChange={(value: string) => {
+                          saveSettings({ ...appSettings, fontFamily: value });
+                        }}
                         options={fontOptions}
                         value={appSettings.fontFamily || 'poppins'}
                         triggerClassName="bg-bg-primary"
@@ -1283,54 +1297,54 @@ export default function SettingsPanel({
                     <Switch
                       label={t('settings.adjustments.chromaticAberration')}
                       checked={appSettings.adjustmentVisibility?.['chromaticAberration'] ?? false}
-                      onChange={(checked) =>
+                      onChange={(checked) => {
                         saveSettings({
                           ...appSettings,
                           adjustmentVisibility: {
                             ...(appSettings.adjustmentVisibility || adjustmentVisibilityDefaults),
                             chromaticAberration: checked,
                           },
-                        })
-                      }
+                        });
+                      }}
                     />
                     <Switch
                       label={t('settings.adjustments.grain')}
                       checked={appSettings.adjustmentVisibility?.['grain'] ?? true}
-                      onChange={(checked) =>
+                      onChange={(checked) => {
                         saveSettings({
                           ...appSettings,
                           adjustmentVisibility: {
                             ...(appSettings.adjustmentVisibility || adjustmentVisibilityDefaults),
                             grain: checked,
                           },
-                        })
-                      }
+                        });
+                      }}
                     />
                     <Switch
                       label={t('settings.adjustments.colorCalibration')}
                       checked={appSettings.adjustmentVisibility?.['colorCalibration'] ?? true}
-                      onChange={(checked) =>
+                      onChange={(checked) => {
                         saveSettings({
                           ...appSettings,
                           adjustmentVisibility: {
                             ...(appSettings.adjustmentVisibility || adjustmentVisibilityDefaults),
                             colorCalibration: checked,
                           },
-                        })
-                      }
+                        });
+                      }}
                     />
                     <Switch
                       label={t('settings.adjustments.noiseReduction')}
                       checked={appSettings.adjustmentVisibility?.['noiseReduction'] ?? true}
-                      onChange={(checked) =>
+                      onChange={(checked) => {
                         saveSettings({
                           ...appSettings,
                           adjustmentVisibility: {
                             ...(appSettings.adjustmentVisibility || adjustmentVisibilityDefaults),
                             noiseReduction: checked,
                           },
-                        })
-                      }
+                        });
+                      }}
                     />
                   </div>
                 </div>
@@ -1421,7 +1435,9 @@ export default function SettingsPanel({
                           checked={appSettings.enableAiTagging ?? false}
                           id="ai-tagging-toggle"
                           label={t('settings.tagging.automaticAiTagging')}
-                          onChange={(checked) => saveSettings({ ...appSettings, enableAiTagging: checked })}
+                          onChange={(checked) => {
+                            saveSettings({ ...appSettings, enableAiTagging: checked });
+                          }}
                         />
                       </SettingItem>
 
@@ -1446,9 +1462,9 @@ export default function SettingsPanel({
                                   step={1}
                                   value={appSettings.aiTagCount ?? 10}
                                   defaultValue={10}
-                                  onChange={(event: NumericChangeEvent) =>
-                                    saveSettings({ ...appSettings, aiTagCount: getIntegerEventValue(event) })
-                                  }
+                                  onChange={(event: NumericChangeEvent) => {
+                                    saveSettings({ ...appSettings, aiTagCount: getIntegerEventValue(event) });
+                                  }}
                                 />
                               </SettingItem>
 
@@ -1519,7 +1535,9 @@ export default function SettingsPanel({
                                       </button>
                                     </div>
                                     <button
-                                      onClick={() => saveSettings({ ...appSettings, customAiTags: [] })}
+                                      onClick={() => {
+                                        saveSettings({ ...appSettings, customAiTags: [] });
+                                      }}
                                       disabled={customAiTags.length === 0}
                                       className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
                                       data-tooltip={t('settings.tagging.clearCustomTooltip')}
@@ -1601,7 +1619,9 @@ export default function SettingsPanel({
                             </button>
                           </div>
                           <button
-                            onClick={() => saveSettings({ ...appSettings, taggingShortcuts: [] })}
+                            onClick={() => {
+                              saveSettings({ ...appSettings, taggingShortcuts: [] });
+                            }}
                             disabled={taggingShortcuts.length === 0}
                             className="p-2 text-text-secondary hover:text-red-400 hover:bg-surface rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-text-secondary disabled:hover:bg-transparent"
                             data-tooltip={t('settings.tagging.clearShortcutsTooltip')}
@@ -1794,9 +1814,9 @@ export default function SettingsPanel({
                                   label={t('settings.processing.previewRes')}
                                 >
                                   <Dropdown
-                                    onChange={(value: number) =>
-                                      handleProcessingSettingChangeVoid('editorPreviewResolution', value)
-                                    }
+                                    onChange={(value: number) => {
+                                      handleProcessingSettingChangeVoid('editorPreviewResolution', value);
+                                    }}
                                     options={resolutions}
                                     value={processingSettings.editorPreviewResolution}
                                     triggerClassName="bg-bg-primary"
@@ -1821,9 +1841,9 @@ export default function SettingsPanel({
                                   label={t('settings.processing.staticPreviewRes')}
                                 >
                                   <Dropdown
-                                    onChange={(value: number) =>
-                                      handleProcessingSettingChangeVoid('editorPreviewResolution', value)
-                                    }
+                                    onChange={(value: number) => {
+                                      handleProcessingSettingChangeVoid('editorPreviewResolution', value);
+                                    }}
                                     options={resolutions}
                                     value={processingSettings.editorPreviewResolution}
                                     triggerClassName="bg-bg-primary"
@@ -1835,9 +1855,9 @@ export default function SettingsPanel({
                                   description={t('settings.processing.renderScaleDesc')}
                                 >
                                   <Dropdown
-                                    onChange={(value: number) =>
-                                      handleProcessingSettingChangeVoid('highResZoomMultiplier', value)
-                                    }
+                                    onChange={(value: number) => {
+                                      handleProcessingSettingChangeVoid('highResZoomMultiplier', value);
+                                    }}
                                     options={zoomMultiplierOptions}
                                     value={processingSettings.highResZoomMultiplier}
                                     triggerClassName="bg-bg-primary"
@@ -1857,9 +1877,9 @@ export default function SettingsPanel({
                                     disabled={dpr <= 1}
                                     id="full-dpi-rendering-toggle"
                                     label={t('settings.processing.nativeDpi')}
-                                    onChange={(checked) =>
-                                      handleProcessingSettingChangeVoid('useFullDpiRendering', checked)
-                                    }
+                                    onChange={(checked) => {
+                                      handleProcessingSettingChangeVoid('useFullDpiRendering', checked);
+                                    }}
                                   />
                                 </SettingItem>
                               </div>
@@ -1899,9 +1919,9 @@ export default function SettingsPanel({
                                 description={t('settings.processing.livePreviewQualityDesc')}
                               >
                                 <Dropdown
-                                  onChange={(value: string) =>
-                                    saveSettings({ ...appSettings, livePreviewQuality: value })
-                                  }
+                                  onChange={(value: string) => {
+                                    saveSettings({ ...appSettings, livePreviewQuality: value });
+                                  }}
                                   options={livePreviewQualityOptions}
                                   value={appSettings.livePreviewQuality || 'high'}
                                   triggerClassName="bg-bg-primary"
@@ -1918,7 +1938,9 @@ export default function SettingsPanel({
                       label={t('settings.processing.thumbnailRes')}
                     >
                       <Dropdown
-                        onChange={(value: number) => handleProcessingSettingChangeVoid('thumbnailResolution', value)}
+                        onChange={(value: number) => {
+                          handleProcessingSettingChangeVoid('thumbnailResolution', value);
+                        }}
                         options={thumbnailResolutions}
                         value={processingSettings.thumbnailResolution}
                         triggerClassName="bg-bg-primary"
@@ -1936,9 +1958,9 @@ export default function SettingsPanel({
                         step={1}
                         value={processingSettings.thumbnailWorkerThreads}
                         defaultValue={4}
-                        onChange={(event: NumericChangeEvent) =>
-                          handleProcessingSettingChangeVoid('thumbnailWorkerThreads', getIntegerEventValue(event))
-                        }
+                        onChange={(event: NumericChangeEvent) => {
+                          handleProcessingSettingChangeVoid('thumbnailWorkerThreads', getIntegerEventValue(event));
+                        }}
                         fillOrigin="min"
                       />
                     </SettingItem>
@@ -1954,9 +1976,9 @@ export default function SettingsPanel({
                         step={1}
                         value={processingSettings.imageCacheSize}
                         defaultValue={5}
-                        onChange={(event: NumericChangeEvent) =>
-                          handleProcessingSettingChangeVoid('imageCacheSize', getIntegerEventValue(event))
-                        }
+                        onChange={(event: NumericChangeEvent) => {
+                          handleProcessingSettingChangeVoid('imageCacheSize', getIntegerEventValue(event));
+                        }}
                         fillOrigin="min"
                       />
                     </SettingItem>
@@ -1976,7 +1998,9 @@ export default function SettingsPanel({
                         disabled={osPlatform === 'linux' || osPlatform === 'android'}
                         id="wgpu-renderer-toggle"
                         label={t('settings.processing.wgpuLabel')}
-                        onChange={(checked) => handleProcessingSettingChangeVoid('useWgpuRenderer', checked)}
+                        onChange={(checked) => {
+                          handleProcessingSettingChangeVoid('useWgpuRenderer', checked);
+                        }}
                       />
                     </SettingItem>
 
@@ -1985,7 +2009,9 @@ export default function SettingsPanel({
                       description={t('settings.processing.backendDesc')}
                     >
                       <Dropdown
-                        onChange={(value: string) => handleProcessingSettingChangeVoid('processingBackend', value)}
+                        onChange={(value: string) => {
+                          handleProcessingSettingChangeVoid('processingBackend', value);
+                        }}
                         options={filteredBackendOptions}
                         value={
                           filteredBackendOptions.some((option) => option.value === processingSettings.processingBackend)
@@ -2005,7 +2031,9 @@ export default function SettingsPanel({
                           checked={processingSettings.linuxGpuOptimization}
                           id="gpu-compat-toggle"
                           label={t('settings.processing.linuxCompatLabel')}
-                          onChange={(checked) => handleProcessingSettingChangeVoid('linuxGpuOptimization', checked)}
+                          onChange={(checked) => {
+                            handleProcessingSettingChangeVoid('linuxGpuOptimization', checked);
+                          }}
                         />
                       </SettingItem>
                     )}
@@ -2050,9 +2078,9 @@ export default function SettingsPanel({
                         step={0.1}
                         value={processingSettings.rawHighlightCompression}
                         defaultValue={2.5}
-                        onChange={(event: NumericChangeEvent) =>
-                          handleProcessingSettingChangeVoid('rawHighlightCompression', getNumericEventValue(event))
-                        }
+                        onChange={(event: NumericChangeEvent) => {
+                          handleProcessingSettingChangeVoid('rawHighlightCompression', getNumericEventValue(event));
+                        }}
                         fillOrigin="min"
                       />
                     </SettingItem>
@@ -2068,9 +2096,9 @@ export default function SettingsPanel({
                         step={0.05}
                         value={processingSettings.rawPreprocessingColorNr}
                         defaultValue={0.5}
-                        onChange={(event: NumericChangeEvent) =>
-                          handleProcessingSettingChangeVoid('rawPreprocessingColorNr', getNumericEventValue(event))
-                        }
+                        onChange={(event: NumericChangeEvent) => {
+                          handleProcessingSettingChangeVoid('rawPreprocessingColorNr', getNumericEventValue(event));
+                        }}
                         fillOrigin="min"
                       />
                     </SettingItem>
@@ -2086,9 +2114,9 @@ export default function SettingsPanel({
                         step={0.05}
                         value={processingSettings.rawPreprocessingSharpening}
                         defaultValue={0.35}
-                        onChange={(event: NumericChangeEvent) =>
-                          handleProcessingSettingChangeVoid('rawPreprocessingSharpening', getNumericEventValue(event))
-                        }
+                        onChange={(event: NumericChangeEvent) => {
+                          handleProcessingSettingChangeVoid('rawPreprocessingSharpening', getNumericEventValue(event));
+                        }}
                         fillOrigin="min"
                       />
                     </SettingItem>
@@ -2101,9 +2129,9 @@ export default function SettingsPanel({
                         checked={processingSettings.applyPreprocessingToNonRaws}
                         id="preprocessing-non-raws-toggle"
                         label={t('settings.processing.preprocessing.enablePreprocessingNonRaws')}
-                        onChange={(checked) =>
-                          handleProcessingSettingChangeVoid('applyPreprocessingToNonRaws', checked)
-                        }
+                        onChange={(checked) => {
+                          handleProcessingSettingChangeVoid('applyPreprocessingToNonRaws', checked);
+                        }}
                       />
                     </SettingItem>
 
@@ -2112,7 +2140,9 @@ export default function SettingsPanel({
                       description={t('settings.processing.preprocessing.linearRawDesc')}
                     >
                       <Dropdown
-                        onChange={(value: string) => saveSettings({ ...appSettings, linearRawMode: value })}
+                        onChange={(value: string) => {
+                          saveSettings({ ...appSettings, linearRawMode: value });
+                        }}
                         options={linearRawOptions}
                         value={appSettings.linearRawMode || 'auto'}
                         triggerClassName="bg-bg-primary"
@@ -2128,7 +2158,9 @@ export default function SettingsPanel({
                           checked={appSettings.tonemapperOverrideEnabled ?? false}
                           id="tonemapper-override-toggle"
                           label={t('settings.processing.preprocessing.enableTonemapperOverride')}
-                          onChange={(checked) => saveSettings({ ...appSettings, tonemapperOverrideEnabled: checked })}
+                          onChange={(checked) => {
+                            saveSettings({ ...appSettings, tonemapperOverrideEnabled: checked });
+                          }}
                         />
                       </SettingItem>
 
@@ -2146,9 +2178,9 @@ export default function SettingsPanel({
                                 description={t('settings.processing.preprocessing.defaultRawTonemapperDesc')}
                               >
                                 <Dropdown
-                                  onChange={(value: string) =>
-                                    saveSettings({ ...appSettings, defaultRawTonemapper: value })
-                                  }
+                                  onChange={(value: string) => {
+                                    saveSettings({ ...appSettings, defaultRawTonemapper: value });
+                                  }}
                                   options={tonemapperOptions}
                                   value={appSettings.defaultRawTonemapper || 'agx'}
                                   triggerClassName="bg-bg-primary"
@@ -2160,9 +2192,9 @@ export default function SettingsPanel({
                                 description={t('settings.processing.preprocessing.defaultNonRawTonemapperDesc')}
                               >
                                 <Dropdown
-                                  onChange={(value: string) =>
-                                    saveSettings({ ...appSettings, defaultNonRawTonemapper: value })
-                                  }
+                                  onChange={(value: string) => {
+                                    saveSettings({ ...appSettings, defaultNonRawTonemapper: value });
+                                  }}
                                   options={tonemapperOptions}
                                   value={appSettings.defaultNonRawTonemapper || 'basic'}
                                   triggerClassName="bg-bg-primary"
@@ -2456,7 +2488,9 @@ export default function SettingsPanel({
                       </Text>
                       <CanvasInputModeSwitch
                         mode={appSettings.canvasInputMode || 'mouse'}
-                        onModeChange={(value) => saveSettings({ ...appSettings, canvasInputMode: value })}
+                        onModeChange={(value) => {
+                          saveSettings({ ...appSettings, canvasInputMode: value });
+                        }}
                       />
                     </div>
 
@@ -2468,9 +2502,9 @@ export default function SettingsPanel({
                         step={0.1}
                         value={appSettings.zoomSpeedMultiplier ?? 1.0}
                         defaultValue={1.0}
-                        onChange={(event: NumericChangeEvent) =>
-                          saveSettings({ ...appSettings, zoomSpeedMultiplier: getNumericEventValue(event) })
-                        }
+                        onChange={(event: NumericChangeEvent) => {
+                          saveSettings({ ...appSettings, zoomSpeedMultiplier: getNumericEventValue(event) });
+                        }}
                         fillOrigin="min"
                       />
                     </SettingItem>
@@ -2507,7 +2541,12 @@ export default function SettingsPanel({
                       );
                     })}
                     <div className="flex justify-end mt-6">
-                      <Button variant="ghost" onClick={() => saveSettings({ ...appSettings, keybinds: {} })}>
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          saveSettings({ ...appSettings, keybinds: {} });
+                        }}
+                      >
                         {t('settings.controls.resetDefaults')}
                       </Button>
                     </div>
