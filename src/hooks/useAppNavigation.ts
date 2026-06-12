@@ -188,7 +188,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       }
 
       const cached = globalImageCache.get(path);
-      const cachedReadyEntry = cached?.selectedImage?.isReady ? cached : undefined;
+      const cachedReadyEntry = cached?.selectedImage.isReady ? cached : undefined;
       const isFrontendCached = cachedReadyEntry !== undefined;
       const isCachedInBackend = isFrontendCached
         ? await invoke<boolean>('is_image_cached', { path }).catch(() => false)
@@ -374,7 +374,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             void handleSettingsChange({ ...appSettings, lastRootPath: path });
           }
         } else if (path && expandParents) {
-          const allRoots = [...(rootPaths || []), ...(pinnedFolders || [])].filter(Boolean);
+          const allRoots = [...rootPaths, ...pinnedFolders];
           const relevantRoot = allRoots.find((r) => path.startsWith(r));
 
           if (relevantRoot) {
@@ -420,9 +420,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
         const initialRatings: Record<string, number> = {};
         files.forEach((f) => {
-          if (f.rating !== undefined) {
-            initialRatings[f.path] = f.rating;
-          }
+          initialRatings[f.path] = f.rating;
         });
         setLibrary({ imageRatings: initialRatings });
 
@@ -498,7 +496,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
         const initialRatings: Record<string, number> = {};
         files.forEach((f) => {
-          if (f.rating !== undefined) initialRatings[f.path] = f.rating;
+          initialRatings[f.path] = f.rating;
         });
 
         setLibrary({
@@ -591,7 +589,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       setLibrary({ isTreeLoading: true });
       try {
         let treesData: FolderTree[];
-        if (preloadedDataRef.current?.rootPaths?.join() === rootFolders.join() && preloadedDataRef.current.trees) {
+        if (preloadedDataRef.current.rootPaths?.join() === rootFolders.join() && preloadedDataRef.current.trees) {
           treesData = await preloadedDataRef.current.trees;
           preloadedDataRef.current.trees = undefined;
         } else {
@@ -612,7 +610,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       }
 
       let preloadedImages: ImageFile[] | undefined = undefined;
-      if (preloadedDataRef.current?.currentPath === pathToSelect && preloadedDataRef.current.images) {
+      if (preloadedDataRef.current.currentPath === pathToSelect && preloadedDataRef.current.images) {
         try {
           preloadedImages = await preloadedDataRef.current.images;
           preloadedDataRef.current.images = undefined;
