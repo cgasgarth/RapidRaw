@@ -142,7 +142,9 @@ export function useFileOperations(
         confirmVariant: 'destructive',
         isOpen: true,
         message: modalMessage,
-        onConfirm: () => executeDelete(pathsToDelete, { includeAssociated: false }),
+        onConfirm: () => {
+          void executeDelete(pathsToDelete, { includeAssociated: false });
+        },
         title: modalTitle,
       },
     });
