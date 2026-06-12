@@ -62,7 +62,12 @@ interface ListHeaderProps {
 }
 
 interface HeaderColumnProps {
+  onResize(event: ReactMouseEvent<HTMLDivElement>, leftCol: ColumnWidthKey, rightCol: ColumnWidthKey): void;
+  onSortChange(key: HeaderSortKey): void;
+  sortCriteria: SortCriteria;
   title: string;
+  totalRawWidth: number;
+  widths: ColumnWidths;
   widthKey: ColumnWidthKey;
   nextKey?: ColumnWidthKey;
   sortKey?: HeaderSortKey;
@@ -102,6 +107,60 @@ interface LibraryGridProps {
 const VirtualizedRow = ({ ariaAttributes: _ariaAttributes, ...rowProps }: VirtualizedRowProps): React.ReactElement => (
   <Row {...rowProps} />
 );
+
+function HeaderColumn({
+  onResize,
+  onSortChange,
+  sortCriteria,
+  title,
+  totalRawWidth,
+  widths,
+  widthKey,
+  nextKey,
+  sortKey,
+}: HeaderColumnProps) {
+  const isSorted = sortCriteria.key === sortKey;
+  const isAsc = sortCriteria.order === SortDirection.Ascending;
+  const actualWidth = `${(widths[widthKey] / totalRawWidth) * 100}%`;
+
+  return (
+    <div
+      style={{ width: actualWidth }}
+      className={`relative flex items-center px-3 h-full select-none ${
+        sortKey ? 'cursor-pointer hover:bg-bg-primary/50 transition-colors' : ''
+      }`}
+      onClick={() => {
+        if (sortKey) {
+          onSortChange(sortKey);
+        }
+      }}
+    >
+      <Text
+        variant={TextVariants.small}
+        weight={TextWeights.semibold}
+        color={isSorted ? TextColors.primary : TextColors.secondary}
+        className="uppercase tracking-wider text-[11px]"
+      >
+        {title}
+      </Text>
+      {isSorted && (
+        <span className={`ml-1 flex items-center ${TEXT_COLOR_KEYS[TextColors.primary]}`}>
+          {isAsc ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </span>
+      )}
+      {nextKey && (
+        <div
+          className="absolute right-[-3px] top-1.5 bottom-1.5 w-[6px] cursor-col-resize z-10 group flex items-center justify-center"
+          onMouseDown={(e) => {
+            onResize(e, widthKey, nextKey);
+          }}
+        >
+          <div className="w-px h-full bg-border-color/40 group-hover:bg-accent transition-colors" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: ListHeaderProps) {
   const { t } = useTranslation();
@@ -155,71 +214,76 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
     document.addEventListener('mouseup', onMouseUp);
   };
 
-  const Column = ({ title, widthKey, nextKey, sortKey }: HeaderColumnProps) => {
-    const isSorted = sortCriteria.key === sortKey;
-    const isAsc = sortCriteria.order === SortDirection.Ascending;
-    const actualWidth = `${(widths[widthKey] / totalRawWidth) * 100}%`;
-
-    return (
-      <div
-        style={{ width: actualWidth }}
-        className={`relative flex items-center px-3 h-full select-none ${
-          sortKey ? 'cursor-pointer hover:bg-bg-primary/50 transition-colors' : ''
-        }`}
-        onClick={() => {
-          if (sortKey) {
-            onSortChange(sortKey);
-          }
-        }}
-      >
-        <Text
-          variant={TextVariants.small}
-          weight={TextWeights.semibold}
-          color={isSorted ? TextColors.primary : TextColors.secondary}
-          className="uppercase tracking-wider text-[11px]"
-        >
-          {title}
-        </Text>
-        {isSorted && (
-          <span className={`ml-1 flex items-center ${TEXT_COLOR_KEYS[TextColors.primary]}`}>
-            {isAsc ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </span>
-        )}
-        {nextKey && (
-          <div
-            className="absolute right-[-3px] top-1.5 bottom-1.5 w-[6px] cursor-col-resize z-10 group flex items-center justify-center"
-            onMouseDown={(e) => {
-              handleResize(e, widthKey, nextKey);
-            }}
-          >
-            <div className="w-px h-full bg-border-color/40 group-hover:bg-accent transition-colors" />
-          </div>
-        )}
-      </div>
-    );
+  const headerColumnProps = {
+    onResize: handleResize,
+    onSortChange,
+    sortCriteria,
+    totalRawWidth,
+    widths,
   };
 
   return (
     <div className="flex items-center w-full h-9 bg-bg-secondary/80 backdrop-blur-sm border-b border-border-color/50 shrink-0">
-      <Column title="" widthKey="thumbnail" nextKey="name" />
-      <Column title={t('library.grid.columns.name')} widthKey="name" nextKey="date" sortKey="name" />
-      <Column title={t('library.grid.columns.modified')} widthKey="date" nextKey="rating" sortKey="date" />
-      <Column title={t('library.grid.columns.rating')} widthKey="rating" nextKey="color" sortKey="rating" />
+      <HeaderColumn {...headerColumnProps} title="" widthKey="thumbnail" nextKey="name" />
+      <HeaderColumn
+        {...headerColumnProps}
+        title={t('library.grid.columns.name')}
+        widthKey="name"
+        nextKey="date"
+        sortKey="name"
+      />
+      <HeaderColumn
+        {...headerColumnProps}
+        title={t('library.grid.columns.modified')}
+        widthKey="date"
+        nextKey="rating"
+        sortKey="date"
+      />
+      <HeaderColumn
+        {...headerColumnProps}
+        title={t('library.grid.columns.rating')}
+        widthKey="rating"
+        nextKey="color"
+        sortKey="rating"
+      />
       {showExifCols ? (
         <>
-          <Column title={t('library.grid.columns.label')} widthKey="color" nextKey="shutter" />
-          <Column
+          <HeaderColumn
+            {...headerColumnProps}
+            title={t('library.grid.columns.label')}
+            widthKey="color"
+            nextKey="shutter"
+          />
+          <HeaderColumn
+            {...headerColumnProps}
             title={t('library.grid.columns.shutter')}
             widthKey="shutter"
             nextKey="aperture"
             sortKey="shutter_speed"
           />
-          <Column title={t('library.grid.columns.aperture')} widthKey="aperture" nextKey="iso" sortKey="aperture" />
-          <Column title={t('library.grid.columns.iso')} widthKey="iso" nextKey="focal" sortKey="iso" />
-          <Column title={t('library.grid.columns.focal')} widthKey="focal" sortKey="focal_length" />
+          <HeaderColumn
+            {...headerColumnProps}
+            title={t('library.grid.columns.aperture')}
+            widthKey="aperture"
+            nextKey="iso"
+            sortKey="aperture"
+          />
+          <HeaderColumn
+            {...headerColumnProps}
+            title={t('library.grid.columns.iso')}
+            widthKey="iso"
+            nextKey="focal"
+            sortKey="iso"
+          />
+          <HeaderColumn
+            {...headerColumnProps}
+            title={t('library.grid.columns.focal')}
+            widthKey="focal"
+            sortKey="focal_length"
+          />
         </>
       ) : (
-        <Column title={t('library.grid.columns.label')} widthKey="color" />
+        <HeaderColumn {...headerColumnProps} title={t('library.grid.columns.label')} widthKey="color" />
       )}
     </div>
   );
