@@ -104,7 +104,7 @@ const insertChildrenIntoTree = (
   if (node.path === targetPath) {
     const mergedChildren = newChildren.map((newChild) => {
       const existingChild = node.children.find((child) => child.path === newChild.path);
-      if (existingChild && existingChild.children && existingChild.children.length > 0) {
+      if (existingChild && existingChild.children.length > 0) {
         return { ...newChild, children: existingChild.children };
       }
       return newChild;
@@ -112,7 +112,7 @@ const insertChildrenIntoTree = (
     return { ...node, children: mergedChildren };
   }
 
-  if (node.children && node.children.length > 0) {
+  if (node.children.length > 0) {
     return {
       ...node,
       children: node.children.map((child) => insertChildrenIntoTree(child, targetPath, newChildren)),
@@ -258,11 +258,11 @@ function App() {
       return halfScreenHeight;
     }
     let effectiveRatio = originalSize.width / originalSize.height;
-    const orientationSteps = adjustments?.orientationSteps || 0;
+    const orientationSteps = adjustments.orientationSteps;
     if (orientationSteps % 2 !== 0) {
       effectiveRatio = originalSize.height / originalSize.width;
     }
-    if (adjustments?.aspectRatio && adjustments.aspectRatio > 0) {
+    if (adjustments.aspectRatio && adjustments.aspectRatio > 0) {
       effectiveRatio = adjustments.aspectRatio;
     }
     const desiredImageHeight = viewportSize.width / effectiveRatio;
@@ -497,7 +497,7 @@ function App() {
     const previousTouchAction = document.documentElement.style.touchAction;
     const previousUserSelect = document.documentElement.style.userSelect;
 
-    target.setPointerCapture?.(pointerId);
+    target.setPointerCapture(pointerId);
     document.documentElement.style.touchAction = 'none';
     document.documentElement.style.userSelect = 'none';
 
@@ -527,7 +527,7 @@ function App() {
 
     const stopDrag = (upEvent: PointerEvent) => {
       if (upEvent.pointerId !== pointerId) return;
-      if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
+      if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
 
       document.documentElement.style.cursor = '';
       document.documentElement.style.touchAction = previousTouchAction;
@@ -598,7 +598,7 @@ function App() {
     [expandedFolders, appSettings?.enableFolderImageCounts, setLibrary],
   );
 
-  const hasRoots = rootPaths && rootPaths.length > 0;
+  const hasRoots = rootPaths.length > 0;
 
   const renderFolderTree = () => {
     if (!hasRoots) return null;
