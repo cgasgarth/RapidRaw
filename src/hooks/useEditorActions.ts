@@ -31,10 +31,13 @@ export const debouncedSave = debounce((path: string, adjustmentsToSave: Adjustme
 }, 300);
 
 type LoadedMetadataAdjustments = Adjustments & { is_null?: boolean };
+type AdjustmentRecord = Record<string, unknown>;
 
 interface MetadataResponse {
   adjustments?: LoadedMetadataAdjustments | null;
 }
+
+const cloneAdjustmentValue = (value: unknown): unknown => structuredClone(value);
 
 export function useEditorActions() {
   const setEditor = useEditorStore((s) => s.setEditor);
@@ -168,12 +171,12 @@ export function useEditorActions() {
 
     if (!sourceAdjustments) return;
 
-    const adjustmentsToCopy: Partial<Adjustments> = {};
+    const adjustmentsToCopy: AdjustmentRecord = {};
 
     for (const key of COPYABLE_ADJUSTMENT_KEYS) {
       if (Object.prototype.hasOwnProperty.call(sourceAdjustments, key)) {
-        const adjustmentKey = key as keyof Adjustments;
-        adjustmentsToCopy[adjustmentKey] = structuredClone(sourceAdjustments[adjustmentKey]);
+        const value: unknown = sourceAdjustments[key];
+        adjustmentsToCopy[key] = cloneAdjustmentValue(value);
       }
     }
     useEditorStore.getState().setEditor({ copiedAdjustments: adjustmentsToCopy });
@@ -193,24 +196,24 @@ export function useEditorActions() {
         mode: PasteMode.Merge,
         includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
       };
-      const adjustmentsToApply: Partial<Adjustments> = {};
+      const copiedAdjustmentRecord: AdjustmentRecord = copiedAdjustments;
+      const adjustmentsToApply: AdjustmentRecord = {};
 
       for (const key of includedAdjustments) {
-        if (Object.prototype.hasOwnProperty.call(copiedAdjustments, key)) {
-          const value = copiedAdjustments[key as keyof Adjustments];
+        if (Object.prototype.hasOwnProperty.call(copiedAdjustmentRecord, key)) {
+          const value = copiedAdjustmentRecord[key];
           if (mode === PasteMode.Merge) {
-            const defaultValue = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
-            if (JSON.stringify(value) !== JSON.stringify(defaultValue))
-              adjustmentsToApply[key as keyof Adjustments] = value;
+            const defaultValue: unknown = INITIAL_ADJUSTMENTS[key];
+            if (JSON.stringify(value) !== JSON.stringify(defaultValue)) adjustmentsToApply[key] = value;
           } else {
-            adjustmentsToApply[key as keyof Adjustments] = value;
+            adjustmentsToApply[key] = value;
           }
         }
       }
 
       if (includedAdjustments.includes(LensAdjustment.LensMaker)) {
-        if (!adjustmentsToApply.lensMaker) {
-          adjustmentsToApply.lensDistortionParams = null;
+        if (!adjustmentsToApply['lensMaker']) {
+          adjustmentsToApply['lensDistortionParams'] = null;
         }
       }
 
