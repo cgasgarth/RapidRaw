@@ -278,7 +278,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
       ? currentPins.filter((p: string) => p !== path)
       : [...currentPins, path].sort((a, b) => a.localeCompare(b));
 
-    handleSettingsChange({ ...appSettings, pinnedFolders: newPins });
+    await handleSettingsChange({ ...appSettings, pinnedFolders: newPins });
 
     try {
       const trees = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {

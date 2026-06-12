@@ -234,12 +234,21 @@ export default function AppModals(props: AppModalsProps) {
         }}
         targetPaths={negativeModalState.targetPaths}
         onSave={(savedPaths) => {
-          props.refreshImageList().then(() => {
-            if (selectedImage && negativeModalState.targetPaths.includes(selectedImage.path) && savedPaths.length > 0) {
-              const savedPath = savedPaths[0];
-              if (savedPath) props.handleImageSelect(savedPath);
-            }
-          });
+          void props
+            .refreshImageList()
+            .then(() => {
+              if (
+                selectedImage &&
+                negativeModalState.targetPaths.includes(selectedImage.path) &&
+                savedPaths.length > 0
+              ) {
+                const savedPath = savedPaths[0];
+                if (savedPath) props.handleImageSelect(savedPath);
+              }
+            })
+            .catch((err: unknown) => {
+              console.error('Failed to refresh image list after negative conversion:', err);
+            });
         }}
       />
       <DenoiseModal

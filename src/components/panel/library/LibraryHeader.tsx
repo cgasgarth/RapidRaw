@@ -590,7 +590,7 @@ export function ViewOptionsDropdown({
                   }`}
                   onClick={() => {
                     if (!appSettings) return;
-                    handleSettingsChange({ ...appSettings, exifOverlay: option.id });
+                    void handleSettingsChange({ ...appSettings, exifOverlay: option.id });
                   }}
                 >
                   <Text

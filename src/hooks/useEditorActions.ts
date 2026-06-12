@@ -234,17 +234,19 @@ export function useEditorActions() {
       invoke(Invokes.ApplyAdjustmentsToPaths, { paths: pathsToUpdate, adjustments: adjustmentsToApply })
         .then(() => {
           if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-            invoke<MetadataResponse>(Invokes.LoadMetadata, { path: selectedImage.path }).then((meta) => {
-              const loadedAdjustments = meta.adjustments;
-              if (loadedAdjustments) {
-                setAdjustments((prev: Adjustments) => ({
-                  ...prev,
-                  lensMaker: loadedAdjustments.lensMaker,
-                  lensModel: loadedAdjustments.lensModel,
-                  lensDistortionParams: loadedAdjustments.lensDistortionParams,
-                }));
-              }
-            });
+            void invoke<MetadataResponse>(Invokes.LoadMetadata, { path: selectedImage.path })
+              .then((meta) => {
+                const loadedAdjustments = meta.adjustments;
+                if (loadedAdjustments) {
+                  setAdjustments((prev: Adjustments) => ({
+                    ...prev,
+                    lensMaker: loadedAdjustments.lensMaker,
+                    lensModel: loadedAdjustments.lensModel,
+                    lensDistortionParams: loadedAdjustments.lensDistortionParams,
+                  }));
+                }
+              })
+              .catch((err: unknown) => toast.error(`Failed to reload metadata: ${formatUnknownError(err)}`));
           }
         })
         .catch((err: unknown) => toast.error(`Failed to paste adjustments: ${formatUnknownError(err)}`));

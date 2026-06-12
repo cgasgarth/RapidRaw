@@ -207,7 +207,7 @@ export function useFileOperations(
           }
 
           if (settingsChanged) {
-            handleSettingsChange(newAppSettings);
+            await handleSettingsChange(newAppSettings);
           }
 
           await refreshAllFolderTrees();
