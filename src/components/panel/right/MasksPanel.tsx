@@ -99,6 +99,7 @@ import { useUIStore } from '../../../store/useUIStore';
 import { useWaveformControls } from '../../../hooks/useWaveformControls';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
 import { aiDepthMaskParametersSchema } from '../../../schemas/maskParameterSchemas';
+import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
 interface SubMaskParameterConfig {
   defaultValue: number;
   key: string;
@@ -129,6 +130,14 @@ type PresetMenuItem = UserPreset & {
   folder?: { children?: Array<PresetMenuItem> | undefined; name?: string | undefined } | undefined;
   preset?: { adjustments: Partial<Adjustments>; name?: string | undefined } | undefined;
 };
+
+function readAdjustmentValue(adjustments: Partial<Adjustments> | null | undefined, key: string): unknown {
+  return adjustments ? (adjustments as Record<string, unknown>)[key] : undefined;
+}
+
+function writeAdjustmentPatchValue(patch: MaskAdjustmentPatch, key: string, value: unknown): void {
+  (patch as Record<string, unknown>)[key] = structuredClone(value);
+}
 
 interface CopiedSectionAdjustments {
   section: string;
@@ -947,39 +956,39 @@ export default function MasksPanel() {
     const isRotated = steps === 1 || steps === 3;
     const imgW = isRotated ? selectedImage.height || 1000 : selectedImage.width || 1000;
     const imgH = isRotated ? selectedImage.width || 1000 : selectedImage.height || 1000;
+    const parameters = toMaskParameterRecord(subMask.parameters);
 
-    if (type === Mask.Linear && subMask.parameters) {
-      subMask.parameters.range = Math.min(imgW, imgH) * 0.1;
+    if (type === Mask.Linear) {
+      parameters['range'] = Math.min(imgW, imgH) * 0.1;
     }
 
     if (type === Mask.Linear || type === Mask.Radial || type === Mask.Color || type === Mask.Luminance) {
-      if (!subMask.parameters) subMask.parameters = {};
-      subMask.parameters.isInitialDraw = true;
+      parameters['isInitialDraw'] = true;
       if (type === Mask.Linear || type === Mask.Radial) {
-        subMask.parameters.startX = -10000;
-        subMask.parameters.startY = -10000;
-        subMask.parameters.endX = -10000;
-        subMask.parameters.endY = -10000;
-        subMask.parameters.centerX = -10000;
-        subMask.parameters.centerY = -10000;
-        subMask.parameters.radiusX = 0;
-        subMask.parameters.radiusY = 0;
+        parameters['startX'] = -10000;
+        parameters['startY'] = -10000;
+        parameters['endX'] = -10000;
+        parameters['endY'] = -10000;
+        parameters['centerX'] = -10000;
+        parameters['centerY'] = -10000;
+        parameters['radiusX'] = 0;
+        parameters['radiusY'] = 0;
       } else {
-        subMask.parameters.targetX = -10000;
-        subMask.parameters.targetY = -10000;
-        subMask.parameters.tolerance = 20;
-        subMask.parameters.feather = 35;
+        parameters['targetX'] = -10000;
+        parameters['targetY'] = -10000;
+        parameters['tolerance'] = 20;
+        parameters['feather'] = 35;
       }
     }
 
     if (type === Mask.AiDepth) {
-      if (!subMask.parameters) subMask.parameters = {};
-      subMask.parameters.minDepth = 20;
-      subMask.parameters.maxDepth = 100;
-      subMask.parameters.minFade = 15;
-      subMask.parameters.maxFade = 15;
-      subMask.parameters.feather = 10;
+      parameters['minDepth'] = 20;
+      parameters['maxDepth'] = 100;
+      parameters['minFade'] = 15;
+      parameters['maxFade'] = 15;
+      parameters['feather'] = 10;
     }
+    subMask.parameters = parameters;
     return subMask;
   };
 
@@ -2565,20 +2574,19 @@ function SettingsPanel({
 
   const handleSubMaskParametersChange = (changes: Record<string, number>) => {
     if (!isActive || !activeSubMask) return;
-    const newParams = { ...activeSubMask.parameters, ...changes };
+    const newParams = mergeMaskParameters(activeSubMask.parameters, changes);
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
   const handleDepthRangeChange = (values: { minDepth: number; maxDepth: number; minFade: number; maxFade: number }) => {
     if (!isActive || !activeSubMask) return;
 
-    const newParams = {
-      ...activeSubMask.parameters,
+    const newParams = mergeMaskParameters(activeSubMask.parameters, {
       minDepth: 100 - values.maxDepth,
       maxDepth: 100 - values.minDepth,
       minFade: values.maxFade,
       maxFade: values.minFade,
-    };
+    });
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
@@ -2631,8 +2639,9 @@ function SettingsPanel({
     const handleCopy = () => {
       const adjustmentsToCopy: MaskAdjustmentPatch = {};
       for (const key of sectionKeys) {
-        if (container.adjustments && container.adjustments[key] !== undefined) {
-          adjustmentsToCopy[key] = structuredClone(container.adjustments[key]);
+        const adjustmentValue = readAdjustmentValue(container.adjustments, key);
+        if (adjustmentValue !== undefined) {
+          writeAdjustmentPatchValue(adjustmentsToCopy, key, adjustmentValue);
         }
       }
       setCopiedSectionAdjustments({ section: sectionName, values: adjustmentsToCopy });
@@ -2654,8 +2663,9 @@ function SettingsPanel({
     const handleReset = () => {
       const resetValues: MaskAdjustmentPatch = {};
       for (const key of sectionKeys) {
-        if (INITIAL_MASK_ADJUSTMENTS[key] !== undefined) {
-          resetValues[key] = structuredClone(INITIAL_MASK_ADJUSTMENTS[key]);
+        const resetValue = readAdjustmentValue(INITIAL_MASK_ADJUSTMENTS, key);
+        if (resetValue !== undefined) {
+          writeAdjustmentPatchValue(resetValues, key, resetValue);
         }
       }
       setMaskContainerAdjustments((prev: Adjustments) => ({
@@ -2824,10 +2834,10 @@ function SettingsPanel({
 
               {activeSubMask.type === Mask.AiDepth && (
                 <DepthRangePicker
-                  minDepth={100 - (activeSubMask.parameters?.maxDepth ?? 100)}
-                  maxDepth={100 - (activeSubMask.parameters?.minDepth ?? 0)}
-                  minFade={activeSubMask.parameters?.maxFade ?? 15}
-                  maxFade={activeSubMask.parameters?.minFade ?? 15}
+                  minDepth={100 - getMaskParameterNumber(activeSubMask.parameters, 'maxDepth', 100)}
+                  maxDepth={100 - getMaskParameterNumber(activeSubMask.parameters, 'minDepth')}
+                  minFade={getMaskParameterNumber(activeSubMask.parameters, 'maxFade', 15)}
+                  maxFade={getMaskParameterNumber(activeSubMask.parameters, 'minFade', 15)}
                   onChange={handleDepthRangeChange}
                   onDragStateChange={onDragStateChange}
                 />
@@ -2845,7 +2855,7 @@ function SettingsPanel({
                   max={param.max}
                   step={param.step}
                   defaultValue={param.defaultValue}
-                  value={(activeSubMask.parameters[param.key] || 0) * (param.multiplier || 1)}
+                  value={getMaskParameterNumber(activeSubMask.parameters, param.key) * (param.multiplier || 1)}
                   onChange={(e: ChangeEvent<HTMLInputElement>) => {
                     handleSubMaskParametersChange({
                       [param.key]: parseFloat(e.target.value) / (param.multiplier || 1),
@@ -2860,7 +2870,7 @@ function SettingsPanel({
                 brushSettings &&
                 (activeSubMask.type === Mask.Flow ? (
                   <FlowBrushTool
-                    flow={activeSubMask.parameters?.flow ?? 10}
+                    flow={getMaskParameterNumber(activeSubMask.parameters, 'flow', 10)}
                     onFlowChange={(flow: number) => {
                       handleSubMaskParametersChange({ flow });
                     }}

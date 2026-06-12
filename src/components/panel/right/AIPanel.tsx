@@ -66,6 +66,7 @@ import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useAiMasking } from '../../../hooks/useAiMasking';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
 import { cloudUsageSchema, type CloudUsage } from '../../../schemas/cloudUsageSchemas';
+import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
 
 interface DragData {
   type: 'Container' | 'SubMask' | 'Creation';
@@ -530,32 +531,33 @@ export default function AIPanel() {
     const isRotated = steps === 1 || steps === 3;
     const imgW = isRotated ? selectedImage.height || 1000 : selectedImage.width || 1000;
     const imgH = isRotated ? selectedImage.width || 1000 : selectedImage.height || 1000;
+    const parameters = toMaskParameterRecord(subMask.parameters);
 
     const config = SUB_MASK_CONFIG[type];
     if (config && config.parameters) {
       config.parameters.forEach((param) => {
         if (param.defaultValue !== undefined) {
-          subMask.parameters[param.key] = param.defaultValue / (param.multiplier || 1);
+          parameters[param.key] = param.defaultValue / (param.multiplier || 1);
         }
       });
     }
 
-    if (type === Mask.Linear && subMask.parameters) {
-      subMask.parameters.range = Math.min(imgW, imgH) * 0.1;
+    if (type === Mask.Linear) {
+      parameters['range'] = Math.min(imgW, imgH) * 0.1;
     }
 
     if (type === Mask.Linear || type === Mask.Radial) {
-      if (!subMask.parameters) subMask.parameters = {};
-      subMask.parameters.isInitialDraw = true;
-      subMask.parameters.startX = -10000;
-      subMask.parameters.startY = -10000;
-      subMask.parameters.endX = -10000;
-      subMask.parameters.endY = -10000;
-      subMask.parameters.centerX = -10000;
-      subMask.parameters.centerY = -10000;
-      subMask.parameters.radiusX = 0;
-      subMask.parameters.radiusY = 0;
+      parameters['isInitialDraw'] = true;
+      parameters['startX'] = -10000;
+      parameters['startY'] = -10000;
+      parameters['endX'] = -10000;
+      parameters['endY'] = -10000;
+      parameters['centerX'] = -10000;
+      parameters['centerY'] = -10000;
+      parameters['radiusX'] = 0;
+      parameters['radiusY'] = 0;
     }
+    subMask.parameters = parameters;
     return subMask;
   };
 
@@ -2156,13 +2158,12 @@ function SettingsPanel({
                   max={param.max}
                   step={param.step}
                   defaultValue={param.defaultValue}
-                  value={(activeSubMask.parameters?.[param.key] || 0) * (param.multiplier || 1)}
+                  value={getMaskParameterNumber(activeSubMask.parameters, param.key) * (param.multiplier || 1)}
                   onChange={(event: NumericChangeEvent) => {
                     updateSubMask(activeSubMask.id, {
-                      parameters: {
-                        ...(activeSubMask.parameters ?? {}),
+                      parameters: mergeMaskParameters(activeSubMask.parameters, {
                         [param.key]: getNumericEventValue(event) / (param.multiplier || 1),
-                      },
+                      }),
                     });
                   }}
                   {...(param.key !== 'grow' && { fillOrigin: 'min' })}
