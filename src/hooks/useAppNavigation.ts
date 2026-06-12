@@ -252,7 +252,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             currentResRef.current = 0;
             setEditor({ originalSize: { width: result.width, height: result.height } });
           })
-          .catch((err) => {
+          .catch((err: unknown) => {
             if (String(err).includes('cancelled')) return;
             console.error('Background load_image failed on cache hit:', err);
             isBackendReadyRef.current = true;
@@ -278,7 +278,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
               globalImageCache.set(path, { ...cachedReadyEntry, adjustments: freshAdjustments });
             }
           })
-          .catch((err) => console.error('Failed background metadata sync on cache hit:', err));
+          .catch((err: unknown) => console.error('Failed background metadata sync on cache hit:', err));
 
         return;
       }
@@ -448,7 +448,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
                   })),
                 }));
               })
-              .catch((err) => {
+              .catch((err: unknown) => {
                 console.error('Failed to read EXIF data in background:', err);
               });
           }
@@ -457,7 +457,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         }
 
         if (!preserveEditor) {
-          invoke(Invokes.StartBackgroundIndexing, { folderPath: path }).catch((err) => {
+          invoke(Invokes.StartBackgroundIndexing, { folderPath: path }).catch((err: unknown) => {
             console.error('Failed to start background indexing:', err);
           });
         }
@@ -647,7 +647,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
       }
     };
 
-    restore().catch((err) => {
+    restore().catch((err: unknown) => {
       console.error('Failed to restore session:', err);
       toast.error('Failed to restore session. A folder may have been moved or deleted.');
       handleGoHome();

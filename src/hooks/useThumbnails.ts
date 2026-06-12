@@ -22,7 +22,7 @@ export function useThumbnails() {
             pathsToSend[j] = currentPath;
           }
 
-          invoke('update_thumbnail_queue', { paths: pathsToSend }).catch((err) => {
+          invoke('update_thumbnail_queue', { paths: pathsToSend }).catch((err: unknown) => {
             console.error('Failed to update thumbnail queue:', err);
           });
 

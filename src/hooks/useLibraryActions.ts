@@ -41,7 +41,7 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
       return { imageRatings: newRatings };
     });
 
-    invoke(Invokes.SetRatingForPaths, { paths: pathsToRate, rating: finalRating }).catch((err) => {
+    invoke(Invokes.SetRatingForPaths, { paths: pathsToRate, rating: finalRating }).catch((err: unknown) => {
       console.error(err);
       toast.error(`Failed to apply rating: ${formatUnknownError(err)}`);
     });

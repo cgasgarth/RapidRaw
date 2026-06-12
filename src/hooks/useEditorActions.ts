@@ -24,7 +24,7 @@ export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
 }, 500);
 
 export const debouncedSave = debounce((path: string, adjustmentsToSave: Adjustments) => {
-  invoke(Invokes.SaveMetadataAndUpdateThumbnail, { path, adjustments: adjustmentsToSave }).catch((err) => {
+  invoke(Invokes.SaveMetadataAndUpdateThumbnail, { path, adjustments: adjustmentsToSave }).catch((err: unknown) => {
     console.error('Auto-save failed:', err);
     toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
   });
@@ -134,7 +134,7 @@ export function useEditorActions() {
             setEditor({ adjustments: resetData });
           }
         })
-        .catch((err) => toast.error(`Failed to reset adjustments: ${formatUnknownError(err)}`));
+        .catch((err: unknown) => toast.error(`Failed to reset adjustments: ${formatUnknownError(err)}`));
     },
     [setEditor],
   );
@@ -243,7 +243,7 @@ export function useEditorActions() {
             });
           }
         })
-        .catch((err) => toast.error(`Failed to paste adjustments: ${formatUnknownError(err)}`));
+        .catch((err: unknown) => toast.error(`Failed to paste adjustments: ${formatUnknownError(err)}`));
 
       setProcess({ isPasted: true });
     },

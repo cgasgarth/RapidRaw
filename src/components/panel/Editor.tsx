@@ -1295,7 +1295,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
             pixelated: isZoomedIn,
           },
         })
-          .catch((err) => {
+          .catch((err: unknown) => {
             console.warn('WGPU Sync Error:', err);
           })
           .finally(() => {

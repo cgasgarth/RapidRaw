@@ -161,7 +161,7 @@ export const useAppInitialization = ({
   useEffect(() => {
     invoke<SupportedTypes>(Invokes.GetSupportedFileTypes)
       .then((types) => setSupportedTypes(types))
-      .catch((err) => console.error('Failed to load supported file types:', err));
+      .catch((err: unknown) => console.error('Failed to load supported file types:', err));
   }, [setSupportedTypes]);
 
   useEffect(() => {
@@ -258,9 +258,9 @@ export const useAppInitialization = ({
           });
         }
 
-        invoke('frontend_ready').catch((e) => console.error('Failed to notify backend of readiness:', e));
+        invoke('frontend_ready').catch((e: unknown) => console.error('Failed to notify backend of readiness:', e));
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error('Failed to load settings:', err);
         setAppSettings({
           lastRootPath: null,

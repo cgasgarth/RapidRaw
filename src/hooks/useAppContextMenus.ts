@@ -194,7 +194,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     useLibraryStore.getState().setLibrary({ albumTree: res }),
                   );
                 })
-                .catch((err) => toast.error(t('contextMenus.toasts.failedAddToAlbum', { err })));
+                .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedAddToAlbum', { err })));
             },
           };
         }
@@ -514,7 +514,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               }
             }
           })
-          .catch((err) => {
+          .catch((err: unknown) => {
             console.error('Failed to apply auto adjustments to paths:', err);
             toast.error(t('contextMenus.toasts.failedApplyAuto', { err }));
           });
@@ -793,7 +793,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           icon: Folder,
           label: t('contextMenus.thumbnail.showExplorer'),
           onClick: () => {
-            invoke(Invokes.ShowInFinder, { path: finalSelection[0] }).catch((err) =>
+            invoke(Invokes.ShowInFinder, { path: finalSelection[0] }).catch((err: unknown) =>
               toast.error(t('contextMenus.toasts.couldNotShowExplorer', { err })),
             );
           },
@@ -1007,7 +1007,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           icon: Folder,
           label: t('contextMenus.folders.showExplorer'),
           onClick: () =>
-            invoke(Invokes.ShowInFinder, { path: targetPath }).catch((err) =>
+            invoke(Invokes.ShowInFinder, { path: targetPath }).catch((err: unknown) =>
               toast.error(t('contextMenus.toasts.couldNotShowFolder', { err })),
             ),
         },
@@ -1141,7 +1141,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         invoke(Invokes.SaveAlbums, { tree: newTree })
           .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
           .then((sortedTree) => setLibrary({ albumTree: sortedTree }))
-          .catch((err) => toast.error(t('contextMenus.toasts.failedMoveError', { err })));
+          .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedMoveError', { err })));
       };
 
       const buildMoveSubmenu = (nodes: AlbumItem[]): Option[] => {
@@ -1233,7 +1233,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       invoke(Invokes.SaveAlbums, { tree: newTree })
                         .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
                         .then((sorted) => setLibrary({ albumTree: sorted }))
-                        .catch((err) => toast.error(t('contextMenus.toasts.failedChangeIcon', { err })));
+                        .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedChangeIcon', { err })));
                     }
                   },
                 })),
@@ -1285,7 +1285,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       invoke(Invokes.SaveAlbums, { tree: newTree })
                         .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
                         .then((sorted) => setLibrary({ albumTree: sorted }))
-                        .catch((err) => toast.error(t('contextMenus.toasts.failedDelete', { err })));
+                        .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedDelete', { err })));
                     },
                   },
                 ],
