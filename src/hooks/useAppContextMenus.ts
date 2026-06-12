@@ -1119,7 +1119,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           const insert = (nodes: AlbumItem[]) => {
             for (const n of nodes) {
               if (n.id === targetId && n.type === 'group') {
-                n.children.push(extractedItem!);
+                n.children.push(extractedItem);
                 inserted = true;
                 return;
               } else if (n.type === 'group') {

@@ -1064,7 +1064,10 @@ export default function MasksPanel() {
           label: getMaskTypeName(maskType),
           icon: maskType.icon,
           disabled: maskType.disabled,
-          onClick: () => handleAddSubMask(targetContainerId!, maskType.type, mode),
+          onClick: () => {
+            if (!targetContainerId) return;
+            handleAddSubMask(targetContainerId, maskType.type, mode);
+          },
         };
       }),
     });
@@ -1277,18 +1280,21 @@ export default function MasksPanel() {
     const dragData = active.data.current as DragData;
     const overData = over?.data.current as DragData;
 
-    if (dragData.type === 'Creation' && dragData.maskType) {
+    const creationMaskType = dragData.type === 'Creation' ? dragData.maskType : undefined;
+    if (creationMaskType) {
       const creationFn = () => {
-        if (overData?.type === 'Container') {
-          handleAddSubMask(overData.item!.id, dragData.maskType!);
+        const overItem = overData?.item;
+        if (overData?.type === 'Container' && overItem) {
+          handleAddSubMask(overItem.id, creationMaskType);
         } else if (overData?.type === 'SubMask') {
           const container = adjustments.masks.find((m) => m.id === overData.parentId);
-          if (container && over) {
+          const parentId = overData.parentId;
+          if (container && over && parentId) {
             const targetIndex = container.subMasks.findIndex((sm) => sm.id === over.id);
-            handleAddSubMask(overData.parentId!, dragData.maskType!, SubMaskMode.Additive, targetIndex);
+            handleAddSubMask(parentId, creationMaskType, SubMaskMode.Additive, targetIndex);
           }
         } else {
-          handleAddMaskContainer(dragData.maskType!);
+          handleAddMaskContainer(creationMaskType);
         }
       };
 
@@ -1311,7 +1317,10 @@ export default function MasksPanel() {
       if (!overId || active.id === overId) return;
 
       setAdjustments((prev: Adjustments) => {
-        const oldIndex = prev.masks.findIndex((m) => m.id === dragData.item!.id);
+        const draggedItem = dragData.item;
+        if (!draggedItem) return prev;
+
+        const oldIndex = prev.masks.findIndex((m) => m.id === draggedItem.id);
         let newIndex = -1;
 
         if (overId === 'mask-list-root') {
@@ -1340,10 +1349,13 @@ export default function MasksPanel() {
 
       if (over?.id === 'mask-list-root' || !over) {
         setAdjustments((prev: Adjustments) => {
+          const draggedItem = dragData.item;
+          if (!draggedItem) return prev;
+
           const newMasks = JSON.parse(JSON.stringify(prev.masks));
           const sourceContainer = newMasks.find((m: MaskContainer) => m.id === sourceContainerId);
           if (!sourceContainer) return prev;
-          const subMaskIndex = sourceContainer.subMasks.findIndex((sm: SubMask) => sm.id === dragData.item!.id);
+          const subMaskIndex = sourceContainer.subMasks.findIndex((sm: SubMask) => sm.id === draggedItem.id);
           if (subMaskIndex === -1) return prev;
           const [movedSubMask] = sourceContainer.subMasks.splice(subMaskIndex, 1);
           if (!movedSubMask) return prev;
@@ -1368,17 +1380,21 @@ export default function MasksPanel() {
       if (!over) return;
 
       let targetContainerId: string | null = null;
-      if (overData?.type === 'Container') targetContainerId = overData.item!.id;
+      if (overData?.type === 'Container') targetContainerId = overData.item?.id ?? null;
       else if (overData?.type === 'SubMask' && overData.parentId) targetContainerId = overData.parentId;
 
       if (targetContainerId) {
+        const expandedTargetContainerId = targetContainerId;
         setAdjustments((prev: Adjustments) => {
+          const draggedItem = dragData.item;
+          if (!draggedItem) return prev;
+
           const newMasks = prev.masks.map((m) => ({ ...m, subMasks: [...m.subMasks] }));
           const sourceContainer = newMasks.find((m) => m.id === sourceContainerId);
-          const targetContainer = newMasks.find((m) => m.id === targetContainerId);
+          const targetContainer = newMasks.find((m) => m.id === expandedTargetContainerId);
           if (!sourceContainer || !targetContainer) return prev;
 
-          const sourceSubMaskIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === dragData.item!.id);
+          const sourceSubMaskIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === draggedItem.id);
           if (sourceSubMaskIndex === -1) return prev;
 
           const [movedSubMask] = sourceContainer.subMasks.splice(sourceSubMaskIndex, 1);
@@ -1400,7 +1416,7 @@ export default function MasksPanel() {
             } else {
               targetContainer.subMasks.push(movedSubMask);
             }
-            setExpandedContainers((p) => new Set(p).add(targetContainerId!));
+            setExpandedContainers((p) => new Set(p).add(expandedTargetContainerId));
           }
           return { ...prev, masks: newMasks };
         });

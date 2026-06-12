@@ -466,6 +466,7 @@ export function usePresets(currentAdjustments: Adjustments) {
         return;
       }
 
+      const movedPreset = presetToMove;
       let updatedPresets = [...presets];
 
       if (sourceFolderId) {
@@ -485,12 +486,12 @@ export function usePresets(currentAdjustments: Adjustments) {
             if (overId) {
               const overIndex = newChildren.findIndex((p) => p.id === overId);
               if (overIndex !== -1) {
-                newChildren.splice(overIndex, 0, presetToMove!);
+                newChildren.splice(overIndex, 0, movedPreset);
               } else {
-                newChildren.push(presetToMove!);
+                newChildren.push(movedPreset);
               }
             } else {
-              newChildren.push(presetToMove!);
+              newChildren.push(movedPreset);
             }
             return { folder: { ...item.folder, children: newChildren } };
           }
