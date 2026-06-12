@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Save, X, Check } from 'lucide-react';
@@ -7,6 +7,7 @@ import { AppSettings } from './AppProperties';
 import Dropdown from './Dropdown';
 import Text from './Text';
 import { TextVariants } from '../../types/typography';
+import { useManagedFocus } from '../../hooks/useManagedFocus';
 
 interface ExportPresetsListProps {
   appSettings: AppSettings | null;
@@ -26,7 +27,10 @@ export default function ExportPresetsList({
   const [newPresetName, setNewPresetName] = useState('');
   const [selectedPresetId, setSelectedPresetId] = useState<string>('');
   const [isSaved, setIsSaved] = useState(false);
+  const newPresetInputRef = useRef<HTMLInputElement>(null);
   const presets = appSettings?.exportPresets || [];
+
+  useManagedFocus(newPresetInputRef, isCreating);
 
   const handleSelect = (id: string) => {
     setSelectedPresetId(id);
@@ -147,13 +151,13 @@ export default function ExportPresetsList({
       ) : (
         <div className="flex gap-2 items-center animate-in fade-in slide-in-from-top-1 duration-200">
           <input
-            autoFocus
             type="text"
             placeholder={t('ui.exportPresets.presetNamePlaceholder')}
             value={newPresetName}
             onChange={(e) => {
               setNewPresetName(e.target.value);
             }}
+            ref={newPresetInputRef}
             className="grow bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {

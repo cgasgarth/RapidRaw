@@ -136,7 +136,7 @@ module.exports = [
       // are tracked separately so this gate can land without broad UI rewrites.
       'jsx-a11y/no-static-element-interactions': 'off',
       'jsx-a11y/click-events-have-key-events': 'off',
-      'jsx-a11y/no-autofocus': 'off',
+      'jsx-a11y/no-autofocus': 'error',
       'jsx-a11y/no-noninteractive-element-interactions': 'error',
       'import-x/no-duplicates': 'error',
       'import-x/no-self-import': 'error',

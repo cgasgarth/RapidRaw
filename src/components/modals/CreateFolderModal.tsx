@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
+import { useManagedFocus } from '../../hooks/useManagedFocus';
 
 interface FolderModalProps {
   isOpen: boolean;
@@ -24,6 +25,9 @@ export default function CreateFolderModal({
   const [name, setName] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useManagedFocus(nameInputRef, show);
 
   useEffect(() => {
     if (isOpen) {
@@ -89,11 +93,11 @@ export default function CreateFolderModal({
           {title || t('modals.createFolder.title')}
         </Text>
         <input
-          autoFocus
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-accent"
           onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder || t('modals.createFolder.placeholder')}
+          ref={nameInputRef}
           type="text"
           value={name}
         />

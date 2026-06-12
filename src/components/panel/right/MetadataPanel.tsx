@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Check, ChevronDown, ChevronRight, Plus, Star, Tag, X, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,6 +14,7 @@ import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
+import { useManagedFocus } from '../../../hooks/useManagedFocus';
 
 interface CameraSetting {
   format?(value: MetadataValue): string | number;
@@ -146,6 +147,9 @@ function EditableMetadataItem({ label, value, onSave }: EditableMetadataItemProp
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value || '');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useManagedFocus(inputRef, isEditing);
 
   useEffect(() => {
     setLocalValue(value || '');
@@ -183,7 +187,6 @@ function EditableMetadataItem({ label, value, onSave }: EditableMetadataItemProp
       <div className="w-[55%] shrink-0">
         {isEditing ? (
           <input
-            autoFocus
             type="text"
             value={localValue}
             onChange={(e) => {
@@ -191,6 +194,7 @@ function EditableMetadataItem({ label, value, onSave }: EditableMetadataItemProp
             }}
             onBlur={handleSave}
             onKeyDown={handleKeyDown}
+            ref={inputRef}
             className="bg-bg-secondary border border-accent rounded-sm px-2 py-0.5 text-xs text-text-primary text-right outline-hidden w-full shadow-sm focus:ring-1 focus:ring-accent/30"
           />
         ) : (

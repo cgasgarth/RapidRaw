@@ -7,6 +7,7 @@ import { TextVariants } from '../../types/typography';
 import Switch from '../ui/Switch';
 import { Preset } from '../ui/AppProperties';
 import { ADJUSTMENT_GROUPS } from '../../utils/adjustments';
+import { useManagedFocus } from '../../hooks/useManagedFocus';
 
 interface ConfigurePresetModalProps {
   isOpen: boolean;
@@ -107,6 +108,9 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
   const [presetType, setPresetType] = useState<'tool' | 'style'>('style');
   const [isMounted, setIsMounted] = useState(false);
   const [show, setShow] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useManagedFocus(nameInputRef, show);
 
   useEffect(() => {
     if (isOpen) {
@@ -188,11 +192,11 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
           {initialPreset ? t('modals.configurePreset.titleConfigure') : t('modals.configurePreset.titleSave')}
         </Text>
         <input
-          autoFocus
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
           onChange={(e) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('modals.configurePreset.placeholder')}
+          ref={nameInputRef}
           type="text"
           value={name}
         />
