@@ -114,6 +114,8 @@ type PreviewQueueItem = { folderId: string | null; preset: Preset };
 const isPresetEntry = (item: UserPreset): item is PresetEntry => !!item.preset;
 const isFolderEntry = (item: UserPreset): item is FolderEntry => !!item.folder;
 const toDragId = (id: DragStartEvent['active']['id']): string => String(id);
+const isPresetListType = (value: unknown): value is PresetListType =>
+  value === PresetListType.Folder || value === PresetListType.Preset;
 
 const itemVariants = {
   hidden: { opacity: 0, x: -15 },
@@ -764,7 +766,8 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
     const activeId = toDragId(active.id);
     const activeParentId = itemParentMap.get(activeId);
-    const activeType = active.data.current?.['type'];
+    const activePayloadType = active.data.current?.['type'];
+    const activeType = isPresetListType(activePayloadType) ? activePayloadType : null;
 
     if (!over) {
       if (activeParentId !== null) {
@@ -779,7 +782,8 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
     const overId = toDragId(over.id);
     const overParentId = itemParentMap.get(overId);
-    const overType = over.data.current?.['type'];
+    const overPayloadType = over.data.current?.['type'];
+    const overType = isPresetListType(overPayloadType) ? overPayloadType : null;
 
     const targetFolderId = overType === PresetListType.Folder ? overId : overParentId;
 
@@ -1165,7 +1169,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       </div>
       <DragOverlay>
         {activeItem ? (
-          activeItem.type === 'preset' ? (
+          activeItem.type === PresetListType.Preset ? (
             <PresetItemDisplay
               isGeneratingPreviews={false}
               preset={activeItem.data}

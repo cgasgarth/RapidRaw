@@ -334,7 +334,7 @@ export interface SelectedImage {
 export interface SortCriteria {
   key: string;
   label?: string;
-  order: string;
+  order: SortDirection;
 }
 
 export interface SupportedTypes {
