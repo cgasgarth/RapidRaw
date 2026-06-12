@@ -912,7 +912,13 @@ export default function ExportPanel({
                     : ''
           }`}
           disabled={status === Status.Exporting ? false : !canExport}
-          onClick={status === Status.Exporting ? handleCancel : handleExport}
+          onClick={() => {
+            if (status === Status.Exporting) {
+              handleCancel();
+            } else {
+              void handleExport();
+            }
+          }}
           size="lg"
         >
           {status === Status.Exporting ? (

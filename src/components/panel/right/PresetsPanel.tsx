@@ -905,7 +905,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         {
           icon: FileDown,
           label: t('editor.presets.menu.exportFolder'),
-          onClick: () => handleExport(item),
+          onClick: () => {
+            void handleExport(item);
+          },
         },
         { type: OPTION_SEPARATOR },
         {
@@ -922,10 +924,10 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         {
           icon: Save,
           label: t('editor.presets.menu.overwrite'),
-          onClick: async () => {
+          onClick: () => {
             const updated = overwritePreset(data?.id ?? null);
             if (updated) {
-              await generateSinglePreview(updated);
+              void generateSinglePreview(updated);
             }
           },
         },
@@ -940,17 +942,19 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
         {
           icon: CopyPlus,
           label: t('editor.presets.menu.duplicatePreset'),
-          onClick: async () => {
+          onClick: () => {
             const duplicated = duplicatePreset(data?.id ?? null);
             if (duplicated) {
-              await generateSinglePreview(duplicated);
+              void generateSinglePreview(duplicated);
             }
           },
         },
         {
           icon: FileDown,
           label: t('editor.presets.menu.exportPreset'),
-          onClick: () => handleExport(item),
+          onClick: () => {
+            void handleExport(item);
+          },
         },
         { type: OPTION_SEPARATOR },
         {
@@ -1017,7 +1021,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
             <button
               className="p-2 rounded-full hover:bg-surface transition-colors"
               disabled={isLoading}
-              onClick={handleImportPresets}
+              onClick={() => {
+                void handleImportPresets();
+              }}
               data-tooltip={t('editor.presets.tooltips.import')}
             >
               <FileUp size={18} />
@@ -1025,7 +1031,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
             <button
               className="p-2 rounded-full hover:bg-surface transition-colors"
               disabled={presets.length === 0 || isLoading}
-              onClick={handleExportAllPresets}
+              onClick={() => {
+                void handleExportAllPresets();
+              }}
               data-tooltip={t('editor.presets.tooltips.export')}
             >
               <FileDown size={18} />
@@ -1152,7 +1160,9 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           onClose={() => {
             setConfigureModalState({ isOpen: false, preset: null });
           }}
-          onSave={handleSaveConfiguredPreset}
+          onSave={(name, description, isFavorite, tags) => {
+            void handleSaveConfiguredPreset(name, description, isFavorite, tags);
+          }}
         />
         <CreateFolderModal
           isOpen={isAddFolderModalOpen}

@@ -1725,7 +1725,9 @@ export default function MasksPanel() {
                   isSettingsSectionOpen={isSettingsSectionOpen}
                   setSettingsSectionOpen={setSettingsSectionOpen}
                   presets={presets}
-                  handleLutSelect={handleLutSelect}
+                  handleLutSelect={(path) => {
+                    void handleLutSelect(path);
+                  }}
                 />
               </motion.div>
             )}

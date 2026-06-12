@@ -299,7 +299,9 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => handleDownloadPreset(preset)}
+                          onClick={() => {
+                            void handleDownloadPreset(preset);
+                          }}
                           disabled={status !== 'idle'}
                           className="shadow-lg"
                         >

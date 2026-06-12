@@ -292,7 +292,9 @@ export default function Controls() {
             adjustments={adjustments}
             setAdjustments={setAdjustments}
             isForMask={false}
-            handleLutSelect={handleLutSelect}
+            handleLutSelect={(path) => {
+              void handleLutSelect(path);
+            }}
             appSettings={appSettings}
             onDragStateChange={onDragStateChange}
           />
@@ -308,7 +310,9 @@ export default function Controls() {
           <button
             className="p-2 rounded-full hover:bg-surface disabled:cursor-not-allowed transition-colors"
             disabled={!selectedImage?.isReady}
-            onClick={handleAutoAdjustments}
+            onClick={() => {
+              void handleAutoAdjustments();
+            }}
             data-tooltip={t('editor.adjustments.tooltips.autoAdjust')}
           >
             <Aperture size={18} />
@@ -326,7 +330,9 @@ export default function Controls() {
           <button
             className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             disabled={!selectedImage}
-            onClick={handleResetAdjustments}
+            onClick={() => {
+              handleResetAdjustments();
+            }}
             data-tooltip={t('editor.adjustments.tooltips.resetAdjustments')}
           >
             <RotateCcw size={18} />

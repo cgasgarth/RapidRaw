@@ -110,7 +110,9 @@ function MetadataItem({ label, value }: MetaDataItemProps) {
           setIsHovered(false);
           setCopied(false);
         }}
-        onClick={handleCopy}
+        onClick={(event) => {
+          void handleCopy(event);
+        }}
         data-tooltip={strValue.length > 500 ? strValue.slice(0, 500) + '...' : strValue}
       >
         <Text
@@ -660,7 +662,9 @@ export default function MetadataPanel() {
                           </Text>
                           <div className="flex flex-wrap gap-2">
                             <button
-                              onClick={() => handleSetColorLabel(null, targetPaths)}
+                              onClick={() => {
+                                void handleSetColorLabel(null, targetPaths);
+                              }}
                               className={clsx(
                                 'w-5 h-5 rounded-full flex items-center justify-center transition-all hover:scale-110',
                                 currentColor === null
@@ -674,7 +678,9 @@ export default function MetadataPanel() {
                             {COLOR_LABELS.map((color: Color) => (
                               <button
                                 key={color.name}
-                                onClick={() => handleSetColorLabel(color.name, targetPaths)}
+                                onClick={() => {
+                                  void handleSetColorLabel(color.name, targetPaths);
+                                }}
                                 className={clsx(
                                   'w-5 h-5 rounded-full transition-all hover:scale-110',
                                   currentColor === color.name
@@ -709,7 +715,9 @@ export default function MetadataPanel() {
                                     animate={{ opacity: 1, scale: 1 }}
                                     exit={{ opacity: 0, scale: 0.8 }}
                                     className="flex items-center gap-1 bg-bg-primary px-2 py-1 rounded-md group cursor-pointer border border-surface hover:border-text-tertiary/50 transition-colors"
-                                    onClick={() => handleRemoveTag(tagItem)}
+                                    onClick={() => {
+                                      void handleRemoveTag(tagItem);
+                                    }}
                                   >
                                     <Text
                                       as="span"
@@ -753,7 +761,9 @@ export default function MetadataPanel() {
                               className="bg-transparent border-none outline-hidden text-xs w-full text-text-primary placeholder-text-tertiary"
                             />
                             <button
-                              onClick={() => handleAddTag(tagInputValue)}
+                              onClick={() => {
+                                void handleAddTag(tagInputValue);
+                              }}
                               disabled={!tagInputValue.trim()}
                               className="text-text-secondary hover:text-accent disabled:opacity-30 transition-colors"
                             >
@@ -765,7 +775,9 @@ export default function MetadataPanel() {
                               {appSettings.taggingShortcuts.map((shortcut) => (
                                 <button
                                   key={shortcut}
-                                  onClick={() => handleAddTag(shortcut)}
+                                  onClick={() => {
+                                    void handleAddTag(shortcut);
+                                  }}
                                   className="text-xs font-medium bg-bg-secondary hover:bg-card-active text-text-secondary px-1.5 py-0.5 rounded-sm border border-transparent hover:border-border-color transition-all"
                                 >
                                   {shortcut}

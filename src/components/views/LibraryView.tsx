@@ -153,8 +153,12 @@ export default function LibraryView({
             onImportClick={() => {
               handleImportClick(currentFolderPath as string);
             }}
-            onLibraryRefresh={handleLibraryRefresh}
-            onOpenFolder={handleOpenFolder}
+            onLibraryRefresh={() => {
+              void handleLibraryRefresh();
+            }}
+            onOpenFolder={() => {
+              void handleOpenFolder();
+            }}
             onSettingsChange={handleSettingsChange}
             onThumbnailAspectRatioChange={setThumbnailAspectRatio}
             onThumbnailSizeChange={setThumbnailSize}

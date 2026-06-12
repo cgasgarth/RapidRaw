@@ -243,7 +243,9 @@ export default function EditorView({
               selectedImage={selectedImage}
               setExportState={setExportState}
               appSettings={appSettings}
-              onSettingsChange={handleSettingsChange}
+              onSettingsChange={(settings) => {
+                void handleSettingsChange(settings);
+              }}
               rootPaths={rootPaths}
             />
           )}

@@ -2082,9 +2082,14 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
             isRotationActive={isRotationActive}
             isSliderDragging={isSliderDragging}
             maskOverlayUrl={maskOverlayUrl}
-            onGenerateAiMask={handleGenerateAiMask}
+            onGenerateAiMask={(id, start, end) => {
+              if (!id) return;
+              void handleGenerateAiMask(id, start, end);
+            }}
             onLiveMaskPreview={handleLiveMaskPreview}
-            onQuickErase={handleQuickErase}
+            onQuickErase={(id, start, end) => {
+              void handleQuickErase(id, start, end);
+            }}
             onSelectAiSubMask={(id) => {
               setEditor({ activeAiSubMaskId: id });
             }}
