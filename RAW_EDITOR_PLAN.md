@@ -2491,6 +2491,25 @@ Use ESLint flat config and type-aware linting:
 - No warnings in CI:
   - `eslint . --max-warnings 0`
 
+Current enforced status as of June 12, 2026:
+
+- Type-aware parser project service is enabled.
+- Strict typed rules are active, including
+  `@typescript-eslint/no-confusing-void-expression`,
+  `@typescript-eslint/no-unnecessary-condition`,
+  `@typescript-eslint/restrict-template-expressions`, and
+  `@typescript-eslint/unbound-method`.
+- React Hooks `rules-of-hooks`, `exhaustive-deps`, `static-components`, and
+  `purity` are active.
+- `bun run check:lint` is expected to pass with zero warnings on main.
+
+Remaining focused ESLint work:
+
+- React compiler hook fences: `set-state-in-effect`, `refs`, `immutability`,
+  and `preserve-manual-memoization`.
+- Accessibility static interaction and keyboard-event parity rules.
+- Import ordering, import cycle, and boundary dependency enforcement.
+
 Formatting should be handled by Prettier or the project's chosen formatter, not by large ESLint formatting rule churn.
 
 Future ESLint issue split:

@@ -49,18 +49,18 @@ contracts instead of making contributors memorize workflow internals.
 
 ## Frontend Config Entrypoints
 
-| Config              | Used by                                         | Notes                                                                                      |
-| ------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `vite.config.js`    | `dev`, `build`, Tauri                           | Dev server uses strict port `1420`; `TAURI_DEV_HOST` controls host/HMR.                    |
-| `tsconfig.json`     | `typecheck`, ESLint future project-service work | `strict` is already enabled; additional strict options are planned in #24-#27.             |
-| `eslint.config.js`  | `lint`, `lint:fix`                              | Flat config with JS recommended, TypeScript recommended, React plugin, and i18next plugin. |
-| `i18next.config.ts` | `i18n:*`                                        | Extracts `en`, `de`, `pl`, `zh-CN` strings from `src/**/*.{ts,tsx}`.                       |
+| Config              | Used by                                  | Notes                                                                                              |
+| ------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `vite.config.js`    | `dev`, `build`, Tauri                    | Dev server uses strict port `1420`; `TAURI_DEV_HOST` controls host/HMR.                            |
+| `tsconfig.json`     | `typecheck`, ESLint project-service work | `strict` and additional strict compiler options are enabled.                                       |
+| `eslint.config.js`  | `lint`, `lint:fix`, `check:lint`         | Flat config with type-aware TypeScript, React, hooks, accessibility, import, and boundary plugins. |
+| `i18next.config.ts` | `i18n:*`                                 | Extracts `en`, `de`, `pl`, `zh-CN` strings from `src/**/*.{ts,tsx}`.                               |
 
 Important current gaps:
 
-- ESLint is not yet type-aware through project service.
-- React hooks, accessibility, import/boundary, async-safety, and zero-warning
-  policies are not yet enforced.
+- Some high-volume React compiler hook rules remain fenced.
+- Accessibility static interaction rules, import order, import cycles, and
+  boundary dependency rules remain fenced for focused cleanup PRs.
 - `format` and `format:check` are whole-repo commands; changed-file local hooks
   may need narrower wrappers to stay fast.
 
