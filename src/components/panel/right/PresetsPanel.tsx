@@ -138,11 +138,11 @@ const itemVariants = {
 function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetItemDisplayProps) {
   const { t } = useTranslation();
   const geometryKeys = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((g) => g.keys);
+  const presetMasks = preset.adjustments['masks'];
 
-  const supportsMasks =
-    preset.includeMasks ?? (preset.adjustments?.['masks'] && preset.adjustments['masks'].length > 0);
+  const supportsMasks = preset.includeMasks ?? (Array.isArray(presetMasks) && presetMasks.length > 0);
   const supportsGeometry =
-    preset.includeCropTransform ?? geometryKeys.some((key) => preset.adjustments?.[key] !== undefined);
+    preset.includeCropTransform ?? geometryKeys.some((key) => preset.adjustments[key] !== undefined);
   const isTool = preset.presetType === 'tool';
   const tooltipContent = useMemo(() => {
     const features = [];
@@ -216,7 +216,7 @@ function FolderItemDisplay({ folder }: FolderProps) {
         {folder.name}
       </Text>
       <Text as="span" weight={TextWeights.medium} className="ml-auto pr-1">
-        {folder.children?.length || 0}
+        {folder.children.length}
       </Text>
     </div>
   );
@@ -305,7 +305,7 @@ function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpa
     touchAction: 'none',
   };
 
-  const hasChildren = folder.children && folder.children.length > 0;
+  const hasChildren = folder.children.length > 0;
 
   return (
     <div
@@ -351,7 +351,7 @@ function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpa
           {folder.name}
         </Text>
         <Text as="span" variant={TextVariants.small} color={TextColors.secondary} className="ml-auto pr-1">
-          {folder.children?.length || 0}
+          {folder.children.length}
         </Text>
       </div>
       <AnimatePresence>
@@ -585,7 +585,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
   const generateSinglePreview = useCallback(
     async (preset: Preset) => {
-      if (!selectedImage?.isReady || !preset) {
+      if (!selectedImage?.isReady) {
         return;
       }
 
@@ -633,7 +633,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       const folder = presets.find(
         (item: UserPreset): item is FolderEntry => isFolderEntry(item) && item.folder.id === folderId,
       );
-      if (!folder?.folder?.children?.length) {
+      if (folder === undefined || folder.folder.children.length === 0) {
         return;
       }
 
@@ -662,7 +662,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
   useEffect(() => {
     const isPathChanged = selectedImage?.path !== currentImagePathRef.current;
 
-    if (isPathChanged || !selectedImage?.isReady) {
+    if (isPathChanged || !selectedImage.isReady) {
       Object.values(previewsRef.current).forEach((url) => {
         if (url && url.startsWith('blob:')) {
           URL.revokeObjectURL(url);
@@ -722,9 +722,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       }
     } else {
       const newPreset = addPreset(name, null, includeMasks, includeCropTransform, presetType);
-      if (newPreset) {
-        await generateSinglePreview(newPreset);
-      }
+      await generateSinglePreview(newPreset);
     }
     setConfigureModalState({ isOpen: false, preset: null });
   };
@@ -893,7 +891,6 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     event.stopPropagation();
 
     const isFolder = isFolderEntry(item);
-    const data = isFolder ? item.folder : item.preset;
 
     let options: Array<Option> = [];
     if (isFolder) {
@@ -918,7 +915,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           isDestructive: true,
           label: t('editor.presets.menu.deleteFolder'),
           onClick: () => {
-            handleDeleteItem(data?.id ?? null, true);
+            handleDeleteItem(item.folder.id, true);
           },
         },
       ];
@@ -928,7 +925,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           icon: Save,
           label: t('editor.presets.menu.overwrite'),
           onClick: () => {
-            const updated = overwritePreset(data?.id ?? null);
+            const updated = overwritePreset(item.preset.id);
             if (updated) {
               void generateSinglePreview(updated);
             }
@@ -938,7 +935,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           icon: Settings2,
           label: t('editor.presets.menu.configurePreset'),
           onClick: () => {
-            setConfigureModalState({ isOpen: true, preset: data as Preset });
+            setConfigureModalState({ isOpen: true, preset: item.preset });
           },
         },
         { type: OPTION_SEPARATOR },
@@ -946,7 +943,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           icon: CopyPlus,
           label: t('editor.presets.menu.duplicatePreset'),
           onClick: () => {
-            const duplicated = duplicatePreset(data?.id ?? null);
+            const duplicated = duplicatePreset(item.preset.id);
             if (duplicated) {
               void generateSinglePreview(duplicated);
             }
@@ -965,7 +962,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           isDestructive: true,
           label: t('editor.presets.menu.deletePreset'),
           onClick: () => {
-            handleDeleteItem(data?.id ?? null, false);
+            handleDeleteItem(item.preset.id, false);
           },
         },
       ];
