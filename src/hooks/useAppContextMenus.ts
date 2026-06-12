@@ -189,9 +189,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               invoke(Invokes.AddToAlbum, { albumId: item.id, paths: pathsToAdd })
                 .then(() => {
                   console.log(`Added image(s) to ${item.name}`);
-                  invoke<AlbumItem[]>(Invokes.GetAlbums).then((res) => {
-                    useLibraryStore.getState().setLibrary({ albumTree: res });
-                  });
+                  void invoke<AlbumItem[]>(Invokes.GetAlbums)
+                    .then((res) => {
+                      useLibraryStore.getState().setLibrary({ albumTree: res });
+                    })
+                    .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedAddToAlbum', { err })));
                 })
                 .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedAddToAlbum', { err })));
             },
@@ -744,7 +746,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: CopyPlus,
               onClick: () => {
                 const selectedPath = finalSelection[0];
-                if (selectedPath) handleCreateVirtualCopy(selectedPath);
+                if (selectedPath) void handleCreateVirtualCopy(selectedPath);
               },
             },
           ],
@@ -951,7 +953,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       newSettings.lastFolderState = null;
                     }
 
-                    handleSettingsChange(newSettings);
+                    void handleSettingsChange(newSettings);
                   }
                 },
               },
@@ -986,13 +988,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 const currentIcons = appSettings.folderIcons || {};
 
                 if (iconDef.value) {
-                  handleSettingsChange({
+                  void handleSettingsChange({
                     ...appSettings,
                     folderIcons: { ...currentIcons, [targetPath]: iconDef.value },
                   });
                 } else {
                   const { [targetPath]: _removedIcon, ...newIcons } = currentIcons;
-                  handleSettingsChange({ ...appSettings, folderIcons: newIcons });
+                  void handleSettingsChange({ ...appSettings, folderIcons: newIcons });
                 }
               }
             },
@@ -1009,7 +1011,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               onClick: async () => {
                 try {
                   await invoke(Invokes.CopyFiles, { sourcePaths: copiedFilePaths, destinationFolder: targetPath });
-                  if (targetPath === currentFolderPath) props.handleLibraryRefresh();
+                  if (targetPath === currentFolderPath) await props.handleLibraryRefresh();
                 } catch (err) {
                   toast.error(t('contextMenus.toasts.failedCopy', { err }));
                 }
@@ -1022,8 +1024,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   await invoke(Invokes.MoveFiles, { sourcePaths: copiedFilePaths, destinationFolder: targetPath });
                   setProcess({ copiedFilePaths: [] });
                   setLibrary({ multiSelectedPaths: [] });
-                  props.refreshAllFolderTrees();
-                  props.handleLibraryRefresh();
+                  await props.refreshAllFolderTrees();
+                  await props.handleLibraryRefresh();
                 } catch (err) {
                   toast.error(t('contextMenus.toasts.failedMove', { err }));
                 }
@@ -1084,11 +1086,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
                     const { appSettings, handleSettingsChange } = useSettingsStore.getState();
                     if (appSettings) {
-                      handleSettingsChange({ ...appSettings, lastFolderState: null });
+                      await handleSettingsChange({ ...appSettings, lastFolderState: null });
                     }
                   }
 
-                  props.refreshAllFolderTrees();
+                  await props.refreshAllFolderTrees();
                 } catch (err) {
                   toast.error(t('contextMenus.toasts.failedDeleteFolder', { err }));
                 }
@@ -1404,7 +1406,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       sourcePaths: copiedFilePaths,
                       destinationFolder: currentFolderPath,
                     });
-                    props.handleLibraryRefresh();
+                    await props.handleLibraryRefresh();
                   } catch (err) {
                     toast.error(t('contextMenus.toasts.failedCopy', { err }));
                   }
@@ -1420,8 +1422,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     });
                     setProcess({ copiedFilePaths: [] });
                     setLibrary({ multiSelectedPaths: [] });
-                    props.refreshAllFolderTrees();
-                    props.handleLibraryRefresh();
+                    await props.refreshAllFolderTrees();
+                    await props.handleLibraryRefresh();
                   } catch (err) {
                     toast.error(t('contextMenus.toasts.failedMove', { err }));
                   }
