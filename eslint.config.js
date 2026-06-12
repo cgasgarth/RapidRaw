@@ -183,7 +183,7 @@ module.exports = [
       // Strict typed lint is enabled, but existing legacy violations are being
       // burned down by focused follow-up issues so this gate can land cleanly.
       '@typescript-eslint/no-confusing-void-expression': 'error',
-      '@typescript-eslint/no-unnecessary-condition': 'off',
+      '@typescript-eslint/no-unnecessary-condition': 'error',
       '@typescript-eslint/restrict-template-expressions': 'off',
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/no-misused-promises': 'error',

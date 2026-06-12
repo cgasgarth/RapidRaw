@@ -298,7 +298,7 @@ const ConnectionStatus = ({
         setIsHovered(false);
       }}
     >
-      <div className={`flex items-center gap-2 px-4 ${hoverContent ? 'pt-2' : 'py-2'}`}>
+      <div className="flex items-center gap-2 px-4 pt-2">
         <div className={`w-2.5 h-2.5 rounded-full ${statusColor}`} />
         <Text variant={TextVariants.label}>{titleText}</Text>
         <Text
@@ -309,18 +309,16 @@ const ConnectionStatus = ({
           {statusText}
         </Text>
       </div>
-      {hoverContent && (
-        <div className="px-4 pb-3">
-          <motion.div
-            animate={{ height: isHovered ? 'auto' : 0, opacity: isHovered ? 1 : 0, marginTop: isHovered ? '2px' : 0 }}
-            className="overflow-hidden"
-            initial={{ height: 0, opacity: 0, marginTop: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
-          >
-            {hoverContent}
-          </motion.div>
-        </div>
-      )}
+      <div className="px-4 pb-3">
+        <motion.div
+          animate={{ height: isHovered ? 'auto' : 0, opacity: isHovered ? 1 : 0, marginTop: isHovered ? '2px' : 0 }}
+          className="overflow-hidden"
+          initial={{ height: 0, opacity: 0, marginTop: 0 }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
+        >
+          {hoverContent}
+        </motion.div>
+      </div>
     </div>
   );
 };
@@ -347,7 +345,7 @@ export default function AIPanel() {
 
   const { user, isSignedIn } = useUser();
   const { getToken } = useAuth();
-  const isPro = user?.publicMetadata?.['plan'] === 'pro';
+  const isPro = user?.publicMetadata['plan'] === 'pro';
   const [cloudUsage, setCloudUsage] = useState<CloudUsage | null>(null);
 
   const isGenerativeAvailable =
@@ -432,7 +430,7 @@ export default function AIPanel() {
   const { setNodeRef: setRootDroppableRef, isOver: isRootOver } = useDroppable({ id: 'ai-list-root' });
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const activeContainer = (adjustments.aiPatches || []).find((p) => p.id === activePatchContainerId);
+  const activeContainer = adjustments.aiPatches.find((p) => p.id === activePatchContainerId);
   const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeSubMaskId);
   const isAiMask =
     activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky].includes(activeSubMaskData.type);
@@ -453,7 +451,7 @@ export default function AIPanel() {
 
   useEffect(() => {
     if (activePatchContainerId) {
-      const patchExists = adjustments.aiPatches?.some((p) => p.id === activePatchContainerId);
+      const patchExists = adjustments.aiPatches.some((p) => p.id === activePatchContainerId);
       if (!patchExists) {
         onSelectPatchContainer(null);
         onSelectSubMask(null);
@@ -462,7 +460,7 @@ export default function AIPanel() {
   }, [adjustments.aiPatches, activePatchContainerId, onSelectPatchContainer, onSelectSubMask]);
 
   useEffect(() => {
-    const hasPatches = (adjustments.aiPatches || []).length > 0;
+    const hasPatches = adjustments.aiPatches.length > 0;
 
     if (hasPatches) {
       setIsSettingsPanelEverOpened(true);
@@ -527,7 +525,7 @@ export default function AIPanel() {
     if (!selectedImage) return createSubMask(type, { width: 1000, height: 1000 }, mode);
     const subMask = createSubMask(type, selectedImage, mode);
 
-    const steps = adjustments?.orientationSteps || 0;
+    const steps = adjustments.orientationSteps;
     const isRotated = steps === 1 || steps === 3;
     const imgW = isRotated ? selectedImage.height || 1000 : selectedImage.width || 1000;
     const imgH = isRotated ? selectedImage.width || 1000 : selectedImage.height || 1000;
@@ -536,9 +534,7 @@ export default function AIPanel() {
     const config = SUB_MASK_CONFIG[type];
     if (config && config.parameters) {
       config.parameters.forEach((param) => {
-        if (param.defaultValue !== undefined) {
-          parameters[param.key] = param.defaultValue / (param.multiplier || 1);
-        }
+        parameters[param.key] = param.defaultValue / (param.multiplier || 1);
       });
     }
 
@@ -567,12 +563,11 @@ export default function AIPanel() {
     let name: string;
     if (type === Mask.QuickEraser) {
       const count =
-        (adjustments.aiPatches || []).filter((p: AiPatch) =>
-          p.subMasks.some((sm: SubMask) => sm.type === Mask.QuickEraser),
-        ).length + 1;
+        adjustments.aiPatches.filter((p: AiPatch) => p.subMasks.some((sm: SubMask) => sm.type === Mask.QuickEraser))
+          .length + 1;
       name = t('editor.ai.patches.quickErase', { count });
     } else {
-      const count = (adjustments.aiPatches || []).length + 1;
+      const count = adjustments.aiPatches.length + 1;
       name = t('editor.ai.patches.aiEdit', { count });
     }
 
@@ -587,7 +582,7 @@ export default function AIPanel() {
       visible: true,
     };
 
-    setAdjustments((prev: Adjustments) => ({ ...prev, aiPatches: [...(prev.aiPatches || []), newContainer] }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, aiPatches: [...prev.aiPatches, newContainer] }));
     onSelectPatchContainer(newContainer.id);
     onSelectSubMask(subMask.id);
     setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
@@ -605,7 +600,7 @@ export default function AIPanel() {
     const subMask = createMaskLogic(type, mode);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      aiPatches: prev.aiPatches?.map((c: AiPatch) => {
+      aiPatches: prev.aiPatches.map((c: AiPatch) => {
         if (c.id === containerId) {
           const newSubMasks = [...c.subMasks];
           if (insertIndex >= 0) newSubMasks.splice(insertIndex, 0, subMask);
@@ -742,7 +737,7 @@ export default function AIPanel() {
 
   const insertPatchContainer = (container: AiPatch, insertIndex?: number) => {
     setAdjustments((prev: Adjustments) => {
-      const newPatches = [...(prev.aiPatches || [])];
+      const newPatches = [...prev.aiPatches];
       const targetIndex = Math.max(0, Math.min(insertIndex ?? newPatches.length, newPatches.length));
 
       newPatches.splice(targetIndex, 0, container);
@@ -757,7 +752,7 @@ export default function AIPanel() {
   const insertSubMaskIntoContainer = (containerId: string, subMask: SubMask, insertIndex?: number) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      aiPatches: (prev.aiPatches || []).map((container) => {
+      aiPatches: prev.aiPatches.map((container) => {
         if (container.id !== containerId) {
           return container;
         }
@@ -776,14 +771,14 @@ export default function AIPanel() {
   };
 
   const handleDuplicatePatchContainer = (container: AiPatch) => {
-    const patchIndex = (adjustments.aiPatches || []).findIndex((patch) => patch.id === container.id);
+    const patchIndex = adjustments.aiPatches.findIndex((patch) => patch.id === container.id);
     const duplicatedContainer = clonePatchData(container, { rename: true });
 
     insertPatchContainer(duplicatedContainer, patchIndex >= 0 ? patchIndex + 1 : undefined);
   };
 
   const handleDuplicateAndInvertPatchContainer = (container: AiPatch) => {
-    const patchIndex = (adjustments.aiPatches || []).findIndex((patch) => patch.id === container.id);
+    const patchIndex = adjustments.aiPatches.findIndex((patch) => patch.id === container.id);
     const duplicatedContainer = clonePatchData(container, { invert: true, rename: false });
     duplicatedContainer.name = t('editor.ai.patches.invertedName', { name: container.name });
 
@@ -797,7 +792,7 @@ export default function AIPanel() {
 
     const pastedContainer = clonePatchData(copiedPatch, { rename: false });
     const patchIndex = insertAfterContainerId
-      ? (adjustments.aiPatches || []).findIndex((patch) => patch.id === insertAfterContainerId)
+      ? adjustments.aiPatches.findIndex((patch) => patch.id === insertAfterContainerId)
       : -1;
 
     insertPatchContainer(pastedContainer, patchIndex >= 0 ? patchIndex + 1 : undefined);
@@ -809,7 +804,7 @@ export default function AIPanel() {
   };
 
   const handleDuplicateAndInvertSubMask = (containerId: string, subMask: SubMask) => {
-    const parentContainer = (adjustments.aiPatches || []).find((p) => p.id === containerId);
+    const parentContainer = adjustments.aiPatches.find((p) => p.id === containerId);
     if (!parentContainer) return;
 
     const duplicatedSubMask = cloneSubMaskData(subMask, { invert: true, rename: false });
@@ -819,7 +814,7 @@ export default function AIPanel() {
     newContainer.subMasks = [duplicatedSubMask];
     newContainer.invert = false;
 
-    const parentIndex = (adjustments.aiPatches || []).findIndex((p) => p.id === containerId);
+    const parentIndex = adjustments.aiPatches.findIndex((p) => p.id === containerId);
     insertPatchContainer(newContainer, parentIndex >= 0 ? parentIndex + 1 : undefined);
   };
 
@@ -865,16 +860,16 @@ export default function AIPanel() {
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragItem(event.active.data.current as DragData);
-    if (onDragStateChange) onDragStateChange(true);
+    onDragStateChange(true);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     const dragData = active.data.current as DragData;
-    const overData = over?.data.current as DragData;
+    const overData = over?.data.current as DragData | undefined;
 
     setActiveDragItem(null);
-    if (onDragStateChange) onDragStateChange(false);
+    onDragStateChange(false);
 
     const creationMaskType = dragData.type === 'Creation' ? dragData.maskType : undefined;
     if (creationMaskType) {
@@ -894,7 +889,7 @@ export default function AIPanel() {
         }
       };
 
-      if ((adjustments.aiPatches || []).length > 0) setPendingAction(() => creationFn);
+      if (adjustments.aiPatches.length > 0) setPendingAction(() => creationFn);
       else creationFn();
       return;
     }
@@ -1031,7 +1026,7 @@ export default function AIPanel() {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 p-4">
           <AnimatePresence mode="wait">
-            {(adjustments.aiPatches || []).length === 0 ? (
+            {adjustments.aiPatches.length === 0 ? (
               <motion.div
                 key="ai-grid"
                 initial={{ opacity: 0 }}
@@ -1107,7 +1102,7 @@ export default function AIPanel() {
                     }
                   }}
                 >
-                  {(adjustments.aiPatches || []).map((container) => (
+                  {adjustments.aiPatches.map((container) => (
                     <ContainerRow
                       key={container.id}
                       container={container}
@@ -1152,7 +1147,7 @@ export default function AIPanel() {
                 </AnimatePresence>
 
                 <AnimatePresence>
-                  {activeDragItem?.type === 'Creation' && (adjustments.aiPatches || []).length > 0 && (
+                  {activeDragItem?.type === 'Creation' && adjustments.aiPatches.length > 0 && (
                     <NewMaskDropZone isOver={isRootOver} />
                   )}
                 </AnimatePresence>
@@ -1232,7 +1227,7 @@ export default function AIPanel() {
               >
                 {(() => {
                   const sm = activeDragItem.item as SubMask;
-                  const Icon = MASK_ICON_MAP[sm.type] || Circle;
+                  const Icon = MASK_ICON_MAP[sm.type];
                   return <Icon size={16} className={`shrink-0 ml-1 ${TEXT_COLOR_KEYS[TextColors.secondary]}`} />;
                 })()}
                 <span className="flex-1 truncate">{getSubMaskName(activeDragItem.item as SubMask)}</span>
@@ -1482,7 +1477,7 @@ function ContainerRow({
     if (isDraggingContainer) {
       borderClass = 'border-t-2 border-accent';
     } else if (
-      (activeDragItem?.type === 'SubMask' && activeDragItem?.parentId !== container.id) ||
+      (activeDragItem?.type === 'SubMask' && activeDragItem.parentId !== container.id) ||
       activeDragItem?.type === 'Creation'
     ) {
       borderClass = 'bg-card-active border border-accent/50';
@@ -1722,7 +1717,7 @@ function SubMaskRow({
     setDroppableRef(node);
   };
   const maskType = subMask.type;
-  const MaskIcon = MASK_ICON_MAP[maskType] || Circle;
+  const MaskIcon = MASK_ICON_MAP[maskType];
   const { showContextMenu } = useContextMenu();
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1965,7 +1960,7 @@ function SettingsPanel({
     if (container) setPrompt(container.prompt || '');
   }, [container]);
 
-  const isQuickErasePatch = displayContainer.subMasks?.some((sm: SubMask) => sm.type === Mask.QuickEraser);
+  const isQuickErasePatch = displayContainer.subMasks.some((sm: SubMask) => sm.type === Mask.QuickEraser);
 
   useEffect(() => {
     if (container) {
@@ -2124,7 +2119,7 @@ function SettingsPanel({
             checked={isComponentMode ? activeSubMask.invert : displayContainer.invert}
             label={isComponentMode ? t('editor.ai.settings.invertComponent') : t('editor.ai.settings.invertSelection')}
             onChange={(v) => {
-              if (isComponentMode && activeSubMask) {
+              if (isComponentMode) {
                 updateSubMask(activeSubMask.id, { invert: v });
               } else if (container) {
                 updateContainer(container.id, { invert: v });

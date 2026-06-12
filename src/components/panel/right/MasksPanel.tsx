@@ -520,7 +520,7 @@ function DepthRangePicker({
 
     const target = e.currentTarget;
 
-    target.setPointerCapture?.(pointerId);
+    target.setPointerCapture(pointerId);
     document.documentElement.style.touchAction = 'none';
     document.documentElement.style.userSelect = 'none';
 
@@ -542,7 +542,7 @@ function DepthRangePicker({
     const onUp = (upEvent: PointerEvent) => {
       if (upEvent.pointerId !== pointerId) return;
       setActiveHandle(null);
-      if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
+      if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       onChange(latest);
       onDragStateChange?.(false);
@@ -856,8 +856,8 @@ export default function MasksPanel() {
 
   const { setNodeRef: setRootDroppableRef, isOver: isRootOver } = useDroppable({ id: 'mask-list-root' });
 
-  const activeContainer = adjustments.masks?.find((m) => m.id === activeMaskContainerId);
-  const activeSubMaskData = activeContainer?.subMasks?.find((sm) => sm.id === activeMaskId);
+  const activeContainer = adjustments.masks.find((m) => m.id === activeMaskContainerId);
+  const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeMaskId);
   const isAiMask =
     activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth].includes(activeSubMaskData.type);
 
@@ -877,7 +877,7 @@ export default function MasksPanel() {
 
   useEffect(() => {
     if (activeMaskContainerId) {
-      const containerExists = adjustments.masks?.some((m) => m.id === activeMaskContainerId);
+      const containerExists = adjustments.masks.some((m) => m.id === activeMaskContainerId);
       if (!containerExists) {
         onSelectContainer(null);
         onSelectMask(null);
@@ -886,7 +886,7 @@ export default function MasksPanel() {
   }, [adjustments.masks, activeMaskContainerId, onSelectContainer, onSelectMask]);
 
   useEffect(() => {
-    if (!hasPerformedInitialSelection.current && !activeMaskContainerId && adjustments.masks?.length > 0) {
+    if (!hasPerformedInitialSelection.current && !activeMaskContainerId && adjustments.masks.length > 0) {
       const lastMask = adjustments.masks[adjustments.masks.length - 1];
       if (lastMask) {
         onSelectContainer(lastMask.id);
@@ -909,7 +909,7 @@ export default function MasksPanel() {
       hasPerformedInitialSelection.current = true;
     }
 
-    if (activeMaskContainerId || adjustments.masks?.length > 0) {
+    if (activeMaskContainerId || adjustments.masks.length > 0) {
       setIsSettingsPanelEverOpened(true);
     }
   }, [activeMaskContainerId, activeMaskId, adjustments.masks, onSelectContainer, onSelectMask]);
@@ -952,7 +952,7 @@ export default function MasksPanel() {
     if (!selectedImage) return createSubMask(type, { width: 1000, height: 1000 }, mode);
     const subMask = createSubMask(type, selectedImage, mode);
 
-    const steps = adjustments?.orientationSteps || 0;
+    const steps = adjustments.orientationSteps;
     const isRotated = steps === 1 || steps === 3;
     const imgW = isRotated ? selectedImage.height || 1000 : selectedImage.width || 1000;
     const imgH = isRotated ? selectedImage.width || 1000 : selectedImage.height || 1000;
@@ -994,14 +994,14 @@ export default function MasksPanel() {
 
   const handleAddMaskContainer = (type: Mask) => {
     const subMask = createMaskLogic(type);
-    const count = (adjustments.masks?.length || 0) + 1;
+    const count = adjustments.masks.length + 1;
     const newContainer = {
       ...INITIAL_MASK_CONTAINER,
       id: uuidv4(),
       name: t('editor.masks.patches.maskName', { count }),
       subMasks: [subMask],
     };
-    setAdjustments((prev: Adjustments) => ({ ...prev, masks: [...(prev.masks || []), newContainer] }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, masks: [...prev.masks, newContainer] }));
     onSelectContainer(newContainer.id);
     onSelectMask(subMask.id);
     setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
@@ -1021,7 +1021,7 @@ export default function MasksPanel() {
     const subMask = createMaskLogic(type, mode);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      masks: prev.masks?.map((c: MaskContainer) => {
+      masks: prev.masks.map((c: MaskContainer) => {
         if (c.id === containerId) {
           const newSubMasks = [...c.subMasks];
           if (insertIndex >= 0) {
@@ -1092,7 +1092,7 @@ export default function MasksPanel() {
         },
       }));
 
-    const container = targetContainerId ? adjustments.masks?.find((m) => m.id === targetContainerId) : null;
+    const container = targetContainerId ? adjustments.masks.find((m) => m.id === targetContainerId) : null;
     const hasComponents = container && container.subMasks.length > 0;
 
     const buildModeSubmenu = (label: string, icon: LucideIcon, mode: SubMaskMode): Option => ({
@@ -1217,7 +1217,7 @@ export default function MasksPanel() {
 
   const insertMaskContainer = (container: MaskContainer, insertIndex?: number) => {
     setAdjustments((prev: Adjustments) => {
-      const newMasks = [...(prev.masks || [])];
+      const newMasks = [...prev.masks];
       const targetIndex = Math.max(0, Math.min(insertIndex ?? newMasks.length, newMasks.length));
 
       newMasks.splice(targetIndex, 0, container);
@@ -1319,13 +1319,13 @@ export default function MasksPanel() {
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragItem(event.active.data.current as DragData);
-    if (onDragStateChange) onDragStateChange(true);
+    onDragStateChange(true);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     const dragData = active.data.current as DragData;
-    const overData = over?.data.current as DragData;
+    const overData = over?.data.current as DragData | undefined;
 
     const creationMaskType = dragData.type === 'Creation' ? dragData.maskType : undefined;
     if (creationMaskType) {
@@ -1345,19 +1345,19 @@ export default function MasksPanel() {
         }
       };
 
-      if (adjustments.masks && adjustments.masks.length > 0) {
+      if (adjustments.masks.length > 0) {
         setPendingAction(() => creationFn);
       } else {
         creationFn();
       }
 
       setActiveDragItem(null);
-      if (onDragStateChange) onDragStateChange(false);
+      onDragStateChange(false);
       return;
     }
 
     setActiveDragItem(null);
-    if (onDragStateChange) onDragStateChange(false);
+    onDragStateChange(false);
 
     if (dragData.type === 'Container') {
       const overId = over?.id;
@@ -1423,8 +1423,6 @@ export default function MasksPanel() {
         });
         return;
       }
-
-      if (!over) return;
 
       let targetContainerId: string | null = null;
       if (overData?.type === 'Container') targetContainerId = overData.item?.id ?? null;
@@ -1556,7 +1554,7 @@ export default function MasksPanel() {
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 p-4">
           <AnimatePresence mode="wait">
-            {!adjustments.masks || adjustments.masks.length === 0 ? (
+            {adjustments.masks.length === 0 ? (
               <motion.div
                 key="empty-masks-grid"
                 initial={{ opacity: 0 }}
@@ -1577,7 +1575,7 @@ export default function MasksPanel() {
                 >
                   {MASK_PANEL_CREATION_TYPES.map((maskType: MaskType) => (
                     <DraggableGridItem
-                      key={maskType.type || maskType.id}
+                      key={maskType.type}
                       maskType={maskType}
                       onClick={(e: ReactMouseEvent<HTMLElement>) => {
                         if (maskType.id === 'others') {
@@ -1759,7 +1757,7 @@ export default function MasksPanel() {
               >
                 {(() => {
                   const sm = activeDragItem.item as SubMask;
-                  const Icon = MASK_ICON_MAP[sm.type] || Circle;
+                  const Icon = MASK_ICON_MAP[sm.type];
                   return <Icon size={16} className={`shrink-0 ml-1 ${TEXT_COLOR_KEYS[TextColors.secondary]}`} />;
                 })()}
                 <span className="flex-1 truncate">{getSubMaskName(activeDragItem.item as SubMask)}</span>
@@ -1941,7 +1939,7 @@ function ContainerRow({
             return {
               label: item.folder.name ?? '',
               icon: FolderIcon,
-              submenu: generatePresetSubmenu(item.folder.children ?? []),
+              submenu: generatePresetSubmenu(item.folder.children),
             };
           const presetAdjustments = item.adjustments ?? item.preset?.adjustments;
           if (presetAdjustments)
@@ -2038,7 +2036,7 @@ function ContainerRow({
     if (isDraggingContainer) {
       borderClass = 'border-t-2 border-accent';
     } else if (
-      (activeDragItem?.type === 'SubMask' && activeDragItem?.parentId !== container.id) ||
+      (activeDragItem?.type === 'SubMask' && activeDragItem.parentId !== container.id) ||
       activeDragItem?.type === 'Creation'
     ) {
       borderClass = 'bg-card-active border border-accent/50';
@@ -2259,7 +2257,7 @@ function SubMaskRow({
     setDroppableRef(node);
   };
   const maskType = subMask.type;
-  const MaskIcon = MASK_ICON_MAP[maskType] || Circle;
+  const MaskIcon = MASK_ICON_MAP[maskType];
   const { showContextMenu } = useContextMenu();
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2526,7 +2524,7 @@ function SettingsPanel({
       ...currentAdjustments,
       ...presetAdjustments,
       sectionVisibility: {
-        ...(currentAdjustments.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility),
+        ...currentAdjustments.sectionVisibility,
         ...(presetAdjustments.sectionVisibility || {}),
       },
     };
@@ -2540,7 +2538,7 @@ function SettingsPanel({
           return {
             label: item.folder.name ?? '',
             icon: FolderIcon,
-            submenu: generatePresetSubmenu(item.folder.children ?? []),
+            submenu: generatePresetSubmenu(item.folder.children),
           };
         }
         const presetAdjustments = item.adjustments ?? item.preset?.adjustments;
@@ -2593,8 +2591,10 @@ function SettingsPanel({
   };
 
   const activeSubMaskType = activeSubMask?.type;
-  const subMaskConfig = activeSubMaskType ? SUB_MASK_CONFIG[activeSubMaskType] || {} : {};
-  const isAiMask = activeSubMask && ['ai-subject', 'ai-foreground', 'ai-sky', 'ai-depth'].includes(activeSubMask.type);
+  const subMaskConfig = activeSubMaskType ? SUB_MASK_CONFIG[activeSubMaskType] : {};
+  const isAiMask =
+    activeSubMaskType !== undefined &&
+    ['ai-subject', 'ai-foreground', 'ai-sky', 'ai-depth'].includes(activeSubMaskType);
   const isComponentMode = !!activeSubMask;
 
   const setMaskContainerAdjustments = (updater: MaskAdjustmentUpdater) => {
@@ -2624,7 +2624,7 @@ function SettingsPanel({
   const handleToggleVisibility = (sectionName: string) => {
     if (!isActive) return;
     const cur = container.adjustments;
-    const vis = cur.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility;
+    const vis = cur.sectionVisibility;
     updateContainer(container.id, {
       adjustments: { ...cur, sectionVisibility: { ...vis, [sectionName]: !vis[sectionName] } },
     });
@@ -2656,7 +2656,7 @@ function SettingsPanel({
         ...prev,
         ...copiedSectionAdjustments.values,
         sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility),
+          ...prev.sectionVisibility,
           [sectionName]: true,
         },
       }));
@@ -2674,7 +2674,7 @@ function SettingsPanel({
         ...prev,
         ...resetValues,
         sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility),
+          ...prev.sectionVisibility,
           [sectionName]: true,
         },
       }));
@@ -2736,8 +2736,7 @@ function SettingsPanel({
     }
   };
 
-  const sectionVisibility =
-    displayContainer.adjustments.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility;
+  const sectionVisibility = displayContainer.adjustments.sectionVisibility;
 
   return (
     <div
@@ -2803,7 +2802,7 @@ function SettingsPanel({
             label={t('editor.masks.settings.opacity')}
             max={100}
             min={0}
-            value={(isComponentMode ? activeSubMask.opacity : displayContainer.opacity) ?? 100}
+            value={isComponentMode ? activeSubMask.opacity : displayContainer.opacity}
             onChange={(e: ChangeEvent<HTMLInputElement>) => {
               if (isComponentMode) {
                 updateSubMask(activeSubMask.id, { opacity: Number(e.target.value) });

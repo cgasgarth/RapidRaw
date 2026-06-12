@@ -277,7 +277,7 @@ export default function MetadataPanel() {
   );
   const liveThumbnailUrl = selectedImage ? thumbnails[selectedImage.path] : undefined;
 
-  const targetPaths = multiSelectedPaths?.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
+  const targetPaths = multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
 
   const { cameraGridSettings, lensSetting, gpsData, otherExifEntries } = useMemo(() => {
     const exif = (selectedImage?.exif || {}) as ExifData;
@@ -307,7 +307,7 @@ export default function MetadataPanel() {
       return {
         key: key,
         label: translatedLabel,
-        value: hasValue && cameraSetting?.format ? cameraSetting.format(value) : hasValue ? value : '-',
+        value: hasValue && cameraSetting.format ? cameraSetting.format(value) : hasValue ? value : '-',
       };
     });
 
@@ -361,16 +361,13 @@ export default function MetadataPanel() {
       .sort((a, b) => a.tag.localeCompare(b.tag));
   }, [tags]);
 
-  const hasGps = gpsData.lat !== null && gpsData.lon !== null;
+  const gpsCoordinates = gpsData.lat !== null && gpsData.lon !== null ? { lat: gpsData.lat, lon: gpsData.lon } : null;
   const fullPath = selectedImage?.path || '';
   const isVirtualCopy = fullPath.includes('?vc=');
   const basePath = fullPath.split('?vc=')[0] ?? fullPath;
   const fileName = basePath.split(/[\\/]/).pop() || '';
   const fileExtension = fileName.split('.').pop()?.toUpperCase() || 'FILE';
-  const megapixels =
-    selectedImage?.width && selectedImage?.height
-      ? ((selectedImage.width * selectedImage.height) / 1000000).toFixed(1)
-      : null;
+  const megapixels = selectedImage ? ((selectedImage.width * selectedImage.height) / 1000000).toFixed(1) : null;
 
   const handleAddTag = async (tagToAdd: string) => {
     const newTagValue = tagToAdd.trim().toLowerCase();
@@ -423,7 +420,7 @@ export default function MetadataPanel() {
                 {t('editor.metadata.fileInfo.title')}
               </Text>
               <div className="bg-surface border border-surface rounded-xl p-3.5 flex flex-col gap-2 cursor-default relative min-h-[5.5rem] overflow-hidden">
-                {(liveThumbnailUrl || selectedImage?.thumbnailUrl) && (
+                {(liveThumbnailUrl || selectedImage.thumbnailUrl) && (
                   <div
                     className="absolute inset-y-0 right-0 w-2/3 pointer-events-none opacity-20"
                     style={{
@@ -563,7 +560,7 @@ export default function MetadataPanel() {
                     >
                       <div className="px-2 pb-3 pt-2 border-t border-surface/50 flex flex-col gap-0.5">
                         {EDITABLE_FIELDS.map((field) => {
-                          const rawValue = (selectedImage?.exif?.[field.key] as string) || '';
+                          const rawValue = selectedImage.exif?.[field.key] || '';
                           const cleanValue = rawValue.replace(/^"|"$/g, '').trim();
                           const displayValue = cleanValue.toLowerCase() === 'default' ? '' : cleanValue;
                           return (
@@ -793,7 +790,7 @@ export default function MetadataPanel() {
               </div>
             </div>
 
-            {hasGps && gpsData?.lat && gpsData?.lon && (
+            {gpsCoordinates && (
               <div>
                 <Text variant={TextVariants.heading} className="mb-3">
                   {t('editor.metadata.gps.title')}
@@ -803,25 +800,25 @@ export default function MetadataPanel() {
                     <iframe
                       className="pointer-events-none h-[180px] w-full border-0"
                       loading="lazy"
-                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${gpsData.lon - 0.01}%2C${
-                        gpsData.lat - 0.01
-                      }%2C${gpsData.lon + 0.01}%2C${gpsData.lat + 0.01}&layer=mapnik&marker=${gpsData.lat}%2C${
-                        gpsData.lon
-                      }`}
+                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${gpsCoordinates.lon - 0.01}%2C${
+                        gpsCoordinates.lat - 0.01
+                      }%2C${gpsCoordinates.lon + 0.01}%2C${gpsCoordinates.lat + 0.01}&layer=mapnik&marker=${
+                        gpsCoordinates.lat
+                      }%2C${gpsCoordinates.lon}`}
                       title={t('editor.metadata.gps.title')}
                     ></iframe>
                     <a
                       aria-label={t('editor.metadata.gps.clickToOpenTooltip')}
                       className="absolute inset-0 cursor-pointer hover:bg-black/10 transition-colors"
-                      href={`https://www.openstreetmap.org/?mlat=${gpsData.lat}&mlon=${gpsData.lon}#map=15/${gpsData.lat}/${gpsData.lon}`}
+                      href={`https://www.openstreetmap.org/?mlat=${gpsCoordinates.lat}&mlon=${gpsCoordinates.lon}#map=15/${gpsCoordinates.lat}/${gpsCoordinates.lon}`}
                       rel="noopener noreferrer"
                       target="_blank"
                       data-tooltip={t('editor.metadata.gps.clickToOpenTooltip')}
                     ></a>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <MetadataItem label={t('editor.metadata.gps.latitude')} value={gpsData.lat?.toFixed(6)} />
-                    <MetadataItem label={t('editor.metadata.gps.longitude')} value={gpsData.lon?.toFixed(6)} />
+                    <MetadataItem label={t('editor.metadata.gps.latitude')} value={gpsCoordinates.lat.toFixed(6)} />
+                    <MetadataItem label={t('editor.metadata.gps.longitude')} value={gpsCoordinates.lon.toFixed(6)} />
                     {gpsData.altitude && (
                       <MetadataItem label={t('editor.metadata.gps.altitude')} value={`${gpsData.altitude} m`} />
                     )}

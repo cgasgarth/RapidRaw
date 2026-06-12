@@ -90,7 +90,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     includeMasks: boolean = false,
     includeCropTransform: boolean = false,
     presetType: 'tool' | 'style' = 'style',
-  ) => {
+  ): Preset => {
     const GEOMETRY_KEYS = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((group) => group.keys);
     const MASK_KEYS = (ADJUSTMENT_GROUPS['masks'] ?? []).flatMap((group) => group.keys);
 
@@ -216,7 +216,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     includeMasks: boolean,
     includeCropTransform: boolean,
     presetType: 'tool' | 'style',
-  ) => {
+  ): Preset | null => {
     let existingPreset: Preset | null = null;
 
     for (const item of presets) {
@@ -306,7 +306,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     return updatedPreset;
   };
 
-  const overwritePreset = (id: string | null) => {
+  const overwritePreset = (id: string | null): Preset | null => {
     let existingPreset: Preset | null = null;
 
     for (const item of presets) {
@@ -391,7 +391,7 @@ export function usePresets(currentAdjustments: Adjustments) {
   };
 
   const duplicatePreset = useCallback(
-    (presetId: string | null) => {
+    (presetId: string | null): Preset | null => {
       let presetToDuplicate: Preset | null = null;
       let sourceFolderId: string | null = null;
 
