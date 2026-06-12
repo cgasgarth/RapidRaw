@@ -172,17 +172,21 @@ export default function EditorView({
       onClearSelection={handleClearSelection}
       onContextMenu={handleThumbnailContextMenu}
       onCopy={handleCopyAdjustments}
-      onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
+      onOpenCopyPasteSettings={() => {
+        setUI({ isCopyPasteSettingsModalOpen: true });
+      }}
       onImageSelect={handleImageClick}
-      onPaste={() => handlePasteAdjustments()}
+      onPaste={() => {
+        handlePasteAdjustments();
+      }}
       onRate={handleRate}
       onRequestThumbnails={requestThumbnails}
       onZoomChange={handleZoomChange}
       rating={imageRatings[selectedImage?.path || ''] || 0}
       selectedImage={selectedImage ?? undefined}
-      setIsFilmstripVisible={(value: boolean) =>
-        setUI((state) => ({ uiVisibility: { ...state.uiVisibility, filmstrip: value } }))
-      }
+      setIsFilmstripVisible={(value: boolean) => {
+        setUI((state) => ({ uiVisibility: { ...state.uiVisibility, filmstrip: value } }));
+      }}
       showFilmstrip={!isCompactPortrait}
       showZoomControls={!isAndroid}
       thumbnailAspectRatio={thumbnailAspectRatio}

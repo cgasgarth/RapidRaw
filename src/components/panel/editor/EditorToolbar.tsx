@@ -153,7 +153,9 @@ const EditorToolbar = memo(
         }
       };
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
     }, [isHistoryVisible]);
 
     const prevNamesRef = useRef<string[]>(['Initial State']);
@@ -326,7 +328,9 @@ const EditorToolbar = memo(
             activeEl.scrollIntoView({ block: 'nearest', behavior: 'auto' });
           }
         }, 10);
-        return () => clearTimeout(timer);
+        return () => {
+          clearTimeout(timer);
+        };
       }
     }, [isHistoryVisible, adjustmentsHistoryIndex]);
 
@@ -373,8 +377,12 @@ const EditorToolbar = memo(
                 ? 'h-18 px-8 rounded-2xl absolute min-w-[340px] whitespace-nowrap shadow-2xl shadow-black/50'
                 : 'h-9 px-4 rounded-[18px] absolute min-w-0 w-auto max-w-full shadow-none',
             )}
-            onMouseEnter={() => setIsInfoHovered(true)}
-            onMouseLeave={() => setIsInfoHovered(false)}
+            onMouseEnter={() => {
+              setIsInfoHovered(true);
+            }}
+            onMouseLeave={() => {
+              setIsInfoHovered(false);
+            }}
             style={{
               top: '10px',
               transform: 'translateX(-50%)',
@@ -400,8 +408,12 @@ const EditorToolbar = memo(
                   color={TextColors.accent}
                   weight={TextWeights.bold}
                   className="ml-2 shrink-0 bg-accent/20 px-2 py-0.5 rounded-full flex items-center overflow-hidden cursor-default"
-                  onMouseEnter={() => setIsVcHovered(true)}
-                  onMouseLeave={() => setIsVcHovered(false)}
+                  onMouseEnter={() => {
+                    setIsVcHovered(true);
+                  }}
+                  onMouseLeave={() => {
+                    setIsVcHovered(false);
+                  }}
                 >
                   <span>{t('editor.toolbar.vc')}</span>
                   <div
@@ -450,7 +462,11 @@ const EditorToolbar = memo(
                 isExpanded ? 'opacity-100 delay-75' : 'opacity-0 hidden',
                 hasExif && 'cursor-pointer',
               )}
-              onClick={() => hasExif && onToggleDateView()}
+              onClick={() => {
+                if (hasExif) {
+                  onToggleDateView();
+                }
+              }}
             >
               <div
                 className={clsx(
@@ -585,7 +601,9 @@ const EditorToolbar = memo(
                       <button
                         key={i}
                         data-active={isCurrent}
-                        onClick={() => goToAdjustmentsHistoryIndex(i)}
+                        onClick={() => {
+                          goToAdjustmentsHistoryIndex(i);
+                        }}
                         onKeyDown={handleButtonKeyDown}
                         className={clsx(
                           'text-left px-3 py-2 transition-colors mx-1 my-0.5 rounded-md',
