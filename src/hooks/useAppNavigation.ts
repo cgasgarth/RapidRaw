@@ -371,7 +371,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         if (isNewRoot && path) {
           newExpandedFolders = new Set([path]);
           if (appSettings) {
-            handleSettingsChange({ ...appSettings, lastRootPath: path });
+            void handleSettingsChange({ ...appSettings, lastRootPath: path });
           }
         } else if (path && expandParents) {
           const allRoots = [...(rootPaths || []), ...(pinnedFolders || [])].filter(Boolean);
@@ -538,7 +538,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
           setLibrary({ rootPaths: newRootPaths });
 
           if (appSettings) {
-            handleSettingsChange({ ...appSettings, rootFolders: newRootPaths });
+            void handleSettingsChange({ ...appSettings, rootFolders: newRootPaths });
           }
 
           setLibrary({ isTreeLoading: true });
