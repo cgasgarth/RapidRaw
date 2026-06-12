@@ -1008,7 +1008,11 @@ export default function SettingsPanel({
       if (!effective) continue;
       const key = effective.join('+');
       if (!map.has(key)) map.set(key, new Set());
-      map.get(key)!.add(def.action);
+      const actions = map.get(key);
+      if (!actions) {
+        throw new Error('keybind conflict map invariant violated');
+      }
+      actions.add(def.action);
     }
     const keys = new Set<string>();
     for (const [, actions] of map) {

@@ -1618,16 +1618,14 @@ const ImageCanvas = memo(
           } else {
             effectiveTool = baseTool;
           }
-          const isShiftClick = isBrushActive && e.evt.shiftKey && lastBrushPoint.current;
-
-          if (isShiftClick) {
+          if (isBrushActive && e.evt.shiftKey && lastBrushPoint.current) {
             const { scale } = imageRenderSize;
             const crop = adjustments.crop;
             const isPercent = crop?.unit === '%';
             const cropX = crop ? (isPercent ? (crop.x / 100) * effectiveImageDimensions.width : crop.x) : 0;
             const cropY = crop ? (isPercent ? (crop.y / 100) * effectiveImageDimensions.height : crop.y) : 0;
 
-            const startImageSpace = lastBrushPoint.current!;
+            const startImageSpace = lastBrushPoint.current;
             const endImageSpace = {
               x: pos.x / scale + cropX,
               y: pos.y / scale + cropY,

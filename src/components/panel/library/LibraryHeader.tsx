@@ -570,7 +570,10 @@ export function ViewOptionsDropdown({
                   className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
                     isSelected ? 'bg-card-active' : 'hover:bg-bg-primary'
                   }`}
-                  onClick={() => handleSettingsChange({ ...appSettings!, exifOverlay: option.id })}
+                  onClick={() => {
+                    if (!appSettings) return;
+                    handleSettingsChange({ ...appSettings, exifOverlay: option.id });
+                  }}
                 >
                   <Text
                     variant={TextVariants.label}

@@ -79,7 +79,9 @@ export const useKeyboardShortcuts = ({
         shouldFire: (s) => !s.editor.selectedImage && s.library.libraryActivePath !== null,
         execute: (e, s) => {
           e.preventDefault();
-          handleImageSelect(s.library.libraryActivePath!);
+          const activePath = s.library.libraryActivePath;
+          if (activePath === null) return;
+          handleImageSelect(activePath);
         },
       },
       copy_adjustments: {
@@ -132,7 +134,9 @@ export const useKeyboardShortcuts = ({
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          const currentIndex = sortedListRef.current.findIndex((img) => img.path === s.editor.selectedImage!.path);
+          const selectedImage = s.editor.selectedImage;
+          if (!selectedImage) return;
+          const currentIndex = sortedListRef.current.findIndex((img) => img.path === selectedImage.path);
           if (currentIndex === -1) return;
           const nextIndex = currentIndex - 1 < 0 ? sortedListRef.current.length - 1 : currentIndex - 1;
           const nextImage = sortedListRef.current[nextIndex];
@@ -143,7 +147,9 @@ export const useKeyboardShortcuts = ({
         shouldFire: (s) => !!s.editor.selectedImage,
         execute: (e, s) => {
           e.preventDefault();
-          const currentIndex = sortedListRef.current.findIndex((img) => img.path === s.editor.selectedImage!.path);
+          const selectedImage = s.editor.selectedImage;
+          if (!selectedImage) return;
+          const currentIndex = sortedListRef.current.findIndex((img) => img.path === selectedImage.path);
           if (currentIndex === -1) return;
           const nextIndex = currentIndex + 1 >= sortedListRef.current.length ? 0 : currentIndex + 1;
           const nextImage = sortedListRef.current[nextIndex];

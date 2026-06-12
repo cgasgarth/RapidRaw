@@ -37,12 +37,20 @@ export class ImageLRUCache {
 
   set(key: string, entry: ImageCacheEntry): void {
     if (this.cache.has(key)) {
-      this.cleanupEntry(this.cache.get(key)!, entry);
+      const existingEntry = this.cache.get(key);
+      if (!existingEntry) {
+        throw new Error('Image cache entry invariant violated');
+      }
+      this.cleanupEntry(existingEntry, entry);
       this.cache.delete(key);
     } else if (this.cache.size >= this.maxSize) {
       const lruKey = this.cache.keys().next().value;
       if (lruKey !== undefined) {
-        this.cleanupEntry(this.cache.get(lruKey)!);
+        const lruEntry = this.cache.get(lruKey);
+        if (!lruEntry) {
+          throw new Error('Image cache LRU invariant violated');
+        }
+        this.cleanupEntry(lruEntry);
         this.cache.delete(lruKey);
       }
     }

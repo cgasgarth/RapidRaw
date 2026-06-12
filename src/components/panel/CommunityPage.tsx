@@ -52,7 +52,13 @@ const shuffleArray = <T,>(array: T[]) => {
   const newArray = [...array];
   for (let i = newArray.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j]!, newArray[i]!];
+    const current = newArray[i];
+    const swap = newArray[j];
+    if (current === undefined || swap === undefined) {
+      throw new Error('shuffleArray index invariant violated');
+    }
+    newArray[i] = swap;
+    newArray[j] = current;
   }
   return newArray;
 };
