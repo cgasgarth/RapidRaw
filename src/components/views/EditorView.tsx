@@ -1,4 +1,9 @@
-import { type MouseEvent, type RefObject, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+  type RefObject,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import clsx from 'clsx';
@@ -60,7 +65,7 @@ interface EditorViewProps {
   handleBackToLibrary: () => void;
   handleEditorContextMenu: (event: MouseEvent<HTMLElement>) => void;
   handleThumbnailContextMenu: (event: MouseEvent<HTMLElement>, path: string) => void;
-  handleImageClick: (path: string, event: MouseEvent<HTMLElement>) => void;
+  handleImageClick: (path: string, event: MouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>) => void;
   handleClearSelection: () => void;
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;
