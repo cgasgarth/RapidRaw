@@ -1669,6 +1669,7 @@ Negative lab ADRs:
 - `ADR-NEG-004: Film base sampling and roll-level calibration`
 - `ADR-NEG-005: Roll consistency and batch application semantics`
 - `ADR-NEG-006: Preset naming, trademark, provenance, and legal policy`
+  ([draft ADR](docs/negative-lab/preset-naming-legal-policy-2026-06-13.md))
 - `ADR-NEG-007: Built-in preset taxonomy and stock refresh cadence`
 - `ADR-NEG-008: Positive variant/export provenance`
 - `ADR-NEG-009: Negative fixture corpus and validation thresholds`

@@ -27,6 +27,7 @@ generator before the release workflow needs one.
 - [Sample agent guide](agent/sample-agent-guide-2026-06-11.md)
 - [App-server agent architecture](agent/app-server-architecture-2026-06-12.md)
 - [Negative Lab density-domain inversion ADR](negative-lab/density-domain-inversion-adr-2026-06-13.md)
+- [Negative Lab preset naming and legal policy ADR](negative-lab/preset-naming-legal-policy-2026-06-13.md)
 - [Architecture baseline](baseline/rapidraw-architecture-baseline-2026-06-11.md)
 - [AI hooks baseline](baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
 - [GPU shader baseline](baseline/rapidraw-gpu-shader-baseline-2026-06-11.md)
