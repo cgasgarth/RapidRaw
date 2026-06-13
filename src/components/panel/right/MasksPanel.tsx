@@ -862,16 +862,15 @@ export default function MasksPanel() {
     activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth].includes(activeSubMaskData.type);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    if (isGeneratingAiMask && isAiMask) {
-      timer = setTimeout(() => {
-        setAnalyzingSubMaskId(activeMaskId);
-      }, 200);
-    } else {
-      setAnalyzingSubMaskId(null);
-    }
+    const timer = setTimeout(
+      () => {
+        setAnalyzingSubMaskId(isGeneratingAiMask && isAiMask ? activeMaskId : null);
+      },
+      isGeneratingAiMask && isAiMask ? 200 : 0,
+    );
+
     return () => {
-      if (timer) clearTimeout(timer);
+      clearTimeout(timer);
     };
   }, [isGeneratingAiMask, isAiMask, activeMaskId]);
 
@@ -886,32 +885,38 @@ export default function MasksPanel() {
   }, [adjustments.masks, activeMaskContainerId, onSelectContainer, onSelectMask]);
 
   useEffect(() => {
-    if (!hasPerformedInitialSelection.current && !activeMaskContainerId && adjustments.masks.length > 0) {
-      const lastMask = adjustments.masks[adjustments.masks.length - 1];
-      if (lastMask) {
-        onSelectContainer(lastMask.id);
-        onSelectMask(null);
-      }
-    }
-
-    if (activeMaskContainerId) {
-      const shouldAutoExpand = !hasPerformedInitialSelection.current || activeMaskId;
-
-      if (shouldAutoExpand) {
-        setExpandedContainers((prev) => {
-          if (prev.has(activeMaskContainerId)) {
-            return prev;
-          }
-          return new Set(prev).add(activeMaskContainerId);
-        });
+    const syncTimer = setTimeout(() => {
+      if (!hasPerformedInitialSelection.current && !activeMaskContainerId && adjustments.masks.length > 0) {
+        const lastMask = adjustments.masks[adjustments.masks.length - 1];
+        if (lastMask) {
+          onSelectContainer(lastMask.id);
+          onSelectMask(null);
+        }
       }
 
-      hasPerformedInitialSelection.current = true;
-    }
+      if (activeMaskContainerId) {
+        const shouldAutoExpand = !hasPerformedInitialSelection.current || activeMaskId;
 
-    if (activeMaskContainerId || adjustments.masks.length > 0) {
-      setIsSettingsPanelEverOpened(true);
-    }
+        if (shouldAutoExpand) {
+          setExpandedContainers((prev) => {
+            if (prev.has(activeMaskContainerId)) {
+              return prev;
+            }
+            return new Set(prev).add(activeMaskContainerId);
+          });
+        }
+
+        hasPerformedInitialSelection.current = true;
+      }
+
+      if (activeMaskContainerId || adjustments.masks.length > 0) {
+        setIsSettingsPanelEverOpened(true);
+      }
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [activeMaskContainerId, activeMaskId, adjustments.masks, onSelectContainer, onSelectMask]);
 
   useEffect(() => {
