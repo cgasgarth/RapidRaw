@@ -1,0 +1,38 @@
+{
+  "commandId": "command_ai_denoise_dry_run_sample",
+  "commandType": "ai.enhancement.dryRun",
+  "correlationId": "corr_ai_denoise_sample",
+  "dryRunPlanHash": "sha256:sample-ai-denoise-plan",
+  "dryRunPlanId": "dryrun_ai_denoise_001",
+  "enhancementArtifacts": [
+    {
+      "artifactId": "artifact_ai_denoise_preview_patch",
+      "contentHash": "sha256:sample-ai-denoise-preview-patch",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "denoise_output",
+      "storage": "temp_cache"
+    }
+  ],
+  "modelId": "local_raw_denoise",
+  "modelVersion": "2026.06",
+  "previewArtifacts": [
+    {
+      "artifactId": "artifact_ai_denoise_preview",
+      "contentHash": "sha256:sample-ai-denoise-preview",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "preview",
+      "storage": "temp_cache"
+    }
+  ],
+  "providerClass": "local_model",
+  "providerId": "rawengine-local-ai",
+  "schemaVersion": 1,
+  "sourceContentHash": "sha256:sample-raw-source-hash",
+  "warnings": []
+}
