@@ -1,8 +1,10 @@
 import { type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import FilmLookBrowser from './FilmLookBrowser';
 import { TextVariants } from '../../types/typography';
 import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
+import { type FilmLookBrowserItem } from '../../utils/filmLookBrowser';
 import { AppSettings } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
 import Slider from '../ui/Slider';
@@ -57,6 +59,13 @@ export default function EffectsPanel({
     }));
   };
 
+  const handleFilmLookApply = (look: FilmLookBrowserItem) => {
+    setAdjustments((prev: Partial<Adjustments>) => ({
+      ...prev,
+      ...look.adjustmentPatch,
+    }));
+  };
+
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
   return (
@@ -107,6 +116,10 @@ export default function EffectsPanel({
 
       {!isForMask && (
         <div className="space-y-4">
+          <div className="p-2 bg-bg-tertiary rounded-md">
+            <FilmLookBrowser onApplyLook={handleFilmLookApply} />
+          </div>
+
           <div className="p-2 bg-bg-tertiary rounded-md">
             <UiText variant={TextVariants.heading} className="mb-2">
               {t('adjustments.effects.lut')}
