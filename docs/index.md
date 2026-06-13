@@ -119,6 +119,7 @@ generator before the release workflow needs one.
 - [Update mechanism research](release/update-mechanism-research-2026-06-11.md)
 - [macOS signing plan](release/macos-signing-plan-2026-06-11.md)
 - [macOS notarization workflow](release/macos-notarization-workflow-2026-06-11.md)
+- [Release notes automation](release/release-notes-automation-2026-06-13.md)
 - [Release metadata, checksums, and SBOM](release/release-metadata-checksums-sbom-2026-06-11.md)
 
 ## Site Rules

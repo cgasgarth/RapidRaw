@@ -4845,7 +4845,8 @@ Issues:
 - Add macOS signing plan.
 - Add notarization workflow.
 - Add update mechanism research.
-- Add release notes automation.
+- Add release notes automation. Initial script, workflow job, and validation
+  captured in `docs/release/release-notes-automation-2026-06-13.md`.
 - Add documentation site.
 - Add user guide.
 - Add developer API guide.
