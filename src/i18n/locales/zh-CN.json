@@ -1149,6 +1149,7 @@
       "btnStart": "开始",
       "cancel": "取消",
       "close": "关闭",
+      "compareSplit": "原始与降噪对比分割线",
       "denoised": "已降噪",
       "denoisingProgress": "降噪进行中",
       "description": "使用 AI 驱动或传统降噪技术去除图像中的噪声。",

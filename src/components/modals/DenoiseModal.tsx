@@ -109,6 +109,31 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
     setPan({ x: newPanX, y: newPanY });
   };
 
+  const handleSliderKeyDown = (e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 10 : 2;
+
+    switch (e.key) {
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        e.preventDefault();
+        setSliderPosition((value) => Math.max(0, value - step));
+        break;
+      case 'ArrowRight':
+      case 'ArrowUp':
+        e.preventDefault();
+        setSliderPosition((value) => Math.min(100, value + step));
+        break;
+      case 'Home':
+        e.preventDefault();
+        setSliderPosition(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        setSliderPosition(100);
+        break;
+    }
+  };
+
   const imageTransformStyle = {
     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
     transition: isDragging || isResizingSlider ? 'none' : 'transform 0.1s ease-out',
@@ -155,6 +180,7 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing select-none"
+        role="presentation"
         onMouseDown={handleMouseDown}
         onWheel={handleWheel}
       >
@@ -188,7 +214,14 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
         <div
           className="absolute top-0 bottom-0 w-0.5 bg-white cursor-col-resize z-10 shadow-[0_0_8px_rgba(0,0,0,0.8)]"
           style={{ left: `${sliderPosition}%` }}
+          role="slider"
+          tabIndex={0}
+          aria-label={t('modals.denoise.compareSplit')}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(sliderPosition)}
           onMouseDown={handleSliderMouseDown}
+          onKeyDown={handleSliderKeyDown}
         >
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center gap-0.5">
             <div className="w-0.5 h-3 bg-black/40 rounded-full"></div>
@@ -567,6 +600,7 @@ export default function DenoiseModal({
       className={`fixed inset-0 flex items-center justify-center z-50 bg-black/40 backdrop-blur-xs transition-opacity duration-300 ease-in-out ${
         show ? 'opacity-100' : 'opacity-0'
       }`}
+      role="presentation"
       onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
     >
