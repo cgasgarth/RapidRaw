@@ -18,6 +18,9 @@ The goal is not complete merely because the current backlog slice feels exhauste
 - Work from the next ready unclosed GitHub issue in milestone order unless the user explicitly redirects.
 - Keep `main` protected: no direct commits or pushes to `main`; all substantive work goes through PRs.
 - Keep PRs small to medium and tied to one coherent validation story.
+- Keep at most two active open PRs at a time. Use that cap as an A/B pattern
+  when useful, where one PR can build while another independent PR is prepared
+  or validated. Do not use it as permission to leave work open and stale.
 - Use this plan as the source of truth for ordering, constraints, and completion evidence.
 - Update this plan in the same PR when product direction, architecture, validation policy, or execution order changes.
 - Record exact local commands, CI runs, screenshots, render artifacts, skipped checks, and residual risk in every PR.
@@ -305,9 +308,13 @@ Required check rollout:
 
 Active PR queue discipline:
 
+- Keep at most two active open PRs at a time unless the user explicitly changes
+  the cap again. The normal pattern is one implementation PR plus, when useful,
+  one independent docs/tooling PR that can progress while the first PR waits on
+  CI.
 - Do not let PRs sit open merely because more local work is available. Every open PR should be actively heading toward merge, or it should be closed with a comment that explains whether the work is superseded, preserved locally, or intentionally deferred.
 - Prefer one active implementation PR at a time for work that touches shared config, validation gates, lockfiles, generated artifacts, or other files likely to conflict with the next similar PR.
-- At most one unrelated infrastructure or documentation PR should be active beside a shared-config implementation PR unless the user explicitly approves a larger queue for a specific reason.
+- At most one unrelated infrastructure or documentation PR should be active beside a shared-config implementation PR unless the user explicitly approves a different cap for a specific reason.
 - Do not stack multiple lint-rule PRs that all touch `eslint.config.js` while required macOS/Rust checks are queued. Keep follow-up lint work local, then open the next PR only after the earlier overlapping PR merges or is closed.
 - After a PR merges, sync `main` before opening the next overlapping PR. Rebase and force-push an open PR only when it is genuinely behind, conflicting, failing, or required by branch protection; avoid needless head updates because they restart required checks.
 - Auto-merge is a convenience, not a parking lot. If required checks are blocked for a long time, inspect the check state and either fix the blocker, keep only the minimal active queue, or close nonessential PRs and preserve the work locally.
