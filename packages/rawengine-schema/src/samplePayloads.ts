@@ -925,6 +925,48 @@ export const sampleAiToolAgentReplayFixtureV1: RawEngineAgentReplayFixtureV1 =
     warnings: [],
   });
 
+export const sampleAiMaskDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleAiToolCommandEnvelopeV1.approval,
+      arguments: sampleAiToolCommandEnvelopeV1,
+      dryRun: true,
+      inputSchemaName: 'AiToolCommandEnvelopeV1',
+      itemId: 'item_tool_call_ai_subject_mask_dry_run',
+      jsonRpcRequestId: 'jsonrpc_ai_subject_mask_dry_run',
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_ai_mask_sample',
+      toolKind: 'dry_run',
+      toolName: 'ai.mask.dry_run_subject',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_ai_mask_sample',
+    },
+  });
+
+export const sampleAiMaskApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleAiToolApplyCommandEnvelopeV1.approval,
+      arguments: sampleAiToolApplyCommandEnvelopeV1,
+      dryRun: false,
+      inputSchemaName: 'AiToolCommandEnvelopeV1',
+      itemId: 'item_tool_call_ai_subject_mask_apply',
+      jsonRpcRequestId: 'jsonrpc_ai_subject_mask_apply',
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_ai_mask_sample',
+      toolKind: 'apply',
+      toolName: 'ai.mask.apply_subject',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_ai_mask_sample',
+    },
+  });
+
 export const sampleLayerMaskCommandEnvelopeV1: LayerMaskCommandEnvelopeV1 = layerMaskCommandEnvelopeV1Schema.parse({
   actor: {
     id: 'codex-app-server',
