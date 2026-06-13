@@ -8,6 +8,8 @@ import { format } from 'prettier';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  negativeAcquisitionProfileV1Schema,
+  negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
   rawEngineToolRegistryV1Schema,
@@ -15,6 +17,8 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleNegativeAcquisitionProfileV1,
+  sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
   sampleToolRegistryV1,
@@ -52,6 +56,18 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/panorama-artifact-v1.json',
     schema: panoramaArtifactV1Schema,
     value: samplePanoramaArtifactV1,
+  },
+  {
+    name: 'negative acquisition profile',
+    path: 'packages/rawengine-schema/samples/negative-acquisition-profile-v1.json',
+    schema: negativeAcquisitionProfileV1Schema,
+    value: sampleNegativeAcquisitionProfileV1,
+  },
+  {
+    name: 'negative roll session',
+    path: 'packages/rawengine-schema/samples/negative-roll-session-v1.json',
+    schema: negativeRollSessionV1Schema,
+    value: sampleNegativeRollSessionV1,
   },
 ];
 

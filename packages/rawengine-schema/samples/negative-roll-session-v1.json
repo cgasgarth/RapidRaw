@@ -1,0 +1,40 @@
+{
+  "acquisitionProfileId": "acq_lab_jpeg_sample_v1",
+  "acquisitionWarnings": [
+    {
+      "blocksAutomation": true,
+      "code": "low_acquisition_confidence",
+      "evidence": "Lab JPEG source has lossy compression and no scanner profile metadata.",
+      "frameIds": ["frame_0001"],
+      "scope": "session",
+      "severity": "warning"
+    }
+  ],
+  "anchorFrameIds": [],
+  "conversionWarnings": [],
+  "frameRecords": [
+    {
+      "baseSampleIds": [],
+      "borderState": "cropped",
+      "contentHash": "sha256:sample-negative-frame-hash",
+      "conversionCommandIds": [],
+      "frameId": "frame_0001",
+      "frameIndex": 0,
+      "positiveVariantIds": [],
+      "qcStatus": "needs_review",
+      "sourcePath": "/photos/roll-01/lab-scan-0001.jpg",
+      "warningCodes": ["lossy_input", "low_acquisition_confidence"]
+    }
+  ],
+  "inputMode": "lab_jpeg",
+  "perFrameOverrideIds": [],
+  "pixelBasis": "lab_rendered_rgb",
+  "processFamily": "c41_color_negative",
+  "provenanceEntryIds": ["prov_import_lab_scan_0001"],
+  "qcStatus": "needs_review",
+  "rollDefaultCommandIds": [],
+  "schemaVersion": 1,
+  "sessionId": "negative_roll_session_sample",
+  "sharedBaseSampleIds": [],
+  "sourceFileIds": ["source_lab_scan_0001"]
+}
