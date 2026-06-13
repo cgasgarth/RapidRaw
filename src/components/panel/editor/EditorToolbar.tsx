@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, ArrowLeft, Maximize, Loader2, Undo, Redo } from 'lucide-react';
 import { memo, useState, useEffect, useRef, useMemo } from 'react';
@@ -375,7 +375,7 @@ const EditorToolbar = memo(
 
         <div className="flex-1 flex justify-center min-w-0 relative h-full">
           <div
-            className={clsx(
+            className={cx(
               'bg-surface flex flex-col items-center overflow-hidden transition-all duration-200 ease-out pt-2',
               isExpanded
                 ? 'h-18 px-8 rounded-2xl absolute min-w-[340px] whitespace-nowrap shadow-2xl shadow-black/50'
@@ -421,7 +421,7 @@ const EditorToolbar = memo(
                 >
                   <span>{t('editor.toolbar.vc')}</span>
                   <div
-                    className={clsx(
+                    className={cx(
                       'transition-all duration-300 ease-out overflow-hidden whitespace-nowrap',
                       isVcHovered ? 'max-w-20 opacity-100' : 'max-w-0 opacity-0',
                     )}
@@ -432,7 +432,7 @@ const EditorToolbar = memo(
               )}
 
               <div
-                className={clsx(
+                className={cx(
                   'transition-all duration-300 ease-out overflow-hidden whitespace-nowrap shrink-0',
                   showResolution ? 'max-w-40 opacity-100 ml-2' : 'max-w-0 opacity-0 ml-0',
                 )}
@@ -440,7 +440,7 @@ const EditorToolbar = memo(
                 <Text
                   as="span"
                   variant={TextVariants.small}
-                  className={clsx(
+                  className={cx(
                     'block transition-transform duration-200 delay-100',
                     showResolution ? 'scale-100' : 'scale-95',
                   )}
@@ -450,7 +450,7 @@ const EditorToolbar = memo(
               </div>
 
               <div
-                className={clsx(
+                className={cx(
                   'overflow-hidden shrink-0',
                   isLoaderVisible ? 'max-w-4 opacity-100 ml-2' : 'max-w-0 opacity-0 ml-0',
                   disableLoaderTransition ? 'transition-none' : 'transition-all duration-300',
@@ -462,7 +462,7 @@ const EditorToolbar = memo(
 
             <button
               type="button"
-              className={clsx(
+              className={cx(
                 'relative mt-2 w-full grow justify-center border-t border-text-secondary/10 pt-2 transition-opacity duration-200 bg-transparent p-0 text-left',
                 isExpanded ? 'opacity-100 delay-75' : 'opacity-0 hidden',
                 hasExif && 'cursor-pointer',
@@ -475,7 +475,7 @@ const EditorToolbar = memo(
               }}
             >
               <div
-                className={clsx(
+                className={cx(
                   'absolute inset-0 flex items-center justify-center gap-6 transition-opacity duration-200',
                   showDateView ? 'opacity-0 pointer-events-none' : 'opacity-100',
                 )}
@@ -523,7 +523,7 @@ const EditorToolbar = memo(
               </div>
 
               <div
-                className={clsx(
+                className={cx(
                   'absolute inset-0 flex items-center justify-center gap-6 transition-opacity duration-200',
                   showDateView ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
@@ -611,7 +611,7 @@ const EditorToolbar = memo(
                           goToAdjustmentsHistoryIndex(i);
                         }}
                         onKeyDown={handleButtonKeyDown}
-                        className={clsx(
+                        className={cx(
                           'text-left px-3 py-2 transition-colors mx-1 my-0.5 rounded-md',
                           isCurrent
                             ? 'bg-accent'
@@ -643,7 +643,7 @@ const EditorToolbar = memo(
           </div>
 
           <button
-            className={clsx(
+            className={cx(
               'p-2 rounded-full transition-colors',
               showOriginal
                 ? 'bg-accent text-button-text hover:bg-accent/90 hover:text-button-text'

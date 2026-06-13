@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -196,7 +196,7 @@ export default function GlobalTooltip() {
           exit={{ opacity: 0, scale: 0.9, x: '-50%' }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
           style={{ top: tooltip.y, left }}
-          className={clsx(
+          className={cx(
             'fixed z-100 pointer-events-none',
             'bg-surface/80 backdrop-blur-xs',
             'border border-text-secondary/10 shadow-xl rounded-md',

@@ -2,7 +2,7 @@ import { ClerkProvider } from '@clerk/react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import clsx from 'clsx';
+import cx from 'clsx';
 import { type PointerEvent as ReactPointerEvent, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ToastContainer, toast, Slide } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
@@ -673,7 +673,7 @@ function App() {
 
     return (
       <div
-        className={clsx(
+        className={cx(
           'flex h-full overflow-hidden shrink-0',
           !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
         )}
@@ -721,14 +721,14 @@ function App() {
       />
       <ImageLoaderManager cachedEditStateRef={cachedEditStateRef} />
       <div
-        className={clsx(
+        className={cx(
           'flex flex-col h-screen font-sans text-text-primary overflow-hidden select-none',
           useMacWindowShell && 'macos-window-shell',
           isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
         )}
       >
         <div
-          className={clsx(
+          className={cx(
             'shrink-0 overflow-hidden z-50',
             !isInstantTransition && 'transition-all duration-300 ease-in-out',
             isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
@@ -737,7 +737,7 @@ function App() {
           {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
         </div>
         <div
-          className={clsx(
+          className={cx(
             'flex-1 flex flex-col min-h-0',
             isLayoutReady && hasRoots && !isInstantTransition && 'transition-all duration-300 ease-in-out',
             [hasRoots && (isFullScreen ? 'p-0 gap-0' : 'p-2 gap-2')],
@@ -801,7 +801,7 @@ function App() {
               <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
             )}
             <div
-              className={clsx(
+              className={cx(
                 'shrink-0 overflow-hidden',
                 !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
               )}
@@ -857,7 +857,7 @@ function App() {
           theme={isLightTheme ? 'light' : 'dark'}
           transition={Slide}
           toastClassName={() =>
-            clsx(
+            cx(
               'relative flex min-h-16 p-4 rounded-lg justify-between overflow-hidden cursor-pointer mb-4',
               'bg-surface! text-text-primary! border! border-border-color! shadow-2xl! max-w-[420px]!',
             )

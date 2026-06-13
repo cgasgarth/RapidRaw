@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -199,7 +199,7 @@ export default function EditorView({
 
   const editorBottomBarNode = (
     <div
-      className={clsx(
+      className={cx(
         'flex flex-col w-full overflow-hidden shrink-0',
         !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
       )}
@@ -259,13 +259,13 @@ export default function EditorView({
   );
 
   return (
-    <div className={clsx('flex grow h-full min-h-0', isCompactPortrait ? 'flex-col gap-2' : 'flex-row')}>
-      <div className={clsx('flex-1 flex flex-col min-w-0', isCompactPortrait && 'min-h-0')}>
+    <div className={cx('flex grow h-full min-h-0', isCompactPortrait ? 'flex-col gap-2' : 'flex-row')}>
+      <div className={cx('flex-1 flex flex-col min-w-0', isCompactPortrait && 'min-h-0')}>
         {editorNode}
         {!isCompactPortrait && editorBottomBarNode}
       </div>
       <div
-        className={clsx(
+        className={cx(
           'flex overflow-hidden shrink-0',
           isCompactPortrait ? 'flex-col bg-bg-secondary rounded-lg' : 'h-full bg-transparent',
           !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
@@ -308,7 +308,7 @@ export default function EditorView({
             <Resizer direction={Orientation.Vertical} onMouseDown={createResizeHandler('right', rightPanelWidth)} />
             <div className="flex bg-bg-secondary rounded-lg h-full">
               <div
-                className={clsx(
+                className={cx(
                   'h-full overflow-hidden',
                   !isResizing && !isInstantTransition && 'transition-all duration-300 ease-in-out',
                 )}
@@ -319,7 +319,7 @@ export default function EditorView({
                 </div>
               </div>
               <div
-                className={clsx(
+                className={cx(
                   'h-full border-l transition-colors',
                   activeRightPanel ? 'border-surface' : 'border-transparent',
                 )}

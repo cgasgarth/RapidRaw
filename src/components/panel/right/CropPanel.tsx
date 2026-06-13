@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion } from 'framer-motion';
 import {
   Aperture,
@@ -534,7 +534,7 @@ export default function CropPanel() {
               <div className="grid grid-cols-3 gap-2">
                 {PRESETS.map((preset: CropPreset) => (
                   <motion.div
-                    className={clsx(
+                    className={cx(
                       'px-2 py-1.5 rounded-md transition-colors text-center cursor-pointer',
                       isPresetActive(preset) ? 'bg-accent' : 'bg-surface hover:bg-card-active',
                     )}
@@ -552,7 +552,7 @@ export default function CropPanel() {
               </div>
               <div>
                 <motion.div
-                  className={clsx(
+                  className={cx(
                     'w-full px-2 py-1.5 rounded-md transition-colors cursor-pointer text-center',
                     isCustomActive ? 'bg-accent' : 'bg-surface hover:bg-card-active',
                   )}
@@ -576,7 +576,7 @@ export default function CropPanel() {
                   </Text>
                 </motion.div>
                 <div
-                  className={clsx(
+                  className={cx(
                     'mt-2 bg-surface p-2 rounded-md transition-opacity',
                     isCustomActive ? 'opacity-100' : 'opacity-50 pointer-events-none',
                   )}
@@ -633,7 +633,7 @@ export default function CropPanel() {
                             return { isStraightenActive: willBeActive };
                           });
                         }}
-                        className={clsx(
+                        className={cx(
                           'p-1.5 rounded-md transition-colors',
                           isStraightenActive
                             ? 'bg-accent text-button-text'
@@ -695,7 +695,7 @@ export default function CropPanel() {
                   <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.rotateRight')}</span>
                 </motion.div>
                 <motion.div
-                  className={clsx(
+                  className={cx(
                     'flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors',
                     flipHorizontal
                       ? 'bg-accent text-button-text'
@@ -715,7 +715,7 @@ export default function CropPanel() {
                   <span className="text-xs mt-2 transition-none">{t('editor.crop.labels.flipHoriz')}</span>
                 </motion.div>
                 <motion.div
-                  className={clsx(
+                  className={cx(
                     'flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors',
                     flipVertical
                       ? 'bg-accent text-button-text'

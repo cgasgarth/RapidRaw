@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import clsx from 'clsx';
+import cx from 'clsx';
 import debounce from 'lodash.debounce';
 import { Loader2 } from 'lucide-react';
 import {
@@ -2037,16 +2037,16 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
   return (
     <div
-      className={clsx(
+      className={cx(
         'flex-1 flex flex-col relative overflow-hidden min-h-0',
         !isInstantTransition && 'transition-all duration-300 ease-in-out',
         isFullScreen
           ? 'rounded-none p-0 gap-0'
-          : clsx('rounded-lg p-2 gap-2', appSettings?.useWgpuRenderer !== false ? 'bg-transparent' : 'bg-bg-secondary'),
+          : cx('rounded-lg p-2 gap-2', appSettings?.useWgpuRenderer !== false ? 'bg-transparent' : 'bg-bg-secondary'),
       )}
     >
       <div
-        className={clsx(
+        className={cx(
           'shrink-0 relative z-10',
           !isInstantTransition && 'transition-all duration-300 ease-in-out',
           isFullScreen ? 'max-h-0 opacity-0 m-0' : 'max-h-25 opacity-100',
@@ -2076,7 +2076,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       </div>
 
       <div
-        className={clsx(
+        className={cx(
           'flex-1 relative overflow-hidden touch-none',
           isFullScreen ? 'rounded-none' : 'rounded-lg',
           appSettings?.useWgpuRenderer !== false && !isFullScreen && 'ring-[9999px] ring-bg-secondary',
@@ -2094,7 +2094,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       >
         {showSpinner && (
           <div
-            className={clsx(
+            className={cx(
               'absolute inset-0 bg-bg-secondary/80 flex items-center justify-center z-50 transition-opacity duration-300',
               isLoaderVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
             )}

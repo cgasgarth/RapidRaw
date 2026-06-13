@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { open } from '@tauri-apps/plugin-shell';
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   ArrowLeft,
@@ -321,7 +321,7 @@ const AiProviderSwitch = ({ selectedProvider, onProviderChange }: AiProviderSwit
           onClick={() => {
             onProviderChange(provider.id);
           }}
-          className={clsx(
+          className={cx(
             'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
             {
               'text-text-primary hover:bg-surface': selectedProvider !== provider.id,
@@ -468,7 +468,7 @@ const CanvasInputModeSwitch = ({ mode, onModeChange }: CanvasInputModeSwitchProp
           onClick={() => {
             onModeChange(item.id);
           }}
-          className={clsx(
+          className={cx(
             'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
             {
               'text-text-primary hover:bg-surface': mode !== item.id,
@@ -519,7 +519,7 @@ const PreviewModeSwitch = ({ mode, onModeChange }: PreviewModeSwitchProps) => {
           onClick={() => {
             onModeChange(item.id);
           }}
-          className={clsx(
+          className={cx(
             'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
             {
               'text-text-primary hover:bg-surface': mode !== item.id,
@@ -1098,7 +1098,7 @@ export default function SettingsPanel({
                 onClick={() => {
                   setActiveCategory(category.id);
                 }}
-                className={clsx(
+                className={cx(
                   'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
                   {
                     'text-text-primary hover:bg-surface': activeCategory !== category.id,

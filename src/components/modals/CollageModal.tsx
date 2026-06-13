@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import clsx from 'clsx';
+import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CheckCircle,
@@ -676,7 +676,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
                       setActiveLayout(item.layout);
                       resetImageOffsets();
                     }}
-                    className={clsx('p-2 rounded-md bg-surface hover:bg-card-active', {
+                    className={cx('p-2 rounded-md bg-surface hover:bg-card-active', {
                       'ring-2 ring-accent': item.layout === activeLayout,
                     })}
                   >
@@ -712,7 +712,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
               onClick={() => {
                 handleAspectRatioChange(preset);
               }}
-              className={clsx(
+              className={cx(
                 'px-2 py-1.5 text-sm rounded-md transition-colors',
                 activeAspectRatio.id === preset.id ? 'bg-accent text-button-text' : 'bg-surface hover:bg-card-active',
               )}
@@ -723,7 +723,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
           {loadedImages.length === 1 && (
             <button
               onClick={handleOriginalAspectRatio}
-              className={clsx(
+              className={cx(
                 'px-2 py-1.5 text-sm rounded-md transition-colors',
                 activeAspectRatio.id === 'original' ? 'bg-accent text-button-text' : 'bg-surface hover:bg-card-active',
               )}
@@ -889,7 +889,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
                       onWheel={(e) => {
                         handleWheel(e, index);
                       }}
-                      className={clsx(
+                      className={cx(
                         'absolute group',
                         panningImage?.index === index && !keepOriginalRatio
                           ? 'cursor-grabbing'

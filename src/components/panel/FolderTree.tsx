@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Folder,
@@ -195,7 +195,7 @@ function AlbumTreeNode({
   return (
     <Text as="div" color={TextColors.primary} weight={TextWeights.medium}>
       <div
-        className={clsx('flex items-center gap-2 p-1.5 rounded-md transition-colors cursor-pointer', {
+        className={cx('flex items-center gap-2 p-1.5 rounded-md transition-colors cursor-pointer', {
           'bg-surface': isSelected,
           'hover:bg-card-active': !isSelected,
         })}
@@ -349,7 +349,7 @@ function TreeNode({
   return (
     <Text as="div" color={TextColors.primary} weight={TextWeights.medium}>
       <div
-        className={clsx('flex items-center gap-2 p-1.5 rounded-md transition-colors cursor-pointer', {
+        className={cx('flex items-center gap-2 p-1.5 rounded-md transition-colors cursor-pointer', {
           'bg-surface': isSelected,
           'hover:bg-card-active': !isSelected,
         })}
@@ -363,7 +363,7 @@ function TreeNode({
       >
         <button
           type="button"
-          className={clsx(
+          className={cx(
             'relative w-5 h-5 flex items-center justify-center p-0.5 rounded-sm transition-colors shrink-0 bg-transparent',
             {
               [TEXT_COLOR_KEYS[TextColors.secondary]]: !isExpanded,
@@ -393,7 +393,7 @@ function TreeNode({
               as="span"
               variant={TextVariants.small}
               color={TextColors.secondary}
-              className={clsx(
+              className={cx(
                 'inline-block ml-1 transition-all ease-in-out duration-300',
                 showImageCounts ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2',
               )}
@@ -406,10 +406,7 @@ function TreeNode({
         {hasChildren && (
           <button
             type="button"
-            className={clsx(
-              'p-0.5 rounded-sm hover:bg-surface/50 bg-transparent',
-              TEXT_COLOR_KEYS[TextColors.secondary],
-            )}
+            className={cx('p-0.5 rounded-sm hover:bg-surface/50 bg-transparent', TEXT_COLOR_KEYS[TextColors.secondary])}
             onClick={handleFolderIconClick}
           >
             {isExpanded ? <ChevronUp size={16} className="shrink-0" /> : <ChevronDown size={16} className="shrink-0" />}
@@ -594,7 +591,7 @@ export default function FolderTree({
 
   return (
     <div
-      className={clsx(
+      className={cx(
         'relative bg-bg-secondary rounded-lg shrink-0',
         !isResizing && 'transition-[width] duration-300 ease-in-out',
       )}

@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { forwardRef, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
 
 import {
@@ -25,7 +25,7 @@ export const Text = forwardRef<HTMLElement, TextProps>(
     return (
       <Component
         ref={ref}
-        className={clsx(
+        className={cx(
           variant.size,
           TEXT_WEIGHT_KEYS[weight ?? variant.defaultWeight],
           TEXT_COLOR_KEYS[color ?? variant.defaultColor],

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ChevronDown, ChevronRight, Plus, Star, Tag, X, User } from 'lucide-react';
 import { useState, useMemo, useRef } from 'react';
@@ -120,7 +120,7 @@ function MetadataItem({ label, value }: MetaDataItemProps) {
         <Text
           variant={TextVariants.small}
           color={TextColors.primary}
-          className={clsx(
+          className={cx(
             'col-start-1 row-start-1 break-words min-w-0 text-right line-clamp-3 transition-opacity duration-200 ease-in-out select-none',
             isHovered ? 'opacity-0' : 'opacity-100',
           )}
@@ -129,7 +129,7 @@ function MetadataItem({ label, value }: MetaDataItemProps) {
         </Text>
         <span
           aria-hidden={!isHovered}
-          className={clsx(
+          className={cx(
             'col-start-1 row-start-1 text-xs font-medium text-text-primary select-none transition-opacity duration-200 ease-in-out pointer-events-none flex items-center justify-end h-full',
             isHovered ? 'opacity-100' : 'opacity-0',
           )}
@@ -636,7 +636,7 @@ export default function MetadataPanel() {
                               >
                                 <Star
                                   size={20}
-                                  className={clsx(
+                                  className={cx(
                                     'transition-colors duration-200',
                                     star <= rating
                                       ? 'fill-accent text-accent'
@@ -661,7 +661,7 @@ export default function MetadataPanel() {
                               onClick={() => {
                                 void handleSetColorLabel(null, targetPaths);
                               }}
-                              className={clsx(
+                              className={cx(
                                 'w-5 h-5 rounded-full flex items-center justify-center transition-all hover:scale-110',
                                 currentColor === null
                                   ? 'ring-2 ring-text-secondary ring-offset-1 ring-offset-bg-primary'
@@ -677,7 +677,7 @@ export default function MetadataPanel() {
                                 onClick={() => {
                                   void handleSetColorLabel(color.name, targetPaths);
                                 }}
-                                className={clsx(
+                                className={cx(
                                   'w-5 h-5 rounded-full transition-all hover:scale-110',
                                   currentColor === color.name
                                     ? 'ring-2 ring-white ring-offset-1 ring-offset-bg-primary'
@@ -735,7 +735,7 @@ export default function MetadataPanel() {
                           </div>
 
                           <div
-                            className={clsx(
+                            className={cx(
                               'flex items-center bg-bg-primary border rounded-md px-2 py-1.5 transition-colors',
                               isTagInputFocused ? 'border-accent' : 'border-surface',
                             )}

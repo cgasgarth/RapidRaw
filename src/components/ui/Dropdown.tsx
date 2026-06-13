@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronDown } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
@@ -111,7 +111,7 @@ const Dropdown = <T extends React.Key>({
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         disabled={disabled}
-        className={clsx(
+        className={cx(
           'w-full border border-border-color rounded-md px-3 mr-4 py-2 flex justify-between items-center text-left disabled:opacity-50 disabled:cursor-not-allowed',
           'focus:ring-accent focus:border-accent focus:outline-hidden focus:ring-2',
           triggerClassName || 'bg-surface',
@@ -172,7 +172,7 @@ const Dropdown = <T extends React.Key>({
                       handleSelect(option);
                     }}
                     onKeyDown={handleContainerKeyDown}
-                    className={clsx(
+                    className={cx(
                       'w-full text-left px-3 py-2 rounded-md flex items-center justify-between',
                       'transition-colors duration-150 hover:bg-bg-primary',
                       {

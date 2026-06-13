@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion } from 'framer-motion';
 
 import Text from './Text';
@@ -46,7 +46,7 @@ const Switch = ({
 
   return (
     <label
-      className={clsx(
+      className={cx(
         'flex items-center justify-between',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         className,
@@ -70,9 +70,9 @@ const Switch = ({
           }}
           type="checkbox"
         />
-        <div className={clsx('w-full h-full bg-card-active/50 rounded-full shadow-inner', trackClassName)}></div>
+        <div className={cx('w-full h-full bg-card-active/50 rounded-full shadow-inner', trackClassName)}></div>
         <motion.div
-          className={clsx('absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-colors', {
+          className={cx('absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-colors', {
             'bg-accent': checked,
             'bg-text-secondary/80': !checked,
           })}

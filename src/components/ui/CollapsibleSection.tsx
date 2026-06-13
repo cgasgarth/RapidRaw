@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 import {
   useRef,
@@ -116,7 +116,7 @@ export default function CollapsibleSection({
           {canToggleVisibility && (
             <div className="w-6 h-6 flex items-center justify-center">
               <button
-                className={clsx(
+                className={cx(
                   'p-1 rounded-full text-text-secondary hover:bg-bg-primary z-10 transition-opacity duration-300',
                   isHovering || !isContentVisible ? 'opacity-100' : 'opacity-0 pointer-events-none',
                 )}
@@ -133,13 +133,13 @@ export default function CollapsibleSection({
           )}
         </div>
         <ChevronDown
-          className={clsx('text-accent transition-transform duration-300', { 'rotate-180': isOpen })}
+          className={cx('text-accent transition-transform duration-300', { 'rotate-180': isOpen })}
           size={20}
         />
       </div>
       <div ref={wrapperRef} className="overflow-hidden transition-all duration-300 ease-in-out">
         <div
-          className={clsx(
+          className={cx(
             'px-4 pb-4 transition-opacity duration-300',
             !isContentVisible && 'opacity-30 pointer-events-none',
           )}

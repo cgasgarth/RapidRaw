@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import ReactCrop, { PercentCrop, Crop } from 'react-image-crop';
+import CropOverlay, { PercentCrop, Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
 
@@ -2598,7 +2598,7 @@ const ImageCanvas = memo(
                 width: uncroppedImageRenderSize.width,
               }}
             >
-              <ReactCrop
+              <CropOverlay
                 aspect={adjustments.aspectRatio}
                 crop={crop}
                 onChange={setCrop}
@@ -2635,7 +2635,7 @@ const ImageCanvas = memo(
                     imageRendering: isMaxZoom ? 'pixelated' : 'auto',
                   }}
                 />
-              </ReactCrop>
+              </CropOverlay>
 
               {isStraightenActive && (
                 <Stage
