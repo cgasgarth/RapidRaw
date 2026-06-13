@@ -1,0 +1,99 @@
+{
+  "catalogId": "negative_lab_input_profiles",
+  "catalogVersion": "2026-06-13",
+  "profiles": [
+    {
+      "acquisitionConfidence": "high",
+      "captureDeviceType": "camera",
+      "colorSpaceEncoding": "camera_raw_native",
+      "defaultInputMode": "camera_raw",
+      "description": "Camera RAW negative capture using the raw decoder camera profile.",
+      "displayName": "Camera RAW Negative Capture",
+      "expectedPixelBasis": "camera_raw_rgb",
+      "fileExtensions": ["arw", "cr2", "cr3", "dng", "nef", "raf"],
+      "inputProfileKind": "camera_raw_input",
+      "inputProfileSource": "raw_decoder_camera_profile",
+      "profileConfidence": "high",
+      "profileId": "negative_lab.input.camera_raw.v1",
+      "profileVersion": "2026-06-13",
+      "provenance": {
+        "legalNote": "Uses local RAW decoder metadata and does not bundle camera vendor profile assets.",
+        "sourceDescription": "Project-defined input profile contract for camera RAW negative captures."
+      },
+      "requiredWarningCodes": [],
+      "schemaVersion": 1,
+      "supportedInputModes": ["camera_raw"],
+      "supportedProcessFamilies": ["c41_color_negative", "black_and_white_silver_negative"]
+    },
+    {
+      "acquisitionConfidence": "high",
+      "captureDeviceType": "camera",
+      "colorSpaceEncoding": "linear_rgb",
+      "defaultInputMode": "camera_tiff",
+      "description": "Linear camera-scanned TIFF negative with an explicit project or embedded profile.",
+      "displayName": "Linear Camera TIFF Negative",
+      "expectedPixelBasis": "camera_rendered",
+      "fileExtensions": ["tif", "tiff"],
+      "inputProfileKind": "camera_scan_input",
+      "inputProfileSource": "embedded_icc",
+      "profileConfidence": "high",
+      "profileId": "negative_lab.input.camera_tiff_linear.v1",
+      "profileVersion": "2026-06-13",
+      "provenance": {
+        "legalNote": "Uses source-file profile metadata supplied by the user or capture workflow.",
+        "sourceDescription": "Project-defined input profile contract for linear camera-scan TIFFs."
+      },
+      "requiredWarningCodes": [],
+      "schemaVersion": 1,
+      "supportedInputModes": ["camera_tiff"],
+      "supportedProcessFamilies": ["c41_color_negative", "black_and_white_silver_negative"]
+    },
+    {
+      "acquisitionConfidence": "medium",
+      "captureDeviceType": "film_scanner",
+      "colorSpaceEncoding": "scanner_rgb",
+      "defaultInputMode": "flatbed_tiff",
+      "description": "Scanner TIFF negative with embedded or user-assigned scanner profile metadata.",
+      "displayName": "Scanner TIFF Negative",
+      "expectedPixelBasis": "scanner_rgb",
+      "fileExtensions": ["tif", "tiff"],
+      "inputProfileKind": "scanner_input",
+      "inputProfileSource": "scanner_icc",
+      "profileConfidence": "medium",
+      "profileId": "negative_lab.input.scanner_tiff.v1",
+      "profileVersion": "2026-06-13",
+      "provenance": {
+        "legalNote": "References scanner profile metadata from the user source; no bundled scanner ICC is included.",
+        "sourceDescription": "Project-defined input profile contract for flatbed or film scanner TIFFs."
+      },
+      "requiredWarningCodes": [],
+      "schemaVersion": 1,
+      "supportedInputModes": ["flatbed_tiff", "lab_tiff"],
+      "supportedProcessFamilies": ["c41_color_negative", "black_and_white_silver_negative"]
+    },
+    {
+      "acquisitionConfidence": "low",
+      "captureDeviceType": "lab_scanner",
+      "colorSpaceEncoding": "display_referred_rgb",
+      "defaultInputMode": "lab_jpeg",
+      "description": "Lab-rendered JPEG negative or positive-adjacent source that requires manual review.",
+      "displayName": "Lab JPEG Review Input",
+      "expectedPixelBasis": "lab_rendered_rgb",
+      "fileExtensions": ["jpg", "jpeg"],
+      "inputProfileKind": "lab_rendered_input",
+      "inputProfileSource": "assumed_display_profile",
+      "profileConfidence": "low",
+      "profileId": "negative_lab.input.lab_jpeg_review.v1",
+      "profileVersion": "2026-06-13",
+      "provenance": {
+        "legalNote": "Assumes generic display-referred input when no reliable lab profile metadata is available.",
+        "sourceDescription": "Project-defined low-confidence input profile for review-only lab JPEG workflows."
+      },
+      "requiredWarningCodes": ["lossy_input", "low_acquisition_confidence"],
+      "schemaVersion": 1,
+      "supportedInputModes": ["lab_jpeg"],
+      "supportedProcessFamilies": ["c41_color_negative", "black_and_white_silver_negative"]
+    }
+  ],
+  "schemaVersion": 1
+}

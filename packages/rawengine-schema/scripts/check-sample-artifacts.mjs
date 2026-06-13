@@ -18,6 +18,7 @@ import {
   negativeLabDryRunResultV1Schema,
   negativeLabFixtureManifestV1Schema,
   negativeLabFrameDetectionResultV1Schema,
+  negativeLabInputProfileCatalogV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
   negativeLabQcProofArtifactV1Schema,
@@ -39,6 +40,7 @@ import {
   sampleNegativeLabDryRunResultV1,
   sampleNegativeLabFixtureManifestV1,
   sampleNegativeLabFrameDetectionResultV1,
+  sampleNegativeLabInputProfileCatalogV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
   sampleNegativeLabQcProofArtifactV1,
@@ -164,6 +166,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab-fixture-manifest-v1.json',
     schema: negativeLabFixtureManifestV1Schema,
     value: sampleNegativeLabFixtureManifestV1,
+  },
+  {
+    name: 'negative lab input profile catalog',
+    path: 'packages/rawengine-schema/samples/negative-lab-input-profile-catalog-v1.json',
+    schema: negativeLabInputProfileCatalogV1Schema,
+    value: sampleNegativeLabInputProfileCatalogV1,
   },
 ];
 

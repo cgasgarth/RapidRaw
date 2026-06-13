@@ -79,6 +79,10 @@
           "path": "docs/negative-lab/negative-scan-fixture-manifest-2026-06-13.md"
         },
         {
+          "title": "Negative Lab scanner and camera input profiles",
+          "path": "docs/negative-lab/scanner-camera-input-profiles-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab generic built-in presets",
           "path": "docs/negative-lab/generic-built-in-presets-2026-06-13.md"
         },

@@ -13,6 +13,7 @@ import {
   negativeLabDryRunResultV1Schema,
   negativeLabFixtureManifestV1Schema,
   negativeLabFrameDetectionResultV1Schema,
+  negativeLabInputProfileCatalogV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
   negativeLabQcProofArtifactV1Schema,
@@ -34,6 +35,7 @@ import {
   sampleNegativeLabDryRunResultV1,
   sampleNegativeLabFixtureManifestV1,
   sampleNegativeLabFrameDetectionResultV1,
+  sampleNegativeLabInputProfileCatalogV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
   sampleNegativeLabQcProofArtifactV1,
@@ -142,6 +144,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab fixture manifest',
     schema: negativeLabFixtureManifestV1Schema,
     value: sampleNegativeLabFixtureManifestV1,
+  },
+  {
+    name: 'negative lab input profile catalog',
+    schema: negativeLabInputProfileCatalogV1Schema,
+    value: sampleNegativeLabInputProfileCatalogV1,
   },
 ];
 
@@ -487,6 +494,92 @@ expectInvalid(
   'generic built-in preset catalog that allows lab JPEG without required warnings',
   negativeLabBuiltInPresetCatalogV1Schema,
   invalidGenericPresetLabJpegWithoutWarnings,
+);
+
+const [sampleNegativeLabInputProfile, secondSampleNegativeLabInputProfile] =
+  sampleNegativeLabInputProfileCatalogV1.profiles;
+if (sampleNegativeLabInputProfile === undefined || secondSampleNegativeLabInputProfile === undefined) {
+  throw new Error('Expected input profile catalog sample to include at least two profiles.');
+}
+
+const invalidInputProfileDuplicateIds = {
+  ...sampleNegativeLabInputProfileCatalogV1,
+  profiles: [
+    sampleNegativeLabInputProfile,
+    {
+      ...secondSampleNegativeLabInputProfile,
+      profileId: sampleNegativeLabInputProfile.profileId,
+    },
+    ...sampleNegativeLabInputProfileCatalogV1.profiles.slice(2),
+  ],
+};
+expectInvalid(
+  'negative lab input profile catalog with duplicate profile IDs',
+  negativeLabInputProfileCatalogV1Schema,
+  invalidInputProfileDuplicateIds,
+);
+
+const invalidInputProfileDefaultMode = {
+  ...sampleNegativeLabInputProfileCatalogV1,
+  profiles: [
+    {
+      ...sampleNegativeLabInputProfile,
+      defaultInputMode: 'lab_jpeg',
+    },
+    ...sampleNegativeLabInputProfileCatalogV1.profiles.slice(1),
+  ],
+};
+expectInvalid(
+  'negative lab input profile with unsupported default mode',
+  negativeLabInputProfileCatalogV1Schema,
+  invalidInputProfileDefaultMode,
+);
+
+const invalidCameraRawProfile = {
+  ...sampleNegativeLabInputProfileCatalogV1,
+  profiles: [
+    {
+      ...sampleNegativeLabInputProfile,
+      colorSpaceEncoding: 'display_referred_rgb',
+    },
+    ...sampleNegativeLabInputProfileCatalogV1.profiles.slice(1),
+  ],
+};
+expectInvalid(
+  'camera raw input profile with display-referred encoding',
+  negativeLabInputProfileCatalogV1Schema,
+  invalidCameraRawProfile,
+);
+
+const invalidLabRenderedProfileWarnings = {
+  ...sampleNegativeLabInputProfileCatalogV1,
+  profiles: [
+    {
+      ...sampleNegativeLabInputProfileCatalogV1.profiles[3],
+      requiredWarningCodes: [],
+    },
+  ],
+};
+expectInvalid(
+  'lab-rendered input profile without required warnings',
+  negativeLabInputProfileCatalogV1Schema,
+  invalidLabRenderedProfileWarnings,
+);
+
+const invalidHighConfidenceAssumption = {
+  ...sampleNegativeLabInputProfileCatalogV1,
+  profiles: [
+    {
+      ...sampleNegativeLabInputProfile,
+      inputProfileSource: 'assumed_display_profile',
+    },
+    ...sampleNegativeLabInputProfileCatalogV1.profiles.slice(1),
+  ],
+};
+expectInvalid(
+  'high-confidence input profile with assumed display profile source',
+  negativeLabInputProfileCatalogV1Schema,
+  invalidHighConfidenceAssumption,
 );
 
 const [sampleQcOverlay] = sampleNegativeLabQcProofArtifactV1.overlays;

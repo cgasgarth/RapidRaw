@@ -34,6 +34,7 @@ generator before the release workflow needs one.
 - [Negative Lab preset naming and legal policy ADR](negative-lab/preset-naming-legal-policy-2026-06-13.md)
 - [Negative Lab fixture licensing and provenance policy](negative-lab/fixture-licensing-provenance-policy-2026-06-13.md)
 - [Negative Lab scan fixture manifest](negative-lab/negative-scan-fixture-manifest-2026-06-13.md)
+- [Negative Lab scanner and camera input profiles](negative-lab/scanner-camera-input-profiles-2026-06-13.md)
 - [Negative Lab frame detection and border contract](negative-lab/frame-detection-border-contract-2026-06-13.md)
 - [Negative Lab process profiles and density normalization](negative-lab/process-profiles-density-normalization-2026-06-13.md)
 - [Negative Lab generic built-in presets](negative-lab/generic-built-in-presets-2026-06-13.md)
