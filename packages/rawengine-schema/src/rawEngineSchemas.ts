@@ -163,6 +163,24 @@ export const rawEngineToolRegistryV1Schema = z
 
 export const panoramaProjectionSchema = z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']);
 
+export const panoramaProjectionSupportSchema = z.enum(['implemented_current_engine', 'schema_only_deferred']);
+
+export const panoramaProjectionSettingsV1Schema = z
+  .object({
+    deferredReason: z.string().trim().min(1).optional(),
+    effectiveProjection: panoramaProjectionSchema,
+    horizontalFovDegrees: z.number().positive().max(360).optional(),
+    inputFocalLength35mmEquivalentMm: z.number().positive().optional(),
+    requestedProjection: panoramaProjectionSchema,
+    support: panoramaProjectionSupportSchema,
+    verticalFovDegrees: z.number().positive().max(180).optional(),
+  })
+  .strict()
+  .refine((settings) => settings.support === 'implemented_current_engine' || settings.deferredReason !== undefined, {
+    message: 'Deferred projection settings require deferredReason.',
+    path: ['deferredReason'],
+  });
+
 export const panoramaBoundaryModeSchema = z.enum(['auto_crop', 'transparent', 'manual_crop', 'deferred_fill']);
 
 export const panoramaWarningCodeSchema = z.enum([
@@ -323,6 +341,7 @@ export const panoramaArtifactV1Schema = z
     outputColorSpace: z.string().trim().min(1),
     previewArtifacts: z.array(artifactHandleV1Schema),
     projection: panoramaProjectionSchema,
+    projectionSettings: panoramaProjectionSettingsV1Schema,
     provenance: z
       .object({
         commandId: z.string().trim().min(1).optional(),

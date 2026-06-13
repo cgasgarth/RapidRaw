@@ -4656,7 +4656,8 @@ Issues:
   `docs/panorama/rapidraw-stitcher-audit-2026-06-13.md`.
 - Define panorama artifact schema. Initial contract captured in
   `docs/panorama/panorama-artifact-schema-2026-06-13.md`.
-- Add projection options.
+- Add projection options. Initial contract captured in
+  `docs/panorama/projection-options-2026-06-13.md`.
 - Add auto crop/boundary controls.
 - Add exposure normalization.
 - Add multi-row support audit. Initial audit captured in
