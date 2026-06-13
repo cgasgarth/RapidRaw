@@ -13,18 +13,18 @@ This step starts with the recommended rule set. The strict rule set should wait
 until recommended coverage is stable and any required UI component conventions
 are documented.
 
-## Legacy Fences
+## Enforced Interaction Rules
 
 The first accessibility recommended run found 140 problems. The recommended
-config is enabled now, but high-volume legacy rule families remain fenced so
-they can be fixed in focused UI PRs.
+config is enabled now, and the largest legacy interaction rule families have
+been burned down and promoted into the blocking lint gate.
 
-| Count | Rule                                              | Follow-Up Path                       |
-| ----: | ------------------------------------------------- | ------------------------------------ |
-|    63 | `jsx-a11y/no-static-element-interactions`         | #535 interactive element semantics   |
-|    53 | `jsx-a11y/click-events-have-key-events`           | #534 keyboard handlers and roles     |
-|    13 | `jsx-a11y/no-autofocus`                           | #536 focus management                |
-|     9 | `jsx-a11y/no-noninteractive-element-interactions` | #537 noninteractive listener cleanup |
+| Rule                                              | Status               |
+| ------------------------------------------------- | -------------------- |
+| `jsx-a11y/no-static-element-interactions`         | Enforced as an error |
+| `jsx-a11y/click-events-have-key-events`           | Enforced as an error |
+| `jsx-a11y/no-autofocus`                           | Enforced as an error |
+| `jsx-a11y/no-noninteractive-element-interactions` | Enforced as an error |
 
 Small GPS map findings were fixed in this PR by adding an iframe title and an
 accessible label to the map link overlay.

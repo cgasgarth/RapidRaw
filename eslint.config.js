@@ -130,10 +130,8 @@ module.exports = [
       'react-hooks/preserve-manual-memoization': 'error',
       'react-hooks/purity': 'error',
       'react/prop-types': 'off',
-      // Accessibility lint is enabled, but legacy interactive element patterns
-      // are tracked separately so this gate can land without broad UI rewrites.
-      'jsx-a11y/no-static-element-interactions': 'off',
-      'jsx-a11y/click-events-have-key-events': 'off',
+      'jsx-a11y/no-static-element-interactions': 'error',
+      'jsx-a11y/click-events-have-key-events': 'error',
       'jsx-a11y/no-autofocus': 'error',
       'jsx-a11y/no-noninteractive-element-interactions': 'error',
       'import-x/no-duplicates': 'error',
