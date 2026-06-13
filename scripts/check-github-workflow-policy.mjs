@@ -25,6 +25,13 @@ function* walkYamlFiles(dir) {
 const stripComment = (line) => line.replace(/\s+#.*$/u, '');
 const indentation = (line) => line.match(/^\s*/u)?.[0].length ?? 0;
 const hasMainListEntry = (line) => /^\s*-\s*['"]?main['"]?\s*$/u.test(stripComment(line));
+const hasMainInlineBranch = (line) => {
+  const cleanLine = stripComment(line);
+  return (
+    /^\s*branches\s*:\s*['"]?main['"]?\s*$/u.test(cleanLine) ||
+    /^\s*branches\s*:\s*\[[^\]]*['"]?main['"]?[^\]]*\]\s*$/u.test(cleanLine)
+  );
+};
 const hasConcurrencyKey = (line) => /^\s*concurrency\s*:/u.test(stripComment(line));
 
 function getTopLevelSection(lines, key) {
@@ -70,6 +77,10 @@ function hasMainPushTrigger(lines) {
     return true;
   }
 
+  if (hasMainInlineBranch(pushBlock[branchIndex].line)) {
+    return true;
+  }
+
   const branchIndent = indentation(pushBlock[branchIndex].line);
   const branchBlock = [];
   for (let index = branchIndex + 1; index < pushBlock.length; index += 1) {
@@ -81,22 +92,150 @@ function hasMainPushTrigger(lines) {
   return branchBlock.some(({ line }) => hasMainListEntry(line));
 }
 
-const violations = [];
+function checkWorkflowFiles(files) {
+  const violations = [];
 
-for (const file of walkYamlFiles(WORKFLOW_DIR)) {
-  const repoPath = relative(ROOT, file);
-  const lines = readFileSync(file, 'utf8').split(/\r?\n/u);
+  for (const { path, source } of files) {
+    const lines = source.split(/\r?\n/u);
 
-  if (!hasMainPushTrigger(lines)) continue;
+    if (!hasMainPushTrigger(lines)) continue;
 
-  lines.forEach((line, index) => {
-    if (hasConcurrencyKey(line)) {
-      violations.push(
-        `${repoPath}:${index + 1}: workflows that run on push to main must not define concurrency; main runs must proceed independently`,
-      );
-    }
-  });
+    lines.forEach((line, index) => {
+      if (hasConcurrencyKey(line)) {
+        violations.push(
+          `${path}:${index + 1}: workflows that run on push to main must not define concurrency; main runs must proceed independently`,
+        );
+      }
+    });
+  }
+
+  return violations;
 }
+
+function checkRepositoryWorkflows() {
+  const files = [];
+
+  for (const file of walkYamlFiles(WORKFLOW_DIR)) {
+    files.push({
+      path: relative(ROOT, file),
+      source: readFileSync(file, 'utf8'),
+    });
+  }
+
+  return checkWorkflowFiles(files);
+}
+
+function runSelfTest() {
+  const cases = [
+    {
+      name: 'rejects block main push concurrency',
+      expectedViolations: 1,
+      source: `name: blocked
+on:
+  push:
+    branches:
+      - main
+concurrency:
+  group: blocked-main
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'rejects inline main push concurrency',
+      expectedViolations: 1,
+      source: `name: blocked
+on:
+  push:
+    branches: [main]
+concurrency:
+  group: blocked-main
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'rejects scalar main push concurrency',
+      expectedViolations: 1,
+      source: `name: blocked
+on:
+  push:
+    branches: main
+concurrency:
+  group: blocked-main
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'allows pull request concurrency',
+      expectedViolations: 0,
+      source: `name: allowed
+on:
+  pull_request:
+concurrency:
+  group: pr-validation
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'allows non-main push concurrency',
+      expectedViolations: 0,
+      source: `name: allowed
+on:
+  push:
+    branches:
+      - release
+concurrency:
+  group: release-validation
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+`,
+    },
+  ];
+
+  const failures = cases
+    .map((testCase) => {
+      const violations = checkWorkflowFiles([{ path: `${testCase.name}.yml`, source: testCase.source }]);
+      if (violations.length === testCase.expectedViolations) {
+        return null;
+      }
+
+      return `${testCase.name}: expected ${testCase.expectedViolations} violation(s), got ${violations.length}`;
+    })
+    .filter(Boolean);
+
+  if (failures.length > 0) {
+    console.error('GitHub workflow policy self-test failed.');
+    console.error(failures.join('\n'));
+    process.exit(1);
+  }
+
+  console.log('Validated GitHub workflow policy self-tests.');
+}
+
+if (process.argv.includes('--self-test')) {
+  runSelfTest();
+  process.exit(0);
+}
+
+const violations = checkRepositoryWorkflows();
 
 if (violations.length > 0) {
   console.error('GitHub workflow policy validation failed.');
