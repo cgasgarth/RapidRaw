@@ -1,0 +1,37 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_sample"
+  },
+  "approval": {
+    "approvalClass": "external_model",
+    "reason": "Local subject-mask model reads pixels and returns a non-mutating dry-run mask artifact.",
+    "state": "approved"
+  },
+  "commandId": "command_ai_subject_mask_dry_run_sample",
+  "commandType": "ai.mask.generateSubject",
+  "correlationId": "corr_ai_subject_mask_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_44",
+  "parameters": {
+    "cachePolicy": "reuse_allowed",
+    "capability": "subject_mask",
+    "maskName": "Subject mask",
+    "maxPreviewDimensionPx": 2048,
+    "modelHash": "sha256:local-sam2-subject-mask-model",
+    "modelId": "local_sam2_subject_mask",
+    "modelVersion": "2026.06",
+    "promptPolicy": "none",
+    "providerClass": "local_model",
+    "providerId": "rawengine-local-ai",
+    "sourceContentHash": "sha256:sample-raw-source-hash",
+    "sourcePixelDisclosure": "local_only"
+  },
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image",
+    "virtualCopyId": null
+  }
+}

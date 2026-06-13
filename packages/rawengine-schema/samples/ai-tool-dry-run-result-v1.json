@@ -1,0 +1,38 @@
+{
+  "commandId": "command_ai_subject_mask_dry_run_sample",
+  "commandType": "ai.mask.generateSubject",
+  "correlationId": "corr_ai_subject_mask_sample",
+  "dryRunPlanHash": "sha256:sample-ai-subject-mask-plan",
+  "dryRunPlanId": "dryrun_ai_subject_mask_001",
+  "maskArtifacts": [
+    {
+      "artifactId": "artifact_ai_subject_mask_alpha",
+      "contentHash": "sha256:sample-ai-subject-mask-alpha",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "mask",
+      "storage": "temp_cache"
+    }
+  ],
+  "modelId": "local_sam2_subject_mask",
+  "modelVersion": "2026.06",
+  "previewArtifacts": [
+    {
+      "artifactId": "artifact_ai_subject_mask_preview",
+      "contentHash": "sha256:sample-ai-subject-mask-preview",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "preview",
+      "storage": "temp_cache"
+    }
+  ],
+  "providerClass": "local_model",
+  "providerId": "rawengine-local-ai",
+  "schemaVersion": 1,
+  "sourceContentHash": "sha256:sample-raw-source-hash",
+  "warnings": []
+}

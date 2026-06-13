@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 import {
+  aiAppServerToolManifestV1Schema,
+  aiToolApplyResultV1Schema,
+  aiToolCommandEnvelopeV1Schema,
+  aiToolDryRunResultV1Schema,
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
@@ -56,6 +60,12 @@ import {
   toneColorMutationResultV1Schema,
 } from '../src/rawEngineSchemas.js';
 import {
+  sampleAiAppServerToolManifestV1,
+  sampleAiToolAgentReplayFixtureV1,
+  sampleAiToolApplyCommandEnvelopeV1,
+  sampleAiToolApplyResultV1,
+  sampleAiToolCommandEnvelopeV1,
+  sampleAiToolDryRunResultV1,
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleComputationalMergeApplyCommandEnvelopeV1,
@@ -153,6 +163,36 @@ const validSamples: ReadonlyArray<{
     name: 'agent replay fixture',
     schema: rawEngineAgentReplayFixtureV1Schema,
     value: sampleRawEngineAgentReplayFixtureV1,
+  },
+  {
+    name: 'AI tool command envelope',
+    schema: aiToolCommandEnvelopeV1Schema,
+    value: sampleAiToolCommandEnvelopeV1,
+  },
+  {
+    name: 'AI tool apply command envelope',
+    schema: aiToolCommandEnvelopeV1Schema,
+    value: sampleAiToolApplyCommandEnvelopeV1,
+  },
+  {
+    name: 'AI tool dry-run result',
+    schema: aiToolDryRunResultV1Schema,
+    value: sampleAiToolDryRunResultV1,
+  },
+  {
+    name: 'AI tool apply result',
+    schema: aiToolApplyResultV1Schema,
+    value: sampleAiToolApplyResultV1,
+  },
+  {
+    name: 'AI tool agent replay fixture',
+    schema: rawEngineAgentReplayFixtureV1Schema,
+    value: sampleAiToolAgentReplayFixtureV1,
+  },
+  {
+    name: 'AI app-server tool manifest',
+    schema: aiAppServerToolManifestV1Schema,
+    value: sampleAiAppServerToolManifestV1,
   },
   {
     name: 'edit graph snapshot query',
@@ -440,9 +480,16 @@ const expectInvalid = (name: string, schema: z.ZodType, value: unknown) => {
 
 const replayDryRunStep = sampleRawEngineAgentReplayFixtureV1.steps[0];
 const replayApplyStep = sampleRawEngineAgentReplayFixtureV1.steps[1];
+const aiReplayDryRunStep = sampleAiToolAgentReplayFixtureV1.steps[0];
+const aiReplayApplyStep = sampleAiToolAgentReplayFixtureV1.steps[1];
 
-if (replayDryRunStep === undefined || replayApplyStep === undefined) {
-  throw new Error('Expected sample agent replay fixture to contain dry-run and apply steps.');
+if (
+  replayDryRunStep === undefined ||
+  replayApplyStep === undefined ||
+  aiReplayDryRunStep === undefined ||
+  aiReplayApplyStep === undefined
+) {
+  throw new Error('Expected sample agent replay fixtures to contain dry-run and apply steps.');
 }
 
 for (const sample of validSamples) {
@@ -556,6 +603,42 @@ expectInvalid('agent replay with future prerequisite', rawEngineAgentReplayFixtu
 expectInvalid('agent replay with mismatched final graph revision', rawEngineAgentReplayFixtureV1Schema, {
   ...sampleRawEngineAgentReplayFixtureV1,
   finalGraphRevision: 'graph_rev_not_from_last_mutation',
+});
+
+expectInvalid('AI dry-run command with cloud provider marked local-only', aiToolCommandEnvelopeV1Schema, {
+  ...sampleAiToolCommandEnvelopeV1,
+  parameters: {
+    ...sampleAiToolCommandEnvelopeV1.parameters,
+    providerClass: 'cloud_service',
+    sourcePixelDisclosure: 'local_only',
+  },
+});
+
+expectInvalid('AI apply command missing dry-run plan id', aiToolCommandEnvelopeV1Schema, {
+  ...sampleAiToolApplyCommandEnvelopeV1,
+  parameters: {
+    ...sampleAiToolApplyCommandEnvelopeV1.parameters,
+    acceptedDryRunPlanId: undefined,
+  },
+});
+
+expectInvalid('AI apply command without generative approval', aiToolCommandEnvelopeV1Schema, {
+  ...sampleAiToolApplyCommandEnvelopeV1,
+  approval: {
+    ...sampleAiToolApplyCommandEnvelopeV1.approval,
+    approvalClass: 'edit_apply',
+  },
+});
+
+expectInvalid('AI agent replay with mismatched output schema', rawEngineAgentReplayFixtureV1Schema, {
+  ...sampleAiToolAgentReplayFixtureV1,
+  steps: [
+    aiReplayDryRunStep,
+    {
+      ...aiReplayApplyStep,
+      outputSchemaName: 'LayerMaskMutationResultV1',
+    },
+  ],
 });
 
 expectInvalid('preview scope result without scope payloads', previewScopeResultV1Schema, {
@@ -1484,6 +1567,40 @@ const invalidMutatingAppServerToolResult = negativeLabAppServerToolManifestV1Sch
 );
 if (invalidMutatingAppServerToolResult.success) {
   throw new Error('Expected mutating app-server tool manifests to require edit approval and a dry-run plan.');
+}
+
+const invalidAiCloudLocalOnlyManifest = {
+  ...sampleAiAppServerToolManifestV1,
+  tools: [
+    {
+      ...sampleAiAppServerToolManifestV1.tools[0],
+      allowedProviderClasses: ['local_model', 'cloud_service'],
+      localOnly: true,
+    },
+  ],
+};
+
+const invalidAiCloudLocalOnlyManifestResult = aiAppServerToolManifestV1Schema.safeParse(
+  invalidAiCloudLocalOnlyManifest,
+);
+if (invalidAiCloudLocalOnlyManifestResult.success) {
+  throw new Error('Expected local-only AI app-server manifests to reject cloud-service providers.');
+}
+
+const invalidAiApplyToolManifest = {
+  ...sampleAiAppServerToolManifestV1,
+  tools: [
+    {
+      ...sampleAiAppServerToolManifestV1.tools[1],
+      mutates: true,
+      requiresDryRunPlan: false,
+    },
+  ],
+};
+
+const invalidAiApplyToolManifestResult = aiAppServerToolManifestV1Schema.safeParse(invalidAiApplyToolManifest);
+if (invalidAiApplyToolManifestResult.success) {
+  throw new Error('Expected AI apply app-server tools to require a dry-run plan.');
 }
 
 const invalidPositiveVariantProvenance = {

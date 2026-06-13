@@ -92,6 +92,26 @@
       "toolName": "layermask.apply_command"
     },
     {
+      "approvalClass": "external_model",
+      "inputSchemaName": "AiToolCommandEnvelopeV1",
+      "mutates": false,
+      "outputSchemaName": "AiToolDryRunResultV1",
+      "requiresDryRun": true,
+      "returnsArtifactHandles": true,
+      "toolKind": "dry_run",
+      "toolName": "ai.mask.dry_run_subject"
+    },
+    {
+      "approvalClass": "generative_edit",
+      "inputSchemaName": "AiToolCommandEnvelopeV1",
+      "mutates": true,
+      "outputSchemaName": "AiToolApplyResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": true,
+      "toolKind": "apply",
+      "toolName": "ai.mask.apply_subject"
+    },
+    {
       "approvalClass": "preview_only",
       "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
       "mutates": false,
