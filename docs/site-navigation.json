@@ -103,6 +103,10 @@
           "path": "docs/negative-lab/roll-batch-consistency-workflow-2026-06-13.md"
         },
         {
+          "title": "Negative Lab roll setup and frame queue UI",
+          "path": "docs/negative-lab/roll-setup-frame-queue-ui-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab measured-profile fixture format",
           "path": "docs/negative-lab/measured-profile-fixture-format-2026-06-13.md"
         },
