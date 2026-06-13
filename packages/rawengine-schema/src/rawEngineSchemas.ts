@@ -403,6 +403,233 @@ export const panoramaArtifactV1Schema = z
 const filmPercentSchema = z.number().min(0).max(100);
 const filmUnitIntervalSchema = z.number().min(0).max(1);
 
+export const filmRenderDomainV1Schema = z.enum([
+  'scene_referred_linear',
+  'negative_lab_positive',
+  'working_rgb',
+  'display_referred',
+]);
+
+export const filmHalationAlgorithmV1Schema = z.enum([
+  'legacy_rapidraw_red_fringe_v0',
+  'spectral_highlight_halation_v1',
+]);
+
+export const filmHalationBlendModeV1Schema = z.enum([
+  'screen_warmth_preserving',
+  'linear_add_limited',
+  'soft_light_tint',
+]);
+
+export const filmHalationQualityModeV1Schema = z.enum(['preview_fast', 'export_reference']);
+
+export const filmHalationRenderStageV1Schema = z.enum([
+  'creative_highlight_transport_before_glow',
+  'layer_local_after_color',
+  'schema_only_deferred',
+]);
+
+export const filmHalationRendererSupportV1Schema = z.enum([
+  'implemented_current_engine',
+  'partially_implemented_current_engine',
+  'schema_only_deferred',
+]);
+
+export const filmHalationSourceChannelV1Schema = z.enum(['luminance', 'red_weighted_luminance', 'highlight_energy']);
+
+export const filmHalationThresholdRolloffV1Schema = z.enum(['smoothstep', 'filmic_soft_knee']);
+
+export const filmHalationWarningCodeV1Schema = z.enum([
+  'creative_not_physical_spectral_model',
+  'display_referred_input',
+  'renderer_path_deferred',
+  'renderer_path_partial',
+]);
+
+export const filmHalationModelV1Schema = z
+  .object({
+    algorithm: filmHalationAlgorithmV1Schema,
+    blendMode: filmHalationBlendModeV1Schema,
+    compatibleScopes: z.array(z.enum(['global', 'layer', 'mask'])).min(1),
+    geometry: z
+      .object({
+        coreRadiusPx: z.number().min(0).max(256),
+        edgeProtection: filmUnitIntervalSchema,
+        fringeRadiusPx: z.number().min(0).max(512),
+        radiusUnit: z.literal('working_pixels'),
+      })
+      .strict(),
+    intensity: z
+      .object({
+        amount: z.number().min(0.01).max(100),
+        highlightRolloff: filmPercentSchema,
+      })
+      .strict(),
+    maskBehavior: z
+      .object({
+        application: z.enum(['source_only', 'composite_only', 'source_and_composite']),
+        avoidLayerDoubleCounting: z.boolean(),
+        expandSourceBeforeMask: z.boolean(),
+      })
+      .strict(),
+    modelId: z
+      .string()
+      .trim()
+      .regex(/^film\.halation\.[a-z0-9_]+\.v[0-9]+$/u),
+    modelVersion: z.string().trim().min(1),
+    qualityPolicy: z
+      .object({
+        exportMode: filmHalationQualityModeV1Schema,
+        maxExportRadiusPx: z.number().min(1).max(512),
+        maxPreviewRadiusPx: z.number().min(1).max(256),
+        previewMode: filmHalationQualityModeV1Schema,
+      })
+      .strict(),
+    renderDomain: filmRenderDomainV1Schema,
+    renderStage: filmHalationRenderStageV1Schema,
+    rendererSupport: filmHalationRendererSupportV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    deterministic: z
+      .object({
+        deterministicReplay: z.boolean(),
+        stochasticInputs: z.boolean(),
+      })
+      .strict(),
+    sourceIsolation: z
+      .object({
+        protectClippedHighlights: z.boolean(),
+        rolloff: filmHalationThresholdRolloffV1Schema,
+        sourceChannel: filmHalationSourceChannelV1Schema,
+        thresholdEnd: filmUnitIntervalSchema,
+        thresholdStart: filmUnitIntervalSchema,
+      })
+      .strict(),
+    spectralBias: z
+      .object({
+        blueGain: z.number().min(0).max(2),
+        greenGain: z.number().min(0).max(2),
+        orangeGain: z.number().min(0).max(2),
+        redGain: z.number().min(0).max(2),
+      })
+      .strict(),
+    warningCodes: z.array(filmHalationWarningCodeV1Schema),
+  })
+  .strict()
+  .superRefine((model, context) => {
+    if (model.sourceIsolation.thresholdStart >= model.sourceIsolation.thresholdEnd) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film halation thresholdStart must be lower than thresholdEnd.',
+        path: ['sourceIsolation', 'thresholdEnd'],
+      });
+    }
+
+    if (model.geometry.fringeRadiusPx < model.geometry.coreRadiusPx) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film halation fringeRadiusPx must be greater than or equal to coreRadiusPx.',
+        path: ['geometry', 'fringeRadiusPx'],
+      });
+    }
+
+    if (model.qualityPolicy.maxPreviewRadiusPx > model.qualityPolicy.maxExportRadiusPx) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film halation preview radius cap must not exceed export radius cap.',
+        path: ['qualityPolicy', 'maxPreviewRadiusPx'],
+      });
+    }
+
+    if (model.qualityPolicy.maxExportRadiusPx < model.geometry.fringeRadiusPx) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film halation export radius cap must cover the configured fringe radius.',
+        path: ['qualityPolicy', 'maxExportRadiusPx'],
+      });
+    }
+
+    if (model.compatibleScopes.includes('mask') && !model.maskBehavior.avoidLayerDoubleCounting) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Mask-compatible film halation must avoid layer double-counting.',
+        path: ['maskBehavior', 'avoidLayerDoubleCounting'],
+      });
+    }
+
+    if (!model.deterministic.deterministicReplay || model.deterministic.stochasticInputs) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film halation v1 must be deterministic and must not declare stochastic inputs.',
+        path: ['deterministic'],
+      });
+    }
+
+    if (model.renderDomain === 'display_referred' && !model.warningCodes.includes('display_referred_input')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Display-referred film halation requires an explicit display-referred warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (model.rendererSupport === 'schema_only_deferred' && !model.warningCodes.includes('renderer_path_deferred')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Schema-only film halation requires a deferred renderer warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (
+      model.rendererSupport === 'partially_implemented_current_engine' &&
+      !model.warningCodes.includes('renderer_path_partial')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Partially implemented film halation requires a partial renderer warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    const warmGain = model.spectralBias.redGain + model.spectralBias.orangeGain;
+    const coolGain = model.spectralBias.greenGain + model.spectralBias.blueGain;
+
+    if (model.intensity.amount > 0 && warmGain <= 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Enabled film halation requires red or orange spectral contribution.',
+        path: ['spectralBias'],
+      });
+    }
+
+    if (model.intensity.amount > 0 && warmGain <= coolGain) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film halation spectral bias must remain warmer than green/blue leakage.',
+        path: ['spectralBias'],
+      });
+    }
+
+    if (model.algorithm === 'legacy_rapidraw_red_fringe_v0' && model.rendererSupport !== 'implemented_current_engine') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Legacy RapidRaw halation maps to the implemented current engine.',
+        path: ['rendererSupport'],
+      });
+    }
+
+    if (
+      model.algorithm === 'spectral_highlight_halation_v1' &&
+      model.rendererSupport === 'implemented_current_engine'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Spectral highlight halation is not fully implemented by the current renderer.',
+        path: ['rendererSupport'],
+      });
+    }
+  });
+
 export const filmGrainAlgorithmV1Schema = z.enum(['legacy_rapidraw_luma_noise_v0', 'procedural_luma_chroma_noise_v1']);
 
 export const filmGrainIsoPresetV1Schema = z.enum([
@@ -1391,13 +1618,6 @@ const filmLookRecipeIdSchema = z
   .regex(/^film_look\.[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*\.v[0-9]+$/u);
 
 const filmLookHumanTextSchema = z.string().trim().min(1).max(280);
-
-export const filmRenderDomainV1Schema = z.enum([
-  'scene_referred_linear',
-  'negative_lab_positive',
-  'working_rgb',
-  'display_referred',
-]);
 
 export const filmLookRecipeCategoryV1Schema = z.enum([
   'color_clean',
@@ -3490,6 +3710,15 @@ export type FilmGrainRenderStageV1 = z.infer<typeof filmGrainRenderStageV1Schema
 export type FilmGrainRendererSupportV1 = z.infer<typeof filmGrainRendererSupportV1Schema>;
 export type FilmGrainSeedPolicyV1 = z.infer<typeof filmGrainSeedPolicyV1Schema>;
 export type FilmGrainToneBandV1 = z.infer<typeof filmGrainToneBandV1Schema>;
+export type FilmHalationAlgorithmV1 = z.infer<typeof filmHalationAlgorithmV1Schema>;
+export type FilmHalationBlendModeV1 = z.infer<typeof filmHalationBlendModeV1Schema>;
+export type FilmHalationModelV1 = z.infer<typeof filmHalationModelV1Schema>;
+export type FilmHalationQualityModeV1 = z.infer<typeof filmHalationQualityModeV1Schema>;
+export type FilmHalationRenderStageV1 = z.infer<typeof filmHalationRenderStageV1Schema>;
+export type FilmHalationRendererSupportV1 = z.infer<typeof filmHalationRendererSupportV1Schema>;
+export type FilmHalationSourceChannelV1 = z.infer<typeof filmHalationSourceChannelV1Schema>;
+export type FilmHalationThresholdRolloffV1 = z.infer<typeof filmHalationThresholdRolloffV1Schema>;
+export type FilmHalationWarningCodeV1 = z.infer<typeof filmHalationWarningCodeV1Schema>;
 export type FilmLookCatalogV1 = z.infer<typeof filmLookCatalogV1Schema>;
 export type FilmLookClaimLevelV1 = z.infer<typeof filmLookClaimLevelV1Schema>;
 export type FilmLookNodeKindV1 = z.infer<typeof filmLookNodeKindV1Schema>;

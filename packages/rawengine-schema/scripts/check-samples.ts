@@ -4,6 +4,7 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   filmGrainModelV1Schema,
+  filmHalationModelV1Schema,
   filmLookCatalogV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
@@ -34,6 +35,7 @@ import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleFilmGrainModelV1,
+  sampleFilmHalationModelV1,
   sampleFilmLookCatalogV1,
   sampleNegativeAcquisitionProfileV1,
   sampleNegativeLabAppServerToolManifestV1,
@@ -101,6 +103,11 @@ const validSamples: ReadonlyArray<{
     name: 'film grain model',
     schema: filmGrainModelV1Schema,
     value: sampleFilmGrainModelV1,
+  },
+  {
+    name: 'film halation model',
+    schema: filmHalationModelV1Schema,
+    value: sampleFilmHalationModelV1,
   },
   {
     name: 'negative acquisition profile',
@@ -294,6 +301,113 @@ const invalidFilmGrainToneBand = {
   },
 };
 expectInvalid('film grain tone band with inverted luma range', filmGrainModelV1Schema, invalidFilmGrainToneBand);
+
+const invalidFilmHalationThreshold = {
+  ...sampleFilmHalationModelV1,
+  sourceIsolation: {
+    ...sampleFilmHalationModelV1.sourceIsolation,
+    thresholdEnd: 0.65,
+    thresholdStart: 0.9,
+  },
+};
+expectInvalid(
+  'film halation model with inverted highlight threshold',
+  filmHalationModelV1Schema,
+  invalidFilmHalationThreshold,
+);
+
+const invalidFilmHalationRadius = {
+  ...sampleFilmHalationModelV1,
+  geometry: {
+    ...sampleFilmHalationModelV1.geometry,
+    coreRadiusPx: 48,
+    fringeRadiusPx: 24,
+  },
+};
+expectInvalid(
+  'film halation model with fringe radius below core radius',
+  filmHalationModelV1Schema,
+  invalidFilmHalationRadius,
+);
+
+const invalidFilmHalationSpectralBias = {
+  ...sampleFilmHalationModelV1,
+  spectralBias: {
+    ...sampleFilmHalationModelV1.spectralBias,
+    blueGain: 1,
+    greenGain: 1,
+    orangeGain: 0,
+    redGain: 0,
+  },
+};
+expectInvalid(
+  'film halation model without warm spectral bias',
+  filmHalationModelV1Schema,
+  invalidFilmHalationSpectralBias,
+);
+
+const invalidFilmHalationRendererSupport = {
+  ...sampleFilmHalationModelV1,
+  algorithm: 'spectral_highlight_halation_v1',
+  rendererSupport: 'implemented_current_engine',
+};
+expectInvalid(
+  'film halation model claiming full renderer support before implementation',
+  filmHalationModelV1Schema,
+  invalidFilmHalationRendererSupport,
+);
+
+const invalidFilmHalationZeroAmount = {
+  ...sampleFilmHalationModelV1,
+  intensity: {
+    ...sampleFilmHalationModelV1.intensity,
+    amount: 0,
+  },
+};
+expectInvalid('film halation model with zero amount', filmHalationModelV1Schema, invalidFilmHalationZeroAmount);
+
+const invalidFilmHalationMaskBehavior = {
+  ...sampleFilmHalationModelV1,
+  maskBehavior: {
+    ...sampleFilmHalationModelV1.maskBehavior,
+    avoidLayerDoubleCounting: false,
+  },
+};
+expectInvalid(
+  'mask-compatible film halation model without double-counting protection',
+  filmHalationModelV1Schema,
+  invalidFilmHalationMaskBehavior,
+);
+
+const invalidFilmHalationDisplayWarning = {
+  ...sampleFilmHalationModelV1,
+  renderDomain: 'display_referred',
+  warningCodes: sampleFilmHalationModelV1.warningCodes.filter((code) => code !== 'display_referred_input'),
+};
+expectInvalid(
+  'display-referred film halation model without warning',
+  filmHalationModelV1Schema,
+  invalidFilmHalationDisplayWarning,
+);
+
+const invalidFilmHalationDeterministicPolicy = {
+  ...sampleFilmHalationModelV1,
+  deterministic: {
+    deterministicReplay: false,
+    stochasticInputs: true,
+  },
+};
+expectInvalid(
+  'film halation model with stochastic deterministic policy',
+  filmHalationModelV1Schema,
+  invalidFilmHalationDeterministicPolicy,
+);
+
+const invalidFilmHalationUnknownField = {
+  ...sampleFilmHalationModelV1,
+  spectralNanometers: [620, 650],
+};
+expectInvalid('film halation model with unknown field', filmHalationModelV1Schema, invalidFilmHalationUnknownField);
 
 const invalidNegativeLabCommand = {
   ...sampleNegativeLabCommandEnvelopeV1,

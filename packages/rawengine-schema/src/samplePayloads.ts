@@ -6,6 +6,7 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   filmGrainModelV1Schema,
+  filmHalationModelV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
@@ -34,6 +35,7 @@ import {
   type ArtifactHandleV1,
   type CommandEnvelopeV1,
   type FilmGrainModelV1,
+  type FilmHalationModelV1,
   type FilmLookCatalogV1,
   type NegativeAcquisitionProfileV1,
   type NegativeLabAppServerToolManifestV1,
@@ -359,6 +361,57 @@ export const sampleFilmGrainModelV1: FilmGrainModelV1 = filmGrainModelV1Schema.p
       startLuma: 0,
     },
   },
+});
+
+export const sampleFilmHalationModelV1: FilmHalationModelV1 = filmHalationModelV1Schema.parse({
+  algorithm: 'spectral_highlight_halation_v1',
+  blendMode: 'screen_warmth_preserving',
+  compatibleScopes: ['global', 'layer', 'mask'],
+  geometry: {
+    coreRadiusPx: 10,
+    edgeProtection: 0.42,
+    fringeRadiusPx: 36,
+    radiusUnit: 'working_pixels',
+  },
+  intensity: {
+    amount: 38,
+    highlightRolloff: 64,
+  },
+  maskBehavior: {
+    application: 'source_and_composite',
+    avoidLayerDoubleCounting: true,
+    expandSourceBeforeMask: true,
+  },
+  modelId: 'film.halation.spectral_highlight.v1',
+  modelVersion: '2026-06-13',
+  qualityPolicy: {
+    exportMode: 'export_reference',
+    maxExportRadiusPx: 96,
+    maxPreviewRadiusPx: 48,
+    previewMode: 'preview_fast',
+  },
+  renderDomain: 'scene_referred_linear',
+  renderStage: 'creative_highlight_transport_before_glow',
+  rendererSupport: 'partially_implemented_current_engine',
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  deterministic: {
+    deterministicReplay: true,
+    stochasticInputs: false,
+  },
+  sourceIsolation: {
+    protectClippedHighlights: true,
+    rolloff: 'filmic_soft_knee',
+    sourceChannel: 'red_weighted_luminance',
+    thresholdEnd: 0.98,
+    thresholdStart: 0.72,
+  },
+  spectralBias: {
+    blueGain: 0.04,
+    greenGain: 0.16,
+    orangeGain: 0.82,
+    redGain: 1,
+  },
+  warningCodes: ['creative_not_physical_spectral_model', 'renderer_path_partial'],
 });
 
 const lowConfidenceLabWarning = {
