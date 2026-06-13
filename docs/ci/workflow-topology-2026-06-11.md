@@ -71,6 +71,13 @@ workflow dispatches. The full package build workflow is path-filtered to
 app-impacting changes so docs-only and planning-only merges do not consume
 scarce macOS packaging runners while newer main validations are waiting.
 
+Workflow-only and GitHub composite-action changes should not route to macOS
+smoke by default. They are covered by actionlint, pinned-action audit, the
+aggregate PR gate, and any normal Ubuntu jobs that exercise the changed action.
+If a workflow change also touches `src-tauri`, lockfiles, package manifests, or
+build configuration, those app-impacting paths still route to the appropriate
+macOS smoke mode.
+
 ## Active PR Queue Policy
 
 GitHub Actions latency should be reduced by better workflow topology, not by
