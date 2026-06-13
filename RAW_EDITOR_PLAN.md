@@ -4722,6 +4722,9 @@ Issues:
   `docs/panorama/multi-row-support-audit-2026-06-13.md`.
 - Add large panorama tiling strategy. Initial strategy captured in
   `docs/panorama/large-panorama-tiling-strategy-2026-06-13.md`.
+- Persist editable derived panorama sources. Initial sidecar preservation
+  contract captured in
+  `docs/panorama/panorama-sidecar-artifact-persistence-2026-06-13.md`.
 - Add panorama fixture set.
 - Add panorama UI.
 - Add panorama API tools.

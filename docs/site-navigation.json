@@ -179,6 +179,10 @@
           "path": "docs/panorama/panorama-artifact-schema-2026-06-13.md"
         },
         {
+          "title": "Panorama sidecar artifact persistence",
+          "path": "docs/panorama/panorama-sidecar-artifact-persistence-2026-06-13.md"
+        },
+        {
           "title": "Panorama projection options",
           "path": "docs/panorama/projection-options-2026-06-13.md"
         },
