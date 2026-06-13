@@ -36,6 +36,35 @@ export interface FilmLookBrowserGroup {
   looks: Array<FilmLookBrowserItem>;
 }
 
+export interface FilmLookAdjustmentSummary {
+  label: string;
+  value: number;
+}
+
+const FILM_LOOK_ADJUSTMENT_KEYS = [
+  'temperature',
+  'contrast',
+  'highlights',
+  'shadows',
+  'blacks',
+  'saturation',
+  'glowAmount',
+  'grainAmount',
+  'grainSize',
+] satisfies Array<FilmLookAdjustmentKey>;
+
+const FILM_LOOK_ADJUSTMENT_LABELS: Record<FilmLookAdjustmentKey, string> = {
+  blacks: 'Blacks',
+  contrast: 'Contrast',
+  glowAmount: 'Glow',
+  grainAmount: 'Grain',
+  grainSize: 'Grain Size',
+  highlights: 'Highlights',
+  saturation: 'Saturation',
+  shadows: 'Shadows',
+  temperature: 'Temp',
+};
+
 const FILM_LOOK_CATEGORY_ORDER: Array<FilmLookCategory> = [
   'color_clean',
   'color_warm',
@@ -136,3 +165,19 @@ export const getFilmLookBrowserGroups = (): Array<FilmLookBrowserGroup> =>
     displayName: FILM_LOOK_CATEGORY_LABELS[category],
     looks: FILM_LOOK_BROWSER_ITEMS.filter((look) => look.category === category),
   })).filter((group) => group.looks.length > 0);
+
+export const getFilmLookAdjustmentSummaries = (look: FilmLookBrowserItem): Array<FilmLookAdjustmentSummary> =>
+  FILM_LOOK_ADJUSTMENT_KEYS.flatMap((key) => {
+    const value = look.adjustmentPatch[key];
+
+    if (typeof value !== 'number') {
+      return [];
+    }
+
+    return [
+      {
+        label: FILM_LOOK_ADJUSTMENT_LABELS[key],
+        value,
+      },
+    ];
+  });
