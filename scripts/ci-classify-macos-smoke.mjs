@@ -69,7 +69,17 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
       'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test',
     ]),
   ],
+  [
+    'check:quick',
+    new Set([
+      'bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures',
+      'bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes',
+    ]),
+  ],
+  ['check:release-notes', new Set(['bun scripts/generate-release-notes.mjs --self-test'])],
   ['check:workflow-policy:self-test', new Set(['bun scripts/check-github-workflow-policy.mjs --self-test'])],
+  ['deps:audit:check', new Set(['bun scripts/audit-dependency-versions.mjs --fail-on-missing-major-issues'])],
+  ['release:notes', new Set(['bun scripts/generate-release-notes.mjs'])],
   [
     'schema:check',
     new Set([
@@ -310,6 +320,28 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -25,9 +25,10 @@\n-    "check:actions": "bun run check:actions:lint && bun run check:workflow-policy",\n+    "check:actions": "bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test",\n+    "check:workflow-policy:self-test": "bun scripts/check-github-workflow-policy.mjs --self-test",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'release notes package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -17,7 +17,7 @@\n-    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures",\n+    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes",\n+    "release:notes": "bun scripts/generate-release-notes.mjs",\n+    "check:release-notes": "bun scripts/generate-release-notes.mjs --self-test",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'dependency audit package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -40,6 +40,7 @@\n+    "deps:audit:check": "bun scripts/audit-dependency-versions.mjs --fail-on-missing-major-issues",',
       },
     ],
     SMOKE_MODES.NONE,

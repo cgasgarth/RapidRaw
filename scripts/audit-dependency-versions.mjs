@@ -3,10 +3,12 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const npmRegistryUrl = 'https://registry.npmjs.org';
 const cratesRegistryUrl = 'https://crates.io/api/v1/crates';
+const majorIssuePolicyPath = join(repoRoot, 'docs/ci/dependency-version-major-issues.json');
 const defaultEcosystem = 'all';
 
 const args = new Set(process.argv.slice(2));
@@ -15,9 +17,26 @@ const ecosystem = ecosystemArg?.split('=')[1] ?? defaultEcosystem;
 const formatArg = process.argv.find((arg) => arg.startsWith('--format='));
 const format = formatArg?.split('=')[1] ?? 'markdown';
 const failOnMajor = args.has('--fail-on-major');
+const failOnMissingMajorIssues = args.has('--fail-on-missing-major-issues');
+
+const trackedMajorIssueSchema = z.object({
+  issue: z.number().int().positive(),
+  reason: z.string().min(1),
+  status: z.enum(['open', 'blocked', 'deferred']),
+  title: z.string().min(1),
+});
+
+const majorIssuePolicySchema = z.object({
+  $schema: z.string().min(1),
+  trackedMajorIssues: z.array(trackedMajorIssueSchema),
+});
 
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const readText = (path) => readFileSync(path, 'utf8');
+const majorIssuePolicy = majorIssuePolicySchema.parse(readJson(majorIssuePolicyPath));
+const trackedMajorIssuesByTitle = new Map(
+  majorIssuePolicy.trackedMajorIssues.map((trackedIssue) => [trackedIssue.title, trackedIssue]),
+);
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 
@@ -48,6 +67,18 @@ const isStableVersion = (version) => /^\d+(?:\.\d+){1,2}$/u.test(version);
 const latestVersion = (versions) => versions.toSorted(compareVersions).at(-1);
 
 const versionToString = (version) => version?.raw ?? 'unavailable';
+
+const resolveMajorIssueTracking = (majorIssueTitle) => {
+  if (!majorIssueTitle) return '';
+
+  const trackedIssue = trackedMajorIssuesByTitle.get(majorIssueTitle);
+  return trackedIssue ? `#${trackedIssue.issue} (${trackedIssue.status})` : 'missing issue';
+};
+
+const withMajorIssueTracking = (row) => ({
+  ...row,
+  majorIssueTracking: resolveMajorIssueTracking(row.majorIssueTitle),
+});
 
 const getNpmMajorIssueTitle = (packageName, currentVersion, latestStableMajor) =>
   currentVersion && latestStableMajor && latestStableMajor.major > currentVersion.major
@@ -352,22 +383,24 @@ const auditCargoDependencies = async () => {
 
 const renderTable = (title, rows) => {
   const majorRows = rows.filter((row) => row.majorIssueTitle);
+  const missingIssueRows = majorRows.filter((row) => row.majorIssueTracking === 'missing issue');
   const skippedRows = rows.filter((row) => row.skipReason);
   const lines = [
     `## ${title}`,
     '',
     `- Packages checked: ${rows.length}`,
     `- Major or semver-breaking migrations found: ${majorRows.length}`,
+    `- Missing major migration issues: ${missingIssueRows.length}`,
     `- Skipped non-registry dependencies: ${skippedRows.length}`,
     '',
-    '| Package | Scope | Declared | Current | Latest compatible | Latest stable minor | Latest stable major | Major issue |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    '| Package | Scope | Declared | Current | Latest compatible | Latest stable minor | Latest stable major | Major issue | Tracking |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ];
 
   for (const row of rows) {
     const packageLabel = row.releaseNotes ? `[${row.name}](${row.releaseNotes})` : row.name;
     lines.push(
-      `| ${packageLabel} | ${row.scope} | \`${row.declared}\` | \`${row.current}\` | \`${row.latestCompatible}\` | \`${row.latestStableMinor}\` | \`${row.latestStableMajor}\` | ${row.majorIssueTitle || ''} |`,
+      `| ${packageLabel} | ${row.scope} | \`${row.declared}\` | \`${row.current}\` | \`${row.latestCompatible}\` | \`${row.latestStableMinor}\` | \`${row.latestStableMajor}\` | ${row.majorIssueTitle || ''} | ${row.majorIssueTracking} |`,
     );
   }
 
@@ -375,7 +408,7 @@ const renderTable = (title, rows) => {
     lines.push('', '### Major or semver-breaking follow-up issues', '');
     for (const row of majorRows) {
       lines.push(
-        `- \`${row.majorIssueTitle}\`: include migration notes, breaking-change links, validation commands, CI expectations, rollback notes, and package-family coupling.`,
+        `- \`${row.majorIssueTitle}\` (${row.majorIssueTracking}): include migration notes, breaking-change links, validation commands, CI expectations, rollback notes, and package-family coupling.`,
       );
     }
   }
@@ -401,8 +434,9 @@ const run = async () => {
 
   const report = {
     generatedAt: new Date().toISOString(),
-    js: ecosystem === 'all' || ecosystem === 'js' ? await auditNpmDependencies() : [],
-    rust: ecosystem === 'all' || ecosystem === 'rust' ? await auditCargoDependencies() : [],
+    js: ecosystem === 'all' || ecosystem === 'js' ? (await auditNpmDependencies()).map(withMajorIssueTracking) : [],
+    rust:
+      ecosystem === 'all' || ecosystem === 'rust' ? (await auditCargoDependencies()).map(withMajorIssueTracking) : [],
   };
 
   if (format === 'json') {
@@ -415,8 +449,15 @@ const run = async () => {
   }
 
   const majorCount = [...report.js, ...report.rust].filter((row) => row.majorIssueTitle).length;
+  const missingMajorIssueCount = [...report.js, ...report.rust].filter(
+    (row) => row.majorIssueTitle && row.majorIssueTracking === 'missing issue',
+  ).length;
   if (failOnMajor && majorCount > 0) {
     throw new Error(`Found ${majorCount} major-version migration candidate(s).`);
+  }
+
+  if (failOnMissingMajorIssues && missingMajorIssueCount > 0) {
+    throw new Error(`Found ${missingMajorIssueCount} missing major-version migration issue(s).`);
   }
 };
 

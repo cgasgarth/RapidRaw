@@ -1,0 +1,41 @@
+{
+  "$schema": "https://rawengine.local/schemas/dependency-version-major-issues.schema.json",
+  "trackedMajorIssues": [
+    {
+      "title": "deps(major): migrate npm/eslint to 10",
+      "issue": 945,
+      "status": "open",
+      "reason": "ESLint 10 is a breaking JavaScript tooling migration."
+    },
+    {
+      "title": "deps(major): migrate npm/@eslint/js to 10",
+      "issue": 946,
+      "status": "open",
+      "reason": "@eslint/js 10 should move with the ESLint 10 migration unless proven independent."
+    },
+    {
+      "title": "deps(major): migrate cargo/glam to 0.33",
+      "issue": 959,
+      "status": "open",
+      "reason": "Cargo 0.x minor changes can carry semver-breaking API changes."
+    },
+    {
+      "title": "deps(major): migrate cargo/imageproc to 0.27",
+      "issue": 960,
+      "status": "open",
+      "reason": "Cargo 0.x minor changes can carry semver-breaking API changes."
+    },
+    {
+      "title": "deps(major): migrate cargo/ndarray to 0.17",
+      "issue": 962,
+      "status": "open",
+      "reason": "Cargo 0.x minor changes can carry semver-breaking API changes."
+    },
+    {
+      "title": "deps(major): migrate cargo/nalgebra to 0.35",
+      "issue": 963,
+      "status": "open",
+      "reason": "Cargo 0.x minor changes can carry semver-breaking API changes."
+    }
+  ]
+}
