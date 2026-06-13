@@ -1512,6 +1512,10 @@ export const panoramaProjectionSettingsV1Schema = z
   .refine((settings) => settings.support === 'implemented_current_engine' || settings.deferredReason !== undefined, {
     message: 'Deferred projection settings require deferredReason.',
     path: ['deferredReason'],
+  })
+  .refine((settings) => settings.support !== 'implemented_current_engine' || settings.deferredReason === undefined, {
+    message: 'Implemented projection settings must not include deferredReason.',
+    path: ['deferredReason'],
   });
 
 export const panoramaBoundaryModeSchema = z.enum(['auto_crop', 'transparent', 'manual_crop', 'deferred_fill']);
@@ -1596,6 +1600,10 @@ export const panoramaBoundarySettingsV1Schema = z
   .refine((settings) => settings.support === 'implemented_current_engine' || settings.deferredReason !== undefined, {
     message: 'Deferred boundary settings require deferredReason.',
     path: ['deferredReason'],
+  })
+  .refine((settings) => settings.support !== 'implemented_current_engine' || settings.deferredReason === undefined, {
+    message: 'Implemented boundary settings must not include deferredReason.',
+    path: ['deferredReason'],
   });
 
 export const panoramaPairwiseMatchV1Schema = z
@@ -1665,6 +1673,10 @@ export const panoramaExposureNormalizationV1Schema = z
   .refine((settings) => settings.support === 'implemented_current_engine' || settings.deferredReason !== undefined, {
     message: 'Deferred exposure normalization requires deferredReason.',
     path: ['deferredReason'],
+  })
+  .refine((settings) => settings.support !== 'implemented_current_engine' || settings.deferredReason === undefined, {
+    message: 'Implemented exposure normalization must not include deferredReason.',
+    path: ['deferredReason'],
   });
 
 export const panoramaSeamPolicyV1Schema = z
@@ -1713,7 +1725,7 @@ export const panoramaArtifactV1Schema = z
     lensCorrectionPolicy: z.enum(['unchanged', 'required_before_stitch', 'applied_before_stitch', 'deferred']),
     operationId: z.string().trim().min(1),
     operationVersion: z.literal(1),
-    outputArtifacts: z.array(artifactHandleV1Schema).min(1),
+    outputArtifacts: z.array(artifactHandleV1Schema),
     outputColorSpace: z.string().trim().min(1),
     previewArtifacts: z.array(artifactHandleV1Schema),
     projection: panoramaProjectionSchema,
@@ -1731,7 +1743,157 @@ export const panoramaArtifactV1Schema = z
     validationMetrics: panoramaValidationMetricsV1Schema,
     warnings: z.array(panoramaWarningCodeSchema),
   })
-  .strict();
+  .strict()
+  .superRefine((artifact, context) => {
+    if (artifact.projection !== artifact.projectionSettings.effectiveProjection) {
+      context.addIssue({
+        code: 'custom',
+        message: 'projection must match projectionSettings.effectiveProjection.',
+        path: ['projection'],
+      });
+    }
+
+    if (artifact.boundaryMode !== artifact.boundarySettings.effectiveMode) {
+      context.addIssue({
+        code: 'custom',
+        message: 'boundaryMode must match boundarySettings.effectiveMode.',
+        path: ['boundaryMode'],
+      });
+    }
+
+    if (JSON.stringify(artifact.crop) !== JSON.stringify(artifact.boundarySettings.crop)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'crop must match boundarySettings.crop.',
+        path: ['crop'],
+      });
+    }
+
+    if (artifact.validationMetrics.sourceCount !== artifact.sourceImageRefs.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'validationMetrics.sourceCount must match sourceImageRefs length.',
+        path: ['validationMetrics', 'sourceCount'],
+      });
+    }
+
+    if (artifact.validationMetrics.excludedSourceCount !== artifact.excludedSources.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'validationMetrics.excludedSourceCount must match excludedSources length.',
+        path: ['validationMetrics', 'excludedSourceCount'],
+      });
+    }
+
+    if (
+      artifact.validationMetrics.stitchedSourceCount + artifact.validationMetrics.excludedSourceCount >
+      artifact.validationMetrics.sourceCount
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'stitchedSourceCount plus excludedSourceCount cannot exceed sourceCount.',
+        path: ['validationMetrics', 'stitchedSourceCount'],
+      });
+    }
+
+    if (artifact.provenance.runtimeStatus === 'rendered' && artifact.outputArtifacts.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Rendered panorama artifacts require at least one output artifact.',
+        path: ['outputArtifacts'],
+      });
+    }
+
+    if (artifact.provenance.runtimeStatus !== 'rendered' && artifact.outputArtifacts.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only rendered panorama artifacts may include durable output artifacts.',
+        path: ['outputArtifacts'],
+      });
+    }
+
+    const sourceIndices = new Set<number>();
+    for (const [sourceIndex, source] of artifact.sourceImageRefs.entries()) {
+      if (sourceIndices.has(source.sourceIndex)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'sourceImageRefs sourceIndex values must be unique.',
+          path: ['sourceImageRefs', sourceIndex, 'sourceIndex'],
+        });
+      }
+
+      sourceIndices.add(source.sourceIndex);
+    }
+
+    if (
+      artifact.projectionSettings.support === 'implemented_current_engine' &&
+      ['rectilinear', 'planar'].includes(artifact.projectionSettings.effectiveProjection) &&
+      !artifact.engine.capabilities.planarHomography
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Implemented rectilinear or planar projection requires planarHomography capability.',
+        path: ['engine', 'capabilities', 'planarHomography'],
+      });
+    }
+
+    if (
+      artifact.projectionSettings.support === 'implemented_current_engine' &&
+      artifact.projectionSettings.effectiveProjection === 'cylindrical' &&
+      !artifact.engine.capabilities.cylindricalProjection
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Implemented cylindrical projection requires cylindricalProjection capability.',
+        path: ['engine', 'capabilities', 'cylindricalProjection'],
+      });
+    }
+
+    if (
+      artifact.projectionSettings.support === 'implemented_current_engine' &&
+      artifact.projectionSettings.effectiveProjection === 'spherical'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Spherical projection is schema-only until an engine capability is added.',
+        path: ['projectionSettings', 'support'],
+      });
+    }
+
+    if (
+      artifact.boundarySettings.support === 'implemented_current_engine' &&
+      artifact.boundarySettings.effectiveMode === 'auto_crop' &&
+      !artifact.engine.capabilities.autoCrop
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Implemented auto-crop boundary mode requires autoCrop capability.',
+        path: ['engine', 'capabilities', 'autoCrop'],
+      });
+    }
+
+    if (
+      artifact.boundarySettings.support === 'implemented_current_engine' &&
+      artifact.boundarySettings.effectiveMode === 'deferred_fill'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Deferred fill must remain schema-only until a fill engine capability exists.',
+        path: ['boundarySettings', 'support'],
+      });
+    }
+
+    if (
+      artifact.exposureNormalization.support === 'implemented_current_engine' &&
+      !artifact.engine.capabilities.exposureNormalization
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Implemented exposure normalization requires exposureNormalization capability.',
+        path: ['engine', 'capabilities', 'exposureNormalization'],
+      });
+    }
+  });
 
 export const computationalMergeFamilyV1Schema = z.enum(['panorama', 'hdr', 'focus_stack', 'super_resolution']);
 
