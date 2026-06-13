@@ -5,6 +5,7 @@ import {
   NEGATIVE_LAB_COMMAND_TYPES,
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  filmGrainModelV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
@@ -32,6 +33,7 @@ import {
   rawEngineToolRegistryV1Schema,
   type ArtifactHandleV1,
   type CommandEnvelopeV1,
+  type FilmGrainModelV1,
   type FilmLookCatalogV1,
   type NegativeAcquisitionProfileV1,
   type NegativeLabAppServerToolManifestV1,
@@ -319,6 +321,44 @@ export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Sc
     stitchedSourceCount: 3,
   },
   warnings: ['exposure_mismatch'],
+});
+
+export const sampleFilmGrainModelV1: FilmGrainModelV1 = filmGrainModelV1Schema.parse({
+  algorithm: 'procedural_luma_chroma_noise_v1',
+  channelSeparation: {
+    chromaAmount: 0.18,
+    chromaCorrelation: 0.65,
+    lumaAmount: 1,
+  },
+  compatibleScopes: ['global', 'layer', 'mask'],
+  intensity: {
+    amount: 34,
+    roughness: 58,
+    size: 28,
+  },
+  isoPreset: 'iso_400',
+  modelId: 'film.grain.procedural_luma_chroma.v1',
+  modelVersion: '2026-06-13',
+  renderStage: 'creative_final_after_glow',
+  rendererSupport: 'partially_implemented_current_engine',
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  seedPolicy: {
+    mode: 'stable_per_variant',
+  },
+  toneResponse: {
+    highlight: {
+      amountScale: 0.62,
+      endLuma: 1,
+      startLuma: 0.72,
+    },
+    midtoneAmountScale: 1,
+    protectClippedHighlights: true,
+    shadow: {
+      amountScale: 0.78,
+      endLuma: 0.18,
+      startLuma: 0,
+    },
+  },
 });
 
 const lowConfidenceLabWarning = {

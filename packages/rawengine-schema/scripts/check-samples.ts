@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  filmGrainModelV1Schema,
   filmLookCatalogV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
@@ -32,6 +33,7 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleFilmGrainModelV1,
   sampleFilmLookCatalogV1,
   sampleNegativeAcquisitionProfileV1,
   sampleNegativeLabAppServerToolManifestV1,
@@ -94,6 +96,11 @@ const validSamples: ReadonlyArray<{
     name: 'film look catalog',
     schema: filmLookCatalogV1Schema,
     value: sampleFilmLookCatalogV1,
+  },
+  {
+    name: 'film grain model',
+    schema: filmGrainModelV1Schema,
+    value: sampleFilmGrainModelV1,
   },
   {
     name: 'negative acquisition profile',
@@ -252,6 +259,41 @@ const invalidAcquisitionResult = negativeAcquisitionProfileV1Schema.safeParse(in
 if (invalidAcquisitionResult.success) {
   throw new Error('Expected negative acquisition profile schema to reject unknown fields.');
 }
+
+const invalidFilmGrainMissingContribution = {
+  ...sampleFilmGrainModelV1,
+  channelSeparation: {
+    ...sampleFilmGrainModelV1.channelSeparation,
+    chromaAmount: 0,
+    lumaAmount: 0,
+  },
+};
+expectInvalid(
+  'film grain model without luma or chroma contribution',
+  filmGrainModelV1Schema,
+  invalidFilmGrainMissingContribution,
+);
+
+const invalidFilmGrainSeedPolicy = {
+  ...sampleFilmGrainModelV1,
+  seedPolicy: {
+    mode: 'explicit_seed',
+  },
+};
+expectInvalid('film grain explicit seed policy without seed', filmGrainModelV1Schema, invalidFilmGrainSeedPolicy);
+
+const invalidFilmGrainToneBand = {
+  ...sampleFilmGrainModelV1,
+  toneResponse: {
+    ...sampleFilmGrainModelV1.toneResponse,
+    highlight: {
+      ...sampleFilmGrainModelV1.toneResponse.highlight,
+      endLuma: 0.7,
+      startLuma: 0.9,
+    },
+  },
+};
+expectInvalid('film grain tone band with inverted luma range', filmGrainModelV1Schema, invalidFilmGrainToneBand);
 
 const invalidNegativeLabCommand = {
   ...sampleNegativeLabCommandEnvelopeV1,

@@ -400,6 +400,137 @@ export const panoramaArtifactV1Schema = z
   })
   .strict();
 
+const filmPercentSchema = z.number().min(0).max(100);
+const filmUnitIntervalSchema = z.number().min(0).max(1);
+
+export const filmGrainAlgorithmV1Schema = z.enum(['legacy_rapidraw_luma_noise_v0', 'procedural_luma_chroma_noise_v1']);
+
+export const filmGrainIsoPresetV1Schema = z.enum([
+  'iso_50',
+  'iso_100',
+  'iso_200',
+  'iso_400',
+  'iso_800',
+  'iso_1600',
+  'iso_3200',
+  'custom',
+]);
+
+export const filmGrainRenderStageV1Schema = z.enum([
+  'creative_final_after_glow',
+  'layer_local_after_color',
+  'schema_only_deferred',
+]);
+
+export const filmGrainRendererSupportV1Schema = z.enum([
+  'implemented_current_engine',
+  'partially_implemented_current_engine',
+  'schema_only_deferred',
+]);
+
+export const filmGrainSeedPolicyV1Schema = z
+  .object({
+    mode: z.enum(['stable_per_image', 'stable_per_variant', 'explicit_seed', 'random_per_render']),
+    seed: z.number().int().nonnegative().optional(),
+  })
+  .strict()
+  .superRefine((policy, context) => {
+    if (policy.mode === 'explicit_seed' && policy.seed === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Explicit film grain seed policy requires a seed.',
+        path: ['seed'],
+      });
+    }
+
+    if (policy.mode !== 'explicit_seed' && policy.seed !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only explicit film grain seed policy may include a seed.',
+        path: ['seed'],
+      });
+    }
+  });
+
+export const filmGrainToneBandV1Schema = z
+  .object({
+    amountScale: z.number().min(0).max(2),
+    endLuma: filmUnitIntervalSchema,
+    startLuma: filmUnitIntervalSchema,
+  })
+  .strict()
+  .refine((band) => band.startLuma < band.endLuma, {
+    message: 'Film grain tone band startLuma must be lower than endLuma.',
+    path: ['endLuma'],
+  });
+
+export const filmGrainModelV1Schema = z
+  .object({
+    algorithm: filmGrainAlgorithmV1Schema,
+    channelSeparation: z
+      .object({
+        chromaAmount: filmUnitIntervalSchema,
+        chromaCorrelation: filmUnitIntervalSchema,
+        lumaAmount: filmUnitIntervalSchema,
+      })
+      .strict(),
+    compatibleScopes: z.array(z.enum(['global', 'layer', 'mask'])).min(1),
+    intensity: z
+      .object({
+        amount: filmPercentSchema,
+        roughness: filmPercentSchema,
+        size: filmPercentSchema,
+      })
+      .strict(),
+    isoPreset: filmGrainIsoPresetV1Schema,
+    modelId: z
+      .string()
+      .trim()
+      .regex(/^film\.grain\.[a-z0-9_]+\.v[0-9]+$/u),
+    modelVersion: z.string().trim().min(1),
+    renderStage: filmGrainRenderStageV1Schema,
+    rendererSupport: filmGrainRendererSupportV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    seedPolicy: filmGrainSeedPolicyV1Schema,
+    toneResponse: z
+      .object({
+        highlight: filmGrainToneBandV1Schema,
+        midtoneAmountScale: z.number().min(0).max(2),
+        protectClippedHighlights: z.boolean(),
+        shadow: filmGrainToneBandV1Schema,
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((model, context) => {
+    if (model.channelSeparation.lumaAmount === 0 && model.channelSeparation.chromaAmount === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film grain model requires luma or chroma grain contribution.',
+        path: ['channelSeparation'],
+      });
+    }
+
+    if (model.algorithm === 'legacy_rapidraw_luma_noise_v0' && model.rendererSupport !== 'implemented_current_engine') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Legacy RapidRaw grain maps to the implemented current engine.',
+        path: ['rendererSupport'],
+      });
+    }
+
+    if (
+      model.algorithm === 'procedural_luma_chroma_noise_v1' &&
+      model.rendererSupport === 'implemented_current_engine'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Procedural luma/chroma grain is not fully implemented by the current renderer.',
+        path: ['rendererSupport'],
+      });
+    }
+  });
+
 export const negativeInputModeSchema = z.enum([
   'camera_raw',
   'camera_tiff',
@@ -3352,6 +3483,13 @@ export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
+export type FilmGrainAlgorithmV1 = z.infer<typeof filmGrainAlgorithmV1Schema>;
+export type FilmGrainIsoPresetV1 = z.infer<typeof filmGrainIsoPresetV1Schema>;
+export type FilmGrainModelV1 = z.infer<typeof filmGrainModelV1Schema>;
+export type FilmGrainRenderStageV1 = z.infer<typeof filmGrainRenderStageV1Schema>;
+export type FilmGrainRendererSupportV1 = z.infer<typeof filmGrainRendererSupportV1Schema>;
+export type FilmGrainSeedPolicyV1 = z.infer<typeof filmGrainSeedPolicyV1Schema>;
+export type FilmGrainToneBandV1 = z.infer<typeof filmGrainToneBandV1Schema>;
 export type FilmLookCatalogV1 = z.infer<typeof filmLookCatalogV1Schema>;
 export type FilmLookClaimLevelV1 = z.infer<typeof filmLookClaimLevelV1Schema>;
 export type FilmLookNodeKindV1 = z.infer<typeof filmLookNodeKindV1Schema>;
