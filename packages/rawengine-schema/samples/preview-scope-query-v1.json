@@ -1,0 +1,22 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_preview_scope_sample"
+  },
+  "correlationId": "corr_preview_scope_sample",
+  "parameters": {
+    "binCount": 256,
+    "includeScopes": ["histogram", "waveform", "rgb_parade", "vectorscope"],
+    "maxDimensionPx": 2048,
+    "renderBasis": "editor_preview",
+    "sourceArtifactId": "artifact_preview_sample"
+  },
+  "queryId": "query_preview_scope_sample",
+  "queryType": "preview.scopes.read",
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image"
+  }
+}

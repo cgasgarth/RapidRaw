@@ -31,6 +31,8 @@ import {
   negativeLabRollBatchWorkflowV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
+  previewScopeQueryV1Schema,
+  previewScopeResultV1Schema,
   projectLibraryCommandEnvelopeV1Schema,
   projectLibraryMutationResultV1Schema,
   projectLibrarySnapshotQueryV1Schema,
@@ -68,6 +70,8 @@ import {
   type NegativeLabRollBatchWorkflowV1,
   type NegativeRollSessionV1,
   type PanoramaArtifactV1,
+  type PreviewScopeQueryV1,
+  type PreviewScopeResultV1,
   type ProjectLibraryCommandEnvelopeV1,
   type ProjectLibraryMutationResultV1,
   type ProjectLibrarySnapshotQueryV1,
@@ -159,6 +163,16 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       toolName: 'edit.dry_run_tone',
     },
     {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'PreviewScopeQueryV1',
+      mutates: false,
+      outputSchemaName: 'PreviewScopeResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: true,
+      toolKind: 'preview',
+      toolName: 'preview.read_scopes',
+    },
+    {
       approvalClass: ApprovalClass.SafeRead,
       inputSchemaName: 'ProjectLibrarySnapshotQueryV1',
       mutates: false,
@@ -225,6 +239,108 @@ export const sampleRawEngineAppServerToolCallValidationV1: RawEngineAppServerToo
       turnId: 'turn_rawengine_agent_sample',
     },
   });
+
+export const samplePreviewScopeQueryV1: PreviewScopeQueryV1 = previewScopeQueryV1Schema.parse({
+  actor: {
+    id: 'codex-app-server',
+    kind: ActorKind.Agent,
+    sessionId: 'session_preview_scope_sample',
+  },
+  correlationId: 'corr_preview_scope_sample',
+  parameters: {
+    binCount: 256,
+    includeScopes: ['histogram', 'waveform', 'rgb_parade', 'vectorscope'],
+    maxDimensionPx: 2048,
+    renderBasis: 'editor_preview',
+    sourceArtifactId: sampleArtifactHandleV1.artifactId,
+  },
+  queryId: 'query_preview_scope_sample',
+  queryType: 'preview.scopes.read',
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  target: {
+    imagePath: '/photos/session/IMG_0001.CR3',
+    kind: 'image',
+  },
+});
+
+export const samplePreviewScopeResultV1: PreviewScopeResultV1 = previewScopeResultV1Schema.parse({
+  colorManaged: true,
+  histogram: {
+    binCount: 256,
+    channels: [
+      {
+        bins: [0, 2, 8, 13, 21, 34, 21, 13, 8, 2, 0],
+        channel: 'luma',
+        clippedHighRatio: 0.001,
+        clippedLowRatio: 0.002,
+        percentile01: 0.03,
+        percentile99: 0.96,
+      },
+      {
+        bins: [0, 1, 6, 11, 18, 29, 18, 11, 6, 1, 0],
+        channel: 'red',
+        clippedHighRatio: 0.001,
+        clippedLowRatio: 0.001,
+        percentile01: 0.04,
+        percentile99: 0.94,
+      },
+    ],
+  },
+  queryId: samplePreviewScopeQueryV1.queryId,
+  renderBasis: samplePreviewScopeQueryV1.parameters.renderBasis,
+  rgbParade: {
+    artifact: {
+      artifactId: 'artifact_preview_scope_parade_sample',
+      contentHash: 'sha256:sample-preview-parade',
+      dimensions: {
+        height: 256,
+        width: 256,
+      },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+    channel: 'parade',
+    encodedFormat: 'artifact_handle',
+    height: 256,
+    width: 256,
+  },
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sourceArtifactId: samplePreviewScopeQueryV1.parameters.sourceArtifactId,
+  sourceImagePath: samplePreviewScopeQueryV1.target.imagePath,
+  vectorscope: {
+    artifact: {
+      artifactId: 'artifact_preview_scope_vectorscope_sample',
+      contentHash: 'sha256:sample-preview-vectorscope',
+      dimensions: {
+        height: 256,
+        width: 256,
+      },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+    channel: 'vectorscope',
+    encodedFormat: 'artifact_handle',
+    height: 256,
+    width: 256,
+  },
+  warnings: [],
+  waveform: {
+    artifact: {
+      artifactId: 'artifact_preview_scope_waveform_sample',
+      contentHash: 'sha256:sample-preview-waveform',
+      dimensions: {
+        height: 256,
+        width: 256,
+      },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+    channel: 'luma',
+    encodedFormat: 'artifact_handle',
+    height: 256,
+    width: 256,
+  },
+});
 
 export const sampleProjectLibrarySnapshotQueryV1: ProjectLibrarySnapshotQueryV1 =
   projectLibrarySnapshotQueryV1Schema.parse({
