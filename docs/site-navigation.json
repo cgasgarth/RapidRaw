@@ -47,6 +47,10 @@
           "path": "docs/agent/app-server-architecture-2026-06-12.md"
         },
         {
+          "title": "Negative Lab density-domain inversion ADR",
+          "path": "docs/negative-lab/density-domain-inversion-adr-2026-06-13.md"
+        },
+        {
           "title": "Architecture baseline",
           "path": "docs/baseline/rapidraw-architecture-baseline-2026-06-11.md"
         },
