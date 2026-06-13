@@ -8,6 +8,7 @@ import { format } from 'prettier';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  filmBlackAndWhiteModelV1Schema,
   filmGlowModelV1Schema,
   filmGrainModelV1Schema,
   filmHalationModelV1Schema,
@@ -40,6 +41,7 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleFilmBlackAndWhiteModelV1,
   sampleFilmGlowModelV1,
   sampleFilmGrainModelV1,
   sampleFilmHalationModelV1,
@@ -108,6 +110,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/film-look-catalog-v1.json',
     schema: filmLookCatalogV1Schema,
     value: sampleFilmLookCatalogV1,
+  },
+  {
+    name: 'film black and white model',
+    path: 'packages/rawengine-schema/samples/film-black-and-white-model-v1.json',
+    schema: filmBlackAndWhiteModelV1Schema,
+    value: sampleFilmBlackAndWhiteModelV1,
   },
   {
     name: 'film grain model',

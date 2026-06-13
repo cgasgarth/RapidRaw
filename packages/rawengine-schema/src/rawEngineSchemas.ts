@@ -632,6 +632,309 @@ export const filmHalationModelV1Schema = z
 
 export const filmGlowAlgorithmV1Schema = z.enum(['legacy_rapidraw_glow_bloom_v0', 'luminance_bloom_glow_v1']);
 
+export const filmBlackAndWhiteAlgorithmV1Schema = z.enum([
+  'legacy_rapidraw_desaturate_v0',
+  'channel_mixer_filter_response_v1',
+]);
+
+export const filmBlackAndWhiteFilterPresetV1Schema = z.enum([
+  'none',
+  'yellow_filter',
+  'orange_filter',
+  'red_filter',
+  'green_filter',
+  'blue_filter',
+  'custom',
+]);
+
+export const filmBlackAndWhiteResponseFamilyV1Schema = z.enum([
+  'panchromatic_style',
+  'orthochromatic_style',
+  'infrared_style',
+  'generic_monochrome_style',
+]);
+
+export const filmBlackAndWhiteRenderStageV1Schema = z.enum([
+  'creative_monochrome_before_halation',
+  'layer_local_after_color',
+  'schema_only_deferred',
+]);
+
+export const filmBlackAndWhiteRendererSupportV1Schema = z.enum([
+  'implemented_current_engine',
+  'partially_implemented_current_engine',
+  'schema_only_deferred',
+]);
+
+export const filmBlackAndWhiteToningModeV1Schema = z.enum(['none', 'paper_tint', 'split_tone']);
+
+export const filmBlackAndWhiteWarningCodeV1Schema = z.enum([
+  'creative_not_measured_stock_response',
+  'display_referred_input',
+  'not_stock_measured_response',
+  'renderer_path_deferred',
+  'renderer_path_partial',
+  'toning_not_measured_paper',
+]);
+
+export const filmBlackAndWhiteModelV1Schema = z
+  .object({
+    algorithm: filmBlackAndWhiteAlgorithmV1Schema,
+    channelMixer: z
+      .object({
+        blueWeight: z.number().min(-2).max(2),
+        greenWeight: z.number().min(-2).max(2),
+        normalizeLuminance: z.boolean(),
+        redWeight: z.number().min(-2).max(2),
+      })
+      .strict(),
+    compatibleScopes: z.array(z.enum(['global', 'layer', 'mask'])).min(1),
+    deterministic: z
+      .object({
+        deterministicReplay: z.boolean(),
+        stochasticInputs: z.boolean(),
+      })
+      .strict(),
+    filterResponse: z
+      .object({
+        customHueDegrees: z.number().min(0).max(360).optional(),
+        preset: filmBlackAndWhiteFilterPresetV1Schema,
+        strength: filmPercentSchema,
+      })
+      .strict(),
+    luminanceCurve: z
+      .object({
+        blackPoint: z.number().min(0).max(1),
+        contrast: filmPercentSchema,
+        midtoneLift: z.number().min(-100).max(100),
+        shoulder: filmPercentSchema,
+        toe: filmPercentSchema,
+        whitePoint: z.number().min(0).max(1),
+      })
+      .strict(),
+    maskBehavior: z
+      .object({
+        application: z.enum(['source_only', 'composite_only', 'source_and_composite']),
+        avoidLayerDoubleCounting: z.boolean(),
+      })
+      .strict(),
+    modelId: z
+      .string()
+      .trim()
+      .regex(/^film\.bw\.[a-z0-9_]+\.v[0-9]+$/u),
+    modelVersion: z.string().trim().min(1),
+    renderDomain: filmRenderDomainV1Schema,
+    renderStage: filmBlackAndWhiteRenderStageV1Schema,
+    rendererSupport: filmBlackAndWhiteRendererSupportV1Schema,
+    responseFamily: filmBlackAndWhiteResponseFamilyV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    toning: z
+      .object({
+        balance: z.number().min(-100).max(100),
+        highlightHueDegrees: z.number().min(0).max(360).optional(),
+        mode: filmBlackAndWhiteToningModeV1Schema,
+        paperHueDegrees: z.number().min(0).max(360).optional(),
+        paperSaturation: z.number().min(0).max(1).optional(),
+        shadowHueDegrees: z.number().min(0).max(360).optional(),
+        strength: filmPercentSchema,
+      })
+      .strict(),
+    warningCodes: z.array(filmBlackAndWhiteWarningCodeV1Schema),
+  })
+  .strict()
+  .superRefine((model, context) => {
+    const mixerMagnitude =
+      Math.abs(model.channelMixer.redWeight) +
+      Math.abs(model.channelMixer.greenWeight) +
+      Math.abs(model.channelMixer.blueWeight);
+
+    if (mixerMagnitude === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Black-and-white channel mixer requires at least one non-zero channel weight.',
+        path: ['channelMixer'],
+      });
+    }
+
+    if (model.luminanceCurve.blackPoint >= model.luminanceCurve.whitePoint) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Black-and-white luminance curve requires blackPoint below whitePoint.',
+        path: ['luminanceCurve'],
+      });
+    }
+
+    if (model.filterResponse.preset === 'none' && model.filterResponse.strength > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Black-and-white filter response preset none requires zero strength.',
+        path: ['filterResponse', 'strength'],
+      });
+    }
+
+    if (model.filterResponse.preset === 'custom' && model.filterResponse.customHueDegrees === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Custom black-and-white filter response requires customHueDegrees.',
+        path: ['filterResponse', 'customHueDegrees'],
+      });
+    }
+
+    if (model.filterResponse.preset !== 'custom' && model.filterResponse.customHueDegrees !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only custom black-and-white filter response may include customHueDegrees.',
+        path: ['filterResponse', 'customHueDegrees'],
+      });
+    }
+
+    if (model.toning.mode === 'none' && model.toning.strength > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Black-and-white toning strength requires a toning mode.',
+        path: ['toning', 'strength'],
+      });
+    }
+
+    if (model.toning.mode === 'paper_tint') {
+      if (model.toning.paperHueDegrees === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Paper-tint black-and-white model requires paperHueDegrees.',
+          path: ['toning', 'paperHueDegrees'],
+        });
+      }
+
+      if (model.toning.paperSaturation === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Paper-tint black-and-white model requires paperSaturation.',
+          path: ['toning', 'paperSaturation'],
+        });
+      }
+    }
+
+    if (model.toning.mode === 'split_tone') {
+      if (model.toning.shadowHueDegrees === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Split-tone black-and-white model requires shadowHueDegrees.',
+          path: ['toning', 'shadowHueDegrees'],
+        });
+      }
+
+      if (model.toning.highlightHueDegrees === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Split-tone black-and-white model requires highlightHueDegrees.',
+          path: ['toning', 'highlightHueDegrees'],
+        });
+      }
+
+      if (model.toning.strength === 0) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Split-tone black-and-white model requires non-zero toning strength.',
+          path: ['toning', 'strength'],
+        });
+      }
+    }
+
+    if (model.toning.mode !== 'paper_tint' && model.toning.paperHueDegrees !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only paper-tint black-and-white model may include paperHueDegrees.',
+        path: ['toning', 'paperHueDegrees'],
+      });
+    }
+
+    if (model.toning.mode !== 'paper_tint' && model.toning.paperSaturation !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only paper-tint black-and-white model may include paperSaturation.',
+        path: ['toning', 'paperSaturation'],
+      });
+    }
+
+    if (model.compatibleScopes.includes('mask') && !model.maskBehavior.avoidLayerDoubleCounting) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Mask-compatible black-and-white model must avoid layer double-counting.',
+        path: ['maskBehavior', 'avoidLayerDoubleCounting'],
+      });
+    }
+
+    if (!model.deterministic.deterministicReplay || model.deterministic.stochasticInputs) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Black-and-white model v1 must be deterministic and must not declare stochastic inputs.',
+        path: ['deterministic'],
+      });
+    }
+
+    if (model.renderDomain === 'display_referred' && !model.warningCodes.includes('display_referred_input')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Display-referred black-and-white model requires an explicit display-referred warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (model.rendererSupport === 'schema_only_deferred' && !model.warningCodes.includes('renderer_path_deferred')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Schema-only black-and-white model requires a deferred renderer warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (
+      model.rendererSupport === 'partially_implemented_current_engine' &&
+      !model.warningCodes.includes('renderer_path_partial')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Partially implemented black-and-white model requires a partial renderer warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (!model.warningCodes.includes('creative_not_measured_stock_response')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generic black-and-white response family requires a measured-stock disclaimer warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (model.toning.mode !== 'none' && !model.warningCodes.includes('toning_not_measured_paper')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Black-and-white toning requires a paper/process disclaimer warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (model.algorithm === 'legacy_rapidraw_desaturate_v0' && model.rendererSupport !== 'implemented_current_engine') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Legacy RapidRaw desaturation maps to the implemented current engine.',
+        path: ['rendererSupport'],
+      });
+    }
+
+    if (
+      model.algorithm === 'channel_mixer_filter_response_v1' &&
+      model.rendererSupport === 'implemented_current_engine'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Channel mixer filter response is not fully implemented by the current renderer.',
+        path: ['rendererSupport'],
+      });
+    }
+  });
+
 export const filmGlowBlendModeV1Schema = z.enum([
   'screen_luminance_preserving',
   'linear_add_limited',
@@ -3950,6 +4253,14 @@ export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
+export type FilmBlackAndWhiteAlgorithmV1 = z.infer<typeof filmBlackAndWhiteAlgorithmV1Schema>;
+export type FilmBlackAndWhiteFilterPresetV1 = z.infer<typeof filmBlackAndWhiteFilterPresetV1Schema>;
+export type FilmBlackAndWhiteModelV1 = z.infer<typeof filmBlackAndWhiteModelV1Schema>;
+export type FilmBlackAndWhiteRenderStageV1 = z.infer<typeof filmBlackAndWhiteRenderStageV1Schema>;
+export type FilmBlackAndWhiteRendererSupportV1 = z.infer<typeof filmBlackAndWhiteRendererSupportV1Schema>;
+export type FilmBlackAndWhiteResponseFamilyV1 = z.infer<typeof filmBlackAndWhiteResponseFamilyV1Schema>;
+export type FilmBlackAndWhiteToningModeV1 = z.infer<typeof filmBlackAndWhiteToningModeV1Schema>;
+export type FilmBlackAndWhiteWarningCodeV1 = z.infer<typeof filmBlackAndWhiteWarningCodeV1Schema>;
 export type FilmGrainAlgorithmV1 = z.infer<typeof filmGrainAlgorithmV1Schema>;
 export type FilmGlowAlgorithmV1 = z.infer<typeof filmGlowAlgorithmV1Schema>;
 export type FilmGlowBlendModeV1 = z.infer<typeof filmGlowBlendModeV1Schema>;

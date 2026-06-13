@@ -5,6 +5,7 @@ import {
   NEGATIVE_LAB_COMMAND_TYPES,
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  filmBlackAndWhiteModelV1Schema,
   filmGlowModelV1Schema,
   filmGrainModelV1Schema,
   filmHalationModelV1Schema,
@@ -35,6 +36,7 @@ import {
   rawEngineToolRegistryV1Schema,
   type ArtifactHandleV1,
   type CommandEnvelopeV1,
+  type FilmBlackAndWhiteModelV1,
   type FilmGlowModelV1,
   type FilmGrainModelV1,
   type FilmHalationModelV1,
@@ -325,6 +327,52 @@ export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Sc
     stitchedSourceCount: 3,
   },
   warnings: ['exposure_mismatch'],
+});
+
+export const sampleFilmBlackAndWhiteModelV1: FilmBlackAndWhiteModelV1 = filmBlackAndWhiteModelV1Schema.parse({
+  algorithm: 'channel_mixer_filter_response_v1',
+  channelMixer: {
+    blueWeight: 0.12,
+    greenWeight: 0.62,
+    normalizeLuminance: true,
+    redWeight: 0.42,
+  },
+  compatibleScopes: ['global', 'layer', 'mask'],
+  deterministic: {
+    deterministicReplay: true,
+    stochasticInputs: false,
+  },
+  filterResponse: {
+    preset: 'orange_filter',
+    strength: 54,
+  },
+  luminanceCurve: {
+    blackPoint: 0.02,
+    contrast: 42,
+    midtoneLift: 6,
+    shoulder: 36,
+    toe: 24,
+    whitePoint: 0.98,
+  },
+  maskBehavior: {
+    application: 'source_and_composite',
+    avoidLayerDoubleCounting: true,
+  },
+  modelId: 'film.bw.channel_mixer_filter.v1',
+  modelVersion: '2026-06-13',
+  renderDomain: 'scene_referred_linear',
+  renderStage: 'creative_monochrome_before_halation',
+  rendererSupport: 'partially_implemented_current_engine',
+  responseFamily: 'panchromatic_style',
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  toning: {
+    balance: 8,
+    highlightHueDegrees: 48,
+    mode: 'split_tone',
+    shadowHueDegrees: 230,
+    strength: 18,
+  },
+  warningCodes: ['creative_not_measured_stock_response', 'renderer_path_partial', 'toning_not_measured_paper'],
 });
 
 export const sampleFilmGrainModelV1: FilmGrainModelV1 = filmGrainModelV1Schema.parse({

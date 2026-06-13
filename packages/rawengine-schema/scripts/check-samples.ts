@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  filmBlackAndWhiteModelV1Schema,
   filmGlowModelV1Schema,
   filmGrainModelV1Schema,
   filmHalationModelV1Schema,
@@ -35,6 +36,7 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleFilmBlackAndWhiteModelV1,
   sampleFilmGlowModelV1,
   sampleFilmGrainModelV1,
   sampleFilmHalationModelV1,
@@ -100,6 +102,11 @@ const validSamples: ReadonlyArray<{
     name: 'film look catalog',
     schema: filmLookCatalogV1Schema,
     value: sampleFilmLookCatalogV1,
+  },
+  {
+    name: 'film black and white model',
+    schema: filmBlackAndWhiteModelV1Schema,
+    value: sampleFilmBlackAndWhiteModelV1,
   },
   {
     name: 'film grain model',
@@ -308,6 +315,209 @@ const invalidFilmGrainToneBand = {
   },
 };
 expectInvalid('film grain tone band with inverted luma range', filmGrainModelV1Schema, invalidFilmGrainToneBand);
+
+const invalidFilmBlackAndWhiteMixer = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  channelMixer: {
+    ...sampleFilmBlackAndWhiteModelV1.channelMixer,
+    blueWeight: 0,
+    greenWeight: 0,
+    redWeight: 0,
+  },
+};
+expectInvalid(
+  'black-and-white model without channel contribution',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteMixer,
+);
+
+const invalidFilmBlackAndWhiteCustomFilter = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  filterResponse: {
+    preset: 'custom',
+    strength: 70,
+  },
+};
+expectInvalid(
+  'black-and-white custom filter without hue',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteCustomFilter,
+);
+
+const invalidFilmBlackAndWhiteFilterNoneStrength = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  filterResponse: {
+    preset: 'none',
+    strength: 30,
+  },
+};
+expectInvalid(
+  'black-and-white filter none with non-zero strength',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteFilterNoneStrength,
+);
+
+const invalidFilmBlackAndWhitePresetCustomHue = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  filterResponse: {
+    customHueDegrees: 45,
+    preset: 'yellow_filter',
+    strength: 45,
+  },
+};
+expectInvalid(
+  'black-and-white preset filter with custom hue',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhitePresetCustomHue,
+);
+
+const invalidFilmBlackAndWhiteTonePoints = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  luminanceCurve: {
+    ...sampleFilmBlackAndWhiteModelV1.luminanceCurve,
+    blackPoint: 0.8,
+    whitePoint: 0.2,
+  },
+};
+expectInvalid(
+  'black-and-white luminance curve with inverted black and white points',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteTonePoints,
+);
+
+const invalidFilmBlackAndWhiteToning = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  toning: {
+    ...sampleFilmBlackAndWhiteModelV1.toning,
+    mode: 'none',
+    strength: 20,
+  },
+};
+expectInvalid(
+  'black-and-white toning strength without toning mode',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteToning,
+);
+
+const invalidFilmBlackAndWhitePaperTint = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  toning: {
+    balance: 0,
+    mode: 'paper_tint',
+    strength: 18,
+  },
+};
+expectInvalid(
+  'black-and-white paper tint without tint payload',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhitePaperTint,
+);
+
+const invalidFilmBlackAndWhiteSplitTone = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  toning: {
+    balance: 0,
+    mode: 'split_tone',
+    shadowHueDegrees: 220,
+    strength: 25,
+  },
+};
+expectInvalid(
+  'black-and-white split tone without highlight hue',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteSplitTone,
+);
+
+const invalidFilmBlackAndWhiteSplitToneStrength = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  toning: {
+    balance: 0,
+    highlightHueDegrees: 48,
+    mode: 'split_tone',
+    shadowHueDegrees: 220,
+    strength: 0,
+  },
+};
+expectInvalid(
+  'black-and-white split tone with zero strength',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteSplitToneStrength,
+);
+
+const invalidFilmBlackAndWhiteRendererSupport = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  rendererSupport: 'implemented_current_engine',
+};
+expectInvalid(
+  'black-and-white model claiming full renderer support before implementation',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteRendererSupport,
+);
+
+const invalidFilmBlackAndWhiteDisplayWarning = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  renderDomain: 'display_referred',
+  warningCodes: sampleFilmBlackAndWhiteModelV1.warningCodes.filter((code) => code !== 'display_referred_input'),
+};
+expectInvalid(
+  'display-referred black-and-white model without warning',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteDisplayWarning,
+);
+
+const invalidFilmBlackAndWhiteResponseWarning = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  warningCodes: sampleFilmBlackAndWhiteModelV1.warningCodes.filter(
+    (code) => code !== 'creative_not_measured_stock_response',
+  ),
+};
+expectInvalid(
+  'black-and-white response family without measured-stock disclaimer warning',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteResponseWarning,
+);
+
+const invalidFilmBlackAndWhiteToningWarning = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  warningCodes: sampleFilmBlackAndWhiteModelV1.warningCodes.filter((code) => code !== 'toning_not_measured_paper'),
+};
+expectInvalid(
+  'black-and-white toning without paper disclaimer warning',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteToningWarning,
+);
+
+const invalidFilmBlackAndWhiteUnknownField = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  stockName: 'not allowed',
+};
+expectInvalid(
+  'black-and-white model with stock-specific unknown field',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteUnknownField,
+);
+
+const invalidFilmBlackAndWhiteHalationLeak = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  spectralBias: {
+    redGain: 1,
+  },
+};
+expectInvalid(
+  'black-and-white model with halation spectral-bias field',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteHalationLeak,
+);
+
+const invalidFilmBlackAndWhiteNegativeLabLeak = {
+  ...sampleFilmBlackAndWhiteModelV1,
+  processFamily: 'black_and_white_silver_negative',
+};
+expectInvalid(
+  'black-and-white model with Negative Lab process-family field',
+  filmBlackAndWhiteModelV1Schema,
+  invalidFilmBlackAndWhiteNegativeLabLeak,
+);
 
 const invalidFilmHalationThreshold = {
   ...sampleFilmHalationModelV1,
