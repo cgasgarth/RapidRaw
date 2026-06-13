@@ -1822,8 +1822,50 @@ export const negativeLabOperationStageSchema = z.enum([
   'objective_inversion',
   'semi_objective_normalization',
   'creative_rendering',
+  'output_generation',
   'quality_control',
 ]);
+
+export const negativeLabOperationClassSchema = z.enum([
+  'acquisition',
+  'calibration',
+  'objective',
+  'semi_objective',
+  'creative',
+  'output',
+  'quality_control',
+]);
+
+const negativeLabCommandStageByType: Readonly<
+  Record<z.infer<typeof negativeLabCommandTypeSchema>, z.infer<typeof negativeLabOperationStageSchema>>
+> = {
+  'negativeLab.applyFrameCrop': 'acquisition',
+  'negativeLab.createPositiveVariant': 'output_generation',
+  'negativeLab.createSession': 'acquisition',
+  'negativeLab.estimateBaseFog': 'calibration',
+  'negativeLab.planRollNormalization': 'semi_objective_normalization',
+  'negativeLab.setConversionRecipe': 'objective_inversion',
+  'negativeLab.setFrameQcStatus': 'quality_control',
+  'negativeLab.updateBaseSamples': 'calibration',
+};
+
+const negativeLabOperationClassByStage: Readonly<
+  Record<z.infer<typeof negativeLabOperationStageSchema>, z.infer<typeof negativeLabOperationClassSchema>>
+> = {
+  acquisition: 'acquisition',
+  calibration: 'calibration',
+  creative_rendering: 'creative',
+  objective_inversion: 'objective',
+  output_generation: 'output',
+  quality_control: 'quality_control',
+  semi_objective_normalization: 'semi_objective',
+};
+
+const negativeLabMutatingApprovalClasses: ReadonlyArray<z.infer<typeof approvalClassSchema>> = [
+  'batch_apply',
+  'edit_apply',
+  'file_mutation',
+];
 
 export const negativeLabFrameSelectionV1Schema = z
   .object({
@@ -2812,6 +2854,161 @@ export const negativeLabApplyResultV1Schema = z
   })
   .strict();
 
+export const negativeLabConversionOperationArtifactPurposeV1Schema = z.enum([
+  'objective_positive_preview',
+  'density_map',
+  'base_sample_overlay',
+  'clipping_overlay',
+  'warning_report',
+  'parameter_diff',
+  'qc_contact_sheet',
+  'editable_positive_variant',
+  'export_ready_positive',
+]);
+
+export const negativeLabConversionOperationParameterRefsV1Schema = z
+  .object({
+    acquisitionProfileId: z.string().trim().min(1).optional(),
+    baseEstimateId: z.string().trim().min(1).optional(),
+    baseSampleIds: z.array(z.string().trim().min(1)),
+    conversionRecipeId: z.string().trim().min(1).optional(),
+    curveSetId: z.string().trim().min(1).optional(),
+    dryRunPlanId: z.string().trim().min(1).optional(),
+    inputProfileId: z.string().trim().min(1).optional(),
+    normalizationProfileId: z.string().trim().min(1).optional(),
+    outputTransformId: z.string().trim().min(1).optional(),
+    positiveVariantIds: z.array(z.string().trim().min(1)),
+    processProfileId: z.string().trim().min(1).optional(),
+    qcProofId: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+export const negativeLabConversionOperationProvenanceV1Schema = z
+  .object({
+    actor: rawEngineActorSchema,
+    commandId: z.string().trim().min(1),
+    correlationId: z.string().trim().min(1),
+    createdAt: z.string().trim().min(1),
+    dryRunCommandId: z.string().trim().min(1).optional(),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    localOnly: z.boolean(),
+    source: z.enum(['ui', 'app_server_agent', 'cli', 'batch']),
+  })
+  .strict();
+
+export const negativeLabConversionOperationV1Schema = z
+  .object({
+    approvalClass: approvalClassSchema,
+    artifactPurposes: z.array(negativeLabConversionOperationArtifactPurposeV1Schema),
+    changeSet: negativeLabChangeSetV1Schema.optional(),
+    commandType: negativeLabCommandTypeSchema,
+    expectedGraphRevision: z.string().trim().min(1).optional(),
+    frameSelection: negativeLabFrameSelectionV1Schema,
+    mutates: z.boolean(),
+    operationClass: negativeLabOperationClassSchema,
+    operationId: z.string().trim().min(1),
+    operationStage: negativeLabOperationStageSchema,
+    outputArtifacts: z.array(artifactHandleV1Schema),
+    parameterRefs: negativeLabConversionOperationParameterRefsV1Schema,
+    provenance: negativeLabConversionOperationProvenanceV1Schema,
+    resultGraphRevision: z.string().trim().min(1).optional(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sessionId: z.string().trim().min(1),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(negativeWarningV1Schema),
+  })
+  .strict()
+  .superRefine((operation, context) => {
+    const expectedStage = negativeLabCommandStageByType[operation.commandType];
+    if (operation.operationStage !== expectedStage) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab operation stage must match the command type.',
+        path: ['operationStage'],
+      });
+    }
+
+    const expectedClass = negativeLabOperationClassByStage[operation.operationStage];
+    if (operation.operationClass !== expectedClass) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab operation class must match the operation stage.',
+        path: ['operationClass'],
+      });
+    }
+
+    if (operation.mutates) {
+      if (!negativeLabMutatingApprovalClasses.includes(operation.approvalClass)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Mutating Negative Lab operations require an apply-class approval.',
+          path: ['approvalClass'],
+        });
+      }
+
+      if (operation.changeSet === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Mutating Negative Lab operations require a change set.',
+          path: ['changeSet'],
+        });
+      }
+
+      if (operation.resultGraphRevision === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Mutating Negative Lab operations require a result graph revision.',
+          path: ['resultGraphRevision'],
+        });
+      }
+    } else {
+      if (operation.changeSet !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Dry-run Negative Lab operations must not include an applied change set.',
+          path: ['changeSet'],
+        });
+      }
+
+      if (operation.resultGraphRevision !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Dry-run Negative Lab operations must not include a result graph revision.',
+          path: ['resultGraphRevision'],
+        });
+      }
+    }
+
+    if (operation.commandType === 'negativeLab.setConversionRecipe') {
+      const { conversionRecipeId, curveSetId, processProfileId } = operation.parameterRefs;
+      if (conversionRecipeId === undefined && curveSetId === undefined && processProfileId === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Conversion recipe operations require a recipe, curve-set, or process-profile reference.',
+          path: ['parameterRefs'],
+        });
+      }
+    }
+
+    if (operation.commandType === 'negativeLab.createPositiveVariant') {
+      if (operation.parameterRefs.positiveVariantIds.length === 0) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Positive variant creation operations require positive variant IDs.',
+          path: ['parameterRefs', 'positiveVariantIds'],
+        });
+      }
+
+      if (operation.outputArtifacts.length === 0) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Positive variant creation operations require output artifacts.',
+          path: ['outputArtifacts'],
+        });
+      }
+    }
+  });
+
 export const negativeLabPositiveVariantProvenanceV1Schema = z
   .object({
     acknowledgedWarningCodes: z.array(negativeWarningCodeSchema),
@@ -2984,6 +3181,16 @@ export type NegativeLabBuiltInPresetV1 = z.infer<typeof negativeLabBuiltInPreset
 export type NegativeLabChangeSetV1 = z.infer<typeof negativeLabChangeSetV1Schema>;
 export type NegativeLabCommandEnvelopeV1 = z.infer<typeof negativeLabCommandEnvelopeV1Schema>;
 export type NegativeLabCommandType = z.infer<typeof negativeLabCommandTypeSchema>;
+export type NegativeLabConversionOperationArtifactPurposeV1 = z.infer<
+  typeof negativeLabConversionOperationArtifactPurposeV1Schema
+>;
+export type NegativeLabConversionOperationParameterRefsV1 = z.infer<
+  typeof negativeLabConversionOperationParameterRefsV1Schema
+>;
+export type NegativeLabConversionOperationProvenanceV1 = z.infer<
+  typeof negativeLabConversionOperationProvenanceV1Schema
+>;
+export type NegativeLabConversionOperationV1 = z.infer<typeof negativeLabConversionOperationV1Schema>;
 export type NegativeLabCreateSessionParametersV1 = z.infer<typeof negativeLabCreateSessionParametersV1Schema>;
 export type NegativeLabCreatePositiveVariantParametersV1 = z.infer<
   typeof negativeLabCreatePositiveVariantParametersV1Schema
@@ -3015,6 +3222,7 @@ export type NegativeLabInputProfileSourceV1 = z.infer<typeof negativeLabInputPro
 export type NegativeLabInputProfileV1 = z.infer<typeof negativeLabInputProfileV1Schema>;
 export type NegativeLabRejectedFrameCandidateV1 = z.infer<typeof negativeLabRejectedFrameCandidateV1Schema>;
 export type NegativeLabLegalNamingStatus = z.infer<typeof negativeLabLegalNamingStatusSchema>;
+export type NegativeLabOperationClass = z.infer<typeof negativeLabOperationClassSchema>;
 export type NegativeLabOperationStage = z.infer<typeof negativeLabOperationStageSchema>;
 export type NegativeLabOutputTransformRefV1 = z.infer<typeof negativeLabOutputTransformRefV1Schema>;
 export type NegativeLabPerChannelInversionCurveSetScopeV1 = z.infer<

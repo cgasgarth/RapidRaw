@@ -11,6 +11,7 @@ import {
   negativeLabBaseSampleRecordV1Schema,
   negativeLabBuiltInPresetCatalogV1Schema,
   negativeLabCommandEnvelopeV1Schema,
+  negativeLabConversionOperationV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
   negativeLabFixtureManifestV1Schema,
@@ -39,6 +40,7 @@ import {
   sampleNegativeLabBaseSampleRecordV1,
   sampleNegativeLabBuiltInPresetCatalogV1,
   sampleNegativeLabCommandEnvelopeV1,
+  sampleNegativeLabConversionOperationV1,
   sampleNegativeLabDensityNormalizationProfileV1,
   sampleNegativeLabDryRunResultV1,
   sampleNegativeLabFixtureManifestV1,
@@ -120,6 +122,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab apply result',
     schema: negativeLabApplyResultV1Schema,
     value: sampleNegativeLabApplyResultV1,
+  },
+  {
+    name: 'negative lab conversion operation',
+    schema: negativeLabConversionOperationV1Schema,
+    value: sampleNegativeLabConversionOperationV1,
   },
   {
     name: 'negative lab app-server tool manifest',
@@ -571,6 +578,66 @@ expectInvalid(
   'high-confidence base fog estimate with confidence warning',
   negativeLabBaseFogEstimateV1Schema,
   invalidHighConfidenceBaseFogWarning,
+);
+
+const invalidOperationWrongStage = {
+  ...sampleNegativeLabConversionOperationV1,
+  operationStage: 'creative_rendering',
+};
+expectInvalid(
+  'conversion operation with wrong stage',
+  negativeLabConversionOperationV1Schema,
+  invalidOperationWrongStage,
+);
+
+const invalidOperationWrongClass = {
+  ...sampleNegativeLabConversionOperationV1,
+  operationClass: 'creative',
+};
+expectInvalid(
+  'conversion operation with wrong class',
+  negativeLabConversionOperationV1Schema,
+  invalidOperationWrongClass,
+);
+
+const invalidMutatingOperationWithoutApplyApproval = {
+  ...sampleNegativeLabConversionOperationV1,
+  changeSet: sampleNegativeLabApplyResultV1.changeSet,
+  mutates: true,
+  resultGraphRevision: sampleNegativeLabApplyResultV1.appliedGraphRevision,
+};
+expectInvalid(
+  'mutating conversion operation without apply approval',
+  negativeLabConversionOperationV1Schema,
+  invalidMutatingOperationWithoutApplyApproval,
+);
+
+const invalidDryRunOperationWithChangeSet = {
+  ...sampleNegativeLabConversionOperationV1,
+  changeSet: sampleNegativeLabApplyResultV1.changeSet,
+};
+expectInvalid(
+  'dry-run conversion operation with change set',
+  negativeLabConversionOperationV1Schema,
+  invalidDryRunOperationWithChangeSet,
+);
+
+const invalidPositiveVariantOperationWithoutOutputs = {
+  ...sampleNegativeLabConversionOperationV1,
+  artifactPurposes: ['editable_positive_variant'],
+  commandType: 'negativeLab.createPositiveVariant',
+  operationClass: 'output',
+  operationStage: 'output_generation',
+  outputArtifacts: [],
+  parameterRefs: {
+    ...sampleNegativeLabConversionOperationV1.parameterRefs,
+    positiveVariantIds: [],
+  },
+};
+expectInvalid(
+  'positive variant operation without output artifact references',
+  negativeLabConversionOperationV1Schema,
+  invalidPositiveVariantOperationWithoutOutputs,
 );
 
 const [sampleBuiltInPreset, secondSampleBuiltInPreset] = sampleNegativeLabBuiltInPresetCatalogV1.presets;
