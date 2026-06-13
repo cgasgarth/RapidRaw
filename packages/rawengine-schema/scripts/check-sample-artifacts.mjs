@@ -6,6 +6,10 @@ import { dirname, join } from 'node:path';
 import { format } from 'prettier';
 
 import {
+  aiAppServerToolManifestV1Schema,
+  aiToolApplyResultV1Schema,
+  aiToolCommandEnvelopeV1Schema,
+  aiToolDryRunResultV1Schema,
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
@@ -53,6 +57,7 @@ import {
   projectLibrarySnapshotQueryV1Schema,
   projectLibrarySnapshotV1Schema,
   queryEnvelopeV1Schema,
+  rawEngineAgentReplayFixtureV1Schema,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
@@ -60,6 +65,14 @@ import {
   toneColorMutationResultV1Schema,
 } from '../src/rawEngineSchemas.ts';
 import {
+  sampleAiAppServerToolManifestV1,
+  sampleAiMaskApplyAppServerToolCallValidationV1,
+  sampleAiMaskDryRunAppServerToolCallValidationV1,
+  sampleAiToolAgentReplayFixtureV1,
+  sampleAiToolApplyCommandEnvelopeV1,
+  sampleAiToolApplyResultV1,
+  sampleAiToolCommandEnvelopeV1,
+  sampleAiToolDryRunResultV1,
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleComputationalMergeCommandEnvelopeV1,
@@ -110,6 +123,7 @@ import {
   sampleProjectLibrarySnapshotQueryV1,
   sampleProjectLibrarySnapshotV1,
   sampleQueryEnvelopeV1,
+  sampleRawEngineAgentReplayFixtureV1,
   sampleRawEngineAppServerToolCallValidationV1,
   sampleToolRegistryV1,
   sampleToneColorCommandEnvelopeV1,
@@ -149,6 +163,60 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/app-server-tool-call-validation-v1.json',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleRawEngineAppServerToolCallValidationV1,
+  },
+  {
+    name: 'agent replay fixture',
+    path: 'packages/rawengine-schema/samples/agent-replay-fixture-v1.json',
+    schema: rawEngineAgentReplayFixtureV1Schema,
+    value: sampleRawEngineAgentReplayFixtureV1,
+  },
+  {
+    name: 'AI tool command envelope',
+    path: 'packages/rawengine-schema/samples/ai-tool-command-envelope-v1.json',
+    schema: aiToolCommandEnvelopeV1Schema,
+    value: sampleAiToolCommandEnvelopeV1,
+  },
+  {
+    name: 'AI tool apply command envelope',
+    path: 'packages/rawengine-schema/samples/ai-tool-apply-command-envelope-v1.json',
+    schema: aiToolCommandEnvelopeV1Schema,
+    value: sampleAiToolApplyCommandEnvelopeV1,
+  },
+  {
+    name: 'AI tool dry-run result',
+    path: 'packages/rawengine-schema/samples/ai-tool-dry-run-result-v1.json',
+    schema: aiToolDryRunResultV1Schema,
+    value: sampleAiToolDryRunResultV1,
+  },
+  {
+    name: 'AI tool apply result',
+    path: 'packages/rawengine-schema/samples/ai-tool-apply-result-v1.json',
+    schema: aiToolApplyResultV1Schema,
+    value: sampleAiToolApplyResultV1,
+  },
+  {
+    name: 'AI tool agent replay fixture',
+    path: 'packages/rawengine-schema/samples/ai-tool-agent-replay-fixture-v1.json',
+    schema: rawEngineAgentReplayFixtureV1Schema,
+    value: sampleAiToolAgentReplayFixtureV1,
+  },
+  {
+    name: 'AI app-server tool manifest',
+    path: 'packages/rawengine-schema/samples/ai-app-server-tool-manifest-v1.json',
+    schema: aiAppServerToolManifestV1Schema,
+    value: sampleAiAppServerToolManifestV1,
+  },
+  {
+    name: 'AI mask dry-run app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/ai-mask-dry-run-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleAiMaskDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'AI mask apply app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/ai-mask-apply-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleAiMaskApplyAppServerToolCallValidationV1,
   },
   {
     name: 'edit graph snapshot query',

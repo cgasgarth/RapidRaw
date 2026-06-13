@@ -5413,11 +5413,166 @@ export const negativeLabApplyResultV1Schema = z
   })
   .strict();
 
+export const aiToolProviderClassV1Schema = z.enum(['local_model', 'self_hosted_connector', 'cloud_service']);
+
+export const aiToolCapabilityV1Schema = z.enum([
+  'subject_mask',
+  'foreground_mask',
+  'sky_mask',
+  'depth_mask',
+  'inpaint',
+  'denoise',
+  'enhance',
+]);
+
+export const aiToolPromptPolicyV1Schema = z.enum(['none', 'operator_prompt', 'system_generated']);
+
+export const aiToolSourcePixelDisclosureV1Schema = z.enum(['local_only', 'may_leave_machine']);
+
+export const aiToolCommandEnvelopeV1Schema = commandEnvelopeV1Schema
+  .extend({
+    commandType: z.enum(['ai.mask.generateSubject', 'ai.mask.applySubject']),
+    parameters: z
+      .object({
+        acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+        acceptedDryRunPlanId: z.string().trim().min(1).optional(),
+        cachePolicy: z.enum(['reuse_allowed', 'force_refresh']),
+        capability: aiToolCapabilityV1Schema,
+        maskName: z.string().trim().min(1),
+        maxPreviewDimensionPx: z.number().int().min(256).max(8192),
+        modelHash: z.string().trim().min(1).optional(),
+        modelId: z.string().trim().min(1),
+        modelVersion: z.string().trim().min(1).optional(),
+        promptPolicy: aiToolPromptPolicyV1Schema,
+        providerClass: aiToolProviderClassV1Schema,
+        providerId: z.string().trim().min(1),
+        sourceContentHash: z.string().trim().min(1),
+        sourcePixelDisclosure: aiToolSourcePixelDisclosureV1Schema,
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((command, context) => {
+    if (
+      command.parameters.providerClass === 'cloud_service' &&
+      command.parameters.sourcePixelDisclosure === 'local_only'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Cloud AI providers must disclose that source pixels may leave the machine.',
+        path: ['parameters', 'sourcePixelDisclosure'],
+      });
+    }
+
+    if (command.dryRun) {
+      if (command.commandType !== 'ai.mask.generateSubject') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI dry-run commands must use ai.mask.generateSubject.',
+          path: ['commandType'],
+        });
+      }
+
+      if (command.approval.approvalClass !== ApprovalClass.ExternalModel) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI dry-run commands require external-model approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      if (command.parameters.acceptedDryRunPlanId !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI dry-run commands must not accept an existing dry-run plan id.',
+          path: ['parameters', 'acceptedDryRunPlanId'],
+        });
+      }
+    } else {
+      if (command.commandType !== 'ai.mask.applySubject') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI apply commands must use ai.mask.applySubject.',
+          path: ['commandType'],
+        });
+      }
+
+      if (command.approval.approvalClass !== ApprovalClass.GenerativeEdit) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI apply commands require generative-edit approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      if (command.approval.state !== 'approved') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI apply commands require approved user approval.',
+          path: ['approval', 'state'],
+        });
+      }
+
+      if (command.parameters.acceptedDryRunPlanId === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI apply commands require an accepted dry-run plan id.',
+          path: ['parameters', 'acceptedDryRunPlanId'],
+        });
+      }
+
+      if (command.parameters.acceptedDryRunPlanHash === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI apply commands require an accepted dry-run plan hash.',
+          path: ['parameters', 'acceptedDryRunPlanHash'],
+        });
+      }
+    }
+  });
+
+export const aiToolDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('ai.mask.generateSubject'),
+    correlationId: z.string().trim().min(1),
+    dryRunPlanHash: z.string().trim().min(1),
+    dryRunPlanId: z.string().trim().min(1),
+    maskArtifacts: z.array(artifactHandleV1Schema).min(1),
+    modelId: z.string().trim().min(1),
+    modelVersion: z.string().trim().min(1).optional(),
+    previewArtifacts: z.array(artifactHandleV1Schema),
+    providerClass: aiToolProviderClassV1Schema,
+    providerId: z.string().trim().min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceContentHash: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const aiToolApplyResultV1Schema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    changedMaskIds: z.array(z.string().trim().min(1)).min(1),
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('ai.mask.applySubject'),
+    correlationId: z.string().trim().min(1),
+    dryRunPlanHash: z.string().trim().min(1),
+    dryRunPlanId: z.string().trim().min(1),
+    outputArtifacts: z.array(artifactHandleV1Schema).min(1),
+    provenanceEntryIds: z.array(z.string().trim().min(1)).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const rawEngineAppServerTransportV1Schema = z.enum(['stdio', 'websocket', 'unix_socket']);
 
 export const rawEngineAppServerProtocolV1Schema = z.literal('codex_app_server_json_rpc');
 
 const rawEngineAppServerKnownInputSchemas = {
+  AiToolCommandEnvelopeV1: aiToolCommandEnvelopeV1Schema,
   CommandEnvelopeV1: commandEnvelopeV1Schema,
   ComputationalMergeCommandEnvelopeV1: computationalMergeCommandEnvelopeV1Schema,
   EditGraphCommandEnvelopeV1: editGraphCommandEnvelopeV1Schema,
@@ -5438,6 +5593,7 @@ export const rawEngineAppServerToolCallV1Schema = z
     arguments: z.unknown(),
     dryRun: z.boolean(),
     inputSchemaName: z.enum([
+      'AiToolCommandEnvelopeV1',
       'CommandEnvelopeV1',
       'ComputationalMergeCommandEnvelopeV1',
       'EditGraphCommandEnvelopeV1',
@@ -5543,6 +5699,193 @@ export const rawEngineAppServerToolCallValidationV1Schema = z
         code: 'custom',
         message: 'Mutating app-server tool calls require approved user approval before execution.',
         path: ['toolCall', 'approval', 'state'],
+      });
+    }
+  });
+
+export const rawEngineAgentReplayStepV1Schema = z
+  .object({
+    approval: approvalRequirementSchema,
+    deterministic: z.boolean(),
+    dryRun: z.boolean(),
+    input: z.unknown(),
+    inputContentHash: z.string().trim().min(1),
+    inputSchemaName: z.string().trim().min(1),
+    mutates: z.boolean(),
+    output: z.unknown(),
+    outputContentHash: z.string().trim().min(1),
+    outputSchemaName: z.string().trim().min(1),
+    prerequisiteStepIds: z.array(z.string().trim().min(1)),
+    resultingGraphRevision: z.string().trim().min(1).optional(),
+    sourceGraphRevision: z.string().trim().min(1).optional(),
+    stepId: z.string().trim().min(1),
+    toolKind: rawEngineToolKindSchema,
+    toolName: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_]*)+$/u),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+  .superRefine((step, context) => {
+    if (step.dryRun && step.mutates) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay dry-run steps must not be marked as mutating.',
+        path: ['mutates'],
+      });
+    }
+
+    if (step.dryRun && step.resultingGraphRevision !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay dry-run steps must not claim a resulting graph revision.',
+        path: ['resultingGraphRevision'],
+      });
+    }
+
+    if (step.mutates && step.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay mutation steps require approved user approval.',
+        path: ['approval', 'state'],
+      });
+    }
+
+    if (step.mutates && step.resultingGraphRevision === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay mutation steps require a resulting graph revision.',
+        path: ['resultingGraphRevision'],
+      });
+    }
+
+    if (
+      step.mutates &&
+      step.sourceGraphRevision !== undefined &&
+      step.resultingGraphRevision === step.sourceGraphRevision
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay mutation steps must advance the graph revision.',
+        path: ['resultingGraphRevision'],
+      });
+    }
+  });
+
+export const rawEngineAgentReplayFixtureV1Schema = z
+  .object({
+    actor: rawEngineActorSchema,
+    deterministicReplayHash: z.string().trim().min(1),
+    finalGraphRevision: z.string().trim().min(1).optional(),
+    initialGraphRevision: z.string().trim().min(1).optional(),
+    registry: rawEngineToolRegistryV1Schema,
+    replayId: z.string().trim().min(1),
+    replayKind: z.enum(['agent_tool_replay']),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    steps: z.array(rawEngineAgentReplayStepV1Schema).min(1),
+    target: rawEngineTargetSchema,
+    validationProfile: z.enum(['schema_contract', 'golden_replay', 'visual_regression']),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+  .superRefine((fixture, context) => {
+    const seenStepIds = new Set<string>();
+    let lastResultingGraphRevision: string | undefined;
+
+    fixture.steps.forEach((step, stepIndex) => {
+      if (seenStepIds.has(step.stepId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Replay step ids must be unique.',
+          path: ['steps', stepIndex, 'stepId'],
+        });
+      }
+
+      for (const prerequisiteStepId of step.prerequisiteStepIds) {
+        if (!seenStepIds.has(prerequisiteStepId)) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay prerequisite steps must reference earlier steps.',
+            path: ['steps', stepIndex, 'prerequisiteStepIds'],
+          });
+        }
+      }
+
+      const toolDefinition = fixture.registry.tools.find((tool) => tool.toolName === step.toolName);
+
+      if (toolDefinition === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Replay steps must reference registered RawEngine tools.',
+          path: ['steps', stepIndex, 'toolName'],
+        });
+      } else {
+        if (toolDefinition.toolKind !== step.toolKind) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay step tool kind must match the registered tool definition.',
+            path: ['steps', stepIndex, 'toolKind'],
+          });
+        }
+
+        if (toolDefinition.inputSchemaName !== step.inputSchemaName) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay step input schema must match the registered tool definition.',
+            path: ['steps', stepIndex, 'inputSchemaName'],
+          });
+        }
+
+        if (toolDefinition.outputSchemaName !== step.outputSchemaName) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay step output schema must match the registered tool definition.',
+            path: ['steps', stepIndex, 'outputSchemaName'],
+          });
+        }
+
+        if (toolDefinition.approvalClass !== step.approval.approvalClass) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay step approval class must match the registered tool definition.',
+            path: ['steps', stepIndex, 'approval', 'approvalClass'],
+          });
+        }
+
+        if (toolDefinition.mutates !== step.mutates) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay step mutation flag must match the registered tool definition.',
+            path: ['steps', stepIndex, 'mutates'],
+          });
+        }
+
+        if (toolDefinition.mutates && toolDefinition.requiresDryRun && step.prerequisiteStepIds.length === 0) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay steps for tools that require dry-run plans must reference a prerequisite dry-run step.',
+            path: ['steps', stepIndex, 'prerequisiteStepIds'],
+          });
+        }
+      }
+
+      if (step.resultingGraphRevision !== undefined) {
+        lastResultingGraphRevision = step.resultingGraphRevision;
+      }
+
+      seenStepIds.add(step.stepId);
+    });
+
+    if (
+      fixture.finalGraphRevision !== undefined &&
+      lastResultingGraphRevision !== undefined &&
+      fixture.finalGraphRevision !== lastResultingGraphRevision
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay final graph revision must match the last mutation step.',
+        path: ['finalGraphRevision'],
       });
     }
   });
@@ -5732,6 +6075,148 @@ export const negativeLabPositiveVariantProvenanceV1Schema = z
   })
   .strict();
 
+export const aiAppServerExecutionModeV1Schema = z.enum(['capability_read', 'dry_run_command', 'apply_dry_run_plan']);
+
+export const aiAppServerAuditEventV1Schema = z.enum([
+  'ai_tool_capability_requested',
+  'ai_tool_capability_completed',
+  'ai_tool_dry_run_requested',
+  'ai_tool_dry_run_completed',
+  'ai_tool_apply_requested',
+  'ai_tool_apply_completed',
+]);
+
+export const aiAppServerToolDefinitionV1Schema = z
+  .object({
+    allowedCapabilities: z.array(aiToolCapabilityV1Schema).min(1),
+    allowedProviderClasses: z.array(aiToolProviderClassV1Schema).min(1),
+    approvalClass: approvalClassSchema,
+    auditEvents: z.array(aiAppServerAuditEventV1Schema).min(1),
+    description: z.string().trim().min(1),
+    executionMode: aiAppServerExecutionModeV1Schema,
+    inputSchemaName: z.string().trim().min(1),
+    localOnly: z.boolean(),
+    mutates: z.boolean(),
+    outputSchemaName: z.string().trim().min(1),
+    recordsProvenance: z.boolean(),
+    requiresDryRunPlan: z.boolean(),
+    returnsArtifactHandles: z.boolean(),
+    toolName: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_]*)+$/u),
+  })
+  .strict()
+  .superRefine((tool, context) => {
+    if (tool.localOnly && tool.allowedProviderClasses.includes('cloud_service')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Local-only AI app-server tools must not allow cloud-service providers.',
+        path: ['allowedProviderClasses'],
+      });
+    }
+
+    if ((tool.mutates || tool.returnsArtifactHandles) && !tool.recordsProvenance) {
+      context.addIssue({
+        code: 'custom',
+        message: 'AI app-server tools that mutate or return artifacts must record provenance.',
+        path: ['recordsProvenance'],
+      });
+    }
+
+    if (tool.executionMode === 'dry_run_command') {
+      if (tool.inputSchemaName !== 'AiToolCommandEnvelopeV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI dry-run app-server tools must accept AiToolCommandEnvelopeV1.',
+          path: ['inputSchemaName'],
+        });
+      }
+
+      if (tool.outputSchemaName !== 'AiToolDryRunResultV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI dry-run app-server tools must return AiToolDryRunResultV1.',
+          path: ['outputSchemaName'],
+        });
+      }
+
+      if (tool.mutates) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI dry-run app-server tools must not mutate project state.',
+          path: ['mutates'],
+        });
+      }
+
+      if (tool.requiresDryRunPlan) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI dry-run app-server tools create dry-run plans and must not require one.',
+          path: ['requiresDryRunPlan'],
+        });
+      }
+
+      if (tool.approvalClass !== ApprovalClass.ExternalModel) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI dry-run app-server tools require external-model approval classification.',
+          path: ['approvalClass'],
+        });
+      }
+    }
+
+    if (tool.executionMode === 'apply_dry_run_plan') {
+      if (tool.inputSchemaName !== 'AiToolCommandEnvelopeV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI apply app-server tools must accept AiToolCommandEnvelopeV1.',
+          path: ['inputSchemaName'],
+        });
+      }
+
+      if (tool.outputSchemaName !== 'AiToolApplyResultV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI apply app-server tools must return AiToolApplyResultV1.',
+          path: ['outputSchemaName'],
+        });
+      }
+
+      if (!tool.mutates) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI apply app-server tools must be marked as mutating.',
+          path: ['mutates'],
+        });
+      }
+
+      if (!tool.requiresDryRunPlan) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI apply app-server tools must require a prior dry-run plan.',
+          path: ['requiresDryRunPlan'],
+        });
+      }
+
+      if (tool.approvalClass !== ApprovalClass.GenerativeEdit) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI apply app-server tools require generative-edit approval classification.',
+          path: ['approvalClass'],
+        });
+      }
+    }
+  });
+
+export const aiAppServerToolManifestV1Schema = z
+  .object({
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    serverRuntime: z.literal('openai_app_server'),
+    tools: z.array(aiAppServerToolDefinitionV1Schema).min(1),
+  })
+  .strict();
+
 export const negativeLabAppServerExecutionModeSchema = z.enum(['dry_run_command', 'apply_dry_run_plan']);
 
 export const negativeLabAppServerAuditEventSchema = z.enum([
@@ -5847,6 +6332,17 @@ export const negativeLabAppServerToolManifestV1Schema = z
   .strict();
 
 export type ActorKind = z.infer<typeof actorKindSchema>;
+export type AiAppServerAuditEventV1 = z.infer<typeof aiAppServerAuditEventV1Schema>;
+export type AiAppServerExecutionModeV1 = z.infer<typeof aiAppServerExecutionModeV1Schema>;
+export type AiAppServerToolDefinitionV1 = z.infer<typeof aiAppServerToolDefinitionV1Schema>;
+export type AiAppServerToolManifestV1 = z.infer<typeof aiAppServerToolManifestV1Schema>;
+export type AiToolApplyResultV1 = z.infer<typeof aiToolApplyResultV1Schema>;
+export type AiToolCapabilityV1 = z.infer<typeof aiToolCapabilityV1Schema>;
+export type AiToolCommandEnvelopeV1 = z.infer<typeof aiToolCommandEnvelopeV1Schema>;
+export type AiToolDryRunResultV1 = z.infer<typeof aiToolDryRunResultV1Schema>;
+export type AiToolPromptPolicyV1 = z.infer<typeof aiToolPromptPolicyV1Schema>;
+export type AiToolProviderClassV1 = z.infer<typeof aiToolProviderClassV1Schema>;
+export type AiToolSourcePixelDisclosureV1 = z.infer<typeof aiToolSourcePixelDisclosureV1Schema>;
 export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
@@ -6069,7 +6565,10 @@ export type ProjectLibrarySnapshotV1 = z.infer<typeof projectLibrarySnapshotV1Sc
 export type ProjectLibrarySortCriteriaV1 = z.infer<typeof projectLibrarySortCriteriaV1Schema>;
 export type QueryEnvelopeV1 = z.infer<typeof queryEnvelopeV1Schema>;
 export type RawEngineActor = z.infer<typeof rawEngineActorSchema>;
+export type RawEngineAgentReplayFixtureV1 = z.infer<typeof rawEngineAgentReplayFixtureV1Schema>;
+export type RawEngineAgentReplayStepV1 = z.infer<typeof rawEngineAgentReplayStepV1Schema>;
 export type RawEngineTarget = z.infer<typeof rawEngineTargetSchema>;
+export type RawEngineToolKind = z.infer<typeof rawEngineToolKindSchema>;
 export type RawEngineToolDefinitionV1 = z.infer<typeof rawEngineToolDefinitionV1Schema>;
 export type RawEngineToolRegistryV1 = z.infer<typeof rawEngineToolRegistryV1Schema>;
 export type ToneColorChannelV1 = z.infer<typeof toneColorChannelV1Schema>;

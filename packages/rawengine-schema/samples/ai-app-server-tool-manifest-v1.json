@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "serverRuntime": "openai_app_server",
+  "tools": [
+    {
+      "allowedCapabilities": ["subject_mask", "foreground_mask", "sky_mask"],
+      "allowedProviderClasses": ["local_model", "self_hosted_connector"],
+      "approvalClass": "external_model",
+      "auditEvents": ["ai_tool_dry_run_requested", "ai_tool_dry_run_completed"],
+      "description": "Generate a non-mutating AI mask preview and dry-run plan from local or self-hosted providers.",
+      "executionMode": "dry_run_command",
+      "inputSchemaName": "AiToolCommandEnvelopeV1",
+      "localOnly": true,
+      "mutates": false,
+      "outputSchemaName": "AiToolDryRunResultV1",
+      "recordsProvenance": true,
+      "requiresDryRunPlan": false,
+      "returnsArtifactHandles": true,
+      "toolName": "ai.mask.dry_run_subject"
+    },
+    {
+      "allowedCapabilities": ["subject_mask", "foreground_mask", "sky_mask"],
+      "allowedProviderClasses": ["local_model", "self_hosted_connector"],
+      "approvalClass": "generative_edit",
+      "auditEvents": ["ai_tool_apply_requested", "ai_tool_apply_completed"],
+      "description": "Apply an accepted AI mask dry-run plan into the non-destructive edit graph.",
+      "executionMode": "apply_dry_run_plan",
+      "inputSchemaName": "AiToolCommandEnvelopeV1",
+      "localOnly": true,
+      "mutates": true,
+      "outputSchemaName": "AiToolApplyResultV1",
+      "recordsProvenance": true,
+      "requiresDryRunPlan": true,
+      "returnsArtifactHandles": true,
+      "toolName": "ai.mask.apply_subject"
+    }
+  ]
+}

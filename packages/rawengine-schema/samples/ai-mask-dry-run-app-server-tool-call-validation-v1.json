@@ -187,9 +187,9 @@
   "schemaVersion": 1,
   "toolCall": {
     "approval": {
-      "approvalClass": "preview_only",
-      "reason": "Tone preview returns a non-mutating render plan before any edit is applied.",
-      "state": "not_required"
+      "approvalClass": "external_model",
+      "reason": "Local subject-mask model reads pixels and returns a non-mutating dry-run mask artifact.",
+      "state": "approved"
     },
     "arguments": {
       "actor": {
@@ -198,18 +198,28 @@
         "sessionId": "session_sample"
       },
       "approval": {
-        "approvalClass": "preview_only",
-        "reason": "Tone dry-run does not persist sidecars or exported files.",
-        "state": "not_required"
+        "approvalClass": "external_model",
+        "reason": "Local subject-mask model reads pixels and returns a non-mutating dry-run mask artifact.",
+        "state": "approved"
       },
-      "commandId": "command_tone_dry_run_sample",
-      "commandType": "edit.tone.dryRun",
-      "correlationId": "corr_tone_dry_run_sample",
+      "commandId": "command_ai_subject_mask_dry_run_sample",
+      "commandType": "ai.mask.generateSubject",
+      "correlationId": "corr_ai_subject_mask_sample",
       "dryRun": true,
-      "expectedGraphRevision": "graph_rev_42",
+      "expectedGraphRevision": "graph_rev_44",
       "parameters": {
-        "exposureEv": 0.25,
-        "highlights": -12
+        "cachePolicy": "reuse_allowed",
+        "capability": "subject_mask",
+        "maskName": "Subject mask",
+        "maxPreviewDimensionPx": 2048,
+        "modelHash": "sha256:local-sam2-subject-mask-model",
+        "modelId": "local_sam2_subject_mask",
+        "modelVersion": "2026.06",
+        "promptPolicy": "none",
+        "providerClass": "local_model",
+        "providerId": "rawengine-local-ai",
+        "sourceContentHash": "sha256:sample-raw-source-hash",
+        "sourcePixelDisclosure": "local_only"
       },
       "schemaVersion": 1,
       "target": {
@@ -219,15 +229,15 @@
       }
     },
     "dryRun": true,
-    "inputSchemaName": "CommandEnvelopeV1",
-    "itemId": "item_tool_call_tone_preview",
-    "jsonRpcRequestId": 42,
+    "inputSchemaName": "AiToolCommandEnvelopeV1",
+    "itemId": "item_tool_call_ai_subject_mask_dry_run",
+    "jsonRpcRequestId": "jsonrpc_ai_subject_mask_dry_run",
     "protocol": "codex_app_server_json_rpc",
     "schemaVersion": 1,
-    "threadId": "thread_rawengine_agent_sample",
+    "threadId": "thread_rawengine_agent_ai_mask_sample",
     "toolKind": "dry_run",
-    "toolName": "edit.dry_run_tone",
+    "toolName": "ai.mask.dry_run_subject",
     "transport": "stdio",
-    "turnId": "turn_rawengine_agent_sample"
+    "turnId": "turn_rawengine_agent_ai_mask_sample"
   }
 }

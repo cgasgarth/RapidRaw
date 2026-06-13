@@ -1,0 +1,137 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_agent_tone_color_demo"
+  },
+  "appServer": {
+    "protocol": "codex_app_server_json_rpc",
+    "threadId": "thread_rawengine_agent_demo",
+    "transport": "stdio",
+    "turnId": "turn_tone_color_demo"
+  },
+  "auditLogId": "audit_agent_tone_color_demo_001",
+  "completedAt": "2026-06-13T17:45:20.000Z",
+  "entries": [
+    {
+      "approvalClass": "safe_read",
+      "approvalState": "not_required",
+      "artifactHandles": [],
+      "commandId": null,
+      "correlationId": "corr_tone_color_demo",
+      "durationMs": 18,
+      "entryId": "entry_001_read_graph",
+      "inputHash": "sha256:sample-read-graph-input",
+      "inputSchemaName": "EditGraphSnapshotQueryV1",
+      "mutates": false,
+      "occurredAt": "2026-06-13T17:45:01.000Z",
+      "outputHash": "sha256:sample-read-graph-output",
+      "outputSchemaName": "EditGraphSnapshotV1",
+      "phase": "read",
+      "resultingGraphRevision": null,
+      "sourceGraphRevision": "graph_rev_44",
+      "status": "succeeded",
+      "toolKind": "read",
+      "toolName": "editgraph.snapshot",
+      "warnings": []
+    },
+    {
+      "approvalClass": "preview_only",
+      "approvalState": "not_required",
+      "artifactHandles": [
+        {
+          "artifactId": "artifact_tone_color_basic_preview",
+          "contentHash": "sha256:sample-tone-color-preview",
+          "kind": "preview",
+          "storage": "temp_cache"
+        }
+      ],
+      "commandId": "command_tone_color_basic_preview_sample",
+      "correlationId": "corr_tone_color_demo",
+      "durationMs": 126,
+      "entryId": "entry_002_dry_run",
+      "inputHash": "sha256:sample-tone-color-dry-run-input",
+      "inputSchemaName": "ToneColorCommandEnvelopeV1",
+      "mutates": false,
+      "occurredAt": "2026-06-13T17:45:05.000Z",
+      "outputHash": "sha256:sample-tone-color-dry-run-output",
+      "outputSchemaName": "ToneColorDryRunResultV1",
+      "phase": "dry_run",
+      "resultingGraphRevision": null,
+      "sourceGraphRevision": "graph_rev_44",
+      "status": "succeeded",
+      "toolKind": "dry_run",
+      "toolName": "tonecolor.dry_run_command",
+      "warnings": []
+    },
+    {
+      "approvalClass": "edit_apply",
+      "approvalState": "approved",
+      "artifactHandles": [],
+      "commandId": "command_tone_color_basic_apply_sample",
+      "correlationId": "corr_tone_color_demo",
+      "durationMs": 42,
+      "entryId": "entry_003_apply",
+      "inputHash": "sha256:sample-tone-color-apply-input",
+      "inputSchemaName": "ToneColorCommandEnvelopeV1",
+      "mutates": true,
+      "occurredAt": "2026-06-13T17:45:16.000Z",
+      "outputHash": "sha256:sample-tone-color-apply-output",
+      "outputSchemaName": "ToneColorMutationResultV1",
+      "phase": "apply",
+      "resultingGraphRevision": "graph_rev_46",
+      "sourceGraphRevision": "graph_rev_44",
+      "status": "succeeded",
+      "toolKind": "apply",
+      "toolName": "tonecolor.apply_command",
+      "warnings": []
+    },
+    {
+      "approvalClass": "safe_read",
+      "approvalState": "not_required",
+      "artifactHandles": [
+        {
+          "artifactId": "replay_agent_tone_color_basic_001",
+          "contentHash": "sha256:sample-agent-tone-color-replay",
+          "kind": "replay",
+          "storage": "fixture_artifact"
+        }
+      ],
+      "commandId": null,
+      "correlationId": "corr_tone_color_demo",
+      "durationMs": 9,
+      "entryId": "entry_004_replay",
+      "inputHash": "sha256:sample-replay-validation-input",
+      "inputSchemaName": "RawEngineAgentReplayFixtureV1",
+      "mutates": false,
+      "occurredAt": "2026-06-13T17:45:19.000Z",
+      "outputHash": "sha256:sample-replay-validation-output",
+      "outputSchemaName": "RawEngineAgentReplayValidationResultV1",
+      "phase": "replay",
+      "resultingGraphRevision": "graph_rev_46",
+      "sourceGraphRevision": "graph_rev_44",
+      "status": "succeeded",
+      "toolKind": "read",
+      "toolName": "agent.replay_validate",
+      "warnings": []
+    }
+  ],
+  "redactions": {
+    "applied": false,
+    "fields": [],
+    "notes": []
+  },
+  "replay": {
+    "contentHash": "sha256:sample-agent-tone-color-replay",
+    "path": "packages/rawengine-schema/samples/agent-replay-fixture-v1.json",
+    "replayId": "replay_agent_tone_color_basic_001"
+  },
+  "schemaVersion": 1,
+  "sessionId": "session_agent_tone_color_demo",
+  "startedAt": "2026-06-13T17:45:00.000Z",
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image",
+    "virtualCopyId": null
+  }
+}

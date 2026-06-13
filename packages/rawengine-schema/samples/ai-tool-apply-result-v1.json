@@ -1,0 +1,25 @@
+{
+  "appliedGraphRevision": "graph_rev_47",
+  "changedMaskIds": ["mask_ai_subject_001"],
+  "commandId": "command_ai_subject_mask_apply_sample",
+  "commandType": "ai.mask.applySubject",
+  "correlationId": "corr_ai_subject_mask_sample",
+  "dryRunPlanHash": "sha256:sample-ai-subject-mask-plan",
+  "dryRunPlanId": "dryrun_ai_subject_mask_001",
+  "outputArtifacts": [
+    {
+      "artifactId": "artifact_ai_subject_mask_sidecar",
+      "contentHash": "sha256:sample-ai-subject-mask-sidecar",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "mask",
+      "storage": "sidecar_artifact"
+    }
+  ],
+  "provenanceEntryIds": ["prov_ai_subject_mask_001"],
+  "schemaVersion": 1,
+  "sourceGraphRevision": "graph_rev_44",
+  "warnings": []
+}
