@@ -1,4 +1,5 @@
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type MouseEvent as ReactMouseEvent,
   useState,
@@ -147,7 +148,7 @@ interface DraggableGridItemProps {
   activeMaskContainerId: string | null;
   isDraggable: boolean;
   maskType: MaskType;
-  onClick: (event: ReactMouseEvent<HTMLElement>) => void;
+  onClick: (event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>) => void;
   onRightClick: (event: ReactMouseEvent<HTMLElement>) => void;
 }
 
@@ -575,8 +576,9 @@ function DepthRangePicker({
 
   return (
     <div className="space-y-2">
-      <div
-        className="grid w-fit cursor-pointer"
+      <button
+        type="button"
+        className="grid w-fit cursor-pointer bg-transparent p-0 text-left"
         onClick={handleReset}
         onMouseEnter={() => {
           setIsLabelHovered(true);
@@ -603,7 +605,7 @@ function DepthRangePicker({
         >
           {t('editor.masks.depthRange.reset')}
         </Text>
-      </div>
+      </button>
       <div ref={trackRef} className="relative rounded-md overflow-hidden mt-2 select-none" style={{ height: 44 }}>
         {isDragging && (
           <div
@@ -1062,7 +1064,7 @@ export default function MasksPanel() {
     handleGridClick(type, true);
   };
 
-  const handleAddOthersMask = (event: ReactMouseEvent<HTMLElement>) => {
+  const handleAddOthersMask = (event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>) => {
     event.stopPropagation();
     const rect = event.currentTarget.getBoundingClientRect();
     const options = OTHERS_MASK_TYPES.map((maskType) => ({
@@ -1078,7 +1080,10 @@ export default function MasksPanel() {
     showContextMenu(rect.left, rect.bottom + 5, options);
   };
 
-  const handleAddMaskContextMenu = (event: ReactMouseEvent<HTMLElement>, targetContainerId?: string | null) => {
+  const handleAddMaskContextMenu = (
+    event: ReactMouseEvent | ReactKeyboardEvent<HTMLElement>,
+    targetContainerId?: string | null,
+  ) => {
     event.preventDefault();
     event.stopPropagation();
     const rect = event.currentTarget.getBoundingClientRect();
@@ -1574,6 +1579,7 @@ export default function MasksPanel() {
                 </Text>
                 <div
                   className="grid grid-cols-3 gap-2"
+                  role="presentation"
                   onClick={(e) => {
                     e.stopPropagation();
                   }}
@@ -1582,7 +1588,7 @@ export default function MasksPanel() {
                     <DraggableGridItem
                       key={maskType.type}
                       maskType={maskType}
-                      onClick={(e: ReactMouseEvent<HTMLElement>) => {
+                      onClick={(e) => {
                         if (maskType.id === 'others') {
                           handleAddOthersMask(e);
                         } else {
@@ -1683,6 +1689,13 @@ export default function MasksPanel() {
                   onClick={(e) => {
                     handleAddMaskContextMenu(e, null);
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    handleAddMaskContextMenu(e, null);
+                  }}
+                  role="button"
+                  tabIndex={0}
                 >
                   <div className="p-0.5">
                     <Plus size={18} />
@@ -1693,7 +1706,7 @@ export default function MasksPanel() {
             )}
           </AnimatePresence>
 
-          <div className="h-4 shrink-0 w-full" onClick={handleDeselect} />
+          <div className="h-4 shrink-0 w-full" role="presentation" onClick={handleDeselect} />
 
           <AnimatePresence>
             {isSettingsPanelEverOpened && (
@@ -1836,6 +1849,11 @@ function DraggableGridItem({
       : activeMaskContainerId
         ? t('editor.masks.tooltips.addToCurrent', { name: getMaskTypeName(maskType) })
         : t('editor.masks.tooltips.createNew', { name: getMaskTypeName(maskType) });
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onClick(event);
+  };
 
   return (
     <motion.div
@@ -1843,6 +1861,9 @@ function DraggableGridItem({
       {...listeners}
       {...attributes}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -2047,6 +2068,11 @@ function ContainerRow({
       borderClass = 'bg-card-active border border-accent/50';
     }
   }
+  const handleContainerKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onSelect();
+  };
 
   return (
     <motion.div
@@ -2067,19 +2093,23 @@ function ContainerRow({
           e.stopPropagation();
           onSelect();
         }}
+        onKeyDown={handleContainerKeyDown}
         onContextMenu={onContextMenu}
+        role="button"
+        tabIndex={0}
       >
-        <Text
-          as="div"
-          color={hasActiveChild || isExpanded ? TextColors.primary : TextColors.secondary}
+        <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
           }}
-          className="p-0.5 rounded transition-colors cursor-pointer"
+          className={`p-0.5 rounded transition-colors cursor-pointer bg-transparent ${
+            TEXT_COLOR_KEYS[hasActiveChild || isExpanded ? TextColors.primary : TextColors.secondary]
+          }`}
         >
           {isExpanded ? <FolderOpen size={18} /> : <FolderIcon size={18} />}
-        </Text>
+        </button>
         <div
           className="flex-1 min-w-0 cursor-pointer"
           onDoubleClick={(e) => {
@@ -2746,6 +2776,7 @@ function SettingsPanel({
   return (
     <div
       className={`space-y-2 transition-opacity duration-300 ${!isActive ? 'opacity-50 pointer-events-none' : ''}`}
+      role="presentation"
       onClick={(e) => {
         e.stopPropagation();
       }}
