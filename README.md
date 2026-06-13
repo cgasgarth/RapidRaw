@@ -512,7 +512,7 @@ You have two options to run RapidRAW:
 
 **2. Build from Source**
 
-If you want to build the project yourself, you'll need to have [Rust](https://www.rust-lang.org/tools/install) and [Node.js](https://nodejs.org/) installed.
+If you want to build the project yourself, you'll need to have [Rust](https://www.rust-lang.org/tools/install) and [Bun](https://bun.sh/docs/installation) installed.
 
 ```bash
 # 1. Clone the repository
@@ -520,10 +520,10 @@ git clone https://github.com/CyberTimon/RapidRAW.git
 cd RapidRAW
 
 # 2. Install frontend dependencies
-npm install
+bun install --frozen-lockfile
 
 # 3. Build and run the application
-npm start
+bun run start
 ```
 
 ## System Requirements
