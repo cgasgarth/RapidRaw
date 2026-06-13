@@ -7,6 +7,7 @@ import {
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
   negativeLabApplyResultV1Schema,
+  negativeLabBuiltInPresetCatalogV1Schema,
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
@@ -25,6 +26,7 @@ import {
   sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabApplyPlanRequestV1,
   sampleNegativeLabApplyResultV1,
+  sampleNegativeLabBuiltInPresetCatalogV1,
   sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeLabDensityNormalizationProfileV1,
   sampleNegativeLabDryRunResultV1,
@@ -122,7 +124,19 @@ const validSamples: ReadonlyArray<{
     schema: negativeLabPositiveVariantProvenanceV1Schema,
     value: sampleNegativeLabPositiveVariantProvenanceV1,
   },
+  {
+    name: 'negative lab built-in preset catalog',
+    schema: negativeLabBuiltInPresetCatalogV1Schema,
+    value: sampleNegativeLabBuiltInPresetCatalogV1,
+  },
 ];
+
+const expectInvalid = (name: string, schema: z.ZodType, value: unknown) => {
+  const parsed = schema.safeParse(value);
+  if (parsed.success) {
+    throw new Error(`Expected ${name} to be rejected.`);
+  }
+};
 
 for (const sample of validSamples) {
   const parsed = sample.schema.safeParse(sample.value);
@@ -301,5 +315,164 @@ const invalidFrameDetectionUnknownSourceResult = negativeLabFrameDetectionResult
 if (invalidFrameDetectionUnknownSourceResult.success) {
   throw new Error('Expected frame detection results to reject frames from unlisted source files.');
 }
+
+const [sampleBuiltInPreset, secondSampleBuiltInPreset] = sampleNegativeLabBuiltInPresetCatalogV1.presets;
+if (sampleBuiltInPreset === undefined || secondSampleBuiltInPreset === undefined) {
+  throw new Error('Expected built-in preset catalog sample to include at least two presets.');
+}
+
+const invalidGenericPresetManufacturerClaim = {
+  ...sampleNegativeLabBuiltInPresetCatalogV1,
+  presets: [
+    {
+      ...sampleBuiltInPreset,
+      displayName: 'Kodak Portra 400',
+    },
+    ...sampleNegativeLabBuiltInPresetCatalogV1.presets.slice(1),
+  ],
+};
+expectInvalid(
+  'generic built-in preset catalog with manufacturer or stock claims',
+  negativeLabBuiltInPresetCatalogV1Schema,
+  invalidGenericPresetManufacturerClaim,
+);
+
+const invalidGenericPresetUppercaseId = {
+  ...sampleNegativeLabBuiltInPresetCatalogV1,
+  presets: [
+    {
+      ...sampleBuiltInPreset,
+      presetId: 'negative_lab.generic.C41.neutral.v1',
+    },
+    ...sampleNegativeLabBuiltInPresetCatalogV1.presets.slice(1),
+  ],
+};
+expectInvalid(
+  'generic built-in preset catalog with uppercase preset IDs',
+  negativeLabBuiltInPresetCatalogV1Schema,
+  invalidGenericPresetUppercaseId,
+);
+
+const invalidGenericPresetDuplicateIds = {
+  ...sampleNegativeLabBuiltInPresetCatalogV1,
+  presets: [
+    sampleBuiltInPreset,
+    {
+      ...secondSampleBuiltInPreset,
+      presetId: sampleBuiltInPreset.presetId,
+    },
+    ...sampleNegativeLabBuiltInPresetCatalogV1.presets.slice(2),
+  ],
+};
+expectInvalid(
+  'generic built-in preset catalog with duplicate preset IDs',
+  negativeLabBuiltInPresetCatalogV1Schema,
+  invalidGenericPresetDuplicateIds,
+);
+
+const invalidGenericPresetDuplicateDisplayNames = {
+  ...sampleNegativeLabBuiltInPresetCatalogV1,
+  presets: [
+    sampleBuiltInPreset,
+    {
+      ...secondSampleBuiltInPreset,
+      displayName: sampleBuiltInPreset.displayName.toLocaleUpperCase('en-US'),
+    },
+    ...sampleNegativeLabBuiltInPresetCatalogV1.presets.slice(2),
+  ],
+};
+expectInvalid(
+  'generic built-in preset catalog with duplicate display names',
+  negativeLabBuiltInPresetCatalogV1Schema,
+  invalidGenericPresetDuplicateDisplayNames,
+);
+
+const invalidGenericPresetExactNameApproval = {
+  ...sampleNegativeLabBuiltInPresetCatalogV1,
+  presets: [
+    {
+      ...sampleBuiltInPreset,
+      legalNamingStatus: 'approved_exact_stock_name',
+    },
+    ...sampleNegativeLabBuiltInPresetCatalogV1.presets.slice(1),
+  ],
+};
+expectInvalid(
+  'generic built-in preset catalog with exact-stock naming status',
+  negativeLabBuiltInPresetCatalogV1Schema,
+  invalidGenericPresetExactNameApproval,
+);
+
+const invalidGenericPresetMeasuredProvenance = {
+  ...sampleNegativeLabBuiltInPresetCatalogV1,
+  presets: [
+    {
+      ...sampleBuiltInPreset,
+      provenance: {
+        ...sampleBuiltInPreset.provenance,
+        measurementSource: 'project_owned_measurement',
+      },
+    },
+    ...sampleNegativeLabBuiltInPresetCatalogV1.presets.slice(1),
+  ],
+};
+expectInvalid(
+  'generic built-in preset catalog with measured provenance',
+  negativeLabBuiltInPresetCatalogV1Schema,
+  invalidGenericPresetMeasuredProvenance,
+);
+
+const invalidGenericPresetProfileMismatch = {
+  ...sampleNegativeLabBuiltInPresetCatalogV1,
+  presets: [
+    {
+      ...sampleBuiltInPreset,
+      processProfileId: 'generic_bw_silver_v1',
+      processProfileVersion: '2026-06-13',
+    },
+    ...sampleNegativeLabBuiltInPresetCatalogV1.presets.slice(1),
+  ],
+};
+expectInvalid(
+  'generic built-in preset catalog with film class and process profile mismatches',
+  negativeLabBuiltInPresetCatalogV1Schema,
+  invalidGenericPresetProfileMismatch,
+);
+
+const invalidGenericPresetCreativeRendering = {
+  ...sampleNegativeLabBuiltInPresetCatalogV1,
+  presets: [
+    {
+      ...sampleBuiltInPreset,
+      touchedParameters: {
+        ...sampleBuiltInPreset.touchedParameters,
+        creativeRendering: ['contrast_s_curve_v1'],
+      },
+    },
+    ...sampleNegativeLabBuiltInPresetCatalogV1.presets.slice(1),
+  ],
+};
+expectInvalid(
+  'generic built-in preset catalog with creative rendering defaults',
+  negativeLabBuiltInPresetCatalogV1Schema,
+  invalidGenericPresetCreativeRendering,
+);
+
+const invalidGenericPresetLabJpegWithoutWarnings = {
+  ...sampleNegativeLabBuiltInPresetCatalogV1,
+  presets: [
+    {
+      ...sampleBuiltInPreset,
+      intendedInputModes: ['camera_raw', 'lab_jpeg'],
+      requiredWarningCodes: [],
+    },
+    ...sampleNegativeLabBuiltInPresetCatalogV1.presets.slice(1),
+  ],
+};
+expectInvalid(
+  'generic built-in preset catalog that allows lab JPEG without required warnings',
+  negativeLabBuiltInPresetCatalogV1Schema,
+  invalidGenericPresetLabJpegWithoutWarnings,
+);
 
 console.log(`Validated ${validSamples.length} RawEngine schema samples.`);

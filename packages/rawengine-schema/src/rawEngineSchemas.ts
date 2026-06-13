@@ -648,6 +648,237 @@ export const negativeLabProcessProfileV1Schema = z
     }
   });
 
+const negativeLabGenericPresetIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*\.v[0-9]+$/u);
+
+const negativeLabPresetHumanTextSchema = z.string().trim().min(1).max(280);
+
+const unsafeGenericPresetClaimPattern =
+  /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|identical|ilford|kodak|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;
+
+export const negativeLabBuiltInPresetTierSchema = z.enum([
+  'generic_builtin',
+  'stock_family_reference',
+  'measured_project_profile',
+  'user_profile',
+]);
+
+export const negativeLabBuiltInPresetFilmClassSchema = z.enum(['color_negative', 'black_and_white_silver']);
+
+export const negativeLabPresetProfileRefV1Schema = z
+  .object({
+    colorMode: z.enum(['color_negative_rgb', 'black_and_white_luminance']),
+    normalizationProfileId: z.string().trim().min(1),
+    normalizationProfileVersion: z.string().trim().min(1),
+    processFamily: negativeLabSupportedProcessFamilyV1Schema,
+    processProfileId: z.string().trim().min(1),
+    processProfileVersion: z.string().trim().min(1),
+  })
+  .strict();
+
+export const negativeLabBuiltInPresetV1Schema = z
+  .object({
+    claimLevel: z.enum(['generic_starting_point_only', 'reference_metadata_only', 'measured_profile']),
+    deprecatedBy: negativeLabGenericPresetIdSchema.optional(),
+    description: negativeLabPresetHumanTextSchema,
+    displayName: negativeLabPresetHumanTextSchema,
+    filmClass: negativeLabBuiltInPresetFilmClassSchema,
+    intendedInputModes: z.array(negativeInputModeSchema).min(1),
+    intent: z.enum(['neutral', 'portrait', 'high_speed', 'saturated', 'classic_bw', 'fine_grain_bw', 'ortho_bw']),
+    legalNamingStatus: negativeLabLegalNamingStatusSchema,
+    legalReviewStatus: z.enum(['not_required_generic', 'required_before_exact_name', 'approved']),
+    normalizationProfileId: z.string().trim().min(1),
+    normalizationProfileVersion: z.string().trim().min(1),
+    presetId: negativeLabGenericPresetIdSchema,
+    presetTier: negativeLabBuiltInPresetTierSchema,
+    presetVersion: z.string().trim().min(1),
+    processFamily: negativeLabSupportedProcessFamilyV1Schema,
+    processProfileId: z.string().trim().min(1),
+    processProfileVersion: z.string().trim().min(1),
+    provenance: z
+      .object({
+        claimsPolicy: z.literal('generic_starting_point_only'),
+        fixtureIds: z.array(z.string().trim().min(1)),
+        legalNote: negativeLabPresetHumanTextSchema,
+        measurementSource: negativeLabProfileMeasurementSourceSchema,
+        sourceProfileIds: z.array(z.string().trim().min(1)),
+      })
+      .strict(),
+    requiredWarningCodes: z.array(negativeWarningCodeSchema),
+    scanAssumptions: z.array(negativeLabPresetHumanTextSchema).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    touchedParameters: z
+      .object({
+        creativeRendering: z.array(z.string().trim().min(1)),
+        objectiveInversion: z.array(z.string().trim().min(1)),
+        semiObjectiveNormalization: z.array(z.string().trim().min(1)),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((preset, context) => {
+    const humanFacingText = [
+      preset.displayName,
+      preset.description,
+      preset.intent,
+      preset.provenance.legalNote,
+      ...preset.scanAssumptions,
+    ].join(' ');
+
+    if (unsafeGenericPresetClaimPattern.test(humanFacingText)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generic built-in presets must not use manufacturer, stock, competitor, or exact-emulation claims.',
+        path: ['displayName'],
+      });
+    }
+
+    if (unsafeGenericPresetClaimPattern.test(preset.presetId)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generic built-in preset IDs must not contain manufacturer or stock identifiers.',
+        path: ['presetId'],
+      });
+    }
+
+    if (preset.presetTier === 'generic_builtin' && preset.legalNamingStatus !== 'generic_safe_name') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generic built-in presets must use generic-safe naming status.',
+        path: ['legalNamingStatus'],
+      });
+    }
+
+    if (
+      preset.presetTier === 'generic_builtin' &&
+      preset.provenance.measurementSource !== 'generic_engineered_starting_point'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generic built-in presets must use generic engineered provenance, not measured-profile provenance.',
+        path: ['provenance', 'measurementSource'],
+      });
+    }
+
+    if (preset.touchedParameters.creativeRendering.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generic built-in presets must not declare creative rendering defaults before that schema exists.',
+        path: ['touchedParameters', 'creativeRendering'],
+      });
+    }
+
+    if (preset.intendedInputModes.includes('lab_jpeg')) {
+      const requiredLabJpegWarnings = ['lossy_input', 'low_acquisition_confidence'] as const;
+      for (const warningCode of requiredLabJpegWarnings) {
+        if (!preset.requiredWarningCodes.includes(warningCode)) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Generic presets that allow lab JPEG input must require lossy-input and confidence warnings.',
+            path: ['requiredWarningCodes'],
+          });
+        }
+      }
+
+      const labJpegAssumptionText = preset.scanAssumptions.join(' ');
+      if (!/\breview\b/iu.test(labJpegAssumptionText)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Generic presets that allow lab JPEG input must tell callers to review the rendered source.',
+          path: ['scanAssumptions'],
+        });
+      }
+    }
+  });
+
+export const negativeLabBuiltInPresetCatalogV1Schema = z
+  .object({
+    catalogId: negativeLabGenericPresetIdSchema,
+    catalogVersion: z.string().trim().min(1),
+    presets: z.array(negativeLabBuiltInPresetV1Schema).min(1),
+    processProfileRefs: z.array(negativeLabPresetProfileRefV1Schema).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  })
+  .strict()
+  .superRefine((catalog, context) => {
+    const presetIds = new Set<string>();
+    const displayNames = new Set<string>();
+    const profileRefs = new Map<string, z.infer<typeof negativeLabPresetProfileRefV1Schema>>();
+
+    for (const profileRef of catalog.processProfileRefs) {
+      profileRefs.set(`${profileRef.processProfileId}@${profileRef.processProfileVersion}`, profileRef);
+    }
+
+    for (const [index, preset] of catalog.presets.entries()) {
+      const displayNameKey = preset.displayName.toLocaleLowerCase('en-US');
+
+      if (presetIds.has(preset.presetId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Built-in preset catalog must not contain duplicate preset IDs.',
+          path: ['presets', index, 'presetId'],
+        });
+      }
+      presetIds.add(preset.presetId);
+
+      if (displayNames.has(displayNameKey)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Built-in preset catalog must not contain duplicate display names.',
+          path: ['presets', index, 'displayName'],
+        });
+      }
+      displayNames.add(displayNameKey);
+
+      const profileRef = profileRefs.get(`${preset.processProfileId}@${preset.processProfileVersion}`);
+      if (profileRef === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Built-in presets must reference a known process profile in the catalog.',
+          path: ['presets', index, 'processProfileId'],
+        });
+        continue;
+      }
+
+      if (profileRef.processFamily !== preset.processFamily) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Built-in preset process family must match the referenced process profile.',
+          path: ['presets', index, 'processFamily'],
+        });
+      }
+
+      if (
+        profileRef.normalizationProfileId !== preset.normalizationProfileId ||
+        profileRef.normalizationProfileVersion !== preset.normalizationProfileVersion
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Built-in preset normalization profile must match the referenced process profile defaults.',
+          path: ['presets', index, 'normalizationProfileId'],
+        });
+      }
+
+      if (preset.filmClass === 'black_and_white_silver' && profileRef.colorMode !== 'black_and_white_luminance') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Black-and-white silver presets must reference luminance process profiles.',
+          path: ['presets', index, 'filmClass'],
+        });
+      }
+
+      if (preset.filmClass === 'color_negative' && profileRef.colorMode !== 'color_negative_rgb') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Color negative presets must reference RGB color process profiles.',
+          path: ['presets', index, 'filmClass'],
+        });
+      }
+    }
+  });
+
 const normalizedScoreSchema = z.number().min(0).max(1);
 
 export const negativeAcquisitionProfileV1Schema = z
@@ -1367,6 +1598,10 @@ export type NegativeLabAppServerToolManifestV1 = z.infer<typeof negativeLabAppSe
 export type NegativeLabApplyResultV1 = z.infer<typeof negativeLabApplyResultV1Schema>;
 export type NegativeLabApplyPlanRequestV1 = z.infer<typeof negativeLabApplyPlanRequestV1Schema>;
 export type NegativeLabBaseSampleRegionV1 = z.infer<typeof negativeLabBaseSampleRegionV1Schema>;
+export type NegativeLabBuiltInPresetCatalogV1 = z.infer<typeof negativeLabBuiltInPresetCatalogV1Schema>;
+export type NegativeLabBuiltInPresetFilmClass = z.infer<typeof negativeLabBuiltInPresetFilmClassSchema>;
+export type NegativeLabBuiltInPresetTier = z.infer<typeof negativeLabBuiltInPresetTierSchema>;
+export type NegativeLabBuiltInPresetV1 = z.infer<typeof negativeLabBuiltInPresetV1Schema>;
 export type NegativeLabChangeSetV1 = z.infer<typeof negativeLabChangeSetV1Schema>;
 export type NegativeLabCommandEnvelopeV1 = z.infer<typeof negativeLabCommandEnvelopeV1Schema>;
 export type NegativeLabCommandType = z.infer<typeof negativeLabCommandTypeSchema>;
@@ -1393,6 +1628,7 @@ export type NegativeLabPlanRollNormalizationParametersV1 = z.infer<
   typeof negativeLabPlanRollNormalizationParametersV1Schema
 >;
 export type NegativeLabPositiveVariantProvenanceV1 = z.infer<typeof negativeLabPositiveVariantProvenanceV1Schema>;
+export type NegativeLabPresetProfileRefV1 = z.infer<typeof negativeLabPresetProfileRefV1Schema>;
 export type NegativeLabProcessProfileClass = z.infer<typeof negativeLabProcessProfileClassSchema>;
 export type NegativeLabProcessProfileV1 = z.infer<typeof negativeLabProcessProfileV1Schema>;
 export type NegativeLabProfileMeasurementSource = z.infer<typeof negativeLabProfileMeasurementSourceSchema>;

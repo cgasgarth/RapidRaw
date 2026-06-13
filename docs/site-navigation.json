@@ -75,6 +75,10 @@
           "path": "docs/negative-lab/fixture-licensing-provenance-policy-2026-06-13.md"
         },
         {
+          "title": "Negative Lab generic built-in presets",
+          "path": "docs/negative-lab/generic-built-in-presets-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab measured-profile fixture format",
           "path": "docs/negative-lab/measured-profile-fixture-format-2026-06-13.md"
         },

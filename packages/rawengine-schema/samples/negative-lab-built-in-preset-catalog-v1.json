@@ -1,0 +1,256 @@
+{
+  "catalogId": "negative_lab.generic.v1",
+  "catalogVersion": "2026-06-13",
+  "presets": [
+    {
+      "claimLevel": "generic_starting_point_only",
+      "description": "Balanced C-41 color negative starting point for well-scanned rolls.",
+      "displayName": "C-41 Neutral",
+      "filmClass": "color_negative",
+      "intendedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff"],
+      "intent": "neutral",
+      "legalNamingStatus": "generic_safe_name",
+      "legalReviewStatus": "not_required_generic",
+      "normalizationProfileId": "generic_c41_density_norm_v1",
+      "normalizationProfileVersion": "2026-06-13",
+      "presetId": "negative_lab.generic.c41.neutral.v1",
+      "presetTier": "generic_builtin",
+      "presetVersion": "2026-06-13",
+      "processFamily": "c41_color_negative",
+      "processProfileId": "generic_c41_v1",
+      "processProfileVersion": "2026-06-13",
+      "provenance": {
+        "claimsPolicy": "generic_starting_point_only",
+        "fixtureIds": [],
+        "legalNote": "Generic RawEngine starting point with no brand or stock claim.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceProfileIds": ["generic_c41_v1"]
+      },
+      "requiredWarningCodes": [],
+      "scanAssumptions": ["Linearized scan data is preferred.", "Visible film border improves base sampling."],
+      "schemaVersion": 1,
+      "touchedParameters": {
+        "creativeRendering": [],
+        "objectiveInversion": ["density_rgb_v1"],
+        "semiObjectiveNormalization": ["density_normalization_v1"]
+      }
+    },
+    {
+      "claimLevel": "generic_starting_point_only",
+      "description": "C-41 color negative starting point tuned for gentle skin-tone contrast.",
+      "displayName": "C-41 Portrait",
+      "filmClass": "color_negative",
+      "intendedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff"],
+      "intent": "portrait",
+      "legalNamingStatus": "generic_safe_name",
+      "legalReviewStatus": "not_required_generic",
+      "normalizationProfileId": "generic_c41_density_norm_v1",
+      "normalizationProfileVersion": "2026-06-13",
+      "presetId": "negative_lab.generic.c41.portrait.v1",
+      "presetTier": "generic_builtin",
+      "presetVersion": "2026-06-13",
+      "processFamily": "c41_color_negative",
+      "processProfileId": "generic_c41_v1",
+      "processProfileVersion": "2026-06-13",
+      "provenance": {
+        "claimsPolicy": "generic_starting_point_only",
+        "fixtureIds": [],
+        "legalNote": "Generic RawEngine starting point with no brand or stock claim.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceProfileIds": ["generic_c41_v1"]
+      },
+      "requiredWarningCodes": [],
+      "scanAssumptions": ["Neutral base sample is available.", "Mixed lighting may need manual balance review."],
+      "schemaVersion": 1,
+      "touchedParameters": {
+        "creativeRendering": [],
+        "objectiveInversion": ["density_rgb_v1"],
+        "semiObjectiveNormalization": ["density_normalization_v1"]
+      }
+    },
+    {
+      "claimLevel": "generic_starting_point_only",
+      "description": "C-41 color negative starting point for denser high-speed scans.",
+      "displayName": "C-41 High Speed",
+      "filmClass": "color_negative",
+      "intendedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff", "lab_jpeg"],
+      "intent": "high_speed",
+      "legalNamingStatus": "generic_safe_name",
+      "legalReviewStatus": "not_required_generic",
+      "normalizationProfileId": "generic_c41_density_norm_v1",
+      "normalizationProfileVersion": "2026-06-13",
+      "presetId": "negative_lab.generic.c41.high_speed.v1",
+      "presetTier": "generic_builtin",
+      "presetVersion": "2026-06-13",
+      "processFamily": "c41_color_negative",
+      "processProfileId": "generic_c41_v1",
+      "processProfileVersion": "2026-06-13",
+      "provenance": {
+        "claimsPolicy": "generic_starting_point_only",
+        "fixtureIds": [],
+        "legalNote": "Generic RawEngine starting point with no brand or stock claim.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceProfileIds": ["generic_c41_v1"]
+      },
+      "requiredWarningCodes": ["lossy_input", "low_acquisition_confidence"],
+      "scanAssumptions": ["Lab-rendered files require review.", "Visible border is preferred for base sampling."],
+      "schemaVersion": 1,
+      "touchedParameters": {
+        "creativeRendering": [],
+        "objectiveInversion": ["density_rgb_v1"],
+        "semiObjectiveNormalization": ["density_normalization_v1"]
+      }
+    },
+    {
+      "claimLevel": "generic_starting_point_only",
+      "description": "C-41 color negative starting point with stronger color separation.",
+      "displayName": "C-41 Saturated",
+      "filmClass": "color_negative",
+      "intendedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff"],
+      "intent": "saturated",
+      "legalNamingStatus": "generic_safe_name",
+      "legalReviewStatus": "not_required_generic",
+      "normalizationProfileId": "generic_c41_density_norm_v1",
+      "normalizationProfileVersion": "2026-06-13",
+      "presetId": "negative_lab.generic.c41.saturated.v1",
+      "presetTier": "generic_builtin",
+      "presetVersion": "2026-06-13",
+      "processFamily": "c41_color_negative",
+      "processProfileId": "generic_c41_v1",
+      "processProfileVersion": "2026-06-13",
+      "provenance": {
+        "claimsPolicy": "generic_starting_point_only",
+        "fixtureIds": [],
+        "legalNote": "Generic RawEngine starting point with no brand or stock claim.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceProfileIds": ["generic_c41_v1"]
+      },
+      "requiredWarningCodes": [],
+      "scanAssumptions": ["Clipped channels should be reviewed before conversion."],
+      "schemaVersion": 1,
+      "touchedParameters": {
+        "creativeRendering": [],
+        "objectiveInversion": ["density_rgb_v1"],
+        "semiObjectiveNormalization": ["density_normalization_v1"]
+      }
+    },
+    {
+      "claimLevel": "generic_starting_point_only",
+      "description": "Silver black-and-white negative starting point with classic tonal placement.",
+      "displayName": "Black and White Classic",
+      "filmClass": "black_and_white_silver",
+      "intendedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff"],
+      "intent": "classic_bw",
+      "legalNamingStatus": "generic_safe_name",
+      "legalReviewStatus": "not_required_generic",
+      "normalizationProfileId": "generic_bw_silver_density_norm_v1",
+      "normalizationProfileVersion": "2026-06-13",
+      "presetId": "negative_lab.generic.bw.classic.v1",
+      "presetTier": "generic_builtin",
+      "presetVersion": "2026-06-13",
+      "processFamily": "black_and_white_silver_negative",
+      "processProfileId": "generic_bw_silver_v1",
+      "processProfileVersion": "2026-06-13",
+      "provenance": {
+        "claimsPolicy": "generic_starting_point_only",
+        "fixtureIds": [],
+        "legalNote": "Generic RawEngine starting point with no brand or stock claim.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceProfileIds": ["generic_bw_silver_v1"]
+      },
+      "requiredWarningCodes": [],
+      "scanAssumptions": ["Luminance conversion is expected.", "Base fog sample should avoid rebate marks."],
+      "schemaVersion": 1,
+      "touchedParameters": {
+        "creativeRendering": [],
+        "objectiveInversion": ["density_rgb_v1"],
+        "semiObjectiveNormalization": ["density_normalization_v1"]
+      }
+    },
+    {
+      "claimLevel": "generic_starting_point_only",
+      "description": "Silver black-and-white negative starting point with smoother midtone separation.",
+      "displayName": "Black and White Fine Grain",
+      "filmClass": "black_and_white_silver",
+      "intendedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff"],
+      "intent": "fine_grain_bw",
+      "legalNamingStatus": "generic_safe_name",
+      "legalReviewStatus": "not_required_generic",
+      "normalizationProfileId": "generic_bw_silver_density_norm_v1",
+      "normalizationProfileVersion": "2026-06-13",
+      "presetId": "negative_lab.generic.bw.fine_grain.v1",
+      "presetTier": "generic_builtin",
+      "presetVersion": "2026-06-13",
+      "processFamily": "black_and_white_silver_negative",
+      "processProfileId": "generic_bw_silver_v1",
+      "processProfileVersion": "2026-06-13",
+      "provenance": {
+        "claimsPolicy": "generic_starting_point_only",
+        "fixtureIds": [],
+        "legalNote": "Generic RawEngine starting point with no brand or stock claim.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceProfileIds": ["generic_bw_silver_v1"]
+      },
+      "requiredWarningCodes": [],
+      "scanAssumptions": ["Low sharpening in the scan is preferred."],
+      "schemaVersion": 1,
+      "touchedParameters": {
+        "creativeRendering": [],
+        "objectiveInversion": ["density_rgb_v1"],
+        "semiObjectiveNormalization": ["density_normalization_v1"]
+      }
+    },
+    {
+      "claimLevel": "generic_starting_point_only",
+      "description": "Silver black-and-white negative starting point for ortho-style tonal relationships.",
+      "displayName": "Black and White Ortho",
+      "filmClass": "black_and_white_silver",
+      "intendedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff"],
+      "intent": "ortho_bw",
+      "legalNamingStatus": "generic_safe_name",
+      "legalReviewStatus": "not_required_generic",
+      "normalizationProfileId": "generic_bw_silver_density_norm_v1",
+      "normalizationProfileVersion": "2026-06-13",
+      "presetId": "negative_lab.generic.bw.ortho.v1",
+      "presetTier": "generic_builtin",
+      "presetVersion": "2026-06-13",
+      "processFamily": "black_and_white_silver_negative",
+      "processProfileId": "generic_bw_silver_v1",
+      "processProfileVersion": "2026-06-13",
+      "provenance": {
+        "claimsPolicy": "generic_starting_point_only",
+        "fixtureIds": [],
+        "legalNote": "Generic RawEngine starting point with no brand or stock claim.",
+        "measurementSource": "generic_engineered_starting_point",
+        "sourceProfileIds": ["generic_bw_silver_v1"]
+      },
+      "requiredWarningCodes": [],
+      "scanAssumptions": ["Color-filtered capture changes should be reviewed separately."],
+      "schemaVersion": 1,
+      "touchedParameters": {
+        "creativeRendering": [],
+        "objectiveInversion": ["density_rgb_v1"],
+        "semiObjectiveNormalization": ["density_normalization_v1"]
+      }
+    }
+  ],
+  "processProfileRefs": [
+    {
+      "colorMode": "color_negative_rgb",
+      "normalizationProfileId": "generic_c41_density_norm_v1",
+      "normalizationProfileVersion": "2026-06-13",
+      "processFamily": "c41_color_negative",
+      "processProfileId": "generic_c41_v1",
+      "processProfileVersion": "2026-06-13"
+    },
+    {
+      "colorMode": "black_and_white_luminance",
+      "normalizationProfileId": "generic_bw_silver_density_norm_v1",
+      "normalizationProfileVersion": "2026-06-13",
+      "processFamily": "black_and_white_silver_negative",
+      "processProfileId": "generic_bw_silver_v1",
+      "processProfileVersion": "2026-06-13"
+    }
+  ],
+  "schemaVersion": 1
+}
