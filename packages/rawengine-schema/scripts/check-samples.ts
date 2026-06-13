@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  filmLookCatalogV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
@@ -31,6 +32,7 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleFilmLookCatalogV1,
   sampleNegativeAcquisitionProfileV1,
   sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabApplyPlanRequestV1,
@@ -87,6 +89,11 @@ const validSamples: ReadonlyArray<{
     name: 'panorama artifact',
     schema: panoramaArtifactV1Schema,
     value: samplePanoramaArtifactV1,
+  },
+  {
+    name: 'film look catalog',
+    schema: filmLookCatalogV1Schema,
+    value: sampleFilmLookCatalogV1,
   },
   {
     name: 'negative acquisition profile',
@@ -223,6 +230,18 @@ const invalidResult = rawEngineToolRegistryV1Schema.safeParse(invalidToolRegistr
 if (invalidResult.success) {
   throw new Error('Expected tool registry schema to reject unknown fields.');
 }
+
+const invalidFilmLookCatalog = {
+  ...sampleFilmLookCatalogV1,
+  looks: [
+    {
+      ...sampleFilmLookCatalogV1.looks[0],
+      displayName: 'Kodak Exact Clone',
+    },
+  ],
+};
+
+expectInvalid('film look catalog with unsafe exact stock claim', filmLookCatalogV1Schema, invalidFilmLookCatalog);
 
 const invalidAcquisitionProfile = {
   ...sampleNegativeAcquisitionProfileV1,
