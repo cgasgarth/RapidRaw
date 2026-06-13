@@ -1,0 +1,91 @@
+{
+  "algorithmId": "per_channel_inversion_curves_v1",
+  "colorMode": "color_negative_rgb",
+  "curveSetId": "roll_01_c41_objective_curves",
+  "curveSetSource": "roll_objective_override",
+  "curveSetVersion": "2026-06-13",
+  "densityCurves": [
+    {
+      "channel": "red",
+      "interpolation": "monotone_cubic",
+      "points": [
+        {
+          "inputDensity": 0,
+          "outputLinear": 0
+        },
+        {
+          "inputDensity": 0.4,
+          "outputLinear": 0.16
+        },
+        {
+          "inputDensity": 1.2,
+          "outputLinear": 0.58
+        },
+        {
+          "inputDensity": 2.6,
+          "outputLinear": 1
+        }
+      ]
+    },
+    {
+      "channel": "green",
+      "interpolation": "monotone_cubic",
+      "points": [
+        {
+          "inputDensity": 0,
+          "outputLinear": 0
+        },
+        {
+          "inputDensity": 0.4,
+          "outputLinear": 0.18
+        },
+        {
+          "inputDensity": 1.2,
+          "outputLinear": 0.6
+        },
+        {
+          "inputDensity": 2.6,
+          "outputLinear": 1
+        }
+      ]
+    },
+    {
+      "channel": "blue",
+      "interpolation": "monotone_cubic",
+      "points": [
+        {
+          "inputDensity": 0,
+          "outputLinear": 0
+        },
+        {
+          "inputDensity": 0.4,
+          "outputLinear": 0.14
+        },
+        {
+          "inputDensity": 1.2,
+          "outputLinear": 0.54
+        },
+        {
+          "inputDensity": 2.6,
+          "outputLinear": 1
+        }
+      ]
+    }
+  ],
+  "operationClass": "objective",
+  "operationStage": "objective_inversion",
+  "processFamily": "c41_color_negative",
+  "provenance": {
+    "legalNamingStatus": "generic_safe_name",
+    "measurementSource": "generic_engineered_starting_point",
+    "notes": "Roll-scoped objective curve override derived from the generic C-41 process profile.",
+    "sourceFixtureIds": [],
+    "sourceProcessProfileId": "generic_c41_v1",
+    "sourceProcessProfileVersion": "2026-06-13"
+  },
+  "schemaVersion": 1,
+  "scope": {
+    "scopeKind": "roll",
+    "sessionId": "negative_roll_session_sample"
+  }
+}

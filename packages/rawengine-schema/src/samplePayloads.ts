@@ -16,6 +16,7 @@ import {
   negativeLabFixtureManifestV1Schema,
   negativeLabFrameDetectionResultV1Schema,
   negativeLabInputProfileCatalogV1Schema,
+  negativeLabPerChannelInversionCurveSetV1Schema,
   negativeLabPresetMetadataPolicyCatalogV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
@@ -38,6 +39,7 @@ import {
   type NegativeLabFixtureManifestV1,
   type NegativeLabFrameDetectionResultV1,
   type NegativeLabInputProfileCatalogV1,
+  type NegativeLabPerChannelInversionCurveSetV1,
   type NegativeLabPresetMetadataPolicyCatalogV1,
   type NegativeLabPositiveVariantProvenanceV1,
   type NegativeLabProcessProfileV1,
@@ -645,6 +647,32 @@ export const sampleNegativeLabProcessProfileV1: NegativeLabProcessProfileV1 = ne
   },
   warningCodes: [],
 });
+
+export const sampleNegativeLabPerChannelInversionCurveSetV1: NegativeLabPerChannelInversionCurveSetV1 =
+  negativeLabPerChannelInversionCurveSetV1Schema.parse({
+    algorithmId: 'per_channel_inversion_curves_v1',
+    colorMode: 'color_negative_rgb',
+    curveSetId: 'roll_01_c41_objective_curves',
+    curveSetSource: 'roll_objective_override',
+    curveSetVersion: '2026-06-13',
+    densityCurves: sampleNegativeLabProcessProfileV1.densityCurves,
+    operationClass: 'objective',
+    operationStage: 'objective_inversion',
+    processFamily: 'c41_color_negative',
+    provenance: {
+      legalNamingStatus: 'generic_safe_name',
+      measurementSource: 'generic_engineered_starting_point',
+      notes: 'Roll-scoped objective curve override derived from the generic C-41 process profile.',
+      sourceFixtureIds: [],
+      sourceProcessProfileId: sampleNegativeLabProcessProfileV1.profileId,
+      sourceProcessProfileVersion: sampleNegativeLabProcessProfileV1.profileVersion,
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    scope: {
+      scopeKind: 'roll',
+      sessionId: sampleNegativeRollSessionV1.sessionId,
+    },
+  });
 
 export const sampleNegativeLabBuiltInPresetCatalogV1: NegativeLabBuiltInPresetCatalogV1 =
   negativeLabBuiltInPresetCatalogV1Schema.parse({
@@ -1265,6 +1293,8 @@ export const sampleNegativeLabCommandEnvelopeV1: NegativeLabCommandEnvelopeV1 =
       },
       curveModel: {
         curveFamily: 'process_profile_monotonic_v1',
+        inversionCurveSet: sampleNegativeLabPerChannelInversionCurveSetV1,
+        inversionCurveSetPolicy: 'use_curve_set_override',
         normalizationProfileId: sampleNegativeLabDensityNormalizationProfileV1.normalizationProfileId,
         normalizationProfileVersion: sampleNegativeLabDensityNormalizationProfileV1.profileVersion,
         processProfileId: sampleNegativeLabProcessProfileV1.profileId,

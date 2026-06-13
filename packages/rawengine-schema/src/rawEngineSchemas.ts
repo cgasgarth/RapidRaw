@@ -648,6 +648,129 @@ export const negativeLabProcessProfileV1Schema = z
     }
   });
 
+export const negativeLabPerChannelInversionCurveSetSourceV1Schema = z.enum([
+  'process_profile_reference',
+  'roll_objective_override',
+  'frame_objective_override',
+  'measured_project_profile',
+  'user_expert_override',
+]);
+
+export const negativeLabPerChannelInversionCurveSetScopeV1Schema = z.enum([
+  'process_profile',
+  'roll',
+  'selected_frames',
+  'single_frame',
+]);
+
+export const negativeLabPerChannelInversionCurveSetV1Schema = z
+  .object({
+    algorithmId: z.literal('per_channel_inversion_curves_v1'),
+    colorMode: z.enum(['color_negative_rgb', 'black_and_white_luminance']),
+    curveSetId: z.string().trim().min(1),
+    curveSetSource: negativeLabPerChannelInversionCurveSetSourceV1Schema,
+    curveSetVersion: z.string().trim().min(1),
+    densityCurves: z.array(negativeLabDensityCurveV1Schema).min(1),
+    operationClass: z.literal('objective'),
+    operationStage: z.literal('objective_inversion'),
+    processFamily: negativeLabSupportedProcessFamilyV1Schema,
+    provenance: z
+      .object({
+        legalNamingStatus: negativeLabLegalNamingStatusSchema,
+        measurementSource: negativeLabProfileMeasurementSourceSchema,
+        notes: z.string().trim().min(1).optional(),
+        sourceFixtureIds: z.array(z.string().trim().min(1)),
+        sourceProcessProfileId: z.string().trim().min(1).optional(),
+        sourceProcessProfileVersion: z.string().trim().min(1).optional(),
+      })
+      .strict(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    scope: z
+      .object({
+        frameSelection: z.lazy(() => negativeLabFrameSelectionV1Schema).optional(),
+        scopeKind: negativeLabPerChannelInversionCurveSetScopeV1Schema,
+        sessionId: z.string().trim().min(1).optional(),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((curveSet, context) => {
+    const channels = curveSet.densityCurves.map((curve) => curve.channel);
+    const uniqueChannels = new Set(channels);
+    if (uniqueChannels.size !== channels.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Per-channel inversion curve sets must not repeat a channel.',
+        path: ['densityCurves'],
+      });
+    }
+
+    if (curveSet.colorMode === 'color_negative_rgb') {
+      const requiredChannels = ['red', 'green', 'blue'] as const;
+      const missingChannels = requiredChannels.filter((channel) => !uniqueChannels.has(channel));
+      if (missingChannels.length > 0 || uniqueChannels.has('luminance')) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Color negative inversion curve sets must contain red, green, and blue curves only.',
+          path: ['densityCurves'],
+        });
+      }
+    }
+
+    if (curveSet.colorMode === 'black_and_white_luminance') {
+      if (uniqueChannels.size !== 1 || !uniqueChannels.has('luminance')) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Black-and-white inversion curve sets must contain one luminance curve.',
+          path: ['densityCurves'],
+        });
+      }
+    }
+
+    const hasSourceProfile =
+      curveSet.provenance.sourceProcessProfileId !== undefined &&
+      curveSet.provenance.sourceProcessProfileVersion !== undefined;
+    if (curveSet.curveSetSource === 'process_profile_reference' && !hasSourceProfile) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Process-profile curve references require source profile ID and version provenance.',
+        path: ['provenance'],
+      });
+    }
+
+    if (curveSet.curveSetSource === 'process_profile_reference' && curveSet.scope.scopeKind !== 'process_profile') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Process-profile curve references must use process_profile scope.',
+        path: ['scope', 'scopeKind'],
+      });
+    }
+
+    if (
+      ['roll_objective_override', 'frame_objective_override', 'user_expert_override'].includes(
+        curveSet.curveSetSource,
+      ) &&
+      curveSet.scope.sessionId === undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Session-scoped inversion curve overrides require a session ID.',
+        path: ['scope', 'sessionId'],
+      });
+    }
+
+    if (
+      ['selected_frames', 'single_frame'].includes(curveSet.scope.scopeKind) &&
+      curveSet.scope.frameSelection === undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Frame-scoped inversion curve sets require a frame selection.',
+        path: ['scope', 'frameSelection'],
+      });
+    }
+  });
+
 const negativeLabGenericPresetIdSchema = z
   .string()
   .trim()
@@ -2177,6 +2300,10 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
     curveModel: z
       .object({
         curveFamily: z.enum(['process_profile_monotonic_v1', 'parametric_monotonic_v1']),
+        inversionCurveSet: negativeLabPerChannelInversionCurveSetV1Schema.optional(),
+        inversionCurveSetPolicy: z
+          .enum(['use_process_profile_curves', 'use_curve_set_override', 'expert_override'])
+          .optional(),
         normalizationProfileId: z.string().trim().min(1).optional(),
         normalizationProfileVersion: z.string().trim().min(1).optional(),
         processProfileId: z.string().trim().min(1).optional(),
@@ -2208,7 +2335,28 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
     processFamily: negativeLabSupportedProcessFamilyV1Schema,
     sessionId: z.string().trim().min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((recipe, context) => {
+    const { inversionCurveSet, inversionCurveSetPolicy } = recipe.curveModel;
+    if (
+      ['use_curve_set_override', 'expert_override'].includes(inversionCurveSetPolicy ?? '') &&
+      inversionCurveSet === undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Inversion curve override policies require an inversion curve set.',
+        path: ['curveModel', 'inversionCurveSet'],
+      });
+    }
+
+    if (inversionCurveSet !== undefined && inversionCurveSet.processFamily !== recipe.processFamily) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Inversion curve set process family must match the conversion recipe process family.',
+        path: ['curveModel', 'inversionCurveSet', 'processFamily'],
+      });
+    }
+  });
 
 export const negativeLabPlanRollNormalizationParametersV1Schema = z
   .object({
@@ -2639,6 +2787,13 @@ export type NegativeLabRejectedFrameCandidateV1 = z.infer<typeof negativeLabReje
 export type NegativeLabLegalNamingStatus = z.infer<typeof negativeLabLegalNamingStatusSchema>;
 export type NegativeLabOperationStage = z.infer<typeof negativeLabOperationStageSchema>;
 export type NegativeLabOutputTransformRefV1 = z.infer<typeof negativeLabOutputTransformRefV1Schema>;
+export type NegativeLabPerChannelInversionCurveSetScopeV1 = z.infer<
+  typeof negativeLabPerChannelInversionCurveSetScopeV1Schema
+>;
+export type NegativeLabPerChannelInversionCurveSetSourceV1 = z.infer<
+  typeof negativeLabPerChannelInversionCurveSetSourceV1Schema
+>;
+export type NegativeLabPerChannelInversionCurveSetV1 = z.infer<typeof negativeLabPerChannelInversionCurveSetV1Schema>;
 export type NegativeLabPlanRollNormalizationParametersV1 = z.infer<
   typeof negativeLabPlanRollNormalizationParametersV1Schema
 >;
