@@ -1229,6 +1229,148 @@ export const negativeAcquisitionProfileV1Schema = z
   })
   .strict();
 
+export const negativeLabInputProfileKindV1Schema = z.enum([
+  'camera_raw_input',
+  'camera_scan_input',
+  'scanner_input',
+  'lab_rendered_input',
+  'manual_assumption',
+]);
+
+export const negativeLabInputProfileSourceV1Schema = z.enum([
+  'embedded_icc',
+  'camera_dcp',
+  'scanner_icc',
+  'raw_decoder_camera_profile',
+  'user_assigned_icc',
+  'generated_synthetic_profile',
+  'assumed_display_profile',
+  'unknown',
+]);
+
+export const negativeLabInputProfileV1Schema = z
+  .object({
+    acquisitionConfidence: negativeAcquisitionConfidenceSchema,
+    captureDeviceType: z.enum(['camera', 'flatbed_scanner', 'film_scanner', 'lab_scanner', 'unknown']),
+    colorSpaceEncoding: z.enum([
+      'camera_raw_native',
+      'linear_rgb',
+      'scanner_rgb',
+      'lab_rendered_rgb',
+      'display_referred_rgb',
+      'unknown',
+    ]),
+    defaultInputMode: negativeInputModeSchema,
+    description: z.string().trim().min(1),
+    displayName: z.string().trim().min(1),
+    expectedPixelBasis: negativePixelBasisSchema,
+    fileExtensions: z
+      .array(
+        z
+          .string()
+          .trim()
+          .regex(/^[a-z0-9]+$/u),
+      )
+      .min(1),
+    inputProfileKind: negativeLabInputProfileKindV1Schema,
+    inputProfileSource: negativeLabInputProfileSourceV1Schema,
+    profileConfidence: negativeAcquisitionConfidenceSchema,
+    profileId: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*\.v[0-9]+$/u),
+    profileVersion: z.string().trim().min(1),
+    provenance: z
+      .object({
+        contentHash: z.string().trim().min(1).optional(),
+        legalNote: z.string().trim().min(1),
+        sourceDescription: z.string().trim().min(1),
+      })
+      .strict(),
+    requiredWarningCodes: z.array(negativeWarningCodeSchema),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    supportedInputModes: z.array(negativeInputModeSchema).min(1),
+    supportedProcessFamilies: z.array(negativeLabSupportedProcessFamilyV1Schema).min(1),
+  })
+  .strict()
+  .superRefine((profile, context) => {
+    if (!profile.supportedInputModes.includes(profile.defaultInputMode)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Default input mode must be included in supported input modes.',
+        path: ['defaultInputMode'],
+      });
+    }
+
+    if (
+      profile.inputProfileKind === 'camera_raw_input' &&
+      (profile.defaultInputMode !== 'camera_raw' || profile.colorSpaceEncoding === 'display_referred_rgb')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Camera raw input profiles must default to camera_raw and must not be display-referred.',
+        path: ['inputProfileKind'],
+      });
+    }
+
+    if (profile.inputProfileKind === 'lab_rendered_input') {
+      const requiredWarnings = ['lossy_input', 'low_acquisition_confidence'] as const;
+      for (const warningCode of requiredWarnings) {
+        if (!profile.requiredWarningCodes.includes(warningCode)) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Lab-rendered input profiles must require lossy-input and confidence warnings.',
+            path: ['requiredWarningCodes'],
+          });
+        }
+      }
+    }
+
+    if (
+      profile.profileConfidence === 'high' &&
+      ['assumed_display_profile', 'unknown'].includes(profile.inputProfileSource)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'High-confidence input profiles require explicit profile source metadata.',
+        path: ['inputProfileSource'],
+      });
+    }
+  });
+
+export const negativeLabInputProfileCatalogV1Schema = z
+  .object({
+    catalogId: z.string().trim().min(1),
+    catalogVersion: z.string().trim().min(1),
+    profiles: z.array(negativeLabInputProfileV1Schema).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  })
+  .strict()
+  .superRefine((catalog, context) => {
+    const profileIds = new Set<string>();
+    const displayNames = new Set<string>();
+    for (const [index, profile] of catalog.profiles.entries()) {
+      if (profileIds.has(profile.profileId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Input profile catalog must not contain duplicate profile IDs.',
+          path: ['profiles', index, 'profileId'],
+        });
+      }
+      profileIds.add(profile.profileId);
+
+      const displayNameKey = profile.displayName.toLocaleLowerCase('en-US');
+      if (displayNames.has(displayNameKey)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Input profile catalog must not contain duplicate display names.',
+          path: ['profiles', index, 'displayName'],
+        });
+      }
+      displayNames.add(displayNameKey);
+    }
+  });
+
 export const negativeFrameRecordV1Schema = z
   .object({
     acquisitionOverrideProfileId: z.string().trim().min(1).optional(),
@@ -1998,6 +2140,10 @@ export type NegativeLabFrameBorderMetricsV1 = z.infer<typeof negativeLabFrameBor
 export type NegativeLabFrameDetectionRequestV1 = z.infer<typeof negativeLabFrameDetectionRequestV1Schema>;
 export type NegativeLabFrameDetectionResultV1 = z.infer<typeof negativeLabFrameDetectionResultV1Schema>;
 export type NegativeLabFrameSelectionV1 = z.infer<typeof negativeLabFrameSelectionV1Schema>;
+export type NegativeLabInputProfileCatalogV1 = z.infer<typeof negativeLabInputProfileCatalogV1Schema>;
+export type NegativeLabInputProfileKindV1 = z.infer<typeof negativeLabInputProfileKindV1Schema>;
+export type NegativeLabInputProfileSourceV1 = z.infer<typeof negativeLabInputProfileSourceV1Schema>;
+export type NegativeLabInputProfileV1 = z.infer<typeof negativeLabInputProfileV1Schema>;
 export type NegativeLabRejectedFrameCandidateV1 = z.infer<typeof negativeLabRejectedFrameCandidateV1Schema>;
 export type NegativeLabLegalNamingStatus = z.infer<typeof negativeLabLegalNamingStatusSchema>;
 export type NegativeLabOperationStage = z.infer<typeof negativeLabOperationStageSchema>;
