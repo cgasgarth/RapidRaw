@@ -958,6 +958,7 @@ export default function CurveGraph({
       <div className="relative">
         <div
           className="w-full aspect-square bg-surface-secondary p-1 rounded-md relative touch-none"
+          role="presentation"
           onMouseDown={handleContainerStart}
           onTouchStart={handleContainerStart}
           onDoubleClick={handleDoubleClick}
