@@ -5,6 +5,10 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
+  negativeLabApplyPlanRequestV1Schema,
+  negativeLabApplyResultV1Schema,
+  negativeLabCommandEnvelopeV1Schema,
+  negativeLabDryRunResultV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -12,6 +16,10 @@ import {
   type ArtifactHandleV1,
   type CommandEnvelopeV1,
   type NegativeAcquisitionProfileV1,
+  type NegativeLabApplyPlanRequestV1,
+  type NegativeLabApplyResultV1,
+  type NegativeLabCommandEnvelopeV1,
+  type NegativeLabDryRunResultV1,
   type NegativeRollSessionV1,
   type PanoramaArtifactV1,
   type QueryEnvelopeV1,
@@ -98,6 +106,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       returnsArtifactHandles: true,
       toolKind: 'dry_run',
       toolName: 'edit.dry_run_tone',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'NegativeLabCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'NegativeLabDryRunResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
+      toolName: 'negativelab.preview_conversion',
+    },
+    {
+      approvalClass: ApprovalClass.EditApply,
+      inputSchemaName: 'NegativeLabApplyPlanRequestV1',
+      mutates: true,
+      outputSchemaName: 'NegativeLabApplyResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'apply',
+      toolName: 'negativelab.apply_planned_command',
     },
   ],
 });
@@ -342,4 +370,122 @@ export const sampleNegativeRollSessionV1: NegativeRollSessionV1 = negativeRollSe
   sessionId: 'negative_roll_session_sample',
   sharedBaseSampleIds: [],
   sourceFileIds: ['source_lab_scan_0001'],
+});
+
+export const sampleNegativeLabCommandEnvelopeV1: NegativeLabCommandEnvelopeV1 =
+  negativeLabCommandEnvelopeV1Schema.parse({
+    actor: {
+      id: 'codex-app-server',
+      kind: ActorKind.Agent,
+      sessionId: 'session_sample',
+    },
+    approval: {
+      approvalClass: ApprovalClass.PreviewOnly,
+      reason: 'Negative conversion dry-run returns a preview artifact before mutating the roll session.',
+      state: 'not_required',
+    },
+    commandId: 'command_negative_set_conversion_recipe_sample',
+    commandType: 'negativeLab.setConversionRecipe',
+    correlationId: 'corr_negative_set_conversion_recipe_sample',
+    dryRun: true,
+    expectedGraphRevision: 'graph_rev_negative_7',
+    idempotencyKey: 'idem_negative_set_conversion_recipe_sample',
+    parameters: {
+      baseStrategy: {
+        baseEstimateId: 'base_estimate_roll_01',
+        baseSampleIds: ['base_sample_roll_01'],
+        mode: 'existing_base_estimate',
+      },
+      conversionModel: {
+        algorithmId: 'density_rgb_v1',
+        algorithmVersion: 1,
+        densityMax: 4,
+        epsilonPolicyId: 'density_epsilon_v1',
+        negativeDensityTolerance: 0.02,
+      },
+      curveModel: {
+        curveFamily: 'process_profile_monotonic_v1',
+        processProfileId: 'generic_c41_v1',
+        processProfileVersion: '2026-06-13',
+      },
+      frameSelection: {
+        excludeFrameIds: [],
+        frameIds: ['frame_0001'],
+        mode: 'selected',
+        qcStatuses: [],
+        warningCodes: [],
+      },
+      inputCharacterization: {
+        channelBasis: 'scanner_rgb',
+        confidence: 'approximate_rendered_rgb',
+        pixelBasis: 'linear_scan_rgb',
+      },
+      neutralization: {
+        mode: 'neutral_sample',
+        sampleIds: ['base_sample_roll_01'],
+      },
+      outputIntent: 'editable_positive',
+      outputTransformRef: {
+        chromaticAdaptation: 'bradford',
+        renderingIntent: 'scene_referred',
+        transformId: 'rawengine_scene_linear_v1',
+      },
+      previewRequest: {
+        artifactPurposes: ['objective_positive_preview', 'base_sample_overlay', 'warning_report'],
+        includePreview: true,
+        maxEdgePx: 1600,
+      },
+      processFamily: 'c41_color_negative',
+      sessionId: sampleNegativeRollSessionV1.sessionId,
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: {
+      id: sampleNegativeRollSessionV1.sessionId,
+      kind: 'roll',
+    },
+  });
+
+const sampleNegativeLabChangeSet = {
+  artifactHandles: [sampleArtifactHandleV1],
+  createdPositiveVariantIds: ['positive_variant_frame_0001'],
+  provenanceEntryIds: ['prov_negative_convert_frames_sample'],
+  updatedFrameIds: ['frame_0001'],
+  updatedSessionId: sampleNegativeRollSessionV1.sessionId,
+  warningCodes: ['lossy_input', 'low_acquisition_confidence'],
+};
+
+export const sampleNegativeLabDryRunResultV1: NegativeLabDryRunResultV1 = negativeLabDryRunResultV1Schema.parse({
+  changeSet: sampleNegativeLabChangeSet,
+  commandId: sampleNegativeLabCommandEnvelopeV1.commandId,
+  commandType: sampleNegativeLabCommandEnvelopeV1.commandType,
+  correlationId: sampleNegativeLabCommandEnvelopeV1.correlationId,
+  dryRunPlanId: 'dry_run_plan_negative_conversion_sample',
+  numericMetrics: {
+    estimatedBaseClippingScore: 0.04,
+    previewDeltaEWarningScore: 0.8,
+  },
+  previewArtifacts: [sampleArtifactHandleV1],
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  warnings: sampleNegativeRollSessionV1.acquisitionWarnings,
+});
+
+export const sampleNegativeLabApplyPlanRequestV1: NegativeLabApplyPlanRequestV1 =
+  negativeLabApplyPlanRequestV1Schema.parse({
+    acknowledgedWarningCodes: ['lossy_input', 'low_acquisition_confidence'],
+    commandId: sampleNegativeLabCommandEnvelopeV1.commandId,
+    dryRunPlanId: sampleNegativeLabDryRunResultV1.dryRunPlanId,
+    expectedSessionRevision: 'session_rev_negative_7',
+    sessionId: sampleNegativeRollSessionV1.sessionId,
+  });
+
+export const sampleNegativeLabApplyResultV1: NegativeLabApplyResultV1 = negativeLabApplyResultV1Schema.parse({
+  appliedGraphRevision: 'graph_rev_negative_8',
+  changeSet: sampleNegativeLabChangeSet,
+  commandId: 'command_negative_convert_frames_apply_sample',
+  commandType: sampleNegativeLabCommandEnvelopeV1.commandType,
+  correlationId: sampleNegativeLabCommandEnvelopeV1.correlationId,
+  dryRunCommandId: sampleNegativeLabCommandEnvelopeV1.commandId,
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sessionId: sampleNegativeRollSessionV1.sessionId,
+  warnings: sampleNegativeRollSessionV1.acquisitionWarnings,
 });

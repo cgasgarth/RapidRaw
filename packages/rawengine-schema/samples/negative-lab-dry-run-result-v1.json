@@ -1,0 +1,52 @@
+{
+  "changeSet": {
+    "artifactHandles": [
+      {
+        "artifactId": "artifact_preview_sample",
+        "contentHash": "sha256:sample-preview-hash",
+        "dimensions": {
+          "height": 1080,
+          "width": 1620
+        },
+        "kind": "preview",
+        "storage": "temp_cache"
+      }
+    ],
+    "createdPositiveVariantIds": ["positive_variant_frame_0001"],
+    "provenanceEntryIds": ["prov_negative_convert_frames_sample"],
+    "updatedFrameIds": ["frame_0001"],
+    "updatedSessionId": "negative_roll_session_sample",
+    "warningCodes": ["lossy_input", "low_acquisition_confidence"]
+  },
+  "dryRunPlanId": "dry_run_plan_negative_conversion_sample",
+  "commandId": "command_negative_set_conversion_recipe_sample",
+  "commandType": "negativeLab.setConversionRecipe",
+  "correlationId": "corr_negative_set_conversion_recipe_sample",
+  "numericMetrics": {
+    "estimatedBaseClippingScore": 0.04,
+    "previewDeltaEWarningScore": 0.8
+  },
+  "previewArtifacts": [
+    {
+      "artifactId": "artifact_preview_sample",
+      "contentHash": "sha256:sample-preview-hash",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "preview",
+      "storage": "temp_cache"
+    }
+  ],
+  "schemaVersion": 1,
+  "warnings": [
+    {
+      "blocksAutomation": true,
+      "code": "low_acquisition_confidence",
+      "evidence": "Lab JPEG source has lossy compression and no scanner profile metadata.",
+      "frameIds": ["frame_0001"],
+      "scope": "session",
+      "severity": "warning"
+    }
+  ]
+}

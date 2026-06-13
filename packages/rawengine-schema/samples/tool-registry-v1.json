@@ -20,6 +20,26 @@
       "returnsArtifactHandles": true,
       "toolKind": "dry_run",
       "toolName": "edit.dry_run_tone"
+    },
+    {
+      "approvalClass": "preview_only",
+      "inputSchemaName": "NegativeLabCommandEnvelopeV1",
+      "mutates": false,
+      "outputSchemaName": "NegativeLabDryRunResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": true,
+      "toolKind": "dry_run",
+      "toolName": "negativelab.preview_conversion"
+    },
+    {
+      "approvalClass": "edit_apply",
+      "inputSchemaName": "NegativeLabApplyPlanRequestV1",
+      "mutates": true,
+      "outputSchemaName": "NegativeLabApplyResultV1",
+      "requiresDryRun": true,
+      "returnsArtifactHandles": true,
+      "toolKind": "apply",
+      "toolName": "negativelab.apply_planned_command"
     }
   ]
 }

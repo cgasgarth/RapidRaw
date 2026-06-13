@@ -59,6 +59,10 @@
           "path": "docs/negative-lab/input-profile-strategy-adr-2026-06-13.md"
         },
         {
+          "title": "Negative Lab API command surface ADR",
+          "path": "docs/negative-lab/api-command-surface-adr-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab preset naming and legal policy ADR",
           "path": "docs/negative-lab/preset-naming-legal-policy-2026-06-13.md"
         },

@@ -9,6 +9,10 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
+  negativeLabApplyPlanRequestV1Schema,
+  negativeLabApplyResultV1Schema,
+  negativeLabCommandEnvelopeV1Schema,
+  negativeLabDryRunResultV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -18,6 +22,10 @@ import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleNegativeAcquisitionProfileV1,
+  sampleNegativeLabApplyPlanRequestV1,
+  sampleNegativeLabApplyResultV1,
+  sampleNegativeLabCommandEnvelopeV1,
+  sampleNegativeLabDryRunResultV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -69,10 +77,34 @@ const sampleArtifacts = [
     schema: negativeRollSessionV1Schema,
     value: sampleNegativeRollSessionV1,
   },
+  {
+    name: 'negative lab command envelope',
+    path: 'packages/rawengine-schema/samples/negative-lab-command-envelope-v1.json',
+    schema: negativeLabCommandEnvelopeV1Schema,
+    value: sampleNegativeLabCommandEnvelopeV1,
+  },
+  {
+    name: 'negative lab dry-run result',
+    path: 'packages/rawengine-schema/samples/negative-lab-dry-run-result-v1.json',
+    schema: negativeLabDryRunResultV1Schema,
+    value: sampleNegativeLabDryRunResultV1,
+  },
+  {
+    name: 'negative lab apply plan request',
+    path: 'packages/rawengine-schema/samples/negative-lab-apply-plan-request-v1.json',
+    schema: negativeLabApplyPlanRequestV1Schema,
+    value: sampleNegativeLabApplyPlanRequestV1,
+  },
+  {
+    name: 'negative lab apply result',
+    path: 'packages/rawengine-schema/samples/negative-lab-apply-result-v1.json',
+    schema: negativeLabApplyResultV1Schema,
+    value: sampleNegativeLabApplyResultV1,
+  },
 ];
 
 const toAbsolutePath = (repoPath) => join(ROOT, repoPath);
-const toStableJson = (value) => format(JSON.stringify(value, null, 2), { parser: 'json' });
+const toStableJson = (value) => format(JSON.stringify(value, null, 2), { parser: 'json', printWidth: 120 });
 
 const updateArtifacts = async () => {
   for (const artifact of sampleArtifacts) {
