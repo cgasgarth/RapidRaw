@@ -4740,6 +4740,9 @@ Issues:
 - Evaluate OpenCV stitching backend. Initial evaluation captured in
   `docs/panorama/opencv-backend-evaluation-2026-06-13.md`; recommendation is
   optional spike behind the panorama adapter, not a default dependency.
+- Compare OpenCV seam and exposure strategies against the legacy engine.
+  Initial comparison captured in
+  `docs/panorama/opencv-seam-exposure-comparison-2026-06-13.md`.
 - Add panorama performance tests.
 
 Definition of done:
