@@ -16,6 +16,7 @@ import {
   negativeLabFrameDetectionResultV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
+  negativeLabQcProofArtifactV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -33,6 +34,7 @@ import {
   type NegativeLabFrameDetectionResultV1,
   type NegativeLabPositiveVariantProvenanceV1,
   type NegativeLabProcessProfileV1,
+  type NegativeLabQcProofArtifactV1,
   type NegativeRollSessionV1,
   type PanoramaArtifactV1,
   type QueryEnvelopeV1,
@@ -944,6 +946,81 @@ export const sampleNegativeLabPositiveVariantProvenanceV1: NegativeLabPositiveVa
     variantName: 'Frame 0001 positive',
     variantNameSource: 'generated_generic',
     warningCodes: sampleNegativeLabApplyResultV1.changeSet.warningCodes,
+  });
+
+export const sampleNegativeLabQcProofArtifactV1: NegativeLabQcProofArtifactV1 =
+  negativeLabQcProofArtifactV1Schema.parse({
+    contactSheet: {
+      artifact: {
+        artifactId: 'artifact_negative_lab_qc_contact_sheet',
+        contentHash: 'sha256:sample-negative-lab-qc-proof',
+        dimensions: {
+          height: 1200,
+          width: 1800,
+        },
+        kind: 'preview',
+        storage: 'temp_cache',
+      },
+      columns: 3,
+      rows: 1,
+    },
+    frameIds: ['frame_0001'],
+    generatedAt: '2026-06-13T00:10:00.000Z',
+    overlays: [
+      {
+        frameId: 'frame_0001',
+        geometry: {
+          coordinateSpace: 'frame_pixels_after_crop',
+          height: 3024,
+          kind: 'rect',
+          width: 4536,
+          x: 0,
+          y: 0,
+        },
+        label: 'Frame boundary requires review',
+        overlayId: 'overlay_frame_boundary_0001',
+        overlayKind: 'frame_boundary',
+        severity: 'warning',
+        warningCodes: ['cropped_no_border', 'frame_detection_low_confidence'],
+      },
+      {
+        frameId: 'frame_0001',
+        geometry: {
+          coordinateSpace: 'normalized_frame',
+          height: 0.08,
+          kind: 'rect',
+          width: 0.12,
+          x: 0.04,
+          y: 0.88,
+        },
+        label: 'Base sample',
+        overlayId: 'overlay_base_sample_0001',
+        overlayKind: 'base_sample',
+        severity: 'info',
+        warningCodes: [],
+      },
+    ],
+    proofId: 'negative_lab_qc_proof_roll_01',
+    rollConsistency: {
+      anchorFrameIds: ['frame_0001'],
+      densityDeltaTolerance: 0.08,
+      exposureDeltaToleranceEv: 0.25,
+      frameMetrics: [
+        {
+          densityDelta: 0,
+          exposureDeltaEv: 0,
+          frameId: 'frame_0001',
+          warningCodes: [],
+          whiteBalanceDelta: 0,
+          withinTolerance: true,
+        },
+      ],
+      metricVersion: 1,
+      whiteBalanceDeltaTolerance: 0.08,
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sessionId: sampleNegativeRollSessionV1.sessionId,
+    warnings: sampleNegativeLabFrameDetectionResultV1.warnings,
   });
 
 export const sampleNegativeLabAppServerToolManifestV1: NegativeLabAppServerToolManifestV1 =

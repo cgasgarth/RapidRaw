@@ -36,6 +36,7 @@ generator before the release workflow needs one.
 - [Negative Lab frame detection and border contract](negative-lab/frame-detection-border-contract-2026-06-13.md)
 - [Negative Lab process profiles and density normalization](negative-lab/process-profiles-density-normalization-2026-06-13.md)
 - [Negative Lab generic built-in presets](negative-lab/generic-built-in-presets-2026-06-13.md)
+- [Negative Lab QC proof validation contract](negative-lab/qc-proof-validation-contract-2026-06-13.md)
 - [Negative Lab measured-profile fixture format](negative-lab/measured-profile-fixture-format-2026-06-13.md)
 - [Negative Lab stock-family research mapping](negative-lab/stock-family-research-mapping-2026-06-13.md)
 - [RapidRAW panorama stitcher audit](panorama/rapidraw-stitcher-audit-2026-06-13.md)
