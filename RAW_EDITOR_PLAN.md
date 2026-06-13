@@ -4743,6 +4743,9 @@ Issues:
 - Compare OpenCV seam and exposure strategies against the legacy engine.
   Initial comparison captured in
   `docs/panorama/opencv-seam-exposure-comparison-2026-06-13.md`.
+- Document OpenCV macOS packaging and codesigning proof before promotion.
+  Initial gate captured in
+  `docs/panorama/opencv-macos-packaging-proof-2026-06-13.md`.
 - Add panorama performance tests.
 
 Definition of done:

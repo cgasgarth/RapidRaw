@@ -69,6 +69,7 @@ generator before the release workflow needs one.
 - [Panorama exposure normalization](panorama/exposure-normalization-2026-06-13.md)
 - [OpenCV panorama backend evaluation](panorama/opencv-backend-evaluation-2026-06-13.md)
 - [OpenCV seam and exposure strategy comparison](panorama/opencv-seam-exposure-comparison-2026-06-13.md)
+- [OpenCV macOS packaging proof](panorama/opencv-macos-packaging-proof-2026-06-13.md)
 - [Architecture baseline](baseline/rapidraw-architecture-baseline-2026-06-11.md)
 - [Image pipeline baseline](baseline/rapidraw-image-pipeline-baseline-2026-06-13.md)
 - [AI hooks baseline](baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
