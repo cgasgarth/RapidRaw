@@ -400,11 +400,191 @@ export const panoramaArtifactV1Schema = z
   })
   .strict();
 
+export const negativeInputModeSchema = z.enum([
+  'camera_raw',
+  'camera_tiff',
+  'flatbed_tiff',
+  'lab_tiff',
+  'lab_jpeg',
+  'contact_sheet',
+  'unknown',
+]);
+
+export const negativePixelBasisSchema = z.enum([
+  'camera_raw_rgb',
+  'camera_rendered',
+  'scanner_rgb',
+  'lab_rendered_rgb',
+  'display_rgb',
+  'unknown',
+]);
+
+export const negativeAcquisitionConfidenceSchema = z.enum(['high', 'medium', 'low', 'blocked']);
+
+export const negativeWarningSeveritySchema = z.enum(['info', 'warning', 'error', 'blocking']);
+
+export const negativeWarningCodeSchema = z.enum([
+  'unknown_input_mode',
+  'unknown_pixel_basis',
+  'unknown_input_profile',
+  'assumed_display_profile',
+  'display_referred_input',
+  'lossy_input',
+  'low_bit_depth_input',
+  'suspected_lab_correction',
+  'suspected_pre_inversion',
+  'suspected_auto_exposure',
+  'suspected_auto_color',
+  'suspected_auto_contrast',
+  'suspected_sharpening',
+  'suspected_ir_cleaning',
+  'missing_visible_base',
+  'cropped_no_border',
+  'clipped_base_channel',
+  'uneven_illumination',
+  'mixed_frame_input_modes',
+  'contact_sheet_requires_split',
+  'profile_mismatch',
+  'low_acquisition_confidence',
+]);
+
+export const negativeProcessFamilySchema = z.enum([
+  'c41_color_negative',
+  'black_and_white_silver_negative',
+  'chromogenic_black_and_white_negative',
+  'ecn2_color_negative',
+  'e6_slide_helper',
+  'redscale_or_creative_negative',
+  'unknown',
+]);
+
+export const negativeWarningV1Schema = z
+  .object({
+    blocksAutomation: z.boolean(),
+    code: negativeWarningCodeSchema,
+    evidence: z.string().trim().min(1),
+    frameIds: z.array(z.string().trim().min(1)).optional(),
+    scope: z.enum(['session', 'frame', 'profile']),
+    severity: negativeWarningSeveritySchema,
+  })
+  .strict();
+
+const normalizedScoreSchema = z.number().min(0).max(1);
+
+export const negativeAcquisitionProfileV1Schema = z
+  .object({
+    acquisitionConfidence: negativeAcquisitionConfidenceSchema,
+    autoColorSuspected: z.boolean(),
+    autoContrastSuspected: z.boolean(),
+    autoExposureSuspected: z.boolean(),
+    bitDepth: z.number().int().positive().optional(),
+    captureDeviceName: z.string().trim().min(1).optional(),
+    captureDeviceType: z.enum(['camera', 'flatbed_scanner', 'lab_scanner', 'unknown']),
+    channelClippingScore: normalizedScoreSchema,
+    compressionArtifactScore: normalizedScoreSchema,
+    compressionKind: z.enum(['none', 'lossless', 'lossy', 'unknown']),
+    createdFrom: z.string().trim().min(1),
+    diffuserOrHolderNotes: z.string().trim().min(1).optional(),
+    dustRemovalSuspected: z.boolean(),
+    embeddedProfileSummary: z.string().trim().min(1).optional(),
+    fileFormat: z.enum(['raw', 'dng', 'tiff', 'png', 'jpeg', 'unknown']),
+    filmHolderType: z.string().trim().min(1).optional(),
+    frameSpacingState: z.enum(['single_frame', 'regular_strip', 'irregular_strip', 'contact_sheet', 'unknown']),
+    inputMode: negativeInputModeSchema,
+    inputProfileId: z.string().trim().min(1).optional(),
+    inputProfileSource: z.enum([
+      'explicit_project_profile',
+      'embedded_icc',
+      'raw_decoder_camera_profile',
+      'generic_assumption',
+      'assumed_display_profile',
+      'unknown',
+    ]),
+    inputProfileVersion: z.string().trim().min(1).optional(),
+    irCleaningSuspected: z.boolean(),
+    lensModel: z.string().trim().min(1).optional(),
+    lightSourceCct: z.number().int().positive().optional(),
+    lightSourceConfidence: negativeAcquisitionConfidenceSchema,
+    lightSourceType: z.enum(['led_panel', 'flash', 'enlarger', 'scanner', 'lab_unknown', 'unknown']),
+    pixelBasis: negativePixelBasisSchema,
+    preInversionSuspected: z.boolean(),
+    profileConfidence: negativeAcquisitionConfidenceSchema,
+    profileId: z.string().trim().min(1),
+    rebateOrBorderState: z.enum(['visible', 'partially_visible', 'cropped_out', 'unknown']),
+    reviewedAt: z.string().trim().min(1).optional(),
+    scannerOrCameraModel: z.string().trim().min(1).optional(),
+    scannerSoftware: z.string().trim().min(1).optional(),
+    scannerSoftwareVersion: z.string().trim().min(1).optional(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sharpeningSuspected: z.boolean(),
+    unevenIlluminationScore: normalizedScoreSchema,
+    visibleBaseState: z.enum(['visible', 'partially_visible', 'not_visible', 'unknown']),
+    warnings: z.array(negativeWarningV1Schema),
+  })
+  .strict();
+
+export const negativeFrameRecordV1Schema = z
+  .object({
+    acquisitionOverrideProfileId: z.string().trim().min(1).optional(),
+    baseSampleIds: z.array(z.string().trim().min(1)),
+    borderState: z.enum(['visible', 'partial', 'cropped', 'unknown']),
+    contentHash: z.string().trim().min(1),
+    conversionCommandIds: z.array(z.string().trim().min(1)),
+    crop: z
+      .object({
+        height: z.number().positive(),
+        rotationDegrees: z.number(),
+        width: z.number().positive(),
+        x: z.number(),
+        y: z.number(),
+      })
+      .strict()
+      .optional(),
+    frameId: z.string().trim().min(1),
+    frameIndex: z.number().int().nonnegative(),
+    positiveVariantIds: z.array(z.string().trim().min(1)),
+    qcStatus: z.enum(['needs_review', 'approved', 'approved_with_warnings', 'rejected', 'excluded_from_export']),
+    sourcePath: z.string().trim().min(1),
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict();
+
+export const negativeRollSessionV1Schema = z
+  .object({
+    acquisitionProfileId: z.string().trim().min(1),
+    acquisitionWarnings: z.array(negativeWarningV1Schema),
+    anchorFrameIds: z.array(z.string().trim().min(1)),
+    conversionWarnings: z.array(negativeWarningV1Schema),
+    frameRecords: z.array(negativeFrameRecordV1Schema).min(1),
+    inputMode: negativeInputModeSchema,
+    perFrameOverrideIds: z.array(z.string().trim().min(1)),
+    pixelBasis: negativePixelBasisSchema,
+    processFamily: negativeProcessFamilySchema,
+    provenanceEntryIds: z.array(z.string().trim().min(1)),
+    qcStatus: z.enum(['needs_review', 'approved', 'approved_with_warnings', 'rejected', 'excluded_from_export']),
+    rollDefaultCommandIds: z.array(z.string().trim().min(1)),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sessionId: z.string().trim().min(1),
+    sharedBaseSampleIds: z.array(z.string().trim().min(1)),
+    sourceFileIds: z.array(z.string().trim().min(1)).min(1),
+  })
+  .strict();
+
 export type ActorKind = z.infer<typeof actorKindSchema>;
 export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
+export type NegativeAcquisitionConfidence = z.infer<typeof negativeAcquisitionConfidenceSchema>;
+export type NegativeAcquisitionProfileV1 = z.infer<typeof negativeAcquisitionProfileV1Schema>;
+export type NegativeFrameRecordV1 = z.infer<typeof negativeFrameRecordV1Schema>;
+export type NegativeInputMode = z.infer<typeof negativeInputModeSchema>;
+export type NegativePixelBasis = z.infer<typeof negativePixelBasisSchema>;
+export type NegativeProcessFamily = z.infer<typeof negativeProcessFamilySchema>;
+export type NegativeRollSessionV1 = z.infer<typeof negativeRollSessionV1Schema>;
+export type NegativeWarningCode = z.infer<typeof negativeWarningCodeSchema>;
+export type NegativeWarningSeverity = z.infer<typeof negativeWarningSeveritySchema>;
+export type NegativeWarningV1 = z.infer<typeof negativeWarningV1Schema>;
 export type PanoramaArtifactV1 = z.infer<typeof panoramaArtifactV1Schema>;
 export type QueryEnvelopeV1 = z.infer<typeof queryEnvelopeV1Schema>;
 export type RawEngineActor = z.infer<typeof rawEngineActorSchema>;

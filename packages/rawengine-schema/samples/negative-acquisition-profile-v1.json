@@ -1,0 +1,48 @@
+{
+  "acquisitionConfidence": "low",
+  "autoColorSuspected": true,
+  "autoContrastSuspected": true,
+  "autoExposureSuspected": true,
+  "bitDepth": 8,
+  "captureDeviceName": "Unknown lab scanner",
+  "captureDeviceType": "lab_scanner",
+  "channelClippingScore": 0.12,
+  "compressionArtifactScore": 0.42,
+  "compressionKind": "lossy",
+  "createdFrom": "metadata.classifier.v1",
+  "dustRemovalSuspected": false,
+  "fileFormat": "jpeg",
+  "frameSpacingState": "single_frame",
+  "inputMode": "lab_jpeg",
+  "inputProfileSource": "assumed_display_profile",
+  "irCleaningSuspected": false,
+  "lightSourceConfidence": "low",
+  "lightSourceType": "lab_unknown",
+  "pixelBasis": "lab_rendered_rgb",
+  "preInversionSuspected": false,
+  "profileConfidence": "low",
+  "profileId": "acq_lab_jpeg_sample_v1",
+  "rebateOrBorderState": "cropped_out",
+  "schemaVersion": 1,
+  "sharpeningSuspected": true,
+  "unevenIlluminationScore": 0.18,
+  "visibleBaseState": "not_visible",
+  "warnings": [
+    {
+      "blocksAutomation": true,
+      "code": "low_acquisition_confidence",
+      "evidence": "Lab JPEG source has lossy compression and no scanner profile metadata.",
+      "frameIds": ["frame_0001"],
+      "scope": "session",
+      "severity": "warning"
+    },
+    {
+      "blocksAutomation": true,
+      "code": "lossy_input",
+      "evidence": "JPEG compression was detected from the source container.",
+      "frameIds": ["frame_0001"],
+      "scope": "frame",
+      "severity": "warning"
+    }
+  ]
+}
