@@ -7,6 +7,7 @@ import Button from '../ui/Button';
 import Switch from '../ui/Switch';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface CopyPasteSettingsModalProps {
   isOpen: boolean;
@@ -116,27 +117,16 @@ const PasteModeSwitch = ({ selectedMode, onModeChange, isVisible }: PasteModeSwi
 
 export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settings }: CopyPasteSettingsModalProps) {
   const { t } = useTranslation();
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
   const [localSettings, setLocalSettings] = useState<CopyPasteSettings>(settings);
 
   useEffect(() => {
     if (isOpen) {
-      setLocalSettings(settings);
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
+      const timer = window.setTimeout(() => {
+        setLocalSettings(settings);
+      }, 0);
       return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-      }, 300);
-      return () => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
       };
     }
   }, [isOpen, settings]);
