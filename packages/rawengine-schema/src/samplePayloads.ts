@@ -13,6 +13,7 @@ import {
   negativeLabBaseSampleRecordV1Schema,
   negativeLabBuiltInPresetCatalogV1Schema,
   negativeLabCommandEnvelopeV1Schema,
+  negativeLabConversionOperationV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
   negativeLabFixtureManifestV1Schema,
@@ -38,6 +39,7 @@ import {
   type NegativeLabBaseSampleRecordV1,
   type NegativeLabBuiltInPresetCatalogV1,
   type NegativeLabCommandEnvelopeV1,
+  type NegativeLabConversionOperationV1,
   type NegativeLabDensityNormalizationProfileV1,
   type NegativeLabDryRunResultV1,
   type NegativeLabFixtureManifestV1,
@@ -1530,6 +1532,51 @@ export const sampleNegativeLabApplyResultV1: NegativeLabApplyResultV1 = negative
   sessionId: sampleNegativeRollSessionV1.sessionId,
   warnings: sampleNegativeRollSessionV1.acquisitionWarnings,
 });
+
+export const sampleNegativeLabConversionOperationV1: NegativeLabConversionOperationV1 =
+  negativeLabConversionOperationV1Schema.parse({
+    approvalClass: ApprovalClass.PreviewOnly,
+    artifactPurposes: ['objective_positive_preview', 'density_map', 'parameter_diff'],
+    commandType: sampleNegativeLabCommandEnvelopeV1.commandType,
+    expectedGraphRevision: sampleNegativeLabCommandEnvelopeV1.expectedGraphRevision,
+    frameSelection: {
+      excludeFrameIds: [],
+      frameIds: ['frame_0001'],
+      mode: 'selected',
+      qcStatuses: [],
+      warningCodes: [],
+    },
+    mutates: false,
+    operationClass: 'objective',
+    operationId: 'negative_lab_operation_conversion_preview_sample',
+    operationStage: 'objective_inversion',
+    outputArtifacts: sampleNegativeLabDryRunResultV1.previewArtifacts,
+    parameterRefs: {
+      acquisitionProfileId: sampleNegativeRollSessionV1.acquisitionProfileId,
+      baseEstimateId: sampleNegativeLabBaseFogEstimateV1.estimateId,
+      baseSampleIds: [sampleNegativeLabBaseSampleRecordV1.sampleId],
+      conversionRecipeId: 'conversion_recipe_negative_roll_01',
+      curveSetId: sampleNegativeLabPerChannelInversionCurveSetV1.curveSetId,
+      dryRunPlanId: sampleNegativeLabDryRunResultV1.dryRunPlanId,
+      inputProfileId: 'negative_lab.input.lab_jpeg_review.v1',
+      normalizationProfileId: sampleNegativeLabDensityNormalizationProfileV1.normalizationProfileId,
+      positiveVariantIds: [],
+      processProfileId: sampleNegativeLabProcessProfileV1.profileId,
+    },
+    provenance: {
+      actor: sampleNegativeLabCommandEnvelopeV1.actor,
+      commandId: sampleNegativeLabCommandEnvelopeV1.commandId,
+      correlationId: sampleNegativeLabCommandEnvelopeV1.correlationId,
+      createdAt: '2026-06-13T10:45:00.000Z',
+      idempotencyKey: sampleNegativeLabCommandEnvelopeV1.idempotencyKey,
+      localOnly: true,
+      source: 'app_server_agent',
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sessionId: sampleNegativeRollSessionV1.sessionId,
+    sourceGraphRevision: 'graph_rev_negative_7',
+    warnings: sampleNegativeLabDryRunResultV1.warnings,
+  });
 
 export const sampleNegativeLabPositiveVariantProvenanceV1: NegativeLabPositiveVariantProvenanceV1 =
   negativeLabPositiveVariantProvenanceV1Schema.parse({

@@ -16,6 +16,7 @@ import {
   negativeLabBaseSampleRecordV1Schema,
   negativeLabBuiltInPresetCatalogV1Schema,
   negativeLabCommandEnvelopeV1Schema,
+  negativeLabConversionOperationV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
   negativeLabFixtureManifestV1Schema,
@@ -43,6 +44,7 @@ import {
   sampleNegativeLabBaseSampleRecordV1,
   sampleNegativeLabBuiltInPresetCatalogV1,
   sampleNegativeLabCommandEnvelopeV1,
+  sampleNegativeLabConversionOperationV1,
   sampleNegativeLabDensityNormalizationProfileV1,
   sampleNegativeLabDryRunResultV1,
   sampleNegativeLabFixtureManifestV1,
@@ -176,6 +178,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab-apply-result-v1.json',
     schema: negativeLabApplyResultV1Schema,
     value: sampleNegativeLabApplyResultV1,
+  },
+  {
+    name: 'negative lab conversion operation',
+    path: 'packages/rawengine-schema/samples/negative-lab-conversion-operation-v1.json',
+    schema: negativeLabConversionOperationV1Schema,
+    value: sampleNegativeLabConversionOperationV1,
   },
   {
     name: 'negative lab app-server tool manifest',

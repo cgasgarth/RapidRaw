@@ -1,0 +1,67 @@
+{
+  "approvalClass": "preview_only",
+  "artifactPurposes": ["objective_positive_preview", "density_map", "parameter_diff"],
+  "commandType": "negativeLab.setConversionRecipe",
+  "expectedGraphRevision": "graph_rev_negative_7",
+  "frameSelection": {
+    "excludeFrameIds": [],
+    "frameIds": ["frame_0001"],
+    "mode": "selected",
+    "qcStatuses": [],
+    "warningCodes": []
+  },
+  "mutates": false,
+  "operationClass": "objective",
+  "operationId": "negative_lab_operation_conversion_preview_sample",
+  "operationStage": "objective_inversion",
+  "outputArtifacts": [
+    {
+      "artifactId": "artifact_preview_sample",
+      "contentHash": "sha256:sample-preview-hash",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "preview",
+      "storage": "temp_cache"
+    }
+  ],
+  "parameterRefs": {
+    "acquisitionProfileId": "acq_lab_jpeg_sample_v1",
+    "baseEstimateId": "base_estimate_roll_01",
+    "baseSampleIds": ["base_sample_roll_01"],
+    "conversionRecipeId": "conversion_recipe_negative_roll_01",
+    "curveSetId": "roll_01_c41_objective_curves",
+    "dryRunPlanId": "dry_run_plan_negative_conversion_sample",
+    "inputProfileId": "negative_lab.input.lab_jpeg_review.v1",
+    "normalizationProfileId": "generic_c41_density_norm_v1",
+    "positiveVariantIds": [],
+    "processProfileId": "generic_c41_v1"
+  },
+  "provenance": {
+    "actor": {
+      "id": "codex-app-server",
+      "kind": "agent",
+      "sessionId": "session_sample"
+    },
+    "commandId": "command_negative_set_conversion_recipe_sample",
+    "correlationId": "corr_negative_set_conversion_recipe_sample",
+    "createdAt": "2026-06-13T10:45:00.000Z",
+    "idempotencyKey": "idem_negative_set_conversion_recipe_sample",
+    "localOnly": true,
+    "source": "app_server_agent"
+  },
+  "schemaVersion": 1,
+  "sessionId": "negative_roll_session_sample",
+  "sourceGraphRevision": "graph_rev_negative_7",
+  "warnings": [
+    {
+      "blocksAutomation": true,
+      "code": "low_acquisition_confidence",
+      "evidence": "Lab JPEG source has lossy compression and no scanner profile metadata.",
+      "frameIds": ["frame_0001"],
+      "scope": "session",
+      "severity": "warning"
+    }
+  ]
+}

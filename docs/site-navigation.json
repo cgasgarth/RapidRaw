@@ -79,6 +79,10 @@
           "path": "docs/negative-lab/api-command-surface-adr-2026-06-13.md"
         },
         {
+          "title": "Negative Lab conversion operation schema",
+          "path": "docs/negative-lab/conversion-operation-schema-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab preset naming and legal policy ADR",
           "path": "docs/negative-lab/preset-naming-legal-policy-2026-06-13.md"
         },
