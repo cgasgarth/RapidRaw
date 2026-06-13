@@ -301,7 +301,18 @@ export const panoramaAlignmentV1Schema = z
 
 export const panoramaExposureNormalizationV1Schema = z
   .object({
+    deferredReason: z.string().trim().min(1).optional(),
     mode: z.enum(['none', 'planned', 'gain_offset_v1']),
+    overlapMetrics: z
+      .object({
+        channelRatioDeltaAfter: z.number().nonnegative().optional(),
+        channelRatioDeltaBefore: z.number().nonnegative().optional(),
+        clippingIncreaseRatio: z.number().nonnegative().optional(),
+        medianLogLuminanceDeltaAfter: z.number().nonnegative().optional(),
+        medianLogLuminanceDeltaBefore: z.number().nonnegative().optional(),
+      })
+      .strict()
+      .optional(),
     perSourceCorrections: z
       .array(
         z
@@ -314,8 +325,14 @@ export const panoramaExposureNormalizationV1Schema = z
           .strict(),
       )
       .optional(),
+    skippedReason: z.enum(['insufficient_overlap', 'low_confidence_alignment', 'not_requested']).optional(),
+    support: z.enum(['implemented_current_engine', 'schema_only_deferred']),
   })
-  .strict();
+  .strict()
+  .refine((settings) => settings.support === 'implemented_current_engine' || settings.deferredReason !== undefined, {
+    message: 'Deferred exposure normalization requires deferredReason.',
+    path: ['deferredReason'],
+  });
 
 export const panoramaSeamPolicyV1Schema = z
   .object({

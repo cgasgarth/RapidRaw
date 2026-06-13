@@ -26,7 +26,7 @@ The v1 schema includes:
 - projection intent;
 - boundary settings, boundary mode, and crop rectangle;
 - pairwise homography summaries;
-- exposure normalization status;
+- exposure normalization status and overlap metrics;
 - seam policy;
 - output and preview artifact handles;
 - provenance fields for command/app-server replay;
