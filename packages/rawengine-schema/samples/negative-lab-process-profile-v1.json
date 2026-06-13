@@ -1,0 +1,90 @@
+{
+  "colorMode": "color_negative_rgb",
+  "curveModelId": "process_profile_monotonic_v1",
+  "densityCurves": [
+    {
+      "channel": "red",
+      "interpolation": "monotone_cubic",
+      "points": [
+        {
+          "inputDensity": 0,
+          "outputLinear": 0
+        },
+        {
+          "inputDensity": 0.4,
+          "outputLinear": 0.16
+        },
+        {
+          "inputDensity": 1.2,
+          "outputLinear": 0.58
+        },
+        {
+          "inputDensity": 2.6,
+          "outputLinear": 1
+        }
+      ]
+    },
+    {
+      "channel": "green",
+      "interpolation": "monotone_cubic",
+      "points": [
+        {
+          "inputDensity": 0,
+          "outputLinear": 0
+        },
+        {
+          "inputDensity": 0.4,
+          "outputLinear": 0.18
+        },
+        {
+          "inputDensity": 1.2,
+          "outputLinear": 0.6
+        },
+        {
+          "inputDensity": 2.6,
+          "outputLinear": 1
+        }
+      ]
+    },
+    {
+      "channel": "blue",
+      "interpolation": "monotone_cubic",
+      "points": [
+        {
+          "inputDensity": 0,
+          "outputLinear": 0
+        },
+        {
+          "inputDensity": 0.4,
+          "outputLinear": 0.14
+        },
+        {
+          "inputDensity": 1.2,
+          "outputLinear": 0.54
+        },
+        {
+          "inputDensity": 2.6,
+          "outputLinear": 1
+        }
+      ]
+    }
+  ],
+  "normalizationProfileId": "generic_c41_density_norm_v1",
+  "processFamily": "c41_color_negative",
+  "profileClass": "generic_process",
+  "profileId": "generic_c41_v1",
+  "profileVersion": "2026-06-13",
+  "provenance": {
+    "claimsPolicy": "generic_starting_point_only",
+    "fixtureIds": [],
+    "legalNamingStatus": "generic_safe_name",
+    "measurementSource": "generic_engineered_starting_point"
+  },
+  "schemaVersion": 1,
+  "touchedParameters": {
+    "creativeRendering": [],
+    "objectiveInversion": ["density_rgb_v1"],
+    "semiObjectiveNormalization": ["density_normalization_v1"]
+  },
+  "warningCodes": []
+}

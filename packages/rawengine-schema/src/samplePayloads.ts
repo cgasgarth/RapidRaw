@@ -10,8 +10,10 @@ import {
   negativeLabApplyPlanRequestV1Schema,
   negativeLabApplyResultV1Schema,
   negativeLabCommandEnvelopeV1Schema,
+  negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
+  negativeLabProcessProfileV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -23,8 +25,10 @@ import {
   type NegativeLabApplyPlanRequestV1,
   type NegativeLabApplyResultV1,
   type NegativeLabCommandEnvelopeV1,
+  type NegativeLabDensityNormalizationProfileV1,
   type NegativeLabDryRunResultV1,
   type NegativeLabPositiveVariantProvenanceV1,
+  type NegativeLabProcessProfileV1,
   type NegativeRollSessionV1,
   type PanoramaArtifactV1,
   type QueryEnvelopeV1,
@@ -377,6 +381,82 @@ export const sampleNegativeRollSessionV1: NegativeRollSessionV1 = negativeRollSe
   sourceFileIds: ['source_lab_scan_0001'],
 });
 
+export const sampleNegativeLabDensityNormalizationProfileV1: NegativeLabDensityNormalizationProfileV1 =
+  negativeLabDensityNormalizationProfileV1Schema.parse({
+    algorithmId: 'density_normalization_v1',
+    anchorPolicy: 'roll_anchor_frames',
+    channelBalanceWeights: {
+      blue: 0.2,
+      green: 0.55,
+      red: 0.25,
+    },
+    densityAim: {
+      highlightDensity: 0.18,
+      midtoneDensity: 0.82,
+      shadowDensity: 2.35,
+    },
+    exposureReferenceDensity: 0.82,
+    normalizationProfileId: 'generic_c41_density_norm_v1',
+    profileVersion: '2026-06-13',
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    supportedProcessFamilies: ['c41_color_negative'],
+  });
+
+export const sampleNegativeLabProcessProfileV1: NegativeLabProcessProfileV1 = negativeLabProcessProfileV1Schema.parse({
+  colorMode: 'color_negative_rgb',
+  curveModelId: 'process_profile_monotonic_v1',
+  densityCurves: [
+    {
+      channel: 'red',
+      interpolation: 'monotone_cubic',
+      points: [
+        { inputDensity: 0, outputLinear: 0 },
+        { inputDensity: 0.4, outputLinear: 0.16 },
+        { inputDensity: 1.2, outputLinear: 0.58 },
+        { inputDensity: 2.6, outputLinear: 1 },
+      ],
+    },
+    {
+      channel: 'green',
+      interpolation: 'monotone_cubic',
+      points: [
+        { inputDensity: 0, outputLinear: 0 },
+        { inputDensity: 0.4, outputLinear: 0.18 },
+        { inputDensity: 1.2, outputLinear: 0.6 },
+        { inputDensity: 2.6, outputLinear: 1 },
+      ],
+    },
+    {
+      channel: 'blue',
+      interpolation: 'monotone_cubic',
+      points: [
+        { inputDensity: 0, outputLinear: 0 },
+        { inputDensity: 0.4, outputLinear: 0.14 },
+        { inputDensity: 1.2, outputLinear: 0.54 },
+        { inputDensity: 2.6, outputLinear: 1 },
+      ],
+    },
+  ],
+  normalizationProfileId: sampleNegativeLabDensityNormalizationProfileV1.normalizationProfileId,
+  processFamily: 'c41_color_negative',
+  profileClass: 'generic_process',
+  profileId: 'generic_c41_v1',
+  profileVersion: '2026-06-13',
+  provenance: {
+    claimsPolicy: 'generic_starting_point_only',
+    fixtureIds: [],
+    legalNamingStatus: 'generic_safe_name',
+    measurementSource: 'generic_engineered_starting_point',
+  },
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  touchedParameters: {
+    creativeRendering: [],
+    objectiveInversion: ['density_rgb_v1'],
+    semiObjectiveNormalization: ['density_normalization_v1'],
+  },
+  warningCodes: [],
+});
+
 export const sampleNegativeLabCommandEnvelopeV1: NegativeLabCommandEnvelopeV1 =
   negativeLabCommandEnvelopeV1Schema.parse({
     actor: {
@@ -410,8 +490,10 @@ export const sampleNegativeLabCommandEnvelopeV1: NegativeLabCommandEnvelopeV1 =
       },
       curveModel: {
         curveFamily: 'process_profile_monotonic_v1',
-        processProfileId: 'generic_c41_v1',
-        processProfileVersion: '2026-06-13',
+        normalizationProfileId: sampleNegativeLabDensityNormalizationProfileV1.normalizationProfileId,
+        normalizationProfileVersion: sampleNegativeLabDensityNormalizationProfileV1.profileVersion,
+        processProfileId: sampleNegativeLabProcessProfileV1.profileId,
+        processProfileVersion: sampleNegativeLabProcessProfileV1.profileVersion,
       },
       frameSelection: {
         excludeFrameIds: [],

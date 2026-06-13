@@ -8,8 +8,10 @@ import {
   negativeLabApplyPlanRequestV1Schema,
   negativeLabApplyResultV1Schema,
   negativeLabCommandEnvelopeV1Schema,
+  negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
+  negativeLabProcessProfileV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -23,8 +25,10 @@ import {
   sampleNegativeLabApplyPlanRequestV1,
   sampleNegativeLabApplyResultV1,
   sampleNegativeLabCommandEnvelopeV1,
+  sampleNegativeLabDensityNormalizationProfileV1,
   sampleNegativeLabDryRunResultV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
+  sampleNegativeLabProcessProfileV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -95,6 +99,16 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab app-server tool manifest',
     schema: negativeLabAppServerToolManifestV1Schema,
     value: sampleNegativeLabAppServerToolManifestV1,
+  },
+  {
+    name: 'negative lab density normalization profile',
+    schema: negativeLabDensityNormalizationProfileV1Schema,
+    value: sampleNegativeLabDensityNormalizationProfileV1,
+  },
+  {
+    name: 'negative lab process profile',
+    schema: negativeLabProcessProfileV1Schema,
+    value: sampleNegativeLabProcessProfileV1,
   },
   {
     name: 'negative lab positive variant provenance',
@@ -204,6 +218,41 @@ const invalidPositiveVariantProvenanceResult = negativeLabPositiveVariantProvena
 );
 if (invalidPositiveVariantProvenanceResult.success) {
   throw new Error('Expected positive variant provenance schema to reject missing source hashes.');
+}
+
+const invalidDensityNormalizationProfile = {
+  ...sampleNegativeLabDensityNormalizationProfileV1,
+  channelBalanceWeights: {
+    blue: 0.5,
+    green: 0.5,
+    red: 0.5,
+  },
+};
+
+const invalidDensityNormalizationProfileResult = negativeLabDensityNormalizationProfileV1Schema.safeParse(
+  invalidDensityNormalizationProfile,
+);
+if (invalidDensityNormalizationProfileResult.success) {
+  throw new Error('Expected density normalization profiles to reject channel weights that do not sum to 1.');
+}
+
+const invalidProcessProfile = {
+  ...sampleNegativeLabProcessProfileV1,
+  densityCurves: [
+    {
+      channel: 'red',
+      interpolation: 'linear',
+      points: [
+        { inputDensity: 0, outputLinear: 0.2 },
+        { inputDensity: 0.5, outputLinear: 0.1 },
+      ],
+    },
+  ],
+};
+
+const invalidProcessProfileResult = negativeLabProcessProfileV1Schema.safeParse(invalidProcessProfile);
+if (invalidProcessProfileResult.success) {
+  throw new Error('Expected process profiles to reject non-monotonic density curves.');
 }
 
 console.log(`Validated ${validSamples.length} RawEngine schema samples.`);

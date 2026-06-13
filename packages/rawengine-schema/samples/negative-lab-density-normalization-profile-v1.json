@@ -1,0 +1,19 @@
+{
+  "algorithmId": "density_normalization_v1",
+  "anchorPolicy": "roll_anchor_frames",
+  "channelBalanceWeights": {
+    "blue": 0.2,
+    "green": 0.55,
+    "red": 0.25
+  },
+  "densityAim": {
+    "highlightDensity": 0.18,
+    "midtoneDensity": 0.82,
+    "shadowDensity": 2.35
+  },
+  "exposureReferenceDensity": 0.82,
+  "normalizationProfileId": "generic_c41_density_norm_v1",
+  "profileVersion": "2026-06-13",
+  "schemaVersion": 1,
+  "supportedProcessFamilies": ["c41_color_negative"]
+}
