@@ -2,6 +2,9 @@ import { z } from 'zod';
 
 import {
   aiAppServerToolManifestV1Schema,
+  aiEnhancementApplyResultV1Schema,
+  aiEnhancementCommandEnvelopeV1Schema,
+  aiEnhancementDryRunResultV1Schema,
   aiToolApplyResultV1Schema,
   aiToolCommandEnvelopeV1Schema,
   aiToolDryRunResultV1Schema,
@@ -61,6 +64,13 @@ import {
 } from '../src/rawEngineSchemas.js';
 import {
   sampleAiAppServerToolManifestV1,
+  sampleAiEnhancementAgentReplayFixtureV1,
+  sampleAiEnhancementApplyAppServerToolCallValidationV1,
+  sampleAiEnhancementApplyCommandEnvelopeV1,
+  sampleAiEnhancementApplyResultV1,
+  sampleAiEnhancementCommandEnvelopeV1,
+  sampleAiEnhancementDryRunAppServerToolCallValidationV1,
+  sampleAiEnhancementDryRunResultV1,
   sampleAiMaskApplyAppServerToolCallValidationV1,
   sampleAiMaskDryRunAppServerToolCallValidationV1,
   sampleAiToolAgentReplayFixtureV1,
@@ -195,6 +205,41 @@ const validSamples: ReadonlyArray<{
     name: 'AI app-server tool manifest',
     schema: aiAppServerToolManifestV1Schema,
     value: sampleAiAppServerToolManifestV1,
+  },
+  {
+    name: 'AI enhancement command envelope',
+    schema: aiEnhancementCommandEnvelopeV1Schema,
+    value: sampleAiEnhancementCommandEnvelopeV1,
+  },
+  {
+    name: 'AI enhancement apply command envelope',
+    schema: aiEnhancementCommandEnvelopeV1Schema,
+    value: sampleAiEnhancementApplyCommandEnvelopeV1,
+  },
+  {
+    name: 'AI enhancement dry-run result',
+    schema: aiEnhancementDryRunResultV1Schema,
+    value: sampleAiEnhancementDryRunResultV1,
+  },
+  {
+    name: 'AI enhancement apply result',
+    schema: aiEnhancementApplyResultV1Schema,
+    value: sampleAiEnhancementApplyResultV1,
+  },
+  {
+    name: 'AI enhancement agent replay fixture',
+    schema: rawEngineAgentReplayFixtureV1Schema,
+    value: sampleAiEnhancementAgentReplayFixtureV1,
+  },
+  {
+    name: 'AI enhancement dry-run app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleAiEnhancementDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'AI enhancement apply app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleAiEnhancementApplyAppServerToolCallValidationV1,
   },
   {
     name: 'AI mask dry-run app-server tool call validation',
@@ -670,6 +715,55 @@ expectInvalid('AI app-server apply call without approved state', rawEngineAppSer
       state: 'pending',
     },
   },
+});
+
+expectInvalid(
+  'AI enhancement dry-run command with cloud provider marked local-only',
+  aiEnhancementCommandEnvelopeV1Schema,
+  {
+    ...sampleAiEnhancementCommandEnvelopeV1,
+    parameters: {
+      ...sampleAiEnhancementCommandEnvelopeV1.parameters,
+      providerClass: 'cloud_service',
+      sourcePixelDisclosure: 'local_only',
+    },
+  },
+);
+
+expectInvalid('AI enhancement apply command missing dry-run plan id', aiEnhancementCommandEnvelopeV1Schema, {
+  ...sampleAiEnhancementApplyCommandEnvelopeV1,
+  parameters: {
+    ...sampleAiEnhancementApplyCommandEnvelopeV1.parameters,
+    acceptedDryRunPlanId: undefined,
+  },
+});
+
+expectInvalid('AI enhancement operator prompt without prompt text', aiEnhancementCommandEnvelopeV1Schema, {
+  ...sampleAiEnhancementCommandEnvelopeV1,
+  parameters: {
+    ...sampleAiEnhancementCommandEnvelopeV1.parameters,
+    promptPolicy: 'operator_prompt',
+  },
+});
+
+expectInvalid('AI inpaint enhancement without region mask', aiEnhancementCommandEnvelopeV1Schema, {
+  ...sampleAiEnhancementCommandEnvelopeV1,
+  parameters: {
+    ...sampleAiEnhancementCommandEnvelopeV1.parameters,
+    capability: 'inpaint',
+  },
+});
+
+expectInvalid('AI enhancement app-server dry-run with mask output schema', aiAppServerToolManifestV1Schema, {
+  ...sampleAiAppServerToolManifestV1,
+  tools: sampleAiAppServerToolManifestV1.tools.map((tool) =>
+    tool.toolName === 'ai.enhancement.dry_run_command'
+      ? {
+          ...tool,
+          outputSchemaName: 'AiToolDryRunResultV1',
+        }
+      : tool,
+  ),
 });
 
 expectInvalid('preview scope result without scope payloads', previewScopeResultV1Schema, {
