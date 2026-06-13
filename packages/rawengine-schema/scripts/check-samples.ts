@@ -28,6 +28,7 @@ import {
   sampleNegativeAcquisitionProfileV1,
   sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabApplyPlanRequestV1,
+  sampleNegativeLabApplyFrameCropCommandEnvelopeV1,
   sampleNegativeLabApplyResultV1,
   sampleNegativeLabBuiltInPresetCatalogV1,
   sampleNegativeLabCommandEnvelopeV1,
@@ -89,6 +90,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab command envelope',
     schema: negativeLabCommandEnvelopeV1Schema,
     value: sampleNegativeLabCommandEnvelopeV1,
+  },
+  {
+    name: 'negative lab apply frame crop command envelope',
+    schema: negativeLabCommandEnvelopeV1Schema,
+    value: sampleNegativeLabApplyFrameCropCommandEnvelopeV1,
   },
   {
     name: 'negative lab dry-run result',
@@ -215,6 +221,97 @@ const invalidFrameQcCommandResult = negativeLabCommandEnvelopeV1Schema.safeParse
 if (invalidFrameQcCommandResult.success) {
   throw new Error('Expected frame QC command schema to reject generated warningCodes as user input.');
 }
+
+if (sampleNegativeLabApplyFrameCropCommandEnvelopeV1.commandType !== 'negativeLab.applyFrameCrop') {
+  throw new Error('Expected frame crop command sample to use negativeLab.applyFrameCrop.');
+}
+
+const [sampleFrameCropEdit] = sampleNegativeLabApplyFrameCropCommandEnvelopeV1.parameters.cropEdits;
+if (sampleFrameCropEdit === undefined) {
+  throw new Error('Expected frame crop command sample to include a crop edit.');
+}
+
+const invalidFrameCropDuplicateFrames = {
+  ...sampleNegativeLabApplyFrameCropCommandEnvelopeV1,
+  parameters: {
+    ...sampleNegativeLabApplyFrameCropCommandEnvelopeV1.parameters,
+    cropEdits: [sampleFrameCropEdit, sampleFrameCropEdit],
+  },
+};
+expectInvalid(
+  'frame crop command with duplicate frame edits',
+  negativeLabCommandEnvelopeV1Schema,
+  invalidFrameCropDuplicateFrames,
+);
+
+const invalidFrameCropMissingDetectionRun = {
+  ...sampleNegativeLabApplyFrameCropCommandEnvelopeV1,
+  parameters: {
+    ...sampleNegativeLabApplyFrameCropCommandEnvelopeV1.parameters,
+    detectionRunId: undefined,
+  },
+};
+expectInvalid(
+  'detected frame crop command without detection run ID',
+  negativeLabCommandEnvelopeV1Schema,
+  invalidFrameCropMissingDetectionRun,
+);
+
+const invalidFrameCropAcceptedManualSource = {
+  ...sampleNegativeLabApplyFrameCropCommandEnvelopeV1,
+  parameters: {
+    ...sampleNegativeLabApplyFrameCropCommandEnvelopeV1.parameters,
+    cropEdits: [
+      {
+        ...sampleFrameCropEdit,
+        cropSource: 'manual_override',
+      },
+    ],
+  },
+};
+expectInvalid(
+  'accepted detected frame crop command with manual crop source',
+  negativeLabCommandEnvelopeV1Schema,
+  invalidFrameCropAcceptedManualSource,
+);
+
+const invalidFrameCropManualDetectedSource = {
+  ...sampleNegativeLabApplyFrameCropCommandEnvelopeV1,
+  parameters: {
+    ...sampleNegativeLabApplyFrameCropCommandEnvelopeV1.parameters,
+    cropEdits: [
+      {
+        ...sampleFrameCropEdit,
+        cropSource: 'detected_frame',
+        editMode: 'manual_override',
+      },
+    ],
+  },
+};
+expectInvalid(
+  'manual frame crop override recorded as detected crop',
+  negativeLabCommandEnvelopeV1Schema,
+  invalidFrameCropManualDetectedSource,
+);
+
+const invalidFrameCropRejectedWithoutNotes = {
+  ...sampleNegativeLabApplyFrameCropCommandEnvelopeV1,
+  parameters: {
+    ...sampleNegativeLabApplyFrameCropCommandEnvelopeV1.parameters,
+    cropEdits: [
+      {
+        ...sampleFrameCropEdit,
+        editMode: 'reject_detected',
+        notes: undefined,
+      },
+    ],
+  },
+};
+expectInvalid(
+  'rejected frame crop command without review notes',
+  negativeLabCommandEnvelopeV1Schema,
+  invalidFrameCropRejectedWithoutNotes,
+);
 
 const invalidDeferredProcessCommand = {
   ...sampleNegativeLabCommandEnvelopeV1,

@@ -1428,6 +1428,7 @@ export const NEGATIVE_LAB_COMMAND_TYPES = [
   'negativeLab.planRollNormalization',
   'negativeLab.createPositiveVariant',
   'negativeLab.setFrameQcStatus',
+  'negativeLab.applyFrameCrop',
 ] as const;
 
 export const negativeLabCommandTypeSchema = z.enum(NEGATIVE_LAB_COMMAND_TYPES);
@@ -1843,6 +1844,84 @@ export const negativeLabSetFrameQcStatusParametersV1Schema = z
   })
   .strict();
 
+export const negativeLabFrameCropEditV1Schema = z
+  .object({
+    borderConfidence: negativeAcquisitionConfidenceSchema,
+    borderState: z.enum(['visible', 'partial', 'cropped', 'unknown']),
+    crop: negativeLabDetectedFrameCropV1Schema,
+    cropSource: z.enum(['detected_frame', 'manual_override', 'imported_metadata']),
+    detectionFrameId: z.string().trim().min(1).optional(),
+    editMode: z.enum(['accept_detected', 'manual_override', 'reject_detected']),
+    frameId: z.string().trim().min(1),
+    notes: z.string().trim().min(1).optional(),
+    sourceFileId: z.string().trim().min(1),
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict()
+  .superRefine((edit, context) => {
+    if (edit.editMode === 'accept_detected' && edit.cropSource !== 'detected_frame') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Accepted detected crops must use detected-frame crop source.',
+        path: ['cropSource'],
+      });
+    }
+
+    if (edit.editMode === 'manual_override' && edit.cropSource === 'detected_frame') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Manual crop overrides must not be recorded as detected-frame crops.',
+        path: ['cropSource'],
+      });
+    }
+
+    if (edit.editMode === 'reject_detected' && edit.notes === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Rejected detected crops require notes for review provenance.',
+        path: ['notes'],
+      });
+    }
+
+    if (edit.cropSource === 'detected_frame' && edit.detectionFrameId === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Detected-frame crop edits require the source detection frame ID.',
+        path: ['detectionFrameId'],
+      });
+    }
+  });
+
+export const negativeLabApplyFrameCropParametersV1Schema = z
+  .object({
+    cropEdits: z.array(negativeLabFrameCropEditV1Schema).min(1),
+    detectionRunId: z.string().trim().min(1).optional(),
+    frameSelection: negativeLabFrameSelectionV1Schema,
+    sessionId: z.string().trim().min(1),
+  })
+  .strict()
+  .superRefine((parameters, context) => {
+    const frameIds = new Set<string>();
+    for (const [index, edit] of parameters.cropEdits.entries()) {
+      if (frameIds.has(edit.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Frame crop commands must not contain duplicate frame IDs.',
+          path: ['cropEdits', index, 'frameId'],
+        });
+      }
+      frameIds.add(edit.frameId);
+
+      if (edit.cropSource === 'detected_frame' && parameters.detectionRunId === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Detected-frame crop edits require a detectionRunId on the command.',
+          path: ['detectionRunId'],
+        });
+      }
+    }
+  });
+
 export const negativeLabApplyPlanRequestV1Schema = z
   .object({
     acknowledgedWarningCodes: z.array(negativeWarningCodeSchema),
@@ -1902,6 +1981,13 @@ export const negativeLabSetFrameQcStatusCommandV1Schema = commandEnvelopeV1Schem
   })
   .strict();
 
+export const negativeLabApplyFrameCropCommandV1Schema = commandEnvelopeV1Schema
+  .extend({
+    commandType: z.literal('negativeLab.applyFrameCrop'),
+    parameters: negativeLabApplyFrameCropParametersV1Schema,
+  })
+  .strict();
+
 export const negativeLabCommandEnvelopeV1Schema = z.discriminatedUnion('commandType', [
   negativeLabCreateSessionCommandV1Schema,
   negativeLabUpdateBaseSamplesCommandV1Schema,
@@ -1910,6 +1996,7 @@ export const negativeLabCommandEnvelopeV1Schema = z.discriminatedUnion('commandT
   negativeLabPlanRollNormalizationCommandV1Schema,
   negativeLabCreatePositiveVariantCommandV1Schema,
   negativeLabSetFrameQcStatusCommandV1Schema,
+  negativeLabApplyFrameCropCommandV1Schema,
 ]);
 
 export const negativeLabChangeSetV1Schema = z
@@ -2106,6 +2193,7 @@ export type NegativeLabAppServerAuditEvent = z.infer<typeof negativeLabAppServer
 export type NegativeLabAppServerExecutionMode = z.infer<typeof negativeLabAppServerExecutionModeSchema>;
 export type NegativeLabAppServerToolDefinitionV1 = z.infer<typeof negativeLabAppServerToolDefinitionV1Schema>;
 export type NegativeLabAppServerToolManifestV1 = z.infer<typeof negativeLabAppServerToolManifestV1Schema>;
+export type NegativeLabApplyFrameCropParametersV1 = z.infer<typeof negativeLabApplyFrameCropParametersV1Schema>;
 export type NegativeLabApplyResultV1 = z.infer<typeof negativeLabApplyResultV1Schema>;
 export type NegativeLabApplyPlanRequestV1 = z.infer<typeof negativeLabApplyPlanRequestV1Schema>;
 export type NegativeLabBaseSampleRegionV1 = z.infer<typeof negativeLabBaseSampleRegionV1Schema>;
@@ -2139,6 +2227,7 @@ export type NegativeLabFixtureWarningCodeV1 = z.infer<typeof negativeLabFixtureW
 export type NegativeLabFrameBorderMetricsV1 = z.infer<typeof negativeLabFrameBorderMetricsV1Schema>;
 export type NegativeLabFrameDetectionRequestV1 = z.infer<typeof negativeLabFrameDetectionRequestV1Schema>;
 export type NegativeLabFrameDetectionResultV1 = z.infer<typeof negativeLabFrameDetectionResultV1Schema>;
+export type NegativeLabFrameCropEditV1 = z.infer<typeof negativeLabFrameCropEditV1Schema>;
 export type NegativeLabFrameSelectionV1 = z.infer<typeof negativeLabFrameSelectionV1Schema>;
 export type NegativeLabInputProfileCatalogV1 = z.infer<typeof negativeLabInputProfileCatalogV1Schema>;
 export type NegativeLabInputProfileKindV1 = z.infer<typeof negativeLabInputProfileKindV1Schema>;

@@ -1109,6 +1109,62 @@ export const sampleNegativeLabCommandEnvelopeV1: NegativeLabCommandEnvelopeV1 =
     },
   });
 
+export const sampleNegativeLabApplyFrameCropCommandEnvelopeV1: NegativeLabCommandEnvelopeV1 =
+  negativeLabCommandEnvelopeV1Schema.parse({
+    actor: {
+      id: 'codex-app-server',
+      kind: ActorKind.Agent,
+      sessionId: 'session_sample',
+    },
+    approval: {
+      approvalClass: ApprovalClass.PreviewOnly,
+      reason: 'Frame crop command returns a dry-run crop diff before mutating frame records.',
+      state: 'not_required',
+    },
+    commandId: 'command_negative_apply_frame_crop_sample',
+    commandType: 'negativeLab.applyFrameCrop',
+    correlationId: 'corr_negative_apply_frame_crop_sample',
+    dryRun: true,
+    expectedGraphRevision: 'graph_rev_negative_8',
+    idempotencyKey: 'idem_negative_apply_frame_crop_sample',
+    parameters: {
+      cropEdits: [
+        {
+          borderConfidence: 'medium',
+          borderState: 'partial',
+          crop: {
+            height: 3024,
+            rotationDegrees: 0.15,
+            width: 4536,
+            x: 128,
+            y: 96,
+          },
+          cropSource: 'detected_frame',
+          detectionFrameId: 'frame_0001',
+          editMode: 'accept_detected',
+          frameId: 'frame_0001',
+          notes: 'Accept detected crop after user review.',
+          sourceFileId: 'source_lab_scan_0001',
+          warningCodes: ['cropped_no_border', 'frame_detection_low_confidence'],
+        },
+      ],
+      detectionRunId: sampleNegativeLabFrameDetectionResultV1.detectionRunId,
+      frameSelection: {
+        excludeFrameIds: [],
+        frameIds: ['frame_0001'],
+        mode: 'selected',
+        qcStatuses: [],
+        warningCodes: [],
+      },
+      sessionId: sampleNegativeRollSessionV1.sessionId,
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: {
+      id: sampleNegativeRollSessionV1.sessionId,
+      kind: 'roll',
+    },
+  });
+
 const sampleNegativeLabChangeSet = {
   artifactHandles: [sampleArtifactHandleV1],
   createdPositiveVariantIds: ['positive_variant_frame_0001'],
