@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface RenameFolderModalProps {
   currentName: string;
@@ -25,32 +26,27 @@ export default function RenameFolderModal({
 }: RenameFolderModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useManagedFocus(nameInputRef, show, { selectText: true });
 
   useEffect(() => {
     if (isOpen) {
-      setName(currentName || '');
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
+      const timer = window.setTimeout(() => {
+        setName(currentName || '');
+      }, 0);
       return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-        setName('');
-      }, 300);
-      return () => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
       };
     }
+
+    const timer = window.setTimeout(() => {
+      setName('');
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [isOpen, currentName]);
 
   const handleSave = useCallback(() => {

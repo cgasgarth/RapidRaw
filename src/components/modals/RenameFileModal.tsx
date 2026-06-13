@@ -4,6 +4,7 @@ import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface RenameFileModalProps {
   filesToRename: Array<string>;
@@ -12,11 +13,22 @@ interface RenameFileModalProps {
   onSave: (template: string) => void;
 }
 
+const getDefaultNameTemplate = (filesToRename: Array<string>, isSingleFile: boolean) => {
+  if (isSingleFile && filesToRename[0]) {
+    const fileName = filesToRename[0].split(/[\\/]/).pop();
+    const nameWithoutExt = fileName?.substring(0, fileName.lastIndexOf('.'));
+    if (nameWithoutExt) {
+      return nameWithoutExt;
+    }
+  }
+
+  return '{original_filename}';
+};
+
 export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave }: RenameFileModalProps) {
   const { t } = useTranslation();
   const [nameTemplate, setNameTemplate] = useState('');
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useManagedFocus(nameInputRef, show);
@@ -26,32 +38,20 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
 
   useEffect(() => {
     if (isOpen) {
-      if (isSingleFile && filesToRename[0]) {
-        const fileName = filesToRename[0].split(/[\\/]/).pop();
-        const nameWithoutExt = fileName?.substring(0, fileName.lastIndexOf('.'));
-        if (nameWithoutExt) {
-          setNameTemplate(nameWithoutExt);
-        }
-      } else {
-        setNameTemplate('{original_filename}');
-      }
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
+      const timer = window.setTimeout(() => {
+        setNameTemplate(getDefaultNameTemplate(filesToRename, isSingleFile));
+      }, 0);
       return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-        setNameTemplate('');
-      }, 300);
-      return () => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
       };
     }
+
+    const timer = window.setTimeout(() => {
+      setNameTemplate('');
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [isOpen, filesToRename, isSingleFile]);
 
   const handleSave = useCallback(() => {
