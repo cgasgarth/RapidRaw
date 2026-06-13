@@ -24,7 +24,14 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
-import { useState, useMemo, useEffect, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useState,
+  useMemo,
+  useEffect,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import Text from '../ui/Text';
@@ -163,6 +170,19 @@ function AlbumTreeNode({
   const isGroup = item.type === 'group';
   const isExpanded = expandedGroups.has(item.id);
   const isSelected = item.id === selectedAlbumId;
+  const handleSelect = () => {
+    if (isGroup) {
+      onToggle(item.id);
+    } else {
+      onSelectAlbum(item.id, item.name, item.images);
+    }
+  };
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handleSelect();
+  };
 
   let ItemIcon = isGroup ? (isExpanded ? FolderOpen : Folder) : AlbumIcon;
   const customIcon = item.icon ? ALBUM_ICONS[item.icon] : undefined;
@@ -178,16 +198,13 @@ function AlbumTreeNode({
           'bg-surface': isSelected,
           'hover:bg-card-active': !isSelected,
         })}
-        onClick={() => {
-          if (isGroup) {
-            onToggle(item.id);
-          } else {
-            onSelectAlbum(item.id, item.name, item.images);
-          }
-        }}
+        onClick={handleSelect}
         onContextMenu={(e) => {
           onContextMenu(e, item);
         }}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}
       >
         <div className="relative w-5 h-5 flex items-center justify-center p-0.5 rounded-sm text-text-secondary shrink-0">
           <AnimatePresence mode="wait" initial={false}>
@@ -214,15 +231,16 @@ function AlbumTreeNode({
           {item.name}
         </span>
         {isGroup && (
-          <div
-            className="text-text-secondary p-0.5 rounded-sm hover:bg-surface/50"
+          <button
+            type="button"
+            className="text-text-secondary p-0.5 rounded-sm hover:bg-surface/50 bg-transparent"
             onClick={(e) => {
               e.stopPropagation();
               onToggle(item.id);
             }}
           >
             {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </div>
+          </button>
         )}
       </div>
 
@@ -290,6 +308,11 @@ function TreeNode({
   const handleNameClick = () => {
     onFolderSelect(node.path);
   };
+  const handleNameKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handleNameClick();
+  };
 
   const handleNameDoubleClick = () => {
     if (hasChildren) {
@@ -333,10 +356,14 @@ function TreeNode({
         onContextMenu={(e) => {
           onContextMenu(e, node.path, isPinned);
         }}
+        onKeyDown={handleNameKeyDown}
+        role="button"
+        tabIndex={0}
       >
-        <div
+        <button
+          type="button"
           className={clsx(
-            'relative w-5 h-5 flex items-center justify-center p-0.5 rounded-sm transition-colors shrink-0',
+            'relative w-5 h-5 flex items-center justify-center p-0.5 rounded-sm transition-colors shrink-0 bg-transparent',
             {
               [TEXT_COLOR_KEYS[TextColors.secondary]]: !isExpanded,
               'hover:bg-surface-hover': !isSelected && hasChildren,
@@ -356,7 +383,7 @@ function TreeNode({
               <ResolvedIcon size={16} />
             </motion.div>
           </AnimatePresence>
-        </div>
+        </button>
 
         <span onDoubleClick={handleNameDoubleClick} className="truncate select-none flex-1">
           <span className="truncate">{node.name}</span>
@@ -376,14 +403,16 @@ function TreeNode({
         </span>
 
         {hasChildren && (
-          <Text
-            as="div"
-            color={TextColors.secondary}
-            className="p-0.5 rounded-sm hover:bg-surface/50"
+          <button
+            type="button"
+            className={clsx(
+              'p-0.5 rounded-sm hover:bg-surface/50 bg-transparent',
+              TEXT_COLOR_KEYS[TextColors.secondary],
+            )}
             onClick={handleFolderIconClick}
           >
             {isExpanded ? <ChevronUp size={16} className="shrink-0" /> : <ChevronDown size={16} className="shrink-0" />}
-          </Text>
+          </button>
         )}
       </div>
 
