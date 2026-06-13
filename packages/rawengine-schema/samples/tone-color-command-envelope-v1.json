@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_tone_color_sample"
+  },
+  "approval": {
+    "approvalClass": "preview_only",
+    "reason": "Previewing tone and color changes renders a non-mutating graph diff before apply.",
+    "state": "not_required"
+  },
+  "commandId": "command_tone_color_basic_preview_sample",
+  "correlationId": "corr_tone_color_basic_preview_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_44",
+  "idempotencyKey": "idem_tone_color_basic_preview_sample",
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image"
+  },
+  "commandType": "toneColor.setBasicTone",
+  "parameters": {
+    "blackPoint": -2,
+    "clarity": 8,
+    "contrast": 14,
+    "exposureEv": 0.35,
+    "highlights": -24,
+    "saturation": 4,
+    "shadows": 18,
+    "whitePoint": 6
+  }
+}

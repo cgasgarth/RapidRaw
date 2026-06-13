@@ -22,6 +22,26 @@
       "toolName": "edit.dry_run_tone"
     },
     {
+      "approvalClass": "preview_only",
+      "inputSchemaName": "ToneColorCommandEnvelopeV1",
+      "mutates": false,
+      "outputSchemaName": "ToneColorDryRunResultV1",
+      "requiresDryRun": true,
+      "returnsArtifactHandles": true,
+      "toolKind": "dry_run",
+      "toolName": "tonecolor.dry_run_command"
+    },
+    {
+      "approvalClass": "edit_apply",
+      "inputSchemaName": "ToneColorCommandEnvelopeV1",
+      "mutates": true,
+      "outputSchemaName": "ToneColorMutationResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": false,
+      "toolKind": "apply",
+      "toolName": "tonecolor.apply_command"
+    },
+    {
       "approvalClass": "safe_read",
       "inputSchemaName": "EditGraphSnapshotQueryV1",
       "mutates": false,

@@ -46,6 +46,9 @@ import {
   rawEngineAppServerToolCallValidationV1Schema,
   filmLookCatalogV1Schema,
   rawEngineToolRegistryV1Schema,
+  toneColorCommandEnvelopeV1Schema,
+  toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
   type ArtifactHandleV1,
   type CommandEnvelopeV1,
   type EditGraphCommandEnvelopeV1,
@@ -89,6 +92,9 @@ import {
   type QueryEnvelopeV1,
   type RawEngineAppServerToolCallValidationV1,
   type RawEngineToolRegistryV1,
+  type ToneColorCommandEnvelopeV1,
+  type ToneColorDryRunResultV1,
+  type ToneColorMutationResultV1,
 } from './rawEngineSchemas.js';
 
 export const sampleQueryEnvelopeV1: QueryEnvelopeV1 = queryEnvelopeV1Schema.parse({
@@ -171,6 +177,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       returnsArtifactHandles: true,
       toolKind: 'dry_run',
       toolName: 'edit.dry_run_tone',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'ToneColorCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'ToneColorDryRunResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
+      toolName: 'tonecolor.dry_run_command',
+    },
+    {
+      approvalClass: ApprovalClass.EditApply,
+      inputSchemaName: 'ToneColorCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'ToneColorMutationResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: false,
+      toolKind: 'apply',
+      toolName: 'tonecolor.apply_command',
     },
     {
       approvalClass: ApprovalClass.SafeRead,
@@ -479,6 +505,107 @@ export const sampleEditGraphMutationResultV1: EditGraphMutationResultV1 = editGr
   commandId: sampleEditGraphApplyCommandEnvelopeV1.commandId,
   commandType: sampleEditGraphApplyCommandEnvelopeV1.commandType,
   correlationId: sampleEditGraphApplyCommandEnvelopeV1.correlationId,
+  dryRun: false,
+  mutates: true,
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  undoRevision: sampleEditGraphSnapshotV1.graphRevision,
+  warnings: [],
+});
+
+export const sampleToneColorCommandEnvelopeV1: ToneColorCommandEnvelopeV1 = toneColorCommandEnvelopeV1Schema.parse({
+  actor: {
+    id: 'codex-app-server',
+    kind: ActorKind.Agent,
+    sessionId: 'session_tone_color_sample',
+  },
+  approval: {
+    approvalClass: ApprovalClass.PreviewOnly,
+    reason: 'Previewing tone and color changes renders a non-mutating graph diff before apply.',
+    state: 'not_required',
+  },
+  commandId: 'command_tone_color_basic_preview_sample',
+  commandType: 'toneColor.setBasicTone',
+  correlationId: 'corr_tone_color_basic_preview_sample',
+  dryRun: true,
+  expectedGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  idempotencyKey: 'idem_tone_color_basic_preview_sample',
+  parameters: {
+    blackPoint: -2,
+    clarity: 8,
+    contrast: 14,
+    exposureEv: 0.35,
+    highlights: -24,
+    saturation: 4,
+    shadows: 18,
+    whitePoint: 6,
+  },
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  target: {
+    imagePath: '/photos/session/IMG_0001.CR3',
+    kind: 'image',
+  },
+});
+
+export const sampleToneColorApplyCommandEnvelopeV1: ToneColorCommandEnvelopeV1 = toneColorCommandEnvelopeV1Schema.parse(
+  {
+    ...sampleToneColorCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'Applying the accepted tone and color command persists the edit graph revision.',
+      state: 'approved',
+    },
+    commandId: 'command_tone_color_basic_apply_sample',
+    correlationId: 'corr_tone_color_basic_apply_sample',
+    dryRun: false,
+    idempotencyKey: 'idem_tone_color_basic_apply_sample',
+  },
+);
+
+export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorDryRunResultV1Schema.parse({
+  commandId: sampleToneColorCommandEnvelopeV1.commandId,
+  commandType: sampleToneColorCommandEnvelopeV1.commandType,
+  correlationId: sampleToneColorCommandEnvelopeV1.correlationId,
+  dryRun: true,
+  mutates: false,
+  parameterDiff: [
+    {
+      module: 'basic_tone',
+      path: '/parameters/exposureEv',
+      previousValue: 0.22,
+      value: 0.35,
+    },
+    {
+      module: 'basic_tone',
+      path: '/parameters/highlights',
+      previousValue: -12,
+      value: -24,
+    },
+  ],
+  predictedGraphRevision: 'graph_rev_46_preview',
+  previewArtifacts: [
+    {
+      artifactId: 'artifact_tone_color_basic_preview',
+      contentHash: 'sha256:sample-tone-color-preview',
+      dimensions: {
+        height: 1080,
+        width: 1620,
+      },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+  ],
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  warnings: [],
+});
+
+export const sampleToneColorMutationResultV1: ToneColorMutationResultV1 = toneColorMutationResultV1Schema.parse({
+  appliedGraphRevision: 'graph_rev_46',
+  changedNodeIds: ['node_tone_color_basic'],
+  commandId: sampleToneColorApplyCommandEnvelopeV1.commandId,
+  commandType: sampleToneColorApplyCommandEnvelopeV1.commandType,
+  correlationId: sampleToneColorApplyCommandEnvelopeV1.correlationId,
   dryRun: false,
   mutates: true,
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
