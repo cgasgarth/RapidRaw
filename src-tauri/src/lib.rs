@@ -26,6 +26,8 @@ mod lens_correction;
 mod lut_processing;
 mod mask_generation;
 mod negative_conversion;
+#[cfg(feature = "panorama-opencv-spike")]
+mod panorama_opencv_spike;
 mod panorama_stitching;
 mod panorama_utils;
 mod preset_converter;
