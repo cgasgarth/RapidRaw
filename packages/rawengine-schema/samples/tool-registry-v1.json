@@ -35,7 +35,7 @@
       "approvalClass": "edit_apply",
       "inputSchemaName": "NegativeLabCommandEnvelopeV1",
       "mutates": true,
-      "outputSchemaName": "NegativeRollSessionV1",
+      "outputSchemaName": "NegativeLabApplyResultV1",
       "requiresDryRun": true,
       "returnsArtifactHandles": true,
       "toolKind": "apply",

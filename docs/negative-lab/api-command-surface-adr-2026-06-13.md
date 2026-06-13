@@ -39,6 +39,12 @@ parameter fields are rejected by schema validation. The generic envelope keeps
 actor, target, approval, dry-run, graph revision, idempotency, and correlation
 metadata consistent with the broader RawEngine command layer.
 
+The v1 command surface also defines `NegativeLabDryRunResultV1` and
+`NegativeLabApplyResultV1` so tool registry entries do not point at undocumented
+output names. These result schemas are intentionally compact: they capture
+warnings, artifacts, numeric metrics, changed frame/session IDs, generated
+positive variants, and provenance entry IDs without claiming final pixel math.
+
 ## Dry-Run And Apply Contract
 
 Commands that mutate roll/session state or produce positive variants must
@@ -129,7 +135,6 @@ out of scope for this command-surface PR.
 - real density conversion math;
 - base/fog auto-detection;
 - frame splitting and border detection;
-- command result schemas;
 - app-server tool adapters;
 - Rust command execution and sidecar persistence;
 - golden image tests.

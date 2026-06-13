@@ -4,8 +4,10 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
-  negativeLabCommandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
+  negativeLabApplyResultV1Schema,
+  negativeLabCommandEnvelopeV1Schema,
+  negativeLabDryRunResultV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -13,7 +15,9 @@ import {
   type ArtifactHandleV1,
   type CommandEnvelopeV1,
   type NegativeAcquisitionProfileV1,
+  type NegativeLabApplyResultV1,
   type NegativeLabCommandEnvelopeV1,
+  type NegativeLabDryRunResultV1,
   type NegativeRollSessionV1,
   type PanoramaArtifactV1,
   type QueryEnvelopeV1,
@@ -115,7 +119,7 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       approvalClass: ApprovalClass.EditApply,
       inputSchemaName: 'NegativeLabCommandEnvelopeV1',
       mutates: true,
-      outputSchemaName: 'NegativeRollSessionV1',
+      outputSchemaName: 'NegativeLabApplyResultV1',
       requiresDryRun: true,
       returnsArtifactHandles: true,
       toolKind: 'apply',
@@ -401,3 +405,38 @@ export const sampleNegativeLabCommandEnvelopeV1: NegativeLabCommandEnvelopeV1 =
       kind: 'roll',
     },
   });
+
+const sampleNegativeLabChangeSet = {
+  artifactHandles: [sampleArtifactHandleV1],
+  createdPositiveVariantIds: ['positive_variant_frame_0001'],
+  provenanceEntryIds: ['prov_negative_convert_frames_sample'],
+  updatedFrameIds: ['frame_0001'],
+  updatedSessionId: sampleNegativeRollSessionV1.sessionId,
+  warningCodes: ['lossy_input', 'low_acquisition_confidence'],
+};
+
+export const sampleNegativeLabDryRunResultV1: NegativeLabDryRunResultV1 = negativeLabDryRunResultV1Schema.parse({
+  changeSet: sampleNegativeLabChangeSet,
+  commandId: sampleNegativeLabCommandEnvelopeV1.commandId,
+  commandType: sampleNegativeLabCommandEnvelopeV1.commandType,
+  correlationId: sampleNegativeLabCommandEnvelopeV1.correlationId,
+  numericMetrics: {
+    estimatedBaseClippingScore: 0.04,
+    previewDeltaEWarningScore: 0.8,
+  },
+  previewArtifacts: [sampleArtifactHandleV1],
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  warnings: sampleNegativeRollSessionV1.acquisitionWarnings,
+});
+
+export const sampleNegativeLabApplyResultV1: NegativeLabApplyResultV1 = negativeLabApplyResultV1Schema.parse({
+  appliedGraphRevision: 'graph_rev_negative_8',
+  changeSet: sampleNegativeLabChangeSet,
+  commandId: 'command_negative_convert_frames_apply_sample',
+  commandType: sampleNegativeLabCommandEnvelopeV1.commandType,
+  correlationId: sampleNegativeLabCommandEnvelopeV1.correlationId,
+  dryRunCommandId: sampleNegativeLabCommandEnvelopeV1.commandId,
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sessionId: sampleNegativeRollSessionV1.sessionId,
+  warnings: sampleNegativeRollSessionV1.acquisitionWarnings,
+});

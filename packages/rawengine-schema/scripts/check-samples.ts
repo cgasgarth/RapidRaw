@@ -4,7 +4,9 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
+  negativeLabApplyResultV1Schema,
   negativeLabCommandEnvelopeV1Schema,
+  negativeLabDryRunResultV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -14,7 +16,9 @@ import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleNegativeAcquisitionProfileV1,
+  sampleNegativeLabApplyResultV1,
   sampleNegativeLabCommandEnvelopeV1,
+  sampleNegativeLabDryRunResultV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -65,6 +69,16 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab command envelope',
     schema: negativeLabCommandEnvelopeV1Schema,
     value: sampleNegativeLabCommandEnvelopeV1,
+  },
+  {
+    name: 'negative lab dry-run result',
+    schema: negativeLabDryRunResultV1Schema,
+    value: sampleNegativeLabDryRunResultV1,
+  },
+  {
+    name: 'negative lab apply result',
+    schema: negativeLabApplyResultV1Schema,
+    value: sampleNegativeLabApplyResultV1,
   },
 ];
 

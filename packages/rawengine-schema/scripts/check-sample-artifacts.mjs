@@ -9,7 +9,9 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
+  negativeLabApplyResultV1Schema,
   negativeLabCommandEnvelopeV1Schema,
+  negativeLabDryRunResultV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -19,7 +21,9 @@ import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleNegativeAcquisitionProfileV1,
+  sampleNegativeLabApplyResultV1,
   sampleNegativeLabCommandEnvelopeV1,
+  sampleNegativeLabDryRunResultV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -76,6 +80,18 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab-command-envelope-v1.json',
     schema: negativeLabCommandEnvelopeV1Schema,
     value: sampleNegativeLabCommandEnvelopeV1,
+  },
+  {
+    name: 'negative lab dry-run result',
+    path: 'packages/rawengine-schema/samples/negative-lab-dry-run-result-v1.json',
+    schema: negativeLabDryRunResultV1Schema,
+    value: sampleNegativeLabDryRunResultV1,
+  },
+  {
+    name: 'negative lab apply result',
+    path: 'packages/rawengine-schema/samples/negative-lab-apply-result-v1.json',
+    schema: negativeLabApplyResultV1Schema,
+    value: sampleNegativeLabApplyResultV1,
   },
 ];
 
