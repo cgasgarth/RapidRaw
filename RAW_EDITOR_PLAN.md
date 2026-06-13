@@ -408,6 +408,7 @@ An issue is done when:
   - Add scripted stale-dependency reports for Bun/npm and Cargo dependency graphs, including current version, latest compatible version, latest stable minor version, latest stable major version, and release-note links when practical.
   - Add a scheduled or manually dispatched GitHub Action that reports outdated package versions without silently changing locks.
   - Convert every discovered major-version update into a tracked GitHub issue before implementation, using the format `deps(major): migrate <ecosystem>/<package> to <major>`.
+  - Treat Cargo `0.x` semver-incompatible minor or patch jumps as major-style migration issues because they can carry breaking API changes under Cargo compatibility rules.
   - Each major-version issue should include migration notes, upstream breaking-change links, expected code/config changes, local validation commands, CI expectations, rollback notes, and whether the bump is blocked by another ecosystem update.
   - Work major-version issues individually or in clearly justified compatibility groups; do not bury major migrations inside broad lockfile refresh PRs.
   - Close the loop after each dependency PR by rerunning the audit and recording whether new major-version follow-up issues were created, already existed, or were intentionally deferred.
