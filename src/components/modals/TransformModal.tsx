@@ -10,6 +10,7 @@ import { Adjustments } from '../../utils/adjustments';
 import clsx from 'clsx';
 import Text from '../ui/Text';
 import { TextColors, TextVariants } from '../../types/typography';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface GeometryParams {
   distortion: number;
@@ -130,8 +131,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
   const containerRef = useRef<HTMLDivElement>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
 
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -240,38 +240,34 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
 
   useEffect(() => {
     if (isOpen) {
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
-      const initParams = {
-        distortion: currentAdjustments.transformDistortion,
-        vertical: currentAdjustments.transformVertical,
-        horizontal: currentAdjustments.transformHorizontal,
-        rotate: currentAdjustments.transformRotate,
-        aspect: currentAdjustments.transformAspect,
-        scale: currentAdjustments.transformScale,
-        x_offset: currentAdjustments.transformXOffset,
-        y_offset: currentAdjustments.transformYOffset,
-      };
-      setParams(initParams);
-      setShowLines(false);
-      handleResetZoom();
-      void updatePreview(initParams, false);
+      const timer = window.setTimeout(() => {
+        const initParams = {
+          distortion: currentAdjustments.transformDistortion,
+          vertical: currentAdjustments.transformVertical,
+          horizontal: currentAdjustments.transformHorizontal,
+          rotate: currentAdjustments.transformRotate,
+          aspect: currentAdjustments.transformAspect,
+          scale: currentAdjustments.transformScale,
+          x_offset: currentAdjustments.transformXOffset,
+          y_offset: currentAdjustments.transformYOffset,
+        };
+        setParams(initParams);
+        setShowLines(false);
+        handleResetZoom();
+        void updatePreview(initParams, false);
+      }, 0);
       return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-        setPreviewUrl(null);
-        setIsApplying(false);
-      }, 300);
-      return () => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
       };
     }
+
+    const timer = window.setTimeout(() => {
+      setPreviewUrl(null);
+      setIsApplying(false);
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [isOpen, currentAdjustments, handleResetZoom, updatePreview]);
 
   const handleChange = (key: keyof typeof DEFAULT_PARAMS, value: number) => {
