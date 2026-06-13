@@ -1149,6 +1149,7 @@
       "btnStart": "Start",
       "cancel": "Abbrechen",
       "close": "Schließen",
+      "compareSplit": "Vergleichstrenner zwischen Original und entrauschtem Bild",
       "denoised": "Entrauscht",
       "denoisingProgress": "Entrauschen in Arbeit",
       "description": "Entfernen Sie Rauschen aus Ihrem Bild mithilfe von KI-gestütztem oder traditionellem Entrauschen.",

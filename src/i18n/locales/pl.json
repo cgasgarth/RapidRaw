@@ -1197,6 +1197,7 @@
       "btnStart": "Start",
       "cancel": "Anuluj",
       "close": "Zamknij",
+      "compareSplit": "Podzial porownania oryginalu i odszumionej wersji",
       "denoised": "Odszumiono",
       "denoisingProgress": "Odszumianie w toku",
       "description": "Usuń szum ze swojego obrazu używając metod opartych o AI lub tradycyjnych.",
