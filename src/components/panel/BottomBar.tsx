@@ -30,7 +30,9 @@ interface BottomBarProps {
   onContextMenu?: ((event: React.MouseEvent<HTMLElement>, path: string) => void) | undefined;
   onCopy: () => void;
   onExportClick?: () => void;
-  onImageSelect?: ((path: string, event: React.MouseEvent<HTMLElement>) => void) | undefined;
+  onImageSelect?:
+    | ((path: string, event: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => void)
+    | undefined;
   onOpenCopyPasteSettings?: () => void;
   onRequestThumbnails?: ((paths: string[]) => void) | undefined;
   onPaste: () => void;

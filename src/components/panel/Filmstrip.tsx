@@ -21,6 +21,8 @@ interface ImageLayer {
 
 type ImageRatings = Record<string, number> | null | undefined;
 type ThumbnailMouseEvent = React.MouseEvent<HTMLDivElement>;
+type ThumbnailKeyboardEvent = React.KeyboardEvent<HTMLDivElement>;
+type ThumbnailSelectEvent = ThumbnailMouseEvent | ThumbnailKeyboardEvent;
 
 interface ResettableGridImperativeAPI extends GridImperativeAPI {
   resetAfterColumnIndex?: (index: number) => void;
@@ -34,7 +36,7 @@ interface ItemData {
   thumbnailAspectRatio: ThumbnailAspectRatio;
   onRequestThumbnails?: ((paths: string[]) => void) | undefined;
   onContextMenu?: ((event: ThumbnailMouseEvent, path: string) => void) | undefined;
-  onImageSelect?: ((path: string, event: ThumbnailMouseEvent) => void) | undefined;
+  onImageSelect?: ((path: string, event: ThumbnailSelectEvent) => void) | undefined;
   itemHeight: number;
   consumeClickTriggeredScroll: () => boolean;
   setRatio: (index: number, ratio: number) => void;
@@ -46,7 +48,7 @@ interface FilmstripThumbnailProps {
   isActive: boolean;
   isSelected: boolean;
   onContextMenu?: ((event: ThumbnailMouseEvent, path: string) => void) | undefined;
-  onImageSelect?: ((path: string, event: ThumbnailMouseEvent) => void) | undefined;
+  onImageSelect?: ((path: string, event: ThumbnailSelectEvent) => void) | undefined;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   itemHeight: number;
   index: number;
@@ -180,6 +182,16 @@ const FilmstripThumbnail = memo(
         : 'hover:ring-2 hover:ring-hover-color';
 
     const imageClasses = `w-full h-full group-hover:scale-[1.02] transition-transform duration-300`;
+    const handleSelect = (event: ThumbnailMouseEvent | ThumbnailKeyboardEvent) => {
+      event.stopPropagation();
+      onImageSelect?.(path, event);
+    };
+
+    const handleKeyDown = (event: ThumbnailKeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      handleSelect(event);
+    };
 
     return (
       <div
@@ -187,11 +199,11 @@ const FilmstripThumbnail = memo(
           'h-full w-full rounded-md overflow-hidden cursor-pointer shrink-0 group relative transition-all duration-150 bg-surface',
           ringClass,
         )}
-        onClick={(e: ThumbnailMouseEvent) => {
-          e.stopPropagation();
-          onImageSelect?.(path, e);
-        }}
+        onClick={handleSelect}
         onContextMenu={(e: ThumbnailMouseEvent) => onContextMenu?.(e, path)}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}
         style={{
           zIndex: isActive ? 2 : isSelected ? 1 : 'auto',
         }}
@@ -641,7 +653,7 @@ interface FilmStripProps {
   multiSelectedPaths: Array<string>;
   onClearSelection?: (() => void) | undefined;
   onContextMenu?: ((event: ThumbnailMouseEvent, path: string) => void) | undefined;
-  onImageSelect?: ((path: string, event: ThumbnailMouseEvent) => void) | undefined;
+  onImageSelect?: ((path: string, event: ThumbnailSelectEvent) => void) | undefined;
   onRequestThumbnails?: ((paths: string[]) => void) | undefined;
   selectedImage?: SelectedImage | undefined;
   thumbnailAspectRatio: ThumbnailAspectRatio;
@@ -680,7 +692,7 @@ export default function Filmstrip({
     };
   }, []);
 
-  const handleImageSelect = (path: string, event: ThumbnailMouseEvent) => {
+  const handleImageSelect = (path: string, event: ThumbnailSelectEvent) => {
     if (path !== selectedImage?.path) {
       clickTriggeredScroll.current = true;
     }
@@ -694,7 +706,7 @@ export default function Filmstrip({
   }, []);
 
   return (
-    <div ref={containerRef} className="h-full w-full" onClick={onClearSelection}>
+    <div ref={containerRef} className="h-full w-full" role="presentation" onClick={onClearSelection}>
       {size.height > 0 && size.width > 0 && (
         <FilmstripList
           height={size.height}
