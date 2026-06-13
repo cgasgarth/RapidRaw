@@ -4658,7 +4658,8 @@ Issues:
   `docs/panorama/panorama-artifact-schema-2026-06-13.md`.
 - Add projection options. Initial contract captured in
   `docs/panorama/projection-options-2026-06-13.md`.
-- Add auto crop/boundary controls.
+- Add auto crop/boundary controls. Initial contract captured in
+  `docs/panorama/boundary-controls-2026-06-13.md`.
 - Add exposure normalization.
 - Add multi-row support audit. Initial audit captured in
   `docs/panorama/multi-row-support-audit-2026-06-13.md`.

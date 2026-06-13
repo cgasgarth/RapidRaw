@@ -183,6 +183,8 @@ export const panoramaProjectionSettingsV1Schema = z
 
 export const panoramaBoundaryModeSchema = z.enum(['auto_crop', 'transparent', 'manual_crop', 'deferred_fill']);
 
+export const panoramaBoundarySupportSchema = z.enum(['implemented_current_engine', 'schema_only_deferred']);
+
 export const panoramaWarningCodeSchema = z.enum([
   'source_excluded',
   'insufficient_features',
@@ -239,6 +241,29 @@ export const panoramaCropV1Schema = z
     y: z.number().int().nonnegative(),
   })
   .strict();
+
+export const panoramaBoundarySettingsV1Schema = z
+  .object({
+    crop: panoramaCropV1Schema,
+    deferredReason: z.string().trim().min(1).optional(),
+    effectiveMode: panoramaBoundaryModeSchema,
+    fillColor: z
+      .object({
+        alpha: z.number().min(0).max(1),
+        blue: z.number().min(0).max(1),
+        green: z.number().min(0).max(1),
+        red: z.number().min(0).max(1),
+      })
+      .strict()
+      .optional(),
+    requestedMode: panoramaBoundaryModeSchema,
+    support: panoramaBoundarySupportSchema,
+  })
+  .strict()
+  .refine((settings) => settings.support === 'implemented_current_engine' || settings.deferredReason !== undefined, {
+    message: 'Deferred boundary settings require deferredReason.',
+    path: ['deferredReason'],
+  });
 
 export const panoramaPairwiseMatchV1Schema = z
   .object({
@@ -320,6 +345,7 @@ export const panoramaArtifactV1Schema = z
     alignment: panoramaAlignmentV1Schema,
     artifactId: z.string().trim().min(1),
     boundaryMode: panoramaBoundaryModeSchema,
+    boundarySettings: panoramaBoundarySettingsV1Schema,
     createdAt: z.iso.datetime({ offset: true }),
     crop: panoramaCropV1Schema,
     excludedSources: z

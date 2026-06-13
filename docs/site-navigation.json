@@ -95,6 +95,10 @@
           "path": "docs/panorama/projection-options-2026-06-13.md"
         },
         {
+          "title": "Panorama boundary controls",
+          "path": "docs/panorama/boundary-controls-2026-06-13.md"
+        },
+        {
           "title": "Architecture baseline",
           "path": "docs/baseline/rapidraw-architecture-baseline-2026-06-11.md"
         },

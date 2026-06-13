@@ -38,6 +38,7 @@ generator before the release workflow needs one.
 - [Large panorama tiling strategy](panorama/large-panorama-tiling-strategy-2026-06-13.md)
 - [Panorama artifact schema](panorama/panorama-artifact-schema-2026-06-13.md)
 - [Panorama projection options](panorama/projection-options-2026-06-13.md)
+- [Panorama boundary controls](panorama/boundary-controls-2026-06-13.md)
 - [Architecture baseline](baseline/rapidraw-architecture-baseline-2026-06-11.md)
 - [AI hooks baseline](baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
 - [GPU shader baseline](baseline/rapidraw-gpu-shader-baseline-2026-06-11.md)
