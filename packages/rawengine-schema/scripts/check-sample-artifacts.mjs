@@ -3,15 +3,19 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { format } from 'prettier';
+
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
   rawEngineToolRegistryV1Schema,
 } from '../src/rawEngineSchemas.ts';
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
   sampleToolRegistryV1,
 } from '../src/samplePayloads.ts';
@@ -43,27 +47,33 @@ const sampleArtifacts = [
     schema: rawEngineToolRegistryV1Schema,
     value: sampleToolRegistryV1,
   },
+  {
+    name: 'panorama artifact',
+    path: 'packages/rawengine-schema/samples/panorama-artifact-v1.json',
+    schema: panoramaArtifactV1Schema,
+    value: samplePanoramaArtifactV1,
+  },
 ];
 
 const toAbsolutePath = (repoPath) => join(ROOT, repoPath);
-const toStableJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
+const toStableJson = (value) => format(JSON.stringify(value, null, 2), { parser: 'json' });
 
-const updateArtifacts = () => {
+const updateArtifacts = async () => {
   for (const artifact of sampleArtifacts) {
     const absolutePath = toAbsolutePath(artifact.path);
     mkdirSync(dirname(absolutePath), { recursive: true });
-    writeFileSync(absolutePath, toStableJson(artifact.value));
+    writeFileSync(absolutePath, await toStableJson(artifact.value));
   }
 
   console.log(`Updated ${sampleArtifacts.length} RawEngine schema sample artifacts.`);
 };
 
-const checkArtifacts = () => {
+const checkArtifacts = async () => {
   const failures = [];
 
   for (const artifact of sampleArtifacts) {
     const absolutePath = toAbsolutePath(artifact.path);
-    const expectedContents = toStableJson(artifact.value);
+    const expectedContents = await toStableJson(artifact.value);
 
     if (!existsSync(absolutePath)) {
       failures.push(`${artifact.path}: missing generated sample artifact`);
@@ -95,7 +105,7 @@ const checkArtifacts = () => {
 const args = new Set(process.argv.slice(2));
 
 if (args.has('--update')) {
-  updateArtifacts();
+  await updateArtifacts();
 } else {
-  checkArtifacts();
+  await checkArtifacts();
 }
