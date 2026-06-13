@@ -1,4 +1,4 @@
-import { type MouseEvent } from 'react';
+import { type KeyboardEvent as ReactKeyboardEvent, type MouseEvent } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import CommunityPage from '../panel/CommunityPage';
@@ -20,7 +20,10 @@ interface LibraryViewProps {
   handleGoHome: () => void;
   handleImageSelect: (path: string) => void;
   handleImportClick: (path: string) => void;
-  handleLibraryImageSingleClick: (path: string, event: MouseEvent<HTMLElement>) => void;
+  handleLibraryImageSingleClick: (
+    path: string,
+    event: MouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>,
+  ) => void;
   handleLibraryRefresh: () => Promise<void>;
   handleMainLibraryContextMenu: (event: MouseEvent<HTMLElement>) => void;
   handleOpenFolder: () => Promise<void> | void;

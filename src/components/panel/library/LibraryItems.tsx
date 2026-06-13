@@ -7,6 +7,7 @@ import {
   useRef,
   useLayoutEffect,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { Image as ImageIcon, Folder, FolderOpen, Star as StarIcon, SlidersHorizontal } from 'lucide-react';
@@ -28,8 +29,10 @@ interface ImageLayer {
 }
 
 type LibraryItemMouseEvent = ReactMouseEvent<HTMLElement>;
+type LibraryItemKeyboardEvent = ReactKeyboardEvent<HTMLElement>;
+type LibraryItemSelectEvent = LibraryItemMouseEvent | LibraryItemKeyboardEvent;
 type LibraryImageContextMenuHandler = (event: LibraryItemMouseEvent, path: string) => void;
-type LibraryImageClickHandler = (path: string, event: LibraryItemMouseEvent) => void;
+type LibraryImageClickHandler = (path: string, event: LibraryItemSelectEvent) => void;
 type LibraryImageDoubleClickHandler = (path: string) => void;
 type LibraryImageLoadHandler = (path: string) => void;
 
@@ -232,20 +235,30 @@ const ThumbnailComponent = ({
   const hasColorLabel = !!colorLabel;
   const hasRating = rating > 0;
   const hasAnyOverlay = hasEditIcon || hasColorLabel || hasRating;
+  const handleSelect = (event: LibraryItemSelectEvent) => {
+    event.stopPropagation();
+    onImageClick(path, event);
+  };
+
+  const handleKeyDown = (event: LibraryItemKeyboardEvent) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handleSelect(event);
+  };
 
   return (
     <div
       className="aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative flex flex-col transition-all duration-150 transform-gpu [-webkit-mask-image:-webkit-radial-gradient(white,black)]"
-      onClick={(e) => {
-        e.stopPropagation();
-        onImageClick(path, e);
-      }}
+      onClick={handleSelect}
       onContextMenu={(e) => {
         onContextMenu(e, path);
       }}
       onDoubleClick={() => {
         onImageDoubleClick(path);
       }}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
     >
       <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
         {layers.length > 0 && (
@@ -624,20 +637,30 @@ const ListItemComponent = ({
     : isSelected
       ? 'ring-1 ring-inset ring-accent/50 bg-accent/5'
       : 'hover:bg-surface/80';
+  const handleSelect = (event: LibraryItemSelectEvent) => {
+    event.stopPropagation();
+    onImageClick(path, event);
+  };
+
+  const handleKeyDown = (event: LibraryItemKeyboardEvent) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    handleSelect(event);
+  };
 
   return (
     <div
       className={`flex items-center w-full h-full border-b border-border-color/30 cursor-pointer transition-colors duration-150 ${stateClass}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onImageClick(path, e);
-      }}
+      onClick={handleSelect}
       onContextMenu={(e) => {
         onContextMenu(e, path);
       }}
       onDoubleClick={() => {
         onImageDoubleClick(path);
       }}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
     >
       <div
         style={{ width: getW('thumbnail') }}
