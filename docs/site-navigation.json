@@ -240,6 +240,10 @@
           "path": "docs/tooling/bun-package-manager-support-2026-06-10.md"
         },
         {
+          "title": "Major dependency migration process",
+          "path": "docs/tooling/major-dependency-migration-process-2026-06-13.md"
+        },
+        {
           "title": "Strict type-checked ESLint",
           "path": "docs/tooling/eslint-strict-type-checked-2026-06-11.md"
         },

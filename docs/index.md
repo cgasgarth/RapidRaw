@@ -79,6 +79,7 @@ generator before the release workflow needs one.
 - [Local check command contract](tooling/local-check-command-contract-2026-06-10.md)
 - [Bun CI script migration](tooling/bun-ci-script-migration-2026-06-10.md)
 - [Bun package manager support](tooling/bun-package-manager-support-2026-06-10.md)
+- [Major dependency migration process](tooling/major-dependency-migration-process-2026-06-13.md)
 - [Strict type-checked ESLint](tooling/eslint-strict-type-checked-2026-06-11.md)
 - [ESLint escape hatches](tooling/eslint-escape-hatches-2026-06-11.md)
 - [ESLint accessibility rules](tooling/eslint-accessibility-rules-2026-06-11.md)
