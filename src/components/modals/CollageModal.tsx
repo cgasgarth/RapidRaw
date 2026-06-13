@@ -881,6 +881,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
                   activeLayout.map((cell, index) => (
                     <div
                       key={index}
+                      role="presentation"
                       onMouseDown={(e) => {
                         handlePanMouseDown(e, index);
                       }}
@@ -963,6 +964,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   return (
     <div
       className={`fixed inset-0 flex items-center justify-center z-50 bg-black/50 backdrop-blur-xs transition-opacity duration-300 ${show ? 'opacity-100' : 'opacity-0'}`}
+      role="presentation"
       onMouseDown={onClose}
     >
       <AnimatePresence>
