@@ -183,6 +183,10 @@
           "path": "docs/panorama/panorama-sidecar-artifact-persistence-2026-06-13.md"
         },
         {
+          "title": "Panorama backend capability contract",
+          "path": "docs/panorama/panorama-backend-capability-contract-2026-06-13.md"
+        },
+        {
           "title": "Panorama projection options",
           "path": "docs/panorama/projection-options-2026-06-13.md"
         },
