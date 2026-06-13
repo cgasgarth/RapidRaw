@@ -31,6 +31,7 @@ import {
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
+  rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
 } from '../src/rawEngineSchemas.js';
 import {
@@ -65,6 +66,7 @@ import {
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
+  sampleRawEngineAppServerToolCallValidationV1,
   sampleToolRegistryV1,
 } from '../src/samplePayloads.js';
 
@@ -92,6 +94,11 @@ const validSamples: ReadonlyArray<{
     name: 'tool registry',
     schema: rawEngineToolRegistryV1Schema,
     value: sampleToolRegistryV1,
+  },
+  {
+    name: 'app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleRawEngineAppServerToolCallValidationV1,
   },
   {
     name: 'panorama artifact',
@@ -258,6 +265,38 @@ const invalidResult = rawEngineToolRegistryV1Schema.safeParse(invalidToolRegistr
 if (invalidResult.success) {
   throw new Error('Expected tool registry schema to reject unknown fields.');
 }
+
+expectInvalid('app-server tool call with unregistered tool', rawEngineAppServerToolCallValidationV1Schema, {
+  ...sampleRawEngineAppServerToolCallValidationV1,
+  toolCall: {
+    ...sampleRawEngineAppServerToolCallValidationV1.toolCall,
+    toolName: 'edit.unregistered_tool',
+  },
+});
+
+expectInvalid('app-server tool call with mismatched tool kind', rawEngineAppServerToolCallValidationV1Schema, {
+  ...sampleRawEngineAppServerToolCallValidationV1,
+  toolCall: {
+    ...sampleRawEngineAppServerToolCallValidationV1.toolCall,
+    toolKind: 'read',
+  },
+});
+
+expectInvalid('app-server tool call with mismatched input schema', rawEngineAppServerToolCallValidationV1Schema, {
+  ...sampleRawEngineAppServerToolCallValidationV1,
+  toolCall: {
+    ...sampleRawEngineAppServerToolCallValidationV1.toolCall,
+    inputSchemaName: 'QueryEnvelopeV1',
+  },
+});
+
+expectInvalid('app-server tool call with mismatched dryRun flag', rawEngineAppServerToolCallValidationV1Schema, {
+  ...sampleRawEngineAppServerToolCallValidationV1,
+  toolCall: {
+    ...sampleRawEngineAppServerToolCallValidationV1.toolCall,
+    dryRun: false,
+  },
+});
 
 const invalidFilmLookCatalog = {
   ...sampleFilmLookCatalogV1,

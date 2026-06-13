@@ -36,6 +36,7 @@ import {
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
+  rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
 } from '../src/rawEngineSchemas.ts';
 import {
@@ -69,6 +70,7 @@ import {
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
+  sampleRawEngineAppServerToolCallValidationV1,
   sampleToolRegistryV1,
 } from '../src/samplePayloads.ts';
 
@@ -98,6 +100,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/tool-registry-v1.json',
     schema: rawEngineToolRegistryV1Schema,
     value: sampleToolRegistryV1,
+  },
+  {
+    name: 'app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleRawEngineAppServerToolCallValidationV1,
   },
   {
     name: 'panorama artifact',
