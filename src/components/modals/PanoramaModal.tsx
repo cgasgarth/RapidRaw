@@ -268,6 +268,7 @@ export default function PanoramaModal({
       }`}
       onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
+      role="presentation"
     >
       <div
         className={`bg-surface rounded-xl shadow-2xl p-6 w-full max-w-4xl transform transition-all duration-300 ease-out ${
@@ -279,6 +280,7 @@ export default function PanoramaModal({
         onMouseDown={(e) => {
           e.stopPropagation();
         }}
+        role="presentation"
       >
         <div className="flex flex-col">
           {renderContent()}
