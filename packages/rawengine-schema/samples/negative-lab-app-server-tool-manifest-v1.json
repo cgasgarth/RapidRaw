@@ -21,6 +21,7 @@
       "localOnly": true,
       "mutates": false,
       "outputSchemaName": "NegativeLabDryRunResultV1",
+      "recordsProvenance": true,
       "requiresDryRunPlan": false,
       "returnsArtifactHandles": true,
       "toolName": "negativelab.preview_conversion"
@@ -44,6 +45,7 @@
       "localOnly": true,
       "mutates": true,
       "outputSchemaName": "NegativeLabApplyResultV1",
+      "recordsProvenance": true,
       "requiresDryRunPlan": true,
       "returnsArtifactHandles": true,
       "toolName": "negativelab.apply_planned_command"
