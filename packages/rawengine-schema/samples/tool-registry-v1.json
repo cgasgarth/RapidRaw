@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "tools": [
+    {
+      "approvalClass": "safe_read",
+      "inputSchemaName": "QueryEnvelopeV1",
+      "mutates": false,
+      "outputSchemaName": "ImageMetadataResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": false,
+      "toolKind": "read",
+      "toolName": "image.get_metadata"
+    },
+    {
+      "approvalClass": "preview_only",
+      "inputSchemaName": "CommandEnvelopeV1",
+      "mutates": false,
+      "outputSchemaName": "ToneDryRunResultV1",
+      "requiresDryRun": true,
+      "returnsArtifactHandles": true,
+      "toolKind": "dry_run",
+      "toolName": "edit.dry_run_tone"
+    }
+  ]
+}

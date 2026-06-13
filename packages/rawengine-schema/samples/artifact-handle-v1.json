@@ -1,0 +1,10 @@
+{
+  "artifactId": "artifact_preview_sample",
+  "contentHash": "sha256:sample-preview-hash",
+  "dimensions": {
+    "height": 1080,
+    "width": 1620
+  },
+  "kind": "preview",
+  "storage": "temp_cache"
+}
