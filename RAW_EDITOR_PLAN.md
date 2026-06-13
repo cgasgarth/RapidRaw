@@ -214,6 +214,12 @@ These are not product non-goals forever. They are constraints to keep early exec
   - Use least-privilege workflow permissions.
   - Pin third-party GitHub Actions by SHA for sensitive/release workflows where practical.
   - Require manual approval for first-time contributors if the repo is public.
+- Keep dependency versions current (tracked by #935):
+  - Regularly audit JavaScript, Rust, GitHub Actions, Bun, Node, Tauri, and validation-tool dependencies against the latest compatible major and minor releases.
+  - Minor and patch dependency updates may be grouped when validation risk is low and the package family is coherent.
+  - Each major-version bump must get its own GitHub issue unless the packages are a tightly coupled toolchain that must be upgraded together.
+  - Major-version issues must record migration notes, breaking-change links, validation commands, rollback strategy, and whether follow-up code changes are expected.
+  - Dependency PRs must keep vulnerability, license, typecheck, lint, generated-artifact, and relevant Rust/Tauri checks green before merge.
 - Add local commit protection:
   - A pre-commit hook must block commits while on `main`.
   - A pre-push hook must block pushes to `main`.
@@ -394,6 +400,11 @@ An issue is done when:
 - Main and PR workflows should not cancel older queued/running checks; speed work should reduce duplicate work, improve caching, or route jobs by changed files instead of cancelling evidence.
 - CI must fail on warnings for project-owned code.
 - CI should include full build coverage, not only linting.
+- Dependency-currency checks should be shifted left where practical:
+  - Add scripted stale-dependency reports for Bun/npm and Cargo dependency graphs.
+  - Add a scheduled or manually dispatched GitHub Action that reports outdated package versions without silently changing locks.
+  - Convert every discovered major-version update into a tracked GitHub issue before implementation.
+  - Prefer small PRs by package family, with one major bump per PR unless toolchain coupling requires otherwise.
 - Validation should be local-first:
   - Hooks catch obvious mistakes before commit.
   - Local scripts mirror CI commands.
