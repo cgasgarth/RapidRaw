@@ -1,0 +1,35 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_export_sample"
+  },
+  "approval": {
+    "approvalClass": "preview_only",
+    "reason": "Plan export files, names, dimensions, and preview artifacts before writing anything to disk.",
+    "state": "not_required"
+  },
+  "commandId": "command_export_plan_sample",
+  "commandType": "export.planFiles",
+  "correlationId": "corr_export_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_44",
+  "idempotencyKey": "idem_export_plan_sample",
+  "parameters": {
+    "bitDepth": 8,
+    "colorSpace": "display_p3",
+    "fileNamePattern": "{captureDate}/{baseName}-rawengine-{variant}",
+    "format": "jpeg",
+    "includeMetadata": true,
+    "jpegQuality": 92,
+    "maxLongEdgePx": 4096,
+    "outputSharpening": "screen",
+    "resizeMode": "fit_long_edge"
+  },
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image",
+    "virtualCopyId": "vc_final_color_grade"
+  }
+}

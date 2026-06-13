@@ -1,0 +1,24 @@
+{
+  "commandId": "command_export_write_sample",
+  "commandType": "export.writeFiles",
+  "correlationId": "corr_export_sample",
+  "exportPlanHash": "sha256:sample-export-plan",
+  "exportPlanId": "export_plan_001",
+  "outputArtifacts": [
+    {
+      "artifactId": "artifact_export_jpeg_001",
+      "contentHash": "sha256:sample-export-output-jpeg",
+      "dimensions": {
+        "height": 2730,
+        "width": 4096
+      },
+      "kind": "export",
+      "storage": "export_path"
+    }
+  ],
+  "schemaVersion": 1,
+  "writtenFiles": [
+    "/Users/photographer/Pictures/RawEngine Exports/2026-06-13/IMG_0001-rawengine-vc_final_color_grade.jpg"
+  ],
+  "warnings": []
+}
