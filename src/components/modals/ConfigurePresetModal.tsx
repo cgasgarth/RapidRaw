@@ -8,6 +8,7 @@ import Switch from '../ui/Switch';
 import { Preset } from '../ui/AppProperties';
 import { ADJUSTMENT_GROUPS } from '../../utils/adjustments';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface ConfigurePresetModalProps {
   isOpen: boolean;
@@ -20,6 +21,22 @@ interface PresetTypeSwitchProps {
   selectedType: 'tool' | 'style';
   onChange: (type: 'tool' | 'style') => void;
 }
+
+const getConfigurePresetState = (initialPreset: Preset | null | undefined) => {
+  const geometryKeys = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((group) => group.keys);
+  const hasGeometry =
+    initialPreset?.adjustments && Object.keys(initialPreset.adjustments).some((key) => geometryKeys.includes(key));
+
+  return {
+    name: initialPreset?.name || '',
+    includeMasks:
+      initialPreset?.includeMasks ??
+      (initialPreset?.adjustments['masks'] && initialPreset.adjustments['masks'].length > 0) ??
+      false,
+    includeCropTransform: initialPreset?.includeCropTransform ?? hasGeometry ?? false,
+    presetType: initialPreset?.presetType || 'style',
+  };
+};
 
 const PresetTypeSwitch = ({ selectedType, onChange }: PresetTypeSwitchProps) => {
   const { t } = useTranslation();
@@ -106,47 +123,34 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
   const [includeMasks, setIncludeMasks] = useState(false);
   const [includeCropTransform, setIncludeCropTransform] = useState(false);
   const [presetType, setPresetType] = useState<'tool' | 'style'>('style');
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useManagedFocus(nameInputRef, show);
 
   useEffect(() => {
     if (isOpen) {
-      setName(initialPreset?.name || '');
-      setIncludeMasks(
-        initialPreset?.includeMasks ??
-          (initialPreset?.adjustments['masks'] && initialPreset.adjustments['masks'].length > 0) ??
-          false,
-      );
-
-      const GEOMETRY_KEYS = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((group) => group.keys);
-      const hasGeometry =
-        initialPreset?.adjustments && Object.keys(initialPreset.adjustments).some((key) => GEOMETRY_KEYS.includes(key));
-      setIncludeCropTransform(initialPreset?.includeCropTransform ?? hasGeometry ?? false);
-
-      setPresetType(initialPreset?.presetType || 'style');
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
+      const timer = window.setTimeout(() => {
+        const presetState = getConfigurePresetState(initialPreset);
+        setName(presetState.name);
+        setIncludeMasks(presetState.includeMasks);
+        setIncludeCropTransform(presetState.includeCropTransform);
+        setPresetType(presetState.presetType);
+      }, 0);
       return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-        setName('');
-        setIncludeMasks(false);
-        setIncludeCropTransform(false);
-        setPresetType('style');
-      }, 300);
-      return () => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
       };
     }
+
+    const timer = window.setTimeout(() => {
+      setName('');
+      setIncludeMasks(false);
+      setIncludeCropTransform(false);
+      setPresetType('style');
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [isOpen, initialPreset]);
 
   const handleSave = useCallback(() => {
