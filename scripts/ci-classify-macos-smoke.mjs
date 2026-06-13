@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
 import { EOL } from 'node:os';
@@ -59,6 +59,20 @@ const SAFE_FRONTEND_EXTENSIONS = new Set([
   '.tsx',
 ]);
 
+const SAFE_SCHEMA_PACKAGE_EXTENSIONS = new Set(['.json', '.md', '.mjs', '.ts']);
+
+const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
+  [
+    'schema:check',
+    new Set([
+      'tsc -p packages/rawengine-schema/tsconfig.json --noEmit --pretty false && bun packages/rawengine-schema/scripts/check-samples.ts',
+      'tsc -p packages/rawengine-schema/tsconfig.json --noEmit --pretty false && bun packages/rawengine-schema/scripts/check-samples.ts && bun run schema:samples',
+    ]),
+  ],
+  ['schema:samples', new Set(['bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs'])],
+  ['schema:samples:update', new Set(['bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs --update'])],
+]);
+
 function hasExtension(path, extensions) {
   return [...extensions].some((extension) => path.endsWith(extension));
 }
@@ -71,11 +85,39 @@ function isSafeFrontendLeaf(path) {
   return (path.startsWith('src/') || path.startsWith('public/')) && hasExtension(path, SAFE_FRONTEND_EXTENSIONS);
 }
 
+function isSafeSchemaPackagePath(path) {
+  return path.startsWith('packages/rawengine-schema/') && hasExtension(path, SAFE_SCHEMA_PACKAGE_EXTENSIONS);
+}
+
 function isSafeValidationScript(path) {
   return path.startsWith('scripts/') && path.endsWith('.mjs');
 }
 
-function classifyPath(path) {
+function isSafePackageJsonScriptPatch(patch) {
+  if (!patch) return false;
+
+  const changedLines = patch
+    .split(/\r?\n/u)
+    .filter((line) => /^[+-]/u.test(line) && !line.startsWith('+++') && !line.startsWith('---'));
+
+  if (changedLines.length === 0) return false;
+
+  return changedLines.every((line) => {
+    const content = line.slice(1).trim();
+    const match = /^"(?<scriptName>[^"]+)":\s*"(?<scriptValue>[^"]+)"\s*,?$/u.exec(content);
+    if (!match?.groups) return false;
+
+    return SAFE_PACKAGE_JSON_SCRIPT_VALUES.get(match.groups.scriptName)?.has(match.groups.scriptValue) ?? false;
+  });
+}
+
+function classifyPathChange(change) {
+  const path = change.filename;
+
+  if (path === 'package.json' && isSafePackageJsonScriptPatch(change.patch)) {
+    return { mode: SMOKE_MODES.NONE, reason: 'schema-only package script change is covered by schema validation' };
+  }
+
   if (ALWAYS_REQUIRE_FILES.has(path)) {
     return { mode: SMOKE_MODES.RELEASE, reason: 'build configuration changed' };
   }
@@ -98,6 +140,7 @@ function classifyPath(path) {
     isMarkdown(path) ||
     path.startsWith('docs/') ||
     path.startsWith('fixtures/docs/') ||
+    isSafeSchemaPackagePath(path) ||
     isSafeValidationScript(path) ||
     isSafeFrontendLeaf(path)
   ) {
@@ -111,10 +154,15 @@ function maxMode(left, right) {
   return MODE_PRIORITY.get(right) > MODE_PRIORITY.get(left) ? right : left;
 }
 
-export function classifyFiles(files) {
-  const normalizedFiles = files.map((file) => file.trim()).filter(Boolean);
+export function classifyFileChanges(changes) {
+  const normalizedChanges = changes
+    .map((change) => ({
+      filename: change.filename.trim(),
+      patch: change.patch,
+    }))
+    .filter((change) => change.filename);
 
-  if (normalizedFiles.length === 0) {
+  if (normalizedChanges.length === 0) {
     return {
       macosSmokeRequired: true,
       macosSmokeMode: SMOKE_MODES.RELEASE,
@@ -129,8 +177,9 @@ export function classifyFiles(files) {
   const safePaths = [];
   let macosSmokeMode = SMOKE_MODES.NONE;
 
-  for (const path of normalizedFiles) {
-    const classification = classifyPath(path);
+  for (const change of normalizedChanges) {
+    const path = change.filename;
+    const classification = classifyPathChange(change);
     const entry = `${path} (${classification.reason})`;
     macosSmokeMode = maxMode(macosSmokeMode, classification.mode);
 
@@ -152,6 +201,10 @@ export function classifyFiles(files) {
     requiredPaths,
     safePaths,
   };
+}
+
+export function classifyFiles(files) {
+  return classifyFileChanges(files.map((filename) => ({ filename })));
 }
 
 function writeMultilineOutput(name, value) {
@@ -177,8 +230,33 @@ function readFilesFromArg(path) {
     .filter(Boolean);
 }
 
+function readPullFilesFromArg(path) {
+  const pullFiles = JSON.parse(readFileSync(path, 'utf8'));
+  const entries = Array.isArray(pullFiles) && Array.isArray(pullFiles[0]) ? pullFiles.flat() : pullFiles;
+
+  if (!Array.isArray(entries)) {
+    throw new Error(`Expected ${path} to contain a GitHub pull files array`);
+  }
+
+  return entries.map((entry) => ({
+    filename: typeof entry.filename === 'string' ? entry.filename : '',
+    patch: typeof entry.patch === 'string' ? entry.patch : undefined,
+  }));
+}
+
 function assertClassification(name, files, expectedMode) {
   const result = classifyFiles(files);
+  const expectedRequired = expectedMode !== SMOKE_MODES.NONE;
+
+  if (result.macosSmokeRequired !== expectedRequired || result.macosSmokeMode !== expectedMode) {
+    throw new Error(
+      `${name}: expected macOS smoke mode=${expectedMode}, required=${expectedRequired}; got mode=${result.macosSmokeMode}, required=${result.macosSmokeRequired}. ${result.reason}`,
+    );
+  }
+}
+
+function assertChangeClassification(name, changes, expectedMode) {
+  const result = classifyFileChanges(changes);
   const expectedRequired = expectedMode !== SMOKE_MODES.NONE;
 
   if (result.macosSmokeRequired !== expectedRequired || result.macosSmokeMode !== expectedMode) {
@@ -198,6 +276,35 @@ function runSelfTest() {
   );
   assertClassification('tauri changes require release smoke', ['src-tauri/src/main.rs'], SMOKE_MODES.RELEASE);
   assertClassification('package changes require release smoke', ['package.json'], SMOKE_MODES.RELEASE);
+  assertChangeClassification(
+    'schema package changes skip smoke',
+    [
+      { filename: 'packages/rawengine-schema/src/rawEngineSchemas.ts' },
+      { filename: 'packages/rawengine-schema/samples/panorama-artifact-v1.json' },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'schema package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -45,6 +45,7 @@\n+    "schema:check": "tsc -p packages/rawengine-schema/tsconfig.json --noEmit --pretty false && bun packages/rawengine-schema/scripts/check-samples.ts",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'non-schema package changes require release smoke',
+    [
+      {
+        filename: 'package.json',
+        patch: '@@ -100,6 +100,7 @@\n+    "new-build-tool": "^1.0.0",',
+      },
+    ],
+    SMOKE_MODES.RELEASE,
+  );
   assertClassification('unknown paths require release smoke', ['tools/new-helper.sh'], SMOKE_MODES.RELEASE);
   assertClassification(
     'frontend leaf changes can skip smoke',
@@ -230,13 +337,19 @@ const args = process.argv.slice(2);
 if (args.includes('--self-test')) {
   runSelfTest();
 } else {
+  const pullFilesJsonIndex = args.indexOf('--pull-files-json');
+  const pullFilesJsonPath = pullFilesJsonIndex >= 0 ? args[pullFilesJsonIndex + 1] : undefined;
   const fileArgIndex = args.indexOf('--files');
   const filesPath = fileArgIndex >= 0 ? args[fileArgIndex + 1] : undefined;
 
-  if (!filesPath) {
-    throw new Error('Usage: bun scripts/ci-classify-macos-smoke.mjs --files <changed-files.txt>');
+  if (!filesPath && !pullFilesJsonPath) {
+    throw new Error(
+      'Usage: bun scripts/ci-classify-macos-smoke.mjs --files <changed-files.txt> | --pull-files-json <pull-files.json>',
+    );
   }
 
-  const result = classifyFiles(readFilesFromArg(filesPath));
+  const result = pullFilesJsonPath
+    ? classifyFileChanges(readPullFilesFromArg(pullFilesJsonPath))
+    : classifyFiles(readFilesFromArg(filesPath));
   emitGitHubOutput(result);
 }

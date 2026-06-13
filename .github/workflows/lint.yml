@@ -37,6 +37,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          gh api --paginate --slurp "repos/$REPO/pulls/$PR_NUMBER/files" > "$RUNNER_TEMP/changed-files.json"
           gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename' > "$RUNNER_TEMP/changed-files.txt"
 
           echo "Changed files:"
@@ -44,7 +45,7 @@ jobs:
 
       - id: classify
         name: Classify macOS smoke requirement
-        run: bun scripts/ci-classify-macos-smoke.mjs --files "$RUNNER_TEMP/changed-files.txt" >> "$GITHUB_OUTPUT"
+        run: bun scripts/ci-classify-macos-smoke.mjs --pull-files-json "$RUNNER_TEMP/changed-files.json" >> "$GITHUB_OUTPUT"
 
       - name: Record routing decision
         run: |
