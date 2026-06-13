@@ -107,6 +107,10 @@
           "path": "docs/negative-lab/roll-setup-frame-queue-ui-2026-06-13.md"
         },
         {
+          "title": "Negative Lab QC overlays and sample readouts UI",
+          "path": "docs/negative-lab/qc-overlays-sample-readouts-ui-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab measured-profile fixture format",
           "path": "docs/negative-lab/measured-profile-fixture-format-2026-06-13.md"
         },
