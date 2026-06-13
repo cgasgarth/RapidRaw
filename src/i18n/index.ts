@@ -1,4 +1,4 @@
-import i18n from 'i18next';
+import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 import de from './locales/de.json';
@@ -12,7 +12,7 @@ import pt from './locales/pt.json';
 import ru from './locales/ru.json';
 import zhCN from './locales/zh-CN.json';
 
-const installI18nPlugin = i18n['use'].bind(i18n);
+const installI18nPlugin = i18next['use'].bind(i18next);
 
 void installI18nPlugin(initReactI18next).init({
   resources: {
@@ -34,4 +34,4 @@ void installI18nPlugin(initReactI18next).init({
   },
 });
 
-export default i18n;
+export default i18next;

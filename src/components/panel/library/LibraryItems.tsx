@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { Image as ImageIcon, Folder, FolderOpen, Star as StarIcon, SlidersHorizontal } from 'lucide-react';
 import {
   memo,
@@ -302,7 +302,7 @@ const ThumbnailComponent = ({
       </div>
 
       <div
-        className={clsx(
+        className={cx(
           'absolute top-0 right-0 w-1/2 h-1/2 bg-linear-to-bl from-black/20 via-black/0 to-transparent pointer-events-none z-0 transition-opacity duration-200 ease-in-out',
           hasAnyOverlay ? 'opacity-100' : 'opacity-0',
         )}
@@ -310,13 +310,13 @@ const ThumbnailComponent = ({
 
       <div className="absolute top-1.5 right-1.5 flex items-center justify-end z-10 pointer-events-none">
         <div
-          className={clsx(
+          className={cx(
             'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 shadow-md bg-black/30 pointer-events-auto transition-all duration-200 ease-out origin-top-right',
             hasAnyOverlay ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none',
           )}
         >
           <div
-            className={clsx(
+            className={cx(
               'text-white flex items-center transition-all duration-200 ease-out overflow-hidden',
               hasEditIcon ? 'max-w-3 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
             )}
@@ -325,7 +325,7 @@ const ThumbnailComponent = ({
           </div>
 
           <div
-            className={clsx(
+            className={cx(
               'flex items-center justify-center shrink-0 transition-all duration-200 ease-out overflow-hidden',
               hasColorLabel ? 'max-w-3 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
               hasColorLabel && hasEditIcon ? 'ml-1.5' : 'ml-0',
@@ -338,7 +338,7 @@ const ThumbnailComponent = ({
           </div>
 
           <div
-            className={clsx(
+            className={cx(
               'flex items-center gap-0.5 shrink-0 transition-all duration-200 ease-out overflow-hidden',
               hasRating ? 'max-w-7 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
               hasRating && (hasEditIcon || hasColorLabel) ? 'ml-1.5' : 'ml-0',
@@ -353,7 +353,7 @@ const ThumbnailComponent = ({
       </div>
 
       <div
-        className={clsx(
+        className={cx(
           'absolute bottom-0 left-0 right-0 h-16 transition-opacity duration-300 pointer-events-none z-10',
           'bg-linear-to-t from-black/70 to-transparent',
           isAlways ? 'opacity-0' : isHover ? 'opacity-100 group-hover:opacity-0' : 'opacity-100',
@@ -361,7 +361,7 @@ const ThumbnailComponent = ({
       />
 
       <div
-        className={clsx(
+        className={cx(
           'w-full transition-[grid-template-rows] duration-300 ease-in-out grid shrink-0 z-0',
           isAlways ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
         )}
@@ -410,7 +410,7 @@ const ThumbnailComponent = ({
       </div>
 
       <div
-        className={clsx(
+        className={cx(
           'absolute bottom-0 left-0 right-0 flex flex-col p-2 pb-1.5 transition-all duration-300 ease-in-out z-20',
           isAlways
             ? 'bg-surface border-t border-border-color/50 pointer-events-auto'
@@ -422,7 +422,7 @@ const ThumbnailComponent = ({
         <div className="flex items-end justify-between shrink-0">
           <Text
             variant={TextVariants.small}
-            className={clsx(
+            className={cx(
               'truncate pr-2 transition-colors duration-300',
               isAlways ? 'text-white' : isHover ? 'text-white group-hover:text-white' : 'text-white',
             )}
@@ -434,7 +434,7 @@ const ThumbnailComponent = ({
               as="div"
               variant={TextVariants.small}
               weight={TextWeights.bold}
-              className={clsx(
+              className={cx(
                 'shrink-0 px-1.5 py-0.5 rounded-full transition-colors duration-300 font-bold pointer-events-auto',
                 isAlways
                   ? 'bg-border-color/30 text-text-primary shadow-none'
@@ -450,7 +450,7 @@ const ThumbnailComponent = ({
         </div>
 
         <div
-          className={clsx(
+          className={cx(
             'grid transition-[grid-template-rows,opacity] duration-300 ease-in-out shrink-0',
             isAlways
               ? 'grid-rows-[1fr] opacity-100'
@@ -461,7 +461,7 @@ const ThumbnailComponent = ({
         >
           <div className="overflow-hidden min-h-0">
             <div
-              className={clsx(
+              className={cx(
                 'pt-1.5 pb-0.5 flex flex-wrap items-center gap-x-2.5 shrink-0 transition-transform duration-300 ease-in-out',
                 isAlways ? 'translate-y-0' : isHover ? 'translate-y-3 group-hover:translate-y-0' : 'translate-y-3',
               )}
@@ -505,7 +505,7 @@ const ThumbnailComponent = ({
       </div>
 
       <div
-        className={clsx('absolute inset-0 rounded-md pointer-events-none z-30 transition-all duration-150', ringClass)}
+        className={cx('absolute inset-0 rounded-md pointer-events-none z-30 transition-all duration-150', ringClass)}
       />
     </div>
   );

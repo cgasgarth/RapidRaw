@@ -10,7 +10,7 @@ import {
   DragStartEvent,
   pointerWithin,
 } from '@dnd-kit/core';
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChartArea,
@@ -1514,7 +1514,7 @@ export default function MasksPanel() {
           <Text variant={TextVariants.title}>{t('editor.masks.maskingTitle')}</Text>
           <div className="flex items-center gap-1">
             <button
-              className={clsx(
+              className={cx(
                 'p-2 rounded-full transition-colors',
                 isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
               )}

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import clsx from 'clsx';
+import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import throttle from 'lodash.throttle';
 import { RotateCcw, ZoomIn, ZoomOut, Maximize, Save, Loader2, Eye, EyeOff, Info } from 'lucide-react';
@@ -231,9 +231,7 @@ export default function NegativeConversionModal({
       </div>
 
       <div className="grow overflow-y-auto p-4 flex flex-col gap-8">
-        <div
-          className={clsx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}
-        >
+        <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
           <Text variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.colorTiming')}
           </Text>
@@ -277,9 +275,7 @@ export default function NegativeConversionModal({
           </div>
         </div>
 
-        <div
-          className={clsx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}
-        >
+        <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
           <Text variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.printGrade')}
           </Text>
@@ -442,7 +438,7 @@ export default function NegativeConversionModal({
               onMouseLeave={() => {
                 setIsCompareActive(false);
               }}
-              className={clsx(
+              className={cx(
                 'p-2 rounded-full transition-colors select-none',
                 isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
               )}
@@ -461,7 +457,7 @@ export default function NegativeConversionModal({
 
   return (
     <div
-      className={clsx(
+      className={cx(
         'fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-300',
         show ? 'opacity-100' : 'opacity-0',
       )}

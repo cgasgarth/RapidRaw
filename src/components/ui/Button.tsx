@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { forwardRef, type ButtonHTMLAttributes, type MouseEventHandler, type ReactNode } from 'react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -21,7 +21,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const hasSurfaceBg = className.includes('bg-surface');
 
-    const combinedClasses = clsx(
+    const combinedClasses = cx(
       baseClasses,
       {
         'bg-accent shadow-shiny': !hasSurfaceBg,

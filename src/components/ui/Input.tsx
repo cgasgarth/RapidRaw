@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { forwardRef, type InputHTMLAttributes } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -17,7 +17,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 const Input = forwardRef<HTMLInputElement, InputProps>(({ className, type = 'text', bgClassName, ...props }, ref) => {
   return (
     <input
-      className={clsx(
+      className={cx(
         'flex h-10 w-full rounded-md border px-3 py-2 text-sm',
         'border-border-color text-text-primary placeholder:text-text-secondary',
         'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent',

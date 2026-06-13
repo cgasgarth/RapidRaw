@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { Image as ImageIcon, Star, SlidersHorizontal } from 'lucide-react';
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -196,7 +196,7 @@ const FilmstripThumbnail = memo(
 
     return (
       <div
-        className={clsx(
+        className={cx(
           'h-full w-full rounded-md overflow-hidden cursor-pointer shrink-0 group relative transition-all duration-150 bg-surface',
           ringClass,
         )}
@@ -251,7 +251,7 @@ const FilmstripThumbnail = memo(
         )}
 
         <div
-          className={clsx(
+          className={cx(
             'absolute top-0 right-0 w-3/4 h-3/4 bg-linear-to-bl from-black/25 via-black/0 to-transparent pointer-events-none z-0 transition-opacity duration-200 ease-in-out',
             hasAnyOverlay ? 'opacity-100' : 'opacity-0',
           )}
@@ -259,13 +259,13 @@ const FilmstripThumbnail = memo(
 
         <div className="absolute top-1 right-1 flex items-center justify-end z-10 pointer-events-none">
           <div
-            className={clsx(
+            className={cx(
               'rounded-full h-5 px-1.5 flex items-center justify-center gap-0 shadow-md bg-black/30 pointer-events-auto transition-all duration-200 ease-out origin-top-right',
               hasAnyOverlay ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none',
             )}
           >
             <div
-              className={clsx(
+              className={cx(
                 'text-white flex items-center transition-all duration-200 ease-out overflow-hidden',
                 hasEditIcon ? 'max-w-3 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
               )}
@@ -274,7 +274,7 @@ const FilmstripThumbnail = memo(
             </div>
 
             <div
-              className={clsx(
+              className={cx(
                 'flex items-center justify-center shrink-0 transition-all duration-200 ease-out overflow-hidden',
                 hasColorLabel ? 'max-w-3 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
                 hasColorLabel && hasEditIcon ? 'ml-1.5' : 'ml-0',
@@ -287,7 +287,7 @@ const FilmstripThumbnail = memo(
             </div>
 
             <div
-              className={clsx(
+              className={cx(
                 'flex items-center gap-0.5 shrink-0 transition-all duration-200 ease-out overflow-hidden',
                 hasRating ? 'max-w-7 opacity-100 scale-100' : 'max-w-0 opacity-0 scale-75 pointer-events-none',
                 hasRating && (hasEditIcon || hasColorLabel) ? 'ml-1.5' : 'ml-0',

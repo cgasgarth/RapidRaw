@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion } from 'framer-motion';
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -145,7 +145,7 @@ const ToneMapperSwitch = ({
               onClick={() => {
                 onMapperChange(mapper.id);
               }}
-              className={clsx(
+              className={cx(
                 'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
                 {
                   'text-text-primary hover:bg-surface': selectedMapper !== mapper.id,

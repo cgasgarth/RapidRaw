@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea } from 'lucide-react';
 import { useCallback, type MouseEvent, type ReactNode } from 'react';
@@ -318,7 +318,7 @@ export default function Controls() {
             <Aperture size={18} />
           </button>
           <button
-            className={clsx(
+            className={cx(
               'p-2 rounded-full transition-colors',
               isWaveformVisible ? 'bg-surface hover:bg-card-active' : 'hover:bg-surface',
             )}

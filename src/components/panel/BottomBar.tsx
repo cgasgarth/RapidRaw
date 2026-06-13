@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, Copy, ClipboardPaste, ChevronUp, ChevronDown, Check, FileInput, Settings } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
@@ -58,7 +58,7 @@ const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
   const { t } = useTranslation();
 
   return (
-    <div className={clsx('flex items-center gap-1', disabled && 'cursor-not-allowed')}>
+    <div className={cx('flex items-center gap-1', disabled && 'cursor-not-allowed')}>
       {Array.from({ length: 5 }, (_, index) => {
         const starValue = index + 1;
         return (
@@ -79,7 +79,7 @@ const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
           >
             <Star
               size={18}
-              className={clsx(
+              className={cx(
                 'transition-colors duration-150',
                 disabled
                   ? 'text-text-secondary opacity-40'
@@ -254,7 +254,7 @@ export default function BottomBar({
     <div className="shrink-0 bg-bg-secondary rounded-lg flex flex-col">
       {!isLibraryView && showFilmstrip && (
         <div
-          className={clsx('overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
+          className={cx('overflow-hidden', !isResizing && 'transition-all duration-300 ease-in-out')}
           style={{ height: isFilmstripVisible ? `${visibleFilmstripHeight}px` : '0px' }}
         >
           <div className="w-full p-2" style={{ height: `${visibleFilmstripHeight}px` }}>
@@ -275,7 +275,7 @@ export default function BottomBar({
       )}
 
       <div
-        className={clsx(
+        className={cx(
           'shrink-0 h-10 flex items-center justify-between px-3',
           !isLibraryView && 'border-t',
           !isLibraryView && showFilmstrip && isFilmstripVisible ? 'border-surface' : 'border-transparent',
@@ -360,7 +360,7 @@ export default function BottomBar({
             </button>
           </div>
           <div
-            className={clsx(
+            className={cx(
               'flex items-center transition-all duration-300 ease-out overflow-hidden',
               showSelectionCounter ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0',
             )}

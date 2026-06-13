@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import clsx from 'clsx';
+import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import throttle from 'lodash.throttle';
 import { Check, RotateCcw, Grid3X3, Eye, EyeOff, Info, LineChart, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
@@ -81,7 +81,7 @@ const SLIDER_DIVISOR = 100.0;
 const CustomGrid = ({ denseVisible, ruleOfThirdsVisible }: { denseVisible: boolean; ruleOfThirdsVisible: boolean }) => (
   <div className="absolute inset-0 pointer-events-none w-full h-full z-10">
     <div
-      className={clsx(
+      className={cx(
         'absolute inset-0 w-full h-full transition-opacity duration-300 ease-in-out',
         ruleOfThirdsVisible ? 'opacity-100' : 'opacity-0',
       )}
@@ -93,7 +93,7 @@ const CustomGrid = ({ denseVisible, ruleOfThirdsVisible }: { denseVisible: boole
     </div>
 
     <div
-      className={clsx(
+      className={cx(
         'absolute inset-0 w-full h-full transition-opacity duration-500 ease-in-out',
         denseVisible ? 'opacity-100' : 'opacity-0',
       )}
@@ -552,7 +552,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               onClick={() => {
                 setShowGrid(!showGrid);
               }}
-              className={clsx(
+              className={cx(
                 'p-2 rounded-full transition-colors',
                 showGrid ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white',
               )}
@@ -562,7 +562,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             </button>
             <button
               onClick={handleShowLinesToggle}
-              className={clsx(
+              className={cx(
                 'p-2 rounded-full transition-colors',
                 showLines ? 'bg-white/20 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white',
               )}
@@ -617,7 +617,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
               onMouseLeave={() => {
                 void toggleCompare(false);
               }}
-              className={clsx(
+              className={cx(
                 'p-2 rounded-full transition-colors select-none',
                 isCompareActive ? 'bg-accent text-button-text' : 'text-white/60 hover:bg-white/10 hover:text-white',
               )}

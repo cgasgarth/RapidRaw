@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion } from 'framer-motion';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -100,7 +100,7 @@ const PasteModeSwitch = ({ selectedMode, onModeChange, isVisible }: PasteModeSwi
           onClick={() => {
             onModeChange(option.id);
           }}
-          className={clsx(
+          className={cx(
             'relative flex-1 flex items-center justify-center gap-2 py-1.5 text-sm rounded-md transition-colors',
             {
               'text-text-primary hover:bg-surface': selectedMode !== option.id,

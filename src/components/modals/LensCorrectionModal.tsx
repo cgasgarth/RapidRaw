@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import clsx from 'clsx';
+import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import throttle from 'lodash.throttle';
 import {
@@ -618,7 +618,7 @@ export default function LensCorrectionModal({
               onClick={() => {
                 handleModeChange('auto');
               }}
-              className={clsx(
+              className={cx(
                 'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
                 params.lensCorrectionMode === 'auto' ? 'text-button-text' : 'text-text-primary hover:bg-surface',
               )}
@@ -630,7 +630,7 @@ export default function LensCorrectionModal({
               onClick={() => {
                 handleModeChange('manual');
               }}
-              className={clsx(
+              className={cx(
                 'relative flex-1 flex items-center justify-center gap-2 px-3 p-1.5 text-sm font-medium rounded-md transition-colors',
                 params.lensCorrectionMode === 'manual' ? 'text-button-text' : 'text-text-primary hover:bg-surface',
               )}
@@ -648,7 +648,7 @@ export default function LensCorrectionModal({
             </Text>
             <div className="space-y-3">
               <div
-                className={clsx(
+                className={cx(
                   'w-full flex items-center justify-center gap-2 px-3 py-3 text-sm font-semibold rounded-md border',
                   detectionStatus === 'not_found'
                     ? 'bg-red-500/10 text-red-400 border-red-500/20'
@@ -717,7 +717,7 @@ export default function LensCorrectionModal({
           <div className="flex flex-col gap-4">
             <div>
               <div
-                className={clsx(
+                className={cx(
                   'flex items-center gap-3 p-2 rounded-md transition-colors',
                   availability.distortion ? 'bg-surface' : 'bg-surface/30',
                 )}
@@ -762,7 +762,7 @@ export default function LensCorrectionModal({
 
             <div>
               <div
-                className={clsx(
+                className={cx(
                   'flex items-center gap-3 p-2 rounded-md transition-colors',
                   availability.tca ? 'bg-surface' : 'bg-surface/30',
                 )}
@@ -807,7 +807,7 @@ export default function LensCorrectionModal({
 
             <div>
               <div
-                className={clsx(
+                className={cx(
                   'flex items-center gap-3 p-2 rounded-md transition-colors',
                   availability.vignetting ? 'bg-surface' : 'bg-surface/30',
                 )}
@@ -985,7 +985,7 @@ export default function LensCorrectionModal({
               onMouseLeave={() => {
                 toggleCompare(false);
               }}
-              className={clsx(
+              className={cx(
                 'p-2 rounded-full transition-colors select-none',
                 isCompareActive ? 'bg-accent text-white' : 'text-white/60 hover:bg-white/10 hover:text-white',
               )}

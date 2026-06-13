@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 import { motion } from 'framer-motion';
 import { useState, useEffect, useCallback, useRef, useMemo, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -101,7 +101,7 @@ const PresetTypeSwitch = ({ selectedType, onChange }: PresetTypeSwitchProps) => 
               e.preventDefault();
               onChange(option.id);
             }}
-            className={clsx(
+            className={cx(
               'relative flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
               {
                 'text-text-primary hover:bg-surface': selectedType !== option.id,

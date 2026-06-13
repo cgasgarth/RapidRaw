@@ -1,4 +1,4 @@
-import clsx from 'clsx';
+import cx from 'clsx';
 
 import { Orientation } from './AppProperties';
 
@@ -11,7 +11,7 @@ interface ResizerProps {
 
 const Resizer = ({ direction, onMouseDown }: ResizerProps) => (
   <div
-    className={clsx('shrink-0 bg-transparent z-10 touch-none', {
+    className={cx('shrink-0 bg-transparent z-10 touch-none', {
       'w-2 cursor-col-resize': direction === Orientation.Vertical,
       'h-2 cursor-row-resize': direction === Orientation.Horizontal,
     })}
