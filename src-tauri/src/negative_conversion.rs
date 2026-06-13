@@ -345,3 +345,134 @@ pub async fn convert_negatives(
     .await
     .map_err(|e| e.to_string())?
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{DynamicImage, Pixel, Rgb32FImage};
+
+    fn render_fixture(
+        pixels: Vec<f32>,
+        params: NegativeConversionParams,
+        bounds: [ChannelBounds; 3],
+    ) -> Rgb32FImage {
+        let input = DynamicImage::ImageRgb32F(Rgb32FImage::from_vec(3, 1, pixels).unwrap());
+        run_pipeline(&input, &params, Some(bounds)).to_rgb32f()
+    }
+
+    fn luminance(pixel: image::Rgb<f32>) -> f32 {
+        let channels = pixel.channels();
+        0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+    }
+
+    #[test]
+    fn color_negative_fixture_renders_finite_monotonic_positive_values() {
+        let rendered = render_fixture(
+            vec![
+                0.82, 0.64, 0.46, //
+                0.36, 0.28, 0.20, //
+                0.09, 0.07, 0.05,
+            ],
+            NegativeConversionParams {
+                red_weight: 1.2,
+                green_weight: 1.0,
+                blue_weight: 0.75,
+                exposure: 0.0,
+                contrast: 1.0,
+            },
+            [
+                ChannelBounds {
+                    min: 0.05,
+                    max: 1.2,
+                },
+                ChannelBounds {
+                    min: 0.08,
+                    max: 1.25,
+                },
+                ChannelBounds {
+                    min: 0.12,
+                    max: 1.35,
+                },
+            ],
+        );
+
+        let thin = luminance(*rendered.get_pixel(0, 0));
+        let mid = luminance(*rendered.get_pixel(1, 0));
+        let dense = luminance(*rendered.get_pixel(2, 0));
+
+        for pixel in rendered.pixels() {
+            for channel in pixel.channels() {
+                assert!(channel.is_finite());
+                assert!((0.0..=1.0).contains(channel));
+            }
+        }
+
+        assert!(
+            thin < mid,
+            "denser color negative sample should render brighter than thin sample"
+        );
+        assert!(
+            mid < dense,
+            "densest color negative sample should render brightest"
+        );
+
+        let mid_pixel = rendered.get_pixel(1, 0).channels();
+        let color_spread = (mid_pixel[0] - mid_pixel[2]).abs();
+        assert!(
+            color_spread > 0.01,
+            "color fixture should preserve channel-specific response"
+        );
+    }
+
+    #[test]
+    fn black_and_white_negative_fixture_renders_neutral_monotonic_values() {
+        let rendered = render_fixture(
+            vec![
+                0.78, 0.78, 0.78, //
+                0.32, 0.32, 0.32, //
+                0.08, 0.08, 0.08,
+            ],
+            NegativeConversionParams::default(),
+            [
+                ChannelBounds {
+                    min: 0.05,
+                    max: 1.2,
+                },
+                ChannelBounds {
+                    min: 0.05,
+                    max: 1.2,
+                },
+                ChannelBounds {
+                    min: 0.05,
+                    max: 1.2,
+                },
+            ],
+        );
+
+        let thin = luminance(*rendered.get_pixel(0, 0));
+        let mid = luminance(*rendered.get_pixel(1, 0));
+        let dense = luminance(*rendered.get_pixel(2, 0));
+
+        assert!(
+            thin < mid,
+            "denser black-and-white sample should render brighter than thin sample"
+        );
+        assert!(
+            mid < dense,
+            "densest black-and-white sample should render brightest"
+        );
+
+        for pixel in rendered.pixels() {
+            let channels = pixel.channels();
+            let max_chroma_delta = (channels[0] - channels[1])
+                .abs()
+                .max((channels[1] - channels[2]).abs())
+                .max((channels[0] - channels[2]).abs());
+
+            assert!(
+                max_chroma_delta <= 0.0001,
+                "black-and-white fixture should remain neutral"
+            );
+        }
+    }
+}
