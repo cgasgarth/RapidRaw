@@ -42,6 +42,7 @@
     "deps:audit": "bun scripts/audit-dependency-versions.mjs",
     "deps:audit:js": "bun scripts/audit-dependency-versions.mjs --ecosystem=js",
     "deps:audit:rust": "bun scripts/audit-dependency-versions.mjs --ecosystem=rust",
+    "check:performance-smoke": "bun scripts/check-performance-smoke.mjs",
     "check:visual-smoke": "bun scripts/capture-visual-smoke.mjs",
     "check:bundle": "bun run build:frontend && bun run check:bundle:budget",
     "check:bundle:budget": "bun scripts/check-vite-bundle-budget.mjs",

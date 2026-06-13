@@ -106,6 +106,7 @@ generator before the release workflow needs one.
 - [Onboarding sample project](sample/onboarding-sample-project-2026-06-11.md)
 - [Fixture download policy](validation/fixture-download-policy-2026-06-11.md)
 - [Public fixture manifest](validation/public-fixture-manifest-2026-06-11.md)
+- [Performance smoke](validation/performance-smoke-2026-06-13.md)
 - [Goal review page](validation/goal-review-2026-06-11.html)
 - [Render baseline](baseline/rapidraw-render-baseline-2026-06-10.md)
 

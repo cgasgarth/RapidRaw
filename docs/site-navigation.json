@@ -333,6 +333,10 @@
           "path": "docs/validation/public-fixture-manifest-2026-06-11.md"
         },
         {
+          "title": "Performance smoke",
+          "path": "docs/validation/performance-smoke-2026-06-13.md"
+        },
+        {
           "title": "Goal review page",
           "path": "docs/validation/goal-review-2026-06-11.html"
         }

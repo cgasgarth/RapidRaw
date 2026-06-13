@@ -12,6 +12,7 @@ node_modules
 dist
 dist-ssr
 artifacts/visual-smoke/
+artifacts/performance-smoke/
 *.local
 
 # Editor directories and files
