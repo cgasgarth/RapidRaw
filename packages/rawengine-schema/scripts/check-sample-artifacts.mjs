@@ -9,6 +9,7 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   filmGrainModelV1Schema,
+  filmHalationModelV1Schema,
   filmLookCatalogV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
@@ -39,6 +40,7 @@ import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleFilmGrainModelV1,
+  sampleFilmHalationModelV1,
   sampleFilmLookCatalogV1,
   sampleNegativeAcquisitionProfileV1,
   sampleNegativeLabAppServerToolManifestV1,
@@ -110,6 +112,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/film-grain-model-v1.json',
     schema: filmGrainModelV1Schema,
     value: sampleFilmGrainModelV1,
+  },
+  {
+    name: 'film halation model',
+    path: 'packages/rawengine-schema/samples/film-halation-model-v1.json',
+    schema: filmHalationModelV1Schema,
+    value: sampleFilmHalationModelV1,
   },
   {
     name: 'negative acquisition profile',
