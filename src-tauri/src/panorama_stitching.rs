@@ -52,6 +52,63 @@ pub struct MatchInfo {
     pub inliers: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PanoramaRenderRequest {
+    pub image_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PanoramaSourceMetadata {
+    pub height: u32,
+    pub index: usize,
+    pub path: String,
+    pub width: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PanoramaPairwiseMatchMetadata {
+    pub inliers: usize,
+    pub source_index: usize,
+    pub target_index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PanoramaRenderMetadata {
+    pub connected_source_indices: Vec<usize>,
+    pub estimated_peak_memory_bytes: u64,
+    pub excluded_source_indices: Vec<usize>,
+    pub output_height: u32,
+    pub output_width: u32,
+    pub pairwise_matches: Vec<PanoramaPairwiseMatchMetadata>,
+    pub sources: Vec<PanoramaSourceMetadata>,
+    pub warnings: Vec<String>,
+}
+
+pub struct PanoramaRenderResult {
+    pub image: DynamicImage,
+    pub metadata: PanoramaRenderMetadata,
+}
+
+pub trait PanoramaRenderEngine {
+    fn render(
+        &self,
+        request: PanoramaRenderRequest,
+        app_handle: AppHandle,
+    ) -> Result<PanoramaRenderResult, String>;
+}
+
+pub struct LegacyRapidRawHomographyEngine;
+
+impl PanoramaRenderEngine for LegacyRapidRawHomographyEngine {
+    fn render(
+        &self,
+        request: PanoramaRenderRequest,
+        app_handle: AppHandle,
+    ) -> Result<PanoramaRenderResult, String> {
+        render_with_legacy_homography_engine(request, app_handle)
+    }
+}
+
 #[tauri::command]
 pub async fn stitch_panorama(
     paths: Vec<String>,
@@ -70,21 +127,37 @@ pub async fn stitch_panorama(
     let panorama_result_handle = state.panorama_result.clone();
 
     let task = tokio::task::spawn_blocking(move || {
-        let panorama_result = stitch_images(source_paths, app_handle.clone());
+        let engine = LegacyRapidRawHomographyEngine;
+        let panorama_result = engine.render(
+            PanoramaRenderRequest {
+                image_paths: source_paths,
+            },
+            app_handle.clone(),
+        );
 
         match panorama_result {
-            Ok(panorama_image) => {
+            Ok(render_result) => {
                 let _ = app_handle.emit("panorama-progress", "Creating preview...");
+                println!(
+                    "Panorama metadata: {} connected source(s), {} excluded source(s), {} pairwise match(es), estimated peak memory {} bytes",
+                    render_result.metadata.connected_source_indices.len(),
+                    render_result.metadata.excluded_source_indices.len(),
+                    render_result.metadata.pairwise_matches.len(),
+                    render_result.metadata.estimated_peak_memory_bytes
+                );
 
-                let (w, h) = panorama_image.dimensions();
+                let (w, h) = render_result.image.dimensions();
                 let (new_w, new_h) = if w > h {
                     (800, (800.0 * h as f32 / w as f32).round() as u32)
                 } else {
                     ((800.0 * w as f32 / h as f32).round() as u32, 800)
                 };
 
-                let preview_f32 =
-                    crate::image_processing::downscale_f32_image(&panorama_image, new_w, new_h);
+                let preview_f32 = crate::image_processing::downscale_f32_image(
+                    &render_result.image,
+                    new_w,
+                    new_h,
+                );
 
                 let preview_u8 = preview_f32.to_rgb8();
 
@@ -97,7 +170,7 @@ pub async fn stitch_panorama(
                 let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
                 let final_base64 = format!("data:image/png;base64,{}", base64_str);
 
-                *panorama_result_handle.lock().unwrap() = Some(panorama_image);
+                *panorama_result_handle.lock().unwrap() = Some(render_result.image);
 
                 let _ = app_handle.emit(
                     "panorama-complete",
@@ -173,7 +246,11 @@ pub async fn save_panorama(
     Ok(output_path.to_string_lossy().to_string())
 }
 
-fn stitch_images(image_paths: Vec<String>, app_handle: AppHandle) -> Result<DynamicImage, String> {
+fn render_with_legacy_homography_engine(
+    request: PanoramaRenderRequest,
+    app_handle: AppHandle,
+) -> Result<PanoramaRenderResult, String> {
+    let image_paths = request.image_paths;
     if image_paths.len() < 2 {
         return Err("At least two images are required for a panorama.".to_string());
     }
@@ -262,6 +339,19 @@ fn stitch_images(image_paths: Vec<String>, app_handle: AppHandle) -> Result<Dyna
         }
     }
 
+    let source_metadata: Vec<PanoramaSourceMetadata> = image_data
+        .iter()
+        .map(|info| {
+            let (width, height) = info.image.dimensions();
+            PanoramaSourceMetadata {
+                height,
+                index: info.id,
+                path: info.filename.clone(),
+                width,
+            }
+        })
+        .collect();
+
     println!(
         "Image loading and feature detection completed in {:.2?}\n",
         start_time.elapsed()
@@ -341,6 +431,7 @@ fn stitch_images(image_paths: Vec<String>, app_handle: AppHandle) -> Result<Dyna
     for result in match_results.into_iter().flatten() {
         pairwise_matches.insert(result.0, result.1);
     }
+    let pairwise_match_metadata = collect_pairwise_match_metadata(&pairwise_matches);
     println!(
         "Pairwise matching completed in {:.2?}\n",
         start_time.elapsed()
@@ -382,6 +473,7 @@ fn stitch_images(image_paths: Vec<String>, app_handle: AppHandle) -> Result<Dyna
     let stitched_images_info: Vec<&ImageInfo> =
         ordered_indices.iter().map(|&i| &image_data[i]).collect();
     let unstitched_count = image_data.len() - stitched_images_info.len();
+    let mut warnings = Vec::new();
     if unstitched_count > 0 {
         let warning_msg = format!(
             "Warning: {} image(s) could not be matched and will be excluded.",
@@ -389,6 +481,10 @@ fn stitch_images(image_paths: Vec<String>, app_handle: AppHandle) -> Result<Dyna
         );
         println!("{}", warning_msg);
         let _ = app_handle.emit("panorama-warning", warning_msg);
+        warnings.push(format!(
+            "{} image(s) could not be matched and will be excluded.",
+            unstitched_count
+        ));
     }
     println!(
         "Global homography calculation completed in {:.2?}\n",
@@ -408,8 +504,79 @@ fn stitch_images(image_paths: Vec<String>, app_handle: AppHandle) -> Result<Dyna
     println!("Stitching completed in {:.2?}\n", start_time.elapsed());
 
     let _ = app_handle.emit("panorama-progress", "Finalizing panorama...");
+    let (output_width, output_height) = panorama.dimensions();
+    let connected_source_indices = ordered_indices.clone();
+    let connected_source_set: HashSet<_> = connected_source_indices.iter().copied().collect();
+    let excluded_source_indices: Vec<_> = image_data
+        .iter()
+        .map(|info| info.id)
+        .filter(|index| !connected_source_set.contains(index))
+        .collect();
+    let estimated_peak_memory_bytes =
+        estimate_legacy_panorama_peak_memory_bytes(&source_metadata, output_width, output_height);
+    let metadata = PanoramaRenderMetadata {
+        connected_source_indices,
+        estimated_peak_memory_bytes,
+        excluded_source_indices,
+        output_height,
+        output_width,
+        pairwise_matches: pairwise_match_metadata,
+        sources: source_metadata,
+        warnings,
+    };
 
-    Ok(DynamicImage::ImageRgb32F(panorama))
+    Ok(PanoramaRenderResult {
+        image: DynamicImage::ImageRgb32F(panorama),
+        metadata,
+    })
+}
+
+fn collect_pairwise_match_metadata(
+    pairwise_matches: &HashMap<(usize, usize), MatchInfo>,
+) -> Vec<PanoramaPairwiseMatchMetadata> {
+    let mut metadata: Vec<_> = pairwise_matches
+        .iter()
+        .map(
+            |(&(source_index, target_index), match_info)| PanoramaPairwiseMatchMetadata {
+                inliers: match_info.inliers,
+                source_index,
+                target_index,
+            },
+        )
+        .collect();
+
+    metadata.sort_by_key(|match_info| (match_info.source_index, match_info.target_index));
+    metadata
+}
+
+fn estimate_legacy_panorama_peak_memory_bytes(
+    sources: &[PanoramaSourceMetadata],
+    output_width: u32,
+    output_height: u32,
+) -> u64 {
+    const RGB32F_BYTES_PER_PIXEL: u64 = 12;
+    const MASK_BYTES_PER_PIXEL: u64 = 1;
+
+    let source_decode_bytes: u64 = sources
+        .iter()
+        .map(|source| source.width as u64 * source.height as u64 * RGB32F_BYTES_PER_PIXEL)
+        .sum();
+    let source_mask_bytes: u64 = sources
+        .iter()
+        .map(|source| source.width as u64 * source.height as u64 * MASK_BYTES_PER_PIXEL)
+        .sum();
+    let output_pixels = output_width as u64 * output_height as u64;
+    let output_canvas_bytes = output_pixels * RGB32F_BYTES_PER_PIXEL;
+    let output_mask_bytes = output_pixels * MASK_BYTES_PER_PIXEL;
+    let seam_workspace_bytes = output_pixels * 4;
+    let overhead_bytes = (source_decode_bytes + output_canvas_bytes) / 10;
+
+    source_decode_bytes
+        + source_mask_bytes
+        + output_canvas_bytes
+        + output_mask_bytes
+        + seam_workspace_bytes
+        + overhead_bytes
 }
 
 struct Dsu {
@@ -519,4 +686,68 @@ fn build_stitching_order(
     }
 
     (ordered_indices, global_homographies)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn collect_pairwise_match_metadata_sorts_by_source_pair() {
+        let mut matches = HashMap::new();
+        matches.insert(
+            (2, 3),
+            MatchInfo {
+                homography: Matrix3::identity(),
+                inliers: 21,
+            },
+        );
+        matches.insert(
+            (0, 1),
+            MatchInfo {
+                homography: Matrix3::identity(),
+                inliers: 42,
+            },
+        );
+
+        let metadata = collect_pairwise_match_metadata(&matches);
+
+        assert_eq!(
+            metadata,
+            vec![
+                PanoramaPairwiseMatchMetadata {
+                    inliers: 42,
+                    source_index: 0,
+                    target_index: 1,
+                },
+                PanoramaPairwiseMatchMetadata {
+                    inliers: 21,
+                    source_index: 2,
+                    target_index: 3,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn estimate_legacy_panorama_peak_memory_bytes_accounts_for_major_buffers() {
+        let sources = vec![
+            PanoramaSourceMetadata {
+                height: 100,
+                index: 0,
+                path: "left.dng".to_string(),
+                width: 200,
+            },
+            PanoramaSourceMetadata {
+                height: 100,
+                index: 1,
+                path: "right.dng".to_string(),
+                width: 200,
+            },
+        ];
+
+        let estimate = estimate_legacy_panorama_peak_memory_bytes(&sources, 300, 100);
+
+        assert_eq!(estimate, 1_114_000);
+    }
 }
