@@ -4,10 +4,12 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { z } from 'zod';
+import { panoramaArtifactV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const ROOT = process.cwd();
 const FIXTURE_DIR = 'fixtures/sidecar-roundtrip';
 const PRIMARY_IMAGE_PATH = '/fixture-roll/IMG_0001.CR3';
+const PANORAMA_IMAGE_PATH = '/fixture-roll/IMG_PANO_0001.CR3';
 const VIRTUAL_COPY_ID = 'a1b2c3';
 
 const COLOR_LABELS = new Set(['red', 'yellow', 'green', 'blue', 'purple']);
@@ -29,6 +31,14 @@ const JsonValueSchema = z.lazy(() =>
   ]),
 );
 
+const RawEngineArtifactsSchema = z
+  .object({
+    panoramaArtifacts: z.array(panoramaArtifactV1Schema).default([]),
+    schemaVersion: z.literal(1),
+    staleArtifactIds: z.array(z.string().trim().min(1)).default([]),
+  })
+  .strict();
+
 const SidecarSchema = z
   .object({
     version: z.number().int().nonnegative(),
@@ -36,6 +46,7 @@ const SidecarSchema = z
     adjustments: JsonValueSchema,
     tags: z.array(z.string().min(1)).nullable().optional(),
     exif: z.record(z.string(), z.string()).optional(),
+    rawEngineArtifacts: RawEngineArtifactsSchema.optional(),
   })
   .passthrough();
 
@@ -162,12 +173,15 @@ const assertRoundtripPreservesAdjustments = (metadata) => {
 };
 
 const primaryFixturePath = `${FIXTURE_DIR}/IMG_0001.CR3.rrdata`;
+const panoramaFixturePath = `${FIXTURE_DIR}/IMG_PANO_0001.CR3.rrdata`;
 const virtualFixturePath = `${FIXTURE_DIR}/IMG_0001.CR3.${VIRTUAL_COPY_ID}.rrdata`;
 
 const primaryContents = await readFixture(primaryFixturePath);
+const panoramaContents = await readFixture(panoramaFixturePath);
 const virtualContents = await readFixture(virtualFixturePath);
 
 const primary = loadSidecarFixture(primaryContents);
+const panorama = loadSidecarFixture(panoramaContents);
 const virtualCopy = loadSidecarFixture(virtualContents);
 
 if (primary.usedDefault) {
@@ -176,6 +190,10 @@ if (primary.usedDefault) {
 
 if (virtualCopy.usedDefault) {
   fail(`${virtualFixturePath} should parse as a valid virtual copy sidecar fixture`);
+}
+
+if (panorama.usedDefault) {
+  fail(`${panoramaFixturePath} should parse as a valid panorama artifact sidecar fixture`);
 }
 
 assertEqual(primary.metadata.version, 1, 'primary sidecar version');
@@ -191,6 +209,11 @@ assertEqual(primary.metadata.exif.Make, 'FixtureCam', 'primary EXIF Make');
 assertEqual(primary.metadata.exif.Model, 'Deterministic 1', 'primary EXIF Model');
 
 assertEqual(deriveSidecarPath(PRIMARY_IMAGE_PATH), '/fixture-roll/IMG_0001.CR3.rrdata', 'primary sidecar path');
+assertEqual(
+  deriveSidecarPath(PANORAMA_IMAGE_PATH),
+  '/fixture-roll/IMG_PANO_0001.CR3.rrdata',
+  'panorama artifact sidecar path',
+);
 assertEqual(
   deriveSidecarPath(`${PRIMARY_IMAGE_PATH}?vc=${VIRTUAL_COPY_ID}`),
   `/fixture-roll/IMG_0001.CR3.${VIRTUAL_COPY_ID}.rrdata`,
@@ -220,6 +243,20 @@ if (invalidVirtualFailures.length > 0) {
 assertRoundtripPreservesAdjustments(virtualCopy.metadata);
 assertTagConventions(virtualCopy.metadata.tags);
 
+const panoramaArtifacts = RawEngineArtifactsSchema.parse(panorama.metadata.rawEngineArtifacts);
+assertEqual(panoramaArtifacts.schemaVersion, 1, 'rawEngineArtifacts schema version');
+assertEqual(panoramaArtifacts.panoramaArtifacts.length, 1, 'panorama artifact count');
+assertEqual(panoramaArtifacts.staleArtifactIds.length, 0, 'panorama stale artifact count');
+
+const [panoramaArtifact] = panoramaArtifacts.panoramaArtifacts;
+assertEqual(panoramaArtifact.provenance.runtimeStatus, 'rendered', 'panorama artifact runtime status');
+assertEqual(panoramaArtifact.outputArtifacts.length, 1, 'panorama output artifact count');
+
+const roundtrippedPanoramaArtifacts = SidecarSchema.parse(
+  JSON.parse(JSON.stringify(panorama.metadata, null, 2)),
+).rawEngineArtifacts;
+assertJsonEqual(roundtrippedPanoramaArtifacts, panoramaArtifacts, 'panorama artifact sidecar roundtrip');
+
 const missing = loadSidecarFixture(undefined);
 if (!missing.usedDefault) {
   fail('missing sidecar should use default metadata');
@@ -242,7 +279,8 @@ console.log(
   [
     'Sidecar roundtrip fixture validation passed.',
     `Checked ${toRepoPath(toAbsolutePath(primaryFixturePath))}`,
+    `Checked ${toRepoPath(toAbsolutePath(panoramaFixturePath))}`,
     `Checked ${toRepoPath(toAbsolutePath(virtualFixturePath))}`,
-    'Coverage: schema shape, virtual-copy naming, adjustment preservation, tag conventions, missing/invalid defaults.',
+    'Coverage: schema shape, virtual-copy naming, adjustment preservation, tag conventions, panorama artifacts, missing/invalid defaults.',
   ].join('\n'),
 );

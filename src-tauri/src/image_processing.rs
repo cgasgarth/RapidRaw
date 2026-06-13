@@ -48,6 +48,16 @@ impl<'a> IntoCowImage<'a> for &'a std::sync::Arc<DynamicImage> {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RawEngineArtifacts {
+    pub schema_version: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub panorama_artifacts: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub stale_artifact_ids: Vec<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImageMetadata {
     pub version: u32,
@@ -57,6 +67,12 @@ pub struct ImageMetadata {
     pub tags: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exif: Option<std::collections::HashMap<String, String>>,
+    #[serde(
+        default,
+        rename = "rawEngineArtifacts",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub raw_engine_artifacts: Option<RawEngineArtifacts>,
 }
 
 impl Default for ImageMetadata {
@@ -67,6 +83,7 @@ impl Default for ImageMetadata {
             adjustments: Value::Null,
             tags: None,
             exif: None,
+            raw_engine_artifacts: None,
         }
     }
 }
@@ -3251,4 +3268,59 @@ pub fn calculate_auto_adjustments(
     let results = perform_auto_analysis(&original_image);
 
     Ok(auto_results_to_json(&results))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ImageMetadata, RawEngineArtifacts};
+    use serde_json::json;
+
+    #[test]
+    fn image_metadata_defaults_without_raw_engine_artifacts() {
+        let metadata: ImageMetadata = serde_json::from_value(json!({
+            "version": 1,
+            "rating": 0,
+            "adjustments": null,
+            "tags": null
+        }))
+        .expect("legacy sidecar metadata should deserialize");
+
+        assert!(metadata.raw_engine_artifacts.is_none());
+    }
+
+    #[test]
+    fn image_metadata_preserves_raw_engine_artifacts() {
+        let metadata = ImageMetadata {
+            version: 1,
+            rating: 5,
+            adjustments: json!({ "exposure": 0.15 }),
+            tags: Some(vec!["color:green".to_string(), "user:panorama".to_string()]),
+            exif: None,
+            raw_engine_artifacts: Some(RawEngineArtifacts {
+                schema_version: 1,
+                panorama_artifacts: vec![json!({
+                    "artifactId": "artifact_panorama_session_0001",
+                    "provenance": { "runtimeStatus": "rendered" }
+                })],
+                stale_artifact_ids: Vec::new(),
+            }),
+        };
+
+        let roundtripped: ImageMetadata = serde_json::from_value(
+            serde_json::to_value(&metadata).expect("sidecar metadata should serialize"),
+        )
+        .expect("sidecar metadata should deserialize");
+
+        let artifacts = roundtripped
+            .raw_engine_artifacts
+            .expect("rawEngineArtifacts should roundtrip");
+
+        assert_eq!(artifacts.schema_version, 1);
+        assert_eq!(artifacts.panorama_artifacts.len(), 1);
+        assert_eq!(
+            artifacts.panorama_artifacts[0]["artifactId"],
+            "artifact_panorama_session_0001"
+        );
+        assert!(artifacts.stale_artifact_ids.is_empty());
+    }
 }
