@@ -25,6 +25,7 @@ import { createBlobFromUint8Array } from '../../utils/blobUtils';
 import Text from '../ui/Text';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments } from '../../utils/adjustments';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface CollageModalProps {
   isOpen: boolean;
@@ -90,15 +91,13 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     [],
   );
 
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
 
-  const [availableLayouts, setAvailableLayouts] = useState<LayoutDefinition[]>([]);
   const [activeLayout, setActiveLayout] = useState<Layout | null>(null);
   const [activeAspectRatio, setActiveAspectRatio] = useState<AspectRatioPreset>(DEFAULT_ASPECT_RATIO_PRESET);
   const [keepOriginalRatio, setKeepOriginalRatio] = useState(false);
@@ -122,6 +121,10 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const imageElementsRef = useRef<Record<string, HTMLImageElement>>({});
+  const availableLayouts = useMemo<LayoutDefinition[]>(
+    () => (loadedImages.length > 0 ? LAYOUTS[loadedImages.length] || [] : []),
+    [loadedImages.length],
+  );
 
   const resetImageOffsets = useCallback(() => {
     const initialStates: Record<string, ImageState> = {};
@@ -132,37 +135,28 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   }, [loadedImages]);
 
   useEffect(() => {
-    if (isOpen) {
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-        setIsLoading(true);
-        setIsSaving(false);
-        setError(null);
-        setSavedPath(null);
-        setLoadedImages([]);
-        setImageStates({});
-        imageElementsRef.current = {};
-        setActiveLayout(null);
-        setActiveAspectRatio(DEFAULT_ASPECT_RATIO_PRESET);
-        setKeepOriginalRatio(false);
-        setBackgroundColor('#FFFFFF');
-        setSpacing(INITIAL_SPACING);
-        setBorderRadius(INITIAL_BORDER_RADIUS);
-      }, 300);
-      return () => {
-        clearTimeout(timer);
-      };
-    }
-  }, [isOpen, ASPECT_RATIO_PRESETS]);
+    if (isOpen) return;
+
+    const resetTimer = setTimeout(() => {
+      setIsLoading(true);
+      setIsSaving(false);
+      setError(null);
+      setSavedPath(null);
+      setLoadedImages([]);
+      setImageStates({});
+      imageElementsRef.current = {};
+      setActiveLayout(null);
+      setActiveAspectRatio(DEFAULT_ASPECT_RATIO_PRESET);
+      setKeepOriginalRatio(false);
+      setBackgroundColor('#FFFFFF');
+      setSpacing(INITIAL_SPACING);
+      setBorderRadius(INITIAL_BORDER_RADIUS);
+    }, 300);
+
+    return () => {
+      clearTimeout(resetTimer);
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || sourceImages.length === 0) return;
@@ -228,22 +222,26 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   }, [isOpen, sourceImages, t]);
 
   useEffect(() => {
-    if (loadedImages.length > 0) {
-      const layoutsForCount = LAYOUTS[loadedImages.length] || [];
-      setAvailableLayouts(layoutsForCount);
-      if (activeLayout === null) {
-        const firstLayout = layoutsForCount[0];
+    const layoutTimer = setTimeout(() => {
+      if (loadedImages.length > 0) {
+        if (activeLayout !== null) return;
+
+        const firstLayout = availableLayouts[0];
         if (firstLayout) {
           setActiveLayout(firstLayout.layout);
         } else if (loadedImages.length === 1) {
           setActiveLayout([{ x: 0, y: 0, width: 1, height: 1 }]);
         }
+        return;
       }
-    } else {
-      setAvailableLayouts([]);
+
       setActiveLayout(null);
-    }
-  }, [loadedImages, activeLayout]);
+    }, 0);
+
+    return () => {
+      clearTimeout(layoutTimer);
+    };
+  }, [activeLayout, availableLayouts, loadedImages.length]);
 
   useLayoutEffect(() => {
     const container = previewContainerRef.current;
