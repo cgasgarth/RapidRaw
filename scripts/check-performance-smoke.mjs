@@ -1,0 +1,157 @@
+#!/usr/bin/env bun
+
+import { spawn } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
+
+import { z } from 'zod';
+
+const BudgetMultiplierSchema = z.coerce.number().positive().finite().default(1);
+
+const SmokeCheckSchema = z
+  .object({
+    args: z.array(z.string().min(1)),
+    budgetMs: z.number().int().positive(),
+    command: z.string().min(1),
+    id: z.string().regex(/^[a-z0-9-]+$/u),
+    summary: z.string().min(1),
+  })
+  .strict();
+
+const SmokeResultSchema = z
+  .object({
+    budgetMs: z.number().int().positive(),
+    elapsedMs: z.number().nonnegative(),
+    exitCode: z.number().int().nullable(),
+    id: z.string().min(1),
+    signal: z.string().nullable(),
+    status: z.enum(['pass', 'fail']),
+    summary: z.string().min(1),
+  })
+  .strict();
+
+const SmokeReportSchema = z
+  .object({
+    budgetMultiplier: z.number().positive(),
+    generatedAt: z.string().datetime(),
+    results: z.array(SmokeResultSchema).min(1),
+    schemaVersion: z.literal(1),
+    totalElapsedMs: z.number().nonnegative(),
+  })
+  .strict();
+
+const budgetMultiplier = BudgetMultiplierSchema.parse(process.env.RAWENGINE_PERFORMANCE_SMOKE_BUDGET_MULTIPLIER);
+const outputDir = resolve('artifacts/performance-smoke');
+const outputPath = resolve(outputDir, 'performance-smoke-report.json');
+
+const smokeChecks = z.array(SmokeCheckSchema).parse([
+  {
+    args: ['scripts/ci-classify-macos-smoke.mjs', '--self-test'],
+    budgetMs: 5_000,
+    command: 'bun',
+    id: 'ci-path-classifier',
+    summary: 'Path routing classifier self-test',
+  },
+  {
+    args: ['scripts/check-generated-type-drift.mjs'],
+    budgetMs: 5_000,
+    command: 'bun',
+    id: 'generated-type-drift',
+    summary: 'Generated Tauri type drift manifest check',
+  },
+  {
+    args: ['scripts/check-film-look-fixture-outputs.mjs'],
+    budgetMs: 5_000,
+    command: 'bun',
+    id: 'film-look-fixtures',
+    summary: 'Built-in film look fixture fingerprint check',
+  },
+  {
+    args: ['packages/rawengine-schema/scripts/check-sample-artifacts.mjs'],
+    budgetMs: 10_000,
+    command: 'bun',
+    id: 'rawengine-schema-samples',
+    summary: 'RawEngine schema sample artifact validation',
+  },
+]);
+
+const formatMs = (milliseconds) => `${Math.round(milliseconds)}ms`;
+
+const runSmokeCheck = (check) =>
+  new Promise((resolveCheck) => {
+    const startedAt = performance.now();
+    const effectiveBudgetMs = Math.ceil(check.budgetMs * budgetMultiplier);
+    const child = spawn(check.command, check.args, {
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+    }, effectiveBudgetMs);
+
+    child.stdout.on('data', (chunk) => {
+      process.stdout.write(chunk);
+    });
+
+    child.stderr.on('data', (chunk) => {
+      process.stderr.write(chunk);
+    });
+
+    child.on('close', (exitCode, signal) => {
+      clearTimeout(timeout);
+      const elapsedMs = performance.now() - startedAt;
+      const status = exitCode === 0 && elapsedMs <= effectiveBudgetMs ? 'pass' : 'fail';
+
+      resolveCheck(
+        SmokeResultSchema.parse({
+          budgetMs: effectiveBudgetMs,
+          elapsedMs: Number(elapsedMs.toFixed(3)),
+          exitCode,
+          id: check.id,
+          signal,
+          status,
+          summary: check.summary,
+        }),
+      );
+    });
+  });
+
+const runStartedAt = performance.now();
+const results = [];
+
+for (const check of smokeChecks) {
+  const effectiveBudgetMs = Math.ceil(check.budgetMs * budgetMultiplier);
+  console.log(`performance smoke: ${check.summary} (budget ${formatMs(effectiveBudgetMs)})`);
+  const result = await runSmokeCheck(check);
+  results.push(result);
+
+  const statusText = result.status === 'pass' ? 'passed' : 'failed';
+  console.log(`performance smoke: ${check.id} ${statusText} in ${formatMs(result.elapsedMs)}`);
+}
+
+const report = SmokeReportSchema.parse({
+  budgetMultiplier,
+  generatedAt: new Date().toISOString(),
+  results,
+  schemaVersion: 1,
+  totalElapsedMs: Number((performance.now() - runStartedAt).toFixed(3)),
+});
+
+await mkdir(outputDir, { recursive: true });
+await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);
+
+const failures = report.results.filter((result) => result.status === 'fail');
+if (failures.length > 0) {
+  console.error('\nPerformance smoke failed:');
+  for (const failure of failures) {
+    console.error(
+      `- ${failure.id}: ${formatMs(failure.elapsedMs)} / ${formatMs(failure.budgetMs)}, exit=${failure.exitCode}, signal=${failure.signal ?? 'none'}`,
+    );
+  }
+  console.error(`Report written to ${outputPath}`);
+  process.exit(1);
+}
+
+console.log(`Performance smoke passed in ${formatMs(report.totalElapsedMs)}. Report written to ${outputPath}`);
