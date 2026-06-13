@@ -65,6 +65,7 @@ generator before the release workflow needs one.
 - [Panorama boundary controls](panorama/boundary-controls-2026-06-13.md)
 - [Panorama exposure normalization](panorama/exposure-normalization-2026-06-13.md)
 - [Architecture baseline](baseline/rapidraw-architecture-baseline-2026-06-11.md)
+- [Image pipeline baseline](baseline/rapidraw-image-pipeline-baseline-2026-06-13.md)
 - [AI hooks baseline](baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
 - [GPU shader baseline](baseline/rapidraw-gpu-shader-baseline-2026-06-11.md)
 - [Command baseline](baseline/rapidraw-command-baseline-2026-06-10.md)

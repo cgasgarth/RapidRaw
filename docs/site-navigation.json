@@ -191,6 +191,10 @@
           "path": "docs/baseline/rapidraw-architecture-baseline-2026-06-11.md"
         },
         {
+          "title": "Image pipeline baseline",
+          "path": "docs/baseline/rapidraw-image-pipeline-baseline-2026-06-13.md"
+        },
+        {
           "title": "AI hooks baseline",
           "path": "docs/baseline/rapidraw-ai-hooks-baseline-2026-06-11.md"
         },
