@@ -61,6 +61,8 @@ import {
 } from '../src/rawEngineSchemas.js';
 import {
   sampleAiAppServerToolManifestV1,
+  sampleAiMaskApplyAppServerToolCallValidationV1,
+  sampleAiMaskDryRunAppServerToolCallValidationV1,
   sampleAiToolAgentReplayFixtureV1,
   sampleAiToolApplyCommandEnvelopeV1,
   sampleAiToolApplyResultV1,
@@ -193,6 +195,16 @@ const validSamples: ReadonlyArray<{
     name: 'AI app-server tool manifest',
     schema: aiAppServerToolManifestV1Schema,
     value: sampleAiAppServerToolManifestV1,
+  },
+  {
+    name: 'AI mask dry-run app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleAiMaskDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'AI mask apply app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleAiMaskApplyAppServerToolCallValidationV1,
   },
   {
     name: 'edit graph snapshot query',
@@ -639,6 +651,25 @@ expectInvalid('AI agent replay with mismatched output schema', rawEngineAgentRep
       outputSchemaName: 'LayerMaskMutationResultV1',
     },
   ],
+});
+
+expectInvalid('AI app-server tool call with mismatched tool name', rawEngineAppServerToolCallValidationV1Schema, {
+  ...sampleAiMaskDryRunAppServerToolCallValidationV1,
+  toolCall: {
+    ...sampleAiMaskDryRunAppServerToolCallValidationV1.toolCall,
+    toolName: 'ai.mask.apply_subject',
+  },
+});
+
+expectInvalid('AI app-server apply call without approved state', rawEngineAppServerToolCallValidationV1Schema, {
+  ...sampleAiMaskApplyAppServerToolCallValidationV1,
+  toolCall: {
+    ...sampleAiMaskApplyAppServerToolCallValidationV1.toolCall,
+    approval: {
+      ...sampleAiMaskApplyAppServerToolCallValidationV1.toolCall.approval,
+      state: 'pending',
+    },
+  },
 });
 
 expectInvalid('preview scope result without scope payloads', previewScopeResultV1Schema, {
