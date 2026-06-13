@@ -1,0 +1,37 @@
+{
+  "algorithm": "procedural_luma_chroma_noise_v1",
+  "channelSeparation": {
+    "chromaAmount": 0.18,
+    "chromaCorrelation": 0.65,
+    "lumaAmount": 1
+  },
+  "compatibleScopes": ["global", "layer", "mask"],
+  "intensity": {
+    "amount": 34,
+    "roughness": 58,
+    "size": 28
+  },
+  "isoPreset": "iso_400",
+  "modelId": "film.grain.procedural_luma_chroma.v1",
+  "modelVersion": "2026-06-13",
+  "renderStage": "creative_final_after_glow",
+  "rendererSupport": "partially_implemented_current_engine",
+  "schemaVersion": 1,
+  "seedPolicy": {
+    "mode": "stable_per_variant"
+  },
+  "toneResponse": {
+    "highlight": {
+      "amountScale": 0.62,
+      "endLuma": 1,
+      "startLuma": 0.72
+    },
+    "midtoneAmountScale": 1,
+    "protectClippedHighlights": true,
+    "shadow": {
+      "amountScale": 0.78,
+      "endLuma": 0.18,
+      "startLuma": 0
+    }
+  }
+}

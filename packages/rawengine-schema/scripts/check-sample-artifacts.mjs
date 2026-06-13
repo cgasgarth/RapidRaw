@@ -8,6 +8,7 @@ import { format } from 'prettier';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  filmGrainModelV1Schema,
   filmLookCatalogV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
@@ -37,6 +38,7 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleFilmGrainModelV1,
   sampleFilmLookCatalogV1,
   sampleNegativeAcquisitionProfileV1,
   sampleNegativeLabAppServerToolManifestV1,
@@ -102,6 +104,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/film-look-catalog-v1.json',
     schema: filmLookCatalogV1Schema,
     value: sampleFilmLookCatalogV1,
+  },
+  {
+    name: 'film grain model',
+    path: 'packages/rawengine-schema/samples/film-grain-model-v1.json',
+    schema: filmGrainModelV1Schema,
+    value: sampleFilmGrainModelV1,
   },
   {
     name: 'negative acquisition profile',
