@@ -38,8 +38,9 @@ interface ImageThumbnailProps {
 function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: ImageThumbnailProps) {
   const thumbnailUrl = thumbnails[path];
   return (
-    <div
-      className={`relative group rounded-md overflow-hidden border-2 transition-colors cursor-pointer ${
+    <button
+      type="button"
+      className={`relative group rounded-md overflow-hidden border-2 transition-colors cursor-pointer text-left ${
         isSelected ? 'border-accent' : 'border-transparent hover:border-surface'
       }`}
       onClick={onToggle}
@@ -65,7 +66,7 @@ function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: Im
           {children}
         </Text>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -477,6 +478,7 @@ export default function CullingModal({
           onClose();
         }
       }}
+      role="presentation"
     >
       <div
         aria-modal="true"
