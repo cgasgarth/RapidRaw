@@ -1,0 +1,45 @@
+{
+  "algorithm": "channel_mixer_filter_response_v1",
+  "channelMixer": {
+    "blueWeight": 0.12,
+    "greenWeight": 0.62,
+    "normalizeLuminance": true,
+    "redWeight": 0.42
+  },
+  "compatibleScopes": ["global", "layer", "mask"],
+  "deterministic": {
+    "deterministicReplay": true,
+    "stochasticInputs": false
+  },
+  "filterResponse": {
+    "preset": "orange_filter",
+    "strength": 54
+  },
+  "luminanceCurve": {
+    "blackPoint": 0.02,
+    "contrast": 42,
+    "midtoneLift": 6,
+    "shoulder": 36,
+    "toe": 24,
+    "whitePoint": 0.98
+  },
+  "maskBehavior": {
+    "application": "source_and_composite",
+    "avoidLayerDoubleCounting": true
+  },
+  "modelId": "film.bw.channel_mixer_filter.v1",
+  "modelVersion": "2026-06-13",
+  "renderDomain": "scene_referred_linear",
+  "renderStage": "creative_monochrome_before_halation",
+  "rendererSupport": "partially_implemented_current_engine",
+  "responseFamily": "panchromatic_style",
+  "schemaVersion": 1,
+  "toning": {
+    "balance": 8,
+    "highlightHueDegrees": 48,
+    "mode": "split_tone",
+    "shadowHueDegrees": 230,
+    "strength": 18
+  },
+  "warningCodes": ["creative_not_measured_stock_response", "renderer_path_partial", "toning_not_measured_paper"]
+}
