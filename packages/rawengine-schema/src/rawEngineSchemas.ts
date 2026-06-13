@@ -980,6 +980,341 @@ export const toneColorMutationResultV1Schema = z
   })
   .strict();
 
+export const layerMaskCommandTypeV1Schema = z.enum([
+  'layerMask.createLayer',
+  'layerMask.setLayerOpacity',
+  'layerMask.attachMask',
+  'layerMask.applyLayerAdjustment',
+  'layerMask.createBrushMask',
+  'layerMask.createGradientMask',
+  'layerMask.createRangeMask',
+  'layerMask.combineMasks',
+  'layerMask.refineMask',
+]);
+
+export const layerMaskBlendModeV1Schema = z.enum([
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'soft_light',
+  'luminosity',
+  'color',
+]);
+
+export const layerMaskPointV1Schema = z
+  .object({
+    pressure: z.number().min(0).max(1).optional(),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+  })
+  .strict();
+
+export const layerMaskBrushStrokeV1Schema = z
+  .object({
+    flow: z.number().min(0).max(1),
+    hardness: z.number().min(0).max(1),
+    mode: z.enum(['paint', 'erase']),
+    points: z.array(layerMaskPointV1Schema).min(2).max(4096),
+    radiusPx: z.number().positive().max(2000),
+    strokeId: z.string().trim().min(1),
+  })
+  .strict();
+
+export const layerMaskGradientV1Schema = z.discriminatedUnion('gradientKind', [
+  z
+    .object({
+      end: layerMaskPointV1Schema,
+      feather: z.number().min(0).max(1),
+      gradientKind: z.literal('linear'),
+      invert: z.boolean(),
+      start: layerMaskPointV1Schema,
+    })
+    .strict(),
+  z
+    .object({
+      center: layerMaskPointV1Schema,
+      feather: z.number().min(0).max(1),
+      gradientKind: z.literal('radial'),
+      invert: z.boolean(),
+      radiusX: z.number().positive().max(1),
+      radiusY: z.number().positive().max(1),
+    })
+    .strict(),
+]);
+
+export const layerMaskRangeSelectionV1Schema = z.discriminatedUnion('rangeKind', [
+  z
+    .object({
+      feather: z.number().min(0).max(1),
+      maxLuma: z.number().min(0).max(1),
+      minLuma: z.number().min(0).max(1),
+      rangeKind: z.literal('luminance'),
+    })
+    .strict()
+    .superRefine((range, context) => {
+      if (range.minLuma >= range.maxLuma) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Luminance range masks require minLuma below maxLuma.',
+          path: ['minLuma'],
+        });
+      }
+    }),
+  z
+    .object({
+      centerHueDegrees: z.number().min(0).lt(360),
+      feather: z.number().min(0).max(1),
+      hueToleranceDegrees: z.number().positive().max(180),
+      maxLuma: z.number().min(0).max(1),
+      maxSaturation: z.number().min(0).max(1),
+      minLuma: z.number().min(0).max(1),
+      minSaturation: z.number().min(0).max(1),
+      rangeKind: z.literal('color'),
+    })
+    .strict()
+    .superRefine((range, context) => {
+      if (range.minSaturation >= range.maxSaturation) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Color range masks require minSaturation below maxSaturation.',
+          path: ['minSaturation'],
+        });
+      }
+
+      if (range.minLuma >= range.maxLuma) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Color range masks require minLuma below maxLuma.',
+          path: ['minLuma'],
+        });
+      }
+    }),
+]);
+
+const layerMaskCommandBaseV1Schema = z.object({
+  actor: rawEngineActorSchema,
+  approval: approvalRequirementSchema,
+  commandId: z.string().trim().min(1),
+  correlationId: z.string().trim().min(1),
+  dryRun: z.boolean(),
+  expectedGraphRevision: z.string().trim().min(1),
+  idempotencyKey: z.string().trim().min(1).optional(),
+  schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'virtual_copy']) }).strict(),
+});
+
+export const layerMaskCommandEnvelopeV1Schema = z
+  .discriminatedUnion('commandType', [
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.createLayer'),
+        parameters: z
+          .object({
+            blendMode: layerMaskBlendModeV1Schema,
+            layerName: z.string().trim().min(1),
+            opacity: z.number().min(0).max(1),
+            position: z.enum(['top', 'bottom', 'above_layer', 'below_layer']),
+            referenceLayerId: z.string().trim().min(1).optional(),
+            visible: z.boolean(),
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            if (
+              ['above_layer', 'below_layer'].includes(parameters.position) &&
+              parameters.referenceLayerId === undefined
+            ) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Relative layer insertion requires referenceLayerId.',
+                path: ['referenceLayerId'],
+              });
+            }
+          }),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.setLayerOpacity'),
+        parameters: z
+          .object({
+            layerId: z.string().trim().min(1),
+            opacity: z.number().min(0).max(1),
+            visible: z.boolean().optional(),
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.attachMask'),
+        parameters: z
+          .object({
+            layerId: z.string().trim().min(1),
+            maskId: z.string().trim().min(1),
+            replaceExisting: z.boolean(),
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.applyLayerAdjustment'),
+        parameters: z
+          .object({
+            adjustmentKind: z.enum(['tone_color', 'negative_lab', 'custom']),
+            adjustmentParameters: z.record(z.string(), z.unknown()),
+            layerId: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.createBrushMask'),
+        parameters: z
+          .object({
+            baseMaskId: z.string().trim().min(1).optional(),
+            maskName: z.string().trim().min(1),
+            strokes: z.array(layerMaskBrushStrokeV1Schema).min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.createGradientMask'),
+        parameters: z
+          .object({
+            gradient: layerMaskGradientV1Schema,
+            maskName: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.createRangeMask'),
+        parameters: z
+          .object({
+            maskName: z.string().trim().min(1),
+            selection: layerMaskRangeSelectionV1Schema,
+            source: z.enum(['preview_pixels', 'working_rgb', 'display_referred']),
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.combineMasks'),
+        parameters: z
+          .object({
+            combineMode: z.enum(['add', 'subtract', 'intersect']),
+            maskName: z.string().trim().min(1),
+            sourceMaskIds: z.array(z.string().trim().min(1)).min(2),
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            const uniqueMaskIds = new Set(parameters.sourceMaskIds);
+            if (uniqueMaskIds.size !== parameters.sourceMaskIds.length) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Mask combination commands require unique source mask IDs.',
+                path: ['sourceMaskIds'],
+              });
+            }
+          }),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.refineMask'),
+        parameters: z
+          .object({
+            density: z.number().min(0).max(1),
+            edgeAware: z.boolean(),
+            featherPx: z.number().min(0).max(500),
+            maskId: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+  ])
+  .superRefine((command, context) => {
+    if (command.dryRun) {
+      if (command.approval.approvalClass !== ApprovalClass.PreviewOnly) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Dry-run layer/mask commands require preview-only approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      return;
+    }
+
+    if (command.approval.approvalClass !== ApprovalClass.EditApply) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied layer/mask commands require edit-apply approval classification.',
+        path: ['approval', 'approvalClass'],
+      });
+    }
+
+    if (command.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied layer/mask commands require approved user approval before execution.',
+        path: ['approval', 'state'],
+      });
+    }
+  });
+
+export const layerMaskParameterDiffV1Schema = z
+  .object({
+    entityId: z.string().trim().min(1).nullable(),
+    entityKind: z.enum(['layer', 'mask', 'layer_stack']),
+    path: z.string().trim().min(1),
+    previousValue: z.unknown().optional(),
+    value: z.unknown().optional(),
+  })
+  .strict();
+
+export const layerMaskDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: layerMaskCommandTypeV1Schema,
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(true),
+    maskArtifacts: z.array(artifactHandleV1Schema),
+    mutates: z.literal(false),
+    parameterDiff: z.array(layerMaskParameterDiffV1Schema),
+    predictedGraphRevision: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const layerMaskMutationResultV1Schema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    changedLayerIds: z.array(z.string().trim().min(1)),
+    changedMaskIds: z.array(z.string().trim().min(1)),
+    changedNodeIds: z.array(z.string().trim().min(1)),
+    commandId: z.string().trim().min(1),
+    commandType: layerMaskCommandTypeV1Schema,
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    mutates: z.literal(true),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    undoRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const panoramaProjectionSchema = z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']);
 
 export const panoramaProjectionSupportSchema = z.enum(['implemented_current_engine', 'schema_only_deferred']);
@@ -4776,6 +5111,7 @@ const rawEngineAppServerKnownInputSchemas = {
   CommandEnvelopeV1: commandEnvelopeV1Schema,
   EditGraphCommandEnvelopeV1: editGraphCommandEnvelopeV1Schema,
   EditGraphSnapshotQueryV1: editGraphSnapshotQueryV1Schema,
+  LayerMaskCommandEnvelopeV1: layerMaskCommandEnvelopeV1Schema,
   NegativeLabApplyPlanRequestV1: negativeLabApplyPlanRequestV1Schema,
   NegativeLabCommandEnvelopeV1: negativeLabCommandEnvelopeV1Schema,
   PreviewScopeQueryV1: previewScopeQueryV1Schema,
@@ -4794,6 +5130,7 @@ export const rawEngineAppServerToolCallV1Schema = z
       'CommandEnvelopeV1',
       'EditGraphCommandEnvelopeV1',
       'EditGraphSnapshotQueryV1',
+      'LayerMaskCommandEnvelopeV1',
       'NegativeLabApplyPlanRequestV1',
       'NegativeLabCommandEnvelopeV1',
       'PreviewScopeQueryV1',
@@ -5257,6 +5594,16 @@ export type FilmLookProvenanceV1 = z.infer<typeof filmLookProvenanceV1Schema>;
 export type FilmLookRecipeCategoryV1 = z.infer<typeof filmLookRecipeCategoryV1Schema>;
 export type FilmLookRecipeV1 = z.infer<typeof filmLookRecipeV1Schema>;
 export type FilmRenderDomainV1 = z.infer<typeof filmRenderDomainV1Schema>;
+export type LayerMaskBlendModeV1 = z.infer<typeof layerMaskBlendModeV1Schema>;
+export type LayerMaskBrushStrokeV1 = z.infer<typeof layerMaskBrushStrokeV1Schema>;
+export type LayerMaskCommandEnvelopeV1 = z.infer<typeof layerMaskCommandEnvelopeV1Schema>;
+export type LayerMaskCommandTypeV1 = z.infer<typeof layerMaskCommandTypeV1Schema>;
+export type LayerMaskDryRunResultV1 = z.infer<typeof layerMaskDryRunResultV1Schema>;
+export type LayerMaskGradientV1 = z.infer<typeof layerMaskGradientV1Schema>;
+export type LayerMaskMutationResultV1 = z.infer<typeof layerMaskMutationResultV1Schema>;
+export type LayerMaskParameterDiffV1 = z.infer<typeof layerMaskParameterDiffV1Schema>;
+export type LayerMaskPointV1 = z.infer<typeof layerMaskPointV1Schema>;
+export type LayerMaskRangeSelectionV1 = z.infer<typeof layerMaskRangeSelectionV1Schema>;
 export type NegativeAcquisitionConfidence = z.infer<typeof negativeAcquisitionConfidenceSchema>;
 export type NegativeAcquisitionProfileV1 = z.infer<typeof negativeAcquisitionProfileV1Schema>;
 export type NegativeLabAppServerAuditEvent = z.infer<typeof negativeLabAppServerAuditEventSchema>;

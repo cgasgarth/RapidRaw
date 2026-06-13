@@ -1,0 +1,46 @@
+{
+  "commandId": "command_layer_mask_brush_preview_sample",
+  "commandType": "layerMask.createBrushMask",
+  "correlationId": "corr_layer_mask_brush_preview_sample",
+  "dryRun": true,
+  "maskArtifacts": [
+    {
+      "artifactId": "artifact_layer_mask_brush_matte",
+      "contentHash": "sha256:sample-layer-mask-matte",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "mask",
+      "storage": "temp_cache"
+    }
+  ],
+  "mutates": false,
+  "parameterDiff": [
+    {
+      "entityId": null,
+      "entityKind": "mask",
+      "path": "/masks/-",
+      "value": {
+        "maskId": "mask_brush_portrait",
+        "maskName": "Portrait Dodge Mask"
+      }
+    }
+  ],
+  "predictedGraphRevision": "graph_rev_47_preview",
+  "previewArtifacts": [
+    {
+      "artifactId": "artifact_layer_mask_brush_preview",
+      "contentHash": "sha256:sample-layer-mask-preview",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "preview",
+      "storage": "temp_cache"
+    }
+  ],
+  "schemaVersion": 1,
+  "sourceGraphRevision": "graph_rev_44",
+  "warnings": []
+}

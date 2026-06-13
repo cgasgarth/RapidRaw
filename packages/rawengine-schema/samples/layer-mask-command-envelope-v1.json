@@ -1,0 +1,47 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_layer_mask_sample"
+  },
+  "approval": {
+    "approvalClass": "preview_only",
+    "reason": "Previewing a brush mask computes a non-mutating matte and edit graph diff before apply.",
+    "state": "not_required"
+  },
+  "commandId": "command_layer_mask_brush_preview_sample",
+  "correlationId": "corr_layer_mask_brush_preview_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_44",
+  "idempotencyKey": "idem_layer_mask_brush_preview_sample",
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image"
+  },
+  "commandType": "layerMask.createBrushMask",
+  "parameters": {
+    "maskName": "Portrait Dodge Mask",
+    "strokes": [
+      {
+        "flow": 0.45,
+        "hardness": 0.62,
+        "mode": "paint",
+        "points": [
+          {
+            "pressure": 0.58,
+            "x": 0.42,
+            "y": 0.36
+          },
+          {
+            "pressure": 0.72,
+            "x": 0.48,
+            "y": 0.44
+          }
+        ],
+        "radiusPx": 72,
+        "strokeId": "stroke_portrait_dodge_001"
+      }
+    ]
+  }
+}
