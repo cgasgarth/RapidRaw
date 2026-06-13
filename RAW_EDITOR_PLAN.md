@@ -4658,7 +4658,8 @@ Issues:
 - Add projection options.
 - Add auto crop/boundary controls.
 - Add exposure normalization.
-- Add multi-row support audit.
+- Add multi-row support audit. Initial audit captured in
+  `docs/panorama/multi-row-support-audit-2026-06-13.md`.
 - Add large panorama tiling strategy.
 - Add panorama fixture set.
 - Add panorama UI.
