@@ -63,6 +63,7 @@ import { useManagedFocus } from '../../../hooks/useManagedFocus';
 import {
   AiProviderId,
   normalizeAiProviderId,
+  resolveAiProviderRuntimeState,
   type AiProviderId as AiProviderIdType,
 } from '../../../schemas/aiProviderSchemas';
 import { cloudUsageSchema, type CloudUsage } from '../../../schemas/cloudUsageSchemas';
@@ -364,9 +365,13 @@ export default function AIPanel() {
   const isPro = user?.publicMetadata['plan'] === 'pro';
   const [cloudUsage, setCloudUsage] = useState<CloudUsage | null>(null);
 
-  const isGenerativeAvailable =
-    (aiProvider === AiProviderId.Cloud && isSignedIn && isPro) ||
-    (aiProvider === AiProviderId.Connector && isAIConnectorConnected);
+  const aiProviderRuntimeState = resolveAiProviderRuntimeState({
+    aiProvider,
+    isAIConnectorConnected,
+    isPro,
+    isSignedIn: isSignedIn ?? false,
+  });
+  const isGenerativeAvailable = aiProviderRuntimeState.generativeEditAvailable;
 
   useEffect(() => {
     if (aiProvider !== AiProviderId.Cloud || !isSignedIn || !isPro) return;

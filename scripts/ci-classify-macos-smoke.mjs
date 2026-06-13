@@ -74,8 +74,10 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set([
       'bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures',
       'bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes',
+      'bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes && bun run check:ai-fallbacks',
     ]),
   ],
+  ['check:ai-fallbacks', new Set(['bun scripts/check-ai-provider-fallbacks.mjs'])],
   ['check:performance-smoke', new Set(['bun scripts/check-performance-smoke.mjs'])],
   ['check:release-notes', new Set(['bun scripts/generate-release-notes.mjs --self-test'])],
   ['check:workflow-policy:self-test', new Set(['bun scripts/check-github-workflow-policy.mjs --self-test'])],
@@ -353,6 +355,17 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch: '@@ -42,6 +42,7 @@\n+    "check:performance-smoke": "bun scripts/check-performance-smoke.mjs",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'AI fallback package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -17,7 +17,7 @@\n-    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes",\n+    "check:quick": "bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes && bun run check:ai-fallbacks",\n+    "check:ai-fallbacks": "bun scripts/check-ai-provider-fallbacks.mjs",',
       },
     ],
     SMOKE_MODES.NONE,
