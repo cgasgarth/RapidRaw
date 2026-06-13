@@ -21,6 +21,8 @@ without exposing runtime app-server tools yet.
 - `RawEngineToolDefinitionV1`
 - `RawEngineToolRegistryV1`
 - `NegativeLabAppServerToolManifestV1`
+- `NegativeLabDensityNormalizationProfileV1`
+- `NegativeLabProcessProfileV1`
 
 The package also includes representative sample payloads, checked JSON sample
 artifacts, and a `schema:check` script that typechecks the package and validates
@@ -58,3 +60,8 @@ bun run schema:samples:update
 Generated sample artifacts live under `packages/rawengine-schema/samples/` so
 app-server adapter PRs can reference stable payloads without importing
 TypeScript source directly.
+
+Negative Lab density/process profile samples include:
+
+- `negative-lab-density-normalization-profile-v1.json`
+- `negative-lab-process-profile-v1.json`

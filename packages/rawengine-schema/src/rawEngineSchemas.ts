@@ -458,6 +458,11 @@ export const negativeProcessFamilySchema = z.enum([
   'unknown',
 ]);
 
+export const negativeLabSupportedProcessFamilyV1Schema = z.enum([
+  'c41_color_negative',
+  'black_and_white_silver_negative',
+]);
+
 export const negativeWarningV1Schema = z
   .object({
     blocksAutomation: z.boolean(),
@@ -468,6 +473,177 @@ export const negativeWarningV1Schema = z
     severity: negativeWarningSeveritySchema,
   })
   .strict();
+
+export const negativeLabProcessProfileClassSchema = z.enum([
+  'generic_process',
+  'stock_family_starting_point',
+  'measured_project_profile',
+  'user_profile',
+  'reference_mapping',
+]);
+
+export const negativeLabLegalNamingStatusSchema = z.enum([
+  'generic_safe_name',
+  'descriptive_stock_family',
+  'legal_review_required',
+  'approved_exact_stock_name',
+]);
+
+export const negativeLabProfileMeasurementSourceSchema = z.enum([
+  'generic_engineered_starting_point',
+  'project_owned_measurement',
+  'user_supplied_measurement',
+  'research_reference_metadata_only',
+]);
+
+export const negativeLabDensityCurvePointV1Schema = z
+  .object({
+    inputDensity: z.number().min(0),
+    outputLinear: z.number().min(0),
+  })
+  .strict();
+
+export const negativeLabDensityCurveV1Schema = z
+  .object({
+    channel: z.enum(['red', 'green', 'blue', 'luminance']),
+    interpolation: z.enum(['linear', 'monotone_cubic']),
+    points: z.array(negativeLabDensityCurvePointV1Schema).min(2),
+  })
+  .strict()
+  .superRefine((curve, context) => {
+    const [firstPoint, ...remainingPoints] = curve.points;
+    if (firstPoint === undefined) return;
+
+    let previous = firstPoint;
+    for (const [offset, current] of remainingPoints.entries()) {
+      const index = offset + 1;
+
+      if (current.inputDensity <= previous.inputDensity) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Density curve inputDensity values must be strictly increasing.',
+          path: ['points', index, 'inputDensity'],
+        });
+      }
+
+      if (current.outputLinear < previous.outputLinear) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Density curve outputLinear values must be monotonic non-decreasing.',
+          path: ['points', index, 'outputLinear'],
+        });
+      }
+
+      previous = current;
+    }
+  });
+
+export const negativeLabDensityNormalizationProfileV1Schema = z
+  .object({
+    algorithmId: z.literal('density_normalization_v1'),
+    anchorPolicy: z.enum(['roll_anchor_frames', 'selected_frames', 'per_frame_only']),
+    channelBalanceWeights: z
+      .object({
+        blue: z.number().min(0).max(1),
+        green: z.number().min(0).max(1),
+        red: z.number().min(0).max(1),
+      })
+      .strict(),
+    densityAim: z
+      .object({
+        highlightDensity: z.number().min(0),
+        midtoneDensity: z.number().min(0),
+        shadowDensity: z.number().min(0),
+      })
+      .strict(),
+    exposureReferenceDensity: z.number().min(0),
+    normalizationProfileId: z.string().trim().min(1),
+    profileVersion: z.string().trim().min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    supportedProcessFamilies: z.array(negativeLabSupportedProcessFamilyV1Schema).min(1),
+  })
+  .strict()
+  .superRefine((profile, context) => {
+    const { highlightDensity, midtoneDensity, shadowDensity } = profile.densityAim;
+    if (!(highlightDensity < midtoneDensity && midtoneDensity < shadowDensity)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Density normalization aims must progress highlight < midtone < shadow.',
+        path: ['densityAim'],
+      });
+    }
+
+    const channelWeightTotal =
+      profile.channelBalanceWeights.red + profile.channelBalanceWeights.green + profile.channelBalanceWeights.blue;
+    if (Math.abs(channelWeightTotal - 1) > 0.001) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Density normalization channel weights must sum to 1.',
+        path: ['channelBalanceWeights'],
+      });
+    }
+  });
+
+export const negativeLabProcessProfileV1Schema = z
+  .object({
+    colorMode: z.enum(['color_negative_rgb', 'black_and_white_luminance']),
+    curveModelId: z.literal('process_profile_monotonic_v1'),
+    densityCurves: z.array(negativeLabDensityCurveV1Schema).min(1),
+    normalizationProfileId: z.string().trim().min(1),
+    processFamily: negativeLabSupportedProcessFamilyV1Schema,
+    profileClass: negativeLabProcessProfileClassSchema,
+    profileId: z.string().trim().min(1),
+    profileVersion: z.string().trim().min(1),
+    provenance: z
+      .object({
+        claimsPolicy: z.enum(['generic_starting_point_only', 'measured_profile', 'reference_metadata_only']),
+        fixtureIds: z.array(z.string().trim().min(1)),
+        legalNamingStatus: negativeLabLegalNamingStatusSchema,
+        measurementSource: negativeLabProfileMeasurementSourceSchema,
+      })
+      .strict(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    touchedParameters: z
+      .object({
+        creativeRendering: z.array(z.string().trim().min(1)),
+        objectiveInversion: z.array(z.string().trim().min(1)),
+        semiObjectiveNormalization: z.array(z.string().trim().min(1)),
+      })
+      .strict(),
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict()
+  .superRefine((profile, context) => {
+    if (profile.profileClass === 'measured_project_profile' && profile.provenance.fixtureIds.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Measured project profiles require at least one fixture ID.',
+        path: ['provenance', 'fixtureIds'],
+      });
+    }
+
+    if (
+      profile.profileClass === 'measured_project_profile' &&
+      profile.provenance.measurementSource !== 'project_owned_measurement'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Measured project profiles must use project-owned measurement provenance.',
+        path: ['provenance', 'measurementSource'],
+      });
+    }
+
+    if (profile.colorMode === 'black_and_white_luminance') {
+      const nonLuminanceCurve = profile.densityCurves.find((curve) => curve.channel !== 'luminance');
+      if (nonLuminanceCurve !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Black-and-white process profiles must use luminance density curves only.',
+          path: ['densityCurves'],
+        });
+      }
+    }
+  });
 
 const normalizedScoreSchema = z.number().min(0).max(1);
 
@@ -583,11 +759,6 @@ export const NEGATIVE_LAB_COMMAND_TYPES = [
 ] as const;
 
 export const negativeLabCommandTypeSchema = z.enum(NEGATIVE_LAB_COMMAND_TYPES);
-
-export const negativeLabSupportedProcessFamilyV1Schema = z.enum([
-  'c41_color_negative',
-  'black_and_white_silver_negative',
-]);
 
 const negativeLabFrameQcStatusSchema = z.enum([
   'needs_review',
@@ -765,6 +936,8 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
     curveModel: z
       .object({
         curveFamily: z.enum(['process_profile_monotonic_v1', 'parametric_monotonic_v1']),
+        normalizationProfileId: z.string().trim().min(1).optional(),
+        normalizationProfileVersion: z.string().trim().min(1).optional(),
         processProfileId: z.string().trim().min(1).optional(),
         processProfileVersion: z.string().trim().min(1).optional(),
       })
@@ -801,6 +974,8 @@ export const negativeLabPlanRollNormalizationParametersV1Schema = z
     anchorFrameIds: nonEmptyIdArraySchema,
     frameSelection: negativeLabFrameSelectionV1Schema,
     normalizationMode: z.enum(['exposure_only', 'white_balance_only', 'density_and_balance']),
+    normalizationProfileId: z.string().trim().min(1).optional(),
+    normalizationProfileVersion: z.string().trim().min(1).optional(),
     previewRequest: negativeLabPreviewRequestV1Schema,
     preserveCreativeAdjustments: z.boolean(),
     sessionId: z.string().trim().min(1),
@@ -1103,16 +1278,23 @@ export type NegativeLabCreateSessionParametersV1 = z.infer<typeof negativeLabCre
 export type NegativeLabCreatePositiveVariantParametersV1 = z.infer<
   typeof negativeLabCreatePositiveVariantParametersV1Schema
 >;
+export type NegativeLabDensityCurvePointV1 = z.infer<typeof negativeLabDensityCurvePointV1Schema>;
+export type NegativeLabDensityCurveV1 = z.infer<typeof negativeLabDensityCurveV1Schema>;
+export type NegativeLabDensityNormalizationProfileV1 = z.infer<typeof negativeLabDensityNormalizationProfileV1Schema>;
 export type NegativeLabDryRunResultV1 = z.infer<typeof negativeLabDryRunResultV1Schema>;
 export type NegativeLabEstimateBaseFogParametersV1 = z.infer<typeof negativeLabEstimateBaseFogParametersV1Schema>;
 export type NegativeLabFrameDetectionRequestV1 = z.infer<typeof negativeLabFrameDetectionRequestV1Schema>;
 export type NegativeLabFrameSelectionV1 = z.infer<typeof negativeLabFrameSelectionV1Schema>;
+export type NegativeLabLegalNamingStatus = z.infer<typeof negativeLabLegalNamingStatusSchema>;
 export type NegativeLabOperationStage = z.infer<typeof negativeLabOperationStageSchema>;
 export type NegativeLabOutputTransformRefV1 = z.infer<typeof negativeLabOutputTransformRefV1Schema>;
 export type NegativeLabPlanRollNormalizationParametersV1 = z.infer<
   typeof negativeLabPlanRollNormalizationParametersV1Schema
 >;
 export type NegativeLabPositiveVariantProvenanceV1 = z.infer<typeof negativeLabPositiveVariantProvenanceV1Schema>;
+export type NegativeLabProcessProfileClass = z.infer<typeof negativeLabProcessProfileClassSchema>;
+export type NegativeLabProcessProfileV1 = z.infer<typeof negativeLabProcessProfileV1Schema>;
+export type NegativeLabProfileMeasurementSource = z.infer<typeof negativeLabProfileMeasurementSourceSchema>;
 export type NegativeLabPreviewRequestV1 = z.infer<typeof negativeLabPreviewRequestV1Schema>;
 export type NegativeLabSampleGeometryV1 = z.infer<typeof negativeLabSampleGeometryV1Schema>;
 export type NegativeLabSetConversionRecipeParametersV1 = z.infer<

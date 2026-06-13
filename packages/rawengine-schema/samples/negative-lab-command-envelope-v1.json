@@ -30,6 +30,8 @@
     },
     "curveModel": {
       "curveFamily": "process_profile_monotonic_v1",
+      "normalizationProfileId": "generic_c41_density_norm_v1",
+      "normalizationProfileVersion": "2026-06-13",
       "processProfileId": "generic_c41_v1",
       "processProfileVersion": "2026-06-13"
     },
