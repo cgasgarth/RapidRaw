@@ -20,7 +20,11 @@ import {
   editGraphMutationResultV1Schema,
   editGraphSnapshotQueryV1Schema,
   editGraphSnapshotV1Schema,
+  exportApplyResultV1Schema,
+  exportCommandEnvelopeV1Schema,
+  exportDryRunResultV1Schema,
   filmBlackAndWhiteModelV1Schema,
+  filmLookCatalogV1Schema,
   filmGlowModelV1Schema,
   filmGrainModelV1Schema,
   filmHalationModelV1Schema,
@@ -58,7 +62,6 @@ import {
   queryEnvelopeV1Schema,
   rawEngineAgentReplayFixtureV1Schema,
   rawEngineAppServerToolCallValidationV1Schema,
-  filmLookCatalogV1Schema,
   rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
@@ -80,11 +83,14 @@ import {
   type EditGraphMutationResultV1,
   type EditGraphSnapshotQueryV1,
   type EditGraphSnapshotV1,
+  type ExportApplyResultV1,
+  type ExportCommandEnvelopeV1,
+  type ExportDryRunResultV1,
   type FilmBlackAndWhiteModelV1,
+  type FilmLookCatalogV1,
   type FilmGlowModelV1,
   type FilmGrainModelV1,
   type FilmHalationModelV1,
-  type FilmLookCatalogV1,
   type LayerMaskCommandEnvelopeV1,
   type LayerMaskDryRunResultV1,
   type LayerMaskMutationResultV1,
@@ -365,6 +371,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       returnsArtifactHandles: false,
       toolKind: 'apply',
       toolName: 'project.library_mutate',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'ExportCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'ExportDryRunResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
+      toolName: 'export.dry_run_command',
+    },
+    {
+      approvalClass: ApprovalClass.FileMutation,
+      inputSchemaName: 'ExportCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'ExportApplyResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: true,
+      toolKind: 'export',
+      toolName: 'export.write_files',
     },
     {
       approvalClass: ApprovalClass.PreviewOnly,
@@ -1210,6 +1236,160 @@ export const sampleAiEnhancementApplyAppServerToolCallValidationV1: RawEngineApp
       toolName: 'ai.enhancement.apply_command',
       transport: 'stdio',
       turnId: 'turn_rawengine_agent_ai_enhancement_sample',
+    },
+  });
+
+export const sampleExportCommandEnvelopeV1: ExportCommandEnvelopeV1 = exportCommandEnvelopeV1Schema.parse({
+  actor: {
+    id: 'codex-app-server',
+    kind: ActorKind.Agent,
+    sessionId: 'session_export_sample',
+  },
+  approval: {
+    approvalClass: ApprovalClass.PreviewOnly,
+    reason: 'Plan export files, names, dimensions, and preview artifacts before writing anything to disk.',
+    state: 'not_required',
+  },
+  commandId: 'command_export_plan_sample',
+  commandType: 'export.planFiles',
+  correlationId: 'corr_export_sample',
+  dryRun: true,
+  expectedGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  idempotencyKey: 'idem_export_plan_sample',
+  parameters: {
+    bitDepth: 8,
+    colorSpace: 'display_p3',
+    fileNamePattern: '{captureDate}/{baseName}-rawengine-{variant}',
+    format: 'jpeg',
+    includeMetadata: true,
+    jpegQuality: 92,
+    maxLongEdgePx: 4096,
+    outputSharpening: 'screen',
+    resizeMode: 'fit_long_edge',
+  },
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  target: {
+    imagePath: '/photos/session/IMG_0001.CR3',
+    kind: 'image',
+    virtualCopyId: 'vc_final_color_grade',
+  },
+});
+
+export const sampleExportApplyCommandEnvelopeV1: ExportCommandEnvelopeV1 = exportCommandEnvelopeV1Schema.parse({
+  ...sampleExportCommandEnvelopeV1,
+  approval: {
+    approvalClass: ApprovalClass.FileMutation,
+    reason: 'Write the accepted export plan to the selected output folder.',
+    recordId: 'approval_export_write_001',
+    state: 'approved',
+  },
+  commandId: 'command_export_write_sample',
+  commandType: 'export.writeFiles',
+  dryRun: false,
+  idempotencyKey: 'idem_export_write_sample',
+  parameters: {
+    ...sampleExportCommandEnvelopeV1.parameters,
+    acceptedExportPlanHash: 'sha256:sample-export-plan',
+    acceptedExportPlanId: 'export_plan_001',
+    destinationDirectory: '/Users/photographer/Pictures/RawEngine Exports',
+  },
+});
+
+export const sampleExportDryRunResultV1: ExportDryRunResultV1 = exportDryRunResultV1Schema.parse({
+  commandId: sampleExportCommandEnvelopeV1.commandId,
+  commandType: sampleExportCommandEnvelopeV1.commandType,
+  correlationId: sampleExportCommandEnvelopeV1.correlationId,
+  exportPlanHash: 'sha256:sample-export-plan',
+  exportPlanId: 'export_plan_001',
+  plannedFiles: [
+    {
+      artifactId: 'artifact_export_preview_jpeg_001',
+      estimatedBytes: 7_250_000,
+      fileName: '2026-06-13/IMG_0001-rawengine-vc_final_color_grade.jpg',
+      format: 'jpeg',
+    },
+  ],
+  previewArtifacts: [
+    {
+      artifactId: 'artifact_export_softproof_preview_001',
+      contentHash: 'sha256:sample-export-softproof-preview',
+      dimensions: {
+        height: 2730,
+        width: 4096,
+      },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+  ],
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  warnings: [],
+});
+
+export const sampleExportApplyResultV1: ExportApplyResultV1 = exportApplyResultV1Schema.parse({
+  commandId: sampleExportApplyCommandEnvelopeV1.commandId,
+  commandType: sampleExportApplyCommandEnvelopeV1.commandType,
+  correlationId: sampleExportApplyCommandEnvelopeV1.correlationId,
+  exportPlanHash: sampleExportApplyCommandEnvelopeV1.parameters.acceptedExportPlanHash,
+  exportPlanId: sampleExportApplyCommandEnvelopeV1.parameters.acceptedExportPlanId,
+  outputArtifacts: [
+    {
+      artifactId: 'artifact_export_jpeg_001',
+      contentHash: 'sha256:sample-export-output-jpeg',
+      dimensions: {
+        height: 2730,
+        width: 4096,
+      },
+      kind: 'export',
+      storage: 'export_path',
+    },
+  ],
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  warnings: [],
+  writtenFiles: [
+    '/Users/photographer/Pictures/RawEngine Exports/2026-06-13/IMG_0001-rawengine-vc_final_color_grade.jpg',
+  ],
+});
+
+export const sampleExportDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleExportCommandEnvelopeV1.approval,
+      arguments: sampleExportCommandEnvelopeV1,
+      dryRun: true,
+      inputSchemaName: 'ExportCommandEnvelopeV1',
+      itemId: 'item_tool_call_export_dry_run',
+      jsonRpcRequestId: 'jsonrpc_export_dry_run',
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_export_sample',
+      toolKind: 'dry_run',
+      toolName: 'export.dry_run_command',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_export_sample',
+    },
+  });
+
+export const sampleExportApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleExportApplyCommandEnvelopeV1.approval,
+      arguments: sampleExportApplyCommandEnvelopeV1,
+      dryRun: false,
+      inputSchemaName: 'ExportCommandEnvelopeV1',
+      itemId: 'item_tool_call_export_apply',
+      jsonRpcRequestId: 'jsonrpc_export_apply',
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_export_sample',
+      toolKind: 'export',
+      toolName: 'export.write_files',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_export_sample',
     },
   });
 

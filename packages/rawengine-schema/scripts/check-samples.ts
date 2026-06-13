@@ -18,6 +18,9 @@ import {
   editGraphMutationResultV1Schema,
   editGraphSnapshotQueryV1Schema,
   editGraphSnapshotV1Schema,
+  exportApplyResultV1Schema,
+  exportCommandEnvelopeV1Schema,
+  exportDryRunResultV1Schema,
   filmBlackAndWhiteModelV1Schema,
   filmGlowModelV1Schema,
   filmGrainModelV1Schema,
@@ -93,6 +96,12 @@ import {
   sampleEditGraphMutationResultV1,
   sampleEditGraphSnapshotQueryV1,
   sampleEditGraphSnapshotV1,
+  sampleExportApplyAppServerToolCallValidationV1,
+  sampleExportApplyCommandEnvelopeV1,
+  sampleExportApplyResultV1,
+  sampleExportCommandEnvelopeV1,
+  sampleExportDryRunAppServerToolCallValidationV1,
+  sampleExportDryRunResultV1,
   sampleFilmBlackAndWhiteModelV1,
   sampleFilmGlowModelV1,
   sampleFilmGrainModelV1,
@@ -250,6 +259,36 @@ const validSamples: ReadonlyArray<{
     name: 'AI mask apply app-server tool call validation',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleAiMaskApplyAppServerToolCallValidationV1,
+  },
+  {
+    name: 'export command envelope',
+    schema: exportCommandEnvelopeV1Schema,
+    value: sampleExportCommandEnvelopeV1,
+  },
+  {
+    name: 'export apply command envelope',
+    schema: exportCommandEnvelopeV1Schema,
+    value: sampleExportApplyCommandEnvelopeV1,
+  },
+  {
+    name: 'export dry-run result',
+    schema: exportDryRunResultV1Schema,
+    value: sampleExportDryRunResultV1,
+  },
+  {
+    name: 'export apply result',
+    schema: exportApplyResultV1Schema,
+    value: sampleExportApplyResultV1,
+  },
+  {
+    name: 'export dry-run app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleExportDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'export apply app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleExportApplyAppServerToolCallValidationV1,
   },
   {
     name: 'edit graph snapshot query',
@@ -764,6 +803,56 @@ expectInvalid('AI enhancement app-server dry-run with mask output schema', aiApp
         }
       : tool,
   ),
+});
+
+expectInvalid('export JPEG command with 16-bit output', exportCommandEnvelopeV1Schema, {
+  ...sampleExportCommandEnvelopeV1,
+  parameters: {
+    ...sampleExportCommandEnvelopeV1.parameters,
+    bitDepth: 16,
+  },
+});
+
+expectInvalid('export TIFF command with JPEG quality', exportCommandEnvelopeV1Schema, {
+  ...sampleExportCommandEnvelopeV1,
+  parameters: {
+    ...sampleExportCommandEnvelopeV1.parameters,
+    format: 'tiff',
+  },
+});
+
+expectInvalid('export fit-long-edge command missing max edge', exportCommandEnvelopeV1Schema, {
+  ...sampleExportCommandEnvelopeV1,
+  parameters: {
+    ...sampleExportCommandEnvelopeV1.parameters,
+    maxLongEdgePx: undefined,
+  },
+});
+
+expectInvalid('export write command missing destination directory', exportCommandEnvelopeV1Schema, {
+  ...sampleExportApplyCommandEnvelopeV1,
+  parameters: {
+    ...sampleExportApplyCommandEnvelopeV1.parameters,
+    destinationDirectory: undefined,
+  },
+});
+
+expectInvalid('export write app-server call without approved state', rawEngineAppServerToolCallValidationV1Schema, {
+  ...sampleExportApplyAppServerToolCallValidationV1,
+  toolCall: {
+    ...sampleExportApplyAppServerToolCallValidationV1.toolCall,
+    approval: {
+      ...sampleExportApplyAppServerToolCallValidationV1.toolCall.approval,
+      state: 'pending',
+    },
+    arguments: {
+      ...sampleExportApplyCommandEnvelopeV1,
+      approval: {
+        ...sampleExportApplyCommandEnvelopeV1.approval,
+        state: 'pending',
+      },
+    },
+  },
 });
 
 expectInvalid('preview scope result without scope payloads', previewScopeResultV1Schema, {
