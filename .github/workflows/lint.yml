@@ -144,6 +144,18 @@ jobs:
       - name: Check generated type drift
         run: bun run check:generated-types
 
+  schema-check:
+    name: 'schemas: RawEngine package'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Check RawEngine schema package
+        run: bun run schema:check
+
   frontend-lint-escapes:
     name: 'frontend: lint escape hatch policy'
     runs-on: ubuntu-latest
@@ -543,6 +555,7 @@ jobs:
       - frontend-i18n-lint
       - frontend-unsafe-casts
       - generated-type-drift
+      - schema-check
       - frontend-lint-escapes
       - docs-check
       - rust-fmt
@@ -569,6 +582,7 @@ jobs:
           FRONTEND_I18N_LINT_RESULT: ${{ needs.frontend-i18n-lint.result }}
           FRONTEND_UNSAFE_CASTS_RESULT: ${{ needs.frontend-unsafe-casts.result }}
           GENERATED_TYPE_DRIFT_RESULT: ${{ needs.generated-type-drift.result }}
+          SCHEMA_CHECK_RESULT: ${{ needs.schema-check.result }}
           FRONTEND_LINT_ESCAPES_RESULT: ${{ needs.frontend-lint-escapes.result }}
           DOCS_CHECK_RESULT: ${{ needs.docs-check.result }}
           RUST_FMT_RESULT: ${{ needs.rust-fmt.result }}
@@ -633,6 +647,7 @@ jobs:
           require_success "frontend: i18n lint baseline" "$FRONTEND_I18N_LINT_RESULT"
           require_success "frontend: unsafe cast ban" "$FRONTEND_UNSAFE_CASTS_RESULT"
           require_success "types: generated artifact drift" "$GENERATED_TYPE_DRIFT_RESULT"
+          require_success "schemas: RawEngine package" "$SCHEMA_CHECK_RESULT"
           require_success "frontend: lint escape hatch policy" "$FRONTEND_LINT_ESCAPES_RESULT"
           require_success "docs: markdown and links" "$DOCS_CHECK_RESULT"
           require_success "rust: fmt" "$RUST_FMT_RESULT"

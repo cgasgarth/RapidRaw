@@ -21,8 +21,9 @@ without exposing runtime app-server tools yet.
 - `RawEngineToolDefinitionV1`
 - `RawEngineToolRegistryV1`
 
-The package also includes representative sample payloads and a `schema:check`
-script that typechecks the package and validates samples with Zod.
+The package also includes representative sample payloads, checked JSON sample
+artifacts, and a `schema:check` script that typechecks the package and validates
+samples with Zod.
 
 ## Rules
 
@@ -44,3 +45,13 @@ bun run schema:check
 
 Feature PRs that add command families should add valid and rejected sample
 payloads before wiring UI, Rust bridge, or app-server adapters.
+
+Intentional sample changes should refresh checked artifacts with:
+
+```sh
+bun run schema:samples:update
+```
+
+Generated sample artifacts live under `packages/rawengine-schema/samples/` so
+app-server adapter PRs can reference stable payloads without importing
+TypeScript source directly.

@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_sample"
+  },
+  "approval": {
+    "approvalClass": "preview_only",
+    "reason": "Tone dry-run does not persist sidecars or exported files.",
+    "state": "not_required"
+  },
+  "commandId": "command_tone_dry_run_sample",
+  "commandType": "edit.tone.dryRun",
+  "correlationId": "corr_tone_dry_run_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_42",
+  "parameters": {
+    "exposureEv": 0.25,
+    "highlights": -12
+  },
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image",
+    "virtualCopyId": null
+  }
+}
