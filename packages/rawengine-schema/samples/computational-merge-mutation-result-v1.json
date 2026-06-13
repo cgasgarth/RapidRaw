@@ -1,0 +1,26 @@
+{
+  "appliedGraphRevision": "graph_rev_48",
+  "changedNodeIds": ["node_merge_panorama_001"],
+  "commandId": "command_merge_panorama_apply_sample",
+  "commandType": "computationalMerge.createPanorama",
+  "correlationId": "corr_merge_panorama_apply_sample",
+  "derivedAssetId": "derived_panorama_ridge_overlook",
+  "dryRun": false,
+  "mutates": true,
+  "outputArtifacts": [
+    {
+      "artifactId": "artifact_merge_panorama_full",
+      "contentHash": "sha256:sample-merge-panorama-full",
+      "dimensions": {
+        "height": 2400,
+        "width": 5600
+      },
+      "kind": "merge_output",
+      "storage": "sidecar_artifact"
+    }
+  ],
+  "schemaVersion": 1,
+  "sourceGraphRevision": "graph_rev_44",
+  "undoRevision": "graph_rev_44",
+  "warnings": []
+}

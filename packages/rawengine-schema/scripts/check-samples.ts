@@ -3,6 +3,9 @@ import { z } from 'zod';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  computationalMergeCommandEnvelopeV1Schema,
+  computationalMergeDryRunResultV1Schema,
+  computationalMergeMutationResultV1Schema,
   editGraphCommandEnvelopeV1Schema,
   editGraphDryRunResultV1Schema,
   editGraphMutationResultV1Schema,
@@ -54,6 +57,13 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleComputationalMergeApplyCommandEnvelopeV1,
+  sampleComputationalMergeCommandEnvelopeV1,
+  sampleComputationalMergeDryRunResultV1,
+  sampleComputationalMergeFocusStackCommandEnvelopeV1,
+  sampleComputationalMergeHdrCommandEnvelopeV1,
+  sampleComputationalMergeMutationResultV1,
+  sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
   sampleEditGraphApplyCommandEnvelopeV1,
   sampleEditGraphCommandEnvelopeV1,
   sampleEditGraphDryRunResultV1,
@@ -206,6 +216,41 @@ const validSamples: ReadonlyArray<{
     name: 'layer mask mutation result',
     schema: layerMaskMutationResultV1Schema,
     value: sampleLayerMaskMutationResultV1,
+  },
+  {
+    name: 'computational merge command envelope',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeCommandEnvelopeV1,
+  },
+  {
+    name: 'computational merge HDR command envelope',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeHdrCommandEnvelopeV1,
+  },
+  {
+    name: 'computational merge focus stack command envelope',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeFocusStackCommandEnvelopeV1,
+  },
+  {
+    name: 'computational merge super-resolution command envelope',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
+  },
+  {
+    name: 'computational merge apply command envelope',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeApplyCommandEnvelopeV1,
+  },
+  {
+    name: 'computational merge dry-run result',
+    schema: computationalMergeDryRunResultV1Schema,
+    value: sampleComputationalMergeDryRunResultV1,
+  },
+  {
+    name: 'computational merge mutation result',
+    schema: computationalMergeMutationResultV1Schema,
+    value: sampleComputationalMergeMutationResultV1,
   },
   {
     name: 'preview scope query',
@@ -604,6 +649,98 @@ expectInvalid('layer mask combine command with repeated source masks', layerMask
     combineMode: 'add',
     maskName: 'Combined Portrait',
     sourceMaskIds: ['mask_subject', 'mask_subject'],
+  },
+});
+
+expectInvalid('computational merge apply command without approved state', computationalMergeCommandEnvelopeV1Schema, {
+  ...sampleComputationalMergeApplyCommandEnvelopeV1,
+  approval: {
+    ...sampleComputationalMergeApplyCommandEnvelopeV1.approval,
+    state: 'pending',
+  },
+});
+
+expectInvalid(
+  'computational merge apply command without accepted dry-run plan',
+  computationalMergeCommandEnvelopeV1Schema,
+  {
+    ...sampleComputationalMergeApplyCommandEnvelopeV1,
+    parameters: {
+      ...sampleComputationalMergeApplyCommandEnvelopeV1.parameters,
+      acceptedDryRunPlanHash: undefined,
+      acceptedDryRunPlanId: undefined,
+    },
+  },
+);
+
+expectInvalid(
+  'computational merge dry-run command with edit apply approval',
+  computationalMergeCommandEnvelopeV1Schema,
+  {
+    ...sampleComputationalMergeCommandEnvelopeV1,
+    approval: {
+      ...sampleComputationalMergeCommandEnvelopeV1.approval,
+      approvalClass: 'edit_apply',
+    },
+  },
+);
+
+expectInvalid('computational merge command with duplicate source indexes', computationalMergeCommandEnvelopeV1Schema, {
+  ...sampleComputationalMergeCommandEnvelopeV1,
+  parameters: {
+    ...sampleComputationalMergeCommandEnvelopeV1.parameters,
+    sources: sampleComputationalMergeCommandEnvelopeV1.parameters.sources.map((source) => ({
+      ...source,
+      sourceIndex: 0,
+    })),
+  },
+});
+
+expectInvalid('computational merge command with mismatched source role', computationalMergeCommandEnvelopeV1Schema, {
+  ...sampleComputationalMergeCommandEnvelopeV1,
+  parameters: {
+    ...sampleComputationalMergeCommandEnvelopeV1.parameters,
+    sources: sampleComputationalMergeCommandEnvelopeV1.parameters.sources.map((source, sourceIndex) => ({
+      ...source,
+      role: sourceIndex === 0 ? 'hdr_bracket' : 'panorama_tile',
+    })),
+  },
+});
+
+expectInvalid('HDR merge command without bracket exposure metadata', computationalMergeCommandEnvelopeV1Schema, {
+  ...sampleComputationalMergeCommandEnvelopeV1,
+  commandType: 'computationalMerge.createHdr',
+  parameters: {
+    alignmentMode: 'auto',
+    bracketValidation: 'required',
+    deghosting: 'medium',
+    maxPreviewDimensionPx: 2048,
+    mergeStrategy: 'scene_linear_radiance',
+    outputName: 'Interior HDR',
+    qualityPreference: 'balanced',
+    sources: sampleComputationalMergeCommandEnvelopeV1.parameters.sources.map((source) => ({
+      ...source,
+      exposureEv: undefined,
+      role: 'hdr_bracket',
+    })),
+    toneMapPreview: true,
+  },
+});
+
+expectInvalid('super-resolution merge command with invalid scale', computationalMergeCommandEnvelopeV1Schema, {
+  ...sampleComputationalMergeCommandEnvelopeV1,
+  commandType: 'computationalMerge.createSuperResolution',
+  parameters: {
+    alignmentMode: 'optical_flow',
+    detailPolicy: 'conservative',
+    maxPreviewDimensionPx: 2048,
+    outputName: 'Burst Super Resolution',
+    outputScale: 8,
+    qualityPreference: 'best',
+    sources: sampleComputationalMergeCommandEnvelopeV1.parameters.sources.map((source) => ({
+      ...source,
+      role: 'sr_frame',
+    })),
   },
 });
 

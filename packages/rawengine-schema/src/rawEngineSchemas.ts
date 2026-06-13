@@ -1554,6 +1554,316 @@ export const panoramaArtifactV1Schema = z
   })
   .strict();
 
+export const computationalMergeFamilyV1Schema = z.enum(['panorama', 'hdr', 'focus_stack', 'super_resolution']);
+
+export const computationalMergeCommandTypeV1Schema = z.enum([
+  'computationalMerge.createPanorama',
+  'computationalMerge.createHdr',
+  'computationalMerge.createFocusStack',
+  'computationalMerge.createSuperResolution',
+]);
+
+export const computationalMergeSourceRoleV1Schema = z.enum(['panorama_tile', 'hdr_bracket', 'focus_slice', 'sr_frame']);
+
+export const computationalMergeSourceImageRefV1Schema = z
+  .object({
+    colorSpaceHint: z.string().trim().min(1).optional(),
+    exposureEv: z.number().optional(),
+    focusDistanceMm: z.number().positive().optional(),
+    imageId: z.string().trim().min(1).optional(),
+    imagePath: z.string().trim().min(1),
+    rawDefaultsApplied: z.boolean(),
+    role: computationalMergeSourceRoleV1Schema,
+    sourceIndex: z.number().int().nonnegative(),
+    virtualCopyId: z.string().trim().min(1).nullable().optional(),
+  })
+  .strict();
+
+export const computationalMergeAlignmentModeV1Schema = z.enum([
+  'auto',
+  'translation',
+  'homography',
+  'optical_flow',
+  'none',
+]);
+
+export const computationalMergeQualityPreferenceV1Schema = z.enum(['preview', 'balanced', 'best']);
+
+export const computationalMergeOutputDimensionsV1Schema = z
+  .object({
+    height: z.number().int().positive(),
+    width: z.number().int().positive(),
+  })
+  .strict();
+
+export const computationalMergePerformanceEstimateV1Schema = z
+  .object({
+    estimatedPeakMemoryBytes: z.number().int().nonnegative(),
+    estimatedRuntimeMs: z.number().int().nonnegative(),
+    requiresBackgroundJob: z.boolean(),
+  })
+  .strict();
+
+export const computationalMergeQualityMetricsV1Schema = z
+  .object({
+    alignmentConfidence: z.number().min(0).max(1).optional(),
+    deghostingRisk: z.enum(['none', 'low', 'medium', 'high']).optional(),
+    expectedDetailGainRatio: z.number().positive().optional(),
+    focusCoverageRatio: z.number().min(0).max(1).optional(),
+    overlapCoverageRatio: z.number().min(0).max(1).optional(),
+    sourceCount: z.number().int().positive(),
+  })
+  .strict();
+
+export const computationalMergePlanV1Schema = z
+  .object({
+    family: computationalMergeFamilyV1Schema,
+    outputDimensions: computationalMergeOutputDimensionsV1Schema,
+    outputName: z.string().trim().min(1),
+    performanceEstimate: computationalMergePerformanceEstimateV1Schema,
+    planId: z.string().trim().min(1),
+    qualityMetrics: computationalMergeQualityMetricsV1Schema,
+    sourceImageRefs: z.array(computationalMergeSourceImageRefV1Schema).min(2),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+  .superRefine((plan, context) => {
+    const sourceIndexes = new Set(plan.sourceImageRefs.map((source) => source.sourceIndex));
+    if (sourceIndexes.size !== plan.sourceImageRefs.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational merge plans require unique source indexes.',
+        path: ['sourceImageRefs'],
+      });
+    }
+  });
+
+const computationalMergeCommandBaseV1Schema = z.object({
+  actor: rawEngineActorSchema,
+  approval: approvalRequirementSchema,
+  commandId: z.string().trim().min(1),
+  correlationId: z.string().trim().min(1),
+  dryRun: z.boolean(),
+  expectedGraphRevision: z.string().trim().min(1),
+  idempotencyKey: z.string().trim().min(1).optional(),
+  schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'project']) }).strict(),
+});
+
+const computationalMergeSourcesSchema = z
+  .array(computationalMergeSourceImageRefV1Schema)
+  .min(2)
+  .superRefine((sources, context) => {
+    const sourceIndexes = new Set(sources.map((source) => source.sourceIndex));
+    if (sourceIndexes.size !== sources.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational merge commands require unique source indexes.',
+      });
+    }
+  });
+
+const computationalMergeAcceptedDryRunSchema = z.object({
+  acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+  acceptedDryRunPlanId: z.string().trim().min(1).optional(),
+});
+
+const validateComputationalMergeSourceRole = (
+  sources: Array<ComputationalMergeSourceImageRefV1>,
+  expectedRole: ComputationalMergeSourceRoleV1,
+  context: z.RefinementCtx,
+) => {
+  sources.forEach((source, sourceIndex) => {
+    if (source.role !== expectedRole) {
+      context.addIssue({
+        code: 'custom',
+        message: `Computational merge ${expectedRole} operations require every source to use the ${expectedRole} role.`,
+        path: ['sources', sourceIndex, 'role'],
+      });
+    }
+  });
+};
+
+export const computationalMergeCommandEnvelopeV1Schema = z
+  .discriminatedUnion('commandType', [
+    computationalMergeCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('computationalMerge.createPanorama'),
+        parameters: z
+          .object({
+            ...computationalMergeAcceptedDryRunSchema.shape,
+            boundaryMode: panoramaBoundaryModeSchema,
+            exposureNormalization: z.enum(['none', 'auto']),
+            lensCorrectionPolicy: z.enum(['unchanged', 'required_before_stitch', 'applied_before_stitch']),
+            maxPreviewDimensionPx: z.number().int().positive().max(8192),
+            outputName: z.string().trim().min(1),
+            projection: panoramaProjectionSchema,
+            qualityPreference: computationalMergeQualityPreferenceV1Schema,
+            sources: computationalMergeSourcesSchema,
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            validateComputationalMergeSourceRole(parameters.sources, 'panorama_tile', context);
+          }),
+      })
+      .strict(),
+    computationalMergeCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('computationalMerge.createHdr'),
+        parameters: z
+          .object({
+            ...computationalMergeAcceptedDryRunSchema.shape,
+            alignmentMode: computationalMergeAlignmentModeV1Schema,
+            bracketValidation: z.enum(['required', 'warn', 'disabled']),
+            deghosting: z.enum(['off', 'low', 'medium', 'high']),
+            maxPreviewDimensionPx: z.number().int().positive().max(8192),
+            mergeStrategy: z.enum(['scene_linear_radiance', 'exposure_fusion_preview']),
+            outputName: z.string().trim().min(1),
+            qualityPreference: computationalMergeQualityPreferenceV1Schema,
+            sources: computationalMergeSourcesSchema,
+            toneMapPreview: z.boolean(),
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            validateComputationalMergeSourceRole(parameters.sources, 'hdr_bracket', context);
+
+            if (parameters.bracketValidation !== 'required') return;
+
+            const exposureValues = parameters.sources
+              .map((source) => source.exposureEv)
+              .filter((exposureEv) => exposureEv !== undefined);
+            const uniqueExposureValues = new Set(exposureValues);
+            if (exposureValues.length !== parameters.sources.length || uniqueExposureValues.size < 2) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Required HDR bracket validation needs exposureEv on every source and at least two exposures.',
+                path: ['sources'],
+              });
+            }
+          }),
+      })
+      .strict(),
+    computationalMergeCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('computationalMerge.createFocusStack'),
+        parameters: z
+          .object({
+            ...computationalMergeAcceptedDryRunSchema.shape,
+            alignmentMode: computationalMergeAlignmentModeV1Schema,
+            blendMethod: z.enum(['depth_map', 'laplacian_pyramid', 'weighted_sharpness']),
+            maxPreviewDimensionPx: z.number().int().positive().max(8192),
+            outputName: z.string().trim().min(1),
+            qualityPreference: computationalMergeQualityPreferenceV1Schema,
+            retouchLayerPolicy: z.enum(['none', 'generate_retouch_layer']),
+            sources: computationalMergeSourcesSchema,
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            validateComputationalMergeSourceRole(parameters.sources, 'focus_slice', context);
+          }),
+      })
+      .strict(),
+    computationalMergeCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('computationalMerge.createSuperResolution'),
+        parameters: z
+          .object({
+            ...computationalMergeAcceptedDryRunSchema.shape,
+            alignmentMode: computationalMergeAlignmentModeV1Schema,
+            detailPolicy: z.enum(['conservative', 'balanced', 'aggressive_preview_only']),
+            maxPreviewDimensionPx: z.number().int().positive().max(8192),
+            outputName: z.string().trim().min(1),
+            outputScale: z.number().min(1.1).max(4),
+            qualityPreference: computationalMergeQualityPreferenceV1Schema,
+            sources: computationalMergeSourcesSchema,
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            validateComputationalMergeSourceRole(parameters.sources, 'sr_frame', context);
+          }),
+      })
+      .strict(),
+  ])
+  .superRefine((command, context) => {
+    if (command.dryRun) {
+      if (command.approval.approvalClass !== ApprovalClass.PreviewOnly) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Dry-run computational merge commands require preview-only approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      return;
+    }
+
+    if (command.approval.approvalClass !== ApprovalClass.EditApply) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied computational merge commands require edit-apply approval classification.',
+        path: ['approval', 'approvalClass'],
+      });
+    }
+
+    if (command.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied computational merge commands require approved user approval before execution.',
+        path: ['approval', 'state'],
+      });
+    }
+
+    if (!command.parameters.acceptedDryRunPlanId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied computational merge commands require an accepted dry-run plan id.',
+        path: ['parameters', 'acceptedDryRunPlanId'],
+      });
+    }
+
+    if (!command.parameters.acceptedDryRunPlanHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied computational merge commands require an accepted dry-run plan hash.',
+        path: ['parameters', 'acceptedDryRunPlanHash'],
+      });
+    }
+  });
+
+export const computationalMergeDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: computationalMergeCommandTypeV1Schema,
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(true),
+    mergePlan: computationalMergePlanV1Schema,
+    mutates: z.literal(false),
+    predictedGraphRevision: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const computationalMergeMutationResultV1Schema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    changedNodeIds: z.array(z.string().trim().min(1)),
+    commandId: z.string().trim().min(1),
+    commandType: computationalMergeCommandTypeV1Schema,
+    correlationId: z.string().trim().min(1),
+    derivedAssetId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    mutates: z.literal(true),
+    outputArtifacts: z.array(artifactHandleV1Schema).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    undoRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 const filmPercentSchema = z.number().min(0).max(100);
 const filmUnitIntervalSchema = z.number().min(0).max(1);
 
@@ -5109,6 +5419,7 @@ export const rawEngineAppServerProtocolV1Schema = z.literal('codex_app_server_js
 
 const rawEngineAppServerKnownInputSchemas = {
   CommandEnvelopeV1: commandEnvelopeV1Schema,
+  ComputationalMergeCommandEnvelopeV1: computationalMergeCommandEnvelopeV1Schema,
   EditGraphCommandEnvelopeV1: editGraphCommandEnvelopeV1Schema,
   EditGraphSnapshotQueryV1: editGraphSnapshotQueryV1Schema,
   LayerMaskCommandEnvelopeV1: layerMaskCommandEnvelopeV1Schema,
@@ -5128,6 +5439,7 @@ export const rawEngineAppServerToolCallV1Schema = z
     dryRun: z.boolean(),
     inputSchemaName: z.enum([
       'CommandEnvelopeV1',
+      'ComputationalMergeCommandEnvelopeV1',
       'EditGraphCommandEnvelopeV1',
       'EditGraphSnapshotQueryV1',
       'LayerMaskCommandEnvelopeV1',
@@ -5539,6 +5851,19 @@ export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
+export type ComputationalMergeAlignmentModeV1 = z.infer<typeof computationalMergeAlignmentModeV1Schema>;
+export type ComputationalMergeCommandEnvelopeV1 = z.infer<typeof computationalMergeCommandEnvelopeV1Schema>;
+export type ComputationalMergeCommandTypeV1 = z.infer<typeof computationalMergeCommandTypeV1Schema>;
+export type ComputationalMergeDryRunResultV1 = z.infer<typeof computationalMergeDryRunResultV1Schema>;
+export type ComputationalMergeFamilyV1 = z.infer<typeof computationalMergeFamilyV1Schema>;
+export type ComputationalMergeMutationResultV1 = z.infer<typeof computationalMergeMutationResultV1Schema>;
+export type ComputationalMergeOutputDimensionsV1 = z.infer<typeof computationalMergeOutputDimensionsV1Schema>;
+export type ComputationalMergePerformanceEstimateV1 = z.infer<typeof computationalMergePerformanceEstimateV1Schema>;
+export type ComputationalMergePlanV1 = z.infer<typeof computationalMergePlanV1Schema>;
+export type ComputationalMergeQualityMetricsV1 = z.infer<typeof computationalMergeQualityMetricsV1Schema>;
+export type ComputationalMergeQualityPreferenceV1 = z.infer<typeof computationalMergeQualityPreferenceV1Schema>;
+export type ComputationalMergeSourceImageRefV1 = z.infer<typeof computationalMergeSourceImageRefV1Schema>;
+export type ComputationalMergeSourceRoleV1 = z.infer<typeof computationalMergeSourceRoleV1Schema>;
 export type EditGraphCommandEnvelopeV1 = z.infer<typeof editGraphCommandEnvelopeV1Schema>;
 export type EditGraphCommandTypeV1 = z.infer<typeof editGraphCommandTypeV1Schema>;
 export type EditGraphDryRunResultV1 = z.infer<typeof editGraphDryRunResultV1Schema>;
