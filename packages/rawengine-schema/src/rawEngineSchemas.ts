@@ -262,6 +262,185 @@ export const previewScopeResultV1Schema = z
     }
   });
 
+export const exportImageFormatV1Schema = z.enum(['jpeg', 'png', 'tiff']);
+
+export const exportColorSpaceV1Schema = z.enum(['srgb', 'display_p3', 'adobe_rgb', 'prophoto_rgb']);
+
+export const exportResizeModeV1Schema = z.enum(['original', 'fit_long_edge', 'fit_box']);
+
+export const exportCommandEnvelopeV1Schema = commandEnvelopeV1Schema
+  .extend({
+    commandType: z.enum(['export.planFiles', 'export.writeFiles']),
+    parameters: z
+      .object({
+        acceptedExportPlanHash: z.string().trim().min(1).optional(),
+        acceptedExportPlanId: z.string().trim().min(1).optional(),
+        bitDepth: z.union([z.literal(8), z.literal(16)]),
+        colorSpace: exportColorSpaceV1Schema,
+        destinationDirectory: z.string().trim().min(1).optional(),
+        fileNamePattern: z.string().trim().min(1),
+        format: exportImageFormatV1Schema,
+        includeMetadata: z.boolean(),
+        jpegQuality: z.number().int().min(1).max(100).optional(),
+        maxHeightPx: z.number().int().positive().optional(),
+        maxLongEdgePx: z.number().int().positive().optional(),
+        maxWidthPx: z.number().int().positive().optional(),
+        outputSharpening: z.enum(['none', 'screen', 'matte_paper', 'glossy_paper']),
+        resizeMode: exportResizeModeV1Schema,
+      })
+      .strict(),
+    target: rawEngineTargetSchema.safeExtend({ kind: z.literal('image') }).strict(),
+  })
+  .strict()
+  .superRefine((command, context) => {
+    if (command.parameters.format === 'jpeg' && command.parameters.bitDepth !== 8) {
+      context.addIssue({
+        code: 'custom',
+        message: 'JPEG exports must use 8-bit output.',
+        path: ['parameters', 'bitDepth'],
+      });
+    }
+
+    if (command.parameters.format !== 'jpeg' && command.parameters.jpegQuality !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only JPEG exports may include jpegQuality.',
+        path: ['parameters', 'jpegQuality'],
+      });
+    }
+
+    if (command.parameters.resizeMode === 'fit_long_edge' && command.parameters.maxLongEdgePx === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'fit_long_edge exports require maxLongEdgePx.',
+        path: ['parameters', 'maxLongEdgePx'],
+      });
+    }
+
+    if (
+      command.parameters.resizeMode === 'fit_box' &&
+      (command.parameters.maxWidthPx === undefined || command.parameters.maxHeightPx === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'fit_box exports require maxWidthPx and maxHeightPx.',
+        path: ['parameters'],
+      });
+    }
+
+    if (command.dryRun) {
+      if (command.commandType !== 'export.planFiles') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export dry-run commands must use export.planFiles.',
+          path: ['commandType'],
+        });
+      }
+
+      if (command.approval.approvalClass !== ApprovalClass.PreviewOnly) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export dry-run commands require preview-only approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      if (command.parameters.acceptedExportPlanId !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export dry-run commands must not accept an existing export plan id.',
+          path: ['parameters', 'acceptedExportPlanId'],
+        });
+      }
+    } else {
+      if (command.commandType !== 'export.writeFiles') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export write commands must use export.writeFiles.',
+          path: ['commandType'],
+        });
+      }
+
+      if (command.approval.approvalClass !== ApprovalClass.FileMutation) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export write commands require file-mutation approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      if (command.approval.state !== 'approved') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export write commands require approved user approval.',
+          path: ['approval', 'state'],
+        });
+      }
+
+      if (command.parameters.destinationDirectory === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export write commands require a destination directory.',
+          path: ['parameters', 'destinationDirectory'],
+        });
+      }
+
+      if (command.parameters.acceptedExportPlanId === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export write commands require an accepted export plan id.',
+          path: ['parameters', 'acceptedExportPlanId'],
+        });
+      }
+
+      if (command.parameters.acceptedExportPlanHash === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Export write commands require an accepted export plan hash.',
+          path: ['parameters', 'acceptedExportPlanHash'],
+        });
+      }
+    }
+  });
+
+export const exportPlannedFileV1Schema = z
+  .object({
+    artifactId: z.string().trim().min(1),
+    estimatedBytes: z.number().int().positive().optional(),
+    fileName: z.string().trim().min(1),
+    format: exportImageFormatV1Schema,
+  })
+  .strict();
+
+export const exportDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('export.planFiles'),
+    correlationId: z.string().trim().min(1),
+    exportPlanHash: z.string().trim().min(1),
+    exportPlanId: z.string().trim().min(1),
+    plannedFiles: z.array(exportPlannedFileV1Schema).min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const exportApplyResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('export.writeFiles'),
+    correlationId: z.string().trim().min(1),
+    exportPlanHash: z.string().trim().min(1),
+    exportPlanId: z.string().trim().min(1),
+    outputArtifacts: z.array(artifactHandleV1Schema).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    writtenFiles: z.array(z.string().trim().min(1)).min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 const projectLibraryPathSchema = z.string().trim().min(1);
 
 export type ProjectLibraryFolderNodeV1 = {
@@ -5747,6 +5926,7 @@ const rawEngineAppServerKnownInputSchemas = {
   ComputationalMergeCommandEnvelopeV1: computationalMergeCommandEnvelopeV1Schema,
   EditGraphCommandEnvelopeV1: editGraphCommandEnvelopeV1Schema,
   EditGraphSnapshotQueryV1: editGraphSnapshotQueryV1Schema,
+  ExportCommandEnvelopeV1: exportCommandEnvelopeV1Schema,
   LayerMaskCommandEnvelopeV1: layerMaskCommandEnvelopeV1Schema,
   NegativeLabApplyPlanRequestV1: negativeLabApplyPlanRequestV1Schema,
   NegativeLabCommandEnvelopeV1: negativeLabCommandEnvelopeV1Schema,
@@ -5769,6 +5949,7 @@ export const rawEngineAppServerToolCallV1Schema = z
       'ComputationalMergeCommandEnvelopeV1',
       'EditGraphCommandEnvelopeV1',
       'EditGraphSnapshotQueryV1',
+      'ExportCommandEnvelopeV1',
       'LayerMaskCommandEnvelopeV1',
       'NegativeLabApplyPlanRequestV1',
       'NegativeLabCommandEnvelopeV1',
@@ -6578,6 +6759,13 @@ export type EditGraphParameterDiffV1 = z.infer<typeof editGraphParameterDiffV1Sc
 export type EditGraphParameterPatchOperationV1 = z.infer<typeof editGraphParameterPatchOperationV1Schema>;
 export type EditGraphSnapshotQueryV1 = z.infer<typeof editGraphSnapshotQueryV1Schema>;
 export type EditGraphSnapshotV1 = z.infer<typeof editGraphSnapshotV1Schema>;
+export type ExportApplyResultV1 = z.infer<typeof exportApplyResultV1Schema>;
+export type ExportColorSpaceV1 = z.infer<typeof exportColorSpaceV1Schema>;
+export type ExportCommandEnvelopeV1 = z.infer<typeof exportCommandEnvelopeV1Schema>;
+export type ExportDryRunResultV1 = z.infer<typeof exportDryRunResultV1Schema>;
+export type ExportImageFormatV1 = z.infer<typeof exportImageFormatV1Schema>;
+export type ExportPlannedFileV1 = z.infer<typeof exportPlannedFileV1Schema>;
+export type ExportResizeModeV1 = z.infer<typeof exportResizeModeV1Schema>;
 export type FilmBlackAndWhiteAlgorithmV1 = z.infer<typeof filmBlackAndWhiteAlgorithmV1Schema>;
 export type FilmBlackAndWhiteFilterPresetV1 = z.infer<typeof filmBlackAndWhiteFilterPresetV1Schema>;
 export type FilmBlackAndWhiteModelV1 = z.infer<typeof filmBlackAndWhiteModelV1Schema>;
