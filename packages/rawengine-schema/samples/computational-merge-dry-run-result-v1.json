@@ -16,6 +16,42 @@
       "requiresBackgroundJob": true
     },
     "planId": "merge_plan_panorama_001",
+    "preflight": {
+      "blockedReasons": [],
+      "engineCapabilities": {
+        "fullFrameLegacy": true,
+        "maxPreviewDimensionPx": 2400,
+        "planOnly": true,
+        "tileBackedRender": false
+      },
+      "executionMode": "full_frame_legacy",
+      "geometryEstimate": {
+        "outputPixelCount": 13440000,
+        "projectedBounds": {
+          "height": 2400,
+          "width": 5600,
+          "x": 0,
+          "y": 0
+        },
+        "sourceCount": 3,
+        "sourcePixelCount": 72000000
+      },
+      "memoryBudgetBytes": 4000000000,
+      "memoryBudgetRatio": 0.35,
+      "memoryComponents": {
+        "lowDetailMaskBytes": 3360000,
+        "outputCanvasBytes": 161280000,
+        "outputMaskBytes": 13440000,
+        "overheadBytes": 112313600,
+        "previewBytes": 29606400,
+        "seamWorkspaceBytes": 180000000,
+        "sourceDecodeBytes": 900000000,
+        "totalEstimatedPeakBytes": 1400000000
+      },
+      "status": "accepted",
+      "tileCount": 1,
+      "warningCodes": ["legacy_full_frame_render"]
+    },
     "qualityMetrics": {
       "alignmentConfidence": 0.92,
       "overlapCoverageRatio": 0.31,

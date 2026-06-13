@@ -55,6 +55,32 @@ Preflight should produce warnings before apply:
 - `tiled_render_required`
 - `tile_runtime_deferred`
 
+## Dry-Run Schema Contract
+
+The computational merge dry-run result now carries a strict preflight contract
+for panorama planning:
+
+- `parameters.memoryBudgetBytes` lets tests, app-server tools, and future UI
+  flows use deterministic budgets instead of host RAM.
+- `mergePlan.preflight.status` distinguishes accepted plans, warning plans,
+  plan-only blocked cases, and tile-runtime-deferred blocked cases.
+- `mergePlan.preflight.executionMode` records whether the plan uses the legacy
+  full-frame path, plan-only metadata, or a future tile-backed render.
+- `mergePlan.preflight.geometryEstimate` reports source count, source pixel
+  count, output pixel count, and projected output bounds. Schema validation
+  requires source count, output pixels, and projected bounds to stay consistent
+  with the selected sources and output dimensions.
+- `mergePlan.preflight.memoryComponents` records source decode, output canvas,
+  output mask, low-detail mask, seam workspace, preview, overhead, and total
+  estimated peak bytes. Schema validation requires the total to equal the
+  component sum.
+- `mergePlan.preflight.engineCapabilities` reports whether plan-only, legacy
+  full-frame, and tile-backed render paths are available for the selected plan.
+- `mergePlan.preflight.warningCodes` provides machine-readable warnings for
+  the user-facing strings in `mergePlan.warnings`.
+- `mergePlan.preflight.blockedReasons` must be empty for accepted plans and
+  non-empty for blocked plans.
+
 ## Proposed Execution Modes
 
 ### Full Frame Legacy

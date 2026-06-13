@@ -1082,6 +1082,59 @@ expectInvalid('computational merge command with mismatched source role', computa
   },
 });
 
+expectInvalid('panorama merge command with invalid memory budget', computationalMergeCommandEnvelopeV1Schema, {
+  ...sampleComputationalMergeCommandEnvelopeV1,
+  parameters: {
+    ...sampleComputationalMergeCommandEnvelopeV1.parameters,
+    memoryBudgetBytes: 0,
+  },
+});
+
+expectInvalid('computational merge dry-run with mismatched memory total', computationalMergeDryRunResultV1Schema, {
+  ...sampleComputationalMergeDryRunResultV1,
+  mergePlan: {
+    ...sampleComputationalMergeDryRunResultV1.mergePlan,
+    preflight: {
+      ...sampleComputationalMergeDryRunResultV1.mergePlan.preflight,
+      memoryComponents: {
+        ...sampleComputationalMergeDryRunResultV1.mergePlan.preflight.memoryComponents,
+        totalEstimatedPeakBytes: 1,
+      },
+    },
+  },
+});
+
+expectInvalid('computational merge blocked preflight without reasons', computationalMergeDryRunResultV1Schema, {
+  ...sampleComputationalMergeDryRunResultV1,
+  mergePlan: {
+    ...sampleComputationalMergeDryRunResultV1.mergePlan,
+    preflight: {
+      ...sampleComputationalMergeDryRunResultV1.mergePlan.preflight,
+      blockedReasons: [],
+      status: 'blocked_plan_only',
+      warningCodes: ['memory_budget_exceeded'],
+    },
+  },
+});
+
+expectInvalid(
+  'computational merge preflight with mismatched output pixel count',
+  computationalMergeDryRunResultV1Schema,
+  {
+    ...sampleComputationalMergeDryRunResultV1,
+    mergePlan: {
+      ...sampleComputationalMergeDryRunResultV1.mergePlan,
+      preflight: {
+        ...sampleComputationalMergeDryRunResultV1.mergePlan.preflight,
+        geometryEstimate: {
+          ...sampleComputationalMergeDryRunResultV1.mergePlan.preflight.geometryEstimate,
+          outputPixelCount: 1,
+        },
+      },
+    },
+  },
+);
+
 expectInvalid('panorama artifact with output artifacts before render', panoramaArtifactV1Schema, {
   ...samplePanoramaArtifactV1,
   provenance: {

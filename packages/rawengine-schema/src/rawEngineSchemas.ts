@@ -1937,6 +1937,150 @@ export const computationalMergeOutputDimensionsV1Schema = z
   })
   .strict();
 
+export const computationalMergePreflightStatusV1Schema = z.enum([
+  'accepted',
+  'warning',
+  'blocked_plan_only',
+  'blocked_tile_runtime_deferred',
+]);
+
+export const computationalMergeExecutionModeV1Schema = z.enum(['full_frame_legacy', 'plan_only', 'tile_backed_render']);
+
+export const computationalMergePreflightWarningCodeV1Schema = z.enum([
+  'geometry_estimate_low_confidence',
+  'high_memory_estimate',
+  'legacy_full_frame_render',
+  'memory_budget_exceeded',
+  'tile_runtime_deferred',
+  'tiled_render_required',
+]);
+
+export const computationalMergeProjectedBoundsV1Schema = z
+  .object({
+    height: z.number().int().positive(),
+    width: z.number().int().positive(),
+    x: z.number().int(),
+    y: z.number().int(),
+  })
+  .strict();
+
+export const computationalMergeGeometryEstimateV1Schema = z
+  .object({
+    outputPixelCount: z.number().int().positive(),
+    projectedBounds: computationalMergeProjectedBoundsV1Schema,
+    sourceCount: z.number().int().positive(),
+    sourcePixelCount: z.number().int().positive(),
+  })
+  .strict();
+
+export const computationalMergeMemoryComponentsV1Schema = z
+  .object({
+    lowDetailMaskBytes: z.number().int().nonnegative(),
+    outputCanvasBytes: z.number().int().nonnegative(),
+    outputMaskBytes: z.number().int().nonnegative(),
+    overheadBytes: z.number().int().nonnegative(),
+    previewBytes: z.number().int().nonnegative(),
+    seamWorkspaceBytes: z.number().int().nonnegative(),
+    sourceDecodeBytes: z.number().int().nonnegative(),
+    totalEstimatedPeakBytes: z.number().int().nonnegative(),
+  })
+  .strict()
+  .superRefine((components, context) => {
+    const summedBytes =
+      components.lowDetailMaskBytes +
+      components.outputCanvasBytes +
+      components.outputMaskBytes +
+      components.overheadBytes +
+      components.previewBytes +
+      components.seamWorkspaceBytes +
+      components.sourceDecodeBytes;
+
+    if (components.totalEstimatedPeakBytes !== summedBytes) {
+      context.addIssue({
+        code: 'custom',
+        message: 'totalEstimatedPeakBytes must equal the sum of memory component estimates.',
+        path: ['totalEstimatedPeakBytes'],
+      });
+    }
+  });
+
+export const computationalMergeEngineCapabilitiesV1Schema = z
+  .object({
+    fullFrameLegacy: z.boolean(),
+    maxPreviewDimensionPx: z.number().int().positive().max(8192),
+    planOnly: z.literal(true),
+    tileBackedRender: z.boolean(),
+  })
+  .strict();
+
+export const computationalMergePreflightEstimateV1Schema = z
+  .object({
+    blockedReasons: z.array(z.string().trim().min(1)),
+    engineCapabilities: computationalMergeEngineCapabilitiesV1Schema,
+    executionMode: computationalMergeExecutionModeV1Schema,
+    geometryEstimate: computationalMergeGeometryEstimateV1Schema,
+    memoryBudgetBytes: z.number().int().positive(),
+    memoryBudgetRatio: z.number().nonnegative(),
+    memoryComponents: computationalMergeMemoryComponentsV1Schema,
+    status: computationalMergePreflightStatusV1Schema,
+    tileCount: z.number().int().positive(),
+    warningCodes: z.array(computationalMergePreflightWarningCodeV1Schema),
+  })
+  .strict()
+  .superRefine((preflight, context) => {
+    const expectedRatio = preflight.memoryComponents.totalEstimatedPeakBytes / preflight.memoryBudgetBytes;
+    if (Math.abs(preflight.memoryBudgetRatio - expectedRatio) > 0.000001) {
+      context.addIssue({
+        code: 'custom',
+        message: 'memoryBudgetRatio must equal totalEstimatedPeakBytes divided by memoryBudgetBytes.',
+        path: ['memoryBudgetRatio'],
+      });
+    }
+
+    if (preflight.status === 'accepted' && preflight.blockedReasons.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Accepted preflight plans must not include blocked reasons.',
+        path: ['blockedReasons'],
+      });
+    }
+
+    if (preflight.status.startsWith('blocked_') && preflight.blockedReasons.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Blocked preflight plans require at least one blocked reason.',
+        path: ['blockedReasons'],
+      });
+    }
+
+    if (
+      preflight.status === 'blocked_tile_runtime_deferred' &&
+      !preflight.warningCodes.includes('tile_runtime_deferred')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Tile-runtime-deferred preflight plans require the tile_runtime_deferred warning code.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (preflight.executionMode === 'tile_backed_render' && preflight.tileCount < 2) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Tile-backed preflight plans require at least two tiles.',
+        path: ['tileCount'],
+      });
+    }
+
+    if (preflight.executionMode !== 'tile_backed_render' && preflight.tileCount !== 1) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Non-tiled preflight plans must use a tileCount of 1.',
+        path: ['tileCount'],
+      });
+    }
+  });
+
 export const computationalMergePerformanceEstimateV1Schema = z
   .object({
     estimatedPeakMemoryBytes: z.number().int().nonnegative(),
@@ -1963,6 +2107,7 @@ export const computationalMergePlanV1Schema = z
     outputName: z.string().trim().min(1),
     performanceEstimate: computationalMergePerformanceEstimateV1Schema,
     planId: z.string().trim().min(1),
+    preflight: computationalMergePreflightEstimateV1Schema,
     qualityMetrics: computationalMergeQualityMetricsV1Schema,
     sourceImageRefs: z.array(computationalMergeSourceImageRefV1Schema).min(2),
     warnings: z.array(z.string().trim().min(1)),
@@ -1975,6 +2120,36 @@ export const computationalMergePlanV1Schema = z
         code: 'custom',
         message: 'Computational merge plans require unique source indexes.',
         path: ['sourceImageRefs'],
+      });
+    }
+
+    if (plan.preflight.geometryEstimate.sourceCount !== plan.sourceImageRefs.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Preflight sourceCount must match sourceImageRefs length.',
+        path: ['preflight', 'geometryEstimate', 'sourceCount'],
+      });
+    }
+
+    if (
+      plan.preflight.geometryEstimate.outputPixelCount !==
+      plan.outputDimensions.height * plan.outputDimensions.width
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Preflight outputPixelCount must match outputDimensions.',
+        path: ['preflight', 'geometryEstimate', 'outputPixelCount'],
+      });
+    }
+
+    if (
+      plan.preflight.geometryEstimate.projectedBounds.height !== plan.outputDimensions.height ||
+      plan.preflight.geometryEstimate.projectedBounds.width !== plan.outputDimensions.width
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Preflight projected bounds must match outputDimensions.',
+        path: ['preflight', 'geometryEstimate', 'projectedBounds'],
       });
     }
   });
@@ -2037,6 +2212,7 @@ export const computationalMergeCommandEnvelopeV1Schema = z
             exposureNormalization: z.enum(['none', 'auto']),
             lensCorrectionPolicy: z.enum(['unchanged', 'required_before_stitch', 'applied_before_stitch']),
             maxPreviewDimensionPx: z.number().int().positive().max(8192),
+            memoryBudgetBytes: z.number().int().positive().optional(),
             outputName: z.string().trim().min(1),
             projection: panoramaProjectionSchema,
             qualityPreference: computationalMergeQualityPreferenceV1Schema,
@@ -6901,11 +7077,19 @@ export type ComputationalMergeAlignmentModeV1 = z.infer<typeof computationalMerg
 export type ComputationalMergeCommandEnvelopeV1 = z.infer<typeof computationalMergeCommandEnvelopeV1Schema>;
 export type ComputationalMergeCommandTypeV1 = z.infer<typeof computationalMergeCommandTypeV1Schema>;
 export type ComputationalMergeDryRunResultV1 = z.infer<typeof computationalMergeDryRunResultV1Schema>;
+export type ComputationalMergeEngineCapabilitiesV1 = z.infer<typeof computationalMergeEngineCapabilitiesV1Schema>;
+export type ComputationalMergeExecutionModeV1 = z.infer<typeof computationalMergeExecutionModeV1Schema>;
 export type ComputationalMergeFamilyV1 = z.infer<typeof computationalMergeFamilyV1Schema>;
+export type ComputationalMergeGeometryEstimateV1 = z.infer<typeof computationalMergeGeometryEstimateV1Schema>;
+export type ComputationalMergeMemoryComponentsV1 = z.infer<typeof computationalMergeMemoryComponentsV1Schema>;
 export type ComputationalMergeMutationResultV1 = z.infer<typeof computationalMergeMutationResultV1Schema>;
 export type ComputationalMergeOutputDimensionsV1 = z.infer<typeof computationalMergeOutputDimensionsV1Schema>;
 export type ComputationalMergePerformanceEstimateV1 = z.infer<typeof computationalMergePerformanceEstimateV1Schema>;
 export type ComputationalMergePlanV1 = z.infer<typeof computationalMergePlanV1Schema>;
+export type ComputationalMergePreflightEstimateV1 = z.infer<typeof computationalMergePreflightEstimateV1Schema>;
+export type ComputationalMergePreflightStatusV1 = z.infer<typeof computationalMergePreflightStatusV1Schema>;
+export type ComputationalMergePreflightWarningCodeV1 = z.infer<typeof computationalMergePreflightWarningCodeV1Schema>;
+export type ComputationalMergeProjectedBoundsV1 = z.infer<typeof computationalMergeProjectedBoundsV1Schema>;
 export type ComputationalMergeQualityMetricsV1 = z.infer<typeof computationalMergeQualityMetricsV1Schema>;
 export type ComputationalMergeQualityPreferenceV1 = z.infer<typeof computationalMergeQualityPreferenceV1Schema>;
 export type ComputationalMergeSourceImageRefV1 = z.infer<typeof computationalMergeSourceImageRefV1Schema>;
