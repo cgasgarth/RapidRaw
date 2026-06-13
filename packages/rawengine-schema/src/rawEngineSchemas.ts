@@ -572,7 +572,7 @@ export const negativeRollSessionV1Schema = z
 
 const nonEmptyIdArraySchema = z.array(z.string().trim().min(1)).min(1);
 
-export const negativeLabCommandTypeSchema = z.enum([
+export const NEGATIVE_LAB_COMMAND_TYPES = [
   'negativeLab.createSession',
   'negativeLab.updateBaseSamples',
   'negativeLab.estimateBaseFog',
@@ -580,7 +580,9 @@ export const negativeLabCommandTypeSchema = z.enum([
   'negativeLab.planRollNormalization',
   'negativeLab.createPositiveVariant',
   'negativeLab.setFrameQcStatus',
-]);
+] as const;
+
+export const negativeLabCommandTypeSchema = z.enum(NEGATIVE_LAB_COMMAND_TYPES);
 
 export const negativeLabSupportedProcessFamilyV1Schema = z.enum([
   'c41_color_negative',
@@ -936,6 +938,120 @@ export const negativeLabApplyResultV1Schema = z
   })
   .strict();
 
+export const negativeLabAppServerExecutionModeSchema = z.enum(['dry_run_command', 'apply_dry_run_plan']);
+
+export const negativeLabAppServerAuditEventSchema = z.enum([
+  'negative_lab_dry_run_requested',
+  'negative_lab_dry_run_completed',
+  'negative_lab_apply_requested',
+  'negative_lab_apply_completed',
+]);
+
+export const negativeLabAppServerToolDefinitionV1Schema = z
+  .object({
+    allowedCommandTypes: z.array(negativeLabCommandTypeSchema).min(1),
+    approvalClass: approvalClassSchema,
+    auditEvents: z.array(negativeLabAppServerAuditEventSchema).min(1),
+    description: z.string().trim().min(1),
+    executionMode: negativeLabAppServerExecutionModeSchema,
+    inputSchemaName: z.string().trim().min(1),
+    localOnly: z.boolean(),
+    mutates: z.boolean(),
+    outputSchemaName: z.string().trim().min(1),
+    requiresDryRunPlan: z.boolean(),
+    returnsArtifactHandles: z.boolean(),
+    toolName: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_]*)+$/u),
+  })
+  .strict()
+  .superRefine((tool, context) => {
+    if (tool.executionMode === 'dry_run_command') {
+      if (tool.inputSchemaName !== 'NegativeLabCommandEnvelopeV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab dry-run app-server tools must accept NegativeLabCommandEnvelopeV1.',
+          path: ['inputSchemaName'],
+        });
+      }
+
+      if (tool.outputSchemaName !== 'NegativeLabDryRunResultV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab dry-run app-server tools must return NegativeLabDryRunResultV1.',
+          path: ['outputSchemaName'],
+        });
+      }
+
+      if (tool.mutates) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab dry-run app-server tools must not mutate project state.',
+          path: ['mutates'],
+        });
+      }
+
+      if (tool.requiresDryRunPlan) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab dry-run app-server tools create dry-run plans and must not require one.',
+          path: ['requiresDryRunPlan'],
+        });
+      }
+    }
+
+    if (tool.executionMode === 'apply_dry_run_plan') {
+      if (tool.inputSchemaName !== 'NegativeLabApplyPlanRequestV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab apply app-server tools must accept NegativeLabApplyPlanRequestV1.',
+          path: ['inputSchemaName'],
+        });
+      }
+
+      if (tool.outputSchemaName !== 'NegativeLabApplyResultV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab apply app-server tools must return NegativeLabApplyResultV1.',
+          path: ['outputSchemaName'],
+        });
+      }
+
+      if (!tool.mutates) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab apply app-server tools must be marked as mutating.',
+          path: ['mutates'],
+        });
+      }
+
+      if (!tool.requiresDryRunPlan) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab apply app-server tools must require a prior dry-run plan.',
+          path: ['requiresDryRunPlan'],
+        });
+      }
+    }
+
+    if (tool.mutates && tool.approvalClass !== ApprovalClass.EditApply) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Mutating Negative Lab app-server tools require edit-apply approval.',
+        path: ['approvalClass'],
+      });
+    }
+  });
+
+export const negativeLabAppServerToolManifestV1Schema = z
+  .object({
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    serverRuntime: z.literal('openai_app_server'),
+    tools: z.array(negativeLabAppServerToolDefinitionV1Schema).min(1),
+  })
+  .strict();
+
 export type ActorKind = z.infer<typeof actorKindSchema>;
 export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
@@ -943,6 +1059,10 @@ export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
 export type NegativeAcquisitionConfidence = z.infer<typeof negativeAcquisitionConfidenceSchema>;
 export type NegativeAcquisitionProfileV1 = z.infer<typeof negativeAcquisitionProfileV1Schema>;
+export type NegativeLabAppServerAuditEvent = z.infer<typeof negativeLabAppServerAuditEventSchema>;
+export type NegativeLabAppServerExecutionMode = z.infer<typeof negativeLabAppServerExecutionModeSchema>;
+export type NegativeLabAppServerToolDefinitionV1 = z.infer<typeof negativeLabAppServerToolDefinitionV1Schema>;
+export type NegativeLabAppServerToolManifestV1 = z.infer<typeof negativeLabAppServerToolManifestV1Schema>;
 export type NegativeLabApplyResultV1 = z.infer<typeof negativeLabApplyResultV1Schema>;
 export type NegativeLabApplyPlanRequestV1 = z.infer<typeof negativeLabApplyPlanRequestV1Schema>;
 export type NegativeLabBaseSampleRegionV1 = z.infer<typeof negativeLabBaseSampleRegionV1Schema>;

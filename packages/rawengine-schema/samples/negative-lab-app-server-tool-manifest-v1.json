@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "serverRuntime": "openai_app_server",
+  "tools": [
+    {
+      "allowedCommandTypes": [
+        "negativeLab.createSession",
+        "negativeLab.updateBaseSamples",
+        "negativeLab.estimateBaseFog",
+        "negativeLab.setConversionRecipe",
+        "negativeLab.planRollNormalization",
+        "negativeLab.createPositiveVariant",
+        "negativeLab.setFrameQcStatus"
+      ],
+      "approvalClass": "preview_only",
+      "auditEvents": ["negative_lab_dry_run_requested", "negative_lab_dry_run_completed"],
+      "description": "Preview a Negative Lab command and return a dry-run plan with non-mutating artifacts.",
+      "executionMode": "dry_run_command",
+      "inputSchemaName": "NegativeLabCommandEnvelopeV1",
+      "localOnly": true,
+      "mutates": false,
+      "outputSchemaName": "NegativeLabDryRunResultV1",
+      "requiresDryRunPlan": false,
+      "returnsArtifactHandles": true,
+      "toolName": "negativelab.preview_conversion"
+    },
+    {
+      "allowedCommandTypes": [
+        "negativeLab.createSession",
+        "negativeLab.updateBaseSamples",
+        "negativeLab.estimateBaseFog",
+        "negativeLab.setConversionRecipe",
+        "negativeLab.planRollNormalization",
+        "negativeLab.createPositiveVariant",
+        "negativeLab.setFrameQcStatus"
+      ],
+      "approvalClass": "edit_apply",
+      "auditEvents": ["negative_lab_apply_requested", "negative_lab_apply_completed"],
+      "description": "Apply a previously generated Negative Lab dry-run plan after local operator approval.",
+      "executionMode": "apply_dry_run_plan",
+      "inputSchemaName": "NegativeLabApplyPlanRequestV1",
+      "localOnly": true,
+      "mutates": true,
+      "outputSchemaName": "NegativeLabApplyResultV1",
+      "requiresDryRunPlan": true,
+      "returnsArtifactHandles": true,
+      "toolName": "negativelab.apply_planned_command"
+    }
+  ]
+}
