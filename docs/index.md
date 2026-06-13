@@ -37,6 +37,7 @@ generator before the release workflow needs one.
 - [Negative Lab scan fixture manifest](negative-lab/negative-scan-fixture-manifest-2026-06-13.md)
 - [Negative Lab scanner and camera input profiles](negative-lab/scanner-camera-input-profiles-2026-06-13.md)
 - [Negative Lab frame detection and border contract](negative-lab/frame-detection-border-contract-2026-06-13.md)
+- [Negative Lab dedicated workspace UI](negative-lab/dedicated-workspace-ui-2026-06-13.md)
 - [Negative Lab process profiles and density normalization](negative-lab/process-profiles-density-normalization-2026-06-13.md)
 - [Negative Lab per-channel inversion curves](negative-lab/per-channel-inversion-curves-2026-06-13.md)
 - [Negative Lab base sampling controls](negative-lab/base-sampling-controls-2026-06-13.md)
