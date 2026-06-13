@@ -30,6 +30,7 @@ generator before the release workflow needs one.
 - [Negative Lab input profile strategy ADR](negative-lab/input-profile-strategy-adr-2026-06-13.md)
 - [Negative Lab preset naming and legal policy ADR](negative-lab/preset-naming-legal-policy-2026-06-13.md)
 - [Negative Lab fixture licensing and provenance policy](negative-lab/fixture-licensing-provenance-policy-2026-06-13.md)
+- [Negative Lab measured-profile fixture format](negative-lab/measured-profile-fixture-format-2026-06-13.md)
 - [Architecture baseline](baseline/rapidraw-architecture-baseline-2026-06-11.md)
 - [AI hooks baseline](baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
 - [GPU shader baseline](baseline/rapidraw-gpu-shader-baseline-2026-06-11.md)
