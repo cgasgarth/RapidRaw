@@ -85,6 +85,7 @@ export default function RenameFolderModal({
           onClose();
         }
       }}
+      role="presentation"
     >
       <div
         aria-modal="true"
