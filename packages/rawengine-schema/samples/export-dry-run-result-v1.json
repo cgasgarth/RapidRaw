@@ -1,0 +1,30 @@
+{
+  "commandId": "command_export_plan_sample",
+  "commandType": "export.planFiles",
+  "correlationId": "corr_export_sample",
+  "exportPlanHash": "sha256:sample-export-plan",
+  "exportPlanId": "export_plan_001",
+  "plannedFiles": [
+    {
+      "artifactId": "artifact_export_preview_jpeg_001",
+      "estimatedBytes": 7250000,
+      "fileName": "2026-06-13/IMG_0001-rawengine-vc_final_color_grade.jpg",
+      "format": "jpeg"
+    }
+  ],
+  "previewArtifacts": [
+    {
+      "artifactId": "artifact_export_softproof_preview_001",
+      "contentHash": "sha256:sample-export-softproof-preview",
+      "dimensions": {
+        "height": 2730,
+        "width": 4096
+      },
+      "kind": "preview",
+      "storage": "temp_cache"
+    }
+  ],
+  "schemaVersion": 1,
+  "sourceGraphRevision": "graph_rev_44",
+  "warnings": []
+}
