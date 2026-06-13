@@ -1,0 +1,46 @@
+# RawEngine Schema Package
+
+- Date: 2026-06-13
+- Issue: #211 `agent(schema): add dynamic tool schema package`
+- Scope: first Zod-authored command, query, artifact, approval, and tool
+  registry primitives for future app-server work.
+
+## Purpose
+
+`packages/rawengine-schema/` is the first dedicated schema surface for
+RawEngine command/query and app-server tool contracts. It is intentionally small:
+it defines the vocabulary and validation shape that future PRs can expand
+without exposing runtime app-server tools yet.
+
+## Included Schemas
+
+- `CommandEnvelopeV1`
+- `QueryEnvelopeV1`
+- `ArtifactHandleV1`
+- `ApprovalRequirementV1`
+- `RawEngineToolDefinitionV1`
+- `RawEngineToolRegistryV1`
+
+The package also includes representative sample payloads and a `schema:check`
+script that typechecks the package and validates samples with Zod.
+
+## Rules
+
+- Tool definitions are strict objects.
+- Command and query envelopes are versioned.
+- Mutating and dry-run behavior is represented in tool metadata.
+- Approval class is schema data, not chat-only text.
+- Artifact handles are the boundary for preview and raster outputs; full image
+  payloads should not be embedded in tool JSON.
+- This package does not expose Tauri commands or app-server runtime behavior.
+
+## Validation
+
+Run:
+
+```sh
+bun run schema:check
+```
+
+Feature PRs that add command families should add valid and rejected sample
+payloads before wiring UI, Rust bridge, or app-server adapters.

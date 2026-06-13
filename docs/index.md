@@ -24,6 +24,7 @@ generator before the release workflow needs one.
 
 - [Developer API guide](api/developer-api-guide-2026-06-11.md)
 - [Edit command API baseline](api/edit-command-api-2026-06-11.md)
+- [RawEngine schema package](api/rawengine-schema-package-2026-06-13.md)
 - [Sample agent guide](agent/sample-agent-guide-2026-06-11.md)
 - [App-server agent architecture](agent/app-server-architecture-2026-06-12.md)
 - [Negative Lab density-domain inversion ADR](negative-lab/density-domain-inversion-adr-2026-06-13.md)

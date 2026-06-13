@@ -39,6 +39,10 @@
           "path": "docs/api/edit-command-api-2026-06-11.md"
         },
         {
+          "title": "RawEngine schema package",
+          "path": "docs/api/rawengine-schema-package-2026-06-13.md"
+        },
+        {
           "title": "Sample agent guide",
           "path": "docs/agent/sample-agent-guide-2026-06-11.md"
         },
