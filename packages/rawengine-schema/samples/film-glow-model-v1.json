@@ -1,0 +1,55 @@
+{
+  "algorithm": "luminance_bloom_glow_v1",
+  "blendMode": "screen_luminance_preserving",
+  "blurPolicy": {
+    "exportStrategy": "separable_gaussian",
+    "previewStrategy": "mip_pyramid",
+    "radiusPx": 44,
+    "radiusUnit": "working_pixels"
+  },
+  "compatibleScopes": ["global", "layer", "mask"],
+  "deterministic": {
+    "deterministicReplay": true,
+    "stochasticInputs": false
+  },
+  "highlightPreservation": {
+    "localContrastRetention": 0.74,
+    "protectClippedHighlights": true,
+    "shoulderCompression": 0.38
+  },
+  "intensity": {
+    "bloomAmount": 28,
+    "glowAmount": 42,
+    "opacity": 58
+  },
+  "maskBehavior": {
+    "application": "source_and_composite",
+    "avoidLayerDoubleCounting": true,
+    "expandSourceBeforeMask": false,
+    "stabilizeMaskEdgesBeforeBlur": true
+  },
+  "modelId": "film.glow.luminance_bloom.v1",
+  "modelVersion": "2026-06-13",
+  "qualityPolicy": {
+    "exportMode": "export_reference",
+    "maxExportRadiusPx": 128,
+    "maxPreviewRadiusPx": 64,
+    "previewMode": "preview_fast"
+  },
+  "renderDomain": "scene_referred_linear",
+  "renderStage": "creative_bloom_after_halation",
+  "rendererSupport": "partially_implemented_current_engine",
+  "schemaVersion": 1,
+  "sourceIsolation": {
+    "rolloff": "filmic_soft_knee",
+    "sourceChannel": "highlight_energy",
+    "thresholdEnd": 0.96,
+    "thresholdStart": 0.62
+  },
+  "tintPolicy": {
+    "mode": "neutral_preserve_hue",
+    "saturationScale": 0.92,
+    "tintStrength": 0
+  },
+  "warningCodes": ["renderer_path_partial", "wide_radius_preview_approximation"]
+}
