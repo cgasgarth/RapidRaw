@@ -74,7 +74,13 @@ export function usePresets(currentAdjustments: Adjustments) {
   );
 
   useEffect(() => {
-    void loadPresets();
+    const loadTimer = setTimeout(() => {
+      void loadPresets();
+    }, 0);
+
+    return () => {
+      clearTimeout(loadTimer);
+    };
   }, [loadPresets]);
 
   useEffect(
