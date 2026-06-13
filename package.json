@@ -40,6 +40,7 @@
     "check:licenses:js": "bun scripts/check-js-dependency-licenses.mjs",
     "check:licenses:rust": "cd src-tauri && cargo deny check licenses",
     "deps:audit": "bun scripts/audit-dependency-versions.mjs",
+    "deps:audit:check": "bun scripts/audit-dependency-versions.mjs --fail-on-missing-major-issues",
     "deps:audit:js": "bun scripts/audit-dependency-versions.mjs --ecosystem=js",
     "deps:audit:rust": "bun scripts/audit-dependency-versions.mjs --ecosystem=rust",
     "check:visual-smoke": "bun scripts/capture-visual-smoke.mjs",
