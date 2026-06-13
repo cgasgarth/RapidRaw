@@ -53,6 +53,7 @@ import {
   negativeLabRollBatchWorkflowV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
+  panoramaBackendCapabilityReportV1Schema,
   previewScopeQueryV1Schema,
   previewScopeResultV1Schema,
   projectLibraryCommandEnvelopeV1Schema,
@@ -116,6 +117,7 @@ import {
   type NegativeLabRollBatchWorkflowV1,
   type NegativeRollSessionV1,
   type PanoramaArtifactV1,
+  type PanoramaBackendCapabilityReportV1,
   type PreviewScopeQueryV1,
   type PreviewScopeResultV1,
   type ProjectLibraryCommandEnvelopeV1,
@@ -2266,6 +2268,50 @@ export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Sc
   },
   warnings: ['exposure_mismatch'],
 });
+
+export const samplePanoramaBackendCapabilityReportV1: PanoramaBackendCapabilityReportV1 =
+  panoramaBackendCapabilityReportV1Schema.parse({
+    backendId: 'rapidraw_homography_seam_v0',
+    backendVersion: 'legacy-current',
+    capabilities: {
+      adaptiveSeamFeather: true,
+      autoCrop: true,
+      bundleAdjustment: false,
+      cylindricalProjection: false,
+      exposureNormalization: false,
+      planarHomography: true,
+      tiledRender: false,
+    },
+    ciPolicy: {
+      defaultRequiredCiAllowed: true,
+      requiredCiBlockers: [],
+      suggestedCiTier: 'required_pr',
+    },
+    limits: {
+      maxRecommendedOutputPixels: 36000000,
+      maxRecommendedPeakMemoryBytes: 2400000000,
+      maxRecommendedSourceCount: 6,
+    },
+    macosPackagingStatus: 'not_required',
+    qualityTier: 'legacy_local_preview',
+    runtimeRequirements: {
+      externalLibraries: [],
+      requiresExternalLibraries: false,
+      requiresNetworkAtRuntime: false,
+    },
+    schemaBoundary: {
+      backendTypesLeakIntoArtifacts: false,
+      rawEngineCapabilityNamesOnly: true,
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    status: 'default_enabled',
+    supportedBlendModes: ['feather', 'overwrite'],
+    supportedBoundaryModes: ['auto_crop', 'transparent', 'manual_crop'],
+    supportedExposureModes: ['none', 'planned'],
+    supportedProjections: ['rectilinear', 'planar'],
+    supportedSeamMethods: ['adaptive_dp_feather_v1', 'overwrite_fallback'],
+    warnings: ['backend_types_must_not_escape'],
+  });
 
 export const sampleFilmBlackAndWhiteModelV1: FilmBlackAndWhiteModelV1 = filmBlackAndWhiteModelV1Schema.parse({
   algorithm: 'channel_mixer_filter_response_v1',

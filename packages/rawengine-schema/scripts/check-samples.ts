@@ -51,6 +51,7 @@ import {
   negativeLabRollBatchWorkflowV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
+  panoramaBackendCapabilityReportV1Schema,
   previewScopeQueryV1Schema,
   previewScopeResultV1Schema,
   projectLibraryCommandEnvelopeV1Schema,
@@ -134,6 +135,7 @@ import {
   sampleNegativeLabRollBatchWorkflowV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
+  samplePanoramaBackendCapabilityReportV1,
   samplePreviewScopeQueryV1,
   samplePreviewScopeResultV1,
   sampleProjectLibraryCommandEnvelopeV1,
@@ -429,6 +431,11 @@ const validSamples: ReadonlyArray<{
     name: 'panorama artifact',
     schema: panoramaArtifactV1Schema,
     value: samplePanoramaArtifactV1,
+  },
+  {
+    name: 'panorama backend capability report',
+    schema: panoramaBackendCapabilityReportV1Schema,
+    value: samplePanoramaBackendCapabilityReportV1,
   },
   {
     name: 'film look catalog',
@@ -1178,6 +1185,36 @@ expectInvalid('panorama artifact with duplicate source indexes', panoramaArtifac
     ...source,
     sourceIndex: 0,
   })),
+});
+
+expectInvalid('panorama backend with leaking backend types', panoramaBackendCapabilityReportV1Schema, {
+  ...samplePanoramaBackendCapabilityReportV1,
+  schemaBoundary: {
+    ...samplePanoramaBackendCapabilityReportV1.schemaBoundary,
+    backendTypesLeakIntoArtifacts: true,
+  },
+});
+
+expectInvalid('external panorama backend required before packaging proof', panoramaBackendCapabilityReportV1Schema, {
+  ...samplePanoramaBackendCapabilityReportV1,
+  backendId: 'opencv_stitching_spike',
+  ciPolicy: {
+    defaultRequiredCiAllowed: true,
+    requiredCiBlockers: [],
+    suggestedCiTier: 'required_pr',
+  },
+  macosPackagingStatus: 'system_dependency_spike',
+  qualityTier: 'optional_spike',
+  runtimeRequirements: {
+    externalLibraries: ['opencv', 'libclang'],
+    requiresExternalLibraries: true,
+    requiresNetworkAtRuntime: false,
+  },
+  status: 'optional_spike',
+  supportedBlendModes: ['feather', 'multi_band'],
+  supportedExposureModes: ['opencv_gain', 'opencv_channels'],
+  supportedSeamMethods: ['opencv_graph_cut_color', 'opencv_voronoi'],
+  warnings: ['external_dependency', 'packaging_unproven', 'required_ci_not_ready'],
 });
 
 expectInvalid('HDR merge command without bracket exposure metadata', computationalMergeCommandEnvelopeV1Schema, {

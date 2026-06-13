@@ -1557,6 +1557,143 @@ export const panoramaEngineV1Schema = z
   })
   .strict();
 
+export const panoramaBackendIdV1Schema = z.enum([
+  'rapidraw_homography_seam_v0',
+  'opencv_stitching_spike',
+  'hugin_reference_tool',
+]);
+
+export const panoramaBackendSeamMethodV1Schema = z.enum([
+  'adaptive_dp_feather_v1',
+  'overwrite_fallback',
+  'opencv_graph_cut_color',
+  'opencv_graph_cut_color_grad',
+  'opencv_dp_color',
+  'opencv_dp_color_grad',
+  'opencv_voronoi',
+]);
+
+export const panoramaBackendBlendModeV1Schema = z.enum(['overwrite', 'feather', 'multi_band']);
+
+export const panoramaBackendExposureModeV1Schema = z.enum([
+  'none',
+  'planned',
+  'gain_offset_v1',
+  'opencv_gain',
+  'opencv_gain_blocks',
+  'opencv_channels',
+  'opencv_channels_blocks',
+]);
+
+export const panoramaBackendCapabilityReportV1Schema = z
+  .object({
+    backendId: panoramaBackendIdV1Schema,
+    backendVersion: z.string().trim().min(1),
+    capabilities: panoramaEngineCapabilitiesV1Schema,
+    ciPolicy: z
+      .object({
+        defaultRequiredCiAllowed: z.boolean(),
+        requiredCiBlockers: z.array(z.string().trim().min(1)),
+        suggestedCiTier: z.enum(['required_pr', 'nightly', 'manual_spike']),
+      })
+      .strict(),
+    limits: z
+      .object({
+        maxRecommendedOutputPixels: z.number().int().positive(),
+        maxRecommendedPeakMemoryBytes: z.number().int().positive(),
+        maxRecommendedSourceCount: z.number().int().positive(),
+      })
+      .strict(),
+    macosPackagingStatus: z.enum(['not_required', 'bundled', 'system_dependency_spike', 'unproven']),
+    qualityTier: z.enum(['legacy_local_preview', 'validated_planar_v1', 'optional_spike', 'reference_only']),
+    runtimeRequirements: z
+      .object({
+        externalLibraries: z.array(z.string().trim().min(1)),
+        requiresExternalLibraries: z.boolean(),
+        requiresNetworkAtRuntime: z.literal(false),
+      })
+      .strict(),
+    schemaBoundary: z
+      .object({
+        backendTypesLeakIntoArtifacts: z.literal(false),
+        rawEngineCapabilityNamesOnly: z.literal(true),
+      })
+      .strict(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    status: z.enum(['default_enabled', 'optional_spike', 'reference_only', 'disabled']),
+    supportedBlendModes: z.array(panoramaBackendBlendModeV1Schema).min(1),
+    supportedBoundaryModes: z.array(panoramaBoundaryModeSchema).min(1),
+    supportedExposureModes: z.array(panoramaBackendExposureModeV1Schema).min(1),
+    supportedProjections: z.array(panoramaProjectionSchema).min(1),
+    supportedSeamMethods: z.array(panoramaBackendSeamMethodV1Schema).min(1),
+    warnings: z.array(
+      z.enum(['backend_types_must_not_escape', 'external_dependency', 'packaging_unproven', 'required_ci_not_ready']),
+    ),
+  })
+  .strict()
+  .superRefine((report, context) => {
+    if (
+      report.runtimeRequirements.requiresExternalLibraries &&
+      report.runtimeRequirements.externalLibraries.length === 0
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Backends that require external libraries must list them.',
+        path: ['runtimeRequirements', 'externalLibraries'],
+      });
+    }
+
+    if (
+      !report.runtimeRequirements.requiresExternalLibraries &&
+      report.runtimeRequirements.externalLibraries.length > 0
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Backends without external library requirements must not list external libraries.',
+        path: ['runtimeRequirements', 'externalLibraries'],
+      });
+    }
+
+    if (report.runtimeRequirements.requiresExternalLibraries && report.macosPackagingStatus === 'not_required') {
+      context.addIssue({
+        code: 'custom',
+        message: 'External-library backends need a macOS packaging status.',
+        path: ['macosPackagingStatus'],
+      });
+    }
+
+    if (
+      report.ciPolicy.defaultRequiredCiAllowed &&
+      report.runtimeRequirements.requiresExternalLibraries &&
+      report.macosPackagingStatus !== 'bundled'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'External-library backends may enter required CI only after bundled packaging is proven.',
+        path: ['ciPolicy', 'defaultRequiredCiAllowed'],
+      });
+    }
+
+    if (report.status === 'default_enabled' && !report.ciPolicy.defaultRequiredCiAllowed) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Default-enabled panorama backends must be allowed in required CI.',
+        path: ['status'],
+      });
+    }
+
+    if (
+      report.backendId === 'rapidraw_homography_seam_v0' &&
+      !report.supportedSeamMethods.includes('adaptive_dp_feather_v1')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The legacy RapidRaw backend must advertise adaptive seam feathering.',
+        path: ['supportedSeamMethods'],
+      });
+    }
+  });
+
 export const panoramaSourceImageRefV1Schema = z
   .object({
     colorSpaceHint: z.string().trim().min(1).optional(),
@@ -7288,6 +7425,11 @@ export type NegativeWarningCode = z.infer<typeof negativeWarningCodeSchema>;
 export type NegativeWarningSeverity = z.infer<typeof negativeWarningSeveritySchema>;
 export type NegativeWarningV1 = z.infer<typeof negativeWarningV1Schema>;
 export type PanoramaArtifactV1 = z.infer<typeof panoramaArtifactV1Schema>;
+export type PanoramaBackendBlendModeV1 = z.infer<typeof panoramaBackendBlendModeV1Schema>;
+export type PanoramaBackendCapabilityReportV1 = z.infer<typeof panoramaBackendCapabilityReportV1Schema>;
+export type PanoramaBackendExposureModeV1 = z.infer<typeof panoramaBackendExposureModeV1Schema>;
+export type PanoramaBackendIdV1 = z.infer<typeof panoramaBackendIdV1Schema>;
+export type PanoramaBackendSeamMethodV1 = z.infer<typeof panoramaBackendSeamMethodV1Schema>;
 export type PreviewHistogramChannelV1 = z.infer<typeof previewHistogramChannelV1Schema>;
 export type PreviewHistogramScopeV1 = z.infer<typeof previewHistogramScopeV1Schema>;
 export type PreviewRasterScopeV1 = z.infer<typeof previewRasterScopeV1Schema>;

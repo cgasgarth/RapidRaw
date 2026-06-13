@@ -4732,6 +4732,8 @@ Issues:
 - Persist editable derived panorama sources. Initial sidecar preservation
   contract captured in
   `docs/panorama/panorama-sidecar-artifact-persistence-2026-06-13.md`.
+- Define backend capability contract. Initial contract captured in
+  `docs/panorama/panorama-backend-capability-contract-2026-06-13.md`.
 - Add panorama fixture set.
 - Add panorama UI.
 - Add panorama API tools.

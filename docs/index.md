@@ -63,6 +63,7 @@ generator before the release workflow needs one.
 - [Large panorama tiling strategy](panorama/large-panorama-tiling-strategy-2026-06-13.md)
 - [Panorama artifact schema](panorama/panorama-artifact-schema-2026-06-13.md)
 - [Panorama sidecar artifact persistence](panorama/panorama-sidecar-artifact-persistence-2026-06-13.md)
+- [Panorama backend capability contract](panorama/panorama-backend-capability-contract-2026-06-13.md)
 - [Panorama projection options](panorama/projection-options-2026-06-13.md)
 - [Panorama boundary controls](panorama/boundary-controls-2026-06-13.md)
 - [Panorama exposure normalization](panorama/exposure-normalization-2026-06-13.md)

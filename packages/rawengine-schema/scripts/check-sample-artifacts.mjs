@@ -56,6 +56,7 @@ import {
   negativeLabRollBatchWorkflowV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
+  panoramaBackendCapabilityReportV1Schema,
   previewScopeQueryV1Schema,
   previewScopeResultV1Schema,
   projectLibraryCommandEnvelopeV1Schema,
@@ -135,6 +136,7 @@ import {
   sampleNegativeLabRollBatchWorkflowV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
+  samplePanoramaBackendCapabilityReportV1,
   samplePreviewScopeQueryV1,
   samplePreviewScopeResultV1,
   sampleProjectLibraryCommandEnvelopeV1,
@@ -458,6 +460,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/panorama-artifact-v1.json',
     schema: panoramaArtifactV1Schema,
     value: samplePanoramaArtifactV1,
+  },
+  {
+    name: 'panorama backend capability report',
+    path: 'packages/rawengine-schema/samples/panorama-backend-capability-report-v1.json',
+    schema: panoramaBackendCapabilityReportV1Schema,
+    value: samplePanoramaBackendCapabilityReportV1,
   },
   {
     name: 'film look catalog',
