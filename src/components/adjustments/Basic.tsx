@@ -99,8 +99,9 @@ const ToneMapperSwitch = ({
   return (
     <div className="group mb-3">
       <div className="flex justify-between items-center mb-2">
-        <div
-          className="grid cursor-pointer"
+        <button
+          type="button"
+          className="grid cursor-pointer bg-transparent border-0 p-0 font-inherit text-left"
           onClick={handleReset}
           onDoubleClick={handleReset}
           onMouseEnter={() => {
@@ -126,7 +127,7 @@ const ToneMapperSwitch = ({
           >
             {t('adjustments.basic.reset')}
           </span>
-        </div>
+        </button>
       </div>
       <div className="w-full p-2 pb-1 bg-card-active rounded-md">
         <div className="relative flex w-full">
