@@ -101,8 +101,9 @@ function MetadataItem({ label, value }: MetaDataItemProps) {
       >
         {label}
       </Text>
-      <div
-        className="grid cursor-pointer text-right min-w-0 flex-1"
+      <button
+        type="button"
+        className="grid cursor-pointer text-right min-w-0 flex-1 bg-transparent border-0 p-0 font-inherit"
         onMouseEnter={() => {
           setIsHovered(true);
         }}
@@ -134,7 +135,7 @@ function MetadataItem({ label, value }: MetaDataItemProps) {
         >
           {copied ? t('editor.metadata.copied') : t('editor.metadata.copy')}
         </span>
-      </div>
+      </button>
     </div>
   );
 }
@@ -195,7 +196,8 @@ function EditableMetadataItem({ label, value, onSave }: EditableMetadataItemProp
             className="bg-bg-secondary border border-accent rounded-sm px-2 py-0.5 text-xs text-text-primary text-right outline-hidden w-full shadow-sm focus:ring-1 focus:ring-accent/30"
           />
         ) : (
-          <div
+          <button
+            type="button"
             onClick={() => {
               setLocalValue(value || '');
               setIsEditing(true);
@@ -204,7 +206,7 @@ function EditableMetadataItem({ label, value, onSave }: EditableMetadataItemProp
             data-tooltip={value ? t('editor.metadata.clickToEdit') : t('editor.metadata.emptyClickToAdd')}
           >
             {value}
-          </div>
+          </button>
         )}
       </div>
     </div>
