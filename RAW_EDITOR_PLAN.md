@@ -214,10 +214,11 @@ These are not product non-goals forever. They are constraints to keep early exec
   - Use least-privilege workflow permissions.
   - Pin third-party GitHub Actions by SHA for sensitive/release workflows where practical.
   - Require manual approval for first-time contributors if the repo is public.
-- Keep dependency versions current (tracked by #935):
-  - Regularly audit JavaScript, Rust, GitHub Actions, Bun, Node, Tauri, and validation-tool dependencies against the latest compatible major and minor releases.
+- Keep dependency versions current (policy tracked by #935; audit automation tracked by #939):
+  - Regularly audit JavaScript, Rust, GitHub Actions, Bun, Node, Tauri, and validation-tool dependencies against the latest stable major and latest stable minor releases, not only the latest compatible range.
+  - Record current, latest compatible, latest stable minor, and latest stable major versions wherever ecosystem tooling can provide them.
   - Minor and patch dependency updates may be grouped when validation risk is low and the package family is coherent.
-  - Each major-version bump must get its own GitHub issue unless the packages are a tightly coupled toolchain that must be upgraded together.
+  - Each discovered major-version bump must get its own GitHub issue before implementation unless the packages are a tightly coupled toolchain that must be upgraded together.
   - Major-version issues must record migration notes, breaking-change links, validation commands, rollback strategy, and whether follow-up code changes are expected.
   - Dependency PRs must keep vulnerability, license, typecheck, lint, generated-artifact, and relevant Rust/Tauri checks green before merge.
 - Add local commit protection:
@@ -403,7 +404,7 @@ An issue is done when:
 - Dependency-currency checks should be shifted left where practical:
   - Track latest stable major and minor versions for Bun/npm packages, Rust crates, GitHub Actions, Bun, Node, Tauri, Rust tooling, and validation CLIs.
   - Keep patch and minor updates current by default when they pass the full validation gate and do not require behavioral migration.
-  - Add scripted stale-dependency reports for Bun/npm and Cargo dependency graphs, including current version, latest compatible version, latest stable major version, and release-note links when practical.
+  - Add scripted stale-dependency reports for Bun/npm and Cargo dependency graphs, including current version, latest compatible version, latest stable minor version, latest stable major version, and release-note links when practical.
   - Add a scheduled or manually dispatched GitHub Action that reports outdated package versions without silently changing locks.
   - Convert every discovered major-version update into a tracked GitHub issue before implementation, using the format `deps(major): migrate <ecosystem>/<package> to <major>`.
   - Each major-version issue should include migration notes, upstream breaking-change links, expected code/config changes, local validation commands, CI expectations, rollback notes, and whether the bump is blocked by another ecosystem update.
