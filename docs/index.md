@@ -58,6 +58,7 @@ generator before the release workflow needs one.
 - [Negative Lab measured-profile fixture format](negative-lab/measured-profile-fixture-format-2026-06-13.md)
 - [Negative Lab stock-family research mapping](negative-lab/stock-family-research-mapping-2026-06-13.md)
 - [RapidRAW panorama stitcher audit](panorama/rapidraw-stitcher-audit-2026-06-13.md)
+- [Panorama architecture consult review](panorama/panorama-architecture-consult-2026-06-13.md)
 - [Panorama multi-row support audit](panorama/multi-row-support-audit-2026-06-13.md)
 - [Large panorama tiling strategy](panorama/large-panorama-tiling-strategy-2026-06-13.md)
 - [Panorama artifact schema](panorama/panorama-artifact-schema-2026-06-13.md)
