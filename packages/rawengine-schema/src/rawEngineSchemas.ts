@@ -161,6 +161,262 @@ export const rawEngineToolRegistryV1Schema = z
   })
   .strict();
 
+const projectLibraryPathSchema = z.string().trim().min(1);
+
+export type ProjectLibraryFolderNodeV1 = {
+  children: ProjectLibraryFolderNodeV1[];
+  hasSubdirs: boolean;
+  imageCount: number;
+  isDir: true;
+  name: string;
+  path: string;
+};
+
+export const projectLibraryFolderNodeV1Schema: z.ZodType<ProjectLibraryFolderNodeV1> = z.lazy(() =>
+  z
+    .object({
+      children: z.array(projectLibraryFolderNodeV1Schema),
+      hasSubdirs: z.boolean(),
+      imageCount: z.number().int().nonnegative(),
+      isDir: z.literal(true),
+      name: z.string().trim().min(1),
+      path: projectLibraryPathSchema,
+    })
+    .strict(),
+);
+
+export type ProjectLibraryAlbumNodeV1 =
+  | {
+      icon?: string | undefined;
+      id: string;
+      images: string[];
+      name: string;
+      type: 'album';
+    }
+  | {
+      children: ProjectLibraryAlbumNodeV1[];
+      icon?: string | undefined;
+      id: string;
+      name: string;
+      type: 'group';
+    };
+
+export const projectLibraryAlbumNodeV1Schema: z.ZodType<ProjectLibraryAlbumNodeV1> = z.lazy(() =>
+  z.discriminatedUnion('type', [
+    z
+      .object({
+        icon: z.string().trim().min(1).optional(),
+        id: z.string().trim().min(1),
+        images: z.array(projectLibraryPathSchema),
+        name: z.string().trim().min(1),
+        type: z.literal('album'),
+      })
+      .strict(),
+    z
+      .object({
+        children: z.array(projectLibraryAlbumNodeV1Schema),
+        icon: z.string().trim().min(1).optional(),
+        id: z.string().trim().min(1),
+        name: z.string().trim().min(1),
+        type: z.literal('group'),
+      })
+      .strict(),
+  ]),
+);
+
+export const projectLibraryImageRefV1Schema = z
+  .object({
+    exif: z.record(z.string(), z.string()).nullable(),
+    isEdited: z.boolean(),
+    isVirtualCopy: z.boolean(),
+    modified: z.number().nonnegative(),
+    path: projectLibraryPathSchema,
+    rating: z.number().int().min(0).max(5),
+    tags: z.array(z.string().trim().min(1)).nullable(),
+  })
+  .strict();
+
+export const projectLibraryFilterCriteriaV1Schema = z
+  .object({
+    colors: z.array(z.string().trim().min(1)),
+    editedStatus: z.enum(['all', 'editedOnly', 'uneditedOnly']).optional(),
+    rating: z.number().int().min(0).max(5),
+    rawStatus: z.enum(['all', 'nonRawOnly', 'rawOnly', 'rawOverNonRaw']),
+  })
+  .strict();
+
+export const projectLibrarySortCriteriaV1Schema = z
+  .object({
+    key: z.string().trim().min(1),
+    label: z.string().trim().min(1).optional(),
+    order: z.enum(['asc', 'desc']),
+  })
+  .strict();
+
+export const projectLibrarySnapshotQueryV1Schema = queryEnvelopeV1Schema
+  .extend({
+    parameters: z
+      .object({
+        currentFolderPath: projectLibraryPathSchema.nullable().optional(),
+        expandedFolders: z.array(projectLibraryPathSchema),
+        includeAlbums: z.boolean(),
+        includeImageList: z.boolean(),
+        includePinnedFolders: z.boolean(),
+        rootPaths: z.array(projectLibraryPathSchema),
+        showImageCounts: z.boolean(),
+      })
+      .strict(),
+    queryType: z.literal('project.library.snapshot'),
+    target: rawEngineTargetSchema.safeExtend({ kind: z.literal('project') }).strict(),
+  })
+  .strict();
+
+export const projectLibrarySnapshotV1Schema = z
+  .object({
+    activeAlbumId: z.string().trim().min(1).nullable(),
+    albums: z.array(projectLibraryAlbumNodeV1Schema),
+    currentFolderPath: projectLibraryPathSchema.nullable(),
+    filterCriteria: projectLibraryFilterCriteriaV1Schema,
+    folders: z.array(projectLibraryFolderNodeV1Schema),
+    imageList: z.array(projectLibraryImageRefV1Schema),
+    libraryActivePath: projectLibraryPathSchema.nullable(),
+    multiSelectedPaths: z.array(projectLibraryPathSchema),
+    pinnedFolders: z.array(projectLibraryFolderNodeV1Schema),
+    rootPaths: z.array(projectLibraryPathSchema),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sortCriteria: projectLibrarySortCriteriaV1Schema,
+  })
+  .strict();
+
+export const projectLibraryCommandTypeV1Schema = z.enum([
+  'project.library.createAlbum',
+  'project.library.createGroup',
+  'project.library.renameAlbumItem',
+  'project.library.addImagesToAlbum',
+  'project.library.removeImagesFromAlbum',
+]);
+
+const projectLibraryCommandBaseV1Schema = z.object({
+  actor: rawEngineActorSchema,
+  approval: approvalRequirementSchema,
+  commandId: z.string().trim().min(1),
+  correlationId: z.string().trim().min(1),
+  dryRun: z.boolean(),
+  expectedLibraryRevision: z.string().trim().min(1).optional(),
+  idempotencyKey: z.string().trim().min(1).optional(),
+  schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  target: rawEngineTargetSchema.safeExtend({ kind: z.literal('project') }).strict(),
+});
+
+export const projectLibraryCommandEnvelopeV1Schema = z
+  .discriminatedUnion('commandType', [
+    projectLibraryCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('project.library.createAlbum'),
+        parameters: z
+          .object({
+            icon: z.string().trim().min(1).optional(),
+            name: z.string().trim().min(1),
+            parentGroupId: z.string().trim().min(1).nullable(),
+          })
+          .strict(),
+      })
+      .strict(),
+    projectLibraryCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('project.library.createGroup'),
+        parameters: z
+          .object({
+            icon: z.string().trim().min(1).optional(),
+            name: z.string().trim().min(1),
+            parentGroupId: z.string().trim().min(1).nullable(),
+          })
+          .strict(),
+      })
+      .strict(),
+    projectLibraryCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('project.library.renameAlbumItem'),
+        parameters: z
+          .object({
+            itemId: z.string().trim().min(1),
+            name: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+    projectLibraryCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('project.library.addImagesToAlbum'),
+        parameters: z
+          .object({
+            albumId: z.string().trim().min(1),
+            imagePaths: z.array(projectLibraryPathSchema).min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+    projectLibraryCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('project.library.removeImagesFromAlbum'),
+        parameters: z
+          .object({
+            albumId: z.string().trim().min(1),
+            imagePaths: z.array(projectLibraryPathSchema).min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+  ])
+  .superRefine((command, context) => {
+    if (!command.dryRun && command.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Mutating project library commands require approved file-mutation approval before execution.',
+        path: ['approval', 'state'],
+      });
+    }
+
+    if (command.approval.approvalClass !== ApprovalClass.FileMutation) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Project library commands require file-mutation approval classification.',
+        path: ['approval', 'approvalClass'],
+      });
+    }
+  });
+
+export const projectLibraryMutationResultV1Schema = z
+  .object({
+    albumTree: z.array(projectLibraryAlbumNodeV1Schema),
+    commandId: z.string().trim().min(1),
+    commandType: projectLibraryCommandTypeV1Schema,
+    correlationId: z.string().trim().min(1),
+    dryRun: z.boolean(),
+    mutates: z.boolean(),
+    resultingLibraryRevision: z.string().trim().min(1).optional(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+  .superRefine((result, context) => {
+    if (result.dryRun && result.mutates) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Dry-run project library results must not mutate library state.',
+        path: ['mutates'],
+      });
+    }
+
+    if (!result.dryRun && result.resultingLibraryRevision === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied project library mutations require a resulting library revision.',
+        path: ['resultingLibraryRevision'],
+      });
+    }
+  });
+
 export const panoramaProjectionSchema = z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']);
 
 export const panoramaProjectionSupportSchema = z.enum(['implemented_current_engine', 'schema_only_deferred']);
@@ -3957,6 +4213,8 @@ const rawEngineAppServerKnownInputSchemas = {
   CommandEnvelopeV1: commandEnvelopeV1Schema,
   NegativeLabApplyPlanRequestV1: negativeLabApplyPlanRequestV1Schema,
   NegativeLabCommandEnvelopeV1: negativeLabCommandEnvelopeV1Schema,
+  ProjectLibraryCommandEnvelopeV1: projectLibraryCommandEnvelopeV1Schema,
+  ProjectLibrarySnapshotQueryV1: projectLibrarySnapshotQueryV1Schema,
   QueryEnvelopeV1: queryEnvelopeV1Schema,
 } as const;
 
@@ -3969,6 +4227,8 @@ export const rawEngineAppServerToolCallV1Schema = z
       'CommandEnvelopeV1',
       'NegativeLabApplyPlanRequestV1',
       'NegativeLabCommandEnvelopeV1',
+      'ProjectLibraryCommandEnvelopeV1',
+      'ProjectLibrarySnapshotQueryV1',
       'QueryEnvelopeV1',
     ]),
     itemId: z.string().trim().min(1).optional(),
@@ -4537,6 +4797,14 @@ export type NegativeWarningCode = z.infer<typeof negativeWarningCodeSchema>;
 export type NegativeWarningSeverity = z.infer<typeof negativeWarningSeveritySchema>;
 export type NegativeWarningV1 = z.infer<typeof negativeWarningV1Schema>;
 export type PanoramaArtifactV1 = z.infer<typeof panoramaArtifactV1Schema>;
+export type ProjectLibraryCommandEnvelopeV1 = z.infer<typeof projectLibraryCommandEnvelopeV1Schema>;
+export type ProjectLibraryCommandTypeV1 = z.infer<typeof projectLibraryCommandTypeV1Schema>;
+export type ProjectLibraryFilterCriteriaV1 = z.infer<typeof projectLibraryFilterCriteriaV1Schema>;
+export type ProjectLibraryImageRefV1 = z.infer<typeof projectLibraryImageRefV1Schema>;
+export type ProjectLibraryMutationResultV1 = z.infer<typeof projectLibraryMutationResultV1Schema>;
+export type ProjectLibrarySnapshotQueryV1 = z.infer<typeof projectLibrarySnapshotQueryV1Schema>;
+export type ProjectLibrarySnapshotV1 = z.infer<typeof projectLibrarySnapshotV1Schema>;
+export type ProjectLibrarySortCriteriaV1 = z.infer<typeof projectLibrarySortCriteriaV1Schema>;
 export type QueryEnvelopeV1 = z.infer<typeof queryEnvelopeV1Schema>;
 export type RawEngineActor = z.infer<typeof rawEngineActorSchema>;
 export type RawEngineTarget = z.infer<typeof rawEngineTargetSchema>;

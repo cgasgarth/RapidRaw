@@ -1,0 +1,27 @@
+{
+  "albumTree": [
+    {
+      "children": [
+        {
+          "icon": "star",
+          "id": "album_selects",
+          "images": ["/photos/session/IMG_0001.CR3", "/photos/session/IMG_0002.CR3"],
+          "name": "Client Selects",
+          "type": "album"
+        }
+      ],
+      "icon": "folder-heart",
+      "id": "group_client",
+      "name": "Client",
+      "type": "group"
+    }
+  ],
+  "commandId": "command_project_library_add_images_sample",
+  "commandType": "project.library.addImagesToAlbum",
+  "correlationId": "corr_project_library_add_images_sample",
+  "dryRun": false,
+  "mutates": true,
+  "resultingLibraryRevision": "library_rev_13",
+  "schemaVersion": 1,
+  "warnings": []
+}

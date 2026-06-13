@@ -23,6 +23,26 @@
         "toolName": "edit.dry_run_tone"
       },
       {
+        "approvalClass": "safe_read",
+        "inputSchemaName": "ProjectLibrarySnapshotQueryV1",
+        "mutates": false,
+        "outputSchemaName": "ProjectLibrarySnapshotV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "read",
+        "toolName": "project.library_snapshot"
+      },
+      {
+        "approvalClass": "file_mutation",
+        "inputSchemaName": "ProjectLibraryCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "ProjectLibraryMutationResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": false,
+        "toolKind": "apply",
+        "toolName": "project.library_mutate"
+      },
+      {
         "approvalClass": "preview_only",
         "inputSchemaName": "NegativeLabCommandEnvelopeV1",
         "mutates": false,

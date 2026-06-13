@@ -31,6 +31,10 @@ import {
   negativeLabRollBatchWorkflowV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
+  projectLibraryCommandEnvelopeV1Schema,
+  projectLibraryMutationResultV1Schema,
+  projectLibrarySnapshotQueryV1Schema,
+  projectLibrarySnapshotV1Schema,
   queryEnvelopeV1Schema,
   rawEngineAppServerToolCallValidationV1Schema,
   filmLookCatalogV1Schema,
@@ -64,6 +68,10 @@ import {
   type NegativeLabRollBatchWorkflowV1,
   type NegativeRollSessionV1,
   type PanoramaArtifactV1,
+  type ProjectLibraryCommandEnvelopeV1,
+  type ProjectLibraryMutationResultV1,
+  type ProjectLibrarySnapshotQueryV1,
+  type ProjectLibrarySnapshotV1,
   type QueryEnvelopeV1,
   type RawEngineAppServerToolCallValidationV1,
   type RawEngineToolRegistryV1,
@@ -151,6 +159,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       toolName: 'edit.dry_run_tone',
     },
     {
+      approvalClass: ApprovalClass.SafeRead,
+      inputSchemaName: 'ProjectLibrarySnapshotQueryV1',
+      mutates: false,
+      outputSchemaName: 'ProjectLibrarySnapshotV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: false,
+      toolKind: 'read',
+      toolName: 'project.library_snapshot',
+    },
+    {
+      approvalClass: ApprovalClass.FileMutation,
+      inputSchemaName: 'ProjectLibraryCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'ProjectLibraryMutationResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: false,
+      toolKind: 'apply',
+      toolName: 'project.library_mutate',
+    },
+    {
       approvalClass: ApprovalClass.PreviewOnly,
       inputSchemaName: 'NegativeLabCommandEnvelopeV1',
       mutates: false,
@@ -196,6 +224,145 @@ export const sampleRawEngineAppServerToolCallValidationV1: RawEngineAppServerToo
       transport: 'stdio',
       turnId: 'turn_rawengine_agent_sample',
     },
+  });
+
+export const sampleProjectLibrarySnapshotQueryV1: ProjectLibrarySnapshotQueryV1 =
+  projectLibrarySnapshotQueryV1Schema.parse({
+    actor: {
+      id: 'codex-app-server',
+      kind: ActorKind.Agent,
+      sessionId: 'session_project_library_sample',
+    },
+    correlationId: 'corr_project_library_snapshot_sample',
+    parameters: {
+      currentFolderPath: '/photos/session',
+      expandedFolders: ['/photos/session', '/photos/session/selects'],
+      includeAlbums: true,
+      includeImageList: true,
+      includePinnedFolders: true,
+      rootPaths: ['/photos/session'],
+      showImageCounts: true,
+    },
+    queryId: 'query_project_library_snapshot_sample',
+    queryType: 'project.library.snapshot',
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: {
+      id: 'project_local_library',
+      kind: 'project',
+    },
+  });
+
+export const sampleProjectLibrarySnapshotV1: ProjectLibrarySnapshotV1 = projectLibrarySnapshotV1Schema.parse({
+  activeAlbumId: 'album_selects',
+  albums: [
+    {
+      children: [
+        {
+          icon: 'star',
+          id: 'album_selects',
+          images: ['/photos/session/IMG_0001.CR3', '/photos/session/IMG_0002.CR3'],
+          name: 'Client Selects',
+          type: 'album',
+        },
+      ],
+      icon: 'folder-heart',
+      id: 'group_client',
+      name: 'Client',
+      type: 'group',
+    },
+  ],
+  currentFolderPath: '/photos/session',
+  filterCriteria: {
+    colors: ['green'],
+    editedStatus: 'all',
+    rating: 3,
+    rawStatus: 'rawOnly',
+  },
+  folders: [
+    {
+      children: [
+        {
+          children: [],
+          hasSubdirs: false,
+          imageCount: 2,
+          isDir: true,
+          name: 'selects',
+          path: '/photos/session/selects',
+        },
+      ],
+      hasSubdirs: true,
+      imageCount: 2,
+      isDir: true,
+      name: 'session',
+      path: '/photos/session',
+    },
+  ],
+  imageList: [
+    {
+      exif: {
+        ISO: '400',
+        LensModel: 'Sample 50mm',
+      },
+      isEdited: true,
+      isVirtualCopy: false,
+      modified: 1717351200,
+      path: '/photos/session/IMG_0001.CR3',
+      rating: 4,
+      tags: ['select', 'portrait'],
+    },
+  ],
+  libraryActivePath: '/photos/session/IMG_0001.CR3',
+  multiSelectedPaths: ['/photos/session/IMG_0001.CR3'],
+  pinnedFolders: [],
+  rootPaths: ['/photos/session'],
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sortCriteria: {
+    key: 'rating',
+    label: 'Rating',
+    order: 'desc',
+  },
+});
+
+export const sampleProjectLibraryCommandEnvelopeV1: ProjectLibraryCommandEnvelopeV1 =
+  projectLibraryCommandEnvelopeV1Schema.parse({
+    actor: {
+      id: 'codex-app-server',
+      kind: ActorKind.Agent,
+      sessionId: 'session_project_library_sample',
+    },
+    approval: {
+      approvalClass: ApprovalClass.FileMutation,
+      reason: 'Adding selected images to a project album mutates the local album sidecar.',
+      state: 'approved',
+    },
+    commandId: 'command_project_library_add_images_sample',
+    commandType: 'project.library.addImagesToAlbum',
+    correlationId: 'corr_project_library_add_images_sample',
+    dryRun: false,
+    expectedLibraryRevision: 'library_rev_12',
+    idempotencyKey: 'idem_project_library_add_images_sample',
+    parameters: {
+      albumId: 'album_selects',
+      imagePaths: ['/photos/session/IMG_0001.CR3'],
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: {
+      id: 'project_local_library',
+      kind: 'project',
+    },
+  });
+
+export const sampleProjectLibraryMutationResultV1: ProjectLibraryMutationResultV1 =
+  projectLibraryMutationResultV1Schema.parse({
+    albumTree: sampleProjectLibrarySnapshotV1.albums,
+    commandId: sampleProjectLibraryCommandEnvelopeV1.commandId,
+    commandType: sampleProjectLibraryCommandEnvelopeV1.commandType,
+    correlationId: sampleProjectLibraryCommandEnvelopeV1.correlationId,
+    dryRun: false,
+    mutates: true,
+    resultingLibraryRevision: 'library_rev_13',
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    warnings: [],
   });
 
 export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Schema.parse({

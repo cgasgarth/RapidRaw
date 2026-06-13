@@ -1,0 +1,24 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_project_library_sample"
+  },
+  "correlationId": "corr_project_library_snapshot_sample",
+  "parameters": {
+    "currentFolderPath": "/photos/session",
+    "expandedFolders": ["/photos/session", "/photos/session/selects"],
+    "includeAlbums": true,
+    "includeImageList": true,
+    "includePinnedFolders": true,
+    "rootPaths": ["/photos/session"],
+    "showImageCounts": true
+  },
+  "queryId": "query_project_library_snapshot_sample",
+  "queryType": "project.library.snapshot",
+  "schemaVersion": 1,
+  "target": {
+    "id": "project_local_library",
+    "kind": "project"
+  }
+}
