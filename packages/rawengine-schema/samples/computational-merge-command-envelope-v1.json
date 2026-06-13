@@ -25,6 +25,7 @@
     "exposureNormalization": "auto",
     "lensCorrectionPolicy": "required_before_stitch",
     "maxPreviewDimensionPx": 2400,
+    "memoryBudgetBytes": 4000000000,
     "outputName": "Ridge Overlook Panorama",
     "projection": "cylindrical",
     "qualityPreference": "balanced",
