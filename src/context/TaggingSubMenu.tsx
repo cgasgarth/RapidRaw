@@ -36,7 +36,13 @@ export default function TaggingSubMenu({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setTags(initialTags);
+    const syncTimer = setTimeout(() => {
+      setTags(initialTags);
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [initialTags]);
 
   useEffect(() => {
