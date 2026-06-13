@@ -12,6 +12,33 @@ permissions:
   contents: read
 
 jobs:
+  visual-smoke:
+    name: visual smoke screenshot macOS
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install chromium
+
+      - name: Capture visual smoke screenshot
+        run: bun run check:visual-smoke
+
+      - name: Upload visual smoke screenshots
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visual-smoke-screenshots
+          path: artifacts/visual-smoke/*.png
+          retention-days: 7
+          if-no-files-found: error
+
   readiness:
     name: image quality readiness / ${{ matrix.lane }}
     runs-on: ubuntu-latest
