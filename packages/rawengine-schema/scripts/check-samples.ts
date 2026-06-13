@@ -7,6 +7,8 @@ import {
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
   negativeLabApplyResultV1Schema,
+  negativeLabBaseFogEstimateV1Schema,
+  negativeLabBaseSampleRecordV1Schema,
   negativeLabBuiltInPresetCatalogV1Schema,
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
@@ -33,6 +35,8 @@ import {
   sampleNegativeLabApplyPlanRequestV1,
   sampleNegativeLabApplyFrameCropCommandEnvelopeV1,
   sampleNegativeLabApplyResultV1,
+  sampleNegativeLabBaseFogEstimateV1,
+  sampleNegativeLabBaseSampleRecordV1,
   sampleNegativeLabBuiltInPresetCatalogV1,
   sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeLabDensityNormalizationProfileV1,
@@ -131,6 +135,16 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab frame detection result',
     schema: negativeLabFrameDetectionResultV1Schema,
     value: sampleNegativeLabFrameDetectionResultV1,
+  },
+  {
+    name: 'negative lab base sample record',
+    schema: negativeLabBaseSampleRecordV1Schema,
+    value: sampleNegativeLabBaseSampleRecordV1,
+  },
+  {
+    name: 'negative lab base fog estimate',
+    schema: negativeLabBaseFogEstimateV1Schema,
+    value: sampleNegativeLabBaseFogEstimateV1,
   },
   {
     name: 'negative lab process profile',
@@ -505,6 +519,59 @@ const invalidFrameDetectionUnknownSourceResult = negativeLabFrameDetectionResult
 if (invalidFrameDetectionUnknownSourceResult.success) {
   throw new Error('Expected frame detection results to reject frames from unlisted source files.');
 }
+
+const invalidAcceptedBaseSampleWithoutStats = {
+  ...sampleNegativeLabBaseSampleRecordV1,
+  sampleStats: undefined,
+};
+expectInvalid(
+  'accepted base sample without channel stats',
+  negativeLabBaseSampleRecordV1Schema,
+  invalidAcceptedBaseSampleWithoutStats,
+);
+
+const invalidRejectedBaseSampleWithoutReason = {
+  ...sampleNegativeLabBaseSampleRecordV1,
+  rejectionReason: undefined,
+  sampleStats: undefined,
+  status: 'rejected',
+};
+expectInvalid(
+  'rejected base sample without reason',
+  negativeLabBaseSampleRecordV1Schema,
+  invalidRejectedBaseSampleWithoutReason,
+);
+
+const invalidBaseFogEstimateDuplicateSources = {
+  ...sampleNegativeLabBaseFogEstimateV1,
+  sourceSampleIds: [sampleNegativeLabBaseSampleRecordV1.sampleId, sampleNegativeLabBaseSampleRecordV1.sampleId],
+};
+expectInvalid(
+  'base fog estimate with duplicate source samples',
+  negativeLabBaseFogEstimateV1Schema,
+  invalidBaseFogEstimateDuplicateSources,
+);
+
+const invalidBaseFogEstimateRejectedSource = {
+  ...sampleNegativeLabBaseFogEstimateV1,
+  rejectedSampleIds: [sampleNegativeLabBaseSampleRecordV1.sampleId],
+};
+expectInvalid(
+  'base fog estimate using a rejected source sample',
+  negativeLabBaseFogEstimateV1Schema,
+  invalidBaseFogEstimateRejectedSource,
+);
+
+const invalidHighConfidenceBaseFogWarning = {
+  ...sampleNegativeLabBaseFogEstimateV1,
+  confidence: 'high',
+  warningCodes: ['clipped_base_channel'],
+};
+expectInvalid(
+  'high-confidence base fog estimate with confidence warning',
+  negativeLabBaseFogEstimateV1Schema,
+  invalidHighConfidenceBaseFogWarning,
+);
 
 const [sampleBuiltInPreset, secondSampleBuiltInPreset] = sampleNegativeLabBuiltInPresetCatalogV1.presets;
 if (sampleBuiltInPreset === undefined || secondSampleBuiltInPreset === undefined) {

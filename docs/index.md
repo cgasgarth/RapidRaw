@@ -39,6 +39,7 @@ generator before the release workflow needs one.
 - [Negative Lab frame detection and border contract](negative-lab/frame-detection-border-contract-2026-06-13.md)
 - [Negative Lab process profiles and density normalization](negative-lab/process-profiles-density-normalization-2026-06-13.md)
 - [Negative Lab per-channel inversion curves](negative-lab/per-channel-inversion-curves-2026-06-13.md)
+- [Negative Lab base sampling controls](negative-lab/base-sampling-controls-2026-06-13.md)
 - [Negative Lab generic built-in presets](negative-lab/generic-built-in-presets-2026-06-13.md)
 - [Negative Lab preset metadata policy schema](negative-lab/preset-metadata-policy-schema-2026-06-13.md)
 - [Negative Lab roll batch consistency workflow](negative-lab/roll-batch-consistency-workflow-2026-06-13.md)

@@ -9,6 +9,8 @@ import {
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
   negativeLabApplyResultV1Schema,
+  negativeLabBaseFogEstimateV1Schema,
+  negativeLabBaseSampleRecordV1Schema,
   negativeLabBuiltInPresetCatalogV1Schema,
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
@@ -32,6 +34,8 @@ import {
   type NegativeLabAppServerToolManifestV1,
   type NegativeLabApplyPlanRequestV1,
   type NegativeLabApplyResultV1,
+  type NegativeLabBaseFogEstimateV1,
+  type NegativeLabBaseSampleRecordV1,
   type NegativeLabBuiltInPresetCatalogV1,
   type NegativeLabCommandEnvelopeV1,
   type NegativeLabDensityNormalizationProfileV1,
@@ -570,6 +574,95 @@ export const sampleNegativeLabFrameDetectionResultV1: NegativeLabFrameDetectionR
         severity: 'warning',
       },
     ],
+  });
+
+export const sampleNegativeLabBaseSampleRecordV1: NegativeLabBaseSampleRecordV1 =
+  negativeLabBaseSampleRecordV1Schema.parse({
+    confidence: 'medium',
+    measuredAt: '2026-06-13T10:30:00.000Z',
+    sampleId: 'base_sample_roll_01',
+    sampleRegion: {
+      frameId: 'frame_0001',
+      geometry: {
+        coordinateSpace: 'normalized_frame',
+        height: 0.08,
+        kind: 'rect',
+        width: 0.12,
+        x: 0.04,
+        y: 0.88,
+      },
+      regionId: 'region_base_sample_roll_01',
+      role: 'base_fog',
+    },
+    sampleScope: 'roll',
+    sampleStats: {
+      blue: {
+        clippingFraction: 0,
+        max: 0.45,
+        mean: 0.44,
+        median: 0.44,
+        min: 0.43,
+        sampleCount: 1800,
+        standardDeviation: 0.004,
+      },
+      green: {
+        clippingFraction: 0,
+        max: 0.63,
+        mean: 0.62,
+        median: 0.62,
+        min: 0.61,
+        sampleCount: 1800,
+        standardDeviation: 0.004,
+      },
+      red: {
+        clippingFraction: 0,
+        max: 0.81,
+        mean: 0.8,
+        median: 0.8,
+        min: 0.79,
+        sampleCount: 1800,
+        standardDeviation: 0.004,
+      },
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    status: 'accepted',
+    warningCodes: [],
+  });
+
+export const sampleNegativeLabBaseFogEstimateV1: NegativeLabBaseFogEstimateV1 =
+  negativeLabBaseFogEstimateV1Schema.parse({
+    algorithm: {
+      algorithmId: 'base_fog_scalar_rgb_v1',
+      algorithmVersion: 1,
+      outlierPolicy: 'mad_v1',
+      statistic: 'median',
+    },
+    baseDensity: {
+      blue: 0.357,
+      green: 0.208,
+      red: 0.097,
+    },
+    baseRgb: {
+      blue: 0.44,
+      green: 0.62,
+      red: 0.8,
+    },
+    confidence: 'medium',
+    estimateId: 'base_estimate_roll_01',
+    estimatedAt: '2026-06-13T10:31:00.000Z',
+    frameSelection: {
+      excludeFrameIds: [],
+      frameIds: ['frame_0001'],
+      mode: 'selected',
+      qcStatuses: [],
+      warningCodes: [],
+    },
+    rejectedSampleIds: [],
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sessionId: sampleNegativeRollSessionV1.sessionId,
+    sourceSampleIds: [sampleNegativeLabBaseSampleRecordV1.sampleId],
+    scope: 'roll',
+    warningCodes: [],
   });
 
 export const sampleNegativeLabDensityNormalizationProfileV1: NegativeLabDensityNormalizationProfileV1 =

@@ -1,0 +1,34 @@
+{
+  "algorithm": {
+    "algorithmId": "base_fog_scalar_rgb_v1",
+    "algorithmVersion": 1,
+    "outlierPolicy": "mad_v1",
+    "statistic": "median"
+  },
+  "baseDensity": {
+    "blue": 0.357,
+    "green": 0.208,
+    "red": 0.097
+  },
+  "baseRgb": {
+    "blue": 0.44,
+    "green": 0.62,
+    "red": 0.8
+  },
+  "confidence": "medium",
+  "estimateId": "base_estimate_roll_01",
+  "estimatedAt": "2026-06-13T10:31:00.000Z",
+  "frameSelection": {
+    "excludeFrameIds": [],
+    "frameIds": ["frame_0001"],
+    "mode": "selected",
+    "qcStatuses": [],
+    "warningCodes": []
+  },
+  "rejectedSampleIds": [],
+  "schemaVersion": 1,
+  "sessionId": "negative_roll_session_sample",
+  "sourceSampleIds": ["base_sample_roll_01"],
+  "scope": "roll",
+  "warningCodes": []
+}
