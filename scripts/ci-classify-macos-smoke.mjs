@@ -63,6 +63,14 @@ const SAFE_SCHEMA_PACKAGE_EXTENSIONS = new Set(['.json', '.md', '.mjs', '.ts']);
 
 const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   [
+    'check:actions',
+    new Set([
+      'bun run check:actions:lint && bun run check:workflow-policy',
+      'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test',
+    ]),
+  ],
+  ['check:workflow-policy:self-test', new Set(['bun scripts/check-github-workflow-policy.mjs --self-test'])],
+  [
     'schema:check',
     new Set([
       'tsc -p packages/rawengine-schema/tsconfig.json --noEmit --pretty false && bun packages/rawengine-schema/scripts/check-samples.ts',
@@ -291,6 +299,17 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -45,6 +45,7 @@\n+    "schema:check": "tsc -p packages/rawengine-schema/tsconfig.json --noEmit --pretty false && bun packages/rawengine-schema/scripts/check-samples.ts",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'workflow policy package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -25,9 +25,10 @@\n-    "check:actions": "bun run check:actions:lint && bun run check:workflow-policy",\n+    "check:actions": "bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test",\n+    "check:workflow-policy:self-test": "bun scripts/check-github-workflow-policy.mjs --self-test",',
       },
     ],
     SMOKE_MODES.NONE,
