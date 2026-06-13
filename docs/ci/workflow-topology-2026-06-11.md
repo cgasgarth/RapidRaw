@@ -58,11 +58,16 @@ Promotion from readiness lane to real validation requires:
 ## Concurrency Policy
 
 PR validation should not cancel older queued or running checks because each PR
-head needs independent merge evidence. `main` push validation is different:
-newer main heads supersede older post-merge heads, so the always-on validation
-workflows use a `main`-scoped concurrency group with `cancel-in-progress` enabled
-only for `push` events on `refs/heads/main`. PR and manual runs use unique
-per-run concurrency groups and continue independently.
+head needs independent merge evidence. `main` push validation should also avoid
+workflow-level concurrency groups: a newer main run must be able to start
+without waiting for, canceling, or being grouped with an older main run. Hosted
+runner capacity can still queue jobs, but RawEngine should not add GitHub
+Actions configuration that serializes main heads.
+
+`scripts/check-github-workflow-policy.mjs` enforces this by rejecting any
+workflow that runs on push to `main` and defines `concurrency`. Keep that guard
+in the required `github actions: actionlint` lane whenever workflow topology is
+changed.
 
 `main` pushes should not enqueue macOS work that duplicates already-passed PR
 coverage. Baseline validation keeps Ubuntu checks on every main push, but macOS
