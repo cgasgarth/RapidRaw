@@ -22,19 +22,20 @@ These commands are intentionally available by name even when some inherited
 baseline work remains. Commands that are green on main should be recorded in PR
 validation whenever their scope is relevant.
 
-| Command                           | Current ownership                                                                                                                               |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun run check:lint`              | Strict ESLint zero-warning gate.                                                                                                                |
-| `bun run check:format`            | Strict Prettier gate.                                                                                                                           |
-| `bun run i18n:lint`               | Hardcoded-string lint, tracked by #285.                                                                                                         |
-| `bun run check:rust:fmt`          | Rust formatting, mirrors current CI.                                                                                                            |
-| `bun run check:rust:check`        | Rust cargo check, mirrors current CI.                                                                                                           |
-| `bun run check:rust:clippy`       | Rust clippy warnings-as-errors, tracked by #287 if it regresses.                                                                                |
-| `bun run check:rust:test`         | Rust test gate, mirrors current CI for Rust-affecting PRs.                                                                                      |
-| `bun run check:rust`              | Blocking Rust local bundle for Rust-affecting PRs.                                                                                              |
-| `bun run check:security`          | Dependency vulnerability checks for JS and Rust.                                                                                                |
-| `bun run check:licenses`          | Dependency license policy checks for JS and Rust.                                                                                               |
-| `bun run check:sidecar-roundtrip` | Fixture-oriented validation for documented `.rrdata` sidecar shape, virtual-copy naming, tag conventions, and missing/invalid default behavior. |
+| Command                             | Current ownership                                                                                                                               |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run check:lint`                | Strict ESLint zero-warning gate.                                                                                                                |
+| `bun run check:format`              | Strict Prettier gate.                                                                                                                           |
+| `bun run i18n:lint`                 | Hardcoded-string lint, tracked by #285.                                                                                                         |
+| `bun run check:rust:fmt`            | Rust formatting, mirrors current CI.                                                                                                            |
+| `bun run check:rust:check`          | Rust cargo check, mirrors current CI.                                                                                                           |
+| `bun run check:rust:clippy`         | Rust clippy warnings-as-errors, tracked by #287 if it regresses.                                                                                |
+| `bun run check:rust:test`           | Rust test gate, mirrors current CI for Rust-affecting PRs.                                                                                      |
+| `bun run check:rust`                | Blocking Rust local bundle for Rust-affecting PRs.                                                                                              |
+| `bun run check:rust-feature-policy` | Ensures required Rust scripts and workflow jobs use the explicit `required-ci` feature set instead of broad `--all-features`.                   |
+| `bun run check:security`            | Dependency vulnerability checks for JS and Rust.                                                                                                |
+| `bun run check:licenses`            | Dependency license policy checks for JS and Rust.                                                                                               |
+| `bun run check:sidecar-roundtrip`   | Fixture-oriented validation for documented `.rrdata` sidecar shape, virtual-copy naming, tag conventions, and missing/invalid default behavior. |
 
 ## Known Baseline Gaps
 
