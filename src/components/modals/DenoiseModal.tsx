@@ -9,6 +9,7 @@ import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { listen } from '@tauri-apps/api/event';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface DenoiseModalProps {
   isOpen: boolean;
@@ -236,8 +237,7 @@ export default function DenoiseModal({
   targetPaths,
 }: DenoiseModalProps) {
   const { t } = useTranslation();
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
   const [intensity, setIntensity] = useState<number>(15);
   const [method, setMethod] = useState<'ai' | 'bm3d'>('ai');
   const [isSaving, setIsSaving] = useState(false);
@@ -278,27 +278,23 @@ export default function DenoiseModal({
 
   useEffect(() => {
     if (isOpen) {
-      setMethod(isRaw ? 'ai' : 'bm3d');
-      setIntensity(isRaw ? 50 : 15);
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
+      const timer = window.setTimeout(() => {
+        setMethod(isRaw ? 'ai' : 'bm3d');
+        setIntensity(isRaw ? 50 : 15);
+      }, 0);
       return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-        setSavedPath(null);
-        setIsSaving(false);
-        setBatchProgress(null);
-      }, 300);
-      return () => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
       };
     }
+
+    const timer = window.setTimeout(() => {
+      setSavedPath(null);
+      setIsSaving(false);
+      setBatchProgress(null);
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [isOpen, isRaw]);
 
   const handleClose = useCallback(() => {
