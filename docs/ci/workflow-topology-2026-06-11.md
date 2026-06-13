@@ -33,8 +33,17 @@ current required gate is intentionally PR-shaped.
 ## Required PR Gate
 
 `PR CI / required` remains the only stable branch-protection status check. It
-waits for the current required peer jobs, including the macOS no-bundle smoke
-when path classification marks it required.
+starts after changed-path routing, reports to GitHub early, and polls the
+current required peer jobs, including the macOS no-bundle smoke when path
+classification marks it required. Do not make the aggregate job depend on every
+peer job through `needs`; that leaves the branch-protection status unreported
+while macOS runners are queued and makes otherwise healthy pull requests look
+stale.
+
+The peer jobs should remain independent so frontend, docs, schema, Rust, and
+security checks can all dispatch as soon as the workflow starts. The aggregate
+may fail early when a completed required peer job fails, but it should not
+serialize the real validation work.
 
 Do not add top-level path filters to required workflows. Required checks should
 start, classify their own scope, and fail closed on workflow/config/Rust/Tauri
@@ -89,8 +98,10 @@ macOS smoke mode.
 GitHub Actions latency should be reduced by better workflow topology, not by
 building up a large queue of overlapping pull requests. Shared CI, lint, lockfile,
 generated artifact, and configuration changes should normally have only one
-active implementation PR at a time. Keep follow-up work local until the active
-overlapping PR merges or is closed.
+active implementation PR at a time. Keep no more than two active open PRs total;
+the second slot exists for a deliberate A/B pattern where one PR is building
+while another independent PR is prepared or validated. Keep follow-up work local
+until the active overlapping PR merges or is closed.
 
 When an open PR is only waiting on required macOS/Rust jobs, do not rebase or
 force-push it unless it has become conflicting, failing, or branch protection
