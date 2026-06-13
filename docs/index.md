@@ -15,6 +15,7 @@ generator before the release workflow needs one.
 ## User Docs
 
 - [User guide](user/user-guide-2026-06-11.md)
+- [Negative Lab user guide](user/negative-lab-user-guide-2026-06-13.md)
 - [Known limitations](release/known-limitations-2026-06-11.md)
 - [Privacy policy](release/privacy-policy-2026-06-11.md)
 - [Crash and error reporting strategy](release/crash-error-reporting-strategy-2026-06-11.md)
