@@ -51,6 +51,10 @@
           "path": "docs/negative-lab/density-domain-inversion-adr-2026-06-13.md"
         },
         {
+          "title": "Negative Lab input profile strategy ADR",
+          "path": "docs/negative-lab/input-profile-strategy-adr-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab preset naming and legal policy ADR",
           "path": "docs/negative-lab/preset-naming-legal-policy-2026-06-13.md"
         },
