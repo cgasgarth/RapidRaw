@@ -98,6 +98,7 @@ export default function TaggingSubMenu({
       onMouseDown={(e) => {
         e.stopPropagation();
       }}
+      role="presentation"
     >
       <div className="mb-2">
         <div className="flex flex-wrap gap-1 p-1 bg-surface rounded-md min-h-[32px] items-center">

@@ -365,8 +365,9 @@ export default function MainLibrary(props: MainLibraryProps) {
                     {appVersion && (
                       <div className="flex items-center space-x-2">
                         <p>
-                          <span
-                            className={`group transition-all duration-300 ease-in-out rounded-md py-1 ${
+                          <button
+                            type="button"
+                            className={`group transition-all duration-300 ease-in-out rounded-md py-1 bg-transparent border-0 font-inherit text-inherit ${
                               isUpdateAvailable
                                 ? 'cursor-pointer border border-yellow-500 px-2 hover:bg-yellow-500/20'
                                 : ''
@@ -390,7 +391,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                                 {t('library.splash.newVersionAvailable')}
                               </span>
                             )}
-                          </span>
+                          </button>
                         </p>
                         <span>-</span>
                         <p>
