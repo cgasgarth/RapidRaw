@@ -49,6 +49,33 @@ const latestVersion = (versions) => versions.toSorted(compareVersions).at(-1);
 
 const versionToString = (version) => version?.raw ?? 'unavailable';
 
+const getNpmMajorIssueTitle = (packageName, currentVersion, latestStableMajor) =>
+  currentVersion && latestStableMajor && latestStableMajor.major > currentVersion.major
+    ? `deps(major): migrate npm/${packageName} to ${latestStableMajor.major}`
+    : '';
+
+const getCargoBreakingIssueTitle = (packageName, currentVersion, latestStableMajor) => {
+  if (!currentVersion || !latestStableMajor) return '';
+
+  if (latestStableMajor.major > currentVersion.major) {
+    return `deps(major): migrate cargo/${packageName} to ${latestStableMajor.major}`;
+  }
+
+  if (currentVersion.major !== 0 || latestStableMajor.major !== 0) {
+    return '';
+  }
+
+  if (latestStableMajor.minor > currentVersion.minor) {
+    return `deps(major): migrate cargo/${packageName} to 0.${latestStableMajor.minor}`;
+  }
+
+  if (currentVersion.minor === 0 && latestStableMajor.patch > currentVersion.patch) {
+    return `deps(major): migrate cargo/${packageName} to 0.0.${latestStableMajor.patch}`;
+  }
+
+  return '';
+};
+
 const latestVersionString = (versions) => {
   const parsedVersions = versions.map((version) => ({ parsed: parseVersionParts(version), raw: version }));
   return parsedVersions
@@ -154,10 +181,7 @@ const auditNpmDependencies = async () => {
       latestCompatible: versionToString(latestCompatible),
       latestStableMajor: versionToString(latestStableMajor),
       latestStableMinor: versionToString(latestStableMinor),
-      majorIssueTitle:
-        currentVersion && latestStableMajor && latestStableMajor.major > currentVersion.major
-          ? `deps(major): migrate npm/${dependency.name} to ${latestStableMajor.major}`
-          : '',
+      majorIssueTitle: getNpmMajorIssueTitle(dependency.name, currentVersion, latestStableMajor),
       name: dependency.name,
       releaseNotes: `https://www.npmjs.com/package/${dependency.name}?activeTab=versions`,
       scope: dependency.scope,
@@ -316,10 +340,7 @@ const auditCargoDependencies = async () => {
       latestCompatible: versionToString(latestCompatible),
       latestStableMajor: versionToString(latestStableMajor),
       latestStableMinor: versionToString(latestStableMinor),
-      majorIssueTitle:
-        currentVersion && latestStableMajor && latestStableMajor.major > currentVersion.major
-          ? `deps(major): migrate cargo/${dependency.name} to ${latestStableMajor.major}`
-          : '',
+      majorIssueTitle: getCargoBreakingIssueTitle(dependency.name, currentVersion, latestStableMajor),
       name: dependency.name,
       releaseNotes: `https://crates.io/crates/${dependency.name}/versions`,
       scope: dependency.scope,
@@ -336,7 +357,7 @@ const renderTable = (title, rows) => {
     `## ${title}`,
     '',
     `- Packages checked: ${rows.length}`,
-    `- Major migrations found: ${majorRows.length}`,
+    `- Major or semver-breaking migrations found: ${majorRows.length}`,
     `- Skipped non-registry dependencies: ${skippedRows.length}`,
     '',
     '| Package | Scope | Declared | Current | Latest compatible | Latest stable minor | Latest stable major | Major issue |',
@@ -351,7 +372,7 @@ const renderTable = (title, rows) => {
   }
 
   if (majorRows.length > 0) {
-    lines.push('', '### Major-version follow-up issues', '');
+    lines.push('', '### Major or semver-breaking follow-up issues', '');
     for (const row of majorRows) {
       lines.push(
         `- \`${row.majorIssueTitle}\`: include migration notes, breaking-change links, validation commands, CI expectations, rollback notes, and package-family coupling.`,
