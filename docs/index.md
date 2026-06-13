@@ -67,6 +67,7 @@ generator before the release workflow needs one.
 - [Panorama projection options](panorama/projection-options-2026-06-13.md)
 - [Panorama boundary controls](panorama/boundary-controls-2026-06-13.md)
 - [Panorama exposure normalization](panorama/exposure-normalization-2026-06-13.md)
+- [OpenCV panorama backend evaluation](panorama/opencv-backend-evaluation-2026-06-13.md)
 - [Architecture baseline](baseline/rapidraw-architecture-baseline-2026-06-11.md)
 - [Image pipeline baseline](baseline/rapidraw-image-pipeline-baseline-2026-06-13.md)
 - [AI hooks baseline](baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
