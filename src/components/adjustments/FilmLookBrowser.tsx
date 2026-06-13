@@ -1,4 +1,4 @@
-import { Check, Film, X } from 'lucide-react';
+import { Check, Film, Save, Share2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { TextVariants } from '../../types/typography';
@@ -11,6 +11,8 @@ import UiText from '../ui/Text';
 
 interface FilmLookBrowserProps {
   onApplyLook: (look: FilmLookBrowserItem) => void;
+  onSaveLook: (look: FilmLookBrowserItem) => void;
+  onShareLook: (look: FilmLookBrowserItem) => void;
 }
 
 type FilmLookComparisonSlot = 'a' | 'b';
@@ -32,8 +34,10 @@ const FILM_LOOK_COMPARE_SLOTS: Array<FilmLookComparisonSlot> = ['a', 'b'];
 const formatFilmLookCount = (count: number) => `${count} looks`;
 const formatFilmLookStrength = (strength: number) => `${strength}%`;
 const formatFilmLookAdjustmentValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
+const formatFilmLookSaveLabel = (displayName: string) => `Save ${displayName} as preset`;
+const formatFilmLookShareLabel = (displayName: string) => `Share ${displayName} preset`;
 
-export default function FilmLookBrowser({ onApplyLook }: FilmLookBrowserProps) {
+export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLookBrowserProps) {
   const groups = useMemo(() => getFilmLookBrowserGroups(), []);
   const looksById = useMemo(
     () => new Map(groups.flatMap((group) => group.looks.map((look): [string, FilmLookBrowserItem] => [look.id, look]))),
@@ -156,7 +160,7 @@ export default function FilmLookBrowser({ onApplyLook }: FilmLookBrowserProps) {
 
                 return (
                   <div
-                    className={`flex h-32 min-w-40 max-w-40 flex-col rounded-md border p-2 transition-colors ${
+                    className={`flex h-36 min-w-40 max-w-40 flex-col rounded-md border p-2 transition-colors ${
                       isSelected
                         ? 'border-accent bg-surface text-text-primary'
                         : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface hover:text-text-primary'
@@ -185,7 +189,7 @@ export default function FilmLookBrowser({ onApplyLook }: FilmLookBrowserProps) {
                         </UiText>
                       </span>
                     </button>
-                    <div className="mt-2 grid grid-cols-2 gap-1">
+                    <div className="mt-2 grid grid-cols-4 gap-1">
                       {FILM_LOOK_COMPARE_SLOTS.map((slot) => {
                         const slotLabel = FILM_LOOK_COMPARE_SLOT_LABELS[slot];
                         const isPinned = comparisonSelection[slot] === look.id;
@@ -208,6 +212,28 @@ export default function FilmLookBrowser({ onApplyLook }: FilmLookBrowserProps) {
                           </button>
                         );
                       })}
+                      <button
+                        aria-label={formatFilmLookSaveLabel(look.displayName)}
+                        className="rounded bg-bg-tertiary px-2 py-1 text-text-secondary hover:bg-surface"
+                        data-tooltip={formatFilmLookSaveLabel(look.displayName)}
+                        onClick={() => {
+                          onSaveLook(look);
+                        }}
+                        type="button"
+                      >
+                        <Save size={13} aria-hidden="true" className="mx-auto" />
+                      </button>
+                      <button
+                        aria-label={formatFilmLookShareLabel(look.displayName)}
+                        className="rounded bg-bg-tertiary px-2 py-1 text-text-secondary hover:bg-surface"
+                        data-tooltip={formatFilmLookShareLabel(look.displayName)}
+                        onClick={() => {
+                          onShareLook(look);
+                        }}
+                        type="button"
+                      >
+                        <Share2 size={13} aria-hidden="true" className="mx-auto" />
+                      </button>
                     </div>
                   </div>
                 );
