@@ -91,6 +91,10 @@
           "path": "docs/negative-lab/preset-metadata-policy-schema-2026-06-13.md"
         },
         {
+          "title": "Negative Lab roll batch consistency workflow",
+          "path": "docs/negative-lab/roll-batch-consistency-workflow-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab measured-profile fixture format",
           "path": "docs/negative-lab/measured-profile-fixture-format-2026-06-13.md"
         },

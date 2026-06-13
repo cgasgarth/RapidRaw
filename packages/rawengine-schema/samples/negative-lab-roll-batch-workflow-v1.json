@@ -1,0 +1,104 @@
+{
+  "anchorFrameIds": ["frame_0001"],
+  "batchPolicy": {
+    "autoApplyEligible": false,
+    "baseStrategy": "roll_shared_base",
+    "includeRejectedFrames": false,
+    "maxPerFrameExposureDeltaEv": 0.25,
+    "maxWhiteBalanceDelta": 0.08,
+    "normalizationMode": "density_and_balance",
+    "preserveCreativeAdjustments": true
+  },
+  "expectedArtifactPurposes": [
+    "objective_positive_preview",
+    "base_sample_overlay",
+    "warning_report",
+    "parameter_diff",
+    "qc_contact_sheet"
+  ],
+  "frameSelection": {
+    "excludeFrameIds": [],
+    "frameIds": ["frame_0001"],
+    "mode": "selected",
+    "qcStatuses": ["needs_review", "approved_with_warnings"],
+    "warningCodes": ["lossy_input", "low_acquisition_confidence"]
+  },
+  "processFamily": "c41_color_negative",
+  "qcProofId": "negative_lab_qc_proof_roll_01",
+  "rollConsistencyPreview": {
+    "anchorFrameIds": ["frame_0001"],
+    "densityDeltaTolerance": 0.08,
+    "exposureDeltaToleranceEv": 0.25,
+    "frameMetrics": [
+      {
+        "densityDelta": 0,
+        "exposureDeltaEv": 0,
+        "frameId": "frame_0001",
+        "warningCodes": [],
+        "whiteBalanceDelta": 0,
+        "withinTolerance": true
+      }
+    ],
+    "metricVersion": 1,
+    "whiteBalanceDeltaTolerance": 0.08
+  },
+  "schemaVersion": 1,
+  "sessionId": "negative_roll_session_sample",
+  "stagePlans": [
+    {
+      "commandIds": [],
+      "dryRunPlanIds": [],
+      "requiredBeforeStages": ["base_fog_sampling"],
+      "stage": "frame_detection_review",
+      "status": "planned",
+      "warningCodes": ["frame_detection_low_confidence"]
+    },
+    {
+      "commandIds": ["command_negative_update_base_samples_roll_01"],
+      "commandType": "negativeLab.updateBaseSamples",
+      "dryRunPlanIds": [],
+      "requiredBeforeStages": ["conversion_recipe", "roll_normalization"],
+      "stage": "base_fog_sampling",
+      "status": "applied",
+      "warningCodes": []
+    },
+    {
+      "commandIds": ["command_negative_set_conversion_recipe_sample"],
+      "commandType": "negativeLab.setConversionRecipe",
+      "dryRunPlanIds": ["dry_run_plan_negative_conversion_sample"],
+      "requiredBeforeStages": ["roll_normalization", "positive_variant_creation"],
+      "stage": "conversion_recipe",
+      "status": "dry_run_ready",
+      "warningCodes": ["lossy_input", "low_acquisition_confidence"]
+    },
+    {
+      "commandIds": ["command_negative_plan_roll_normalization_roll_01"],
+      "commandType": "negativeLab.planRollNormalization",
+      "dryRunPlanIds": ["dry_run_plan_roll_normalization_roll_01"],
+      "requiredBeforeStages": ["positive_variant_creation", "qc_review"],
+      "stage": "roll_normalization",
+      "status": "dry_run_ready",
+      "warningCodes": []
+    },
+    {
+      "commandIds": ["command_negative_convert_frames_apply_sample"],
+      "commandType": "negativeLab.createPositiveVariant",
+      "dryRunPlanIds": ["dry_run_plan_negative_conversion_sample"],
+      "requiredBeforeStages": ["qc_review"],
+      "stage": "positive_variant_creation",
+      "status": "planned",
+      "warningCodes": ["lossy_input", "low_acquisition_confidence"]
+    },
+    {
+      "commandIds": ["command_negative_set_frame_qc_roll_01"],
+      "commandType": "negativeLab.setFrameQcStatus",
+      "dryRunPlanIds": [],
+      "requiredBeforeStages": [],
+      "stage": "qc_review",
+      "status": "planned",
+      "warningCodes": []
+    }
+  ],
+  "workflowId": "negative_lab_roll_batch_workflow_roll_01",
+  "workflowVersion": "2026-06-13"
+}
