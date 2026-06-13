@@ -230,6 +230,7 @@ fn hald_lut_size(width: u32, height: u32) -> Result<u32> {
     let is_square_hald = width == height;
     let is_vertical_strip = height == width.saturating_mul(width) && width == size;
     let is_horizontal_strip = width == height.saturating_mul(height) && height == size;
+    let strip_extent = size.saturating_mul(size);
 
     if !(is_square_hald || is_vertical_strip || is_horizontal_strip) {
         return Err(anyhow!(
@@ -237,8 +238,8 @@ fn hald_lut_size(width: u32, height: u32) -> Result<u32> {
             width,
             height,
             size,
-            size * size,
-            size * size,
+            strip_extent,
+            strip_extent,
             size
         ));
     }
