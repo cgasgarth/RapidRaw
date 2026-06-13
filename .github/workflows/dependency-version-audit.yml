@@ -1,0 +1,38 @@
+name: Dependency Version Audit
+
+on:
+  schedule:
+    - cron: '43 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  javascript-dependency-versions:
+    name: JavaScript dependency versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Audit JavaScript package versions
+        run: bun run deps:audit:js >> "$GITHUB_STEP_SUMMARY"
+
+  rust-dependency-versions:
+    name: Rust dependency versions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Audit Rust crate versions
+        run: bun run deps:audit:rust >> "$GITHUB_STEP_SUMMARY"
