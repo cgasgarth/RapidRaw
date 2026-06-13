@@ -30,6 +30,10 @@ import {
   negativeLabRollBatchWorkflowV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
+  projectLibraryCommandEnvelopeV1Schema,
+  projectLibraryMutationResultV1Schema,
+  projectLibrarySnapshotQueryV1Schema,
+  projectLibrarySnapshotV1Schema,
   queryEnvelopeV1Schema,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
@@ -65,6 +69,10 @@ import {
   sampleNegativeLabRollBatchWorkflowV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
+  sampleProjectLibraryCommandEnvelopeV1,
+  sampleProjectLibraryMutationResultV1,
+  sampleProjectLibrarySnapshotQueryV1,
+  sampleProjectLibrarySnapshotV1,
   sampleQueryEnvelopeV1,
   sampleRawEngineAppServerToolCallValidationV1,
   sampleToolRegistryV1,
@@ -99,6 +107,26 @@ const validSamples: ReadonlyArray<{
     name: 'app-server tool call validation',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleRawEngineAppServerToolCallValidationV1,
+  },
+  {
+    name: 'project library snapshot query',
+    schema: projectLibrarySnapshotQueryV1Schema,
+    value: sampleProjectLibrarySnapshotQueryV1,
+  },
+  {
+    name: 'project library snapshot',
+    schema: projectLibrarySnapshotV1Schema,
+    value: sampleProjectLibrarySnapshotV1,
+  },
+  {
+    name: 'project library command envelope',
+    schema: projectLibraryCommandEnvelopeV1Schema,
+    value: sampleProjectLibraryCommandEnvelopeV1,
+  },
+  {
+    name: 'project library mutation result',
+    schema: projectLibraryMutationResultV1Schema,
+    value: sampleProjectLibraryMutationResultV1,
   },
   {
     name: 'panorama artifact',
@@ -296,6 +324,27 @@ expectInvalid('app-server tool call with mismatched dryRun flag', rawEngineAppSe
     ...sampleRawEngineAppServerToolCallValidationV1.toolCall,
     dryRun: false,
   },
+});
+
+expectInvalid('project library command without approved apply state', projectLibraryCommandEnvelopeV1Schema, {
+  ...sampleProjectLibraryCommandEnvelopeV1,
+  approval: {
+    ...sampleProjectLibraryCommandEnvelopeV1.approval,
+    state: 'pending',
+  },
+});
+
+expectInvalid('project library command with wrong approval class', projectLibraryCommandEnvelopeV1Schema, {
+  ...sampleProjectLibraryCommandEnvelopeV1,
+  approval: {
+    ...sampleProjectLibraryCommandEnvelopeV1.approval,
+    approvalClass: 'edit_apply',
+  },
+});
+
+expectInvalid('project library mutation result missing revision', projectLibraryMutationResultV1Schema, {
+  ...sampleProjectLibraryMutationResultV1,
+  resultingLibraryRevision: undefined,
 });
 
 const invalidFilmLookCatalog = {

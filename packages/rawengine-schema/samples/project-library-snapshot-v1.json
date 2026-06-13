@@ -1,0 +1,70 @@
+{
+  "activeAlbumId": "album_selects",
+  "albums": [
+    {
+      "children": [
+        {
+          "icon": "star",
+          "id": "album_selects",
+          "images": ["/photos/session/IMG_0001.CR3", "/photos/session/IMG_0002.CR3"],
+          "name": "Client Selects",
+          "type": "album"
+        }
+      ],
+      "icon": "folder-heart",
+      "id": "group_client",
+      "name": "Client",
+      "type": "group"
+    }
+  ],
+  "currentFolderPath": "/photos/session",
+  "filterCriteria": {
+    "colors": ["green"],
+    "editedStatus": "all",
+    "rating": 3,
+    "rawStatus": "rawOnly"
+  },
+  "folders": [
+    {
+      "children": [
+        {
+          "children": [],
+          "hasSubdirs": false,
+          "imageCount": 2,
+          "isDir": true,
+          "name": "selects",
+          "path": "/photos/session/selects"
+        }
+      ],
+      "hasSubdirs": true,
+      "imageCount": 2,
+      "isDir": true,
+      "name": "session",
+      "path": "/photos/session"
+    }
+  ],
+  "imageList": [
+    {
+      "exif": {
+        "ISO": "400",
+        "LensModel": "Sample 50mm"
+      },
+      "isEdited": true,
+      "isVirtualCopy": false,
+      "modified": 1717351200,
+      "path": "/photos/session/IMG_0001.CR3",
+      "rating": 4,
+      "tags": ["select", "portrait"]
+    }
+  ],
+  "libraryActivePath": "/photos/session/IMG_0001.CR3",
+  "multiSelectedPaths": ["/photos/session/IMG_0001.CR3"],
+  "pinnedFolders": [],
+  "rootPaths": ["/photos/session"],
+  "schemaVersion": 1,
+  "sortCriteria": {
+    "key": "rating",
+    "label": "Rating",
+    "order": "desc"
+  }
+}

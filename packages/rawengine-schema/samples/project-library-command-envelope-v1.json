@@ -1,0 +1,27 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_project_library_sample"
+  },
+  "approval": {
+    "approvalClass": "file_mutation",
+    "reason": "Adding selected images to a project album mutates the local album sidecar.",
+    "state": "approved"
+  },
+  "commandId": "command_project_library_add_images_sample",
+  "correlationId": "corr_project_library_add_images_sample",
+  "dryRun": false,
+  "expectedLibraryRevision": "library_rev_12",
+  "idempotencyKey": "idem_project_library_add_images_sample",
+  "schemaVersion": 1,
+  "target": {
+    "id": "project_local_library",
+    "kind": "project"
+  },
+  "commandType": "project.library.addImagesToAlbum",
+  "parameters": {
+    "albumId": "album_selects",
+    "imagePaths": ["/photos/session/IMG_0001.CR3"]
+  }
+}
