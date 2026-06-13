@@ -1679,6 +1679,7 @@ Negative lab ADRs:
 - `ADR-NEG-013: Synthetic negative generator and numeric quality gates`
 - `ADR-NEG-014: App-server safety model, file scope, dry-run, and rollback`
 - `ADR-NEG-015: Acquisition fixture manifest and provenance contract`
+  ([draft policy](docs/negative-lab/fixture-licensing-provenance-policy-2026-06-13.md))
 - `ADR-NEG-016: Named stock-profile measurement methodology and claims policy`
 - `ADR-NEG-017: Dedicated Negative Lab UI workflow architecture`
 - `ADR-NEG-018: Negative Lab performance budgets and macOS benchmark matrix`

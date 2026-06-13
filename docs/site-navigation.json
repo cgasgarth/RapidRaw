@@ -55,6 +55,10 @@
           "path": "docs/negative-lab/preset-naming-legal-policy-2026-06-13.md"
         },
         {
+          "title": "Negative Lab fixture licensing and provenance policy",
+          "path": "docs/negative-lab/fixture-licensing-provenance-policy-2026-06-13.md"
+        },
+        {
           "title": "Architecture baseline",
           "path": "docs/baseline/rapidraw-architecture-baseline-2026-06-11.md"
         },
