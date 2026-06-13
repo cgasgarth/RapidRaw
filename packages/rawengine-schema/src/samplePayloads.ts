@@ -163,7 +163,13 @@ export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Sc
     qualityTier: 'legacy_local_preview',
   },
   exposureNormalization: {
+    deferredReason: 'Current panorama runtime records planned exposure normalization but does not apply it yet.',
     mode: 'planned',
+    overlapMetrics: {
+      channelRatioDeltaBefore: 0.09,
+      medianLogLuminanceDeltaBefore: 0.14,
+    },
+    support: 'schema_only_deferred',
   },
   lensCorrectionPolicy: 'required_before_stitch',
   operationId: 'merge.panorama.create',

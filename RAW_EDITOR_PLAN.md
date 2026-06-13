@@ -4660,7 +4660,8 @@ Issues:
   `docs/panorama/projection-options-2026-06-13.md`.
 - Add auto crop/boundary controls. Initial contract captured in
   `docs/panorama/boundary-controls-2026-06-13.md`.
-- Add exposure normalization.
+- Add exposure normalization. Initial contract captured in
+  `docs/panorama/exposure-normalization-2026-06-13.md`.
 - Add multi-row support audit. Initial audit captured in
   `docs/panorama/multi-row-support-audit-2026-06-13.md`.
 - Add large panorama tiling strategy. Initial strategy captured in
