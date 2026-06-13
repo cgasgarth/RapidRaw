@@ -192,6 +192,26 @@
       },
       {
         "approvalClass": "preview_only",
+        "inputSchemaName": "ExportCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "ExportDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "export.dry_run_command"
+      },
+      {
+        "approvalClass": "file_mutation",
+        "inputSchemaName": "ExportCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "ExportApplyResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": true,
+        "toolKind": "export",
+        "toolName": "export.write_files"
+      },
+      {
+        "approvalClass": "preview_only",
         "inputSchemaName": "NegativeLabCommandEnvelopeV1",
         "mutates": false,
         "outputSchemaName": "NegativeLabDryRunResultV1",

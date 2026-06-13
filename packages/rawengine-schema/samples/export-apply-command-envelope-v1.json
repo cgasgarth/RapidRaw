@@ -1,0 +1,39 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_export_sample"
+  },
+  "approval": {
+    "approvalClass": "file_mutation",
+    "reason": "Write the accepted export plan to the selected output folder.",
+    "recordId": "approval_export_write_001",
+    "state": "approved"
+  },
+  "commandId": "command_export_write_sample",
+  "commandType": "export.writeFiles",
+  "correlationId": "corr_export_sample",
+  "dryRun": false,
+  "expectedGraphRevision": "graph_rev_44",
+  "idempotencyKey": "idem_export_write_sample",
+  "parameters": {
+    "acceptedExportPlanHash": "sha256:sample-export-plan",
+    "acceptedExportPlanId": "export_plan_001",
+    "bitDepth": 8,
+    "colorSpace": "display_p3",
+    "destinationDirectory": "/Users/photographer/Pictures/RawEngine Exports",
+    "fileNamePattern": "{captureDate}/{baseName}-rawengine-{variant}",
+    "format": "jpeg",
+    "includeMetadata": true,
+    "jpegQuality": 92,
+    "maxLongEdgePx": 4096,
+    "outputSharpening": "screen",
+    "resizeMode": "fit_long_edge"
+  },
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image",
+    "virtualCopyId": "vc_final_color_grade"
+  }
+}
