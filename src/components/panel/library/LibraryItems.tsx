@@ -1,3 +1,5 @@
+import clsx from 'clsx';
+import { Image as ImageIcon, Folder, FolderOpen, Star as StarIcon, SlidersHorizontal } from 'lucide-react';
 import {
   memo,
   useState,
@@ -10,17 +12,17 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
-import { Image as ImageIcon, Folder, FolderOpen, Star as StarIcon, SlidersHorizontal } from 'lucide-react';
-import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
+
+import { useProcessStore } from '../../../store/useProcessStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
+import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import { ThumbnailAspectRatio, type ImageFile, ExifOverlay } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
-import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
-import type { ColumnWidths } from '../MainLibrary';
-import { useProcessStore } from '../../../store/useProcessStore';
-import { useSettingsStore } from '../../../store/useSettingsStore';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
+
+import type { ColumnWidths } from '../MainLibrary';
 
 interface ImageLayer {
   id: string;

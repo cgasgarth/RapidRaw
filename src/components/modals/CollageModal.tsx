@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
 import {
   CheckCircle,
   XCircle,
@@ -15,17 +14,19 @@ import {
   RectangleVertical,
   Palette,
 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { useModalTransition } from '../../hooks/useModalTransition';
+import { TextVariants } from '../../types/typography';
+import { type Adjustments } from '../../utils/adjustments';
+import { createBlobFromUint8Array } from '../../utils/blobUtils';
+import { LAYOUTS, type Layout, type LayoutDefinition } from '../../utils/CollageVariants';
 import { ImageFile, Invokes } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
-import clsx from 'clsx';
-import { LAYOUTS, type Layout, type LayoutDefinition } from '../../utils/CollageVariants';
-import { createBlobFromUint8Array } from '../../utils/blobUtils';
 import Text from '../ui/Text';
-import { TextVariants } from '../../types/typography';
-import { type Adjustments } from '../../utils/adjustments';
-import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface CollageModalProps {
   isOpen: boolean;

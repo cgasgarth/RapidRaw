@@ -1,15 +1,16 @@
-import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
-import { useEditorStore } from '../store/useEditorStore';
-import { useUIStore } from '../store/useUIStore';
-import { useSettingsStore } from '../store/useSettingsStore';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
-import { Invokes, Panel } from '../components/ui/AppProperties';
+import React, { useCallback, useEffect, useRef, useMemo } from 'react';
+
 import { debouncedSave } from './useEditorActions';
-import { globalImageCache } from '../utils/ImageLRUCache';
+import { Invokes, Panel } from '../components/ui/AppProperties';
 import { prepareAdjustmentPayloadForBackend } from '../schemas/adjustmentPayloadSchemas';
+import { useEditorStore } from '../store/useEditorStore';
+import { useLibraryStore } from '../store/useLibraryStore';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { useUIStore } from '../store/useUIStore';
+import { Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
+import { globalImageCache } from '../utils/ImageLRUCache';
 
 interface PreviousAdjustments {
   adjustments: Adjustments;

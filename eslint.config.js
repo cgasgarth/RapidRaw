@@ -141,7 +141,14 @@ module.exports = [
       // the current module graph is measured and split into focused PRs.
       'import-x/no-named-as-default': 'off',
       'import-x/no-named-as-default-member': 'error',
-      'import-x/order': 'off',
+      'import-x/order': [
+        'error',
+        {
+          groups: ['builtin', 'external', 'internal', ['parent', 'sibling', 'index'], 'object', 'type'],
+          alphabetize: { order: 'asc', caseInsensitive: true },
+          'newlines-between': 'always',
+        },
+      ],
       'import-x/no-cycle': 'off',
       'boundaries/element-types': 'error',
       'boundaries/entry-point': 'error',

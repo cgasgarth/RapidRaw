@@ -1,5 +1,5 @@
-import { forwardRef, type InputHTMLAttributes } from 'react';
 import clsx from 'clsx';
+import { forwardRef, type InputHTMLAttributes } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   bgClassName?: string;

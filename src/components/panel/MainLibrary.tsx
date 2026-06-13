@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-shell';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle,
   Check,
@@ -14,10 +14,12 @@ import {
   Users,
   SlidersHorizontal,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import Button from '../ui/Button';
+
 import SettingsPanel from './SettingsPanel';
+import { useLibraryStore } from '../../store/useLibraryStore';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import {
   AppSettings,
@@ -30,11 +32,9 @@ import {
   EditedStatus,
   Theme,
 } from '../ui/AppProperties';
+import Button from '../ui/Button';
 import { ImportState, Status } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
-import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { useLibraryStore } from '../../store/useLibraryStore';
-
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 

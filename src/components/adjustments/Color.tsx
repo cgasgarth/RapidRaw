@@ -1,9 +1,9 @@
-import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
-import { Pipette, Sliders } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Pipette, Sliders } from 'lucide-react';
+import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Slider from '../ui/Slider';
-import ColorWheel from '../ui/ColorWheel';
+
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
   Adjustments,
   ColorAdjustment,
@@ -13,8 +13,9 @@ import {
   INITIAL_ADJUSTMENTS,
 } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
+import ColorWheel from '../ui/ColorWheel';
+import Slider from '../ui/Slider';
 import Text from '../ui/Text';
-import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 interface ColorProps {
   color: string;

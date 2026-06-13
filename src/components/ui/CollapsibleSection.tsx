@@ -1,3 +1,5 @@
+import clsx from 'clsx';
+import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 import {
   useRef,
   useEffect,
@@ -7,9 +9,8 @@ import {
   type MouseEventHandler,
   type ReactNode,
 } from 'react';
-import { ChevronDown, Eye, EyeOff } from 'lucide-react';
-import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
+
 import Text from './Text';
 import { TextVariants, TextWeights } from '../../types/typography';
 

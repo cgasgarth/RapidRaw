@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
 import { platform } from '@tauri-apps/plugin-os';
+import { useMemo } from 'react';
 
 export function useOsPlatform() {
   return useMemo(() => {

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+
 import { ImageFile, Panel, UiVisibility, CullingSuggestions } from '../components/ui/AppProperties';
 
 const RIGHT_PANEL_ORDER = [

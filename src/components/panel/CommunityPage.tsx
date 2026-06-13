@@ -1,16 +1,17 @@
-import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowLeft, CheckCircle2, Loader2, Search, Users } from 'lucide-react';
-import { siGithub } from 'simple-icons';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, CheckCircle2, Loader2, Search, Users } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import Button from '../ui/Button';
-import Input from '../ui/Input';
-import { Invokes, SupportedTypes, ImageFile } from '../ui/AppProperties';
-import { Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
-import Text from '../ui/Text';
+import { siGithub } from 'simple-icons';
+
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import { Invokes, SupportedTypes, ImageFile } from '../ui/AppProperties';
+import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
+import Input from '../ui/Input';
+import Text from '../ui/Text';
 
 const DEFAULT_PREVIEW_IMAGE_URL = 'https://raw.githubusercontent.com/CyberTimon/RapidRAW-Presets/main/sample-image.jpg';
 

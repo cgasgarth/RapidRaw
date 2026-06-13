@@ -1,3 +1,5 @@
+import debounce from 'lodash.debounce';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import React, {
   useState,
   useEffect,
@@ -7,12 +9,14 @@ import React, {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
-import { List, useListCallbackRef } from 'react-window';
-import { ChevronUp, ChevronDown } from 'lucide-react';
-import debounce from 'lodash.debounce';
 import { useTranslation } from 'react-i18next';
+import { List, useListCallbackRef } from 'react-window';
+
 import { Row, type LibraryRow, type LibraryRowProps } from './LibraryItems';
 import { useLibraryStore } from '../../../store/useLibraryStore';
+import { useProcessStore } from '../../../store/useProcessStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
+import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import {
   ExifOverlay,
   LibraryViewMode,
@@ -23,9 +27,7 @@ import {
   type ThumbnailAspectRatio,
 } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
-import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
-import { useProcessStore } from '../../../store/useProcessStore';
-import { useSettingsStore } from '../../../store/useSettingsStore';
+
 import type { ColumnWidths } from '../MainLibrary';
 
 type ColumnWidthKey = keyof ColumnWidths;

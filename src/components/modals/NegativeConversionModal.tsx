@@ -1,17 +1,18 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { useTranslation, Trans } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { RotateCcw, ZoomIn, ZoomOut, Maximize, Save, Loader2, Eye, EyeOff, Info } from 'lucide-react';
+import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
+import throttle from 'lodash.throttle';
+import { RotateCcw, ZoomIn, ZoomOut, Maximize, Save, Loader2, Eye, EyeOff, Info } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
+
+import { useModalTransition } from '../../hooks/useModalTransition';
+import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
+import { TextColors, TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
-import clsx from 'clsx';
-import throttle from 'lodash.throttle';
 import Text from '../ui/Text';
-import { TextColors, TextVariants } from '../../types/typography';
-import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
-import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface NegativeParams {
   red_weight: number;

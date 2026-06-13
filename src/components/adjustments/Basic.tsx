@@ -1,10 +1,11 @@
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
 import clsx from 'clsx';
-import Slider from '../ui/Slider';
-import { Adjustments, BasicAdjustment } from '../../utils/adjustments';
+import { motion } from 'framer-motion';
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { Adjustments, BasicAdjustment } from '../../utils/adjustments';
 import { type AppSettings } from '../ui/AppProperties';
+import Slider from '../ui/Slider';
 
 interface BasicAdjustmentsProps {
   adjustments: Adjustments;

@@ -1,15 +1,16 @@
+import { listen } from '@tauri-apps/api/event';
+import { motion } from 'framer-motion';
+import { CheckCircle, XCircle, Loader2, Save, RefreshCw, ZoomIn, ZoomOut, Move, Grip } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, XCircle, Loader2, Save, RefreshCw, ZoomIn, ZoomOut, Move, Grip } from 'lucide-react';
-import { motion } from 'framer-motion';
+
+import { useModalTransition } from '../../hooks/useModalTransition';
+import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Slider from '../ui/Slider';
 import Text from '../ui/Text';
-import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { listen } from '@tauri-apps/api/event';
-import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
-import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface DenoiseModalProps {
   isOpen: boolean;

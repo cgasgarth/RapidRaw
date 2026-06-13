@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { AlertOctagon } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { WaveformData } from '../../ui/AppProperties';
+
 import { DisplayMode } from '../../../utils/adjustments';
+import { WaveformData } from '../../ui/AppProperties';
+
 import type { ChannelConfig } from '../../adjustments/Curves';
 
 interface WaveformProps {

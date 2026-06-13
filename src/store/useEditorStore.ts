@@ -1,10 +1,11 @@
 import { create } from 'zustand';
-import { Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, MaskContainer } from '../utils/adjustments';
-import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
+
 import { ChannelConfig } from '../components/adjustments/Curves';
-import { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
-import { ToolType } from '../components/panel/right/Masks';
 import { OverlayMode } from '../components/panel/right/CropPanel';
+import { ToolType } from '../components/panel/right/Masks';
+import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
+import { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
+import { Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, MaskContainer } from '../utils/adjustments';
 
 export interface InteractivePatch {
   url: string;

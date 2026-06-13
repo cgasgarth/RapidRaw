@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import type { JsonValue } from '../utils/adjustments';
 
 const jsonPrimitiveSchema = z.union([z.boolean(), z.null(), z.number(), z.string()]);

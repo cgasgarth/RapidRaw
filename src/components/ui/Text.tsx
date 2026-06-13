@@ -1,5 +1,6 @@
-import { forwardRef, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
 import clsx from 'clsx';
+import { forwardRef, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
+
 import {
   TextWeight,
   TextColor,

@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
-import { Star, Copy, ClipboardPaste, ChevronUp, ChevronDown, Check, FileInput, Settings } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useShallow } from 'zustand/react/shallow';
+import { Star, Copy, ClipboardPaste, ChevronUp, ChevronDown, Check, FileInput, Settings } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 
 import Filmstrip from './Filmstrip';
+import { useEditorStore } from '../../store/useEditorStore';
 import { GLOBAL_KEYS, ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import Text from '../ui/Text';
-import { useEditorStore } from '../../store/useEditorStore';
 
 interface BottomBarProps {
   filmstripHeight?: number;

@@ -1,20 +1,21 @@
-import { useState, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Check, ChevronDown, ChevronRight, Plus, Star, Tag, X, User } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
-import { Invokes } from '../../ui/AppProperties';
-import { COLOR_LABELS, Color } from '../../../utils/adjustments';
-import Text from '../../ui/Text';
-import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { IconAperture, IconShutter, IconIso, IconFocalLength, IconLens } from '../editor/ExifIcons';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { useLibraryStore } from '../../../store/useLibraryStore';
-import { useSettingsStore } from '../../../store/useSettingsStore';
-import { useProcessStore } from '../../../store/useProcessStore';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Check, ChevronDown, ChevronRight, Plus, Star, Tag, X, User } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { useLibraryStore } from '../../../store/useLibraryStore';
+import { useProcessStore } from '../../../store/useProcessStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
+import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { COLOR_LABELS, Color } from '../../../utils/adjustments';
+import { Invokes } from '../../ui/AppProperties';
+import Text from '../../ui/Text';
+import { IconAperture, IconShutter, IconIso, IconFocalLength, IconLens } from '../editor/ExifIcons';
 
 interface CameraSetting {
   format?(value: MetadataValue): string | number;

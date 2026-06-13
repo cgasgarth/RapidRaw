@@ -1,4 +1,5 @@
 import { type PointerEvent as ReactPointerEvent, useState, useCallback } from 'react';
+
 import { useEditorStore } from '../store/useEditorStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { DisplayMode } from '../utils/adjustments';

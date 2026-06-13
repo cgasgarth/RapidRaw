@@ -1,3 +1,6 @@
+import clsx from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronRight } from 'lucide-react';
 import {
   createContext,
   useCallback,
@@ -12,10 +15,8 @@ import {
   type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+
 import { OPTION_SEPARATOR, type Option as AppOption } from '../components/ui/AppProperties';
-import clsx from 'clsx';
 
 interface ContextMenuProviderProps {
   children: ReactNode;

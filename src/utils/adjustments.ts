@@ -1,7 +1,8 @@
 import { Crop } from 'react-image-crop';
 import { v4 as uuidv4 } from 'uuid';
-import { Mask, SubMask, SubMaskMode } from '../components/panel/right/Masks';
+
 import { toMaskParameterRecord } from './maskParameterAccess';
+import { Mask, SubMask, SubMaskMode } from '../components/panel/right/Masks';
 
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | Array<JsonValue>;
@@ -151,7 +152,7 @@ export interface ParametricCurve {
 }
 
 export interface Adjustments {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy adjustment setter props rely on this dynamic index accepting updater functions; tighten after setter contracts are typed.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy adjustment indexing is used by preset/copy-paste flows; replace with keyed helpers in a focused type-hardening PR.
   [index: string]: any;
   aiPatches: Array<AiPatch>;
   aspectRatio: number | null;
@@ -295,7 +296,7 @@ interface Hsl {
 }
 
 export interface MaskAdjustments {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Mask adjustments share the legacy dynamic adjustment map contract until mask setter props are typed.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy mask adjustment indexing mirrors Adjustments until mask-specific keyed helpers are introduced.
   [index: string]: any;
   blacks: number;
   brightness: number;

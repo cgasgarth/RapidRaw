@@ -1,4 +1,5 @@
-import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import clsx from 'clsx';
+import { motion } from 'framer-motion';
 import {
   Aperture,
   FlipHorizontal,
@@ -12,18 +13,18 @@ import {
   Scan,
   X,
 } from 'lucide-react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
-import clsx from 'clsx';
-import { Orientation } from '../../ui/AppProperties';
-import TransformModal from '../../modals/TransformModal';
-import LensCorrectionModal from '../../modals/LensCorrectionModal';
-import { motion } from 'framer-motion';
-import Text from '../../ui/Text';
-import Slider from '../../ui/Slider';
-import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { useEditorStore } from '../../../store/useEditorStore';
+
 import { useEditorActions } from '../../../hooks/useEditorActions';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import LensCorrectionModal from '../../modals/LensCorrectionModal';
+import TransformModal from '../../modals/TransformModal';
+import { Orientation } from '../../ui/AppProperties';
+import Slider from '../../ui/Slider';
+import Text from '../../ui/Text';
 
 const BASE_RATIO = 1.618;
 const ORIGINAL_RATIO = 0;

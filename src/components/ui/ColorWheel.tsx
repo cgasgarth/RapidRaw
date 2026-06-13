@@ -1,13 +1,14 @@
-import { useState, useRef, useEffect, useId } from 'react';
-import Slider, { type SliderChangeEvent } from './Slider';
-import Wheel from '@uiw/react-color-wheel';
 import { ColorResult, HsvaColor, hsvaToHex } from '@uiw/color-convert';
-import { Sun } from 'lucide-react';
-import { HueSatLum } from '../../utils/adjustments';
+import Wheel from '@uiw/react-color-wheel';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Sun } from 'lucide-react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import Slider, { type SliderChangeEvent } from './Slider';
 import Text from './Text';
 import { TextColors, TextVariants } from '../../types/typography';
+import { HueSatLum } from '../../utils/adjustments';
 
 interface ColorWheelProps {
   defaultValue: HueSatLum;

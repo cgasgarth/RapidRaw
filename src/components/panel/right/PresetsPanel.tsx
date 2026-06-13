@@ -1,17 +1,4 @@
 import {
-  type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
-  type ReactNode,
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-  useLayoutEffect,
-} from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
-import {
   DndContext,
   DragOverlay,
   PointerSensor,
@@ -22,9 +9,9 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { useTranslation } from 'react-i18next';
-import { PresetListType, usePresets, UserPreset } from '../../../hooks/usePresets';
-import { useContextMenu } from '../../../context/ContextMenuContext';
+import { invoke } from '@tauri-apps/api/core';
+import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   CopyPlus,
   Edit,
@@ -45,19 +32,33 @@ import {
   Palette,
   Settings2,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  useLayoutEffect,
+} from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { useContextMenu } from '../../../context/ContextMenuContext';
+import { useEditorActions } from '../../../hooks/useEditorActions';
+import { PresetListType, usePresets, UserPreset } from '../../../hooks/usePresets';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { useUIStore } from '../../../store/useUIStore';
+import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
+import { createBlobFromUint8Array } from '../../../utils/blobUtils';
 import ConfigurePresetModal from '../../modals/ConfigurePresetModal';
 import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
+import { Invokes, OPTION_SEPARATOR, Panel, type Folder, type Option, type Preset } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import Text from '../../ui/Text';
-import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
-import { Invokes, OPTION_SEPARATOR, Panel, type Folder, type Option, type Preset } from '../../ui/AppProperties';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { useUIStore } from '../../../store/useUIStore';
-import { useEditorActions } from '../../../hooks/useEditorActions';
-import { createBlobFromUint8Array } from '../../../utils/blobUtils';
 
 interface DroppableFolderItemProps {
   children: ReactNode;

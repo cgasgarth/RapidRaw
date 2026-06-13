@@ -14,6 +14,7 @@ element map for the current `src/` topology.
 The first gate enables rules that pass after small local cleanup:
 
 - `import-x/no-duplicates`
+- `import-x/order`
 - `import-x/no-self-import`
 - `import-x/no-useless-path-segments`
 - `boundaries/element-types`
@@ -32,13 +33,13 @@ focused follow-up PRs rather than hidden inside one large lint change.
 | ----: | ------------------------------------- | ---------------------------------- |
 |    77 | `import-x/no-named-as-default`        | #540 default export import naming  |
 |    21 | `import-x/no-named-as-default-member` | #544 React/i18n member imports     |
-|   TBD | `import-x/order`                      | #539 import ordering cleanup       |
 |    10 | `import-x/no-cycle`                   | #542 dependency cycle audit        |
 |   TBD | `boundaries/dependencies`             | #543 cross-layer dependency policy |
 |   516 | `boundaries/no-unknown`               | #543 element map completion        |
 |   516 | `boundaries/no-unknown-files`         | #543 element map completion        |
 
-The duplicate-import findings were fixed in this PR.
+The duplicate-import findings were fixed in the first PR. Import ordering was
+later promoted to a blocking lint rule after a mechanical import cleanup.
 
 ## Dependency Cycle Audit
 

@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+
 import Input from './Input';
 import Text from './Text';
-import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
-import clsx from 'clsx';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 export interface OptionItem<T extends React.Key> {
   label: string;

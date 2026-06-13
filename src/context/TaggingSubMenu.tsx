@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { X, Plus } from 'lucide-react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { X, Plus } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import { Invokes, type AppSettings } from '../components/ui/AppProperties';
 import Text from '../components/ui/Text';
 import { TextVariants } from '../types/typography';

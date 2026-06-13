@@ -1,4 +1,3 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -11,9 +10,15 @@ import {
   ChevronDown,
   HelpCircle,
 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
+
+import { ADVANCED_QUERY_REGEX } from '../../../hooks/useSortedLibrary';
 import { useLibraryStore } from '../../../store/useLibraryStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
+import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
+import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import {
   FilterCriteria,
   RawStatus,
@@ -26,12 +31,8 @@ import {
   ThumbnailAspectRatio,
   ThumbnailSize,
 } from '../../ui/AppProperties';
-import { COLOR_LABELS, Color } from '../../../utils/adjustments';
-import Text from '../../ui/Text';
-import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import Button from '../../ui/Button';
-import { useSettingsStore } from '../../../store/useSettingsStore';
-import { ADVANCED_QUERY_REGEX } from '../../../hooks/useSortedLibrary';
+import Text from '../../ui/Text';
 
 interface DropdownMenuProps {
   buttonContent: React.ReactNode;
