@@ -32,7 +32,7 @@ import {
   ThumbnailSize,
 } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
-import Text from '../../ui/Text';
+import UiText from '../../ui/Text';
 
 interface DropdownMenuProps {
   buttonContent: React.ReactNode;
@@ -299,7 +299,7 @@ export function SearchInput({ indexingProgress, isIndexing }: SearchInputProps) 
                   removeTag(tag);
                 }}
               >
-                <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                <UiText variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
                   {isQuery ? (
                     <span className="flex gap-0.5">
                       <span className="uppercase opacity-70">{match[1]}</span>
@@ -309,7 +309,7 @@ export function SearchInput({ indexingProgress, isIndexing }: SearchInputProps) 
                   ) : (
                     tag
                   )}
-                </Text>
+                </UiText>
                 <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
                   <X size={12} />
                 </span>
@@ -347,9 +347,9 @@ export function SearchInput({ indexingProgress, isIndexing }: SearchInputProps) 
             className="p-1.5 rounded-md hover:bg-bg-primary w-10 shrink-0 flex items-center justify-center outline-hidden"
             data-tooltip={mode === 'AND' ? t('library.header.search.matchAll') : t('library.header.search.matchAny')}
           >
-            <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.semibold}>
+            <UiText variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.semibold}>
               {mode}
-            </Text>
+            </UiText>
           </button>
         )}
         <div
@@ -468,9 +468,9 @@ export function ViewOptionsDropdown({
       <div className="library-view-options-content flex">
         <div className="library-view-options-section w-1/4 p-2 border-r border-border-color">
           <>
-            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+            <UiText as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
               {t('library.header.viewOptions.thumbnailSize')}
-            </Text>
+            </UiText>
             {thumbnailSizeOptions.map((option) => {
               const isSelected = thumbnailSize === option.id;
               return (
@@ -484,13 +484,13 @@ export function ViewOptionsDropdown({
                   }}
                   role="menuitem"
                 >
-                  <Text
+                  <UiText
                     variant={TextVariants.label}
                     color={TextColors.primary}
                     weight={isSelected ? TextWeights.semibold : TextWeights.normal}
                   >
                     {option.label}
-                  </Text>
+                  </UiText>
                   {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
                 </button>
               );
@@ -499,9 +499,14 @@ export function ViewOptionsDropdown({
 
           <div className="pt-2">
             <>
-              <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+              <UiText
+                as="div"
+                variant={TextVariants.small}
+                weight={TextWeights.semibold}
+                className="px-3 py-2 uppercase"
+              >
                 {t('library.header.viewOptions.thumbnailFit')}
-              </Text>
+              </UiText>
               {thumbnailAspectRatioOptions.map((option) => {
                 const isSelected = thumbnailAspectRatio === option.id;
                 return (
@@ -515,13 +520,13 @@ export function ViewOptionsDropdown({
                     }}
                     role="menuitem"
                   >
-                    <Text
+                    <UiText
                       variant={TextVariants.label}
                       color={TextColors.primary}
                       weight={isSelected ? TextWeights.semibold : TextWeights.normal}
                     >
                       {option.label}
-                    </Text>
+                    </UiText>
                     {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
                   </button>
                 );
@@ -531,9 +536,14 @@ export function ViewOptionsDropdown({
 
           <div className="pt-2">
             <>
-              <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+              <UiText
+                as="div"
+                variant={TextVariants.small}
+                weight={TextWeights.semibold}
+                className="px-3 py-2 uppercase"
+              >
                 {t('library.header.viewOptions.displayMode')}
-              </Text>
+              </UiText>
               <button
                 className={`w-full text-left px-3 py-2 rounded-md flex items-center justify-between transition-colors duration-150 ${
                   libraryViewMode === LibraryViewMode.Flat ? 'bg-card-active' : 'hover:bg-bg-primary'
@@ -543,13 +553,13 @@ export function ViewOptionsDropdown({
                 }}
                 role="menuitem"
               >
-                <Text
+                <UiText
                   variant={TextVariants.label}
                   color={TextColors.primary}
                   weight={libraryViewMode === LibraryViewMode.Flat ? TextWeights.semibold : TextWeights.normal}
                 >
                   {t('library.header.viewOptions.currentFolder')}
-                </Text>
+                </UiText>
                 {libraryViewMode === LibraryViewMode.Flat && (
                   <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />
                 )}
@@ -563,13 +573,13 @@ export function ViewOptionsDropdown({
                 }}
                 role="menuitem"
               >
-                <Text
+                <UiText
                   variant={TextVariants.label}
                   color={TextColors.primary}
                   weight={libraryViewMode === LibraryViewMode.Recursive ? TextWeights.semibold : TextWeights.normal}
                 >
                   {t('library.header.viewOptions.recursive')}
-                </Text>
+                </UiText>
                 {libraryViewMode === LibraryViewMode.Recursive && (
                   <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />
                 )}
@@ -578,9 +588,9 @@ export function ViewOptionsDropdown({
           </div>
 
           <div className="pt-2">
-            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+            <UiText as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
               {t('library.header.viewOptions.showMetadata')}
-            </Text>
+            </UiText>
             {metadataOptions.map((option) => {
               const isSelected = (appSettings?.exifOverlay || ExifOverlay.Off) === option.id;
               return (
@@ -594,13 +604,13 @@ export function ViewOptionsDropdown({
                     void handleSettingsChange({ ...appSettings, exifOverlay: option.id });
                   }}
                 >
-                  <Text
+                  <UiText
                     variant={TextVariants.label}
                     color={TextColors.primary}
                     weight={isSelected ? TextWeights.semibold : TextWeights.normal}
                   >
                     {option.label}
-                  </Text>
+                  </UiText>
                   {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
                 </button>
               );
@@ -611,9 +621,14 @@ export function ViewOptionsDropdown({
         <div className="library-view-options-section w-2/4 p-2 border-r border-border-color">
           <div className="space-y-4">
             <div>
-              <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+              <UiText
+                as="div"
+                variant={TextVariants.small}
+                weight={TextWeights.semibold}
+                className="px-3 py-2 uppercase"
+              >
                 {t('library.header.viewOptions.filterByRating')}
-              </Text>
+              </UiText>
 
               {ratingFilterOptions
                 .filter((option) => option.value <= 0)
@@ -630,13 +645,13 @@ export function ViewOptionsDropdown({
                       }}
                       role="menuitem"
                     >
-                      <Text
+                      <UiText
                         variant={TextVariants.label}
                         color={TextColors.primary}
                         weight={isSelected ? TextWeights.semibold : TextWeights.normal}
                       >
                         {option.label}
-                      </Text>
+                      </UiText>
                       {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
                     </button>
                   );
@@ -677,20 +692,25 @@ export function ViewOptionsDropdown({
                       );
                     })}
                   </div>
-                  <Text variant={TextVariants.label} color={TextColors.secondary}>
+                  <UiText variant={TextVariants.label} color={TextColors.secondary}>
                     {filterCriteria.rating === 5
                       ? t('library.filters.rating.onlySuffix')
                       : t('library.filters.rating.andUpSuffix')}
-                  </Text>
+                  </UiText>
                 </div>
                 {filterCriteria.rating > 0 && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
               </div>
             </div>
 
             <div>
-              <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+              <UiText
+                as="div"
+                variant={TextVariants.small}
+                weight={TextWeights.semibold}
+                className="px-3 py-2 uppercase"
+              >
                 {t('library.header.viewOptions.filterByFileType')}
-              </Text>
+              </UiText>
               {rawStatusOptions.map((option) => {
                 const isSelected = filterCriteria.rawStatus === option.key;
                 return (
@@ -704,13 +724,13 @@ export function ViewOptionsDropdown({
                     }}
                     role="menuitem"
                   >
-                    <Text
+                    <UiText
                       variant={TextVariants.label}
                       color={TextColors.primary}
                       weight={isSelected ? TextWeights.semibold : TextWeights.normal}
                     >
                       {option.label}
-                    </Text>
+                    </UiText>
                     {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
                   </button>
                 );
@@ -718,9 +738,14 @@ export function ViewOptionsDropdown({
             </div>
 
             <div>
-              <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+              <UiText
+                as="div"
+                variant={TextVariants.small}
+                weight={TextWeights.semibold}
+                className="px-3 py-2 uppercase"
+              >
                 {t('library.header.viewOptions.filterByEdited', 'Filter by Edit Status')}
-              </Text>
+              </UiText>
               {editedStatusOptions.map((option) => {
                 const isSelected = (filterCriteria.editedStatus || EditedStatus.All) === option.key;
                 return (
@@ -734,13 +759,13 @@ export function ViewOptionsDropdown({
                     }}
                     role="menuitem"
                   >
-                    <Text
+                    <UiText
                       variant={TextVariants.label}
                       color={TextColors.primary}
                       weight={isSelected ? TextWeights.semibold : TextWeights.normal}
                     >
                       {option.label}
-                    </Text>
+                    </UiText>
                     {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
                   </button>
                 );
@@ -751,9 +776,9 @@ export function ViewOptionsDropdown({
           <div className="py-2"></div>
 
           <div>
-            <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
+            <UiText as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="px-3 py-2 uppercase">
               {t('library.header.viewOptions.filterByColorLabel')}
-            </Text>
+            </UiText>
             <div className="flex flex-wrap gap-3 px-3 py-2">
               {allColors.map((color: Color) => {
                 const isSelected = filterCriteria.colors.includes(color.name);
@@ -791,9 +816,9 @@ export function ViewOptionsDropdown({
         <div className="library-view-options-section w-1/4 p-2">
           <>
             <div className="px-3 py-2 relative flex items-center">
-              <Text as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="uppercase">
+              <UiText as="div" variant={TextVariants.small} weight={TextWeights.semibold} className="uppercase">
                 {t('library.header.viewOptions.sortBy')}
-              </Text>
+              </UiText>
               <button
                 onClick={() => {
                   setSortCriteria((prev: SortCriteria) => ({
@@ -828,13 +853,13 @@ export function ViewOptionsDropdown({
                   disabled={option.disabled}
                   data-tooltip={option.disabled ? t('library.header.viewOptions.exifDisabledTooltip') : undefined}
                 >
-                  <Text
+                  <UiText
                     variant={TextVariants.label}
                     color={TextColors.primary}
                     weight={isSelected ? TextWeights.semibold : TextWeights.normal}
                   >
                     {option.label}
-                  </Text>
+                  </UiText>
                   {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
                 </button>
               );

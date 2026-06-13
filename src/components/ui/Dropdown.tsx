@@ -4,7 +4,7 @@ import { Check, ChevronDown } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 
 import Input from './Input';
-import Text from './Text';
+import UiText from './Text';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 
@@ -127,9 +127,9 @@ const Dropdown = <T extends React.Key>({
         onKeyDown={handleContainerKeyDown}
         type="button"
       >
-        <Text as="span" variant={TextVariants.label} color={TextColors.primary}>
+        <UiText as="span" variant={TextVariants.label} color={TextColors.primary}>
           {selectedOption ? selectedOption.label : placeholder}
-        </Text>
+        </UiText>
         <ChevronDown
           className={`${TEXT_COLOR_KEYS[TextColors.secondary]} transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           size={20}
@@ -182,9 +182,9 @@ const Dropdown = <T extends React.Key>({
                     role="option"
                     aria-selected={isSelected}
                   >
-                    <Text color={TextColors.primary} weight={isSelected ? TextWeights.semibold : TextWeights.normal}>
+                    <UiText color={TextColors.primary} weight={isSelected ? TextWeights.semibold : TextWeights.normal}>
                       {option.label}
-                    </Text>
+                    </UiText>
                     {isSelected && <Check size={16} className={TEXT_COLOR_KEYS[TextColors.primary]} />}
                   </button>
                 );

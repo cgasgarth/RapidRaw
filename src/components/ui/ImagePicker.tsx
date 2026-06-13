@@ -2,7 +2,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import Text from './Text';
+import UiText from './Text';
 import { TextVariants } from '../../types/typography';
 
 interface ImagePickerProps {
@@ -37,9 +37,9 @@ export default function ImagePicker({ imageName, onImageSelect, onClear, label }
   return (
     <div className="mb-2">
       <div className="flex justify-between items-center mb-1">
-        <Text variant={TextVariants.label} className="select-none">
+        <UiText variant={TextVariants.label} className="select-none">
           {label}
-        </Text>
+        </UiText>
         <div className="group flex items-center">
           <button
             onClick={() => {

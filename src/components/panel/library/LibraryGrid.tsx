@@ -26,7 +26,7 @@ import {
   type SortCriteria,
   type ThumbnailAspectRatio,
 } from '../../ui/AppProperties';
-import Text from '../../ui/Text';
+import UiText from '../../ui/Text';
 
 import type { ColumnWidths } from '../MainLibrary';
 
@@ -145,14 +145,14 @@ function HeaderColumn({
       role={sortKey ? 'button' : undefined}
       tabIndex={sortKey ? 0 : undefined}
     >
-      <Text
+      <UiText
         variant={TextVariants.small}
         weight={TextWeights.semibold}
         color={isSorted ? TextColors.primary : TextColors.secondary}
         className="uppercase tracking-wider text-[11px]"
       >
         {title}
-      </Text>
+      </UiText>
       {isSorted && (
         <span className={`ml-1 flex items-center ${TEXT_COLOR_KEYS[TextColors.primary]}`}>
           {isAsc ? <ChevronUp size={12} /> : <ChevronDown size={12} />}

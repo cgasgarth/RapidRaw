@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextVariants } from '../../types/typography';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface RenameFolderModalProps {
   currentName: string;
@@ -97,9 +97,9 @@ export default function RenameFolderModal({
         `}
         role="dialog"
       >
-        <Text variant={TextVariants.title} className="mb-4">
+        <UiText variant={TextVariants.title} className="mb-4">
           {title || t('modals.renameFolder.title')}
-        </Text>
+        </UiText>
         <input
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-hidden focus:ring-2 focus:ring-accent"
           onChange={(e: ChangeEvent<HTMLInputElement>) => {

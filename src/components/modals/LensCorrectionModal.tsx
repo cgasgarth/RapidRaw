@@ -27,7 +27,7 @@ import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface GeometryParams {
   distortion: number;
@@ -596,7 +596,7 @@ export default function LensCorrectionModal({
   const renderControls = () => (
     <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('modals.lensCorrection.title')}</Text>
+        <UiText variant={TextVariants.title}>{t('modals.lensCorrection.title')}</UiText>
         <button
           onClick={handleReset}
           data-tooltip={t('modals.lensCorrection.resetTooltip')}
@@ -643,9 +643,9 @@ export default function LensCorrectionModal({
 
         {params.lensCorrectionMode === 'auto' ? (
           <div>
-            <Text variant={TextVariants.heading} className="mb-2">
+            <UiText variant={TextVariants.heading} className="mb-2">
               {t('modals.lensCorrection.autoDetectStatus')}
-            </Text>
+            </UiText>
             <div className="space-y-3">
               <div
                 className={cx(
@@ -675,9 +675,9 @@ export default function LensCorrectionModal({
           </div>
         ) : (
           <div>
-            <Text variant={TextVariants.heading} className="mb-2">
+            <UiText variant={TextVariants.heading} className="mb-2">
               {t('modals.lensCorrection.manualSelection')}
-            </Text>
+            </UiText>
             <div className="space-y-4">
               <Dropdown
                 options={myLensOptions}
@@ -710,9 +710,9 @@ export default function LensCorrectionModal({
         )}
 
         <div>
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.lensCorrection.corrections')}
-          </Text>
+          </UiText>
 
           <div className="flex flex-col gap-4">
             <div>
@@ -722,9 +722,9 @@ export default function LensCorrectionModal({
                   availability.distortion ? 'bg-surface' : 'bg-surface/30',
                 )}
               >
-                <Text as="div" className="p-1.5 bg-bg-primary rounded-sm">
+                <UiText as="div" className="p-1.5 bg-bg-primary rounded-sm">
                   <SquareDashed size={16} />
-                </Text>
+                </UiText>
                 <Switch
                   className="grow"
                   label={t('modals.lensCorrection.distortion')}
@@ -767,9 +767,9 @@ export default function LensCorrectionModal({
                   availability.tca ? 'bg-surface' : 'bg-surface/30',
                 )}
               >
-                <Text as="div" className="p-1.5 bg-bg-primary rounded-sm">
+                <UiText as="div" className="p-1.5 bg-bg-primary rounded-sm">
                   <Activity size={16} />
-                </Text>
+                </UiText>
                 <Switch
                   className="grow"
                   label={t('modals.lensCorrection.chromaticAberration')}
@@ -812,9 +812,9 @@ export default function LensCorrectionModal({
                   availability.vignetting ? 'bg-surface' : 'bg-surface/30',
                 )}
               >
-                <Text as="div" className="p-1.5 bg-bg-primary rounded-sm">
+                <UiText as="div" className="p-1.5 bg-bg-primary rounded-sm">
                   <CircleDashed size={16} />
-                </Text>
+                </UiText>
                 <Switch
                   className="grow"
                   label={t('modals.lensCorrection.vignetting')}
@@ -854,16 +854,16 @@ export default function LensCorrectionModal({
 
         <div className="mt-auto space-y-2">
           {currentAdjustments.masks.length > 0 && (
-            <Text
+            <UiText
               as="div"
               variant={TextVariants.small}
               className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3"
             >
               <Info size={16} className="shrink-0" />
               <p className="leading-relaxed">{t('modals.lensCorrection.maskWarning')}</p>
-            </Text>
+            </UiText>
           )}
-          <Text
+          <UiText
             as="div"
             variant={TextVariants.small}
             className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3"
@@ -892,7 +892,7 @@ export default function LensCorrectionModal({
                 ).
               </Trans>
             </div>
-          </Text>
+          </UiText>
         </div>
       </div>
     </div>
@@ -925,14 +925,14 @@ export default function LensCorrectionModal({
                     draggable={false}
                   />
                   {isCompareActive && (
-                    <Text
+                    <UiText
                       as="div"
                       variant={TextVariants.small}
                       color={TextColors.button}
                       className="absolute top-4 left-4 bg-accent px-2 py-1 rounded-sm shadow-lg z-20"
                     >
                       {t('modals.lensCorrection.original')}
-                    </Text>
+                    </UiText>
                   )}
                 </div>
               </div>

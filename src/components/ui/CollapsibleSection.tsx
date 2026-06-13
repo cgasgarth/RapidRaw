@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import Text from './Text';
+import UiText from './Text';
 import { TextVariants, TextWeights } from '../../types/typography';
 
 interface CollapsibleSectionProps {
@@ -110,9 +110,9 @@ export default function CollapsibleSection({
         tabIndex={0}
       >
         <div className="flex items-center gap-2">
-          <Text variant={TextVariants.title} weight={TextWeights.normal}>
+          <UiText variant={TextVariants.title} weight={TextWeights.normal}>
             {title}
-          </Text>
+          </UiText>
           {canToggleVisibility && (
             <div className="w-6 h-6 flex items-center justify-center">
               <button

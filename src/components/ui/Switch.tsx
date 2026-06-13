@@ -1,7 +1,7 @@
 import cx from 'clsx';
 import { motion } from 'framer-motion';
 
-import Text from './Text';
+import UiText from './Text';
 import { TextVariants } from '../../types/typography';
 
 import type { ChangeEvent } from 'react';
@@ -54,9 +54,9 @@ const Switch = ({
       htmlFor={uniqueId}
       data-tooltip={tooltip}
     >
-      <Text variant={TextVariants.label} className="select-none">
+      <UiText variant={TextVariants.label} className="select-none">
         {label}
-      </Text>
+      </UiText>
       <div className="relative w-10 h-5">
         <input
           checked={checked}

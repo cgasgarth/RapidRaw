@@ -11,7 +11,7 @@ import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface CullingModalProps {
   isOpen: boolean;
@@ -58,14 +58,14 @@ function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: Im
       />
       <div className="absolute top-2 right-2">{isSelected && <CheckCircle size={16} className="text-accent" />}</div>
       {children && (
-        <Text
+        <UiText
           as="div"
           variant={TextVariants.small}
           color={TextColors.white}
           className="absolute bottom-0 left-0 right-0 p-1 bg-black/60"
         >
           {children}
-        </Text>
+        </UiText>
       )}
     </button>
   );
@@ -176,9 +176,9 @@ export default function CullingModal({
       <div className="flex items-center justify-center mb-4">
         <Users className="w-12 h-12 text-accent" />
       </div>
-      <Text variant={TextVariants.title} className="mb-6 text-center">
+      <UiText variant={TextVariants.title} className="mb-6 text-center">
         {t('modals.culling.title')}
-      </Text>
+      </UiText>
       <div className="space-y-6 text-sm">
         <div>
           <Switch
@@ -202,9 +202,9 @@ export default function CullingModal({
                 }}
                 fillOrigin="min"
               />
-              <Text variant={TextVariants.small} className="mt-1">
+              <UiText variant={TextVariants.small} className="mt-1">
                 {t('modals.culling.similarityThresholdDesc')}
-              </Text>
+              </UiText>
             </div>
           )}
         </div>
@@ -230,9 +230,9 @@ export default function CullingModal({
                 }}
                 fillOrigin="min"
               />
-              <Text variant={TextVariants.small} className="mt-1">
+              <UiText variant={TextVariants.small} className="mt-1">
                 {t('modals.culling.blurThresholdDesc')}
-              </Text>
+              </UiText>
             </div>
           )}
         </div>
@@ -275,10 +275,10 @@ export default function CullingModal({
       return (
         <div className="flex flex-col items-center justify-center h-48">
           <XCircle className="w-16 h-16 text-red-500" />
-          <Text variant={TextVariants.heading} className="mt-4 text-center">
+          <UiText variant={TextVariants.heading} className="mt-4 text-center">
             {t('modals.culling.cullingFailed')}
-          </Text>
-          <Text>{error}</Text>
+          </UiText>
+          <UiText>{error}</UiText>
           <div className="mt-6">
             <Button onClick={onClose}>{t('modals.culling.close')}</Button>
           </div>
@@ -293,10 +293,10 @@ export default function CullingModal({
       return (
         <div className="flex flex-col items-center justify-center h-48">
           <CheckCircle className="w-16 h-16 text-green-500" />
-          <Text variant={TextVariants.heading} className="mt-4">
+          <UiText variant={TextVariants.heading} className="mt-4">
             {t('modals.culling.noIssuesFound')}
-          </Text>
-          <Text>{t('modals.culling.noIssuesDesc')}</Text>
+          </UiText>
+          <UiText>{t('modals.culling.noIssuesDesc')}</UiText>
           <div className="mt-6">
             <Button onClick={onClose}>{t('modals.culling.done')}</Button>
           </div>
@@ -306,9 +306,9 @@ export default function CullingModal({
 
     return (
       <>
-        <Text variant={TextVariants.title} className="mb-4">
+        <UiText variant={TextVariants.title} className="mb-4">
           {t('modals.culling.cullingSuggestions')}
-        </Text>
+        </UiText>
         <div className="border-b border-surface mb-4">
           <nav className="-mb-px flex space-x-4" aria-label={t('modals.culling.tabs')}>
             {numSimilar > 0 && (
@@ -357,34 +357,34 @@ export default function CullingModal({
                 <div className="space-y-4">
                   {suggestions.similarGroups.map((group, index) => (
                     <div key={index} className="bg-surface rounded-lg p-3">
-                      <Text variant={TextVariants.heading} className="mb-2">
+                      <UiText variant={TextVariants.heading} className="mb-2">
                         {t('modals.culling.groupHeader', { index: index + 1 })}
-                      </Text>
+                      </UiText>
                       <div className="grid grid-cols-[1fr_3fr] gap-3">
                         <div>
-                          <Text variant={TextVariants.label} className="mb-1">
+                          <UiText variant={TextVariants.label} className="mb-1">
                             {t('modals.culling.bestImage')}
-                          </Text>
+                          </UiText>
                           <div className="relative rounded-md overflow-hidden border-2 border-green-500">
                             <img
                               src={thumbnails[group.representative.path]}
                               alt={t('modals.culling.representative')}
                               className="w-full h-full object-cover"
                             />
-                            <Text
+                            <UiText
                               as="div"
                               variant={TextVariants.small}
                               color={TextColors.white}
                               className="absolute bottom-0 left-0 right-0 p-1 bg-black/60"
                             >
                               {t('modals.culling.score', { score: group.representative.qualityScore.toFixed(2) })}
-                            </Text>
+                            </UiText>
                           </div>
                         </div>
                         <div>
-                          <Text variant={TextVariants.label} className="mb-1">
+                          <UiText variant={TextVariants.label} className="mb-1">
                             {t('modals.culling.duplicatesHeader', { count: group.duplicates.length })}
-                          </Text>
+                          </UiText>
                           <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                             {group.duplicates.map((dup) => (
                               <ImageThumbnail

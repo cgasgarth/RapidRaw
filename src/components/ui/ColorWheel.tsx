@@ -6,7 +6,7 @@ import { useState, useRef, useEffect, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Slider, { type SliderChangeEvent } from './Slider';
-import Text from './Text';
+import UiText from './Text';
 import { TextColors, TextVariants } from '../../types/typography';
 import { HueSatLum } from '../../utils/adjustments';
 
@@ -189,16 +189,16 @@ const ColorWheel = ({
         }}
         type="button"
       >
-        <Text
+        <UiText
           variant={TextVariants.label}
           className={`absolute inset-0 flex items-center justify-center whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
             !isDragging && !isLabelHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
           {label}
-        </Text>
+        </UiText>
 
-        <Text
+        <UiText
           variant={TextVariants.label}
           color={TextColors.primary}
           className={`absolute inset-0 flex items-center justify-center whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
@@ -206,9 +206,9 @@ const ColorWheel = ({
           }`}
         >
           {t('ui.colorWheel.reset')}
-        </Text>
+        </UiText>
 
-        <Text
+        <UiText
           as="div"
           variant={TextVariants.label}
           className={`absolute inset-0 flex items-center justify-center gap-2 whitespace-nowrap select-none transition-opacity duration-200 ease-in-out ${
@@ -224,7 +224,7 @@ const ColorWheel = ({
             <span className="font-bold">{t('ui.colorWheel.saturationAbbreviation')}</span>
             <span className="w-6 text-right">{Math.round(saturation)}</span>
           </div>
-        </Text>
+        </UiText>
       </button>
 
       <div ref={sizerRef} className="relative w-full aspect-square">

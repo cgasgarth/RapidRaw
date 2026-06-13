@@ -34,7 +34,7 @@ import {
 } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import { ImportState, Status } from '../ui/ExportImportProperties';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 
@@ -287,8 +287,8 @@ export default function MainLibrary(props: MainLibraryProps) {
               ) : (
                 <>
                   <div className="my-auto text-left relative z-10">
-                    <Text variant={TextVariants.displayLarge}>{t('library.splash.brand')}</Text>
-                    <Text
+                    <UiText variant={TextVariants.displayLarge}>{t('library.splash.brand')}</UiText>
+                    <UiText
                       variant={TextVariants.heading}
                       color={TextColors.secondary}
                       weight={TextWeights.normal}
@@ -305,7 +305,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                       ) : (
                         t('library.splash.descriptionDesktop')
                       )}
-                    </Text>
+                    </UiText>
                     <div className="flex flex-col w-full max-w-xs gap-4 relative z-10">
                       {hasLastPath && (
                         <Button
@@ -346,7 +346,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                     </div>
                   </div>
 
-                  <Text
+                  <UiText
                     variant={TextVariants.small}
                     as="div"
                     className="absolute bottom-8 left-8 lg:left-16 space-y-1 z-10 drop-shadow-sm"
@@ -415,7 +415,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                         </p>
                       </div>
                     )}
-                  </Text>
+                  </UiText>
                 </>
               )}
             </div>
@@ -437,11 +437,11 @@ export default function MainLibrary(props: MainLibraryProps) {
         }}
       >
         <div className="min-w-0">
-          <Text variant={TextVariants.headline}>{t('library.header.title')}</Text>
+          <UiText variant={TextVariants.headline}>{t('library.header.title')}</UiText>
           {!props.isAndroid && (
             <div className="flex items-center gap-2">
               {props.currentFolderPath ? (
-                <Text className="truncate">{props.currentFolderPath}</Text>
+                <UiText className="truncate">{props.currentFolderPath}</UiText>
               ) : (
                 <p className="text-sm invisible select-none pointer-events-none h-5 overflow-hidden"></p>
               )}
@@ -458,9 +458,9 @@ export default function MainLibrary(props: MainLibraryProps) {
                       : 'max-w-0 opacity-0'
                   }`}
                 >
-                  <Text variant={TextVariants.small} color={TextColors.secondary} className="whitespace-nowrap">
+                  <UiText variant={TextVariants.small} color={TextColors.secondary} className="whitespace-nowrap">
                     ({props.thumbnailProgress.current}/{props.thumbnailProgress.total})
-                  </Text>
+                  </UiText>
                 </div>
               </div>
             </div>
@@ -468,7 +468,7 @@ export default function MainLibrary(props: MainLibraryProps) {
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {props.importState.status === Status.Importing && (
-            <Text as="div" color={TextColors.accent} className="flex items-center gap-2 animate-pulse">
+            <UiText as="div" color={TextColors.accent} className="flex items-center gap-2 animate-pulse">
               <FolderInput size={16} />
               <span>
                 {t('library.import.progress', {
@@ -476,19 +476,19 @@ export default function MainLibrary(props: MainLibraryProps) {
                   total: props.importState.progress?.total,
                 })}
               </span>
-            </Text>
+            </UiText>
           )}
           {props.importState.status === Status.Success && (
-            <Text as="div" color={TextColors.success} className="flex items-center gap-2">
+            <UiText as="div" color={TextColors.success} className="flex items-center gap-2">
               <Check size={16} />
               <span>{t('library.import.complete')}</span>
-            </Text>
+            </UiText>
           )}
           {props.importState.status === Status.Error && (
-            <Text as="div" color={TextColors.error} className="flex items-center gap-2">
+            <UiText as="div" color={TextColors.error} className="flex items-center gap-2">
               <AlertTriangle size={16} />
               <span>{t('library.import.failed')}</span>
-            </Text>
+            </UiText>
           )}
           <SearchInput indexingProgress={props.indexingProgress} isIndexing={props.isIndexing} />
           <ViewOptionsDropdown
@@ -531,7 +531,7 @@ export default function MainLibrary(props: MainLibraryProps) {
       ) : props.isIndexing || props.aiModelDownloadStatus || props.importState.status === Status.Importing ? (
         <div className="flex-1 flex flex-col items-center justify-center" onContextMenu={props.onEmptyAreaContextMenu}>
           <Loader2 className="h-12 w-12 text-secondary animate-spin mb-4" />
-          <Text variant={TextVariants.heading} color={TextColors.secondary}>
+          <UiText variant={TextVariants.heading} color={TextColors.secondary}>
             {props.aiModelDownloadStatus
               ? t('library.status.downloading', { status: props.aiModelDownloadStatus })
               : props.isIndexing && props.indexingProgress.total > 0
@@ -545,8 +545,8 @@ export default function MainLibrary(props: MainLibraryProps) {
                       total: importProgress.total,
                     })
                   : t('library.status.processing')}
-          </Text>
-          <Text className="mt-2">{t('library.status.moment')}</Text>
+          </UiText>
+          <UiText className="mt-2">{t('library.status.moment')}</UiText>
         </div>
       ) : searchCriteria.tags.length > 0 || searchCriteria.text ? (
         <div
@@ -554,18 +554,18 @@ export default function MainLibrary(props: MainLibraryProps) {
           onContextMenu={props.onEmptyAreaContextMenu}
         >
           <Search className="h-12 w-12 text-secondary mb-4" />
-          <Text variant={TextVariants.heading} color={TextColors.secondary}>
+          <UiText variant={TextVariants.heading} color={TextColors.secondary}>
             {t('library.search.noResults')}
-          </Text>
-          <Text className="mt-2 max-w-sm">
+          </UiText>
+          <UiText className="mt-2 max-w-sm">
             {t('library.search.noResultsDesc')}
             {!props.appSettings?.enableAiTagging && t('library.search.noResultsAiHint')}
-          </Text>
+          </UiText>
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center" onContextMenu={props.onEmptyAreaContextMenu}>
           <SlidersHorizontal className="h-12 w-12 mb-4 text-text-secondary" />
-          <Text>{t('library.filters.noMatch')}</Text>
+          <UiText>{t('library.filters.noMatch')}</UiText>
         </div>
       )}
       {props.isAndroid && (

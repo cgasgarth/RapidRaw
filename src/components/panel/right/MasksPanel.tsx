@@ -96,7 +96,7 @@ import CollapsibleSection from '../../ui/CollapsibleSection';
 import Resizer from '../../ui/Resizer';
 import Slider, { type SliderChangeEvent } from '../../ui/Slider';
 import Switch from '../../ui/Switch';
-import Text from '../../ui/Text';
+import UiText from '../../ui/Text';
 import Waveform from '../editor/Waveform';
 
 import type { LucideIcon } from 'lucide-react';
@@ -587,7 +587,7 @@ function DepthRangePicker({
           setIsLabelHovered(false);
         }}
       >
-        <Text
+        <UiText
           variant={TextVariants.label}
           aria-hidden={isLabelHovered}
           className={`col-start-1 row-start-1 select-none transition-opacity duration-200 ease-in-out ${
@@ -595,8 +595,8 @@ function DepthRangePicker({
           }`}
         >
           {t('editor.masks.depthRange.title')}
-        </Text>
-        <Text
+        </UiText>
+        <UiText
           variant={TextVariants.label}
           aria-hidden={!isLabelHovered}
           className={`col-start-1 row-start-1 select-none transition-opacity duration-200 ease-in-out pointer-events-none ${
@@ -604,7 +604,7 @@ function DepthRangePicker({
           }`}
         >
           {t('editor.masks.depthRange.reset')}
-        </Text>
+        </UiText>
       </button>
       <div ref={trackRef} className="relative rounded-md overflow-hidden mt-2 select-none" style={{ height: 44 }}>
         {isDragging && (
@@ -728,10 +728,10 @@ function DepthRangePicker({
           </div>
         ))}
       </div>
-      <Text as="div" variant={TextVariants.small} className="flex justify-between select-none px-1">
+      <UiText as="div" variant={TextVariants.small} className="flex justify-between select-none px-1">
         <span>{t('editor.masks.depthRange.near')}</span>
         <span>{t('editor.masks.depthRange.far')}</span>
-      </Text>
+      </UiText>
     </div>
   );
 }
@@ -1511,7 +1511,7 @@ export default function MasksPanel() {
     >
       <div className="flex flex-col h-full select-none overflow-hidden" onContextMenu={handlePanelContextMenu}>
         <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-          <Text variant={TextVariants.title}>{t('editor.masks.maskingTitle')}</Text>
+          <UiText variant={TextVariants.title}>{t('editor.masks.maskingTitle')}</UiText>
           <div className="flex items-center gap-1">
             <button
               className={cx(
@@ -1574,9 +1574,9 @@ export default function MasksPanel() {
                 className="z-10 shrink-0"
                 onClick={handleDeselect}
               >
-                <Text variant={TextVariants.heading} className="mb-2">
+                <UiText variant={TextVariants.heading} className="mb-2">
                   {t('editor.masks.createNewTitle')}
-                </Text>
+                </UiText>
                 <div
                   className="grid grid-cols-3 gap-2"
                   role="presentation"
@@ -1615,9 +1615,9 @@ export default function MasksPanel() {
                 className={`flex-col transition-colors ${isRootOver ? 'bg-surface' : ''}`}
                 onClick={handleDeselect}
               >
-                <Text variant={TextVariants.heading} className="mb-2">
+                <UiText variant={TextVariants.heading} className="mb-2">
                   {t('editor.masks.masksTitle')}
-                </Text>
+                </UiText>
 
                 <AnimatePresence
                   initial={false}
@@ -1682,14 +1682,14 @@ export default function MasksPanel() {
                   )}
                 </AnimatePresence>
 
-                <Text
+                <UiText
                   as="div"
                   weight={TextWeights.medium}
                   className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
-                  onClick={(e) => {
+                  onClick={(e: ReactMouseEvent<HTMLElement>) => {
                     handleAddMaskContextMenu(e, null);
                   }}
-                  onKeyDown={(e) => {
+                  onKeyDown={(e: ReactKeyboardEvent<HTMLElement>) => {
                     if (e.key !== 'Enter' && e.key !== ' ') return;
                     e.preventDefault();
                     handleAddMaskContextMenu(e, null);
@@ -1701,7 +1701,7 @@ export default function MasksPanel() {
                     <Plus size={18} />
                   </div>
                   <span>{t('editor.masks.addNewMask')}</span>
-                </Text>
+                </UiText>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1718,9 +1718,9 @@ export default function MasksPanel() {
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="flex-1 min-h-0"
               >
-                <Text variant={TextVariants.heading} className="mb-2">
+                <UiText variant={TextVariants.heading} className="mb-2">
                   {t('editor.masks.maskAdjustmentsTitle')}
-                </Text>
+                </UiText>
                 <SettingsPanel
                   container={activeContainer ?? null}
                   activeSubMask={activeSubMaskData || null}
@@ -1755,7 +1755,7 @@ export default function MasksPanel() {
         {activeDragItem ? (
           <div className="w-(--sidebar-width,280px) pointer-events-none">
             {activeDragItem.type === 'Container' && activeDragItem.item && (
-              <Text
+              <UiText
                 as="div"
                 color={TextColors.primary}
                 weight={TextWeights.medium}
@@ -1763,11 +1763,11 @@ export default function MasksPanel() {
               >
                 <FolderIcon size={18} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
                 <span className="flex-1 truncate">{(activeDragItem.item as MaskContainer).name}</span>
-              </Text>
+              </UiText>
             )}
 
             {activeDragItem.type === 'SubMask' && activeDragItem.item && (
-              <Text
+              <UiText
                 as="div"
                 color={TextColors.primary}
                 weight={TextWeights.medium}
@@ -1779,11 +1779,11 @@ export default function MasksPanel() {
                   return <Icon size={16} className={`shrink-0 ml-1 ${TEXT_COLOR_KEYS[TextColors.secondary]}`} />;
                 })()}
                 <span className="flex-1 truncate">{getSubMaskName(activeDragItem.item as SubMask)}</span>
-              </Text>
+              </UiText>
             )}
 
             {activeDragItem.type === 'Creation' && (
-              <Text
+              <UiText
                 as="div"
                 variant={TextVariants.small}
                 color={TextColors.primary}
@@ -1803,7 +1803,7 @@ export default function MasksPanel() {
                     </>
                   );
                 })()}
-              </Text>
+              </UiText>
             )}
           </div>
         ) : null}
@@ -1823,7 +1823,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
       transition={{ duration: 0.2, ease: 'easeOut' }}
       className={`p-4 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
     >
-      <Text weight={TextWeights.medium}>{t('editor.masks.dropzoneText')}</Text>
+      <UiText weight={TextWeights.medium}>{t('editor.masks.dropzoneText')}</UiText>
     </motion.div>
   );
 }
@@ -1879,9 +1879,9 @@ function DraggableGridItem({
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
       <maskType.icon size={24} />{' '}
-      <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
+      <UiText as="span" variant={TextVariants.small} color={TextColors.primary}>
         {getMaskTypeName(maskType)}
-      </Text>
+      </UiText>
     </motion.div>
   );
 }
@@ -2136,9 +2136,9 @@ function ContainerRow({
               ref={renameInputRef}
             />
           ) : (
-            <Text color={TextColors.primary} weight={TextWeights.medium} className="truncate select-none">
+            <UiText color={TextColors.primary} weight={TextWeights.medium} className="truncate select-none">
               {container.name}
-            </Text>
+            </UiText>
           )}
         </div>
         <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2231,11 +2231,11 @@ function ContainerRow({
                   exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                   transition={{ duration: 0.2 }}
                 >
-                  <Text
+                  <UiText
                     as="div"
                     weight={TextWeights.medium}
                     className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
-                    onClick={(e) => {
+                    onClick={(e: ReactMouseEvent<HTMLElement>) => {
                       e.stopPropagation();
                       onAddComponent(e);
                     }}
@@ -2244,7 +2244,7 @@ function ContainerRow({
                       <Plus size={16} />
                     </div>
                     <span className="select-none">{t('editor.masks.actions.addNewComponent')}</span>
-                  </Text>
+                  </UiText>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -2387,7 +2387,7 @@ function SubMaskRow({
       }}
       onContextMenu={onContextMenu}
     >
-      <Text
+      <UiText
         as="div"
         variant={TextVariants.small}
         weight={TextWeights.bold}
@@ -2429,7 +2429,7 @@ function SubMaskRow({
             </motion.div>
           )}
         </AnimatePresence>
-      </Text>
+      </UiText>
       {renamingId === subMask.id ? (
         <input
           className="bg-bg-primary text-sm w-full rounded px-1 outline-none border border-accent"
@@ -2449,9 +2449,9 @@ function SubMaskRow({
           ref={renameInputRef}
         />
       ) : (
-        <Text color={TextColors.primary} className="flex-1 truncate select-none">
+        <UiText color={TextColors.primary} className="flex-1 truncate select-none">
           {getSubMaskName(subMask)}
-        </Text>
+        </UiText>
       )}
       <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
         {index > 1 && (
@@ -2819,9 +2819,9 @@ function SettingsPanel({
 
           {!isComponentMode && (
             <div className="flex justify-between items-center">
-              <Text variant={TextVariants.label} className="select-none">
+              <UiText variant={TextVariants.label} className="select-none">
                 {t('editor.masks.settings.applyPreset')}
-              </Text>
+              </UiText>
               <button
                 ref={presetButtonRef}
                 onClick={handlePresetSelectClick}
@@ -2854,7 +2854,7 @@ function SettingsPanel({
           {isComponentMode && (
             <>
               {isAiMask && aiModelDownloadStatus && (
-                <Text
+                <UiText
                   as="div"
                   variant={TextVariants.small}
                   color={TextColors.accent}
@@ -2863,10 +2863,10 @@ function SettingsPanel({
                 >
                   <Loader2 size={16} className="animate-spin shrink-0" />
                   <div className="leading-relaxed">
-                    <Text variant={TextVariants.small}>{t('editor.masks.settings.aiModelDownloading')}</Text>
+                    <UiText variant={TextVariants.small}>{t('editor.masks.settings.aiModelDownloading')}</UiText>
                     <span>{aiModelDownloadStatus}</span>
                   </div>
-                </Text>
+                </UiText>
               )}
 
               {activeSubMask.type === Mask.AiDepth && (

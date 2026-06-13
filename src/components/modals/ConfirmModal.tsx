@@ -5,7 +5,7 @@ import { useManagedFocus } from '../../hooks/useManagedFocus';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface ConfirmModalProps {
   cancelText?: string;
@@ -91,10 +91,10 @@ export default function ConfirmModal({
         `}
         role="dialog"
       >
-        <Text variant={TextVariants.title} id="confirm-modal-title" className="mb-4">
+        <UiText variant={TextVariants.title} id="confirm-modal-title" className="mb-4">
           {title}
-        </Text>
-        <Text className="mb-6 whitespace-pre-wrap">{message}</Text>
+        </UiText>
+        <UiText className="mb-6 whitespace-pre-wrap">{message}</UiText>
         <div className="flex justify-end gap-3 mt-5">
           <Button
             className="bg-bg-primary shadow-transparent hover:bg-bg-primary text-white shadow-none focus:outline-hidden focus:ring-0"

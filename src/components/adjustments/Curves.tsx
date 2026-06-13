@@ -17,7 +17,7 @@ import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { ActiveChannel, Adjustments, Coord, MaskAdjustments, ParametricCurveSettings } from '../../utils/adjustments';
 import { Theme, OPTION_SEPARATOR } from '../ui/AppProperties';
 import Slider from '../ui/Slider';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 let curveClipboard: Array<Coord> | null = null;
 let parametricClipboard: ParametricCurveSettings | null = null;
@@ -947,9 +947,9 @@ export default function CurveGraph({
                 }}
                 title={t('adjustments.curves.channelTitle', { channel: channelLabel })}
               >
-                <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.bold}>
+                <UiText variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.bold}>
                   {channelLabel.charAt(0).toUpperCase()}
-                </Text>
+                </UiText>
               </button>
             );
           })}

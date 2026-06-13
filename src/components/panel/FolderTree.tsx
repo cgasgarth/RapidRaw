@@ -39,7 +39,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { AlbumItem, Invokes } from '../ui/AppProperties';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 export interface FolderTree {
   children: FolderTree[];
@@ -133,7 +133,7 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string; isOpen: boo
   const { t } = useTranslation();
 
   return (
-    <Text
+    <UiText
       as="div"
       variant={TextVariants.small}
       weight={TextWeights.bold}
@@ -149,7 +149,7 @@ function SectionHeader({ title, isOpen, onToggle }: { title: string; isOpen: boo
         {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       </div>
       <span className="ml-1 uppercase tracking-wider select-none">{title}</span>
-    </Text>
+    </UiText>
   );
 }
 
@@ -193,7 +193,7 @@ function AlbumTreeNode({
   const iconKey = item.icon || (isGroup ? (isExpanded ? 'group-open' : 'group-closed') : 'album');
 
   return (
-    <Text as="div" color={TextColors.primary} weight={TextWeights.medium}>
+    <UiText as="div" color={TextColors.primary} weight={TextWeights.medium}>
       <div
         className={cx('flex items-center gap-2 p-1.5 rounded-md transition-colors cursor-pointer', {
           'bg-surface': isSelected,
@@ -278,7 +278,7 @@ function AlbumTreeNode({
           </motion.div>
         )}
       </AnimatePresence>
-    </Text>
+    </UiText>
   );
 }
 
@@ -347,7 +347,7 @@ function TreeNode({
   const iconKey = currentFolderIconKey || (isExpanded ? 'folder-open' : 'folder-closed');
 
   return (
-    <Text as="div" color={TextColors.primary} weight={TextWeights.medium}>
+    <UiText as="div" color={TextColors.primary} weight={TextWeights.medium}>
       <div
         className={cx('flex items-center gap-2 p-1.5 rounded-md transition-colors cursor-pointer', {
           'bg-surface': isSelected,
@@ -389,7 +389,7 @@ function TreeNode({
         <span onDoubleClick={handleNameDoubleClick} className="truncate select-none flex-1">
           <span className="truncate">{node.name}</span>
           {typeof node.imageCount === 'number' && node.imageCount > 0 && (
-            <Text
+            <UiText
               as="span"
               variant={TextVariants.small}
               color={TextColors.secondary}
@@ -399,7 +399,7 @@ function TreeNode({
               )}
             >
               ({node.imageCount})
-            </Text>
+            </UiText>
           )}
         </span>
 
@@ -456,7 +456,7 @@ function TreeNode({
           </motion.div>
         )}
       </AnimatePresence>
-    </Text>
+    </UiText>
   );
 }
 
@@ -774,9 +774,9 @@ export default function FolderTree({
                         </AnimatePresence>
                         {albumTree.length === 0 && (
                           <motion.div layout="position">
-                            <Text variant={TextVariants.small} className="p-2 text-center">
+                            <UiText variant={TextVariants.small} className="p-2 text-center">
                               {t('library.folders.albumsEmpty')}
-                            </Text>
+                            </UiText>
                           </motion.div>
                         )}
                       </div>
@@ -852,7 +852,7 @@ export default function FolderTree({
                               exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                               transition={{ duration: 0.2 }}
                             >
-                              <Text
+                              <UiText
                                 as="div"
                                 weight={TextWeights.medium}
                                 className="flex items-center gap-2 p-2 mt-1 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
@@ -865,7 +865,7 @@ export default function FolderTree({
                                   <Plus size={16} />
                                 </div>
                                 <span className="select-none">{t('library.folders.addFolder')}</span>
-                              </Text>
+                              </UiText>
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -877,15 +877,15 @@ export default function FolderTree({
             )}
 
             {filteredTrees.length === 0 && !hasVisiblePinnedTrees && isSearching && (
-              <Text className="p-2 text-center">{t('library.folders.noFoldersFound')}</Text>
+              <UiText className="p-2 text-center">{t('library.folders.noFoldersFound')}</UiText>
             )}
 
             {folderTrees.length === 0 && pinnedFolderTrees.length === 0 && !isSearching && (
               <div className="pt-1">
                 {isLoading ? (
-                  <Text className="animate-pulse p-2">{t('library.folders.loading')}</Text>
+                  <UiText className="animate-pulse p-2">{t('library.folders.loading')}</UiText>
                 ) : (
-                  <Text className="p-2">{t('library.folders.openFolderInstruction')}</Text>
+                  <UiText className="p-2">{t('library.folders.openFolderInstruction')}</UiText>
                 )}
               </div>
             )}

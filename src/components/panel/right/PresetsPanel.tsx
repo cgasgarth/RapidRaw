@@ -58,7 +58,7 @@ import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
 import { Invokes, OPTION_SEPARATOR, Panel, type Folder, type Option, type Preset } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
-import Text from '../../ui/Text';
+import UiText from '../../ui/Text';
 
 interface DroppableFolderItemProps {
   children: ReactNode;
@@ -187,22 +187,22 @@ function PresetItemDisplay({ preset, previewUrl, isGeneratingPreviews }: PresetI
       </div>
 
       <div className="grow min-w-0 flex flex-col justify-center">
-        <Text color={TextColors.primary} weight={TextWeights.medium} className="truncate">
+        <UiText color={TextColors.primary} weight={TextWeights.medium} className="truncate">
           {preset.name}
-        </Text>
+        </UiText>
         <div className="flex items-center gap-1.5 mt-0.5">
           {isTool ? (
             <Wrench size={12} className="text-text-secondary" />
           ) : (
             <Palette size={12} className="text-text-secondary" />
           )}
-          <Text
+          <UiText
             variant={TextVariants.small}
             color={TextColors.secondary}
             className="text-[10px] uppercase tracking-wider"
           >
             {isTool ? t('editor.presets.types.tool') : t('editor.presets.types.style')}
-          </Text>
+          </UiText>
         </div>
       </div>
     </div>
@@ -215,12 +215,12 @@ function FolderItemDisplay({ folder }: FolderProps) {
       <div className="p-1">
         <FolderIcon size={18} />
       </div>
-      <Text color={TextColors.primary} weight={TextWeights.medium} className="grow truncate select-none">
+      <UiText color={TextColors.primary} weight={TextWeights.medium} className="grow truncate select-none">
         {folder.name}
-      </Text>
-      <Text as="span" weight={TextWeights.medium} className="ml-auto pr-1">
+      </UiText>
+      <UiText as="span" weight={TextWeights.medium} className="ml-auto pr-1">
         {folder.children.length}
-      </Text>
+      </UiText>
     </div>
   );
 }
@@ -354,7 +354,7 @@ function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpa
             />
           )}
         </div>
-        <Text
+        <UiText
           color={TextColors.primary}
           weight={TextWeights.medium}
           className="grow truncate select-none"
@@ -363,10 +363,10 @@ function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpa
           }}
         >
           {folder.name}
-        </Text>
-        <Text as="span" variant={TextVariants.small} color={TextColors.secondary} className="ml-auto pr-1">
+        </UiText>
+        <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="ml-auto pr-1">
           {folder.children.length}
-        </Text>
+        </UiText>
       </div>
       <AnimatePresence>
         {isExpanded && hasChildren && (
@@ -1025,7 +1025,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex flex-col h-full">
         <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-          <Text variant={TextVariants.title}>{t('editor.presets.title')}</Text>
+          <UiText variant={TextVariants.title}>{t('editor.presets.title')}</UiText>
           <div className="flex items-center gap-1">
             <button
               className="p-2 rounded-full hover:bg-surface transition-colors"
@@ -1075,7 +1075,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           ref={setRootNodeRef}
         >
           {isLoading && presets.length === 0 && (
-            <Text
+            <UiText
               as="div"
               variant={TextVariants.heading}
               color={TextColors.secondary}
@@ -1083,11 +1083,11 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
               className="text-center mt-4"
             >
               <Loader2 size={14} className="animate-spin inline-block mr-2" /> {t('editor.presets.status.loading')}
-            </Text>
+            </UiText>
           )}
           {!isLoading && presets.length === 0 ? (
             <div className="text-center text-text-secondary flex flex-col items-center gap-4 pt-4">
-              <Text className="max-w-xs">{t('editor.presets.status.empty')}</Text>
+              <UiText className="max-w-xs">{t('editor.presets.status.empty')}</UiText>
               <Button variant="secondary" onClick={onNavigateToCommunity}>
                 <Users size={16} className="mr-2" />
                 {t('editor.presets.status.getCommunity')}

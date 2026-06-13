@@ -26,7 +26,7 @@ import { ImageFile, Invokes } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface CollageModalProps {
   isOpen: boolean;
@@ -655,7 +655,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary p-4 flex flex-col gap-8 overflow-y-auto border-l border-surface h-full">
       {loadedImages.length > 1 && (
         <div>
-          <Text variant={TextVariants.heading} className="mb-2 flex items-center justify-between">
+          <UiText variant={TextVariants.heading} className="mb-2 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <LayoutTemplate size={16} /> {t('modals.collage.layout')}
             </span>
@@ -666,7 +666,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
             >
               <Shuffle size={16} />
             </button>
-          </Text>
+          </UiText>
           <div className="grid grid-cols-3 gap-2">
             {availableLayouts.length > 0
               ? availableLayouts.map((item, index) => (
@@ -689,7 +689,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       )}
 
       <div>
-        <Text variant={TextVariants.heading} className="mb-2 flex items-center justify-between">
+        <UiText variant={TextVariants.heading} className="mb-2 flex items-center justify-between">
           <span className="flex items-center gap-2">
             <Crop size={16} /> {t('modals.collage.aspectRatio')}
           </span>
@@ -704,7 +704,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
               <RectangleHorizontal size={16} />
             )}
           </button>
-        </Text>
+        </UiText>
         <div className="grid grid-cols-3 gap-2 mb-4">
           {ASPECT_RATIO_PRESETS.map((preset) => (
             <button
@@ -768,9 +768,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       </div>
 
       <div>
-        <Text variant={TextVariants.heading} className="mb-2 flex items-center gap-2">
+        <UiText variant={TextVariants.heading} className="mb-2 flex items-center gap-2">
           <Palette size={16} /> {t('modals.collage.background')}
-        </Text>
+        </UiText>
         <div className="flex items-center gap-2 bg-surface p-2 rounded-md">
           <input
             type="color"
@@ -792,9 +792,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       </div>
 
       <div>
-        <Text variant={TextVariants.heading} className="mb-2 flex items-center gap-2">
+        <UiText variant={TextVariants.heading} className="mb-2 flex items-center gap-2">
           <Proportions size={16} /> {t('modals.collage.exportSize')}
-        </Text>
+        </UiText>
         <div className="flex items-center gap-2">
           <input
             type="number"
@@ -825,9 +825,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       return (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.collage.saved')}
-          </Text>
+          </UiText>
         </div>
       );
     }
@@ -835,10 +835,10 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       return (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.collage.errorTitle')}
-          </Text>
-          <Text className="max-w-xs">{error}</Text>
+          </UiText>
+          <UiText className="max-w-xs">{error}</UiText>
         </div>
       );
     }

@@ -8,7 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import Filmstrip from './Filmstrip';
 import { useEditorStore } from '../../store/useEditorStore';
 import { GLOBAL_KEYS, ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface BottomBarProps {
   filmstripHeight?: number;
@@ -366,9 +366,9 @@ export default function BottomBar({
             )}
           >
             <div className="h-5 w-px bg-surface mr-4"></div>
-            <Text as="span" className="whitespace-nowrap">
+            <UiText as="span" className="whitespace-nowrap">
               {t('ui.bottomBar.imagesSelected', { current: numSelected, total })}
-            </Text>
+            </UiText>
           </div>
         </div>
         <div className="grow" />

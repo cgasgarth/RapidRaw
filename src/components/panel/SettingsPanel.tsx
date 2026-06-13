@@ -54,7 +54,7 @@ import Dropdown, { OptionItem } from '../ui/Dropdown';
 import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 import type { TFunction } from 'i18next';
 
@@ -209,7 +209,7 @@ const KeybindRow = ({
 
   return (
     <div className="flex justify-between items-center py-2">
-      <Text variant={TextVariants.label}>{translateDynamicKey(t, def.description)}</Text>
+      <UiText variant={TextVariants.label}>{translateDynamicKey(t, def.description)}</UiText>
       <div className="flex items-center gap-1">
         {isConflicting && <span className="text-yellow-400 text-xs">⚠</span>}
         <button
@@ -219,7 +219,7 @@ const KeybindRow = ({
           className="flex items-center gap-1 flex-wrap shrink-0"
         >
           {recording ? (
-            <Text
+            <UiText
               as="kbd"
               variant={TextVariants.small}
               color={TextColors.accent}
@@ -227,9 +227,9 @@ const KeybindRow = ({
               className="px-2 py-1 font-sans bg-bg-primary border border-accent rounded-md animate-pulse"
             >
               {t('settings.controls.pressKey')}
-            </Text>
+            </UiText>
           ) : (
-            <Text
+            <UiText
               as="kbd"
               variant={TextVariants.small}
               color={TextColors.primary}
@@ -241,7 +241,7 @@ const KeybindRow = ({
               ) : (
                 <span className="text-text-secondary italic">{t('settings.controls.notAssigned')}</span>
               )}
-            </Text>
+            </UiText>
           )}
         </button>
       </div>
@@ -251,14 +251,14 @@ const KeybindRow = ({
 
 const SettingItem = ({ children, description, label }: SettingItemProps) => (
   <div>
-    <Text variant={TextVariants.heading} className="block mb-2">
+    <UiText variant={TextVariants.heading} className="block mb-2">
       {label}
-    </Text>
+    </UiText>
     {children}
     {description && (
-      <Text variant={TextVariants.small} className="mt-2">
+      <UiText variant={TextVariants.small} className="mt-2">
         {description}
-      </Text>
+      </UiText>
     )}
   </div>
 );
@@ -277,20 +277,20 @@ const DataActionItem = ({
 
   return (
     <div className="pb-8 border-b border-border-color last:border-b-0 last:pb-0">
-      <Text variant={TextVariants.heading} className="mb-2">
+      <UiText variant={TextVariants.heading} className="mb-2">
         {title}
-      </Text>
-      <Text variant={TextVariants.small} className="mb-3">
+      </UiText>
+      <UiText variant={TextVariants.small} className="mb-3">
         {description}
-      </Text>
+      </UiText>
       <Button variant="destructive" onClick={buttonAction} disabled={isProcessing || disabled}>
         {icon}
         {isProcessing ? t('settings.data.statuses.processing') : buttonText}
       </Button>
       {message && (
-        <Text color={TextColors.accent} className="mt-3">
+        <UiText color={TextColors.accent} className="mt-3">
           {message}
-        </Text>
+        </UiText>
       )}
     </div>
   );
@@ -381,12 +381,12 @@ const CloudDashboard = () => {
       <div className="flex items-center justify-between border-b border-border-color pb-4">
         <div className="flex items-center gap-3">
           <div>
-            <Text variant={TextVariants.heading}>{user?.fullName || user?.primaryEmailAddress?.emailAddress}</Text>
-            <Text variant={TextVariants.small} color={isPro ? TextColors.success : TextColors.error}>
+            <UiText variant={TextVariants.heading}>{user?.fullName || user?.primaryEmailAddress?.emailAddress}</UiText>
+            <UiText variant={TextVariants.small} color={isPro ? TextColors.success : TextColors.error}>
               {isPro
                 ? t('settings.processing.ai.cloud.signedIn.active')
                 : t('settings.processing.ai.cloud.signedIn.inactive')}
-            </Text>
+            </UiText>
           </div>
         </div>
         <div className="flex gap-2">
@@ -413,13 +413,13 @@ const CloudDashboard = () => {
       {isPro ? (
         <div className="bg-surface p-4 rounded-md">
           <div className="flex justify-between items-center mb-2">
-            <Text variant={TextVariants.label}>{t('settings.processing.ai.cloud.signedIn.usage')}</Text>
-            <Text variant={TextVariants.small}>
+            <UiText variant={TextVariants.label}>{t('settings.processing.ai.cloud.signedIn.usage')}</UiText>
+            <UiText variant={TextVariants.small}>
               {t('settings.processing.ai.cloud.signedIn.usageStats', {
                 requests: usage?.requests ?? 0,
                 limit: usage?.limit ?? 500,
               })}
-            </Text>
+            </UiText>
           </div>
           <div className="w-full bg-bg-primary rounded-full h-2">
             <div
@@ -430,7 +430,7 @@ const CloudDashboard = () => {
         </div>
       ) : (
         <div className="bg-red-900/10 border border-red-500/50 p-4 rounded-md text-center">
-          <Text className="mb-3">{t('settings.processing.ai.cloud.signedOut.upgradeDesc')}</Text>
+          <UiText className="mb-3">{t('settings.processing.ai.cloud.signedOut.upgradeDesc')}</UiText>
           <Button
             onClick={() => {
               void open('https://www.getrapidraw.com/cloud');
@@ -1086,9 +1086,9 @@ export default function SettingsPanel({
             >
               <ArrowLeft />
             </Button>
-            <Text variant={TextVariants.display} color={TextColors.accent} className="whitespace-nowrap">
+            <UiText variant={TextVariants.display} color={TextColors.accent} className="whitespace-nowrap">
               {t('settings.title')}
-            </Text>
+            </UiText>
           </div>
 
           <div className="relative flex w-full min-[1200px]:w-112.5 p-2 bg-surface rounded-md">
@@ -1136,9 +1136,9 @@ export default function SettingsPanel({
                 className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     {t('settings.general.title')}
-                  </Text>
+                  </UiText>
                   <div className="space-y-8">
                     <SettingItem label={t('settings.general.theme')} description={t('settings.general.themeDesc')}>
                       <Dropdown
@@ -1297,10 +1297,10 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     {t('settings.adjustments.title')}
-                  </Text>
-                  <Text className="mb-4">{t('settings.adjustments.description')}</Text>
+                  </UiText>
+                  <UiText className="mb-4">{t('settings.adjustments.description')}</UiText>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <Switch
                       label={t('settings.adjustments.chromaticAberration')}
@@ -1358,16 +1358,16 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     {t('settings.lenses.title')}
-                  </Text>
-                  <Text className="mb-6">{t('settings.lenses.description')}</Text>
+                  </UiText>
+                  <UiText className="mb-6">{t('settings.lenses.description')}</UiText>
 
                   <div className="space-y-8">
                     <div className="bg-bg-primary rounded-lg p-4 border border-border-color">
-                      <Text variant={TextVariants.heading} className="mb-3">
+                      <UiText variant={TextVariants.heading} className="mb-3">
                         {t('settings.lenses.addNew')}
-                      </Text>
+                      </UiText>
                       <div className="space-y-4">
                         <Dropdown
                           options={lensMakers.map((m) => ({ label: m, value: m }))}
@@ -1390,11 +1390,11 @@ export default function SettingsPanel({
                     </div>
 
                     <div>
-                      <Text variant={TextVariants.heading} className="mb-2">
+                      <UiText variant={TextVariants.heading} className="mb-2">
                         {t('settings.lenses.saved')}
-                      </Text>
+                      </UiText>
                       {(!appSettings.myLenses || appSettings.myLenses.length === 0) && (
-                        <Text className="italic">{t('settings.lenses.noLenses')}</Text>
+                        <UiText className="italic">{t('settings.lenses.noLenses')}</UiText>
                       )}
                       <div className="divide-y divide-border-color">
                         {(appSettings.myLenses || []).map((lens: MyLens, index: number) => (
@@ -1407,10 +1407,10 @@ export default function SettingsPanel({
                                 <Bookmark size={16} />
                               </div>
                               <div>
-                                <Text color={TextColors.primary} weight={TextWeights.medium}>
+                                <UiText color={TextColors.primary} weight={TextWeights.medium}>
                                   {lens.model}
-                                </Text>
-                                <Text variant={TextVariants.small}>{lens.maker}</Text>
+                                </UiText>
+                                <UiText variant={TextVariants.small}>{lens.maker}</UiText>
                               </div>
                             </div>
                             <button
@@ -1430,9 +1430,9 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     {t('settings.tagging.title')}
-                  </Text>
+                  </UiText>
                   <div className="space-y-8">
                     <div className="space-y-4">
                       <SettingItem
@@ -1498,9 +1498,9 @@ export default function SettingsPanel({
                                             data-tooltip={t('settings.tagging.removeCustomTooltip', { tag })}
                                             className="flex items-center gap-1 bg-surface px-2 py-1 rounded-sm group cursor-pointer"
                                           >
-                                            <Text variant={TextVariants.label} color={TextColors.primary}>
+                                            <UiText variant={TextVariants.label} color={TextColors.primary}>
                                               {tag}
-                                            </Text>
+                                            </UiText>
                                             <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
                                               <X size={14} />
                                             </span>
@@ -1514,9 +1514,9 @@ export default function SettingsPanel({
                                           exit={{ opacity: 0 }}
                                           transition={{ duration: 0.2 }}
                                         >
-                                          <Text className="px-1 select-none italic">
+                                          <UiText className="px-1 select-none italic">
                                             {t('settings.tagging.noCustomTags')}
-                                          </Text>
+                                          </UiText>
                                         </motion.span>
                                       )}
                                     </AnimatePresence>
@@ -1583,9 +1583,9 @@ export default function SettingsPanel({
                                   data-tooltip={t('settings.tagging.removeShortcutTooltip', { shortcut })}
                                   className="flex items-center gap-1 bg-surface px-2 py-1 rounded-sm group cursor-pointer"
                                 >
-                                  <Text variant={TextVariants.label} color={TextColors.primary}>
+                                  <UiText variant={TextVariants.label} color={TextColors.primary}>
                                     {shortcut}
-                                  </Text>
+                                  </UiText>
                                   <span className="rounded-full group-hover:bg-black/20 p-0.5 transition-colors">
                                     <X size={14} />
                                   </span>
@@ -1668,11 +1668,11 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-6">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-6">
                     {t('settings.thanks.title')}
-                  </Text>
-                  <Text className="mb-4">{t('settings.thanks.description')}</Text>
-                  <Text as="ul" className="space-y-3 list-disc ml-5 pl-1">
+                  </UiText>
+                  <UiText className="mb-4">{t('settings.thanks.description')}</UiText>
+                  <UiText as="ul" className="space-y-3 list-disc ml-5 pl-1">
                     <li>
                       <a
                         href="https://github.com/dnglab/dnglab/tree/main/rawler"
@@ -1776,7 +1776,7 @@ export default function SettingsPanel({
                       <span className="font-semibold text-accent">{t('settings.thanks.list.youLabel')}</span>:{' '}
                       {t('settings.thanks.list.you')}
                     </li>
-                  </Text>
+                  </UiText>
                 </div>
               </motion.div>
             )}
@@ -1790,14 +1790,14 @@ export default function SettingsPanel({
                 className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     {t('settings.processing.title')}
-                  </Text>
+                  </UiText>
                   <div className="space-y-8">
                     <div>
-                      <Text variant={TextVariants.heading} className="mb-2">
+                      <UiText variant={TextVariants.heading} className="mb-2">
                         {t('settings.processing.previewStrategy')}
-                      </Text>
+                      </UiText>
                       <PreviewModeSwitch
                         mode={appSettings.enableZoomHifi ? 'dynamic' : 'static'}
                         onModeChange={handlePreviewModeChange}
@@ -1813,9 +1813,9 @@ export default function SettingsPanel({
                               exit={{ opacity: 0, x: -10 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <Text variant={TextVariants.small} className="mb-4">
+                              <UiText variant={TextVariants.small} className="mb-4">
                                 {t('settings.processing.staticDesc')}
-                              </Text>
+                              </UiText>
                               <div className="pl-4 border-l-2 border-border-color ml-1">
                                 <SettingItem
                                   description={t('settings.processing.previewResDesc')}
@@ -1840,9 +1840,9 @@ export default function SettingsPanel({
                               exit={{ opacity: 0, x: -10 }}
                               transition={{ duration: 0.2 }}
                             >
-                              <Text variant={TextVariants.small} className="mb-4">
+                              <UiText variant={TextVariants.small} className="mb-4">
                                 {t('settings.processing.dynamicDesc')}
-                              </Text>
+                              </UiText>
                               <div className="pl-4 border-l-2 border-border-color ml-1 space-y-3">
                                 <SettingItem
                                   description={t('settings.processing.staticPreviewResDesc')}
@@ -2048,14 +2048,14 @@ export default function SettingsPanel({
 
                     {restartRequired && (
                       <>
-                        <Text
+                        <UiText
                           as="div"
                           color={TextColors.info}
                           className="p-3 bg-blue-900/10 border border-blue-500/50 rounded-lg flex items-center gap-3"
                         >
                           <Info size={18} />
                           <p>{t('settings.processing.restartRequired')}</p>
-                        </Text>
+                        </UiText>
                         <div className="flex justify-end">
                           <Button
                             onClick={() => {
@@ -2071,9 +2071,9 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     {t('settings.processing.preprocessing.title')}
-                  </Text>
+                  </UiText>
                   <div className="space-y-8">
                     <SettingItem
                       label={t('settings.processing.preprocessing.highlightRecovery')}
@@ -2217,10 +2217,10 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     {t('settings.processing.ai.title')}
-                  </Text>
-                  <Text className="mb-4">{t('settings.processing.ai.description')}</Text>
+                  </UiText>
+                  <UiText className="mb-4">{t('settings.processing.ai.description')}</UiText>
 
                   <AiProviderSwitch selectedProvider={aiProvider} onProviderChange={handleProviderChange} />
 
@@ -2234,13 +2234,13 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <Text variant={TextVariants.heading}>{t('settings.processing.ai.cpu.title')}</Text>
-                          <Text className="mt-1">{t('settings.processing.ai.cpu.description')}</Text>
-                          <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
+                          <UiText variant={TextVariants.heading}>{t('settings.processing.ai.cpu.title')}</UiText>
+                          <UiText className="mt-1">{t('settings.processing.ai.cpu.description')}</UiText>
+                          <UiText as="ul" className="mt-3 space-y-1 list-disc list-inside">
                             <li>{t('settings.processing.ai.cpu.feature1')}</li>
                             <li>{t('settings.processing.ai.cpu.feature2')}</li>
                             <li>{t('settings.processing.ai.cpu.feature3')}</li>
-                          </Text>
+                          </UiText>
                         </motion.div>
                       )}
 
@@ -2254,13 +2254,15 @@ export default function SettingsPanel({
                         >
                           <div className="space-y-8">
                             <div>
-                              <Text variant={TextVariants.heading}>{t('settings.processing.ai.connector.title')}</Text>
-                              <Text className="mt-1">{t('settings.processing.ai.connector.description')}</Text>
-                              <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
+                              <UiText variant={TextVariants.heading}>
+                                {t('settings.processing.ai.connector.title')}
+                              </UiText>
+                              <UiText className="mt-1">{t('settings.processing.ai.connector.description')}</UiText>
+                              <UiText as="ul" className="mt-3 space-y-1 list-disc list-inside">
                                 <li>{t('settings.processing.ai.connector.feature1')}</li>
                                 <li>{t('settings.processing.ai.connector.feature2')}</li>
                                 <li>{t('settings.processing.ai.connector.feature3')}</li>
-                              </Text>
+                              </UiText>
                             </div>
                             <SettingItem
                               label={t('settings.processing.ai.connector.address')}
@@ -2297,14 +2299,14 @@ export default function SettingsPanel({
                                 </Button>
                               </div>
                               {testStatus.message && (
-                                <Text
+                                <UiText
                                   color={testStatus.success ? TextColors.success : TextColors.error}
                                   className="mt-2 flex items-center gap-2"
                                 >
                                   {testStatus.success === true && <Wifi size={16} />}
                                   {testStatus.success === false && <WifiOff size={16} />}
                                   {testStatus.message}
-                                </Text>
+                                </UiText>
                               )}
                             </SettingItem>
                           </div>
@@ -2319,13 +2321,13 @@ export default function SettingsPanel({
                           exit={{ opacity: 0, x: -10 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <Text variant={TextVariants.heading}>{t('settings.processing.ai.cloud.title')}</Text>
-                          <Text className="mt-1">{t('settings.processing.ai.cloud.description')}</Text>
-                          <Text as="ul" className="mt-3 space-y-1 list-disc list-inside">
+                          <UiText variant={TextVariants.heading}>{t('settings.processing.ai.cloud.title')}</UiText>
+                          <UiText className="mt-1">{t('settings.processing.ai.cloud.description')}</UiText>
+                          <UiText as="ul" className="mt-3 space-y-1 list-disc list-inside">
                             <li>{t('settings.processing.ai.cloud.feature1')}</li>
                             <li>{t('settings.processing.ai.cloud.feature2')}</li>
                             <li>{t('settings.processing.ai.cloud.feature3')}</li>
-                          </Text>
+                          </UiText>
 
                           <div className="mt-8">
                             <Show when="signed-in">
@@ -2383,7 +2385,7 @@ export default function SettingsPanel({
                                   }}
                                 />
                                 <div className="mt-6">
-                                  <Text variant={TextVariants.small}>
+                                  <UiText variant={TextVariants.small}>
                                     {t('settings.processing.ai.cloud.signedOut.noAccount')}{' '}
                                     <button
                                       onClick={() => {
@@ -2393,7 +2395,7 @@ export default function SettingsPanel({
                                     >
                                       {t('settings.processing.ai.cloud.signedOut.signup')}
                                     </button>
-                                  </Text>
+                                  </UiText>
                                 </div>
                               </div>
                             </Show>
@@ -2405,18 +2407,18 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     {t('settings.data.title')}
-                  </Text>
+                  </UiText>
                   <div className="space-y-8">
                     <DataActionItem
                       buttonAction={handleClearSidecars}
                       buttonText={t('settings.data.clearSidecarsButton')}
                       description={
                         <>
-                          <Text as="span" variant={TextVariants.small}>
+                          <UiText as="span" variant={TextVariants.small}>
                             {t('settings.data.clearSidecarsDesc')}
-                          </Text>
+                          </UiText>
                           <span className="block font-mono bg-bg-primary p-2 rounded-sm mt-2 break-all border border-border-color whitespace-pre-wrap">
                             {effectiveRootPaths.length > 0
                               ? effectiveRootPaths.join('\n')
@@ -2451,7 +2453,7 @@ export default function SettingsPanel({
                       }}
                       buttonText={t('settings.data.logsButton')}
                       description={
-                        <Text as="span" variant={TextVariants.small}>
+                        <UiText as="span" variant={TextVariants.small}>
                           {t('settings.data.logsDesc')}
                           <span className="block font-mono bg-bg-primary p-2 rounded-sm mt-2 break-all border border-border-color">
                             {logPathLoading
@@ -2460,7 +2462,7 @@ export default function SettingsPanel({
                                 ? t('settings.data.statuses.failedToGetPath')
                                 : logPath}
                           </span>
-                        </Text>
+                        </UiText>
                       }
                       disabled={logPathLoading || logPathError || !logPath}
                       icon={<ExternalLinkIcon size={16} className="mr-2" />}
@@ -2483,17 +2485,17 @@ export default function SettingsPanel({
                 className="space-y-10"
               >
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     {t('settings.controls.title')}
-                  </Text>
+                  </UiText>
                   <div className="space-y-8">
                     <div>
-                      <Text variant={TextVariants.heading} className="mb-2">
+                      <UiText variant={TextVariants.heading} className="mb-2">
                         {t('settings.controls.optimization')}
-                      </Text>
-                      <Text variant={TextVariants.small} className="mb-4">
+                      </UiText>
+                      <UiText variant={TextVariants.small} className="mb-4">
                         {t('settings.controls.optimizationDesc')}
-                      </Text>
+                      </UiText>
                       <CanvasInputModeSwitch
                         mode={appSettings.canvasInputMode || 'mouse'}
                         onModeChange={(value) => {
@@ -2520,9 +2522,9 @@ export default function SettingsPanel({
                 </div>
 
                 <div className="p-6 bg-surface rounded-xl shadow-md">
-                  <Text variant={TextVariants.title} color={TextColors.accent} className="mb-8">
+                  <UiText variant={TextVariants.title} color={TextColors.accent} className="mb-8">
                     {t('settings.controls.keyboardTitle')}
-                  </Text>
+                  </UiText>
                   <div className="space-y-8">
                     {' '}
                     {KEYBIND_SECTIONS.map((section) => {
@@ -2530,7 +2532,7 @@ export default function SettingsPanel({
                       const userKb = appSettings.keybinds || {};
                       return (
                         <div key={section.id}>
-                          <Text variant={TextVariants.heading}>{translateDynamicKey(t, section.label)}</Text>
+                          <UiText variant={TextVariants.heading}>{translateDynamicKey(t, section.label)}</UiText>
                           <div className="divide-y divide-border-color">
                             {sectionDefs.map((def) => (
                               <KeybindRow

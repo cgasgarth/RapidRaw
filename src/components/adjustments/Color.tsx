@@ -15,7 +15,7 @@ import {
 import { AppSettings } from '../ui/AppProperties';
 import ColorWheel from '../ui/ColorWheel';
 import Slider from '../ui/Slider';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface ColorProps {
   color: string;
@@ -366,13 +366,13 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
 
   return (
     <div className="p-2 bg-bg-tertiary rounded-md mt-4">
-      <Text variant={TextVariants.heading} className="mb-2">
+      <UiText variant={TextVariants.heading} className="mb-2">
         {t('adjustments.color.calibration.title')}
-      </Text>
+      </UiText>
       <div>
-        <Text color={TextColors.primary} weight={TextWeights.medium} className="mb-1">
+        <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-1">
           {t('adjustments.color.calibration.shadows')}
-        </Text>
+        </UiText>
         <Slider
           label={t('adjustments.color.calibration.tint')}
           min={-100}
@@ -388,9 +388,9 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
         />
       </div>
       <div className="mt-3">
-        <Text color={TextColors.primary} weight={TextWeights.medium} className="mb-3">
+        <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-3">
           {t('adjustments.color.calibration.primaries')}
-        </Text>
+        </UiText>
         <div className="flex justify-center gap-6 mb-4 px-1">
           {PRIMARY_COLORS.map(({ name, color, label }) => (
             <ColorSwatch
@@ -513,7 +513,7 @@ export default function ColorPanel({
     <div className="space-y-4">
       <div className="p-2 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
-          <Text variant={TextVariants.heading}>{t('adjustments.color.whiteBalance')}</Text>
+          <UiText variant={TextVariants.heading}>{t('adjustments.color.whiteBalance')}</UiText>
           {!isForMask && toggleWbPicker && (
             <button
               onClick={toggleWbPicker}
@@ -560,9 +560,9 @@ export default function ColorPanel({
       </div>
 
       <div className="p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2">
+        <UiText variant={TextVariants.heading} className="mb-2">
           {t('adjustments.color.presence')}
-        </Text>
+        </UiText>
         <Slider
           label={t('adjustments.color.vibrance')}
           max={100}
@@ -588,9 +588,9 @@ export default function ColorPanel({
       </div>
 
       <div className="p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-3">
+        <UiText variant={TextVariants.heading} className="mb-3">
           {t('adjustments.color.colorGrading')}
-        </Text>
+        </UiText>
         <ColorGradingPanel
           adjustments={adjustments}
           setAdjustments={setAdjustments}
@@ -600,9 +600,9 @@ export default function ColorPanel({
       </div>
 
       <div className="p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-3">
+        <UiText variant={TextVariants.heading} className="mb-3">
           {t('adjustments.color.colorMixer')}
-        </Text>
+        </UiText>
         <div className="flex justify-between mb-4 px-1">
           {HSL_COLORS.map(({ name, color, label }) => (
             <ColorSwatch

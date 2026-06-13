@@ -9,7 +9,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { Color, COLOR_LABELS } from '../../utils/adjustments';
 import { ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
@@ -293,9 +293,9 @@ const FilmstripThumbnail = memo(
                 hasRating && (hasEditIcon || hasColorLabel) ? 'ml-1.5' : 'ml-0',
               )}
             >
-              <Text variant={TextVariants.small} color={TextColors.white}>
+              <UiText variant={TextVariants.small} color={TextColors.white}>
                 {rating}
-              </Text>
+              </UiText>
               <Star size={12} className="text-white fill-white" />
             </div>
           </div>
@@ -306,7 +306,7 @@ const FilmstripThumbnail = memo(
             <div className="absolute bottom-0 right-0 w-1/2 h-1/2 bg-linear-to-tl from-black/30 via-black/0 to-transparent pointer-events-none z-0" />
 
             <div className="absolute bottom-1 right-1 z-10">
-              <Text
+              <UiText
                 as="div"
                 variant={TextVariants.small}
                 color={TextColors.white}
@@ -315,7 +315,7 @@ const FilmstripThumbnail = memo(
                 data-tooltip={t('ui.filmstrip.tooltips.virtualCopy')}
               >
                 {t('ui.filmstrip.virtualCopyAbbreviation')}
-              </Text>
+              </UiText>
             </div>
           </>
         )}

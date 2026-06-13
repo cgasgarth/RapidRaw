@@ -21,7 +21,7 @@ import EffectsPanel from '../../adjustments/Effects';
 import { OPTION_SEPARATOR, Orientation, type Option } from '../../ui/AppProperties';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Resizer from '../../ui/Resizer';
-import Text from '../../ui/Text';
+import UiText from '../../ui/Text';
 import Waveform from '../editor/Waveform';
 
 const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'color', 'details', 'effects'] as const;
@@ -305,7 +305,7 @@ export default function Controls() {
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('editor.adjustments.title')}</Text>
+        <UiText variant={TextVariants.title}>{t('editor.adjustments.title')}</UiText>
         <div className="flex items-center gap-1">
           <button
             className="p-2 rounded-full hover:bg-surface disabled:cursor-not-allowed transition-colors"
