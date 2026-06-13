@@ -27,6 +27,7 @@ without exposing runtime app-server tools yet.
 - `NegativeLabBuiltInPresetCatalogV1`
 - `NegativeLabPresetMetadataPolicyCatalogV1`
 - `NegativeLabQcProofArtifactV1`
+- `NegativeLabRollBatchWorkflowV1`
 - `NegativeLabFixtureManifestV1`
 - `NegativeLabInputProfileCatalogV1`
 
@@ -75,5 +76,6 @@ Negative Lab density/process profile samples include:
 - `negative-lab-built-in-preset-catalog-v1.json`
 - `negative-lab-preset-metadata-policy-catalog-v1.json`
 - `negative-lab-qc-proof-artifact-v1.json`
+- `negative-lab-roll-batch-workflow-v1.json`
 - `negative-lab-fixture-manifest-v1.json`
 - `negative-lab-input-profile-catalog-v1.json`

@@ -18,6 +18,7 @@ import {
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
   negativeLabQcProofArtifactV1Schema,
+  negativeLabRollBatchWorkflowV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -42,6 +43,7 @@ import {
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
   sampleNegativeLabQcProofArtifactV1,
+  sampleNegativeLabRollBatchWorkflowV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -137,6 +139,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab QC proof artifact',
     schema: negativeLabQcProofArtifactV1Schema,
     value: sampleNegativeLabQcProofArtifactV1,
+  },
+  {
+    name: 'negative lab roll batch workflow',
+    schema: negativeLabRollBatchWorkflowV1Schema,
+    value: sampleNegativeLabRollBatchWorkflowV1,
   },
   {
     name: 'negative lab positive variant provenance',
@@ -857,6 +864,109 @@ const invalidQcMetricFrameResult = negativeLabQcProofArtifactV1Schema.safeParse(
 if (invalidQcMetricFrameResult.success) {
   throw new Error('Expected QC proof artifacts to reject roll metrics for unlisted frames.');
 }
+
+const [
+  sampleRollBatchFrameDetectionStage,
+  sampleRollBatchBaseStage,
+  sampleRollBatchConversionStage,
+  ...remainingSampleRollBatchStages
+] = sampleNegativeLabRollBatchWorkflowV1.stagePlans;
+const [sampleRollBatchFrameMetric] = sampleNegativeLabRollBatchWorkflowV1.rollConsistencyPreview.frameMetrics;
+if (
+  sampleRollBatchFrameDetectionStage === undefined ||
+  sampleRollBatchBaseStage === undefined ||
+  sampleRollBatchConversionStage === undefined ||
+  sampleRollBatchFrameMetric === undefined
+) {
+  throw new Error('Expected roll batch workflow sample to include stages and frame metrics.');
+}
+
+const invalidRollBatchWorkflowRejectedFrames = {
+  ...sampleNegativeLabRollBatchWorkflowV1,
+  batchPolicy: {
+    ...sampleNegativeLabRollBatchWorkflowV1.batchPolicy,
+    includeRejectedFrames: true,
+  },
+};
+expectInvalid(
+  'negative lab roll batch workflow that includes rejected frames',
+  negativeLabRollBatchWorkflowV1Schema,
+  invalidRollBatchWorkflowRejectedFrames,
+);
+
+const invalidRollBatchWorkflowAnchorOutsideSelection = {
+  ...sampleNegativeLabRollBatchWorkflowV1,
+  anchorFrameIds: ['missing_frame'],
+};
+expectInvalid(
+  'negative lab roll batch workflow with anchor outside selected frames',
+  negativeLabRollBatchWorkflowV1Schema,
+  invalidRollBatchWorkflowAnchorOutsideSelection,
+);
+
+const invalidRollBatchWorkflowMetricOutsideSelection = {
+  ...sampleNegativeLabRollBatchWorkflowV1,
+  rollConsistencyPreview: {
+    ...sampleNegativeLabRollBatchWorkflowV1.rollConsistencyPreview,
+    frameMetrics: [
+      {
+        ...sampleRollBatchFrameMetric,
+        frameId: 'missing_frame',
+      },
+    ],
+  },
+};
+expectInvalid(
+  'negative lab roll batch workflow with consistency metric outside selected frames',
+  negativeLabRollBatchWorkflowV1Schema,
+  invalidRollBatchWorkflowMetricOutsideSelection,
+);
+
+const invalidRollBatchWorkflowMissingRequiredStage = {
+  ...sampleNegativeLabRollBatchWorkflowV1,
+  stagePlans: sampleNegativeLabRollBatchWorkflowV1.stagePlans.filter((stagePlan) => stagePlan.stage !== 'qc_review'),
+};
+expectInvalid(
+  'negative lab roll batch workflow missing QC review stage',
+  negativeLabRollBatchWorkflowV1Schema,
+  invalidRollBatchWorkflowMissingRequiredStage,
+);
+
+const invalidRollBatchWorkflowDryRunReadyWithoutPlan = {
+  ...sampleNegativeLabRollBatchWorkflowV1,
+  stagePlans: [
+    sampleRollBatchFrameDetectionStage,
+    sampleRollBatchBaseStage,
+    {
+      ...sampleRollBatchConversionStage,
+      dryRunPlanIds: [],
+    },
+    ...remainingSampleRollBatchStages,
+  ],
+};
+expectInvalid(
+  'negative lab roll batch workflow dry-run stage without plan IDs',
+  negativeLabRollBatchWorkflowV1Schema,
+  invalidRollBatchWorkflowDryRunReadyWithoutPlan,
+);
+
+const invalidRollBatchWorkflowDuplicateStages = {
+  ...sampleNegativeLabRollBatchWorkflowV1,
+  stagePlans: [
+    sampleRollBatchFrameDetectionStage,
+    {
+      ...sampleRollBatchBaseStage,
+      stage: sampleRollBatchFrameDetectionStage.stage,
+    },
+    sampleRollBatchConversionStage,
+    ...remainingSampleRollBatchStages,
+  ],
+};
+expectInvalid(
+  'negative lab roll batch workflow with duplicate stages',
+  negativeLabRollBatchWorkflowV1Schema,
+  invalidRollBatchWorkflowDuplicateStages,
+);
 
 const [sampleNegativeLabFixture, secondSampleNegativeLabFixture] = sampleNegativeLabFixtureManifestV1.entries;
 if (sampleNegativeLabFixture === undefined || secondSampleNegativeLabFixture === undefined) {

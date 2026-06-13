@@ -23,6 +23,7 @@ import {
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
   negativeLabQcProofArtifactV1Schema,
+  negativeLabRollBatchWorkflowV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -46,6 +47,7 @@ import {
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
   sampleNegativeLabQcProofArtifactV1,
+  sampleNegativeLabRollBatchWorkflowV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -126,6 +128,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab-qc-proof-artifact-v1.json',
     schema: negativeLabQcProofArtifactV1Schema,
     value: sampleNegativeLabQcProofArtifactV1,
+  },
+  {
+    name: 'negative lab roll batch workflow',
+    path: 'packages/rawengine-schema/samples/negative-lab-roll-batch-workflow-v1.json',
+    schema: negativeLabRollBatchWorkflowV1Schema,
+    value: sampleNegativeLabRollBatchWorkflowV1,
   },
   {
     name: 'negative lab dry-run result',

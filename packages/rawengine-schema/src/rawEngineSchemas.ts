@@ -1878,6 +1878,156 @@ export const negativeLabRollConsistencyMetricsV1Schema = z
     }
   });
 
+export const negativeLabRollBatchWorkflowStageV1Schema = z.enum([
+  'frame_detection_review',
+  'base_fog_sampling',
+  'conversion_recipe',
+  'roll_normalization',
+  'positive_variant_creation',
+  'qc_review',
+]);
+
+export const negativeLabRollBatchWorkflowStagePlanV1Schema = z
+  .object({
+    commandIds: z.array(z.string().trim().min(1)),
+    commandType: negativeLabCommandTypeSchema.optional(),
+    dryRunPlanIds: z.array(z.string().trim().min(1)),
+    requiredBeforeStages: z.array(negativeLabRollBatchWorkflowStageV1Schema),
+    stage: negativeLabRollBatchWorkflowStageV1Schema,
+    status: z.enum(['planned', 'dry_run_ready', 'applied', 'blocked']),
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict();
+
+export const negativeLabRollBatchWorkflowV1Schema = z
+  .object({
+    anchorFrameIds: nonEmptyIdArraySchema,
+    batchPolicy: z
+      .object({
+        autoApplyEligible: z.boolean(),
+        baseStrategy: z.enum(['roll_shared_base', 'anchor_frame_base', 'per_frame_base']),
+        includeRejectedFrames: z.boolean(),
+        maxPerFrameExposureDeltaEv: z.number().nonnegative(),
+        maxWhiteBalanceDelta: z.number().nonnegative(),
+        normalizationMode: z.enum(['exposure_only', 'white_balance_only', 'density_and_balance']),
+        preserveCreativeAdjustments: z.boolean(),
+      })
+      .strict(),
+    expectedArtifactPurposes: z.array(
+      z.enum([
+        'objective_positive_preview',
+        'density_map',
+        'base_sample_overlay',
+        'clipping_overlay',
+        'warning_report',
+        'parameter_diff',
+        'qc_contact_sheet',
+      ]),
+    ),
+    frameSelection: negativeLabFrameSelectionV1Schema,
+    processFamily: negativeLabSupportedProcessFamilyV1Schema,
+    qcProofId: z.string().trim().min(1).optional(),
+    rollConsistencyPreview: negativeLabRollConsistencyMetricsV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sessionId: z.string().trim().min(1),
+    stagePlans: z.array(negativeLabRollBatchWorkflowStagePlanV1Schema).min(1),
+    workflowId: z.string().trim().min(1),
+    workflowVersion: z.string().trim().min(1),
+  })
+  .strict()
+  .superRefine((workflow, context) => {
+    const selectedFrameIds =
+      workflow.frameSelection.mode === 'selected' ? new Set(workflow.frameSelection.frameIds) : undefined;
+    const seenStages = new Set<z.infer<typeof negativeLabRollBatchWorkflowStageV1Schema>>();
+
+    if (workflow.batchPolicy.includeRejectedFrames) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Roll batch workflows must not include rejected frames.',
+        path: ['batchPolicy', 'includeRejectedFrames'],
+      });
+    }
+
+    for (const [index, anchorFrameId] of workflow.anchorFrameIds.entries()) {
+      if (selectedFrameIds !== undefined && !selectedFrameIds.has(anchorFrameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Roll batch anchor frames must be included in the selected frame set.',
+          path: ['anchorFrameIds', index],
+        });
+      }
+    }
+
+    for (const [index, metric] of workflow.rollConsistencyPreview.frameMetrics.entries()) {
+      if (selectedFrameIds !== undefined && !selectedFrameIds.has(metric.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Roll consistency preview metrics must be included in the selected frame set.',
+          path: ['rollConsistencyPreview', 'frameMetrics', index, 'frameId'],
+        });
+      }
+    }
+
+    for (const [index, stagePlan] of workflow.stagePlans.entries()) {
+      if (seenStages.has(stagePlan.stage)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Roll batch workflow stages must be unique.',
+          path: ['stagePlans', index, 'stage'],
+        });
+      }
+      seenStages.add(stagePlan.stage);
+
+      if (stagePlan.status === 'applied' && stagePlan.commandIds.length === 0) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Applied roll batch workflow stages require command IDs.',
+          path: ['stagePlans', index, 'commandIds'],
+        });
+      }
+
+      if (stagePlan.status === 'dry_run_ready' && stagePlan.dryRunPlanIds.length === 0) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Dry-run-ready roll batch workflow stages require dry-run plan IDs.',
+          path: ['stagePlans', index, 'dryRunPlanIds'],
+        });
+      }
+
+      if (stagePlan.commandType !== undefined && !stagePlan.commandIds.every((commandId) => commandId.length > 0)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Command-backed roll batch workflow stages require non-empty command IDs.',
+          path: ['stagePlans', index, 'commandIds'],
+        });
+      }
+    }
+
+    const stageSet = new Set(workflow.stagePlans.map((stagePlan) => stagePlan.stage));
+    for (const requiredStage of [
+      'base_fog_sampling',
+      'conversion_recipe',
+      'roll_normalization',
+      'qc_review',
+    ] as const) {
+      if (!stageSet.has(requiredStage)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Roll batch workflow is missing a required consistency stage.',
+          path: ['stagePlans'],
+        });
+      }
+    }
+
+    if (workflow.qcProofId !== undefined && !stageSet.has('qc_review')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Roll batch workflows with a QC proof must include the QC review stage.',
+        path: ['qcProofId'],
+      });
+    }
+  });
+
 export const negativeLabQcProofArtifactV1Schema = z
   .object({
     contactSheet: z
@@ -2511,6 +2661,9 @@ export type NegativeLabQcOverlayKind = z.infer<typeof negativeLabQcOverlayKindSc
 export type NegativeLabQcOverlayV1 = z.infer<typeof negativeLabQcOverlayV1Schema>;
 export type NegativeLabQcProofArtifactV1 = z.infer<typeof negativeLabQcProofArtifactV1Schema>;
 export type NegativeLabPreviewRequestV1 = z.infer<typeof negativeLabPreviewRequestV1Schema>;
+export type NegativeLabRollBatchWorkflowStagePlanV1 = z.infer<typeof negativeLabRollBatchWorkflowStagePlanV1Schema>;
+export type NegativeLabRollBatchWorkflowStageV1 = z.infer<typeof negativeLabRollBatchWorkflowStageV1Schema>;
+export type NegativeLabRollBatchWorkflowV1 = z.infer<typeof negativeLabRollBatchWorkflowV1Schema>;
 export type NegativeLabRollConsistencyFrameMetricV1 = z.infer<typeof negativeLabRollConsistencyFrameMetricV1Schema>;
 export type NegativeLabRollConsistencyMetricsV1 = z.infer<typeof negativeLabRollConsistencyMetricsV1Schema>;
 export type NegativeLabSampleGeometryV1 = z.infer<typeof negativeLabSampleGeometryV1Schema>;
