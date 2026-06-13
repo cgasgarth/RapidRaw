@@ -128,6 +128,18 @@ export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Sc
   },
   artifactId: 'artifact_panorama_session_0001',
   boundaryMode: 'auto_crop',
+  boundarySettings: {
+    crop: {
+      height: 3900,
+      mode: 'auto',
+      width: 9200,
+      x: 42,
+      y: 18,
+    },
+    effectiveMode: 'auto_crop',
+    requestedMode: 'auto_crop',
+    support: 'implemented_current_engine',
+  },
   createdAt: '2026-06-13T07:30:00.000Z',
   crop: {
     height: 3900,

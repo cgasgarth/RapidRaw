@@ -24,7 +24,7 @@ The v1 schema includes:
 - source image references with RAW-default and lens-correction state;
 - engine identity, quality tier, and capability flags;
 - projection intent;
-- boundary mode and crop rectangle;
+- boundary settings, boundary mode, and crop rectangle;
 - pairwise homography summaries;
 - exposure normalization status;
 - seam policy;
