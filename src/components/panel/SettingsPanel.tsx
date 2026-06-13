@@ -693,26 +693,32 @@ export default function SettingsPanel({
   const taggingShortcuts = Array.from(new Set<string>(appSettings.taggingShortcuts || []));
 
   useEffect(() => {
-    setAiConnectorAddress((current) =>
-      appSettings.aiConnectorAddress !== current ? appSettings.aiConnectorAddress || '' : current,
-    );
-    setAiProvider((current) => (appSettings.aiProvider !== current ? appSettings.aiProvider || 'cpu' : current));
-    setProcessingSettings({
-      editorPreviewResolution: appSettings.editorPreviewResolution || 1920,
-      thumbnailResolution: appSettings.thumbnailResolution || 720,
-      rawHighlightCompression: appSettings.rawHighlightCompression ?? 2.5,
-      processingBackend: appSettings.processingBackend || 'auto',
-      linuxGpuOptimization: appSettings.linuxGpuOptimization ?? false,
-      highResZoomMultiplier: appSettings.highResZoomMultiplier || 1.0,
-      useFullDpiRendering: appSettings.useFullDpiRendering ?? false,
-      useWgpuRenderer: appSettings.useWgpuRenderer ?? true,
-      thumbnailWorkerThreads: appSettings.thumbnailWorkerThreads ?? 4,
-      imageCacheSize: appSettings.imageCacheSize ?? 5,
-      rawPreprocessingColorNr: appSettings.rawPreprocessingColorNr ?? 0.5,
-      rawPreprocessingSharpening: appSettings.rawPreprocessingSharpening ?? 0.35,
-      applyPreprocessingToNonRaws: appSettings.applyPreprocessingToNonRaws ?? false,
-    });
-    setRestartRequired(false);
+    const syncTimer = setTimeout(() => {
+      setAiConnectorAddress((current) =>
+        appSettings.aiConnectorAddress !== current ? appSettings.aiConnectorAddress || '' : current,
+      );
+      setAiProvider((current) => (appSettings.aiProvider !== current ? appSettings.aiProvider || 'cpu' : current));
+      setProcessingSettings({
+        editorPreviewResolution: appSettings.editorPreviewResolution || 1920,
+        thumbnailResolution: appSettings.thumbnailResolution || 720,
+        rawHighlightCompression: appSettings.rawHighlightCompression ?? 2.5,
+        processingBackend: appSettings.processingBackend || 'auto',
+        linuxGpuOptimization: appSettings.linuxGpuOptimization ?? false,
+        highResZoomMultiplier: appSettings.highResZoomMultiplier || 1.0,
+        useFullDpiRendering: appSettings.useFullDpiRendering ?? false,
+        useWgpuRenderer: appSettings.useWgpuRenderer ?? true,
+        thumbnailWorkerThreads: appSettings.thumbnailWorkerThreads ?? 4,
+        imageCacheSize: appSettings.imageCacheSize ?? 5,
+        rawPreprocessingColorNr: appSettings.rawPreprocessingColorNr ?? 0.5,
+        rawPreprocessingSharpening: appSettings.rawPreprocessingSharpening ?? 0.35,
+        applyPreprocessingToNonRaws: appSettings.applyPreprocessingToNonRaws ?? false,
+      });
+      setRestartRequired(false);
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [appSettings]);
 
   useEffect(() => {
