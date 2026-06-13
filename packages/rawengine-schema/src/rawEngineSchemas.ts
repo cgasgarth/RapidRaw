@@ -161,11 +161,189 @@ export const rawEngineToolRegistryV1Schema = z
   })
   .strict();
 
+export const panoramaProjectionSchema = z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']);
+
+export const panoramaBoundaryModeSchema = z.enum(['auto_crop', 'transparent', 'manual_crop', 'deferred_fill']);
+
+export const panoramaWarningCodeSchema = z.enum([
+  'source_excluded',
+  'insufficient_features',
+  'ambiguous_matches',
+  'weak_alignment',
+  'low_inlier_count',
+  'high_memory_estimate',
+  'memory_budget_exceeded',
+  'missing_lens_correction',
+  'exposure_mismatch',
+  'projection_runtime_deferred',
+  'boundary_runtime_deferred',
+  'cancellation_not_supported',
+]);
+
+export const panoramaEngineCapabilitiesV1Schema = z
+  .object({
+    adaptiveSeamFeather: z.boolean(),
+    autoCrop: z.boolean(),
+    bundleAdjustment: z.boolean(),
+    cylindricalProjection: z.boolean(),
+    exposureNormalization: z.boolean(),
+    planarHomography: z.boolean(),
+    tiledRender: z.boolean(),
+  })
+  .strict();
+
+export const panoramaEngineV1Schema = z
+  .object({
+    capabilities: panoramaEngineCapabilitiesV1Schema,
+    engineId: z.literal('rapidraw_homography_seam_v0'),
+    qualityTier: z.enum(['legacy_local_preview', 'validated_planar_v1']),
+  })
+  .strict();
+
+export const panoramaSourceImageRefV1Schema = z
+  .object({
+    colorSpaceHint: z.string().trim().min(1).optional(),
+    imageId: z.string().trim().min(1).optional(),
+    imagePath: z.string().trim().min(1),
+    lensCorrectionState: z.enum(['unknown', 'not_applied', 'applied', 'required_before_stitch']),
+    rawDefaultsApplied: z.boolean(),
+    sourceIndex: z.number().int().nonnegative(),
+    virtualCopyId: z.string().trim().min(1).nullable().optional(),
+  })
+  .strict();
+
+export const panoramaCropV1Schema = z
+  .object({
+    height: z.number().int().positive(),
+    mode: z.enum(['none', 'auto', 'manual']),
+    width: z.number().int().positive(),
+    x: z.number().int().nonnegative(),
+    y: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const panoramaPairwiseMatchV1Schema = z
+  .object({
+    fromSourceIndex: z.number().int().nonnegative(),
+    homography3x3: z.tuple([
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+      z.number(),
+    ]),
+    inliers: z.number().int().nonnegative(),
+    matchQuality: z.enum(['accepted', 'weak', 'rejected']),
+    reprojectionErrorPx: z.number().nonnegative().optional(),
+    toSourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const panoramaAlignmentV1Schema = z
+  .object({
+    algorithmId: z.literal('rapidraw_fast9_brief_ransac_v1'),
+    downscaleMaxDimensionPx: z.number().int().positive(),
+    globalHomographyCount: z.number().int().nonnegative(),
+    minimumInliersForConnection: z.number().int().positive(),
+    pairwiseMatches: z.array(panoramaPairwiseMatchV1Schema),
+    ransacSeed: z.number().int().nonnegative().optional(),
+    ransacInlierThresholdPx: z.number().positive(),
+    ransacIterations: z.number().int().positive(),
+  })
+  .strict();
+
+export const panoramaExposureNormalizationV1Schema = z
+  .object({
+    mode: z.enum(['none', 'planned', 'gain_offset_v1']),
+    perSourceCorrections: z
+      .array(
+        z
+          .object({
+            exposureEv: z.number(),
+            sourceIndex: z.number().int().nonnegative(),
+            temperatureShift: z.number().optional(),
+            tintShift: z.number().optional(),
+          })
+          .strict(),
+      )
+      .optional(),
+  })
+  .strict();
+
+export const panoramaSeamPolicyV1Schema = z
+  .object({
+    featherWidthPx: z.number().positive(),
+    lowDetailFeatherMultiplier: z.number().positive(),
+    mode: z.enum(['adaptive_dp_feather_v1', 'overwrite_fallback']),
+  })
+  .strict();
+
+export const panoramaValidationMetricsV1Schema = z
+  .object({
+    estimatedPeakMemoryBytes: z.number().int().nonnegative().optional(),
+    excludedSourceCount: z.number().int().nonnegative(),
+    overlapCoverageRatio: z.number().min(0).max(1).optional(),
+    outputHeight: z.number().int().positive(),
+    outputWidth: z.number().int().positive(),
+    reprojectionP95Px: z.number().nonnegative().optional(),
+    reprojectionRmsPx: z.number().nonnegative().optional(),
+    seamEnergy: z.number().nonnegative().optional(),
+    sourceCount: z.number().int().positive(),
+    stitchedSourceCount: z.number().int().positive(),
+  })
+  .strict();
+
+export const panoramaArtifactV1Schema = z
+  .object({
+    alignment: panoramaAlignmentV1Schema,
+    artifactId: z.string().trim().min(1),
+    boundaryMode: panoramaBoundaryModeSchema,
+    createdAt: z.iso.datetime({ offset: true }),
+    crop: panoramaCropV1Schema,
+    excludedSources: z
+      .array(
+        z
+          .object({
+            reason: panoramaWarningCodeSchema,
+            sourceIndex: z.number().int().nonnegative(),
+          })
+          .strict(),
+      )
+      .default([]),
+    engine: panoramaEngineV1Schema,
+    exposureNormalization: panoramaExposureNormalizationV1Schema,
+    lensCorrectionPolicy: z.enum(['unchanged', 'required_before_stitch', 'applied_before_stitch', 'deferred']),
+    operationId: z.string().trim().min(1),
+    operationVersion: z.literal(1),
+    outputArtifacts: z.array(artifactHandleV1Schema).min(1),
+    outputColorSpace: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema),
+    projection: panoramaProjectionSchema,
+    provenance: z
+      .object({
+        commandId: z.string().trim().min(1).optional(),
+        graphRevision: z.string().trim().min(1).optional(),
+        runtimeStatus: z.enum(['schema_only', 'dry_run_planned', 'rendered']),
+      })
+      .strict(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    seamPolicy: panoramaSeamPolicyV1Schema,
+    sourceImageRefs: z.array(panoramaSourceImageRefV1Schema).min(2),
+    validationMetrics: panoramaValidationMetricsV1Schema,
+    warnings: z.array(panoramaWarningCodeSchema),
+  })
+  .strict();
+
 export type ActorKind = z.infer<typeof actorKindSchema>;
 export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
+export type PanoramaArtifactV1 = z.infer<typeof panoramaArtifactV1Schema>;
 export type QueryEnvelopeV1 = z.infer<typeof queryEnvelopeV1Schema>;
 export type RawEngineActor = z.infer<typeof rawEngineActorSchema>;
 export type RawEngineTarget = z.infer<typeof rawEngineTargetSchema>;

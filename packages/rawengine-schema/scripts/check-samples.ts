@@ -3,12 +3,14 @@ import { z } from 'zod';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
   rawEngineToolRegistryV1Schema,
 } from '../src/rawEngineSchemas.js';
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
   sampleToolRegistryV1,
 } from '../src/samplePayloads.js';
@@ -37,6 +39,11 @@ const validSamples: ReadonlyArray<{
     name: 'tool registry',
     schema: rawEngineToolRegistryV1Schema,
     value: sampleToolRegistryV1,
+  },
+  {
+    name: 'panorama artifact',
+    schema: panoramaArtifactV1Schema,
+    value: samplePanoramaArtifactV1,
   },
 ];
 

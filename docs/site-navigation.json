@@ -87,6 +87,10 @@
           "path": "docs/panorama/large-panorama-tiling-strategy-2026-06-13.md"
         },
         {
+          "title": "Panorama artifact schema",
+          "path": "docs/panorama/panorama-artifact-schema-2026-06-13.md"
+        },
+        {
           "title": "Architecture baseline",
           "path": "docs/baseline/rapidraw-architecture-baseline-2026-06-11.md"
         },

@@ -4654,7 +4654,8 @@ Issues:
 - Consult on panorama architecture.
 - Audit existing RapidRAW panorama stitcher. Initial audit captured in
   `docs/panorama/rapidraw-stitcher-audit-2026-06-13.md`.
-- Define panorama artifact schema.
+- Define panorama artifact schema. Initial contract captured in
+  `docs/panorama/panorama-artifact-schema-2026-06-13.md`.
 - Add projection options.
 - Add auto crop/boundary controls.
 - Add exposure normalization.
