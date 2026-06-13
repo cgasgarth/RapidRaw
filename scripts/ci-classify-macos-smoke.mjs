@@ -21,7 +21,6 @@ const MODE_PRIORITY = new Map([
   [SMOKE_MODES.RELEASE, 2],
 ]);
 
-const DEBUG_PREFIXES = ['.github/actions/', '.github/workflows/'];
 const RELEASE_PREFIXES = ['src-tauri/'];
 
 const ALWAYS_REQUIRE_FILES = new Set([
@@ -85,12 +84,8 @@ function classifyPath(path) {
     return { mode: SMOKE_MODES.RELEASE, reason: 'Rust or Tauri path changed' };
   }
 
-  if (DEBUG_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-    return { mode: SMOKE_MODES.DEBUG, reason: 'workflow or action path changed' };
-  }
-
   if (path.startsWith('.github/')) {
-    return { mode: SMOKE_MODES.DEBUG, reason: 'GitHub repository automation changed' };
+    return { mode: SMOKE_MODES.NONE, reason: 'GitHub automation is covered by actionlint and pin audits' };
   }
 
   if (path.startsWith('src/') && path.endsWith('.rs')) {
@@ -195,11 +190,11 @@ function assertClassification(name, files, expectedMode) {
 
 function runSelfTest() {
   assertClassification('empty file list fails closed', [], SMOKE_MODES.RELEASE);
-  assertClassification('workflow changes require debug smoke', ['.github/workflows/lint.yml'], SMOKE_MODES.DEBUG);
+  assertClassification('workflow changes skip smoke', ['.github/workflows/lint.yml'], SMOKE_MODES.NONE);
   assertClassification(
-    'github action changes require debug smoke',
+    'github action changes skip smoke',
     ['.github/actions/setup-bun-deps/action.yml'],
-    SMOKE_MODES.DEBUG,
+    SMOKE_MODES.NONE,
   );
   assertClassification('tauri changes require release smoke', ['src-tauri/src/main.rs'], SMOKE_MODES.RELEASE);
   assertClassification('package changes require release smoke', ['package.json'], SMOKE_MODES.RELEASE);
@@ -218,9 +213,9 @@ function runSelfTest() {
   );
   assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], SMOKE_MODES.NONE);
   assertClassification(
-    'mixed safe and debug paths require debug smoke',
+    'mixed safe and workflow paths skip smoke',
     ['README.md', '.github/workflows/lint.yml'],
-    SMOKE_MODES.DEBUG,
+    SMOKE_MODES.NONE,
   );
   assertClassification(
     'mixed safe and release paths require release smoke',

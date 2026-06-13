@@ -8,14 +8,14 @@ regression, and release packaging.
 
 ## Current Split
 
-| Workflow                    | File                                                | Trigger                 | Blocking status                     |
-| --------------------------- | --------------------------------------------------- | ----------------------- | ----------------------------------- |
-| Baseline Validation         | `.github/workflows/lint.yml`                        | PRs, `main`, manual     | Required through `PR CI / required` |
-| Main Full Build             | `.github/workflows/ci.yml`                          | `main` pushes           | Required post-merge signal          |
-| Image Quality Regression    | `.github/workflows/image-quality.yml`               | manual                  | Non-required readiness scaffold     |
-| Performance Regression      | `.github/workflows/performance.yml`                 | manual                  | Non-required readiness scaffold     |
-| Release Build And Package   | `.github/workflows/release.yml`                     | manual, release created | Release-only                        |
-| GitHub Action Version Audit | `.github/workflows/github-action-version-audit.yml` | schedule, manual        | Non-required maintenance signal     |
+| Workflow                    | File                                                | Trigger                                     | Blocking status                     |
+| --------------------------- | --------------------------------------------------- | ------------------------------------------- | ----------------------------------- |
+| Baseline Validation         | `.github/workflows/lint.yml`                        | PRs, `main`, manual                         | Required through `PR CI / required` |
+| Main Full Build             | `.github/workflows/ci.yml`                          | App-impacting `main` pushes and manual runs | Post-merge package signal           |
+| Image Quality Regression    | `.github/workflows/image-quality.yml`               | manual                                      | Non-required readiness scaffold     |
+| Performance Regression      | `.github/workflows/performance.yml`                 | manual                                      | Non-required readiness scaffold     |
+| Release Build And Package   | `.github/workflows/release.yml`                     | manual, release created                     | Release-only                        |
+| GitHub Action Version Audit | `.github/workflows/github-action-version-audit.yml` | schedule, manual                            | Non-required maintenance signal     |
 
 ## Merge Queue
 
@@ -57,10 +57,26 @@ Promotion from readiness lane to real validation requires:
 
 ## Concurrency Policy
 
-PR and `main` validation should not cancel older queued or running checks. GitHub
-Actions is allowed to finish evidence for older commits. Speed work should come
-from parallel jobs, tighter path routing inside always-starting workflows,
-caching, and smaller validation commands.
+PR validation should not cancel older queued or running checks because each PR
+head needs independent merge evidence. `main` push validation is different:
+newer main heads supersede older post-merge heads, so the always-on validation
+workflows use a `main`-scoped concurrency group with `cancel-in-progress` enabled
+only for `push` events on `refs/heads/main`. PR and manual runs use unique
+per-run concurrency groups and continue independently.
+
+`main` pushes should not enqueue macOS work that duplicates already-passed PR
+coverage. Baseline validation keeps Ubuntu checks on every main push, but macOS
+Rust check/clippy jobs run only for PRs that route to macOS smoke or for manual
+workflow dispatches. The full package build workflow is path-filtered to
+app-impacting changes so docs-only and planning-only merges do not consume
+scarce macOS packaging runners while newer main validations are waiting.
+
+Workflow-only and GitHub composite-action changes should not route to macOS
+smoke by default. They are covered by actionlint, pinned-action audit, the
+aggregate PR gate, and any normal Ubuntu jobs that exercise the changed action.
+If a workflow change also touches `src-tauri`, lockfiles, package manifests, or
+build configuration, those app-impacting paths still route to the appropriate
+macOS smoke mode.
 
 ## Active PR Queue Policy
 
