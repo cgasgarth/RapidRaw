@@ -1,0 +1,243 @@
+{
+  "registry": {
+    "schemaVersion": 1,
+    "tools": [
+      {
+        "approvalClass": "safe_read",
+        "inputSchemaName": "QueryEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "ImageMetadataResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "read",
+        "toolName": "image.get_metadata"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "CommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "ToneDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "edit.dry_run_tone"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "ToneColorCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "ToneColorDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "tonecolor.dry_run_command"
+      },
+      {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "ToneColorCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "ToneColorMutationResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "apply",
+        "toolName": "tonecolor.apply_command"
+      },
+      {
+        "approvalClass": "safe_read",
+        "inputSchemaName": "EditGraphSnapshotQueryV1",
+        "mutates": false,
+        "outputSchemaName": "EditGraphSnapshotV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "read",
+        "toolName": "editgraph.snapshot"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "EditGraphCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "EditGraphDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "editgraph.dry_run_command"
+      },
+      {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "EditGraphCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "EditGraphMutationResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "apply",
+        "toolName": "editgraph.apply_command"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "LayerMaskCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "LayerMaskDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "layermask.dry_run_command"
+      },
+      {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "LayerMaskCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "LayerMaskMutationResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "apply",
+        "toolName": "layermask.apply_command"
+      },
+      {
+        "approvalClass": "external_model",
+        "inputSchemaName": "AiToolCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "AiToolDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "ai.mask.dry_run_subject"
+      },
+      {
+        "approvalClass": "generative_edit",
+        "inputSchemaName": "AiToolCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "AiToolApplyResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": true,
+        "toolKind": "apply",
+        "toolName": "ai.mask.apply_subject"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "ComputationalMergeDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "computationalmerge.dry_run_command"
+      },
+      {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "ComputationalMergeMutationResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": true,
+        "toolKind": "apply",
+        "toolName": "computationalmerge.apply_command"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "PreviewScopeQueryV1",
+        "mutates": false,
+        "outputSchemaName": "PreviewScopeResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": true,
+        "toolKind": "preview",
+        "toolName": "preview.read_scopes"
+      },
+      {
+        "approvalClass": "safe_read",
+        "inputSchemaName": "ProjectLibrarySnapshotQueryV1",
+        "mutates": false,
+        "outputSchemaName": "ProjectLibrarySnapshotV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "read",
+        "toolName": "project.library_snapshot"
+      },
+      {
+        "approvalClass": "file_mutation",
+        "inputSchemaName": "ProjectLibraryCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "ProjectLibraryMutationResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": false,
+        "toolKind": "apply",
+        "toolName": "project.library_mutate"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "NegativeLabCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "NegativeLabDryRunResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "negativelab.preview_conversion"
+      },
+      {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "NegativeLabApplyPlanRequestV1",
+        "mutates": true,
+        "outputSchemaName": "NegativeLabApplyResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "apply",
+        "toolName": "negativelab.apply_planned_command"
+      }
+    ]
+  },
+  "schemaVersion": 1,
+  "toolCall": {
+    "approval": {
+      "approvalClass": "external_model",
+      "reason": "Local subject-mask model reads pixels and returns a non-mutating dry-run mask artifact.",
+      "state": "approved"
+    },
+    "arguments": {
+      "actor": {
+        "id": "codex-app-server",
+        "kind": "agent",
+        "sessionId": "session_sample"
+      },
+      "approval": {
+        "approvalClass": "external_model",
+        "reason": "Local subject-mask model reads pixels and returns a non-mutating dry-run mask artifact.",
+        "state": "approved"
+      },
+      "commandId": "command_ai_subject_mask_dry_run_sample",
+      "commandType": "ai.mask.generateSubject",
+      "correlationId": "corr_ai_subject_mask_sample",
+      "dryRun": true,
+      "expectedGraphRevision": "graph_rev_44",
+      "parameters": {
+        "cachePolicy": "reuse_allowed",
+        "capability": "subject_mask",
+        "maskName": "Subject mask",
+        "maxPreviewDimensionPx": 2048,
+        "modelHash": "sha256:local-sam2-subject-mask-model",
+        "modelId": "local_sam2_subject_mask",
+        "modelVersion": "2026.06",
+        "promptPolicy": "none",
+        "providerClass": "local_model",
+        "providerId": "rawengine-local-ai",
+        "sourceContentHash": "sha256:sample-raw-source-hash",
+        "sourcePixelDisclosure": "local_only"
+      },
+      "schemaVersion": 1,
+      "target": {
+        "imagePath": "/photos/session/IMG_0001.CR3",
+        "kind": "image",
+        "virtualCopyId": null
+      }
+    },
+    "dryRun": true,
+    "inputSchemaName": "AiToolCommandEnvelopeV1",
+    "itemId": "item_tool_call_ai_subject_mask_dry_run",
+    "jsonRpcRequestId": "jsonrpc_ai_subject_mask_dry_run",
+    "protocol": "codex_app_server_json_rpc",
+    "schemaVersion": 1,
+    "threadId": "thread_rawengine_agent_ai_mask_sample",
+    "toolKind": "dry_run",
+    "toolName": "ai.mask.dry_run_subject",
+    "transport": "stdio",
+    "turnId": "turn_rawengine_agent_ai_mask_sample"
+  }
+}
