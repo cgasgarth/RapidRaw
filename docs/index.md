@@ -29,6 +29,7 @@ generator before the release workflow needs one.
 - [Sample agent guide](agent/sample-agent-guide-2026-06-11.md)
 - [App-server agent architecture](agent/app-server-architecture-2026-06-12.md)
 - [Negative Lab app-server tool contract](agent/negative-lab-app-server-tools-2026-06-13.md)
+- [Negative Lab consult design review](negative-lab/consult-design-review-2026-06-13.md)
 - [Negative Lab density-domain inversion ADR](negative-lab/density-domain-inversion-adr-2026-06-13.md)
 - [Negative Lab input profile strategy ADR](negative-lab/input-profile-strategy-adr-2026-06-13.md)
 - [Negative Lab API command surface ADR](negative-lab/api-command-surface-adr-2026-06-13.md)

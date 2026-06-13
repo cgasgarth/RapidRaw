@@ -59,6 +59,10 @@
           "path": "docs/agent/negative-lab-app-server-tools-2026-06-13.md"
         },
         {
+          "title": "Negative Lab consult design review",
+          "path": "docs/negative-lab/consult-design-review-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab density-domain inversion ADR",
           "path": "docs/negative-lab/density-domain-inversion-adr-2026-06-13.md"
         },
