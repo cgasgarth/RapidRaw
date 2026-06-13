@@ -1082,6 +1082,51 @@ expectInvalid('computational merge command with mismatched source role', computa
   },
 });
 
+expectInvalid('panorama artifact with output artifacts before render', panoramaArtifactV1Schema, {
+  ...samplePanoramaArtifactV1,
+  provenance: {
+    ...samplePanoramaArtifactV1.provenance,
+    runtimeStatus: 'dry_run_planned',
+  },
+});
+
+expectInvalid('panorama artifact rendered without output artifacts', panoramaArtifactV1Schema, {
+  ...samplePanoramaArtifactV1,
+  outputArtifacts: [],
+});
+
+expectInvalid('panorama artifact with mismatched projection summary', panoramaArtifactV1Schema, {
+  ...samplePanoramaArtifactV1,
+  projection: 'cylindrical',
+});
+
+expectInvalid('panorama artifact with unsupported implemented auto crop', panoramaArtifactV1Schema, {
+  ...samplePanoramaArtifactV1,
+  engine: {
+    ...samplePanoramaArtifactV1.engine,
+    capabilities: {
+      ...samplePanoramaArtifactV1.engine.capabilities,
+      autoCrop: false,
+    },
+  },
+});
+
+expectInvalid('panorama artifact with mismatched source count', panoramaArtifactV1Schema, {
+  ...samplePanoramaArtifactV1,
+  validationMetrics: {
+    ...samplePanoramaArtifactV1.validationMetrics,
+    sourceCount: samplePanoramaArtifactV1.sourceImageRefs.length - 1,
+  },
+});
+
+expectInvalid('panorama artifact with duplicate source indexes', panoramaArtifactV1Schema, {
+  ...samplePanoramaArtifactV1,
+  sourceImageRefs: samplePanoramaArtifactV1.sourceImageRefs.map((source) => ({
+    ...source,
+    sourceIndex: 0,
+  })),
+});
+
 expectInvalid('HDR merge command without bracket exposure metadata', computationalMergeCommandEnvelopeV1Schema, {
   ...sampleComputationalMergeCommandEnvelopeV1,
   commandType: 'computationalMerge.createHdr',

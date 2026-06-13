@@ -44,6 +44,33 @@ The v1 schema defers:
 - OpenCV/Hugin-grade optimizer integration;
 - fixture-backed quality metrics beyond the schema sample.
 
+## Support Invariants
+
+Issue #979 hardens the schema so the artifact cannot claim support that the
+engine capabilities do not advertise. The schema now rejects:
+
+- top-level projection, boundary, or crop summaries that disagree with their
+  canonical settings objects;
+- implemented projection, boundary, or exposure settings that still include a
+  deferred reason;
+- deferred projection, boundary, or exposure settings without a deferred
+  reason;
+- rendered panorama artifacts without durable output artifacts;
+- plan-only or schema-only panorama artifacts that already claim durable output
+  artifacts;
+- source-count metrics that disagree with source references or excluded source
+  records;
+- stitched plus excluded source counts that exceed total source count;
+- duplicate source indexes;
+- implemented rectilinear/planar projection without planar homography engine
+  capability;
+- implemented cylindrical projection without cylindrical engine capability;
+- implemented spherical projection before a spherical engine capability exists;
+- implemented auto-crop without auto-crop engine capability;
+- implemented deferred fill before a fill engine capability exists;
+- implemented exposure normalization without exposure-normalization engine
+  capability.
+
 ## Validation
 
 The schema is validated by:
