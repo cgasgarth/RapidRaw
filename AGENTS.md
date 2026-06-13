@@ -16,13 +16,14 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Pull Requests And GitHub Flow
 
 - Use pull requests for all repo changes. Do not commit directly to `main`.
-- Keep up to 6 active open PRs at a time when useful.
-- Keep several independent PRs or worktrees in flight when CI latency would
-  otherwise cause idle time, but use judgment so parallelism does not reduce
-  reviewability or quality.
-- Do not leave PRs forgotten. Any PR open for more than 1 hour must be checked:
+- Keep at most 2 active open PRs at a time. This is a hard cap.
+- Use the two-PR cap as an A/B pattern when useful: one PR can build in CI while
+  another independent PR is prepared or validated. Do not use the cap as
+  permission to leave work sitting open.
+- Do not leave PRs forgotten. Any PR open for more than 1 hour must be acted on:
   merge it if passing or clearly safe, refresh/rebase it if behind, fix it if
-  failing, or close it if obsolete.
+  failing, or close it if obsolete. If neither merge nor close is possible, add
+  a clear status comment and keep checking until it resolves.
 - Enable auto-merge on PRs when appropriate and keep branch state fresh enough
   for the required aggregate gate.
 - PRs should stay small to medium sized where possible, ideally one issue and
@@ -36,7 +37,7 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Do not delete that automation unless the user explicitly asks to remove that
   exact reminder.
 - It should run every 15 minutes and check for stale open PRs, especially PRs
-  open for more than 1 hour.
+  open for more than 1 hour, while enforcing the two-open-PR cap.
 - It should also remind the agent to use the consult skill for hard decisions.
 - If a temporary reminder is needed to check consult output, update the existing
   `check-rapidraw-consult` automation instead of creating or deleting a
