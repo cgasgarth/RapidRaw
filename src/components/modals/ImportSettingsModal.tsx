@@ -95,6 +95,7 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
         }
       }}
       onKeyDown={handleKeyDown}
+      role="presentation"
     >
       <div
         aria-modal="true"

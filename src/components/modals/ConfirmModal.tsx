@@ -78,6 +78,7 @@ export default function ConfirmModal({
         }
       }}
       onKeyDown={handleKeyDown}
+      role="presentation"
     >
       <div
         aria-labelledby="confirm-modal-title"
