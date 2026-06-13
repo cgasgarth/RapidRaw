@@ -3739,10 +3739,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `ci(rust): enforce rustfmt clippy warnings-as-errors and tests`
 - `ci(security): add dependency vulnerability checks`
 - `ci(license): add dependency license checks`
-- `deps(audit): report latest package and crate versions`
+- `deps(audit): report latest major and minor package and crate versions`
 - `deps(minor): update JavaScript packages to latest stable compatible releases`
 - `deps(minor): update Rust crates to latest stable compatible releases`
-- `deps(major): create one migration issue per major package upgrade`
+- `deps(major): create one migration issue per discovered major package upgrade`
 - `ci(docs): add markdown and link checks`
 
 #### Milestone 2: CI Build Matrix And Release Skeleton
@@ -4278,11 +4278,11 @@ Issues:
   - Blocked by: package manager baseline.
   - Scope: license allow/deny policy.
   - Acceptance criteria: incompatible licenses fail CI.
-- `deps(audit): report latest package and crate versions`
+- `deps(audit): report latest major and minor package and crate versions`
   - Labels: `area:tooling`, `type:implementation`, `priority:p1`, `pr:size-small`, `validation:build`.
   - Blocked by: package manager baseline.
-  - Scope: add local and CI-readable reports for outdated JavaScript packages, Rust crates, GitHub Actions, Node, Bun, Tauri, Rust tooling, and validation CLIs.
-  - Acceptance criteria: audit output distinguishes patch/minor updates from major migrations and records which major migration issues exist or need creation.
+  - Scope: add local and CI-readable reports for outdated JavaScript packages, Rust crates, GitHub Actions, Node, Bun, Tauri, Rust tooling, and validation CLIs, including latest compatible minor and latest stable major targets.
+  - Acceptance criteria: audit output distinguishes patch/minor updates from major migrations and records which major migration issues exist, need creation, or are explicitly deferred with a blocker.
   - Validation evidence: audit command output and generated report diff.
 - `deps(minor): update JavaScript packages to latest stable compatible releases`
   - Labels: `area:tooling`, `type:implementation`, `priority:p2`, `pr:size-medium`, `validation:build`, `validation:security`.
@@ -4294,10 +4294,10 @@ Issues:
   - Blocked by: dependency version audit.
   - Scope: apply compatible Rust crate updates without bundling breaking migrations.
   - Acceptance criteria: lockfile is current for compatible releases, Rust fmt/check/clippy/test/license/security gates pass, and any remaining major updates have linked issues.
-- `deps(major): create one migration issue per major package upgrade`
+- `deps(major): create one migration issue per discovered major package upgrade`
   - Labels: `area:tooling`, `type:docs`, `priority:p2`, `pr:size-small`, `validation:docs`.
   - Blocked by: dependency version audit.
-  - Scope: create or update one GitHub issue for each discovered major version bump across JavaScript, Rust, GitHub Actions, Node/Bun/Tauri tooling, and validation CLIs.
+  - Scope: create or update one GitHub issue for each discovered major version bump across JavaScript, Rust, GitHub Actions, Node/Bun/Tauri tooling, and validation CLIs before implementation starts.
   - Acceptance criteria: every major update is represented by a dedicated issue or a documented compatibility-group issue with migration notes, upstream breaking-change links, validation commands, and rollback notes.
 - `ci(docs): add markdown and link checks`
   - Labels: `area:ci`, `area:docs`, `type:ci`, `priority:p1`, `validation:docs`.
