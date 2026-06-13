@@ -109,6 +109,7 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
         }
       }}
       onKeyDown={handleKeyDown}
+      role="presentation"
     >
       <div
         aria-modal="true"
