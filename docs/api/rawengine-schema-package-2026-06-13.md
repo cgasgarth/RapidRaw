@@ -22,6 +22,7 @@ without exposing runtime app-server tools yet.
 - `RawEngineToolRegistryV1`
 - `NegativeLabAppServerToolManifestV1`
 - `NegativeLabDensityNormalizationProfileV1`
+- `NegativeLabFrameDetectionResultV1`
 - `NegativeLabProcessProfileV1`
 
 The package also includes representative sample payloads, checked JSON sample
@@ -64,4 +65,5 @@ TypeScript source directly.
 Negative Lab density/process profile samples include:
 
 - `negative-lab-density-normalization-profile-v1.json`
+- `negative-lab-frame-detection-result-v1.json`
 - `negative-lab-process-profile-v1.json`

@@ -440,6 +440,9 @@ export const negativeWarningCodeSchema = z.enum([
   'suspected_ir_cleaning',
   'missing_visible_base',
   'cropped_no_border',
+  'frame_detection_low_confidence',
+  'irregular_frame_spacing',
+  'overlapping_frame_candidates',
   'clipped_base_channel',
   'uneven_illumination',
   'mixed_frame_input_modes',
@@ -798,11 +801,104 @@ export const negativeLabSourceAssetRefV1Schema = z
 
 export const negativeLabFrameDetectionRequestV1Schema = z
   .object({
+    borderPolicy: z.enum(['require_visible_border', 'prefer_visible_border', 'allow_cropped']),
     contactSheetHandling: z.enum(['defer', 'suggest_frames']),
+    detectionSensitivity: z.enum(['conservative', 'balanced', 'aggressive']),
     mode: z.enum(['none', 'suggest_only', 'manual_seed']),
     preserveOriginalOrientation: z.boolean(),
   })
   .strict();
+
+export const negativeLabDetectedFrameCropV1Schema = z
+  .object({
+    height: z.number().positive(),
+    rotationDegrees: z.number(),
+    width: z.number().positive(),
+    x: z.number().min(0),
+    y: z.number().min(0),
+  })
+  .strict();
+
+export const negativeLabFrameBorderMetricsV1Schema = z
+  .object({
+    borderConfidence: negativeAcquisitionConfidenceSchema,
+    borderState: z.enum(['visible', 'partial', 'cropped', 'unknown']),
+    rebateTextDetected: z.boolean(),
+    sprocketHoleDetected: z.boolean(),
+    visibleBorderPx: z
+      .object({
+        bottom: z.number().min(0),
+        left: z.number().min(0),
+        right: z.number().min(0),
+        top: z.number().min(0),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const negativeLabDetectedFrameV1Schema = z
+  .object({
+    borderMetrics: negativeLabFrameBorderMetricsV1Schema,
+    contentHash: z.string().trim().min(1).optional(),
+    crop: negativeLabDetectedFrameCropV1Schema,
+    detectionConfidence: negativeAcquisitionConfidenceSchema,
+    frameId: z.string().trim().min(1),
+    frameIndex: z.number().int().nonnegative(),
+    needsManualReview: z.boolean(),
+    sourceFileId: z.string().trim().min(1),
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict();
+
+export const negativeLabRejectedFrameCandidateV1Schema = z
+  .object({
+    candidateId: z.string().trim().min(1),
+    crop: negativeLabDetectedFrameCropV1Schema,
+    reason: z.enum(['too_small', 'overlap_duplicate', 'low_edge_confidence', 'manual_rejected']),
+    sourceFileId: z.string().trim().min(1),
+  })
+  .strict();
+
+export const negativeLabFrameDetectionResultV1Schema = z
+  .object({
+    algorithm: z
+      .object({
+        algorithmId: z.literal('frame_split_border_detect_v1'),
+        algorithmVersion: z.literal(1),
+        deterministicSeed: z.number().int().nonnegative().optional(),
+      })
+      .strict(),
+    detectedFrames: z.array(negativeLabDetectedFrameV1Schema).min(1),
+    detectionRunId: z.string().trim().min(1),
+    inputRequest: negativeLabFrameDetectionRequestV1Schema,
+    rejectedCandidates: z.array(negativeLabRejectedFrameCandidateV1Schema),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sessionId: z.string().trim().min(1).optional(),
+    sourceFileIds: z.array(z.string().trim().min(1)).min(1),
+    warnings: z.array(negativeWarningV1Schema),
+  })
+  .strict()
+  .superRefine((result, context) => {
+    const seenFrameIds = new Set<string>();
+    for (const [index, frame] of result.detectedFrames.entries()) {
+      if (seenFrameIds.has(frame.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Detected frame IDs must be unique within a detection result.',
+          path: ['detectedFrames', index, 'frameId'],
+        });
+      }
+      seenFrameIds.add(frame.frameId);
+
+      if (!result.sourceFileIds.includes(frame.sourceFileId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Detected frame sourceFileId must be listed in sourceFileIds.',
+          path: ['detectedFrames', index, 'sourceFileId'],
+        });
+      }
+    }
+  });
 
 export const negativeLabSampleGeometryV1Schema = z
   .object({
@@ -1283,8 +1379,13 @@ export type NegativeLabDensityCurveV1 = z.infer<typeof negativeLabDensityCurveV1
 export type NegativeLabDensityNormalizationProfileV1 = z.infer<typeof negativeLabDensityNormalizationProfileV1Schema>;
 export type NegativeLabDryRunResultV1 = z.infer<typeof negativeLabDryRunResultV1Schema>;
 export type NegativeLabEstimateBaseFogParametersV1 = z.infer<typeof negativeLabEstimateBaseFogParametersV1Schema>;
+export type NegativeLabDetectedFrameCropV1 = z.infer<typeof negativeLabDetectedFrameCropV1Schema>;
+export type NegativeLabDetectedFrameV1 = z.infer<typeof negativeLabDetectedFrameV1Schema>;
+export type NegativeLabFrameBorderMetricsV1 = z.infer<typeof negativeLabFrameBorderMetricsV1Schema>;
 export type NegativeLabFrameDetectionRequestV1 = z.infer<typeof negativeLabFrameDetectionRequestV1Schema>;
+export type NegativeLabFrameDetectionResultV1 = z.infer<typeof negativeLabFrameDetectionResultV1Schema>;
 export type NegativeLabFrameSelectionV1 = z.infer<typeof negativeLabFrameSelectionV1Schema>;
+export type NegativeLabRejectedFrameCandidateV1 = z.infer<typeof negativeLabRejectedFrameCandidateV1Schema>;
 export type NegativeLabLegalNamingStatus = z.infer<typeof negativeLabLegalNamingStatusSchema>;
 export type NegativeLabOperationStage = z.infer<typeof negativeLabOperationStageSchema>;
 export type NegativeLabOutputTransformRefV1 = z.infer<typeof negativeLabOutputTransformRefV1Schema>;

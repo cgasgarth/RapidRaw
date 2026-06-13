@@ -15,6 +15,7 @@ import {
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
+  negativeLabFrameDetectionResultV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
   negativeRollSessionV1Schema,
@@ -32,6 +33,7 @@ import {
   sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeLabDensityNormalizationProfileV1,
   sampleNegativeLabDryRunResultV1,
+  sampleNegativeLabFrameDetectionResultV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
   sampleNegativeRollSessionV1,
@@ -96,6 +98,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab-density-normalization-profile-v1.json',
     schema: negativeLabDensityNormalizationProfileV1Schema,
     value: sampleNegativeLabDensityNormalizationProfileV1,
+  },
+  {
+    name: 'negative lab frame detection result',
+    path: 'packages/rawengine-schema/samples/negative-lab-frame-detection-result-v1.json',
+    schema: negativeLabFrameDetectionResultV1Schema,
+    value: sampleNegativeLabFrameDetectionResultV1,
   },
   {
     name: 'negative lab process profile',
