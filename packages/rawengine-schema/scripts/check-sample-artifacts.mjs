@@ -12,6 +12,7 @@ import {
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
   negativeLabApplyResultV1Schema,
+  negativeLabBuiltInPresetCatalogV1Schema,
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
@@ -30,6 +31,7 @@ import {
   sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabApplyPlanRequestV1,
   sampleNegativeLabApplyResultV1,
+  sampleNegativeLabBuiltInPresetCatalogV1,
   sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeLabDensityNormalizationProfileV1,
   sampleNegativeLabDryRunResultV1,
@@ -140,6 +142,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab-positive-variant-provenance-v1.json',
     schema: negativeLabPositiveVariantProvenanceV1Schema,
     value: sampleNegativeLabPositiveVariantProvenanceV1,
+  },
+  {
+    name: 'negative lab built-in preset catalog',
+    path: 'packages/rawengine-schema/samples/negative-lab-built-in-preset-catalog-v1.json',
+    schema: negativeLabBuiltInPresetCatalogV1Schema,
+    value: sampleNegativeLabBuiltInPresetCatalogV1,
   },
 ];
 
