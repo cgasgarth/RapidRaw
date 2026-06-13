@@ -1,4 +1,13 @@
-import { type ChangeEvent, type Dispatch, type SetStateAction, useState, useEffect, useRef, useCallback } from 'react';
+import {
+  type ChangeEvent,
+  type Dispatch,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type SetStateAction,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -622,10 +631,13 @@ export default function AIPanel() {
     if (type === Mask.AiForeground) void handleGenerateAiForegroundMask(subMask.id);
   };
 
-  const handleAddAiContextMenu = (event: React.MouseEvent, targetContainerId?: string | null) => {
+  const handleAddAiContextMenu = (
+    event: React.MouseEvent | ReactKeyboardEvent<HTMLElement>,
+    targetContainerId?: string | null,
+  ) => {
     event.preventDefault();
     event.stopPropagation();
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const rect = event.currentTarget.getBoundingClientRect();
 
     const buildMenu = (types: MaskType[], mode: SubMaskMode = SubMaskMode.Additive) =>
       types
@@ -1064,6 +1076,7 @@ export default function AIPanel() {
                     </Text>
                     <div
                       className="grid grid-cols-3 gap-2"
+                      role="presentation"
                       onClick={(e) => {
                         e.stopPropagation();
                       }}
@@ -1164,6 +1177,13 @@ export default function AIPanel() {
                   onClick={(e) => {
                     handleAddAiContextMenu(e, null);
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    handleAddAiContextMenu(e, null);
+                  }}
+                  role="button"
+                  tabIndex={0}
                 >
                   <div className="p-0.5">
                     <Plus size={18} />
@@ -1174,7 +1194,7 @@ export default function AIPanel() {
             )}
           </AnimatePresence>
 
-          <div className="h-4 shrink-0 w-full" onClick={handleDeselect} />
+          <div className="h-4 shrink-0 w-full" role="presentation" onClick={handleDeselect} />
 
           <AnimatePresence>
             {isSettingsPanelEverOpened && (
@@ -1295,12 +1315,21 @@ function DraggableGridItem({ maskType, isGenerating, onClick }: DraggableGridIte
     data: { type: 'Creation', maskType: maskType.type },
     disabled: isGenerating,
   });
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onClick();
+  };
+
   return (
     <motion.div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
       className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-2 aspect-square transition-colors
             ${
               maskType.disabled || isGenerating
@@ -1488,6 +1517,11 @@ function ContainerRow({
       borderClass = 'bg-card-active border border-accent/50';
     }
   }
+  const handleContainerKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onSelect();
+  };
 
   return (
     <motion.div
@@ -1508,19 +1542,23 @@ function ContainerRow({
           e.stopPropagation();
           onSelect();
         }}
+        onKeyDown={handleContainerKeyDown}
         onContextMenu={onContextMenu}
+        role="button"
+        tabIndex={0}
       >
-        <Text
-          as="div"
-          color={hasActiveChild || isExpanded ? TextColors.primary : TextColors.secondary}
+        <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
           }}
-          className="p-0.5 rounded transition-colors cursor-pointer"
+          className={`p-0.5 rounded transition-colors cursor-pointer bg-transparent ${
+            TEXT_COLOR_KEYS[hasActiveChild || isExpanded ? TextColors.primary : TextColors.secondary]
+          }`}
         >
           {isExpanded ? <FolderOpen size={18} /> : <Wand2 size={18} />}
-        </Text>
+        </button>
         <div
           className="flex-1 min-w-0 cursor-pointer"
           onDoubleClick={(e) => {
@@ -2016,6 +2054,7 @@ function SettingsPanel({
   return (
     <div
       className={`space-y-2 transition-opacity duration-300 ${!isActive ? 'opacity-50 pointer-events-none' : ''}`}
+      role="presentation"
       onClick={(e) => {
         e.stopPropagation();
       }}
