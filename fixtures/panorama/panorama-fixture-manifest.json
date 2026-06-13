@@ -1,0 +1,159 @@
+{
+  "$schema": "https://rawengine.dev/schemas/panorama-fixture-manifest.v1.json",
+  "schemaVersion": 1,
+  "issue": 182,
+  "snapshotDate": "2026-06-13",
+  "fixtures": [
+    {
+      "fixtureId": "panorama.synthetic.horizontal-translation.v1",
+      "status": "active_metadata_only",
+      "class": "synthetic",
+      "generator": {
+        "id": "synthetic-grid-horizontal-translation",
+        "seed": "rawengine-panorama-horizontal-translation-v1",
+        "version": 1
+      },
+      "sourceFrames": [
+        {
+          "sourceIndex": 0,
+          "width": 320,
+          "height": 180,
+          "expectedOffsetX": 0,
+          "expectedOffsetY": 0
+        },
+        {
+          "sourceIndex": 1,
+          "width": 320,
+          "height": 180,
+          "expectedOffsetX": 180,
+          "expectedOffsetY": 0
+        },
+        {
+          "sourceIndex": 2,
+          "width": 320,
+          "height": 180,
+          "expectedOffsetX": 360,
+          "expectedOffsetY": 0
+        }
+      ],
+      "expectedOutput": {
+        "width": 680,
+        "height": 180,
+        "stitchedSourceCount": 3,
+        "excludedSourceCount": 0
+      },
+      "expectedMatchGraph": {
+        "minimumConnectedComponents": 1,
+        "expectedConnectedSourceIndices": [0, 1, 2],
+        "expectedExcludedSourceIndices": []
+      },
+      "memoryBudgetBytes": 64000000,
+      "expectedWarningCodes": ["legacy_full_frame_render"],
+      "validationPurpose": "Deterministic small panorama happy path for plan, adapter, and future render smoke tests.",
+      "notes": "Metadata-only fixture until the synthetic image generator and golden render artifacts land."
+    },
+    {
+      "fixtureId": "panorama.synthetic.disconnected-source.v1",
+      "status": "active_metadata_only",
+      "class": "synthetic",
+      "generator": {
+        "id": "synthetic-grid-disconnected-source",
+        "seed": "rawengine-panorama-disconnected-source-v1",
+        "version": 1
+      },
+      "sourceFrames": [
+        {
+          "sourceIndex": 0,
+          "width": 320,
+          "height": 180,
+          "expectedOffsetX": 0,
+          "expectedOffsetY": 0
+        },
+        {
+          "sourceIndex": 1,
+          "width": 320,
+          "height": 180,
+          "expectedOffsetX": 180,
+          "expectedOffsetY": 0
+        },
+        {
+          "sourceIndex": 2,
+          "width": 320,
+          "height": 180,
+          "expectedOffsetX": null,
+          "expectedOffsetY": null
+        }
+      ],
+      "expectedOutput": {
+        "width": 500,
+        "height": 180,
+        "stitchedSourceCount": 2,
+        "excludedSourceCount": 1
+      },
+      "expectedMatchGraph": {
+        "minimumConnectedComponents": 2,
+        "expectedConnectedSourceIndices": [0, 1],
+        "expectedExcludedSourceIndices": [2]
+      },
+      "memoryBudgetBytes": 64000000,
+      "expectedWarningCodes": ["excluded_sources"],
+      "validationPurpose": "Deterministic warning-path fixture for excluded-source handling and user-visible warnings.",
+      "notes": "Metadata-only fixture until feature matching fixtures are generated."
+    },
+    {
+      "fixtureId": "panorama.synthetic.large-plan-only.v1",
+      "status": "active_metadata_only",
+      "class": "synthetic",
+      "generator": {
+        "id": "synthetic-large-panorama-estimate",
+        "seed": "rawengine-panorama-large-plan-only-v1",
+        "version": 1
+      },
+      "sourceFrames": [
+        {
+          "sourceIndex": 0,
+          "width": 12000,
+          "height": 8000,
+          "expectedOffsetX": 0,
+          "expectedOffsetY": 0
+        },
+        {
+          "sourceIndex": 1,
+          "width": 12000,
+          "height": 8000,
+          "expectedOffsetX": 7600,
+          "expectedOffsetY": 0
+        },
+        {
+          "sourceIndex": 2,
+          "width": 12000,
+          "height": 8000,
+          "expectedOffsetX": 15200,
+          "expectedOffsetY": 0
+        },
+        {
+          "sourceIndex": 3,
+          "width": 12000,
+          "height": 8000,
+          "expectedOffsetX": 22800,
+          "expectedOffsetY": 0
+        }
+      ],
+      "expectedOutput": {
+        "width": 34800,
+        "height": 8000,
+        "stitchedSourceCount": 4,
+        "excludedSourceCount": 0
+      },
+      "expectedMatchGraph": {
+        "minimumConnectedComponents": 1,
+        "expectedConnectedSourceIndices": [0, 1, 2, 3],
+        "expectedExcludedSourceIndices": []
+      },
+      "memoryBudgetBytes": 4000000000,
+      "expectedWarningCodes": ["high_memory_estimate", "memory_budget_exceeded", "tiled_render_required"],
+      "validationPurpose": "Metadata-only large panorama fixture for dry-run memory budgets independent of runner RAM.",
+      "notes": "Must remain metadata-only in PR CI; render/performance artifacts belong in optional or nightly fixture packs."
+    }
+  ]
+}
