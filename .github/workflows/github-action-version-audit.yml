@@ -21,4 +21,4 @@ jobs:
           bun-version-file: package.json
 
       - name: Check latest action pins
-        run: bun scripts/check-github-action-pins.mjs --check-latest
+        run: bun run check:action-pins:latest

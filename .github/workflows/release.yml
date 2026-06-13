@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          bun scripts/generate-release-notes.mjs \
+          bun run release:notes -- \
             --input "$RUNNER_TEMP/merged-pull-requests.json" \
             --output "$RUNNER_TEMP/release-notes.md" \
             --title "RapidRaw ${GITHUB_REF_NAME} release notes"
