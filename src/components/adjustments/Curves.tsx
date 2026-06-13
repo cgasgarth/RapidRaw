@@ -369,7 +369,13 @@ export default function CurveGraph({
   }, [parametricCurves]);
 
   useEffect(() => {
-    setCurveMode(adjustments.curveMode || 'point');
+    const syncTimer = setTimeout(() => {
+      setCurveMode(adjustments.curveMode || 'point');
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [adjustments.curveMode]);
 
   useEffect(() => {
@@ -433,18 +439,30 @@ export default function CurveGraph({
 
   useEffect(() => {
     activeChannelRef.current = activeChannel;
-    setLocalPoints(null);
-    setDraggingPointIndex(null);
-    setLocalParametricSettings(null);
-    setDraggingSplitKey(null);
+    const resetTimer = setTimeout(() => {
+      setLocalPoints(null);
+      setDraggingPointIndex(null);
+      setLocalParametricSettings(null);
+      setDraggingSplitKey(null);
+    }, 0);
+
+    return () => {
+      clearTimeout(resetTimer);
+    };
   }, [activeChannel]);
 
   const activeCurve = adjustments.curves[activeChannel];
 
   useEffect(() => {
     if (draggingPointIndex === null) {
-      setLocalPoints(null);
       localPointsRef.current = null;
+      const resetTimer = setTimeout(() => {
+        setLocalPoints(null);
+      }, 0);
+
+      return () => {
+        clearTimeout(resetTimer);
+      };
     }
   }, [activeCurve, draggingPointIndex]);
 
