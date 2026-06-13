@@ -207,6 +207,10 @@
           "path": "docs/panorama/opencv-seam-exposure-comparison-2026-06-13.md"
         },
         {
+          "title": "OpenCV macOS packaging proof",
+          "path": "docs/panorama/opencv-macos-packaging-proof-2026-06-13.md"
+        },
+        {
           "title": "Architecture baseline",
           "path": "docs/baseline/rapidraw-architecture-baseline-2026-06-11.md"
         },
