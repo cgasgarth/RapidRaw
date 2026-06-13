@@ -351,6 +351,7 @@ export default function NegativeConversionModal({
         <div
           ref={containerRef}
           className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing select-none"
+          role="presentation"
           onMouseDown={handleMouseDown}
           onWheel={handleWheel}
         >
@@ -393,6 +394,7 @@ export default function NegativeConversionModal({
 
           <div
             className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/70 backdrop-blur-md p-1.5 rounded-full border border-white/10 shadow-xl z-20 pointer-events-auto"
+            role="presentation"
             onMouseDown={(e) => {
               e.stopPropagation();
             }}
@@ -462,6 +464,7 @@ export default function NegativeConversionModal({
         'fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-300',
         show ? 'opacity-100' : 'opacity-0',
       )}
+      role="presentation"
       onMouseDown={onClose}
     >
       <AnimatePresence>
