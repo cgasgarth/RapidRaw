@@ -81,24 +81,25 @@ The real visual harness is tracked by #292.
 
 ## Rust Entrypoints
 
-| Command                                                    | Current role                   | Baseline status             |
-| ---------------------------------------------------------- | ------------------------------ | --------------------------- |
-| `cargo fmt -p RapidRAW -- --check`                         | Rust formatting check.         | Passing.                    |
-| `cargo check`                                              | macOS Rust compile check.      | Passing.                    |
-| `cargo clippy --all-targets --all-features -- -D warnings` | Rust lint with warnings fatal. | Passing and blocking in CI. |
+| Command                                                           | Current role                   | Baseline status             |
+| ----------------------------------------------------------------- | ------------------------------ | --------------------------- |
+| `cargo fmt -p RapidRAW -- --check`                                | Rust formatting check.         | Passing.                    |
+| `cargo check`                                                     | macOS Rust compile check.      | Passing.                    |
+| `cargo clippy --all-targets --all-features -- -D warnings`        | Rust lint with warnings fatal. | Passing and blocking in CI. |
+| `cargo test --locked --all-targets --all-features --no-fail-fast` | macOS Rust test gate.          | Passing and blocking in CI. |
 
 Rust commands are run from `src-tauri`. The package declares `rust-version =
 "1.95"`, and GitHub Actions uses `actions-rust-lang/setup-rust-toolchain@v1`.
 
 ## GitHub Actions Entrypoints
 
-| Workflow                        | Trigger                              | Primary entrypoints                                                                                                                                                                                  | Current gate behavior                                                                                                          |
-| ------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `.github/workflows/lint.yml`    | push to `main`, pull request, manual | `bun install --frozen-lockfile`, `bun run build`, `bun run i18n:check`, `bun run typecheck`, `bun run lint`, `bun run format:check`, `bun run i18n:lint`, `cargo fmt`, `cargo check`, `cargo clippy` | Passing baseline commands are blocking; known debt commands are visible but non-blocking until #283/#285/#286/#287/#289 close. |
-| `.github/workflows/pr-ci.yml`   | pull request                         | reusable `build.yml` with `macos-14`/`aarch64-apple-darwin`                                                                                                                                          | Apple Silicon macOS app packaging is blocking.                                                                                 |
-| `.github/workflows/build.yml`   | workflow call                        | `bun install --frozen-lockfile`, `rustup target add`, `tauri-apps/tauri-action`, Android `bun run tauri android build`                                                                               | Reusable package build workflow.                                                                                               |
-| `.github/workflows/ci.yml`      | push to `main`                       | reusable `build.yml` matrix for Windows, macOS, Linux, Android                                                                                                                                       | Inherited full matrix still present.                                                                                           |
-| `.github/workflows/release.yml` | GitHub release creation              | reusable `build.yml` matrix for Windows, macOS, Linux, Android                                                                                                                                       | Release packaging matrix still inherited.                                                                                      |
+| Workflow                        | Trigger                              | Primary entrypoints                                                                                                                                                                                                | Current gate behavior                                                                                                          |
+| ------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `.github/workflows/lint.yml`    | push to `main`, pull request, manual | `bun install --frozen-lockfile`, `bun run build`, `bun run i18n:check`, `bun run typecheck`, `bun run lint`, `bun run format:check`, `bun run i18n:lint`, `cargo fmt`, `cargo check`, `cargo clippy`, `cargo test` | Passing baseline commands are blocking; known debt commands are visible but non-blocking until #283/#285/#286/#287/#289 close. |
+| `.github/workflows/pr-ci.yml`   | pull request                         | reusable `build.yml` with `macos-14`/`aarch64-apple-darwin`                                                                                                                                                        | Apple Silicon macOS app packaging is blocking.                                                                                 |
+| `.github/workflows/build.yml`   | workflow call                        | `bun install --frozen-lockfile`, `rustup target add`, `tauri-apps/tauri-action`, Android `bun run tauri android build`                                                                                             | Reusable package build workflow.                                                                                               |
+| `.github/workflows/ci.yml`      | push to `main`                       | reusable `build.yml` matrix for Windows, macOS, Linux, Android                                                                                                                                                     | Inherited full matrix still present.                                                                                           |
+| `.github/workflows/release.yml` | GitHub release creation              | reusable `build.yml` matrix for Windows, macOS, Linux, Android                                                                                                                                                     | Release packaging matrix still inherited.                                                                                      |
 
 ## Workflow Findings
 
