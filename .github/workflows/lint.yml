@@ -226,7 +226,7 @@ jobs:
             echo "- Scope: \`${{ runner.os }}-${{ runner.arch }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Lint GitHub Actions workflows
+      - name: Lint GitHub Actions workflows and policy
         run: bun run check:actions
 
   actions-pins:
