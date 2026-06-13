@@ -182,6 +182,13 @@ export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Sc
     },
   ],
   projection: 'rectilinear',
+  projectionSettings: {
+    effectiveProjection: 'rectilinear',
+    horizontalFovDegrees: 72,
+    inputFocalLength35mmEquivalentMm: 28,
+    requestedProjection: 'rectilinear',
+    support: 'implemented_current_engine',
+  },
   provenance: {
     commandId: 'command_panorama_create_sample',
     graphRevision: 'graph_rev_43',
