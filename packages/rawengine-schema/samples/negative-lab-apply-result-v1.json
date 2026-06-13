@@ -5,7 +5,10 @@
       {
         "artifactId": "artifact_preview_sample",
         "contentHash": "sha256:sample-preview-hash",
-        "dimensions": { "height": 1080, "width": 1620 },
+        "dimensions": {
+          "height": 1080,
+          "width": 1620
+        },
         "kind": "preview",
         "storage": "temp_cache"
       }
@@ -17,9 +20,9 @@
     "warningCodes": ["lossy_input", "low_acquisition_confidence"]
   },
   "commandId": "command_negative_convert_frames_apply_sample",
-  "commandType": "negativeLab.convertFrames",
-  "correlationId": "corr_negative_convert_frames_sample",
-  "dryRunCommandId": "command_negative_convert_frames_sample",
+  "commandType": "negativeLab.setConversionRecipe",
+  "correlationId": "corr_negative_set_conversion_recipe_sample",
+  "dryRunCommandId": "command_negative_set_conversion_recipe_sample",
   "schemaVersion": 1,
   "sessionId": "negative_roll_session_sample",
   "warnings": [
@@ -28,8 +31,8 @@
       "code": "low_acquisition_confidence",
       "evidence": "Lab JPEG source has lossy compression and no scanner profile metadata.",
       "frameIds": ["frame_0001"],
-      "severity": "warning",
-      "scope": "session"
+      "scope": "session",
+      "severity": "warning"
     }
   ]
 }

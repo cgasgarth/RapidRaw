@@ -1,0 +1,7 @@
+{
+  "acknowledgedWarningCodes": ["lossy_input", "low_acquisition_confidence"],
+  "commandId": "command_negative_set_conversion_recipe_sample",
+  "dryRunPlanId": "dry_run_plan_negative_conversion_sample",
+  "expectedSessionRevision": "session_rev_negative_7",
+  "sessionId": "negative_roll_session_sample"
+}

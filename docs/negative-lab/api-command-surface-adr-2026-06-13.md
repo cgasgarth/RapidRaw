@@ -21,17 +21,18 @@ inversion ADR, input profile ADR, and schema package.
 
 ## Decision
 
-Negative Lab v1 will expose strict Zod command envelopes for six objective or
+Negative Lab v1 will expose strict Zod command envelopes for seven objective or
 workflow commands:
 
-| Command                             | Stage            | Purpose                                                    |
-| ----------------------------------- | ---------------- | ---------------------------------------------------------- |
-| `negativeLab.createRollSession`     | acquisition      | create a roll/session from one or more source file records |
-| `negativeLab.sampleFilmBase`        | calibration      | record film-base/rebate/leader sample regions              |
-| `negativeLab.convertFrames`         | inversion        | dry-run or apply density-domain frame conversion           |
-| `negativeLab.normalizeRoll`         | normalization    | synchronize objective exposure/balance across frames       |
-| `negativeLab.createPositiveVariant` | rendering bridge | create editable positive variants from converted frames    |
-| `negativeLab.updateFrameQc`         | quality control  | record frame review state and warning acknowledgements     |
+| Command                             | Stage            | Purpose                                                     |
+| ----------------------------------- | ---------------- | ----------------------------------------------------------- |
+| `negativeLab.createSession`         | acquisition      | create a single-frame, roll, or contact-sheet session       |
+| `negativeLab.updateBaseSamples`     | calibration      | add, replace, accept, reject, or remove base sample regions |
+| `negativeLab.estimateBaseFog`       | calibration      | estimate base/fog values from accepted sample IDs           |
+| `negativeLab.setConversionRecipe`   | inversion        | set a non-destructive density conversion recipe             |
+| `negativeLab.planRollNormalization` | normalization    | produce a dry-run plan for objective roll synchronization   |
+| `negativeLab.createPositiveVariant` | rendering bridge | create editable positive variants from conversion recipes   |
+| `negativeLab.setFrameQcStatus`      | quality control  | record frame review state and warning acknowledgements      |
 
 Each command extends the generic `CommandEnvelopeV1` with a literal
 `commandType` and strict typed `parameters`. Unknown command fields and unknown
@@ -39,9 +40,10 @@ parameter fields are rejected by schema validation. The generic envelope keeps
 actor, target, approval, dry-run, graph revision, idempotency, and correlation
 metadata consistent with the broader RawEngine command layer.
 
-The v1 command surface also defines `NegativeLabDryRunResultV1` and
-`NegativeLabApplyResultV1` so tool registry entries do not point at undocumented
-output names. These result schemas are intentionally compact: they capture
+The v1 command surface also defines `NegativeLabDryRunResultV1`,
+`NegativeLabApplyPlanRequestV1`, and `NegativeLabApplyResultV1` so tool registry
+entries do not point at undocumented output names or accept arbitrary generic
+apply payloads. These result schemas are intentionally compact: they capture
 warnings, artifacts, numeric metrics, changed frame/session IDs, generated
 positive variants, and provenance entry IDs without claiming final pixel math.
 
@@ -57,9 +59,11 @@ support dry-run before apply. Dry-run results should include:
 - numeric fixture metrics when the command touches pixels;
 - provenance entries that would be written on apply.
 
+Apply requests must reference a prior dry-run plan for risky mutation paths.
 Apply results should reference the prior dry-run or record why no dry-run was
 required. App-server tools must call the same command layer as UI controls, not
-raw Tauri invokes or UI automation.
+raw Tauri invokes, UI automation, or a broad command dispatcher that accepts any
+arbitrary command envelope.
 
 ## Command Parameters
 
@@ -69,27 +73,41 @@ choices:
 - input mode and pixel basis;
 - process family;
 - source file IDs and roll/session IDs;
-- base sample region geometry;
-- density model;
-- inversion method;
-- target working space;
+- base sample region geometry and coordinate space;
+- base/fog estimator policy;
+- conversion algorithm ID and version;
+- input characterization;
+- base strategy;
+- curve model;
+- neutralization mode;
+- output transform reference;
 - output intent;
 - frame IDs, anchor frame IDs, and base sample IDs;
-- QC status and warning codes.
+- QC status and acknowledged warning codes.
 
 Implementation-specific knobs, film-stock look parameters, GPU kernel options,
 and UI layout state are explicitly deferred. They can be introduced as versioned
 parameter objects after fixtures prove the behavior.
 
+V1 command parameters accept only C-41 color negative and black-and-white silver
+negative process families. Broader acquisition metadata may describe deferred
+families, but executable v1 commands must reject them until their math,
+fixtures, and warnings are defined.
+
 ## Color-Science Boundaries
 
-`negativeLab.convertFrames` owns objective inversion parameters. It must not
-hide creative rendering inside a stock preset or UI-only adjustment. The v1
-schema distinguishes:
+`negativeLab.setConversionRecipe` owns objective inversion recipe parameters. It
+must not hide creative rendering inside a stock preset or UI-only adjustment.
+The v1 schema distinguishes:
 
-- density model: how scan RGB is interpreted for inversion;
-- inversion method: how base/fog and channel inversion are selected;
-- target working space: where editable positives are handed off;
+- conversion model: algorithm ID, algorithm version, density maximum, epsilon
+  policy, and negative-density tolerance;
+- input characterization: channel basis and confidence;
+- base strategy: existing estimate, manual samples, roll-shared base, or
+  low-confidence profile default;
+- curve model: monotonic process or parametric curve family;
+- output transform reference: versioned output transform, intent, and chromatic
+  adaptation policy;
 - output intent: preview, editable positive, or export-oriented proof.
 
 Creative film looks and stock-family presets belong in later render/profile

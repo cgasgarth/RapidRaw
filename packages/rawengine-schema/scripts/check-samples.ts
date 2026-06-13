@@ -4,6 +4,7 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
+  negativeLabApplyPlanRequestV1Schema,
   negativeLabApplyResultV1Schema,
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDryRunResultV1Schema,
@@ -16,6 +17,7 @@ import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleNegativeAcquisitionProfileV1,
+  sampleNegativeLabApplyPlanRequestV1,
   sampleNegativeLabApplyResultV1,
   sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeLabDryRunResultV1,
@@ -76,6 +78,11 @@ const validSamples: ReadonlyArray<{
     value: sampleNegativeLabDryRunResultV1,
   },
   {
+    name: 'negative lab apply plan request',
+    schema: negativeLabApplyPlanRequestV1Schema,
+    value: sampleNegativeLabApplyPlanRequestV1,
+  },
+  {
     name: 'negative lab apply result',
     schema: negativeLabApplyResultV1Schema,
     value: sampleNegativeLabApplyResultV1,
@@ -120,6 +127,36 @@ const invalidNegativeLabCommand = {
 const invalidNegativeLabCommandResult = negativeLabCommandEnvelopeV1Schema.safeParse(invalidNegativeLabCommand);
 if (invalidNegativeLabCommandResult.success) {
   throw new Error('Expected negative lab command schema to reject unknown parameter fields.');
+}
+
+const invalidFrameQcCommand = {
+  ...sampleNegativeLabCommandEnvelopeV1,
+  commandType: 'negativeLab.setFrameQcStatus',
+  parameters: {
+    acknowledgedWarningCodes: [],
+    frameId: 'frame_0001',
+    qcStatus: 'approved',
+    sessionId: 'negative_roll_session_sample',
+    warningCodes: ['lossy_input'],
+  },
+};
+
+const invalidFrameQcCommandResult = negativeLabCommandEnvelopeV1Schema.safeParse(invalidFrameQcCommand);
+if (invalidFrameQcCommandResult.success) {
+  throw new Error('Expected frame QC command schema to reject generated warningCodes as user input.');
+}
+
+const invalidDeferredProcessCommand = {
+  ...sampleNegativeLabCommandEnvelopeV1,
+  parameters: {
+    ...sampleNegativeLabCommandEnvelopeV1.parameters,
+    processFamily: 'ecn2_color_negative',
+  },
+};
+
+const invalidDeferredProcessCommandResult = negativeLabCommandEnvelopeV1Schema.safeParse(invalidDeferredProcessCommand);
+if (invalidDeferredProcessCommandResult.success) {
+  throw new Error('Expected negative lab v1 command schema to reject deferred process families.');
 }
 
 console.log(`Validated ${validSamples.length} RawEngine schema samples.`);
