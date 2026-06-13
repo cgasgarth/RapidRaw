@@ -630,6 +630,253 @@ export const filmHalationModelV1Schema = z
     }
   });
 
+export const filmGlowAlgorithmV1Schema = z.enum(['legacy_rapidraw_glow_bloom_v0', 'luminance_bloom_glow_v1']);
+
+export const filmGlowBlendModeV1Schema = z.enum([
+  'screen_luminance_preserving',
+  'linear_add_limited',
+  'soft_light_lift',
+]);
+
+export const filmGlowBlurStrategyV1Schema = z.enum(['separable_gaussian', 'mip_pyramid', 'cpu_reference_deferred']);
+
+export const filmGlowQualityModeV1Schema = z.enum(['preview_fast', 'export_reference']);
+
+export const filmGlowRenderStageV1Schema = z.enum([
+  'creative_bloom_after_halation',
+  'layer_local_after_color',
+  'schema_only_deferred',
+]);
+
+export const filmGlowRendererSupportV1Schema = z.enum([
+  'implemented_current_engine',
+  'partially_implemented_current_engine',
+  'schema_only_deferred',
+]);
+
+export const filmGlowSourceChannelV1Schema = z.enum(['luminance', 'max_rgb', 'highlight_energy']);
+
+export const filmGlowThresholdRolloffV1Schema = z.enum(['smoothstep', 'filmic_soft_knee']);
+
+export const filmGlowTintModeV1Schema = z.enum(['neutral_preserve_hue', 'subtle_warmth', 'subtle_cool']);
+
+export const filmGlowWarningCodeV1Schema = z.enum([
+  'clipping_risk',
+  'display_referred_input',
+  'renderer_path_deferred',
+  'renderer_path_partial',
+  'wide_radius_performance_risk',
+  'wide_radius_preview_approximation',
+]);
+
+export const filmGlowModelV1Schema = z
+  .object({
+    algorithm: filmGlowAlgorithmV1Schema,
+    blendMode: filmGlowBlendModeV1Schema,
+    blurPolicy: z
+      .object({
+        exportStrategy: filmGlowBlurStrategyV1Schema,
+        previewStrategy: filmGlowBlurStrategyV1Schema,
+        radiusPx: z.number().min(0.5).max(512),
+        radiusUnit: z.literal('working_pixels'),
+      })
+      .strict(),
+    compatibleScopes: z.array(z.enum(['global', 'layer', 'mask'])).min(1),
+    deterministic: z
+      .object({
+        deterministicReplay: z.boolean(),
+        stochasticInputs: z.boolean(),
+      })
+      .strict(),
+    highlightPreservation: z
+      .object({
+        localContrastRetention: filmUnitIntervalSchema,
+        protectClippedHighlights: z.boolean(),
+        shoulderCompression: filmUnitIntervalSchema,
+      })
+      .strict(),
+    intensity: z
+      .object({
+        bloomAmount: filmPercentSchema,
+        glowAmount: filmPercentSchema,
+        opacity: z.number().min(0.01).max(100),
+      })
+      .strict(),
+    maskBehavior: z
+      .object({
+        application: z.enum(['source_only', 'composite_only', 'source_and_composite']),
+        avoidLayerDoubleCounting: z.boolean(),
+        expandSourceBeforeMask: z.boolean(),
+        stabilizeMaskEdgesBeforeBlur: z.boolean(),
+      })
+      .strict(),
+    modelId: z
+      .string()
+      .trim()
+      .regex(/^film\.glow\.[a-z0-9_]+\.v[0-9]+$/u),
+    modelVersion: z.string().trim().min(1),
+    qualityPolicy: z
+      .object({
+        exportMode: filmGlowQualityModeV1Schema,
+        maxExportRadiusPx: z.number().min(1).max(512),
+        maxPreviewRadiusPx: z.number().min(1).max(256),
+        previewMode: filmGlowQualityModeV1Schema,
+      })
+      .strict(),
+    renderDomain: filmRenderDomainV1Schema,
+    renderStage: filmGlowRenderStageV1Schema,
+    rendererSupport: filmGlowRendererSupportV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceIsolation: z
+      .object({
+        rolloff: filmGlowThresholdRolloffV1Schema,
+        sourceChannel: filmGlowSourceChannelV1Schema,
+        thresholdEnd: filmUnitIntervalSchema,
+        thresholdStart: filmUnitIntervalSchema,
+      })
+      .strict(),
+    tintPolicy: z
+      .object({
+        mode: filmGlowTintModeV1Schema,
+        saturationScale: z.number().min(0).max(2),
+        tintStrength: filmUnitIntervalSchema,
+      })
+      .strict(),
+    warningCodes: z.array(filmGlowWarningCodeV1Schema),
+  })
+  .strict()
+  .superRefine((model, context) => {
+    if (model.sourceIsolation.thresholdStart >= model.sourceIsolation.thresholdEnd) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film glow thresholdStart must be lower than thresholdEnd.',
+        path: ['sourceIsolation', 'thresholdEnd'],
+      });
+    }
+
+    if (model.intensity.bloomAmount === 0 && model.intensity.glowAmount === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film glow model requires bloom or glow contribution.',
+        path: ['intensity'],
+      });
+    }
+
+    if (model.qualityPolicy.maxPreviewRadiusPx > model.qualityPolicy.maxExportRadiusPx) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film glow preview radius cap must not exceed export radius cap.',
+        path: ['qualityPolicy', 'maxPreviewRadiusPx'],
+      });
+    }
+
+    if (model.qualityPolicy.maxExportRadiusPx < model.blurPolicy.radiusPx) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film glow export radius cap must cover the configured blur radius.',
+        path: ['qualityPolicy', 'maxExportRadiusPx'],
+      });
+    }
+
+    if (model.blurPolicy.radiusPx > 256 && !model.warningCodes.includes('wide_radius_performance_risk')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Wide-radius film glow requires an explicit performance-risk warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (
+      model.blurPolicy.radiusPx > model.qualityPolicy.maxPreviewRadiusPx &&
+      !model.warningCodes.includes('wide_radius_preview_approximation')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film glow preview radius approximation requires an explicit warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (
+      model.blendMode === 'linear_add_limited' &&
+      model.intensity.opacity > 70 &&
+      !model.warningCodes.includes('clipping_risk')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'High-opacity additive film glow requires an explicit clipping-risk warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (model.compatibleScopes.includes('mask') && !model.maskBehavior.avoidLayerDoubleCounting) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Mask-compatible film glow must avoid layer double-counting.',
+        path: ['maskBehavior', 'avoidLayerDoubleCounting'],
+      });
+    }
+
+    if (model.compatibleScopes.includes('mask') && !model.maskBehavior.stabilizeMaskEdgesBeforeBlur) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Mask-compatible film glow must stabilize mask edges before blur.',
+        path: ['maskBehavior', 'stabilizeMaskEdgesBeforeBlur'],
+      });
+    }
+
+    if (!model.deterministic.deterministicReplay || model.deterministic.stochasticInputs) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Film glow v1 must be deterministic and must not declare stochastic inputs.',
+        path: ['deterministic'],
+      });
+    }
+
+    if (model.renderDomain === 'display_referred' && !model.warningCodes.includes('display_referred_input')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Display-referred film glow requires an explicit display-referred warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (model.rendererSupport === 'schema_only_deferred' && !model.warningCodes.includes('renderer_path_deferred')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Schema-only film glow requires a deferred renderer warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (
+      model.rendererSupport === 'partially_implemented_current_engine' &&
+      !model.warningCodes.includes('renderer_path_partial')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Partially implemented film glow requires a partial renderer warning.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (model.algorithm === 'legacy_rapidraw_glow_bloom_v0' && model.rendererSupport !== 'implemented_current_engine') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Legacy RapidRaw glow maps to the implemented current engine.',
+        path: ['rendererSupport'],
+      });
+    }
+
+    if (model.algorithm === 'luminance_bloom_glow_v1' && model.rendererSupport === 'implemented_current_engine') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Luminance bloom/glow is not fully implemented by the current renderer.',
+        path: ['rendererSupport'],
+      });
+    }
+  });
+
 export const filmGrainAlgorithmV1Schema = z.enum(['legacy_rapidraw_luma_noise_v0', 'procedural_luma_chroma_noise_v1']);
 
 export const filmGrainIsoPresetV1Schema = z.enum([
@@ -3704,6 +3951,17 @@ export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
 export type FilmGrainAlgorithmV1 = z.infer<typeof filmGrainAlgorithmV1Schema>;
+export type FilmGlowAlgorithmV1 = z.infer<typeof filmGlowAlgorithmV1Schema>;
+export type FilmGlowBlendModeV1 = z.infer<typeof filmGlowBlendModeV1Schema>;
+export type FilmGlowBlurStrategyV1 = z.infer<typeof filmGlowBlurStrategyV1Schema>;
+export type FilmGlowModelV1 = z.infer<typeof filmGlowModelV1Schema>;
+export type FilmGlowQualityModeV1 = z.infer<typeof filmGlowQualityModeV1Schema>;
+export type FilmGlowRenderStageV1 = z.infer<typeof filmGlowRenderStageV1Schema>;
+export type FilmGlowRendererSupportV1 = z.infer<typeof filmGlowRendererSupportV1Schema>;
+export type FilmGlowSourceChannelV1 = z.infer<typeof filmGlowSourceChannelV1Schema>;
+export type FilmGlowThresholdRolloffV1 = z.infer<typeof filmGlowThresholdRolloffV1Schema>;
+export type FilmGlowTintModeV1 = z.infer<typeof filmGlowTintModeV1Schema>;
+export type FilmGlowWarningCodeV1 = z.infer<typeof filmGlowWarningCodeV1Schema>;
 export type FilmGrainIsoPresetV1 = z.infer<typeof filmGrainIsoPresetV1Schema>;
 export type FilmGrainModelV1 = z.infer<typeof filmGrainModelV1Schema>;
 export type FilmGrainRenderStageV1 = z.infer<typeof filmGrainRenderStageV1Schema>;

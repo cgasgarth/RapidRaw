@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  filmGlowModelV1Schema,
   filmGrainModelV1Schema,
   filmHalationModelV1Schema,
   filmLookCatalogV1Schema,
@@ -34,6 +35,7 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleFilmGlowModelV1,
   sampleFilmGrainModelV1,
   sampleFilmHalationModelV1,
   sampleFilmLookCatalogV1,
@@ -108,6 +110,11 @@ const validSamples: ReadonlyArray<{
     name: 'film halation model',
     schema: filmHalationModelV1Schema,
     value: sampleFilmHalationModelV1,
+  },
+  {
+    name: 'film glow model',
+    schema: filmGlowModelV1Schema,
+    value: sampleFilmGlowModelV1,
   },
   {
     name: 'negative acquisition profile',
@@ -408,6 +415,148 @@ const invalidFilmHalationUnknownField = {
   spectralNanometers: [620, 650],
 };
 expectInvalid('film halation model with unknown field', filmHalationModelV1Schema, invalidFilmHalationUnknownField);
+
+const invalidFilmGlowMissingContribution = {
+  ...sampleFilmGlowModelV1,
+  intensity: {
+    ...sampleFilmGlowModelV1.intensity,
+    bloomAmount: 0,
+    glowAmount: 0,
+  },
+};
+expectInvalid(
+  'film glow model without bloom or glow contribution',
+  filmGlowModelV1Schema,
+  invalidFilmGlowMissingContribution,
+);
+
+const invalidFilmGlowThreshold = {
+  ...sampleFilmGlowModelV1,
+  sourceIsolation: {
+    ...sampleFilmGlowModelV1.sourceIsolation,
+    thresholdEnd: 0.58,
+    thresholdStart: 0.82,
+  },
+};
+expectInvalid('film glow model with inverted highlight threshold', filmGlowModelV1Schema, invalidFilmGlowThreshold);
+
+const invalidFilmGlowRadiusCap = {
+  ...sampleFilmGlowModelV1,
+  qualityPolicy: {
+    ...sampleFilmGlowModelV1.qualityPolicy,
+    maxExportRadiusPx: 32,
+  },
+};
+expectInvalid('film glow model with export radius below blur radius', filmGlowModelV1Schema, invalidFilmGlowRadiusCap);
+
+const invalidFilmGlowMaskBehavior = {
+  ...sampleFilmGlowModelV1,
+  maskBehavior: {
+    ...sampleFilmGlowModelV1.maskBehavior,
+    avoidLayerDoubleCounting: false,
+  },
+};
+expectInvalid(
+  'mask-compatible film glow model without double-counting protection',
+  filmGlowModelV1Schema,
+  invalidFilmGlowMaskBehavior,
+);
+
+const invalidFilmGlowMaskEdgeStabilization = {
+  ...sampleFilmGlowModelV1,
+  maskBehavior: {
+    ...sampleFilmGlowModelV1.maskBehavior,
+    stabilizeMaskEdgesBeforeBlur: false,
+  },
+};
+expectInvalid(
+  'mask-compatible film glow model without mask-edge stabilization',
+  filmGlowModelV1Schema,
+  invalidFilmGlowMaskEdgeStabilization,
+);
+
+const invalidFilmGlowRendererSupport = {
+  ...sampleFilmGlowModelV1,
+  rendererSupport: 'implemented_current_engine',
+};
+expectInvalid(
+  'film glow model claiming full renderer support before implementation',
+  filmGlowModelV1Schema,
+  invalidFilmGlowRendererSupport,
+);
+
+const invalidFilmGlowDisplayWarning = {
+  ...sampleFilmGlowModelV1,
+  renderDomain: 'display_referred',
+  warningCodes: sampleFilmGlowModelV1.warningCodes.filter((code) => code !== 'display_referred_input'),
+};
+expectInvalid('display-referred film glow model without warning', filmGlowModelV1Schema, invalidFilmGlowDisplayWarning);
+
+const invalidFilmGlowPreviewApproximationWarning = {
+  ...sampleFilmGlowModelV1,
+  blurPolicy: {
+    ...sampleFilmGlowModelV1.blurPolicy,
+    radiusPx: 96,
+  },
+  warningCodes: sampleFilmGlowModelV1.warningCodes.filter((code) => code !== 'wide_radius_preview_approximation'),
+};
+expectInvalid(
+  'film glow model with preview radius approximation without warning',
+  filmGlowModelV1Schema,
+  invalidFilmGlowPreviewApproximationWarning,
+);
+
+const invalidFilmGlowWideRadiusWarning = {
+  ...sampleFilmGlowModelV1,
+  blurPolicy: {
+    ...sampleFilmGlowModelV1.blurPolicy,
+    radiusPx: 320,
+  },
+  qualityPolicy: {
+    ...sampleFilmGlowModelV1.qualityPolicy,
+    maxExportRadiusPx: 384,
+  },
+  warningCodes: sampleFilmGlowModelV1.warningCodes.filter((code) => code !== 'wide_radius_performance_risk'),
+};
+expectInvalid(
+  'wide-radius film glow model without performance warning',
+  filmGlowModelV1Schema,
+  invalidFilmGlowWideRadiusWarning,
+);
+
+const invalidFilmGlowAdditiveClippingWarning = {
+  ...sampleFilmGlowModelV1,
+  blendMode: 'linear_add_limited',
+  intensity: {
+    ...sampleFilmGlowModelV1.intensity,
+    opacity: 82,
+  },
+  warningCodes: sampleFilmGlowModelV1.warningCodes.filter((code) => code !== 'clipping_risk'),
+};
+expectInvalid(
+  'high-opacity additive film glow model without clipping warning',
+  filmGlowModelV1Schema,
+  invalidFilmGlowAdditiveClippingWarning,
+);
+
+const invalidFilmGlowDeterministicPolicy = {
+  ...sampleFilmGlowModelV1,
+  deterministic: {
+    deterministicReplay: false,
+    stochasticInputs: true,
+  },
+};
+expectInvalid(
+  'film glow model with stochastic deterministic policy',
+  filmGlowModelV1Schema,
+  invalidFilmGlowDeterministicPolicy,
+);
+
+const invalidFilmGlowUnknownField = {
+  ...sampleFilmGlowModelV1,
+  halationRedGain: 1,
+};
+expectInvalid('film glow model with halation-style unknown field', filmGlowModelV1Schema, invalidFilmGlowUnknownField);
 
 const invalidNegativeLabCommand = {
   ...sampleNegativeLabCommandEnvelopeV1,

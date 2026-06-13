@@ -8,6 +8,7 @@ import { format } from 'prettier';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  filmGlowModelV1Schema,
   filmGrainModelV1Schema,
   filmHalationModelV1Schema,
   filmLookCatalogV1Schema,
@@ -39,6 +40,7 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleFilmGlowModelV1,
   sampleFilmGrainModelV1,
   sampleFilmHalationModelV1,
   sampleFilmLookCatalogV1,
@@ -118,6 +120,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/film-halation-model-v1.json',
     schema: filmHalationModelV1Schema,
     value: sampleFilmHalationModelV1,
+  },
+  {
+    name: 'film glow model',
+    path: 'packages/rawengine-schema/samples/film-glow-model-v1.json',
+    schema: filmGlowModelV1Schema,
+    value: sampleFilmGlowModelV1,
   },
   {
     name: 'negative acquisition profile',
