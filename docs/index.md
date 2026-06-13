@@ -42,6 +42,7 @@ generator before the release workflow needs one.
 - [Negative Lab generic built-in presets](negative-lab/generic-built-in-presets-2026-06-13.md)
 - [Negative Lab preset metadata policy schema](negative-lab/preset-metadata-policy-schema-2026-06-13.md)
 - [Negative Lab roll batch consistency workflow](negative-lab/roll-batch-consistency-workflow-2026-06-13.md)
+- [Negative Lab roll setup and frame queue UI](negative-lab/roll-setup-frame-queue-ui-2026-06-13.md)
 - [Negative Lab QC proof validation contract](negative-lab/qc-proof-validation-contract-2026-06-13.md)
 - [Negative Lab measured-profile fixture format](negative-lab/measured-profile-fixture-format-2026-06-13.md)
 - [Negative Lab stock-family research mapping](negative-lab/stock-family-research-mapping-2026-06-13.md)
