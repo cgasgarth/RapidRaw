@@ -12,6 +12,7 @@ import {
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
+  negativeLabFrameDetectionResultV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
   negativeRollSessionV1Schema,
@@ -27,6 +28,7 @@ import {
   type NegativeLabCommandEnvelopeV1,
   type NegativeLabDensityNormalizationProfileV1,
   type NegativeLabDryRunResultV1,
+  type NegativeLabFrameDetectionResultV1,
   type NegativeLabPositiveVariantProvenanceV1,
   type NegativeLabProcessProfileV1,
   type NegativeRollSessionV1,
@@ -380,6 +382,80 @@ export const sampleNegativeRollSessionV1: NegativeRollSessionV1 = negativeRollSe
   sharedBaseSampleIds: [],
   sourceFileIds: ['source_lab_scan_0001'],
 });
+
+export const sampleNegativeLabFrameDetectionResultV1: NegativeLabFrameDetectionResultV1 =
+  negativeLabFrameDetectionResultV1Schema.parse({
+    algorithm: {
+      algorithmId: 'frame_split_border_detect_v1',
+      algorithmVersion: 1,
+      deterministicSeed: 42,
+    },
+    detectedFrames: [
+      {
+        borderMetrics: {
+          borderConfidence: 'medium',
+          borderState: 'partial',
+          rebateTextDetected: false,
+          sprocketHoleDetected: true,
+          visibleBorderPx: {
+            bottom: 18,
+            left: 24,
+            right: 22,
+            top: 12,
+          },
+        },
+        contentHash: 'sha256:sample-detected-frame-0001',
+        crop: {
+          height: 3024,
+          rotationDegrees: 0.2,
+          width: 4536,
+          x: 148,
+          y: 96,
+        },
+        detectionConfidence: 'medium',
+        frameId: 'frame_0001',
+        frameIndex: 0,
+        needsManualReview: true,
+        sourceFileId: 'source_lab_scan_0001',
+        warningCodes: ['cropped_no_border', 'frame_detection_low_confidence'],
+      },
+    ],
+    detectionRunId: 'frame_detection_roll_01_run_01',
+    inputRequest: {
+      borderPolicy: 'prefer_visible_border',
+      contactSheetHandling: 'suggest_frames',
+      detectionSensitivity: 'balanced',
+      mode: 'suggest_only',
+      preserveOriginalOrientation: true,
+    },
+    rejectedCandidates: [
+      {
+        candidateId: 'candidate_overlap_0001',
+        crop: {
+          height: 2950,
+          rotationDegrees: 0.2,
+          width: 4450,
+          x: 162,
+          y: 112,
+        },
+        reason: 'overlap_duplicate',
+        sourceFileId: 'source_lab_scan_0001',
+      },
+    ],
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sessionId: sampleNegativeRollSessionV1.sessionId,
+    sourceFileIds: ['source_lab_scan_0001'],
+    warnings: [
+      {
+        blocksAutomation: false,
+        code: 'frame_detection_low_confidence',
+        evidence: 'Only partial border was visible on the top edge.',
+        frameIds: ['frame_0001'],
+        scope: 'frame',
+        severity: 'warning',
+      },
+    ],
+  });
 
 export const sampleNegativeLabDensityNormalizationProfileV1: NegativeLabDensityNormalizationProfileV1 =
   negativeLabDensityNormalizationProfileV1Schema.parse({

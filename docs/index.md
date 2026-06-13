@@ -33,6 +33,7 @@ generator before the release workflow needs one.
 - [Negative Lab API command surface ADR](negative-lab/api-command-surface-adr-2026-06-13.md)
 - [Negative Lab preset naming and legal policy ADR](negative-lab/preset-naming-legal-policy-2026-06-13.md)
 - [Negative Lab fixture licensing and provenance policy](negative-lab/fixture-licensing-provenance-policy-2026-06-13.md)
+- [Negative Lab frame detection and border contract](negative-lab/frame-detection-border-contract-2026-06-13.md)
 - [Negative Lab process profiles and density normalization](negative-lab/process-profiles-density-normalization-2026-06-13.md)
 - [Negative Lab measured-profile fixture format](negative-lab/measured-profile-fixture-format-2026-06-13.md)
 - [Negative Lab stock-family research mapping](negative-lab/stock-family-research-mapping-2026-06-13.md)

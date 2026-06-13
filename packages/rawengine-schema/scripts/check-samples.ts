@@ -10,6 +10,7 @@ import {
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
+  negativeLabFrameDetectionResultV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
   negativeRollSessionV1Schema,
@@ -27,6 +28,7 @@ import {
   sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeLabDensityNormalizationProfileV1,
   sampleNegativeLabDryRunResultV1,
+  sampleNegativeLabFrameDetectionResultV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
   sampleNegativeRollSessionV1,
@@ -104,6 +106,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab density normalization profile',
     schema: negativeLabDensityNormalizationProfileV1Schema,
     value: sampleNegativeLabDensityNormalizationProfileV1,
+  },
+  {
+    name: 'negative lab frame detection result',
+    schema: negativeLabFrameDetectionResultV1Schema,
+    value: sampleNegativeLabFrameDetectionResultV1,
   },
   {
     name: 'negative lab process profile',
@@ -253,6 +260,46 @@ const invalidProcessProfile = {
 const invalidProcessProfileResult = negativeLabProcessProfileV1Schema.safeParse(invalidProcessProfile);
 if (invalidProcessProfileResult.success) {
   throw new Error('Expected process profiles to reject non-monotonic density curves.');
+}
+
+const [sampleDetectedFrame] = sampleNegativeLabFrameDetectionResultV1.detectedFrames;
+if (sampleDetectedFrame === undefined) {
+  throw new Error('Expected frame detection sample to include a detected frame.');
+}
+
+const invalidFrameDetectionDuplicateId = {
+  ...sampleNegativeLabFrameDetectionResultV1,
+  detectedFrames: [
+    sampleDetectedFrame,
+    {
+      ...sampleDetectedFrame,
+      frameIndex: 1,
+    },
+  ],
+};
+
+const invalidFrameDetectionDuplicateIdResult = negativeLabFrameDetectionResultV1Schema.safeParse(
+  invalidFrameDetectionDuplicateId,
+);
+if (invalidFrameDetectionDuplicateIdResult.success) {
+  throw new Error('Expected frame detection results to reject duplicate frame IDs.');
+}
+
+const invalidFrameDetectionUnknownSource = {
+  ...sampleNegativeLabFrameDetectionResultV1,
+  detectedFrames: [
+    {
+      ...sampleDetectedFrame,
+      sourceFileId: 'unknown_source_file',
+    },
+  ],
+};
+
+const invalidFrameDetectionUnknownSourceResult = negativeLabFrameDetectionResultV1Schema.safeParse(
+  invalidFrameDetectionUnknownSource,
+);
+if (invalidFrameDetectionUnknownSourceResult.success) {
+  throw new Error('Expected frame detection results to reject frames from unlisted source files.');
 }
 
 console.log(`Validated ${validSamples.length} RawEngine schema samples.`);
