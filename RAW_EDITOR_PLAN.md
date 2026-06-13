@@ -2500,12 +2500,12 @@ Current enforced status as of June 12, 2026:
   `@typescript-eslint/restrict-template-expressions`, and
   `@typescript-eslint/unbound-method`.
 - React Hooks `rules-of-hooks`, `exhaustive-deps`, `static-components`,
-  `immutability`, `preserve-manual-memoization`, and `purity` are active.
+  `immutability`, `preserve-manual-memoization`, `purity`, `refs`, and
+  `set-state-in-effect` are active.
 - `bun run check:lint` is expected to pass with zero warnings on main.
 
 Remaining focused ESLint work:
 
-- React compiler hook fences: `set-state-in-effect` and `refs`.
 - Accessibility static interaction and keyboard-event parity rules.
 - Import ordering, import cycle, and unknown-file boundary enforcement.
 
