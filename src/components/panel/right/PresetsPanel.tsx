@@ -1,4 +1,5 @@
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useState,
@@ -230,6 +231,7 @@ function DraggablePresetItem({
   previewUrl,
   isGeneratingPreviews,
 }: DraggablePresetItemProps) {
+  const { t } = useTranslation();
   const {
     attributes,
     listeners,
@@ -261,6 +263,12 @@ function DraggablePresetItem({
     touchAction: 'none',
   };
 
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onApply(preset);
+  };
+
   return (
     <div
       onClick={() => {
@@ -270,6 +278,10 @@ function DraggablePresetItem({
         onContextMenu(e, { preset });
       }}
       ref={setCombinedRef}
+      role="button"
+      tabIndex={0}
+      aria-label={t('editor.presets.applyPresetLabel', { name: preset.name })}
+      onKeyDown={handleKeyDown}
       style={style}
     >
       <motion.div
