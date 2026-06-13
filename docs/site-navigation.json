@@ -374,6 +374,10 @@
           "path": "docs/release/macos-notarization-workflow-2026-06-11.md"
         },
         {
+          "title": "Release notes automation",
+          "path": "docs/release/release-notes-automation-2026-06-13.md"
+        },
+        {
           "title": "Release metadata, checksums, and SBOM",
           "path": "docs/release/release-metadata-checksums-sbom-2026-06-11.md"
         }

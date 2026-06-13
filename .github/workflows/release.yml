@@ -11,6 +11,67 @@ on:
     types: [created]
 
 jobs:
+  release-notes:
+    name: Generate release notes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up Bun dependencies
+        uses: ./.github/actions/setup-bun-deps
+
+      - name: Collect merged pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state merged \
+            --base main \
+            --limit 100 \
+            --json number,title,mergedAt,url,author,labels \
+            > "$RUNNER_TEMP/merged-pull-requests.json"
+
+      - name: Generate release notes
+        run: |
+          set -euo pipefail
+
+          bun scripts/generate-release-notes.mjs \
+            --input "$RUNNER_TEMP/merged-pull-requests.json" \
+            --output "$RUNNER_TEMP/release-notes.md" \
+            --title "RapidRaw ${GITHUB_REF_NAME} release notes"
+
+          cat "$RUNNER_TEMP/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release notes artifact
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/release-notes.md
+          if-no-files-found: error
+
+      - name: Attach release notes to release
+        if: ${{ github.event_name == 'release' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh release upload \
+            "$GITHUB_REF_NAME" \
+            "$RUNNER_TEMP/release-notes.md#Release notes" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
   release:
     strategy:
       fail-fast: false
