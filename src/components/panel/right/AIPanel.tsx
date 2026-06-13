@@ -34,6 +34,7 @@ import {
   type ChangeEvent,
   type Dispatch,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type SetStateAction,
   useState,
   useEffect,
@@ -74,7 +75,7 @@ import CollapsibleSection from '../../ui/CollapsibleSection';
 import Input from '../../ui/Input';
 import Slider from '../../ui/Slider';
 import Switch from '../../ui/Switch';
-import Text from '../../ui/Text';
+import UiText from '../../ui/Text';
 
 interface DragData {
   type: 'Container' | 'SubMask' | 'Creation';
@@ -256,10 +257,10 @@ const ConnectionStatus = ({
       hoverContent = (
         <div className="w-full mt-1">
           <div className="flex justify-between items-center mb-1.5">
-            <Text variant={TextVariants.small}>{t('editor.ai.connection.monthlyUsage')}</Text>
-            <Text variant={TextVariants.small}>
+            <UiText variant={TextVariants.small}>{t('editor.ai.connection.monthlyUsage')}</UiText>
+            <UiText variant={TextVariants.small}>
               {t('settings.processing.ai.cloud.signedIn.usageStats', { requests: reqs, limit: limit })}
-            </Text>
+            </UiText>
           </div>
           <div className="w-full bg-bg-tertiary rounded-full h-1.5 border border-border-color">
             <div
@@ -272,28 +273,30 @@ const ConnectionStatus = ({
     } else if (isSignedIn && !isPro) {
       statusColor = 'bg-red-500';
       statusText = t('editor.ai.connection.upgradeRequired');
-      hoverContent = <Text variant={TextVariants.small}>{t('editor.ai.connection.proRequiredDesc')}</Text>;
+      hoverContent = <UiText variant={TextVariants.small}>{t('editor.ai.connection.proRequiredDesc')}</UiText>;
     } else {
       statusColor = 'bg-red-500';
       statusText = t('editor.ai.connection.notLoggedIn');
-      hoverContent = <Text variant={TextVariants.small}>{t('editor.ai.connection.loginRequiredDesc')}</Text>;
+      hoverContent = <UiText variant={TextVariants.small}>{t('editor.ai.connection.loginRequiredDesc')}</UiText>;
     }
   } else if (aiProvider === 'ai-connector') {
     titleText = t('editor.ai.connection.connectorLabel');
     if (isAIConnectorConnected) {
       statusColor = 'bg-green-500';
       statusText = t('editor.ai.connection.ready');
-      hoverContent = <Text variant={TextVariants.small}>{t('editor.ai.connection.connectorConnectedDesc')}</Text>;
+      hoverContent = <UiText variant={TextVariants.small}>{t('editor.ai.connection.connectorConnectedDesc')}</UiText>;
     } else {
       statusColor = 'bg-red-500';
       statusText = t('editor.ai.connection.notDetected');
-      hoverContent = <Text variant={TextVariants.small}>{t('editor.ai.connection.connectorDisconnectedDesc')}</Text>;
+      hoverContent = (
+        <UiText variant={TextVariants.small}>{t('editor.ai.connection.connectorDisconnectedDesc')}</UiText>
+      );
     }
   } else {
     titleText = t('editor.ai.connection.builtinLabel');
     statusColor = 'bg-green-500';
     statusText = t('editor.ai.connection.ready');
-    hoverContent = <Text variant={TextVariants.small}>{t('editor.ai.connection.builtinDesc')}</Text>;
+    hoverContent = <UiText variant={TextVariants.small}>{t('editor.ai.connection.builtinDesc')}</UiText>;
   }
 
   return (
@@ -308,14 +311,14 @@ const ConnectionStatus = ({
     >
       <div className="flex items-center gap-2 px-4 pt-2">
         <div className={`w-2.5 h-2.5 rounded-full ${statusColor}`} />
-        <Text variant={TextVariants.label}>{titleText}</Text>
-        <Text
+        <UiText variant={TextVariants.label}>{titleText}</UiText>
+        <UiText
           variant={TextVariants.label}
           weight={TextWeights.bold}
           className={statusColor === 'bg-green-500' ? 'text-green-500' : 'text-red-500'}
         >
           {statusText}
-        </Text>
+        </UiText>
       </div>
       <div className="px-4 pb-3">
         <motion.div
@@ -1030,7 +1033,7 @@ export default function AIPanel() {
     >
       <div className="flex flex-col h-full select-none overflow-hidden" onContextMenu={handlePanelContextMenu}>
         <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-          <Text variant={TextVariants.title}>{t('editor.ai.inpaintingTitle')}</Text>
+          <UiText variant={TextVariants.title}>{t('editor.ai.inpaintingTitle')}</UiText>
           <button
             className="p-2 rounded-full hover:bg-surface transition-colors"
             onClick={handleResetAllAiEdits}
@@ -1053,14 +1056,14 @@ export default function AIPanel() {
                 onClick={handleDeselect}
               >
                 {!selectedImage ? (
-                  <Text
+                  <UiText
                     variant={TextVariants.heading}
                     color={TextColors.secondary}
                     weight={TextWeights.normal}
                     className="text-center mt-4"
                   >
                     {t('editor.ai.noImageSelected')}
-                  </Text>
+                  </UiText>
                 ) : (
                   <>
                     <ConnectionStatus
@@ -1070,9 +1073,9 @@ export default function AIPanel() {
                       isPro={isPro}
                       cloudUsage={cloudUsage}
                     />
-                    <Text variant={TextVariants.heading} className="mb-2 mt-8">
+                    <UiText variant={TextVariants.heading} className="mb-2 mt-8">
                       {t('editor.ai.createNewTitle')}
-                    </Text>
+                    </UiText>
                     <div
                       className="grid grid-cols-3 gap-2"
                       role="presentation"
@@ -1105,9 +1108,9 @@ export default function AIPanel() {
                 className={`flex flex-col transition-colors ${isRootOver ? 'bg-surface' : ''}`}
                 onClick={handleDeselect}
               >
-                <Text variant={TextVariants.heading} className="mb-2">
+                <UiText variant={TextVariants.heading} className="mb-2">
                   {t('editor.ai.editsTitle')}
-                </Text>
+                </UiText>
 
                 <AnimatePresence
                   initial={false}
@@ -1169,14 +1172,14 @@ export default function AIPanel() {
                   )}
                 </AnimatePresence>
 
-                <Text
+                <UiText
                   as="div"
                   weight={TextWeights.medium}
                   className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
-                  onClick={(e) => {
+                  onClick={(e: ReactMouseEvent<HTMLElement>) => {
                     handleAddAiContextMenu(e, null);
                   }}
-                  onKeyDown={(e) => {
+                  onKeyDown={(e: ReactKeyboardEvent<HTMLElement>) => {
                     if (e.key !== 'Enter' && e.key !== ' ') return;
                     e.preventDefault();
                     handleAddAiContextMenu(e, null);
@@ -1188,7 +1191,7 @@ export default function AIPanel() {
                     <Plus size={18} />
                   </div>
                   <span>{t('editor.ai.addNewEdit')}</span>
-                </Text>
+                </UiText>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1204,9 +1207,9 @@ export default function AIPanel() {
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="flex-1 min-h-0"
               >
-                <Text variant={TextVariants.heading} className="mb-2">
+                <UiText variant={TextVariants.heading} className="mb-2">
                   {t('editor.ai.editSettingsTitle')}
-                </Text>
+                </UiText>
                 <SettingsPanel
                   container={activeContainer || null}
                   activeSubMask={activeSubMaskData}
@@ -1232,7 +1235,7 @@ export default function AIPanel() {
         {activeDragItem ? (
           <div className="w-(--sidebar-width,280px) pointer-events-none">
             {activeDragItem.type === 'Container' && activeDragItem.item && (
-              <Text
+              <UiText
                 as="div"
                 color={TextColors.primary}
                 weight={TextWeights.medium}
@@ -1240,10 +1243,10 @@ export default function AIPanel() {
               >
                 <Wand2 size={18} className={TEXT_COLOR_KEYS[TextColors.secondary]} />
                 <span className="flex-1 truncate">{(activeDragItem.item as AiPatch).name}</span>
-              </Text>
+              </UiText>
             )}
             {activeDragItem.type === 'SubMask' && activeDragItem.item && (
-              <Text
+              <UiText
                 as="div"
                 color={TextColors.primary}
                 weight={TextWeights.medium}
@@ -1255,10 +1258,10 @@ export default function AIPanel() {
                   return <Icon size={16} className={`shrink-0 ml-1 ${TEXT_COLOR_KEYS[TextColors.secondary]}`} />;
                 })()}
                 <span className="flex-1 truncate">{getSubMaskName(activeDragItem.item as SubMask)}</span>
-              </Text>
+              </UiText>
             )}
             {activeDragItem.type === 'Creation' && (
-              <Text
+              <UiText
                 as="div"
                 variant={TextVariants.small}
                 color={TextColors.primary}
@@ -1276,7 +1279,7 @@ export default function AIPanel() {
                     </>
                   );
                 })()}
-              </Text>
+              </UiText>
             )}
           </div>
         ) : null}
@@ -1296,7 +1299,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
       transition={{ duration: 0.2, ease: 'easeOut' }}
       className={`p-4 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
     >
-      <Text weight={TextWeights.medium}>{t('editor.ai.dropzoneText')}</Text>
+      <UiText weight={TextWeights.medium}>{t('editor.ai.dropzoneText')}</UiText>
     </motion.div>
   );
 }
@@ -1343,9 +1346,9 @@ function DraggableGridItem({ maskType, isGenerating, onClick }: DraggableGridIte
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
       <maskType.icon size={24} />{' '}
-      <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
+      <UiText as="span" variant={TextVariants.small} color={TextColors.primary}>
         {maskType.name}
-      </Text>
+      </UiText>
     </motion.div>
   );
 }
@@ -1584,9 +1587,9 @@ function ContainerRow({
               ref={renameInputRef}
             />
           ) : (
-            <Text color={TextColors.primary} weight={TextWeights.medium} className="truncate select-none">
+            <UiText color={TextColors.primary} weight={TextWeights.medium} className="truncate select-none">
               {container.name}
-            </Text>
+            </UiText>
           )}
         </div>
         <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1674,11 +1677,11 @@ function ContainerRow({
                   exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                   transition={{ duration: 0.2 }}
                 >
-                  <Text
+                  <UiText
                     as="div"
                     weight={TextWeights.medium}
                     className="flex items-center gap-2 p-2 rounded-md transition-colors transition-opacity opacity-70 hover:opacity-100 hover:bg-card-active cursor-pointer hover:text-text-primary"
-                    onClick={(e) => {
+                    onClick={(e: ReactMouseEvent<HTMLElement>) => {
                       e.stopPropagation();
                       onAddComponent(e);
                     }}
@@ -1687,7 +1690,7 @@ function ContainerRow({
                       <Plus size={16} />
                     </div>
                     <span className="select-none">{t('editor.ai.actions.addNewComponent')}</span>
-                  </Text>
+                  </UiText>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1846,7 +1849,7 @@ function SubMaskRow({
       }}
       onContextMenu={onContextMenu}
     >
-      <Text
+      <UiText
         as="div"
         variant={TextVariants.small}
         weight={TextWeights.bold}
@@ -1888,7 +1891,7 @@ function SubMaskRow({
             </motion.div>
           )}
         </AnimatePresence>
-      </Text>
+      </UiText>
       {renamingId === subMask.id ? (
         <input
           className="bg-bg-primary text-sm w-full rounded px-1 outline-none border border-accent"
@@ -1908,9 +1911,9 @@ function SubMaskRow({
           ref={renameInputRef}
         />
       ) : (
-        <Text color={TextColors.primary} className="flex-1 truncate select-none">
+        <UiText color={TextColors.primary} className="flex-1 truncate select-none">
           {getSubMaskName(subMask)}
-        </Text>
+        </UiText>
       )}
       <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
         {index > 1 && (
@@ -2069,7 +2072,7 @@ function SettingsPanel({
       >
         <div className="space-y-4 pt-2">
           {aiModelDownloadStatus && aiModelDownloadStatus.includes('Inpainting') && (
-            <Text
+            <UiText
               as="div"
               variant={TextVariants.small}
               color={TextColors.accent}
@@ -2078,19 +2081,19 @@ function SettingsPanel({
             >
               <Loader2 size={16} className="animate-spin shrink-0" />
               <div className="leading-relaxed">
-                <Text variant={TextVariants.small}>{t('editor.ai.settings.downloading')}</Text>
+                <UiText variant={TextVariants.small}>{t('editor.ai.settings.downloading')}</UiText>
                 <span>{aiModelDownloadStatus}</span>
               </div>
-            </Text>
+            </UiText>
           )}
 
-          <Text variant={TextVariants.small}>
+          <UiText variant={TextVariants.small}>
             {isQuickErasePatch
               ? t('editor.ai.settings.quickEraseDesc')
               : useFastInpaint
                 ? t('editor.ai.settings.fastInpaintDesc')
                 : t('editor.ai.settings.generativeDesc')}
-          </Text>
+          </UiText>
 
           <div>
             <Switch
@@ -2189,7 +2192,7 @@ function SettingsPanel({
           {isComponentMode && (
             <>
               {isAiMask && aiModelDownloadStatus && (
-                <Text
+                <UiText
                   as="div"
                   variant={TextVariants.small}
                   color={TextColors.accent}
@@ -2198,10 +2201,10 @@ function SettingsPanel({
                 >
                   <Loader2 size={16} className="animate-spin shrink-0" />
                   <div className="leading-relaxed">
-                    <Text variant={TextVariants.small}>{t('editor.ai.settings.aiModelDownloading')}</Text>
+                    <UiText variant={TextVariants.small}>{t('editor.ai.settings.aiModelDownloading')}</UiText>
                     <span>{aiModelDownloadStatus}</span>
                   </div>
-                </Text>
+                </UiText>
               )}
 
               {subMaskConfig.parameters?.map((param) => (

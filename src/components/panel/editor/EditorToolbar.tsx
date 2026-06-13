@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { SelectedImage } from '../../ui/AppProperties';
-import Text from '../../ui/Text';
+import UiText from '../../ui/Text';
 
 import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
 
@@ -395,7 +395,7 @@ const EditorToolbar = memo(
             }}
           >
             <div className="flex items-center justify-center max-w-full h-5 shrink-0">
-              <Text
+              <UiText
                 as="span"
                 variant={TextVariants.small}
                 color={TextColors.primary}
@@ -403,10 +403,10 @@ const EditorToolbar = memo(
                 className="truncate min-w-0 shrink"
               >
                 {baseName}
-              </Text>
+              </UiText>
 
               {isVirtualCopy && (
-                <Text
+                <UiText
                   as="div"
                   variant={TextVariants.small}
                   color={TextColors.accent}
@@ -428,7 +428,7 @@ const EditorToolbar = memo(
                   >
                     <span>-{vcId}</span>
                   </div>
-                </Text>
+                </UiText>
               )}
 
               <div
@@ -437,7 +437,7 @@ const EditorToolbar = memo(
                   showResolution ? 'max-w-40 opacity-100 ml-2' : 'max-w-0 opacity-0 ml-0',
                 )}
               >
-                <Text
+                <UiText
                   as="span"
                   variant={TextVariants.small}
                   className={cx(
@@ -446,7 +446,7 @@ const EditorToolbar = memo(
                   )}
                 >
                   {displayedResolution}
-                </Text>
+                </UiText>
               </div>
 
               <div
@@ -482,42 +482,62 @@ const EditorToolbar = memo(
               >
                 {exifData.shutter && (
                   <div className="flex items-center gap-1.5" data-tooltip={t('editor.toolbar.tooltips.shutterSpeed')}>
-                    <Text as="span">
+                    <UiText as="span">
                       <IconShutter />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                    </UiText>
+                    <UiText
+                      as="span"
+                      variant={TextVariants.small}
+                      color={TextColors.primary}
+                      weight={TextWeights.medium}
+                    >
                       {exifData.shutter}
-                    </Text>
+                    </UiText>
                   </div>
                 )}
                 {exifData.fNumber && (
                   <div className="flex items-center gap-1.5" data-tooltip={t('editor.toolbar.tooltips.aperture')}>
-                    <Text as="span">
+                    <UiText as="span">
                       <IconAperture />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                    </UiText>
+                    <UiText
+                      as="span"
+                      variant={TextVariants.small}
+                      color={TextColors.primary}
+                      weight={TextWeights.medium}
+                    >
                       {exifData.fNumber}
-                    </Text>
+                    </UiText>
                   </div>
                 )}
                 {exifData.iso && (
                   <div className="flex items-center gap-1.5" data-tooltip={t('editor.toolbar.tooltips.iso')}>
-                    <Text as="span">
+                    <UiText as="span">
                       <IconIso />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                    </UiText>
+                    <UiText
+                      as="span"
+                      variant={TextVariants.small}
+                      color={TextColors.primary}
+                      weight={TextWeights.medium}
+                    >
                       {exifData.iso}
-                    </Text>
+                    </UiText>
                   </div>
                 )}
                 {exifData.focal && (
                   <div className="flex items-center gap-1.5" data-tooltip={t('editor.toolbar.tooltips.focalLength')}>
-                    <Text as="span">
+                    <UiText as="span">
                       <IconFocalLength />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                    </UiText>
+                    <UiText
+                      as="span"
+                      variant={TextVariants.small}
+                      color={TextColors.primary}
+                      weight={TextWeights.medium}
+                    >
                       {exifData.focal.endsWith('mm') ? exifData.focal : `${exifData.focal}mm`}
-                    </Text>
+                    </UiText>
                   </div>
                 )}
               </div>
@@ -530,22 +550,32 @@ const EditorToolbar = memo(
               >
                 {exifData.captureDate && (
                   <div className="flex items-center gap-2">
-                    <Text as="span">
+                    <UiText as="span">
                       <IconCalendar />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                    </UiText>
+                    <UiText
+                      as="span"
+                      variant={TextVariants.small}
+                      color={TextColors.primary}
+                      weight={TextWeights.medium}
+                    >
                       {exifData.captureDate}
-                    </Text>
+                    </UiText>
                   </div>
                 )}
                 {exifData.captureTime && (
                   <div className="flex items-center gap-2">
-                    <Text as="span">
+                    <UiText as="span">
                       <IconClock />
-                    </Text>
-                    <Text as="span" variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+                    </UiText>
+                    <UiText
+                      as="span"
+                      variant={TextVariants.small}
+                      color={TextColors.primary}
+                      weight={TextWeights.medium}
+                    >
                       {exifData.captureTime}
-                    </Text>
+                    </UiText>
                   </div>
                 )}
               </div>
@@ -621,10 +651,10 @@ const EditorToolbar = memo(
                         )}
                       >
                         <div className="flex justify-between items-center gap-2">
-                          <Text as="span" color={textColor} weight={textWeight} className="truncate">
+                          <UiText as="span" color={textColor} weight={textWeight} className="truncate">
                             {name}
-                          </Text>
-                          <Text
+                          </UiText>
+                          <UiText
                             as="span"
                             variant={TextVariants.small}
                             color={textColor}
@@ -632,7 +662,7 @@ const EditorToolbar = memo(
                             className="opacity-50 shrink-0"
                           >
                             {i === 0 ? '' : i}
-                          </Text>
+                          </UiText>
                         </div>
                       </button>
                     );

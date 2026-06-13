@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextColors, TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface HdrModalProps {
   error: string | null;
@@ -96,10 +96,10 @@ export default function HdrModal({
           <div className="flex items-center justify-center mb-6">
             <XCircle className="w-12 h-12 text-red-500" />
           </div>
-          <Text variant={TextVariants.title} className="mb-2 text-center">
+          <UiText variant={TextVariants.title} className="mb-2 text-center">
             {t('modals.hdr.failed')}
-          </Text>
-          <Text className="text-center p-4 rounded-lg bg-bg-primary max-w-md mt-2 leading-relaxed">{error}</Text>
+          </UiText>
+          <UiText className="text-center p-4 rounded-lg bg-bg-primary max-w-md mt-2 leading-relaxed">{error}</UiText>
         </div>
       );
     }
@@ -116,7 +116,7 @@ export default function HdrModal({
           </div>
           {savedPath && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-              <Text
+              <UiText
                 as="div"
                 variant={TextVariants.heading}
                 color={TextColors.success}
@@ -124,7 +124,7 @@ export default function HdrModal({
               >
                 <CheckCircle className="w-5 h-5" />
                 <span>{t('modals.hdr.savedSuccess')}</span>
-              </Text>
+              </UiText>
             </motion.div>
           )}
         </div>
@@ -152,12 +152,12 @@ export default function HdrModal({
               transition={{ delay: 0.1, duration: 0.4 }}
               className="flex flex-col items-center w-full"
             >
-              <Text variant={TextVariants.title} className="mb-2 text-center">
+              <UiText variant={TextVariants.title} className="mb-2 text-center">
                 {t('modals.hdr.merging')}
-              </Text>
-              <Text className="text-center font-mono h-6 flex justify-center items-center">
+              </UiText>
+              <UiText className="text-center font-mono h-6 flex justify-center items-center">
                 {progressMessage || t('modals.hdr.initializing')}
-              </Text>
+              </UiText>
 
               <div className="mt-8 w-64 relative">
                 <div className="h-1 bg-surface rounded-full overflow-hidden relative w-full shadow-xs">
@@ -176,9 +176,9 @@ export default function HdrModal({
                 </div>
               </div>
 
-              <Text variant={TextVariants.small} className="mt-6 text-center max-w-xs opacity-60">
+              <UiText variant={TextVariants.small} className="mt-6 text-center max-w-xs opacity-60">
                 {t('modals.hdr.speedNotice')}
-              </Text>
+              </UiText>
             </motion.div>
           </div>
         </div>
@@ -190,12 +190,12 @@ export default function HdrModal({
         <div className="flex items-center justify-center mb-6">
           <Images className="w-12 h-12 text-accent" />
         </div>
-        <Text variant={TextVariants.title} className="mb-3 text-center">
+        <UiText variant={TextVariants.title} className="mb-3 text-center">
           {t('modals.hdr.title')}
-        </Text>
-        <Text className="text-center max-w-md leading-relaxed">
+        </UiText>
+        <UiText className="text-center max-w-md leading-relaxed">
           {imageCount ? t('modals.hdr.descriptionWithCount', { count: imageCount }) : t('modals.hdr.description')}
-        </Text>
+        </UiText>
       </div>
     );
   };

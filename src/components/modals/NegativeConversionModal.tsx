@@ -12,7 +12,7 @@ import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface NegativeParams {
   red_weight: number;
@@ -216,7 +216,7 @@ export default function NegativeConversionModal({
   const renderControls = () => (
     <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('modals.negativeConversion.title')}</Text>
+        <UiText variant={TextVariants.title}>{t('modals.negativeConversion.title')}</UiText>
         <button
           onClick={() => {
             setParams(DEFAULT_PARAMS);
@@ -232,9 +232,9 @@ export default function NegativeConversionModal({
 
       <div className="grow overflow-y-auto p-4 flex flex-col gap-8">
         <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.colorTiming')}
-          </Text>
+          </UiText>
           <div className="space-y-3">
             <Slider
               label={t('modals.negativeConversion.redWeight')}
@@ -276,9 +276,9 @@ export default function NegativeConversionModal({
         </div>
 
         <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.printGrade')}
-          </Text>
+          </UiText>
           <div className="space-y-3">
             <Slider
               label={t('modals.negativeConversion.exposure')}
@@ -307,7 +307,7 @@ export default function NegativeConversionModal({
         </div>
 
         <div className="mt-auto pt-4 space-y-2">
-          <Text
+          <UiText
             as="div"
             variant={TextVariants.small}
             className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3"
@@ -336,7 +336,7 @@ export default function NegativeConversionModal({
                 ).
               </Trans>
             </div>
-          </Text>
+          </UiText>
         </div>
       </div>
     </div>
@@ -375,14 +375,14 @@ export default function NegativeConversionModal({
                     draggable={false}
                   />
                   {isCompareActive && (
-                    <Text
+                    <UiText
                       as="div"
                       variant={TextVariants.small}
                       color={TextColors.button}
                       className="absolute top-4 left-4 bg-accent px-2 py-1 rounded-sm shadow-lg z-20"
                     >
                       {t('modals.negativeConversion.originalLabel')}
-                    </Text>
+                    </UiText>
                   )}
                 </div>
               </div>

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextColors, TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface PanoramaModalProps {
   error: string | null;
@@ -96,10 +96,10 @@ export default function PanoramaModal({
           <div className="flex items-center justify-center mb-6">
             <XCircle className="w-12 h-12 text-red-500" />
           </div>
-          <Text variant={TextVariants.title} className="mb-2 text-center">
+          <UiText variant={TextVariants.title} className="mb-2 text-center">
             {t('modals.panorama.failed')}
-          </Text>
-          <Text className="text-center p-4 rounded-lg bg-bg-primary max-w-md mt-2 leading-relaxed">{error}</Text>
+          </UiText>
+          <UiText className="text-center p-4 rounded-lg bg-bg-primary max-w-md mt-2 leading-relaxed">{error}</UiText>
         </div>
       );
     }
@@ -116,7 +116,7 @@ export default function PanoramaModal({
           </div>
           {savedPath && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-              <Text
+              <UiText
                 as="div"
                 variant={TextVariants.heading}
                 color={TextColors.success}
@@ -124,7 +124,7 @@ export default function PanoramaModal({
               >
                 <CheckCircle className="w-5 h-5" />
                 <span>{t('modals.panorama.savedSuccess')}</span>
-              </Text>
+              </UiText>
             </motion.div>
           )}
         </div>
@@ -152,12 +152,12 @@ export default function PanoramaModal({
               transition={{ delay: 0.1, duration: 0.4 }}
               className="flex flex-col items-center w-full"
             >
-              <Text variant={TextVariants.title} className="mb-2 text-center">
+              <UiText variant={TextVariants.title} className="mb-2 text-center">
                 {t('modals.panorama.stitchingProgress')}
-              </Text>
-              <Text className="text-center font-mono h-6 flex justify-center items-center">
+              </UiText>
+              <UiText className="text-center font-mono h-6 flex justify-center items-center">
                 {progressMessage || t('modals.panorama.initializing')}
-              </Text>
+              </UiText>
 
               <div className="mt-8 w-64 relative">
                 <div className="h-1 bg-surface rounded-full overflow-hidden relative w-full shadow-xs">
@@ -176,9 +176,9 @@ export default function PanoramaModal({
                 </div>
               </div>
 
-              <Text variant={TextVariants.small} className="mt-6 text-center max-w-xs opacity-60">
+              <UiText variant={TextVariants.small} className="mt-6 text-center max-w-xs opacity-60">
                 {t('modals.panorama.speedNotice')}
-              </Text>
+              </UiText>
             </motion.div>
           </div>
         </div>
@@ -190,12 +190,12 @@ export default function PanoramaModal({
         <div className="flex items-center justify-center mb-6">
           <Layers className="w-12 h-12 text-accent" />
         </div>
-        <Text variant={TextVariants.title} className="mb-3 text-center">
+        <UiText variant={TextVariants.title} className="mb-3 text-center">
           {t('modals.panorama.title')}
-        </Text>
-        <Text className="text-center max-w-md leading-relaxed text-text-secondary">
+        </UiText>
+        <UiText className="text-center max-w-md leading-relaxed text-text-secondary">
           {imageCount ? t('modals.panorama.descCount', { count: imageCount }) : t('modals.panorama.descGeneric')}
-        </Text>
+        </UiText>
       </div>
     );
   };

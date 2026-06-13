@@ -5,7 +5,7 @@ import { TextVariants } from '../../types/typography';
 import { Adjustments, DetailsAdjustment } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
 import Slider from '../ui/Slider';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface DetailsPanelProps {
   adjustments: Adjustments;
@@ -45,9 +45,9 @@ export default function DetailsPanel({
     <div className="space-y-4">
       {adjustmentVisibility['sharpening'] !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.sharpening')}
-          </Text>
+          </UiText>
           <Slider
             label={t('adjustments.details.sharpness')}
             max={100}
@@ -77,9 +77,9 @@ export default function DetailsPanel({
 
       {adjustmentVisibility['presence'] !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.presence')}
-          </Text>
+          </UiText>
           <Slider
             label={t('adjustments.details.clarity')}
             max={100}
@@ -131,9 +131,9 @@ export default function DetailsPanel({
 
       {adjustmentVisibility['noiseReduction'] !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.noiseReduction')}
-          </Text>
+          </UiText>
           <Slider
             label={t('adjustments.details.luminance')}
             max={100}
@@ -161,9 +161,9 @@ export default function DetailsPanel({
 
       {!isForMask && adjustmentVisibility['chromaticAberration'] !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.chromaticAberration')}
-          </Text>
+          </UiText>
           <Slider
             label={t('adjustments.details.redCyan')}
             max={100}

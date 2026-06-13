@@ -8,7 +8,7 @@ import { TextVariants } from '../../types/typography';
 import { ADJUSTMENT_GROUPS, COPYABLE_ADJUSTMENT_KEYS, CopyPasteSettings, PasteMode } from '../../utils/adjustments';
 import Button from '../ui/Button';
 import Switch from '../ui/Switch';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface CopyPasteSettingsModalProps {
   isOpen: boolean;
@@ -193,14 +193,14 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
         }`}
         role="dialog"
       >
-        <Text variant={TextVariants.title} className="mb-4">
+        <UiText variant={TextVariants.title} className="mb-4">
           {t('modals.copyPaste.title')}
-        </Text>
+        </UiText>
         <div className="grow overflow-y-auto pr-2 -mr-2 space-y-6">
           <div>
-            <Text variant={TextVariants.heading} className="block mb-2">
+            <UiText variant={TextVariants.heading} className="block mb-2">
               {t('modals.copyPaste.pasteMode')}
-            </Text>
+            </UiText>
             <PasteModeSwitch
               selectedMode={localSettings.mode}
               onModeChange={(mode) => {
@@ -208,16 +208,16 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
               }}
               isVisible={show}
             />
-            <Text variant={TextVariants.small} className="mt-2">
+            <UiText variant={TextVariants.small} className="mt-2">
               <b>{t('modals.copyPaste.modeMerge')}:</b> {t('modals.copyPaste.descMerge')}
               <br />
               <b>{t('modals.copyPaste.modeReplace')}:</b> {t('modals.copyPaste.descReplace')}
-            </Text>
+            </UiText>
           </div>
 
           <div>
             <div className="flex justify-between items-center mb-2">
-              <Text variant={TextVariants.heading}>{t('modals.copyPaste.includedAdjustments')}</Text>
+              <UiText variant={TextVariants.heading}>{t('modals.copyPaste.includedAdjustments')}</UiText>
               <div className="flex gap-2">
                 <Button
                   className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
@@ -239,9 +239,9 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-6">
                 {Object.entries(ADJUSTMENT_GROUPS).map(([section, groups]) => (
                   <div key={section}>
-                    <Text variant={TextVariants.heading} className="mb-2">
+                    <UiText variant={TextVariants.heading} className="mb-2">
                       {t(`editor.adjustments.sections.${section}`, { defaultValue: capitalize(section) })}
-                    </Text>
+                    </UiText>
                     {groups.map((group) => {
                       const isFullyChecked = group.keys.every((key) => localSettings.includedAdjustments.includes(key));
 

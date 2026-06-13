@@ -29,7 +29,7 @@ import ExportPresetsList from '../../ui/ExportPresetsList';
 import ImagePicker from '../../ui/ImagePicker';
 import Slider from '../../ui/Slider';
 import Switch from '../../ui/Switch';
-import Text from '../../ui/Text';
+import UiText from '../../ui/Text';
 
 import type { Adjustments } from '../../../utils/adjustments';
 import type { TFunction } from 'i18next';
@@ -59,9 +59,9 @@ interface ImageDimensions {
 function Section({ title, children }: SectionProps) {
   return (
     <div>
-      <Text variant={TextVariants.heading} className="mb-2">
+      <UiText variant={TextVariants.heading} className="mb-2">
         {title}
-      </Text>
+      </UiText>
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -151,7 +151,7 @@ function WatermarkPreview({
       style={{ aspectRatio: imageAspectRatio }}
     >
       <div className="absolute inset-0 flex items-center justify-center">
-        <Text variant={TextVariants.label}>{t('export.watermark.previewText')}</Text>
+        <UiText variant={TextVariants.label}>{t('export.watermark.previewText')}</UiText>
       </div>
       {watermarkPath && (
         <div style={getPositionStyles()}>
@@ -582,7 +582,7 @@ export default function ExportPanel({
   return (
     <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('export.title')}</Text>
+        <UiText variant={TextVariants.title}>{t('export.title')}</UiText>
         {onClose && (
           <button
             onClick={onClose}
@@ -613,9 +613,9 @@ export default function ExportPanel({
                       setFileFormat(format.id);
                     }}
                   >
-                    <Text color={fileFormat === format.id ? TextColors.button : TextColors.secondary}>
+                    <UiText color={fileFormat === format.id ? TextColors.button : TextColors.secondary}>
                       {format.name}
-                    </Text>
+                    </UiText>
                   </button>
                 ))}
               </div>
@@ -700,7 +700,7 @@ export default function ExportPanel({
                           type="number"
                           value={resizeValue}
                         />
-                        <Text variant={TextVariants.label}>{t('export.resize.pixels')}</Text>
+                        <UiText variant={TextVariants.label}>{t('export.resize.pixels')}</UiText>
                       </div>
                       <Switch
                         checked={dontEnlarge}
@@ -821,9 +821,9 @@ export default function ExportPanel({
             )}
 
             <div>
-              <Text variant={TextVariants.heading} className="mb-2">
+              <UiText variant={TextVariants.heading} className="mb-2">
                 {t('export.sections.advanced')}
-              </Text>
+              </UiText>
               <div className="bg-surface rounded-xl overflow-hidden">
                 <button
                   onClick={() => {
@@ -831,17 +831,17 @@ export default function ExportPanel({
                   }}
                   className="w-full flex items-center justify-between p-3.5 hover:bg-card-active transition-colors"
                 >
-                  <Text
+                  <UiText
                     as="span"
                     variant={TextVariants.label}
                     color={TextColors.primary}
                     className="flex items-center gap-2"
                   >
                     <Settings size={16} /> {t('export.advanced.title')}
-                  </Text>
-                  <Text color={TextColors.secondary}>
+                  </UiText>
+                  <UiText color={TextColors.secondary}>
                     {isAdvancedExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  </Text>
+                  </UiText>
                 </button>
                 <AnimatePresence initial={false}>
                   {isAdvancedExpanded && (
@@ -888,19 +888,19 @@ export default function ExportPanel({
             </div>
           </>
         ) : (
-          <Text
+          <UiText
             variant={TextVariants.heading}
             color={TextColors.secondary}
             weight={TextWeights.normal}
             className="text-center mt-4"
           >
             {isLibraryContext ? t('export.status.noImagesSelected') : t('export.status.noImageSelected')}
-          </Text>
+          </UiText>
         )}
       </div>
 
       <div className="p-4 border-t border-surface shrink-0 space-y-2">
-        <Text as="div" variant={TextVariants.small} color={TextColors.primary} className="text-center">
+        <UiText as="div" variant={TextVariants.small} color={TextColors.primary} className="text-center">
           {isEstimating ? (
             <span className="italic">{t('export.status.estimatingSize')}</span>
           ) : estimatedSize !== null ? (
@@ -912,7 +912,7 @@ export default function ExportPanel({
               {numImages > 1 && ` (~${formatBytes(estimatedSize / numImages, t)})`}
             </span>
           ) : null}
-        </Text>
+        </UiText>
         <Button
           className={`group rounded-md h-11 w-full flex items-center text-md font-bold! justify-center ${
             status === Status.Exporting

@@ -6,7 +6,7 @@ import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments
 import { AppSettings } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
 import Slider from '../ui/Slider';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface EffectsPanelProps {
   adjustments: Adjustments;
@@ -62,9 +62,9 @@ export default function EffectsPanel({
   return (
     <div className="space-y-4">
       <div className="p-2 bg-bg-tertiary rounded-md">
-        <Text variant={TextVariants.heading} className="mb-2">
+        <UiText variant={TextVariants.heading} className="mb-2">
           {t('adjustments.effects.creative')}
-        </Text>
+        </UiText>
 
         <Slider
           label={t('adjustments.effects.glow')}
@@ -108,9 +108,9 @@ export default function EffectsPanel({
       {!isForMask && (
         <div className="space-y-4">
           <div className="p-2 bg-bg-tertiary rounded-md">
-            <Text variant={TextVariants.heading} className="mb-2">
+            <UiText variant={TextVariants.heading} className="mb-2">
               {t('adjustments.effects.lut')}
-            </Text>
+            </UiText>
             <LUTControl
               lutName={adjustments.lutName || null}
               lutIntensity={adjustments.lutIntensity || 100}
@@ -123,9 +123,9 @@ export default function EffectsPanel({
 
           {adjustmentVisibility['vignette'] !== false && (
             <div className="p-2 bg-bg-tertiary rounded-md">
-              <Text variant={TextVariants.heading} className="mb-2">
+              <UiText variant={TextVariants.heading} className="mb-2">
                 {t('adjustments.effects.vignette')}
-              </Text>
+              </UiText>
               <Slider
                 label={t('adjustments.effects.amount')}
                 max={100}
@@ -179,9 +179,9 @@ export default function EffectsPanel({
 
           {adjustmentVisibility['grain'] !== false && (
             <div className="p-2 bg-bg-tertiary rounded-md">
-              <Text variant={TextVariants.heading} className="mb-2">
+              <UiText variant={TextVariants.heading} className="mb-2">
                 {t('adjustments.effects.grain')}
-              </Text>
+              </UiText>
               <Slider
                 label={t('adjustments.effects.amount')}
                 max={100}

@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Invokes, type AppSettings } from '../components/ui/AppProperties';
-import Text from '../components/ui/Text';
+import UiText from '../components/ui/Text';
 import { TextVariants } from '../types/typography';
 import { formatUnknownError } from '../utils/errorFormatting';
 
@@ -134,9 +134,9 @@ export default function TaggingSubMenu({
                 transition={{ duration: 0.2 }}
                 className="p-1 select-none"
               >
-                <Text variant={TextVariants.small} className="italic">
+                <UiText variant={TextVariants.small} className="italic">
                   {t('menus.tagging.noTags')}
-                </Text>
+                </UiText>
               </motion.span>
             )}
           </AnimatePresence>

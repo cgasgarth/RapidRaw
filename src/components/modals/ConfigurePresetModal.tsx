@@ -9,7 +9,7 @@ import { TextVariants } from '../../types/typography';
 import { ADJUSTMENT_GROUPS } from '../../utils/adjustments';
 import { Preset } from '../ui/AppProperties';
 import Switch from '../ui/Switch';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface ConfigurePresetModalProps {
   isOpen: boolean;
@@ -200,9 +200,9 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
         `}
         role="dialog"
       >
-        <Text variant={TextVariants.title} className="mb-4">
+        <UiText variant={TextVariants.title} className="mb-4">
           {initialPreset ? t('modals.configurePreset.titleConfigure') : t('modals.configurePreset.titleSave')}
-        </Text>
+        </UiText>
         <input
           className="w-full bg-bg-primary text-text-primary border border-border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent"
           onChange={(e) => {

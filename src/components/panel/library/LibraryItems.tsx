@@ -19,7 +19,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { COLOR_LABELS, Color } from '../../../utils/adjustments';
 import { ThumbnailAspectRatio, type ImageFile, ExifOverlay } from '../../ui/AppProperties';
-import Text from '../../ui/Text';
+import UiText from '../../ui/Text';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';
 
 import type { ColumnWidths } from '../MainLibrary';
@@ -344,9 +344,9 @@ const ThumbnailComponent = ({
               hasRating && (hasEditIcon || hasColorLabel) ? 'ml-1.5' : 'ml-0',
             )}
           >
-            <Text variant={TextVariants.small} color={TextColors.white}>
+            <UiText variant={TextVariants.small} color={TextColors.white}>
               {rating}
-            </Text>
+            </UiText>
             <StarIcon size={12} className="text-white fill-white" />
           </div>
         </div>
@@ -370,39 +370,39 @@ const ThumbnailComponent = ({
         <div className="min-h-0 overflow-hidden pointer-events-none invisible">
           <div className="flex flex-col p-2 pb-1.5">
             <div className="flex items-end justify-between shrink-0">
-              <Text variant={TextVariants.small} className="truncate pr-2">
+              <UiText variant={TextVariants.small} className="truncate pr-2">
                 {baseName}
-              </Text>
+              </UiText>
               {isVirtualCopy && (
-                <Text variant={TextVariants.small} className="px-1.5 py-0.5 font-bold">
+                <UiText variant={TextVariants.small} className="px-1.5 py-0.5 font-bold">
                   VC
-                </Text>
+                </UiText>
               )}
             </div>
             <div className="pt-1.5 pb-0.5 flex flex-wrap items-center gap-x-2.5 shrink-0">
               <div className="flex items-center gap-1">
                 <IconShutter className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                <UiText variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {shutter || '-'}
-                </Text>
+                </UiText>
               </div>
               <div className="flex items-center gap-1">
                 <IconAperture className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                <UiText variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {fNumber || '-'}
-                </Text>
+                </UiText>
               </div>
               <div className="flex items-center gap-1">
                 <IconIso className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                <UiText variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {iso || '-'}
-                </Text>
+                </UiText>
               </div>
               <div className="flex items-center gap-1">
                 <IconFocalLength className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                <UiText variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {focal ? (focal.endsWith('mm') ? focal : `${focal}mm`) : '-'}
-                </Text>
+                </UiText>
               </div>
             </div>
           </div>
@@ -420,7 +420,7 @@ const ThumbnailComponent = ({
         )}
       >
         <div className="flex items-end justify-between shrink-0">
-          <Text
+          <UiText
             variant={TextVariants.small}
             className={cx(
               'truncate pr-2 transition-colors duration-300',
@@ -428,9 +428,9 @@ const ThumbnailComponent = ({
             )}
           >
             {baseName}
-          </Text>
+          </UiText>
           {isVirtualCopy && (
-            <Text
+            <UiText
               as="div"
               variant={TextVariants.small}
               weight={TextWeights.bold}
@@ -445,7 +445,7 @@ const ThumbnailComponent = ({
               data-tooltip={t('library.items.tooltipVirtualCopy')}
             >
               VC
-            </Text>
+            </UiText>
           )}
         </div>
 
@@ -471,33 +471,33 @@ const ThumbnailComponent = ({
                 data-tooltip={t('library.items.tooltipShutterSpeed')}
               >
                 <IconShutter className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                <UiText variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {shutter || '-'}
-                </Text>
+                </UiText>
               </div>
               <div
                 className="flex items-center gap-1 text-text-secondary"
                 data-tooltip={t('library.items.tooltipAperture')}
               >
                 <IconAperture className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                <UiText variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {fNumber || '-'}
-                </Text>
+                </UiText>
               </div>
               <div className="flex items-center gap-1 text-text-secondary" data-tooltip={t('library.items.tooltipIso')}>
                 <IconIso className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                <UiText variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {iso || '-'}
-                </Text>
+                </UiText>
               </div>
               <div
                 className="flex items-center gap-1 text-text-secondary"
                 data-tooltip={t('library.items.tooltipFocalLength')}
               >
                 <IconFocalLength className="w-2.5 h-2.5" />
-                <Text variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
+                <UiText variant={TextVariants.small} className="text-[9px] font-medium tracking-wide">
                   {focal ? (focal.endsWith('mm') ? focal : `${focal}mm`) : '-'}
-                </Text>
+                </UiText>
               </div>
             </div>
           </div>
@@ -706,11 +706,16 @@ const ListItemComponent = ({
       </div>
 
       <div style={{ width: getW('name') }} className="flex items-center gap-2 px-3 h-full overflow-hidden">
-        <Text variant={TextVariants.small} className="truncate" weight={TextWeights.medium} color={TextColors.primary}>
+        <UiText
+          variant={TextVariants.small}
+          className="truncate"
+          weight={TextWeights.medium}
+          color={TextColors.primary}
+        >
           {baseName}
-        </Text>
+        </UiText>
         {isVirtualCopy && (
-          <Text
+          <UiText
             as="div"
             variant={TextVariants.small}
             color={TextColors.secondary}
@@ -719,23 +724,23 @@ const ListItemComponent = ({
             data-tooltip={t('library.items.tooltipVirtualCopy')}
           >
             VC
-          </Text>
+          </UiText>
         )}
       </div>
 
       <div style={{ width: getW('date') }} className="flex items-center px-3 h-full overflow-hidden">
-        <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+        <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
           {dateStr}
-        </Text>
+        </UiText>
       </div>
 
       <div style={{ width: getW('rating') }} className="flex items-center px-3 h-full overflow-hidden">
         {rating > 0 && (
           <div className="flex items-center gap-1">
             <StarIcon size={12} className="text-accent fill-accent" />
-            <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+            <UiText variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
               {rating}
-            </Text>
+            </UiText>
           </div>
         )}
       </div>
@@ -747,11 +752,11 @@ const ListItemComponent = ({
               className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-black/20"
               style={{ backgroundColor: colorLabel.color }}
             />
-            <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
               {t(`contextMenus.colors.${colorLabel.name}`, {
                 defaultValue: colorLabel.name.charAt(0).toUpperCase() + colorLabel.name.slice(1),
               })}
-            </Text>
+            </UiText>
           </div>
         )}
       </div>
@@ -759,24 +764,24 @@ const ListItemComponent = ({
       {showExifCols && (
         <>
           <div style={{ width: getW('shutter') }} className="flex items-center px-3 h-full overflow-hidden">
-            <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
               {shutter}
-            </Text>
+            </UiText>
           </div>
           <div style={{ width: getW('aperture') }} className="flex items-center px-3 h-full overflow-hidden">
-            <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
               {fNumber}
-            </Text>
+            </UiText>
           </div>
           <div style={{ width: getW('iso') }} className="flex items-center px-3 h-full overflow-hidden">
-            <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
               {iso}
-            </Text>
+            </UiText>
           </div>
           <div style={{ width: getW('focal') }} className="flex items-center px-3 h-full overflow-hidden">
-            <Text variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
               {focal ? (focal.endsWith('mm') ? focal : `${focal}mm`) : ''}
-            </Text>
+            </UiText>
           </div>
         </>
       )}
@@ -869,12 +874,17 @@ const RowComponent = ({
           >
             {row.isExpanded ? <FolderOpen size={16} /> : <Folder size={16} />}
           </button>
-          <Text variant={TextVariants.label} weight={TextWeights.semibold} className="truncate" data-tooltip={row.path}>
+          <UiText
+            variant={TextVariants.label}
+            weight={TextWeights.semibold}
+            className="truncate"
+            data-tooltip={row.path}
+          >
             {displayPath}
-          </Text>
-          <Text variant={TextVariants.small} color={TextColors.secondary} className="ml-auto">
+          </UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="ml-auto">
             {t('library.items.imagesCount', { count: row.count })}
-          </Text>
+          </UiText>
         </div>
       </div>
     );

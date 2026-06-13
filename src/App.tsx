@@ -10,7 +10,7 @@ import { useShallow } from 'zustand/react/shallow';
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import AppModals from './components/modals/AppModals';
-import FolderTree from './components/panel/FolderTree';
+import FolderTreePanel from './components/panel/FolderTree';
 import ExportPanel from './components/panel/right/ExportPanel';
 import {
   Album,
@@ -682,7 +682,7 @@ function App() {
           opacity: isFullScreen ? 0 : 1,
         }}
       >
-        <FolderTree
+        <FolderTreePanel
           isResizing={isResizing}
           isVisible={uiVisibility.folderTree}
           onContextMenu={handleFolderTreeContextMenu}

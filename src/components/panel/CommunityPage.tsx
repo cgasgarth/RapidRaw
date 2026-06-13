@@ -11,7 +11,7 @@ import { Invokes, SupportedTypes, ImageFile } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Input from '../ui/Input';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 const DEFAULT_PREVIEW_IMAGE_URL = 'https://raw.githubusercontent.com/CyberTimon/RapidRAW-Presets/main/sample-image.jpg';
 
@@ -224,10 +224,10 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
             <ArrowLeft />
           </Button>
           <div>
-            <Text variant={TextVariants.headline} className="flex items-center gap-2">
+            <UiText variant={TextVariants.headline} className="flex items-center gap-2">
               <Users /> {t('library.community.headerTitle')}
-            </Text>
-            <Text>{t('library.community.headerDesc')}</Text>
+            </UiText>
+            <UiText>{t('library.community.headerDesc')}</UiText>
           </div>
         </div>
       </header>
@@ -245,7 +245,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary" />
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <Text variant={TextVariants.label}>{t('library.community.sortBy')}</Text>
+          <UiText variant={TextVariants.label}>{t('library.community.sortBy')}</UiText>
           <Dropdown
             options={sortMethods}
             value={sortBy}
@@ -258,7 +258,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
 
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2">
         {isLoading ? (
-          <Text
+          <UiText
             variant={TextVariants.heading}
             color={TextColors.secondary}
             weight={TextWeights.normal}
@@ -266,7 +266,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
           >
             <Loader2 className="h-8 w-8 animate-spin mr-2" />
             {t('library.community.fetchingPresets')}
-          </Text>
+          </UiText>
         ) : (
           <motion.div
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
@@ -323,12 +323,12 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
                       </div>
                     </div>
                     <div className="p-4 text-center">
-                      <Text variant={TextVariants.heading} className="truncate mb-1">
+                      <UiText variant={TextVariants.heading} className="truncate mb-1">
                         {preset.name}
-                      </Text>
-                      <Text variant={TextVariants.small} className="font-['cursive'] italic">
+                      </UiText>
+                      <UiText variant={TextVariants.small} className="font-['cursive'] italic">
                         {t('library.community.presetBy', { creator: preset.creator })}
-                      </Text>
+                      </UiText>
                     </div>
                   </motion.div>
                 );
@@ -342,7 +342,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
           transition={{ duration: 0.5, delay: 0.3 }}
           className="text-center mt-8 py-4"
         >
-          <Text>
+          <UiText>
             {t('library.community.footerHeading')}
             <br />
             <a
@@ -362,7 +362,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
               />
               {t('library.community.footerLinkText')}
             </a>
-          </Text>
+          </UiText>
         </motion.div>
       </div>
     </div>

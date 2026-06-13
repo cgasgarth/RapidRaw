@@ -5,7 +5,7 @@ import { useManagedFocus } from '../../hooks/useManagedFocus';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextVariants } from '../../types/typography';
 import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface RenameFileModalProps {
   filesToRename: Array<string>;
@@ -119,17 +119,17 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
         }`}
         role="dialog"
       >
-        <Text variant={TextVariants.title} className="mb-4">
+        <UiText variant={TextVariants.title} className="mb-4">
           {isSingleFile
             ? t('modals.renameFile.titleSingle')
             : t('modals.renameFile.titleMultiple', { count: fileCount })}
-        </Text>
+        </UiText>
 
         <div className="space-y-8 text-sm">
           <div>
-            <Text variant={TextVariants.heading} className="block mb-2">
+            <UiText variant={TextVariants.heading} className="block mb-2">
               {isSingleFile ? t('modals.renameFile.newName') : t('modals.renameFile.fileNamingTemplate')}
-            </Text>
+            </UiText>
             <input
               className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
               onChange={(e: ChangeEvent<HTMLInputElement>) => {

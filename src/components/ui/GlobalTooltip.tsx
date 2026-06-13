@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-import Text from './Text';
+import UiText from './Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 const TOOLTIP_DELAY = 500;
@@ -204,9 +204,9 @@ export default function GlobalTooltip() {
             tooltip.isAbove && '-translate-y-full',
           )}
         >
-          <Text variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
+          <UiText variant={TextVariants.small} color={TextColors.primary} weight={TextWeights.medium}>
             {tooltip.content}
-          </Text>
+          </UiText>
         </motion.div>
       )}
     </AnimatePresence>,

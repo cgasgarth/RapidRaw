@@ -11,7 +11,7 @@ import { TextColors, TextVariants } from '../../types/typography';
 import { Adjustments } from '../../utils/adjustments';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface GeometryParams {
   distortion: number;
@@ -334,7 +334,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
   const renderControls = () => (
     <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('modals.transform.title')}</Text>
+        <UiText variant={TextVariants.title}>{t('modals.transform.title')}</UiText>
         <button
           onClick={handleReset}
           data-tooltip={t('modals.transform.resetTooltip')}
@@ -346,9 +346,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
 
       <div className="grow overflow-y-auto p-4 flex flex-col gap-8" onPointerDownCapture={handleInteractionStart}>
         <div>
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.transform.distortion')}
-          </Text>
+          </UiText>
           <div className="space-y-3">
             <Slider
               label={t('modals.transform.amount')}
@@ -365,9 +365,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         </div>
 
         <div>
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.transform.perspective')}
-          </Text>
+          </UiText>
           <div className="space-y-3">
             <Slider
               label={t('modals.transform.vertical')}
@@ -395,9 +395,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         </div>
 
         <div>
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.transform.title')}
-          </Text>
+          </UiText>
           <div className="space-y-3">
             <Slider
               label={t('modals.transform.rotate')}
@@ -436,9 +436,9 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         </div>
 
         <div>
-          <Text variant={TextVariants.heading} className="mb-2">
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.transform.offset')}
-          </Text>
+          </UiText>
           <div className="space-y-3">
             <Slider
               label={t('modals.transform.xAxis')}
@@ -467,14 +467,14 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
 
         <div className="mt-auto">
           {currentAdjustments.masks.length > 0 && (
-            <Text
+            <UiText
               as="div"
               variant={TextVariants.small}
               className="p-3 bg-surface rounded-md border border-surface flex items-center gap-3"
             >
               <Info size={16} className="shrink-0" />
               <p className="leading-relaxed">{t('modals.transform.maskWarning')}</p>
-            </Text>
+            </UiText>
           )}
         </div>
       </div>
@@ -527,14 +527,14 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
                   )}
 
                   {isCompareActive && (
-                    <Text
+                    <UiText
                       as="div"
                       variant={TextVariants.small}
                       color={TextColors.button}
                       className="absolute top-4 left-4 bg-accent px-2 py-1 rounded-sm shadow-lg z-20"
                     >
                       {t('modals.transform.original')}
-                    </Text>
+                    </UiText>
                   )}
                 </div>
               </div>

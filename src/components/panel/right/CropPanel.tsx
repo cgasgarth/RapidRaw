@@ -24,7 +24,7 @@ import LensCorrectionModal from '../../modals/LensCorrectionModal';
 import TransformModal from '../../modals/TransformModal';
 import { Orientation } from '../../ui/AppProperties';
 import Slider from '../../ui/Slider';
-import Text from '../../ui/Text';
+import UiText from '../../ui/Text';
 
 const BASE_RATIO = 1.618;
 const ORIGINAL_RATIO = 0;
@@ -493,7 +493,7 @@ export default function CropPanel() {
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
-        <Text variant={TextVariants.title}>{t('editor.crop.title')}</Text>
+        <UiText variant={TextVariants.title}>{t('editor.crop.title')}</UiText>
         <button
           className="p-2 rounded-full hover:bg-surface transition-colors"
           onClick={handleReset}
@@ -507,7 +507,7 @@ export default function CropPanel() {
         {selectedImage ? (
           <>
             <div className="space-y-4">
-              <Text variant={TextVariants.heading} className="mb-2 flex items-center justify-between">
+              <UiText variant={TextVariants.heading} className="mb-2 flex items-center justify-between">
                 {t('editor.crop.aspectRatioHeading')}
                 <div className="flex items-center gap-2">
                   <button
@@ -530,7 +530,7 @@ export default function CropPanel() {
                     )}
                   </button>
                 </div>
-              </Text>
+              </UiText>
               <div className="grid grid-cols-3 gap-2">
                 {PRESETS.map((preset: CropPreset) => (
                   <motion.div
@@ -546,7 +546,9 @@ export default function CropPanel() {
                     whileTap={{ scale: 0.98 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                   >
-                    <Text color={isPresetActive(preset) ? TextColors.button : TextColors.secondary}>{preset.name}</Text>
+                    <UiText color={isPresetActive(preset) ? TextColors.button : TextColors.secondary}>
+                      {preset.name}
+                    </UiText>
                   </motion.div>
                 ))}
               </div>
@@ -571,9 +573,9 @@ export default function CropPanel() {
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 >
-                  <Text color={isCustomActive ? TextColors.button : TextColors.secondary}>
+                  <UiText color={isCustomActive ? TextColors.button : TextColors.secondary}>
                     {t('editor.crop.presets.custom.name')}
-                  </Text>
+                  </UiText>
                 </motion.div>
                 <div
                   className={cx(
@@ -615,9 +617,9 @@ export default function CropPanel() {
             </div>
 
             <div className="space-y-4">
-              <Text variant={TextVariants.heading} className="mb-2">
+              <UiText variant={TextVariants.heading} className="mb-2">
                 {t('editor.crop.rotationHeading')}
-              </Text>
+              </UiText>
               <div className="bg-surface px-4 pt-3 pb-4 rounded-lg">
                 <Slider
                   label={
@@ -666,9 +668,9 @@ export default function CropPanel() {
             </div>
 
             <div className="space-y-4">
-              <Text variant={TextVariants.heading} className="mb-2">
+              <UiText variant={TextVariants.heading} className="mb-2">
                 {t('editor.crop.orientationHeading')}
-              </Text>
+              </UiText>
               <div className="grid grid-cols-2 gap-2">
                 <motion.div
                   className="flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary"
@@ -735,9 +737,9 @@ export default function CropPanel() {
             </div>
 
             <div className="space-y-4">
-              <Text variant={TextVariants.heading} className="mb-2">
+              <UiText variant={TextVariants.heading} className="mb-2">
                 {t('editor.crop.geometryHeading')}
-              </Text>
+              </UiText>
               <div className="grid grid-cols-2 gap-2">
                 <motion.div
                   className="flex flex-col items-center justify-center p-3 cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary group"
@@ -767,14 +769,14 @@ export default function CropPanel() {
             </div>
           </>
         ) : (
-          <Text
+          <UiText
             variant={TextVariants.heading}
             color={TextColors.secondary}
             weight={TextWeights.normal}
             className="text-center mt-4"
           >
             {t('editor.ai.noImageSelected')}
-          </Text>
+          </UiText>
         )}
       </div>
 

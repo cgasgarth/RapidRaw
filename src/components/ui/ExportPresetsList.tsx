@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AppSettings } from './AppProperties';
 import Dropdown from './Dropdown';
 import { ExportPreset } from './ExportImportProperties';
-import Text from './Text';
+import UiText from './Text';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
 import { TextVariants } from '../../types/typography';
 
@@ -103,9 +103,9 @@ export default function ExportPresetsList({
 
   return (
     <div className="mb-8">
-      <Text variant={TextVariants.heading} className="mb-2">
+      <UiText variant={TextVariants.heading} className="mb-2">
         {t('ui.exportPresets.heading')}
-      </Text>
+      </UiText>
 
       {!isCreating ? (
         <div className="flex gap-2">

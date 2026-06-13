@@ -10,7 +10,7 @@ import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Slider from '../ui/Slider';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface DenoiseModalProps {
   isOpen: boolean;
@@ -144,10 +144,10 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
   return (
     <div className="flex flex-col h-full bg-[#111] rounded-lg overflow-hidden border border-surface">
       <div className="h-9 bg-bg-primary border-b border-surface flex items-center justify-between px-3">
-        <Text as="div" variant={TextVariants.small} className="flex items-center gap-2">
+        <UiText as="div" variant={TextVariants.small} className="flex items-center gap-2">
           <Move size={14} /> <span>{t('modals.denoise.panZoomEnabled')}</span>
-        </Text>
-        <Text as="div" variant={TextVariants.small} className="flex items-center gap-2">
+        </UiText>
+        <UiText as="div" variant={TextVariants.small} className="flex items-center gap-2">
           <button
             onClick={() => {
               setZoom((z) => Math.max(0.5, z - 0.5));
@@ -175,7 +175,7 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
           >
             {t('modals.denoise.reset')}
           </button>
-        </Text>
+        </UiText>
       </div>
 
       <div
@@ -230,7 +230,7 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
           </div>
         </div>
 
-        <Text
+        <UiText
           as="div"
           variant={TextVariants.small}
           color={TextColors.white}
@@ -238,8 +238,8 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
           className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs px-2.5 py-1 rounded-md pointer-events-none z-0"
         >
           {t('modals.denoise.original')}
-        </Text>
-        <Text
+        </UiText>
+        <UiText
           as="div"
           variant={TextVariants.small}
           color={TextColors.button}
@@ -247,7 +247,7 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
           className="absolute top-3 right-3 bg-accent/90 backdrop-blur-xs px-2.5 py-1 rounded-md pointer-events-none z-0"
         >
           {t('modals.denoise.denoised')}
-        </Text>
+        </UiText>
       </div>
     </div>
   );
@@ -391,10 +391,10 @@ export default function DenoiseModal({
           <div className="flex items-center justify-center mb-6">
             <XCircle className="w-12 h-12 text-red-500" />
           </div>
-          <Text variant={TextVariants.title} className="mb-2 text-center">
+          <UiText variant={TextVariants.title} className="mb-2 text-center">
             {t('modals.denoise.processingFailed')}
-          </Text>
-          <Text className="text-center p-4 rounded-lg bg-bg-primary max-w-md mt-2 leading-relaxed">{error}</Text>
+          </UiText>
+          <UiText className="text-center p-4 rounded-lg bg-bg-primary max-w-md mt-2 leading-relaxed">{error}</UiText>
         </div>
       );
     }
@@ -405,7 +405,7 @@ export default function DenoiseModal({
           <ImageCompare original={originalBase64} denoised={previewBase64} />
           {savedPath && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-              <Text
+              <UiText
                 as="div"
                 variant={TextVariants.heading}
                 color={TextColors.success}
@@ -413,7 +413,7 @@ export default function DenoiseModal({
               >
                 <CheckCircle className="w-5 h-5" />
                 <span>{t('modals.denoise.saveSuccess')}</span>
-              </Text>
+              </UiText>
             </motion.div>
           )}
         </div>
@@ -441,10 +441,12 @@ export default function DenoiseModal({
               transition={{ delay: 0.1, duration: 0.4 }}
               className="flex flex-col items-center w-full"
             >
-              <Text variant={TextVariants.title} className="mb-2 text-center">
+              <UiText variant={TextVariants.title} className="mb-2 text-center">
                 {t('modals.denoise.denoisingProgress')}
-              </Text>
-              <Text className="text-center font-mono h-6 flex justify-center items-center">{currentStatusText}</Text>
+              </UiText>
+              <UiText className="text-center font-mono h-6 flex justify-center items-center">
+                {currentStatusText}
+              </UiText>
 
               <div className="mt-8 w-64 relative">
                 <div className="h-1 bg-surface rounded-full overflow-hidden relative w-full shadow-xs">
@@ -463,13 +465,13 @@ export default function DenoiseModal({
                 </div>
               </div>
 
-              <Text
+              <UiText
                 variant={TextVariants.small}
                 data-tooltip={t('modals.denoise.gpuWarningTooltip')}
                 className="mt-6 text-center max-w-xs opacity-60"
               >
                 {t('modals.denoise.speedNotice')}
-              </Text>
+              </UiText>
             </motion.div>
           </div>
         </div>
@@ -481,10 +483,10 @@ export default function DenoiseModal({
         <div className="flex items-center justify-center mb-6">
           <Grip className="w-12 h-12 text-accent" />
         </div>
-        <Text variant={TextVariants.title} className="mb-3 text-center">
+        <UiText variant={TextVariants.title} className="mb-3 text-center">
           {isBatch ? t('modals.denoise.titleBatch') : t('modals.denoise.titleSingle')}
-        </Text>
-        <Text className="text-center max-w-md leading-relaxed">{t('modals.denoise.description')}</Text>
+        </UiText>
+        <UiText className="text-center max-w-md leading-relaxed">{t('modals.denoise.description')}</UiText>
       </div>
     );
   };
@@ -518,9 +520,9 @@ export default function DenoiseModal({
       <div className={`w-full flex items-center gap-4 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex-1 flex items-center gap-6">
           <div className="flex flex-col gap-1 w-[280px] mt-2 shrink-0">
-            <Text variant={TextVariants.body} weight={TextWeights.medium}>
+            <UiText variant={TextVariants.body} weight={TextWeights.medium}>
               {t('modals.denoise.methodLabel')}
-            </Text>
+            </UiText>
             <Dropdown
               options={methodOptions}
               value={method}

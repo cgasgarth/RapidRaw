@@ -6,7 +6,7 @@ import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextVariants } from '../../types/typography';
 import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
 import Switch from '../ui/Switch';
-import Text from '../ui/Text';
+import UiText from '../ui/Text';
 
 interface ImportSettings {
   dateFolderFormat: string;
@@ -105,15 +105,15 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
         }`}
         role="dialog"
       >
-        <Text variant={TextVariants.title} className="mb-4">
+        <UiText variant={TextVariants.title} className="mb-4">
           {t('modals.importSettings.title')}
-        </Text>
+        </UiText>
 
         <div className="space-y-8 text-sm">
           <div>
-            <Text variant={TextVariants.heading} className="block mb-2">
+            <UiText variant={TextVariants.heading} className="block mb-2">
               {t('modals.importSettings.fileNaming')}
-            </Text>
+            </UiText>
             <input
               className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
               onChange={(e: ChangeEvent<HTMLInputElement>) => {
@@ -139,9 +139,9 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
           </div>
 
           <div>
-            <Text variant={TextVariants.heading} className="block mb-2">
+            <UiText variant={TextVariants.heading} className="block mb-2">
               {t('modals.importSettings.folderOrganization')}
-            </Text>
+            </UiText>
             <Switch
               label={t('modals.importSettings.organizeByDate')}
               checked={organizeByDate}
@@ -149,9 +149,9 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
             />
             {organizeByDate && (
               <div className="mt-2">
-                <Text variant={TextVariants.label} className="block mb-1">
+                <UiText variant={TextVariants.label} className="block mb-1">
                   {t('modals.importSettings.dateFormat')}
-                </Text>
+                </UiText>
                 <input
                   className="w-full bg-bg-primary border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
                   onChange={(e: ChangeEvent<HTMLInputElement>) => {
@@ -166,18 +166,18 @@ export default function ImportSettingsModal({ fileCount, isOpen, onClose, onSave
           </div>
 
           <div>
-            <Text variant={TextVariants.heading} className="block mb-2">
+            <UiText variant={TextVariants.heading} className="block mb-2">
               {t('modals.importSettings.sourceFiles')}
-            </Text>
+            </UiText>
             <Switch
               checked={deleteAfterImport}
               label={t('modals.importSettings.deleteAfterImport')}
               onChange={setDeleteAfterImport}
             />
             {deleteAfterImport && (
-              <Text variant={TextVariants.small} className="mt-1">
+              <UiText variant={TextVariants.small} className="mt-1">
                 {t('modals.importSettings.deleteWarning')}
-              </Text>
+              </UiText>
             )}
           </div>
         </div>
