@@ -1254,6 +1254,200 @@ export const negativeLabPresetMetadataPolicyCatalogV1Schema = z
     }
   });
 
+const filmLookRecipeIdSchema = z
+  .string()
+  .trim()
+  .regex(/^film_look\.[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*\.v[0-9]+$/u);
+
+const filmLookHumanTextSchema = z.string().trim().min(1).max(280);
+
+export const filmRenderDomainV1Schema = z.enum([
+  'scene_referred_linear',
+  'negative_lab_positive',
+  'working_rgb',
+  'display_referred',
+]);
+
+export const filmLookRecipeCategoryV1Schema = z.enum([
+  'color_clean',
+  'color_warm',
+  'color_cool',
+  'color_contrast',
+  'color_fade',
+  'black_and_white',
+]);
+
+export const filmLookClaimLevelV1Schema = z.enum([
+  'generic_engineered',
+  'stock_family_reference_metadata',
+  'measured_project_profile',
+  'licensed_exact_profile',
+  'user_supplied_profile',
+]);
+
+export const filmLookProvenanceV1Schema = z
+  .object({
+    claimLevel: filmLookClaimLevelV1Schema,
+    fixtureIds: z.array(z.string().trim().min(1)),
+    legalNamingStatus: negativeLabLegalNamingStatusSchema,
+    legalNote: filmLookHumanTextSchema,
+    licenseRecordIds: z.array(z.string().trim().min(1)),
+    measurementSource: negativeLabProfileMeasurementSourceSchema,
+    sourceCitationIds: z.array(z.string().trim().min(1)),
+    sourceProfileIds: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const filmLookNodeKindV1Schema = z.enum([
+  'tone_curve',
+  'color_matrix',
+  'channel_mixer',
+  'split_tone',
+  'grain',
+  'halation',
+  'glow',
+  'black_and_white_mixer',
+  'lut_reference',
+]);
+
+export const filmLookNodeStageV1Schema = z.enum([
+  'creative_color_rendering',
+  'texture_rendering',
+  'output_conditioning',
+]);
+
+const filmLookNodeParameterValueV1Schema = z.union([
+  z.boolean(),
+  z.number(),
+  z.string().trim().min(1),
+  z.array(z.number()).min(1),
+]);
+
+export const filmLookNodeV1Schema = z
+  .object({
+    enabledByDefault: z.boolean(),
+    nodeId: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/u),
+    nodeKind: filmLookNodeKindV1Schema,
+    parameters: z.record(z.string(), filmLookNodeParameterValueV1Schema),
+    renderStage: filmLookNodeStageV1Schema,
+  })
+  .strict();
+
+export const filmLookRecipeV1Schema = z
+  .object({
+    category: filmLookRecipeCategoryV1Schema,
+    deprecatedBy: filmLookRecipeIdSchema.optional(),
+    description: filmLookHumanTextSchema,
+    displayName: filmLookHumanTextSchema,
+    intendedInputModes: z.array(z.enum(['raw_photo', 'rendered_photo', 'negative_lab_positive'])).min(1),
+    lookId: filmLookRecipeIdSchema,
+    lookVersion: z.string().trim().min(1),
+    nodes: z.array(filmLookNodeV1Schema).min(1),
+    provenance: filmLookProvenanceV1Schema,
+    renderDomain: filmRenderDomainV1Schema,
+    requiredWarnings: z.array(
+      z.enum(['creative_not_exact_emulation', 'display_referred_input', 'requires_user_review']),
+    ),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    strengthDefault: z.number().min(0).max(100),
+  })
+  .strict()
+  .superRefine((look, context) => {
+    const humanFacingText = [look.displayName, look.description, look.category, look.provenance.legalNote].join(' ');
+
+    if (look.provenance.claimLevel === 'generic_engineered') {
+      if (unsafeGenericPresetClaimPattern.test(humanFacingText) || unsafeGenericPresetClaimPattern.test(look.lookId)) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Generic built-in film looks must not use manufacturer, stock, competitor, or exact-emulation claims.',
+          path: ['displayName'],
+        });
+      }
+
+      if (look.provenance.legalNamingStatus !== 'generic_safe_name') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Generic built-in film looks must use generic-safe naming status.',
+          path: ['provenance', 'legalNamingStatus'],
+        });
+      }
+
+      if (look.provenance.measurementSource !== 'generic_engineered_starting_point') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Generic built-in film looks must use generic engineered provenance.',
+          path: ['provenance', 'measurementSource'],
+        });
+      }
+
+      if (look.provenance.licenseRecordIds.length > 0 || look.provenance.sourceCitationIds.length > 0) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Generic built-in film looks must not imply licensed or source-measured provenance.',
+          path: ['provenance'],
+        });
+      }
+    }
+
+    const nodeIds = new Set<string>();
+    for (const [index, node] of look.nodes.entries()) {
+      if (nodeIds.has(node.nodeId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Film look recipes must not contain duplicate node IDs.',
+          path: ['nodes', index, 'nodeId'],
+        });
+      }
+      nodeIds.add(node.nodeId);
+
+      if (node.nodeKind === 'lut_reference' && node.parameters['assetId'] === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'LUT reference nodes require an assetId parameter.',
+          path: ['nodes', index, 'parameters'],
+        });
+      }
+    }
+  });
+
+export const filmLookCatalogV1Schema = z
+  .object({
+    catalogId: filmLookRecipeIdSchema,
+    catalogVersion: z.string().trim().min(1),
+    looks: z.array(filmLookRecipeV1Schema).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  })
+  .strict()
+  .superRefine((catalog, context) => {
+    const lookIds = new Set<string>();
+    const displayNames = new Set<string>();
+
+    for (const [index, look] of catalog.looks.entries()) {
+      if (lookIds.has(look.lookId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Film look catalog must not contain duplicate look IDs.',
+          path: ['looks', index, 'lookId'],
+        });
+      }
+      lookIds.add(look.lookId);
+
+      const displayNameKey = look.displayName.toLocaleLowerCase('en-US');
+      if (displayNames.has(displayNameKey)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Film look catalog must not contain duplicate display names.',
+          path: ['looks', index, 'displayName'],
+        });
+      }
+      displayNames.add(displayNameKey);
+    }
+  });
+
 const contentHashSchema = z
   .string()
   .trim()
@@ -3158,6 +3352,15 @@ export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
+export type FilmLookCatalogV1 = z.infer<typeof filmLookCatalogV1Schema>;
+export type FilmLookClaimLevelV1 = z.infer<typeof filmLookClaimLevelV1Schema>;
+export type FilmLookNodeKindV1 = z.infer<typeof filmLookNodeKindV1Schema>;
+export type FilmLookNodeStageV1 = z.infer<typeof filmLookNodeStageV1Schema>;
+export type FilmLookNodeV1 = z.infer<typeof filmLookNodeV1Schema>;
+export type FilmLookProvenanceV1 = z.infer<typeof filmLookProvenanceV1Schema>;
+export type FilmLookRecipeCategoryV1 = z.infer<typeof filmLookRecipeCategoryV1Schema>;
+export type FilmLookRecipeV1 = z.infer<typeof filmLookRecipeV1Schema>;
+export type FilmRenderDomainV1 = z.infer<typeof filmRenderDomainV1Schema>;
 export type NegativeAcquisitionConfidence = z.infer<typeof negativeAcquisitionConfidenceSchema>;
 export type NegativeAcquisitionProfileV1 = z.infer<typeof negativeAcquisitionProfileV1Schema>;
 export type NegativeLabAppServerAuditEvent = z.infer<typeof negativeLabAppServerAuditEventSchema>;

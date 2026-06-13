@@ -30,6 +30,7 @@ generator before the release workflow needs one.
 - [App-server agent architecture](agent/app-server-architecture-2026-06-12.md)
 - [Negative Lab app-server tool contract](agent/negative-lab-app-server-tools-2026-06-13.md)
 - [Film simulation architecture](film/film-simulation-architecture-2026-06-13.md)
+- [Built-In Film Look catalog schema](film/built-in-look-catalog-schema-2026-06-13.md)
 - [Bundled look legal review checklist](film/bundled-look-legal-review-checklist-2026-06-13.md)
 - [Negative Lab architecture overview](negative-lab/architecture-overview-2026-06-13.md)
 - [Negative Lab consult design review](negative-lab/consult-design-review-2026-06-13.md)

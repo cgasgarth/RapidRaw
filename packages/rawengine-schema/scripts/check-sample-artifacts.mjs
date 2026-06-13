@@ -8,6 +8,7 @@ import { format } from 'prettier';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  filmLookCatalogV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
@@ -36,6 +37,7 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleFilmLookCatalogV1,
   sampleNegativeAcquisitionProfileV1,
   sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabApplyPlanRequestV1,
@@ -94,6 +96,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/panorama-artifact-v1.json',
     schema: panoramaArtifactV1Schema,
     value: samplePanoramaArtifactV1,
+  },
+  {
+    name: 'film look catalog',
+    path: 'packages/rawengine-schema/samples/film-look-catalog-v1.json',
+    schema: filmLookCatalogV1Schema,
+    value: sampleFilmLookCatalogV1,
   },
   {
     name: 'negative acquisition profile',
