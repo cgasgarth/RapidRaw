@@ -458,12 +458,14 @@ const EditorToolbar = memo(
               </div>
             </div>
 
-            <div
+            <button
+              type="button"
               className={clsx(
-                'relative mt-2 w-full grow justify-center border-t border-text-secondary/10 pt-2 transition-opacity duration-200',
+                'relative mt-2 w-full grow justify-center border-t border-text-secondary/10 pt-2 transition-opacity duration-200 bg-transparent p-0 text-left',
                 isExpanded ? 'opacity-100 delay-75' : 'opacity-0 hidden',
                 hasExif && 'cursor-pointer',
               )}
+              disabled={!hasExif}
               onClick={() => {
                 if (hasExif) {
                   onToggleDateView();
@@ -545,7 +547,7 @@ const EditorToolbar = memo(
                   </div>
                 )}
               </div>
-            </div>
+            </button>
           </div>
         </div>
 
