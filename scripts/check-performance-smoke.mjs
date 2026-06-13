@@ -47,28 +47,28 @@ const outputPath = resolve(outputDir, 'performance-smoke-report.json');
 
 const smokeChecks = z.array(SmokeCheckSchema).parse([
   {
-    args: ['scripts/ci-classify-macos-smoke.mjs', '--self-test'],
+    args: ['run', 'check:ci-paths'],
     budgetMs: 5_000,
     command: 'bun',
     id: 'ci-path-classifier',
     summary: 'Path routing classifier self-test',
   },
   {
-    args: ['scripts/check-generated-type-drift.mjs'],
+    args: ['run', 'check:generated-types'],
     budgetMs: 5_000,
     command: 'bun',
     id: 'generated-type-drift',
     summary: 'Generated Tauri type drift manifest check',
   },
   {
-    args: ['scripts/check-film-look-fixture-outputs.mjs'],
+    args: ['run', 'check:film-fixtures'],
     budgetMs: 5_000,
     command: 'bun',
     id: 'film-look-fixtures',
     summary: 'Built-in film look fixture fingerprint check',
   },
   {
-    args: ['packages/rawengine-schema/scripts/check-sample-artifacts.mjs'],
+    args: ['run', 'schema:samples'],
     budgetMs: 10_000,
     command: 'bun',
     id: 'rawengine-schema-samples',

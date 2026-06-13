@@ -26,10 +26,10 @@ artifacts/performance-smoke/performance-smoke-report.json
 
 The smoke currently times these deterministic commands:
 
-- `bun scripts/ci-classify-macos-smoke.mjs --self-test`
-- `bun scripts/check-generated-type-drift.mjs`
-- `bun scripts/check-film-look-fixture-outputs.mjs`
-- `bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs`
+- `bun run check:ci-paths`
+- `bun run check:generated-types`
+- `bun run check:film-fixtures`
+- `bun run schema:samples`
 
 Each command has a conservative elapsed-time budget. The script fails if a
 command exits nonzero, times out, or exceeds its effective budget.
