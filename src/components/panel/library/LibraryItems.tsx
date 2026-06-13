@@ -157,37 +157,43 @@ const ThumbnailComponent = ({
   const { shutter, fNumber, iso, focal } = useMemo(() => getExifOverlayValues(exif), [exif]);
 
   useEffect(() => {
-    if (data) {
-      setShowPlaceholder(false);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setShowPlaceholder(true);
-    }, 500);
+    const timer = setTimeout(
+      () => {
+        setShowPlaceholder(!data);
+      },
+      data ? 0 : 500,
+    );
+
     return () => {
       clearTimeout(timer);
     };
   }, [data]);
 
   useEffect(() => {
-    if (!data) {
-      setLayers([]);
-      return;
-    }
-
-    setLayers((prev) => {
-      if (prev.some((l) => l.id === data)) return prev;
-
-      if (prev.length === 0) {
-        if (hadDataOnPathChange.current) {
-          return [{ id: data, url: data, opacity: 1 }];
-        } else {
-          return [{ id: data, url: data, opacity: 0 }];
-        }
+    const layerTimer = setTimeout(() => {
+      if (!data) {
+        setLayers([]);
+        return;
       }
 
-      return [...prev, { id: data, url: data, opacity: 0 }];
-    });
+      setLayers((prev) => {
+        if (prev.some((l) => l.id === data)) return prev;
+
+        if (prev.length === 0) {
+          if (hadDataOnPathChange.current) {
+            return [{ id: data, url: data, opacity: 1 }];
+          } else {
+            return [{ id: data, url: data, opacity: 0 }];
+          }
+        }
+
+        return [...prev, { id: data, url: data, opacity: 0 }];
+      });
+    }, 0);
+
+    return () => {
+      clearTimeout(layerTimer);
+    };
   }, [data, path]);
 
   useEffect(() => {
@@ -545,37 +551,43 @@ const ListItemComponent = ({
   const getW = (key: keyof ColumnWidths) => `${(columnWidths[key] / totalBase) * 100}%`;
 
   useEffect(() => {
-    if (data) {
-      setShowPlaceholder(false);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setShowPlaceholder(true);
-    }, 500);
+    const timer = setTimeout(
+      () => {
+        setShowPlaceholder(!data);
+      },
+      data ? 0 : 500,
+    );
+
     return () => {
       clearTimeout(timer);
     };
   }, [data]);
 
   useEffect(() => {
-    if (!data) {
-      setLayers([]);
-      return;
-    }
-
-    setLayers((prev) => {
-      if (prev.some((l) => l.id === data)) return prev;
-
-      if (prev.length === 0) {
-        if (hadDataOnPathChange.current) {
-          return [{ id: data, url: data, opacity: 1 }];
-        } else {
-          return [{ id: data, url: data, opacity: 0 }];
-        }
+    const layerTimer = setTimeout(() => {
+      if (!data) {
+        setLayers([]);
+        return;
       }
 
-      return [...prev, { id: data, url: data, opacity: 0 }];
-    });
+      setLayers((prev) => {
+        if (prev.some((l) => l.id === data)) return prev;
+
+        if (prev.length === 0) {
+          if (hadDataOnPathChange.current) {
+            return [{ id: data, url: data, opacity: 1 }];
+          } else {
+            return [{ id: data, url: data, opacity: 0 }];
+          }
+        }
+
+        return [...prev, { id: data, url: data, opacity: 0 }];
+      });
+    }, 0);
+
+    return () => {
+      clearTimeout(layerTimer);
+    };
   }, [data, path]);
 
   useEffect(() => {
