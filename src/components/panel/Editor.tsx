@@ -2083,6 +2083,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
           !isWgpuActive && 'bg-bg-secondary',
         )}
         style={{ cursor: cursorStyle }}
+        role="presentation"
         onContextMenu={onContextMenu}
         ref={imageContainerRef}
         onPointerDown={handlePointerDown}
