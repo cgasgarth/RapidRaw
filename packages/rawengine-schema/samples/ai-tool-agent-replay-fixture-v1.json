@@ -121,6 +121,26 @@
         "toolName": "ai.mask.apply_subject"
       },
       {
+        "approvalClass": "external_model",
+        "inputSchemaName": "AiEnhancementCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "AiEnhancementDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "ai.enhancement.dry_run_command"
+      },
+      {
+        "approvalClass": "generative_edit",
+        "inputSchemaName": "AiEnhancementCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "AiEnhancementApplyResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": true,
+        "toolKind": "apply",
+        "toolName": "ai.enhancement.apply_command"
+      },
+      {
         "approvalClass": "preview_only",
         "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
         "mutates": false,

@@ -33,6 +33,38 @@
       "requiresDryRunPlan": true,
       "returnsArtifactHandles": true,
       "toolName": "ai.mask.apply_subject"
+    },
+    {
+      "allowedCapabilities": ["denoise", "enhance", "inpaint"],
+      "allowedProviderClasses": ["local_model", "self_hosted_connector"],
+      "approvalClass": "external_model",
+      "auditEvents": ["ai_tool_dry_run_requested", "ai_tool_dry_run_completed"],
+      "description": "Generate a non-mutating AI enhancement preview and dry-run plan.",
+      "executionMode": "dry_run_command",
+      "inputSchemaName": "AiEnhancementCommandEnvelopeV1",
+      "localOnly": true,
+      "mutates": false,
+      "outputSchemaName": "AiEnhancementDryRunResultV1",
+      "recordsProvenance": true,
+      "requiresDryRunPlan": false,
+      "returnsArtifactHandles": true,
+      "toolName": "ai.enhancement.dry_run_command"
+    },
+    {
+      "allowedCapabilities": ["denoise", "enhance", "inpaint"],
+      "allowedProviderClasses": ["local_model", "self_hosted_connector"],
+      "approvalClass": "generative_edit",
+      "auditEvents": ["ai_tool_apply_requested", "ai_tool_apply_completed"],
+      "description": "Apply an accepted AI enhancement dry-run plan into the non-destructive edit graph.",
+      "executionMode": "apply_dry_run_plan",
+      "inputSchemaName": "AiEnhancementCommandEnvelopeV1",
+      "localOnly": true,
+      "mutates": true,
+      "outputSchemaName": "AiEnhancementApplyResultV1",
+      "recordsProvenance": true,
+      "requiresDryRunPlan": true,
+      "returnsArtifactHandles": true,
+      "toolName": "ai.enhancement.apply_command"
     }
   ]
 }
