@@ -4,6 +4,7 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
+  negativeLabCommandEnvelopeV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -13,6 +14,7 @@ import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleNegativeAcquisitionProfileV1,
+  sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -59,6 +61,11 @@ const validSamples: ReadonlyArray<{
     schema: negativeRollSessionV1Schema,
     value: sampleNegativeRollSessionV1,
   },
+  {
+    name: 'negative lab command envelope',
+    schema: negativeLabCommandEnvelopeV1Schema,
+    value: sampleNegativeLabCommandEnvelopeV1,
+  },
 ];
 
 for (const sample of validSamples) {
@@ -86,6 +93,19 @@ const invalidAcquisitionProfile = {
 const invalidAcquisitionResult = negativeAcquisitionProfileV1Schema.safeParse(invalidAcquisitionProfile);
 if (invalidAcquisitionResult.success) {
   throw new Error('Expected negative acquisition profile schema to reject unknown fields.');
+}
+
+const invalidNegativeLabCommand = {
+  ...sampleNegativeLabCommandEnvelopeV1,
+  parameters: {
+    ...sampleNegativeLabCommandEnvelopeV1.parameters,
+    unexpectedParameter: true,
+  },
+};
+
+const invalidNegativeLabCommandResult = negativeLabCommandEnvelopeV1Schema.safeParse(invalidNegativeLabCommand);
+if (invalidNegativeLabCommandResult.success) {
+  throw new Error('Expected negative lab command schema to reject unknown parameter fields.');
 }
 
 console.log(`Validated ${validSamples.length} RawEngine schema samples.`);

@@ -20,6 +20,26 @@
       "returnsArtifactHandles": true,
       "toolKind": "dry_run",
       "toolName": "edit.dry_run_tone"
+    },
+    {
+      "approvalClass": "preview_only",
+      "inputSchemaName": "NegativeLabCommandEnvelopeV1",
+      "mutates": false,
+      "outputSchemaName": "NegativeLabDryRunResultV1",
+      "requiresDryRun": true,
+      "returnsArtifactHandles": true,
+      "toolKind": "dry_run",
+      "toolName": "negativelab.convert_frames"
+    },
+    {
+      "approvalClass": "edit_apply",
+      "inputSchemaName": "NegativeLabCommandEnvelopeV1",
+      "mutates": true,
+      "outputSchemaName": "NegativeRollSessionV1",
+      "requiresDryRun": true,
+      "returnsArtifactHandles": true,
+      "toolKind": "apply",
+      "toolName": "negativelab.apply_command"
     }
   ]
 }

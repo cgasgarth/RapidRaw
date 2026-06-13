@@ -570,6 +570,145 @@ export const negativeRollSessionV1Schema = z
   })
   .strict();
 
+const nonEmptyIdArraySchema = z.array(z.string().trim().min(1)).min(1);
+
+export const negativeLabCommandTypeSchema = z.enum([
+  'negativeLab.createRollSession',
+  'negativeLab.sampleFilmBase',
+  'negativeLab.convertFrames',
+  'negativeLab.normalizeRoll',
+  'negativeLab.createPositiveVariant',
+  'negativeLab.updateFrameQc',
+]);
+
+export const negativeLabBaseSampleRegionV1Schema = z
+  .object({
+    frameId: z.string().trim().min(1),
+    height: z.number().positive(),
+    regionKind: z.enum(['film_base', 'rebate', 'leader', 'manual_neutral_reference']),
+    width: z.number().positive(),
+    x: z.number(),
+    y: z.number(),
+  })
+  .strict();
+
+export const negativeLabCreateRollSessionParametersV1Schema = z
+  .object({
+    acquisitionProfileId: z.string().trim().min(1).optional(),
+    inputMode: negativeInputModeSchema,
+    notes: z.string().trim().min(1).optional(),
+    pixelBasis: negativePixelBasisSchema,
+    processFamily: negativeProcessFamilySchema,
+    sourceFileIds: nonEmptyIdArraySchema,
+    splitContactSheets: z.boolean(),
+  })
+  .strict();
+
+export const negativeLabSampleFilmBaseParametersV1Schema = z
+  .object({
+    applyTo: z.enum(['roll', 'selected_frames']),
+    replaceSampleIds: z.array(z.string().trim().min(1)),
+    sampleRegions: z.array(negativeLabBaseSampleRegionV1Schema).min(1),
+    sessionId: z.string().trim().min(1),
+  })
+  .strict();
+
+export const negativeLabConvertFramesParametersV1Schema = z
+  .object({
+    acquisitionProfileId: z.string().trim().min(1).optional(),
+    baseSampleIds: nonEmptyIdArraySchema,
+    densityModel: z.enum(['log_transmittance', 'scanner_rgb_approximation']),
+    frameIds: nonEmptyIdArraySchema,
+    inversionMethod: z.enum(['neutral_base', 'profiled_process', 'manual_curve']),
+    outputIntent: z.enum(['editable_positive', 'proof_preview', 'export_ready_preview']),
+    preserveDensityArtifacts: z.boolean(),
+    processFamily: negativeProcessFamilySchema,
+    sessionId: z.string().trim().min(1),
+    targetWorkingSpace: z.enum(['linear_prophoto_rgb', 'linear_rec2020', 'acescg']),
+  })
+  .strict();
+
+export const negativeLabNormalizeRollParametersV1Schema = z
+  .object({
+    anchorFrameIds: nonEmptyIdArraySchema,
+    frameIds: nonEmptyIdArraySchema,
+    normalizationMode: z.enum(['exposure_only', 'white_balance_only', 'density_and_balance']),
+    preserveCreativeAdjustments: z.boolean(),
+    sessionId: z.string().trim().min(1),
+  })
+  .strict();
+
+export const negativeLabCreatePositiveVariantParametersV1Schema = z
+  .object({
+    frameIds: nonEmptyIdArraySchema,
+    inheritRollDefaults: z.boolean(),
+    positiveVariantName: z.string().trim().min(1),
+    renderProfileId: z.string().trim().min(1).optional(),
+    sessionId: z.string().trim().min(1),
+  })
+  .strict();
+
+export const negativeLabUpdateFrameQcParametersV1Schema = z
+  .object({
+    frameId: z.string().trim().min(1),
+    notes: z.string().trim().min(1).optional(),
+    qcStatus: z.enum(['needs_review', 'approved', 'approved_with_warnings', 'rejected', 'excluded_from_export']),
+    sessionId: z.string().trim().min(1),
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict();
+
+export const negativeLabCreateRollSessionCommandV1Schema = commandEnvelopeV1Schema
+  .extend({
+    commandType: z.literal('negativeLab.createRollSession'),
+    parameters: negativeLabCreateRollSessionParametersV1Schema,
+  })
+  .strict();
+
+export const negativeLabSampleFilmBaseCommandV1Schema = commandEnvelopeV1Schema
+  .extend({
+    commandType: z.literal('negativeLab.sampleFilmBase'),
+    parameters: negativeLabSampleFilmBaseParametersV1Schema,
+  })
+  .strict();
+
+export const negativeLabConvertFramesCommandV1Schema = commandEnvelopeV1Schema
+  .extend({
+    commandType: z.literal('negativeLab.convertFrames'),
+    parameters: negativeLabConvertFramesParametersV1Schema,
+  })
+  .strict();
+
+export const negativeLabNormalizeRollCommandV1Schema = commandEnvelopeV1Schema
+  .extend({
+    commandType: z.literal('negativeLab.normalizeRoll'),
+    parameters: negativeLabNormalizeRollParametersV1Schema,
+  })
+  .strict();
+
+export const negativeLabCreatePositiveVariantCommandV1Schema = commandEnvelopeV1Schema
+  .extend({
+    commandType: z.literal('negativeLab.createPositiveVariant'),
+    parameters: negativeLabCreatePositiveVariantParametersV1Schema,
+  })
+  .strict();
+
+export const negativeLabUpdateFrameQcCommandV1Schema = commandEnvelopeV1Schema
+  .extend({
+    commandType: z.literal('negativeLab.updateFrameQc'),
+    parameters: negativeLabUpdateFrameQcParametersV1Schema,
+  })
+  .strict();
+
+export const negativeLabCommandEnvelopeV1Schema = z.discriminatedUnion('commandType', [
+  negativeLabCreateRollSessionCommandV1Schema,
+  negativeLabSampleFilmBaseCommandV1Schema,
+  negativeLabConvertFramesCommandV1Schema,
+  negativeLabNormalizeRollCommandV1Schema,
+  negativeLabCreatePositiveVariantCommandV1Schema,
+  negativeLabUpdateFrameQcCommandV1Schema,
+]);
+
 export type ActorKind = z.infer<typeof actorKindSchema>;
 export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
@@ -577,6 +716,17 @@ export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
 export type NegativeAcquisitionConfidence = z.infer<typeof negativeAcquisitionConfidenceSchema>;
 export type NegativeAcquisitionProfileV1 = z.infer<typeof negativeAcquisitionProfileV1Schema>;
+export type NegativeLabBaseSampleRegionV1 = z.infer<typeof negativeLabBaseSampleRegionV1Schema>;
+export type NegativeLabCommandEnvelopeV1 = z.infer<typeof negativeLabCommandEnvelopeV1Schema>;
+export type NegativeLabCommandType = z.infer<typeof negativeLabCommandTypeSchema>;
+export type NegativeLabConvertFramesParametersV1 = z.infer<typeof negativeLabConvertFramesParametersV1Schema>;
+export type NegativeLabCreatePositiveVariantParametersV1 = z.infer<
+  typeof negativeLabCreatePositiveVariantParametersV1Schema
+>;
+export type NegativeLabCreateRollSessionParametersV1 = z.infer<typeof negativeLabCreateRollSessionParametersV1Schema>;
+export type NegativeLabNormalizeRollParametersV1 = z.infer<typeof negativeLabNormalizeRollParametersV1Schema>;
+export type NegativeLabSampleFilmBaseParametersV1 = z.infer<typeof negativeLabSampleFilmBaseParametersV1Schema>;
+export type NegativeLabUpdateFrameQcParametersV1 = z.infer<typeof negativeLabUpdateFrameQcParametersV1Schema>;
 export type NegativeFrameRecordV1 = z.infer<typeof negativeFrameRecordV1Schema>;
 export type NegativeInputMode = z.infer<typeof negativeInputModeSchema>;
 export type NegativePixelBasis = z.infer<typeof negativePixelBasisSchema>;

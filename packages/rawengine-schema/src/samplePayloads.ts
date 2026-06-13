@@ -4,6 +4,7 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  negativeLabCommandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
@@ -12,6 +13,7 @@ import {
   type ArtifactHandleV1,
   type CommandEnvelopeV1,
   type NegativeAcquisitionProfileV1,
+  type NegativeLabCommandEnvelopeV1,
   type NegativeRollSessionV1,
   type PanoramaArtifactV1,
   type QueryEnvelopeV1,
@@ -98,6 +100,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       returnsArtifactHandles: true,
       toolKind: 'dry_run',
       toolName: 'edit.dry_run_tone',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'NegativeLabCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'NegativeLabDryRunResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
+      toolName: 'negativelab.convert_frames',
+    },
+    {
+      approvalClass: ApprovalClass.EditApply,
+      inputSchemaName: 'NegativeLabCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'NegativeRollSessionV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'apply',
+      toolName: 'negativelab.apply_command',
     },
   ],
 });
@@ -343,3 +365,39 @@ export const sampleNegativeRollSessionV1: NegativeRollSessionV1 = negativeRollSe
   sharedBaseSampleIds: [],
   sourceFileIds: ['source_lab_scan_0001'],
 });
+
+export const sampleNegativeLabCommandEnvelopeV1: NegativeLabCommandEnvelopeV1 =
+  negativeLabCommandEnvelopeV1Schema.parse({
+    actor: {
+      id: 'codex-app-server',
+      kind: ActorKind.Agent,
+      sessionId: 'session_sample',
+    },
+    approval: {
+      approvalClass: ApprovalClass.PreviewOnly,
+      reason: 'Negative conversion dry-run returns a preview artifact before mutating the roll session.',
+      state: 'not_required',
+    },
+    commandId: 'command_negative_convert_frames_sample',
+    commandType: 'negativeLab.convertFrames',
+    correlationId: 'corr_negative_convert_frames_sample',
+    dryRun: true,
+    expectedGraphRevision: 'graph_rev_negative_7',
+    idempotencyKey: 'idem_negative_convert_frames_sample',
+    parameters: {
+      baseSampleIds: ['base_sample_roll_01'],
+      densityModel: 'log_transmittance',
+      frameIds: ['frame_0001'],
+      inversionMethod: 'neutral_base',
+      outputIntent: 'editable_positive',
+      preserveDensityArtifacts: true,
+      processFamily: 'c41_color_negative',
+      sessionId: sampleNegativeRollSessionV1.sessionId,
+      targetWorkingSpace: 'linear_prophoto_rgb',
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: {
+      id: sampleNegativeRollSessionV1.sessionId,
+      kind: 'roll',
+    },
+  });

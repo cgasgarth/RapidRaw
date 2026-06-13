@@ -1,0 +1,31 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_sample"
+  },
+  "approval": {
+    "approvalClass": "preview_only",
+    "reason": "Negative conversion dry-run returns a preview artifact before mutating the roll session.",
+    "state": "not_required"
+  },
+  "commandId": "command_negative_convert_frames_sample",
+  "commandType": "negativeLab.convertFrames",
+  "correlationId": "corr_negative_convert_frames_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_negative_7",
+  "idempotencyKey": "idem_negative_convert_frames_sample",
+  "parameters": {
+    "baseSampleIds": ["base_sample_roll_01"],
+    "densityModel": "log_transmittance",
+    "frameIds": ["frame_0001"],
+    "inversionMethod": "neutral_base",
+    "outputIntent": "editable_positive",
+    "preserveDensityArtifacts": true,
+    "processFamily": "c41_color_negative",
+    "sessionId": "negative_roll_session_sample",
+    "targetWorkingSpace": "linear_prophoto_rgb"
+  },
+  "schemaVersion": 1,
+  "target": { "id": "negative_roll_session_sample", "kind": "roll" }
+}

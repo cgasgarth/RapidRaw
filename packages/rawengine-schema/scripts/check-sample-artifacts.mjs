@@ -9,6 +9,7 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
+  negativeLabCommandEnvelopeV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -18,6 +19,7 @@ import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleNegativeAcquisitionProfileV1,
+  sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -68,6 +70,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-roll-session-v1.json',
     schema: negativeRollSessionV1Schema,
     value: sampleNegativeRollSessionV1,
+  },
+  {
+    name: 'negative lab command envelope',
+    path: 'packages/rawengine-schema/samples/negative-lab-command-envelope-v1.json',
+    schema: negativeLabCommandEnvelopeV1Schema,
+    value: sampleNegativeLabCommandEnvelopeV1,
   },
 ];
 
