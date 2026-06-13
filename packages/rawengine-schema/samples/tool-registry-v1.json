@@ -73,6 +73,26 @@
     },
     {
       "approvalClass": "preview_only",
+      "inputSchemaName": "LayerMaskCommandEnvelopeV1",
+      "mutates": false,
+      "outputSchemaName": "LayerMaskDryRunResultV1",
+      "requiresDryRun": true,
+      "returnsArtifactHandles": true,
+      "toolKind": "dry_run",
+      "toolName": "layermask.dry_run_command"
+    },
+    {
+      "approvalClass": "edit_apply",
+      "inputSchemaName": "LayerMaskCommandEnvelopeV1",
+      "mutates": true,
+      "outputSchemaName": "LayerMaskMutationResultV1",
+      "requiresDryRun": false,
+      "returnsArtifactHandles": false,
+      "toolKind": "apply",
+      "toolName": "layermask.apply_command"
+    },
+    {
+      "approvalClass": "preview_only",
       "inputSchemaName": "PreviewScopeQueryV1",
       "mutates": false,
       "outputSchemaName": "PreviewScopeResultV1",

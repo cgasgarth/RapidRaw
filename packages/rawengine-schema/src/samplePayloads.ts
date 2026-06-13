@@ -14,6 +14,9 @@ import {
   filmGlowModelV1Schema,
   filmGrainModelV1Schema,
   filmHalationModelV1Schema,
+  layerMaskCommandEnvelopeV1Schema,
+  layerMaskDryRunResultV1Schema,
+  layerMaskMutationResultV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
@@ -61,6 +64,9 @@ import {
   type FilmGrainModelV1,
   type FilmHalationModelV1,
   type FilmLookCatalogV1,
+  type LayerMaskCommandEnvelopeV1,
+  type LayerMaskDryRunResultV1,
+  type LayerMaskMutationResultV1,
   type NegativeAcquisitionProfileV1,
   type NegativeLabAppServerToolManifestV1,
   type NegativeLabApplyPlanRequestV1,
@@ -227,6 +233,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       returnsArtifactHandles: false,
       toolKind: 'apply',
       toolName: 'editgraph.apply_command',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'LayerMaskCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'LayerMaskDryRunResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
+      toolName: 'layermask.dry_run_command',
+    },
+    {
+      approvalClass: ApprovalClass.EditApply,
+      inputSchemaName: 'LayerMaskCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'LayerMaskMutationResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: false,
+      toolKind: 'apply',
+      toolName: 'layermask.apply_command',
     },
     {
       approvalClass: ApprovalClass.PreviewOnly,
@@ -606,6 +632,132 @@ export const sampleToneColorMutationResultV1: ToneColorMutationResultV1 = toneCo
   commandId: sampleToneColorApplyCommandEnvelopeV1.commandId,
   commandType: sampleToneColorApplyCommandEnvelopeV1.commandType,
   correlationId: sampleToneColorApplyCommandEnvelopeV1.correlationId,
+  dryRun: false,
+  mutates: true,
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  undoRevision: sampleEditGraphSnapshotV1.graphRevision,
+  warnings: [],
+});
+
+export const sampleLayerMaskCommandEnvelopeV1: LayerMaskCommandEnvelopeV1 = layerMaskCommandEnvelopeV1Schema.parse({
+  actor: {
+    id: 'codex-app-server',
+    kind: ActorKind.Agent,
+    sessionId: 'session_layer_mask_sample',
+  },
+  approval: {
+    approvalClass: ApprovalClass.PreviewOnly,
+    reason: 'Previewing a brush mask computes a non-mutating matte and edit graph diff before apply.',
+    state: 'not_required',
+  },
+  commandId: 'command_layer_mask_brush_preview_sample',
+  commandType: 'layerMask.createBrushMask',
+  correlationId: 'corr_layer_mask_brush_preview_sample',
+  dryRun: true,
+  expectedGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  idempotencyKey: 'idem_layer_mask_brush_preview_sample',
+  parameters: {
+    maskName: 'Portrait Dodge Mask',
+    strokes: [
+      {
+        flow: 0.45,
+        hardness: 0.62,
+        mode: 'paint',
+        points: [
+          {
+            pressure: 0.58,
+            x: 0.42,
+            y: 0.36,
+          },
+          {
+            pressure: 0.72,
+            x: 0.48,
+            y: 0.44,
+          },
+        ],
+        radiusPx: 72,
+        strokeId: 'stroke_portrait_dodge_001',
+      },
+    ],
+  },
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  target: {
+    imagePath: '/photos/session/IMG_0001.CR3',
+    kind: 'image',
+  },
+});
+
+export const sampleLayerMaskApplyCommandEnvelopeV1: LayerMaskCommandEnvelopeV1 = layerMaskCommandEnvelopeV1Schema.parse(
+  {
+    ...sampleLayerMaskCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'Applying the accepted brush mask persists the mask and edit graph revision.',
+      state: 'approved',
+    },
+    commandId: 'command_layer_mask_brush_apply_sample',
+    correlationId: 'corr_layer_mask_brush_apply_sample',
+    dryRun: false,
+    idempotencyKey: 'idem_layer_mask_brush_apply_sample',
+  },
+);
+
+export const sampleLayerMaskDryRunResultV1: LayerMaskDryRunResultV1 = layerMaskDryRunResultV1Schema.parse({
+  commandId: sampleLayerMaskCommandEnvelopeV1.commandId,
+  commandType: sampleLayerMaskCommandEnvelopeV1.commandType,
+  correlationId: sampleLayerMaskCommandEnvelopeV1.correlationId,
+  dryRun: true,
+  maskArtifacts: [
+    {
+      artifactId: 'artifact_layer_mask_brush_matte',
+      contentHash: 'sha256:sample-layer-mask-matte',
+      dimensions: {
+        height: 1080,
+        width: 1620,
+      },
+      kind: 'mask',
+      storage: 'temp_cache',
+    },
+  ],
+  mutates: false,
+  parameterDiff: [
+    {
+      entityId: null,
+      entityKind: 'mask',
+      path: '/masks/-',
+      value: {
+        maskId: 'mask_brush_portrait',
+        maskName: 'Portrait Dodge Mask',
+      },
+    },
+  ],
+  predictedGraphRevision: 'graph_rev_47_preview',
+  previewArtifacts: [
+    {
+      artifactId: 'artifact_layer_mask_brush_preview',
+      contentHash: 'sha256:sample-layer-mask-preview',
+      dimensions: {
+        height: 1080,
+        width: 1620,
+      },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+  ],
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  warnings: [],
+});
+
+export const sampleLayerMaskMutationResultV1: LayerMaskMutationResultV1 = layerMaskMutationResultV1Schema.parse({
+  appliedGraphRevision: 'graph_rev_47',
+  changedLayerIds: [],
+  changedMaskIds: ['mask_brush_portrait'],
+  changedNodeIds: ['node_mask_brush_portrait'],
+  commandId: sampleLayerMaskApplyCommandEnvelopeV1.commandId,
+  commandType: sampleLayerMaskApplyCommandEnvelopeV1.commandType,
+  correlationId: sampleLayerMaskApplyCommandEnvelopeV1.correlationId,
   dryRun: false,
   mutates: true,
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,

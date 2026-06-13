@@ -13,6 +13,9 @@ import {
   filmGrainModelV1Schema,
   filmHalationModelV1Schema,
   filmLookCatalogV1Schema,
+  layerMaskCommandEnvelopeV1Schema,
+  layerMaskDryRunResultV1Schema,
+  layerMaskMutationResultV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
@@ -62,6 +65,10 @@ import {
   sampleFilmGrainModelV1,
   sampleFilmHalationModelV1,
   sampleFilmLookCatalogV1,
+  sampleLayerMaskApplyCommandEnvelopeV1,
+  sampleLayerMaskCommandEnvelopeV1,
+  sampleLayerMaskDryRunResultV1,
+  sampleLayerMaskMutationResultV1,
   sampleNegativeAcquisitionProfileV1,
   sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabApplyPlanRequestV1,
@@ -179,6 +186,26 @@ const validSamples: ReadonlyArray<{
     name: 'tone color mutation result',
     schema: toneColorMutationResultV1Schema,
     value: sampleToneColorMutationResultV1,
+  },
+  {
+    name: 'layer mask command envelope',
+    schema: layerMaskCommandEnvelopeV1Schema,
+    value: sampleLayerMaskCommandEnvelopeV1,
+  },
+  {
+    name: 'layer mask apply command envelope',
+    schema: layerMaskCommandEnvelopeV1Schema,
+    value: sampleLayerMaskApplyCommandEnvelopeV1,
+  },
+  {
+    name: 'layer mask dry-run result',
+    schema: layerMaskDryRunResultV1Schema,
+    value: sampleLayerMaskDryRunResultV1,
+  },
+  {
+    name: 'layer mask mutation result',
+    schema: layerMaskMutationResultV1Schema,
+    value: sampleLayerMaskMutationResultV1,
   },
   {
     name: 'preview scope query',
@@ -524,6 +551,59 @@ expectInvalid('tone color custom white balance without tint', toneColorCommandEn
   parameters: {
     mode: 'custom_kelvin_tint',
     temperatureKelvin: 5200,
+  },
+});
+
+expectInvalid('layer mask apply command without approved state', layerMaskCommandEnvelopeV1Schema, {
+  ...sampleLayerMaskApplyCommandEnvelopeV1,
+  approval: {
+    ...sampleLayerMaskApplyCommandEnvelopeV1.approval,
+    state: 'pending',
+  },
+});
+
+expectInvalid('layer mask dry-run command with edit apply approval', layerMaskCommandEnvelopeV1Schema, {
+  ...sampleLayerMaskCommandEnvelopeV1,
+  approval: {
+    ...sampleLayerMaskCommandEnvelopeV1.approval,
+    approvalClass: 'edit_apply',
+  },
+});
+
+expectInvalid('layer insertion command without required reference layer', layerMaskCommandEnvelopeV1Schema, {
+  ...sampleLayerMaskCommandEnvelopeV1,
+  commandType: 'layerMask.createLayer',
+  parameters: {
+    blendMode: 'normal',
+    layerName: 'Sky Burn',
+    opacity: 0.8,
+    position: 'above_layer',
+    visible: true,
+  },
+});
+
+expectInvalid('layer luminance range mask with inverted range', layerMaskCommandEnvelopeV1Schema, {
+  ...sampleLayerMaskCommandEnvelopeV1,
+  commandType: 'layerMask.createRangeMask',
+  parameters: {
+    maskName: 'Highlights',
+    selection: {
+      feather: 0.12,
+      maxLuma: 0.3,
+      minLuma: 0.7,
+      rangeKind: 'luminance',
+    },
+    source: 'working_rgb',
+  },
+});
+
+expectInvalid('layer mask combine command with repeated source masks', layerMaskCommandEnvelopeV1Schema, {
+  ...sampleLayerMaskCommandEnvelopeV1,
+  commandType: 'layerMask.combineMasks',
+  parameters: {
+    combineMode: 'add',
+    maskName: 'Combined Portrait',
+    sourceMaskIds: ['mask_subject', 'mask_subject'],
   },
 });
 
