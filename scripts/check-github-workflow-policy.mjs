@@ -177,6 +177,45 @@ jobs:
 `,
     },
     {
+      name: 'rejects main push job concurrency',
+      expectedViolations: 1,
+      source: `name: blocked
+on:
+  push:
+    branches:
+      - main
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: blocked-main-job
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'rejects main push matrix job concurrency',
+      expectedViolations: 1,
+      source: `name: blocked
+on:
+  push:
+    branches:
+      - main
+jobs:
+  test:
+    strategy:
+      matrix:
+        lane:
+          - a
+          - b
+    runs-on: ubuntu-latest
+    concurrency:
+      group: blocked-main-\${{ matrix.lane }}
+    steps:
+      - run: true
+`,
+    },
+    {
       name: 'allows pull request concurrency',
       expectedViolations: 0,
       source: `name: allowed
