@@ -679,6 +679,7 @@
       "title": "Metadane"
     },
     "presets": {
+      "applyPresetLabel": "Zastosuj preset {{name}}",
       "dialog": {
         "allPresetFiles": "Wszystkie pliki presetów",
         "exportAllTitle": "Eksportuj wszystkie presety",

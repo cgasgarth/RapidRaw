@@ -641,6 +641,7 @@
       "title": "元数据"
     },
     "presets": {
+      "applyPresetLabel": "应用预设 {{name}}",
       "dialog": {
         "allPresetFiles": "所有预设文件",
         "exportAllTitle": "导出所有预设",

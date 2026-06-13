@@ -641,6 +641,7 @@
       "title": "Metadaten"
     },
     "presets": {
+      "applyPresetLabel": "Vorgabe {{name}} anwenden",
       "dialog": {
         "allPresetFiles": "Alle Vorgabendateien",
         "exportAllTitle": "Alle Vorgaben exportieren",
