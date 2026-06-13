@@ -30,6 +30,8 @@ import {
   negativeLabRollBatchWorkflowV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
+  previewScopeQueryV1Schema,
+  previewScopeResultV1Schema,
   projectLibraryCommandEnvelopeV1Schema,
   projectLibraryMutationResultV1Schema,
   projectLibrarySnapshotQueryV1Schema,
@@ -69,6 +71,8 @@ import {
   sampleNegativeLabRollBatchWorkflowV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
+  samplePreviewScopeQueryV1,
+  samplePreviewScopeResultV1,
   sampleProjectLibraryCommandEnvelopeV1,
   sampleProjectLibraryMutationResultV1,
   sampleProjectLibrarySnapshotQueryV1,
@@ -107,6 +111,16 @@ const validSamples: ReadonlyArray<{
     name: 'app-server tool call validation',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleRawEngineAppServerToolCallValidationV1,
+  },
+  {
+    name: 'preview scope query',
+    schema: previewScopeQueryV1Schema,
+    value: samplePreviewScopeQueryV1,
+  },
+  {
+    name: 'preview scope result',
+    schema: previewScopeResultV1Schema,
+    value: samplePreviewScopeResultV1,
   },
   {
     name: 'project library snapshot query',
@@ -323,6 +337,30 @@ expectInvalid('app-server tool call with mismatched dryRun flag', rawEngineAppSe
   toolCall: {
     ...sampleRawEngineAppServerToolCallValidationV1.toolCall,
     dryRun: false,
+  },
+});
+
+expectInvalid('preview scope result without scope payloads', previewScopeResultV1Schema, {
+  ...samplePreviewScopeResultV1,
+  histogram: undefined,
+  rgbParade: undefined,
+  vectorscope: undefined,
+  waveform: undefined,
+});
+
+expectInvalid('preview scope result with mismatched parade channel', previewScopeResultV1Schema, {
+  ...samplePreviewScopeResultV1,
+  rgbParade: {
+    ...samplePreviewScopeResultV1.rgbParade,
+    channel: 'rgb',
+  },
+});
+
+expectInvalid('preview scope query with empty scope selection', previewScopeQueryV1Schema, {
+  ...samplePreviewScopeQueryV1,
+  parameters: {
+    ...samplePreviewScopeQueryV1.parameters,
+    includeScopes: [],
   },
 });
 

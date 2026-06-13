@@ -23,6 +23,16 @@
         "toolName": "edit.dry_run_tone"
       },
       {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "PreviewScopeQueryV1",
+        "mutates": false,
+        "outputSchemaName": "PreviewScopeResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": true,
+        "toolKind": "preview",
+        "toolName": "preview.read_scopes"
+      },
+      {
         "approvalClass": "safe_read",
         "inputSchemaName": "ProjectLibrarySnapshotQueryV1",
         "mutates": false,

@@ -161,6 +161,107 @@ export const rawEngineToolRegistryV1Schema = z
   })
   .strict();
 
+export const previewScopeKindV1Schema = z.enum(['histogram', 'waveform', 'rgb_parade', 'vectorscope']);
+
+export const previewScopeChannelV1Schema = z.enum(['red', 'green', 'blue', 'luma', 'rgb']);
+
+export const previewScopeRenderBasisV1Schema = z.enum([
+  'editor_preview',
+  'working_rgb',
+  'display_referred',
+  'export_preview',
+]);
+
+export const previewScopeQueryV1Schema = queryEnvelopeV1Schema
+  .extend({
+    parameters: z
+      .object({
+        binCount: z.number().int().min(16).max(4096),
+        includeScopes: z.array(previewScopeKindV1Schema).min(1),
+        maxDimensionPx: z.number().int().positive().max(8192),
+        renderBasis: previewScopeRenderBasisV1Schema,
+        sourceArtifactId: z.string().trim().min(1).optional(),
+      })
+      .strict(),
+    queryType: z.literal('preview.scopes.read'),
+    target: rawEngineTargetSchema.safeExtend({ kind: z.literal('image') }).strict(),
+  })
+  .strict();
+
+export const previewHistogramChannelV1Schema = z
+  .object({
+    bins: z.array(z.number().nonnegative()).min(1),
+    channel: previewScopeChannelV1Schema,
+    clippedHighRatio: z.number().min(0).max(1),
+    clippedLowRatio: z.number().min(0).max(1),
+    percentile01: z.number().min(0).max(1),
+    percentile99: z.number().min(0).max(1),
+  })
+  .strict();
+
+export const previewHistogramScopeV1Schema = z
+  .object({
+    binCount: z.number().int().min(16).max(4096),
+    channels: z.array(previewHistogramChannelV1Schema).min(1),
+  })
+  .strict();
+
+export const previewRasterScopeV1Schema = z
+  .object({
+    artifact: artifactHandleV1Schema,
+    channel: z.enum(['red', 'green', 'blue', 'luma', 'rgb', 'parade', 'vectorscope']),
+    encodedFormat: z.enum(['rgba_u8_base64', 'png_base64', 'artifact_handle']),
+    height: z.number().int().positive(),
+    width: z.number().int().positive(),
+  })
+  .strict();
+
+export const previewScopeResultV1Schema = z
+  .object({
+    colorManaged: z.boolean(),
+    histogram: previewHistogramScopeV1Schema.optional(),
+    queryId: z.string().trim().min(1),
+    renderBasis: previewScopeRenderBasisV1Schema,
+    rgbParade: previewRasterScopeV1Schema.optional(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceArtifactId: z.string().trim().min(1).optional(),
+    sourceImagePath: z.string().trim().min(1),
+    vectorscope: previewRasterScopeV1Schema.optional(),
+    warnings: z.array(z.string().trim().min(1)),
+    waveform: previewRasterScopeV1Schema.optional(),
+  })
+  .strict()
+  .superRefine((result, context) => {
+    if (
+      result.histogram === undefined &&
+      result.waveform === undefined &&
+      result.rgbParade === undefined &&
+      result.vectorscope === undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Preview scope results require at least one scope payload.',
+        path: ['histogram'],
+      });
+    }
+
+    if (result.rgbParade !== undefined && result.rgbParade.channel !== 'parade') {
+      context.addIssue({
+        code: 'custom',
+        message: 'RGB parade payloads must use the parade channel.',
+        path: ['rgbParade', 'channel'],
+      });
+    }
+
+    if (result.vectorscope !== undefined && result.vectorscope.channel !== 'vectorscope') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Vectorscope payloads must use the vectorscope channel.',
+        path: ['vectorscope', 'channel'],
+      });
+    }
+  });
+
 const projectLibraryPathSchema = z.string().trim().min(1);
 
 export type ProjectLibraryFolderNodeV1 = {
@@ -4213,6 +4314,7 @@ const rawEngineAppServerKnownInputSchemas = {
   CommandEnvelopeV1: commandEnvelopeV1Schema,
   NegativeLabApplyPlanRequestV1: negativeLabApplyPlanRequestV1Schema,
   NegativeLabCommandEnvelopeV1: negativeLabCommandEnvelopeV1Schema,
+  PreviewScopeQueryV1: previewScopeQueryV1Schema,
   ProjectLibraryCommandEnvelopeV1: projectLibraryCommandEnvelopeV1Schema,
   ProjectLibrarySnapshotQueryV1: projectLibrarySnapshotQueryV1Schema,
   QueryEnvelopeV1: queryEnvelopeV1Schema,
@@ -4227,6 +4329,7 @@ export const rawEngineAppServerToolCallV1Schema = z
       'CommandEnvelopeV1',
       'NegativeLabApplyPlanRequestV1',
       'NegativeLabCommandEnvelopeV1',
+      'PreviewScopeQueryV1',
       'ProjectLibraryCommandEnvelopeV1',
       'ProjectLibrarySnapshotQueryV1',
       'QueryEnvelopeV1',
@@ -4797,6 +4900,14 @@ export type NegativeWarningCode = z.infer<typeof negativeWarningCodeSchema>;
 export type NegativeWarningSeverity = z.infer<typeof negativeWarningSeveritySchema>;
 export type NegativeWarningV1 = z.infer<typeof negativeWarningV1Schema>;
 export type PanoramaArtifactV1 = z.infer<typeof panoramaArtifactV1Schema>;
+export type PreviewHistogramChannelV1 = z.infer<typeof previewHistogramChannelV1Schema>;
+export type PreviewHistogramScopeV1 = z.infer<typeof previewHistogramScopeV1Schema>;
+export type PreviewRasterScopeV1 = z.infer<typeof previewRasterScopeV1Schema>;
+export type PreviewScopeChannelV1 = z.infer<typeof previewScopeChannelV1Schema>;
+export type PreviewScopeKindV1 = z.infer<typeof previewScopeKindV1Schema>;
+export type PreviewScopeQueryV1 = z.infer<typeof previewScopeQueryV1Schema>;
+export type PreviewScopeRenderBasisV1 = z.infer<typeof previewScopeRenderBasisV1Schema>;
+export type PreviewScopeResultV1 = z.infer<typeof previewScopeResultV1Schema>;
 export type ProjectLibraryCommandEnvelopeV1 = z.infer<typeof projectLibraryCommandEnvelopeV1Schema>;
 export type ProjectLibraryCommandTypeV1 = z.infer<typeof projectLibraryCommandTypeV1Schema>;
 export type ProjectLibraryFilterCriteriaV1 = z.infer<typeof projectLibraryFilterCriteriaV1Schema>;
