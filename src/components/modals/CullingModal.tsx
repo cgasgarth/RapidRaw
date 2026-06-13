@@ -10,6 +10,7 @@ import Slider from '../ui/Slider';
 import Dropdown from '../ui/Dropdown';
 import Text from '../ui/Text';
 import { TextColors, TextVariants } from '../../types/typography';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface CullingModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ interface CullingModalProps {
 }
 
 type CullAction = 'reject' | 'rate_zero' | 'delete';
+type CullingStage = 'settings' | 'progress' | 'results';
 
 interface ImageThumbnailProps {
   children?: ReactNode;
@@ -79,9 +81,7 @@ export default function CullingModal({
   onError,
 }: CullingModalProps) {
   const { t } = useTranslation();
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
-  const [stage, setStage] = useState<'settings' | 'progress' | 'results'>('settings');
+  const { isMounted, show } = useModalTransition(isOpen);
 
   const [settings, setSettings] = useState<CullingSettings>({
     groupSimilar: true,
@@ -106,47 +106,38 @@ export default function CullingModal({
     ],
     [t],
   );
+  const stage = useMemo<CullingStage>(() => {
+    if (suggestions || error) return 'results';
+    if (progress) return 'progress';
+    return 'settings';
+  }, [error, progress, suggestions]);
 
   useEffect(() => {
-    if (isOpen) {
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-        setStage('settings');
-        setSelectedRejects(new Set());
-      }, 300);
-      return () => {
-        clearTimeout(timer);
-      };
-    }
+    if (isOpen) return;
+
+    const resetTimer = setTimeout(() => {
+      setSelectedRejects(new Set());
+    }, 300);
+
+    return () => {
+      clearTimeout(resetTimer);
+    };
   }, [isOpen]);
 
   useEffect(() => {
-    if (suggestions || error) {
-      setStage('results');
-    } else if (progress) {
-      setStage('progress');
-    } else if (isOpen) {
-      setStage('settings');
-    }
-  }, [progress, suggestions, error, isOpen]);
-
-  useEffect(() => {
     if (stage === 'results' && suggestions) {
-      const initialRejects = new Set<string>();
-      suggestions.similarGroups.forEach((group) => {
-        group.duplicates.forEach((dup) => initialRejects.add(dup.path));
-      });
-      suggestions.blurryImages.forEach((img) => initialRejects.add(img.path));
-      setSelectedRejects(initialRejects);
+      const syncTimer = setTimeout(() => {
+        const initialRejects = new Set<string>();
+        suggestions.similarGroups.forEach((group) => {
+          group.duplicates.forEach((dup) => initialRejects.add(dup.path));
+        });
+        suggestions.blurryImages.forEach((img) => initialRejects.add(img.path));
+        setSelectedRejects(initialRejects);
+      }, 0);
+
+      return () => {
+        clearTimeout(syncTimer);
+      };
     }
   }, [stage, suggestions]);
 
