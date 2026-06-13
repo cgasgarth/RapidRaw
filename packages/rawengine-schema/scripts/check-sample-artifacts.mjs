@@ -19,6 +19,7 @@ import {
   negativeLabFixtureManifestV1Schema,
   negativeLabFrameDetectionResultV1Schema,
   negativeLabInputProfileCatalogV1Schema,
+  negativeLabPresetMetadataPolicyCatalogV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
   negativeLabQcProofArtifactV1Schema,
@@ -41,6 +42,7 @@ import {
   sampleNegativeLabFixtureManifestV1,
   sampleNegativeLabFrameDetectionResultV1,
   sampleNegativeLabInputProfileCatalogV1,
+  sampleNegativeLabPresetMetadataPolicyCatalogV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
   sampleNegativeLabQcProofArtifactV1,
@@ -160,6 +162,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab-built-in-preset-catalog-v1.json',
     schema: negativeLabBuiltInPresetCatalogV1Schema,
     value: sampleNegativeLabBuiltInPresetCatalogV1,
+  },
+  {
+    name: 'negative lab preset metadata policy catalog',
+    path: 'packages/rawengine-schema/samples/negative-lab-preset-metadata-policy-catalog-v1.json',
+    schema: negativeLabPresetMetadataPolicyCatalogV1Schema,
+    value: sampleNegativeLabPresetMetadataPolicyCatalogV1,
   },
   {
     name: 'negative lab fixture manifest',

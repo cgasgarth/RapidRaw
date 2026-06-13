@@ -879,6 +879,258 @@ export const negativeLabBuiltInPresetCatalogV1Schema = z
     }
   });
 
+const negativeLabPresetPolicyIdSchema = z
+  .string()
+  .trim()
+  .regex(/^negative_lab\.preset_policy\.[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*\.v[0-9]+$/u);
+
+export const negativeLabPresetMetadataPolicyClaimLevelV1Schema = z.enum([
+  'generic_starting_point_only',
+  'stock_family_reference_metadata',
+  'measured_project_profile',
+  'licensed_exact_profile',
+  'user_supplied_profile',
+  'blocked_or_unsupported',
+]);
+
+export const negativeLabPresetMetadataPolicyTierV1Schema = z.enum([
+  'generic_builtin',
+  'stock_family_reference',
+  'measured_project_profile',
+  'licensed_profile',
+  'user_profile',
+  'blocked',
+]);
+
+export const negativeLabPresetMetadataLegalReviewStatusV1Schema = z.enum([
+  'not_required_generic',
+  'required_before_ui',
+  'approved',
+  'blocked',
+]);
+
+export const negativeLabPresetMetadataUiContextV1Schema = z.enum([
+  'negative_lab_workspace',
+  'preset_browser',
+  'app_server_tool',
+  'export_sidecar',
+  'admin_review_queue',
+]);
+
+export const negativeLabPresetMetadataPolicyV1Schema = z
+  .object({
+    allowedClaims: z
+      .object({
+        competitorCompatibilityClaim: z.boolean(),
+        exactStockName: z.boolean(),
+        manufacturerEndorsement: z.boolean(),
+        manufacturerName: z.boolean(),
+        measuredBehavior: z.boolean(),
+        officialProfile: z.boolean(),
+      })
+      .strict(),
+    allowedInputModes: z.array(negativeInputModeSchema).min(1),
+    allowedUiContexts: z.array(negativeLabPresetMetadataUiContextV1Schema).min(1),
+    claimLevel: negativeLabPresetMetadataPolicyClaimLevelV1Schema,
+    displayCopy: z
+      .object({
+        disclosure: negativeLabPresetHumanTextSchema,
+        label: negativeLabPresetHumanTextSchema,
+      })
+      .strict(),
+    legalNamingStatus: negativeLabLegalNamingStatusSchema,
+    legalReviewStatus: negativeLabPresetMetadataLegalReviewStatusV1Schema,
+    policyId: negativeLabPresetPolicyIdSchema,
+    policyVersion: z.string().trim().min(1),
+    presetTier: negativeLabPresetMetadataPolicyTierV1Schema,
+    prohibitedClaimPhrases: z.array(z.string().trim().min(1)).min(1),
+    requiredWarnings: z.array(negativeWarningCodeSchema),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceRequirements: z
+      .object({
+        fixtureIds: z.array(z.string().trim().min(1)),
+        legalReviewIssue: z.string().trim().min(1).optional(),
+        licenseRecordIds: z.array(z.string().trim().min(1)),
+        reviewedAt: z
+          .string()
+          .trim()
+          .regex(/^\d{4}-\d{2}-\d{2}$/u)
+          .optional(),
+        reviewer: z.string().trim().min(1).optional(),
+        sourceCitationIds: z.array(z.string().trim().min(1)),
+      })
+      .strict(),
+    supportedProcessFamilies: z.array(negativeLabSupportedProcessFamilyV1Schema).min(1),
+  })
+  .strict()
+  .superRefine((policy, context) => {
+    const addPolicyIssue = (message: string, path: Array<string | number>) => {
+      context.addIssue({ code: 'custom', message, path });
+    };
+
+    const hasLegalReviewRecord =
+      policy.sourceRequirements.legalReviewIssue !== undefined &&
+      policy.sourceRequirements.reviewedAt !== undefined &&
+      policy.sourceRequirements.reviewer !== undefined;
+
+    if (policy.claimLevel === 'generic_starting_point_only' || policy.presetTier === 'generic_builtin') {
+      if (policy.claimLevel !== 'generic_starting_point_only' || policy.presetTier !== 'generic_builtin') {
+        addPolicyIssue('Generic preset metadata policies must pair generic tier with generic claim level.', [
+          'claimLevel',
+        ]);
+      }
+
+      if (policy.legalNamingStatus !== 'generic_safe_name') {
+        addPolicyIssue('Generic preset metadata policies must use generic-safe naming status.', ['legalNamingStatus']);
+      }
+
+      if (policy.legalReviewStatus !== 'not_required_generic') {
+        addPolicyIssue('Generic preset metadata policies must not require legal review.', ['legalReviewStatus']);
+      }
+
+      const genericDisallowedClaims = [
+        policy.allowedClaims.competitorCompatibilityClaim,
+        policy.allowedClaims.exactStockName,
+        policy.allowedClaims.manufacturerEndorsement,
+        policy.allowedClaims.manufacturerName,
+        policy.allowedClaims.measuredBehavior,
+        policy.allowedClaims.officialProfile,
+      ];
+      if (genericDisallowedClaims.some(Boolean)) {
+        addPolicyIssue(
+          'Generic preset metadata policies must not allow exact, manufacturer, measured, or official claims.',
+          ['allowedClaims'],
+        );
+      }
+    }
+
+    if (policy.claimLevel === 'stock_family_reference_metadata') {
+      if (policy.presetTier !== 'stock_family_reference') {
+        addPolicyIssue('Stock-family reference policies must use the stock-family reference tier.', ['presetTier']);
+      }
+
+      if (policy.legalNamingStatus !== 'descriptive_stock_family') {
+        addPolicyIssue('Stock-family reference policies must use descriptive stock-family naming.', [
+          'legalNamingStatus',
+        ]);
+      }
+
+      if (policy.sourceRequirements.sourceCitationIds.length === 0) {
+        addPolicyIssue('Stock-family reference policies require source citations.', [
+          'sourceRequirements',
+          'sourceCitationIds',
+        ]);
+      }
+
+      if (policy.allowedClaims.exactStockName || policy.allowedClaims.manufacturerEndorsement) {
+        addPolicyIssue('Stock-family reference policies must not allow exact stock or endorsement claims.', [
+          'allowedClaims',
+        ]);
+      }
+    }
+
+    if (policy.claimLevel === 'measured_project_profile') {
+      if (policy.presetTier !== 'measured_project_profile') {
+        addPolicyIssue('Measured project policies must use the measured-project tier.', ['presetTier']);
+      }
+
+      if (!policy.allowedClaims.measuredBehavior) {
+        addPolicyIssue('Measured project policies must allow measured-behavior claims.', [
+          'allowedClaims',
+          'measuredBehavior',
+        ]);
+      }
+
+      if (policy.sourceRequirements.fixtureIds.length === 0) {
+        addPolicyIssue('Measured project policies require fixture IDs.', ['sourceRequirements', 'fixtureIds']);
+      }
+    }
+
+    if (policy.claimLevel === 'licensed_exact_profile') {
+      if (policy.presetTier !== 'licensed_profile') {
+        addPolicyIssue('Licensed exact policies must use the licensed-profile tier.', ['presetTier']);
+      }
+
+      if (policy.legalNamingStatus !== 'approved_exact_stock_name') {
+        addPolicyIssue('Licensed exact policies require approved exact-stock naming.', ['legalNamingStatus']);
+      }
+
+      if (policy.legalReviewStatus !== 'approved' || !hasLegalReviewRecord) {
+        addPolicyIssue('Licensed exact policies require approved legal review metadata.', ['legalReviewStatus']);
+      }
+
+      if (policy.sourceRequirements.licenseRecordIds.length === 0) {
+        addPolicyIssue('Licensed exact policies require license record IDs.', [
+          'sourceRequirements',
+          'licenseRecordIds',
+        ]);
+      }
+    }
+
+    if (policy.claimLevel === 'user_supplied_profile' && policy.presetTier !== 'user_profile') {
+      addPolicyIssue('User supplied policies must use the user-profile tier.', ['presetTier']);
+    }
+
+    if (policy.claimLevel === 'blocked_or_unsupported') {
+      if (policy.presetTier !== 'blocked' || policy.legalReviewStatus !== 'blocked') {
+        addPolicyIssue('Blocked preset policies must use blocked tier and blocked review status.', ['presetTier']);
+      }
+
+      if (policy.allowedUiContexts.some((contextName) => contextName !== 'admin_review_queue')) {
+        addPolicyIssue('Blocked preset policies may only appear in the admin review queue.', ['allowedUiContexts']);
+      }
+    }
+
+    if (policy.allowedClaims.manufacturerEndorsement && policy.claimLevel !== 'licensed_exact_profile') {
+      addPolicyIssue('Manufacturer endorsement claims require a licensed exact policy.', [
+        'allowedClaims',
+        'manufacturerEndorsement',
+      ]);
+    }
+
+    if (policy.allowedClaims.officialProfile || policy.allowedClaims.competitorCompatibilityClaim) {
+      addPolicyIssue(
+        'Official-profile and competitor-compatibility claims are not allowed in RawEngine preset metadata.',
+        ['allowedClaims'],
+      );
+    }
+  });
+
+export const negativeLabPresetMetadataPolicyCatalogV1Schema = z
+  .object({
+    catalogId: negativeLabPresetPolicyIdSchema,
+    catalogVersion: z.string().trim().min(1),
+    policies: z.array(negativeLabPresetMetadataPolicyV1Schema).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  })
+  .strict()
+  .superRefine((catalog, context) => {
+    const policyIds = new Set<string>();
+    const displayLabels = new Set<string>();
+
+    for (const [index, policy] of catalog.policies.entries()) {
+      const displayLabelKey = policy.displayCopy.label.toLocaleLowerCase('en-US');
+
+      if (policyIds.has(policy.policyId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Preset metadata policy catalog must not contain duplicate policy IDs.',
+          path: ['policies', index, 'policyId'],
+        });
+      }
+      policyIds.add(policy.policyId);
+
+      if (displayLabels.has(displayLabelKey)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Preset metadata policy catalog must not contain duplicate display labels.',
+          path: ['policies', index, 'displayCopy', 'label'],
+        });
+      }
+      displayLabels.add(displayLabelKey);
+    }
+  });
+
 const contentHashSchema = z
   .string()
   .trim()
@@ -2241,6 +2493,16 @@ export type NegativeLabPlanRollNormalizationParametersV1 = z.infer<
   typeof negativeLabPlanRollNormalizationParametersV1Schema
 >;
 export type NegativeLabPositiveVariantProvenanceV1 = z.infer<typeof negativeLabPositiveVariantProvenanceV1Schema>;
+export type NegativeLabPresetMetadataLegalReviewStatusV1 = z.infer<
+  typeof negativeLabPresetMetadataLegalReviewStatusV1Schema
+>;
+export type NegativeLabPresetMetadataPolicyCatalogV1 = z.infer<typeof negativeLabPresetMetadataPolicyCatalogV1Schema>;
+export type NegativeLabPresetMetadataPolicyClaimLevelV1 = z.infer<
+  typeof negativeLabPresetMetadataPolicyClaimLevelV1Schema
+>;
+export type NegativeLabPresetMetadataPolicyTierV1 = z.infer<typeof negativeLabPresetMetadataPolicyTierV1Schema>;
+export type NegativeLabPresetMetadataPolicyV1 = z.infer<typeof negativeLabPresetMetadataPolicyV1Schema>;
+export type NegativeLabPresetMetadataUiContextV1 = z.infer<typeof negativeLabPresetMetadataUiContextV1Schema>;
 export type NegativeLabPresetProfileRefV1 = z.infer<typeof negativeLabPresetProfileRefV1Schema>;
 export type NegativeLabProcessProfileClass = z.infer<typeof negativeLabProcessProfileClassSchema>;
 export type NegativeLabProcessProfileV1 = z.infer<typeof negativeLabProcessProfileV1Schema>;
