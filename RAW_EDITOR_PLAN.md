@@ -1666,6 +1666,7 @@ Negative lab ADRs:
 - `ADR-NEG-002: Density-domain inversion model`
   ([draft ADR](docs/negative-lab/density-domain-inversion-adr-2026-06-13.md))
 - `ADR-NEG-003: Input profile strategy for camera, flatbed, and lab scans`
+  ([draft ADR](docs/negative-lab/input-profile-strategy-adr-2026-06-13.md))
 - `ADR-NEG-004: Film base sampling and roll-level calibration`
 - `ADR-NEG-005: Roll consistency and batch application semantics`
 - `ADR-NEG-006: Preset naming, trademark, provenance, and legal policy`
