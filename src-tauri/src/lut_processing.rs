@@ -19,6 +19,60 @@ pub struct Lut {
     pub data: Vec<f32>,
 }
 
+const MIN_LUT_SIZE: u32 = 2;
+const MAX_LUT_SIZE: u32 = 128;
+
+fn validate_lut_size(size: u32, source: &str) -> Result<u32> {
+    if !(MIN_LUT_SIZE..=MAX_LUT_SIZE).contains(&size) {
+        return Err(anyhow!(
+            "{} LUT size {} is outside the supported range {}..={}",
+            source,
+            size,
+            MIN_LUT_SIZE,
+            MAX_LUT_SIZE
+        ));
+    }
+
+    Ok(size)
+}
+
+fn expected_lut_data_len(size: u32, source: &str) -> Result<usize> {
+    let entries = size
+        .checked_mul(size)
+        .and_then(|value| value.checked_mul(size))
+        .ok_or_else(|| anyhow!("{} LUT size {} overflows entry count", source, size))?;
+    let values = entries
+        .checked_mul(3)
+        .ok_or_else(|| anyhow!("{} LUT size {} overflows RGB value count", source, size))?;
+
+    Ok(values as usize)
+}
+
+fn perfect_cube_root(value: u64) -> Option<u32> {
+    let root = (value as f64).cbrt().round() as u64;
+    if root
+        .checked_mul(root)
+        .and_then(|partial| partial.checked_mul(root))
+        == Some(value)
+    {
+        u32::try_from(root).ok()
+    } else {
+        None
+    }
+}
+
+fn validate_lut_value(value: f32, line_num: usize, channel: &str) -> Result<f32> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(anyhow!(
+            "Invalid {} value on line {}: LUT values must be finite",
+            channel,
+            line_num
+        ))
+    }
+}
+
 fn parse_cube(reader: impl BufRead) -> Result<Lut> {
     let mut size: Option<u32> = None;
     let mut data: Vec<f32> = Vec::new();
@@ -49,14 +103,17 @@ fn parse_cube(reader: impl BufRead) -> Result<Lut> {
                         line
                     ));
                 }
-                size = Some(parts[1].parse().map_err(|e| {
-                    anyhow!(
-                        "Failed to parse LUT_3D_SIZE on line {}: '{}'. Error: {}",
-                        line_num,
-                        line,
-                        e
-                    )
-                })?);
+                size = Some(validate_lut_size(
+                    parts[1].parse().map_err(|e| {
+                        anyhow!(
+                            "Failed to parse LUT_3D_SIZE on line {}: '{}'. Error: {}",
+                            line_num,
+                            line,
+                            e
+                        )
+                    })?,
+                    ".cube",
+                )?);
             }
             _ => {
                 if size.is_some() {
@@ -76,6 +133,7 @@ fn parse_cube(reader: impl BufRead) -> Result<Lut> {
                             e
                         )
                     })?;
+                    let r = validate_lut_value(r, line_num, "R")?;
                     let g: f32 = parts[1].parse().map_err(|e| {
                         anyhow!(
                             "Failed to parse G value on line {}: '{}'. Error: {}",
@@ -84,6 +142,7 @@ fn parse_cube(reader: impl BufRead) -> Result<Lut> {
                             e
                         )
                     })?;
+                    let g = validate_lut_value(g, line_num, "G")?;
                     let b: f32 = parts[2].parse().map_err(|e| {
                         anyhow!(
                             "Failed to parse B value on line {}: '{}'. Error: {}",
@@ -92,6 +151,7 @@ fn parse_cube(reader: impl BufRead) -> Result<Lut> {
                             e
                         )
                     })?;
+                    let b = validate_lut_value(b, line_num, "B")?;
                     data.push(r);
                     data.push(g);
                     data.push(b);
@@ -101,7 +161,7 @@ fn parse_cube(reader: impl BufRead) -> Result<Lut> {
     }
 
     let lut_size = size.ok_or(anyhow!("LUT_3D_SIZE not found in .cube file"))?;
-    let expected_len = (lut_size * lut_size * lut_size * 3) as usize;
+    let expected_len = expected_lut_data_len(lut_size, ".cube")?;
     if data.len() != expected_len {
         return Err(anyhow!(
             "LUT data size mismatch. Expected {} float values (for size {}), but found {}. The file may be corrupt or incomplete.",
@@ -120,17 +180,18 @@ fn parse_cube(reader: impl BufRead) -> Result<Lut> {
 fn parse_3dl(reader: impl BufRead) -> Result<Lut> {
     let mut data: Vec<f32> = Vec::new();
 
-    for line in reader.lines() {
+    for (line_index, line) in reader.lines().enumerate() {
         let line = line?;
+        let line_num = line_index + 1;
         let trimmed = line.trim();
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
         let parts: Vec<&str> = trimmed.split_whitespace().collect();
         if parts.len() == 3 {
-            let r: f32 = parts[0].parse()?;
-            let g: f32 = parts[1].parse()?;
-            let b: f32 = parts[2].parse()?;
+            let r = validate_lut_value(parts[0].parse()?, line_num, "R")?;
+            let g = validate_lut_value(parts[1].parse()?, line_num, "G")?;
+            let b = validate_lut_value(parts[2].parse()?, line_num, "B")?;
             data.push(r);
             data.push(g);
             data.push(b);
@@ -142,37 +203,55 @@ fn parse_3dl(reader: impl BufRead) -> Result<Lut> {
         return Err(anyhow!("No data found in 3DL file"));
     }
     let num_entries = total_values / 3;
-    let size = (num_entries as f64).cbrt().round() as u32;
-
-    if size * size * size != num_entries as u32 {
+    let Some(size) = perfect_cube_root(num_entries as u64) else {
         return Err(anyhow!(
             "Invalid 3DL LUT data size: the number of entries ({}) is not a perfect cube.",
             num_entries
         ));
-    }
+    };
+    let size = validate_lut_size(size, "3DL")?;
 
     Ok(Lut { size, data })
 }
 
-fn parse_hald(image: DynamicImage) -> Result<Lut> {
-    let (width, height) = image.dimensions();
-    if width != height {
-        return Err(anyhow!(
-            "HALD image must be square, but dimensions are {}x{}",
-            width,
-            height
-        ));
+fn hald_lut_size(width: u32, height: u32) -> Result<u32> {
+    if width == 0 || height == 0 {
+        return Err(anyhow!("HALD image dimensions must be positive"));
     }
 
-    let total_pixels = width * height;
-    let size = (total_pixels as f64).cbrt().round() as u32;
-
-    if size * size * size != total_pixels {
+    let total_pixels = u64::from(width) * u64::from(height);
+    let Some(size) = perfect_cube_root(total_pixels) else {
         return Err(anyhow!(
             "Invalid HALD image dimensions: total pixels ({}) is not a perfect cube.",
             total_pixels
         ));
+    };
+
+    let is_square_hald = width == height;
+    let is_vertical_strip = height == width.saturating_mul(width) && width == size;
+    let is_horizontal_strip = width == height.saturating_mul(height) && height == size;
+
+    if !(is_square_hald || is_vertical_strip || is_horizontal_strip) {
+        return Err(anyhow!(
+            "Unsupported HALD image layout: dimensions are {}x{}. Expected a square HALD image or a {}x{} / {}x{} strip layout.",
+            width,
+            height,
+            size,
+            size * size,
+            size * size,
+            size
+        ));
     }
+
+    validate_lut_size(size, "HALD")
+}
+
+fn parse_hald(image: DynamicImage) -> Result<Lut> {
+    let (width, height) = image.dimensions();
+    let size = hald_lut_size(width, height)?;
+    let total_pixels = width
+        .checked_mul(height)
+        .ok_or_else(|| anyhow!("HALD image dimensions overflow pixel count"))?;
 
     let mut data = Vec::with_capacity((total_pixels * 3) as usize);
     let rgb_image = image.to_rgb8();
@@ -325,4 +404,76 @@ pub fn convert_image_to_cube_lut(image: &DynamicImage, size: u32) -> Result<Vec<
     }
 
     Ok(out.into_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::RgbImage;
+    use std::io::Cursor;
+
+    fn cube_fixture(size: u32) -> String {
+        let mut contents = format!("LUT_3D_SIZE {}\n", size);
+        for _ in 0..(size * size * size) {
+            contents.push_str("0.0 0.5 1.0\n");
+        }
+        contents
+    }
+
+    #[test]
+    fn parses_valid_cube_lut() {
+        let lut = parse_cube(BufReader::new(Cursor::new(cube_fixture(2)))).expect("valid cube LUT");
+
+        assert_eq!(lut.size, 2);
+        assert_eq!(lut.data.len(), 2 * 2 * 2 * 3);
+    }
+
+    #[test]
+    fn rejects_cube_lut_size_outside_supported_range() {
+        let result = parse_cube(BufReader::new(Cursor::new(cube_fixture(1))));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_non_finite_cube_lut_values() {
+        let contents = "LUT_3D_SIZE 2\nNaN 0.5 1.0\n";
+        let result = parse_cube(BufReader::new(Cursor::new(contents)));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parses_standard_square_hald_lut() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(8, 8));
+        let lut = parse_hald(image).expect("valid square HALD LUT");
+
+        assert_eq!(lut.size, 4);
+        assert_eq!(lut.data.len(), 4 * 4 * 4 * 3);
+    }
+
+    #[test]
+    fn parses_generated_vertical_hald_strip_lut() {
+        let image = generate_identity_lut_image(4);
+        let lut = parse_hald(image).expect("valid generated HALD strip LUT");
+
+        assert_eq!(lut.size, 4);
+        assert_eq!(lut.data.len(), 4 * 4 * 4 * 3);
+    }
+
+    #[test]
+    fn rejects_hald_lut_with_unsupported_layout() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(2, 32));
+        let result = parse_hald(image);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_hald_lut_when_pixels_are_not_perfect_cube() {
+        let image = DynamicImage::ImageRgb8(RgbImage::new(5, 5));
+        let result = parse_hald(image);
+
+        assert!(result.is_err());
+    }
 }
