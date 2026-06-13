@@ -404,10 +404,13 @@ An issue is done when:
 - Dependency-currency checks should be shifted left where practical:
   - Track latest stable major and minor versions for Bun/npm packages, Rust crates, GitHub Actions, Bun, Node, Tauri, Rust tooling, and validation CLIs.
   - Keep patch and minor updates current by default when they pass the full validation gate and do not require behavioral migration.
+  - Prefer latest stable major and minor versions as the target state for first-party tooling and dependencies; older versions need a tracked blocker, compatibility note, or explicit deferral issue.
   - Add scripted stale-dependency reports for Bun/npm and Cargo dependency graphs, including current version, latest compatible version, latest stable minor version, latest stable major version, and release-note links when practical.
   - Add a scheduled or manually dispatched GitHub Action that reports outdated package versions without silently changing locks.
   - Convert every discovered major-version update into a tracked GitHub issue before implementation, using the format `deps(major): migrate <ecosystem>/<package> to <major>`.
   - Each major-version issue should include migration notes, upstream breaking-change links, expected code/config changes, local validation commands, CI expectations, rollback notes, and whether the bump is blocked by another ecosystem update.
+  - Work major-version issues individually or in clearly justified compatibility groups; do not bury major migrations inside broad lockfile refresh PRs.
+  - Close the loop after each dependency PR by rerunning the audit and recording whether new major-version follow-up issues were created, already existed, or were intentionally deferred.
   - Prefer small PRs by package family, with one major bump per PR unless toolchain coupling requires otherwise.
 - Validation should be local-first:
   - Hooks catch obvious mistakes before commit.
@@ -3735,6 +3738,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `ci(rust): enforce rustfmt clippy warnings-as-errors and tests`
 - `ci(security): add dependency vulnerability checks`
 - `ci(license): add dependency license checks`
+- `deps(audit): report latest package and crate versions`
+- `deps(minor): update JavaScript packages to latest stable compatible releases`
+- `deps(minor): update Rust crates to latest stable compatible releases`
+- `deps(major): create one migration issue per major package upgrade`
 - `ci(docs): add markdown and link checks`
 
 #### Milestone 2: CI Build Matrix And Release Skeleton
@@ -4270,6 +4277,27 @@ Issues:
   - Blocked by: package manager baseline.
   - Scope: license allow/deny policy.
   - Acceptance criteria: incompatible licenses fail CI.
+- `deps(audit): report latest package and crate versions`
+  - Labels: `area:tooling`, `type:implementation`, `priority:p1`, `pr:size-small`, `validation:build`.
+  - Blocked by: package manager baseline.
+  - Scope: add local and CI-readable reports for outdated JavaScript packages, Rust crates, GitHub Actions, Node, Bun, Tauri, Rust tooling, and validation CLIs.
+  - Acceptance criteria: audit output distinguishes patch/minor updates from major migrations and records which major migration issues exist or need creation.
+  - Validation evidence: audit command output and generated report diff.
+- `deps(minor): update JavaScript packages to latest stable compatible releases`
+  - Labels: `area:tooling`, `type:implementation`, `priority:p2`, `pr:size-medium`, `validation:build`, `validation:security`.
+  - Blocked by: dependency version audit.
+  - Scope: apply patch/minor JavaScript package updates that do not require major migration work.
+  - Acceptance criteria: lockfile is current for compatible releases, license/security/type/lint checks pass, and any remaining major updates have linked issues.
+- `deps(minor): update Rust crates to latest stable compatible releases`
+  - Labels: `area:rust`, `type:implementation`, `priority:p2`, `pr:size-medium`, `validation:rust`, `validation:security`.
+  - Blocked by: dependency version audit.
+  - Scope: apply compatible Rust crate updates without bundling breaking migrations.
+  - Acceptance criteria: lockfile is current for compatible releases, Rust fmt/check/clippy/test/license/security gates pass, and any remaining major updates have linked issues.
+- `deps(major): create one migration issue per major package upgrade`
+  - Labels: `area:tooling`, `type:docs`, `priority:p2`, `pr:size-small`, `validation:docs`.
+  - Blocked by: dependency version audit.
+  - Scope: create or update one GitHub issue for each discovered major version bump across JavaScript, Rust, GitHub Actions, Node/Bun/Tauri tooling, and validation CLIs.
+  - Acceptance criteria: every major update is represented by a dedicated issue or a documented compatibility-group issue with migration notes, upstream breaking-change links, validation commands, and rollback notes.
 - `ci(docs): add markdown and link checks`
   - Labels: `area:ci`, `area:docs`, `type:ci`, `priority:p1`, `validation:docs`.
   - Blocked by: plan artifact.
