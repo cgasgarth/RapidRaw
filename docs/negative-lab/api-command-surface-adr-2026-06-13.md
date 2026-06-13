@@ -33,6 +33,7 @@ workflow commands:
 | `negativeLab.planRollNormalization` | normalization    | produce a dry-run plan for objective roll synchronization   |
 | `negativeLab.createPositiveVariant` | rendering bridge | create editable positive variants from conversion recipes   |
 | `negativeLab.setFrameQcStatus`      | quality control  | record frame review state and warning acknowledgements      |
+| `negativeLab.applyFrameCrop`        | frame handling   | accept, override, or reject replayable frame crop decisions |
 
 Each command extends the generic `CommandEnvelopeV1` with a literal
 `commandType` and strict typed `parameters`. Unknown command fields and unknown

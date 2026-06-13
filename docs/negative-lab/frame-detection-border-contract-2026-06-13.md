@@ -20,6 +20,8 @@ import code can review the same payload.
 - `NegativeLabDetectedFrameV1`
 - `NegativeLabRejectedFrameCandidateV1`
 - `NegativeLabFrameDetectionResultV1`
+- `NegativeLabFrameCropEditV1`
+- `NegativeLabApplyFrameCropParametersV1`
 
 The generated sample is:
 
@@ -33,9 +35,16 @@ The generated sample is:
 - Border measurements are non-negative per edge.
 - Low-confidence frame detection uses stable warning codes so UI and app-server
   dry-runs can explain why manual review is needed.
+- Accepted detected crops must reference a detection run and source detection
+  frame ID.
+- Manual crop overrides must be recorded as manual or imported metadata, not as
+  detected-frame output.
+- Rejected detected crops require review notes so crop decisions remain
+  auditable.
+- A crop command cannot contain duplicate edits for the same frame.
 
 ## Deferred
 
-This PR does not implement image analysis, automatic crop application, contact
-sheet UI, or border overlay rendering. Those should land as separate PRs with
-sample images, visual artifacts, and UI validation.
+This contract does not implement image analysis, crop rendering, contact sheet
+UI, or border overlay rendering. Those should land as separate PRs with sample
+images, visual artifacts, and UI validation.
