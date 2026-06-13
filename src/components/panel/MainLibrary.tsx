@@ -58,7 +58,7 @@ interface MainLibraryProps {
   onContinueSession: () => void;
   onEmptyAreaContextMenu: (event: React.MouseEvent<HTMLElement>) => void;
   onGoHome: () => void;
-  onImageClick: (path: string, event: React.MouseEvent<HTMLElement>) => void;
+  onImageClick: (path: string, event: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => void;
   onImageDoubleClick: (path: string) => void;
   onImportClick: () => void;
   onLibraryRefresh: () => void;

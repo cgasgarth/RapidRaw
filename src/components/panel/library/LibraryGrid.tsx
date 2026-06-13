@@ -93,7 +93,7 @@ interface LibraryGridProps {
   activePath: string | null;
   multiSelectedPaths: string[];
   onContextMenu: (event: ReactMouseEvent<HTMLElement>, path: string) => void;
-  onImageClick: (path: string, event: ReactMouseEvent<HTMLElement>) => void;
+  onImageClick: (path: string, event: ReactMouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>) => void;
   onImageDoubleClick: (path: string) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   imageRatings: Record<string, number>;
@@ -122,6 +122,11 @@ function HeaderColumn({
   const isSorted = sortCriteria.key === sortKey;
   const isAsc = sortCriteria.order === SortDirection.Ascending;
   const actualWidth = `${(widths[widthKey] / totalRawWidth) * 100}%`;
+  const handleSortKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!sortKey || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    onSortChange(sortKey);
+  };
 
   return (
     <div
@@ -134,6 +139,9 @@ function HeaderColumn({
           onSortChange(sortKey);
         }
       }}
+      onKeyDown={handleSortKeyDown}
+      role={sortKey ? 'button' : undefined}
+      tabIndex={sortKey ? 0 : undefined}
     >
       <Text
         variant={TextVariants.small}
@@ -151,6 +159,7 @@ function HeaderColumn({
       {nextKey && (
         <div
           className="absolute right-[-3px] top-1.5 bottom-1.5 w-[6px] cursor-col-resize z-10 group flex items-center justify-center"
+          role="presentation"
           onMouseDown={(e) => {
             onResize(e, widthKey, nextKey);
           }}
@@ -636,6 +645,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
       <div
         ref={libraryContainerRef}
         className="flex-1 w-full h-full"
+        role="presentation"
         onClick={props.onClearSelection}
         onContextMenu={props.onEmptyAreaContextMenu}
       />
@@ -666,6 +676,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
     <div
       ref={libraryContainerRef}
       className="flex-1 w-full h-full"
+      role="presentation"
       onClick={props.onClearSelection}
       onContextMenu={props.onEmptyAreaContextMenu}
     >
