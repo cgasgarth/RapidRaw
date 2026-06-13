@@ -52,7 +52,7 @@
   "engine": {
     "capabilities": {
       "adaptiveSeamFeather": true,
-      "autoCrop": false,
+      "autoCrop": true,
       "bundleAdjustment": false,
       "cylindricalProjection": false,
       "exposureNormalization": false,
@@ -110,7 +110,7 @@
   "provenance": {
     "commandId": "command_panorama_create_sample",
     "graphRevision": "graph_rev_43",
-    "runtimeStatus": "schema_only"
+    "runtimeStatus": "rendered"
   },
   "schemaVersion": 1,
   "seamPolicy": {

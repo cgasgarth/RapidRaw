@@ -2126,7 +2126,7 @@ export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Sc
   engine: {
     capabilities: {
       adaptiveSeamFeather: true,
-      autoCrop: false,
+      autoCrop: true,
       bundleAdjustment: false,
       cylindricalProjection: false,
       exposureNormalization: false,
@@ -2184,7 +2184,7 @@ export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Sc
   provenance: {
     commandId: 'command_panorama_create_sample',
     graphRevision: 'graph_rev_43',
-    runtimeStatus: 'schema_only',
+    runtimeStatus: 'rendered',
   },
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
   seamPolicy: {
