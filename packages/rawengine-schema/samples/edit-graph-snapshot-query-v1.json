@@ -1,0 +1,20 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_edit_graph_sample"
+  },
+  "correlationId": "corr_edit_graph_snapshot_sample",
+  "parameters": {
+    "includeDisabledNodes": true,
+    "includeHistory": true,
+    "maxHistoryEntries": 50
+  },
+  "queryId": "query_edit_graph_snapshot_sample",
+  "queryType": "editGraph.snapshot",
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image"
+  }
+}

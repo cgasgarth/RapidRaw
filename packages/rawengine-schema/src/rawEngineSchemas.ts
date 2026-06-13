@@ -518,6 +518,245 @@ export const projectLibraryMutationResultV1Schema = z
     }
   });
 
+export const editGraphNodeKindV1Schema = z.enum([
+  'legacy_adjustments',
+  'preset_fragment',
+  'layer_adjustment',
+  'mask_operation',
+  'negative_lab_operation',
+  'agent_command',
+]);
+
+export const editGraphCommandTypeV1Schema = z.enum([
+  'editGraph.applyParameterPatch',
+  'editGraph.applyPresetFragment',
+  'editGraph.undo',
+  'editGraph.redo',
+  'editGraph.revertToRevision',
+]);
+
+export const editGraphParameterPatchOperationV1Schema = z
+  .object({
+    nodeId: z.string().trim().min(1).nullable(),
+    op: z.enum(['add', 'replace', 'remove']),
+    path: z.string().trim().min(1),
+    previousValue: z.unknown().optional(),
+    value: z.unknown().optional(),
+  })
+  .strict()
+  .superRefine((operation, context) => {
+    if (operation.op !== 'remove' && operation.value === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Add and replace parameter patch operations require a value.',
+        path: ['value'],
+      });
+    }
+  });
+
+export const editGraphNodeV1Schema = z
+  .object({
+    createdAt: z.iso.datetime({ offset: true }),
+    createdBy: rawEngineActorSchema,
+    enabled: z.boolean(),
+    id: z.string().trim().min(1),
+    inputRevision: z.string().trim().min(1).nullable(),
+    kind: editGraphNodeKindV1Schema,
+    label: z.string().trim().min(1),
+    outputRevision: z.string().trim().min(1),
+    parameters: z.record(z.string(), z.unknown()),
+    sourceCommandId: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+export const editGraphHistoryEntryV1Schema = z
+  .object({
+    actor: rawEngineActorSchema,
+    commandId: z.string().trim().min(1),
+    commandType: editGraphCommandTypeV1Schema,
+    createdAt: z.iso.datetime({ offset: true }),
+    graphRevision: z.string().trim().min(1),
+    label: z.string().trim().min(1),
+  })
+  .strict();
+
+export const editGraphSnapshotQueryV1Schema = queryEnvelopeV1Schema
+  .extend({
+    parameters: z
+      .object({
+        includeDisabledNodes: z.boolean(),
+        includeHistory: z.boolean(),
+        maxHistoryEntries: z.number().int().positive().max(500),
+      })
+      .strict(),
+    queryType: z.literal('editGraph.snapshot'),
+    target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'virtual_copy']) }).strict(),
+  })
+  .strict();
+
+export const editGraphSnapshotV1Schema = z
+  .object({
+    activeHistoryIndex: z.number().int().min(-1),
+    graphId: z.string().trim().min(1),
+    graphRevision: z.string().trim().min(1),
+    history: z.array(editGraphHistoryEntryV1Schema),
+    imagePath: z.string().trim().min(1),
+    nodes: z.array(editGraphNodeV1Schema),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    virtualCopyId: z.string().trim().min(1).nullable(),
+  })
+  .strict()
+  .superRefine((snapshot, context) => {
+    if (snapshot.activeHistoryIndex >= snapshot.history.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Active history index must point at an existing history entry or be -1.',
+        path: ['activeHistoryIndex'],
+      });
+    }
+  });
+
+const editGraphCommandBaseV1Schema = z.object({
+  actor: rawEngineActorSchema,
+  approval: approvalRequirementSchema,
+  commandId: z.string().trim().min(1),
+  correlationId: z.string().trim().min(1),
+  dryRun: z.boolean(),
+  expectedGraphRevision: z.string().trim().min(1),
+  idempotencyKey: z.string().trim().min(1).optional(),
+  schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'virtual_copy']) }).strict(),
+});
+
+export const editGraphCommandEnvelopeV1Schema = z
+  .discriminatedUnion('commandType', [
+    editGraphCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('editGraph.applyParameterPatch'),
+        parameters: z
+          .object({
+            label: z.string().trim().min(1),
+            operations: z.array(editGraphParameterPatchOperationV1Schema).min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+    editGraphCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('editGraph.applyPresetFragment'),
+        parameters: z
+          .object({
+            fragmentId: z.string().trim().min(1).optional(),
+            layerId: z.string().trim().min(1).nullable(),
+            parameterOverrides: z.record(z.string(), z.unknown()),
+            presetId: z.string().trim().min(1),
+            strength: z.number().min(0).max(1),
+          })
+          .strict(),
+      })
+      .strict(),
+    editGraphCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('editGraph.undo'),
+        parameters: z
+          .object({
+            steps: z.number().int().positive().max(100),
+          })
+          .strict(),
+      })
+      .strict(),
+    editGraphCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('editGraph.redo'),
+        parameters: z
+          .object({
+            steps: z.number().int().positive().max(100),
+          })
+          .strict(),
+      })
+      .strict(),
+    editGraphCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('editGraph.revertToRevision'),
+        parameters: z
+          .object({
+            graphRevision: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+  ])
+  .superRefine((command, context) => {
+    if (command.dryRun) {
+      if (command.approval.approvalClass !== ApprovalClass.PreviewOnly) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Dry-run edit graph commands require preview-only approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      return;
+    }
+
+    if (command.approval.approvalClass !== ApprovalClass.EditApply) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied edit graph commands require edit-apply approval classification.',
+        path: ['approval', 'approvalClass'],
+      });
+    }
+
+    if (command.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied edit graph commands require approved user approval before execution.',
+        path: ['approval', 'state'],
+      });
+    }
+  });
+
+export const editGraphParameterDiffV1Schema = z
+  .object({
+    nodeId: z.string().trim().min(1).nullable(),
+    path: z.string().trim().min(1),
+    previousValue: z.unknown().optional(),
+    value: z.unknown().optional(),
+  })
+  .strict();
+
+export const editGraphDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: editGraphCommandTypeV1Schema,
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(true),
+    mutates: z.literal(false),
+    parameterDiff: z.array(editGraphParameterDiffV1Schema),
+    predictedGraphRevision: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const editGraphMutationResultV1Schema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    changedNodeIds: z.array(z.string().trim().min(1)),
+    commandId: z.string().trim().min(1),
+    commandType: editGraphCommandTypeV1Schema,
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    mutates: z.literal(true),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    undoRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const panoramaProjectionSchema = z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']);
 
 export const panoramaProjectionSupportSchema = z.enum(['implemented_current_engine', 'schema_only_deferred']);
@@ -4312,6 +4551,8 @@ export const rawEngineAppServerProtocolV1Schema = z.literal('codex_app_server_js
 
 const rawEngineAppServerKnownInputSchemas = {
   CommandEnvelopeV1: commandEnvelopeV1Schema,
+  EditGraphCommandEnvelopeV1: editGraphCommandEnvelopeV1Schema,
+  EditGraphSnapshotQueryV1: editGraphSnapshotQueryV1Schema,
   NegativeLabApplyPlanRequestV1: negativeLabApplyPlanRequestV1Schema,
   NegativeLabCommandEnvelopeV1: negativeLabCommandEnvelopeV1Schema,
   PreviewScopeQueryV1: previewScopeQueryV1Schema,
@@ -4327,6 +4568,8 @@ export const rawEngineAppServerToolCallV1Schema = z
     dryRun: z.boolean(),
     inputSchemaName: z.enum([
       'CommandEnvelopeV1',
+      'EditGraphCommandEnvelopeV1',
+      'EditGraphSnapshotQueryV1',
       'NegativeLabApplyPlanRequestV1',
       'NegativeLabCommandEnvelopeV1',
       'PreviewScopeQueryV1',
@@ -4734,6 +4977,17 @@ export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
+export type EditGraphCommandEnvelopeV1 = z.infer<typeof editGraphCommandEnvelopeV1Schema>;
+export type EditGraphCommandTypeV1 = z.infer<typeof editGraphCommandTypeV1Schema>;
+export type EditGraphDryRunResultV1 = z.infer<typeof editGraphDryRunResultV1Schema>;
+export type EditGraphHistoryEntryV1 = z.infer<typeof editGraphHistoryEntryV1Schema>;
+export type EditGraphMutationResultV1 = z.infer<typeof editGraphMutationResultV1Schema>;
+export type EditGraphNodeKindV1 = z.infer<typeof editGraphNodeKindV1Schema>;
+export type EditGraphNodeV1 = z.infer<typeof editGraphNodeV1Schema>;
+export type EditGraphParameterDiffV1 = z.infer<typeof editGraphParameterDiffV1Schema>;
+export type EditGraphParameterPatchOperationV1 = z.infer<typeof editGraphParameterPatchOperationV1Schema>;
+export type EditGraphSnapshotQueryV1 = z.infer<typeof editGraphSnapshotQueryV1Schema>;
+export type EditGraphSnapshotV1 = z.infer<typeof editGraphSnapshotV1Schema>;
 export type FilmBlackAndWhiteAlgorithmV1 = z.infer<typeof filmBlackAndWhiteAlgorithmV1Schema>;
 export type FilmBlackAndWhiteFilterPresetV1 = z.infer<typeof filmBlackAndWhiteFilterPresetV1Schema>;
 export type FilmBlackAndWhiteModelV1 = z.infer<typeof filmBlackAndWhiteModelV1Schema>;

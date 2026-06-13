@@ -1,0 +1,75 @@
+{
+  "activeHistoryIndex": 1,
+  "graphId": "edit_graph_img_0001",
+  "graphRevision": "graph_rev_44",
+  "history": [
+    {
+      "actor": {
+        "id": "local-ui",
+        "kind": "ui",
+        "sessionId": "session_edit_graph_sample"
+      },
+      "commandId": "command_initial_adjustments_sample",
+      "commandType": "editGraph.applyParameterPatch",
+      "createdAt": "2026-06-13T15:00:00.000Z",
+      "graphRevision": "graph_rev_43",
+      "label": "Initial tone balancing"
+    },
+    {
+      "actor": {
+        "id": "codex-app-server",
+        "kind": "agent",
+        "sessionId": "session_edit_graph_sample"
+      },
+      "commandId": "command_edit_graph_patch_sample",
+      "commandType": "editGraph.applyParameterPatch",
+      "createdAt": "2026-06-13T15:05:00.000Z",
+      "graphRevision": "graph_rev_44",
+      "label": "Refine exposure and contrast"
+    }
+  ],
+  "imagePath": "/photos/session/IMG_0001.CR3",
+  "nodes": [
+    {
+      "createdAt": "2026-06-13T15:00:00.000Z",
+      "createdBy": {
+        "id": "local-ui",
+        "kind": "ui",
+        "sessionId": "session_edit_graph_sample"
+      },
+      "enabled": true,
+      "id": "node_legacy_adjustments",
+      "inputRevision": null,
+      "kind": "legacy_adjustments",
+      "label": "Base Adjustments",
+      "outputRevision": "graph_rev_43",
+      "parameters": {
+        "contrast": 8,
+        "exposure": 0.15,
+        "highlights": -12
+      },
+      "sourceCommandId": "command_initial_adjustments_sample"
+    },
+    {
+      "createdAt": "2026-06-13T15:05:00.000Z",
+      "createdBy": {
+        "id": "codex-app-server",
+        "kind": "agent",
+        "sessionId": "session_edit_graph_sample"
+      },
+      "enabled": true,
+      "id": "node_agent_refinement",
+      "inputRevision": "graph_rev_43",
+      "kind": "agent_command",
+      "label": "Agent tone refinement",
+      "outputRevision": "graph_rev_44",
+      "parameters": {
+        "contrast": 12,
+        "exposure": 0.22
+      },
+      "sourceCommandId": "command_edit_graph_patch_sample"
+    }
+  ],
+  "schemaVersion": 1,
+  "virtualCopyId": null
+}

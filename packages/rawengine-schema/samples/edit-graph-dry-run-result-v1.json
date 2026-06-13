@@ -1,0 +1,37 @@
+{
+  "commandId": "command_edit_graph_patch_preview_sample",
+  "commandType": "editGraph.applyParameterPatch",
+  "correlationId": "corr_edit_graph_patch_preview_sample",
+  "dryRun": true,
+  "mutates": false,
+  "parameterDiff": [
+    {
+      "nodeId": "node_agent_refinement",
+      "path": "/parameters/exposure",
+      "previousValue": 0.22,
+      "value": 0.3
+    },
+    {
+      "nodeId": "node_agent_refinement",
+      "path": "/parameters/contrast",
+      "previousValue": 12,
+      "value": 14
+    }
+  ],
+  "predictedGraphRevision": "graph_rev_45_preview",
+  "previewArtifacts": [
+    {
+      "artifactId": "artifact_edit_graph_patch_preview",
+      "contentHash": "sha256:sample-edit-graph-preview",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "preview",
+      "storage": "temp_cache"
+    }
+  ],
+  "schemaVersion": 1,
+  "sourceGraphRevision": "graph_rev_44",
+  "warnings": []
+}

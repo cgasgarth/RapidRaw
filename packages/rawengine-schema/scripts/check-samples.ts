@@ -3,6 +3,11 @@ import { z } from 'zod';
 import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  editGraphCommandEnvelopeV1Schema,
+  editGraphDryRunResultV1Schema,
+  editGraphMutationResultV1Schema,
+  editGraphSnapshotQueryV1Schema,
+  editGraphSnapshotV1Schema,
   filmBlackAndWhiteModelV1Schema,
   filmGlowModelV1Schema,
   filmGrainModelV1Schema,
@@ -43,6 +48,12 @@ import {
 import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleEditGraphApplyCommandEnvelopeV1,
+  sampleEditGraphCommandEnvelopeV1,
+  sampleEditGraphDryRunResultV1,
+  sampleEditGraphMutationResultV1,
+  sampleEditGraphSnapshotQueryV1,
+  sampleEditGraphSnapshotV1,
   sampleFilmBlackAndWhiteModelV1,
   sampleFilmGlowModelV1,
   sampleFilmGrainModelV1,
@@ -111,6 +122,36 @@ const validSamples: ReadonlyArray<{
     name: 'app-server tool call validation',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleRawEngineAppServerToolCallValidationV1,
+  },
+  {
+    name: 'edit graph snapshot query',
+    schema: editGraphSnapshotQueryV1Schema,
+    value: sampleEditGraphSnapshotQueryV1,
+  },
+  {
+    name: 'edit graph snapshot',
+    schema: editGraphSnapshotV1Schema,
+    value: sampleEditGraphSnapshotV1,
+  },
+  {
+    name: 'edit graph command envelope',
+    schema: editGraphCommandEnvelopeV1Schema,
+    value: sampleEditGraphCommandEnvelopeV1,
+  },
+  {
+    name: 'edit graph apply command envelope',
+    schema: editGraphCommandEnvelopeV1Schema,
+    value: sampleEditGraphApplyCommandEnvelopeV1,
+  },
+  {
+    name: 'edit graph dry-run result',
+    schema: editGraphDryRunResultV1Schema,
+    value: sampleEditGraphDryRunResultV1,
+  },
+  {
+    name: 'edit graph mutation result',
+    schema: editGraphMutationResultV1Schema,
+    value: sampleEditGraphMutationResultV1,
   },
   {
     name: 'preview scope query',
@@ -383,6 +424,41 @@ expectInvalid('project library command with wrong approval class', projectLibrar
 expectInvalid('project library mutation result missing revision', projectLibraryMutationResultV1Schema, {
   ...sampleProjectLibraryMutationResultV1,
   resultingLibraryRevision: undefined,
+});
+
+expectInvalid('edit graph apply command without approved state', editGraphCommandEnvelopeV1Schema, {
+  ...sampleEditGraphApplyCommandEnvelopeV1,
+  approval: {
+    ...sampleEditGraphApplyCommandEnvelopeV1.approval,
+    state: 'pending',
+  },
+});
+
+expectInvalid('edit graph dry-run command with edit apply approval', editGraphCommandEnvelopeV1Schema, {
+  ...sampleEditGraphCommandEnvelopeV1,
+  approval: {
+    ...sampleEditGraphCommandEnvelopeV1.approval,
+    approvalClass: 'edit_apply',
+  },
+});
+
+expectInvalid('edit graph patch operation without value', editGraphCommandEnvelopeV1Schema, {
+  ...sampleEditGraphCommandEnvelopeV1,
+  parameters: {
+    ...sampleEditGraphCommandEnvelopeV1.parameters,
+    operations: [
+      {
+        nodeId: 'node_agent_refinement',
+        op: 'replace',
+        path: '/parameters/exposure',
+      },
+    ],
+  },
+});
+
+expectInvalid('edit graph snapshot with invalid history index', editGraphSnapshotV1Schema, {
+  ...sampleEditGraphSnapshotV1,
+  activeHistoryIndex: sampleEditGraphSnapshotV1.history.length,
 });
 
 const invalidFilmLookCatalog = {

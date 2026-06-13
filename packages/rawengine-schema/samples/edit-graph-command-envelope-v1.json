@@ -1,0 +1,42 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_edit_graph_sample"
+  },
+  "approval": {
+    "approvalClass": "preview_only",
+    "reason": "Previewing an edit graph patch computes a non-mutating graph diff and preview artifact.",
+    "state": "not_required"
+  },
+  "commandId": "command_edit_graph_patch_preview_sample",
+  "correlationId": "corr_edit_graph_patch_preview_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_44",
+  "idempotencyKey": "idem_edit_graph_patch_preview_sample",
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image"
+  },
+  "commandType": "editGraph.applyParameterPatch",
+  "parameters": {
+    "label": "Preview exposure and contrast refinement",
+    "operations": [
+      {
+        "nodeId": "node_agent_refinement",
+        "op": "replace",
+        "path": "/parameters/exposure",
+        "previousValue": 0.22,
+        "value": 0.3
+      },
+      {
+        "nodeId": "node_agent_refinement",
+        "op": "replace",
+        "path": "/parameters/contrast",
+        "previousValue": 12,
+        "value": 14
+      }
+    ]
+  }
+}

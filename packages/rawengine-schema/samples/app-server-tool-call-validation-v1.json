@@ -23,6 +23,36 @@
         "toolName": "edit.dry_run_tone"
       },
       {
+        "approvalClass": "safe_read",
+        "inputSchemaName": "EditGraphSnapshotQueryV1",
+        "mutates": false,
+        "outputSchemaName": "EditGraphSnapshotV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "read",
+        "toolName": "editgraph.snapshot"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "EditGraphCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "EditGraphDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "editgraph.dry_run_command"
+      },
+      {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "EditGraphCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "EditGraphMutationResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "apply",
+        "toolName": "editgraph.apply_command"
+      },
+      {
         "approvalClass": "preview_only",
         "inputSchemaName": "PreviewScopeQueryV1",
         "mutates": false,
