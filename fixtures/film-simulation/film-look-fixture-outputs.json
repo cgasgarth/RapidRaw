@@ -1,0 +1,147 @@
+{
+  "fixtureInput": {
+    "colorSpace": "adjustment-domain",
+    "kind": "synthetic-neutral-adjustment-state",
+    "note": "Deterministic fixture for built-in Film Looks. The output captures the adjustment-domain deltas applied by each look, not a rendered image."
+  },
+  "generatedFrom": "src/utils/filmLookBrowser.ts",
+  "outputs": [
+    {
+      "adjustmentFingerprint": "31703de7f4a90d5b0be8c0d50911b6e4328017f8ce6dfa251253f1b2f0fdaacb",
+      "adjustmentSummaries": [
+        {
+          "label": "Contrast",
+          "value": 12
+        },
+        {
+          "label": "Saturation",
+          "value": 4
+        }
+      ],
+      "category": "color_clean",
+      "description": "Neutral creative color with modest contrast and restrained saturation.",
+      "displayName": "Clean Color",
+      "id": "film_look.generic.clean_color.v1",
+      "strengthDefault": 70
+    },
+    {
+      "adjustmentFingerprint": "d13a52724cebba02bfde10373967d04c51d47ebc776620f5d405f10cc6e1458f",
+      "adjustmentSummaries": [
+        {
+          "label": "Temp",
+          "value": 8
+        },
+        {
+          "label": "Contrast",
+          "value": 8
+        },
+        {
+          "label": "Highlights",
+          "value": -10
+        }
+      ],
+      "category": "color_warm",
+      "description": "Warm print-style color with gentle highlight compression.",
+      "displayName": "Warm Print",
+      "id": "film_look.generic.warm_print.v1",
+      "strengthDefault": 65
+    },
+    {
+      "adjustmentFingerprint": "0986f4c10fe06483f279621125ab422fba20ed382dfb948216178b6fc379d448",
+      "adjustmentSummaries": [
+        {
+          "label": "Temp",
+          "value": -8
+        },
+        {
+          "label": "Contrast",
+          "value": 18
+        },
+        {
+          "label": "Shadows",
+          "value": -10
+        },
+        {
+          "label": "Saturation",
+          "value": -2
+        }
+      ],
+      "category": "color_cool",
+      "description": "Cool contrast color with deeper shadows and controlled saturation.",
+      "displayName": "Cool Contrast",
+      "id": "film_look.generic.cool_contrast.v1",
+      "strengthDefault": 60
+    },
+    {
+      "adjustmentFingerprint": "42f57e3c2e83337ba8ceba1bc4ed96ca7171212205794fb1f9f633cdd857390f",
+      "adjustmentSummaries": [
+        {
+          "label": "Contrast",
+          "value": -10
+        },
+        {
+          "label": "Blacks",
+          "value": 8
+        },
+        {
+          "label": "Saturation",
+          "value": -18
+        }
+      ],
+      "category": "color_fade",
+      "description": "Low-contrast faded color with lifted blacks and soft saturation.",
+      "displayName": "Soft Fade",
+      "id": "film_look.generic.soft_fade.v1",
+      "strengthDefault": 55
+    },
+    {
+      "adjustmentFingerprint": "572b894e7421f8f8c20808754f8668d805f050b2b6701740b3176690367c182f",
+      "adjustmentSummaries": [
+        {
+          "label": "Contrast",
+          "value": 12
+        },
+        {
+          "label": "Saturation",
+          "value": -100
+        },
+        {
+          "label": "Grain",
+          "value": 22
+        },
+        {
+          "label": "Grain Size",
+          "value": 42
+        }
+      ],
+      "category": "black_and_white",
+      "description": "Monochrome rendering with balanced channel response and gentle texture defaults.",
+      "displayName": "Mono Silver",
+      "id": "film_look.generic.mono_silver.v1",
+      "strengthDefault": 75
+    },
+    {
+      "adjustmentFingerprint": "c5ece814b40d96905250e31abe8adc992fa5c59c88affa11f2ef19fdd2a58f74",
+      "adjustmentSummaries": [
+        {
+          "label": "Contrast",
+          "value": 24
+        },
+        {
+          "label": "Blacks",
+          "value": -3
+        },
+        {
+          "label": "Glow",
+          "value": 8
+        }
+      ],
+      "category": "color_contrast",
+      "description": "Punchy color with stronger curve separation and subtle glow defaults.",
+      "displayName": "Punch Color",
+      "id": "film_look.generic.punch_color.v1",
+      "strengthDefault": 60
+    }
+  ],
+  "version": 1
+}
