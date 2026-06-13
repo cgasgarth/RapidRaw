@@ -2210,6 +2210,187 @@ export const negativeLabBaseSampleRegionV1Schema = z
   })
   .strict();
 
+export const negativeLabBaseSampleStatusV1Schema = z.enum(['candidate', 'accepted', 'rejected']);
+
+export const negativeLabBaseSampleRejectionReasonV1Schema = z.enum([
+  'dust',
+  'rebate_text',
+  'sprocket',
+  'scratch',
+  'light_leak',
+  'clipped_channel',
+  'uneven_illumination',
+  'manual',
+]);
+
+export const negativeLabBaseSampleChannelStatsV1Schema = z
+  .object({
+    clippingFraction: z.number().min(0).max(1),
+    max: z.number().min(0),
+    mean: z.number().min(0),
+    median: z.number().min(0),
+    min: z.number().min(0),
+    sampleCount: z.number().int().positive(),
+    standardDeviation: z.number().min(0),
+  })
+  .strict()
+  .superRefine((stats, context) => {
+    if (!(stats.min <= stats.median && stats.median <= stats.max)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Base sample channel stats must satisfy min <= median <= max.',
+        path: ['median'],
+      });
+    }
+
+    if (!(stats.min <= stats.mean && stats.mean <= stats.max)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Base sample channel stats must satisfy min <= mean <= max.',
+        path: ['mean'],
+      });
+    }
+  });
+
+export const negativeLabBaseSampleStatsV1Schema = z
+  .object({
+    blue: negativeLabBaseSampleChannelStatsV1Schema,
+    green: negativeLabBaseSampleChannelStatsV1Schema,
+    red: negativeLabBaseSampleChannelStatsV1Schema,
+  })
+  .strict();
+
+export const negativeLabBaseSampleRecordV1Schema = z
+  .object({
+    confidence: negativeAcquisitionConfidenceSchema,
+    measuredAt: z.string().trim().min(1),
+    rejectionReason: negativeLabBaseSampleRejectionReasonV1Schema.optional(),
+    sampleId: z.string().trim().min(1),
+    sampleRegion: negativeLabBaseSampleRegionV1Schema,
+    sampleScope: z.enum(['frame', 'roll', 'selected_frames']),
+    sampleStats: negativeLabBaseSampleStatsV1Schema.optional(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    status: negativeLabBaseSampleStatusV1Schema,
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict()
+  .superRefine((sample, context) => {
+    if (sample.status === 'accepted' && sample.sampleStats === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Accepted base samples require measured channel statistics.',
+        path: ['sampleStats'],
+      });
+    }
+
+    if (sample.status === 'rejected' && sample.rejectionReason === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Rejected base samples require a rejection reason.',
+        path: ['rejectionReason'],
+      });
+    }
+
+    if (sample.status !== 'rejected' && sample.rejectionReason !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only rejected base samples may include a rejection reason.',
+        path: ['rejectionReason'],
+      });
+    }
+  });
+
+export const negativeLabBaseFogEstimateV1Schema = z
+  .object({
+    algorithm: z
+      .object({
+        algorithmId: z.literal('base_fog_scalar_rgb_v1'),
+        algorithmVersion: z.literal(1),
+        outlierPolicy: z.enum(['mad_v1', 'none']),
+        statistic: z.enum(['median', 'trimmed_mean']),
+      })
+      .strict(),
+    baseDensity: z
+      .object({
+        blue: z.number().min(0),
+        green: z.number().min(0),
+        red: z.number().min(0),
+      })
+      .strict(),
+    baseRgb: z
+      .object({
+        blue: z.number().positive(),
+        green: z.number().positive(),
+        red: z.number().positive(),
+      })
+      .strict(),
+    confidence: negativeAcquisitionConfidenceSchema,
+    estimateId: z.string().trim().min(1),
+    estimatedAt: z.string().trim().min(1),
+    frameSelection: negativeLabFrameSelectionV1Schema,
+    rejectedSampleIds: z.array(z.string().trim().min(1)),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sessionId: z.string().trim().min(1),
+    sourceSampleIds: nonEmptyIdArraySchema,
+    scope: z.enum(['frame', 'roll', 'selected_frames']),
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict()
+  .superRefine((estimate, context) => {
+    const sourceSampleIds = new Set(estimate.sourceSampleIds);
+    if (sourceSampleIds.size !== estimate.sourceSampleIds.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Base/fog estimates must not repeat source sample IDs.',
+        path: ['sourceSampleIds'],
+      });
+    }
+
+    const rejectedSampleIds = new Set(estimate.rejectedSampleIds);
+    if (rejectedSampleIds.size !== estimate.rejectedSampleIds.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Base/fog estimates must not repeat rejected sample IDs.',
+        path: ['rejectedSampleIds'],
+      });
+    }
+
+    for (const [index, sampleId] of estimate.rejectedSampleIds.entries()) {
+      if (sourceSampleIds.has(sampleId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Rejected base samples cannot also be source samples for an estimate.',
+          path: ['rejectedSampleIds', index],
+        });
+      }
+    }
+
+    if (estimate.scope === 'frame' && estimate.frameSelection.frameIds.length !== 1) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Frame-scoped base/fog estimates must select exactly one frame.',
+        path: ['frameSelection', 'frameIds'],
+      });
+    }
+
+    const confidenceWarningCodes: ReadonlyArray<z.infer<typeof negativeWarningCodeSchema>> = [
+      'clipped_base_channel',
+      'uneven_illumination',
+      'low_acquisition_confidence',
+      'missing_visible_base',
+    ];
+    const hasConfidenceWarning = estimate.warningCodes.some((warningCode) =>
+      confidenceWarningCodes.includes(warningCode),
+    );
+    if (estimate.confidence === 'high' && hasConfidenceWarning) {
+      context.addIssue({
+        code: 'custom',
+        message: 'High-confidence base/fog estimates cannot include confidence-lowering warning codes.',
+        path: ['confidence'],
+      });
+    }
+  });
+
 export const negativeLabPreviewRequestV1Schema = z
   .object({
     artifactPurposes: z.array(
@@ -2256,18 +2437,43 @@ export const negativeLabCreateSessionParametersV1Schema = z
 export const negativeLabUpdateBaseSamplesParametersV1Schema = z
   .object({
     frameSelection: negativeLabFrameSelectionV1Schema,
-    rejectionReason: z.enum(['dust', 'rebate_text', 'sprocket', 'scratch', 'light_leak', 'manual']).optional(),
+    rejectionReason: negativeLabBaseSampleRejectionReasonV1Schema.optional(),
     sampleEditMode: z.enum(['add', 'replace', 'accept', 'reject', 'remove']),
+    sampleRecords: z.array(negativeLabBaseSampleRecordV1Schema).optional(),
     sampleRegions: z.array(negativeLabBaseSampleRegionV1Schema).min(1),
     sessionId: z.string().trim().min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((parameters, context) => {
+    if (parameters.sampleEditMode === 'reject' && parameters.rejectionReason === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Rejecting base samples requires a rejection reason.',
+        path: ['rejectionReason'],
+      });
+    }
+
+    if (parameters.sampleRecords !== undefined) {
+      const sampleIds = new Set<string>();
+      for (const [index, sampleRecord] of parameters.sampleRecords.entries()) {
+        if (sampleIds.has(sampleRecord.sampleId)) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Base sample update commands must not repeat sample IDs.',
+            path: ['sampleRecords', index, 'sampleId'],
+          });
+        }
+        sampleIds.add(sampleRecord.sampleId);
+      }
+    }
+  });
 
 export const negativeLabEstimateBaseFogParametersV1Schema = z
   .object({
     estimator: z
       .object({
         algorithmId: z.literal('base_fog_scalar_rgb_v1'),
+        minimumAcceptedSamples: z.number().int().positive().optional(),
         outlierPolicy: z.enum(['mad_v1', 'none']),
         scope: z.enum(['frame', 'roll', 'selected_frames']),
         sourceSampleIds: nonEmptyIdArraySchema,
@@ -2277,7 +2483,25 @@ export const negativeLabEstimateBaseFogParametersV1Schema = z
     frameSelection: negativeLabFrameSelectionV1Schema,
     sessionId: z.string().trim().min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((parameters, context) => {
+    const sourceSampleIds = new Set(parameters.estimator.sourceSampleIds);
+    if (sourceSampleIds.size !== parameters.estimator.sourceSampleIds.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Base/fog estimation source sample IDs must be unique.',
+        path: ['estimator', 'sourceSampleIds'],
+      });
+    }
+
+    if (parameters.estimator.scope === 'frame' && parameters.frameSelection.frameIds.length !== 1) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Frame-scoped base/fog estimation must select exactly one frame.',
+        path: ['frameSelection', 'frameIds'],
+      });
+    }
+  });
 
 export const negativeLabSetConversionRecipeParametersV1Schema = z
   .object({
@@ -2746,7 +2970,13 @@ export type NegativeLabAppServerToolManifestV1 = z.infer<typeof negativeLabAppSe
 export type NegativeLabApplyFrameCropParametersV1 = z.infer<typeof negativeLabApplyFrameCropParametersV1Schema>;
 export type NegativeLabApplyResultV1 = z.infer<typeof negativeLabApplyResultV1Schema>;
 export type NegativeLabApplyPlanRequestV1 = z.infer<typeof negativeLabApplyPlanRequestV1Schema>;
+export type NegativeLabBaseFogEstimateV1 = z.infer<typeof negativeLabBaseFogEstimateV1Schema>;
+export type NegativeLabBaseSampleChannelStatsV1 = z.infer<typeof negativeLabBaseSampleChannelStatsV1Schema>;
+export type NegativeLabBaseSampleRecordV1 = z.infer<typeof negativeLabBaseSampleRecordV1Schema>;
+export type NegativeLabBaseSampleRejectionReasonV1 = z.infer<typeof negativeLabBaseSampleRejectionReasonV1Schema>;
 export type NegativeLabBaseSampleRegionV1 = z.infer<typeof negativeLabBaseSampleRegionV1Schema>;
+export type NegativeLabBaseSampleStatsV1 = z.infer<typeof negativeLabBaseSampleStatsV1Schema>;
+export type NegativeLabBaseSampleStatusV1 = z.infer<typeof negativeLabBaseSampleStatusV1Schema>;
 export type NegativeLabBuiltInPresetCatalogV1 = z.infer<typeof negativeLabBuiltInPresetCatalogV1Schema>;
 export type NegativeLabBuiltInPresetFilmClass = z.infer<typeof negativeLabBuiltInPresetFilmClassSchema>;
 export type NegativeLabBuiltInPresetTier = z.infer<typeof negativeLabBuiltInPresetTierSchema>;
