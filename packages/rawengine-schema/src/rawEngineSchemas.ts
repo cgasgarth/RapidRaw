@@ -879,6 +879,302 @@ export const negativeLabBuiltInPresetCatalogV1Schema = z
     }
   });
 
+const contentHashSchema = z
+  .string()
+  .trim()
+  .regex(/^sha256:[a-f0-9]{64}$/u);
+const isoDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/u);
+const negativeLabFixtureIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/u);
+
+export const negativeLabSampleGeometryV1Schema = z
+  .object({
+    coordinateSpace: z.enum(['source_asset_pixels', 'frame_pixels_after_crop', 'normalized_frame']),
+    height: z.number().positive().optional(),
+    kind: z.enum(['rect', 'polygon']),
+    points: z.array(z.object({ x: z.number(), y: z.number() }).strict()).optional(),
+    width: z.number().positive().optional(),
+    x: z.number().optional(),
+    y: z.number().optional(),
+  })
+  .strict()
+  .superRefine((geometry, context) => {
+    if (geometry.kind === 'rect') {
+      for (const key of ['x', 'y', 'width', 'height'] as const) {
+        if (geometry[key] === undefined) {
+          context.addIssue({
+            code: 'custom',
+            message: `Rect sample geometry requires ${key}.`,
+            path: [key],
+          });
+        }
+      }
+    }
+
+    if (geometry.kind === 'polygon' && (geometry.points === undefined || geometry.points.length < 3)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Polygon sample geometry requires at least three points.',
+        path: ['points'],
+      });
+    }
+  });
+
+export const negativeLabFixtureStateV1Schema = z.enum([
+  'candidate',
+  'review_pending',
+  'approved_metadata_only',
+  'approved_smoke',
+  'approved_numeric',
+  'approved_profile_measurement',
+  'deprecated',
+  'blocked',
+]);
+
+export const negativeLabFixtureTierV1Schema = z.enum([
+  'synthetic_numeric',
+  'synthetic_visual',
+  'project_owned_scan',
+  'permissive_public_scan',
+  'licensed_scan',
+  'local_private_scan',
+  'registry_metadata_only',
+]);
+
+export const negativeLabFixtureRoleV1Schema = z.enum([
+  'density_math_reference',
+  'warning_stability',
+  'ui_overlay_smoke',
+  'roll_consistency',
+  'profile_measurement',
+  'stock_reference_mapping',
+]);
+
+export const negativeLabFixtureValidationUseV1Schema = z.enum([
+  'schema_roundtrip',
+  'ui_overlay_smoke',
+  'density_math_reference',
+  'warning_stability',
+  'roll_consistency',
+  'profile_measurement',
+  'stock_reference_mapping',
+  'marketing_screenshot',
+]);
+
+export const negativeLabFixtureDistributionV1Schema = z.enum([
+  'none',
+  'private_local_only',
+  'private_ci_only',
+  'public_repo',
+  'release_artifact',
+]);
+
+export const negativeLabFixtureWarningCodeV1Schema = z.enum([
+  'missing_fixture_license',
+  'unknown_fixture_rights',
+  'fixture_payload_not_public',
+  'fixture_setup_unknown',
+  'fixture_stock_unverified',
+  'fixture_process_unverified',
+  'fixture_auto_correction_unknown',
+  'fixture_profile_claim_disallowed',
+  'fixture_derivative_not_allowed',
+  'fixture_review_expired',
+]);
+
+export const negativeLabFixtureSourceV1Schema = z
+  .object({
+    copyrightOwner: z.string().trim().min(1),
+    licenseName: z.string().trim().min(1).optional(),
+    licenseUrl: z.url().optional(),
+    redistributionEvidence: z.string().trim().min(1).optional(),
+    sourceKind: z.enum([
+      'project_owned',
+      'generated_synthetic',
+      'permissive_public',
+      'licensed_third_party',
+      'local_private',
+      'registry_metadata_only',
+    ]),
+    sourceUrl: z.url().optional(),
+  })
+  .strict()
+  .superRefine((source, context) => {
+    if (
+      ['permissive_public', 'licensed_third_party'].includes(source.sourceKind) &&
+      (source.sourceUrl === undefined ||
+        source.licenseName === undefined ||
+        source.redistributionEvidence === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Public or licensed fixture sources require a source URL, license name, and redistribution evidence.',
+        path: ['sourceUrl'],
+      });
+    }
+  });
+
+export const negativeLabFixtureManifestEntryV1Schema = z
+  .object({
+    allowedDistribution: negativeLabFixtureDistributionV1Schema,
+    allowedValidationUses: z.array(negativeLabFixtureValidationUseV1Schema),
+    autoCorrectionBakedIn: z.enum(['known_absent', 'known_present', 'unknown']),
+    baseFogSampleRegions: z.array(negativeLabSampleGeometryV1Schema),
+    bitDepth: z.number().int().positive(),
+    captureProfile: z.string().trim().min(1),
+    colorProfile: z.string().trim().min(1),
+    contentHash: contentHashSchema.optional(),
+    derivativeDistributionAllowed: z.boolean(),
+    developmentNotes: z.string().trim().min(1),
+    developmentProcessKnown: z.boolean(),
+    disallowedValidationUses: z.array(negativeLabFixtureValidationUseV1Schema),
+    expectedFixtureWarningCodes: z.array(negativeLabFixtureWarningCodeV1Schema),
+    expectedNegativeWarningCodes: z.array(negativeWarningCodeSchema),
+    fileFormat: z.enum(['raw', 'dng', 'tiff', 'jpeg', 'png', 'json', 'synthetic_generated']),
+    filmStockDisplayName: z.string().trim().min(1),
+    filmStockKnown: z.boolean(),
+    filmStockSource: z.string().trim().min(1),
+    fixtureId: negativeLabFixtureIdSchema,
+    fixtureRole: negativeLabFixtureRoleV1Schema,
+    frameFormat: z.string().trim().min(1),
+    generatorId: z.string().trim().min(1).optional(),
+    lens: z.string().trim().min(1),
+    lightSource: z.string().trim().min(1),
+    lossyCompression: z.boolean(),
+    measurementClaimAllowed: z.boolean(),
+    negativeFixtureTier: negativeLabFixtureTierV1Schema,
+    payloadAccess: z.enum([
+      'metadata_only',
+      'generated_in_repo',
+      'committed_public_payload',
+      'private_ci_payload',
+      'local_only_payload',
+    ]),
+    processFamily: negativeProcessFamilySchema,
+    profileClaimAllowed: z.boolean(),
+    rejectedSampleRegions: z.array(negativeLabSampleGeometryV1Schema),
+    reviewIssue: z.string().trim().min(1).optional(),
+    reviewedAt: isoDateSchema.optional(),
+    reviewer: z.string().trim().min(1).optional(),
+    rollOrSheetIdentifier: z.string().trim().min(1),
+    scanInputMode: negativeInputModeSchema,
+    scannerOrCamera: z.string().trim().min(1),
+    scannerSoftware: z.string().trim().min(1),
+    scannerSoftwareSettingsKnown: z.boolean(),
+    source: negativeLabFixtureSourceV1Schema,
+    state: negativeLabFixtureStateV1Schema,
+    targetOrStepWedgePresent: z.boolean(),
+  })
+  .strict()
+  .superRefine((fixture, context) => {
+    const approvedStates = [
+      'approved_metadata_only',
+      'approved_smoke',
+      'approved_numeric',
+      'approved_profile_measurement',
+    ];
+    if (approvedStates.includes(fixture.state)) {
+      for (const key of ['reviewIssue', 'reviewedAt', 'reviewer'] as const) {
+        if (fixture[key] === undefined) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Approved negative-lab fixtures require review issue, reviewer, and review date.',
+            path: [key],
+          });
+        }
+      }
+    }
+
+    if (
+      fixture.allowedDistribution === 'public_repo' &&
+      (!fixture.derivativeDistributionAllowed || fixture.contentHash === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Public fixture distribution requires derivative rights and a content hash.',
+        path: ['allowedDistribution'],
+      });
+    }
+
+    if (
+      fixture.payloadAccess === 'committed_public_payload' &&
+      (fixture.allowedDistribution !== 'public_repo' || fixture.contentHash === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Committed public fixture payloads require public distribution rights and a content hash.',
+        path: ['payloadAccess'],
+      });
+    }
+
+    if (fixture.scanInputMode === 'lab_jpeg') {
+      for (const warningCode of ['lossy_input', 'low_acquisition_confidence'] as const) {
+        if (!fixture.expectedNegativeWarningCodes.includes(warningCode)) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Lab JPEG fixtures must declare lossy-input and low-confidence expected warnings.',
+            path: ['expectedNegativeWarningCodes'],
+          });
+        }
+      }
+    }
+
+    if (fixture.allowedValidationUses.includes('profile_measurement')) {
+      const profileEligibleTier = ['project_owned_scan', 'licensed_scan'].includes(fixture.negativeFixtureTier);
+      if (
+        fixture.state !== 'approved_profile_measurement' ||
+        !profileEligibleTier ||
+        !fixture.targetOrStepWedgePresent ||
+        !fixture.measurementClaimAllowed ||
+        !fixture.profileClaimAllowed
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Profile measurement fixtures require approved measured state, eligible source tier, target data, and claim approval.',
+          path: ['allowedValidationUses'],
+        });
+      }
+    }
+
+    for (const validationUse of fixture.allowedValidationUses) {
+      if (fixture.disallowedValidationUses.includes(validationUse)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Fixture validation uses cannot be both allowed and disallowed.',
+          path: ['allowedValidationUses'],
+        });
+      }
+    }
+  });
+
+export const negativeLabFixtureManifestV1Schema = z
+  .object({
+    entries: z.array(negativeLabFixtureManifestEntryV1Schema).min(1),
+    manifestId: z.string().trim().min(1),
+    manifestVersion: z.string().trim().min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  })
+  .strict()
+  .superRefine((manifest, context) => {
+    const fixtureIds = new Set<string>();
+    for (const [index, fixture] of manifest.entries.entries()) {
+      if (fixtureIds.has(fixture.fixtureId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative-lab fixture manifests must not contain duplicate fixture IDs.',
+          path: ['entries', index, 'fixtureId'],
+        });
+      }
+      fixtureIds.add(fixture.fixtureId);
+    }
+  });
+
 const normalizedScoreSchema = z.number().min(0).max(1);
 
 export const negativeAcquisitionProfileV1Schema = z
@@ -1128,39 +1424,6 @@ export const negativeLabFrameDetectionResultV1Schema = z
           path: ['detectedFrames', index, 'sourceFileId'],
         });
       }
-    }
-  });
-
-export const negativeLabSampleGeometryV1Schema = z
-  .object({
-    coordinateSpace: z.enum(['source_asset_pixels', 'frame_pixels_after_crop', 'normalized_frame']),
-    height: z.number().positive().optional(),
-    kind: z.enum(['rect', 'polygon']),
-    points: z.array(z.object({ x: z.number(), y: z.number() }).strict()).optional(),
-    width: z.number().positive().optional(),
-    x: z.number().optional(),
-    y: z.number().optional(),
-  })
-  .strict()
-  .superRefine((geometry, context) => {
-    if (geometry.kind === 'rect') {
-      for (const key of ['x', 'y', 'width', 'height'] as const) {
-        if (geometry[key] === undefined) {
-          context.addIssue({
-            code: 'custom',
-            message: `Rect sample geometry requires ${key}.`,
-            path: [key],
-          });
-        }
-      }
-    }
-
-    if (geometry.kind === 'polygon' && (geometry.points === undefined || geometry.points.length < 3)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Polygon sample geometry requires at least three points.',
-        path: ['points'],
-      });
     }
   });
 
@@ -1722,6 +1985,15 @@ export type NegativeLabDryRunResultV1 = z.infer<typeof negativeLabDryRunResultV1
 export type NegativeLabEstimateBaseFogParametersV1 = z.infer<typeof negativeLabEstimateBaseFogParametersV1Schema>;
 export type NegativeLabDetectedFrameCropV1 = z.infer<typeof negativeLabDetectedFrameCropV1Schema>;
 export type NegativeLabDetectedFrameV1 = z.infer<typeof negativeLabDetectedFrameV1Schema>;
+export type NegativeLabFixtureDistributionV1 = z.infer<typeof negativeLabFixtureDistributionV1Schema>;
+export type NegativeLabFixtureManifestEntryV1 = z.infer<typeof negativeLabFixtureManifestEntryV1Schema>;
+export type NegativeLabFixtureManifestV1 = z.infer<typeof negativeLabFixtureManifestV1Schema>;
+export type NegativeLabFixtureRoleV1 = z.infer<typeof negativeLabFixtureRoleV1Schema>;
+export type NegativeLabFixtureSourceV1 = z.infer<typeof negativeLabFixtureSourceV1Schema>;
+export type NegativeLabFixtureStateV1 = z.infer<typeof negativeLabFixtureStateV1Schema>;
+export type NegativeLabFixtureTierV1 = z.infer<typeof negativeLabFixtureTierV1Schema>;
+export type NegativeLabFixtureValidationUseV1 = z.infer<typeof negativeLabFixtureValidationUseV1Schema>;
+export type NegativeLabFixtureWarningCodeV1 = z.infer<typeof negativeLabFixtureWarningCodeV1Schema>;
 export type NegativeLabFrameBorderMetricsV1 = z.infer<typeof negativeLabFrameBorderMetricsV1Schema>;
 export type NegativeLabFrameDetectionRequestV1 = z.infer<typeof negativeLabFrameDetectionRequestV1Schema>;
 export type NegativeLabFrameDetectionResultV1 = z.infer<typeof negativeLabFrameDetectionResultV1Schema>;

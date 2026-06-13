@@ -11,6 +11,7 @@ import {
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDensityNormalizationProfileV1Schema,
   negativeLabDryRunResultV1Schema,
+  negativeLabFixtureManifestV1Schema,
   negativeLabFrameDetectionResultV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
@@ -31,6 +32,7 @@ import {
   sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeLabDensityNormalizationProfileV1,
   sampleNegativeLabDryRunResultV1,
+  sampleNegativeLabFixtureManifestV1,
   sampleNegativeLabFrameDetectionResultV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
@@ -135,6 +137,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab built-in preset catalog',
     schema: negativeLabBuiltInPresetCatalogV1Schema,
     value: sampleNegativeLabBuiltInPresetCatalogV1,
+  },
+  {
+    name: 'negative lab fixture manifest',
+    schema: negativeLabFixtureManifestV1Schema,
+    value: sampleNegativeLabFixtureManifestV1,
   },
 ];
 
@@ -524,5 +531,113 @@ const invalidQcMetricFrameResult = negativeLabQcProofArtifactV1Schema.safeParse(
 if (invalidQcMetricFrameResult.success) {
   throw new Error('Expected QC proof artifacts to reject roll metrics for unlisted frames.');
 }
+
+const [sampleNegativeLabFixture, secondSampleNegativeLabFixture] = sampleNegativeLabFixtureManifestV1.entries;
+if (sampleNegativeLabFixture === undefined || secondSampleNegativeLabFixture === undefined) {
+  throw new Error('Expected negative lab fixture manifest sample to include at least two entries.');
+}
+
+const invalidFixtureDuplicateIds = {
+  ...sampleNegativeLabFixtureManifestV1,
+  entries: [
+    sampleNegativeLabFixture,
+    {
+      ...secondSampleNegativeLabFixture,
+      fixtureId: sampleNegativeLabFixture.fixtureId,
+    },
+  ],
+};
+expectInvalid(
+  'negative lab fixture manifest with duplicate IDs',
+  negativeLabFixtureManifestV1Schema,
+  invalidFixtureDuplicateIds,
+);
+
+const invalidApprovedFixtureWithoutReview = {
+  ...sampleNegativeLabFixtureManifestV1,
+  entries: [
+    {
+      ...sampleNegativeLabFixture,
+      reviewedAt: undefined,
+      reviewer: undefined,
+    },
+    ...sampleNegativeLabFixtureManifestV1.entries.slice(1),
+  ],
+};
+expectInvalid(
+  'approved negative lab fixture without review metadata',
+  negativeLabFixtureManifestV1Schema,
+  invalidApprovedFixtureWithoutReview,
+);
+
+const invalidPublicFixtureWithoutRights = {
+  ...sampleNegativeLabFixtureManifestV1,
+  entries: [
+    {
+      ...sampleNegativeLabFixture,
+      derivativeDistributionAllowed: false,
+    },
+    ...sampleNegativeLabFixtureManifestV1.entries.slice(1),
+  ],
+};
+expectInvalid(
+  'public negative lab fixture without derivative rights',
+  negativeLabFixtureManifestV1Schema,
+  invalidPublicFixtureWithoutRights,
+);
+
+const invalidPublicSourceWithoutLicense = {
+  ...sampleNegativeLabFixtureManifestV1,
+  entries: [
+    {
+      ...sampleNegativeLabFixture,
+      source: {
+        copyrightOwner: 'Unknown source',
+        sourceKind: 'permissive_public',
+      },
+    },
+    ...sampleNegativeLabFixtureManifestV1.entries.slice(1),
+  ],
+};
+expectInvalid(
+  'negative lab fixture manifest with public source missing license evidence',
+  negativeLabFixtureManifestV1Schema,
+  invalidPublicSourceWithoutLicense,
+);
+
+const invalidFixtureProfileMeasurementUse = {
+  ...sampleNegativeLabFixtureManifestV1,
+  entries: [
+    {
+      ...sampleNegativeLabFixture,
+      allowedValidationUses: ['profile_measurement'],
+    },
+    ...sampleNegativeLabFixtureManifestV1.entries.slice(1),
+  ],
+};
+expectInvalid(
+  'synthetic negative lab fixture used for profile measurement',
+  negativeLabFixtureManifestV1Schema,
+  invalidFixtureProfileMeasurementUse,
+);
+
+const invalidFixtureLabJpegWarnings = {
+  ...sampleNegativeLabFixtureManifestV1,
+  entries: [
+    {
+      ...sampleNegativeLabFixture,
+      expectedNegativeWarningCodes: [],
+      fileFormat: 'jpeg',
+      lossyCompression: true,
+      scanInputMode: 'lab_jpeg',
+    },
+    ...sampleNegativeLabFixtureManifestV1.entries.slice(1),
+  ],
+};
+expectInvalid(
+  'negative lab lab-JPEG fixture without expected warnings',
+  negativeLabFixtureManifestV1Schema,
+  invalidFixtureLabJpegWarnings,
+);
 
 console.log(`Validated ${validSamples.length} RawEngine schema samples.`);
