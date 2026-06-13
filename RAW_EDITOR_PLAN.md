@@ -3980,6 +3980,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 #### Milestone 11: Panorama Stitching
 
 - `consult(panorama): get panorama architecture review`
+- `panorama(schema): harden artifact support invariants`
+- `panorama(engine): wrap current stitcher behind adapter boundary`
+- `panorama(plan): add dry-run memory and geometry preflight`
+- `panorama(artifact): persist editable derived panorama sources`
 - `panorama(audit): audit existing RapidRAW panorama stitcher`
 - `panorama(schema): define panorama artifact schema`
 - `panorama(projection): add projection options`
@@ -3990,6 +3994,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(panorama): add panorama fixture set`
 - `ui(panorama): add panorama UI`
 - `api(panorama): add panorama API tools`
+- `panorama(adapter): evaluate OpenCV stitching backend`
 - `validation(panorama): add panorama performance tests`
 
 #### Milestone 12: Focus Stacking
@@ -4695,7 +4700,14 @@ Goal: produce professional editable panorama outputs.
 
 Issues:
 
-- Consult on panorama architecture.
+- Consult on panorama architecture. Review captured in
+  `docs/panorama/panorama-architecture-consult-2026-06-13.md`; follow-up
+  issues added for schema hardening, engine adapter boundary, dry-run
+  preflight, durable artifact persistence, and OpenCV backend evaluation.
+- Harden artifact schema support invariants.
+- Wrap current stitcher behind an adapter boundary.
+- Add dry-run memory and geometry preflight.
+- Persist editable derived panorama sources.
 - Audit existing RapidRAW panorama stitcher. Initial audit captured in
   `docs/panorama/rapidraw-stitcher-audit-2026-06-13.md`.
 - Define panorama artifact schema. Initial contract captured in
@@ -4713,6 +4725,7 @@ Issues:
 - Add panorama fixture set.
 - Add panorama UI.
 - Add panorama API tools.
+- Evaluate OpenCV stitching backend.
 - Add panorama performance tests.
 
 Definition of done:
