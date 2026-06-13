@@ -4746,6 +4746,8 @@ Issues:
 - Document OpenCV macOS packaging and codesigning proof before promotion.
   Initial gate captured in
   `docs/panorama/opencv-macos-packaging-proof-2026-06-13.md`.
+- Decide OpenCV required-CI promotion criteria. Initial policy captured in
+  `docs/panorama/opencv-required-ci-promotion-2026-06-13.md`.
 - Add panorama performance tests.
 
 Definition of done:
