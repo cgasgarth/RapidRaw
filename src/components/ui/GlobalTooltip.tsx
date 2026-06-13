@@ -18,9 +18,17 @@ interface TooltipData {
   isAbove: boolean;
 }
 
+interface TooltipLeftOverride {
+  key: string;
+  left: number;
+}
+
+const getTooltipKey = (tooltip: TooltipData) =>
+  `${tooltip.content}:${String(tooltip.centerX)}:${String(tooltip.y)}:${String(tooltip.isAbove)}`;
+
 export default function GlobalTooltip() {
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
-  const [leftOverride, setLeftOverride] = useState<number | null>(null);
+  const [leftOverride, setLeftOverride] = useState<TooltipLeftOverride | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const targetRef = useRef<HTMLElement | null>(null);
   const rafRef = useRef<number>(0);
@@ -102,7 +110,6 @@ export default function GlobalTooltip() {
           return;
         }
 
-        setLeftOverride(null);
         setTooltip(data);
         watchTarget();
       }, TOOLTIP_DELAY);
@@ -149,7 +156,6 @@ export default function GlobalTooltip() {
 
   useLayoutEffect(() => {
     if (!tooltip) {
-      if (leftOverride !== null) setLeftOverride(null);
       return;
     }
 
@@ -163,13 +169,20 @@ export default function GlobalTooltip() {
     const clampedLeft = clamp(desiredLeft, minLeft, maxLeft);
     // Compensate for the -50% translateX so the original animation stays identical.
     const adjustedCenterX = clampedLeft + width / 2;
+    const tooltipKey = getTooltipKey(tooltip);
 
-    if (leftOverride !== adjustedCenterX) {
-      setLeftOverride(adjustedCenterX);
+    if (leftOverride?.key !== tooltipKey || leftOverride.left !== adjustedCenterX) {
+      const frame = requestAnimationFrame(() => {
+        setLeftOverride({ key: tooltipKey, left: adjustedCenterX });
+      });
+      return () => {
+        cancelAnimationFrame(frame);
+      };
     }
   }, [tooltip, leftOverride]);
 
-  const left = leftOverride !== null ? leftOverride : (tooltip?.centerX ?? 0);
+  const tooltipKey = tooltip ? getTooltipKey(tooltip) : null;
+  const left = leftOverride !== null && leftOverride.key === tooltipKey ? leftOverride.left : (tooltip?.centerX ?? 0);
 
   return createPortal(
     <AnimatePresence mode="wait">
