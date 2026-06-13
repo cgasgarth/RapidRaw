@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_sample"
+  },
+  "approval": {
+    "approvalClass": "generative_edit",
+    "reason": "Apply the accepted AI denoise dry-run plan into the non-destructive edit graph.",
+    "recordId": "approval_ai_denoise_apply_001",
+    "state": "approved"
+  },
+  "commandId": "command_ai_denoise_apply_sample",
+  "commandType": "ai.enhancement.apply",
+  "correlationId": "corr_ai_denoise_sample",
+  "dryRun": false,
+  "expectedGraphRevision": "graph_rev_44",
+  "parameters": {
+    "acceptedDryRunPlanHash": "sha256:sample-ai-denoise-plan",
+    "acceptedDryRunPlanId": "dryrun_ai_denoise_001",
+    "cachePolicy": "reuse_allowed",
+    "capability": "denoise",
+    "maxPreviewDimensionPx": 2048,
+    "modelHash": "sha256:local-denoise-model",
+    "modelId": "local_raw_denoise",
+    "modelVersion": "2026.06",
+    "promptPolicy": "none",
+    "providerClass": "local_model",
+    "providerId": "rawengine-local-ai",
+    "qualityPreference": "balanced",
+    "sourceContentHash": "sha256:sample-raw-source-hash",
+    "sourcePixelDisclosure": "local_only",
+    "strength": 0.42
+  },
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image",
+    "virtualCopyId": null
+  }
+}

@@ -5550,6 +5550,175 @@ export const aiToolDryRunResultV1Schema = z
   })
   .strict();
 
+export const aiEnhancementCapabilityV1Schema = z.enum(['inpaint', 'denoise', 'enhance']);
+
+export const aiEnhancementQualityPreferenceV1Schema = z.enum(['preview', 'balanced', 'best']);
+
+export const aiEnhancementCommandEnvelopeV1Schema = commandEnvelopeV1Schema
+  .extend({
+    commandType: z.enum(['ai.enhancement.dryRun', 'ai.enhancement.apply']),
+    parameters: z
+      .object({
+        acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+        acceptedDryRunPlanId: z.string().trim().min(1).optional(),
+        cachePolicy: z.enum(['reuse_allowed', 'force_refresh']),
+        capability: aiEnhancementCapabilityV1Schema,
+        maxPreviewDimensionPx: z.number().int().min(256).max(8192),
+        modelHash: z.string().trim().min(1).optional(),
+        modelId: z.string().trim().min(1),
+        modelVersion: z.string().trim().min(1).optional(),
+        prompt: z.string().trim().min(1).optional(),
+        promptPolicy: aiToolPromptPolicyV1Schema,
+        providerClass: aiToolProviderClassV1Schema,
+        providerId: z.string().trim().min(1),
+        qualityPreference: aiEnhancementQualityPreferenceV1Schema,
+        regionMaskArtifactId: z.string().trim().min(1).optional(),
+        sourceContentHash: z.string().trim().min(1),
+        sourcePixelDisclosure: aiToolSourcePixelDisclosureV1Schema,
+        strength: z.number().min(0).max(1),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((command, context) => {
+    if (
+      command.parameters.providerClass === 'cloud_service' &&
+      command.parameters.sourcePixelDisclosure === 'local_only'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Cloud AI providers must disclose that source pixels may leave the machine.',
+        path: ['parameters', 'sourcePixelDisclosure'],
+      });
+    }
+
+    if (command.parameters.promptPolicy === 'operator_prompt' && command.parameters.prompt === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Operator-prompt AI enhancement commands require a prompt.',
+        path: ['parameters', 'prompt'],
+      });
+    }
+
+    if (command.parameters.promptPolicy === 'none' && command.parameters.prompt !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Prompt-free AI enhancement commands must not include prompt text.',
+        path: ['parameters', 'prompt'],
+      });
+    }
+
+    if (command.parameters.capability === 'inpaint' && command.parameters.regionMaskArtifactId === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'AI inpaint enhancement commands require a region mask artifact.',
+        path: ['parameters', 'regionMaskArtifactId'],
+      });
+    }
+
+    if (command.dryRun) {
+      if (command.commandType !== 'ai.enhancement.dryRun') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI enhancement dry-run commands must use ai.enhancement.dryRun.',
+          path: ['commandType'],
+        });
+      }
+
+      if (command.approval.approvalClass !== ApprovalClass.ExternalModel) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI enhancement dry-run commands require external-model approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      if (command.parameters.acceptedDryRunPlanId !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI enhancement dry-run commands must not accept an existing dry-run plan id.',
+          path: ['parameters', 'acceptedDryRunPlanId'],
+        });
+      }
+    } else {
+      if (command.commandType !== 'ai.enhancement.apply') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI enhancement apply commands must use ai.enhancement.apply.',
+          path: ['commandType'],
+        });
+      }
+
+      if (command.approval.approvalClass !== ApprovalClass.GenerativeEdit) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI enhancement apply commands require generative-edit approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      if (command.approval.state !== 'approved') {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI enhancement apply commands require approved user approval.',
+          path: ['approval', 'state'],
+        });
+      }
+
+      if (command.parameters.acceptedDryRunPlanId === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI enhancement apply commands require an accepted dry-run plan id.',
+          path: ['parameters', 'acceptedDryRunPlanId'],
+        });
+      }
+
+      if (command.parameters.acceptedDryRunPlanHash === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI enhancement apply commands require an accepted dry-run plan hash.',
+          path: ['parameters', 'acceptedDryRunPlanHash'],
+        });
+      }
+    }
+  });
+
+export const aiEnhancementDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('ai.enhancement.dryRun'),
+    correlationId: z.string().trim().min(1),
+    dryRunPlanHash: z.string().trim().min(1),
+    dryRunPlanId: z.string().trim().min(1),
+    enhancementArtifacts: z.array(artifactHandleV1Schema).min(1),
+    modelId: z.string().trim().min(1),
+    modelVersion: z.string().trim().min(1).optional(),
+    previewArtifacts: z.array(artifactHandleV1Schema).min(1),
+    providerClass: aiToolProviderClassV1Schema,
+    providerId: z.string().trim().min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceContentHash: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const aiEnhancementApplyResultV1Schema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    changedEditNodeIds: z.array(z.string().trim().min(1)).min(1),
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('ai.enhancement.apply'),
+    correlationId: z.string().trim().min(1),
+    dryRunPlanHash: z.string().trim().min(1),
+    dryRunPlanId: z.string().trim().min(1),
+    outputArtifacts: z.array(artifactHandleV1Schema).min(1),
+    provenanceEntryIds: z.array(z.string().trim().min(1)).min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const aiToolApplyResultV1Schema = z
   .object({
     appliedGraphRevision: z.string().trim().min(1),
@@ -5572,6 +5741,7 @@ export const rawEngineAppServerTransportV1Schema = z.enum(['stdio', 'websocket',
 export const rawEngineAppServerProtocolV1Schema = z.literal('codex_app_server_json_rpc');
 
 const rawEngineAppServerKnownInputSchemas = {
+  AiEnhancementCommandEnvelopeV1: aiEnhancementCommandEnvelopeV1Schema,
   AiToolCommandEnvelopeV1: aiToolCommandEnvelopeV1Schema,
   CommandEnvelopeV1: commandEnvelopeV1Schema,
   ComputationalMergeCommandEnvelopeV1: computationalMergeCommandEnvelopeV1Schema,
@@ -5593,6 +5763,7 @@ export const rawEngineAppServerToolCallV1Schema = z
     arguments: z.unknown(),
     dryRun: z.boolean(),
     inputSchemaName: z.enum([
+      'AiEnhancementCommandEnvelopeV1',
       'AiToolCommandEnvelopeV1',
       'CommandEnvelopeV1',
       'ComputationalMergeCommandEnvelopeV1',
@@ -6125,18 +6296,29 @@ export const aiAppServerToolDefinitionV1Schema = z
     }
 
     if (tool.executionMode === 'dry_run_command') {
-      if (tool.inputSchemaName !== 'AiToolCommandEnvelopeV1') {
+      if (!['AiEnhancementCommandEnvelopeV1', 'AiToolCommandEnvelopeV1'].includes(tool.inputSchemaName)) {
         context.addIssue({
           code: 'custom',
-          message: 'AI dry-run app-server tools must accept AiToolCommandEnvelopeV1.',
+          message: 'AI dry-run app-server tools must accept an AI command envelope.',
           path: ['inputSchemaName'],
         });
       }
 
-      if (tool.outputSchemaName !== 'AiToolDryRunResultV1') {
+      if (tool.inputSchemaName === 'AiToolCommandEnvelopeV1' && tool.outputSchemaName !== 'AiToolDryRunResultV1') {
         context.addIssue({
           code: 'custom',
-          message: 'AI dry-run app-server tools must return AiToolDryRunResultV1.',
+          message: 'AI mask dry-run app-server tools must return AiToolDryRunResultV1.',
+          path: ['outputSchemaName'],
+        });
+      }
+
+      if (
+        tool.inputSchemaName === 'AiEnhancementCommandEnvelopeV1' &&
+        tool.outputSchemaName !== 'AiEnhancementDryRunResultV1'
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI enhancement dry-run app-server tools must return AiEnhancementDryRunResultV1.',
           path: ['outputSchemaName'],
         });
       }
@@ -6167,18 +6349,29 @@ export const aiAppServerToolDefinitionV1Schema = z
     }
 
     if (tool.executionMode === 'apply_dry_run_plan') {
-      if (tool.inputSchemaName !== 'AiToolCommandEnvelopeV1') {
+      if (!['AiEnhancementCommandEnvelopeV1', 'AiToolCommandEnvelopeV1'].includes(tool.inputSchemaName)) {
         context.addIssue({
           code: 'custom',
-          message: 'AI apply app-server tools must accept AiToolCommandEnvelopeV1.',
+          message: 'AI apply app-server tools must accept an AI command envelope.',
           path: ['inputSchemaName'],
         });
       }
 
-      if (tool.outputSchemaName !== 'AiToolApplyResultV1') {
+      if (tool.inputSchemaName === 'AiToolCommandEnvelopeV1' && tool.outputSchemaName !== 'AiToolApplyResultV1') {
         context.addIssue({
           code: 'custom',
-          message: 'AI apply app-server tools must return AiToolApplyResultV1.',
+          message: 'AI mask apply app-server tools must return AiToolApplyResultV1.',
+          path: ['outputSchemaName'],
+        });
+      }
+
+      if (
+        tool.inputSchemaName === 'AiEnhancementCommandEnvelopeV1' &&
+        tool.outputSchemaName !== 'AiEnhancementApplyResultV1'
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'AI enhancement apply app-server tools must return AiEnhancementApplyResultV1.',
           path: ['outputSchemaName'],
         });
       }
@@ -6345,6 +6538,11 @@ export type AiAppServerAuditEventV1 = z.infer<typeof aiAppServerAuditEventV1Sche
 export type AiAppServerExecutionModeV1 = z.infer<typeof aiAppServerExecutionModeV1Schema>;
 export type AiAppServerToolDefinitionV1 = z.infer<typeof aiAppServerToolDefinitionV1Schema>;
 export type AiAppServerToolManifestV1 = z.infer<typeof aiAppServerToolManifestV1Schema>;
+export type AiEnhancementApplyResultV1 = z.infer<typeof aiEnhancementApplyResultV1Schema>;
+export type AiEnhancementCapabilityV1 = z.infer<typeof aiEnhancementCapabilityV1Schema>;
+export type AiEnhancementCommandEnvelopeV1 = z.infer<typeof aiEnhancementCommandEnvelopeV1Schema>;
+export type AiEnhancementDryRunResultV1 = z.infer<typeof aiEnhancementDryRunResultV1Schema>;
+export type AiEnhancementQualityPreferenceV1 = z.infer<typeof aiEnhancementQualityPreferenceV1Schema>;
 export type AiToolApplyResultV1 = z.infer<typeof aiToolApplyResultV1Schema>;
 export type AiToolCapabilityV1 = z.infer<typeof aiToolCapabilityV1Schema>;
 export type AiToolCommandEnvelopeV1 = z.infer<typeof aiToolCommandEnvelopeV1Schema>;
