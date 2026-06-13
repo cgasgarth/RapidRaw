@@ -14,6 +14,7 @@ import {
   negativeLabApplyResultV1Schema,
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDryRunResultV1Schema,
+  negativeLabPositiveVariantProvenanceV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -28,6 +29,7 @@ import {
   sampleNegativeLabApplyResultV1,
   sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeLabDryRunResultV1,
+  sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -108,6 +110,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab-app-server-tool-manifest-v1.json',
     schema: negativeLabAppServerToolManifestV1Schema,
     value: sampleNegativeLabAppServerToolManifestV1,
+  },
+  {
+    name: 'negative lab positive variant provenance',
+    path: 'packages/rawengine-schema/samples/negative-lab-positive-variant-provenance-v1.json',
+    schema: negativeLabPositiveVariantProvenanceV1Schema,
+    value: sampleNegativeLabPositiveVariantProvenanceV1,
   },
 ];
 
