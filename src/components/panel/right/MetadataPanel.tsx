@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Check, ChevronDown, ChevronRight, Plus, Star, Tag, X, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -153,11 +153,6 @@ function EditableMetadataItem({ label, value, onSave }: EditableMetadataItemProp
 
   useManagedFocus(inputRef, isEditing);
 
-  useEffect(() => {
-    setLocalValue(value || '');
-    setIsEditing(false);
-  }, [value]);
-
   const handleSave = () => {
     setIsEditing(false);
     const trimmedLocal = localValue.trim();
@@ -202,6 +197,7 @@ function EditableMetadataItem({ label, value, onSave }: EditableMetadataItemProp
         ) : (
           <div
             onClick={() => {
+              setLocalValue(value || '');
               setIsEditing(true);
             }}
             className="text-xs px-2 py-0.5 min-h-[24px] flex items-center justify-end rounded-sm cursor-text border transition-colors text-right truncate w-full text-text-primary bg-bg-secondary/40 border-surface/50 hover:bg-bg-secondary/80 hover:border-text-tertiary/40"
