@@ -384,8 +384,9 @@ export default function BottomBar({
         ) : showZoomControls ? (
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 w-56">
-              <div
-                className="relative w-12 h-full flex items-center justify-end cursor-pointer"
+              <button
+                type="button"
+                className="relative w-12 h-full flex items-center justify-end cursor-pointer bg-transparent p-0 text-left"
                 onClick={handleResetZoom}
                 onMouseEnter={() => {
                   setIsZoomLabelHovered(true);
@@ -398,7 +399,7 @@ export default function BottomBar({
                 <span className="absolute right-0 text-xs text-text-secondary select-none text-right w-max transition-colors hover:text-text-primary">
                   {isZoomLabelHovered ? t('ui.bottomBar.zoomLabelReset') : t('ui.bottomBar.zoomLabel')}
                 </span>
-              </div>
+              </button>
 
               <div className="relative flex-1 h-5">
                 <div className="absolute top-1/2 left-0 w-full h-1.5 -translate-y-1/2 bg-surface rounded-full pointer-events-none" />
@@ -436,13 +437,14 @@ export default function BottomBar({
                     style={{ fontSize: '12px', height: '18px' }}
                   />
                 ) : (
-                  <span
+                  <button
+                    type="button"
                     onClick={handlePercentClick}
-                    className="cursor-pointer hover:text-text-primary transition-colors select-none"
+                    className="cursor-pointer hover:text-text-primary transition-colors select-none bg-transparent p-0 text-right text-xs text-text-secondary"
                     data-tooltip={t('ui.bottomBar.tooltips.customZoom')}
                   >
                     {latchedDisplayPercent}%
-                  </span>
+                  </button>
                 )}
               </div>
             </div>
