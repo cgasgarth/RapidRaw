@@ -5,6 +5,11 @@ import {
   NEGATIVE_LAB_COMMAND_TYPES,
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  editGraphCommandEnvelopeV1Schema,
+  editGraphDryRunResultV1Schema,
+  editGraphMutationResultV1Schema,
+  editGraphSnapshotQueryV1Schema,
+  editGraphSnapshotV1Schema,
   filmBlackAndWhiteModelV1Schema,
   filmGlowModelV1Schema,
   filmGrainModelV1Schema,
@@ -43,6 +48,11 @@ import {
   rawEngineToolRegistryV1Schema,
   type ArtifactHandleV1,
   type CommandEnvelopeV1,
+  type EditGraphCommandEnvelopeV1,
+  type EditGraphDryRunResultV1,
+  type EditGraphMutationResultV1,
+  type EditGraphSnapshotQueryV1,
+  type EditGraphSnapshotV1,
   type FilmBlackAndWhiteModelV1,
   type FilmGlowModelV1,
   type FilmGrainModelV1,
@@ -163,6 +173,36 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       toolName: 'edit.dry_run_tone',
     },
     {
+      approvalClass: ApprovalClass.SafeRead,
+      inputSchemaName: 'EditGraphSnapshotQueryV1',
+      mutates: false,
+      outputSchemaName: 'EditGraphSnapshotV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: false,
+      toolKind: 'read',
+      toolName: 'editgraph.snapshot',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'EditGraphCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'EditGraphDryRunResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
+      toolName: 'editgraph.dry_run_command',
+    },
+    {
+      approvalClass: ApprovalClass.EditApply,
+      inputSchemaName: 'EditGraphCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'EditGraphMutationResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: false,
+      toolKind: 'apply',
+      toolName: 'editgraph.apply_command',
+    },
+    {
       approvalClass: ApprovalClass.PreviewOnly,
       inputSchemaName: 'PreviewScopeQueryV1',
       mutates: false,
@@ -239,6 +279,213 @@ export const sampleRawEngineAppServerToolCallValidationV1: RawEngineAppServerToo
       turnId: 'turn_rawengine_agent_sample',
     },
   });
+
+export const sampleEditGraphSnapshotQueryV1: EditGraphSnapshotQueryV1 = editGraphSnapshotQueryV1Schema.parse({
+  actor: {
+    id: 'codex-app-server',
+    kind: ActorKind.Agent,
+    sessionId: 'session_edit_graph_sample',
+  },
+  correlationId: 'corr_edit_graph_snapshot_sample',
+  parameters: {
+    includeDisabledNodes: true,
+    includeHistory: true,
+    maxHistoryEntries: 50,
+  },
+  queryId: 'query_edit_graph_snapshot_sample',
+  queryType: 'editGraph.snapshot',
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  target: {
+    imagePath: '/photos/session/IMG_0001.CR3',
+    kind: 'image',
+  },
+});
+
+export const sampleEditGraphSnapshotV1: EditGraphSnapshotV1 = editGraphSnapshotV1Schema.parse({
+  activeHistoryIndex: 1,
+  graphId: 'edit_graph_img_0001',
+  graphRevision: 'graph_rev_44',
+  history: [
+    {
+      actor: {
+        id: 'local-ui',
+        kind: ActorKind.Ui,
+        sessionId: 'session_edit_graph_sample',
+      },
+      commandId: 'command_initial_adjustments_sample',
+      commandType: 'editGraph.applyParameterPatch',
+      createdAt: '2026-06-13T15:00:00.000Z',
+      graphRevision: 'graph_rev_43',
+      label: 'Initial tone balancing',
+    },
+    {
+      actor: {
+        id: 'codex-app-server',
+        kind: ActorKind.Agent,
+        sessionId: 'session_edit_graph_sample',
+      },
+      commandId: 'command_edit_graph_patch_sample',
+      commandType: 'editGraph.applyParameterPatch',
+      createdAt: '2026-06-13T15:05:00.000Z',
+      graphRevision: 'graph_rev_44',
+      label: 'Refine exposure and contrast',
+    },
+  ],
+  imagePath: '/photos/session/IMG_0001.CR3',
+  nodes: [
+    {
+      createdAt: '2026-06-13T15:00:00.000Z',
+      createdBy: {
+        id: 'local-ui',
+        kind: ActorKind.Ui,
+        sessionId: 'session_edit_graph_sample',
+      },
+      enabled: true,
+      id: 'node_legacy_adjustments',
+      inputRevision: null,
+      kind: 'legacy_adjustments',
+      label: 'Base Adjustments',
+      outputRevision: 'graph_rev_43',
+      parameters: {
+        contrast: 8,
+        exposure: 0.15,
+        highlights: -12,
+      },
+      sourceCommandId: 'command_initial_adjustments_sample',
+    },
+    {
+      createdAt: '2026-06-13T15:05:00.000Z',
+      createdBy: {
+        id: 'codex-app-server',
+        kind: ActorKind.Agent,
+        sessionId: 'session_edit_graph_sample',
+      },
+      enabled: true,
+      id: 'node_agent_refinement',
+      inputRevision: 'graph_rev_43',
+      kind: 'agent_command',
+      label: 'Agent tone refinement',
+      outputRevision: 'graph_rev_44',
+      parameters: {
+        contrast: 12,
+        exposure: 0.22,
+      },
+      sourceCommandId: 'command_edit_graph_patch_sample',
+    },
+  ],
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  virtualCopyId: null,
+});
+
+export const sampleEditGraphCommandEnvelopeV1: EditGraphCommandEnvelopeV1 = editGraphCommandEnvelopeV1Schema.parse({
+  actor: {
+    id: 'codex-app-server',
+    kind: ActorKind.Agent,
+    sessionId: 'session_edit_graph_sample',
+  },
+  approval: {
+    approvalClass: ApprovalClass.PreviewOnly,
+    reason: 'Previewing an edit graph patch computes a non-mutating graph diff and preview artifact.',
+    state: 'not_required',
+  },
+  commandId: 'command_edit_graph_patch_preview_sample',
+  commandType: 'editGraph.applyParameterPatch',
+  correlationId: 'corr_edit_graph_patch_preview_sample',
+  dryRun: true,
+  expectedGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  idempotencyKey: 'idem_edit_graph_patch_preview_sample',
+  parameters: {
+    label: 'Preview exposure and contrast refinement',
+    operations: [
+      {
+        nodeId: 'node_agent_refinement',
+        op: 'replace',
+        path: '/parameters/exposure',
+        previousValue: 0.22,
+        value: 0.3,
+      },
+      {
+        nodeId: 'node_agent_refinement',
+        op: 'replace',
+        path: '/parameters/contrast',
+        previousValue: 12,
+        value: 14,
+      },
+    ],
+  },
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  target: {
+    imagePath: '/photos/session/IMG_0001.CR3',
+    kind: 'image',
+  },
+});
+
+export const sampleEditGraphApplyCommandEnvelopeV1: EditGraphCommandEnvelopeV1 = editGraphCommandEnvelopeV1Schema.parse(
+  {
+    ...sampleEditGraphCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'Applying the accepted edit graph patch persists the graph revision to the image sidecar.',
+      state: 'approved',
+    },
+    commandId: 'command_edit_graph_patch_apply_sample',
+    correlationId: 'corr_edit_graph_patch_apply_sample',
+    dryRun: false,
+    idempotencyKey: 'idem_edit_graph_patch_apply_sample',
+  },
+);
+
+export const sampleEditGraphDryRunResultV1: EditGraphDryRunResultV1 = editGraphDryRunResultV1Schema.parse({
+  commandId: sampleEditGraphCommandEnvelopeV1.commandId,
+  commandType: sampleEditGraphCommandEnvelopeV1.commandType,
+  correlationId: sampleEditGraphCommandEnvelopeV1.correlationId,
+  dryRun: true,
+  mutates: false,
+  parameterDiff: [
+    {
+      nodeId: 'node_agent_refinement',
+      path: '/parameters/exposure',
+      previousValue: 0.22,
+      value: 0.3,
+    },
+    {
+      nodeId: 'node_agent_refinement',
+      path: '/parameters/contrast',
+      previousValue: 12,
+      value: 14,
+    },
+  ],
+  predictedGraphRevision: 'graph_rev_45_preview',
+  previewArtifacts: [
+    {
+      artifactId: 'artifact_edit_graph_patch_preview',
+      contentHash: 'sha256:sample-edit-graph-preview',
+      dimensions: {
+        height: 1080,
+        width: 1620,
+      },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+  ],
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  warnings: [],
+});
+
+export const sampleEditGraphMutationResultV1: EditGraphMutationResultV1 = editGraphMutationResultV1Schema.parse({
+  appliedGraphRevision: 'graph_rev_45',
+  changedNodeIds: ['node_agent_refinement'],
+  commandId: sampleEditGraphApplyCommandEnvelopeV1.commandId,
+  commandType: sampleEditGraphApplyCommandEnvelopeV1.commandType,
+  correlationId: sampleEditGraphApplyCommandEnvelopeV1.correlationId,
+  dryRun: false,
+  mutates: true,
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  undoRevision: sampleEditGraphSnapshotV1.graphRevision,
+  warnings: [],
+});
 
 export const samplePreviewScopeQueryV1: PreviewScopeQueryV1 = previewScopeQueryV1Schema.parse({
   actor: {

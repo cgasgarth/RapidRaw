@@ -1,0 +1,13 @@
+{
+  "appliedGraphRevision": "graph_rev_45",
+  "changedNodeIds": ["node_agent_refinement"],
+  "commandId": "command_edit_graph_patch_apply_sample",
+  "commandType": "editGraph.applyParameterPatch",
+  "correlationId": "corr_edit_graph_patch_apply_sample",
+  "dryRun": false,
+  "mutates": true,
+  "schemaVersion": 1,
+  "sourceGraphRevision": "graph_rev_44",
+  "undoRevision": "graph_rev_44",
+  "warnings": []
+}
