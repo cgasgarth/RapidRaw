@@ -55,6 +55,14 @@
           "path": "docs/agent/app-server-architecture-2026-06-12.md"
         },
         {
+          "title": "App-server agent demo workflow",
+          "path": "docs/agent/app-server-demo-workflow-2026-06-13.md"
+        },
+        {
+          "title": "Agent tool-call audit log",
+          "path": "docs/agent/tool-call-audit-log-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab app-server tool contract",
           "path": "docs/agent/negative-lab-app-server-tools-2026-06-13.md"
         },
