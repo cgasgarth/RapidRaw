@@ -1,0 +1,60 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_merge_sample"
+  },
+  "approval": {
+    "approvalClass": "preview_only",
+    "reason": "Previewing a focus stack estimates focus coverage and retouch layer needs.",
+    "state": "not_required"
+  },
+  "commandId": "command_merge_focus_stack_preview_sample",
+  "correlationId": "corr_merge_focus_stack_preview_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_44",
+  "idempotencyKey": "idem_merge_focus_stack_preview_sample",
+  "schemaVersion": 1,
+  "target": {
+    "id": "project_local_library",
+    "kind": "project"
+  },
+  "commandType": "computationalMerge.createFocusStack",
+  "parameters": {
+    "alignmentMode": "auto",
+    "blendMethod": "laplacian_pyramid",
+    "maxPreviewDimensionPx": 2400,
+    "outputName": "Macro Focus Stack",
+    "qualityPreference": "best",
+    "retouchLayerPolicy": "generate_retouch_layer",
+    "sources": [
+      {
+        "colorSpaceHint": "camera_rgb",
+        "focusDistanceMm": 180,
+        "imageId": "img_focus_001",
+        "imagePath": "/photos/session/FOCUS_0001.CR3",
+        "rawDefaultsApplied": true,
+        "role": "focus_slice",
+        "sourceIndex": 0
+      },
+      {
+        "colorSpaceHint": "camera_rgb",
+        "focusDistanceMm": 240,
+        "imageId": "img_focus_002",
+        "imagePath": "/photos/session/FOCUS_0002.CR3",
+        "rawDefaultsApplied": true,
+        "role": "focus_slice",
+        "sourceIndex": 1
+      },
+      {
+        "colorSpaceHint": "camera_rgb",
+        "focusDistanceMm": 320,
+        "imageId": "img_focus_003",
+        "imagePath": "/photos/session/FOCUS_0003.CR3",
+        "rawDefaultsApplied": true,
+        "role": "focus_slice",
+        "sourceIndex": 2
+      }
+    ]
+  }
+}

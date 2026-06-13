@@ -5,6 +5,9 @@ import {
   NEGATIVE_LAB_COMMAND_TYPES,
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  computationalMergeCommandEnvelopeV1Schema,
+  computationalMergeDryRunResultV1Schema,
+  computationalMergeMutationResultV1Schema,
   editGraphCommandEnvelopeV1Schema,
   editGraphDryRunResultV1Schema,
   editGraphMutationResultV1Schema,
@@ -54,6 +57,9 @@ import {
   toneColorMutationResultV1Schema,
   type ArtifactHandleV1,
   type CommandEnvelopeV1,
+  type ComputationalMergeCommandEnvelopeV1,
+  type ComputationalMergeDryRunResultV1,
+  type ComputationalMergeMutationResultV1,
   type EditGraphCommandEnvelopeV1,
   type EditGraphDryRunResultV1,
   type EditGraphMutationResultV1,
@@ -253,6 +259,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       returnsArtifactHandles: false,
       toolKind: 'apply',
       toolName: 'layermask.apply_command',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'ComputationalMergeDryRunResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
+      toolName: 'computationalmerge.dry_run_command',
+    },
+    {
+      approvalClass: ApprovalClass.EditApply,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'ComputationalMergeMutationResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: true,
+      toolKind: 'apply',
+      toolName: 'computationalmerge.apply_command',
     },
     {
       approvalClass: ApprovalClass.PreviewOnly,
@@ -765,6 +791,318 @@ export const sampleLayerMaskMutationResultV1: LayerMaskMutationResultV1 = layerM
   undoRevision: sampleEditGraphSnapshotV1.graphRevision,
   warnings: [],
 });
+
+export const sampleComputationalMergeCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
+  computationalMergeCommandEnvelopeV1Schema.parse({
+    actor: {
+      id: 'codex-app-server',
+      kind: ActorKind.Agent,
+      sessionId: 'session_merge_sample',
+    },
+    approval: {
+      approvalClass: ApprovalClass.PreviewOnly,
+      reason:
+        'Previewing a panorama merge estimates alignment, output dimensions, and artifacts without writing sidecars.',
+      state: 'not_required',
+    },
+    commandId: 'command_merge_panorama_preview_sample',
+    commandType: 'computationalMerge.createPanorama',
+    correlationId: 'corr_merge_panorama_preview_sample',
+    dryRun: true,
+    expectedGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+    idempotencyKey: 'idem_merge_panorama_preview_sample',
+    parameters: {
+      boundaryMode: 'auto_crop',
+      exposureNormalization: 'auto',
+      lensCorrectionPolicy: 'required_before_stitch',
+      maxPreviewDimensionPx: 2400,
+      outputName: 'Ridge Overlook Panorama',
+      projection: 'cylindrical',
+      qualityPreference: 'balanced',
+      sources: [
+        {
+          colorSpaceHint: 'camera_rgb',
+          exposureEv: 0,
+          imageId: 'img_panorama_001',
+          imagePath: '/photos/session/PANO_0001.CR3',
+          rawDefaultsApplied: true,
+          role: 'panorama_tile',
+          sourceIndex: 0,
+        },
+        {
+          colorSpaceHint: 'camera_rgb',
+          exposureEv: 0,
+          imageId: 'img_panorama_002',
+          imagePath: '/photos/session/PANO_0002.CR3',
+          rawDefaultsApplied: true,
+          role: 'panorama_tile',
+          sourceIndex: 1,
+        },
+        {
+          colorSpaceHint: 'camera_rgb',
+          exposureEv: 0,
+          imageId: 'img_panorama_003',
+          imagePath: '/photos/session/PANO_0003.CR3',
+          rawDefaultsApplied: true,
+          role: 'panorama_tile',
+          sourceIndex: 2,
+        },
+      ],
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: {
+      id: 'project_local_library',
+      kind: 'project',
+    },
+  });
+
+export const sampleComputationalMergeHdrCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
+  computationalMergeCommandEnvelopeV1Schema.parse({
+    ...sampleComputationalMergeCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.PreviewOnly,
+      reason: 'Previewing an HDR merge estimates bracket quality, deghosting risk, and output artifacts.',
+      state: 'not_required',
+    },
+    commandId: 'command_merge_hdr_preview_sample',
+    commandType: 'computationalMerge.createHdr',
+    correlationId: 'corr_merge_hdr_preview_sample',
+    idempotencyKey: 'idem_merge_hdr_preview_sample',
+    parameters: {
+      alignmentMode: 'auto',
+      bracketValidation: 'required',
+      deghosting: 'medium',
+      maxPreviewDimensionPx: 2400,
+      mergeStrategy: 'scene_linear_radiance',
+      outputName: 'Window Light HDR',
+      qualityPreference: 'balanced',
+      sources: [
+        {
+          colorSpaceHint: 'camera_rgb',
+          exposureEv: -2,
+          imageId: 'img_hdr_001',
+          imagePath: '/photos/session/HDR_0001.CR3',
+          rawDefaultsApplied: true,
+          role: 'hdr_bracket',
+          sourceIndex: 0,
+        },
+        {
+          colorSpaceHint: 'camera_rgb',
+          exposureEv: 0,
+          imageId: 'img_hdr_002',
+          imagePath: '/photos/session/HDR_0002.CR3',
+          rawDefaultsApplied: true,
+          role: 'hdr_bracket',
+          sourceIndex: 1,
+        },
+        {
+          colorSpaceHint: 'camera_rgb',
+          exposureEv: 2,
+          imageId: 'img_hdr_003',
+          imagePath: '/photos/session/HDR_0003.CR3',
+          rawDefaultsApplied: true,
+          role: 'hdr_bracket',
+          sourceIndex: 2,
+        },
+      ],
+      toneMapPreview: true,
+    },
+  });
+
+export const sampleComputationalMergeFocusStackCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
+  computationalMergeCommandEnvelopeV1Schema.parse({
+    ...sampleComputationalMergeCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.PreviewOnly,
+      reason: 'Previewing a focus stack estimates focus coverage and retouch layer needs.',
+      state: 'not_required',
+    },
+    commandId: 'command_merge_focus_stack_preview_sample',
+    commandType: 'computationalMerge.createFocusStack',
+    correlationId: 'corr_merge_focus_stack_preview_sample',
+    idempotencyKey: 'idem_merge_focus_stack_preview_sample',
+    parameters: {
+      alignmentMode: 'auto',
+      blendMethod: 'laplacian_pyramid',
+      maxPreviewDimensionPx: 2400,
+      outputName: 'Macro Focus Stack',
+      qualityPreference: 'best',
+      retouchLayerPolicy: 'generate_retouch_layer',
+      sources: [
+        {
+          colorSpaceHint: 'camera_rgb',
+          focusDistanceMm: 180,
+          imageId: 'img_focus_001',
+          imagePath: '/photos/session/FOCUS_0001.CR3',
+          rawDefaultsApplied: true,
+          role: 'focus_slice',
+          sourceIndex: 0,
+        },
+        {
+          colorSpaceHint: 'camera_rgb',
+          focusDistanceMm: 240,
+          imageId: 'img_focus_002',
+          imagePath: '/photos/session/FOCUS_0002.CR3',
+          rawDefaultsApplied: true,
+          role: 'focus_slice',
+          sourceIndex: 1,
+        },
+        {
+          colorSpaceHint: 'camera_rgb',
+          focusDistanceMm: 320,
+          imageId: 'img_focus_003',
+          imagePath: '/photos/session/FOCUS_0003.CR3',
+          rawDefaultsApplied: true,
+          role: 'focus_slice',
+          sourceIndex: 2,
+        },
+      ],
+    },
+  });
+
+export const sampleComputationalMergeSuperResolutionCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
+  computationalMergeCommandEnvelopeV1Schema.parse({
+    ...sampleComputationalMergeCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.PreviewOnly,
+      reason: 'Previewing a super-resolution merge estimates registration quality and detail gain without synthesis.',
+      state: 'not_required',
+    },
+    commandId: 'command_merge_super_resolution_preview_sample',
+    commandType: 'computationalMerge.createSuperResolution',
+    correlationId: 'corr_merge_super_resolution_preview_sample',
+    idempotencyKey: 'idem_merge_super_resolution_preview_sample',
+    parameters: {
+      alignmentMode: 'optical_flow',
+      detailPolicy: 'conservative',
+      maxPreviewDimensionPx: 2400,
+      outputName: 'Handheld Burst Super Resolution',
+      outputScale: 2,
+      qualityPreference: 'best',
+      sources: [
+        {
+          colorSpaceHint: 'camera_rgb',
+          exposureEv: 0,
+          imageId: 'img_sr_001',
+          imagePath: '/photos/session/SR_0001.CR3',
+          rawDefaultsApplied: true,
+          role: 'sr_frame',
+          sourceIndex: 0,
+        },
+        {
+          colorSpaceHint: 'camera_rgb',
+          exposureEv: 0,
+          imageId: 'img_sr_002',
+          imagePath: '/photos/session/SR_0002.CR3',
+          rawDefaultsApplied: true,
+          role: 'sr_frame',
+          sourceIndex: 1,
+        },
+        {
+          colorSpaceHint: 'camera_rgb',
+          exposureEv: 0,
+          imageId: 'img_sr_003',
+          imagePath: '/photos/session/SR_0003.CR3',
+          rawDefaultsApplied: true,
+          role: 'sr_frame',
+          sourceIndex: 2,
+        },
+      ],
+    },
+  });
+
+export const sampleComputationalMergeApplyCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
+  computationalMergeCommandEnvelopeV1Schema.parse({
+    ...sampleComputationalMergeCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'Applying the accepted panorama merge creates a derived editable asset and edit graph node.',
+      state: 'approved',
+    },
+    commandId: 'command_merge_panorama_apply_sample',
+    correlationId: 'corr_merge_panorama_apply_sample',
+    dryRun: false,
+    idempotencyKey: 'idem_merge_panorama_apply_sample',
+    parameters: {
+      ...sampleComputationalMergeCommandEnvelopeV1.parameters,
+      acceptedDryRunPlanHash: 'sha256:sample-merge-panorama-plan',
+      acceptedDryRunPlanId: 'merge_plan_panorama_001',
+    },
+  });
+
+export const sampleComputationalMergeDryRunResultV1: ComputationalMergeDryRunResultV1 =
+  computationalMergeDryRunResultV1Schema.parse({
+    commandId: sampleComputationalMergeCommandEnvelopeV1.commandId,
+    commandType: sampleComputationalMergeCommandEnvelopeV1.commandType,
+    correlationId: sampleComputationalMergeCommandEnvelopeV1.correlationId,
+    dryRun: true,
+    mergePlan: {
+      family: 'panorama',
+      outputDimensions: {
+        height: 2400,
+        width: 5600,
+      },
+      outputName: sampleComputationalMergeCommandEnvelopeV1.parameters.outputName,
+      performanceEstimate: {
+        estimatedPeakMemoryBytes: 1_400_000_000,
+        estimatedRuntimeMs: 8500,
+        requiresBackgroundJob: true,
+      },
+      planId: 'merge_plan_panorama_001',
+      qualityMetrics: {
+        alignmentConfidence: 0.92,
+        overlapCoverageRatio: 0.31,
+        sourceCount: sampleComputationalMergeCommandEnvelopeV1.parameters.sources.length,
+      },
+      sourceImageRefs: sampleComputationalMergeCommandEnvelopeV1.parameters.sources,
+      warnings: ['Lens correction must be applied before final stitch.'],
+    },
+    mutates: false,
+    predictedGraphRevision: 'graph_rev_48_preview',
+    previewArtifacts: [
+      {
+        artifactId: 'artifact_merge_panorama_preview',
+        contentHash: 'sha256:sample-merge-panorama-preview',
+        dimensions: {
+          height: 1028,
+          width: 2400,
+        },
+        kind: 'preview',
+        storage: 'temp_cache',
+      },
+    ],
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+    warnings: ['Preview uses downscaled alignment and may shift after full-resolution render.'],
+  });
+
+export const sampleComputationalMergeMutationResultV1: ComputationalMergeMutationResultV1 =
+  computationalMergeMutationResultV1Schema.parse({
+    appliedGraphRevision: 'graph_rev_48',
+    changedNodeIds: ['node_merge_panorama_001'],
+    commandId: sampleComputationalMergeApplyCommandEnvelopeV1.commandId,
+    commandType: sampleComputationalMergeApplyCommandEnvelopeV1.commandType,
+    correlationId: sampleComputationalMergeApplyCommandEnvelopeV1.correlationId,
+    derivedAssetId: 'derived_panorama_ridge_overlook',
+    dryRun: false,
+    mutates: true,
+    outputArtifacts: [
+      {
+        artifactId: 'artifact_merge_panorama_full',
+        contentHash: 'sha256:sample-merge-panorama-full',
+        dimensions: {
+          height: 2400,
+          width: 5600,
+        },
+        kind: 'merge_output',
+        storage: 'sidecar_artifact',
+      },
+    ],
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+    undoRevision: sampleEditGraphSnapshotV1.graphRevision,
+    warnings: [],
+  });
 
 export const samplePreviewScopeQueryV1: PreviewScopeQueryV1 = previewScopeQueryV1Schema.parse({
   actor: {

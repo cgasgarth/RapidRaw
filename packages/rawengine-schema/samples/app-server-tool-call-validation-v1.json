@@ -94,6 +94,26 @@
       },
       {
         "approvalClass": "preview_only",
+        "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "ComputationalMergeDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "computationalmerge.dry_run_command"
+      },
+      {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "ComputationalMergeMutationResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": true,
+        "toolKind": "apply",
+        "toolName": "computationalmerge.apply_command"
+      },
+      {
+        "approvalClass": "preview_only",
         "inputSchemaName": "PreviewScopeQueryV1",
         "mutates": false,
         "outputSchemaName": "PreviewScopeResultV1",

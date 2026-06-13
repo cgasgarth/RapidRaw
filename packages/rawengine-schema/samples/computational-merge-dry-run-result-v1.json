@@ -1,0 +1,72 @@
+{
+  "commandId": "command_merge_panorama_preview_sample",
+  "commandType": "computationalMerge.createPanorama",
+  "correlationId": "corr_merge_panorama_preview_sample",
+  "dryRun": true,
+  "mergePlan": {
+    "family": "panorama",
+    "outputDimensions": {
+      "height": 2400,
+      "width": 5600
+    },
+    "outputName": "Ridge Overlook Panorama",
+    "performanceEstimate": {
+      "estimatedPeakMemoryBytes": 1400000000,
+      "estimatedRuntimeMs": 8500,
+      "requiresBackgroundJob": true
+    },
+    "planId": "merge_plan_panorama_001",
+    "qualityMetrics": {
+      "alignmentConfidence": 0.92,
+      "overlapCoverageRatio": 0.31,
+      "sourceCount": 3
+    },
+    "sourceImageRefs": [
+      {
+        "colorSpaceHint": "camera_rgb",
+        "exposureEv": 0,
+        "imageId": "img_panorama_001",
+        "imagePath": "/photos/session/PANO_0001.CR3",
+        "rawDefaultsApplied": true,
+        "role": "panorama_tile",
+        "sourceIndex": 0
+      },
+      {
+        "colorSpaceHint": "camera_rgb",
+        "exposureEv": 0,
+        "imageId": "img_panorama_002",
+        "imagePath": "/photos/session/PANO_0002.CR3",
+        "rawDefaultsApplied": true,
+        "role": "panorama_tile",
+        "sourceIndex": 1
+      },
+      {
+        "colorSpaceHint": "camera_rgb",
+        "exposureEv": 0,
+        "imageId": "img_panorama_003",
+        "imagePath": "/photos/session/PANO_0003.CR3",
+        "rawDefaultsApplied": true,
+        "role": "panorama_tile",
+        "sourceIndex": 2
+      }
+    ],
+    "warnings": ["Lens correction must be applied before final stitch."]
+  },
+  "mutates": false,
+  "predictedGraphRevision": "graph_rev_48_preview",
+  "previewArtifacts": [
+    {
+      "artifactId": "artifact_merge_panorama_preview",
+      "contentHash": "sha256:sample-merge-panorama-preview",
+      "dimensions": {
+        "height": 1028,
+        "width": 2400
+      },
+      "kind": "preview",
+      "storage": "temp_cache"
+    }
+  ],
+  "schemaVersion": 1,
+  "sourceGraphRevision": "graph_rev_44",
+  "warnings": ["Preview uses downscaled alignment and may shift after full-resolution render."]
+}

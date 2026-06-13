@@ -1,0 +1,60 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_merge_sample"
+  },
+  "approval": {
+    "approvalClass": "preview_only",
+    "reason": "Previewing a super-resolution merge estimates registration quality and detail gain without synthesis.",
+    "state": "not_required"
+  },
+  "commandId": "command_merge_super_resolution_preview_sample",
+  "correlationId": "corr_merge_super_resolution_preview_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_44",
+  "idempotencyKey": "idem_merge_super_resolution_preview_sample",
+  "schemaVersion": 1,
+  "target": {
+    "id": "project_local_library",
+    "kind": "project"
+  },
+  "commandType": "computationalMerge.createSuperResolution",
+  "parameters": {
+    "alignmentMode": "optical_flow",
+    "detailPolicy": "conservative",
+    "maxPreviewDimensionPx": 2400,
+    "outputName": "Handheld Burst Super Resolution",
+    "outputScale": 2,
+    "qualityPreference": "best",
+    "sources": [
+      {
+        "colorSpaceHint": "camera_rgb",
+        "exposureEv": 0,
+        "imageId": "img_sr_001",
+        "imagePath": "/photos/session/SR_0001.CR3",
+        "rawDefaultsApplied": true,
+        "role": "sr_frame",
+        "sourceIndex": 0
+      },
+      {
+        "colorSpaceHint": "camera_rgb",
+        "exposureEv": 0,
+        "imageId": "img_sr_002",
+        "imagePath": "/photos/session/SR_0002.CR3",
+        "rawDefaultsApplied": true,
+        "role": "sr_frame",
+        "sourceIndex": 1
+      },
+      {
+        "colorSpaceHint": "camera_rgb",
+        "exposureEv": 0,
+        "imageId": "img_sr_003",
+        "imagePath": "/photos/session/SR_0003.CR3",
+        "rawDefaultsApplied": true,
+        "role": "sr_frame",
+        "sourceIndex": 2
+      }
+    ]
+  }
+}
