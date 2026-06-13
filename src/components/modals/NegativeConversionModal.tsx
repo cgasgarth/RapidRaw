@@ -11,6 +11,7 @@ import throttle from 'lodash.throttle';
 import Text from '../ui/Text';
 import { TextColors, TextVariants } from '../../types/typography';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface NegativeParams {
   red_weight: number;
@@ -48,8 +49,7 @@ export default function NegativeConversionModal({
   const [isSaving, setIsSaving] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
 
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -146,12 +146,10 @@ export default function NegativeConversionModal({
 
   useEffect(() => {
     if (isOpen) {
-      setIsMounted(true);
-      setIsLoading(true);
-      setTimeout(() => {
-        setShow(true);
-      }, 10);
-      void updatePreview(DEFAULT_PARAMS, true);
+      const timer = window.setTimeout(() => {
+        setIsLoading(true);
+        void updatePreview(DEFAULT_PARAMS, true);
+      }, 0);
 
       if (selectedImagePath) {
         invoke<number[]>('generate_preview_for_path', {
@@ -164,19 +162,23 @@ export default function NegativeConversionModal({
           })
           .catch(console.error);
       }
-    } else {
-      setShow(false);
-      setTimeout(() => {
-        setIsMounted(false);
-        setPreviewUrl(null);
-        setOriginalUrl(null);
-        setParams(DEFAULT_PARAMS);
-        setZoom(1);
-        setPan({ x: 0, y: 0 });
-        setIsLoading(true);
-        setProgress(null);
-      }, 300);
+      return () => {
+        window.clearTimeout(timer);
+      };
     }
+
+    const timer = window.setTimeout(() => {
+      setPreviewUrl(null);
+      setOriginalUrl(null);
+      setParams(DEFAULT_PARAMS);
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+      setIsLoading(true);
+      setProgress(null);
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [isOpen, selectedImagePath, updatePreview]);
 
   const handleParamChange = (key: keyof NegativeParams, value: number) => {
