@@ -294,6 +294,7 @@ Required check rollout:
 - Do not use top-level `paths` filters on required workflows. Use always-starting workflows with job-level changed-file routing and an always-running aggregate gate.
 - Path-aware CI routing must fail closed. Workflow, action, Rust, Tauri, dependency, build config, unknown, or unclassified paths require the expensive macOS smoke gate. Only explicitly classified docs/frontend-leaf paths may skip the macOS no-bundle smoke, and the routing decision must be represented as its own completed peer job under `PR CI / required`.
 - Do not use workflow concurrency cancellation for PR or main validation unless project governance explicitly changes. Older runs should be allowed to complete.
+- Merge queue was evaluated in `docs/ci/merge-queue-evaluation-2026-06-12.md` and should not be enabled yet. Revisit only after `main` validation latency is consistently lower and a merge-group routing path exists for changed-file classification.
 
 Active PR queue discipline:
 
@@ -4289,7 +4290,9 @@ Issues:
   `docs/release/macos-signing-notarization-placeholders-2026-06-11.md`.
 - Add failure artifact uploads. Current failure artifact policy:
   `docs/ci/failure-artifacts-2026-06-11.md`.
-- Evaluate merge queue only after the aggregate required gate and main CI are stable.
+- Merge queue evaluation is captured in
+  `docs/ci/merge-queue-evaluation-2026-06-12.md`; it remains deferred until
+  macOS queue latency and merge-group routing are ready.
 
 Definition of done:
 

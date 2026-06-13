@@ -17,6 +17,19 @@ regression, and release packaging.
 | Release Build And Package   | `.github/workflows/release.yml`                     | manual, release created | Release-only                        |
 | GitHub Action Version Audit | `.github/workflows/github-action-version-audit.yml` | schedule, manual        | Non-required maintenance signal     |
 
+## Merge Queue
+
+Merge queue has been evaluated in
+`docs/ci/merge-queue-evaluation-2026-06-12.md` and should not be enabled yet.
+The current ruleset already requires the stable aggregate PR gate
+`PR CI / required`; recent `main` validation has been dominated by hosted macOS
+queue time, so adding merge-group runs would currently increase latency more
+than it reduces merge risk.
+
+Do not add `merge_group` triggers as a standalone cleanup. A future merge queue
+implementation must also add merge-group changed-file routing because the
+current required gate is intentionally PR-shaped.
+
 ## Required PR Gate
 
 `PR CI / required` remains the only stable branch-protection status check. It
