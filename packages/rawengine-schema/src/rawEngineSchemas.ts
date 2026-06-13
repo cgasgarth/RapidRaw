@@ -757,6 +757,229 @@ export const editGraphMutationResultV1Schema = z
   })
   .strict();
 
+export const toneColorCommandTypeV1Schema = z.enum([
+  'toneColor.setBasicTone',
+  'toneColor.setToneCurve',
+  'toneColor.setWhiteBalance',
+  'toneColor.adjustHsl',
+  'toneColor.setColorGrading',
+]);
+
+export const toneColorChannelV1Schema = z.enum(['luma', 'red', 'green', 'blue', 'rgb']);
+
+export const toneColorHslBandV1Schema = z.enum([
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'aqua',
+  'blue',
+  'purple',
+  'magenta',
+]);
+
+export const toneColorCurvePointV1Schema = z
+  .object({
+    input: z.number().min(0).max(1),
+    output: z.number().min(0).max(1),
+  })
+  .strict();
+
+export const toneColorWheelV1Schema = z
+  .object({
+    hueDegrees: z.number().min(0).lt(360),
+    luminance: z.number().min(-100).max(100),
+    saturation: z.number().min(0).max(100),
+  })
+  .strict();
+
+const toneColorCommandBaseV1Schema = z.object({
+  actor: rawEngineActorSchema,
+  approval: approvalRequirementSchema,
+  commandId: z.string().trim().min(1),
+  correlationId: z.string().trim().min(1),
+  dryRun: z.boolean(),
+  expectedGraphRevision: z.string().trim().min(1),
+  idempotencyKey: z.string().trim().min(1).optional(),
+  schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'virtual_copy']) }).strict(),
+});
+
+export const toneColorCommandEnvelopeV1Schema = z
+  .discriminatedUnion('commandType', [
+    toneColorCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('toneColor.setBasicTone'),
+        parameters: z
+          .object({
+            blackPoint: z.number().min(-100).max(100),
+            clarity: z.number().min(-100).max(100),
+            contrast: z.number().min(-100).max(100),
+            exposureEv: z.number().min(-10).max(10),
+            highlights: z.number().min(-100).max(100),
+            saturation: z.number().min(-100).max(100),
+            shadows: z.number().min(-100).max(100),
+            whitePoint: z.number().min(-100).max(100),
+          })
+          .strict(),
+      })
+      .strict(),
+    toneColorCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('toneColor.setToneCurve'),
+        parameters: z
+          .object({
+            channel: toneColorChannelV1Schema,
+            interpolation: z.enum(['linear', 'monotone_cubic']),
+            points: z.array(toneColorCurvePointV1Schema).min(2).max(32),
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            let previousInput = -Infinity;
+            for (const [index, point] of parameters.points.entries()) {
+              if (point.input <= previousInput) {
+                context.addIssue({
+                  code: 'custom',
+                  message: 'Tone curve points must be strictly ordered by input value.',
+                  path: ['points', index, 'input'],
+                });
+              }
+              previousInput = point.input;
+            }
+          }),
+      })
+      .strict(),
+    toneColorCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('toneColor.setWhiteBalance'),
+        parameters: z
+          .object({
+            mode: z.enum(['as_shot', 'auto', 'custom_kelvin_tint']),
+            temperatureKelvin: z.number().min(1500).max(50000).optional(),
+            tint: z.number().min(-150).max(150).optional(),
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            if (parameters.mode === 'custom_kelvin_tint') {
+              if (parameters.temperatureKelvin === undefined) {
+                context.addIssue({
+                  code: 'custom',
+                  message: 'Custom white balance requires temperatureKelvin.',
+                  path: ['temperatureKelvin'],
+                });
+              }
+
+              if (parameters.tint === undefined) {
+                context.addIssue({
+                  code: 'custom',
+                  message: 'Custom white balance requires tint.',
+                  path: ['tint'],
+                });
+              }
+            }
+          }),
+      })
+      .strict(),
+    toneColorCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('toneColor.adjustHsl'),
+        parameters: z
+          .object({
+            band: toneColorHslBandV1Schema,
+            hueShiftDegrees: z.number().min(-180).max(180),
+            luminance: z.number().min(-100).max(100),
+            saturation: z.number().min(-100).max(100),
+          })
+          .strict(),
+      })
+      .strict(),
+    toneColorCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('toneColor.setColorGrading'),
+        parameters: z
+          .object({
+            balance: z.number().min(-100).max(100),
+            blend: z.number().min(0).max(100),
+            global: toneColorWheelV1Schema,
+            highlights: toneColorWheelV1Schema,
+            midtones: toneColorWheelV1Schema,
+            shadows: toneColorWheelV1Schema,
+          })
+          .strict(),
+      })
+      .strict(),
+  ])
+  .superRefine((command, context) => {
+    if (command.dryRun) {
+      if (command.approval.approvalClass !== ApprovalClass.PreviewOnly) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Dry-run tone/color commands require preview-only approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      return;
+    }
+
+    if (command.approval.approvalClass !== ApprovalClass.EditApply) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied tone/color commands require edit-apply approval classification.',
+        path: ['approval', 'approvalClass'],
+      });
+    }
+
+    if (command.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied tone/color commands require approved user approval before execution.',
+        path: ['approval', 'state'],
+      });
+    }
+  });
+
+export const toneColorParameterDiffV1Schema = z
+  .object({
+    module: z.enum(['basic_tone', 'tone_curve', 'white_balance', 'hsl', 'color_grading']),
+    path: z.string().trim().min(1),
+    previousValue: z.unknown().optional(),
+    value: z.unknown().optional(),
+  })
+  .strict();
+
+export const toneColorDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: toneColorCommandTypeV1Schema,
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(true),
+    mutates: z.literal(false),
+    parameterDiff: z.array(toneColorParameterDiffV1Schema),
+    predictedGraphRevision: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const toneColorMutationResultV1Schema = z
+  .object({
+    appliedGraphRevision: z.string().trim().min(1),
+    changedNodeIds: z.array(z.string().trim().min(1)),
+    commandId: z.string().trim().min(1),
+    commandType: toneColorCommandTypeV1Schema,
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    mutates: z.literal(true),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    undoRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const panoramaProjectionSchema = z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']);
 
 export const panoramaProjectionSupportSchema = z.enum(['implemented_current_engine', 'schema_only_deferred']);
@@ -4559,6 +4782,7 @@ const rawEngineAppServerKnownInputSchemas = {
   ProjectLibraryCommandEnvelopeV1: projectLibraryCommandEnvelopeV1Schema,
   ProjectLibrarySnapshotQueryV1: projectLibrarySnapshotQueryV1Schema,
   QueryEnvelopeV1: queryEnvelopeV1Schema,
+  ToneColorCommandEnvelopeV1: toneColorCommandEnvelopeV1Schema,
 } as const;
 
 export const rawEngineAppServerToolCallV1Schema = z
@@ -4576,6 +4800,7 @@ export const rawEngineAppServerToolCallV1Schema = z
       'ProjectLibraryCommandEnvelopeV1',
       'ProjectLibrarySnapshotQueryV1',
       'QueryEnvelopeV1',
+      'ToneColorCommandEnvelopeV1',
     ]),
     itemId: z.string().trim().min(1).optional(),
     jsonRpcRequestId: z.union([z.string().trim().min(1), z.number().int().nonnegative()]),
@@ -5175,3 +5400,12 @@ export type RawEngineActor = z.infer<typeof rawEngineActorSchema>;
 export type RawEngineTarget = z.infer<typeof rawEngineTargetSchema>;
 export type RawEngineToolDefinitionV1 = z.infer<typeof rawEngineToolDefinitionV1Schema>;
 export type RawEngineToolRegistryV1 = z.infer<typeof rawEngineToolRegistryV1Schema>;
+export type ToneColorChannelV1 = z.infer<typeof toneColorChannelV1Schema>;
+export type ToneColorCommandEnvelopeV1 = z.infer<typeof toneColorCommandEnvelopeV1Schema>;
+export type ToneColorCommandTypeV1 = z.infer<typeof toneColorCommandTypeV1Schema>;
+export type ToneColorCurvePointV1 = z.infer<typeof toneColorCurvePointV1Schema>;
+export type ToneColorDryRunResultV1 = z.infer<typeof toneColorDryRunResultV1Schema>;
+export type ToneColorHslBandV1 = z.infer<typeof toneColorHslBandV1Schema>;
+export type ToneColorMutationResultV1 = z.infer<typeof toneColorMutationResultV1Schema>;
+export type ToneColorParameterDiffV1 = z.infer<typeof toneColorParameterDiffV1Schema>;
+export type ToneColorWheelV1 = z.infer<typeof toneColorWheelV1Schema>;

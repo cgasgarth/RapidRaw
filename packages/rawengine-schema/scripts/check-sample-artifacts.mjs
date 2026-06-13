@@ -49,6 +49,9 @@ import {
   queryEnvelopeV1Schema,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
+  toneColorCommandEnvelopeV1Schema,
+  toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
 } from '../src/rawEngineSchemas.ts';
 import {
   sampleArtifactHandleV1,
@@ -94,6 +97,9 @@ import {
   sampleQueryEnvelopeV1,
   sampleRawEngineAppServerToolCallValidationV1,
   sampleToolRegistryV1,
+  sampleToneColorCommandEnvelopeV1,
+  sampleToneColorDryRunResultV1,
+  sampleToneColorMutationResultV1,
 } from '../src/samplePayloads.ts';
 
 const ROOT = process.cwd();
@@ -158,6 +164,24 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/edit-graph-mutation-result-v1.json',
     schema: editGraphMutationResultV1Schema,
     value: sampleEditGraphMutationResultV1,
+  },
+  {
+    name: 'tone color command envelope',
+    path: 'packages/rawengine-schema/samples/tone-color-command-envelope-v1.json',
+    schema: toneColorCommandEnvelopeV1Schema,
+    value: sampleToneColorCommandEnvelopeV1,
+  },
+  {
+    name: 'tone color dry-run result',
+    path: 'packages/rawengine-schema/samples/tone-color-dry-run-result-v1.json',
+    schema: toneColorDryRunResultV1Schema,
+    value: sampleToneColorDryRunResultV1,
+  },
+  {
+    name: 'tone color mutation result',
+    path: 'packages/rawengine-schema/samples/tone-color-mutation-result-v1.json',
+    schema: toneColorMutationResultV1Schema,
+    value: sampleToneColorMutationResultV1,
   },
   {
     name: 'preview scope query',

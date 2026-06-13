@@ -44,6 +44,9 @@ import {
   queryEnvelopeV1Schema,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
+  toneColorCommandEnvelopeV1Schema,
+  toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
 } from '../src/rawEngineSchemas.js';
 import {
   sampleArtifactHandleV1,
@@ -91,6 +94,10 @@ import {
   sampleQueryEnvelopeV1,
   sampleRawEngineAppServerToolCallValidationV1,
   sampleToolRegistryV1,
+  sampleToneColorApplyCommandEnvelopeV1,
+  sampleToneColorCommandEnvelopeV1,
+  sampleToneColorDryRunResultV1,
+  sampleToneColorMutationResultV1,
 } from '../src/samplePayloads.js';
 
 const validSamples: ReadonlyArray<{
@@ -152,6 +159,26 @@ const validSamples: ReadonlyArray<{
     name: 'edit graph mutation result',
     schema: editGraphMutationResultV1Schema,
     value: sampleEditGraphMutationResultV1,
+  },
+  {
+    name: 'tone color command envelope',
+    schema: toneColorCommandEnvelopeV1Schema,
+    value: sampleToneColorCommandEnvelopeV1,
+  },
+  {
+    name: 'tone color apply command envelope',
+    schema: toneColorCommandEnvelopeV1Schema,
+    value: sampleToneColorApplyCommandEnvelopeV1,
+  },
+  {
+    name: 'tone color dry-run result',
+    schema: toneColorDryRunResultV1Schema,
+    value: sampleToneColorDryRunResultV1,
+  },
+  {
+    name: 'tone color mutation result',
+    schema: toneColorMutationResultV1Schema,
+    value: sampleToneColorMutationResultV1,
   },
   {
     name: 'preview scope query',
@@ -459,6 +486,45 @@ expectInvalid('edit graph patch operation without value', editGraphCommandEnvelo
 expectInvalid('edit graph snapshot with invalid history index', editGraphSnapshotV1Schema, {
   ...sampleEditGraphSnapshotV1,
   activeHistoryIndex: sampleEditGraphSnapshotV1.history.length,
+});
+
+expectInvalid('tone color apply command without approved state', toneColorCommandEnvelopeV1Schema, {
+  ...sampleToneColorApplyCommandEnvelopeV1,
+  approval: {
+    ...sampleToneColorApplyCommandEnvelopeV1.approval,
+    state: 'pending',
+  },
+});
+
+expectInvalid('tone color dry-run command with edit apply approval', toneColorCommandEnvelopeV1Schema, {
+  ...sampleToneColorCommandEnvelopeV1,
+  approval: {
+    ...sampleToneColorCommandEnvelopeV1.approval,
+    approvalClass: 'edit_apply',
+  },
+});
+
+expectInvalid('tone color curve with unordered points', toneColorCommandEnvelopeV1Schema, {
+  ...sampleToneColorCommandEnvelopeV1,
+  commandType: 'toneColor.setToneCurve',
+  parameters: {
+    channel: 'luma',
+    interpolation: 'monotone_cubic',
+    points: [
+      { input: 0, output: 0 },
+      { input: 0, output: 0.1 },
+      { input: 1, output: 1 },
+    ],
+  },
+});
+
+expectInvalid('tone color custom white balance without tint', toneColorCommandEnvelopeV1Schema, {
+  ...sampleToneColorCommandEnvelopeV1,
+  commandType: 'toneColor.setWhiteBalance',
+  parameters: {
+    mode: 'custom_kelvin_tint',
+    temperatureKelvin: 5200,
+  },
 });
 
 const invalidFilmLookCatalog = {
