@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '.github/actions/setup-bun-deps/**'
+      - '.github/workflows/build.yml'
+      - '.github/workflows/ci.yml'
+      - 'bun.lock'
+      - 'package.json'
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'vite.config.*'
+  workflow_dispatch:
 
 jobs:
   build:

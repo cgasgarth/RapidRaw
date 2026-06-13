@@ -8,14 +8,14 @@ regression, and release packaging.
 
 ## Current Split
 
-| Workflow                    | File                                                | Trigger                 | Blocking status                     |
-| --------------------------- | --------------------------------------------------- | ----------------------- | ----------------------------------- |
-| Baseline Validation         | `.github/workflows/lint.yml`                        | PRs, `main`, manual     | Required through `PR CI / required` |
-| Main Full Build             | `.github/workflows/ci.yml`                          | `main` pushes           | Required post-merge signal          |
-| Image Quality Regression    | `.github/workflows/image-quality.yml`               | manual                  | Non-required readiness scaffold     |
-| Performance Regression      | `.github/workflows/performance.yml`                 | manual                  | Non-required readiness scaffold     |
-| Release Build And Package   | `.github/workflows/release.yml`                     | manual, release created | Release-only                        |
-| GitHub Action Version Audit | `.github/workflows/github-action-version-audit.yml` | schedule, manual        | Non-required maintenance signal     |
+| Workflow                    | File                                                | Trigger                                     | Blocking status                     |
+| --------------------------- | --------------------------------------------------- | ------------------------------------------- | ----------------------------------- |
+| Baseline Validation         | `.github/workflows/lint.yml`                        | PRs, `main`, manual                         | Required through `PR CI / required` |
+| Main Full Build             | `.github/workflows/ci.yml`                          | App-impacting `main` pushes and manual runs | Post-merge package signal           |
+| Image Quality Regression    | `.github/workflows/image-quality.yml`               | manual                                      | Non-required readiness scaffold     |
+| Performance Regression      | `.github/workflows/performance.yml`                 | manual                                      | Non-required readiness scaffold     |
+| Release Build And Package   | `.github/workflows/release.yml`                     | manual, release created                     | Release-only                        |
+| GitHub Action Version Audit | `.github/workflows/github-action-version-audit.yml` | schedule, manual                            | Non-required maintenance signal     |
 
 ## Merge Queue
 
@@ -61,6 +61,13 @@ PR and `main` validation should not cancel older queued or running checks. GitHu
 Actions is allowed to finish evidence for older commits. Speed work should come
 from parallel jobs, tighter path routing inside always-starting workflows,
 caching, and smaller validation commands.
+
+`main` pushes should not enqueue macOS work that duplicates already-passed PR
+coverage. Baseline validation keeps Ubuntu checks on every main push, but macOS
+Rust check/clippy jobs run only for PRs that route to macOS smoke or for manual
+workflow dispatches. The full package build workflow is path-filtered to
+app-impacting changes so docs-only and planning-only merges do not consume
+scarce macOS packaging runners while newer main validations are waiting.
 
 ## Active PR Queue Policy
 

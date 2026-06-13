@@ -309,7 +309,12 @@ jobs:
     name: 'rust: cargo check macOS'
     needs:
       - changed-paths
-    if: always() && (github.event_name != 'pull_request' || needs.changed-paths.outputs.macos_smoke_mode != 'none')
+    if: >-
+      always() &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'pull_request' && needs.changed-paths.outputs.macos_smoke_mode != 'none')
+      )
     runs-on: macos-14
     timeout-minutes: 45
     steps:
@@ -359,7 +364,12 @@ jobs:
     name: 'rust: clippy baseline macOS'
     needs:
       - changed-paths
-    if: always() && (github.event_name != 'pull_request' || needs.changed-paths.outputs.macos_smoke_mode != 'none')
+    if: >-
+      always() &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'pull_request' && needs.changed-paths.outputs.macos_smoke_mode != 'none')
+      )
     runs-on: macos-14
     timeout-minutes: 45
     steps:
