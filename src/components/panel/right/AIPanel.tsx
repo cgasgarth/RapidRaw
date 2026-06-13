@@ -60,6 +60,11 @@ import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../hooks/useAiMasking';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import {
+  AiProviderId,
+  normalizeAiProviderId,
+  type AiProviderId as AiProviderIdType,
+} from '../../../schemas/aiProviderSchemas';
 import { cloudUsageSchema, type CloudUsage } from '../../../schemas/cloudUsageSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useProcessStore } from '../../../store/useProcessStore';
@@ -222,7 +227,7 @@ const BrushTools = ({ settings, onSettingsChange }: BrushToolsProps) => {
 };
 
 interface ConnectionStatusProps {
-  aiProvider: string;
+  aiProvider: AiProviderIdType;
   isAIConnectorConnected: boolean;
   isSignedIn: boolean;
   isPro: boolean;
@@ -244,7 +249,7 @@ const ConnectionStatus = ({
   let titleText = t('editor.ai.connection.backendLabel');
   let hoverContent: React.ReactNode = null;
 
-  if (aiProvider === 'cloud') {
+  if (aiProvider === AiProviderId.Cloud) {
     titleText = t('editor.ai.connection.cloudLabel');
     if (isSignedIn && isPro) {
       statusColor = 'bg-green-500';
@@ -279,7 +284,7 @@ const ConnectionStatus = ({
       statusText = t('editor.ai.connection.notLoggedIn');
       hoverContent = <UiText variant={TextVariants.small}>{t('editor.ai.connection.loginRequiredDesc')}</UiText>;
     }
-  } else if (aiProvider === 'ai-connector') {
+  } else if (aiProvider === AiProviderId.Connector) {
     titleText = t('editor.ai.connection.connectorLabel');
     if (isAIConnectorConnected) {
       statusColor = 'bg-green-500';
@@ -352,7 +357,7 @@ export default function AIPanel() {
   const { setAdjustments } = useEditorActions();
   const { handleGenerativeReplace, handleDeleteAiPatch, handleGenerateAiForegroundMask } = useAiMasking();
   const appSettings = useSettingsStore((s) => s.appSettings);
-  const aiProvider = appSettings?.aiProvider || 'cpu';
+  const aiProvider = normalizeAiProviderId(appSettings?.aiProvider);
 
   const { user, isSignedIn } = useUser();
   const { getToken } = useAuth();
@@ -360,10 +365,11 @@ export default function AIPanel() {
   const [cloudUsage, setCloudUsage] = useState<CloudUsage | null>(null);
 
   const isGenerativeAvailable =
-    (aiProvider === 'cloud' && isSignedIn && isPro) || (aiProvider === 'ai-connector' && isAIConnectorConnected);
+    (aiProvider === AiProviderId.Cloud && isSignedIn && isPro) ||
+    (aiProvider === AiProviderId.Connector && isAIConnectorConnected);
 
   useEffect(() => {
-    if (aiProvider !== 'cloud' || !isSignedIn || !isPro) return;
+    if (aiProvider !== AiProviderId.Cloud || !isSignedIn || !isPro) return;
 
     const fetchUsage = async () => {
       try {

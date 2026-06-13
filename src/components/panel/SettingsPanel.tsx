@@ -37,6 +37,11 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { useOsPlatform } from '../../hooks/useOsPlatform';
+import {
+  AiProviderId,
+  normalizeAiProviderId,
+  type AiProviderId as AiProviderIdType,
+} from '../../schemas/aiProviderSchemas';
 import { cloudUsageSchema, type CloudUsage } from '../../schemas/cloudUsageSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
@@ -297,17 +302,17 @@ const DataActionItem = ({
 };
 
 interface AiProviderSwitchProps {
-  selectedProvider: string;
-  onProviderChange: (provider: string) => void;
+  selectedProvider: AiProviderIdType;
+  onProviderChange: (provider: AiProviderIdType) => void;
 }
 
 const AiProviderSwitch = ({ selectedProvider, onProviderChange }: AiProviderSwitchProps) => {
   const { t } = useTranslation();
 
-  const aiProviders = useMemo<Array<{ id: string; label: string; icon: LucideIcon }>>(
+  const aiProviders = useMemo<Array<{ id: AiProviderIdType; label: string; icon: LucideIcon }>>(
     () => [
-      { id: 'cpu', label: t('settings.processing.ai.providers.cpu'), icon: Cpu },
-      { id: 'ai-connector', label: t('settings.processing.ai.providers.aiConnector'), icon: Server },
+      { id: AiProviderId.Local, label: t('settings.processing.ai.providers.cpu'), icon: Cpu },
+      { id: AiProviderId.Connector, label: t('settings.processing.ai.providers.aiConnector'), icon: Server },
       //{ id: 'cloud', label: t('settings.processing.ai.providers.cloud'), icon: Cloud },
     ],
     [t],
@@ -575,7 +580,7 @@ export default function SettingsPanel({
   const [hasInteractedWithLivePreview, setHasInteractedWithLivePreview] = useState(false);
   const [recordingAction, setRecordingAction] = useState<string | null>(null);
 
-  const [aiProvider, setAiProvider] = useState<string>(appSettings.aiProvider || 'cpu');
+  const [aiProvider, setAiProvider] = useState<AiProviderIdType>(() => normalizeAiProviderId(appSettings.aiProvider));
   const [aiConnectorAddress, setAiConnectorAddress] = useState<string>(appSettings.aiConnectorAddress || '');
   const [newShortcut, setNewShortcut] = useState('');
   const [newAiTag, setNewAiTag] = useState('');
@@ -699,7 +704,10 @@ export default function SettingsPanel({
       setAiConnectorAddress((current) =>
         appSettings.aiConnectorAddress !== current ? appSettings.aiConnectorAddress || '' : current,
       );
-      setAiProvider((current) => (appSettings.aiProvider !== current ? appSettings.aiProvider || 'cpu' : current));
+      setAiProvider((current) => {
+        const nextProvider = normalizeAiProviderId(appSettings.aiProvider);
+        return nextProvider !== current ? nextProvider : current;
+      });
       setProcessingSettings({
         editorPreviewResolution: appSettings.editorPreviewResolution || 1920,
         thumbnailResolution: appSettings.thumbnailResolution || 720,
@@ -780,7 +788,7 @@ export default function SettingsPanel({
     await relaunch();
   };
 
-  const handleProviderChange = (provider: string) => {
+  const handleProviderChange = (provider: AiProviderIdType) => {
     setAiProvider(provider);
     saveSettings({ ...appSettings, aiProvider: provider });
   };
@@ -2226,7 +2234,7 @@ export default function SettingsPanel({
 
                   <div className="mt-8">
                     <AnimatePresence mode="wait">
-                      {aiProvider === 'cpu' && (
+                      {aiProvider === AiProviderId.Local && (
                         <motion.div
                           key="cpu"
                           initial={{ opacity: 0, x: 10 }}
@@ -2244,7 +2252,7 @@ export default function SettingsPanel({
                         </motion.div>
                       )}
 
-                      {aiProvider === 'ai-connector' && (
+                      {aiProvider === AiProviderId.Connector && (
                         <motion.div
                           key="ai-connector"
                           initial={{ opacity: 0, x: 10 }}
@@ -2313,7 +2321,7 @@ export default function SettingsPanel({
                         </motion.div>
                       )}
 
-                      {aiProvider === 'cloud' && (
+                      {aiProvider === AiProviderId.Cloud && (
                         <motion.div
                           key="cloud"
                           initial={{ opacity: 0, x: 10 }}
