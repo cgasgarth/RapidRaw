@@ -1,16 +1,17 @@
+import { invoke } from '@tauri-apps/api/core';
+import clsx from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
+import throttle from 'lodash.throttle';
+import { Check, RotateCcw, Grid3X3, Eye, EyeOff, Info, LineChart, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { invoke } from '@tauri-apps/api/core';
-import { Check, RotateCcw, Grid3X3, Eye, EyeOff, Info, LineChart, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+
+import { useModalTransition } from '../../hooks/useModalTransition';
+import { TextColors, TextVariants } from '../../types/typography';
+import { Adjustments } from '../../utils/adjustments';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
-import throttle from 'lodash.throttle';
-import { Adjustments } from '../../utils/adjustments';
-import clsx from 'clsx';
 import Text from '../ui/Text';
-import { TextColors, TextVariants } from '../../types/typography';
-import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface GeometryParams {
   distortion: number;

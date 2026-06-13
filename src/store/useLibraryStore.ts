@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+
+import { ColumnWidths } from '../components/panel/MainLibrary';
 import {
   FilterCriteria,
   ImageFile,
@@ -8,7 +10,7 @@ import {
   AlbumItem,
 } from '../components/ui/AppProperties';
 import { Adjustments, INITIAL_ADJUSTMENTS } from '../utils/adjustments';
-import { ColumnWidths } from '../components/panel/MainLibrary';
+
 import type { FolderTree } from '../components/panel/FolderTree';
 
 export interface SearchCriteria {

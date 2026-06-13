@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+
 import { GLOBAL_KEYS } from './AppProperties';
 
 export type SliderChangeEvent =

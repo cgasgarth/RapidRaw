@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+
 import { Panel } from '../../ui/AppProperties';
 
 interface PanelOptions {

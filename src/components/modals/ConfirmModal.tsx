@@ -1,10 +1,11 @@
 import { type KeyboardEvent, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import Button from '../ui/Button';
-import Text from '../ui/Text';
-import { TextVariants } from '../../types/typography';
+
 import { useManagedFocus } from '../../hooks/useManagedFocus';
 import { useModalTransition } from '../../hooks/useModalTransition';
+import { TextVariants } from '../../types/typography';
+import Button from '../ui/Button';
+import Text from '../ui/Text';
 
 interface ConfirmModalProps {
   cancelText?: string;

@@ -1,10 +1,11 @@
+import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'react-toastify';
+
 import Slider from './Slider';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
-import { toast } from 'react-toastify';
-import { invoke } from '@tauri-apps/api/core';
 
 interface LUTControlProps {
   lutName: string | null;

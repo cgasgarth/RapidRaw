@@ -1,13 +1,14 @@
-import { useRef, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Save, X, Check } from 'lucide-react';
-import { ExportPreset } from './ExportImportProperties';
+import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { v4 as uuidv4 } from 'uuid';
+
 import { AppSettings } from './AppProperties';
 import Dropdown from './Dropdown';
+import { ExportPreset } from './ExportImportProperties';
 import Text from './Text';
-import { TextVariants } from '../../types/typography';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { TextVariants } from '../../types/typography';
 
 interface ExportPresetsListProps {
   appSettings: AppSettings | null;

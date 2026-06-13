@@ -1,13 +1,8 @@
-import { useCallback, useEffect, useRef, type RefObject } from 'react';
-import type { i18n as I18n } from 'i18next';
 import { invoke } from '@tauri-apps/api/core';
+import { useCallback, useEffect, useRef, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { useSettingsStore } from '../store/useSettingsStore';
-import { useUIStore } from '../store/useUIStore';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { useEditorStore } from '../store/useEditorStore';
-import { THEMES, DEFAULT_THEME_ID, ThemeProps } from '../utils/themes';
-import { COPYABLE_ADJUSTMENT_KEYS, DisplayMode, PasteMode } from '../utils/adjustments';
+
 import {
   type AppSettings,
   FilterCriteria,
@@ -20,8 +15,15 @@ import {
   ThumbnailAspectRatio,
   type SupportedTypes,
 } from '../components/ui/AppProperties';
+import { useEditorStore } from '../store/useEditorStore';
+import { useLibraryStore } from '../store/useLibraryStore';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { useUIStore } from '../store/useUIStore';
+import { COPYABLE_ADJUSTMENT_KEYS, DisplayMode, PasteMode } from '../utils/adjustments';
+import { THEMES, DEFAULT_THEME_ID, ThemeProps } from '../utils/themes';
+
 import type { FolderTree } from '../components/panel/FolderTree';
-import { useTranslation } from 'react-i18next';
+import type { i18n as I18n } from 'i18next';
 
 interface PreloadedInitializationData {
   currentPath?: string;

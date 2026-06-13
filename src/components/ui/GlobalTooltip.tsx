@@ -1,7 +1,8 @@
+import clsx from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import clsx from 'clsx';
+
 import Text from './Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 

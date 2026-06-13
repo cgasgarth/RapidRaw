@@ -1,11 +1,12 @@
+import { motion } from 'framer-motion';
+import { CheckCircle, XCircle, Loader2, Save, RefreshCw, Images } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle, XCircle, Loader2, Save, RefreshCw, Images } from 'lucide-react';
-import { motion } from 'framer-motion';
+
+import { useModalTransition } from '../../hooks/useModalTransition';
+import { TextColors, TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
 import Text from '../ui/Text';
-import { TextColors, TextVariants } from '../../types/typography';
-import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface HdrModalProps {
   error: string | null;

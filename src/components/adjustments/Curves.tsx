@@ -1,3 +1,5 @@
+import { motion, AnimatePresence } from 'framer-motion';
+import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2 } from 'lucide-react';
 import {
   type ChangeEvent,
   type MouseEvent as ReactMouseEvent,
@@ -8,15 +10,14 @@ import {
   useMemo,
   useCallback,
 } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+
+import { useContextMenu } from '../../context/ContextMenuContext';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { ActiveChannel, Adjustments, Coord, MaskAdjustments, ParametricCurveSettings } from '../../utils/adjustments';
 import { Theme, OPTION_SEPARATOR } from '../ui/AppProperties';
-import { useContextMenu } from '../../context/ContextMenuContext';
-import Text from '../ui/Text';
 import Slider from '../ui/Slider';
-import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import Text from '../ui/Text';
 
 let curveClipboard: Array<Coord> | null = null;
 let parametricClipboard: ParametricCurveSettings | null = null;

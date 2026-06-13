@@ -1,3 +1,6 @@
+import { invoke } from '@tauri-apps/api/core';
+import clsx from 'clsx';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   Folder,
   FolderOpen,
@@ -22,8 +25,6 @@ import {
   Briefcase,
   type LucideIcon,
 } from 'lucide-react';
-import clsx from 'clsx';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   useState,
   useMemo,
@@ -33,12 +34,12 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { invoke } from '@tauri-apps/api/core';
-import Text from '../ui/Text';
-import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
+
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { AlbumItem, Invokes } from '../ui/AppProperties';
+import Text from '../ui/Text';
 
 export interface FolderTree {
   children: FolderTree[];

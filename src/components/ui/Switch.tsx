@@ -1,8 +1,10 @@
-import type { ChangeEvent } from 'react';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
+
 import Text from './Text';
 import { TextVariants } from '../../types/typography';
+
+import type { ChangeEvent } from 'react';
 
 interface SwitchProps {
   checked: boolean;

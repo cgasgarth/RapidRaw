@@ -1,16 +1,19 @@
-import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react';
-import { save, open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import { FileInput, CheckCircle, XCircle, Loader, Ban, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
+import { save, open } from '@tauri-apps/plugin-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 import debounce from 'lodash.debounce';
-import Switch from '../../ui/Switch';
+import { FileInput, CheckCircle, XCircle, Loader, Ban, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
+
+import { useExportSettings } from '../../../hooks/useExportSettings';
+import { useOsPlatform } from '../../../hooks/useOsPlatform';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { Invokes, SelectedImage, AppSettings } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import Dropdown from '../../ui/Dropdown';
-import Slider from '../../ui/Slider';
-import ImagePicker from '../../ui/ImagePicker';
 import {
   ExportPreset,
   ExportSettings,
@@ -22,15 +25,14 @@ import {
   FileFormats,
   WatermarkAnchor,
 } from '../../ui/ExportImportProperties';
-import { Invokes, SelectedImage, AppSettings } from '../../ui/AppProperties';
 import ExportPresetsList from '../../ui/ExportPresetsList';
-import { useExportSettings } from '../../../hooks/useExportSettings';
-import { useOsPlatform } from '../../../hooks/useOsPlatform';
-import type { Adjustments } from '../../../utils/adjustments';
+import ImagePicker from '../../ui/ImagePicker';
+import Slider from '../../ui/Slider';
+import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
-import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { useShallow } from 'zustand/react/shallow';
-import { useEditorStore } from '../../../store/useEditorStore';
+
+import type { Adjustments } from '../../../utils/adjustments';
+import type { TFunction } from 'i18next';
 
 interface ExportPanelProps {
   exportState: ExportState;

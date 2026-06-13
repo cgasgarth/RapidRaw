@@ -1,11 +1,12 @@
 import { type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import Slider from '../ui/Slider';
-import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
-import LUTControl from '../ui/LUTControl';
-import { AppSettings } from '../ui/AppProperties';
-import Text from '../ui/Text';
+
 import { TextVariants } from '../../types/typography';
+import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
+import { AppSettings } from '../ui/AppProperties';
+import LUTControl from '../ui/LUTControl';
+import Slider from '../ui/Slider';
+import Text from '../ui/Text';
 
 interface EffectsPanelProps {
   adjustments: Adjustments;

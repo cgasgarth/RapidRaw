@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useTranslation, Trans } from 'react-i18next';
+import clsx from 'clsx';
+import { AnimatePresence, motion } from 'framer-motion';
+import throttle from 'lodash.throttle';
 import {
   RotateCcw,
   Check,
@@ -15,18 +16,18 @@ import {
   CircleDashed,
   Activity,
 } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
-import Button from '../ui/Button';
-import Slider from '../ui/Slider';
-import Dropdown from '../ui/Dropdown';
-import Switch from '../ui/Switch';
-import throttle from 'lodash.throttle';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
+
+import { useModalTransition } from '../../hooks/useModalTransition';
+import { TextColors, TextVariants } from '../../types/typography';
 import { Adjustments } from '../../utils/adjustments';
 import { SelectedImage } from '../ui/AppProperties';
-import clsx from 'clsx';
+import Button from '../ui/Button';
+import Dropdown from '../ui/Dropdown';
+import Slider from '../ui/Slider';
+import Switch from '../ui/Switch';
 import Text from '../ui/Text';
-import { TextColors, TextVariants } from '../../types/typography';
-import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface GeometryParams {
   distortion: number;

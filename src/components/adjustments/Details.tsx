@@ -1,10 +1,11 @@
 import { type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import Slider from '../ui/Slider';
+
+import { TextVariants } from '../../types/typography';
 import { Adjustments, DetailsAdjustment } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
+import Slider from '../ui/Slider';
 import Text from '../ui/Text';
-import { TextVariants } from '../../types/typography';
 
 interface DetailsPanelProps {
   adjustments: Adjustments;

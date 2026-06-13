@@ -1,12 +1,10 @@
-import {
-  type ChangeEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { Show, SignIn, useUser, useAuth, useClerk } from '@clerk/react';
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { relaunch } from '@tauri-apps/plugin-process';
+import { open } from '@tauri-apps/plugin-shell';
+import clsx from 'clsx';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   ArrowLeft,
   Cpu,
@@ -27,23 +25,20 @@ import {
   Touchpad,
   type LucideIcon,
 } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { relaunch } from '@tauri-apps/plugin-process';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
-import clsx from 'clsx';
-import { Show, SignIn, useUser, useAuth, useClerk } from '@clerk/react';
-import type { TFunction } from 'i18next';
-import Button from '../ui/Button';
-import ConfirmModal from '../modals/ConfirmModal';
-import Dropdown, { OptionItem } from '../ui/Dropdown';
-import Switch from '../ui/Switch';
-import { cloudUsageSchema, type CloudUsage } from '../../schemas/cloudUsageSchemas';
-import Input from '../ui/Input';
-import Slider from '../ui/Slider';
-import { ThemeProps, THEMES } from '../../utils/themes';
+import {
+  type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppSettings, Invokes, Theme } from '../ui/AppProperties';
+
+import { useOsPlatform } from '../../hooks/useOsPlatform';
+import { cloudUsageSchema, type CloudUsage } from '../../schemas/cloudUsageSchemas';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
   formatKeyCode,
   KeybindDefinition,
@@ -51,10 +46,17 @@ import {
   KEYBIND_SECTIONS,
   normalizeCombo,
 } from '../../utils/keyboardUtils';
+import { ThemeProps, THEMES } from '../../utils/themes';
+import ConfirmModal from '../modals/ConfirmModal';
+import { AppSettings, Invokes, Theme } from '../ui/AppProperties';
+import Button from '../ui/Button';
+import Dropdown, { OptionItem } from '../ui/Dropdown';
+import Input from '../ui/Input';
+import Slider from '../ui/Slider';
+import Switch from '../ui/Switch';
 import Text from '../ui/Text';
-import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { useOsPlatform } from '../../hooks/useOsPlatform';
-import { open } from '@tauri-apps/plugin-shell';
+
+import type { TFunction } from 'i18next';
 
 interface ConfirmModalState {
   confirmText: string;

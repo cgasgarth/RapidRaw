@@ -1,13 +1,10 @@
-import { useCallback, type RefObject } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
 import { homeDir } from '@tauri-apps/api/path';
+import { open } from '@tauri-apps/plugin-dialog';
+import { useCallback, type RefObject } from 'react';
 import { toast } from 'react-toastify';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { useEditorStore } from '../store/useEditorStore';
-import { useUIStore } from '../store/useUIStore';
-import { useProcessStore } from '../store/useProcessStore';
-import { useSettingsStore } from '../store/useSettingsStore';
+
+import { debouncedSave, debouncedSetHistory } from './useEditorActions';
 import {
   Invokes,
   LibraryViewMode,
@@ -16,11 +13,16 @@ import {
   type AppSettings,
   type ImageFile,
 } from '../components/ui/AppProperties';
-import type { FolderTree } from '../components/panel/FolderTree';
+import { useEditorStore } from '../store/useEditorStore';
+import { useLibraryStore } from '../store/useLibraryStore';
+import { useProcessStore } from '../store/useProcessStore';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { useUIStore } from '../store/useUIStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
-import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';
-import { debouncedSave, debouncedSetHistory } from './useEditorActions';
 import { formatUnknownError } from '../utils/errorFormatting';
+import { globalImageCache, type ImageCacheEntry } from '../utils/ImageLRUCache';
+
+import type { FolderTree } from '../components/panel/FolderTree';
 
 interface TransformController {
   resetTransform(time?: number): void;

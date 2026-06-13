@@ -1,12 +1,9 @@
-import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { Status } from '../components/ui/ExportImportProperties';
+import { useEffect, useRef } from 'react';
+
 import { ChannelConfig } from '../components/adjustments/Curves';
 import { ImageFile, WaveformData } from '../components/ui/AppProperties';
-import { useProcessStore } from '../store/useProcessStore';
-import { useEditorStore } from '../store/useEditorStore';
-import { useUIStore } from '../store/useUIStore';
-import { useLibraryStore } from '../store/useLibraryStore';
+import { Status } from '../components/ui/ExportImportProperties';
 import {
   parseBase64Payload,
   parseCountPayload,
@@ -20,6 +17,10 @@ import {
   parseStringPayload,
   parseThumbnailGeneratedPayload,
 } from '../schemas/tauriEventSchemas';
+import { useEditorStore } from '../store/useEditorStore';
+import { useLibraryStore } from '../store/useLibraryStore';
+import { useProcessStore } from '../store/useProcessStore';
+import { useUIStore } from '../store/useUIStore';
 
 interface TauriListenerProps {
   refreshAllFolderTrees: () => void;

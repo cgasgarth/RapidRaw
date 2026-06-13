@@ -1,3 +1,4 @@
+import { t } from 'i18next';
 import {
   Brush,
   BringToFront,
@@ -13,8 +14,8 @@ import {
   User,
   Sun,
 } from 'lucide-react';
+
 import type { LucideIcon } from 'lucide-react';
-import { t } from 'i18next';
 
 export enum Mask {
   AiDepth = 'ai-depth',

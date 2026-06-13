@@ -1,32 +1,30 @@
+import clsx from 'clsx';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
   type RefObject,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
-import clsx from 'clsx';
-
-import Editor from '../panel/Editor';
-import BottomBar from '../panel/BottomBar';
-import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
-import Resizer from '../ui/Resizer';
-import Controls from '../panel/right/ControlsPanel';
-import MetadataPanel from '../panel/right/MetadataPanel';
-import CropPanel from '../panel/right/CropPanel';
-import MasksPanel from '../panel/right/MasksPanel';
-import AIPanel from '../panel/right/AIPanel';
-import PresetsPanel from '../panel/right/PresetsPanel';
-import ExportPanel from '../panel/right/ExportPanel';
 
 import { useEditorStore } from '../../store/useEditorStore';
-import { useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-
+import { useUIStore } from '../../store/useUIStore';
+import BottomBar from '../panel/BottomBar';
+import Editor from '../panel/Editor';
+import AIPanel from '../panel/right/AIPanel';
+import Controls from '../panel/right/ControlsPanel';
+import CropPanel from '../panel/right/CropPanel';
+import ExportPanel from '../panel/right/ExportPanel';
+import MasksPanel from '../panel/right/MasksPanel';
+import MetadataPanel from '../panel/right/MetadataPanel';
+import PresetsPanel from '../panel/right/PresetsPanel';
+import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
 import { ImageFile, Orientation, Panel, ThumbnailAspectRatio } from '../ui/AppProperties';
+import Resizer from '../ui/Resizer';
 
 const panelVariants: Variants = {
   animate: (direction: number) => ({

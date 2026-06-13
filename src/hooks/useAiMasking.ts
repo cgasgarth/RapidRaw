@@ -1,13 +1,14 @@
-import { useCallback, useEffect } from 'react';
+import { useAuth } from '@clerk/react';
 import { invoke } from '@tauri-apps/api/core';
+import { useCallback, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { useEditorStore } from '../store/useEditorStore';
+
 import { useEditorActions } from './useEditorActions';
-import { Adjustments, AiPatch, MaskContainer, Coord } from '../utils/adjustments';
 import { Mask, SubMask } from '../components/panel/right/Masks';
 import { Invokes } from '../components/ui/AppProperties';
-import { useAuth } from '@clerk/react';
 import { parseAiPatchDataJson } from '../schemas/aiMaskingSchemas';
+import { useEditorStore } from '../store/useEditorStore';
+import { Adjustments, AiPatch, MaskContainer, Coord } from '../utils/adjustments';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { mergeMaskParameters } from '../utils/maskParameterAccess';
 

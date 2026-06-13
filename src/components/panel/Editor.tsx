@@ -1,3 +1,7 @@
+import { invoke } from '@tauri-apps/api/core';
+import clsx from 'clsx';
+import debounce from 'lodash.debounce';
+import { Loader2 } from 'lucide-react';
 import {
   useState,
   useEffect,
@@ -10,24 +14,20 @@ import {
   type RefObject,
 } from 'react';
 import { Crop, PercentCrop } from 'react-image-crop';
-import { Loader2 } from 'lucide-react';
-import clsx from 'clsx';
-import { invoke } from '@tauri-apps/api/core';
-import debounce from 'lodash.debounce';
 
-import { BaseRenderSize, ImageDimensions, RenderSize, useImageRenderSize } from '../../hooks/useImageRenderSize';
-import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
-import { calculateCenteredCrop } from '../../utils/cropUtils';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { Mask, SubMask } from './right/Masks';
-import { Panel, TransformState, Invokes } from '../ui/AppProperties';
+import { useAiMasking } from '../../hooks/useAiMasking';
+import { BaseRenderSize, ImageDimensions, RenderSize, useImageRenderSize } from '../../hooks/useImageRenderSize';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { useAiMasking } from '../../hooks/useAiMasking';
+import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
+import { calculateCenteredCrop } from '../../utils/cropUtils';
 import { toMaskParameterRecord } from '../../utils/maskParameterAccess';
+import { Panel, TransformState, Invokes } from '../ui/AppProperties';
 
 const parseRgb = (rgbStr: string): [number, number, number, number] => {
   const match = rgbStr.match(/[\d.]+/g);
@@ -1386,7 +1386,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
 
     const geometry: Record<string, unknown> = {};
     geometryKeys.forEach((k) => {
-      geometry[k] = adjustments[k] as unknown;
+      geometry[k] = adjustments[k];
     });
 
     const subMasks = activeMaskDef.subMasks.map((sm: SubMask) => {

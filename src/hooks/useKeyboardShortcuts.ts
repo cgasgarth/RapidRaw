@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { ImageFile, Panel, ExifOverlay } from '../components/ui/AppProperties';
-import { KEYBIND_DEFINITIONS, normalizeCombo } from '../utils/keyboardUtils';
-import { useEditorStore } from '../store/useEditorStore';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { useSettingsStore } from '../store/useSettingsStore';
-import { useUIStore } from '../store/useUIStore';
-import { useProcessStore } from '../store/useProcessStore';
+
 import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
+import { ImageFile, Panel, ExifOverlay } from '../components/ui/AppProperties';
+import { useEditorStore } from '../store/useEditorStore';
+import { useLibraryStore } from '../store/useLibraryStore';
+import { useProcessStore } from '../store/useProcessStore';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { useUIStore } from '../store/useUIStore';
+import { KEYBIND_DEFINITIONS, normalizeCombo } from '../utils/keyboardUtils';
 
 interface KeyboardShortcutsProps {
   sortedImageList: Array<ImageFile>;

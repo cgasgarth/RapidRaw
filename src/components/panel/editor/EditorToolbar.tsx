@@ -1,12 +1,14 @@
-import { memo, useState, useEffect, useRef, useMemo } from 'react';
-import { Eye, EyeOff, ArrowLeft, Maximize, Loader2, Undo, Redo } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Eye, EyeOff, ArrowLeft, Maximize, Loader2, Undo, Redo } from 'lucide-react';
+import { memo, useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SelectedImage } from '../../ui/AppProperties';
+
 import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
-import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { SelectedImage } from '../../ui/AppProperties';
+import Text from '../../ui/Text';
+
 import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
 
 interface EditorToolbarProps {

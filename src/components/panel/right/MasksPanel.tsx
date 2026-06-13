@@ -1,18 +1,4 @@
 import {
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-  type MouseEvent as ReactMouseEvent,
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-} from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { v4 as uuidv4 } from 'uuid';
-import clsx from 'clsx';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
-import {
   DndContext,
   DragOverlay,
   PointerSensor,
@@ -24,6 +10,8 @@ import {
   DragStartEvent,
   pointerWithin,
 } from '@dnd-kit/core';
+import clsx from 'clsx';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChartArea,
   Circle,
@@ -43,17 +31,18 @@ import {
   SwatchBook,
   SquaresIntersect,
 } from 'lucide-react';
-
-import CollapsibleSection from '../../ui/CollapsibleSection';
-import Switch from '../../ui/Switch';
-import Slider, { type SliderChangeEvent } from '../../ui/Slider';
-import BasicAdjustments from '../../adjustments/Basic';
-import CurveGraph, { type ChannelConfig } from '../../adjustments/Curves';
-import ColorPanel from '../../adjustments/Color';
-import DetailsPanel from '../../adjustments/Details';
-import EffectsPanel from '../../adjustments/Effects';
-import Waveform from '../editor/Waveform';
-import Resizer from '../../ui/Resizer';
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type MouseEvent as ReactMouseEvent,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from 'react';
+import { useTranslation } from 'react-i18next';
+import { v4 as uuidv4 } from 'uuid';
+import { useShallow } from 'zustand/react/shallow';
 
 import {
   Mask,
@@ -68,6 +57,18 @@ import {
   getSubMaskName,
   getMaskTypeName,
 } from './Masks';
+import { useContextMenu } from '../../../context/ContextMenuContext';
+import { useAiMasking } from '../../../hooks/useAiMasking';
+import { useEditorActions } from '../../../hooks/useEditorActions';
+import { useManagedFocus } from '../../../hooks/useManagedFocus';
+import { usePresets, type UserPreset } from '../../../hooks/usePresets';
+import { useWaveformControls } from '../../../hooks/useWaveformControls';
+import { aiDepthMaskParametersSchema } from '../../../schemas/maskParameterSchemas';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { useProcessStore } from '../../../store/useProcessStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
+import { useUIStore } from '../../../store/useUIStore';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import {
   Adjustments,
   INITIAL_ADJUSTMENTS,
@@ -76,7 +77,13 @@ import {
   MaskContainer,
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
-import { useContextMenu } from '../../../context/ContextMenuContext';
+import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
+import { createSubMask } from '../../../utils/maskUtils';
+import BasicAdjustments from '../../adjustments/Basic';
+import ColorPanel from '../../adjustments/Color';
+import CurveGraph, { type ChannelConfig } from '../../adjustments/Curves';
+import DetailsPanel from '../../adjustments/Details';
+import EffectsPanel from '../../adjustments/Effects';
 import {
   OPTION_SEPARATOR,
   Orientation,
@@ -85,21 +92,14 @@ import {
   type BrushSettings,
   type Option,
 } from '../../ui/AppProperties';
-import type { LucideIcon } from 'lucide-react';
-import { createSubMask } from '../../../utils/maskUtils';
-import { usePresets, type UserPreset } from '../../../hooks/usePresets';
+import CollapsibleSection from '../../ui/CollapsibleSection';
+import Resizer from '../../ui/Resizer';
+import Slider, { type SliderChangeEvent } from '../../ui/Slider';
+import Switch from '../../ui/Switch';
 import Text from '../../ui/Text';
-import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { useSettingsStore } from '../../../store/useSettingsStore';
-import { useProcessStore } from '../../../store/useProcessStore';
-import { useAiMasking } from '../../../hooks/useAiMasking';
-import { useEditorActions } from '../../../hooks/useEditorActions';
-import { useUIStore } from '../../../store/useUIStore';
-import { useWaveformControls } from '../../../hooks/useWaveformControls';
-import { useManagedFocus } from '../../../hooks/useManagedFocus';
-import { aiDepthMaskParametersSchema } from '../../../schemas/maskParameterSchemas';
-import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
+import Waveform from '../editor/Waveform';
+
+import type { LucideIcon } from 'lucide-react';
 interface SubMaskParameterConfig {
   defaultValue: number;
   key: string;

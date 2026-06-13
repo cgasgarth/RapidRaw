@@ -1,16 +1,4 @@
-import {
-  type ChangeEvent,
-  type Dispatch,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type SetStateAction,
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-} from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
+import { useUser, useAuth } from '@clerk/react';
 import {
   DndContext,
   DragOverlay,
@@ -23,6 +11,7 @@ import {
   DragStartEvent,
   pointerWithin,
 } from '@dnd-kit/core';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Circle,
   ClipboardPaste,
@@ -41,14 +30,19 @@ import {
   FolderOpen,
   SquaresIntersect,
 } from 'lucide-react';
+import {
+  type ChangeEvent,
+  type Dispatch,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type SetStateAction,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+} from 'react';
+import { useTranslation } from 'react-i18next';
+import { v4 as uuidv4 } from 'uuid';
 
-import CollapsibleSection from '../../ui/CollapsibleSection';
-import Switch from '../../ui/Switch';
-import Slider from '../../ui/Slider';
-import Input from '../../ui/Input';
-import Button from '../../ui/Button';
-
-import { useContextMenu } from '../../../context/ContextMenuContext';
 import {
   Mask,
   MaskType,
@@ -61,21 +55,26 @@ import {
   formatMaskTypeName,
   getSubMaskName,
 } from './Masks';
-import { Adjustments, AiPatch } from '../../../utils/adjustments';
-import { BrushSettings, OPTION_SEPARATOR, type Option } from '../../ui/AppProperties';
-import { createSubMask } from '../../../utils/maskUtils';
-import Text from '../../ui/Text';
-import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { useUser, useAuth } from '@clerk/react';
-import { useSettingsStore } from '../../../store/useSettingsStore';
-import { useEditorStore } from '../../../store/useEditorStore';
-import { useProcessStore } from '../../../store/useProcessStore';
-import { useUIStore } from '../../../store/useUIStore';
-import { useEditorActions } from '../../../hooks/useEditorActions';
+import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../hooks/useAiMasking';
+import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useManagedFocus } from '../../../hooks/useManagedFocus';
 import { cloudUsageSchema, type CloudUsage } from '../../../schemas/cloudUsageSchemas';
+import { useEditorStore } from '../../../store/useEditorStore';
+import { useProcessStore } from '../../../store/useProcessStore';
+import { useSettingsStore } from '../../../store/useSettingsStore';
+import { useUIStore } from '../../../store/useUIStore';
+import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { Adjustments, AiPatch } from '../../../utils/adjustments';
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
+import { createSubMask } from '../../../utils/maskUtils';
+import { BrushSettings, OPTION_SEPARATOR, type Option } from '../../ui/AppProperties';
+import Button from '../../ui/Button';
+import CollapsibleSection from '../../ui/CollapsibleSection';
+import Input from '../../ui/Input';
+import Slider from '../../ui/Slider';
+import Switch from '../../ui/Switch';
+import Text from '../../ui/Text';
 
 interface DragData {
   type: 'Container' | 'SubMask' | 'Creation';

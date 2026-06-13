@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
-import Text from '../ui/Text';
-import { TextVariants } from '../../types/typography';
+
 import { useManagedFocus } from '../../hooks/useManagedFocus';
 import { useModalTransition } from '../../hooks/useModalTransition';
+import { TextVariants } from '../../types/typography';
+import { FILENAME_VARIABLES } from '../ui/ExportImportProperties';
+import Text from '../ui/Text';
 
 interface RenameFileModalProps {
   filesToRename: Array<string>;

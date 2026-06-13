@@ -1,4 +1,3 @@
-import { useCallback, useMemo, type MouseEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import {
   Aperture,
@@ -42,14 +41,12 @@ import {
   User,
   Album as AlbumIcon,
 } from 'lucide-react';
-import { toast } from 'react-toastify';
+import { useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useContextMenu } from '../context/ContextMenuContext';
-import { useEditorStore } from '../store/useEditorStore';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { useProcessStore } from '../store/useProcessStore';
-import { useUIStore } from '../store/useUIStore';
-import { useSettingsStore } from '../store/useSettingsStore';
+import { toast } from 'react-toastify';
+
+import { useEditorActions } from './useEditorActions';
+import { useLibraryActions } from './useLibraryActions';
 import {
   Invokes,
   Option,
@@ -60,6 +57,13 @@ import {
   ImageFile,
   AppSettings,
 } from '../components/ui/AppProperties';
+import { useContextMenu } from '../context/ContextMenuContext';
+import TaggingSubMenu from '../context/TaggingSubMenu';
+import { useEditorStore } from '../store/useEditorStore';
+import { useLibraryStore } from '../store/useLibraryStore';
+import { useProcessStore } from '../store/useProcessStore';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { useUIStore } from '../store/useUIStore';
 import {
   type Adjustments,
   type Color,
@@ -67,9 +71,6 @@ import {
   INITIAL_ADJUSTMENTS,
   normalizeLoadedAdjustments,
 } from '../utils/adjustments';
-import TaggingSubMenu from '../context/TaggingSubMenu';
-import { useEditorActions } from './useEditorActions';
-import { useLibraryActions } from './useLibraryActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
 
 export interface UseAppContextMenusProps {

@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo, useLayoutEffect } from 'react';
-import { Image as ImageIcon, Star, SlidersHorizontal } from 'lucide-react';
 import clsx from 'clsx';
-import { Grid, useGridCallbackRef, type GridImperativeAPI } from 'react-window';
+import { Image as ImageIcon, Star, SlidersHorizontal } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
-import { Color, COLOR_LABELS } from '../../utils/adjustments';
-import Text from '../ui/Text';
-import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { Grid, useGridCallbackRef, type GridImperativeAPI } from 'react-window';
+
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { Color, COLOR_LABELS } from '../../utils/adjustments';
+import { ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
+import Text from '../ui/Text';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;

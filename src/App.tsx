@@ -1,46 +1,17 @@
-import { type PointerEvent as ReactPointerEvent, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { ClerkProvider } from '@clerk/react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { ClerkProvider } from '@clerk/react';
-import { ToastContainer, toast, Slide } from 'react-toastify';
 import clsx from 'clsx';
-
-import TitleBar from './window/TitleBar';
-import FolderTree from './components/panel/FolderTree';
-import ExportPanel from './components/panel/right/ExportPanel';
-import Resizer from './components/ui/Resizer';
-import GlobalTooltip from './components/ui/GlobalTooltip';
-import AppModals from './components/modals/AppModals';
-
-import EditorView from './components/views/EditorView';
-import LibraryView from './components/views/LibraryView';
-
-import { ContextMenuProvider } from './context/ContextMenuContext';
-import { useSettingsStore } from './store/useSettingsStore';
-import { useUIStore } from './store/useUIStore';
-import { useLibraryStore } from './store/useLibraryStore';
-import { useEditorStore } from './store/useEditorStore';
-import { useProcessStore } from './store/useProcessStore';
+import { type PointerEvent as ReactPointerEvent, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { ToastContainer, toast, Slide } from 'react-toastify';
 import { useShallow } from 'zustand/react/shallow';
 
-import { useThumbnails } from './hooks/useThumbnails';
-import { ImageDimensions } from './hooks/useImageRenderSize';
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { useTauriListeners } from './hooks/useTauriListeners';
-import { useFileOperations } from './hooks/useFileOperations';
-import { useAppContextMenus } from './hooks/useAppContextMenus';
-import { useSortedLibrary } from './hooks/useSortedLibrary';
-import { useAppNavigation } from './hooks/useAppNavigation';
-
-import { useEditorActions } from './hooks/useEditorActions';
-import { useLibraryActions } from './hooks/useLibraryActions';
-import { useProductivityActions } from './hooks/useProductivityActions';
-import { parseAiConnectorStatusPayload } from './schemas/tauriEventSchemas';
-
-import { useAppInitialization } from './hooks/useAppInitialization';
-import './i18n';
-
+import ImageLoaderManager from './components/managers/ImageLoaderManager';
+import ImageProcessingManager from './components/managers/ImageProcessingManager';
+import AppModals from './components/modals/AppModals';
+import FolderTree from './components/panel/FolderTree';
+import ExportPanel from './components/panel/right/ExportPanel';
 import {
   Album,
   AlbumItem,
@@ -53,12 +24,35 @@ import {
   ThumbnailSize,
   ThumbnailAspectRatio,
 } from './components/ui/AppProperties';
+import GlobalTooltip from './components/ui/GlobalTooltip';
+import Resizer from './components/ui/Resizer';
+import EditorView from './components/views/EditorView';
+import LibraryView from './components/views/LibraryView';
+import { ContextMenuProvider } from './context/ContextMenuContext';
+import { useAppContextMenus } from './hooks/useAppContextMenus';
+import { useAppInitialization } from './hooks/useAppInitialization';
+import { useAppNavigation } from './hooks/useAppNavigation';
+import { useEditorActions } from './hooks/useEditorActions';
+import { useFileOperations } from './hooks/useFileOperations';
+import { ImageDimensions } from './hooks/useImageRenderSize';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useLibraryActions } from './hooks/useLibraryActions';
+import { useProductivityActions } from './hooks/useProductivityActions';
+import { useSortedLibrary } from './hooks/useSortedLibrary';
+import { useTauriListeners } from './hooks/useTauriListeners';
+import { useThumbnails } from './hooks/useThumbnails';
+import './i18n';
+import { parseAiConnectorStatusPayload } from './schemas/tauriEventSchemas';
+import { useEditorStore } from './store/useEditorStore';
+import { useLibraryStore } from './store/useLibraryStore';
+import { useProcessStore } from './store/useProcessStore';
+import { useSettingsStore } from './store/useSettingsStore';
+import { useUIStore } from './store/useUIStore';
+import TitleBar from './window/TitleBar';
+
 import type { FolderTree as FolderTreeNode } from './components/panel/FolderTree';
 import type { Adjustments } from './utils/adjustments';
 import type { ImageCacheEntry } from './utils/ImageLRUCache';
-
-import ImageProcessingManager from './components/managers/ImageProcessingManager';
-import ImageLoaderManager from './components/managers/ImageLoaderManager';
 
 const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
 

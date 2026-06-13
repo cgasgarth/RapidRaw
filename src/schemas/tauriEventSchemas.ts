@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import type { CullingSuggestions, Progress } from '../components/ui/AppProperties';
 
 const nonnegativeNumberSchema = z.number().nonnegative();

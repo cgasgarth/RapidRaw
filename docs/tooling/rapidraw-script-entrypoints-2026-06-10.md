@@ -59,8 +59,8 @@ contracts instead of making contributors memorize workflow internals.
 Important current gaps:
 
 - Some high-volume React compiler hook rules remain fenced.
-- Accessibility static interaction rules, import order, import cycles, and
-  unknown-file boundary rules remain fenced for focused cleanup PRs.
+- Import cycles and unknown-file boundary rules remain fenced for focused
+  cleanup PRs.
 - `format` and `format:check` are whole-repo commands; changed-file local hooks
   may need narrower wrappers to stay fast.
 
