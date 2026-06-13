@@ -4,6 +4,7 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
+  negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
   negativeLabApplyResultV1Schema,
   negativeLabCommandEnvelopeV1Schema,
@@ -17,6 +18,7 @@ import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleNegativeAcquisitionProfileV1,
+  sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabApplyPlanRequestV1,
   sampleNegativeLabApplyResultV1,
   sampleNegativeLabCommandEnvelopeV1,
@@ -86,6 +88,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab apply result',
     schema: negativeLabApplyResultV1Schema,
     value: sampleNegativeLabApplyResultV1,
+  },
+  {
+    name: 'negative lab app-server tool manifest',
+    schema: negativeLabAppServerToolManifestV1Schema,
+    value: sampleNegativeLabAppServerToolManifestV1,
   },
 ];
 
@@ -157,6 +164,27 @@ const invalidDeferredProcessCommand = {
 const invalidDeferredProcessCommandResult = negativeLabCommandEnvelopeV1Schema.safeParse(invalidDeferredProcessCommand);
 if (invalidDeferredProcessCommandResult.success) {
   throw new Error('Expected negative lab v1 command schema to reject deferred process families.');
+}
+
+const invalidMutatingAppServerToolManifest = {
+  ...sampleNegativeLabAppServerToolManifestV1,
+  tools: [
+    {
+      ...sampleNegativeLabAppServerToolManifestV1.tools[0],
+      approvalClass: 'preview_only',
+      executionMode: 'apply_dry_run_plan',
+      inputSchemaName: 'NegativeLabCommandEnvelopeV1',
+      mutates: true,
+      requiresDryRunPlan: false,
+    },
+  ],
+};
+
+const invalidMutatingAppServerToolResult = negativeLabAppServerToolManifestV1Schema.safeParse(
+  invalidMutatingAppServerToolManifest,
+);
+if (invalidMutatingAppServerToolResult.success) {
+  throw new Error('Expected mutating app-server tool manifests to require edit approval and a dry-run plan.');
 }
 
 console.log(`Validated ${validSamples.length} RawEngine schema samples.`);

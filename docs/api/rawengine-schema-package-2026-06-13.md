@@ -20,6 +20,7 @@ without exposing runtime app-server tools yet.
 - `ApprovalRequirementV1`
 - `RawEngineToolDefinitionV1`
 - `RawEngineToolRegistryV1`
+- `NegativeLabAppServerToolManifestV1`
 
 The package also includes representative sample payloads, checked JSON sample
 artifacts, and a `schema:check` script that typechecks the package and validates
@@ -34,6 +35,8 @@ samples with Zod.
 - Artifact handles are the boundary for preview and raster outputs; full image
   payloads should not be embedded in tool JSON.
 - This package does not expose Tauri commands or app-server runtime behavior.
+- App-server tool manifests define typed runtime boundaries, but handler
+  registration and transport wiring remain separate PRs.
 
 ## Validation
 

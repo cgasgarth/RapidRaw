@@ -51,6 +51,10 @@
           "path": "docs/agent/app-server-architecture-2026-06-12.md"
         },
         {
+          "title": "Negative Lab app-server tool contract",
+          "path": "docs/agent/negative-lab-app-server-tools-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab density-domain inversion ADR",
           "path": "docs/negative-lab/density-domain-inversion-adr-2026-06-13.md"
         },

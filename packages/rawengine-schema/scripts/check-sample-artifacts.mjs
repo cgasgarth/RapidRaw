@@ -9,6 +9,7 @@ import {
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
   negativeAcquisitionProfileV1Schema,
+  negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
   negativeLabApplyResultV1Schema,
   negativeLabCommandEnvelopeV1Schema,
@@ -22,6 +23,7 @@ import {
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
   sampleNegativeAcquisitionProfileV1,
+  sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabApplyPlanRequestV1,
   sampleNegativeLabApplyResultV1,
   sampleNegativeLabCommandEnvelopeV1,
@@ -100,6 +102,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab-apply-result-v1.json',
     schema: negativeLabApplyResultV1Schema,
     value: sampleNegativeLabApplyResultV1,
+  },
+  {
+    name: 'negative lab app-server tool manifest',
+    path: 'packages/rawengine-schema/samples/negative-lab-app-server-tool-manifest-v1.json',
+    schema: negativeLabAppServerToolManifestV1Schema,
+    value: sampleNegativeLabAppServerToolManifestV1,
   },
 ];
 
