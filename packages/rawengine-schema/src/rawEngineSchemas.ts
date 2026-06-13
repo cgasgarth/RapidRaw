@@ -938,6 +938,36 @@ export const negativeLabApplyResultV1Schema = z
   })
   .strict();
 
+export const negativeLabPositiveVariantProvenanceV1Schema = z
+  .object({
+    acknowledgedWarningCodes: z.array(negativeWarningCodeSchema),
+    acquisitionProfileId: z.string().trim().min(1),
+    applyCommandId: z.string().trim().min(1),
+    baseSampleIds: nonEmptyIdArraySchema,
+    conversionCommandId: z.string().trim().min(1),
+    conversionRecipeId: z.string().trim().min(1),
+    createdAt: z.string().trim().min(1),
+    createdBy: rawEngineActorSchema,
+    dryRunPlanId: z.string().trim().min(1),
+    graphRevision: z.string().trim().min(1),
+    inheritedRollDefaults: z.boolean(),
+    outputIntent: z.enum(['editable_positive', 'proof_preview', 'export_ready_preview']),
+    outputTransformRef: negativeLabOutputTransformRefV1Schema,
+    positiveVariantId: z.string().trim().min(1),
+    previewArtifactHandles: z.array(artifactHandleV1Schema),
+    processFamily: negativeLabSupportedProcessFamilyV1Schema,
+    provenanceEntryIds: nonEmptyIdArraySchema,
+    rollSessionId: z.string().trim().min(1),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceContentHash: z.string().trim().min(1),
+    sourceFileId: z.string().trim().min(1),
+    sourceFrameId: z.string().trim().min(1),
+    variantName: z.string().trim().min(1),
+    variantNameSource: z.enum(['user_supplied', 'generated_generic']),
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict();
+
 export const negativeLabAppServerExecutionModeSchema = z.enum(['dry_run_command', 'apply_dry_run_plan']);
 
 export const negativeLabAppServerAuditEventSchema = z.enum([
@@ -1082,6 +1112,7 @@ export type NegativeLabOutputTransformRefV1 = z.infer<typeof negativeLabOutputTr
 export type NegativeLabPlanRollNormalizationParametersV1 = z.infer<
   typeof negativeLabPlanRollNormalizationParametersV1Schema
 >;
+export type NegativeLabPositiveVariantProvenanceV1 = z.infer<typeof negativeLabPositiveVariantProvenanceV1Schema>;
 export type NegativeLabPreviewRequestV1 = z.infer<typeof negativeLabPreviewRequestV1Schema>;
 export type NegativeLabSampleGeometryV1 = z.infer<typeof negativeLabSampleGeometryV1Schema>;
 export type NegativeLabSetConversionRecipeParametersV1 = z.infer<

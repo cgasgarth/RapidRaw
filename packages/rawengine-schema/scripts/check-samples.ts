@@ -9,6 +9,7 @@ import {
   negativeLabApplyResultV1Schema,
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDryRunResultV1Schema,
+  negativeLabPositiveVariantProvenanceV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -23,6 +24,7 @@ import {
   sampleNegativeLabApplyResultV1,
   sampleNegativeLabCommandEnvelopeV1,
   sampleNegativeLabDryRunResultV1,
+  sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -93,6 +95,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab app-server tool manifest',
     schema: negativeLabAppServerToolManifestV1Schema,
     value: sampleNegativeLabAppServerToolManifestV1,
+  },
+  {
+    name: 'negative lab positive variant provenance',
+    schema: negativeLabPositiveVariantProvenanceV1Schema,
+    value: sampleNegativeLabPositiveVariantProvenanceV1,
   },
 ];
 
@@ -185,6 +192,18 @@ const invalidMutatingAppServerToolResult = negativeLabAppServerToolManifestV1Sch
 );
 if (invalidMutatingAppServerToolResult.success) {
   throw new Error('Expected mutating app-server tool manifests to require edit approval and a dry-run plan.');
+}
+
+const invalidPositiveVariantProvenance = {
+  ...sampleNegativeLabPositiveVariantProvenanceV1,
+  sourceContentHash: '',
+};
+
+const invalidPositiveVariantProvenanceResult = negativeLabPositiveVariantProvenanceV1Schema.safeParse(
+  invalidPositiveVariantProvenance,
+);
+if (invalidPositiveVariantProvenanceResult.success) {
+  throw new Error('Expected positive variant provenance schema to reject missing source hashes.');
 }
 
 console.log(`Validated ${validSamples.length} RawEngine schema samples.`);

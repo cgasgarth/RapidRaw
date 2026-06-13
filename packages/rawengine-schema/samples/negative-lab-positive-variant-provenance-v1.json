@@ -1,0 +1,46 @@
+{
+  "acknowledgedWarningCodes": ["lossy_input", "low_acquisition_confidence"],
+  "acquisitionProfileId": "acq_lab_jpeg_sample_v1",
+  "applyCommandId": "command_negative_convert_frames_apply_sample",
+  "baseSampleIds": ["base_sample_roll_01"],
+  "conversionCommandId": "command_negative_set_conversion_recipe_sample",
+  "conversionRecipeId": "conversion_recipe_negative_roll_01",
+  "createdAt": "2026-06-13T00:00:00.000Z",
+  "createdBy": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_sample"
+  },
+  "dryRunPlanId": "dry_run_plan_negative_conversion_sample",
+  "graphRevision": "graph_rev_negative_8",
+  "inheritedRollDefaults": true,
+  "outputIntent": "editable_positive",
+  "outputTransformRef": {
+    "chromaticAdaptation": "bradford",
+    "renderingIntent": "scene_referred",
+    "transformId": "rawengine_scene_linear_v1"
+  },
+  "positiveVariantId": "positive_variant_frame_0001",
+  "previewArtifactHandles": [
+    {
+      "artifactId": "artifact_preview_sample",
+      "contentHash": "sha256:sample-preview-hash",
+      "dimensions": {
+        "height": 1080,
+        "width": 1620
+      },
+      "kind": "preview",
+      "storage": "temp_cache"
+    }
+  ],
+  "processFamily": "c41_color_negative",
+  "provenanceEntryIds": ["prov_negative_convert_frames_sample"],
+  "rollSessionId": "negative_roll_session_sample",
+  "schemaVersion": 1,
+  "sourceContentHash": "sha256:sample-negative-frame-hash",
+  "sourceFileId": "source_lab_scan_0001",
+  "sourceFrameId": "frame_0001",
+  "variantName": "Frame 0001 positive",
+  "variantNameSource": "generated_generic",
+  "warningCodes": ["lossy_input", "low_acquisition_confidence"]
+}

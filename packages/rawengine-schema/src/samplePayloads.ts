@@ -11,6 +11,7 @@ import {
   negativeLabApplyResultV1Schema,
   negativeLabCommandEnvelopeV1Schema,
   negativeLabDryRunResultV1Schema,
+  negativeLabPositiveVariantProvenanceV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -23,6 +24,7 @@ import {
   type NegativeLabApplyResultV1,
   type NegativeLabCommandEnvelopeV1,
   type NegativeLabDryRunResultV1,
+  type NegativeLabPositiveVariantProvenanceV1,
   type NegativeRollSessionV1,
   type PanoramaArtifactV1,
   type QueryEnvelopeV1,
@@ -492,6 +494,39 @@ export const sampleNegativeLabApplyResultV1: NegativeLabApplyResultV1 = negative
   sessionId: sampleNegativeRollSessionV1.sessionId,
   warnings: sampleNegativeRollSessionV1.acquisitionWarnings,
 });
+
+export const sampleNegativeLabPositiveVariantProvenanceV1: NegativeLabPositiveVariantProvenanceV1 =
+  negativeLabPositiveVariantProvenanceV1Schema.parse({
+    acknowledgedWarningCodes: sampleNegativeLabApplyPlanRequestV1.acknowledgedWarningCodes,
+    acquisitionProfileId: sampleNegativeRollSessionV1.acquisitionProfileId,
+    applyCommandId: sampleNegativeLabApplyResultV1.commandId,
+    baseSampleIds: ['base_sample_roll_01'],
+    conversionCommandId: sampleNegativeLabCommandEnvelopeV1.commandId,
+    conversionRecipeId: 'conversion_recipe_negative_roll_01',
+    createdAt: '2026-06-13T00:00:00.000Z',
+    createdBy: sampleNegativeLabCommandEnvelopeV1.actor,
+    dryRunPlanId: sampleNegativeLabApplyPlanRequestV1.dryRunPlanId,
+    graphRevision: sampleNegativeLabApplyResultV1.appliedGraphRevision,
+    inheritedRollDefaults: true,
+    outputIntent: 'editable_positive',
+    outputTransformRef: {
+      chromaticAdaptation: 'bradford',
+      renderingIntent: 'scene_referred',
+      transformId: 'rawengine_scene_linear_v1',
+    },
+    positiveVariantId: 'positive_variant_frame_0001',
+    previewArtifactHandles: sampleNegativeLabDryRunResultV1.previewArtifacts,
+    processFamily: 'c41_color_negative',
+    provenanceEntryIds: sampleNegativeLabApplyResultV1.changeSet.provenanceEntryIds,
+    rollSessionId: sampleNegativeRollSessionV1.sessionId,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sourceContentHash: 'sha256:sample-negative-frame-hash',
+    sourceFileId: 'source_lab_scan_0001',
+    sourceFrameId: 'frame_0001',
+    variantName: 'Frame 0001 positive',
+    variantNameSource: 'generated_generic',
+    warningCodes: sampleNegativeLabApplyResultV1.changeSet.warningCodes,
+  });
 
 export const sampleNegativeLabAppServerToolManifestV1: NegativeLabAppServerToolManifestV1 =
   negativeLabAppServerToolManifestV1Schema.parse({
