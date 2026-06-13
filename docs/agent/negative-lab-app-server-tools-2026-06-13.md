@@ -20,10 +20,10 @@ packages/rawengine-schema/samples/negative-lab-app-server-tool-manifest-v1.json
 
 ## Tool Boundary
 
-| Tool                                | Mode                 | Input                           | Output                      | Mutates | Dry-run plan |
-| ----------------------------------- | -------------------- | ------------------------------- | --------------------------- | ------- | ------------ |
-| `negativelab.preview_conversion`    | `dry_run_command`    | `NegativeLabCommandEnvelopeV1`  | `NegativeLabDryRunResultV1` | No      | Creates one  |
-| `negativelab.apply_planned_command` | `apply_dry_run_plan` | `NegativeLabApplyPlanRequestV1` | `NegativeLabApplyResultV1`  | Yes     | Requires one |
+| Tool                                | Mode                 | Input                           | Output                      | Mutates | Dry-run plan | Provenance |
+| ----------------------------------- | -------------------- | ------------------------------- | --------------------------- | ------- | ------------ | ---------- |
+| `negativelab.preview_conversion`    | `dry_run_command`    | `NegativeLabCommandEnvelopeV1`  | `NegativeLabDryRunResultV1` | No      | Creates one  | Yes        |
+| `negativelab.apply_planned_command` | `apply_dry_run_plan` | `NegativeLabApplyPlanRequestV1` | `NegativeLabApplyResultV1`  | Yes     | Requires one | Yes        |
 
 The preview tool accepts the Negative Lab command union and returns a dry-run
 plan plus preview artifacts. The apply tool never accepts free-form command
@@ -36,6 +36,7 @@ provenance.
 - Dry-run tools must not mutate project state.
 - Apply tools must be marked mutating and must require a prior dry-run plan.
 - Mutating tools must use `edit_apply` approval class.
+- Tools that mutate or return artifacts must record provenance.
 - Runtime adapters must preserve `commandId`, `correlationId`, and warning
   acknowledgements across dry-run and apply calls.
 - Tool JSON returns artifact handles rather than embedding full raster payloads.

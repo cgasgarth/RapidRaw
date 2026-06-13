@@ -6237,6 +6237,7 @@ export const negativeLabAppServerToolDefinitionV1Schema = z
     localOnly: z.boolean(),
     mutates: z.boolean(),
     outputSchemaName: z.string().trim().min(1),
+    recordsProvenance: z.boolean(),
     requiresDryRunPlan: z.boolean(),
     returnsArtifactHandles: z.boolean(),
     toolName: z
@@ -6319,6 +6320,14 @@ export const negativeLabAppServerToolDefinitionV1Schema = z
         code: 'custom',
         message: 'Mutating Negative Lab app-server tools require edit-apply approval.',
         path: ['approvalClass'],
+      });
+    }
+
+    if ((tool.mutates || tool.returnsArtifactHandles) && !tool.recordsProvenance) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab app-server tools that mutate or return artifacts must record provenance.',
+        path: ['recordsProvenance'],
       });
     }
   });
