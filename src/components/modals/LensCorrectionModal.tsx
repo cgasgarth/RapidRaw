@@ -26,6 +26,7 @@ import { SelectedImage } from '../ui/AppProperties';
 import clsx from 'clsx';
 import Text from '../ui/Text';
 import { TextColors, TextVariants } from '../../types/typography';
+import { useModalTransition } from '../../hooks/useModalTransition';
 
 interface GeometryParams {
   distortion: number;
@@ -147,8 +148,7 @@ export default function LensCorrectionModal({
   const [makers, setMakers] = useState<string[]>([]);
   const [lenses, setLenses] = useState<string[]>([]);
   const [myLenses, setMyLenses] = useState<MyLens[]>([]);
-  const [isMounted, setIsMounted] = useState(false);
-  const [show, setShow] = useState(false);
+  const { isMounted, show } = useModalTransition(isOpen);
   const [detectionStatus, setDetectionStatus] = useState<'idle' | 'detecting' | 'not_found' | 'success'>('idle');
 
   const [isCompareActive, setIsCompareActive] = useState(false);
@@ -310,11 +310,6 @@ export default function LensCorrectionModal({
 
   useEffect(() => {
     if (isOpen) {
-      setIsMounted(true);
-      const timer = setTimeout(() => {
-        setShow(true);
-      }, 10);
-
       void invoke<LensSettings>('load_settings')
         .then((settings) => {
           if (settings.myLenses) {
@@ -336,10 +331,12 @@ export default function LensCorrectionModal({
         lensDistortionParams: currentAdjustments.lensDistortionParams,
       };
 
-      setParams(initParams);
-      setDetectionStatus('idle');
-      handleResetZoom();
-      void updatePreview(initParams);
+      const timer = window.setTimeout(() => {
+        setParams(initParams);
+        setDetectionStatus('idle');
+        handleResetZoom();
+        void updatePreview(initParams);
+      }, 0);
 
       void invoke<Array<string>>('get_lensfun_makers')
         .then((m) => {
@@ -356,19 +353,17 @@ export default function LensCorrectionModal({
       }
 
       return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setShow(false);
-      const timer = setTimeout(() => {
-        setIsMounted(false);
-        setPreviewUrl(null);
-        setIsApplying(false);
-      }, 300);
-      return () => {
-        clearTimeout(timer);
+        window.clearTimeout(timer);
       };
     }
+
+    const timer = window.setTimeout(() => {
+      setPreviewUrl(null);
+      setIsApplying(false);
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [isOpen, currentAdjustments, handleResetZoom, updatePreview]);
 
   const handleMakerChange = (maker: string) => {
