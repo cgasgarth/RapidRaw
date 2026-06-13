@@ -76,6 +76,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
       'bun run check:types && bun run check:i18n && bun run check:unsafe-casts && bun run check:film-fixtures && bun run check:release-notes',
     ]),
   ],
+  ['check:performance-smoke', new Set(['bun scripts/check-performance-smoke.mjs'])],
   ['check:release-notes', new Set(['bun scripts/generate-release-notes.mjs --self-test'])],
   ['check:workflow-policy:self-test', new Set(['bun scripts/check-github-workflow-policy.mjs --self-test'])],
   ['deps:audit:check', new Set(['bun scripts/audit-dependency-versions.mjs --fail-on-missing-major-issues'])],
@@ -342,6 +343,16 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -40,6 +40,7 @@\n+    "deps:audit:check": "bun scripts/audit-dependency-versions.mjs --fail-on-missing-major-issues",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'performance smoke package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch: '@@ -42,6 +42,7 @@\n+    "check:performance-smoke": "bun scripts/check-performance-smoke.mjs",',
       },
     ],
     SMOKE_MODES.NONE,
