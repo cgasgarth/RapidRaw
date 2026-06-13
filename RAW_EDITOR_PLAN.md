@@ -4737,7 +4737,9 @@ Issues:
 - Add panorama fixture set.
 - Add panorama UI.
 - Add panorama API tools.
-- Evaluate OpenCV stitching backend.
+- Evaluate OpenCV stitching backend. Initial evaluation captured in
+  `docs/panorama/opencv-backend-evaluation-2026-06-13.md`; recommendation is
+  optional spike behind the panorama adapter, not a default dependency.
 - Add panorama performance tests.
 
 Definition of done:
