@@ -4652,7 +4652,8 @@ Goal: produce professional editable panorama outputs.
 Issues:
 
 - Consult on panorama architecture.
-- Audit existing RapidRAW panorama stitcher.
+- Audit existing RapidRAW panorama stitcher. Initial audit captured in
+  `docs/panorama/rapidraw-stitcher-audit-2026-06-13.md`.
 - Define panorama artifact schema.
 - Add projection options.
 - Add auto crop/boundary controls.
