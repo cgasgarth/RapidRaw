@@ -401,9 +401,12 @@ An issue is done when:
 - CI must fail on warnings for project-owned code.
 - CI should include full build coverage, not only linting.
 - Dependency-currency checks should be shifted left where practical:
-  - Add scripted stale-dependency reports for Bun/npm and Cargo dependency graphs.
+  - Track latest stable major and minor versions for Bun/npm packages, Rust crates, GitHub Actions, Bun, Node, Tauri, Rust tooling, and validation CLIs.
+  - Keep patch and minor updates current by default when they pass the full validation gate and do not require behavioral migration.
+  - Add scripted stale-dependency reports for Bun/npm and Cargo dependency graphs, including current version, latest compatible version, latest stable major version, and release-note links when practical.
   - Add a scheduled or manually dispatched GitHub Action that reports outdated package versions without silently changing locks.
-  - Convert every discovered major-version update into a tracked GitHub issue before implementation.
+  - Convert every discovered major-version update into a tracked GitHub issue before implementation, using the format `deps(major): migrate <ecosystem>/<package> to <major>`.
+  - Each major-version issue should include migration notes, upstream breaking-change links, expected code/config changes, local validation commands, CI expectations, rollback notes, and whether the bump is blocked by another ecosystem update.
   - Prefer small PRs by package family, with one major bump per PR unless toolchain coupling requires otherwise.
 - Validation should be local-first:
   - Hooks catch obvious mistakes before commit.
