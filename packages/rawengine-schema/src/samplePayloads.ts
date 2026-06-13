@@ -32,6 +32,7 @@ import {
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
+  rawEngineAppServerToolCallValidationV1Schema,
   filmLookCatalogV1Schema,
   rawEngineToolRegistryV1Schema,
   type ArtifactHandleV1,
@@ -64,6 +65,7 @@ import {
   type NegativeRollSessionV1,
   type PanoramaArtifactV1,
   type QueryEnvelopeV1,
+  type RawEngineAppServerToolCallValidationV1,
   type RawEngineToolRegistryV1,
 } from './rawEngineSchemas.js';
 
@@ -170,6 +172,31 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
     },
   ],
 });
+
+export const sampleRawEngineAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: {
+        approvalClass: ApprovalClass.PreviewOnly,
+        reason: 'Tone preview returns a non-mutating render plan before any edit is applied.',
+        state: 'not_required',
+      },
+      arguments: sampleCommandEnvelopeV1,
+      dryRun: true,
+      inputSchemaName: 'CommandEnvelopeV1',
+      itemId: 'item_tool_call_tone_preview',
+      jsonRpcRequestId: 42,
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_sample',
+      toolKind: 'dry_run',
+      toolName: 'edit.dry_run_tone',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_sample',
+    },
+  });
 
 export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Schema.parse({
   alignment: {

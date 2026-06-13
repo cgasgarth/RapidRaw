@@ -1,0 +1,93 @@
+{
+  "registry": {
+    "schemaVersion": 1,
+    "tools": [
+      {
+        "approvalClass": "safe_read",
+        "inputSchemaName": "QueryEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "ImageMetadataResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": false,
+        "toolKind": "read",
+        "toolName": "image.get_metadata"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "CommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "ToneDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "edit.dry_run_tone"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "NegativeLabCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "NegativeLabDryRunResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
+        "toolName": "negativelab.preview_conversion"
+      },
+      {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "NegativeLabApplyPlanRequestV1",
+        "mutates": true,
+        "outputSchemaName": "NegativeLabApplyResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "apply",
+        "toolName": "negativelab.apply_planned_command"
+      }
+    ]
+  },
+  "schemaVersion": 1,
+  "toolCall": {
+    "approval": {
+      "approvalClass": "preview_only",
+      "reason": "Tone preview returns a non-mutating render plan before any edit is applied.",
+      "state": "not_required"
+    },
+    "arguments": {
+      "actor": {
+        "id": "codex-app-server",
+        "kind": "agent",
+        "sessionId": "session_sample"
+      },
+      "approval": {
+        "approvalClass": "preview_only",
+        "reason": "Tone dry-run does not persist sidecars or exported files.",
+        "state": "not_required"
+      },
+      "commandId": "command_tone_dry_run_sample",
+      "commandType": "edit.tone.dryRun",
+      "correlationId": "corr_tone_dry_run_sample",
+      "dryRun": true,
+      "expectedGraphRevision": "graph_rev_42",
+      "parameters": {
+        "exposureEv": 0.25,
+        "highlights": -12
+      },
+      "schemaVersion": 1,
+      "target": {
+        "imagePath": "/photos/session/IMG_0001.CR3",
+        "kind": "image",
+        "virtualCopyId": null
+      }
+    },
+    "dryRun": true,
+    "inputSchemaName": "CommandEnvelopeV1",
+    "itemId": "item_tool_call_tone_preview",
+    "jsonRpcRequestId": 42,
+    "protocol": "codex_app_server_json_rpc",
+    "schemaVersion": 1,
+    "threadId": "thread_rawengine_agent_sample",
+    "toolKind": "dry_run",
+    "toolName": "edit.dry_run_tone",
+    "transport": "stdio",
+    "turnId": "turn_rawengine_agent_sample"
+  }
+}

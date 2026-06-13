@@ -3949,6 +3949,124 @@ export const negativeLabApplyResultV1Schema = z
   })
   .strict();
 
+export const rawEngineAppServerTransportV1Schema = z.enum(['stdio', 'websocket', 'unix_socket']);
+
+export const rawEngineAppServerProtocolV1Schema = z.literal('codex_app_server_json_rpc');
+
+const rawEngineAppServerKnownInputSchemas = {
+  CommandEnvelopeV1: commandEnvelopeV1Schema,
+  NegativeLabApplyPlanRequestV1: negativeLabApplyPlanRequestV1Schema,
+  NegativeLabCommandEnvelopeV1: negativeLabCommandEnvelopeV1Schema,
+  QueryEnvelopeV1: queryEnvelopeV1Schema,
+} as const;
+
+export const rawEngineAppServerToolCallV1Schema = z
+  .object({
+    approval: approvalRequirementSchema,
+    arguments: z.unknown(),
+    dryRun: z.boolean(),
+    inputSchemaName: z.enum([
+      'CommandEnvelopeV1',
+      'NegativeLabApplyPlanRequestV1',
+      'NegativeLabCommandEnvelopeV1',
+      'QueryEnvelopeV1',
+    ]),
+    itemId: z.string().trim().min(1).optional(),
+    jsonRpcRequestId: z.union([z.string().trim().min(1), z.number().int().nonnegative()]),
+    protocol: rawEngineAppServerProtocolV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    threadId: z.string().trim().min(1),
+    toolKind: rawEngineToolKindSchema,
+    toolName: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_]*)+$/u),
+    transport: rawEngineAppServerTransportV1Schema,
+    turnId: z.string().trim().min(1),
+  })
+  .strict()
+  .superRefine((toolCall, context) => {
+    const inputSchema = rawEngineAppServerKnownInputSchemas[toolCall.inputSchemaName];
+    const parsedArguments = inputSchema.safeParse(toolCall.arguments);
+
+    if (!parsedArguments.success) {
+      context.addIssue({
+        code: 'custom',
+        message: `Tool call arguments must match ${toolCall.inputSchemaName}.`,
+        path: ['arguments'],
+      });
+      return;
+    }
+
+    if ('dryRun' in parsedArguments.data && parsedArguments.data.dryRun !== toolCall.dryRun) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Tool call dryRun flag must match the wrapped command envelope.',
+        path: ['dryRun'],
+      });
+    }
+  });
+
+export const rawEngineAppServerToolCallValidationV1Schema = z
+  .object({
+    registry: rawEngineToolRegistryV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    toolCall: rawEngineAppServerToolCallV1Schema,
+  })
+  .strict()
+  .superRefine((validation, context) => {
+    const toolDefinition = validation.registry.tools.find((tool) => tool.toolName === validation.toolCall.toolName);
+
+    if (toolDefinition === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'App-server tool call must reference a registered RawEngine tool.',
+        path: ['toolCall', 'toolName'],
+      });
+      return;
+    }
+
+    if (toolDefinition.toolKind !== validation.toolCall.toolKind) {
+      context.addIssue({
+        code: 'custom',
+        message: 'App-server tool call kind must match the registered tool definition.',
+        path: ['toolCall', 'toolKind'],
+      });
+    }
+
+    if (toolDefinition.inputSchemaName !== validation.toolCall.inputSchemaName) {
+      context.addIssue({
+        code: 'custom',
+        message: 'App-server tool call input schema must match the registered tool definition.',
+        path: ['toolCall', 'inputSchemaName'],
+      });
+    }
+
+    if (toolDefinition.requiresDryRun && !validation.toolCall.dryRun) {
+      context.addIssue({
+        code: 'custom',
+        message: 'App-server tool call must be a dry run when the registered tool requires dry-run execution.',
+        path: ['toolCall', 'dryRun'],
+      });
+    }
+
+    if (toolDefinition.approvalClass !== validation.toolCall.approval.approvalClass) {
+      context.addIssue({
+        code: 'custom',
+        message: 'App-server tool call approval class must match the registered tool definition.',
+        path: ['toolCall', 'approval', 'approvalClass'],
+      });
+    }
+
+    if (toolDefinition.mutates && validation.toolCall.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Mutating app-server tool calls require approved user approval before execution.',
+        path: ['toolCall', 'approval', 'state'],
+      });
+    }
+  });
+
 export const negativeLabConversionOperationArtifactPurposeV1Schema = z.enum([
   'objective_positive_preview',
   'density_map',
@@ -4303,6 +4421,10 @@ export type NegativeLabAppServerAuditEvent = z.infer<typeof negativeLabAppServer
 export type NegativeLabAppServerExecutionMode = z.infer<typeof negativeLabAppServerExecutionModeSchema>;
 export type NegativeLabAppServerToolDefinitionV1 = z.infer<typeof negativeLabAppServerToolDefinitionV1Schema>;
 export type NegativeLabAppServerToolManifestV1 = z.infer<typeof negativeLabAppServerToolManifestV1Schema>;
+export type RawEngineAppServerProtocolV1 = z.infer<typeof rawEngineAppServerProtocolV1Schema>;
+export type RawEngineAppServerToolCallV1 = z.infer<typeof rawEngineAppServerToolCallV1Schema>;
+export type RawEngineAppServerToolCallValidationV1 = z.infer<typeof rawEngineAppServerToolCallValidationV1Schema>;
+export type RawEngineAppServerTransportV1 = z.infer<typeof rawEngineAppServerTransportV1Schema>;
 export type NegativeLabApplyFrameCropParametersV1 = z.infer<typeof negativeLabApplyFrameCropParametersV1Schema>;
 export type NegativeLabApplyResultV1 = z.infer<typeof negativeLabApplyResultV1Schema>;
 export type NegativeLabApplyPlanRequestV1 = z.infer<typeof negativeLabApplyPlanRequestV1Schema>;
