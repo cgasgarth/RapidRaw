@@ -14,6 +14,7 @@ import {
   negativeLabFrameDetectionResultV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
+  negativeLabQcProofArtifactV1Schema,
   negativeRollSessionV1Schema,
   panoramaArtifactV1Schema,
   queryEnvelopeV1Schema,
@@ -33,6 +34,7 @@ import {
   sampleNegativeLabFrameDetectionResultV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
+  sampleNegativeLabQcProofArtifactV1,
   sampleNegativeRollSessionV1,
   samplePanoramaArtifactV1,
   sampleQueryEnvelopeV1,
@@ -118,6 +120,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab process profile',
     schema: negativeLabProcessProfileV1Schema,
     value: sampleNegativeLabProcessProfileV1,
+  },
+  {
+    name: 'negative lab QC proof artifact',
+    schema: negativeLabQcProofArtifactV1Schema,
+    value: sampleNegativeLabQcProofArtifactV1,
   },
   {
     name: 'negative lab positive variant provenance',
@@ -474,5 +481,48 @@ expectInvalid(
   negativeLabBuiltInPresetCatalogV1Schema,
   invalidGenericPresetLabJpegWithoutWarnings,
 );
+
+const [sampleQcOverlay] = sampleNegativeLabQcProofArtifactV1.overlays;
+if (sampleQcOverlay === undefined) {
+  throw new Error('Expected QC proof sample to include an overlay.');
+}
+
+const [sampleQcFrameMetric] = sampleNegativeLabQcProofArtifactV1.rollConsistency.frameMetrics;
+if (sampleQcFrameMetric === undefined) {
+  throw new Error('Expected QC proof sample to include a roll consistency frame metric.');
+}
+
+const invalidQcOverlayFrame = {
+  ...sampleNegativeLabQcProofArtifactV1,
+  overlays: [
+    {
+      ...sampleQcOverlay,
+      frameId: 'missing_frame',
+    },
+  ],
+};
+
+const invalidQcOverlayFrameResult = negativeLabQcProofArtifactV1Schema.safeParse(invalidQcOverlayFrame);
+if (invalidQcOverlayFrameResult.success) {
+  throw new Error('Expected QC proof artifacts to reject overlays for unlisted frames.');
+}
+
+const invalidQcMetricFrame = {
+  ...sampleNegativeLabQcProofArtifactV1,
+  rollConsistency: {
+    ...sampleNegativeLabQcProofArtifactV1.rollConsistency,
+    frameMetrics: [
+      {
+        ...sampleQcFrameMetric,
+        frameId: 'missing_frame',
+      },
+    ],
+  },
+};
+
+const invalidQcMetricFrameResult = negativeLabQcProofArtifactV1Schema.safeParse(invalidQcMetricFrame);
+if (invalidQcMetricFrameResult.success) {
+  throw new Error('Expected QC proof artifacts to reject roll metrics for unlisted frames.');
+}
 
 console.log(`Validated ${validSamples.length} RawEngine schema samples.`);

@@ -25,6 +25,7 @@ without exposing runtime app-server tools yet.
 - `NegativeLabFrameDetectionResultV1`
 - `NegativeLabProcessProfileV1`
 - `NegativeLabBuiltInPresetCatalogV1`
+- `NegativeLabQcProofArtifactV1`
 
 The package also includes representative sample payloads, checked JSON sample
 artifacts, and a `schema:check` script that typechecks the package and validates
@@ -69,3 +70,4 @@ Negative Lab density/process profile samples include:
 - `negative-lab-frame-detection-result-v1.json`
 - `negative-lab-process-profile-v1.json`
 - `negative-lab-built-in-preset-catalog-v1.json`
+- `negative-lab-qc-proof-artifact-v1.json`

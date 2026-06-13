@@ -1164,6 +1164,112 @@ export const negativeLabSampleGeometryV1Schema = z
     }
   });
 
+export const negativeLabQcOverlayKindSchema = z.enum([
+  'frame_boundary',
+  'base_sample',
+  'clipping',
+  'density_sample',
+  'warning_badge',
+  'roll_consistency_delta',
+]);
+
+export const negativeLabQcOverlayV1Schema = z
+  .object({
+    frameId: z.string().trim().min(1),
+    geometry: negativeLabSampleGeometryV1Schema,
+    label: z.string().trim().min(1),
+    overlayId: z.string().trim().min(1),
+    overlayKind: negativeLabQcOverlayKindSchema,
+    severity: negativeWarningSeveritySchema,
+    warningCodes: z.array(negativeWarningCodeSchema),
+  })
+  .strict();
+
+export const negativeLabRollConsistencyFrameMetricV1Schema = z
+  .object({
+    densityDelta: z.number().min(0),
+    exposureDeltaEv: z.number(),
+    frameId: z.string().trim().min(1),
+    warningCodes: z.array(negativeWarningCodeSchema),
+    whiteBalanceDelta: z.number().min(0),
+    withinTolerance: z.boolean(),
+  })
+  .strict();
+
+export const negativeLabRollConsistencyMetricsV1Schema = z
+  .object({
+    anchorFrameIds: nonEmptyIdArraySchema,
+    densityDeltaTolerance: z.number().min(0),
+    exposureDeltaToleranceEv: z.number().min(0),
+    frameMetrics: z.array(negativeLabRollConsistencyFrameMetricV1Schema).min(1),
+    metricVersion: z.literal(1),
+    whiteBalanceDeltaTolerance: z.number().min(0),
+  })
+  .strict()
+  .superRefine((metrics, context) => {
+    const seenFrameIds = new Set<string>();
+    for (const [index, metric] of metrics.frameMetrics.entries()) {
+      if (seenFrameIds.has(metric.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Roll consistency frame metrics must use unique frame IDs.',
+          path: ['frameMetrics', index, 'frameId'],
+        });
+      }
+      seenFrameIds.add(metric.frameId);
+    }
+  });
+
+export const negativeLabQcProofArtifactV1Schema = z
+  .object({
+    contactSheet: z
+      .object({
+        artifact: artifactHandleV1Schema,
+        columns: z.number().int().positive(),
+        rows: z.number().int().positive(),
+      })
+      .strict(),
+    frameIds: z.array(z.string().trim().min(1)).min(1),
+    generatedAt: z.string().trim().min(1),
+    overlays: z.array(negativeLabQcOverlayV1Schema),
+    proofId: z.string().trim().min(1),
+    rollConsistency: negativeLabRollConsistencyMetricsV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sessionId: z.string().trim().min(1),
+    warnings: z.array(negativeWarningV1Schema),
+  })
+  .strict()
+  .superRefine((proof, context) => {
+    const frameIds = new Set(proof.frameIds);
+    if (frameIds.size !== proof.frameIds.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'QC proof frameIds must be unique.',
+        path: ['frameIds'],
+      });
+    }
+
+    for (const [index, overlay] of proof.overlays.entries()) {
+      if (!frameIds.has(overlay.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'QC overlay frameId must be included in proof frameIds.',
+          path: ['overlays', index, 'frameId'],
+        });
+      }
+    }
+
+    for (const [index, metric] of proof.rollConsistency.frameMetrics.entries()) {
+      if (!frameIds.has(metric.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Roll consistency metric frameId must be included in proof frameIds.',
+          path: ['rollConsistency', 'frameMetrics', index, 'frameId'],
+        });
+      }
+    }
+  });
+
 export const negativeLabBaseSampleRegionV1Schema = z
   .object({
     frameId: z.string().trim().min(1),
@@ -1632,7 +1738,12 @@ export type NegativeLabPresetProfileRefV1 = z.infer<typeof negativeLabPresetProf
 export type NegativeLabProcessProfileClass = z.infer<typeof negativeLabProcessProfileClassSchema>;
 export type NegativeLabProcessProfileV1 = z.infer<typeof negativeLabProcessProfileV1Schema>;
 export type NegativeLabProfileMeasurementSource = z.infer<typeof negativeLabProfileMeasurementSourceSchema>;
+export type NegativeLabQcOverlayKind = z.infer<typeof negativeLabQcOverlayKindSchema>;
+export type NegativeLabQcOverlayV1 = z.infer<typeof negativeLabQcOverlayV1Schema>;
+export type NegativeLabQcProofArtifactV1 = z.infer<typeof negativeLabQcProofArtifactV1Schema>;
 export type NegativeLabPreviewRequestV1 = z.infer<typeof negativeLabPreviewRequestV1Schema>;
+export type NegativeLabRollConsistencyFrameMetricV1 = z.infer<typeof negativeLabRollConsistencyFrameMetricV1Schema>;
+export type NegativeLabRollConsistencyMetricsV1 = z.infer<typeof negativeLabRollConsistencyMetricsV1Schema>;
 export type NegativeLabSampleGeometryV1 = z.infer<typeof negativeLabSampleGeometryV1Schema>;
 export type NegativeLabSetConversionRecipeParametersV1 = z.infer<
   typeof negativeLabSetConversionRecipeParametersV1Schema
