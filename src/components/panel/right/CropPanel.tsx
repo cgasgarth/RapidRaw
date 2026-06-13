@@ -148,10 +148,16 @@ export default function CropPanel() {
   const { aspectRatio, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
 
   useEffect(() => {
-    if (isStraightenActive) {
+    if (!isStraightenActive) return;
+
+    const syncTimer = setTimeout(() => {
       updateLocalRotation(null);
       setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
-    }
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [isStraightenActive, setAdjustments, updateLocalRotation]);
 
   useEffect(() => {
@@ -235,25 +241,37 @@ export default function CropPanel() {
   const isCustomActive = aspectRatio !== null && !activePreset;
 
   useEffect(() => {
-    if (aspectRatio && aspectRatio !== 1) {
+    if (!aspectRatio || aspectRatio === 1) return;
+
+    const syncTimer = setTimeout(() => {
       setPreferPortrait(aspectRatio < 1);
-    }
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [aspectRatio]);
 
   useEffect(() => {
-    if (isCustomActive && aspectRatio && !isEditingCustom) {
-      if (lastSyncedRatio.current === null || Math.abs(lastSyncedRatio.current - aspectRatio) > RATIO_TOLERANCE) {
-        const h = 100;
-        const w = aspectRatio * h;
-        setCustomW(w.toFixed(1).replace(/\.0$/, ''));
-        setCustomH(h.toString());
-        lastSyncedRatio.current = aspectRatio;
+    const syncTimer = setTimeout(() => {
+      if (isCustomActive && aspectRatio && !isEditingCustom) {
+        if (lastSyncedRatio.current === null || Math.abs(lastSyncedRatio.current - aspectRatio) > RATIO_TOLERANCE) {
+          const h = 100;
+          const w = aspectRatio * h;
+          setCustomW(w.toFixed(1).replace(/\.0$/, ''));
+          setCustomH(h.toString());
+          lastSyncedRatio.current = aspectRatio;
+        }
+      } else if (!isCustomActive) {
+        setCustomW('');
+        setCustomH('');
+        lastSyncedRatio.current = null;
       }
-    } else if (!isCustomActive) {
-      setCustomW('');
-      setCustomH('');
-      lastSyncedRatio.current = null;
-    }
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [isCustomActive, aspectRatio, isEditingCustom]);
 
   useEffect(() => {
