@@ -436,16 +436,15 @@ export default function AIPanel() {
     activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky].includes(activeSubMaskData.type);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    if (isGeneratingAiMask && isAiMask) {
-      timer = setTimeout(() => {
-        setAnalyzingSubMaskId(activeSubMaskId);
-      }, 200);
-    } else {
-      setAnalyzingSubMaskId(null);
-    }
+    const timer = setTimeout(
+      () => {
+        setAnalyzingSubMaskId(isGeneratingAiMask && isAiMask ? activeSubMaskId : null);
+      },
+      isGeneratingAiMask && isAiMask ? 200 : 0,
+    );
+
     return () => {
-      if (timer) clearTimeout(timer);
+      clearTimeout(timer);
     };
   }, [isGeneratingAiMask, isAiMask, activeSubMaskId]);
 
@@ -460,23 +459,29 @@ export default function AIPanel() {
   }, [adjustments.aiPatches, activePatchContainerId, onSelectPatchContainer, onSelectSubMask]);
 
   useEffect(() => {
-    const hasPatches = adjustments.aiPatches.length > 0;
+    const syncTimer = setTimeout(() => {
+      const hasPatches = adjustments.aiPatches.length > 0;
 
-    if (hasPatches) {
-      setIsSettingsPanelEverOpened(true);
-    }
-
-    if (activePatchContainerId) {
-      const shouldAutoExpand = !hasPerformedInitialSelection.current || activeSubMaskId;
-      if (shouldAutoExpand) {
-        setExpandedContainers((prev) => {
-          if (prev.has(activePatchContainerId)) return prev;
-          return new Set(prev).add(activePatchContainerId);
-        });
+      if (hasPatches) {
+        setIsSettingsPanelEverOpened(true);
       }
-      hasPerformedInitialSelection.current = true;
-      setIsSettingsPanelEverOpened(true);
-    }
+
+      if (activePatchContainerId) {
+        const shouldAutoExpand = !hasPerformedInitialSelection.current || activeSubMaskId;
+        if (shouldAutoExpand) {
+          setExpandedContainers((prev) => {
+            if (prev.has(activePatchContainerId)) return prev;
+            return new Set(prev).add(activePatchContainerId);
+          });
+        }
+        hasPerformedInitialSelection.current = true;
+        setIsSettingsPanelEverOpened(true);
+      }
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [activePatchContainerId, activeSubMaskId, adjustments.aiPatches, onSelectPatchContainer, onSelectSubMask]);
 
   useEffect(() => {
@@ -1957,22 +1962,38 @@ function SettingsPanel({
   const prevContainerId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (container) setPrompt(container.prompt || '');
+    if (!container) return;
+
+    const syncTimer = setTimeout(() => {
+      setPrompt(container.prompt || '');
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [container]);
 
   const isQuickErasePatch = displayContainer.subMasks.some((sm: SubMask) => sm.type === Mask.QuickEraser);
 
   useEffect(() => {
-    if (container) {
+    const syncTimer = setTimeout(() => {
+      if (!container) return;
+
       if (!isGenerativeAvailable) {
         setUseFastInpaint(true);
       } else if (container.id !== prevContainerId.current) {
         setUseFastInpaint(isQuickErasePatch);
         prevContainerId.current = container.id;
       }
-    } else {
+    }, 0);
+
+    if (!container) {
       prevContainerId.current = null;
     }
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [isGenerativeAvailable, container, isQuickErasePatch]);
 
   const subMaskConfig = activeSubMask ? SUB_MASK_CONFIG[activeSubMask.type] || {} : {};
