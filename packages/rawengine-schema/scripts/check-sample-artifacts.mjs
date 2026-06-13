@@ -7,6 +7,9 @@ import { format } from 'prettier';
 
 import {
   aiAppServerToolManifestV1Schema,
+  aiEnhancementApplyResultV1Schema,
+  aiEnhancementCommandEnvelopeV1Schema,
+  aiEnhancementDryRunResultV1Schema,
   aiToolApplyResultV1Schema,
   aiToolCommandEnvelopeV1Schema,
   aiToolDryRunResultV1Schema,
@@ -66,6 +69,13 @@ import {
 } from '../src/rawEngineSchemas.ts';
 import {
   sampleAiAppServerToolManifestV1,
+  sampleAiEnhancementAgentReplayFixtureV1,
+  sampleAiEnhancementApplyAppServerToolCallValidationV1,
+  sampleAiEnhancementApplyCommandEnvelopeV1,
+  sampleAiEnhancementApplyResultV1,
+  sampleAiEnhancementCommandEnvelopeV1,
+  sampleAiEnhancementDryRunAppServerToolCallValidationV1,
+  sampleAiEnhancementDryRunResultV1,
   sampleAiMaskApplyAppServerToolCallValidationV1,
   sampleAiMaskDryRunAppServerToolCallValidationV1,
   sampleAiToolAgentReplayFixtureV1,
@@ -205,6 +215,48 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/ai-app-server-tool-manifest-v1.json',
     schema: aiAppServerToolManifestV1Schema,
     value: sampleAiAppServerToolManifestV1,
+  },
+  {
+    name: 'AI enhancement command envelope',
+    path: 'packages/rawengine-schema/samples/ai-enhancement-command-envelope-v1.json',
+    schema: aiEnhancementCommandEnvelopeV1Schema,
+    value: sampleAiEnhancementCommandEnvelopeV1,
+  },
+  {
+    name: 'AI enhancement apply command envelope',
+    path: 'packages/rawengine-schema/samples/ai-enhancement-apply-command-envelope-v1.json',
+    schema: aiEnhancementCommandEnvelopeV1Schema,
+    value: sampleAiEnhancementApplyCommandEnvelopeV1,
+  },
+  {
+    name: 'AI enhancement dry-run result',
+    path: 'packages/rawengine-schema/samples/ai-enhancement-dry-run-result-v1.json',
+    schema: aiEnhancementDryRunResultV1Schema,
+    value: sampleAiEnhancementDryRunResultV1,
+  },
+  {
+    name: 'AI enhancement apply result',
+    path: 'packages/rawengine-schema/samples/ai-enhancement-apply-result-v1.json',
+    schema: aiEnhancementApplyResultV1Schema,
+    value: sampleAiEnhancementApplyResultV1,
+  },
+  {
+    name: 'AI enhancement agent replay fixture',
+    path: 'packages/rawengine-schema/samples/ai-enhancement-agent-replay-fixture-v1.json',
+    schema: rawEngineAgentReplayFixtureV1Schema,
+    value: sampleAiEnhancementAgentReplayFixtureV1,
+  },
+  {
+    name: 'AI enhancement dry-run app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/ai-enhancement-dry-run-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleAiEnhancementDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'AI enhancement apply app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/ai-enhancement-apply-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleAiEnhancementApplyAppServerToolCallValidationV1,
   },
   {
     name: 'AI mask dry-run app-server tool call validation',
