@@ -1,3 +1,5 @@
+import { invoke } from '@tauri-apps/api/core';
+import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -5,7 +7,7 @@ import FilmLookBrowser from './FilmLookBrowser';
 import { TextVariants } from '../../types/typography';
 import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
 import { type FilmLookBrowserItem } from '../../utils/filmLookBrowser';
-import { AppSettings } from '../ui/AppProperties';
+import { AppSettings, Invokes, type Preset } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
@@ -21,6 +23,8 @@ interface EffectsPanelProps {
 
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Partial<Adjustments>) => Partial<Adjustments>);
 
+type PresetExportItem = { preset: Preset };
+
 type SliderChangeEvent =
   | ChangeEvent<HTMLInputElement>
   | {
@@ -28,6 +32,18 @@ type SliderChangeEvent =
         value: number | string;
       };
     };
+
+const FILM_LOOK_PRESET_FILE_EXTENSION = 'rrpreset';
+const FILM_LOOK_PRESET_FILE_TYPE = 'RapidRaw Preset';
+const sanitizeFilmLookPresetFileName = (displayName: string) => `${displayName}.rrpreset`.replace(/[<>:"/\\|?*]/g, '_');
+const createFilmLookPreset = (look: FilmLookBrowserItem): Preset => ({
+  adjustments: { ...look.adjustmentPatch },
+  id: crypto.randomUUID(),
+  includeCropTransform: false,
+  includeMasks: false,
+  name: look.displayName,
+  presetType: 'style',
+});
 
 export default function EffectsPanel({
   adjustments,
@@ -64,6 +80,41 @@ export default function EffectsPanel({
       ...prev,
       ...look.adjustmentPatch,
     }));
+  };
+
+  const saveFilmLookPreset = async (look: FilmLookBrowserItem) => {
+    await invoke(Invokes.SaveCommunityPreset, {
+      adjustments: look.adjustmentPatch,
+      includeCropTransform: false,
+      includeMasks: false,
+      name: look.displayName,
+      presetType: 'style',
+    });
+  };
+
+  const shareFilmLookPreset = async (look: FilmLookBrowserItem) => {
+    const filePath = await saveDialog({
+      defaultPath: sanitizeFilmLookPresetFileName(look.displayName),
+      filters: [{ name: FILM_LOOK_PRESET_FILE_TYPE, extensions: [FILM_LOOK_PRESET_FILE_EXTENSION] }],
+      title: t('editor.presets.dialog.exportTitle', {
+        type: t('editor.presets.types.preset'),
+      }),
+    });
+
+    if (typeof filePath !== 'string') {
+      return;
+    }
+
+    const presetsToExport: Array<PresetExportItem> = [{ preset: createFilmLookPreset(look) }];
+    await invoke(Invokes.HandleExportPresetsToFile, { presetsToExport, filePath });
+  };
+
+  const handleFilmLookSave = (look: FilmLookBrowserItem) => {
+    void saveFilmLookPreset(look);
+  };
+
+  const handleFilmLookShare = (look: FilmLookBrowserItem) => {
+    void shareFilmLookPreset(look);
   };
 
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
@@ -117,7 +168,11 @@ export default function EffectsPanel({
       {!isForMask && (
         <div className="space-y-4">
           <div className="p-2 bg-bg-tertiary rounded-md">
-            <FilmLookBrowser onApplyLook={handleFilmLookApply} />
+            <FilmLookBrowser
+              onApplyLook={handleFilmLookApply}
+              onSaveLook={handleFilmLookSave}
+              onShareLook={handleFilmLookShare}
+            />
           </div>
 
           <div className="p-2 bg-bg-tertiary rounded-md">
