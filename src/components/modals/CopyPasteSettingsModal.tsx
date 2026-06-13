@@ -183,6 +183,7 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
           onClose();
         }
       }}
+      role="presentation"
     >
       <div
         aria-modal="true"

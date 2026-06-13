@@ -75,6 +75,7 @@ export default function CreateFolderModal({
           onClose();
         }
       }}
+      role="presentation"
     >
       <div
         aria-modal="true"

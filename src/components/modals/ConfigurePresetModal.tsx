@@ -188,6 +188,7 @@ export default function ConfigurePresetModal({ isOpen, onClose, onSave, initialP
           onClose();
         }
       }}
+      role="presentation"
     >
       <div
         aria-modal="true"
