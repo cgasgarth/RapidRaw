@@ -429,6 +429,56 @@ jobs:
         working-directory: src-tauri
         run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
+  rust-test:
+    name: 'rust: tests macOS'
+    needs:
+      - changed-paths
+    if: always() && (github.event_name != 'pull_request' || needs.changed-paths.outputs.macos_smoke_mode != 'none')
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
+        with:
+          rustflags: ''
+          rust-src-dir: src-tauri
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: src-tauri
+          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-test-macos-host-desktop
+          cache-on-failure: true
+
+      - name: Cache ONNX Runtime library
+        id: rust-test-onnx-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: src-tauri/resources/libonnxruntime.dylib
+          key: v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-${{ hashFiles('src-tauri/build.rs') }}
+          restore-keys: |
+            v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-
+
+      - name: Record Rust test cache status
+        run: |
+          set -euo pipefail
+
+          onnx_cache_hit="${{ steps.rust-test-onnx-cache.outputs.cache-hit }}"
+          if [[ -z "$onnx_cache_hit" ]]; then
+            onnx_cache_hit="miss"
+          fi
+
+          {
+            echo "### Rust test cache status"
+            echo "- Rust cache key suffix: \`v1-${{ runner.os }}-${{ runner.arch }}-rust-test-macos-host-desktop\`"
+            echo "- ONNX exact hit: \`$onnx_cache_hit\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cargo test
+        working-directory: src-tauri
+        run: cargo test --locked --all-targets --all-features --no-fail-fast
+
   pr-macos-app-build:
     name: macOS app no-bundle smoke
     needs:
@@ -567,6 +617,7 @@ jobs:
       - dependency-license-rust
       - rust-check
       - rust-clippy
+      - rust-test
       - pr-macos-app-build
     if: always() && github.event_name == 'pull_request'
     timeout-minutes: 10
@@ -594,6 +645,7 @@ jobs:
           DEPENDENCY_LICENSE_RUST_RESULT: ${{ needs.dependency-license-rust.result }}
           RUST_CHECK_RESULT: ${{ needs.rust-check.result }}
           RUST_CLIPPY_RESULT: ${{ needs.rust-clippy.result }}
+          RUST_TEST_RESULT: ${{ needs.rust-test.result }}
           PR_MACOS_APP_BUILD_RESULT: ${{ needs.pr-macos-app-build.result }}
           MACOS_SMOKE_REQUIRED: ${{ needs.changed-paths.outputs.macos_smoke_required }}
           MACOS_SMOKE_MODE: ${{ needs.changed-paths.outputs.macos_smoke_mode }}
@@ -661,9 +713,10 @@ jobs:
           if [[ "$MACOS_SMOKE_MODE" != "none" ]]; then
             require_success "rust: cargo check macOS" "$RUST_CHECK_RESULT"
             require_success "rust: clippy baseline macOS" "$RUST_CLIPPY_RESULT"
+            require_success "rust: tests macOS" "$RUST_TEST_RESULT"
             require_success "macOS app no-bundle smoke" "$PR_MACOS_APP_BUILD_RESULT"
           else
-            echo "Skipping macOS Rust check, macOS clippy, and macOS app no-bundle smoke in aggregate verification."
+            echo "Skipping macOS Rust check, macOS clippy, macOS Rust tests, and macOS app no-bundle smoke in aggregate verification."
             echo "Routing reason: $MACOS_SMOKE_REASON"
           fi
 
