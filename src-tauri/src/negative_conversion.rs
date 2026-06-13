@@ -28,6 +28,13 @@ pub struct NegativeConversionParams {
     pub contrast: f32,
 }
 
+const MIN_CHANNEL_WEIGHT: f32 = 0.5;
+const MAX_CHANNEL_WEIGHT: f32 = 2.0;
+const MIN_EXPOSURE: f32 = -2.0;
+const MAX_EXPOSURE: f32 = 2.0;
+const MIN_CONTRAST: f32 = 0.5;
+const MAX_CONTRAST: f32 = 2.5;
+
 impl Default for NegativeConversionParams {
     fn default() -> Self {
         Self {
@@ -36,6 +43,29 @@ impl Default for NegativeConversionParams {
             blue_weight: 1.0,
             exposure: 0.0,
             contrast: 1.0,
+        }
+    }
+}
+
+impl NegativeConversionParams {
+    fn sanitized(self) -> Self {
+        fn finite_or_default(value: f32, fallback: f32) -> f32 {
+            if value.is_finite() { value } else { fallback }
+        }
+
+        let defaults = Self::default();
+
+        Self {
+            red_weight: finite_or_default(self.red_weight, defaults.red_weight)
+                .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
+            green_weight: finite_or_default(self.green_weight, defaults.green_weight)
+                .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
+            blue_weight: finite_or_default(self.blue_weight, defaults.blue_weight)
+                .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
+            exposure: finite_or_default(self.exposure, defaults.exposure)
+                .clamp(MIN_EXPOSURE, MAX_EXPOSURE),
+            contrast: finite_or_default(self.contrast, defaults.contrast)
+                .clamp(MIN_CONTRAST, MAX_CONTRAST),
         }
     }
 }
@@ -109,6 +139,7 @@ fn run_pipeline(
     params: &NegativeConversionParams,
     override_bounds: Option<[ChannelBounds; 3]>,
 ) -> DynamicImage {
+    let params = params.sanitized();
     let rgb = input.to_rgb32f();
     let (width, height) = rgb.dimensions();
     let raw_pixels = rgb.as_raw();
@@ -126,7 +157,7 @@ fn run_pipeline(
 
     let mut out_buffer = vec![0.0f32; raw_pixels.len()];
 
-    let k = 4.0 * params.contrast.max(0.1);
+    let k = 4.0 * params.contrast;
     let x0 = 0.6 - (params.exposure * 0.25);
     let gamma_inv = 1.0 / 2.2;
 
@@ -363,6 +394,72 @@ mod tests {
     fn luminance(pixel: image::Rgb<f32>) -> f32 {
         let channels = pixel.channels();
         0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+    }
+
+    #[test]
+    fn negative_conversion_params_clamp_to_supported_api_range() {
+        let sanitized = NegativeConversionParams {
+            red_weight: f32::NAN,
+            green_weight: 99.0,
+            blue_weight: -99.0,
+            exposure: f32::INFINITY,
+            contrast: f32::NEG_INFINITY,
+        }
+        .sanitized();
+
+        assert_eq!(
+            sanitized.red_weight,
+            NegativeConversionParams::default().red_weight
+        );
+        assert_eq!(sanitized.green_weight, MAX_CHANNEL_WEIGHT);
+        assert_eq!(sanitized.blue_weight, MIN_CHANNEL_WEIGHT);
+        assert_eq!(
+            sanitized.exposure,
+            NegativeConversionParams::default().exposure
+        );
+        assert_eq!(
+            sanitized.contrast,
+            NegativeConversionParams::default().contrast
+        );
+    }
+
+    #[test]
+    fn negative_conversion_rejects_pathological_api_values_before_density_math() {
+        let rendered = render_fixture(
+            vec![
+                0.92, 0.72, 0.52, //
+                0.22, 0.16, 0.10, //
+                0.03, 0.02, 0.01,
+            ],
+            NegativeConversionParams {
+                red_weight: f32::NAN,
+                green_weight: f32::INFINITY,
+                blue_weight: f32::NEG_INFINITY,
+                exposure: 50.0,
+                contrast: -50.0,
+            },
+            [
+                ChannelBounds {
+                    min: 0.02,
+                    max: 1.5,
+                },
+                ChannelBounds {
+                    min: 0.02,
+                    max: 1.5,
+                },
+                ChannelBounds {
+                    min: 0.02,
+                    max: 1.5,
+                },
+            ],
+        );
+
+        for pixel in rendered.pixels() {
+            for channel in pixel.channels() {
+                assert!(channel.is_finite());
+                assert!((0.0..=1.0).contains(channel));
+            }
+        }
     }
 
     #[test]
