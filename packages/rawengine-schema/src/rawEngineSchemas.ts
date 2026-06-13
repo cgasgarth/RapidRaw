@@ -5547,6 +5547,193 @@ export const rawEngineAppServerToolCallValidationV1Schema = z
     }
   });
 
+export const rawEngineAgentReplayStepV1Schema = z
+  .object({
+    approval: approvalRequirementSchema,
+    deterministic: z.boolean(),
+    dryRun: z.boolean(),
+    input: z.unknown(),
+    inputContentHash: z.string().trim().min(1),
+    inputSchemaName: z.string().trim().min(1),
+    mutates: z.boolean(),
+    output: z.unknown(),
+    outputContentHash: z.string().trim().min(1),
+    outputSchemaName: z.string().trim().min(1),
+    prerequisiteStepIds: z.array(z.string().trim().min(1)),
+    resultingGraphRevision: z.string().trim().min(1).optional(),
+    sourceGraphRevision: z.string().trim().min(1).optional(),
+    stepId: z.string().trim().min(1),
+    toolKind: rawEngineToolKindSchema,
+    toolName: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_]*)+$/u),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+  .superRefine((step, context) => {
+    if (step.dryRun && step.mutates) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay dry-run steps must not be marked as mutating.',
+        path: ['mutates'],
+      });
+    }
+
+    if (step.dryRun && step.resultingGraphRevision !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay dry-run steps must not claim a resulting graph revision.',
+        path: ['resultingGraphRevision'],
+      });
+    }
+
+    if (step.mutates && step.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay mutation steps require approved user approval.',
+        path: ['approval', 'state'],
+      });
+    }
+
+    if (step.mutates && step.resultingGraphRevision === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay mutation steps require a resulting graph revision.',
+        path: ['resultingGraphRevision'],
+      });
+    }
+
+    if (
+      step.mutates &&
+      step.sourceGraphRevision !== undefined &&
+      step.resultingGraphRevision === step.sourceGraphRevision
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay mutation steps must advance the graph revision.',
+        path: ['resultingGraphRevision'],
+      });
+    }
+  });
+
+export const rawEngineAgentReplayFixtureV1Schema = z
+  .object({
+    actor: rawEngineActorSchema,
+    deterministicReplayHash: z.string().trim().min(1),
+    finalGraphRevision: z.string().trim().min(1).optional(),
+    initialGraphRevision: z.string().trim().min(1).optional(),
+    registry: rawEngineToolRegistryV1Schema,
+    replayId: z.string().trim().min(1),
+    replayKind: z.enum(['agent_tool_replay']),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    steps: z.array(rawEngineAgentReplayStepV1Schema).min(1),
+    target: rawEngineTargetSchema,
+    validationProfile: z.enum(['schema_contract', 'golden_replay', 'visual_regression']),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+  .superRefine((fixture, context) => {
+    const seenStepIds = new Set<string>();
+    let lastResultingGraphRevision: string | undefined;
+
+    fixture.steps.forEach((step, stepIndex) => {
+      if (seenStepIds.has(step.stepId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Replay step ids must be unique.',
+          path: ['steps', stepIndex, 'stepId'],
+        });
+      }
+
+      for (const prerequisiteStepId of step.prerequisiteStepIds) {
+        if (!seenStepIds.has(prerequisiteStepId)) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay prerequisite steps must reference earlier steps.',
+            path: ['steps', stepIndex, 'prerequisiteStepIds'],
+          });
+        }
+      }
+
+      const toolDefinition = fixture.registry.tools.find((tool) => tool.toolName === step.toolName);
+
+      if (toolDefinition === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Replay steps must reference registered RawEngine tools.',
+          path: ['steps', stepIndex, 'toolName'],
+        });
+      } else {
+        if (toolDefinition.toolKind !== step.toolKind) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay step tool kind must match the registered tool definition.',
+            path: ['steps', stepIndex, 'toolKind'],
+          });
+        }
+
+        if (toolDefinition.inputSchemaName !== step.inputSchemaName) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay step input schema must match the registered tool definition.',
+            path: ['steps', stepIndex, 'inputSchemaName'],
+          });
+        }
+
+        if (toolDefinition.outputSchemaName !== step.outputSchemaName) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay step output schema must match the registered tool definition.',
+            path: ['steps', stepIndex, 'outputSchemaName'],
+          });
+        }
+
+        if (toolDefinition.approvalClass !== step.approval.approvalClass) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay step approval class must match the registered tool definition.',
+            path: ['steps', stepIndex, 'approval', 'approvalClass'],
+          });
+        }
+
+        if (toolDefinition.mutates !== step.mutates) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay step mutation flag must match the registered tool definition.',
+            path: ['steps', stepIndex, 'mutates'],
+          });
+        }
+
+        if (toolDefinition.mutates && toolDefinition.requiresDryRun && step.prerequisiteStepIds.length === 0) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Replay steps for tools that require dry-run plans must reference a prerequisite dry-run step.',
+            path: ['steps', stepIndex, 'prerequisiteStepIds'],
+          });
+        }
+      }
+
+      if (step.resultingGraphRevision !== undefined) {
+        lastResultingGraphRevision = step.resultingGraphRevision;
+      }
+
+      seenStepIds.add(step.stepId);
+    });
+
+    if (
+      fixture.finalGraphRevision !== undefined &&
+      lastResultingGraphRevision !== undefined &&
+      fixture.finalGraphRevision !== lastResultingGraphRevision
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay final graph revision must match the last mutation step.',
+        path: ['finalGraphRevision'],
+      });
+    }
+  });
+
 export const negativeLabConversionOperationArtifactPurposeV1Schema = z.enum([
   'objective_positive_preview',
   'density_map',
@@ -6069,7 +6256,10 @@ export type ProjectLibrarySnapshotV1 = z.infer<typeof projectLibrarySnapshotV1Sc
 export type ProjectLibrarySortCriteriaV1 = z.infer<typeof projectLibrarySortCriteriaV1Schema>;
 export type QueryEnvelopeV1 = z.infer<typeof queryEnvelopeV1Schema>;
 export type RawEngineActor = z.infer<typeof rawEngineActorSchema>;
+export type RawEngineAgentReplayFixtureV1 = z.infer<typeof rawEngineAgentReplayFixtureV1Schema>;
+export type RawEngineAgentReplayStepV1 = z.infer<typeof rawEngineAgentReplayStepV1Schema>;
 export type RawEngineTarget = z.infer<typeof rawEngineTargetSchema>;
+export type RawEngineToolKind = z.infer<typeof rawEngineToolKindSchema>;
 export type RawEngineToolDefinitionV1 = z.infer<typeof rawEngineToolDefinitionV1Schema>;
 export type RawEngineToolRegistryV1 = z.infer<typeof rawEngineToolRegistryV1Schema>;
 export type ToneColorChannelV1 = z.infer<typeof toneColorChannelV1Schema>;
