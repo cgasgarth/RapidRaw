@@ -48,6 +48,7 @@ import {
   projectLibrarySnapshotQueryV1Schema,
   projectLibrarySnapshotV1Schema,
   queryEnvelopeV1Schema,
+  rawEngineAgentReplayFixtureV1Schema,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
@@ -109,6 +110,7 @@ import {
   sampleProjectLibrarySnapshotQueryV1,
   sampleProjectLibrarySnapshotV1,
   sampleQueryEnvelopeV1,
+  sampleRawEngineAgentReplayFixtureV1,
   sampleRawEngineAppServerToolCallValidationV1,
   sampleToolRegistryV1,
   sampleToneColorApplyCommandEnvelopeV1,
@@ -146,6 +148,11 @@ const validSamples: ReadonlyArray<{
     name: 'app-server tool call validation',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleRawEngineAppServerToolCallValidationV1,
+  },
+  {
+    name: 'agent replay fixture',
+    schema: rawEngineAgentReplayFixtureV1Schema,
+    value: sampleRawEngineAgentReplayFixtureV1,
   },
   {
     name: 'edit graph snapshot query',
@@ -431,6 +438,13 @@ const expectInvalid = (name: string, schema: z.ZodType, value: unknown) => {
   }
 };
 
+const replayDryRunStep = sampleRawEngineAgentReplayFixtureV1.steps[0];
+const replayApplyStep = sampleRawEngineAgentReplayFixtureV1.steps[1];
+
+if (replayDryRunStep === undefined || replayApplyStep === undefined) {
+  throw new Error('Expected sample agent replay fixture to contain dry-run and apply steps.');
+}
+
 for (const sample of validSamples) {
   const parsed = sample.schema.safeParse(sample.value);
   if (!parsed.success) {
@@ -478,6 +492,70 @@ expectInvalid('app-server tool call with mismatched dryRun flag', rawEngineAppSe
     ...sampleRawEngineAppServerToolCallValidationV1.toolCall,
     dryRun: false,
   },
+});
+
+expectInvalid('agent replay with unregistered tool', rawEngineAgentReplayFixtureV1Schema, {
+  ...sampleRawEngineAgentReplayFixtureV1,
+  steps: [
+    {
+      ...replayDryRunStep,
+      toolName: 'tonecolor.unregistered_command',
+    },
+    replayApplyStep,
+  ],
+});
+
+expectInvalid('agent replay with mismatched input schema', rawEngineAgentReplayFixtureV1Schema, {
+  ...sampleRawEngineAgentReplayFixtureV1,
+  steps: [
+    {
+      ...replayDryRunStep,
+      inputSchemaName: 'QueryEnvelopeV1',
+    },
+    replayApplyStep,
+  ],
+});
+
+expectInvalid('agent replay mutating step without approval', rawEngineAgentReplayFixtureV1Schema, {
+  ...sampleRawEngineAgentReplayFixtureV1,
+  steps: [
+    replayDryRunStep,
+    {
+      ...replayApplyStep,
+      approval: {
+        ...replayApplyStep.approval,
+        state: 'pending',
+      },
+    },
+  ],
+});
+
+expectInvalid('agent replay dry-run marked as mutating', rawEngineAgentReplayFixtureV1Schema, {
+  ...sampleRawEngineAgentReplayFixtureV1,
+  steps: [
+    {
+      ...replayDryRunStep,
+      mutates: true,
+      resultingGraphRevision: 'graph_rev_invalid_preview_mutation',
+    },
+    replayApplyStep,
+  ],
+});
+
+expectInvalid('agent replay with future prerequisite', rawEngineAgentReplayFixtureV1Schema, {
+  ...sampleRawEngineAgentReplayFixtureV1,
+  steps: [
+    {
+      ...replayDryRunStep,
+      prerequisiteStepIds: ['step_tone_color_apply'],
+    },
+    replayApplyStep,
+  ],
+});
+
+expectInvalid('agent replay with mismatched final graph revision', rawEngineAgentReplayFixtureV1Schema, {
+  ...sampleRawEngineAgentReplayFixtureV1,
+  finalGraphRevision: 'graph_rev_not_from_last_mutation',
 });
 
 expectInvalid('preview scope result without scope payloads', previewScopeResultV1Schema, {
