@@ -34,6 +34,7 @@
     "check:licenses": "bun run check:licenses:js && bun run check:licenses:rust",
     "check:licenses:js": "bun scripts/check-js-dependency-licenses.mjs",
     "check:licenses:rust": "cd src-tauri && cargo deny check licenses",
+    "check:visual-smoke": "bun scripts/capture-visual-smoke.mjs",
     "check:bundle": "bun run build:frontend && bun run check:bundle:budget",
     "check:bundle:budget": "bun scripts/check-vite-bundle-budget.mjs",
     "check:ci-paths": "bun scripts/ci-classify-macos-smoke.mjs --self-test",
@@ -82,6 +83,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/cli": "^2.11.1",
     "@types/lodash.debounce": "^4.0.9",
