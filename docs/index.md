@@ -25,6 +25,7 @@ generator before the release workflow needs one.
 - [Developer API guide](api/developer-api-guide-2026-06-11.md)
 - [Edit command API baseline](api/edit-command-api-2026-06-11.md)
 - [Sample agent guide](agent/sample-agent-guide-2026-06-11.md)
+- [App-server agent architecture](agent/app-server-architecture-2026-06-12.md)
 - [Architecture baseline](baseline/rapidraw-architecture-baseline-2026-06-11.md)
 - [AI hooks baseline](baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
 - [GPU shader baseline](baseline/rapidraw-gpu-shader-baseline-2026-06-11.md)

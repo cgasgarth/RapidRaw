@@ -43,6 +43,10 @@
           "path": "docs/agent/sample-agent-guide-2026-06-11.md"
         },
         {
+          "title": "App-server agent architecture",
+          "path": "docs/agent/app-server-architecture-2026-06-12.md"
+        },
+        {
           "title": "Architecture baseline",
           "path": "docs/baseline/rapidraw-architecture-baseline-2026-06-11.md"
         },
