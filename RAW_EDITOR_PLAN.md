@@ -4660,7 +4660,8 @@ Issues:
 - Add exposure normalization.
 - Add multi-row support audit. Initial audit captured in
   `docs/panorama/multi-row-support-audit-2026-06-13.md`.
-- Add large panorama tiling strategy.
+- Add large panorama tiling strategy. Initial strategy captured in
+  `docs/panorama/large-panorama-tiling-strategy-2026-06-13.md`.
 - Add panorama fixture set.
 - Add panorama UI.
 - Add panorama API tools.

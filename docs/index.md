@@ -34,6 +34,7 @@ generator before the release workflow needs one.
 - [Negative Lab stock-family research mapping](negative-lab/stock-family-research-mapping-2026-06-13.md)
 - [RapidRAW panorama stitcher audit](panorama/rapidraw-stitcher-audit-2026-06-13.md)
 - [Panorama multi-row support audit](panorama/multi-row-support-audit-2026-06-13.md)
+- [Large panorama tiling strategy](panorama/large-panorama-tiling-strategy-2026-06-13.md)
 - [Architecture baseline](baseline/rapidraw-architecture-baseline-2026-06-11.md)
 - [AI hooks baseline](baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
 - [GPU shader baseline](baseline/rapidraw-gpu-shader-baseline-2026-06-11.md)
