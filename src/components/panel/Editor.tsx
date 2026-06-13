@@ -310,16 +310,16 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const handleWbPicked = useCallback(() => {}, []);
 
   useEffect(() => {
-    if (isFullScreen) {
-      setToolbarOverflowVisible(false);
-    } else {
-      const timer = setTimeout(() => {
-        setToolbarOverflowVisible(true);
-      }, 300);
-      return () => {
-        clearTimeout(timer);
-      };
-    }
+    const timer = setTimeout(
+      () => {
+        setToolbarOverflowVisible(!isFullScreen);
+      },
+      isFullScreen ? 0 : 300,
+    );
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [isFullScreen]);
 
   const isCropping = activeRightPanel === Panel.Crop;
@@ -979,15 +979,28 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       isInitialMount.current = false;
       return;
     }
-    if (showOriginal) {
+
+    if (!showOriginal) return;
+
+    const syncTimer = setTimeout(() => {
       setEditor({ showOriginal: false });
-    }
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [adjustments, setEditor, showOriginal]);
 
   useEffect(() => {
-    if (!isMasking && !isAiEditing) {
+    if (isMasking || isAiEditing) return;
+
+    const syncTimer = setTimeout(() => {
       setIsMaskTouchInteracting(false);
-    }
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [isMasking, isAiEditing]);
 
   const hasDisplayableImage = finalPreviewUrl || selectedImage?.thumbnailUrl;
@@ -1457,14 +1470,13 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   ]);
 
   useEffect(() => {
-    let timer: number;
-    if (showSpinner) {
-      setIsLoaderVisible(true);
-    } else {
-      timer = setTimeout(() => {
-        setIsLoaderVisible(false);
-      }, 300);
-    }
+    const timer = setTimeout(
+      () => {
+        setIsLoaderVisible(showSpinner);
+      },
+      showSpinner ? 0 : 300,
+    );
+
     return () => {
       clearTimeout(timer);
     };
@@ -1475,85 +1487,52 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       return;
     }
 
-    const { aspectRatio, orientationSteps, crop: currentAdjCrop, rotation } = adjustments;
-    const effectiveRotation = liveRotation !== null ? liveRotation : rotation;
+    const cropTimer = setTimeout(() => {
+      const { aspectRatio, orientationSteps, crop: currentAdjCrop, rotation } = adjustments;
+      const effectiveRotation = liveRotation !== null ? liveRotation : rotation;
 
-    const geometryChanged =
-      prevCropParams.current?.rotation !== rotation ||
-      prevCropParams.current.aspectRatio !== aspectRatio ||
-      prevCropParams.current.orientationSteps !== orientationSteps;
+      const geometryChanged =
+        prevCropParams.current?.rotation !== rotation ||
+        prevCropParams.current.aspectRatio !== aspectRatio ||
+        prevCropParams.current.orientationSteps !== orientationSteps;
 
-    const isDraggingRotation = liveRotation !== null;
-    const needsRecalc = currentAdjCrop === null || geometryChanged || isDraggingRotation;
+      const isDraggingRotation = liveRotation !== null;
+      const needsRecalc = currentAdjCrop === null || geometryChanged || isDraggingRotation;
 
-    if (needsRecalc) {
-      const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-      const W = isSwapped ? selectedImage.height : selectedImage.width;
-      const H = isSwapped ? selectedImage.width : selectedImage.height;
-      const A = aspectRatio || W / H;
+      if (needsRecalc) {
+        const isSwapped = orientationSteps === 1 || orientationSteps === 3;
+        const W = isSwapped ? selectedImage.height : selectedImage.width;
+        const H = isSwapped ? selectedImage.width : selectedImage.height;
+        const A = aspectRatio || W / H;
 
-      let nextPixelCrop = currentAdjCrop;
-      const aspectChanged = prevCropParams.current?.aspectRatio !== aspectRatio;
-      const orientationChanged = prevCropParams.current?.orientationSteps !== orientationSteps;
-      const rotationChanged = prevCropParams.current?.rotation !== rotation || isDraggingRotation;
+        let nextPixelCrop = currentAdjCrop;
+        const aspectChanged = prevCropParams.current?.aspectRatio !== aspectRatio;
+        const orientationChanged = prevCropParams.current?.orientationSteps !== orientationSteps;
+        const rotationChanged = prevCropParams.current?.rotation !== rotation || isDraggingRotation;
 
-      let isMaximized = false;
-      if (currentAdjCrop) {
-        const referenceRotation = prevCropParams.current?.rotation ?? rotation;
-        const maxCropForReference = calculateCenteredCrop(
-          selectedImage.width,
-          selectedImage.height,
-          orientationSteps,
-          A,
-          referenceRotation,
-        );
+        let isMaximized = false;
+        if (currentAdjCrop) {
+          const referenceRotation = prevCropParams.current?.rotation ?? rotation;
+          const maxCropForReference = calculateCenteredCrop(
+            selectedImage.width,
+            selectedImage.height,
+            orientationSteps,
+            A,
+            referenceRotation,
+          );
 
-        if (
-          maxCropForReference &&
-          Math.abs(currentAdjCrop.x - maxCropForReference.x) <= 2 &&
-          Math.abs(currentAdjCrop.y - maxCropForReference.y) <= 2 &&
-          Math.abs(currentAdjCrop.width - maxCropForReference.width) <= 2 &&
-          Math.abs(currentAdjCrop.height - maxCropForReference.height) <= 2
-        ) {
-          isMaximized = true;
-        }
-      }
-
-      if (!currentAdjCrop || orientationChanged) {
-        nextPixelCrop = calculateCenteredCrop(
-          selectedImage.width,
-          selectedImage.height,
-          orientationSteps,
-          A,
-          effectiveRotation,
-        );
-      } else if (aspectChanged) {
-        if (!aspectRatio) {
-          nextPixelCrop = currentAdjCrop;
-        } else {
-          const curW = currentAdjCrop.width;
-          const curH = currentAdjCrop.height;
-          const curCx = currentAdjCrop.x + curW / 2;
-          const curCy = currentAdjCrop.y + curH / 2;
-
-          let newW = curW;
-          let newH = curW / A;
-
-          if (newH > curH) {
-            newH = curH;
-            newW = curH * A;
+          if (
+            maxCropForReference &&
+            Math.abs(currentAdjCrop.x - maxCropForReference.x) <= 2 &&
+            Math.abs(currentAdjCrop.y - maxCropForReference.y) <= 2 &&
+            Math.abs(currentAdjCrop.width - maxCropForReference.width) <= 2 &&
+            Math.abs(currentAdjCrop.height - maxCropForReference.height) <= 2
+          ) {
+            isMaximized = true;
           }
-
-          nextPixelCrop = {
-            unit: 'px',
-            x: Math.ceil(curCx - newW / 2),
-            y: Math.ceil(curCy - newH / 2),
-            width: Math.floor(newW),
-            height: Math.floor(newH),
-          };
         }
 
-        if (!checkCropValid(nextPixelCrop, W, H, effectiveRotation)) {
+        if (!currentAdjCrop || orientationChanged) {
           nextPixelCrop = calculateCenteredCrop(
             selectedImage.width,
             selectedImage.height,
@@ -1561,44 +1540,33 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
             A,
             effectiveRotation,
           );
-        }
-      } else if (isMaximized && rotationChanged) {
-        nextPixelCrop = calculateCenteredCrop(
-          selectedImage.width,
-          selectedImage.height,
-          orientationSteps,
-          A,
-          effectiveRotation,
-        );
-      } else {
-        if (!checkCropValid(currentAdjCrop, W, H, effectiveRotation)) {
-          let low = 0.1;
-          let high = 1.0;
-          let bestCrop = currentAdjCrop;
+        } else if (aspectChanged) {
+          if (!aspectRatio) {
+            nextPixelCrop = currentAdjCrop;
+          } else {
+            const curW = currentAdjCrop.width;
+            const curH = currentAdjCrop.height;
+            const curCx = currentAdjCrop.x + curW / 2;
+            const curCy = currentAdjCrop.y + curH / 2;
 
-          for (let i = 0; i < 10; i++) {
-            const mid = (low + high) / 2;
-            const cx = currentAdjCrop.x + currentAdjCrop.width / 2;
-            const cy = currentAdjCrop.y + currentAdjCrop.height / 2;
-            const nw = currentAdjCrop.width * mid;
-            const nh = currentAdjCrop.height * mid;
-            const testCrop = {
-              unit: 'px' as const,
-              x: cx - nw / 2,
-              y: cy - nh / 2,
-              width: nw,
-              height: nh,
-            };
+            let newW = curW;
+            let newH = curW / A;
 
-            if (checkCropValid(testCrop, W, H, effectiveRotation)) {
-              bestCrop = testCrop;
-              low = mid;
-            } else {
-              high = mid;
+            if (newH > curH) {
+              newH = curH;
+              newW = curH * A;
             }
+
+            nextPixelCrop = {
+              unit: 'px',
+              x: Math.ceil(curCx - newW / 2),
+              y: Math.ceil(curCy - newH / 2),
+              width: Math.floor(newW),
+              height: Math.floor(newH),
+            };
           }
 
-          if (low < 0.15) {
+          if (!checkCropValid(nextPixelCrop, W, H, effectiveRotation)) {
             nextPixelCrop = calculateCenteredCrop(
               selectedImage.width,
               selectedImage.height,
@@ -1606,45 +1574,95 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
               A,
               effectiveRotation,
             );
-          } else {
-            nextPixelCrop = {
-              unit: 'px',
-              x: Math.ceil(bestCrop.x),
-              y: Math.ceil(bestCrop.y),
-              width: Math.floor(bestCrop.width),
-              height: Math.floor(bestCrop.height),
+          }
+        } else if (isMaximized && rotationChanged) {
+          nextPixelCrop = calculateCenteredCrop(
+            selectedImage.width,
+            selectedImage.height,
+            orientationSteps,
+            A,
+            effectiveRotation,
+          );
+        } else {
+          if (!checkCropValid(currentAdjCrop, W, H, effectiveRotation)) {
+            let low = 0.1;
+            let high = 1.0;
+            let bestCrop = currentAdjCrop;
+
+            for (let i = 0; i < 10; i++) {
+              const mid = (low + high) / 2;
+              const cx = currentAdjCrop.x + currentAdjCrop.width / 2;
+              const cy = currentAdjCrop.y + currentAdjCrop.height / 2;
+              const nw = currentAdjCrop.width * mid;
+              const nh = currentAdjCrop.height * mid;
+              const testCrop = {
+                unit: 'px' as const,
+                x: cx - nw / 2,
+                y: cy - nh / 2,
+                width: nw,
+                height: nh,
+              };
+
+              if (checkCropValid(testCrop, W, H, effectiveRotation)) {
+                bestCrop = testCrop;
+                low = mid;
+              } else {
+                high = mid;
+              }
+            }
+
+            if (low < 0.15) {
+              nextPixelCrop = calculateCenteredCrop(
+                selectedImage.width,
+                selectedImage.height,
+                orientationSteps,
+                A,
+                effectiveRotation,
+              );
+            } else {
+              nextPixelCrop = {
+                unit: 'px',
+                x: Math.ceil(bestCrop.x),
+                y: Math.ceil(bestCrop.y),
+                width: Math.floor(bestCrop.width),
+                height: Math.floor(bestCrop.height),
+              };
+            }
+          }
+        }
+
+        if (isDraggingRotation) {
+          if (nextPixelCrop) {
+            const pc: PercentCrop = {
+              unit: '%',
+              x: (nextPixelCrop.x / W) * 100,
+              y: (nextPixelCrop.y / H) * 100,
+              width: (nextPixelCrop.width / W) * 100,
+              height: (nextPixelCrop.height / H) * 100,
             };
+            setCrop(pc);
+            lastValidCropRef.current = pc;
+          }
+        } else {
+          prevCropParams.current = { rotation, aspectRatio, orientationSteps };
+
+          if (
+            nextPixelCrop &&
+            (!currentAdjCrop ||
+              Math.abs(currentAdjCrop.x - nextPixelCrop.x) > 1 ||
+              Math.abs(currentAdjCrop.y - nextPixelCrop.y) > 1 ||
+              Math.abs(currentAdjCrop.width - nextPixelCrop.width) > 1 ||
+              Math.abs(currentAdjCrop.height - nextPixelCrop.height) > 1)
+          ) {
+            setAdjustments((prev: Adjustments) => ({ ...prev, crop: nextPixelCrop }));
           }
         }
       }
+    }, 0);
 
-      if (isDraggingRotation) {
-        if (nextPixelCrop) {
-          const pc: PercentCrop = {
-            unit: '%',
-            x: (nextPixelCrop.x / W) * 100,
-            y: (nextPixelCrop.y / H) * 100,
-            width: (nextPixelCrop.width / W) * 100,
-            height: (nextPixelCrop.height / H) * 100,
-          };
-          setCrop(pc);
-          lastValidCropRef.current = pc;
-        }
-      } else {
-        prevCropParams.current = { rotation, aspectRatio, orientationSteps };
-
-        if (
-          nextPixelCrop &&
-          (!currentAdjCrop ||
-            Math.abs(currentAdjCrop.x - nextPixelCrop.x) > 1 ||
-            Math.abs(currentAdjCrop.y - nextPixelCrop.y) > 1 ||
-            Math.abs(currentAdjCrop.width - nextPixelCrop.width) > 1 ||
-            Math.abs(currentAdjCrop.height - nextPixelCrop.height) > 1)
-        ) {
-          setAdjustments((prev: Adjustments) => ({ ...prev, crop: nextPixelCrop }));
-        }
-      }
-    }
+    return () => {
+      clearTimeout(cropTimer);
+    };
   }, [
     adjustments.aspectRatio,
     adjustments.crop,
@@ -1658,33 +1676,39 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   ]);
 
   useEffect(() => {
-    if (!isCropping || !selectedImage?.width) {
-      setCrop(null);
-      return;
-    }
+    const syncTimer = setTimeout(() => {
+      if (!isCropping || !selectedImage?.width) {
+        setCrop(null);
+        return;
+      }
 
-    if (liveRotation !== null) {
-      return;
-    }
+      if (liveRotation !== null) {
+        return;
+      }
 
-    const orientationSteps = adjustments.orientationSteps || 0;
-    const isSwapped = orientationSteps === 1 || orientationSteps === 3;
-    const cropBaseWidth = isSwapped ? selectedImage.height : selectedImage.width;
-    const cropBaseHeight = isSwapped ? selectedImage.width : selectedImage.height;
+      const orientationSteps = adjustments.orientationSteps || 0;
+      const isSwapped = orientationSteps === 1 || orientationSteps === 3;
+      const cropBaseWidth = isSwapped ? selectedImage.height : selectedImage.width;
+      const cropBaseHeight = isSwapped ? selectedImage.width : selectedImage.height;
 
-    const { crop: pixelCrop } = adjustments;
+      const { crop: pixelCrop } = adjustments;
 
-    if (pixelCrop) {
-      const pct: PercentCrop = {
-        unit: '%',
-        x: (pixelCrop.x / cropBaseWidth) * 100,
-        y: (pixelCrop.y / cropBaseHeight) * 100,
-        width: (pixelCrop.width / cropBaseWidth) * 100,
-        height: (pixelCrop.height / cropBaseHeight) * 100,
-      };
-      setCrop(pct);
-      lastValidCropRef.current = pct;
-    }
+      if (pixelCrop) {
+        const pct: PercentCrop = {
+          unit: '%',
+          x: (pixelCrop.x / cropBaseWidth) * 100,
+          y: (pixelCrop.y / cropBaseHeight) * 100,
+          width: (pixelCrop.width / cropBaseWidth) * 100,
+          height: (pixelCrop.height / cropBaseHeight) * 100,
+        };
+        setCrop(pct);
+        lastValidCropRef.current = pct;
+      }
+    }, 0);
+
+    return () => {
+      clearTimeout(syncTimer);
+    };
   }, [isCropping, adjustments, adjustments.crop, adjustments.orientationSteps, selectedImage, liveRotation]);
 
   const handleCropChange = useCallback(
