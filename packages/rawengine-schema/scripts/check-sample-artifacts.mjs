@@ -66,6 +66,8 @@ import {
 } from '../src/rawEngineSchemas.ts';
 import {
   sampleAiAppServerToolManifestV1,
+  sampleAiMaskApplyAppServerToolCallValidationV1,
+  sampleAiMaskDryRunAppServerToolCallValidationV1,
   sampleAiToolAgentReplayFixtureV1,
   sampleAiToolApplyCommandEnvelopeV1,
   sampleAiToolApplyResultV1,
@@ -203,6 +205,18 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/ai-app-server-tool-manifest-v1.json',
     schema: aiAppServerToolManifestV1Schema,
     value: sampleAiAppServerToolManifestV1,
+  },
+  {
+    name: 'AI mask dry-run app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/ai-mask-dry-run-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleAiMaskDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'AI mask apply app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/ai-mask-apply-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleAiMaskApplyAppServerToolCallValidationV1,
   },
   {
     name: 'edit graph snapshot query',
