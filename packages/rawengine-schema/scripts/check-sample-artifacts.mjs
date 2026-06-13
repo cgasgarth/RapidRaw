@@ -53,6 +53,7 @@ import {
   projectLibrarySnapshotQueryV1Schema,
   projectLibrarySnapshotV1Schema,
   queryEnvelopeV1Schema,
+  rawEngineAgentReplayFixtureV1Schema,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
@@ -110,6 +111,7 @@ import {
   sampleProjectLibrarySnapshotQueryV1,
   sampleProjectLibrarySnapshotV1,
   sampleQueryEnvelopeV1,
+  sampleRawEngineAgentReplayFixtureV1,
   sampleRawEngineAppServerToolCallValidationV1,
   sampleToolRegistryV1,
   sampleToneColorCommandEnvelopeV1,
@@ -149,6 +151,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/app-server-tool-call-validation-v1.json',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleRawEngineAppServerToolCallValidationV1,
+  },
+  {
+    name: 'agent replay fixture',
+    path: 'packages/rawengine-schema/samples/agent-replay-fixture-v1.json',
+    schema: rawEngineAgentReplayFixtureV1Schema,
+    value: sampleRawEngineAgentReplayFixtureV1,
   },
   {
     name: 'edit graph snapshot query',
