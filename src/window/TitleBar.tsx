@@ -1,8 +1,9 @@
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { platform } from '@tauri-apps/plugin-os';
 import { Minus, Square, X } from 'lucide-react';
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { getOptionalCurrentWindow } from './currentWindow';
 
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
@@ -28,9 +29,13 @@ export default function TitleBar() {
   const [osPlatform, setOsPlatform] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
 
-  const appWindow = getCurrentWindow();
+  const appWindow = useMemo(() => getOptionalCurrentWindow(), []);
 
   useEffect(() => {
+    if (!appWindow) {
+      return;
+    }
+
     const getPlatform = () => {
       try {
         const p = platform();
@@ -41,12 +46,17 @@ export default function TitleBar() {
       }
     };
     getPlatform();
-  }, []);
+  }, [appWindow]);
 
   useEffect(() => {
+    if (!appWindow) {
+      return undefined;
+    }
+    const activeWindow = appWindow;
+
     const updateMaximizedState = async () => {
       try {
-        const max = await appWindow.isMaximized();
+        const max = await activeWindow.isMaximized();
         setIsMaximized(max);
       } catch (error) {
         console.error('Failed to check maximized state:', error);
@@ -57,7 +67,7 @@ export default function TitleBar() {
 
     let unlisten: (() => void) | undefined;
     let didCleanup = false;
-    void appWindow
+    void activeWindow
       .onResized(() => {
         void updateMaximizedState();
       })
@@ -79,16 +89,20 @@ export default function TitleBar() {
   }, [appWindow]);
 
   const handleMinimize = useCallback(() => {
-    void appWindow.minimize();
+    void appWindow?.minimize();
   }, [appWindow]);
 
   const handleClose = useCallback(() => {
-    void appWindow.close();
+    void appWindow?.close();
   }, [appWindow]);
 
   const handleMaximize = useCallback(() => {
     void (async () => {
       try {
+        if (!appWindow) {
+          return;
+        }
+
         if (osPlatform === 'macos') {
           const isFullscreen = await appWindow.isFullscreen();
           await appWindow.setFullscreen(!isFullscreen);
@@ -105,6 +119,16 @@ export default function TitleBar() {
   const isLinux = osPlatform === 'linux';
   const isWindows = osPlatform === 'windows';
   const isMobile = osPlatform === 'android';
+  if (!appWindow) {
+    return (
+      <div className="relative pt-2 px-2 w-full z-50 bg-transparent">
+        <div className="h-10 bg-bg-secondary flex items-center select-none rounded-lg overflow-hidden px-4">
+          <p className="text-sm font-semibold text-text-secondary pointer-events-none">{t('library.splash.brand')}</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!osPlatform || isMobile) {
     return null;
   }

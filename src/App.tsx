@@ -1,7 +1,6 @@
 import { ClerkProvider } from '@clerk/react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import cx from 'clsx';
 import { type PointerEvent as ReactPointerEvent, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ToastContainer, toast, Slide } from 'react-toastify';
@@ -48,6 +47,7 @@ import { useLibraryStore } from './store/useLibraryStore';
 import { useProcessStore } from './store/useProcessStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
+import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
 
 import type { FolderTree as FolderTreeNode } from './components/panel/FolderTree';
@@ -599,7 +599,12 @@ function App() {
   };
 
   useEffect(() => {
-    const appWindow = getCurrentWindow();
+    const appWindow = getOptionalCurrentWindow();
+    if (!appWindow) {
+      setUI({ isWindowFullScreen: false });
+      return undefined;
+    }
+
     const checkFullscreen = async () => {
       setUI({ isWindowFullScreen: await appWindow.isFullscreen() });
     };
