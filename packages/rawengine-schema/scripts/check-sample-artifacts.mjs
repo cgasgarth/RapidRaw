@@ -19,6 +19,7 @@ import {
   negativeLabFixtureManifestV1Schema,
   negativeLabFrameDetectionResultV1Schema,
   negativeLabInputProfileCatalogV1Schema,
+  negativeLabPerChannelInversionCurveSetV1Schema,
   negativeLabPresetMetadataPolicyCatalogV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
@@ -43,6 +44,7 @@ import {
   sampleNegativeLabFixtureManifestV1,
   sampleNegativeLabFrameDetectionResultV1,
   sampleNegativeLabInputProfileCatalogV1,
+  sampleNegativeLabPerChannelInversionCurveSetV1,
   sampleNegativeLabPresetMetadataPolicyCatalogV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
@@ -122,6 +124,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/negative-lab-process-profile-v1.json',
     schema: negativeLabProcessProfileV1Schema,
     value: sampleNegativeLabProcessProfileV1,
+  },
+  {
+    name: 'negative lab per-channel inversion curve set',
+    path: 'packages/rawengine-schema/samples/negative-lab-per-channel-inversion-curve-set-v1.json',
+    schema: negativeLabPerChannelInversionCurveSetV1Schema,
+    value: sampleNegativeLabPerChannelInversionCurveSetV1,
   },
   {
     name: 'negative lab QC proof artifact',

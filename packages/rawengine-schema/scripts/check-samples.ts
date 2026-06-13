@@ -14,6 +14,7 @@ import {
   negativeLabFixtureManifestV1Schema,
   negativeLabFrameDetectionResultV1Schema,
   negativeLabInputProfileCatalogV1Schema,
+  negativeLabPerChannelInversionCurveSetV1Schema,
   negativeLabPresetMetadataPolicyCatalogV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
@@ -39,6 +40,7 @@ import {
   sampleNegativeLabFixtureManifestV1,
   sampleNegativeLabFrameDetectionResultV1,
   sampleNegativeLabInputProfileCatalogV1,
+  sampleNegativeLabPerChannelInversionCurveSetV1,
   sampleNegativeLabPresetMetadataPolicyCatalogV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
@@ -134,6 +136,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab process profile',
     schema: negativeLabProcessProfileV1Schema,
     value: sampleNegativeLabProcessProfileV1,
+  },
+  {
+    name: 'negative lab per-channel inversion curve set',
+    schema: negativeLabPerChannelInversionCurveSetV1Schema,
+    value: sampleNegativeLabPerChannelInversionCurveSetV1,
   },
   {
     name: 'negative lab QC proof artifact',
@@ -407,6 +414,57 @@ const invalidProcessProfileResult = negativeLabProcessProfileV1Schema.safeParse(
 if (invalidProcessProfileResult.success) {
   throw new Error('Expected process profiles to reject non-monotonic density curves.');
 }
+
+const [sampleRedDensityCurve] = sampleNegativeLabProcessProfileV1.densityCurves;
+if (sampleRedDensityCurve === undefined) {
+  throw new Error('Expected process profile sample to include a red density curve.');
+}
+
+const invalidDuplicateInversionCurveSet = {
+  ...sampleNegativeLabPerChannelInversionCurveSetV1,
+  densityCurves: [sampleRedDensityCurve, sampleRedDensityCurve],
+};
+expectInvalid(
+  'per-channel inversion curve set with duplicate channels',
+  negativeLabPerChannelInversionCurveSetV1Schema,
+  invalidDuplicateInversionCurveSet,
+);
+
+const invalidBlackAndWhiteInversionCurveSet = {
+  ...sampleNegativeLabPerChannelInversionCurveSetV1,
+  colorMode: 'black_and_white_luminance',
+};
+expectInvalid(
+  'black-and-white inversion curve set with RGB curves',
+  negativeLabPerChannelInversionCurveSetV1Schema,
+  invalidBlackAndWhiteInversionCurveSet,
+);
+
+if (sampleNegativeLabCommandEnvelopeV1.commandType !== 'negativeLab.setConversionRecipe') {
+  throw new Error('Expected command sample to use negativeLab.setConversionRecipe.');
+}
+
+const sampleConversionRecipeParameters = sampleNegativeLabCommandEnvelopeV1.parameters;
+const curveModelWithoutInversionCurveSet = {
+  curveFamily: sampleConversionRecipeParameters.curveModel.curveFamily,
+  inversionCurveSetPolicy: 'use_curve_set_override',
+  normalizationProfileId: sampleConversionRecipeParameters.curveModel.normalizationProfileId,
+  normalizationProfileVersion: sampleConversionRecipeParameters.curveModel.normalizationProfileVersion,
+  processProfileId: sampleConversionRecipeParameters.curveModel.processProfileId,
+  processProfileVersion: sampleConversionRecipeParameters.curveModel.processProfileVersion,
+};
+const invalidCurveOverrideCommand = {
+  ...sampleNegativeLabCommandEnvelopeV1,
+  parameters: {
+    ...sampleConversionRecipeParameters,
+    curveModel: curveModelWithoutInversionCurveSet,
+  },
+};
+expectInvalid(
+  'curve override command without curve set',
+  negativeLabCommandEnvelopeV1Schema,
+  invalidCurveOverrideCommand,
+);
 
 const [sampleDetectedFrame] = sampleNegativeLabFrameDetectionResultV1.detectedFrames;
 if (sampleDetectedFrame === undefined) {
