@@ -25,6 +25,7 @@ without exposing runtime app-server tools yet.
 - `NegativeLabFrameDetectionResultV1`
 - `NegativeLabProcessProfileV1`
 - `NegativeLabBuiltInPresetCatalogV1`
+- `NegativeLabPresetMetadataPolicyCatalogV1`
 - `NegativeLabQcProofArtifactV1`
 - `NegativeLabFixtureManifestV1`
 - `NegativeLabInputProfileCatalogV1`
@@ -72,6 +73,7 @@ Negative Lab density/process profile samples include:
 - `negative-lab-frame-detection-result-v1.json`
 - `negative-lab-process-profile-v1.json`
 - `negative-lab-built-in-preset-catalog-v1.json`
+- `negative-lab-preset-metadata-policy-catalog-v1.json`
 - `negative-lab-qc-proof-artifact-v1.json`
 - `negative-lab-fixture-manifest-v1.json`
 - `negative-lab-input-profile-catalog-v1.json`

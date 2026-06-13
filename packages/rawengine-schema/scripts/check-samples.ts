@@ -14,6 +14,7 @@ import {
   negativeLabFixtureManifestV1Schema,
   negativeLabFrameDetectionResultV1Schema,
   negativeLabInputProfileCatalogV1Schema,
+  negativeLabPresetMetadataPolicyCatalogV1Schema,
   negativeLabPositiveVariantProvenanceV1Schema,
   negativeLabProcessProfileV1Schema,
   negativeLabQcProofArtifactV1Schema,
@@ -37,6 +38,7 @@ import {
   sampleNegativeLabFixtureManifestV1,
   sampleNegativeLabFrameDetectionResultV1,
   sampleNegativeLabInputProfileCatalogV1,
+  sampleNegativeLabPresetMetadataPolicyCatalogV1,
   sampleNegativeLabPositiveVariantProvenanceV1,
   sampleNegativeLabProcessProfileV1,
   sampleNegativeLabQcProofArtifactV1,
@@ -145,6 +147,11 @@ const validSamples: ReadonlyArray<{
     name: 'negative lab built-in preset catalog',
     schema: negativeLabBuiltInPresetCatalogV1Schema,
     value: sampleNegativeLabBuiltInPresetCatalogV1,
+  },
+  {
+    name: 'negative lab preset metadata policy catalog',
+    schema: negativeLabPresetMetadataPolicyCatalogV1Schema,
+    value: sampleNegativeLabPresetMetadataPolicyCatalogV1,
   },
   {
     name: 'negative lab fixture manifest',
@@ -591,6 +598,135 @@ expectInvalid(
   'generic built-in preset catalog that allows lab JPEG without required warnings',
   negativeLabBuiltInPresetCatalogV1Schema,
   invalidGenericPresetLabJpegWithoutWarnings,
+);
+
+const [
+  sampleGenericPresetPolicy,
+  sampleStockFamilyPresetPolicy,
+  sampleMeasuredPresetPolicy,
+  sampleLicensedPresetPolicy,
+  sampleBlockedPresetPolicy,
+] = sampleNegativeLabPresetMetadataPolicyCatalogV1.policies;
+if (
+  sampleGenericPresetPolicy === undefined ||
+  sampleStockFamilyPresetPolicy === undefined ||
+  sampleMeasuredPresetPolicy === undefined ||
+  sampleLicensedPresetPolicy === undefined ||
+  sampleBlockedPresetPolicy === undefined
+) {
+  throw new Error('Expected preset metadata policy catalog sample to include all policy tiers.');
+}
+
+const invalidPresetPolicyGenericManufacturerClaim = {
+  ...sampleNegativeLabPresetMetadataPolicyCatalogV1,
+  policies: [
+    {
+      ...sampleGenericPresetPolicy,
+      allowedClaims: {
+        ...sampleGenericPresetPolicy.allowedClaims,
+        manufacturerName: true,
+      },
+    },
+    ...sampleNegativeLabPresetMetadataPolicyCatalogV1.policies.slice(1),
+  ],
+};
+expectInvalid(
+  'preset metadata policy catalog with generic manufacturer claims',
+  negativeLabPresetMetadataPolicyCatalogV1Schema,
+  invalidPresetPolicyGenericManufacturerClaim,
+);
+
+const invalidPresetPolicyStockFamilyWithoutCitations = {
+  ...sampleNegativeLabPresetMetadataPolicyCatalogV1,
+  policies: [
+    sampleGenericPresetPolicy,
+    {
+      ...sampleStockFamilyPresetPolicy,
+      sourceRequirements: {
+        ...sampleStockFamilyPresetPolicy.sourceRequirements,
+        sourceCitationIds: [],
+      },
+    },
+    ...sampleNegativeLabPresetMetadataPolicyCatalogV1.policies.slice(2),
+  ],
+};
+expectInvalid(
+  'preset metadata policy catalog with stock-family policy missing citations',
+  negativeLabPresetMetadataPolicyCatalogV1Schema,
+  invalidPresetPolicyStockFamilyWithoutCitations,
+);
+
+const invalidPresetPolicyMeasuredWithoutFixture = {
+  ...sampleNegativeLabPresetMetadataPolicyCatalogV1,
+  policies: [
+    ...sampleNegativeLabPresetMetadataPolicyCatalogV1.policies.slice(0, 2),
+    {
+      ...sampleMeasuredPresetPolicy,
+      sourceRequirements: {
+        ...sampleMeasuredPresetPolicy.sourceRequirements,
+        fixtureIds: [],
+      },
+    },
+    ...sampleNegativeLabPresetMetadataPolicyCatalogV1.policies.slice(3),
+  ],
+};
+expectInvalid(
+  'preset metadata policy catalog with measured policy missing fixture IDs',
+  negativeLabPresetMetadataPolicyCatalogV1Schema,
+  invalidPresetPolicyMeasuredWithoutFixture,
+);
+
+const invalidPresetPolicyLicensedWithoutLicense = {
+  ...sampleNegativeLabPresetMetadataPolicyCatalogV1,
+  policies: [
+    ...sampleNegativeLabPresetMetadataPolicyCatalogV1.policies.slice(0, 3),
+    {
+      ...sampleLicensedPresetPolicy,
+      sourceRequirements: {
+        ...sampleLicensedPresetPolicy.sourceRequirements,
+        licenseRecordIds: [],
+      },
+    },
+    ...sampleNegativeLabPresetMetadataPolicyCatalogV1.policies.slice(4),
+  ],
+};
+expectInvalid(
+  'preset metadata policy catalog with licensed exact policy missing license records',
+  negativeLabPresetMetadataPolicyCatalogV1Schema,
+  invalidPresetPolicyLicensedWithoutLicense,
+);
+
+const invalidPresetPolicyBlockedInNormalUi = {
+  ...sampleNegativeLabPresetMetadataPolicyCatalogV1,
+  policies: [
+    ...sampleNegativeLabPresetMetadataPolicyCatalogV1.policies.slice(0, 4),
+    {
+      ...sampleBlockedPresetPolicy,
+      allowedUiContexts: ['negative_lab_workspace'],
+    },
+  ],
+};
+expectInvalid(
+  'preset metadata policy catalog with blocked policy visible in normal UI',
+  negativeLabPresetMetadataPolicyCatalogV1Schema,
+  invalidPresetPolicyBlockedInNormalUi,
+);
+
+const invalidPresetPolicyDuplicateIds = {
+  ...sampleNegativeLabPresetMetadataPolicyCatalogV1,
+  policies: [
+    sampleGenericPresetPolicy,
+    {
+      ...sampleStockFamilyPresetPolicy,
+      policyId: sampleGenericPresetPolicy.policyId,
+    },
+    ...sampleNegativeLabPresetMetadataPolicyCatalogV1.policies.slice(2),
+  ],
+};
+expectInvalid(
+  'preset metadata policy catalog with duplicate policy IDs',
+  negativeLabPresetMetadataPolicyCatalogV1Schema,
+  invalidPresetPolicyDuplicateIds,
 );
 
 const [sampleNegativeLabInputProfile, secondSampleNegativeLabInputProfile] =

@@ -1,0 +1,192 @@
+{
+  "catalogId": "negative_lab.preset_policy.catalog.v1",
+  "catalogVersion": "2026-06-13",
+  "policies": [
+    {
+      "allowedClaims": {
+        "competitorCompatibilityClaim": false,
+        "exactStockName": false,
+        "manufacturerEndorsement": false,
+        "manufacturerName": false,
+        "measuredBehavior": false,
+        "officialProfile": false
+      },
+      "allowedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff", "lab_jpeg"],
+      "allowedUiContexts": ["negative_lab_workspace", "preset_browser", "app_server_tool", "export_sidecar"],
+      "claimLevel": "generic_starting_point_only",
+      "displayCopy": {
+        "disclosure": "Generic engineered starting point with no brand, stock, official, or exact-emulation claim.",
+        "label": "Generic Built-In Starting Point"
+      },
+      "legalNamingStatus": "generic_safe_name",
+      "legalReviewStatus": "not_required_generic",
+      "policyId": "negative_lab.preset_policy.generic_builtin.v1",
+      "policyVersion": "2026-06-13",
+      "presetTier": "generic_builtin",
+      "prohibitedClaimPhrases": [
+        "exact emulation",
+        "official profile",
+        "manufacturer approved",
+        "competitor compatible"
+      ],
+      "requiredWarnings": [],
+      "schemaVersion": 1,
+      "sourceRequirements": {
+        "fixtureIds": [],
+        "licenseRecordIds": [],
+        "sourceCitationIds": []
+      },
+      "supportedProcessFamilies": ["c41_color_negative", "black_and_white_silver_negative"]
+    },
+    {
+      "allowedClaims": {
+        "competitorCompatibilityClaim": false,
+        "exactStockName": false,
+        "manufacturerEndorsement": false,
+        "manufacturerName": false,
+        "measuredBehavior": false,
+        "officialProfile": false
+      },
+      "allowedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff"],
+      "allowedUiContexts": ["negative_lab_workspace", "preset_browser", "app_server_tool", "export_sidecar"],
+      "claimLevel": "stock_family_reference_metadata",
+      "displayCopy": {
+        "disclosure": "Reference metadata for a stock family; rendering remains a generic RawEngine starting point.",
+        "label": "Stock Family Reference"
+      },
+      "legalNamingStatus": "descriptive_stock_family",
+      "legalReviewStatus": "required_before_ui",
+      "policyId": "negative_lab.preset_policy.stock_family_reference.v1",
+      "policyVersion": "2026-06-13",
+      "presetTier": "stock_family_reference",
+      "prohibitedClaimPhrases": [
+        "exact stock match",
+        "manufacturer endorsed",
+        "official manufacturer profile",
+        "competitor preset clone"
+      ],
+      "requiredWarnings": ["profile_mismatch"],
+      "schemaVersion": 1,
+      "sourceRequirements": {
+        "fixtureIds": [],
+        "legalReviewIssue": "https://github.com/cgasgarth/RapidRaw/issues/155",
+        "licenseRecordIds": [],
+        "reviewedAt": "2026-06-13",
+        "reviewer": "RawEngine preset policy",
+        "sourceCitationIds": ["negative_lab.stock_family_research_mapping.v1"]
+      },
+      "supportedProcessFamilies": ["c41_color_negative", "black_and_white_silver_negative"]
+    },
+    {
+      "allowedClaims": {
+        "competitorCompatibilityClaim": false,
+        "exactStockName": false,
+        "manufacturerEndorsement": false,
+        "manufacturerName": false,
+        "measuredBehavior": true,
+        "officialProfile": false
+      },
+      "allowedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff"],
+      "allowedUiContexts": ["negative_lab_workspace", "preset_browser", "app_server_tool", "export_sidecar"],
+      "claimLevel": "measured_project_profile",
+      "displayCopy": {
+        "disclosure": "Project-owned measured behavior from approved fixtures; no manufacturer endorsement implied.",
+        "label": "Measured Project Profile"
+      },
+      "legalNamingStatus": "legal_review_required",
+      "legalReviewStatus": "approved",
+      "policyId": "negative_lab.preset_policy.measured_project_profile.v1",
+      "policyVersion": "2026-06-13",
+      "presetTier": "measured_project_profile",
+      "prohibitedClaimPhrases": [
+        "official profile",
+        "manufacturer approved",
+        "competitor compatible",
+        "commercial preset match"
+      ],
+      "requiredWarnings": ["profile_mismatch"],
+      "schemaVersion": 1,
+      "sourceRequirements": {
+        "fixtureIds": ["negative_lab.synthetic.c41_density_ramp_001"],
+        "legalReviewIssue": "https://github.com/cgasgarth/RapidRaw/issues/155",
+        "licenseRecordIds": [],
+        "reviewedAt": "2026-06-13",
+        "reviewer": "RawEngine preset policy",
+        "sourceCitationIds": ["negative_lab.measured_profile_fixture_format.v1"]
+      },
+      "supportedProcessFamilies": ["c41_color_negative"]
+    },
+    {
+      "allowedClaims": {
+        "competitorCompatibilityClaim": false,
+        "exactStockName": true,
+        "manufacturerEndorsement": true,
+        "manufacturerName": true,
+        "measuredBehavior": true,
+        "officialProfile": false
+      },
+      "allowedInputModes": ["camera_raw", "camera_tiff", "flatbed_tiff", "lab_tiff"],
+      "allowedUiContexts": ["negative_lab_workspace", "preset_browser", "app_server_tool", "export_sidecar"],
+      "claimLevel": "licensed_exact_profile",
+      "displayCopy": {
+        "disclosure": "Exact stock and manufacturer naming require approved legal review and a license record.",
+        "label": "Licensed Exact Profile"
+      },
+      "legalNamingStatus": "approved_exact_stock_name",
+      "legalReviewStatus": "approved",
+      "policyId": "negative_lab.preset_policy.licensed_exact_profile.v1",
+      "policyVersion": "2026-06-13",
+      "presetTier": "licensed_profile",
+      "prohibitedClaimPhrases": ["competitor compatible", "commercial preset clone", "unlicensed exact emulation"],
+      "requiredWarnings": ["profile_mismatch"],
+      "schemaVersion": 1,
+      "sourceRequirements": {
+        "fixtureIds": ["negative_lab.synthetic.c41_density_ramp_001"],
+        "legalReviewIssue": "https://github.com/cgasgarth/RapidRaw/issues/155",
+        "licenseRecordIds": ["license_record.project_owned_exact_profile_policy.v1"],
+        "reviewedAt": "2026-06-13",
+        "reviewer": "RawEngine preset policy",
+        "sourceCitationIds": ["negative_lab.fixture_licensing_policy.v1"]
+      },
+      "supportedProcessFamilies": ["c41_color_negative"]
+    },
+    {
+      "allowedClaims": {
+        "competitorCompatibilityClaim": false,
+        "exactStockName": false,
+        "manufacturerEndorsement": false,
+        "manufacturerName": false,
+        "measuredBehavior": false,
+        "officialProfile": false
+      },
+      "allowedInputModes": ["camera_raw"],
+      "allowedUiContexts": ["admin_review_queue"],
+      "claimLevel": "blocked_or_unsupported",
+      "displayCopy": {
+        "disclosure": "Preset metadata is blocked until provenance, licensing, and review requirements are satisfied.",
+        "label": "Blocked Pending Review"
+      },
+      "legalNamingStatus": "legal_review_required",
+      "legalReviewStatus": "blocked",
+      "policyId": "negative_lab.preset_policy.blocked_pending_review.v1",
+      "policyVersion": "2026-06-13",
+      "presetTier": "blocked",
+      "prohibitedClaimPhrases": [
+        "exact emulation",
+        "official profile",
+        "manufacturer approved",
+        "competitor compatible"
+      ],
+      "requiredWarnings": ["profile_mismatch", "low_acquisition_confidence"],
+      "schemaVersion": 1,
+      "sourceRequirements": {
+        "fixtureIds": [],
+        "legalReviewIssue": "https://github.com/cgasgarth/RapidRaw/issues/155",
+        "licenseRecordIds": [],
+        "sourceCitationIds": []
+      },
+      "supportedProcessFamilies": ["c41_color_negative"]
+    }
+  ],
+  "schemaVersion": 1
+}
