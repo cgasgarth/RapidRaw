@@ -4013,6 +4013,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `focus(blend): add blending strategy`
 - `focus(retouch): add artifact retouch strategy`
 - `validation(focus): add focus bracket fixture set`
+  - Doc: `docs/focus-stacking/focus-bracket-fixture-manifest-2026-06-14.md`
 - `ui(focus): add focus stack UI`
 - `api(focus): add focus stack API tools`
 - `validation(focus): add focus stack performance tests`
