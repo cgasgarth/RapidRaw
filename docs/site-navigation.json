@@ -83,6 +83,10 @@
           "path": "docs/color/color-pipeline-design-2026-06-14.md"
         },
         {
+          "title": "White balance picker validation",
+          "path": "docs/color/white-balance-picker-validation-2026-06-14.md"
+        },
+        {
           "title": "Film simulation architecture",
           "path": "docs/film/film-simulation-architecture-2026-06-13.md"
         },

@@ -1,0 +1,59 @@
+[
+  {
+    "case": "neutral gray keeps sliders unchanged",
+    "input": {
+      "currentTemperature": 0,
+      "currentTint": 0,
+      "sample": {
+        "red": 128,
+        "green": 128,
+        "blue": 128
+      }
+    },
+    "expected": {
+      "deltaTemperature": 0,
+      "deltaTint": 0,
+      "temperature": 0,
+      "tint": 0
+    },
+    "tolerance": 0.000001
+  },
+  {
+    "case": "blue sample warms the image",
+    "input": {
+      "currentTemperature": 0,
+      "currentTint": 0,
+      "sample": {
+        "red": 90,
+        "green": 120,
+        "blue": 180
+      }
+    },
+    "expected": {
+      "deltaTemperature": 80.315598,
+      "deltaTint": -78.140341,
+      "temperature": 80.315598,
+      "tint": -78.140341
+    },
+    "tolerance": 0.000001
+  },
+  {
+    "case": "warm magenta sample clamps cool correction",
+    "input": {
+      "currentTemperature": -80,
+      "currentTint": -90,
+      "sample": {
+        "red": 240,
+        "green": 90,
+        "blue": 80
+      }
+    },
+    "expected": {
+      "deltaTemperature": -104.527626,
+      "deltaTint": -259.944238,
+      "temperature": -100,
+      "tint": -100
+    },
+    "tolerance": 0.000001
+  }
+]
