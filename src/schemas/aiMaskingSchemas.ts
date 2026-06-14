@@ -18,7 +18,9 @@ export const parseAiPatchDataJson = (value: string): JsonValue => {
   try {
     parsed = JSON.parse(value);
   } catch (error) {
-    throw new Error(`Invalid AI patch data JSON: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Invalid AI patch data JSON: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error,
+    });
   }
 
   return aiPatchDataSchema.parse(parsed);

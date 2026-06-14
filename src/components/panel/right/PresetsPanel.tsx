@@ -908,7 +908,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
     const isFolder = isFolderEntry(item);
 
-    let options: Array<Option> = [];
+    let options: Array<Option>;
     if (isFolder) {
       options = [
         {

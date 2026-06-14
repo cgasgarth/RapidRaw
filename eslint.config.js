@@ -1,11 +1,14 @@
 const js = require('@eslint/js');
+const { fixupPluginRules } = require('@eslint/compat');
 const tseslint = require('typescript-eslint');
-const react = require('eslint-plugin-react');
+const reactPlugin = require('eslint-plugin-react');
 const reactHooks = require('eslint-plugin-react-hooks');
 const jsxA11y = require('eslint-plugin-jsx-a11y');
 const importX = require('eslint-plugin-import-x');
 const boundaries = require('eslint-plugin-boundaries');
 const i18next = require('eslint-plugin-i18next');
+
+const react = fixupPluginRules(reactPlugin);
 
 const tsFiles = ['**/*.{ts,tsx,mts}'];
 
@@ -19,13 +22,15 @@ const tsStrictTypeChecked = tseslint.configs.strictTypeChecked.map((config) =>
 );
 
 const reactRecommended = {
-  ...react.configs.flat.recommended,
+  ...reactPlugin.configs.flat.recommended,
   files: tsFiles,
+  plugins: { react },
 };
 
 const reactJsxRuntime = {
-  ...react.configs.flat['jsx-runtime'],
+  ...reactPlugin.configs.flat['jsx-runtime'],
   files: tsFiles,
+  plugins: { react },
 };
 
 const reactHooksRecommended = {

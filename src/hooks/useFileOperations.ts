@@ -122,8 +122,8 @@ export function useFileOperations(
       imageList.some((image) => image.path.startsWith(`${firstPathToDelete}?vc=`));
 
     let modalTitle = 'Confirm Delete';
-    let modalMessage = '';
-    let confirmText = 'Delete';
+    let modalMessage: string;
+    let confirmText: string;
 
     if (selectionHasVirtualCopies) {
       modalTitle = 'Delete Image and All Virtual Copies?';
