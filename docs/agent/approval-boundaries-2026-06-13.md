@@ -35,6 +35,5 @@ read tools are marked mutating, app-server apply tools do not require accepted
 dry-run plans, mutating calls lack approved state, or replay steps drift from the
 approval boundary expected by their mutation behavior.
 
-This script is intentionally standalone while dependency/update PRs own
-`package.json`. Once that queue settles, wire it into the normal validation
-entrypoint so approval regressions fail before CI.
+`bun run check:quick` includes this script so approval regressions fail before
+CI reaches slower build and Rust stages.
