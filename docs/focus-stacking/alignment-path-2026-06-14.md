@@ -14,6 +14,10 @@ path that runtime, UI, API, and agent work should implement against.
 
 ### 1. Source Normalization
 
+Source normalization must follow the
+[Focus Stack RAW normalization and color policy](raw-normalization-color-policy-2026-06-14.md)
+before alignment features are detected.
+
 Inputs:
 
 - ordered focus slices with stable source indexes;

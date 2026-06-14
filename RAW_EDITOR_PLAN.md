@@ -4034,6 +4034,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Doc: `docs/focus-stacking/performance-validation-contract-2026-06-14.md`
 - `docs(focus): define RAW normalization and color policy`
   - Issue: #1057
+  - Doc: `docs/focus-stacking/raw-normalization-color-policy-2026-06-14.md`
 - `focus(runtime): add plan-only dry-run preflight`
   - Issue: #1058
 - `validation(focus): add tiny synthetic bracket generator`
