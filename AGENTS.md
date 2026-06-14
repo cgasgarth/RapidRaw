@@ -31,6 +31,24 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - PR bodies should include `How`, `Why`, and validation evidence.
 - Update linked GitHub issues and milestones with evidence as work lands.
 
+## Concise Output Discipline
+
+- Optimize long-running work for low-token operation.
+- Keep routine thread updates to one short sentence. Skip obvious narration and
+  do not repeat the same PR queue, CI, or branch facts unless something changed.
+- Summarize tool output only when it changes the next action, proves validation,
+  or explains a blocker.
+- Use concise conventional commit subjects. Add commit bodies only when the
+  reasoning is not obvious from the diff or linked issue.
+- Keep PR descriptions short: scope, validation commands, non-obvious risks or
+  limits, and linked issue. Do not paste broad background, repeated plans, or
+  large command output.
+- Preserve hard evidence. Exact validation commands, runtime proof, blockers,
+  safety decisions, and accepted or rejected consult advice must remain visible
+  even when other prose is compressed.
+- Prefer updating existing issues, docs, plan entries, and PR descriptions over
+  adding new duplicated summaries.
+
 ## Recurring Reminder Automation
 
 - The standing reminder automation is `check-rapidraw-consult`.
