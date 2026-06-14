@@ -903,6 +903,8 @@ Core editing groups:
 
 ### 7.3 Layers And Masks
 
+Workflow contract: `docs/layers/layer-workflow-model-2026-06-14.md`.
+
 Layer model requirements:
 
 - Multiple edit layers.
@@ -3886,6 +3888,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 #### Milestone 7: Layers And Masking
 
 - `layers(ux): define final layer workflow model`
+  - Contract: `docs/layers/layer-workflow-model-2026-06-14.md`
+  - Runtime status: plan and contract only; runtime layer application remains future work.
 - `ui(layers): add polished layer stack UI`
 - `layers(core): add opacity visibility reorder duplicate delete`
 - `layers(core): add per-layer adjustments`
