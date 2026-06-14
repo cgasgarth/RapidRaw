@@ -1,0 +1,65 @@
+[
+  {
+    "id": "single-adjustment-clamps-exposure",
+    "initialLayers": [{ "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true }],
+    "operations": [{ "type": "setAdjustment", "layerId": "tone", "key": "exposure", "value": 8 }],
+    "expected": {
+      "tone": {
+        "exposure": 5
+      }
+    }
+  },
+  {
+    "id": "patch-adjusts-basic-local-tone",
+    "initialLayers": [
+      { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true }
+    ],
+    "operations": [
+      {
+        "type": "setAdjustments",
+        "layerId": "sky",
+        "patch": {
+          "contrast": 18,
+          "highlights": -42,
+          "shadows": 24,
+          "temperature": -7
+        }
+      }
+    ],
+    "expected": {
+      "sky": {
+        "contrast": 18,
+        "highlights": -42,
+        "shadows": 24,
+        "temperature": -7
+      },
+      "skin": {
+        "contrast": 0,
+        "highlights": 0
+      }
+    }
+  },
+  {
+    "id": "patch-clamps-effect-and-detail-ranges",
+    "initialLayers": [{ "id": "look", "name": "Film Look", "opacity": 100, "visible": true }],
+    "operations": [
+      {
+        "type": "setAdjustments",
+        "layerId": "look",
+        "patch": {
+          "glowAmount": 125,
+          "lumaNoiseReduction": -140,
+          "sharpnessThreshold": -12
+        }
+      }
+    ],
+    "expected": {
+      "look": {
+        "glowAmount": 100,
+        "lumaNoiseReduction": -100,
+        "sharpnessThreshold": 0
+      }
+    }
+  }
+]

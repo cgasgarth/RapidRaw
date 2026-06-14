@@ -3899,6 +3899,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `layers(core): add opacity visibility reorder duplicate delete`
   - Runtime status: mask-backed layer stack operations are typed, fixture-validated, and wired to the layer shell; graph-native edit graph persistence remains future work.
 - `layers(core): add per-layer adjustments`
+  - Runtime status: per-layer scalar adjustment helpers are typed and fixture-validated for current mask-backed layers; full graph operation schemas remain future work.
 - `masks(brush): improve brush and eraser masks`
 - `masks(gradient): add linear and radial gradients`
 - `masks(range): add luminance range masks`
