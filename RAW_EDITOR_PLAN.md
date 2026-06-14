@@ -3913,6 +3913,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(refine): add feather density and edge refine`
   - Runtime status: feather, density, edge shift, smoothness, and edge contrast schemas plus refined weight evaluation are fixture-validated; renderer integration remains future work.
 - `masks(overlay): add mask overlay modes`
+  - Runtime status: rubylith, color, grayscale, inverse, edge, and hidden overlay modes are schema-backed and fixture-validated for preview color evaluation; UI integration remains future work.
 - `masks(copy): add mask copy paste`
 - `masks(ai): audit subject sky background masks`
 - `masks(ai): research people and parts masks`
