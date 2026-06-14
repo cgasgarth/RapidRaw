@@ -4048,6 +4048,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Issue: #1062
 - `agent(focus): bind app-server focus tools to command bus`
   - Issue: #1063
+  - Check: `bun run schema:focus-app-server`
 
 #### Milestone 13: Super-Resolution
 
