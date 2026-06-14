@@ -7080,6 +7080,71 @@ export const aiToolPromptPolicyV1Schema = z.enum(['none', 'operator_prompt', 'sy
 
 export const aiToolSourcePixelDisclosureV1Schema = z.enum(['local_only', 'may_leave_machine']);
 
+export const aiEnhancementCapabilityV1Schema = z.enum(['inpaint', 'denoise', 'enhance']);
+
+export const aiEnhancementQualityPreferenceV1Schema = z.enum(['preview', 'balanced', 'best']);
+
+export const aiSidecarProvenanceEntryV1Schema = z
+  .object({
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    approvalClass: approvalClassSchema,
+    approvalRecordId: z.string().trim().min(1),
+    capability: aiToolCapabilityV1Schema.or(aiEnhancementCapabilityV1Schema),
+    commandId: z.string().trim().min(1),
+    commandType: z.enum(['ai.mask.applySubject', 'ai.enhancement.apply']),
+    correlationId: z.string().trim().min(1),
+    modelHash: z.string().trim().min(1).optional(),
+    modelId: z.string().trim().min(1),
+    modelVersion: z.string().trim().min(1).optional(),
+    outputArtifactIds: z.array(z.string().trim().min(1)).min(1),
+    promptHash: z.string().trim().min(1).optional(),
+    promptPolicy: aiToolPromptPolicyV1Schema,
+    provenanceEntryId: z.string().trim().min(1),
+    providerClass: aiToolProviderClassV1Schema,
+    providerId: z.string().trim().min(1),
+    qualityPreference: aiEnhancementQualityPreferenceV1Schema.optional(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    settingsHash: z.string().trim().min(1),
+    sourceContentHash: z.string().trim().min(1),
+    sourceGraphRevision: z.string().trim().min(1),
+    sourcePixelDisclosure: aiToolSourcePixelDisclosureV1Schema,
+  })
+  .strict()
+  .superRefine((entry, context) => {
+    if (entry.approvalClass !== ApprovalClass.GenerativeEdit) {
+      context.addIssue({
+        code: 'custom',
+        message: 'AI sidecar provenance entries are written by approved generative apply commands.',
+        path: ['approvalClass'],
+      });
+    }
+
+    if (entry.providerClass === 'cloud_service' && entry.sourcePixelDisclosure === 'local_only') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Cloud AI provenance must disclose that source pixels may leave the machine.',
+        path: ['sourcePixelDisclosure'],
+      });
+    }
+
+    if (entry.promptPolicy === 'operator_prompt' && entry.promptHash === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Operator-prompt AI provenance requires a prompt hash instead of raw prompt text.',
+        path: ['promptHash'],
+      });
+    }
+
+    if (entry.commandType === 'ai.mask.applySubject' && entry.qualityPreference !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'AI mask provenance must not include enhancement quality preference.',
+        path: ['qualityPreference'],
+      });
+    }
+  });
+
 export const aiToolCommandEnvelopeV1Schema = commandEnvelopeV1Schema
   .extend({
     commandType: z.enum(['ai.mask.generateSubject', 'ai.mask.applySubject']),
@@ -7200,10 +7265,6 @@ export const aiToolDryRunResultV1Schema = z
     warnings: z.array(z.string().trim().min(1)),
   })
   .strict();
-
-export const aiEnhancementCapabilityV1Schema = z.enum(['inpaint', 'denoise', 'enhance']);
-
-export const aiEnhancementQualityPreferenceV1Schema = z.enum(['preview', 'balanced', 'best']);
 
 export const aiEnhancementCommandEnvelopeV1Schema = commandEnvelopeV1Schema
   .extend({

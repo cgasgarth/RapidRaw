@@ -988,6 +988,7 @@ fn upsert_panorama_artifact_metadata(
         .raw_engine_artifacts
         .get_or_insert_with(|| RawEngineArtifacts {
             schema_version: 1,
+            ai_provenance_entries: Vec::new(),
             panorama_artifacts: Vec::new(),
             stale_artifact_ids: Vec::new(),
         });
@@ -1745,6 +1746,7 @@ mod tests {
             exif: None,
             raw_engine_artifacts: Some(RawEngineArtifacts {
                 schema_version: 1,
+                ai_provenance_entries: Vec::new(),
                 panorama_artifacts: vec![json!({
                     "artifactId": "artifact_panorama_test",
                     "createdAt": "2023-11-14T22:13:21Z",
