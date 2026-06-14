@@ -504,6 +504,20 @@
         "transform": "Perspektiv- und Trapezkorrektur"
       }
     },
+    "layers": {
+      "blend": "Blend",
+      "blendModes": {
+        "color": "Color",
+        "luminosity": "Luminosity",
+        "multiply": "Multiply",
+        "normal": "Normal",
+        "overlay": "Overlay",
+        "screen": "Screen",
+        "softLight": "Soft Light"
+      },
+      "rowSummary": "{{blendMode}} - {{opacity}}% - {{maskCount}}",
+      "title": "Layers"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "Neue Komponente hinzufügen",

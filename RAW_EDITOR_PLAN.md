@@ -3891,6 +3891,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Contract: `docs/layers/layer-workflow-model-2026-06-14.md`
   - Runtime status: plan and contract only; runtime layer application remains future work.
 - `ui(layers): add polished layer stack UI`
+  - Runtime status: layer stack shell is mounted in the masking panel and backed by current mask containers; graph-native layers and blend/reorder commands remain future work.
 - `layers(core): add opacity visibility reorder duplicate delete`
 - `layers(core): add per-layer adjustments`
 - `masks(brush): improve brush and eraser masks`

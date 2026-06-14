@@ -44,6 +44,7 @@ import { useTranslation } from 'react-i18next';
 import { v4 as uuidv4 } from 'uuid';
 import { useShallow } from 'zustand/react/shallow';
 
+import LayerStackPanel from './LayerStackPanel';
 import {
   Mask,
   MaskType,
@@ -1532,6 +1533,13 @@ export default function MasksPanel() {
             </button>
           </div>
         </div>
+
+        <LayerStackPanel
+          activeMaskContainerId={activeMaskContainerId}
+          masks={adjustments.masks}
+          onSelectMaskContainer={onSelectContainer}
+          onUpdateMaskContainer={updateContainer}
+        />
 
         <AnimatePresence initial={false}>
           {isWaveformVisible && (
