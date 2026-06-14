@@ -1,0 +1,68 @@
+[
+  {
+    "fixtureId": "synthetic.detail.purple-backlit-branch.v0",
+    "kind": "backlit_branch",
+    "settings": {
+      "amount": 0.6,
+      "edgeThreshold": 0.35,
+      "chromaProtection": 0.45,
+      "ranges": [
+        {
+          "target": "purple",
+          "hueCenterDeg": 292,
+          "hueWidthDeg": 45,
+          "minSaturation": 0.18
+        }
+      ]
+    },
+    "expectedMinFringeReduction": 0.45,
+    "expectedMaxProtectedColorDeltaE": 0.9,
+    "notes": "Purple fringe fixture around backlit branches with protected neutral edges."
+  },
+  {
+    "fixtureId": "synthetic.detail.green-specular-edge.v0",
+    "kind": "specular_edge",
+    "settings": {
+      "amount": 0.55,
+      "edgeThreshold": 0.3,
+      "chromaProtection": 0.5,
+      "ranges": [
+        {
+          "target": "green",
+          "hueCenterDeg": 125,
+          "hueWidthDeg": 40,
+          "minSaturation": 0.16
+        }
+      ]
+    },
+    "expectedMinFringeReduction": 0.4,
+    "expectedMaxProtectedColorDeltaE": 0.8,
+    "notes": "Green fringe fixture for high-contrast specular edges."
+  },
+  {
+    "fixtureId": "synthetic.detail.defringe-color-patch-guard.v0",
+    "kind": "false_positive_color_patch",
+    "settings": {
+      "amount": 0.45,
+      "edgeThreshold": 0.45,
+      "chromaProtection": 0.8,
+      "ranges": [
+        {
+          "target": "purple",
+          "hueCenterDeg": 300,
+          "hueWidthDeg": 35,
+          "minSaturation": 0.25
+        },
+        {
+          "target": "green",
+          "hueCenterDeg": 120,
+          "hueWidthDeg": 35,
+          "minSaturation": 0.25
+        }
+      ]
+    },
+    "expectedMinFringeReduction": 0,
+    "expectedMaxProtectedColorDeltaE": 0.35,
+    "notes": "False-positive guard prevents real purple and green subject colors from being desaturated."
+  }
+]
