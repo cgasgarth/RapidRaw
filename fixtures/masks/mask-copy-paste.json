@@ -1,0 +1,25 @@
+[
+  {
+    "expected": {
+      "containerIds": ["container-original", "container-copy", "container-tail"],
+      "subMaskIds": ["submask-copy", "submask-original"],
+      "subMaskName": "Brush copy"
+    },
+    "id": "clone-and-insert"
+  },
+  {
+    "expected": {
+      "containerInvert": true,
+      "containerName": "Inverted Brush",
+      "subMaskInvert": true
+    },
+    "id": "invert-and-rename"
+  },
+  {
+    "expected": {
+      "exposure": 0,
+      "originalExposure": 0.75
+    },
+    "id": "reset-adjustments"
+  }
+]
