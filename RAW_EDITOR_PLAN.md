@@ -4020,6 +4020,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 #### Milestone 13: Super-Resolution
 
 - `consult(super-resolution): get super-resolution strategy review`
+  - Doc: `docs/super-resolution/strategy-consult-summary-2026-06-14.md`
 - `sr(modes): define single-image and multi-image modes`
 - `sr(policy): define conservative professional output policy`
   - Doc: `docs/super-resolution/conservative-output-policy-2026-06-13.md`
