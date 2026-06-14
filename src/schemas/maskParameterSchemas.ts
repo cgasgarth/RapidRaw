@@ -52,6 +52,18 @@ export const radialGradientMaskParametersSchema = z
   })
   .strict();
 
+export const luminanceRangeMaskParametersSchema = z
+  .object({
+    maxLuma: z.number().min(0).max(1),
+    minLuma: z.number().min(0).max(1),
+    softness: z.number().min(0).max(1),
+  })
+  .strict()
+  .refine((range) => range.minLuma < range.maxLuma, {
+    message: 'Luminance range masks require minLuma below maxLuma.',
+    path: ['minLuma'],
+  });
+
 export const aiDepthMaskParametersSchema = z.object({
   feather: z.number(),
   maxDepth: z.number(),
@@ -66,3 +78,4 @@ export type BrushMaskParameters = z.infer<typeof brushMaskParametersSchema>;
 export type FlowBrushMaskParameters = z.infer<typeof flowBrushMaskParametersSchema>;
 export type LinearGradientMaskParameters = z.infer<typeof linearGradientMaskParametersSchema>;
 export type RadialGradientMaskParameters = z.infer<typeof radialGradientMaskParametersSchema>;
+export type LuminanceRangeMaskParameters = z.infer<typeof luminanceRangeMaskParametersSchema>;

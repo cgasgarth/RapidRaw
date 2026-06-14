@@ -1,0 +1,18 @@
+[
+  {
+    "id": "equal-range",
+    "payload": { "maxLuma": 0.5, "minLuma": 0.5, "softness": 0.2 }
+  },
+  {
+    "id": "out-of-range-min",
+    "payload": { "maxLuma": 0.9, "minLuma": -0.1, "softness": 0.2 }
+  },
+  {
+    "id": "out-of-range-softness",
+    "payload": { "maxLuma": 0.9, "minLuma": 0.1, "softness": 1.2 }
+  },
+  {
+    "id": "extra-field",
+    "payload": { "maxLuma": 0.9, "minLuma": 0.1, "softness": 0.2, "falloff": "linear" }
+  }
+]
