@@ -1,0 +1,63 @@
+[
+  {
+    "id": "append-brush-stroke",
+    "initial": { "lines": [] },
+    "operation": {
+      "type": "appendStroke",
+      "stroke": {
+        "feather": 35,
+        "points": [
+          { "pressure": 0.4, "x": 12, "y": 16 },
+          { "pressure": 0.7, "x": 24, "y": 28 }
+        ],
+        "size": 42,
+        "tool": "brush"
+      }
+    },
+    "expected": {
+      "lines": [
+        {
+          "feather": 35,
+          "points": [
+            { "pressure": 0.4, "x": 12, "y": 16 },
+            { "pressure": 0.7, "x": 24, "y": 28 }
+          ],
+          "size": 42,
+          "tool": "brush"
+        }
+      ]
+    }
+  },
+  {
+    "id": "append-eraser-stroke-clamps-tool-settings",
+    "initial": { "lines": [] },
+    "operation": {
+      "type": "appendStroke",
+      "stroke": {
+        "feather": 140,
+        "points": [{ "pressure": 1.4, "x": 3, "y": 9 }],
+        "size": 0,
+        "tool": "eraser"
+      }
+    },
+    "expected": {
+      "lines": [
+        {
+          "feather": 100,
+          "points": [{ "pressure": 1, "x": 3, "y": 9 }],
+          "size": 1,
+          "tool": "eraser"
+        }
+      ]
+    }
+  },
+  {
+    "id": "flow-brush-clamps-flow",
+    "initial": { "flow": 10, "lines": [] },
+    "operation": {
+      "flow": -15,
+      "type": "setFlow"
+    },
+    "expected": { "flow": 0, "lines": [] }
+  }
+]
