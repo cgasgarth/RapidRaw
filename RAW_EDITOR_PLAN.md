@@ -3905,6 +3905,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(gradient): add linear and radial gradients`
   - Runtime status: linear and radial gradient parameter schemas, normalization helpers, and fixture validation are present; canvas handles remain future work.
 - `masks(range): add luminance range masks`
+  - Runtime status: luminance range schemas, normalization, weight evaluation, and fixture validation are present; renderer integration remains future work.
 - `masks(range): add color range masks`
 - `masks(compose): add add subtract intersect`
 - `masks(refine): add feather density and edge refine`
