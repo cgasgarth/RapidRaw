@@ -1,0 +1,42 @@
+[
+  {
+    "expectedConflicts": [],
+    "id": "valid-custom-map",
+    "shortcuts": {
+      "copy_adjustments": ["ctrl", "KeyC"],
+      "paste_adjustments": ["ctrl", "KeyV"],
+      "toggle_masks": ["KeyM"],
+      "zoom_fit": ["ctrl", "Digit0"]
+    }
+  },
+  {
+    "expectedConflicts": [
+      {
+        "actions": ["copy_adjustments", "copy_files"],
+        "combo": ["ctrl", "KeyC"],
+        "comboKey": "ctrl+KeyC"
+      }
+    ],
+    "id": "duplicate-copy-combo",
+    "shortcuts": {
+      "copy_adjustments": ["ctrl", "KeyC"],
+      "copy_files": ["ctrl", "KeyC"],
+      "paste_adjustments": ["ctrl", "KeyV"]
+    }
+  },
+  {
+    "expectedConflicts": [
+      {
+        "actions": ["toggle_ai", "toggle_masks", "toggle_presets"],
+        "combo": ["KeyM"],
+        "comboKey": "KeyM"
+      }
+    ],
+    "id": "three-way-panel-conflict",
+    "shortcuts": {
+      "toggle_ai": ["KeyM"],
+      "toggle_masks": ["KeyM"],
+      "toggle_presets": ["KeyM"]
+    }
+  }
+]
