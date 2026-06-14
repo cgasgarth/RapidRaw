@@ -2020,7 +2020,7 @@ Required ADR fleet:
   - Validation: schema drift CI, strict JSON Schema tests, tool replay tests.
 - `ADR-010: OpenAI app-server agent safety boundary`
   - Decision: agent edits only through typed tools and never through UI automation.
-  - Validation: tool-call audit log, prompt injection tests, approval boundary tests.
+  - Validation: local tool replay, tool-call audit log, approval boundary tests, and executable before/after artifacts.
 - `ADR-011: macOS-first release posture`
   - Decision: macOS quality gates are mandatory first; inherited cross-platform support is preserved where practical.
   - Validation: macOS Tauri build, high-DPI UI QA, signing/notarization plan.
@@ -3475,9 +3475,9 @@ Agent shift-left gates:
 - `agent:replay`
   - Tool call logs can replay a representative edit.
   - Replay uses the same edit graph commands as UI and CLI.
-- `agent:prompt-injection`
-  - Malicious filenames, metadata, sidecar text, and image-embedded text cannot cause destructive tool calls.
-  - Tool descriptions remind the model not to trust untrusted metadata as instructions.
+- `agent:local-threat-model`
+  - RawEngine agent tooling is designed for a single-user local workstation threat model.
+  - Prompt-injection fixtures are not a priority gate; local typed-tool approval, audit, replay, and provenance checks carry the safety boundary.
 - `agent:visual-proof`
   - Any edit claim includes before/after preview artifacts.
   - Agent cannot claim an edit is complete if render/export failed.
@@ -3488,7 +3488,7 @@ Agent issue split:
 - `agent(schema): generate tool schemas from edit command definitions`
 - `agent(audit): add tool-call audit log format`
 - `agent(approval): define approval policy for mutating tools`
-- `agent(eval): add prompt injection fixtures`
+- `agent(eval): add local tool replay and approval-boundary fixtures`
 - `agent(eval): add replay tests for representative edits`
 - `agent(eval): add before-after artifact requirement`
 - `agent(app-server): add lifecycle integration design`
@@ -4145,7 +4145,6 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(agent): add agent replay tests`
 - `validation(ai): add AI tool schema and replay tests`
 - `validation(ai): add unavailable-provider fallback tests`
-- `validation(agent): add prompt injection fixtures`
 - `agent(demo): add agent demo workflow`
 
 #### Milestone 15: Professional Workflow Polish
@@ -4930,7 +4929,7 @@ Issues:
 - Add agent replay tests.
 - Add AI tool schema and replay tests.
 - Add unavailable-provider fallback tests.
-- Add prompt injection test fixtures.
+- Add local tool replay and approval-boundary fixtures.
 - Add agent demo workflow.
 
 Definition of done:
@@ -5206,7 +5205,7 @@ Mitigation:
 - Require approvals for batch/export/delete/move/cloud operations.
 - Log every tool call.
 - Make edits undoable and replayable.
-- Add prompt injection tests.
+- Add local tool replay and approval-boundary tests.
 
 ### Test Asset Risk
 
