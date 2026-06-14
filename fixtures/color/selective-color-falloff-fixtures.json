@@ -1,0 +1,45 @@
+{
+  "$schema": "https://rawengine.dev/schemas/selective-color-falloff-fixtures-v1.json",
+  "cases": [
+    {
+      "centerHueDegrees": 358,
+      "expectedInfluence": 1,
+      "hueDegrees": 358,
+      "id": "color.selective.falloff.red-center.v1",
+      "smoothness": 1.5,
+      "tolerance": 0.000001,
+      "widthDegrees": 35
+    },
+    {
+      "centerHueDegrees": 358,
+      "expectedInfluence": 0.140973,
+      "hueDegrees": 18,
+      "id": "color.selective.falloff.red-wrap-edge.v1",
+      "smoothness": 1.5,
+      "tolerance": 0.000001,
+      "widthDegrees": 35
+    },
+    {
+      "centerHueDegrees": 115,
+      "expectedInfluence": 0.30569,
+      "hueDegrees": 155,
+      "id": "color.selective.falloff.green-wide-range.v1",
+      "smoothness": 1.5,
+      "tolerance": 0.000001,
+      "widthDegrees": 90
+    },
+    {
+      "centerHueDegrees": 225,
+      "expectedInfluence": 0.129812,
+      "hueDegrees": 260,
+      "id": "color.selective.falloff.blue-smoothness-preview.v1",
+      "smoothness": 1.5,
+      "tolerance": 0.000001,
+      "widthDegrees": 60
+    }
+  ],
+  "issue": 97,
+  "schemaVersion": 1,
+  "shaderDefaultSmoothness": 1.5,
+  "snapshotDate": "2026-06-14"
+}
