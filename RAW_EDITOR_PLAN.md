@@ -4015,6 +4015,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `focus(sharpness): add sharpness map generation`
   - Doc: `docs/focus-stacking/sharpness-map-generation-2026-06-14.md`
 - `focus(blend): add blending strategy`
+  - Doc: `docs/focus-stacking/blending-strategy-2026-06-14.md`
 - `focus(retouch): add artifact retouch strategy`
   - Doc: `docs/focus-stacking/retouch-artifact-strategy-2026-06-14.md`
 - `validation(focus): add focus bracket fixture set`
