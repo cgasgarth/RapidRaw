@@ -3979,6 +3979,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `hdr(audit): audit existing RapidRAW HDR merge`
   - Doc: `docs/hdr/existing-hdr-audit-2026-06-14.md`
 - `hdr(schema): define HDR merge artifact schema`
+  - Schema: `packages/rawengine-schema/src/rawEngineSchemas.ts#hdrMergeArtifactV1Schema`
+  - Sample: `packages/rawengine-schema/samples/hdr-merge-artifact-v1.json`
 - `hdr(brackets): add bracket detection`
 - `hdr(align): add auto alignment tests`
 - `hdr(merge): add merge weighting strategy`
