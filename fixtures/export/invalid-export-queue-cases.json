@@ -1,0 +1,81 @@
+[
+  {
+    "case": "rejects duplicate job ids",
+    "queue": {
+      "activeJobId": "duplicate",
+      "jobs": [
+        {
+          "completedAt": null,
+          "createdAt": "2026-06-14T08:00:00.000Z",
+          "errorMessage": null,
+          "id": "duplicate",
+          "outputTarget": "/tmp/export",
+          "priority": "normal",
+          "progress": { "current": 0, "total": 1 },
+          "recipe": { "fileFormat": "jpeg", "recipeId": "web", "recipeName": "Web" },
+          "sourcePaths": ["/tmp/a.raw"],
+          "startedAt": null,
+          "status": "queued"
+        },
+        {
+          "completedAt": null,
+          "createdAt": "2026-06-14T08:00:00.000Z",
+          "errorMessage": null,
+          "id": "duplicate",
+          "outputTarget": "/tmp/export",
+          "priority": "normal",
+          "progress": { "current": 0, "total": 1 },
+          "recipe": { "fileFormat": "jpeg", "recipeId": "web", "recipeName": "Web" },
+          "sourcePaths": ["/tmp/b.raw"],
+          "startedAt": null,
+          "status": "queued"
+        }
+      ],
+      "maxConcurrentJobs": 1
+    }
+  },
+  {
+    "case": "rejects running job without startedAt",
+    "queue": {
+      "activeJobId": "running-without-start",
+      "jobs": [
+        {
+          "completedAt": null,
+          "createdAt": "2026-06-14T08:00:00.000Z",
+          "errorMessage": null,
+          "id": "running-without-start",
+          "outputTarget": "/tmp/export",
+          "priority": "normal",
+          "progress": { "current": 0, "total": 1 },
+          "recipe": { "fileFormat": "jpeg", "recipeId": "web", "recipeName": "Web" },
+          "sourcePaths": ["/tmp/a.raw"],
+          "startedAt": null,
+          "status": "running"
+        }
+      ],
+      "maxConcurrentJobs": 1
+    }
+  },
+  {
+    "case": "rejects failed job without error",
+    "queue": {
+      "activeJobId": null,
+      "jobs": [
+        {
+          "completedAt": "2026-06-14T08:05:00.000Z",
+          "createdAt": "2026-06-14T08:00:00.000Z",
+          "errorMessage": null,
+          "id": "failed-without-error",
+          "outputTarget": "/tmp/export",
+          "priority": "normal",
+          "progress": { "current": 0, "total": 1 },
+          "recipe": { "fileFormat": "jpeg", "recipeId": "web", "recipeName": "Web" },
+          "sourcePaths": ["/tmp/a.raw"],
+          "startedAt": "2026-06-14T08:01:00.000Z",
+          "status": "failed"
+        }
+      ],
+      "maxConcurrentJobs": 1
+    }
+  }
+]
