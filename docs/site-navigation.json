@@ -235,6 +235,42 @@
           "path": "docs/panorama/opencv-required-ci-promotion-2026-06-13.md"
         },
         {
+          "title": "Focus Stack architecture consult summary",
+          "path": "docs/focus-stacking/architecture-consult-summary-2026-06-14.md"
+        },
+        {
+          "title": "Focus Stack RAW normalization and color policy",
+          "path": "docs/focus-stacking/raw-normalization-color-policy-2026-06-14.md"
+        },
+        {
+          "title": "Focus Stack alignment path",
+          "path": "docs/focus-stacking/alignment-path-2026-06-14.md"
+        },
+        {
+          "title": "Focus Stack sharpness map generation",
+          "path": "docs/focus-stacking/sharpness-map-generation-2026-06-14.md"
+        },
+        {
+          "title": "Focus Stack blending strategy",
+          "path": "docs/focus-stacking/blending-strategy-2026-06-14.md"
+        },
+        {
+          "title": "Focus Stack retouch artifact strategy",
+          "path": "docs/focus-stacking/retouch-artifact-strategy-2026-06-14.md"
+        },
+        {
+          "title": "Focus Stack fixture manifest",
+          "path": "docs/focus-stacking/focus-bracket-fixture-manifest-2026-06-14.md"
+        },
+        {
+          "title": "Focus Stack API tool contract",
+          "path": "docs/focus-stacking/api-tool-contract-2026-06-14.md"
+        },
+        {
+          "title": "Focus Stack performance validation contract",
+          "path": "docs/focus-stacking/performance-validation-contract-2026-06-14.md"
+        },
+        {
           "title": "Architecture baseline",
           "path": "docs/baseline/rapidraw-architecture-baseline-2026-06-11.md"
         },

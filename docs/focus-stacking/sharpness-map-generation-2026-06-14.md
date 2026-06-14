@@ -21,6 +21,10 @@ Required inputs:
 - optional focus distance metadata;
 - working luminance in the linear preview pipeline.
 
+The linear preview pipeline and luminance input must follow the
+[Focus Stack RAW normalization and color policy](raw-normalization-color-policy-2026-06-14.md)
+before focus measures are evaluated.
+
 Optional inputs:
 
 - lens metadata for focus breathing diagnostics;
