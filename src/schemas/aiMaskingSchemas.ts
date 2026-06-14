@@ -325,11 +325,45 @@ export const aiPeopleMaskFakeProviderFixtureSchema = z
   })
   .strict();
 
+export const aiPeopleMaskLayerPlanEntrySchema = z
+  .object({
+    artifactId: z.string().trim().min(1),
+    layerId: z.string().trim().min(1),
+    maskOperationId: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    opacity: z.number().min(0).max(100),
+    target: aiPeopleMaskTargetSchema,
+    visible: z.boolean(),
+  })
+  .strict();
+
+export const aiPeopleMaskLayerApplyPlanSchema = z
+  .object({
+    imageHash: z.string().trim().min(1),
+    layers: z.array(aiPeopleMaskLayerPlanEntrySchema).min(1),
+    providerTier: aiPeopleMaskProviderTierSchema,
+    schemaVersion: z.literal(1),
+    status: z.literal('dry_run'),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export const aiPeopleMaskLayerApplyPlanFixtureSchema = z
+  .object({
+    $schema: z.url(),
+    expectedPlan: aiPeopleMaskLayerApplyPlanSchema,
+    issue: z.literal(1136),
+    schemaVersion: z.literal(1),
+    snapshotDate: z.iso.date(),
+  })
+  .strict();
+
 export type AiMaskCapability = z.infer<typeof aiMaskCapabilitySchema>;
 export type AiMaskCapabilityAuditEntry = z.infer<typeof aiMaskCapabilityAuditEntrySchema>;
 export type AiPeopleMaskAnalysis = z.infer<typeof aiPeopleMaskAnalysisSchema>;
 export type AiPeopleMaskPickerModel = z.infer<typeof aiPeopleMaskPickerModelSchema>;
 export type AiPeopleMaskFakeAlphaMask = z.infer<typeof aiPeopleMaskFakeAlphaMaskSchema>;
+export type AiPeopleMaskLayerApplyPlan = z.infer<typeof aiPeopleMaskLayerApplyPlanSchema>;
 export type AiPeopleMaskPart = z.infer<typeof aiPeopleMaskPartSchema>;
 export type AiPeopleMaskProviderCapability = z.infer<typeof aiPeopleMaskProviderCapabilitySchema>;
 export type AiPeopleMaskTarget = z.infer<typeof aiPeopleMaskTargetSchema>;

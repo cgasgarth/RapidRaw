@@ -3961,7 +3961,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Runtime status: subject, sky, foreground, depth, and derived background capability coverage is schema-backed, fixture-validated, and checked against frontend invoke commands plus Rust command/render branches; runtime quality benchmarking remains future work.
 - `masks(ai): research people and parts masks`
   - Consult: 2026-06-14 RapidRaw Pro Extended consultation recommended a staged path: schema contract, deterministic fake provider, render/apply plumbing, dry-run UI, then macOS whole-person runtime before fine portrait parts.
-  - Runtime status: people/parts taxonomy, provider tiers, target/artifact schemas, fixture validation, deterministic fake-provider tiny masks, fake people-mask render fixtures, and a validated dry-run picker model are present; React UI wiring and runtime whole-person generation remain future work.
+  - Runtime status: people/parts taxonomy, provider tiers, target/artifact schemas, fixture validation, deterministic fake-provider tiny masks, fake people-mask render fixtures, dry-run layer apply plans, and a validated dry-run picker model are present; React UI wiring and runtime whole-person generation remain future work.
 - `validation(masks): add mask schema and render tests`
 
 #### Milestone 8: Detail Denoise And Wavelet Tools
