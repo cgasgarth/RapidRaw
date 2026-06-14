@@ -3909,6 +3909,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(range): add color range masks`
   - Runtime status: color range schemas, selective color range parameter conversion, hue/luma/saturation weight evaluation, and fixture validation are present; renderer integration remains future work.
 - `masks(compose): add add subtract intersect`
+  - Runtime status: add/subtract/intersect weight composition is typed, clamped, and fixture-validated; renderer integration remains future work.
 - `masks(refine): add feather density and edge refine`
 - `masks(overlay): add mask overlay modes`
 - `masks(copy): add mask copy paste`
