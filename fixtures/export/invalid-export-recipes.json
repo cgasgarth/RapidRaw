@@ -1,0 +1,68 @@
+[
+  {
+    "case": "rejects empty filename template",
+    "recipe": {
+      "dontEnlarge": true,
+      "enableResize": false,
+      "enableWatermark": false,
+      "fileFormat": "jpeg",
+      "filenameTemplate": "",
+      "id": "bad-template",
+      "jpegQuality": 95,
+      "keepMetadata": true,
+      "name": "Bad Template",
+      "resizeMode": "longEdge",
+      "resizeValue": 2048,
+      "stripGps": false,
+      "watermarkAnchor": "bottomRight",
+      "watermarkOpacity": 75,
+      "watermarkPath": null,
+      "watermarkScale": 10,
+      "watermarkSpacing": 5
+    }
+  },
+  {
+    "case": "rejects watermark without path",
+    "recipe": {
+      "dontEnlarge": true,
+      "enableResize": false,
+      "enableWatermark": true,
+      "fileFormat": "jpeg",
+      "filenameTemplate": "{original_filename}",
+      "id": "bad-watermark",
+      "jpegQuality": 95,
+      "keepMetadata": true,
+      "name": "Bad Watermark",
+      "resizeMode": "longEdge",
+      "resizeValue": 2048,
+      "stripGps": false,
+      "watermarkAnchor": "bottomRight",
+      "watermarkOpacity": 75,
+      "watermarkPath": null,
+      "watermarkScale": 10,
+      "watermarkSpacing": 5
+    }
+  },
+  {
+    "case": "rejects lossy quality on non-jpeg",
+    "recipe": {
+      "dontEnlarge": true,
+      "enableResize": false,
+      "enableWatermark": false,
+      "fileFormat": "tiff",
+      "filenameTemplate": "{original_filename}",
+      "id": "bad-tiff-quality",
+      "jpegQuality": 95,
+      "keepMetadata": true,
+      "name": "Bad TIFF Quality",
+      "resizeMode": "longEdge",
+      "resizeValue": 2048,
+      "stripGps": false,
+      "watermarkAnchor": "bottomRight",
+      "watermarkOpacity": 75,
+      "watermarkPath": null,
+      "watermarkScale": 10,
+      "watermarkSpacing": 5
+    }
+  }
+]
