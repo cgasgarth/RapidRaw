@@ -68,8 +68,26 @@ pub struct ExportSettings {
     pub watermark: Option<WatermarkSettings>,
     #[serde(default)]
     pub export_masks: bool,
+    pub output_sharpening: Option<OutputSharpeningSettings>,
     #[serde(default)]
     pub preserve_folders: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum OutputSharpeningTarget {
+    Screen,
+    Print,
+    Custom,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OutputSharpeningSettings {
+    pub target: OutputSharpeningTarget,
+    pub amount: f32,
+    pub radius_px: f32,
+    pub threshold: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -204,10 +222,55 @@ fn apply_export_resize_and_watermark(
         }
     }
 
+    if let Some(output_sharpening) = &export_settings.output_sharpening {
+        image = apply_output_sharpening(image, output_sharpening);
+    }
+
     if let Some(watermark_settings) = &export_settings.watermark {
         apply_watermark(&mut image, watermark_settings)?;
     }
     Ok(image)
+}
+
+fn apply_output_sharpening(
+    image: DynamicImage,
+    settings: &OutputSharpeningSettings,
+) -> DynamicImage {
+    let amount = (settings.amount / 100.0).clamp(0.0, 1.0);
+    if amount <= 0.0 {
+        return image;
+    }
+
+    let target_multiplier = match settings.target {
+        OutputSharpeningTarget::Screen => 0.8,
+        OutputSharpeningTarget::Print => 1.15,
+        OutputSharpeningTarget::Custom => 1.0,
+    };
+    let effective_amount = amount * target_multiplier;
+    let threshold = settings.threshold.clamp(0.0, 1.0);
+    let radius = settings.radius_px.clamp(0.3, 3.0);
+
+    let mut output = image.to_rgb32f();
+    let blurred = DynamicImage::ImageRgb32F(output.clone())
+        .blur(radius)
+        .to_rgb32f();
+    let output_pixels = output.as_mut();
+    let blurred_pixels = blurred.as_raw();
+
+    for (out, blurred) in output_pixels.chunks_mut(3).zip(blurred_pixels.chunks(3)) {
+        let detail_r = out[0] - blurred[0];
+        let detail_g = out[1] - blurred[1];
+        let detail_b = out[2] - blurred[2];
+        let detail_luma = (0.299 * detail_r + 0.587 * detail_g + 0.114 * detail_b).abs();
+
+        if detail_luma >= threshold {
+            out[0] = (out[0] + detail_r * effective_amount).clamp(0.0, 1.0);
+            out[1] = (out[1] + detail_g * effective_amount).clamp(0.0, 1.0);
+            out[2] = (out[2] + detail_b * effective_amount).clamp(0.0, 1.0);
+        }
+    }
+
+    DynamicImage::ImageRgb32F(output)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1301,4 +1364,79 @@ pub async fn estimate_export_sizes(
     };
 
     Ok(single_image_extrapolated_size * paths.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        ExportSettings, OutputSharpeningSettings, OutputSharpeningTarget,
+        apply_export_resize_and_watermark,
+    };
+    use image::{DynamicImage, ImageBuffer, Rgb};
+
+    fn synthetic_export_edge() -> DynamicImage {
+        let mut buffer = ImageBuffer::<Rgb<f32>, Vec<f32>>::new(11, 5);
+        for y in 0..5 {
+            for x in 0..11 {
+                let value = if x < 5 { 0.3 } else { 0.7 };
+                buffer.put_pixel(x, y, Rgb([value, value, value]));
+            }
+        }
+        DynamicImage::ImageRgb32F(buffer)
+    }
+
+    fn base_export_settings(output_sharpening: Option<OutputSharpeningSettings>) -> ExportSettings {
+        ExportSettings {
+            jpeg_quality: 90,
+            resize: None,
+            keep_metadata: false,
+            preserve_timestamps: false,
+            strip_gps: true,
+            filename_template: None,
+            watermark: None,
+            export_masks: false,
+            output_sharpening,
+            preserve_folders: false,
+        }
+    }
+
+    fn red_channel(image: &DynamicImage, x: u32, y: u32) -> f32 {
+        image.to_rgb32f().get_pixel(x, y).0[0]
+    }
+
+    #[test]
+    fn output_sharpening_increases_export_edge_contrast() {
+        let before = synthetic_export_edge();
+        let after = apply_export_resize_and_watermark(
+            before.clone(),
+            &base_export_settings(Some(OutputSharpeningSettings {
+                target: OutputSharpeningTarget::Print,
+                amount: 70.0,
+                radius_px: 1.2,
+                threshold: 0.0,
+            })),
+        )
+        .expect("output sharpening should process");
+
+        let before_contrast = red_channel(&before, 5, 2) - red_channel(&before, 4, 2);
+        let after_contrast = red_channel(&after, 5, 2) - red_channel(&after, 4, 2);
+
+        assert!(
+            after_contrast > before_contrast,
+            "output sharpening should increase final export edge contrast"
+        );
+    }
+
+    #[test]
+    fn disabled_output_sharpening_preserves_export_pixels() {
+        let before = synthetic_export_edge();
+        let after = apply_export_resize_and_watermark(before.clone(), &base_export_settings(None))
+            .expect("disabled output sharpening should process");
+
+        for y in 0..5 {
+            for x in 0..11 {
+                assert_eq!(red_channel(&after, x, y), red_channel(&before, x, y));
+            }
+        }
+    }
 }

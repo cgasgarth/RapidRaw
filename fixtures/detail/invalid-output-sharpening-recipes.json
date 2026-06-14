@@ -1,0 +1,51 @@
+[
+  {
+    "case": "print_without_size",
+    "recipe": {
+      "format": "tiff",
+      "id": "invalid_print_size",
+      "outputSharpening": {
+        "amount": 40,
+        "radiusPx": 1,
+        "target": "print",
+        "threshold": 0.02
+      },
+      "resize": null,
+      "schemaVersion": 1
+    }
+  },
+  {
+    "case": "print_radius_too_low",
+    "recipe": {
+      "format": "jpeg",
+      "id": "invalid_print_radius",
+      "outputSharpening": {
+        "amount": 40,
+        "radiusPx": 0.5,
+        "target": "print",
+        "threshold": 0.02
+      },
+      "resize": {
+        "longEdgePx": 4000
+      },
+      "schemaVersion": 1
+    }
+  },
+  {
+    "case": "disabled_with_threshold",
+    "recipe": {
+      "format": "png",
+      "id": "invalid_disabled_threshold",
+      "outputSharpening": {
+        "amount": 0,
+        "radiusPx": 0.7,
+        "target": "screen",
+        "threshold": 0.02
+      },
+      "resize": {
+        "longEdgePx": 2048
+      },
+      "schemaVersion": 1
+    }
+  }
+]
