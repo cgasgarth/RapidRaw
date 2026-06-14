@@ -27,6 +27,8 @@
     "check:film-fixtures:update": "bun scripts/check-film-look-fixture-outputs.mjs --update",
     "check:panorama-fixtures": "bun scripts/check-panorama-fixture-manifest.mjs",
     "check:panorama-parity": "bun scripts/check-panorama-synthetic-parity.mjs",
+    "check:focus-fixtures": "bun scripts/check-focus-synthetic-fixtures.mjs",
+    "check:focus-fixtures:update": "bun scripts/check-focus-synthetic-fixtures.mjs --update",
     "check:sr-performance-fixtures": "bun scripts/check-super-resolution-performance-fixtures.mjs",
     "check:lint-escapes": "bun scripts/check-eslint-escape-hatches.mjs",
     "check:lint": "eslint . --max-warnings 0",

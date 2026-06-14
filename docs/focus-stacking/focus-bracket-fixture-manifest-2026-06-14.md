@@ -136,6 +136,12 @@ Every fixture set must include:
 
 ## Current Status
 
-This manifest reserves the fixture contract only. It does not add raster assets,
-download scripts, or runtime focus stack tests. Those should land after fixture
-licensing and runtime processing paths are available.
+The first deterministic synthetic fixture manifest and generator live at:
+
+- `fixtures/focus-stacking/focus-synthetic-bracket-fixtures.json`
+- `scripts/check-focus-synthetic-fixtures.mjs`
+
+They generate tiny temporary PPM sources during validation and verify stable
+fixture hashes. They do not commit raster assets or claim runtime focus-stack
+quality. Runtime focus stack tests should consume these fixtures after the
+plan-only preflight, alignment, sharpness-map, and blend paths exist.
