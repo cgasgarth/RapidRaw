@@ -1,0 +1,56 @@
+[
+  {
+    "fixtureId": "synthetic.detail.slanted-edge.local-contrast.v0",
+    "kind": "slanted_edge",
+    "settings": {
+      "clarity": 35,
+      "structure": 20,
+      "dehaze": 0,
+      "edgeProtection": 0.55,
+      "noiseProtection": 0.2,
+      "haloBudgetPx": 2.5
+    },
+    "minRequiredAcutanceGain": 0.12,
+    "maxAllowedHaloPx": 2.5,
+    "maxAllowedNoiseGain": 0.05,
+    "maxAllowedChromaShiftDeltaE": 0.6,
+    "expectedRisk": "medium",
+    "notes": "Primary edge fixture for halo-safe clarity and structure proof."
+  },
+  {
+    "fixtureId": "synthetic.detail.high-iso.local-contrast.v0",
+    "kind": "high_iso_noise",
+    "settings": {
+      "clarity": 18,
+      "structure": 22,
+      "dehaze": 35,
+      "edgeProtection": 0.45,
+      "noiseProtection": 0.7,
+      "haloBudgetPx": 2
+    },
+    "minRequiredAcutanceGain": 0.05,
+    "maxAllowedHaloPx": 2,
+    "maxAllowedNoiseGain": 0.18,
+    "maxAllowedChromaShiftDeltaE": 0.8,
+    "expectedRisk": "high",
+    "notes": "High ISO fixture blocks local contrast from turning noise into false texture."
+  },
+  {
+    "fixtureId": "synthetic.detail.flat-gradient.local-contrast.v0",
+    "kind": "flat_gradient",
+    "settings": {
+      "clarity": 12,
+      "structure": -8,
+      "dehaze": 0,
+      "edgeProtection": 0.4,
+      "noiseProtection": 0.5,
+      "haloBudgetPx": 1
+    },
+    "minRequiredAcutanceGain": 0,
+    "maxAllowedHaloPx": 1,
+    "maxAllowedNoiseGain": 0.03,
+    "maxAllowedChromaShiftDeltaE": 0.3,
+    "expectedRisk": "low",
+    "notes": "Flat gradient fixture catches banding, halos, and color shifts where no texture exists."
+  }
+]

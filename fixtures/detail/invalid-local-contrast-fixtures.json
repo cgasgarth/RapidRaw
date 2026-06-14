@@ -1,0 +1,65 @@
+[
+  {
+    "case": "strong-local-contrast-without-edge-protection",
+    "fixture": {
+      "fixtureId": "invalid.detail.local-contrast.edge-protection",
+      "kind": "slanted_edge",
+      "settings": {
+        "clarity": 80,
+        "structure": 70,
+        "dehaze": 10,
+        "edgeProtection": 0.1,
+        "noiseProtection": 0.4,
+        "haloBudgetPx": 2
+      },
+      "minRequiredAcutanceGain": 0.4,
+      "maxAllowedHaloPx": 2,
+      "maxAllowedNoiseGain": 0.1,
+      "maxAllowedChromaShiftDeltaE": 1,
+      "expectedRisk": "high",
+      "notes": "Strong local contrast must not pass without edge protection."
+    }
+  },
+  {
+    "case": "high-iso-without-noise-protection",
+    "fixture": {
+      "fixtureId": "invalid.detail.local-contrast.noise-protection",
+      "kind": "high_iso_noise",
+      "settings": {
+        "clarity": 10,
+        "structure": 15,
+        "dehaze": 20,
+        "edgeProtection": 0.5,
+        "noiseProtection": 0.2,
+        "haloBudgetPx": 2
+      },
+      "minRequiredAcutanceGain": 0.1,
+      "maxAllowedHaloPx": 2,
+      "maxAllowedNoiseGain": 0.6,
+      "maxAllowedChromaShiftDeltaE": 1,
+      "expectedRisk": "medium",
+      "notes": "High ISO local contrast must require stronger noise protection."
+    }
+  },
+  {
+    "case": "flat-gradient-demands-detail-gain",
+    "fixture": {
+      "fixtureId": "invalid.detail.local-contrast.flat-gain",
+      "kind": "flat_gradient",
+      "settings": {
+        "clarity": 20,
+        "structure": 20,
+        "dehaze": 0,
+        "edgeProtection": 0.5,
+        "noiseProtection": 0.5,
+        "haloBudgetPx": 1
+      },
+      "minRequiredAcutanceGain": 0.4,
+      "maxAllowedHaloPx": 1,
+      "maxAllowedNoiseGain": 0.05,
+      "maxAllowedChromaShiftDeltaE": 0.3,
+      "expectedRisk": "low",
+      "notes": "Flat gradients should preserve smooth tone instead of inventing detail."
+    }
+  }
+]
