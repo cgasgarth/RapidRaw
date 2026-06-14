@@ -556,7 +556,20 @@ export const useKeyboardShortcuts = ({
     const handleKeyDown = (event: KeyboardEvent) => {
       const state = getStoreState();
 
+      const isCommandPaletteShortcut =
+        (state.settings.osPlatform === 'macos' ? event.metaKey : event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.code === 'KeyK';
+
+      if (isCommandPaletteShortcut) {
+        event.preventDefault();
+        state.ui.setUI({ isCommandPaletteOpen: !state.ui.isCommandPaletteOpen });
+        return;
+      }
+
       const isModalOpen =
+        state.ui.isCommandPaletteOpen ||
         state.ui.isCreateFolderModalOpen ||
         state.ui.isRenameFolderModalOpen ||
         state.ui.isRenameFileModalOpen ||

@@ -1,0 +1,36 @@
+import { z } from 'zod';
+
+export const commandPaletteCommandIdSchema = z.enum([
+  'backToLibrary',
+  'copyPasteSettings',
+  'focusStack',
+  'hdrMerge',
+  'importFiles',
+  'negativeLab',
+  'panorama',
+  'panelAdjustments',
+  'panelAi',
+  'panelCrop',
+  'panelExport',
+  'panelMasks',
+  'panelMetadata',
+  'panelPresets',
+  'superResolution',
+]);
+
+export type CommandPaletteCommandId = z.infer<typeof commandPaletteCommandIdSchema>;
+
+export const commandPaletteCommandCategorySchema = z.enum(['merge', 'navigation', 'panels', 'workflow']);
+
+export type CommandPaletteCommandCategory = z.infer<typeof commandPaletteCommandCategorySchema>;
+
+export const commandPaletteCommandSchema = z
+  .object({
+    category: commandPaletteCommandCategorySchema,
+    id: commandPaletteCommandIdSchema,
+    requiresEditorImage: z.boolean().default(false),
+    searchTokens: z.array(z.string().min(1)).default([]),
+  })
+  .strict();
+
+export type CommandPaletteCommand = z.infer<typeof commandPaletteCommandSchema>;

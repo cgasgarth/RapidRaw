@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
 import CollageModal from './CollageModal';
+import CommandPaletteModal from './CommandPaletteModal';
 import ConfirmModal from './ConfirmModal';
 import CopyPasteSettingsModal from './CopyPasteSettingsModal';
 import CreateFolderModal from './CreateFolderModal';
@@ -54,6 +55,7 @@ export interface AppModalsProps {
   handleSaveCollage: (base64Data: string, firstPath: string) => Promise<string>;
   handleCreateAlbumItem: (name: string, type: 'album' | 'group') => Promise<void>;
   handleRenameAlbumItem: (newName: string) => Promise<void>;
+  handleBackToLibrary: () => void;
 }
 
 export default function AppModals(props: AppModalsProps) {
@@ -71,6 +73,7 @@ export default function AppModals(props: AppModalsProps) {
     isRenameFileModalOpen,
     isImportModalOpen,
     isCopyPasteSettingsModalOpen,
+    isCommandPaletteOpen,
     folderActionTarget,
     renameTargetPaths,
     importSourcePaths,
@@ -95,6 +98,7 @@ export default function AppModals(props: AppModalsProps) {
       isRenameFileModalOpen: state.isRenameFileModalOpen,
       isImportModalOpen: state.isImportModalOpen,
       isCopyPasteSettingsModalOpen: state.isCopyPasteSettingsModalOpen,
+      isCommandPaletteOpen: state.isCommandPaletteOpen,
       folderActionTarget: state.folderActionTarget,
       renameTargetPaths: state.renameTargetPaths,
       importSourcePaths: state.importSourcePaths,
@@ -154,6 +158,13 @@ export default function AppModals(props: AppModalsProps) {
 
   return (
     <>
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onBackToLibrary={props.handleBackToLibrary}
+        onClose={() => {
+          setUI({ isCommandPaletteOpen: false });
+        }}
+      />
       <CopyPasteSettingsModal
         isOpen={isCopyPasteSettingsModalOpen}
         onClose={() => {

@@ -1043,6 +1043,36 @@
       "shuffleTooltip": "Shuffle Images",
       "spacing": "Spacing"
     },
+    "commandPalette": {
+      "categories": {
+        "merge": "Merge",
+        "navigation": "Navigation",
+        "panels": "Panels",
+        "workflow": "Workflow"
+      },
+      "close": "Close command palette",
+      "commands": {
+        "backToLibrary": "Back to library",
+        "copyPasteSettings": "Copy and paste settings",
+        "focusStack": "Open focus stacking",
+        "hdrMerge": "Open HDR merge",
+        "importFiles": "Open import settings",
+        "negativeLab": "Open negative lab",
+        "panelAdjustments": "Show adjustments",
+        "panelAi": "Show AI tools",
+        "panelCrop": "Show crop tools",
+        "panelExport": "Show export",
+        "panelMasks": "Show masks",
+        "panelMetadata": "Show metadata",
+        "panelPresets": "Show presets",
+        "panorama": "Open panorama stitching",
+        "superResolution": "Open super resolution"
+      },
+      "noResults": "No commands found",
+      "searchLabel": "Search commands",
+      "searchPlaceholder": "Search commands...",
+      "title": "Command Palette"
+    },
     "common": {
       "sourcePreviewAlt": "Source preview"
     },
