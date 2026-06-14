@@ -89,6 +89,13 @@ const smokeChecks = z.array(SmokeCheckSchema).parse([
     summary: 'Panorama performance fixture budget validation',
   },
   {
+    args: ['run', 'check:hdr-performance-smoke'],
+    budgetMs: 7_500,
+    command: 'bun',
+    id: 'hdr-performance-smoke',
+    summary: 'HDR alignment, merge weighting, and deghosting smoke budgets',
+  },
+  {
     args: ['run', 'check:focus-alignment-smoke'],
     budgetMs: 5_000,
     command: 'bun',
