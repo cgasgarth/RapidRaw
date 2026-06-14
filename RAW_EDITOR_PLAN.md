@@ -3901,6 +3901,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `layers(core): add per-layer adjustments`
   - Runtime status: per-layer scalar adjustment helpers are typed and fixture-validated for current mask-backed layers; full graph operation schemas remain future work.
 - `masks(brush): improve brush and eraser masks`
+  - Runtime status: brush and eraser parameter schemas, normalization helpers, and fixture validation are present; canvas stroke capture remains future work.
 - `masks(gradient): add linear and radial gradients`
 - `masks(range): add luminance range masks`
 - `masks(range): add color range masks`
