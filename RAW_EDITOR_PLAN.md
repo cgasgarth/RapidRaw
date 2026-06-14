@@ -4601,7 +4601,9 @@ Issues:
 - Add wavelet/detail-by-scale design.
 - Add wavelet/detail-by-scale implementation.
 - Add chroma/luma noise separation.
-- Add high ISO fixture set.
+- Add high ISO fixture set. Initial manifest entries separate project-generated
+  public-CI placeholders from real-photo private-review placeholders until
+  payload rights, hashes, and thresholds are supplied.
 - Add defringe improvements.
 - Add dust spot visualization.
 - Add AI denoise research issue.
