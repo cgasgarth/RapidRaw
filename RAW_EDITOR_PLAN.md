@@ -3843,6 +3843,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `color(adr): decide camera profile strategy`
   - ADR: `docs/color/camera-profile-strategy-adr-2026-06-14.md`
 - `color(docs): add color pipeline design doc`
+  - Design: `docs/color/color-pipeline-design-2026-06-14.md`
 - `validation(color): add ColorChecker fixture set`
 - `validation(color): add DeltaE measurement harness`
 - `validation(color): add histogram and scope validation`
