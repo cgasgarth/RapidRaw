@@ -1,0 +1,72 @@
+{
+  "$schema": "https://rawengine.local/schemas/ai-people-fake-provider.v1.json",
+  "analysis": {
+    "generatedAt": "2026-06-14T00:00:00.000Z",
+    "imageHash": "fixture://portrait-two-people",
+    "people": [
+      {
+        "availableParts": ["full_person", "face", "hair", "skin", "clothing"],
+        "bounds": {
+          "height": 0.72,
+          "width": 0.31,
+          "x": 0.12,
+          "y": 0.18
+        },
+        "confidence": 0.94,
+        "personId": "person-1"
+      },
+      {
+        "availableParts": ["full_person", "face", "clothing"],
+        "bounds": {
+          "height": 0.68,
+          "width": 0.28,
+          "x": 0.54,
+          "y": 0.2
+        },
+        "confidence": 0.88,
+        "personId": "person-2"
+      }
+    ],
+    "providerTier": "fake_provider",
+    "schemaVersion": 1,
+    "warnings": ["fake_provider_rectangular_masks_not_model_quality"]
+  },
+  "expectedMasks": [
+    {
+      "artifactId": "fake.people.person-1.full_person.v1",
+      "coverage": 0.1875,
+      "height": 8,
+      "rows": ["........", ".##.....", ".##.....", ".##.....", ".##.....", ".##.....", ".##.....", "........"],
+      "target": {
+        "part": "full_person",
+        "personId": "person-1"
+      },
+      "width": 8
+    },
+    {
+      "artifactId": "fake.people.all.background.v1",
+      "coverage": 0.578125,
+      "height": 8,
+      "rows": ["########", "#..#####", "#..#...#", "#..#...#", "#..#...#", "#..#...#", "#..#...#", "########"],
+      "target": {
+        "part": "background",
+        "personId": null
+      },
+      "width": 8
+    },
+    {
+      "artifactId": "fake.people.person-1.face.v1",
+      "coverage": 0.03125,
+      "height": 8,
+      "rows": ["........", "........", "..#.....", "..#.....", "........", "........", "........", "........"],
+      "target": {
+        "part": "face",
+        "personId": "person-1"
+      },
+      "width": 8
+    }
+  ],
+  "issue": 1133,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14"
+}
