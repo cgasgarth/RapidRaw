@@ -88,6 +88,13 @@ const smokeChecks = z.array(SmokeCheckSchema).parse([
     id: 'panorama-performance-fixtures',
     summary: 'Panorama performance fixture budget validation',
   },
+  {
+    args: ['run', 'check:focus-alignment-smoke'],
+    budgetMs: 5_000,
+    command: 'bun',
+    id: 'focus-translation-alignment-smoke',
+    summary: 'Focus stacking CPU translation alignment smoke',
+  },
 ]);
 
 const formatMs = (milliseconds) => `${Math.round(milliseconds)}ms`;
