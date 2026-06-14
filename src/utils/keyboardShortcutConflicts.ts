@@ -1,4 +1,5 @@
 import {
+  keyboardShortcutComboSchema,
   keyboardShortcutMapSchema,
   type KeyboardShortcutCombo,
   type KeyboardShortcutMap,
@@ -8,6 +9,11 @@ export interface KeyboardShortcutConflict {
   actions: Array<string>;
   combo: KeyboardShortcutCombo;
   comboKey: string;
+}
+
+export interface KeyboardShortcutConflictDefinition {
+  action: string;
+  defaultCombo: unknown;
 }
 
 export function findKeyboardShortcutConflicts(value: unknown): Array<KeyboardShortcutConflict> {
@@ -43,4 +49,27 @@ export function assertKeyboardShortcutMapHasNoConflicts(shortcuts: KeyboardShort
 
   const summary = conflicts.map((conflict) => `${conflict.comboKey}: ${conflict.actions.join(', ')}`).join('; ');
   throw new Error(`Keyboard shortcut conflicts detected: ${summary}`);
+}
+
+export function buildEffectiveKeyboardShortcutMap(
+  definitions: ReadonlyArray<KeyboardShortcutConflictDefinition>,
+  userShortcuts: unknown,
+): KeyboardShortcutMap {
+  const parsedUserShortcuts = keyboardShortcutMapSchema.safeParse(userShortcuts);
+  const userShortcutMap = parsedUserShortcuts.success ? parsedUserShortcuts.data : {};
+
+  return Object.fromEntries(
+    definitions.map((definition) => {
+      const userCombo = userShortcutMap[definition.action];
+      const defaultCombo = keyboardShortcutComboSchema.parse(definition.defaultCombo);
+      return [definition.action, userCombo === undefined ? defaultCombo : userCombo];
+    }),
+  );
+}
+
+export function findEffectiveKeyboardShortcutConflicts(
+  definitions: ReadonlyArray<KeyboardShortcutConflictDefinition>,
+  userShortcuts: unknown,
+): Array<KeyboardShortcutConflict> {
+  return findKeyboardShortcutConflicts(buildEffectiveKeyboardShortcutMap(definitions, userShortcuts));
 }

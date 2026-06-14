@@ -38,5 +38,33 @@
       "toggle_masks": ["KeyM"],
       "toggle_presets": ["KeyM"]
     }
+  },
+  {
+    "definitions": [
+      {
+        "action": "copy_files",
+        "defaultCombo": ["ctrl", "shift", "KeyC"]
+      },
+      {
+        "action": "copy_adjustments",
+        "defaultCombo": ["ctrl", "KeyC"]
+      },
+      {
+        "action": "paste_adjustments",
+        "defaultCombo": ["ctrl", "KeyV"]
+      }
+    ],
+    "expectedConflicts": [],
+    "expectedEffectiveConflicts": [
+      {
+        "actions": ["copy_adjustments", "copy_files"],
+        "combo": ["ctrl", "KeyC"],
+        "comboKey": "ctrl+KeyC"
+      }
+    ],
+    "id": "effective-default-user-conflict",
+    "shortcuts": {
+      "copy_files": ["ctrl", "KeyC"]
+    }
   }
 ]

@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
   Mouse,
   Touchpad,
+  TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -45,6 +46,7 @@ import {
 import { cloudUsageSchema, type CloudUsage } from '../../schemas/cloudUsageSchemas';
 import { normalizeKeyboardShortcutMap, parseKeyboardShortcutCombo } from '../../schemas/keyboardShortcutSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { findEffectiveKeyboardShortcutConflicts } from '../../utils/keyboardShortcutConflicts';
 import {
   formatKeyCode,
   KeybindDefinition,
@@ -92,6 +94,7 @@ interface KeybindRowProps {
   recordingAction: string | null;
   onStartRecording: (action: string) => void;
   isConflicting: boolean;
+  conflictTooltip?: string | undefined;
 }
 
 interface SettingItemProps {
@@ -186,6 +189,7 @@ const KeybindRow = ({
   recordingAction,
   onStartRecording,
   isConflicting,
+  conflictTooltip,
 }: KeybindRowProps) => {
   const { t } = useTranslation();
   const recording = recordingAction === def.action;
@@ -213,18 +217,33 @@ const KeybindRow = ({
   }, [recording, def.action, onSave, onStartRecording, osPlatform]);
 
   const displayCombo = currentCombo !== undefined ? (currentCombo.length ? currentCombo : null) : def.defaultCombo;
+  const actionLabel = translateDynamicKey(t, def.description);
+  const displayComboLabel = displayCombo
+    ? displayCombo.map((k) => formatKeyCode(k, osPlatform)).join(' + ')
+    : t('settings.controls.notAssigned');
+  const conflictLabel = conflictTooltip ? `Conflicts with ${conflictTooltip}` : undefined;
 
   return (
     <div className="flex justify-between items-center py-2">
-      <UiText variant={TextVariants.label}>{translateDynamicKey(t, def.description)}</UiText>
+      <UiText variant={TextVariants.label}>{actionLabel}</UiText>
       <div className="flex items-center gap-1">
-        {isConflicting && <span className="text-yellow-400 text-xs">⚠</span>}
+        {isConflicting && (
+          <TriangleAlert
+            aria-hidden="true"
+            className="h-4 w-4 text-yellow-400"
+            data-tooltip={conflictTooltip}
+            strokeWidth={2}
+          />
+        )}
         <button
           onClick={() => {
             onStartRecording(def.action);
           }}
+          aria-label={`${actionLabel}: ${displayComboLabel}`}
           className="flex items-center gap-1 flex-wrap shrink-0"
+          type="button"
         >
+          {conflictLabel && <span className="sr-only">{conflictLabel}</span>}
           {recording ? (
             <UiText
               as="kbd"
@@ -244,7 +263,7 @@ const KeybindRow = ({
               className={`px-2 py-1 font-sans bg-bg-primary border rounded-md cursor-pointer hover:border-accent transition-colors ${isConflicting ? 'border-yellow-400' : 'border-border-color'}`}
             >
               {displayCombo ? (
-                displayCombo.map((k) => formatKeyCode(k, osPlatform)).join(' + ')
+                displayComboLabel
               ) : (
                 <span className="text-text-secondary italic">{t('settings.controls.notAssigned')}</span>
               )}
@@ -1061,27 +1080,24 @@ export default function SettingsPanel({
     saveSettings({ ...appSettings, keybinds: newKeybinds });
   };
 
-  const conflictingKeys = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    const userKb = normalizeKeyboardShortcutMap(appSettings.keybinds, KEYBIND_ACTIONS);
-    for (const def of KEYBIND_DEFINITIONS) {
-      const userCombo = userKb[def.action];
-      const effective = userCombo?.length ? userCombo : userCombo === undefined ? def.defaultCombo : null;
-      if (!effective) continue;
-      const key = effective.join('+');
-      if (!map.has(key)) map.set(key, new Set());
-      const actions = map.get(key);
-      if (!actions) {
-        throw new Error('keybind conflict map invariant violated');
+  const conflictActionsByAction = useMemo(() => {
+    const conflicts = findEffectiveKeyboardShortcutConflicts(KEYBIND_DEFINITIONS, appSettings.keybinds);
+    const actionsByAction = new Map<string, Array<string>>();
+    for (const conflict of conflicts) {
+      for (const action of conflict.actions) {
+        actionsByAction.set(
+          action,
+          conflict.actions
+            .filter((conflictingAction) => conflictingAction !== action)
+            .map((conflictingAction) => {
+              const definition = KEYBIND_DEFINITIONS.find((candidate) => candidate.action === conflictingAction);
+              return definition ? translateDynamicKey(t, definition.description) : conflictingAction;
+            }),
+        );
       }
-      actions.add(def.action);
     }
-    const keys = new Set<string>();
-    for (const [, actions] of map) {
-      if (actions.size > 1) actions.forEach((k) => keys.add(k));
-    }
-    return keys;
-  }, [appSettings.keybinds]);
+    return actionsByAction;
+  }, [appSettings.keybinds, t]);
 
   return (
     <>
@@ -2554,7 +2570,8 @@ export default function SettingsPanel({
                                 onSave={handleKeybindSave}
                                 recordingAction={recordingAction}
                                 onStartRecording={setRecordingAction}
-                                isConflicting={conflictingKeys.has(def.action)}
+                                isConflicting={conflictActionsByAction.has(def.action)}
+                                conflictTooltip={conflictActionsByAction.get(def.action)?.join(', ')}
                               />
                             ))}
                           </div>
