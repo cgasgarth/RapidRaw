@@ -67,6 +67,10 @@
           "path": "docs/agent/negative-lab-app-server-tools-2026-06-13.md"
         },
         {
+          "title": "Working color space ADR",
+          "path": "docs/color/working-color-space-adr-2026-06-14.md"
+        },
+        {
           "title": "Film simulation architecture",
           "path": "docs/film/film-simulation-architecture-2026-06-13.md"
         },
