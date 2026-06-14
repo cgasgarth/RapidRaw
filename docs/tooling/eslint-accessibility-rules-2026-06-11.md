@@ -35,6 +35,12 @@ Run these commands before merging accessibility lint changes:
 
 ```sh
 bun install --frozen-lockfile
+bun run check:a11y
 bun run check:lint
 bun run docs:check
 ```
+
+`check:a11y` is the fast focused accessibility pass for JSX/TSX surfaces. The
+full `check:lint` gate still runs the complete strict lint profile, including
+the same `jsx-a11y` rules plus TypeScript, React, hooks, imports, i18n, and
+module-boundary checks.

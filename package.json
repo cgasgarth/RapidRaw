@@ -61,6 +61,7 @@
     "check:focus-fixtures:update": "bun scripts/check-focus-synthetic-fixtures.mjs --update",
     "check:focus-alignment-smoke": "bun scripts/check-focus-translation-alignment-smoke.mjs",
     "check:sr-performance-fixtures": "bun scripts/check-super-resolution-performance-fixtures.mjs",
+    "check:a11y": "eslint \"src/**/*.{tsx,jsx}\" --max-warnings 0",
     "check:lint-escapes": "bun scripts/check-eslint-escape-hatches.mjs",
     "check:lint": "eslint . --max-warnings 0",
     "check:format": "prettier --check .",
