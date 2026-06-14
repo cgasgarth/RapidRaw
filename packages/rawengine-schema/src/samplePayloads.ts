@@ -12,6 +12,7 @@ import {
   aiToolDryRunResultV1Schema,
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  computationalMergeAppServerToolManifestV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
@@ -76,6 +77,7 @@ import {
   type AiToolDryRunResultV1,
   type ArtifactHandleV1,
   type CommandEnvelopeV1,
+  type ComputationalMergeAppServerToolManifestV1,
   type ComputationalMergeCommandEnvelopeV1,
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMutationResultV1,
@@ -343,6 +345,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       returnsArtifactHandles: true,
       toolKind: 'apply',
       toolName: 'computationalmerge.apply_command',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'ComputationalMergeDryRunResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
+      toolName: 'computationalmerge.super_resolution.dry_run_command',
+    },
+    {
+      approvalClass: ApprovalClass.EditApply,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'ComputationalMergeMutationResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: true,
+      toolKind: 'apply',
+      toolName: 'computationalmerge.super_resolution.apply_command',
     },
     {
       approvalClass: ApprovalClass.PreviewOnly,
@@ -1741,6 +1763,26 @@ export const sampleComputationalMergeSuperResolutionCommandEnvelopeV1: Computati
     },
   });
 
+export const sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
+  computationalMergeCommandEnvelopeV1Schema.parse({
+    ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason:
+        'Applying the accepted conservative super-resolution merge creates a derived editable asset and provenance entry.',
+      state: 'approved',
+    },
+    commandId: 'command_merge_super_resolution_apply_sample',
+    correlationId: 'corr_merge_super_resolution_apply_sample',
+    dryRun: false,
+    idempotencyKey: 'idem_merge_super_resolution_apply_sample',
+    parameters: {
+      ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1.parameters,
+      acceptedDryRunPlanHash: 'sha256:sample-merge-super-resolution-plan',
+      acceptedDryRunPlanId: 'merge_plan_super_resolution_001',
+    },
+  });
+
 export const sampleComputationalMergeApplyCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
   computationalMergeCommandEnvelopeV1Schema.parse({
     ...sampleComputationalMergeCommandEnvelopeV1,
@@ -1868,6 +1910,48 @@ export const sampleComputationalMergeMutationResultV1: ComputationalMergeMutatio
     sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
     undoRevision: sampleEditGraphSnapshotV1.graphRevision,
     warnings: [],
+  });
+
+export const sampleComputationalMergeSuperResolutionDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleComputationalMergeSuperResolutionCommandEnvelopeV1.approval,
+      arguments: sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
+      dryRun: true,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      itemId: 'item_tool_call_sr_dry_run',
+      jsonRpcRequestId: 48,
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_sample',
+      toolKind: 'dry_run',
+      toolName: 'computationalmerge.super_resolution.dry_run_command',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_sample',
+    },
+  });
+
+export const sampleComputationalMergeSuperResolutionApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1.approval,
+      arguments: sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1,
+      dryRun: false,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      itemId: 'item_tool_call_sr_apply',
+      jsonRpcRequestId: 49,
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_sample',
+      toolKind: 'apply',
+      toolName: 'computationalmerge.super_resolution.apply_command',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_sample',
+    },
   });
 
 export const samplePreviewScopeQueryV1: PreviewScopeQueryV1 = previewScopeQueryV1Schema.parse({
@@ -4244,6 +4328,46 @@ export const sampleNegativeLabAppServerToolManifestV1: NegativeLabAppServerToolM
         requiresDryRunPlan: true,
         returnsArtifactHandles: true,
         toolName: 'negativelab.apply_planned_command',
+      },
+    ],
+  });
+
+export const sampleComputationalMergeAppServerToolManifestV1: ComputationalMergeAppServerToolManifestV1 =
+  computationalMergeAppServerToolManifestV1Schema.parse({
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    serverRuntime: 'openai_app_server',
+    tools: [
+      {
+        allowedCommandTypes: ['computationalMerge.createSuperResolution'],
+        approvalClass: ApprovalClass.PreviewOnly,
+        auditEvents: ['computational_merge_dry_run_requested', 'computational_merge_dry_run_completed'],
+        description:
+          'Preview a local multi-image super-resolution merge and return a non-mutating dry-run plan with artifact handles.',
+        executionMode: 'dry_run_command',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: false,
+        outputSchemaName: 'ComputationalMergeDryRunResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: false,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.super_resolution.dry_run_command',
+      },
+      {
+        allowedCommandTypes: ['computationalMerge.createSuperResolution'],
+        approvalClass: ApprovalClass.EditApply,
+        auditEvents: ['computational_merge_apply_requested', 'computational_merge_apply_completed'],
+        description:
+          'Apply an accepted local super-resolution dry-run plan into the non-destructive edit graph after approval.',
+        executionMode: 'apply_dry_run_plan',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: true,
+        outputSchemaName: 'ComputationalMergeMutationResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: true,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.super_resolution.apply_command',
       },
     ],
   });

@@ -10,6 +10,7 @@ import {
   aiToolDryRunResultV1Schema,
   artifactHandleV1Schema,
   commandEnvelopeV1Schema,
+  computationalMergeAppServerToolManifestV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
@@ -84,13 +85,17 @@ import {
   sampleAiToolDryRunResultV1,
   sampleArtifactHandleV1,
   sampleCommandEnvelopeV1,
+  sampleComputationalMergeAppServerToolManifestV1,
   sampleComputationalMergeApplyCommandEnvelopeV1,
   sampleComputationalMergeCommandEnvelopeV1,
   sampleComputationalMergeDryRunResultV1,
   sampleComputationalMergeFocusStackCommandEnvelopeV1,
   sampleComputationalMergeHdrCommandEnvelopeV1,
   sampleComputationalMergeMutationResultV1,
+  sampleComputationalMergeSuperResolutionApplyAppServerToolCallValidationV1,
+  sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1,
   sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
+  sampleComputationalMergeSuperResolutionDryRunAppServerToolCallValidationV1,
   sampleEditGraphApplyCommandEnvelopeV1,
   sampleEditGraphCommandEnvelopeV1,
   sampleEditGraphDryRunResultV1,
@@ -396,6 +401,21 @@ const validSamples: ReadonlyArray<{
     name: 'computational merge mutation result',
     schema: computationalMergeMutationResultV1Schema,
     value: sampleComputationalMergeMutationResultV1,
+  },
+  {
+    name: 'computational merge app-server tool manifest',
+    schema: computationalMergeAppServerToolManifestV1Schema,
+    value: sampleComputationalMergeAppServerToolManifestV1,
+  },
+  {
+    name: 'computational merge super-resolution dry-run app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergeSuperResolutionDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'computational merge super-resolution apply app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergeSuperResolutionApplyAppServerToolCallValidationV1,
   },
   {
     name: 'preview scope query',
@@ -1066,6 +1086,14 @@ expectInvalid(
     },
   },
 );
+
+expectInvalid('super-resolution apply command above 1x without alignment', computationalMergeCommandEnvelopeV1Schema, {
+  ...sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1,
+  parameters: {
+    ...sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1.parameters,
+    alignmentMode: 'none',
+  },
+});
 
 expectInvalid('computational merge command with duplicate source indexes', computationalMergeCommandEnvelopeV1Schema, {
   ...sampleComputationalMergeCommandEnvelopeV1,
@@ -1937,6 +1965,38 @@ const invalidMutatingAppServerToolResult = negativeLabAppServerToolManifestV1Sch
 if (invalidMutatingAppServerToolResult.success) {
   throw new Error('Expected mutating app-server tool manifests to require edit approval and a dry-run plan.');
 }
+
+const invalidComputationalMergeRemoteManifest = {
+  ...sampleComputationalMergeAppServerToolManifestV1,
+  tools: [
+    {
+      ...sampleComputationalMergeAppServerToolManifestV1.tools[0],
+      localOnly: false,
+    },
+  ],
+};
+expectInvalid(
+  'remote computational merge app-server tool manifest',
+  computationalMergeAppServerToolManifestV1Schema,
+  invalidComputationalMergeRemoteManifest,
+);
+
+const invalidComputationalMergeApplyManifest = {
+  ...sampleComputationalMergeAppServerToolManifestV1,
+  tools: [
+    {
+      ...sampleComputationalMergeAppServerToolManifestV1.tools[1],
+      mutates: true,
+      recordsProvenance: false,
+      requiresDryRunPlan: false,
+    },
+  ],
+};
+expectInvalid(
+  'computational merge apply manifest without provenance or dry-run plan',
+  computationalMergeAppServerToolManifestV1Schema,
+  invalidComputationalMergeApplyManifest,
+);
 
 const invalidAiCloudLocalOnlyManifest = {
   ...sampleAiAppServerToolManifestV1,
