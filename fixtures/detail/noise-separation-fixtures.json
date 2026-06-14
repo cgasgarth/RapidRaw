@@ -1,0 +1,50 @@
+[
+  {
+    "fixtureId": "synthetic.detail.flat-shadow-noise.v0",
+    "kind": "flat_shadow",
+    "iso": 12800,
+    "settings": {
+      "lumaNoiseReduction": 45,
+      "colorNoiseReduction": 35,
+      "detailPreservation": 0.55,
+      "highIsoProtection": 0.65
+    },
+    "expectedLumaNoiseReduction": 0.35,
+    "expectedMaxDetailLoss": 0.12,
+    "expectedMaxChromaBlurDeltaE": 0.8,
+    "expectedMaxHueShiftDeltaE": 0.4,
+    "notes": "Flat shadow fixture validates luma noise cleanup without banding or hue drift."
+  },
+  {
+    "fixtureId": "synthetic.detail.chroma-edge-noise.v0",
+    "kind": "edge_with_chroma_noise",
+    "iso": 6400,
+    "settings": {
+      "lumaNoiseReduction": 25,
+      "colorNoiseReduction": 65,
+      "detailPreservation": 0.65,
+      "highIsoProtection": 0.6
+    },
+    "expectedLumaNoiseReduction": 0.18,
+    "expectedMaxDetailLoss": 0.1,
+    "expectedMaxChromaBlurDeltaE": 1,
+    "expectedMaxHueShiftDeltaE": 0.6,
+    "notes": "Color-edge fixture validates chroma cleanup without bleeding color across edges."
+  },
+  {
+    "fixtureId": "synthetic.detail.fine-texture-high-iso.v0",
+    "kind": "fine_texture_high_iso",
+    "iso": 25600,
+    "settings": {
+      "lumaNoiseReduction": 55,
+      "colorNoiseReduction": 45,
+      "detailPreservation": 0.7,
+      "highIsoProtection": 0.75
+    },
+    "expectedLumaNoiseReduction": 0.4,
+    "expectedMaxDetailLoss": 0.18,
+    "expectedMaxChromaBlurDeltaE": 1.2,
+    "expectedMaxHueShiftDeltaE": 0.7,
+    "notes": "Fine texture fixture prevents luma NR from smearing true subject detail."
+  }
+]
