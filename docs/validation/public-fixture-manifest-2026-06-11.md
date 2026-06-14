@@ -9,10 +9,10 @@
 
 ## Purpose
 
-This document introduces the first public fixture manifest surface without adding
-fixture payloads or download scripts. The manifest is intentionally small and
-contains planned synthetic entries only, so future validation PRs can evolve the
-schema and add real fixtures deliberately.
+This document introduces the first public fixture manifest surface without
+requiring fixture payloads or download scripts. The manifest starts with planned
+metadata entries so future validation PRs can evolve the schema and activate
+real fixtures deliberately.
 
 ## Current Manifest Scope
 
@@ -21,8 +21,8 @@ The current manifest is non-executable metadata.
 - It does not download images.
 - It does not add fixture payloads.
 - It does not add CI jobs.
-- It records two planned synthetic fixture entries that are safe to discuss in a
-  public repository.
+- It records planned fixture entries that are safe to discuss in a public
+  repository.
 - It references the fixture download policy for rights and acquisition rules.
 
 ## Entry Status
