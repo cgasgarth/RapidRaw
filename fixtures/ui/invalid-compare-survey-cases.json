@@ -1,0 +1,110 @@
+[
+  {
+    "case": "rejects compare mode without reference",
+    "session": {
+      "activePath": "/tmp/a.raw",
+      "candidatePaths": ["/tmp/a.raw", "/tmp/b.raw"],
+      "candidates": [
+        {
+          "capturedAt": null,
+          "colorLabel": null,
+          "edited": false,
+          "path": "/tmp/a.raw",
+          "rating": 0,
+          "rejected": false,
+          "virtualCopyId": null
+        },
+        {
+          "capturedAt": null,
+          "colorLabel": null,
+          "edited": false,
+          "path": "/tmp/b.raw",
+          "rating": 0,
+          "rejected": false,
+          "virtualCopyId": null
+        }
+      ],
+      "compareReferencePath": null,
+      "createdAt": "2026-06-14T11:30:00.000Z",
+      "id": "bad-reference",
+      "mode": "compare",
+      "showMetadataOverlays": true,
+      "sort": { "key": "selection_order", "order": "asc" },
+      "updatedAt": "2026-06-14T11:30:00.000Z",
+      "version": 1,
+      "zoomLinked": true
+    }
+  },
+  {
+    "case": "rejects active path outside candidates",
+    "session": {
+      "activePath": "/tmp/missing.raw",
+      "candidatePaths": ["/tmp/a.raw", "/tmp/b.raw"],
+      "candidates": [
+        {
+          "capturedAt": null,
+          "colorLabel": null,
+          "edited": false,
+          "path": "/tmp/a.raw",
+          "rating": 0,
+          "rejected": false,
+          "virtualCopyId": null
+        },
+        {
+          "capturedAt": null,
+          "colorLabel": null,
+          "edited": false,
+          "path": "/tmp/b.raw",
+          "rating": 0,
+          "rejected": false,
+          "virtualCopyId": null
+        }
+      ],
+      "compareReferencePath": null,
+      "createdAt": "2026-06-14T11:30:00.000Z",
+      "id": "bad-active",
+      "mode": "survey",
+      "showMetadataOverlays": true,
+      "sort": { "key": "selection_order", "order": "asc" },
+      "updatedAt": "2026-06-14T11:30:00.000Z",
+      "version": 1,
+      "zoomLinked": true
+    }
+  },
+  {
+    "case": "rejects duplicate candidate paths",
+    "session": {
+      "activePath": "/tmp/a.raw",
+      "candidatePaths": ["/tmp/a.raw", "/tmp/a.raw"],
+      "candidates": [
+        {
+          "capturedAt": null,
+          "colorLabel": null,
+          "edited": false,
+          "path": "/tmp/a.raw",
+          "rating": 0,
+          "rejected": false,
+          "virtualCopyId": null
+        },
+        {
+          "capturedAt": null,
+          "colorLabel": null,
+          "edited": false,
+          "path": "/tmp/b.raw",
+          "rating": 0,
+          "rejected": false,
+          "virtualCopyId": null
+        }
+      ],
+      "compareReferencePath": null,
+      "createdAt": "2026-06-14T11:30:00.000Z",
+      "id": "bad-duplicates",
+      "mode": "survey",
+      "showMetadataOverlays": true,
+      "sort": { "key": "selection_order", "order": "asc" },
+      "updatedAt": "2026-06-14T11:30:00.000Z",
+      "version": 1,
+      "zoomLinked": true
+    }
+  }
+]

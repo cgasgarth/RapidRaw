@@ -1,0 +1,46 @@
+{
+  "activePath": "/Users/example/Pictures/Selects/DSC_0002.NEF",
+  "candidatePaths": [
+    "/Users/example/Pictures/Selects/DSC_0001.NEF",
+    "/Users/example/Pictures/Selects/DSC_0002.NEF",
+    "/Users/example/Pictures/Selects/DSC_0003.NEF"
+  ],
+  "candidates": [
+    {
+      "capturedAt": "2026-06-14T08:00:00.000Z",
+      "colorLabel": "green",
+      "edited": true,
+      "path": "/Users/example/Pictures/Selects/DSC_0001.NEF",
+      "rating": 4,
+      "rejected": false,
+      "virtualCopyId": null
+    },
+    {
+      "capturedAt": "2026-06-14T08:01:00.000Z",
+      "colorLabel": "green",
+      "edited": false,
+      "path": "/Users/example/Pictures/Selects/DSC_0002.NEF",
+      "rating": 5,
+      "rejected": false,
+      "virtualCopyId": null
+    },
+    {
+      "capturedAt": "2026-06-14T08:02:00.000Z",
+      "colorLabel": null,
+      "edited": false,
+      "path": "/Users/example/Pictures/Selects/DSC_0003.NEF",
+      "rating": 2,
+      "rejected": true,
+      "virtualCopyId": "a1b2c3"
+    }
+  ],
+  "compareReferencePath": "/Users/example/Pictures/Selects/DSC_0001.NEF",
+  "createdAt": "2026-06-14T11:30:00.000Z",
+  "id": "compare-selects",
+  "mode": "compare",
+  "showMetadataOverlays": true,
+  "sort": { "key": "selection_order", "order": "asc" },
+  "updatedAt": "2026-06-14T11:35:00.000Z",
+  "version": 1,
+  "zoomLinked": true
+}
