@@ -3864,6 +3864,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Docs: `docs/color/selective-color-ranges-2026-06-14.md`
   - Runtime status: UI range metadata is shared and validated against WGSL; interactive range-width editing remains future work.
 - `color(selective): add range smoothness and falloff controls`
+  - Contract: `src/utils/selectiveColorFalloff.ts`
+  - Fixtures: `fixtures/color/selective-color-falloff-fixtures.json`
+  - Docs: `docs/color/selective-color-falloff-2026-06-14.md`
+  - Runtime status: default falloff math is available and validated; user-adjustable smoothness UI remains future work.
 - `color(skin): add skin tone uniformity controls`
 - `color(mask): create color masks from selected ranges`
 - `color(grading): refine color grading wheels`
@@ -4553,6 +4557,7 @@ Issues:
 - Add advanced selective color ranges.
   - Shared range metadata and WGSL parity validation are present.
 - Add range smoothness/falloff controls.
+  - Default falloff math and shader parity validation are present.
 - Add skin tone uniformity controls.
 - Add color mask creation from selected range.
 - Add color grading wheels refinement.
