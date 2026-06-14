@@ -63,6 +63,8 @@ import {
   rawEngineAgentReplayFixtureV1Schema,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
+  superResolutionArtifactV1Schema,
+  superResolutionDryRunSummaryV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
@@ -150,6 +152,8 @@ import {
   sampleQueryEnvelopeV1,
   sampleRawEngineAgentReplayFixtureV1,
   sampleRawEngineAppServerToolCallValidationV1,
+  sampleSuperResolutionArtifactV1,
+  sampleSuperResolutionDryRunSummaryV1,
   sampleToolRegistryV1,
   sampleToneColorApplyCommandEnvelopeV1,
   sampleToneColorCommandEnvelopeV1,
@@ -416,6 +420,16 @@ const validSamples: ReadonlyArray<{
     name: 'computational merge super-resolution apply app-server tool call validation',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleComputationalMergeSuperResolutionApplyAppServerToolCallValidationV1,
+  },
+  {
+    name: 'super-resolution dry-run summary',
+    schema: superResolutionDryRunSummaryV1Schema,
+    value: sampleSuperResolutionDryRunSummaryV1,
+  },
+  {
+    name: 'super-resolution artifact',
+    schema: superResolutionArtifactV1Schema,
+    value: sampleSuperResolutionArtifactV1,
   },
   {
     name: 'preview scope query',
@@ -1243,6 +1257,99 @@ expectInvalid('external panorama backend required before packaging proof', panor
   supportedExposureModes: ['opencv_gain', 'opencv_channels'],
   supportedSeamMethods: ['opencv_graph_cut_color', 'opencv_voronoi'],
   warnings: ['external_dependency', 'packaging_unproven', 'required_ci_not_ready'],
+});
+
+expectInvalid('eligible super-resolution summary with block codes', superResolutionDryRunSummaryV1Schema, {
+  ...sampleSuperResolutionDryRunSummaryV1,
+  blockCodes: ['insufficient_overlap'],
+});
+
+expectInvalid('blocked super-resolution summary without block codes', superResolutionDryRunSummaryV1Schema, {
+  ...sampleSuperResolutionDryRunSummaryV1,
+  decisionStatus: 'blocked',
+});
+
+expectInvalid('super-resolution summary with effective scale above request', superResolutionDryRunSummaryV1Schema, {
+  ...sampleSuperResolutionDryRunSummaryV1,
+  effectiveOutputScale: sampleSuperResolutionDryRunSummaryV1.requestedOutputScale + 0.25,
+});
+
+expectInvalid('super-resolution summary with duplicate source state indexes', superResolutionDryRunSummaryV1Schema, {
+  ...sampleSuperResolutionDryRunSummaryV1,
+  sourceState: sampleSuperResolutionDryRunSummaryV1.sourceState.map((sourceState) => ({
+    ...sourceState,
+    sourceIndex: 0,
+  })),
+});
+
+expectInvalid('super-resolution summary with mismatched source count', superResolutionDryRunSummaryV1Schema, {
+  ...sampleSuperResolutionDryRunSummaryV1,
+  validationSummary: {
+    ...sampleSuperResolutionDryRunSummaryV1.validationSummary,
+    sourceCount: sampleSuperResolutionDryRunSummaryV1.validationSummary.sourceCount - 1,
+  },
+});
+
+expectInvalid('super-resolution artifact with aggressive preview-only detail', superResolutionArtifactV1Schema, {
+  ...sampleSuperResolutionArtifactV1,
+  detailPolicy: 'aggressive_preview_only',
+});
+
+expectInvalid('super-resolution artifact without durable output artifact', superResolutionArtifactV1Schema, {
+  ...sampleSuperResolutionArtifactV1,
+  outputArtifact: {
+    ...sampleSuperResolutionArtifactV1.outputArtifact,
+    storage: 'temp_cache',
+  },
+});
+
+expectInvalid('model-backed super-resolution artifact without model provenance', superResolutionArtifactV1Schema, {
+  ...sampleSuperResolutionArtifactV1,
+  engine: {
+    backendType: 'local_model',
+    engineId: 'rawengine_sr_model_backend',
+    engineVersion: '0.1.0-schema',
+  },
+});
+
+expectInvalid('non-model super-resolution artifact with model provenance', superResolutionArtifactV1Schema, {
+  ...sampleSuperResolutionArtifactV1,
+  engine: {
+    ...sampleSuperResolutionArtifactV1.engine,
+    model: {
+      modelId: 'rawengine_sr_model_preview',
+      modelVersion: '0.0.1',
+    },
+  },
+});
+
+expectInvalid('current super-resolution artifact with invalidation reasons', superResolutionArtifactV1Schema, {
+  ...sampleSuperResolutionArtifactV1,
+  staleState: {
+    ...sampleSuperResolutionArtifactV1.staleState,
+    invalidationReasons: ['source_content_hash_changed'],
+  },
+});
+
+expectInvalid('stale super-resolution artifact without invalidation reasons', superResolutionArtifactV1Schema, {
+  ...sampleSuperResolutionArtifactV1,
+  staleState: {
+    ...sampleSuperResolutionArtifactV1.staleState,
+    state: 'stale',
+  },
+});
+
+expectInvalid('super-resolution artifact with source state missing a source', superResolutionArtifactV1Schema, {
+  ...sampleSuperResolutionArtifactV1,
+  sourceState: sampleSuperResolutionArtifactV1.sourceState.slice(1),
+});
+
+expectInvalid('super-resolution artifact with unknown source state index', superResolutionArtifactV1Schema, {
+  ...sampleSuperResolutionArtifactV1,
+  sourceState: sampleSuperResolutionArtifactV1.sourceState.map((sourceState, sourceIndex) => ({
+    ...sourceState,
+    sourceIndex: sourceIndex === 0 ? 99 : sourceState.sourceIndex,
+  })),
 });
 
 expectInvalid('HDR merge command without bracket exposure metadata', computationalMergeCommandEnvelopeV1Schema, {

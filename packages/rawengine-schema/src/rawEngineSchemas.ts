@@ -2067,6 +2067,56 @@ export const computationalMergeAlignmentModeV1Schema = z.enum([
 
 export const computationalMergeQualityPreferenceV1Schema = z.enum(['preview', 'balanced', 'best']);
 
+export const superResolutionDetailPolicyV1Schema = z.enum(['conservative', 'balanced', 'aggressive_preview_only']);
+
+export const superResolutionDecisionStatusV1Schema = z.enum([
+  'eligible_for_apply',
+  'preview_only',
+  'blocked',
+  'downgraded',
+]);
+
+export const superResolutionWarningCodeV1Schema = z.enum([
+  'aggressive_preview_only',
+  'effective_scale_downgraded',
+  'high_memory_estimate',
+  'human_review_required',
+  'low_alignment_confidence',
+  'low_overlap_coverage',
+  'motion_detected',
+  'runtime_estimate_high',
+  'texture_risk',
+]);
+
+export const superResolutionBlockCodeV1Schema = z.enum([
+  'aggressive_detail_preview_only',
+  'alignment_confidence_too_low',
+  'alignment_required',
+  'human_review_failed',
+  'insufficient_overlap',
+  'memory_budget_exceeded',
+  'missing_accepted_dry_run',
+  'source_graph_changed',
+  'source_hash_changed',
+  'unsupported_detail_policy',
+]);
+
+export const superResolutionReviewStatusV1Schema = z.enum(['not_required', 'pending', 'passed', 'failed']);
+
+export const superResolutionInvalidationReasonV1Schema = z.enum([
+  'alignment_settings_changed',
+  'detail_policy_changed',
+  'engine_version_changed',
+  'model_version_changed',
+  'output_artifact_changed',
+  'scale_changed',
+  'source_content_hash_changed',
+  'source_graph_revision_changed',
+  'source_set_changed',
+]);
+
+export const superResolutionStaleStateV1Schema = z.enum(['current', 'stale', 'unknown']);
+
 export const computationalMergeOutputDimensionsV1Schema = z
   .object({
     height: z.number().int().positive(),
@@ -2424,7 +2474,7 @@ export const computationalMergeCommandEnvelopeV1Schema = z
           .object({
             ...computationalMergeAcceptedDryRunSchema.shape,
             alignmentMode: computationalMergeAlignmentModeV1Schema,
-            detailPolicy: z.enum(['conservative', 'balanced', 'aggressive_preview_only']),
+            detailPolicy: superResolutionDetailPolicyV1Schema,
             maxPreviewDimensionPx: z.number().int().positive().max(8192),
             outputName: z.string().trim().min(1),
             outputScale: z.number().min(1.1).max(4),
@@ -2540,6 +2590,289 @@ export const computationalMergeMutationResultV1Schema = z
     warnings: z.array(z.string().trim().min(1)),
   })
   .strict();
+
+const superResolutionSourceStateV1Schema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    graphRevision: z.string().trim().min(1),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const validateSuperResolutionSourceState = (
+  sourceImageRefs: Array<ComputationalMergeSourceImageRefV1>,
+  sourceStates: Array<z.infer<typeof superResolutionSourceStateV1Schema>>,
+  context: z.RefinementCtx,
+  path: Array<string | number>,
+) => {
+  const sourceIndexes = new Set(sourceImageRefs.map((source) => source.sourceIndex));
+  const stateIndexes = new Set<number>();
+
+  for (const [index, sourceState] of sourceStates.entries()) {
+    if (stateIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Super-resolution source state entries require unique source indexes.',
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+
+    stateIndexes.add(sourceState.sourceIndex);
+
+    if (!sourceIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Super-resolution source state entries must reference sourceImageRefs.',
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+  }
+
+  if (stateIndexes.size !== sourceIndexes.size) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Super-resolution source state entries must cover every source image.',
+      path,
+    });
+  }
+};
+
+const validateUniqueSuperResolutionSourceState = (
+  sourceStates: Array<z.infer<typeof superResolutionSourceStateV1Schema>>,
+  context: z.RefinementCtx,
+  path: Array<string | number>,
+) => {
+  const stateIndexes = new Set<number>();
+
+  for (const [index, sourceState] of sourceStates.entries()) {
+    if (stateIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Super-resolution source state entries require unique source indexes.',
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+
+    stateIndexes.add(sourceState.sourceIndex);
+  }
+};
+
+export const superResolutionDryRunSummaryV1Schema = z
+  .object({
+    blockCodes: z.array(superResolutionBlockCodeV1Schema),
+    commandId: z.string().trim().min(1),
+    decisionStatus: superResolutionDecisionStatusV1Schema,
+    detailPolicy: superResolutionDetailPolicyV1Schema,
+    effectiveOutputScale: z.number().min(1).max(4),
+    estimatedOutputDimensions: computationalMergeOutputDimensionsV1Schema,
+    humanReviewStatus: superResolutionReviewStatusV1Schema,
+    localConfidenceMapArtifact: artifactHandleV1Schema.optional(),
+    planHash: z.string().trim().min(1),
+    planId: z.string().trim().min(1),
+    qualityPreference: computationalMergeQualityPreferenceV1Schema,
+    requestedAlignmentMode: computationalMergeAlignmentModeV1Schema,
+    requestedOutputScale: z.number().min(1.1).max(4),
+    resolvedAlignmentMode: computationalMergeAlignmentModeV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceState: z.array(superResolutionSourceStateV1Schema).min(2),
+    validationSummary: z
+      .object({
+        alignmentConfidence: z.number().min(0).max(1).optional(),
+        expectedDetailGainRatio: z.number().positive().optional(),
+        falseDetailRisk: z.enum(['unknown', 'low', 'medium', 'high']),
+        overlapCoverageRatio: z.number().min(0).max(1).optional(),
+        sourceCount: z.number().int().positive(),
+      })
+      .strict(),
+    warningCodes: z.array(superResolutionWarningCodeV1Schema),
+  })
+  .strict()
+  .superRefine((summary, context) => {
+    validateUniqueSuperResolutionSourceState(summary.sourceState, context, ['sourceState']);
+
+    if (summary.effectiveOutputScale > summary.requestedOutputScale) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Effective SR scale cannot exceed requested scale.',
+        path: ['effectiveOutputScale'],
+      });
+    }
+
+    if (summary.decisionStatus === 'eligible_for_apply' && summary.blockCodes.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Eligible SR dry-run summaries must not include block codes.',
+        path: ['blockCodes'],
+      });
+    }
+
+    if (summary.decisionStatus === 'blocked' && summary.blockCodes.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Blocked SR dry-run summaries require at least one block code.',
+        path: ['blockCodes'],
+      });
+    }
+
+    if (
+      summary.decisionStatus === 'downgraded' &&
+      !summary.warningCodes.includes('effective_scale_downgraded') &&
+      summary.effectiveOutputScale < summary.requestedOutputScale
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Downgraded SR summaries require the effective_scale_downgraded warning code.',
+        path: ['warningCodes'],
+      });
+    }
+
+    if (
+      summary.detailPolicy === 'aggressive_preview_only' &&
+      summary.decisionStatus !== 'preview_only' &&
+      summary.decisionStatus !== 'blocked'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Aggressive SR detail policy can only produce preview-only or blocked summaries.',
+        path: ['decisionStatus'],
+      });
+    }
+
+    if (summary.validationSummary.sourceCount !== summary.sourceState.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'SR validation sourceCount must match source state length.',
+        path: ['validationSummary', 'sourceCount'],
+      });
+    }
+  });
+
+export const superResolutionArtifactV1Schema = z
+  .object({
+    artifactId: z.string().trim().min(1),
+    createdAt: z.iso.datetime({ offset: true }),
+    decisionStatus: superResolutionDecisionStatusV1Schema,
+    detailPolicy: superResolutionDetailPolicyV1Schema,
+    dryRun: z
+      .object({
+        acceptedDryRunPlanHash: z.string().trim().min(1),
+        acceptedDryRunPlanId: z.string().trim().min(1),
+      })
+      .strict(),
+    engine: z
+      .object({
+        backendType: z.enum(['local_cpu', 'local_gpu', 'local_model', 'schema_only']),
+        engineId: z.string().trim().min(1),
+        engineVersion: z.string().trim().min(1),
+        model: z
+          .object({
+            modelId: z.string().trim().min(1),
+            modelVersion: z.string().trim().min(1),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict(),
+    family: z.literal('super_resolution'),
+    outputArtifact: artifactHandleV1Schema,
+    outputColorSpace: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema),
+    qualityPreference: computationalMergeQualityPreferenceV1Schema,
+    requestedAlignmentMode: computationalMergeAlignmentModeV1Schema,
+    requestedOutputScale: z.number().min(1.1).max(4),
+    resolvedAlignmentMode: computationalMergeAlignmentModeV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceImageRefs: z.array(computationalMergeSourceImageRefV1Schema).min(2),
+    sourceState: z.array(superResolutionSourceStateV1Schema).min(2),
+    staleState: z
+      .object({
+        checkedAt: z.iso.datetime({ offset: true }).optional(),
+        invalidationReasons: z.array(superResolutionInvalidationReasonV1Schema),
+        state: superResolutionStaleStateV1Schema,
+      })
+      .strict(),
+    validationSummary: z
+      .object({
+        actualPeakMemoryBytes: z.number().int().nonnegative().optional(),
+        actualRuntimeMs: z.number().int().nonnegative().optional(),
+        alignmentConfidence: z.number().min(0).max(1).optional(),
+        expectedDetailGainRatio: z.number().positive().optional(),
+        falseDetailRisk: z.enum(['unknown', 'low', 'medium', 'high']),
+        humanReviewStatus: superResolutionReviewStatusV1Schema,
+        overlapCoverageRatio: z.number().min(0).max(1).optional(),
+        sourceCount: z.number().int().positive(),
+      })
+      .strict(),
+    warningCodes: z.array(superResolutionWarningCodeV1Schema),
+  })
+  .strict()
+  .superRefine((artifact, context) => {
+    if (artifact.detailPolicy === 'aggressive_preview_only') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Final SR derived artifacts must not use aggressive preview-only detail policy.',
+        path: ['detailPolicy'],
+      });
+    }
+
+    if (artifact.decisionStatus === 'blocked' || artifact.decisionStatus === 'preview_only') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Final SR derived artifacts require an apply-eligible decision status.',
+        path: ['decisionStatus'],
+      });
+    }
+
+    if (artifact.outputArtifact.kind !== 'merge_output' || artifact.outputArtifact.storage !== 'sidecar_artifact') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Final SR derived artifacts must reference a durable merge output sidecar artifact.',
+        path: ['outputArtifact'],
+      });
+    }
+
+    if (artifact.engine.backendType === 'local_model' && artifact.engine.model === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Model-backed SR artifacts require model provenance.',
+        path: ['engine', 'model'],
+      });
+    }
+
+    if (artifact.engine.backendType !== 'local_model' && artifact.engine.model !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Non-model SR artifacts must not include model provenance.',
+        path: ['engine', 'model'],
+      });
+    }
+
+    if (artifact.staleState.state === 'current' && artifact.staleState.invalidationReasons.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Current SR artifacts must not include invalidation reasons.',
+        path: ['staleState', 'invalidationReasons'],
+      });
+    }
+
+    if (artifact.staleState.state === 'stale' && artifact.staleState.invalidationReasons.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Stale SR artifacts require invalidation reasons.',
+        path: ['staleState', 'invalidationReasons'],
+      });
+    }
+
+    if (artifact.validationSummary.sourceCount !== artifact.sourceImageRefs.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'SR artifact validation sourceCount must match sourceImageRefs length.',
+        path: ['validationSummary', 'sourceCount'],
+      });
+    }
+
+    validateSuperResolutionSourceState(artifact.sourceImageRefs, artifact.sourceState, context, ['sourceState']);
+  });
 
 const filmPercentSchema = z.number().min(0).max(100);
 const filmUnitIntervalSchema = z.number().min(0).max(1);
@@ -7401,6 +7734,15 @@ export type ComputationalMergeQualityMetricsV1 = z.infer<typeof computationalMer
 export type ComputationalMergeQualityPreferenceV1 = z.infer<typeof computationalMergeQualityPreferenceV1Schema>;
 export type ComputationalMergeSourceImageRefV1 = z.infer<typeof computationalMergeSourceImageRefV1Schema>;
 export type ComputationalMergeSourceRoleV1 = z.infer<typeof computationalMergeSourceRoleV1Schema>;
+export type SuperResolutionArtifactV1 = z.infer<typeof superResolutionArtifactV1Schema>;
+export type SuperResolutionBlockCodeV1 = z.infer<typeof superResolutionBlockCodeV1Schema>;
+export type SuperResolutionDecisionStatusV1 = z.infer<typeof superResolutionDecisionStatusV1Schema>;
+export type SuperResolutionDetailPolicyV1 = z.infer<typeof superResolutionDetailPolicyV1Schema>;
+export type SuperResolutionDryRunSummaryV1 = z.infer<typeof superResolutionDryRunSummaryV1Schema>;
+export type SuperResolutionInvalidationReasonV1 = z.infer<typeof superResolutionInvalidationReasonV1Schema>;
+export type SuperResolutionReviewStatusV1 = z.infer<typeof superResolutionReviewStatusV1Schema>;
+export type SuperResolutionStaleStateV1 = z.infer<typeof superResolutionStaleStateV1Schema>;
+export type SuperResolutionWarningCodeV1 = z.infer<typeof superResolutionWarningCodeV1Schema>;
 export type EditGraphCommandEnvelopeV1 = z.infer<typeof editGraphCommandEnvelopeV1Schema>;
 export type EditGraphCommandTypeV1 = z.infer<typeof editGraphCommandTypeV1Schema>;
 export type EditGraphDryRunResultV1 = z.infer<typeof editGraphDryRunResultV1Schema>;

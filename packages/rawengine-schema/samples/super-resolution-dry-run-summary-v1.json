@@ -1,0 +1,54 @@
+{
+  "blockCodes": [],
+  "commandId": "command_merge_super_resolution_preview_sample",
+  "decisionStatus": "eligible_for_apply",
+  "detailPolicy": "conservative",
+  "effectiveOutputScale": 2,
+  "estimatedOutputDimensions": {
+    "height": 6000,
+    "width": 9000
+  },
+  "humanReviewStatus": "pending",
+  "localConfidenceMapArtifact": {
+    "artifactId": "artifact_sr_confidence_map_preview",
+    "contentHash": "sha256:sample-sr-confidence-map",
+    "dimensions": {
+      "height": 1500,
+      "width": 2250
+    },
+    "kind": "preview",
+    "storage": "temp_cache"
+  },
+  "planHash": "sha256:sample-merge-super-resolution-plan",
+  "planId": "merge_plan_super_resolution_001",
+  "qualityPreference": "best",
+  "requestedAlignmentMode": "optical_flow",
+  "requestedOutputScale": 2,
+  "resolvedAlignmentMode": "optical_flow",
+  "schemaVersion": 1,
+  "sourceState": [
+    {
+      "contentHash": "sha256:sr-source-0001",
+      "graphRevision": "graph_rev_44",
+      "sourceIndex": 0
+    },
+    {
+      "contentHash": "sha256:sr-source-0002",
+      "graphRevision": "graph_rev_44",
+      "sourceIndex": 1
+    },
+    {
+      "contentHash": "sha256:sr-source-0003",
+      "graphRevision": "graph_rev_44",
+      "sourceIndex": 2
+    }
+  ],
+  "validationSummary": {
+    "alignmentConfidence": 0.91,
+    "expectedDetailGainRatio": 1.72,
+    "falseDetailRisk": "low",
+    "overlapCoverageRatio": 0.88,
+    "sourceCount": 3
+  },
+  "warningCodes": ["human_review_required"]
+}

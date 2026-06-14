@@ -65,6 +65,8 @@ import {
   rawEngineAgentReplayFixtureV1Schema,
   rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
+  superResolutionArtifactV1Schema,
+  superResolutionDryRunSummaryV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
@@ -130,6 +132,8 @@ import {
   type RawEngineAgentReplayFixtureV1,
   type RawEngineAppServerToolCallValidationV1,
   type RawEngineToolRegistryV1,
+  type SuperResolutionArtifactV1,
+  type SuperResolutionDryRunSummaryV1,
   type ToneColorCommandEnvelopeV1,
   type ToneColorDryRunResultV1,
   type ToneColorMutationResultV1,
@@ -1953,6 +1957,125 @@ export const sampleComputationalMergeSuperResolutionApplyAppServerToolCallValida
       turnId: 'turn_rawengine_agent_sample',
     },
   });
+
+const sampleSuperResolutionDetailPolicy = 'conservative';
+const sampleSuperResolutionOutputScale = 2;
+const sampleSuperResolutionAlignmentMode = 'optical_flow';
+const sampleSuperResolutionQualityPreference = 'best';
+
+export const sampleSuperResolutionDryRunSummaryV1: SuperResolutionDryRunSummaryV1 =
+  superResolutionDryRunSummaryV1Schema.parse({
+    blockCodes: [],
+    commandId: sampleComputationalMergeSuperResolutionCommandEnvelopeV1.commandId,
+    decisionStatus: 'eligible_for_apply',
+    detailPolicy: sampleSuperResolutionDetailPolicy,
+    effectiveOutputScale: sampleSuperResolutionOutputScale,
+    estimatedOutputDimensions: {
+      height: 6000,
+      width: 9000,
+    },
+    humanReviewStatus: 'pending',
+    localConfidenceMapArtifact: {
+      artifactId: 'artifact_sr_confidence_map_preview',
+      contentHash: 'sha256:sample-sr-confidence-map',
+      dimensions: {
+        height: 1500,
+        width: 2250,
+      },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+    planHash: 'sha256:sample-merge-super-resolution-plan',
+    planId: 'merge_plan_super_resolution_001',
+    qualityPreference: sampleSuperResolutionQualityPreference,
+    requestedAlignmentMode: sampleSuperResolutionAlignmentMode,
+    requestedOutputScale: sampleSuperResolutionOutputScale,
+    resolvedAlignmentMode: sampleSuperResolutionAlignmentMode,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sourceState: [
+      {
+        contentHash: 'sha256:sr-source-0001',
+        graphRevision: sampleEditGraphSnapshotV1.graphRevision,
+        sourceIndex: 0,
+      },
+      {
+        contentHash: 'sha256:sr-source-0002',
+        graphRevision: sampleEditGraphSnapshotV1.graphRevision,
+        sourceIndex: 1,
+      },
+      {
+        contentHash: 'sha256:sr-source-0003',
+        graphRevision: sampleEditGraphSnapshotV1.graphRevision,
+        sourceIndex: 2,
+      },
+    ],
+    validationSummary: {
+      alignmentConfidence: 0.91,
+      expectedDetailGainRatio: 1.72,
+      falseDetailRisk: 'low',
+      overlapCoverageRatio: 0.88,
+      sourceCount: sampleComputationalMergeSuperResolutionCommandEnvelopeV1.parameters.sources.length,
+    },
+    warningCodes: ['human_review_required'],
+  });
+
+export const sampleSuperResolutionArtifactV1: SuperResolutionArtifactV1 = superResolutionArtifactV1Schema.parse({
+  artifactId: 'artifact_sr_handheld_burst_0001',
+  createdAt: '2026-06-14T02:30:00.000Z',
+  decisionStatus: 'eligible_for_apply',
+  detailPolicy: sampleSuperResolutionDetailPolicy,
+  dryRun: {
+    acceptedDryRunPlanHash: sampleSuperResolutionDryRunSummaryV1.planHash,
+    acceptedDryRunPlanId: sampleSuperResolutionDryRunSummaryV1.planId,
+  },
+  engine: {
+    backendType: 'local_gpu',
+    engineId: 'rawengine_sr_multi_frame_v0',
+    engineVersion: '0.1.0-schema',
+  },
+  family: 'super_resolution',
+  outputArtifact: {
+    artifactId: 'artifact_sr_handheld_burst_0001_output',
+    contentHash: 'sha256:sample-sr-output',
+    dimensions: sampleSuperResolutionDryRunSummaryV1.estimatedOutputDimensions,
+    kind: 'merge_output',
+    storage: 'sidecar_artifact',
+  },
+  outputColorSpace: 'linear_rec2020_d65_v1',
+  previewArtifacts: [
+    {
+      artifactId: 'artifact_sr_handheld_burst_0001_preview',
+      contentHash: 'sha256:sample-sr-preview',
+      dimensions: {
+        height: 1600,
+        width: 2400,
+      },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+  ],
+  qualityPreference: sampleSuperResolutionQualityPreference,
+  requestedAlignmentMode: sampleSuperResolutionAlignmentMode,
+  requestedOutputScale: sampleSuperResolutionOutputScale,
+  resolvedAlignmentMode: sampleSuperResolutionDryRunSummaryV1.resolvedAlignmentMode,
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sourceImageRefs: sampleComputationalMergeSuperResolutionCommandEnvelopeV1.parameters.sources,
+  sourceState: sampleSuperResolutionDryRunSummaryV1.sourceState,
+  staleState: {
+    checkedAt: '2026-06-14T02:31:00.000Z',
+    invalidationReasons: [],
+    state: 'current',
+  },
+  validationSummary: {
+    alignmentConfidence: sampleSuperResolutionDryRunSummaryV1.validationSummary.alignmentConfidence,
+    expectedDetailGainRatio: sampleSuperResolutionDryRunSummaryV1.validationSummary.expectedDetailGainRatio,
+    falseDetailRisk: sampleSuperResolutionDryRunSummaryV1.validationSummary.falseDetailRisk,
+    humanReviewStatus: 'passed',
+    overlapCoverageRatio: sampleSuperResolutionDryRunSummaryV1.validationSummary.overlapCoverageRatio,
+    sourceCount: sampleSuperResolutionDryRunSummaryV1.validationSummary.sourceCount,
+  },
+  warningCodes: sampleSuperResolutionDryRunSummaryV1.warningCodes,
+});
 
 export const samplePreviewScopeQueryV1: PreviewScopeQueryV1 = previewScopeQueryV1Schema.parse({
   actor: {
