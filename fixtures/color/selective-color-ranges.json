@@ -1,0 +1,56 @@
+{
+  "$schema": "https://rawengine.dev/schemas/selective-color-ranges-v1.json",
+  "issue": 96,
+  "ranges": [
+    {
+      "centerHueDegrees": 358,
+      "key": "reds",
+      "labelKey": "adjustments.color.mixerColors.reds",
+      "widthDegrees": 35
+    },
+    {
+      "centerHueDegrees": 25,
+      "key": "oranges",
+      "labelKey": "adjustments.color.mixerColors.oranges",
+      "widthDegrees": 45
+    },
+    {
+      "centerHueDegrees": 60,
+      "key": "yellows",
+      "labelKey": "adjustments.color.mixerColors.yellows",
+      "widthDegrees": 40
+    },
+    {
+      "centerHueDegrees": 115,
+      "key": "greens",
+      "labelKey": "adjustments.color.mixerColors.greens",
+      "widthDegrees": 90
+    },
+    {
+      "centerHueDegrees": 180,
+      "key": "aquas",
+      "labelKey": "adjustments.color.mixerColors.aquas",
+      "widthDegrees": 60
+    },
+    {
+      "centerHueDegrees": 225,
+      "key": "blues",
+      "labelKey": "adjustments.color.mixerColors.blues",
+      "widthDegrees": 60
+    },
+    {
+      "centerHueDegrees": 280,
+      "key": "purples",
+      "labelKey": "adjustments.color.mixerColors.purples",
+      "widthDegrees": 55
+    },
+    {
+      "centerHueDegrees": 330,
+      "key": "magentas",
+      "labelKey": "adjustments.color.mixerColors.magentas",
+      "widthDegrees": 50
+    }
+  ],
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14"
+}

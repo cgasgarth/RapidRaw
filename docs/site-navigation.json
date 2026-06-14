@@ -91,6 +91,10 @@
           "path": "docs/color/colorchecker-fixtures-2026-06-14.md"
         },
         {
+          "title": "Selective color ranges",
+          "path": "docs/color/selective-color-ranges-2026-06-14.md"
+        },
+        {
           "title": "Film simulation architecture",
           "path": "docs/film/film-simulation-architecture-2026-06-13.md"
         },

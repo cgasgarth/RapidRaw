@@ -3859,6 +3859,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 #### Milestone 6: Capture One-Class Color Editing
 
 - `color(selective): add advanced selective color ranges`
+  - Contract: `src/utils/selectiveColorRanges.ts`
+  - Fixtures: `fixtures/color/selective-color-ranges.json`
+  - Docs: `docs/color/selective-color-ranges-2026-06-14.md`
+  - Runtime status: UI range metadata is shared and validated against WGSL; interactive range-width editing remains future work.
 - `color(selective): add range smoothness and falloff controls`
 - `color(skin): add skin tone uniformity controls`
 - `color(mask): create color masks from selected ranges`
@@ -4547,6 +4551,7 @@ Goal: build the core professional color tools.
 Issues:
 
 - Add advanced selective color ranges.
+  - Shared range metadata and WGSL parity validation are present.
 - Add range smoothness/falloff controls.
 - Add skin tone uniformity controls.
 - Add color mask creation from selected range.
