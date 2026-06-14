@@ -1,0 +1,22 @@
+[
+  {
+    "id": "linear-missing-end",
+    "type": "linear",
+    "payload": { "range": 50, "startX": 0, "startY": 0 }
+  },
+  {
+    "id": "linear-extra-field",
+    "type": "linear",
+    "payload": { "endX": 1, "endY": 1, "range": 50, "startX": 0, "startY": 0, "opacity": 50 }
+  },
+  {
+    "id": "radial-zero-radius",
+    "type": "radial",
+    "payload": { "centerX": 0, "centerY": 0, "feather": 0.5, "radiusX": 0, "radiusY": 10, "rotation": 0 }
+  },
+  {
+    "id": "radial-rotation-out-of-range",
+    "type": "radial",
+    "payload": { "centerX": 0, "centerY": 0, "feather": 0.5, "radiusX": 10, "radiusY": 10, "rotation": 270 }
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "linear-gradient-keeps-endpoints-and-range",
+    "type": "linear",
+    "input": { "endX": 750, "endY": 400, "range": 120, "startX": 250, "startY": 400 },
+    "expected": { "endX": 750, "endY": 400, "range": 120, "startX": 250, "startY": 400 }
+  },
+  {
+    "id": "linear-gradient-clamps-range",
+    "type": "linear",
+    "input": { "endX": 100, "endY": 100, "range": 5000, "startX": 0, "startY": 0 },
+    "expected": { "endX": 100, "endY": 100, "range": 4096, "startX": 0, "startY": 0 }
+  },
+  {
+    "id": "radial-gradient-clamps-geometry",
+    "type": "radial",
+    "input": { "centerX": 500, "centerY": 300, "feather": 1.4, "radiusX": 0, "radiusY": 200000, "rotation": 270 },
+    "expected": { "centerX": 500, "centerY": 300, "feather": 1, "radiusX": 1, "radiusY": 100000, "rotation": 180 }
+  }
+]
