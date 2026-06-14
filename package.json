@@ -67,6 +67,7 @@
     "schema:check": "tsc -p packages/rawengine-schema/tsconfig.json --noEmit --pretty false && bun packages/rawengine-schema/scripts/check-samples.ts && bun run schema:samples",
     "schema:samples": "bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs",
     "schema:samples:update": "bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs --update",
+    "schema:focus-app-server": "bun packages/rawengine-schema/scripts/check-focus-app-server-command-bus.ts",
     "check:rust:test": "cd src-tauri && cargo test --locked --all-targets --no-default-features --features required-ci --no-fail-fast",
     "build:frontend": "vite build",
     "docs:check": "prettier --check \"**/*.md\" && bun scripts/check-markdown-links.mjs",
