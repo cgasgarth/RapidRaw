@@ -1,0 +1,58 @@
+[
+  {
+    "id": "unknown-range-kind",
+    "payload": {
+      "centerHueDegrees": 0,
+      "feather": 0.3,
+      "hueToleranceDegrees": 22,
+      "maxLuma": 1,
+      "maxSaturation": 1,
+      "minLuma": 0,
+      "minSaturation": 0,
+      "rangeKind": "hue",
+      "sourceRangeKey": "reds"
+    }
+  },
+  {
+    "id": "inverted-luma-range",
+    "payload": {
+      "centerHueDegrees": 0,
+      "feather": 0.3,
+      "hueToleranceDegrees": 22,
+      "maxLuma": 0.2,
+      "maxSaturation": 1,
+      "minLuma": 0.8,
+      "minSaturation": 0,
+      "rangeKind": "color",
+      "sourceRangeKey": "reds"
+    }
+  },
+  {
+    "id": "inverted-saturation-range",
+    "payload": {
+      "centerHueDegrees": 0,
+      "feather": 0.3,
+      "hueToleranceDegrees": 22,
+      "maxLuma": 1,
+      "maxSaturation": 0.2,
+      "minLuma": 0,
+      "minSaturation": 0.8,
+      "rangeKind": "color",
+      "sourceRangeKey": "reds"
+    }
+  },
+  {
+    "id": "unknown-source-range",
+    "payload": {
+      "centerHueDegrees": 0,
+      "feather": 0.3,
+      "hueToleranceDegrees": 22,
+      "maxLuma": 1,
+      "maxSaturation": 1,
+      "minLuma": 0,
+      "minSaturation": 0,
+      "rangeKind": "color",
+      "sourceRangeKey": "cyan"
+    }
+  }
+]

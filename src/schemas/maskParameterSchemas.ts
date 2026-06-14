@@ -64,6 +64,28 @@ export const luminanceRangeMaskParametersSchema = z
     path: ['minLuma'],
   });
 
+export const colorRangeMaskParametersSchema = z
+  .object({
+    centerHueDegrees: z.number().min(0).max(360),
+    feather: z.number().min(0).max(1),
+    hueToleranceDegrees: z.number().min(1).max(180),
+    maxLuma: z.number().min(0).max(1),
+    maxSaturation: z.number().min(0).max(1),
+    minLuma: z.number().min(0).max(1),
+    minSaturation: z.number().min(0).max(1),
+    rangeKind: z.literal('color'),
+    sourceRangeKey: z.enum(['reds', 'oranges', 'yellows', 'greens', 'aquas', 'blues', 'purples', 'magentas']),
+  })
+  .strict()
+  .refine((range) => range.minLuma < range.maxLuma, {
+    message: 'Color range masks require minLuma below maxLuma.',
+    path: ['minLuma'],
+  })
+  .refine((range) => range.minSaturation < range.maxSaturation, {
+    message: 'Color range masks require minSaturation below maxSaturation.',
+    path: ['minSaturation'],
+  });
+
 export const aiDepthMaskParametersSchema = z.object({
   feather: z.number(),
   maxDepth: z.number(),
@@ -79,3 +101,4 @@ export type FlowBrushMaskParameters = z.infer<typeof flowBrushMaskParametersSche
 export type LinearGradientMaskParameters = z.infer<typeof linearGradientMaskParametersSchema>;
 export type RadialGradientMaskParameters = z.infer<typeof radialGradientMaskParametersSchema>;
 export type LuminanceRangeMaskParameters = z.infer<typeof luminanceRangeMaskParametersSchema>;
+export type ColorRangeMaskParameters = z.infer<typeof colorRangeMaskParametersSchema>;
