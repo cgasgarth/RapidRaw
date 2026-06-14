@@ -1,0 +1,33 @@
+[
+  {
+    "capability": "subject",
+    "invokeCommand": "generate_ai_subject_mask",
+    "renderMaskType": "ai-subject",
+    "status": "native"
+  },
+  {
+    "capability": "sky",
+    "invokeCommand": "generate_ai_sky_mask",
+    "renderMaskType": "ai-sky",
+    "status": "native"
+  },
+  {
+    "capability": "foreground",
+    "invokeCommand": "generate_ai_foreground_mask",
+    "renderMaskType": "ai-foreground",
+    "status": "native"
+  },
+  {
+    "capability": "background",
+    "derivedFrom": "foreground",
+    "invokeCommand": null,
+    "renderMaskType": "ai-foreground",
+    "status": "derived"
+  },
+  {
+    "capability": "depth",
+    "invokeCommand": "generate_ai_depth_mask",
+    "renderMaskType": "ai-depth",
+    "status": "native"
+  }
+]
