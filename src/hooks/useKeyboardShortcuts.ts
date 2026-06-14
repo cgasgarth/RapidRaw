@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
 import { ImageFile, Panel, ExifOverlay } from '../components/ui/AppProperties';
+import { normalizeKeyboardShortcutMap } from '../schemas/keyboardShortcutSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
@@ -38,6 +39,8 @@ interface BuiltinShortcut {
   match: (event: KeyboardEvent, state: KeyboardStoreState) => boolean;
 }
 
+const KEYBIND_ACTIONS = new Set(KEYBIND_DEFINITIONS.map((definition) => definition.action));
+
 export const useKeyboardShortcuts = ({
   sortedImageList,
   handleBackToLibrary,
@@ -65,10 +68,10 @@ export const useKeyboardShortcuts = ({
     });
 
     const comboMap = new Map<string, string>();
-    const keybinds = useSettingsStore.getState().appSettings?.keybinds;
+    const keybinds = normalizeKeyboardShortcutMap(useSettingsStore.getState().appSettings?.keybinds, KEYBIND_ACTIONS);
 
     for (const def of KEYBIND_DEFINITIONS) {
-      const userCombo = keybinds?.[def.action];
+      const userCombo = keybinds[def.action];
       const effective = userCombo && userCombo.length > 0 ? userCombo : def.defaultCombo;
       if (effective.length > 0) {
         comboMap.set(effective.join('+'), def.action);
