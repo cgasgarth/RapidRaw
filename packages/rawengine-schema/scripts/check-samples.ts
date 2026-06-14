@@ -1254,6 +1254,26 @@ expectInvalid('super-resolution merge command with invalid scale', computational
   },
 });
 
+expectInvalid(
+  'super-resolution apply command with aggressive preview-only detail policy',
+  computationalMergeCommandEnvelopeV1Schema,
+  {
+    ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
+    approval: {
+      approvalClass: 'edit_apply',
+      reason: 'Applying an accepted super-resolution merge creates a derived editable asset.',
+      state: 'approved',
+    },
+    dryRun: false,
+    parameters: {
+      ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1.parameters,
+      acceptedDryRunPlanHash: 'sha256:sample-super-resolution-plan',
+      acceptedDryRunPlanId: 'merge_plan_super_resolution_001',
+      detailPolicy: 'aggressive_preview_only',
+    },
+  },
+);
+
 const invalidFilmLookCatalog = {
   ...sampleFilmLookCatalogV1,
   looks: [

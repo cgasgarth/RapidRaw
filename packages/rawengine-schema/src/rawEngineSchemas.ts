@@ -2467,6 +2467,17 @@ export const computationalMergeCommandEnvelopeV1Schema = z
       });
     }
 
+    if (
+      command.commandType === 'computationalMerge.createSuperResolution' &&
+      command.parameters.detailPolicy === 'aggressive_preview_only'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Aggressive super-resolution detail policy is preview-only and cannot be applied.',
+        path: ['parameters', 'detailPolicy'],
+      });
+    }
+
     if (!command.parameters.acceptedDryRunPlanId) {
       context.addIssue({
         code: 'custom',
