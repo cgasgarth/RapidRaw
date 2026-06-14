@@ -4054,6 +4054,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Check: `bun run check:focus-fixtures`
 - `focus(runtime): add CPU translation alignment smoke`
   - Issue: #1060
+  - Check: `bun run check:focus-alignment-smoke`
 - `focus(runtime): add CPU sharpness-map smoke`
   - Issue: #1061
 - `focus(runtime): add weighted-sharpness preview blend smoke`
