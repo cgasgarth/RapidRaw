@@ -4022,6 +4022,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `consult(super-resolution): get super-resolution strategy review`
   - Doc: `docs/super-resolution/strategy-consult-summary-2026-06-14.md`
 - `sr(modes): define single-image and multi-image modes`
+  - Doc: `docs/super-resolution/mode-taxonomy-2026-06-14.md`
 - `sr(policy): define conservative professional output policy`
   - Doc: `docs/super-resolution/conservative-output-policy-2026-06-13.md`
 - `sr(align): add multi-image alignment path`
