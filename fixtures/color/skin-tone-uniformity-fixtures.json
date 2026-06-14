@@ -1,0 +1,74 @@
+{
+  "$schema": "https://rawengine.dev/schemas/skin-tone-uniformity-fixtures-v1.json",
+  "cases": [
+    {
+      "expected": {
+        "hueDegrees": 27.5,
+        "luminance": 0.52,
+        "saturation": 0.42
+      },
+      "id": "color.skin.uniformity-warm-patch.v1",
+      "input": {
+        "hueDegrees": 35,
+        "luminance": 0.46,
+        "saturation": 0.5
+      },
+      "settings": {
+        "hueUniformity": 0.5,
+        "luminanceUniformity": 0.4,
+        "saturationUniformity": 0.5,
+        "targetHueDegrees": 20,
+        "targetLuminance": 0.61,
+        "targetSaturation": 0.34
+      },
+      "tolerance": 0.000001
+    },
+    {
+      "expected": {
+        "hueDegrees": 14,
+        "luminance": 0.6,
+        "saturation": 0.34
+      },
+      "id": "color.skin.uniformity-wraparound.v1",
+      "input": {
+        "hueDegrees": 350,
+        "luminance": 0.6,
+        "saturation": 0.34
+      },
+      "settings": {
+        "hueUniformity": 0.8,
+        "luminanceUniformity": 0,
+        "saturationUniformity": 0,
+        "targetHueDegrees": 20,
+        "targetLuminance": 0.61,
+        "targetSaturation": 0.34
+      },
+      "tolerance": 0.000001
+    },
+    {
+      "expected": {
+        "hueDegrees": 20,
+        "luminance": 0.61,
+        "saturation": 0.34
+      },
+      "id": "color.skin.uniformity-full-target.v1",
+      "input": {
+        "hueDegrees": 45,
+        "luminance": 0.82,
+        "saturation": 0.72
+      },
+      "settings": {
+        "hueUniformity": 1,
+        "luminanceUniformity": 1,
+        "saturationUniformity": 1,
+        "targetHueDegrees": 20,
+        "targetLuminance": 0.61,
+        "targetSaturation": 0.34
+      },
+      "tolerance": 0.000001
+    }
+  ],
+  "issue": 98,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14"
+}

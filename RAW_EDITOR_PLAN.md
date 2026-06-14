@@ -3869,6 +3869,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Docs: `docs/color/selective-color-falloff-2026-06-14.md`
   - Runtime status: default falloff math is available and validated; user-adjustable smoothness UI remains future work.
 - `color(skin): add skin tone uniformity controls`
+  - Contract: `src/utils/skinToneUniformity.ts`
+  - Fixtures: `fixtures/color/skin-tone-uniformity-fixtures.json`
+  - Docs: `docs/color/skin-tone-uniformity-2026-06-14.md`
+  - Runtime status: uniformity math is available and fixture-backed; full UI and renderer integration remain future work.
 - `color(mask): create color masks from selected ranges`
 - `color(grading): refine color grading wheels`
 - `color(balance-rgb): add color balance RGB style module`
@@ -4559,6 +4563,7 @@ Issues:
 - Add range smoothness/falloff controls.
   - Default falloff math and shader parity validation are present.
 - Add skin tone uniformity controls.
+  - Uniformity math and fixture validation are present.
 - Add color mask creation from selected range.
 - Add color grading wheels refinement.
 - Add color balance RGB-style module.
