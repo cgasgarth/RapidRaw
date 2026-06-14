@@ -1,0 +1,84 @@
+[
+  {
+    "case": "missing-operation-reference",
+    "scene": {
+      "schemaVersion": 1,
+      "canvas": { "width": 1000, "height": 1000, "colorSpace": "srgb" },
+      "layers": [
+        {
+          "id": "layer_missing",
+          "name": "Missing",
+          "visible": true,
+          "opacity": 1,
+          "blendMode": "normal",
+          "maskOperationIds": ["mask_not_present"]
+        }
+      ],
+      "maskOperations": [
+        {
+          "id": "mask_present",
+          "type": "luminance_range",
+          "mode": "add",
+          "opacity": 0.5,
+          "range": { "minLuma": 0.1, "maxLuma": 0.7, "softness": 0.2 }
+        }
+      ]
+    }
+  },
+  {
+    "case": "inverted-luma-range",
+    "scene": {
+      "schemaVersion": 1,
+      "canvas": { "width": 1000, "height": 1000, "colorSpace": "srgb" },
+      "layers": [
+        {
+          "id": "layer_luma",
+          "name": "Luma",
+          "visible": true,
+          "opacity": 1,
+          "blendMode": "normal",
+          "maskOperationIds": ["mask_luma"]
+        }
+      ],
+      "maskOperations": [
+        {
+          "id": "mask_luma",
+          "type": "luminance_range",
+          "mode": "add",
+          "opacity": 0.5,
+          "range": { "minLuma": 0.8, "maxLuma": 0.3, "softness": 0.2 }
+        }
+      ]
+    }
+  },
+  {
+    "case": "zero-opacity-intersect",
+    "scene": {
+      "schemaVersion": 1,
+      "canvas": { "width": 1000, "height": 1000, "colorSpace": "srgb" },
+      "layers": [
+        {
+          "id": "layer_intersect",
+          "name": "Intersect",
+          "visible": true,
+          "opacity": 1,
+          "blendMode": "normal",
+          "maskOperationIds": ["mask_intersect"]
+        }
+      ],
+      "maskOperations": [
+        {
+          "id": "mask_intersect",
+          "type": "linear_gradient",
+          "mode": "intersect",
+          "opacity": 0,
+          "gradient": {
+            "start": { "x": 0, "y": 0 },
+            "end": { "x": 1000, "y": 1000 },
+            "featherPx": 100
+          }
+        }
+      ]
+    }
+  }
+]
