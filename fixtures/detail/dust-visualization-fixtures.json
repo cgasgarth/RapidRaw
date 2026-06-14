@@ -1,0 +1,60 @@
+[
+  {
+    "fixtureId": "synthetic.detail.dust-sky-spots.v0",
+    "width": 2400,
+    "height": 1600,
+    "overlayMode": "spots",
+    "expectedMinRecall": 0.85,
+    "expectedMaxFalsePositiveRate": 0.05,
+    "candidates": [
+      {
+        "id": "spot-001",
+        "kind": "dust_spot",
+        "x": 840,
+        "y": 320,
+        "radiusPx": 9,
+        "confidence": 0.92,
+        "expectedFalsePositive": false
+      },
+      {
+        "id": "texture-guard-001",
+        "kind": "false_positive_texture",
+        "x": 1200,
+        "y": 910,
+        "radiusPx": 14,
+        "confidence": 0.05,
+        "expectedFalsePositive": true
+      }
+    ],
+    "notes": "Blue-sky dust overlay fixture with an explicit texture false-positive guard."
+  },
+  {
+    "fixtureId": "synthetic.detail.dust-negative-scratch.v0",
+    "width": 3000,
+    "height": 2000,
+    "overlayMode": "all",
+    "expectedMinRecall": 0.78,
+    "expectedMaxFalsePositiveRate": 0.08,
+    "candidates": [
+      {
+        "id": "scratch-001",
+        "kind": "scratch",
+        "x": 1460,
+        "y": 1040,
+        "radiusPx": 28,
+        "confidence": 0.82,
+        "expectedFalsePositive": false
+      },
+      {
+        "id": "smear-001",
+        "kind": "sensor_smear",
+        "x": 420,
+        "y": 770,
+        "radiusPx": 35,
+        "confidence": 0.76,
+        "expectedFalsePositive": false
+      }
+    ],
+    "notes": "Dust/scratch fixture covers longer defects used by negative and scan workflows."
+  }
+]

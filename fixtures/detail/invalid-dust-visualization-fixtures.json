@@ -1,0 +1,71 @@
+[
+  {
+    "case": "candidate-outside-image",
+    "fixture": {
+      "fixtureId": "invalid.detail.dust.outside",
+      "width": 100,
+      "height": 100,
+      "overlayMode": "spots",
+      "expectedMinRecall": 0.8,
+      "expectedMaxFalsePositiveRate": 0.05,
+      "candidates": [
+        {
+          "id": "spot-outside",
+          "kind": "dust_spot",
+          "x": 120,
+          "y": 40,
+          "radiusPx": 8,
+          "confidence": 0.9,
+          "expectedFalsePositive": false
+        }
+      ],
+      "notes": "Coordinates must remain inside image bounds."
+    }
+  },
+  {
+    "case": "false-positive-confidence-too-high",
+    "fixture": {
+      "fixtureId": "invalid.detail.dust.false-positive-confidence",
+      "width": 1000,
+      "height": 1000,
+      "overlayMode": "spots",
+      "expectedMinRecall": 0.8,
+      "expectedMaxFalsePositiveRate": 0.05,
+      "candidates": [
+        {
+          "id": "texture-guard",
+          "kind": "false_positive_texture",
+          "x": 500,
+          "y": 500,
+          "radiusPx": 8,
+          "confidence": 0.7,
+          "expectedFalsePositive": true
+        }
+      ],
+      "notes": "False-positive guards must not score as likely dust."
+    }
+  },
+  {
+    "case": "scratch-overlay-low-recall",
+    "fixture": {
+      "fixtureId": "invalid.detail.dust.low-recall",
+      "width": 1000,
+      "height": 1000,
+      "overlayMode": "all",
+      "expectedMinRecall": 0.5,
+      "expectedMaxFalsePositiveRate": 0.05,
+      "candidates": [
+        {
+          "id": "scratch-low-recall",
+          "kind": "scratch",
+          "x": 300,
+          "y": 300,
+          "radiusPx": 20,
+          "confidence": 0.8,
+          "expectedFalsePositive": false
+        }
+      ],
+      "notes": "Scratch/all overlays need stronger recall."
+    }
+  }
+]
