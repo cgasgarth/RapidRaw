@@ -1,0 +1,36 @@
+{
+  "albums": [
+    {
+      "conditions": [
+        { "field": "rating", "negate": false, "operator": "gte", "value": 4 },
+        { "field": "tag", "negate": false, "operator": "contains", "value": "portfolio" },
+        { "field": "raw_status", "negate": false, "operator": "equals", "value": "raw" }
+      ],
+      "createdAt": "2026-06-14T09:30:00.000Z",
+      "id": "smart-portfolio-raw-picks",
+      "includeVirtualCopies": false,
+      "limit": 50,
+      "match": "all",
+      "name": "Portfolio RAW Picks",
+      "sort": { "key": "rating", "order": "desc" },
+      "updatedAt": "2026-06-14T09:35:00.000Z",
+      "version": 1
+    },
+    {
+      "conditions": [
+        { "field": "color_label", "negate": false, "operator": "equals", "value": "green" },
+        { "field": "edited_status", "negate": false, "operator": "equals", "value": "edited" }
+      ],
+      "createdAt": "2026-06-14T09:31:00.000Z",
+      "id": "smart-green-or-edited",
+      "includeVirtualCopies": true,
+      "limit": null,
+      "match": "any",
+      "name": "Green Or Edited",
+      "sort": { "key": "name", "order": "asc" },
+      "updatedAt": "2026-06-14T09:31:00.000Z",
+      "version": 1
+    }
+  ],
+  "defaultAlbumId": "smart-portfolio-raw-picks"
+}
