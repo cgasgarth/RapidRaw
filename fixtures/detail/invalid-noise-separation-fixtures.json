@@ -1,0 +1,59 @@
+[
+  {
+    "case": "high-iso-without-protection",
+    "fixture": {
+      "fixtureId": "invalid.detail.noise.high-iso-protection",
+      "kind": "flat_shadow",
+      "iso": 12800,
+      "settings": {
+        "lumaNoiseReduction": 40,
+        "colorNoiseReduction": 35,
+        "detailPreservation": 0.5,
+        "highIsoProtection": 0.2
+      },
+      "expectedLumaNoiseReduction": 0.3,
+      "expectedMaxDetailLoss": 0.1,
+      "expectedMaxChromaBlurDeltaE": 0.8,
+      "expectedMaxHueShiftDeltaE": 0.5,
+      "notes": "High ISO fixtures must have protection enabled."
+    }
+  },
+  {
+    "case": "texture-allows-too-much-detail-loss",
+    "fixture": {
+      "fixtureId": "invalid.detail.noise.texture-loss",
+      "kind": "fine_texture_high_iso",
+      "iso": 6400,
+      "settings": {
+        "lumaNoiseReduction": 45,
+        "colorNoiseReduction": 35,
+        "detailPreservation": 0.6,
+        "highIsoProtection": 0.6
+      },
+      "expectedLumaNoiseReduction": 0.35,
+      "expectedMaxDetailLoss": 0.45,
+      "expectedMaxChromaBlurDeltaE": 1,
+      "expectedMaxHueShiftDeltaE": 0.5,
+      "notes": "Texture fixtures must preserve real detail."
+    }
+  },
+  {
+    "case": "chroma-fixture-prefers-luma-reduction",
+    "fixture": {
+      "fixtureId": "invalid.detail.noise.chroma-priority",
+      "kind": "edge_with_chroma_noise",
+      "iso": 6400,
+      "settings": {
+        "lumaNoiseReduction": 70,
+        "colorNoiseReduction": 20,
+        "detailPreservation": 0.6,
+        "highIsoProtection": 0.6
+      },
+      "expectedLumaNoiseReduction": 0.5,
+      "expectedMaxDetailLoss": 0.2,
+      "expectedMaxChromaBlurDeltaE": 1,
+      "expectedMaxHueShiftDeltaE": 0.5,
+      "notes": "Chroma fixtures must target color noise before luma smoothing."
+    }
+  }
+]
