@@ -74,6 +74,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Advanced image-quality features should improve iteratively with measured
   evidence. Do not treat the first working implementation as final when better
   math, fixtures, thresholds, UI controls, or runtime proofs are still available.
+- Before an implementation PR changes advanced image-processing math, create or
+  reference a consult-backed decision note, define the next measurable quality
+  target, and state which follow-up iteration remains.
 - When using consult for repo-aware decisions, prefer the RapidRaw ChatGPT
   project with the GitHub repo attached when available.
 - Treat consult output as advice. Verify it against current repo state before

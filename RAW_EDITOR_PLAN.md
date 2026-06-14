@@ -4669,6 +4669,9 @@ Issues:
   science-heavy image processing: each pass should define the next measurable
   image-quality target, consult-backed math decision, fixture set, artifact
   review, and runtime proof before claiming feature maturity.
+- Advanced deblur, denoise, sharpening, reconstruction, tone/gamut mapping,
+  fusion, and color-science PRs must name the current quality ceiling, the next
+  planned improvement, and the consult-backed rationale for the chosen math.
 
 Definition of done:
 
@@ -4678,6 +4681,8 @@ Definition of done:
 - Deblur, denoise, sharpening, and color-science-adjacent changes document the
   consult-backed math choice, rejected alternatives, numeric gates, and next
   iteration target.
+- Advanced image-quality work is tracked as an improvement ladder, not a
+  one-and-done feature checkbox.
 
 ### Milestone 9: Film Simulation Lab
 
