@@ -3,6 +3,8 @@ import { z } from 'zod';
 const maskIdSchema = z.string().trim().min(1);
 const normalizedScalarSchema = z.number().min(0).max(1);
 
+export const maskComposeModeSchema = z.enum(['add', 'subtract', 'intersect']);
+
 export const maskRenderBrushPointSchema = z
   .object({
     pressure: normalizedScalarSchema,
@@ -25,7 +27,7 @@ export const maskRenderOperationSchema = z
           })
           .strict(),
         id: maskIdSchema,
-        mode: z.enum(['add', 'subtract', 'intersect']),
+        mode: maskComposeModeSchema,
         opacity: normalizedScalarSchema,
         type: z.literal('brush_stroke'),
       })
@@ -40,7 +42,7 @@ export const maskRenderOperationSchema = z
           })
           .strict(),
         id: maskIdSchema,
-        mode: z.enum(['add', 'subtract', 'intersect']),
+        mode: maskComposeModeSchema,
         opacity: normalizedScalarSchema,
         type: z.literal('linear_gradient'),
       })
@@ -48,7 +50,7 @@ export const maskRenderOperationSchema = z
     z
       .object({
         id: maskIdSchema,
-        mode: z.enum(['add', 'subtract', 'intersect']),
+        mode: maskComposeModeSchema,
         opacity: normalizedScalarSchema,
         radial: z
           .object({
@@ -65,7 +67,7 @@ export const maskRenderOperationSchema = z
     z
       .object({
         id: maskIdSchema,
-        mode: z.enum(['add', 'subtract', 'intersect']),
+        mode: maskComposeModeSchema,
         opacity: normalizedScalarSchema,
         range: z
           .object({
@@ -135,6 +137,7 @@ export const maskRenderSceneSchema = z
 export type MaskRenderLayer = z.infer<typeof maskRenderLayerSchema>;
 export type MaskRenderOperation = z.infer<typeof maskRenderOperationSchema>;
 export type MaskRenderScene = z.infer<typeof maskRenderSceneSchema>;
+export type MaskComposeMode = z.infer<typeof maskComposeModeSchema>;
 
 export function estimateMaskRenderTileCount(scene: MaskRenderScene, tileSizePx = 512): number {
   const columns = Math.ceil(scene.canvas.width / tileSizePx);

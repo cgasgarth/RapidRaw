@@ -1,0 +1,14 @@
+[
+  {
+    "id": "unknown-mode",
+    "operations": [{ "mode": "replace", "opacity": 1, "weight": 0.5 }]
+  },
+  {
+    "id": "empty-operations",
+    "operations": []
+  },
+  {
+    "id": "non-numeric-opacity",
+    "operations": [{ "mode": "add", "opacity": "full", "weight": 0.5 }]
+  }
+]

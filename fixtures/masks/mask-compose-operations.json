@@ -1,0 +1,47 @@
+[
+  {
+    "expectedWeight": 0.6,
+    "id": "add-starts-selection",
+    "operations": [{ "mode": "add", "opacity": 1, "weight": 0.6 }]
+  },
+  {
+    "expectedWeight": 0.8,
+    "id": "add-unions-overlap",
+    "operations": [
+      { "mode": "add", "opacity": 1, "weight": 0.5 },
+      { "mode": "add", "opacity": 1, "weight": 0.6 }
+    ]
+  },
+  {
+    "expectedWeight": 0.35,
+    "id": "subtract-removes-weight",
+    "operations": [
+      { "mode": "add", "opacity": 1, "weight": 0.7 },
+      { "mode": "subtract", "opacity": 1, "weight": 0.5 }
+    ]
+  },
+  {
+    "expectedWeight": 0.2,
+    "id": "intersect-gates-weight",
+    "operations": [
+      { "mode": "add", "opacity": 1, "weight": 0.8 },
+      { "mode": "intersect", "opacity": 1, "weight": 0.25 }
+    ]
+  },
+  {
+    "expectedWeight": 0.625,
+    "id": "opacity-scales-contribution",
+    "operations": [
+      { "mode": "add", "opacity": 1, "weight": 0.5 },
+      { "mode": "add", "opacity": 0.5, "weight": 0.5 }
+    ]
+  },
+  {
+    "expectedWeight": 1,
+    "id": "clamps-invalid-contributions",
+    "operations": [
+      { "mode": "add", "opacity": 2, "weight": 2 },
+      { "mode": "subtract", "opacity": 1, "weight": -1 }
+    ]
+  }
+]
