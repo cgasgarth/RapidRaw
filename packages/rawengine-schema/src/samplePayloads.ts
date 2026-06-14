@@ -1729,6 +1729,7 @@ export const sampleComputationalMergeFocusStackCommandEnvelopeV1: ComputationalM
       alignmentMode: sampleFocusStackAlignmentMode,
       blendMethod: sampleFocusStackBlendMethod,
       maxPreviewDimensionPx: 2400,
+      memoryBudgetBytes: 1_000_000_000,
       outputName: 'Macro Focus Stack',
       qualityPreference: sampleFocusStackQualityPreference,
       retouchLayerPolicy: sampleFocusStackRetouchLayerPolicy,

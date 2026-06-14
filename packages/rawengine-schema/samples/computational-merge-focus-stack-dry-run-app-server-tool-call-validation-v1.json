@@ -317,6 +317,7 @@
         "alignmentMode": "auto",
         "blendMethod": "laplacian_pyramid",
         "maxPreviewDimensionPx": 2400,
+        "memoryBudgetBytes": 1000000000,
         "outputName": "Macro Focus Stack",
         "qualityPreference": "best",
         "retouchLayerPolicy": "generate_retouch_layer",

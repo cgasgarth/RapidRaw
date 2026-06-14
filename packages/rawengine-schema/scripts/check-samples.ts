@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { createFocusStackPlanOnlyDryRunResultV1 } from '../src/focusStackPreflight.js';
 import {
   aiAppServerToolManifestV1Schema,
   aiEnhancementApplyResultV1Schema,
@@ -121,6 +122,7 @@ import {
   sampleFilmGrainModelV1,
   sampleFilmHalationModelV1,
   sampleFilmLookCatalogV1,
+  sampleFocusStackArtifactV1,
   sampleLayerMaskApplyCommandEnvelopeV1,
   sampleLayerMaskCommandEnvelopeV1,
   sampleLayerMaskDryRunResultV1,
@@ -651,6 +653,16 @@ const expectInvalid = (name: string, schema: z.ZodType, value: unknown) => {
   }
 };
 
+const expectThrows = (name: string, action: () => unknown) => {
+  try {
+    action();
+  } catch {
+    return;
+  }
+
+  throw new Error(`Expected ${name} to throw.`);
+};
+
 const replayDryRunStep = sampleRawEngineAgentReplayFixtureV1.steps[0];
 const replayApplyStep = sampleRawEngineAgentReplayFixtureV1.steps[1];
 const aiReplayDryRunStep = sampleAiToolAgentReplayFixtureV1.steps[0];
@@ -671,6 +683,43 @@ for (const sample of validSamples) {
     throw new Error(`Expected valid ${sample.name}: ${parsed.error.message}`);
   }
 }
+
+const sampleFocusStackPreflightSourceStates = sampleFocusStackArtifactV1.sourceState.map((sourceState) => ({
+  contentHash: sourceState.contentHash,
+  graphRevision: sourceState.graphRevision,
+  sourceIndex: sourceState.sourceIndex,
+}));
+
+const sampleFocusStackPlanOnlyDryRunResult = createFocusStackPlanOnlyDryRunResultV1(
+  sampleComputationalMergeFocusStackCommandEnvelopeV1,
+  {
+    planId: 'merge_plan_focus_stack_plan_only_001',
+    predictedGraphRevision: 'graph_rev_48_focus_stack_preview',
+    sourceStates: sampleFocusStackPreflightSourceStates,
+  },
+);
+
+if (sampleFocusStackPlanOnlyDryRunResult.mergePlan.preflight.status !== 'accepted') {
+  throw new Error('Expected focus-stack plan-only dry-run preflight to be accepted.');
+}
+
+const sampleBlockedFocusStackPlanOnlyDryRunResult = createFocusStackPlanOnlyDryRunResultV1(
+  sampleComputationalMergeFocusStackCommandEnvelopeV1,
+  {
+    planId: 'merge_plan_focus_stack_blocked_missing_source_state',
+    sourceStates: sampleFocusStackPreflightSourceStates.slice(0, 2),
+  },
+);
+
+if (sampleBlockedFocusStackPlanOnlyDryRunResult.mergePlan.preflight.status !== 'blocked_plan_only') {
+  throw new Error('Expected focus-stack plan-only dry-run preflight to block missing source state.');
+}
+
+expectThrows('focus-stack plan-only preflight with apply command', () =>
+  createFocusStackPlanOnlyDryRunResultV1(sampleComputationalMergeFocusStackApplyCommandEnvelopeV1, {
+    sourceStates: sampleFocusStackPreflightSourceStates,
+  }),
+);
 
 const invalidToolRegistry = {
   ...sampleToolRegistryV1,

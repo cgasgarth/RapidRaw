@@ -4037,6 +4037,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Doc: `docs/focus-stacking/raw-normalization-color-policy-2026-06-14.md`
 - `focus(runtime): add plan-only dry-run preflight`
   - Issue: #1058
+  - Utility: `packages/rawengine-schema/src/focusStackPreflight.ts`
 - `validation(focus): add tiny synthetic bracket generator`
   - Issue: #1059
 - `focus(runtime): add CPU translation alignment smoke`

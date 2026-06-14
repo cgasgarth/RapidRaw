@@ -2471,6 +2471,7 @@ export const computationalMergeCommandEnvelopeV1Schema = z
             alignmentMode: computationalMergeAlignmentModeV1Schema,
             blendMethod: z.enum(['depth_map', 'laplacian_pyramid', 'weighted_sharpness']),
             maxPreviewDimensionPx: z.number().int().positive().max(8192),
+            memoryBudgetBytes: z.number().int().positive().optional(),
             outputName: z.string().trim().min(1),
             qualityPreference: computationalMergeQualityPreferenceV1Schema,
             retouchLayerPolicy: z.enum(['none', 'generate_retouch_layer']),
