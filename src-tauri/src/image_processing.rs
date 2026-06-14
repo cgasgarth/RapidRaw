@@ -2469,6 +2469,139 @@ pub fn remove_raw_artifacts_and_enhance(
     *image = DynamicImage::ImageRgb32F(buffer);
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
+pub struct WaveletDetailSettings {
+    pub fine_amount: f32,
+    pub medium_amount: f32,
+    pub coarse_amount: f32,
+    pub edge_threshold: f32,
+    pub halo_suppression: f32,
+}
+
+impl Default for WaveletDetailSettings {
+    fn default() -> Self {
+        Self {
+            fine_amount: 0.0,
+            medium_amount: 0.0,
+            coarse_amount: 0.0,
+            edge_threshold: 0.18,
+            halo_suppression: 0.65,
+        }
+    }
+}
+
+#[allow(dead_code)]
+pub fn apply_wavelet_detail_by_scale(image: &mut DynamicImage, settings: WaveletDetailSettings) {
+    if settings.fine_amount.abs() <= f32::EPSILON
+        && settings.medium_amount.abs() <= f32::EPSILON
+        && settings.coarse_amount.abs() <= f32::EPSILON
+    {
+        return;
+    }
+
+    let mut buffer = image.to_rgb32f();
+    let width = buffer.width() as usize;
+    let height = buffer.height() as usize;
+    if width == 0 || height == 0 {
+        return;
+    }
+
+    let source = buffer.as_raw();
+    let luma: Vec<f32> = source
+        .par_chunks_exact(3)
+        .map(|pixel| rgb_to_yc_only(pixel[0], pixel[1], pixel[2]).0)
+        .collect();
+
+    let fine_base = box_blur_luma(&luma, width, height, 1);
+    let medium_base = box_blur_luma(&fine_base, width, height, 3);
+    let coarse_base = box_blur_luma(&medium_base, width, height, 7);
+
+    let fine_gain = (settings.fine_amount / 100.0).clamp(-1.0, 1.0);
+    let medium_gain = (settings.medium_amount / 100.0).clamp(-1.0, 1.0) * 0.75;
+    let coarse_gain = (settings.coarse_amount / 100.0).clamp(-1.0, 1.0) * 0.5;
+    let edge_threshold = settings.edge_threshold.clamp(0.0, 1.0);
+    let halo_suppression = settings.halo_suppression.clamp(0.0, 1.0);
+
+    buffer
+        .as_mut()
+        .par_chunks_mut(width * 3)
+        .enumerate()
+        .for_each(|(y, row)| {
+            let row_offset = y * width;
+            for x in 0..width {
+                let idx = row_offset + x;
+                let fine = luma[idx] - fine_base[idx];
+                let medium = fine_base[idx] - medium_base[idx];
+                let coarse = medium_base[idx] - coarse_base[idx];
+
+                let detail_energy = fine.abs() + medium.abs() + coarse.abs();
+                let over_edge = (detail_energy - edge_threshold).max(0.0);
+                let halo_guard = 1.0 - halo_suppression * (over_edge / (over_edge + 0.2));
+                let boost =
+                    (fine * fine_gain + medium * medium_gain + coarse * coarse_gain) * halo_guard;
+
+                let r_idx = x * 3;
+                let g_idx = r_idx + 1;
+                let b_idx = r_idx + 2;
+                let r = row[r_idx];
+                let g = row[g_idx];
+                let b = row[b_idx];
+
+                row[r_idx] = (r + boost).clamp(0.0, 1.0);
+                row[g_idx] = (g + boost).clamp(0.0, 1.0);
+                row[b_idx] = (b + boost).clamp(0.0, 1.0);
+            }
+        });
+
+    *image = DynamicImage::ImageRgb32F(buffer);
+}
+
+#[allow(dead_code)]
+fn box_blur_luma(source: &[f32], width: usize, height: usize, radius: usize) -> Vec<f32> {
+    if radius == 0 || width == 0 || height == 0 {
+        return source.to_vec();
+    }
+
+    let diameter = radius * 2 + 1;
+    let mut horizontal = vec![0.0; source.len()];
+
+    horizontal
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            let row_offset = y * width;
+            for (x, value) in row.iter_mut().enumerate() {
+                let x_start = x.saturating_sub(radius);
+                let x_end = (x + radius + 1).min(width);
+                let mut sum = 0.0;
+                for sx in x_start..x_end {
+                    sum += source[row_offset + sx];
+                }
+                *value = sum / diameter.min(x_end - x_start) as f32;
+            }
+        });
+
+    let mut vertical = vec![0.0; source.len()];
+    vertical
+        .par_chunks_mut(width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            let y_start = y.saturating_sub(radius);
+            let y_end = (y + radius + 1).min(height);
+            for (x, value) in row.iter_mut().enumerate() {
+                let mut sum = 0.0;
+                for sy in y_start..y_end {
+                    sum += horizontal[sy * width + x];
+                }
+                *value = sum / diameter.min(y_end - y_start) as f32;
+            }
+        });
+
+    vertical
+}
+
 fn apply_gentle_detail_enhance(
     buffer: &mut image::ImageBuffer<image::Rgb<f32>, Vec<f32>>,
     ycbcr_source: &[f32],
@@ -3274,8 +3407,11 @@ pub fn calculate_auto_adjustments(
 
 #[cfg(test)]
 mod tests {
-    use super::{ImageMetadata, RawEngineArtifacts, remove_raw_artifacts_and_enhance};
-    use image::{DynamicImage, ImageBuffer, Rgb};
+    use super::{
+        ImageMetadata, RawEngineArtifacts, WaveletDetailSettings, apply_wavelet_detail_by_scale,
+        remove_raw_artifacts_and_enhance,
+    };
+    use image::{DynamicImage, ImageBuffer, Rgb, Rgb32FImage};
     use serde_json::json;
 
     fn synthetic_edge_image() -> DynamicImage {
@@ -3291,6 +3427,49 @@ mod tests {
 
     fn red_channel(image: &DynamicImage, x: u32, y: u32) -> f32 {
         image.to_rgb32f().get_pixel(x, y).0[0]
+    }
+
+    fn synthetic_texture_image() -> DynamicImage {
+        let width = 64;
+        let height = 32;
+        let mut data = Vec::with_capacity(width * height * 3);
+
+        for y in 0..height {
+            for x in 0..width {
+                let gradient = x as f32 / width as f32 * 0.2;
+                let fine = if (x + y) % 2 == 0 { 0.04 } else { -0.04 };
+                let medium = if (x / 4 + y / 4) % 2 == 0 {
+                    0.05
+                } else {
+                    -0.05
+                };
+                let value = (0.45 + gradient + fine + medium).clamp(0.0, 1.0);
+                data.extend_from_slice(&[value, value, value]);
+            }
+        }
+
+        DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_raw(width as u32, height as u32, data)
+                .expect("synthetic buffer dimensions should match"),
+        )
+    }
+
+    fn luma_variance(image: &DynamicImage) -> f32 {
+        let rgb = image.to_rgb32f();
+        let raw = rgb.as_raw();
+        let luma_values: Vec<f32> = raw
+            .chunks_exact(3)
+            .map(|pixel| 0.299 * pixel[0] + 0.587 * pixel[1] + 0.114 * pixel[2])
+            .collect();
+        let mean = luma_values.iter().sum::<f32>() / luma_values.len() as f32;
+        luma_values
+            .iter()
+            .map(|value| {
+                let delta = value - mean;
+                delta * delta
+            })
+            .sum::<f32>()
+            / luma_values.len() as f32
     }
 
     #[test]
@@ -3380,5 +3559,38 @@ mod tests {
             "prov_ai_subject_mask_001"
         );
         assert!(artifacts.stale_artifact_ids.is_empty());
+    }
+
+    #[test]
+    fn wavelet_detail_by_scale_increases_texture_variance() {
+        let mut image = synthetic_texture_image();
+        let before = luma_variance(&image);
+
+        apply_wavelet_detail_by_scale(
+            &mut image,
+            WaveletDetailSettings {
+                fine_amount: 55.0,
+                medium_amount: 35.0,
+                coarse_amount: 0.0,
+                edge_threshold: 0.28,
+                halo_suppression: 0.8,
+            },
+        );
+
+        let after = luma_variance(&image);
+        assert!(
+            after > before * 1.08,
+            "wavelet detail should increase texture variance: before={before} after={after}"
+        );
+    }
+
+    #[test]
+    fn disabled_wavelet_detail_preserves_pixels() {
+        let mut image = synthetic_texture_image();
+        let before = image.to_rgb32f();
+
+        apply_wavelet_detail_by_scale(&mut image, WaveletDetailSettings::default());
+
+        assert_eq!(before.as_raw(), image.to_rgb32f().as_raw());
     }
 }
