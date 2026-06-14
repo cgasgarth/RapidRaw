@@ -87,6 +87,10 @@
           "path": "docs/color/white-balance-picker-validation-2026-06-14.md"
         },
         {
+          "title": "ColorChecker fixture manifest",
+          "path": "docs/color/colorchecker-fixtures-2026-06-14.md"
+        },
+        {
           "title": "Film simulation architecture",
           "path": "docs/film/film-simulation-architecture-2026-06-13.md"
         },

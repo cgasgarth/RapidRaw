@@ -1,0 +1,56 @@
+{
+  "$schema": "https://rawengine.dev/schemas/colorchecker-fixture-manifest-v1.json",
+  "fixtures": [
+    {
+      "assetState": "metadata_only",
+      "captureKind": "synthetic_chart",
+      "colorPipelineStage": "camera_profile_to_working_space",
+      "expectedPatchCount": 24,
+      "fixtureId": "colorchecker.synthetic.acescg-neutral-ramp.v1",
+      "license": {
+        "evidence": "Project-generated synthetic metadata; no external image asset is committed.",
+        "spdx": "CC0-1.0"
+      },
+      "measurement": {
+        "referenceIlluminant": "D50",
+        "referenceObserver": "2deg",
+        "referenceSpace": "cie_lab",
+        "source": "synthetic_reference_values"
+      },
+      "notes": "Metadata-only fixture for validating ColorChecker manifest shape before rendered patch data lands.",
+      "patchGeometry": {
+        "columns": 6,
+        "rows": 4
+      },
+      "status": "planned",
+      "validationUses": ["schema_contract", "deltae_harness_bootstrap", "neutral_patch_gate"]
+    },
+    {
+      "assetState": "metadata_only",
+      "captureKind": "raw_camera_chart",
+      "colorPipelineStage": "camera_profile_to_working_space",
+      "expectedPatchCount": 24,
+      "fixtureId": "colorchecker.raw.camera-profile-baseline.v1",
+      "license": {
+        "evidence": "Placeholder for a future project-owned RAW chart capture with recorded permission and hashes.",
+        "spdx": "LicenseRef-RawEngine-Project-Owned"
+      },
+      "measurement": {
+        "referenceIlluminant": "D50",
+        "referenceObserver": "2deg",
+        "referenceSpace": "cie_lab",
+        "source": "future_measured_reference"
+      },
+      "notes": "Reserved fixture for first real RAW ColorChecker capture; no asset hash is required until assetState is active_asset.",
+      "patchGeometry": {
+        "columns": 6,
+        "rows": 4
+      },
+      "status": "planned",
+      "validationUses": ["camera_profile_regression", "deltae_harness_bootstrap", "preview_export_parity"]
+    }
+  ],
+  "issue": 88,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14"
+}
