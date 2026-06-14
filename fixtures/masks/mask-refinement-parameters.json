@@ -1,0 +1,48 @@
+[
+  {
+    "expected": {
+      "density": 1,
+      "edgeContrast": 0,
+      "edgeShiftPx": 0,
+      "featherPx": 0,
+      "smoothness": 0
+    },
+    "id": "defaults",
+    "input": {},
+    "samples": [
+      { "baseWeight": 1, "edgeDistancePx": 4, "weight": 1 },
+      { "baseWeight": 1, "edgeDistancePx": -1, "weight": 0 }
+    ]
+  },
+  {
+    "expected": {
+      "density": 0.7,
+      "edgeContrast": 0,
+      "edgeShiftPx": 0,
+      "featherPx": 10,
+      "smoothness": 0
+    },
+    "id": "feather-and-density",
+    "input": { "density": 0.7, "featherPx": 10 },
+    "samples": [
+      { "baseWeight": 1, "edgeDistancePx": 0, "weight": 0.35 },
+      { "baseWeight": 0.5, "edgeDistancePx": 10, "weight": 0.35 }
+    ]
+  },
+  {
+    "expected": {
+      "density": 1,
+      "edgeContrast": 1,
+      "edgeShiftPx": 5,
+      "featherPx": 10,
+      "smoothness": 1
+    },
+    "id": "shift-smooth-and-contrast",
+    "input": { "density": 2, "edgeContrast": 2, "edgeShiftPx": 5, "featherPx": 10, "smoothness": 2 },
+    "samples": [
+      { "baseWeight": 1, "edgeDistancePx": -5, "weight": 0.5 },
+      { "baseWeight": 1, "edgeDistancePx": -10, "weight": 0 },
+      { "baseWeight": 1, "edgeDistancePx": 10, "weight": 1 }
+    ]
+  }
+]
