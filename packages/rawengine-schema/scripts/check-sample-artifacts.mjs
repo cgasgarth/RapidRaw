@@ -96,7 +96,10 @@ import {
   sampleComputationalMergeAppServerToolManifestV1,
   sampleComputationalMergeCommandEnvelopeV1,
   sampleComputationalMergeDryRunResultV1,
+  sampleComputationalMergeFocusStackApplyAppServerToolCallValidationV1,
+  sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
   sampleComputationalMergeFocusStackCommandEnvelopeV1,
+  sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1,
   sampleComputationalMergeHdrCommandEnvelopeV1,
   sampleComputationalMergeMutationResultV1,
   sampleComputationalMergeSuperResolutionApplyAppServerToolCallValidationV1,
@@ -419,6 +422,12 @@ const sampleArtifacts = [
     value: sampleFocusStackArtifactV1,
   },
   {
+    name: 'computational merge focus stack apply command envelope',
+    path: 'packages/rawengine-schema/samples/computational-merge-focus-stack-apply-command-envelope-v1.json',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
+  },
+  {
     name: 'computational merge super-resolution command envelope',
     path: 'packages/rawengine-schema/samples/computational-merge-super-resolution-command-envelope-v1.json',
     schema: computationalMergeCommandEnvelopeV1Schema,
@@ -447,6 +456,18 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/computational-merge-app-server-tool-manifest-v1.json',
     schema: computationalMergeAppServerToolManifestV1Schema,
     value: sampleComputationalMergeAppServerToolManifestV1,
+  },
+  {
+    name: 'computational merge focus stack dry-run app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/computational-merge-focus-stack-dry-run-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'computational merge focus stack apply app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/computational-merge-focus-stack-apply-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergeFocusStackApplyAppServerToolCallValidationV1,
   },
   {
     name: 'computational merge super-resolution dry-run app-server tool call validation',
