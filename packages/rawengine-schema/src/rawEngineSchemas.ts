@@ -2645,6 +2645,390 @@ export const computationalMergeMutationResultV1Schema = z
   })
   .strict();
 
+export const hdrCapabilityLevelV1Schema = z.enum(['schema_only', 'plan_only', 'dry_run_only', 'runtime_apply_capable']);
+
+export const hdrMergeWarningCodeV1Schema = z.enum([
+  'alignment_cropped_edges',
+  'alignment_low_confidence',
+  'bracket_order_inferred',
+  'bracket_spacing_irregular',
+  'camera_or_lens_mismatch',
+  'capture_time_gap_large',
+  'clipped_reference_frame',
+  'deghost_mask_generated',
+  'dimensions_match_but_raw_geometry_unverified',
+  'exposure_metadata_missing',
+  'high_memory_estimate',
+  'highlight_recovery_limited',
+  'human_review_required',
+  'iso_metadata_missing',
+  'legacy_full_frame_render',
+  'motion_detected',
+  'noise_risk_in_shadow_recovery',
+  'runtime_estimate_high',
+  'tone_mapped_preview_only',
+  'white_balance_mismatch',
+]);
+
+export const hdrMergeBlockCodeV1Schema = z.enum([
+  'alignment_failed',
+  'apply_requires_accepted_dry_run',
+  'apply_requires_approval',
+  'dimension_mismatch',
+  'duplicate_exposure_values',
+  'memory_budget_exceeded',
+  'missing_required_exposure_metadata',
+  'not_a_bracket',
+  'raw_geometry_mismatch',
+  'runtime_not_available',
+  'source_count_too_low',
+  'source_files_unreadable',
+  'unsupported_source_format',
+]);
+
+export const hdrBracketDetectionMethodV1Schema = z.enum([
+  'caller_declared_ev',
+  'luminance_estimate',
+  'manual_order',
+  'metadata_exposure_compensation',
+  'metadata_exposure_time_iso_aperture',
+]);
+
+export const hdrMotionRiskV1Schema = z.enum(['none', 'low', 'medium', 'high']);
+
+export const hdrDeghostingModeV1Schema = z.enum(['off', 'low', 'medium', 'high']);
+
+export const hdrMaskArtifactKindV1Schema = z.enum(['deghost_selection', 'motion_probability', 'rejected_pixel_map']);
+
+export const hdrMergeInvalidationReasonV1Schema = z.enum([
+  'alignment_settings_changed',
+  'bracket_metadata_changed',
+  'deghosting_settings_changed',
+  'engine_version_changed',
+  'merge_strategy_changed',
+  'output_artifact_changed',
+  'source_content_hash_changed',
+  'source_graph_revision_changed',
+  'source_order_changed',
+  'source_set_changed',
+  'tone_map_preview_settings_changed',
+]);
+
+export const hdrMergeStaleStateV1Schema = z.enum(['current', 'stale', 'unknown']);
+
+export const hdrBracketSourceMetadataV1Schema = z
+  .object({
+    aperture: z.number().positive().optional(),
+    cameraMake: z.string().trim().min(1).optional(),
+    cameraModel: z.string().trim().min(1).optional(),
+    captureTimestamp: z.iso.datetime({ offset: true }).optional(),
+    contentHash: z.string().trim().min(1).optional(),
+    declaredExposureEv: z.number().optional(),
+    exposureCompensationEv: z.number().optional(),
+    exposureTimeSeconds: z.number().positive().optional(),
+    graphRevision: z.string().trim().min(1).optional(),
+    height: z.number().int().positive(),
+    imageId: z.string().trim().min(1).optional(),
+    imagePath: z.string().trim().min(1),
+    iso: z.number().positive().optional(),
+    lensModel: z.string().trim().min(1).optional(),
+    rawBlackLevelKnown: z.boolean(),
+    rawWhiteLevelKnown: z.boolean(),
+    resolvedBracketRole: z.enum(['over_exposed', 'reference', 'under_exposed', 'unknown']),
+    resolvedExposureEv: z.number(),
+    sourceIndex: z.number().int().nonnegative(),
+    virtualCopyId: z.string().trim().min(1).nullable().optional(),
+    whiteBalanceComparable: z.boolean(),
+    width: z.number().int().positive(),
+  })
+  .strict();
+
+export const hdrBracketDetectionResultV1Schema = z
+  .object({
+    accepted: z.boolean(),
+    blockCodes: z.array(hdrMergeBlockCodeV1Schema),
+    bracketSpanEv: z.number().nonnegative(),
+    detectionConfidence: z.number().min(0).max(1),
+    detectionMethod: hdrBracketDetectionMethodV1Schema,
+    referenceSourceIndex: z.number().int().nonnegative(),
+    sourceMetadata: z.array(hdrBracketSourceMetadataV1Schema).min(2),
+    warningCodes: z.array(hdrMergeWarningCodeV1Schema),
+  })
+  .strict()
+  .superRefine((detection, context) => {
+    const sourceIndexes = new Set(detection.sourceMetadata.map((source) => source.sourceIndex));
+    if (!sourceIndexes.has(detection.referenceSourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'HDR bracket referenceSourceIndex must reference a source metadata entry.',
+        path: ['referenceSourceIndex'],
+      });
+    }
+
+    const exposureValues = new Set(detection.sourceMetadata.map((source) => source.resolvedExposureEv));
+    if (detection.accepted && exposureValues.size < 2) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Accepted HDR bracket detection requires at least two distinct resolved exposure values.',
+        path: ['sourceMetadata'],
+      });
+    }
+
+    if (detection.accepted && detection.blockCodes.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Accepted HDR bracket detection must not include block codes.',
+        path: ['blockCodes'],
+      });
+    }
+
+    if (!detection.accepted && detection.blockCodes.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Rejected HDR bracket detection requires at least one block code.',
+        path: ['blockCodes'],
+      });
+    }
+  });
+
+export const hdrAlignmentTransformV1Schema = z
+  .object({
+    confidence: z.number().min(0).max(1),
+    cropBounds: computationalMergeProjectedBoundsV1Schema.optional(),
+    inlierRatio: z.number().min(0).max(1).optional(),
+    matrix3x3: z.array(z.number()).length(9).optional(),
+    sourceIndex: z.number().int().nonnegative(),
+    transformType: z.enum(['homography', 'identity', 'similarity', 'translation']),
+    translationPx: z
+      .object({
+        x: z.number(),
+        y: z.number(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export const hdrAlignmentSummaryV1Schema = z
+  .object({
+    alignmentConfidence: z.number().min(0).max(1),
+    referenceSourceIndex: z.number().int().nonnegative(),
+    rejectedSourceIndexes: z.array(z.number().int().nonnegative()),
+    requestedAlignmentMode: computationalMergeAlignmentModeV1Schema,
+    resolvedAlignmentMode: computationalMergeAlignmentModeV1Schema,
+    transforms: z.array(hdrAlignmentTransformV1Schema).min(2),
+  })
+  .strict()
+  .superRefine((alignment, context) => {
+    const transformIndexes = new Set(alignment.transforms.map((transform) => transform.sourceIndex));
+    if (!transformIndexes.has(alignment.referenceSourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'HDR alignment referenceSourceIndex must reference a transform source.',
+        path: ['referenceSourceIndex'],
+      });
+    }
+
+    for (const [index, rejectedSourceIndex] of alignment.rejectedSourceIndexes.entries()) {
+      if (!transformIndexes.has(rejectedSourceIndex)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'HDR rejected alignment source indexes must reference a transform source.',
+          path: ['rejectedSourceIndexes', index],
+        });
+      }
+    }
+  });
+
+export const hdrMaskArtifactV1Schema = z
+  .object({
+    artifact: artifactHandleV1Schema,
+    encodedMeaning: z.enum(['f32_probability', 'u8_0_255_probability', 'u8_binary']),
+    height: z.number().int().positive(),
+    kind: hdrMaskArtifactKindV1Schema,
+    sourceIndexes: z.array(z.number().int().nonnegative()).min(1),
+    width: z.number().int().positive(),
+  })
+  .strict();
+
+export const hdrDeghostingSummaryV1Schema = z
+  .object({
+    masks: z.array(hdrMaskArtifactV1Schema),
+    motionCoverageRatio: z.number().min(0).max(1),
+    motionRisk: hdrMotionRiskV1Schema,
+    referenceSourceIndex: z.number().int().nonnegative(),
+    requestedDeghosting: hdrDeghostingModeV1Schema,
+    resolvedDeghosting: hdrDeghostingModeV1Schema,
+  })
+  .strict();
+
+export const hdrHighlightRecoveryMetricsV1Schema = z
+  .object({
+    clippedInputPixelRatioBySource: z
+      .array(
+        z
+          .object({
+            clippedHighRatio: z.number().min(0).max(1),
+            nearClippedHighRatio: z.number().min(0).max(1),
+            sourceIndex: z.number().int().nonnegative(),
+          })
+          .strict(),
+      )
+      .min(2),
+    highlightDetailGainRatio: z.number().nonnegative(),
+    recoveredHighlightPixelRatio: z.number().min(0).max(1),
+    shadowNoiseAmplificationRisk: z.enum(['high', 'low', 'medium', 'unknown']),
+    unrecoveredClippedPixelRatio: z.number().min(0).max(1),
+  })
+  .strict();
+
+const hdrSourceStateV1Schema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    graphRevision: z.string().trim().min(1),
+    resolvedExposureEv: z.number(),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const validateHdrSourceState = (
+  sourceImageRefs: Array<ComputationalMergeSourceImageRefV1>,
+  sourceStates: Array<z.infer<typeof hdrSourceStateV1Schema>>,
+  context: z.RefinementCtx,
+  path: Array<string | number>,
+) => {
+  const sourceIndexes = new Set(sourceImageRefs.map((source) => source.sourceIndex));
+  const stateIndexes = new Set<number>();
+
+  for (const [index, sourceState] of sourceStates.entries()) {
+    if (stateIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'HDR source state entries require unique source indexes.',
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+
+    stateIndexes.add(sourceState.sourceIndex);
+
+    if (!sourceIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'HDR source state entries must reference sourceImageRefs.',
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+  }
+
+  if (stateIndexes.size !== sourceIndexes.size) {
+    context.addIssue({
+      code: 'custom',
+      message: 'HDR source state entries must cover every source image.',
+      path,
+    });
+  }
+};
+
+export const hdrMergeArtifactV1Schema = z
+  .object({
+    alignment: hdrAlignmentSummaryV1Schema,
+    artifactId: z.string().trim().min(1),
+    blockCodes: z.array(hdrMergeBlockCodeV1Schema),
+    bracketDetection: hdrBracketDetectionResultV1Schema,
+    createdAt: z.iso.datetime({ offset: true }),
+    deghosting: hdrDeghostingSummaryV1Schema,
+    dryRun: z
+      .object({
+        acceptedDryRunPlanHash: z.string().trim().min(1),
+        acceptedDryRunPlanId: z.string().trim().min(1),
+      })
+      .strict(),
+    editableDerivedAssetId: z.string().trim().min(1).optional(),
+    engine: z
+      .object({
+        backendType: z.enum(['legacy_image_hdr', 'local_cpu', 'local_gpu', 'schema_only']),
+        capabilityLevel: hdrCapabilityLevelV1Schema,
+        engineId: z.string().trim().min(1),
+        engineVersion: z.string().trim().min(1),
+      })
+      .strict(),
+    family: z.literal('hdr'),
+    highlightRecovery: hdrHighlightRecoveryMetricsV1Schema,
+    mergeStrategy: z.enum(['exposure_fusion_preview', 'scene_linear_radiance']),
+    outputArtifact: artifactHandleV1Schema,
+    outputColorSpace: z.string().trim().min(1),
+    outputEncoding: z.enum(['display_referred_preview', 'scene_linear_float', 'scene_linear_half_float']),
+    outputName: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema),
+    previewToneMapped: z.boolean(),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceImageRefs: z.array(computationalMergeSourceImageRefV1Schema).min(2),
+    sourceState: z.array(hdrSourceStateV1Schema).min(2),
+    staleState: z
+      .object({
+        checkedAt: z.iso.datetime({ offset: true }).optional(),
+        invalidationReasons: z.array(hdrMergeInvalidationReasonV1Schema),
+        state: hdrMergeStaleStateV1Schema,
+      })
+      .strict(),
+    warningCodes: z.array(hdrMergeWarningCodeV1Schema),
+    workingColorSpace: z.string().trim().min(1),
+  })
+  .strict()
+  .superRefine((artifact, context) => {
+    for (const [sourceIndex, source] of artifact.sourceImageRefs.entries()) {
+      if (source.role !== 'hdr_bracket') {
+        context.addIssue({
+          code: 'custom',
+          message: 'HDR artifacts require every source to use the hdr_bracket role.',
+          path: ['sourceImageRefs', sourceIndex, 'role'],
+        });
+      }
+    }
+
+    if (artifact.outputArtifact.kind !== 'merge_output' || artifact.outputArtifact.storage !== 'sidecar_artifact') {
+      context.addIssue({
+        code: 'custom',
+        message: 'HDR artifacts must reference a durable merge output sidecar artifact.',
+        path: ['outputArtifact'],
+      });
+    }
+
+    if (artifact.mergeStrategy === 'scene_linear_radiance' && artifact.outputEncoding === 'display_referred_preview') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Scene-linear HDR artifacts must not store only display-referred preview output.',
+        path: ['outputEncoding'],
+      });
+    }
+
+    if (artifact.staleState.state === 'current' && artifact.staleState.invalidationReasons.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Current HDR artifacts must not include invalidation reasons.',
+        path: ['staleState', 'invalidationReasons'],
+      });
+    }
+
+    if (artifact.staleState.state === 'stale' && artifact.staleState.invalidationReasons.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Stale HDR artifacts require invalidation reasons.',
+        path: ['staleState', 'invalidationReasons'],
+      });
+    }
+
+    if (artifact.blockCodes.length > 0 && artifact.engine.capabilityLevel === 'runtime_apply_capable') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Runtime-apply-capable HDR artifacts must not include apply-blocking codes.',
+        path: ['blockCodes'],
+      });
+    }
+
+    validateHdrSourceState(artifact.sourceImageRefs, artifact.sourceState, context, ['sourceState']);
+  });
+
 export const focusStackBlendMethodV1Schema = z.enum(['depth_map', 'laplacian_pyramid', 'weighted_sharpness']);
 
 export const focusStackRetouchLayerPolicyV1Schema = z.enum(['none', 'generate_retouch_layer']);
@@ -7991,6 +8375,20 @@ export type ComputationalMergeQualityMetricsV1 = z.infer<typeof computationalMer
 export type ComputationalMergeQualityPreferenceV1 = z.infer<typeof computationalMergeQualityPreferenceV1Schema>;
 export type ComputationalMergeSourceImageRefV1 = z.infer<typeof computationalMergeSourceImageRefV1Schema>;
 export type ComputationalMergeSourceRoleV1 = z.infer<typeof computationalMergeSourceRoleV1Schema>;
+export type HdrAlignmentSummaryV1 = z.infer<typeof hdrAlignmentSummaryV1Schema>;
+export type HdrBracketDetectionResultV1 = z.infer<typeof hdrBracketDetectionResultV1Schema>;
+export type HdrBracketSourceMetadataV1 = z.infer<typeof hdrBracketSourceMetadataV1Schema>;
+export type HdrCapabilityLevelV1 = z.infer<typeof hdrCapabilityLevelV1Schema>;
+export type HdrDeghostingModeV1 = z.infer<typeof hdrDeghostingModeV1Schema>;
+export type HdrDeghostingSummaryV1 = z.infer<typeof hdrDeghostingSummaryV1Schema>;
+export type HdrHighlightRecoveryMetricsV1 = z.infer<typeof hdrHighlightRecoveryMetricsV1Schema>;
+export type HdrMaskArtifactV1 = z.infer<typeof hdrMaskArtifactV1Schema>;
+export type HdrMergeArtifactV1 = z.infer<typeof hdrMergeArtifactV1Schema>;
+export type HdrMergeBlockCodeV1 = z.infer<typeof hdrMergeBlockCodeV1Schema>;
+export type HdrMergeInvalidationReasonV1 = z.infer<typeof hdrMergeInvalidationReasonV1Schema>;
+export type HdrMergeStaleStateV1 = z.infer<typeof hdrMergeStaleStateV1Schema>;
+export type HdrMergeWarningCodeV1 = z.infer<typeof hdrMergeWarningCodeV1Schema>;
+export type HdrMotionRiskV1 = z.infer<typeof hdrMotionRiskV1Schema>;
 export type FocusStackArtifactV1 = z.infer<typeof focusStackArtifactV1Schema>;
 export type FocusStackBlendMethodV1 = z.infer<typeof focusStackBlendMethodV1Schema>;
 export type FocusStackInvalidationReasonV1 = z.infer<typeof focusStackInvalidationReasonV1Schema>;

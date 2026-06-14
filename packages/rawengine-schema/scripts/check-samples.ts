@@ -31,6 +31,7 @@ import {
   layerMaskCommandEnvelopeV1Schema,
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
+  hdrMergeArtifactV1Schema,
   negativeAcquisitionProfileV1Schema,
   negativeLabAppServerToolManifestV1Schema,
   negativeLabApplyPlanRequestV1Schema,
@@ -123,6 +124,7 @@ import {
   sampleFilmHalationModelV1,
   sampleFilmLookCatalogV1,
   sampleFocusStackArtifactV1,
+  sampleHdrMergeArtifactV1,
   sampleLayerMaskApplyCommandEnvelopeV1,
   sampleLayerMaskCommandEnvelopeV1,
   sampleLayerMaskDryRunResultV1,
@@ -458,6 +460,11 @@ const validSamples: ReadonlyArray<{
     name: 'computational merge super-resolution apply app-server tool call validation',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleComputationalMergeSuperResolutionApplyAppServerToolCallValidationV1,
+  },
+  {
+    name: 'HDR merge artifact',
+    schema: hdrMergeArtifactV1Schema,
+    value: sampleHdrMergeArtifactV1,
   },
   {
     name: 'super-resolution dry-run summary',
@@ -1435,6 +1442,40 @@ expectInvalid('super-resolution artifact with unknown source state index', super
     ...sourceState,
     sourceIndex: sourceIndex === 0 ? 99 : sourceState.sourceIndex,
   })),
+});
+
+expectInvalid('HDR artifact with non-HDR source role', hdrMergeArtifactV1Schema, {
+  ...sampleHdrMergeArtifactV1,
+  sourceImageRefs: sampleHdrMergeArtifactV1.sourceImageRefs.map((source, sourceIndex) => ({
+    ...source,
+    role: sourceIndex === 0 ? 'panorama_tile' : source.role,
+  })),
+});
+
+expectInvalid('HDR artifact without durable merge output', hdrMergeArtifactV1Schema, {
+  ...sampleHdrMergeArtifactV1,
+  outputArtifact: {
+    ...sampleHdrMergeArtifactV1.outputArtifact,
+    storage: 'temp_cache',
+  },
+});
+
+expectInvalid('scene-linear HDR artifact with display-only output', hdrMergeArtifactV1Schema, {
+  ...sampleHdrMergeArtifactV1,
+  outputEncoding: 'display_referred_preview',
+});
+
+expectInvalid('current HDR artifact with invalidation reasons', hdrMergeArtifactV1Schema, {
+  ...sampleHdrMergeArtifactV1,
+  staleState: {
+    ...sampleHdrMergeArtifactV1.staleState,
+    invalidationReasons: ['source_content_hash_changed'],
+  },
+});
+
+expectInvalid('HDR artifact with source state missing a source', hdrMergeArtifactV1Schema, {
+  ...sampleHdrMergeArtifactV1,
+  sourceState: sampleHdrMergeArtifactV1.sourceState.slice(1),
 });
 
 expectInvalid('HDR merge command without bracket exposure metadata', computationalMergeCommandEnvelopeV1Schema, {
