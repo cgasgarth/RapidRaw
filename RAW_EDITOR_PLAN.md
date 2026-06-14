@@ -3972,6 +3972,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 #### Milestone 10: HDR Merge
 
 - `consult(hdr): get HDR architecture review`
+  - Advisory review captured in
+    `docs/hdr/architecture-consult-summary-2026-06-14.md`. It classifies the
+    legacy RapidRAW HDR command path as runtime-capable baseline behavior, not
+    the final durable/editable RawEngine artifact architecture.
 - `hdr(audit): audit existing RapidRAW HDR merge`
 - `hdr(schema): define HDR merge artifact schema`
 - `hdr(brackets): add bracket detection`
@@ -4731,6 +4735,7 @@ Goal: produce editable high-quality HDR merge outputs.
 Issues:
 
 - Consult on HDR merge architecture.
+  - See `docs/hdr/architecture-consult-summary-2026-06-14.md`.
 - Audit existing RapidRAW HDR merge.
 - Define HDR merge artifact schema.
 - Add bracket detection.
