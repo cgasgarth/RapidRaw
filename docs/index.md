@@ -72,6 +72,7 @@ generator before the release workflow needs one.
 - [OpenCV macOS packaging proof](panorama/opencv-macos-packaging-proof-2026-06-13.md)
 - [OpenCV required CI promotion criteria](panorama/opencv-required-ci-promotion-2026-06-13.md)
 - [HDR architecture consult summary](hdr/architecture-consult-summary-2026-06-14.md)
+- [Current detail and noise tool audit](detail/current-detail-noise-audit-2026-06-14.md)
 - [Focus Stack architecture consult summary](focus-stacking/architecture-consult-summary-2026-06-14.md)
 - [Focus Stack RAW normalization and color policy](focus-stacking/raw-normalization-color-policy-2026-06-14.md)
 - [Focus Stack alignment path](focus-stacking/alignment-path-2026-06-14.md)

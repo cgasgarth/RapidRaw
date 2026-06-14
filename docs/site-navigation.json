@@ -239,6 +239,10 @@
           "path": "docs/hdr/architecture-consult-summary-2026-06-14.md"
         },
         {
+          "title": "Current detail and noise tool audit",
+          "path": "docs/detail/current-detail-noise-audit-2026-06-14.md"
+        },
+        {
           "title": "Focus Stack architecture consult summary",
           "path": "docs/focus-stacking/architecture-consult-summary-2026-06-14.md"
         },
