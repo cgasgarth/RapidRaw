@@ -4094,6 +4094,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Command: `bun run check:focus-sharpness-smoke`
 - `focus(runtime): add weighted-sharpness preview blend smoke`
   - Issue: #1062
+  - Check: `bun run check:focus-weighted-blend-smoke`
 - `agent(focus): bind app-server focus tools to command bus`
   - Issue: #1063
   - Check: `bun run schema:focus-app-server`
