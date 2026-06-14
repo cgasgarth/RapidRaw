@@ -30,6 +30,7 @@ The smoke currently times these deterministic commands:
 - `bun run check:generated-types`
 - `bun run check:film-fixtures`
 - `bun run schema:samples`
+- `bun run check:sr-performance-fixtures`
 
 Each command has a conservative elapsed-time budget. The script fails if a
 command exits nonzero, times out, or exceeds its effective budget.
@@ -57,5 +58,6 @@ their real benchmark commands land.
 - Add renderer-level image fixture benchmarks after golden render commands land.
 - Add preview-latency measurements once interactive controls expose a stable
   test harness.
-- Add memory-budget tests for panorama, HDR, focus stacking, and super-resolution
-  once those engines have deterministic preflight estimators.
+- Promote panorama, HDR, focus stacking, and super-resolution performance
+  fixtures from manifest validation to renderer/runtime benchmarks once those
+  engines have deterministic preflight estimators and stable fixture assets.

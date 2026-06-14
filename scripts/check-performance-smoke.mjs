@@ -74,6 +74,13 @@ const smokeChecks = z.array(SmokeCheckSchema).parse([
     id: 'rawengine-schema-samples',
     summary: 'RawEngine schema sample artifact validation',
   },
+  {
+    args: ['run', 'check:sr-performance-fixtures'],
+    budgetMs: 5_000,
+    command: 'bun',
+    id: 'sr-performance-fixtures',
+    summary: 'Super-resolution performance fixture budget validation',
+  },
 ]);
 
 const formatMs = (milliseconds) => `${Math.round(milliseconds)}ms`;
