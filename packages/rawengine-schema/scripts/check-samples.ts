@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { createFocusStackPlanOnlyDryRunResultV1 } from '../src/focusStackPreflight.js';
 import { detectHdrBracketV1 } from '../src/hdrBracketDetection.js';
+import { createHdrEditableSourceMutationResultV1 } from '../src/hdrEditableSource.js';
 import {
   aiAppServerToolManifestV1Schema,
   aiEnhancementApplyResultV1Schema,
@@ -798,6 +799,43 @@ if (
 ) {
   throw new Error('Expected HDR bracket detector to reject duplicate exposure values.');
 }
+
+const sampleHdrEditableSourceMutationResult = createHdrEditableSourceMutationResultV1(
+  sampleComputationalMergeHdrApplyCommandEnvelopeV1,
+  sampleHdrMergeArtifactV1,
+  {
+    appliedGraphRevision: 'graph_rev_48_hdr',
+    changedNodeId: 'node_merge_hdr_001',
+    undoRevision: sampleEditGraphSnapshotV1.graphRevision,
+  },
+);
+
+if (sampleHdrEditableSourceMutationResult.derivedAssetId !== sampleHdrMergeArtifactV1.editableDerivedAssetId) {
+  throw new Error('Expected HDR editable source mutation to use the artifact editable asset id.');
+}
+
+expectThrows('HDR editable source mutation with dry-run command', () =>
+  createHdrEditableSourceMutationResultV1(sampleComputationalMergeHdrCommandEnvelopeV1, sampleHdrMergeArtifactV1, {
+    appliedGraphRevision: 'graph_rev_48_hdr',
+    changedNodeId: 'node_merge_hdr_001',
+    undoRevision: sampleEditGraphSnapshotV1.graphRevision,
+  }),
+);
+
+expectThrows('HDR editable source mutation without editable asset id', () =>
+  createHdrEditableSourceMutationResultV1(
+    sampleComputationalMergeHdrApplyCommandEnvelopeV1,
+    {
+      ...sampleHdrMergeArtifactV1,
+      editableDerivedAssetId: undefined,
+    },
+    {
+      appliedGraphRevision: 'graph_rev_48_hdr',
+      changedNodeId: 'node_merge_hdr_001',
+      undoRevision: sampleEditGraphSnapshotV1.graphRevision,
+    },
+  ),
+);
 
 const invalidToolRegistry = {
   ...sampleToolRegistryV1,
