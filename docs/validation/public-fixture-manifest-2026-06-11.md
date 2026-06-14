@@ -48,6 +48,9 @@ Future PRs that add or activate manifest entries should keep these rules:
   machine-local paths, or private image content.
 - Negative and film fixtures must include acquisition assumptions before they are
   used for product-quality claims.
+- High-ISO detail fixtures must separate synthetic public-CI fixtures from real
+  photo review fixtures until rights, hashes, and expected thresholds are
+  supplied.
 
 ## Known Gaps
 
