@@ -1,0 +1,94 @@
+[
+  {
+    "case": "rejects duplicate session ids",
+    "sessionSet": {
+      "activeSessionId": "duplicate",
+      "sessions": [
+        {
+          "activeAlbumId": null,
+          "activeAssetPath": null,
+          "activeFolderPath": "/tmp/raw",
+          "createdAt": "2026-06-14T09:00:00.000Z",
+          "exportRecipeIds": [],
+          "filters": { "colorLabels": [], "minimumRating": 0, "rawStatus": "all", "tags": [], "text": "" },
+          "id": "duplicate",
+          "importPresetId": null,
+          "kind": "folder_browse",
+          "lastOpenedAt": null,
+          "name": "A",
+          "notes": null,
+          "recentAssetPaths": [],
+          "rootPaths": ["/tmp"],
+          "selectedAssetPaths": [],
+          "smartAlbumIds": [],
+          "sort": { "key": "name", "order": "asc" },
+          "stateVersion": 1,
+          "updatedAt": "2026-06-14T09:00:00.000Z",
+          "viewMode": "grid",
+          "workflowStage": "ingest"
+        },
+        {
+          "activeAlbumId": null,
+          "activeAssetPath": null,
+          "activeFolderPath": "/tmp/raw",
+          "createdAt": "2026-06-14T09:00:00.000Z",
+          "exportRecipeIds": [],
+          "filters": { "colorLabels": [], "minimumRating": 0, "rawStatus": "all", "tags": [], "text": "" },
+          "id": "duplicate",
+          "importPresetId": null,
+          "kind": "folder_browse",
+          "lastOpenedAt": null,
+          "name": "B",
+          "notes": null,
+          "recentAssetPaths": [],
+          "rootPaths": ["/tmp"],
+          "selectedAssetPaths": [],
+          "smartAlbumIds": [],
+          "sort": { "key": "name", "order": "asc" },
+          "stateVersion": 1,
+          "updatedAt": "2026-06-14T09:00:00.000Z",
+          "viewMode": "grid",
+          "workflowStage": "ingest"
+        }
+      ]
+    }
+  },
+  {
+    "case": "rejects active session missing from sessions",
+    "sessionSet": {
+      "activeSessionId": "missing",
+      "sessions": []
+    }
+  },
+  {
+    "case": "rejects active folder outside roots",
+    "sessionSet": {
+      "activeSessionId": "bad-root",
+      "sessions": [
+        {
+          "activeAlbumId": null,
+          "activeAssetPath": null,
+          "activeFolderPath": "/var/photos",
+          "createdAt": "2026-06-14T09:00:00.000Z",
+          "exportRecipeIds": [],
+          "filters": { "colorLabels": [], "minimumRating": 0, "rawStatus": "all", "tags": [], "text": "" },
+          "id": "bad-root",
+          "importPresetId": null,
+          "kind": "folder_browse",
+          "lastOpenedAt": null,
+          "name": "Bad Root",
+          "notes": null,
+          "recentAssetPaths": [],
+          "rootPaths": ["/tmp"],
+          "selectedAssetPaths": [],
+          "smartAlbumIds": [],
+          "sort": { "key": "name", "order": "asc" },
+          "stateVersion": 1,
+          "updatedAt": "2026-06-14T09:00:00.000Z",
+          "viewMode": "grid",
+          "workflowStage": "ingest"
+        }
+      ]
+    }
+  }
+]

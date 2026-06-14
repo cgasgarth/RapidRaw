@@ -1,0 +1,76 @@
+{
+  "activeSessionId": "session-wedding-cull",
+  "sessions": [
+    {
+      "activeAlbumId": "album-client-picks",
+      "activeAssetPath": "/Users/example/Pictures/Wedding/RAW/DSC_0002.NEF",
+      "activeFolderPath": "/Users/example/Pictures/Wedding/RAW",
+      "createdAt": "2026-06-14T09:00:00.000Z",
+      "exportRecipeIds": ["client-proof-jpeg"],
+      "filters": {
+        "colorLabels": ["green"],
+        "minimumRating": 3,
+        "rawStatus": "raw_only",
+        "tags": ["ceremony"],
+        "text": "keeper"
+      },
+      "id": "session-wedding-cull",
+      "importPresetId": "wedding-ingest",
+      "kind": "culling",
+      "lastOpenedAt": "2026-06-14T09:25:00.000Z",
+      "name": "Wedding Cull",
+      "notes": "Cull ceremony picks before first proof export.",
+      "recentAssetPaths": [
+        "/Users/example/Pictures/Wedding/RAW/DSC_0001.NEF",
+        "/Users/example/Pictures/Wedding/RAW/DSC_0002.NEF",
+        "/Users/example/Pictures/Wedding/RAW/DSC_0003.NEF"
+      ],
+      "rootPaths": ["/Users/example/Pictures/Wedding"],
+      "selectedAssetPaths": [
+        "/Users/example/Pictures/Wedding/RAW/DSC_0001.NEF",
+        "/Users/example/Pictures/Wedding/RAW/DSC_0002.NEF"
+      ],
+      "smartAlbumIds": ["smart-five-star"],
+      "sort": {
+        "key": "rating",
+        "order": "desc"
+      },
+      "stateVersion": 1,
+      "updatedAt": "2026-06-14T09:20:00.000Z",
+      "viewMode": "survey",
+      "workflowStage": "cull"
+    },
+    {
+      "activeAlbumId": null,
+      "activeAssetPath": null,
+      "activeFolderPath": "/Users/example/Pictures/Portfolio",
+      "createdAt": "2026-06-13T18:00:00.000Z",
+      "exportRecipeIds": [],
+      "filters": {
+        "colorLabels": [],
+        "minimumRating": 0,
+        "rawStatus": "all",
+        "tags": [],
+        "text": ""
+      },
+      "id": "session-portfolio-edit",
+      "importPresetId": null,
+      "kind": "editing",
+      "lastOpenedAt": null,
+      "name": "Portfolio Edit",
+      "notes": null,
+      "recentAssetPaths": [],
+      "rootPaths": ["/Users/example/Pictures/Portfolio"],
+      "selectedAssetPaths": [],
+      "smartAlbumIds": [],
+      "sort": {
+        "key": "modified_at",
+        "order": "desc"
+      },
+      "stateVersion": 1,
+      "updatedAt": "2026-06-13T18:00:00.000Z",
+      "viewMode": "grid",
+      "workflowStage": "edit"
+    }
+  ]
+}
