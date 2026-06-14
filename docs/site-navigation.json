@@ -75,6 +75,10 @@
           "path": "docs/color/scene-to-display-transform-adr-2026-06-14.md"
         },
         {
+          "title": "Camera profile strategy ADR",
+          "path": "docs/color/camera-profile-strategy-adr-2026-06-14.md"
+        },
+        {
           "title": "Film simulation architecture",
           "path": "docs/film/film-simulation-architecture-2026-06-13.md"
         },

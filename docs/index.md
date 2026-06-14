@@ -33,6 +33,7 @@ generator before the release workflow needs one.
 - [Negative Lab app-server tool contract](agent/negative-lab-app-server-tools-2026-06-13.md)
 - [Working color space ADR](color/working-color-space-adr-2026-06-14.md)
 - [Scene-to-display transform ADR](color/scene-to-display-transform-adr-2026-06-14.md)
+- [Camera profile strategy ADR](color/camera-profile-strategy-adr-2026-06-14.md)
 - [Film simulation architecture](film/film-simulation-architecture-2026-06-13.md)
 - [Built-In Film Look catalog schema](film/built-in-look-catalog-schema-2026-06-13.md)
 - [Bundled look legal review checklist](film/bundled-look-legal-review-checklist-2026-06-13.md)
