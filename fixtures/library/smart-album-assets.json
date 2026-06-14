@@ -1,0 +1,53 @@
+[
+  {
+    "aperture": 2.8,
+    "cameraMake": "Nikon",
+    "cameraModel": "Z8",
+    "capturedAt": "2026-06-14T08:00:00.000Z",
+    "colorLabel": "green",
+    "editedStatus": "edited",
+    "fileExtension": "nef",
+    "focalLengthMm": 85,
+    "isVirtualCopy": false,
+    "iso": 400,
+    "lens": "85mm f/1.8",
+    "path": "/Users/example/Pictures/Portfolio/DSC_0001.NEF",
+    "rating": 5,
+    "rawStatus": "raw",
+    "tags": ["portfolio", "portrait"]
+  },
+  {
+    "aperture": 5.6,
+    "cameraMake": "Sony",
+    "cameraModel": "A7R V",
+    "capturedAt": "2026-06-14T08:02:00.000Z",
+    "colorLabel": null,
+    "editedStatus": "unedited",
+    "fileExtension": "arw",
+    "focalLengthMm": 35,
+    "isVirtualCopy": false,
+    "iso": 100,
+    "lens": "35mm f/1.4",
+    "path": "/Users/example/Pictures/Portfolio/DSC_0002.ARW",
+    "rating": 4,
+    "rawStatus": "raw",
+    "tags": ["portfolio", "wide"]
+  },
+  {
+    "aperture": null,
+    "cameraMake": null,
+    "cameraModel": null,
+    "capturedAt": null,
+    "colorLabel": "green",
+    "editedStatus": "unedited",
+    "fileExtension": "jpg",
+    "focalLengthMm": null,
+    "isVirtualCopy": true,
+    "iso": null,
+    "lens": null,
+    "path": "/Users/example/Pictures/Portfolio/DSC_0003-copy.JPG",
+    "rating": 5,
+    "rawStatus": "rendered",
+    "tags": ["portfolio"]
+  }
+]

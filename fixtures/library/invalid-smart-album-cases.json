@@ -1,0 +1,74 @@
+[
+  {
+    "case": "rejects duplicate smart album ids",
+    "catalog": {
+      "albums": [
+        {
+          "conditions": [{ "field": "rating", "negate": false, "operator": "gte", "value": 4 }],
+          "createdAt": "2026-06-14T09:30:00.000Z",
+          "id": "duplicate",
+          "includeVirtualCopies": false,
+          "limit": null,
+          "match": "all",
+          "name": "A",
+          "sort": { "key": "rating", "order": "desc" },
+          "updatedAt": "2026-06-14T09:30:00.000Z",
+          "version": 1
+        },
+        {
+          "conditions": [{ "field": "tag", "negate": false, "operator": "contains", "value": "portfolio" }],
+          "createdAt": "2026-06-14T09:30:00.000Z",
+          "id": "duplicate",
+          "includeVirtualCopies": false,
+          "limit": null,
+          "match": "all",
+          "name": "B",
+          "sort": { "key": "name", "order": "asc" },
+          "updatedAt": "2026-06-14T09:30:00.000Z",
+          "version": 1
+        }
+      ],
+      "defaultAlbumId": null
+    }
+  },
+  {
+    "case": "rejects text operator on numeric field",
+    "catalog": {
+      "albums": [
+        {
+          "conditions": [{ "field": "rating", "negate": false, "operator": "contains", "value": "5" }],
+          "createdAt": "2026-06-14T09:30:00.000Z",
+          "id": "bad-condition",
+          "includeVirtualCopies": false,
+          "limit": null,
+          "match": "all",
+          "name": "Bad Condition",
+          "sort": { "key": "rating", "order": "desc" },
+          "updatedAt": "2026-06-14T09:30:00.000Z",
+          "version": 1
+        }
+      ],
+      "defaultAlbumId": null
+    }
+  },
+  {
+    "case": "rejects updatedAt before createdAt",
+    "catalog": {
+      "albums": [
+        {
+          "conditions": [{ "field": "tag", "negate": false, "operator": "contains", "value": "portfolio" }],
+          "createdAt": "2026-06-14T09:30:00.000Z",
+          "id": "bad-time",
+          "includeVirtualCopies": false,
+          "limit": null,
+          "match": "all",
+          "name": "Bad Time",
+          "sort": { "key": "name", "order": "asc" },
+          "updatedAt": "2026-06-14T09:29:00.000Z",
+          "version": 1
+        }
+      ],
+      "defaultAlbumId": null
+    }
+  }
+]
