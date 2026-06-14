@@ -2,20 +2,24 @@ use crate::app_settings::load_settings;
 use crate::app_state::AppState;
 use crate::file_management::parse_virtual_path;
 use base64::{Engine as _, engine::general_purpose};
+use chrono::{DateTime, Utc};
 use image::ImageFormat;
 use image::{DynamicImage, GenericImageView, GrayImage, Rgb32FImage};
 use nalgebra::Matrix3;
 use rayon::prelude::*;
 use serde::Serialize;
+use serde_json::json;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use tauri::{AppHandle, Emitter};
+use uuid::Uuid;
 
 use crate::formats::is_raw_file;
 use crate::image_processing::apply_cpu_default_raw_processing;
+use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
 use crate::panorama_utils::{processing, stitching};
 
 pub const BRIEF_DESCRIPTOR_SIZE: usize = 256;
@@ -66,14 +70,15 @@ pub struct PanoramaSourceMetadata {
     pub width: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PanoramaPairwiseMatchMetadata {
+    pub homography3x3: [f64; 9],
     pub inliers: usize,
     pub source_index: usize,
     pub target_index: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PanoramaRenderMetadata {
     pub connected_source_indices: Vec<usize>,
     pub estimated_peak_memory_bytes: u64,
@@ -88,6 +93,21 @@ pub struct PanoramaRenderMetadata {
 pub struct PanoramaRenderResult {
     pub image: DynamicImage,
     pub metadata: PanoramaRenderMetadata,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingPanoramaSourceRef {
+    pub image_path: String,
+    pub raw_defaults_applied: bool,
+    pub source_index: usize,
+    pub virtual_copy_id: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct PendingPanoramaResult {
+    pub image: DynamicImage,
+    pub metadata: PanoramaRenderMetadata,
+    pub source_refs: Vec<PendingPanoramaSourceRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -250,6 +270,7 @@ pub async fn stitch_panorama(
         return Err("Please select at least two images to stitch.".to_string());
     }
 
+    let source_refs = build_pending_panorama_source_refs(&paths);
     let source_paths: Vec<String> = paths
         .iter()
         .map(|p| parse_virtual_path(p).0.to_string_lossy().into_owned())
@@ -301,7 +322,11 @@ pub async fn stitch_panorama(
                 let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
                 let final_base64 = format!("data:image/png;base64,{}", base64_str);
 
-                *panorama_result_handle.lock().unwrap() = Some(render_result.image);
+                *panorama_result_handle.lock().unwrap() = Some(PendingPanoramaResult {
+                    image: render_result.image,
+                    metadata: render_result.metadata,
+                    source_refs,
+                });
 
                 let _ = app_handle.emit(
                     "panorama-complete",
@@ -366,13 +391,14 @@ fn load_panorama_source_metadata_for_plan(
 #[tauri::command]
 pub async fn save_panorama(
     first_path_str: String,
+    source_paths: Option<Vec<String>>,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let panorama_image = state
+    let pending_panorama = state
         .panorama_result
         .lock()
         .unwrap()
-        .take()
+        .clone()
         .ok_or_else(|| {
             "No panorama image found in memory to save. It might have already been saved."
                 .to_string()
@@ -387,30 +413,45 @@ pub async fn save_panorama(
         .and_then(|s| s.to_str())
         .unwrap_or("panorama");
 
+    let source_refs = if pending_panorama.source_refs.is_empty() {
+        build_pending_panorama_source_refs(
+            source_paths
+                .as_deref()
+                .unwrap_or_else(|| std::slice::from_ref(&first_path_str)),
+        )
+    } else {
+        pending_panorama.source_refs.clone()
+    };
+
     let (output_filename, image_to_save): (String, DynamicImage) =
-        if panorama_image.color().has_alpha() {
+        if pending_panorama.image.color().has_alpha() {
             (
                 format!("{}_Pano.png", stem),
-                DynamicImage::ImageRgba8(panorama_image.to_rgba8()),
+                DynamicImage::ImageRgba8(pending_panorama.image.to_rgba8()),
             )
-        } else if panorama_image.as_rgb32f().is_some() {
-            (format!("{}_Pano.tiff", stem), panorama_image)
+        } else if pending_panorama.image.as_rgb32f().is_some() {
+            (
+                format!("{}_Pano.tiff", stem),
+                pending_panorama.image.clone(),
+            )
         } else {
             (
                 format!("{}_Pano.png", stem),
-                DynamicImage::ImageRgb8(panorama_image.to_rgb8()),
+                DynamicImage::ImageRgb8(pending_panorama.image.to_rgb8()),
             )
         };
 
-    let output_path = parent_dir.join(output_filename);
+    let output_path = next_available_panorama_output_path(parent_dir, &output_filename);
 
     image_to_save
         .save(&output_path)
         .map_err(|e| format!("Failed to save panorama image: {}", e))?;
 
     let (real_path, _) = crate::file_management::parse_virtual_path(&first_path_str);
-    let _ =
-        crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path);
+    crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path)?;
+    write_panorama_output_sidecar(&output_path, &pending_panorama.metadata, &source_refs)?;
+
+    *state.panorama_result.lock().unwrap() = None;
 
     Ok(output_path.to_string_lossy().to_string())
 }
@@ -707,6 +748,7 @@ fn collect_pairwise_match_metadata(
         .iter()
         .map(
             |(&(source_index, target_index), match_info)| PanoramaPairwiseMatchMetadata {
+                homography3x3: matrix_to_row_major_array(&match_info.homography),
                 inliers: match_info.inliers,
                 source_index,
                 target_index,
@@ -716,6 +758,346 @@ fn collect_pairwise_match_metadata(
 
     metadata.sort_by_key(|match_info| (match_info.source_index, match_info.target_index));
     metadata
+}
+
+fn build_pending_panorama_source_refs(paths: &[String]) -> Vec<PendingPanoramaSourceRef> {
+    paths
+        .iter()
+        .enumerate()
+        .map(|(source_index, path)| {
+            let (source_path, _) = parse_virtual_path(path);
+            let image_path = source_path.to_string_lossy().into_owned();
+            PendingPanoramaSourceRef {
+                raw_defaults_applied: is_raw_file(&image_path),
+                image_path,
+                source_index,
+                virtual_copy_id: extract_virtual_copy_id(path),
+            }
+        })
+        .collect()
+}
+
+fn extract_virtual_copy_id(path: &str) -> Option<String> {
+    let (_, copy_id) = path.rsplit_once("?vc=")?;
+    if copy_id.trim().is_empty() {
+        None
+    } else {
+        Some(copy_id.to_string())
+    }
+}
+
+fn matrix_to_row_major_array(matrix: &Matrix3<f64>) -> [f64; 9] {
+    [
+        matrix[(0, 0)],
+        matrix[(0, 1)],
+        matrix[(0, 2)],
+        matrix[(1, 0)],
+        matrix[(1, 1)],
+        matrix[(1, 2)],
+        matrix[(2, 0)],
+        matrix[(2, 1)],
+        matrix[(2, 2)],
+    ]
+}
+
+fn next_available_panorama_output_path(parent_dir: &Path, output_filename: &str) -> PathBuf {
+    let candidate = parent_dir.join(output_filename);
+    if !candidate.exists() {
+        return candidate;
+    }
+
+    let path = Path::new(output_filename);
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("panorama");
+    let extension = path.extension().and_then(|value| value.to_str());
+
+    for index in 2.. {
+        let filename = match extension {
+            Some(ext) => format!("{}_{}.{}", stem, index, ext),
+            None => format!("{}_{}", stem, index),
+        };
+        let candidate = parent_dir.join(filename);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+
+    unreachable!("unbounded panorama output filename search should always return")
+}
+
+fn write_panorama_output_sidecar(
+    output_path: &Path,
+    metadata: &PanoramaRenderMetadata,
+    source_refs: &[PendingPanoramaSourceRef],
+) -> Result<(), String> {
+    let sidecar_path = output_path.with_file_name(format!(
+        "{}.rrdata",
+        output_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+    ));
+    let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+    upsert_panorama_artifact_metadata(&mut sidecar, output_path, metadata, source_refs)?;
+    let json = serde_json::to_string_pretty(&sidecar)
+        .map_err(|e| format!("Failed to serialize panorama sidecar: {}", e))?;
+    fs::write(&sidecar_path, json).map_err(|e| {
+        format!(
+            "Failed to write panorama sidecar {}: {}",
+            sidecar_path.display(),
+            e
+        )
+    })
+}
+
+fn upsert_panorama_artifact_metadata(
+    sidecar: &mut ImageMetadata,
+    output_path: &Path,
+    metadata: &PanoramaRenderMetadata,
+    source_refs: &[PendingPanoramaSourceRef],
+) -> Result<(), String> {
+    let artifact_id = format!("artifact_panorama_{}", Uuid::new_v4().simple());
+    let output_artifact_id = format!("{}_output", artifact_id);
+    let preview_artifact_id = format!("{}_preview", artifact_id);
+    let crop = json!({
+        "height": metadata.output_height,
+        "mode": "auto",
+        "width": metadata.output_width,
+        "x": 0,
+        "y": 0,
+    });
+    let warnings = panorama_warning_codes(metadata);
+    let excluded_sources: Vec<_> = metadata
+        .excluded_source_indices
+        .iter()
+        .map(|source_index| {
+            json!({
+                "reason": "source_excluded",
+                "sourceIndex": source_index,
+            })
+        })
+        .collect();
+    let output_hash = hash_file_for_artifact(output_path)?;
+
+    let artifact = json!({
+        "alignment": {
+            "algorithmId": "rapidraw_fast9_brief_ransac_v1",
+            "downscaleMaxDimensionPx": processing::MAX_PROCESSING_DIMENSION,
+            "globalHomographyCount": metadata.connected_source_indices.len().saturating_sub(1),
+            "minimumInliersForConnection": processing::MIN_INLIERS_FOR_CONNECTION,
+            "pairwiseMatches": metadata.pairwise_matches.iter().map(|pair| json!({
+                "fromSourceIndex": pair.source_index,
+                "homography3x3": pair.homography3x3,
+                "inliers": pair.inliers,
+                "matchQuality": "accepted",
+                "toSourceIndex": pair.target_index,
+            })).collect::<Vec<_>>(),
+            "ransacSeed": 12345,
+            "ransacInlierThresholdPx": processing::RANSAC_INLIER_THRESHOLD,
+            "ransacIterations": processing::RANSAC_ITERATIONS,
+        },
+        "artifactId": artifact_id,
+        "boundaryMode": "auto_crop",
+        "boundarySettings": {
+            "crop": crop.clone(),
+            "effectiveMode": "auto_crop",
+            "requestedMode": "auto_crop",
+            "support": "implemented_current_engine",
+        },
+        "createdAt": Utc::now().to_rfc3339(),
+        "crop": crop,
+        "excludedSources": excluded_sources,
+        "engine": {
+            "capabilities": {
+                "adaptiveSeamFeather": true,
+                "autoCrop": true,
+                "bundleAdjustment": false,
+                "cylindricalProjection": false,
+                "exposureNormalization": false,
+                "planarHomography": true,
+                "tiledRender": false,
+            },
+            "engineId": "rapidraw_homography_seam_v0",
+            "qualityTier": "legacy_local_preview",
+        },
+        "exposureNormalization": {
+            "deferredReason": "Current panorama runtime records planned exposure normalization but does not apply it yet.",
+            "mode": "planned",
+            "support": "schema_only_deferred",
+        },
+        "lensCorrectionPolicy": "required_before_stitch",
+        "operationId": "merge.panorama.create",
+        "operationVersion": 1,
+        "outputArtifacts": [{
+            "artifactId": output_artifact_id,
+            "contentHash": output_hash,
+            "dimensions": {
+                "height": metadata.output_height,
+                "width": metadata.output_width,
+            },
+            "kind": "merge_output",
+            "storage": "sidecar_artifact",
+        }],
+        "outputColorSpace": "linear_rec2020_d65_v1",
+        "previewArtifacts": [{
+            "artifactId": preview_artifact_id,
+            "dimensions": {
+                "height": metadata.output_height.min(DEFAULT_PANORAMA_MAX_PREVIEW_DIMENSION_PX),
+                "width": metadata.output_width.min(DEFAULT_PANORAMA_MAX_PREVIEW_DIMENSION_PX),
+            },
+            "kind": "preview",
+            "storage": "temp_cache",
+        }],
+        "projection": "rectilinear",
+        "projectionSettings": {
+            "effectiveProjection": "rectilinear",
+            "requestedProjection": "rectilinear",
+            "support": "implemented_current_engine",
+        },
+        "provenance": {
+            "commandId": "command_panorama_create",
+            "runtimeStatus": "rendered",
+        },
+        "schemaVersion": 1,
+        "seamPolicy": {
+            "featherWidthPx": 100,
+            "lowDetailFeatherMultiplier": 5,
+            "mode": "adaptive_dp_feather_v1",
+        },
+        "sourceImageRefs": source_refs.iter().map(|source| json!({
+            "imagePath": source.image_path.clone(),
+            "lensCorrectionState": "required_before_stitch",
+            "rawDefaultsApplied": source.raw_defaults_applied,
+            "sourceIndex": source.source_index,
+            "virtualCopyId": source.virtual_copy_id.clone(),
+        })).collect::<Vec<_>>(),
+        "validationMetrics": {
+            "estimatedPeakMemoryBytes": metadata.estimated_peak_memory_bytes,
+            "excludedSourceCount": metadata.excluded_source_indices.len(),
+            "outputHeight": metadata.output_height,
+            "outputWidth": metadata.output_width,
+            "sourceCount": source_refs.len(),
+            "stitchedSourceCount": metadata.connected_source_indices.len(),
+        },
+        "warnings": warnings,
+    });
+
+    let artifacts = sidecar
+        .raw_engine_artifacts
+        .get_or_insert_with(|| RawEngineArtifacts {
+            schema_version: 1,
+            panorama_artifacts: Vec::new(),
+            stale_artifact_ids: Vec::new(),
+        });
+    artifacts.schema_version = 1;
+    artifacts.panorama_artifacts.push(artifact);
+    artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
+    Ok(())
+}
+
+fn panorama_warning_codes(metadata: &PanoramaRenderMetadata) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if !metadata.excluded_source_indices.is_empty() {
+        warnings.push("source_excluded".to_string());
+    }
+    if metadata.estimated_peak_memory_bytes >= DEFAULT_PANORAMA_MEMORY_BUDGET_BYTES {
+        warnings.push("high_memory_estimate".to_string());
+    }
+    warnings
+}
+
+fn hash_file_for_artifact(path: &Path) -> Result<String, String> {
+    let bytes = fs::read(path)
+        .map_err(|e| format!("Failed to read panorama output for artifact hash: {}", e))?;
+    Ok(format!("blake3:{}", blake3::hash(&bytes).to_hex()))
+}
+
+pub fn refresh_panorama_stale_artifacts(metadata: &mut ImageMetadata) -> bool {
+    let Some(artifacts) = metadata.raw_engine_artifacts.as_mut() else {
+        return false;
+    };
+
+    let stale_artifact_ids: Vec<String> = artifacts
+        .panorama_artifacts
+        .iter()
+        .filter_map(|artifact| {
+            let artifact_id = artifact.get("artifactId")?.as_str()?.to_string();
+            let created_at = artifact
+                .get("createdAt")
+                .and_then(|value| value.as_str())
+                .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+                .map(|value| value.with_timezone(&Utc));
+
+            let is_stale = match created_at {
+                Some(created_at) => panorama_artifact_sources_are_stale(artifact, created_at),
+                None => true,
+            };
+
+            is_stale.then_some(artifact_id)
+        })
+        .collect();
+
+    if artifacts.stale_artifact_ids == stale_artifact_ids {
+        return false;
+    }
+
+    artifacts.stale_artifact_ids = stale_artifact_ids;
+    true
+}
+
+fn panorama_artifact_sources_are_stale(
+    artifact: &serde_json::Value,
+    created_at: DateTime<Utc>,
+) -> bool {
+    let Some(source_refs) = artifact
+        .get("sourceImageRefs")
+        .and_then(|value| value.as_array())
+    else {
+        return true;
+    };
+
+    source_refs.iter().any(|source| {
+        let Some(image_path) = source.get("imagePath").and_then(|value| value.as_str()) else {
+            return true;
+        };
+        let image_path = Path::new(image_path);
+        if path_modified_after(image_path, created_at).unwrap_or(true) {
+            return true;
+        }
+
+        let sidecar_path = source_sidecar_path_for_stale_check(
+            image_path,
+            source.get("virtualCopyId").and_then(|value| value.as_str()),
+        );
+        path_modified_after(&sidecar_path, created_at).unwrap_or(false)
+    })
+}
+
+fn source_sidecar_path_for_stale_check(
+    image_path: &Path,
+    virtual_copy_id: Option<&str>,
+) -> PathBuf {
+    let sidecar_filename = match virtual_copy_id {
+        Some(copy_id) if !copy_id.is_empty() => format!(
+            "{}.{}.rrdata",
+            image_path.file_name().unwrap_or_default().to_string_lossy(),
+            copy_id
+        ),
+        _ => format!(
+            "{}.rrdata",
+            image_path.file_name().unwrap_or_default().to_string_lossy()
+        ),
+    };
+
+    image_path.with_file_name(sidecar_filename)
+}
+
+fn path_modified_after(path: &Path, created_at: DateTime<Utc>) -> Option<bool> {
+    let modified = fs::metadata(path).ok()?.modified().ok()?;
+    let modified_at = DateTime::<Utc>::from(modified);
+    Some(modified_at > created_at)
 }
 
 fn estimate_legacy_panorama_peak_memory_bytes(
@@ -1059,16 +1441,172 @@ mod tests {
             metadata,
             vec![
                 PanoramaPairwiseMatchMetadata {
+                    homography3x3: matrix_to_row_major_array(&Matrix3::identity()),
                     inliers: 42,
                     source_index: 0,
                     target_index: 1,
                 },
                 PanoramaPairwiseMatchMetadata {
+                    homography3x3: matrix_to_row_major_array(&Matrix3::identity()),
                     inliers: 21,
                     source_index: 2,
                     target_index: 3,
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn build_pending_panorama_source_refs_preserves_virtual_copy_identity() {
+        let refs = build_pending_panorama_source_refs(&[
+            "/photos/IMG_0001.CR3?vc=abc123".to_string(),
+            "/photos/IMG_0002.jpg".to_string(),
+        ]);
+
+        assert_eq!(refs.len(), 2);
+        assert_eq!(refs[0].image_path, "/photos/IMG_0001.CR3");
+        assert_eq!(refs[0].virtual_copy_id.as_deref(), Some("abc123"));
+        assert!(refs[0].raw_defaults_applied);
+        assert_eq!(refs[1].image_path, "/photos/IMG_0002.jpg");
+        assert_eq!(refs[1].virtual_copy_id, None);
+        assert!(!refs[1].raw_defaults_applied);
+    }
+
+    #[test]
+    fn next_available_panorama_output_path_avoids_overwriting_existing_outputs() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let first_path = temp_dir.path().join("IMG_0001_Pano.tiff");
+        let second_path = temp_dir.path().join("IMG_0001_Pano_2.tiff");
+        fs::write(&first_path, b"first").expect("first output should be written");
+        fs::write(&second_path, b"second").expect("second output should be written");
+
+        let next_path = next_available_panorama_output_path(temp_dir.path(), "IMG_0001_Pano.tiff");
+
+        assert_eq!(next_path, temp_dir.path().join("IMG_0001_Pano_3.tiff"));
+    }
+
+    #[test]
+    fn write_panorama_output_sidecar_records_editable_artifact_provenance() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let output_path = temp_dir.path().join("IMG_0001_Pano.tiff");
+        fs::write(&output_path, b"panorama-output").expect("output should be written");
+        let metadata = sample_render_metadata();
+        let source_refs = vec![
+            PendingPanoramaSourceRef {
+                image_path: temp_dir
+                    .path()
+                    .join("IMG_0001.CR3")
+                    .to_string_lossy()
+                    .into_owned(),
+                raw_defaults_applied: true,
+                source_index: 0,
+                virtual_copy_id: Some("abc123".to_string()),
+            },
+            PendingPanoramaSourceRef {
+                image_path: temp_dir
+                    .path()
+                    .join("IMG_0002.CR3")
+                    .to_string_lossy()
+                    .into_owned(),
+                raw_defaults_applied: true,
+                source_index: 1,
+                virtual_copy_id: None,
+            },
+        ];
+
+        write_panorama_output_sidecar(&output_path, &metadata, &source_refs)
+            .expect("sidecar should be written");
+
+        let sidecar_path = output_path.with_file_name("IMG_0001_Pano.tiff.rrdata");
+        let sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+        let artifacts = sidecar
+            .raw_engine_artifacts
+            .expect("raw engine artifacts should be present");
+        assert_eq!(artifacts.schema_version, 1);
+        assert_eq!(artifacts.panorama_artifacts.len(), 1);
+
+        let artifact = &artifacts.panorama_artifacts[0];
+        assert_eq!(artifact["provenance"]["runtimeStatus"], "rendered");
+        assert_eq!(artifact["outputArtifacts"][0]["kind"], "merge_output");
+        assert_eq!(
+            artifact["outputArtifacts"][0]["storage"],
+            "sidecar_artifact"
+        );
+        assert_eq!(artifact["sourceImageRefs"][0]["virtualCopyId"], "abc123");
+        assert_eq!(artifact["validationMetrics"]["sourceCount"], 2);
+        assert_eq!(artifact["validationMetrics"]["stitchedSourceCount"], 2);
+        assert_eq!(
+            artifact["alignment"]["pairwiseMatches"][0]["homography3x3"][2],
+            12.0
+        );
+    }
+
+    #[test]
+    fn refresh_panorama_stale_artifacts_marks_newer_source_file_stale() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let source_path = temp_dir.path().join("IMG_0001.CR3");
+        fs::write(&source_path, b"raw-source").expect("source should be written");
+        set_mtime(&source_path, 1_700_000_000);
+        let mut metadata = metadata_with_artifact_sources(vec![json!({
+            "imagePath": source_path.to_string_lossy(),
+            "lensCorrectionState": "required_before_stitch",
+            "rawDefaultsApplied": true,
+            "sourceIndex": 0,
+            "virtualCopyId": null,
+        })]);
+
+        assert!(!refresh_panorama_stale_artifacts(&mut metadata));
+        assert!(
+            metadata
+                .raw_engine_artifacts
+                .as_ref()
+                .expect("artifacts should exist")
+                .stale_artifact_ids
+                .is_empty()
+        );
+
+        set_mtime(&source_path, 1_700_000_200);
+
+        assert!(refresh_panorama_stale_artifacts(&mut metadata));
+        assert_eq!(
+            metadata
+                .raw_engine_artifacts
+                .as_ref()
+                .expect("artifacts should exist")
+                .stale_artifact_ids,
+            vec!["artifact_panorama_test".to_string()]
+        );
+    }
+
+    #[test]
+    fn refresh_panorama_stale_artifacts_marks_newer_virtual_copy_sidecar_stale() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let source_path = temp_dir.path().join("IMG_0001.CR3");
+        let virtual_sidecar_path = temp_dir.path().join("IMG_0001.CR3.abc123.rrdata");
+        fs::write(&source_path, b"raw-source").expect("source should be written");
+        fs::write(&virtual_sidecar_path, b"virtual-copy").expect("sidecar should be written");
+        set_mtime(&source_path, 1_700_000_000);
+        set_mtime(&virtual_sidecar_path, 1_700_000_000);
+        let mut metadata = metadata_with_artifact_sources(vec![json!({
+            "imagePath": source_path.to_string_lossy(),
+            "lensCorrectionState": "required_before_stitch",
+            "rawDefaultsApplied": true,
+            "sourceIndex": 0,
+            "virtualCopyId": "abc123",
+        })]);
+
+        assert!(!refresh_panorama_stale_artifacts(&mut metadata));
+
+        set_mtime(&virtual_sidecar_path, 1_700_000_200);
+
+        assert!(refresh_panorama_stale_artifacts(&mut metadata));
+        assert_eq!(
+            metadata
+                .raw_engine_artifacts
+                .as_ref()
+                .expect("artifacts should exist")
+                .stale_artifact_ids,
+            vec!["artifact_panorama_test".to_string()]
         );
     }
 
@@ -1178,5 +1716,47 @@ mod tests {
                 width: 100,
             },
         ]
+    }
+
+    fn sample_render_metadata() -> PanoramaRenderMetadata {
+        PanoramaRenderMetadata {
+            connected_source_indices: vec![0, 1],
+            estimated_peak_memory_bytes: 128_000,
+            excluded_source_indices: Vec::new(),
+            output_height: 100,
+            output_width: 220,
+            pairwise_matches: vec![PanoramaPairwiseMatchMetadata {
+                homography3x3: [1.0, 0.0, 12.0, 0.0, 1.0, 1.5, 0.0, 0.0, 1.0],
+                inliers: 32,
+                source_index: 0,
+                target_index: 1,
+            }],
+            sources: sample_plan_sources(),
+            warnings: Vec::new(),
+        }
+    }
+
+    fn metadata_with_artifact_sources(sources: Vec<serde_json::Value>) -> ImageMetadata {
+        ImageMetadata {
+            version: 1,
+            rating: 0,
+            adjustments: serde_json::Value::Null,
+            tags: None,
+            exif: None,
+            raw_engine_artifacts: Some(RawEngineArtifacts {
+                schema_version: 1,
+                panorama_artifacts: vec![json!({
+                    "artifactId": "artifact_panorama_test",
+                    "createdAt": "2023-11-14T22:13:21Z",
+                    "sourceImageRefs": sources,
+                })],
+                stale_artifact_ids: Vec::new(),
+            }),
+        }
+    }
+
+    fn set_mtime(path: &Path, unix_seconds: i64) {
+        let file_time = filetime::FileTime::from_unix_time(unix_seconds, 0);
+        filetime::set_file_mtime(path, file_time).expect("mtime should be set");
     }
 }

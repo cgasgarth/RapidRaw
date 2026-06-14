@@ -2475,6 +2475,12 @@ pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadat
         let _ = fs::write(&sidecar_path, json);
     }
 
+    if crate::panorama_stitching::refresh_panorama_stale_artifacts(&mut metadata)
+        && let Ok(json) = serde_json::to_string_pretty(&metadata)
+    {
+        let _ = fs::write(&sidecar_path, json);
+    }
+
     Ok(metadata)
 }
 
