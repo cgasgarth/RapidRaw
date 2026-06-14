@@ -4030,6 +4030,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(sr): add resolution chart fixtures`
   - Doc: `docs/super-resolution/resolution-chart-fixture-manifest-2026-06-13.md`
 - `validation(sr): add real photo fixtures`
+  - Doc: `docs/super-resolution/real-photo-fixture-manifest-2026-06-13.md`
 - `ui(sr): add super-resolution UI`
 - `api(sr): add super-resolution API tools`
 - `validation(sr): add performance tests`
