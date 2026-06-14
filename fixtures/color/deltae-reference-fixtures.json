@@ -1,0 +1,72 @@
+{
+  "$schema": "https://rawengine.dev/schemas/deltae-reference-fixtures-v1.json",
+  "fixtures": [
+    {
+      "expectedDeltaE00": 0,
+      "fixtureId": "deltae.identity-neutral.v1",
+      "labA": {
+        "a": 0,
+        "b": 0,
+        "l": 50
+      },
+      "labB": {
+        "a": 0,
+        "b": 0,
+        "l": 50
+      },
+      "notes": "Identity neutral fixture must produce zero color difference.",
+      "tolerance": 0.000001
+    },
+    {
+      "expectedDeltaE00": 2.0425,
+      "fixtureId": "deltae.sharma-blue-01.v1",
+      "labA": {
+        "a": 2.6772,
+        "b": -79.7751,
+        "l": 50
+      },
+      "labB": {
+        "a": 0,
+        "b": -82.7485,
+        "l": 50
+      },
+      "notes": "Published CIEDE2000 reference pair used to catch hue-rotation and weighting mistakes.",
+      "tolerance": 0.0001
+    },
+    {
+      "expectedDeltaE00": 2.8615,
+      "fixtureId": "deltae.sharma-blue-02.v1",
+      "labA": {
+        "a": 3.1571,
+        "b": -77.2803,
+        "l": 50
+      },
+      "labB": {
+        "a": 0,
+        "b": -82.7485,
+        "l": 50
+      },
+      "notes": "Second published CIEDE2000 reference pair with stronger chroma separation.",
+      "tolerance": 0.0001
+    },
+    {
+      "expectedDeltaE00": 3.4412,
+      "fixtureId": "deltae.sharma-blue-03.v1",
+      "labA": {
+        "a": 2.8361,
+        "b": -74.02,
+        "l": 50
+      },
+      "labB": {
+        "a": 0,
+        "b": -82.7485,
+        "l": 50
+      },
+      "notes": "Third published CIEDE2000 reference pair for blue-region regression coverage.",
+      "tolerance": 0.0001
+    }
+  ],
+  "issue": 89,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14"
+}
