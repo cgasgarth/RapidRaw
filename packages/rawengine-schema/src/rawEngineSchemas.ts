@@ -8376,6 +8376,7 @@ export type ComputationalMergeQualityPreferenceV1 = z.infer<typeof computational
 export type ComputationalMergeSourceImageRefV1 = z.infer<typeof computationalMergeSourceImageRefV1Schema>;
 export type ComputationalMergeSourceRoleV1 = z.infer<typeof computationalMergeSourceRoleV1Schema>;
 export type HdrAlignmentSummaryV1 = z.infer<typeof hdrAlignmentSummaryV1Schema>;
+export type HdrBracketDetectionMethodV1 = z.infer<typeof hdrBracketDetectionMethodV1Schema>;
 export type HdrBracketDetectionResultV1 = z.infer<typeof hdrBracketDetectionResultV1Schema>;
 export type HdrBracketSourceMetadataV1 = z.infer<typeof hdrBracketSourceMetadataV1Schema>;
 export type HdrCapabilityLevelV1 = z.infer<typeof hdrCapabilityLevelV1Schema>;

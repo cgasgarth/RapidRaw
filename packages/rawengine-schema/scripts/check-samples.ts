@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { createFocusStackPlanOnlyDryRunResultV1 } from '../src/focusStackPreflight.js';
+import { detectHdrBracketV1 } from '../src/hdrBracketDetection.js';
 import {
   aiAppServerToolManifestV1Schema,
   aiEnhancementApplyResultV1Schema,
@@ -727,6 +728,58 @@ expectThrows('focus-stack plan-only preflight with apply command', () =>
     sourceStates: sampleFocusStackPreflightSourceStates,
   }),
 );
+
+const sampleDetectedHdrBracket = detectHdrBracketV1({
+  sources: sampleHdrMergeArtifactV1.bracketDetection.sourceMetadata,
+});
+
+if (!sampleDetectedHdrBracket.accepted) {
+  throw new Error('Expected HDR bracket detector to accept the sample bracket.');
+}
+
+if (sampleDetectedHdrBracket.referenceSourceIndex !== 1) {
+  throw new Error('Expected HDR bracket detector to choose the 0 EV source as reference.');
+}
+
+if (sampleDetectedHdrBracket.bracketSpanEv !== 4) {
+  throw new Error('Expected HDR bracket detector to preserve the sample bracket span.');
+}
+
+const missingExposureHdrBracket = detectHdrBracketV1({
+  sources: sampleHdrMergeArtifactV1.bracketDetection.sourceMetadata.map((source) => {
+    const { declaredExposureEv, resolvedBracketRole, resolvedExposureEv, ...sourceWithoutExposureEvidence } = source;
+    void declaredExposureEv;
+    void resolvedBracketRole;
+    void resolvedExposureEv;
+
+    return {
+      ...sourceWithoutExposureEvidence,
+      exposureCompensationEv: undefined,
+      exposureTimeSeconds: undefined,
+    };
+  }),
+});
+
+if (
+  missingExposureHdrBracket.accepted ||
+  !missingExposureHdrBracket.blockCodes.includes('missing_required_exposure_metadata')
+) {
+  throw new Error('Expected HDR bracket detector to reject missing exposure metadata.');
+}
+
+const duplicateExposureHdrBracket = detectHdrBracketV1({
+  sources: sampleHdrMergeArtifactV1.bracketDetection.sourceMetadata.map((source) => ({
+    ...source,
+    declaredExposureEv: 0,
+  })),
+});
+
+if (
+  duplicateExposureHdrBracket.accepted ||
+  !duplicateExposureHdrBracket.blockCodes.includes('duplicate_exposure_values')
+) {
+  throw new Error('Expected HDR bracket detector to reject duplicate exposure values.');
+}
 
 const invalidToolRegistry = {
   ...sampleToolRegistryV1,
