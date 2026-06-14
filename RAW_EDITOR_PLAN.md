@@ -3848,6 +3848,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(color): add DeltaE measurement harness`
 - `validation(color): add histogram and scope validation`
 - `color(wb): add white balance picker tests`
+  - Validation doc: `docs/color/white-balance-picker-validation-2026-06-14.md`
 - `color(profile): add camera profile lookup tests`
 - `color(cat): add chromatic adaptation plan`
 - `color(gamut): add gamut mapping plan`

@@ -7,6 +7,7 @@ import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'r
 import CompositionOverlays from './overlays/CompositionOverlays';
 import { RenderSize } from '../../../hooks/useImageRenderSize';
 import { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
+import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
 import { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
 
@@ -1493,22 +1494,23 @@ const ImageCanvas = memo(
           const avgG = gTotal / count;
           const avgB = bTotal / count;
 
-          const linR = Math.pow(avgR / 255.0, 2.2);
-          const linG = Math.pow(avgG / 255.0, 2.2);
-          const linB = Math.pow(avgB / 255.0, 2.2);
+          setAdjustments((prev: Adjustments) => {
+            const whiteBalance = calculateWhiteBalancePickerAdjustment({
+              currentTemperature: prev.temperature,
+              currentTint: prev.tint,
+              sample: {
+                red: avgR,
+                green: avgG,
+                blue: avgB,
+              },
+            });
 
-          const sumRB = linR + linB;
-          const deltaTemp = sumRB > 0.0001 ? ((linB - linR) / sumRB) * 125.0 : 0;
-
-          const linM = sumRB / 2.0;
-          const sumGM = linG + linM;
-          const deltaTint = sumGM > 0.0001 ? ((linG - linM) / sumGM) * 400.0 : 0;
-
-          setAdjustments((prev: Adjustments) => ({
-            ...prev,
-            temperature: Math.max(-100, Math.min(100, (prev.temperature || 0) + deltaTemp)),
-            tint: Math.max(-100, Math.min(100, (prev.tint || 0) + deltaTint)),
-          }));
+            return {
+              ...prev,
+              temperature: whiteBalance.temperature,
+              tint: whiteBalance.tint,
+            };
+          });
 
           onWbPicked();
         };
