@@ -4036,6 +4036,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `ui(sr): add super-resolution UI`
 - `api(sr): add super-resolution API tools`
 - `validation(sr): add performance tests`
+  - Doc: `docs/super-resolution/performance-validation-contract-2026-06-14.md`
 - `validation(sr): add visual artifact review checklist`
   - Doc: `docs/super-resolution/visual-artifact-review-checklist-2026-06-14.md`
 
