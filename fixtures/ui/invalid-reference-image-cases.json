@@ -1,0 +1,85 @@
+[
+  {
+    "case": "rejects duplicate reference ids",
+    "workspace": {
+      "activeReferenceId": "duplicate",
+      "createdAt": "2026-06-14T12:00:00.000Z",
+      "id": "bad-duplicates",
+      "mode": "side_by_side",
+      "opacity": 1,
+      "placement": "right",
+      "references": [
+        {
+          "colorIntent": "match_display",
+          "id": "duplicate",
+          "label": "A",
+          "path": "/tmp/a.jpg",
+          "pinned": true,
+          "sourceProfile": null
+        },
+        {
+          "colorIntent": "match_display",
+          "id": "duplicate",
+          "label": "B",
+          "path": "/tmp/b.jpg",
+          "pinned": false,
+          "sourceProfile": null
+        }
+      ],
+      "targetImagePath": "/tmp/target.raw",
+      "updatedAt": "2026-06-14T12:00:00.000Z",
+      "version": 1,
+      "zoomLinked": true
+    }
+  },
+  {
+    "case": "rejects missing active reference",
+    "workspace": {
+      "activeReferenceId": "missing",
+      "createdAt": "2026-06-14T12:00:00.000Z",
+      "id": "bad-active",
+      "mode": "side_by_side",
+      "opacity": 1,
+      "placement": "right",
+      "references": [
+        {
+          "colorIntent": "match_display",
+          "id": "present",
+          "label": "Present",
+          "path": "/tmp/a.jpg",
+          "pinned": true,
+          "sourceProfile": null
+        }
+      ],
+      "targetImagePath": "/tmp/target.raw",
+      "updatedAt": "2026-06-14T12:00:00.000Z",
+      "version": 1,
+      "zoomLinked": true
+    }
+  },
+  {
+    "case": "rejects invisible overlay",
+    "workspace": {
+      "activeReferenceId": "overlay",
+      "createdAt": "2026-06-14T12:00:00.000Z",
+      "id": "bad-overlay",
+      "mode": "overlay",
+      "opacity": 0,
+      "placement": "floating",
+      "references": [
+        {
+          "colorIntent": "match_display",
+          "id": "overlay",
+          "label": "Overlay",
+          "path": "/tmp/a.jpg",
+          "pinned": true,
+          "sourceProfile": null
+        }
+      ],
+      "targetImagePath": "/tmp/target.raw",
+      "updatedAt": "2026-06-14T12:00:00.000Z",
+      "version": 1,
+      "zoomLinked": true
+    }
+  }
+]

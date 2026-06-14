@@ -1,0 +1,30 @@
+{
+  "activeReferenceId": "reference-client-grade",
+  "createdAt": "2026-06-14T12:00:00.000Z",
+  "id": "reference-workspace-portrait",
+  "mode": "side_by_side",
+  "opacity": 1,
+  "placement": "right",
+  "references": [
+    {
+      "colorIntent": "match_display",
+      "id": "reference-client-grade",
+      "label": "Client Approved Grade",
+      "path": "/Users/example/Pictures/References/client-approved.jpg",
+      "pinned": true,
+      "sourceProfile": "Display P3"
+    },
+    {
+      "colorIntent": "proof_output",
+      "id": "reference-print-proof",
+      "label": "Print Proof",
+      "path": "/Users/example/Pictures/References/print-proof.tif",
+      "pinned": false,
+      "sourceProfile": "Adobe RGB"
+    }
+  ],
+  "targetImagePath": "/Users/example/Pictures/Session/DSC_0042.NEF",
+  "updatedAt": "2026-06-14T12:05:00.000Z",
+  "version": 1,
+  "zoomLinked": true
+}
