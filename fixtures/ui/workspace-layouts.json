@@ -1,0 +1,40 @@
+{
+  "activeLayoutId": "capture-cull-dense",
+  "layouts": [
+    {
+      "activePanelId": "metadata",
+      "createdAt": "2026-06-14T11:00:00.000Z",
+      "density": "dense",
+      "hiddenAdjustmentSections": ["effects", "lensCorrection"],
+      "id": "capture-cull-dense",
+      "name": "Capture Cull Dense",
+      "panels": [
+        { "collapsed": false, "dock": "left", "id": "library", "order": 0, "widthPx": 280 },
+        { "collapsed": false, "dock": "right", "id": "metadata", "order": 0, "widthPx": 340 },
+        { "collapsed": true, "dock": "right", "id": "export", "order": 1, "widthPx": 320 },
+        { "collapsed": false, "dock": "hidden", "id": "ai", "order": 0, "widthPx": null }
+      ],
+      "primarySurface": "library",
+      "shortcutScope": "surface",
+      "updatedAt": "2026-06-14T11:05:00.000Z",
+      "version": 1
+    },
+    {
+      "activePanelId": "adjustments",
+      "createdAt": "2026-06-14T11:02:00.000Z",
+      "density": "comfortable",
+      "hiddenAdjustmentSections": [],
+      "id": "edit-color",
+      "name": "Edit Color",
+      "panels": [
+        { "collapsed": false, "dock": "right", "id": "adjustments", "order": 0, "widthPx": 360 },
+        { "collapsed": false, "dock": "right", "id": "masks", "order": 1, "widthPx": 340 },
+        { "collapsed": false, "dock": "right", "id": "presets", "order": 2, "widthPx": 320 }
+      ],
+      "primarySurface": "editor",
+      "shortcutScope": "global",
+      "updatedAt": "2026-06-14T11:02:00.000Z",
+      "version": 1
+    }
+  ]
+}
