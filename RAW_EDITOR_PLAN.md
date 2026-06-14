@@ -4037,6 +4037,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `api(sr): add super-resolution API tools`
 - `validation(sr): add performance tests`
 - `validation(sr): add visual artifact review checklist`
+  - Doc: `docs/super-resolution/visual-artifact-review-checklist-2026-06-14.md`
 
 #### Milestone 14: OpenAI App-Server Agent
 
