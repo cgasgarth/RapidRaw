@@ -3970,6 +3970,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `detail(wavelet): implement detail-by-scale controls`
   - Adds a CPU runtime wavelet detail helper, Zod recipe schema, fixture
     contract, and `bun run check:wavelet-detail` gate.
+- `validation(detail): add preview export parity checks`
+  - Runtime status: synthetic shared-stage parity fixtures validate no-op and
+    detail-like settings; output sharpening remains explicitly outside this
+    parity stage.
 - `detail(noise): separate chroma and luma noise`
 - `validation(noise): add high ISO fixture set`
 - `detail(defringe): improve defringe controls`
@@ -4684,6 +4688,7 @@ Issues:
 - Add local contrast refinement.
 - Add wavelet/detail-by-scale design.
 - Add wavelet/detail-by-scale implementation.
+- Add preview/export parity checks for detail-stage settings.
 - Add chroma/luma noise separation.
 - Add synthetic noise metric harness.
   - Consult result: accepted a validation-only first PR with deterministic
