@@ -1,0 +1,50 @@
+[
+  {
+    "case": "high_iso_without_masking",
+    "preset": {
+      "amount": 0.8,
+      "applyToNonRaw": false,
+      "colorNoiseReduction": 0.8,
+      "detail": 0.6,
+      "edgeMasking": 0.1,
+      "id": "invalid_high_iso",
+      "name": "Invalid High ISO",
+      "radiusPx": 2,
+      "schemaVersion": 1,
+      "sourceClass": "raw_high_iso",
+      "stage": "post_demosaic_pre_global"
+    }
+  },
+  {
+    "case": "non_raw_without_opt_in",
+    "preset": {
+      "amount": 0.2,
+      "applyToNonRaw": false,
+      "colorNoiseReduction": 0.1,
+      "detail": 0.2,
+      "edgeMasking": 0.5,
+      "id": "invalid_non_raw",
+      "name": "Invalid Non-RAW",
+      "radiusPx": 1,
+      "schemaVersion": 1,
+      "sourceClass": "non_raw_opt_in",
+      "stage": "post_demosaic_pre_global"
+    }
+  },
+  {
+    "case": "wrong_pipeline_stage",
+    "preset": {
+      "amount": 0.35,
+      "applyToNonRaw": false,
+      "colorNoiseReduction": 0.5,
+      "detail": 0.45,
+      "edgeMasking": 0.3,
+      "id": "invalid_stage",
+      "name": "Invalid Stage",
+      "radiusPx": 2,
+      "schemaVersion": 1,
+      "sourceClass": "raw_low_iso",
+      "stage": "after_global_edits"
+    }
+  }
+]

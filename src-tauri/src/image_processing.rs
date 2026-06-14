@@ -3274,8 +3274,54 @@ pub fn calculate_auto_adjustments(
 
 #[cfg(test)]
 mod tests {
-    use super::{ImageMetadata, RawEngineArtifacts};
+    use super::{ImageMetadata, RawEngineArtifacts, remove_raw_artifacts_and_enhance};
+    use image::{DynamicImage, ImageBuffer, Rgb};
     use serde_json::json;
+
+    fn synthetic_edge_image() -> DynamicImage {
+        let mut buffer = ImageBuffer::<Rgb<f32>, Vec<f32>>::new(9, 5);
+        for y in 0..5 {
+            for x in 0..9 {
+                let value = if x < 4 { 0.25 } else { 0.75 };
+                buffer.put_pixel(x, y, Rgb([value, value, value]));
+            }
+        }
+        DynamicImage::ImageRgb32F(buffer)
+    }
+
+    fn red_channel(image: &DynamicImage, x: u32, y: u32) -> f32 {
+        image.to_rgb32f().get_pixel(x, y).0[0]
+    }
+
+    #[test]
+    fn capture_pre_sharpening_enhances_synthetic_edge() {
+        let before = synthetic_edge_image();
+        let mut after = before.clone();
+
+        remove_raw_artifacts_and_enhance(&mut after, 0.0, 0.75);
+
+        let before_contrast = red_channel(&before, 4, 2) - red_channel(&before, 3, 2);
+        let after_contrast = red_channel(&after, 4, 2) - red_channel(&after, 3, 2);
+
+        assert!(
+            after_contrast > before_contrast,
+            "capture sharpening should increase edge contrast"
+        );
+    }
+
+    #[test]
+    fn disabled_capture_pre_sharpening_preserves_synthetic_edge() {
+        let before = synthetic_edge_image();
+        let mut after = before.clone();
+
+        remove_raw_artifacts_and_enhance(&mut after, 0.0, 0.0);
+
+        for y in 0..5 {
+            for x in 0..9 {
+                assert_eq!(red_channel(&after, x, y), red_channel(&before, x, y));
+            }
+        }
+    }
 
     #[test]
     fn image_metadata_defaults_without_raw_engine_artifacts() {
