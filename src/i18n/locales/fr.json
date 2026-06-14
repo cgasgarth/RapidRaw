@@ -192,7 +192,8 @@
       "resetAdjustments": "Réinitialiser les ajustements",
       "stitchPanorama": "Assembler le panorama",
       "tagging": "Marquage",
-      "undo": "Annuler"
+      "undo": "Annuler",
+      "superResolution": "Super Resolution"
     },
     "folders": {
       "changeIcon": "Changer l'icône",
@@ -1309,6 +1310,65 @@
       "yAxis": "Axe Y",
       "zoomInTooltip": "Zoom avant",
       "zoomOutTooltip": "Zoom arrière"
+    },
+    "superResolution": {
+      "aggressiveNotice": "Aggressive detail is preview-only until a validated final-render path exists.",
+      "alignment": {
+        "auto": "Auto",
+        "homography": "Homography",
+        "optical_flow": "Optical flow",
+        "translation": "Translation"
+      },
+      "alignmentAuto": "Auto",
+      "alignmentHomography": "Homography",
+      "alignmentLabel": "Alignment",
+      "alignmentOpticalFlow": "Optical flow",
+      "alignmentTranslation": "Translation",
+      "apiPending": "API pending",
+      "close": "Close",
+      "detailPolicy": {
+        "aggressive_preview_only": {
+          "label": "Aggressive preview",
+          "status": "Preview only"
+        },
+        "balanced": {
+          "label": "Balanced",
+          "status": "Gated final output"
+        },
+        "conservative": {
+          "label": "Conservative",
+          "status": "Professional default"
+        }
+      },
+      "detailPolicyLabel": "Detail policy",
+      "planDependency": "Final apply requires an accepted dry-run plan from the super-resolution API.",
+      "preflight": {
+        "alignment": "Alignment",
+        "detail": "Detail",
+        "memory": "Memory",
+        "pending": "Not estimated",
+        "provenance": "Provenance",
+        "required": "Required",
+        "scale": "Scale",
+        "sources": "Sources"
+      },
+      "preflightTitle": "Preflight",
+      "previewBudgetLabel": "Preview budget",
+      "previewBudgetValue": "{{value}} px",
+      "previewPlan": "Preview plan",
+      "qualityBalanced": "Balanced",
+      "qualityBest": "Best",
+      "qualityLabel": "Quality",
+      "qualityPreview": "Preview",
+      "scaleLabel": "Scale",
+      "scaleValue": "{{scale}}x",
+      "sourceCountBlocked": "Super-resolution needs at least two source frames in the current API contract.",
+      "sourceSummary": "{{count}} source frames selected",
+      "sourceSummary_one": "{{count}} source frame selected",
+      "sourceSummary_other": "{{count}} source frames selected",
+      "title": "Super Resolution",
+      "workflowStatus": "Plan-only surface until API wiring lands.",
+      "workflowTitle": "Super-resolution plan"
     }
   },
   "settings": {
