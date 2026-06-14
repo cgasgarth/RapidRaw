@@ -4704,7 +4704,9 @@ Issues:
   payload rights, hashes, and thresholds are supplied.
 - Add defringe improvements.
 - Add dust spot visualization.
-- Add AI denoise research issue.
+- Add AI denoise research issue. Accepted initial direction: typed dry-run/apply
+  derived-artifact workflow with model provenance, no-original-overwrite,
+  cancellation, and future app-server tool schema gates before agent exposure.
 
 Definition of done:
 
