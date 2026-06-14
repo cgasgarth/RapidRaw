@@ -7,7 +7,20 @@ const host = '127.0.0.1';
 const port = 1420;
 const baseUrl = `http://${host}:${port}`;
 const outputDir = resolve('artifacts/visual-smoke');
-const outputPath = resolve(outputDir, 'empty-library.png');
+const scenarios = [
+  {
+    mode: 'empty-library',
+    outputPath: resolve(outputDir, 'empty-library.png'),
+    readySelector: '[data-visual-smoke-ready="true"]',
+    minSectionCount: 4,
+  },
+  {
+    mode: 'hdr-modal',
+    outputPath: resolve(outputDir, 'hdr-modal.png'),
+    readySelector: '[role="dialog"][aria-label="Merge to HDR"]',
+    minSectionCount: 1,
+  },
+];
 
 const sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds));
 
@@ -76,16 +89,20 @@ async function main() {
       throw error;
     });
 
-    await page.goto(`${baseUrl}/visual-smoke.html?scenario=empty-library`, { waitUntil: 'networkidle' });
-    await page.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
+    for (const scenario of scenarios) {
+      await page.goto(`${baseUrl}/visual-smoke.html?scenario=${scenario.mode}`, { waitUntil: 'networkidle' });
+      await page.locator(scenario.readySelector).waitFor({ timeout: 10_000 });
 
-    const sectionCount = await page.locator('[data-visual-smoke-section]').count();
-    if (sectionCount < 4) {
-      throw new Error(`Expected at least 4 visual smoke sections, found ${sectionCount}`);
+      const sectionCount = await page.locator('[data-visual-smoke-section]').count();
+      if (sectionCount < scenario.minSectionCount) {
+        throw new Error(
+          `${scenario.mode}: expected at least ${scenario.minSectionCount} visual smoke sections, found ${sectionCount}`,
+        );
+      }
+
+      await page.screenshot({ path: scenario.outputPath, fullPage: false });
+      console.log(`Captured visual smoke screenshot: ${scenario.outputPath}`);
     }
-
-    await page.screenshot({ path: outputPath, fullPage: false });
-    console.log(`Captured visual smoke screenshot: ${outputPath}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('Executable doesn')) {

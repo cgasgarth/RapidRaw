@@ -1175,7 +1175,53 @@
       "savedSuccess": "HDR Salvo com Sucesso!",
       "speedNotice": "Isso pode levar alguns minutos, dependendo do número e tamanho das suas exposições.",
       "start": "Iniciar",
-      "title": "Mesclar para HDR"
+      "title": "Mesclar para HDR",
+      "alignment": {
+        "auto": "Auto",
+        "none": "None",
+        "translation": "Translation"
+      },
+      "alignmentLabel": "Alignment",
+      "apiPending": "API pending",
+      "deghosting": {
+        "off": "Off",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      },
+      "deghostingLabel": "Deghosting",
+      "exposureFusionNotice": "Exposure fusion is preview-oriented until scene-linear output validation is complete.",
+      "mergeStrategy": {
+        "scene_linear_radiance": {
+          "label": "Scene-linear radiance",
+          "status": "Editable output"
+        },
+        "exposure_fusion_preview": {
+          "label": "Exposure fusion preview",
+          "status": "Fast preview"
+        }
+      },
+      "mergeStrategyLabel": "Merge strategy",
+      "planDependency": "Final apply requires an accepted dry-run plan from the HDR merge API.",
+      "preflight": {
+        "deghosting": "Deghosting",
+        "editable": "Editable source",
+        "output": "Output",
+        "sources": "Sources",
+        "strategy": "Strategy"
+      },
+      "preflightTitle": "Preflight",
+      "previewBudgetLabel": "Preview budget",
+      "previewBudgetValue": "{{value}} px",
+      "quality": {
+        "preview": "Preview",
+        "balanced": "Balanced",
+        "best": "Best"
+      },
+      "qualityLabel": "Quality",
+      "sourceCountBlocked": "HDR merging needs at least two bracketed exposures.",
+      "workflowStatus": "Plan-aware surface; legacy merge remains available until API apply wiring lands.",
+      "workflowTitle": "HDR merge plan"
     },
     "importSettings": {
       "cancel": "Cancelar",

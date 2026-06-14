@@ -1,5 +1,8 @@
 import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles } from 'lucide-react';
 
+import HdrModal from '../../components/modals/HdrModal';
+import { DEFAULT_HDR_UI_SETTINGS } from '../../schemas/hdrUiSchemas';
+
 interface VisualSmokeAppProps {
   mode: string;
 }
@@ -42,6 +45,33 @@ const scopes = [
 ] as const;
 
 function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
+  if (mode === 'hdr-modal') {
+    return (
+      <main
+        className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-ready="true"
+        data-visual-smoke-mode={mode}
+      >
+        <div className="h-screen bg-[#111316]" data-visual-smoke-section="hdr-modal-backdrop" />
+        <HdrModal
+          error={null}
+          finalImageBase64={null}
+          imageCount={3}
+          isOpen
+          isProcessing={false}
+          loadingImageUrl={null}
+          onClose={() => {}}
+          onMerge={() => {}}
+          onOpenFile={() => {}}
+          onSave={() => Promise.resolve('visual-smoke-hdr-output.tif')}
+          onSettingsChange={() => {}}
+          progressMessage={null}
+          settings={DEFAULT_HDR_UI_SETTINGS}
+        />
+      </main>
+    );
+  }
+
   const scenario = mode === 'empty-library' ? 'Empty Library Startup' : 'Editor Shell Smoke';
 
   return (

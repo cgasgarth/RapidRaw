@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { ImageFile, Panel, UiVisibility, CullingSuggestions } from '../components/ui/AppProperties';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focusStackUiSchemas';
+import { DEFAULT_HDR_UI_SETTINGS, type HdrUiSettings } from '../schemas/hdrUiSchemas';
 import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
@@ -54,6 +55,7 @@ export interface HdrModalState {
   isOpen: boolean;
   isProcessing: boolean;
   progressMessage: string | null;
+  settings: HdrUiSettings;
   stitchingSourcePaths: Array<string>;
 }
 
@@ -201,6 +203,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     isOpen: false,
     isProcessing: false,
     progressMessage: '',
+    settings: DEFAULT_HDR_UI_SETTINGS,
     stitchingSourcePaths: [],
   },
   superResolutionModalState: {

@@ -61,6 +61,7 @@ import {
 import { useContextMenu } from '../context/ContextMenuContext';
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../schemas/focusStackUiSchemas';
+import { DEFAULT_HDR_UI_SETTINGS } from '../schemas/hdrUiSchemas';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../schemas/superResolutionUiSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
@@ -718,6 +719,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     isOpen: true,
                     isProcessing: false,
                     progressMessage: null,
+                    settings: DEFAULT_HDR_UI_SETTINGS,
                     stitchingSourcePaths: finalSelection,
                   },
                 });
