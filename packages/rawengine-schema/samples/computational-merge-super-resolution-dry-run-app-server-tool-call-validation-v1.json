@@ -160,6 +160,26 @@
         "requiresDryRun": true,
         "returnsArtifactHandles": true,
         "toolKind": "dry_run",
+        "toolName": "computationalmerge.focus_stack.dry_run_command"
+      },
+      {
+        "approvalClass": "edit_apply",
+        "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+        "mutates": true,
+        "outputSchemaName": "ComputationalMergeMutationResultV1",
+        "requiresDryRun": false,
+        "returnsArtifactHandles": true,
+        "toolKind": "apply",
+        "toolName": "computationalmerge.focus_stack.apply_command"
+      },
+      {
+        "approvalClass": "preview_only",
+        "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+        "mutates": false,
+        "outputSchemaName": "ComputationalMergeDryRunResultV1",
+        "requiresDryRun": true,
+        "returnsArtifactHandles": true,
+        "toolKind": "dry_run",
         "toolName": "computationalmerge.super_resolution.dry_run_command"
       },
       {

@@ -360,6 +360,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       requiresDryRun: true,
       returnsArtifactHandles: true,
       toolKind: 'dry_run',
+      toolName: 'computationalmerge.focus_stack.dry_run_command',
+    },
+    {
+      approvalClass: ApprovalClass.EditApply,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'ComputationalMergeMutationResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: true,
+      toolKind: 'apply',
+      toolName: 'computationalmerge.focus_stack.apply_command',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'ComputationalMergeDryRunResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
       toolName: 'computationalmerge.super_resolution.dry_run_command',
     },
     {
@@ -1833,6 +1853,26 @@ export const sampleFocusStackArtifactV1: FocusStackArtifactV1 = focusStackArtifa
   warningCodes: ['human_review_required', 'retouch_layer_required'],
 });
 
+export const sampleComputationalMergeFocusStackApplyCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
+  computationalMergeCommandEnvelopeV1Schema.parse({
+    ...sampleComputationalMergeFocusStackCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason:
+        'Applying the accepted focus stack creates an editable all-in-focus derived asset with retouch provenance.',
+      state: 'approved',
+    },
+    commandId: 'command_merge_focus_stack_apply_sample',
+    correlationId: 'corr_merge_focus_stack_apply_sample',
+    dryRun: false,
+    idempotencyKey: 'idem_merge_focus_stack_apply_sample',
+    parameters: {
+      ...sampleComputationalMergeFocusStackCommandEnvelopeV1.parameters,
+      acceptedDryRunPlanHash: 'sha256:sample-merge-focus-stack-plan',
+      acceptedDryRunPlanId: 'merge_plan_focus_stack_001',
+    },
+  });
+
 export const sampleComputationalMergeSuperResolutionCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
   computationalMergeCommandEnvelopeV1Schema.parse({
     ...sampleComputationalMergeCommandEnvelopeV1,
@@ -2059,6 +2099,48 @@ export const sampleComputationalMergeMutationResultV1: ComputationalMergeMutatio
     sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
     undoRevision: sampleEditGraphSnapshotV1.graphRevision,
     warnings: [],
+  });
+
+export const sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleComputationalMergeFocusStackCommandEnvelopeV1.approval,
+      arguments: sampleComputationalMergeFocusStackCommandEnvelopeV1,
+      dryRun: true,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      itemId: 'item_tool_call_focus_stack_dry_run',
+      jsonRpcRequestId: 46,
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_sample',
+      toolKind: 'dry_run',
+      toolName: 'computationalmerge.focus_stack.dry_run_command',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_sample',
+    },
+  });
+
+export const sampleComputationalMergeFocusStackApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleComputationalMergeFocusStackApplyCommandEnvelopeV1.approval,
+      arguments: sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
+      dryRun: false,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      itemId: 'item_tool_call_focus_stack_apply',
+      jsonRpcRequestId: 47,
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_sample',
+      toolKind: 'apply',
+      toolName: 'computationalmerge.focus_stack.apply_command',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_sample',
+    },
   });
 
 export const sampleComputationalMergeSuperResolutionDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
@@ -4605,6 +4687,38 @@ export const sampleComputationalMergeAppServerToolManifestV1: ComputationalMerge
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     serverRuntime: 'openai_app_server',
     tools: [
+      {
+        allowedCommandTypes: ['computationalMerge.createFocusStack'],
+        approvalClass: ApprovalClass.PreviewOnly,
+        auditEvents: ['computational_merge_dry_run_requested', 'computational_merge_dry_run_completed'],
+        description:
+          'Preview a local focus stack and return a non-mutating dry-run plan with focus coverage and retouch artifact handles.',
+        executionMode: 'dry_run_command',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: false,
+        outputSchemaName: 'ComputationalMergeDryRunResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: false,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.focus_stack.dry_run_command',
+      },
+      {
+        allowedCommandTypes: ['computationalMerge.createFocusStack'],
+        approvalClass: ApprovalClass.EditApply,
+        auditEvents: ['computational_merge_apply_requested', 'computational_merge_apply_completed'],
+        description:
+          'Apply an accepted local focus stack dry-run plan into the non-destructive edit graph after approval.',
+        executionMode: 'apply_dry_run_plan',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: true,
+        outputSchemaName: 'ComputationalMergeMutationResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: true,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.focus_stack.apply_command',
+      },
       {
         allowedCommandTypes: ['computationalMerge.createSuperResolution'],
         approvalClass: ApprovalClass.PreviewOnly,

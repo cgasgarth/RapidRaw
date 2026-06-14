@@ -91,7 +91,10 @@ import {
   sampleComputationalMergeApplyCommandEnvelopeV1,
   sampleComputationalMergeCommandEnvelopeV1,
   sampleComputationalMergeDryRunResultV1,
+  sampleComputationalMergeFocusStackApplyAppServerToolCallValidationV1,
+  sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
   sampleComputationalMergeFocusStackCommandEnvelopeV1,
+  sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1,
   sampleComputationalMergeHdrCommandEnvelopeV1,
   sampleComputationalMergeMutationResultV1,
   sampleComputationalMergeSuperResolutionApplyAppServerToolCallValidationV1,
@@ -388,6 +391,11 @@ const validSamples: ReadonlyArray<{
     value: sampleComputationalMergeFocusStackCommandEnvelopeV1,
   },
   {
+    name: 'computational merge focus stack apply command envelope',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
+  },
+  {
     name: 'computational merge super-resolution command envelope',
     schema: computationalMergeCommandEnvelopeV1Schema,
     value: sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
@@ -416,6 +424,16 @@ const validSamples: ReadonlyArray<{
     name: 'computational merge app-server tool manifest',
     schema: computationalMergeAppServerToolManifestV1Schema,
     value: sampleComputationalMergeAppServerToolManifestV1,
+  },
+  {
+    name: 'computational merge focus stack dry-run app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'computational merge focus stack apply app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergeFocusStackApplyAppServerToolCallValidationV1,
   },
   {
     name: 'computational merge super-resolution dry-run app-server tool call validation',

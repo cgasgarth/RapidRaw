@@ -3,6 +3,36 @@
   "serverRuntime": "openai_app_server",
   "tools": [
     {
+      "allowedCommandTypes": ["computationalMerge.createFocusStack"],
+      "approvalClass": "preview_only",
+      "auditEvents": ["computational_merge_dry_run_requested", "computational_merge_dry_run_completed"],
+      "description": "Preview a local focus stack and return a non-mutating dry-run plan with focus coverage and retouch artifact handles.",
+      "executionMode": "dry_run_command",
+      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "localOnly": true,
+      "mutates": false,
+      "outputSchemaName": "ComputationalMergeDryRunResultV1",
+      "recordsProvenance": true,
+      "requiresDryRunPlan": false,
+      "returnsArtifactHandles": true,
+      "toolName": "computationalmerge.focus_stack.dry_run_command"
+    },
+    {
+      "allowedCommandTypes": ["computationalMerge.createFocusStack"],
+      "approvalClass": "edit_apply",
+      "auditEvents": ["computational_merge_apply_requested", "computational_merge_apply_completed"],
+      "description": "Apply an accepted local focus stack dry-run plan into the non-destructive edit graph after approval.",
+      "executionMode": "apply_dry_run_plan",
+      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "localOnly": true,
+      "mutates": true,
+      "outputSchemaName": "ComputationalMergeMutationResultV1",
+      "recordsProvenance": true,
+      "requiresDryRunPlan": true,
+      "returnsArtifactHandles": true,
+      "toolName": "computationalmerge.focus_stack.apply_command"
+    },
+    {
       "allowedCommandTypes": ["computationalMerge.createSuperResolution"],
       "approvalClass": "preview_only",
       "auditEvents": ["computational_merge_dry_run_requested", "computational_merge_dry_run_completed"],

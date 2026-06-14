@@ -4022,6 +4022,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Doc: `docs/focus-stacking/focus-bracket-fixture-manifest-2026-06-14.md`
 - `ui(focus): add focus stack UI`
 - `api(focus): add focus stack API tools`
+  - Doc: `docs/focus-stacking/api-tool-contract-2026-06-14.md`
 - `validation(focus): add focus stack performance tests`
   - Doc: `docs/focus-stacking/performance-validation-contract-2026-06-14.md`
 
