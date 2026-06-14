@@ -46,7 +46,15 @@ export interface ExportSettings {
   stripGps: boolean;
   watermark: WatermarkSettings | null;
   exportMasks?: boolean | undefined;
+  outputSharpening?: OutputSharpeningSettings | null | undefined;
   preserveFolders?: boolean | undefined;
+}
+
+export interface OutputSharpeningSettings {
+  amount: number;
+  radiusPx: number;
+  target: 'custom' | 'print' | 'screen';
+  threshold: number;
 }
 
 export enum WatermarkAnchor {

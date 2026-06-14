@@ -403,6 +403,7 @@ export default function ExportPanel({
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
       exportMasks: !isLibraryContext ? exportMasks : undefined,
+      outputSharpening: null,
       watermark:
         enableWatermark && watermarkPath
           ? {
@@ -481,6 +482,7 @@ export default function ExportPanel({
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
       exportMasks: !isLibraryContext ? exportMasks : undefined,
+      outputSharpening: null,
       watermark:
         enableWatermark && watermarkPath
           ? {

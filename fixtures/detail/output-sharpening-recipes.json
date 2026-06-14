@@ -1,0 +1,37 @@
+[
+  {
+    "format": "jpeg",
+    "id": "screen_jpeg_social",
+    "outputSharpening": {
+      "amount": 35,
+      "radiusPx": 0.7,
+      "target": "screen",
+      "threshold": 0.02
+    },
+    "resize": {
+      "longEdgePx": 2048
+    },
+    "schemaVersion": 1
+  },
+  {
+    "format": "tiff",
+    "id": "print_tiff_16x20",
+    "outputSharpening": {
+      "amount": 55,
+      "radiusPx": 1.1,
+      "target": "print",
+      "threshold": 0.03
+    },
+    "resize": {
+      "longEdgePx": 6000
+    },
+    "schemaVersion": 1
+  },
+  {
+    "format": "png",
+    "id": "disabled_png_archive",
+    "outputSharpening": null,
+    "resize": null,
+    "schemaVersion": 1
+  }
+]
