@@ -1,0 +1,110 @@
+[
+  {
+    "case": "rejects duplicate preset ids",
+    "catalog": {
+      "defaultPresetId": null,
+      "presets": [
+        {
+          "addTags": [],
+          "applyPresetIds": [],
+          "backupPolicy": { "backupRootPath": null, "enabled": false },
+          "colorLabel": null,
+          "createdAt": "2026-06-14T10:00:00.000Z",
+          "destinationRootPath": null,
+          "duplicatePolicy": "skip",
+          "fileNamingTemplate": "{filename}",
+          "id": "duplicate",
+          "metadataTemplateId": null,
+          "name": "A",
+          "rawOnly": false,
+          "rating": null,
+          "requireExplicitApproval": false,
+          "sidecarPolicy": "ignore",
+          "sourcePolicy": "reference",
+          "subfolderTemplate": null,
+          "updatedAt": "2026-06-14T10:00:00.000Z",
+          "version": 1
+        },
+        {
+          "addTags": [],
+          "applyPresetIds": [],
+          "backupPolicy": { "backupRootPath": null, "enabled": false },
+          "colorLabel": null,
+          "createdAt": "2026-06-14T10:00:00.000Z",
+          "destinationRootPath": null,
+          "duplicatePolicy": "skip",
+          "fileNamingTemplate": "{filename}",
+          "id": "duplicate",
+          "metadataTemplateId": null,
+          "name": "B",
+          "rawOnly": false,
+          "rating": null,
+          "requireExplicitApproval": false,
+          "sidecarPolicy": "ignore",
+          "sourcePolicy": "reference",
+          "subfolderTemplate": null,
+          "updatedAt": "2026-06-14T10:00:00.000Z",
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "case": "rejects move without approval",
+    "catalog": {
+      "defaultPresetId": "move-no-approval",
+      "presets": [
+        {
+          "addTags": [],
+          "applyPresetIds": [],
+          "backupPolicy": { "backupRootPath": null, "enabled": false },
+          "colorLabel": null,
+          "createdAt": "2026-06-14T10:00:00.000Z",
+          "destinationRootPath": "/tmp/import",
+          "duplicatePolicy": "rename",
+          "fileNamingTemplate": "{filename}",
+          "id": "move-no-approval",
+          "metadataTemplateId": null,
+          "name": "Move No Approval",
+          "rawOnly": true,
+          "rating": null,
+          "requireExplicitApproval": false,
+          "sidecarPolicy": "copy_existing",
+          "sourcePolicy": "move",
+          "subfolderTemplate": null,
+          "updatedAt": "2026-06-14T10:00:00.000Z",
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "case": "rejects enabled backup without root",
+    "catalog": {
+      "defaultPresetId": "bad-backup",
+      "presets": [
+        {
+          "addTags": [],
+          "applyPresetIds": [],
+          "backupPolicy": { "backupRootPath": null, "enabled": true },
+          "colorLabel": null,
+          "createdAt": "2026-06-14T10:00:00.000Z",
+          "destinationRootPath": "/tmp/import",
+          "duplicatePolicy": "rename",
+          "fileNamingTemplate": "{filename}",
+          "id": "bad-backup",
+          "metadataTemplateId": null,
+          "name": "Bad Backup",
+          "rawOnly": true,
+          "rating": null,
+          "requireExplicitApproval": false,
+          "sidecarPolicy": "copy_existing",
+          "sourcePolicy": "copy",
+          "subfolderTemplate": null,
+          "updatedAt": "2026-06-14T10:00:00.000Z",
+          "version": 1
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,53 @@
+{
+  "defaultPresetId": "wedding-copy-ingest",
+  "presets": [
+    {
+      "addTags": ["wedding", "incoming"],
+      "applyPresetIds": ["camera-standard-start"],
+      "backupPolicy": {
+        "backupRootPath": "/Volumes/Backup/RawEngineImports",
+        "enabled": true
+      },
+      "colorLabel": "green",
+      "createdAt": "2026-06-14T10:00:00.000Z",
+      "destinationRootPath": "/Users/example/Pictures/Wedding",
+      "duplicatePolicy": "rename",
+      "fileNamingTemplate": "{sequence}_{filename}",
+      "id": "wedding-copy-ingest",
+      "metadataTemplateId": "copyright-client",
+      "name": "Wedding Copy Ingest",
+      "rawOnly": true,
+      "rating": null,
+      "requireExplicitApproval": false,
+      "sidecarPolicy": "copy_existing",
+      "sourcePolicy": "copy",
+      "subfolderTemplate": "RAW",
+      "updatedAt": "2026-06-14T10:05:00.000Z",
+      "version": 1
+    },
+    {
+      "addTags": [],
+      "applyPresetIds": [],
+      "backupPolicy": {
+        "backupRootPath": null,
+        "enabled": false
+      },
+      "colorLabel": null,
+      "createdAt": "2026-06-14T10:02:00.000Z",
+      "destinationRootPath": null,
+      "duplicatePolicy": "skip",
+      "fileNamingTemplate": "{filename}",
+      "id": "reference-only-review",
+      "metadataTemplateId": null,
+      "name": "Reference Only Review",
+      "rawOnly": false,
+      "rating": 0,
+      "requireExplicitApproval": false,
+      "sidecarPolicy": "ignore",
+      "sourcePolicy": "reference",
+      "subfolderTemplate": null,
+      "updatedAt": "2026-06-14T10:02:00.000Z",
+      "version": 1
+    }
+  ]
+}
