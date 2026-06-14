@@ -83,6 +83,10 @@
           "path": "docs/super-resolution/conservative-output-policy-2026-06-13.md"
         },
         {
+          "title": "Super-Resolution multi-image alignment path",
+          "path": "docs/super-resolution/multi-image-alignment-path-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab architecture overview",
           "path": "docs/negative-lab/architecture-overview-2026-06-13.md"
         },
