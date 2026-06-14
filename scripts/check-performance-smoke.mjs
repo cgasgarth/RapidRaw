@@ -81,6 +81,13 @@ const smokeChecks = z.array(SmokeCheckSchema).parse([
     id: 'sr-performance-fixtures',
     summary: 'Super-resolution performance fixture budget validation',
   },
+  {
+    args: ['run', 'check:panorama-performance-fixtures'],
+    budgetMs: 5_000,
+    command: 'bun',
+    id: 'panorama-performance-fixtures',
+    summary: 'Panorama performance fixture budget validation',
+  },
 ]);
 
 const formatMs = (milliseconds) => `${Math.round(milliseconds)}ms`;

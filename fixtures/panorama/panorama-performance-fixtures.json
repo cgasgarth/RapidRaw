@@ -1,0 +1,48 @@
+{
+  "$schema": "https://rawengine.dev/schemas/panorama-performance-fixtures.v1.json",
+  "schemaVersion": 1,
+  "issue": 185,
+  "snapshotDate": "2026-06-14",
+  "policy": "metadata_only_pr_ci",
+  "performanceFixtures": [
+    {
+      "fixtureId": "panorama.synthetic.horizontal-translation.v1",
+      "tier": "tier1-tiny-smoke",
+      "ciMode": "required-pr-metadata",
+      "measurementMode": "estimated",
+      "maxSourceFrames": 3,
+      "maxLongEdgePx": 320,
+      "maxOutputPixels": 122400,
+      "memoryBudgetBytes": 64000000,
+      "runtimeBudgetMs": 5000,
+      "requiredWarningCodes": ["legacy_full_frame_render"],
+      "validationPurpose": "Tiny deterministic happy-path budget for future panorama runtime smoke tests."
+    },
+    {
+      "fixtureId": "panorama.synthetic.disconnected-source.v1",
+      "tier": "tier1-tiny-smoke",
+      "ciMode": "required-pr-metadata",
+      "measurementMode": "estimated",
+      "maxSourceFrames": 3,
+      "maxLongEdgePx": 320,
+      "maxOutputPixels": 90000,
+      "memoryBudgetBytes": 64000000,
+      "runtimeBudgetMs": 5000,
+      "requiredWarningCodes": ["excluded_sources"],
+      "validationPurpose": "Tiny deterministic warning-path budget for excluded-source handling."
+    },
+    {
+      "fixtureId": "panorama.synthetic.large-plan-only.v1",
+      "tier": "tier3-heavy-nightly",
+      "ciMode": "scheduled-nightly",
+      "measurementMode": "estimated",
+      "maxSourceFrames": 4,
+      "maxLongEdgePx": 12000,
+      "maxOutputPixels": 278400000,
+      "memoryBudgetBytes": 4000000000,
+      "runtimeBudgetMs": 120000,
+      "requiredWarningCodes": ["high_memory_estimate", "memory_budget_exceeded", "tiled_render_required"],
+      "validationPurpose": "Large panorama budget sentinel for dry-run memory estimates and tiling promotion gates."
+    }
+  ]
+}
