@@ -1,0 +1,74 @@
+name: Panorama OpenCV Spike
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-opencv-spike:
+    name: macOS OpenCV feature spike
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
+        with:
+          rustflags: ''
+          rust-src-dir: src-tauri
+
+      - name: Install OpenCV build dependencies
+        run: brew install opencv llvm pkg-config
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: src-tauri
+          key: v1-${{ runner.os }}-${{ runner.arch }}-panorama-opencv-spike
+          cache-on-failure: true
+
+      - name: Record OpenCV environment
+        run: |
+          set -euo pipefail
+
+          opencv_prefix="$(brew --prefix opencv)"
+          llvm_prefix="$(brew --prefix llvm)"
+          export PKG_CONFIG_PATH="$opencv_prefix/lib/pkgconfig"
+
+          {
+            echo "### OpenCV spike environment"
+            echo "- OpenCV prefix: \`$opencv_prefix\`"
+            echo "- LLVM prefix: \`$llvm_prefix\`"
+            echo "- pkg-config: \`$(pkg-config --version)\`"
+            echo "- OpenCV version: \`$(pkg-config --modversion opencv4)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cargo check OpenCV spike
+        working-directory: src-tauri
+        env:
+          LIBCLANG_PATH: ${{ runner.temp }}/unused
+        run: |
+          set -euo pipefail
+
+          opencv_prefix="$(brew --prefix opencv)"
+          llvm_prefix="$(brew --prefix llvm)"
+          export PKG_CONFIG_PATH="$opencv_prefix/lib/pkgconfig"
+          export LIBCLANG_PATH="$llvm_prefix/lib"
+
+          cargo check --locked --no-default-features --features required-ci,panorama-opencv-spike
+
+      - name: Cargo test OpenCV spike
+        working-directory: src-tauri
+        env:
+          LIBCLANG_PATH: ${{ runner.temp }}/unused
+        run: |
+          set -euo pipefail
+
+          opencv_prefix="$(brew --prefix opencv)"
+          llvm_prefix="$(brew --prefix llvm)"
+          export PKG_CONFIG_PATH="$opencv_prefix/lib/pkgconfig"
+          export LIBCLANG_PATH="$llvm_prefix/lib"
+
+          cargo test --locked --no-default-features --features required-ci,panorama-opencv-spike opencv_spike -- --nocapture

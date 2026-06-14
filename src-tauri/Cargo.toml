@@ -11,6 +11,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
 default = ["required-ci"]
+panorama-opencv-spike = ["dep:opencv"]
 required-ci = []
 
 [dependencies]
@@ -33,6 +34,7 @@ tokio = { version = "1", features = ["full"] }
 uuid = { version = "1.23", features = ["v4", "serde"] }
 walkdir = "2.5.0"
 imageproc = "0.26.2"
+opencv = { version = "0.98.2", default-features = false, features = ["imgcodecs", "imgproc", "stitching"], optional = true }
 ort = { version = "=2.0.0-rc.10", features = ["ndarray", "load-dynamic"] }
 ndarray = "0.16"
 futures-util = "0.3"
