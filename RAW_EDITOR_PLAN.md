@@ -4024,6 +4024,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `sr(policy): define conservative professional output policy`
   - Doc: `docs/super-resolution/conservative-output-policy-2026-06-13.md`
 - `sr(align): add multi-image alignment path`
+  - Doc: `docs/super-resolution/multi-image-alignment-path-2026-06-13.md`
 - `sr(detail): add detail reconstruction strategy`
 - `validation(sr): add resolution chart fixtures`
 - `validation(sr): add real photo fixtures`
