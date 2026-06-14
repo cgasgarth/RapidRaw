@@ -1,0 +1,114 @@
+[
+  {
+    "schemaVersion": 1,
+    "canvas": {
+      "width": 6048,
+      "height": 4024,
+      "colorSpace": "linear_rec2020"
+    },
+    "layers": [
+      {
+        "id": "layer_sky_balance",
+        "name": "Sky balance",
+        "visible": true,
+        "opacity": 0.72,
+        "blendMode": "normal",
+        "maskOperationIds": ["mask_sky_gradient", "mask_subject_subtract"]
+      },
+      {
+        "id": "layer_face_detail",
+        "name": "Face detail",
+        "visible": true,
+        "opacity": 0.58,
+        "blendMode": "soft_light",
+        "maskOperationIds": ["mask_face_brush"]
+      }
+    ],
+    "maskOperations": [
+      {
+        "id": "mask_sky_gradient",
+        "type": "linear_gradient",
+        "mode": "add",
+        "opacity": 0.88,
+        "gradient": {
+          "start": { "x": 3024, "y": 0 },
+          "end": { "x": 3024, "y": 2210 },
+          "featherPx": 820
+        }
+      },
+      {
+        "id": "mask_subject_subtract",
+        "type": "radial_gradient",
+        "mode": "subtract",
+        "opacity": 0.63,
+        "radial": {
+          "center": { "x": 2920, "y": 1810 },
+          "radiusXPx": 680,
+          "radiusYPx": 940,
+          "rotationDeg": -7,
+          "featherPx": 260
+        }
+      },
+      {
+        "id": "mask_face_brush",
+        "type": "brush_stroke",
+        "mode": "add",
+        "opacity": 0.74,
+        "brush": {
+          "radiusPx": 42,
+          "featherPx": 18,
+          "hardness": 0.41,
+          "flow": 0.56,
+          "points": [
+            { "x": 2836, "y": 1650, "pressure": 0.42 },
+            { "x": 2868, "y": 1664, "pressure": 0.54 },
+            { "x": 2901, "y": 1678, "pressure": 0.58 },
+            { "x": 2930, "y": 1691, "pressure": 0.51 }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "canvas": {
+      "width": 8256,
+      "height": 5504,
+      "colorSpace": "display_p3"
+    },
+    "layers": [
+      {
+        "id": "layer_window_luma",
+        "name": "Window luminance trim",
+        "visible": true,
+        "opacity": 0.82,
+        "blendMode": "luminosity",
+        "maskOperationIds": ["mask_window_luma", "mask_window_edge"]
+      }
+    ],
+    "maskOperations": [
+      {
+        "id": "mask_window_luma",
+        "type": "luminance_range",
+        "mode": "add",
+        "opacity": 0.91,
+        "range": {
+          "minLuma": 0.62,
+          "maxLuma": 0.96,
+          "softness": 0.23
+        }
+      },
+      {
+        "id": "mask_window_edge",
+        "type": "linear_gradient",
+        "mode": "intersect",
+        "opacity": 0.67,
+        "gradient": {
+          "start": { "x": 4128, "y": 900 },
+          "end": { "x": 4128, "y": 2380 },
+          "featherPx": 510
+        }
+      }
+    ]
+  }
+]
