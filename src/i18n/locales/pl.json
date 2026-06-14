@@ -541,6 +541,14 @@
       }
     },
     "layers": {
+      "actions": {
+        "delete": "Delete layer",
+        "duplicate": "Duplicate layer",
+        "hide": "Hide layer",
+        "moveDown": "Move layer down",
+        "moveUp": "Move layer up",
+        "show": "Show layer"
+      },
       "blend": "Blend",
       "blendModes": {
         "color": "Color",
@@ -550,6 +558,15 @@
         "overlay": "Overlay",
         "screen": "Screen",
         "softLight": "Soft Light"
+      },
+      "copyName": "{{name}} Copy",
+      "maskCount": {
+        "count": "{{count}} mask",
+        "count_one": "{{count}} mask",
+        "count_few": "{{count}} masks",
+        "count_many": "{{count}} masks",
+        "count_other": "{{count}} masks",
+        "none": "No masks"
       },
       "rowSummary": "{{blendMode}} - {{opacity}}% - {{maskCount}}",
       "title": "Layers"

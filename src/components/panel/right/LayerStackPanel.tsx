@@ -1,9 +1,11 @@
 import cx from 'clsx';
-import { ChevronDown, Copy, Eye, EyeOff, GripVertical, Layers3, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, Layers3, Plus, Trash2 } from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { v4 as uuidv4 } from 'uuid';
 
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { deleteLayer, duplicateLayer, moveLayer, setLayerOpacity, setLayerVisibility } from '../../../utils/layerStack';
 import Slider, { type SliderChangeEvent } from '../../ui/Slider';
 import UiText from '../../ui/Text';
 
@@ -13,7 +15,7 @@ interface LayerStackPanelProps {
   activeMaskContainerId: string | null;
   masks: Array<MaskContainer>;
   onSelectMaskContainer: (id: string | null) => void;
-  onUpdateMaskContainer: (id: string, data: Partial<Pick<MaskContainer, 'opacity' | 'visible'>>) => void;
+  onSetMaskContainers: (masks: Array<MaskContainer>) => void;
 }
 
 interface LayerRowModel {
@@ -37,12 +39,6 @@ const blendModes = [
   { labelKey: 'editor.layers.blendModes.color', value: 'Color' },
   { labelKey: 'editor.layers.blendModes.luminosity', value: 'Luminosity' },
 ] as const;
-
-function formatMaskCount(count: number): string {
-  if (count === 0) return 'No masks';
-  if (count === 1) return '1 mask';
-  return `${String(count)} masks`;
-}
 
 function getLayerRows(masks: Array<MaskContainer>): Array<LayerRowModel> {
   const localLayers = masks.map((mask, index) => ({
@@ -73,22 +69,56 @@ export default function LayerStackPanel({
   activeMaskContainerId,
   masks,
   onSelectMaskContainer,
-  onUpdateMaskContainer,
+  onSetMaskContainers,
 }: LayerStackPanelProps) {
   const { t } = useTranslation();
   const rows = useMemo(() => getLayerRows(masks), [masks]);
-  const [selectedLayerId, setSelectedLayerId] = useState<string>(activeMaskContainerId ?? BASE_LAYER_ID);
+  const [localSelectedLayerId, setLocalSelectedLayerId] = useState<string>(BASE_LAYER_ID);
+  const selectedLayerId = activeMaskContainerId ?? localSelectedLayerId;
 
   const activeRow = rows.find((row) => row.id === selectedLayerId) ?? rows[0];
   const isBaseSelected = activeRow?.isBase ?? true;
+  const activeMaskIndex = activeRow && !activeRow.isBase ? masks.findIndex((mask) => mask.id === activeRow.id) : -1;
+  const canMoveActiveLayerUp = activeMaskIndex > 0;
+  const canMoveActiveLayerDown = activeMaskIndex >= 0 && activeMaskIndex < masks.length - 1;
+
   const selectRow = (row: LayerRowModel) => {
-    setSelectedLayerId(row.id);
+    setLocalSelectedLayerId(row.id);
     onSelectMaskContainer(row.isBase ? null : row.id);
   };
   const handleRowKeyDown = (event: KeyboardEvent<HTMLDivElement>, row: LayerRowModel) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
     selectRow(row);
+  };
+  const getMaskCountLabel = (count: number) =>
+    count === 0 ? t('editor.layers.maskCount.none') : t('editor.layers.maskCount.count', { count });
+  const applyLayerStack = (nextMasks: Array<MaskContainer>, nextSelectedLayerId = selectedLayerId) => {
+    onSetMaskContainers(nextMasks);
+    setLocalSelectedLayerId(nextSelectedLayerId);
+    onSelectMaskContainer(nextSelectedLayerId === BASE_LAYER_ID ? null : nextSelectedLayerId);
+  };
+  const updateLayerVisibility = (layerId: string, visible: boolean) => {
+    applyLayerStack(setLayerVisibility(masks, layerId, visible), layerId);
+  };
+  const updateLayerOpacity = (layerId: string, opacity: number) => {
+    applyLayerStack(setLayerOpacity(masks, layerId, opacity), layerId);
+  };
+  const moveActiveLayer = (direction: 'down' | 'up') => {
+    if (!activeRow || activeRow.isBase) return;
+    applyLayerStack(moveLayer(masks, activeRow.id, direction), activeRow.id);
+  };
+  const duplicateActiveLayer = () => {
+    if (!activeRow || activeRow.isBase) return;
+    const newLayerId = uuidv4();
+    applyLayerStack(
+      duplicateLayer(masks, activeRow.id, newLayerId, t('editor.layers.copyName', { name: activeRow.name })),
+      newLayerId,
+    );
+  };
+  const deleteActiveLayer = () => {
+    if (!activeRow || activeRow.isBase) return;
+    applyLayerStack(deleteLayer(masks, activeRow.id), BASE_LAYER_ID);
   };
 
   return (
@@ -143,7 +173,7 @@ export default function LayerStackPanel({
                 <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block truncate">
                   {t('editor.layers.rowSummary', {
                     blendMode: row.blendMode,
-                    maskCount: formatMaskCount(row.maskCount),
+                    maskCount: getMaskCountLabel(row.maskCount),
                     opacity: row.opacity,
                   })}
                 </UiText>
@@ -151,11 +181,11 @@ export default function LayerStackPanel({
               <span className="flex items-center gap-1">
                 <button
                   className="h-7 w-7 rounded-md text-text-secondary hover:bg-card-active hover:text-text-primary transition-colors"
-                  data-tooltip={row.visible ? 'Hide layer' : 'Show layer'}
+                  data-tooltip={row.visible ? t('editor.layers.actions.hide') : t('editor.layers.actions.show')}
                   onClick={(event) => {
                     event.stopPropagation();
                     if (!row.isBase) {
-                      onUpdateMaskContainer(row.id, { visible: !row.visible });
+                      updateLayerVisibility(row.id, !row.visible);
                     }
                   }}
                   disabled={row.isBase}
@@ -204,7 +234,7 @@ export default function LayerStackPanel({
             min={0}
             onChange={(event: SliderChangeEvent) => {
               if (!activeRow.isBase) {
-                onUpdateMaskContainer(activeRow.id, { opacity: Number(event.target.value) });
+                updateLayerOpacity(activeRow.id, Number(event.target.value));
               }
             }}
             step={1}
@@ -214,16 +244,40 @@ export default function LayerStackPanel({
           <div className="flex items-center justify-end gap-1">
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
-              data-tooltip="Duplicate layer"
-              disabled
+              data-tooltip={t('editor.layers.actions.moveUp')}
+              disabled={!canMoveActiveLayerUp}
+              onClick={() => {
+                moveActiveLayer('up');
+              }}
+              type="button"
+            >
+              <ArrowUp size={16} className="mx-auto" />
+            </button>
+            <button
+              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+              data-tooltip={t('editor.layers.actions.moveDown')}
+              disabled={!canMoveActiveLayerDown}
+              onClick={() => {
+                moveActiveLayer('down');
+              }}
+              type="button"
+            >
+              <ArrowDown size={16} className="mx-auto" />
+            </button>
+            <button
+              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+              data-tooltip={t('editor.layers.actions.duplicate')}
+              disabled={isBaseSelected}
+              onClick={duplicateActiveLayer}
               type="button"
             >
               <Copy size={16} className="mx-auto" />
             </button>
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
-              data-tooltip="Delete layer"
+              data-tooltip={t('editor.layers.actions.delete')}
               disabled={isBaseSelected}
+              onClick={deleteActiveLayer}
               type="button"
             >
               <Trash2 size={16} className="mx-auto" />
