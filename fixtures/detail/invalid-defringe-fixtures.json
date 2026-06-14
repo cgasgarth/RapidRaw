@@ -1,0 +1,71 @@
+[
+  {
+    "case": "purple-target-with-green-hue",
+    "fixture": {
+      "fixtureId": "invalid.detail.defringe.purple-hue",
+      "kind": "backlit_branch",
+      "settings": {
+        "amount": 0.5,
+        "edgeThreshold": 0.3,
+        "chromaProtection": 0.4,
+        "ranges": [
+          {
+            "target": "purple",
+            "hueCenterDeg": 120,
+            "hueWidthDeg": 40,
+            "minSaturation": 0.2
+          }
+        ]
+      },
+      "expectedMinFringeReduction": 0.4,
+      "expectedMaxProtectedColorDeltaE": 1,
+      "notes": "Purple target must stay in the purple hue range."
+    }
+  },
+  {
+    "case": "strong-defringe-without-edge-threshold",
+    "fixture": {
+      "fixtureId": "invalid.detail.defringe.edge-threshold",
+      "kind": "specular_edge",
+      "settings": {
+        "amount": 0.8,
+        "edgeThreshold": 0.05,
+        "chromaProtection": 0.5,
+        "ranges": [
+          {
+            "target": "green",
+            "hueCenterDeg": 120,
+            "hueWidthDeg": 40,
+            "minSaturation": 0.2
+          }
+        ]
+      },
+      "expectedMinFringeReduction": 0.4,
+      "expectedMaxProtectedColorDeltaE": 1,
+      "notes": "Strong defringe must require edge evidence."
+    }
+  },
+  {
+    "case": "false-positive-demands-fringe-reduction",
+    "fixture": {
+      "fixtureId": "invalid.detail.defringe.false-positive",
+      "kind": "false_positive_color_patch",
+      "settings": {
+        "amount": 0.4,
+        "edgeThreshold": 0.4,
+        "chromaProtection": 0.8,
+        "ranges": [
+          {
+            "target": "purple",
+            "hueCenterDeg": 300,
+            "hueWidthDeg": 30,
+            "minSaturation": 0.25
+          }
+        ]
+      },
+      "expectedMinFringeReduction": 0.3,
+      "expectedMaxProtectedColorDeltaE": 0.4,
+      "notes": "False-positive fixtures must protect subject color."
+    }
+  }
+]
