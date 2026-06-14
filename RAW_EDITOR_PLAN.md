@@ -4013,6 +4013,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `focus(align): add alignment path`
   - Doc: `docs/focus-stacking/alignment-path-2026-06-14.md`
 - `focus(sharpness): add sharpness map generation`
+  - Doc: `docs/focus-stacking/sharpness-map-generation-2026-06-14.md`
 - `focus(blend): add blending strategy`
 - `focus(retouch): add artifact retouch strategy`
 - `validation(focus): add focus bracket fixture set`
