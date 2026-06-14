@@ -3845,6 +3845,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `color(docs): add color pipeline design doc`
   - Design: `docs/color/color-pipeline-design-2026-06-14.md`
 - `validation(color): add ColorChecker fixture set`
+  - Manifest: `fixtures/color/colorchecker-fixture-manifest.json`
+  - Docs: `docs/color/colorchecker-fixtures-2026-06-14.md`
 - `validation(color): add DeltaE measurement harness`
 - `validation(color): add histogram and scope validation`
 - `color(wb): add white balance picker tests`

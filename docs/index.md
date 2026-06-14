@@ -36,6 +36,7 @@ generator before the release workflow needs one.
 - [Camera profile strategy ADR](color/camera-profile-strategy-adr-2026-06-14.md)
 - [Color pipeline design](color/color-pipeline-design-2026-06-14.md)
 - [White balance picker validation](color/white-balance-picker-validation-2026-06-14.md)
+- [ColorChecker fixture manifest](color/colorchecker-fixtures-2026-06-14.md)
 - [Film simulation architecture](film/film-simulation-architecture-2026-06-13.md)
 - [Built-In Film Look catalog schema](film/built-in-look-catalog-schema-2026-06-13.md)
 - [Bundled look legal review checklist](film/bundled-look-legal-review-checklist-2026-06-13.md)
