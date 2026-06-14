@@ -31,8 +31,11 @@ The command:
 2. opens the visual-smoke URL with Playwright Chromium;
 3. waits for `data-visual-smoke-ready="true"`;
 4. verifies that the library, viewer, adjustment, and filmstrip sections exist;
-5. captures `artifacts/visual-smoke/empty-library.png`;
-6. shuts down the local dev server.
+5. captures `artifacts/visual-smoke/empty-library-1x.png`;
+6. captures `artifacts/visual-smoke/empty-library-2x.png` at
+   `deviceScaleFactor: 2`;
+7. verifies PNG dimensions match the requested viewport and device scale;
+8. shuts down the local dev server.
 
 If Chromium has not been installed locally, run:
 
@@ -61,6 +64,8 @@ Current state covered:
 - editor preview placeholder;
 - adjustment panel surface;
 - filmstrip row.
+- standard 1x screenshot dimensions;
+- high-DPI 2x screenshot dimensions.
 
 ## Known Limitations
 

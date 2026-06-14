@@ -1,13 +1,17 @@
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const host = '127.0.0.1';
 const port = 1420;
 const baseUrl = `http://${host}:${port}`;
 const outputDir = resolve('artifacts/visual-smoke');
-const outputPath = resolve(outputDir, 'empty-library.png');
+const viewport = { width: 1440, height: 960 };
+const screenshotTargets = [
+  { deviceScaleFactor: 1, name: 'empty-library-1x.png' },
+  { deviceScaleFactor: 2, name: 'empty-library-2x.png' },
+];
 
 const sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds));
 
@@ -47,6 +51,18 @@ async function stopDevServer(server) {
   ]);
 }
 
+async function readPngDimensions(path) {
+  const buffer = await readFile(path);
+  if (buffer.toString('ascii', 1, 4) !== 'PNG') {
+    throw new Error(`${path} is not a PNG file.`);
+  }
+
+  return {
+    height: buffer.readUInt32BE(20),
+    width: buffer.readUInt32BE(16),
+  };
+}
+
 async function main() {
   await mkdir(outputDir, { recursive: true });
 
@@ -67,25 +83,40 @@ async function main() {
   try {
     await waitForDevServer();
     browser = await chromium.launch({ headless: true });
-    const page = await browser.newPage({
-      deviceScaleFactor: 1,
-      viewport: { width: 1440, height: 960 },
-    });
 
-    page.on('pageerror', (error) => {
-      throw error;
-    });
+    for (const target of screenshotTargets) {
+      const page = await browser.newPage({
+        deviceScaleFactor: target.deviceScaleFactor,
+        viewport,
+      });
 
-    await page.goto(`${baseUrl}/visual-smoke.html?scenario=empty-library`, { waitUntil: 'networkidle' });
-    await page.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
+      page.on('pageerror', (error) => {
+        throw error;
+      });
 
-    const sectionCount = await page.locator('[data-visual-smoke-section]').count();
-    if (sectionCount < 4) {
-      throw new Error(`Expected at least 4 visual smoke sections, found ${sectionCount}`);
+      await page.goto(`${baseUrl}/visual-smoke.html?scenario=empty-library`, { waitUntil: 'networkidle' });
+      await page.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
+
+      const sectionCount = await page.locator('[data-visual-smoke-section]').count();
+      if (sectionCount < 4) {
+        throw new Error(`Expected at least 4 visual smoke sections, found ${sectionCount}`);
+      }
+
+      const outputPath = resolve(outputDir, target.name);
+      await page.screenshot({ path: outputPath, fullPage: false });
+      await page.close();
+
+      const dimensions = await readPngDimensions(outputPath);
+      const expectedWidth = viewport.width * target.deviceScaleFactor;
+      const expectedHeight = viewport.height * target.deviceScaleFactor;
+      if (dimensions.width !== expectedWidth || dimensions.height !== expectedHeight) {
+        throw new Error(
+          `${target.name} dimensions mismatch: expected ${expectedWidth}x${expectedHeight}, got ${dimensions.width}x${dimensions.height}`,
+        );
+      }
+
+      console.log(`Captured visual smoke screenshot: ${outputPath} (${dimensions.width}x${dimensions.height})`);
     }
-
-    await page.screenshot({ path: outputPath, fullPage: false });
-    console.log(`Captured visual smoke screenshot: ${outputPath}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('Executable doesn')) {
