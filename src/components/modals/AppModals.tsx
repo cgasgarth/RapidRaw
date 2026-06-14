@@ -7,6 +7,7 @@ import CopyPasteSettingsModal from './CopyPasteSettingsModal';
 import CreateFolderModal from './CreateFolderModal';
 import CullingModal from './CullingModal';
 import DenoiseModal from './DenoiseModal';
+import FocusStackModal from './FocusStackModal';
 import HdrModal from './HdrModal';
 import ImportSettingsModal from './ImportSettingsModal';
 import NegativeConversionModal from './NegativeConversionModal';
@@ -81,6 +82,7 @@ export default function AppModals(props: AppModalsProps) {
     panoramaModalState,
     hdrModalState,
     superResolutionModalState,
+    focusStackModalState,
     negativeModalState,
     denoiseModalState,
     cullingModalState,
@@ -104,6 +106,7 @@ export default function AppModals(props: AppModalsProps) {
       panoramaModalState: state.panoramaModalState,
       hdrModalState: state.hdrModalState,
       superResolutionModalState: state.superResolutionModalState,
+      focusStackModalState: state.focusStackModalState,
       negativeModalState: state.negativeModalState,
       denoiseModalState: state.denoiseModalState,
       cullingModalState: state.cullingModalState,
@@ -262,6 +265,37 @@ export default function AppModals(props: AppModalsProps) {
         }}
         settings={superResolutionModalState.settings}
         sourceCount={superResolutionModalState.sourcePaths.length}
+      />
+      <FocusStackModal
+        isOpen={focusStackModalState.isOpen}
+        loadingImageUrl={
+          focusStackModalState.sourcePaths.length > 0
+            ? thumbnails[
+                focusStackModalState.sourcePaths[Math.floor(focusStackModalState.sourcePaths.length / 2)] ?? ''
+              ] || null
+            : selectedImage
+              ? finalPreviewUrl
+              : null
+        }
+        onClose={() => {
+          setUI((state) => ({
+            focusStackModalState: {
+              ...state.focusStackModalState,
+              isOpen: false,
+              sourcePaths: [],
+            },
+          }));
+        }}
+        onSettingsChange={(settings) => {
+          setUI((state) => ({
+            focusStackModalState: {
+              ...state.focusStackModalState,
+              settings,
+            },
+          }));
+        }}
+        settings={focusStackModalState.settings}
+        sourceCount={focusStackModalState.sourcePaths.length}
       />
       <NegativeConversionModal
         isOpen={negativeModalState.isOpen}

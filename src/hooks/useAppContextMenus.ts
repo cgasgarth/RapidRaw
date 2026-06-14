@@ -13,6 +13,7 @@ import {
   FolderPlus,
   Images,
   LayoutTemplate,
+  Layers3,
   Redo,
   RefreshCw,
   RotateCcw,
@@ -60,6 +61,7 @@ import {
 } from '../components/ui/AppProperties';
 import { useContextMenu } from '../context/ContextMenuContext';
 import TaggingSubMenu from '../context/TaggingSubMenu';
+import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../schemas/focusStackUiSchemas';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../schemas/superResolutionUiSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
@@ -302,6 +304,11 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: ScanSearch,
               label: t('contextMenus.editor.superResolution'),
             },
+            {
+              disabled: true,
+              icon: Layers3,
+              label: t('contextMenus.editor.focusStack'),
+            },
             { disabled: true, icon: SquaresUnite, label: t('contextMenus.editor.stitchPanorama') },
             { disabled: true, icon: Images, label: t('contextMenus.editor.mergeHdr') },
             {
@@ -496,6 +503,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const collageLabel = t('contextMenus.thumbnail.collage', { count: selectionCount });
       const stitchLabel = t('contextMenus.editor.stitchPanorama');
       const superResolutionLabel = t('contextMenus.editor.superResolution');
+      const focusStackLabel = t('contextMenus.editor.focusStack');
       const conversionLabel = t('contextMenus.thumbnail.convertNegative', { count: selectionCount });
       const denoiseLabel = t('contextMenus.thumbnail.denoise', { count: selectionCount });
       const mergeLabel = t('contextMenus.editor.mergeHdr');
@@ -663,6 +671,20 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   superResolutionModalState: {
                     isOpen: true,
                     settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
+                    sourcePaths: finalSelection,
+                  },
+                });
+              },
+            },
+            {
+              disabled: selectionCount < 2 || selectionCount > 64,
+              icon: Layers3,
+              label: focusStackLabel,
+              onClick: () => {
+                setUI({
+                  focusStackModalState: {
+                    isOpen: true,
+                    settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
                     sourcePaths: finalSelection,
                   },
                 });

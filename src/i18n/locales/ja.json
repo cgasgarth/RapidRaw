@@ -193,7 +193,8 @@
       "stitchPanorama": "パノラマ写真を作成",
       "tagging": "タグ付け",
       "undo": "元に戻す",
-      "superResolution": "Super Resolution"
+      "superResolution": "Super Resolution",
+      "focusStack": "Focus Stack"
     },
     "folders": {
       "changeIcon": "アイコンを変更",
@@ -1368,6 +1369,67 @@
       "title": "Super Resolution",
       "workflowStatus": "Plan-only surface until API wiring lands.",
       "workflowTitle": "Super-resolution plan"
+    },
+    "focusStack": {
+      "alignment": {
+        "auto": "Auto",
+        "homography": "Homography",
+        "optical_flow": "Optical flow",
+        "translation": "Translation"
+      },
+      "alignmentAuto": "Auto",
+      "alignmentHomography": "Homography",
+      "alignmentLabel": "Alignment",
+      "alignmentOpticalFlow": "Optical flow",
+      "alignmentTranslation": "Translation",
+      "apiPending": "API pending",
+      "blendDepthMap": "Depth map",
+      "blendLaplacianPyramid": "Laplacian pyramid",
+      "blendMethod": {
+        "depth_map": "Depth map",
+        "laplacian_pyramid": "Laplacian pyramid",
+        "weighted_sharpness": "Weighted sharpness"
+      },
+      "blendMethodLabel": "Blend method",
+      "blendWeightedSharpness": "Weighted sharpness",
+      "close": "Close",
+      "planDependency": "Final apply requires an accepted dry-run plan from the focus-stack API.",
+      "preflight": {
+        "alignment": "Alignment",
+        "blend": "Blend",
+        "depth": "Depth map",
+        "pending": "Not estimated",
+        "provenance": "Provenance",
+        "required": "Required",
+        "retouch": "Retouch",
+        "sources": "Sources"
+      },
+      "preflightTitle": "Preflight",
+      "previewBudgetLabel": "Preview budget",
+      "previewBudgetValue": "{{value}} px",
+      "previewPlan": "Preview plan",
+      "qualityBalanced": "Balanced",
+      "qualityBest": "Best",
+      "qualityLabel": "Quality",
+      "qualityPreview": "Preview",
+      "retouchPolicy": {
+        "generate_retouch_layer": {
+          "label": "Generate retouch layer",
+          "status": "Manual cleanup ready"
+        },
+        "none": {
+          "label": "No retouch layer",
+          "status": "Flattened output only"
+        }
+      },
+      "retouchPolicyLabel": "Retouch policy",
+      "sourceCountBlocked": "Focus stacking needs at least two source frames in the current API contract.",
+      "sourceSummary": "{{count}} source frames selected",
+      "sourceSummary_one": "{{count}} source frame selected",
+      "sourceSummary_other": "{{count}} source frames selected",
+      "title": "Focus Stack",
+      "workflowStatus": "Plan-only surface until API wiring lands.",
+      "workflowTitle": "Focus-stack plan"
     }
   },
   "settings": {
