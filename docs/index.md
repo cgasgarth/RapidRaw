@@ -87,6 +87,7 @@ generator before the release workflow needs one.
 - [Bun package manager support](tooling/bun-package-manager-support-2026-06-10.md)
 - [Major dependency migration process](tooling/major-dependency-migration-process-2026-06-13.md)
 - [Dependency version audit](tooling/dependency-version-audit-2026-06-13.md)
+- [Rust required feature policy](tooling/rust-required-feature-policy-2026-06-13.md)
 - [Strict type-checked ESLint](tooling/eslint-strict-type-checked-2026-06-11.md)
 - [ESLint escape hatches](tooling/eslint-escape-hatches-2026-06-11.md)
 - [ESLint accessibility rules](tooling/eslint-accessibility-rules-2026-06-11.md)

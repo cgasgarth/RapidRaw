@@ -81,15 +81,17 @@ The real visual harness is tracked by #292.
 
 ## Rust Entrypoints
 
-| Command                                                           | Current role                   | Baseline status             |
-| ----------------------------------------------------------------- | ------------------------------ | --------------------------- |
-| `cargo fmt -p RapidRAW -- --check`                                | Rust formatting check.         | Passing.                    |
-| `cargo check`                                                     | macOS Rust compile check.      | Passing.                    |
-| `cargo clippy --all-targets --all-features -- -D warnings`        | Rust lint with warnings fatal. | Passing and blocking in CI. |
-| `cargo test --locked --all-targets --all-features --no-fail-fast` | macOS Rust test gate.          | Passing and blocking in CI. |
+| Command                                                                                           | Current role                   | Baseline status             |
+| ------------------------------------------------------------------------------------------------- | ------------------------------ | --------------------------- |
+| `cargo fmt -p RapidRAW -- --check`                                                                | Rust formatting check.         | Passing.                    |
+| `cargo check --locked --no-default-features --features required-ci`                               | macOS Rust compile check.      | Passing.                    |
+| `cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings` | Rust lint with warnings fatal. | Passing and blocking in CI. |
+| `cargo test --locked --all-targets --no-default-features --features required-ci --no-fail-fast`   | macOS Rust test gate.          | Passing and blocking in CI. |
 
 Rust commands are run from `src-tauri`. The package declares `rust-version =
 "1.95"`, and GitHub Actions uses `actions-rust-lang/setup-rust-toolchain@v1`.
+Required Rust checks use the explicit `required-ci` feature set; optional native
+backend spikes must use separate manual or nightly lanes.
 
 ## GitHub Actions Entrypoints
 

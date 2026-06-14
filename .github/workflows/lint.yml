@@ -417,7 +417,7 @@ jobs:
 
       - name: Cargo check
         working-directory: src-tauri
-        run: cargo check --locked
+        run: cargo check --locked --no-default-features --features required-ci
 
   rust-clippy:
     name: 'rust: clippy baseline macOS'
@@ -473,7 +473,7 @@ jobs:
 
       - name: Clippy
         working-directory: src-tauri
-        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings
 
   rust-test:
     name: 'rust: tests macOS'
@@ -523,7 +523,7 @@ jobs:
 
       - name: Cargo test
         working-directory: src-tauri
-        run: cargo test --locked --all-targets --all-features --no-fail-fast
+        run: cargo test --locked --all-targets --no-default-features --features required-ci --no-fail-fast
 
   pr-macos-app-build:
     name: macOS app no-bundle smoke
