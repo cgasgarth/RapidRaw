@@ -3917,6 +3917,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(copy): add mask copy paste`
   - Runtime status: mask container and sub-mask clone/insert helpers are fixture-validated for paste, duplicate, invert, rename, and reset-adjustment behavior; UI extraction remains future work.
 - `masks(ai): audit subject sky background masks`
+  - Runtime status: subject, sky, foreground, depth, and derived background capability coverage is schema-backed, fixture-validated, and checked against frontend invoke commands plus Rust command/render branches; runtime quality benchmarking remains future work.
 - `masks(ai): research people and parts masks`
 - `validation(masks): add mask schema and render tests`
 
