@@ -1398,6 +1398,36 @@ async fn save_temp_file(bytes: Vec<u8>) -> Result<String, String> {
     Ok(path.to_string_lossy().to_string())
 }
 
+fn validate_hdr_merge_dimensions(
+    loaded_items: &[(String, DynamicImage, Duration, f32)],
+) -> Result<(), String> {
+    if let Some((first_path, first_img, _, _)) = loaded_items.first() {
+        let (width, height) = (first_img.width(), first_img.height());
+
+        for (path, img, _, _) in loaded_items.iter().skip(1) {
+            if img.width() != width || img.height() != height {
+                return Err(format!(
+                    "Dimension mismatch detected.\n\nBase image ({}): {}x{}\nTarget image ({}): {}x{}\n\nHDR merge requires all images to be exactly the same size.",
+                    Path::new(first_path)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy(),
+                    width,
+                    height,
+                    Path::new(path)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy(),
+                    img.width(),
+                    img.height()
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 async fn merge_hdr(
     paths: Vec<String>,
@@ -1449,29 +1479,7 @@ async fn merge_hdr(
         })
         .collect::<Result<Vec<_>, String>>()?;
 
-    if let Some((first_path, first_img, _, _)) = loaded_items.first() {
-        let (width, height) = (first_img.width(), first_img.height());
-
-        for (path, img, _, _) in loaded_items.iter().skip(1) {
-            if img.width() != width || img.height() != height {
-                return Err(format!(
-                    "Dimension mismatch detected.\n\nBase image ({}): {}x{}\nTarget image ({}): {}x{}\n\nHDR merge requires all images to be exactly the same size.",
-                    Path::new(first_path)
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy(),
-                    width,
-                    height,
-                    Path::new(path)
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy(),
-                    img.width(),
-                    img.height()
-                ));
-            }
-        }
-    }
+    validate_hdr_merge_dimensions(&loaded_items)?;
 
     let images: Vec<HDRInput> = loaded_items
         .iter()
@@ -2359,4 +2367,44 @@ pub fn run() {
                 _ => {}
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hdr_test_item(path: &str, width: u32, height: u32) -> (String, DynamicImage, Duration, f32) {
+        (
+            path.to_string(),
+            DynamicImage::new_rgb8(width, height),
+            Duration::from_millis(125),
+            100.0,
+        )
+    }
+
+    #[test]
+    fn validate_hdr_merge_dimensions_accepts_matching_inputs() {
+        let items = vec![
+            hdr_test_item("/tmp/base.exr", 64, 48),
+            hdr_test_item("/tmp/bright.exr", 64, 48),
+            hdr_test_item("/tmp/dark.exr", 64, 48),
+        ];
+
+        assert!(validate_hdr_merge_dimensions(&items).is_ok());
+    }
+
+    #[test]
+    fn validate_hdr_merge_dimensions_reports_target_mismatch() {
+        let items = vec![
+            hdr_test_item("/tmp/base.exr", 64, 48),
+            hdr_test_item("/tmp/wrong-size.exr", 32, 48),
+        ];
+
+        let error =
+            validate_hdr_merge_dimensions(&items).expect_err("dimension mismatch should fail");
+
+        assert!(error.contains("Dimension mismatch detected."));
+        assert!(error.contains("Base image (base.exr): 64x48"));
+        assert!(error.contains("Target image (wrong-size.exr): 32x48"));
+    }
 }
