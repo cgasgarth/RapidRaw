@@ -4046,6 +4046,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Issue: #1060
 - `focus(runtime): add CPU sharpness-map smoke`
   - Issue: #1061
+  - Check: `scripts/check-focus-sharpness-map-smoke.mjs`
+  - Command: `bun run check:focus-sharpness-smoke`
 - `focus(runtime): add weighted-sharpness preview blend smoke`
   - Issue: #1062
 - `agent(focus): bind app-server focus tools to command bus`
