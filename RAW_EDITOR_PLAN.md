@@ -3977,6 +3977,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
     legacy RapidRAW HDR command path as runtime-capable baseline behavior, not
     the final durable/editable RawEngine artifact architecture.
 - `hdr(audit): audit existing RapidRAW HDR merge`
+  - Doc: `docs/hdr/existing-hdr-audit-2026-06-14.md`
 - `hdr(schema): define HDR merge artifact schema`
 - `hdr(brackets): add bracket detection`
 - `hdr(align): add auto alignment tests`
