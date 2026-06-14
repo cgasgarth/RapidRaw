@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    {
+      "id": "sr-multi-image-chart-preview",
+      "mode": "multi_image",
+      "sourceCount": 3,
+      "requestedScale": 2,
+      "effectiveScale": 2,
+      "outputDimensions": {
+        "width": 9000,
+        "height": 6000
+      },
+      "budgets": {
+        "maxEstimatedPeakMemoryBytes": 4294967296,
+        "maxEstimatedRuntimeMs": 15000
+      },
+      "ciLane": "smoke",
+      "expectedWarningCodes": ["human_review_required"],
+      "finalApplyAllowed": true
+    },
+    {
+      "id": "sr-single-image-preview-only",
+      "mode": "single_image",
+      "sourceCount": 1,
+      "requestedScale": 1.5,
+      "effectiveScale": 1.5,
+      "outputDimensions": {
+        "width": 6000,
+        "height": 4000
+      },
+      "budgets": {
+        "maxEstimatedPeakMemoryBytes": 2147483648,
+        "maxEstimatedRuntimeMs": 8000
+      },
+      "ciLane": "smoke",
+      "expectedWarningCodes": ["human_review_required"],
+      "finalApplyAllowed": false
+    },
+    {
+      "id": "sr-panorama-style-manual-readiness",
+      "mode": "panorama_style",
+      "sourceCount": 4,
+      "requestedScale": 2,
+      "effectiveScale": 1.5,
+      "outputDimensions": {
+        "width": 12000,
+        "height": 6000
+      },
+      "budgets": {
+        "maxEstimatedPeakMemoryBytes": 8589934592,
+        "maxEstimatedRuntimeMs": 30000
+      },
+      "ciLane": "manual",
+      "expectedWarningCodes": ["effective_scale_downgraded", "human_review_required"],
+      "finalApplyAllowed": false
+    }
+  ]
+}
