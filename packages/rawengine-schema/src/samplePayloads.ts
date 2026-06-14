@@ -29,6 +29,7 @@ import {
   filmGlowModelV1Schema,
   filmGrainModelV1Schema,
   filmHalationModelV1Schema,
+  focusStackArtifactV1Schema,
   layerMaskCommandEnvelopeV1Schema,
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
@@ -96,6 +97,7 @@ import {
   type FilmGlowModelV1,
   type FilmGrainModelV1,
   type FilmHalationModelV1,
+  type FocusStackArtifactV1,
   type LayerMaskCommandEnvelopeV1,
   type LayerMaskDryRunResultV1,
   type LayerMaskMutationResultV1,
@@ -1665,6 +1667,12 @@ export const sampleComputationalMergeHdrCommandEnvelopeV1: ComputationalMergeCom
     },
   });
 
+const sampleFocusStackAlignmentMode = 'auto';
+const sampleFocusStackBlendMethod = 'laplacian_pyramid';
+const sampleFocusStackQualityPreference = 'best';
+const sampleFocusStackResolvedAlignmentMode = 'homography';
+const sampleFocusStackRetouchLayerPolicy = 'generate_retouch_layer';
+
 export const sampleComputationalMergeFocusStackCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
   computationalMergeCommandEnvelopeV1Schema.parse({
     ...sampleComputationalMergeCommandEnvelopeV1,
@@ -1678,12 +1686,12 @@ export const sampleComputationalMergeFocusStackCommandEnvelopeV1: ComputationalM
     correlationId: 'corr_merge_focus_stack_preview_sample',
     idempotencyKey: 'idem_merge_focus_stack_preview_sample',
     parameters: {
-      alignmentMode: 'auto',
-      blendMethod: 'laplacian_pyramid',
+      alignmentMode: sampleFocusStackAlignmentMode,
+      blendMethod: sampleFocusStackBlendMethod,
       maxPreviewDimensionPx: 2400,
       outputName: 'Macro Focus Stack',
-      qualityPreference: 'best',
-      retouchLayerPolicy: 'generate_retouch_layer',
+      qualityPreference: sampleFocusStackQualityPreference,
+      retouchLayerPolicy: sampleFocusStackRetouchLayerPolicy,
       sources: [
         {
           colorSpaceHint: 'camera_rgb',
@@ -1715,6 +1723,115 @@ export const sampleComputationalMergeFocusStackCommandEnvelopeV1: ComputationalM
       ],
     },
   });
+
+export const sampleFocusStackArtifactV1: FocusStackArtifactV1 = focusStackArtifactV1Schema.parse({
+  artifactId: 'artifact_focus_stack_macro_0001',
+  blendMethod: sampleFocusStackBlendMethod,
+  createdAt: '2026-06-14T03:00:00.000Z',
+  depthConfidenceMapArtifact: {
+    artifactId: 'artifact_focus_stack_macro_0001_depth_confidence',
+    contentHash: 'sha256:sample-focus-depth-confidence-map',
+    dimensions: {
+      height: 1200,
+      width: 1800,
+    },
+    kind: 'mask',
+    storage: 'sidecar_artifact',
+  },
+  dryRun: {
+    acceptedDryRunPlanHash: 'sha256:sample-merge-focus-stack-plan',
+    acceptedDryRunPlanId: 'merge_plan_focus_stack_001',
+  },
+  engine: {
+    backendType: 'local_gpu',
+    engineId: 'rawengine_focus_stack_v0',
+    engineVersion: '0.1.0-schema',
+  },
+  family: 'focus_stack',
+  outputArtifact: {
+    artifactId: 'artifact_focus_stack_macro_0001_output',
+    contentHash: 'sha256:sample-focus-stack-output',
+    dimensions: {
+      height: 4000,
+      width: 6000,
+    },
+    kind: 'merge_output',
+    storage: 'sidecar_artifact',
+  },
+  outputColorSpace: 'linear_rec2020_d65_v1',
+  previewArtifacts: [
+    {
+      artifactId: 'artifact_focus_stack_macro_0001_preview',
+      contentHash: 'sha256:sample-focus-stack-preview',
+      dimensions: {
+        height: 1600,
+        width: 2400,
+      },
+      kind: 'preview',
+      storage: 'temp_cache',
+    },
+  ],
+  qualityPreference: sampleFocusStackQualityPreference,
+  requestedAlignmentMode: sampleFocusStackAlignmentMode,
+  resolvedAlignmentMode: sampleFocusStackResolvedAlignmentMode,
+  retouchLayerArtifact: {
+    artifactId: 'artifact_focus_stack_macro_0001_retouch_layer',
+    contentHash: 'sha256:sample-focus-stack-retouch-layer',
+    dimensions: {
+      height: 4000,
+      width: 6000,
+    },
+    kind: 'generated_patch',
+    storage: 'sidecar_artifact',
+  },
+  retouchLayerPolicy: sampleFocusStackRetouchLayerPolicy,
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  sharpnessMapArtifact: {
+    artifactId: 'artifact_focus_stack_macro_0001_sharpness_map',
+    contentHash: 'sha256:sample-focus-sharpness-map',
+    dimensions: {
+      height: 1200,
+      width: 1800,
+    },
+    kind: 'mask',
+    storage: 'sidecar_artifact',
+  },
+  sourceImageRefs: sampleComputationalMergeFocusStackCommandEnvelopeV1.parameters.sources,
+  sourceState: [
+    {
+      contentHash: 'sha256:focus-source-0001',
+      focusDistanceMm: 180,
+      graphRevision: sampleEditGraphSnapshotV1.graphRevision,
+      sourceIndex: 0,
+    },
+    {
+      contentHash: 'sha256:focus-source-0002',
+      focusDistanceMm: 240,
+      graphRevision: sampleEditGraphSnapshotV1.graphRevision,
+      sourceIndex: 1,
+    },
+    {
+      contentHash: 'sha256:focus-source-0003',
+      focusDistanceMm: 320,
+      graphRevision: sampleEditGraphSnapshotV1.graphRevision,
+      sourceIndex: 2,
+    },
+  ],
+  staleState: {
+    checkedAt: '2026-06-14T03:01:00.000Z',
+    invalidationReasons: [],
+    state: 'current',
+  },
+  validationSummary: {
+    alignmentConfidence: 0.92,
+    focusCoverageRatio: 0.96,
+    parallaxRisk: 'low',
+    rejectedSourceIndexes: [],
+    retouchRequired: true,
+    sourceCount: sampleComputationalMergeFocusStackCommandEnvelopeV1.parameters.sources.length,
+  },
+  warningCodes: ['human_review_required', 'retouch_layer_required'],
+});
 
 export const sampleComputationalMergeSuperResolutionCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
   computationalMergeCommandEnvelopeV1Schema.parse({
