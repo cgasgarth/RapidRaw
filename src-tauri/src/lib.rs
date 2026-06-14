@@ -2261,6 +2261,7 @@ pub fn run() {
             denoising::save_denoised_image,
             image_loader::load_image,
             image_loader::is_image_cached,
+            panorama_stitching::plan_panorama,
             panorama_stitching::stitch_panorama,
             panorama_stitching::save_panorama,
             export_processing::export_images,

@@ -6,6 +6,7 @@ use image::ImageFormat;
 use image::{DynamicImage, GenericImageView, GrayImage, Rgb32FImage};
 use nalgebra::Matrix3;
 use rayon::prelude::*;
+use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::io::Cursor;
@@ -89,6 +90,91 @@ pub struct PanoramaRenderResult {
     pub metadata: PanoramaRenderMetadata,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanoramaPlanSourceRef {
+    pub height: u32,
+    pub image_path: String,
+    pub raw_defaults_applied: bool,
+    pub role: String,
+    pub source_index: usize,
+    pub width: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanoramaPlanDimensions {
+    pub height: u32,
+    pub width: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanoramaProjectedBounds {
+    pub height: u32,
+    pub width: u32,
+    pub x: i32,
+    pub y: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanoramaGeometryEstimate {
+    pub output_pixel_count: u64,
+    pub projected_bounds: PanoramaProjectedBounds,
+    pub source_count: usize,
+    pub source_pixel_count: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanoramaMemoryComponents {
+    pub low_detail_mask_bytes: u64,
+    pub output_canvas_bytes: u64,
+    pub output_mask_bytes: u64,
+    pub overhead_bytes: u64,
+    pub preview_bytes: u64,
+    pub seam_workspace_bytes: u64,
+    pub source_decode_bytes: u64,
+    pub total_estimated_peak_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanoramaPreflightEstimate {
+    pub blocked_reasons: Vec<String>,
+    pub engine_capabilities: PanoramaPlanEngineCapabilities,
+    pub execution_mode: String,
+    pub geometry_estimate: PanoramaGeometryEstimate,
+    pub memory_budget_bytes: u64,
+    pub memory_budget_ratio: f64,
+    pub memory_components: PanoramaMemoryComponents,
+    pub status: String,
+    pub tile_count: u32,
+    pub warning_codes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanoramaPlanEngineCapabilities {
+    pub full_frame_legacy: bool,
+    pub max_preview_dimension_px: u32,
+    pub plan_only: bool,
+    pub tile_backed_render: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanoramaPlanResult {
+    pub dry_run: bool,
+    pub family: String,
+    pub mutates: bool,
+    pub output_dimensions: PanoramaPlanDimensions,
+    pub preflight: PanoramaPreflightEstimate,
+    pub source_image_refs: Vec<PanoramaPlanSourceRef>,
+    pub warnings: Vec<String>,
+}
+
 pub trait PanoramaRenderEngine {
     fn render(
         &self,
@@ -106,6 +192,51 @@ impl PanoramaRenderEngine for LegacyRapidRawHomographyEngine {
         app_handle: AppHandle,
     ) -> Result<PanoramaRenderResult, String> {
         render_with_legacy_homography_engine(request, app_handle)
+    }
+}
+
+const DEFAULT_PANORAMA_MEMORY_BUDGET_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const DEFAULT_PANORAMA_MAX_PREVIEW_DIMENSION_PX: u32 = 800;
+const HIGH_MEMORY_BUDGET_RATIO: f64 = 0.8;
+
+#[tauri::command]
+pub async fn plan_panorama(
+    paths: Vec<String>,
+    memory_budget_bytes: Option<u64>,
+    max_preview_dimension_px: Option<u32>,
+    app_handle: tauri::AppHandle,
+) -> Result<PanoramaPlanResult, String> {
+    if paths.len() < 2 {
+        return Err("Please select at least two images to plan a panorama.".to_string());
+    }
+
+    let source_paths: Vec<String> = paths
+        .iter()
+        .map(|p| parse_virtual_path(p).0.to_string_lossy().into_owned())
+        .collect();
+    let memory_budget = memory_budget_bytes.unwrap_or(DEFAULT_PANORAMA_MEMORY_BUDGET_BYTES);
+    if memory_budget == 0 {
+        return Err("Panorama memory budget must be greater than zero.".to_string());
+    }
+
+    let preview_dimension =
+        max_preview_dimension_px.unwrap_or(DEFAULT_PANORAMA_MAX_PREVIEW_DIMENSION_PX);
+    if preview_dimension == 0 {
+        return Err("Panorama preview dimension must be greater than zero.".to_string());
+    }
+
+    let task = tokio::task::spawn_blocking(move || {
+        let sources = load_panorama_source_metadata_for_plan(&source_paths, &app_handle)?;
+        Ok(estimate_panorama_plan_from_sources(
+            sources,
+            memory_budget,
+            preview_dimension,
+        ))
+    });
+
+    match task.await {
+        Ok(result) => result,
+        Err(join_err) => Err(format!("Panorama plan task failed: {}", join_err)),
     }
 }
 
@@ -192,6 +323,44 @@ pub async fn stitch_panorama(
         Ok(Err(e)) => Err(e),
         Err(join_err) => Err(format!("Panorama task failed: {}", join_err)),
     }
+}
+
+fn load_panorama_source_metadata_for_plan(
+    image_paths: &[String],
+    app_handle: &AppHandle,
+) -> Result<Vec<PanoramaSourceMetadata>, String> {
+    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+
+    image_paths
+        .iter()
+        .enumerate()
+        .map(|(index, filename)| {
+            let (width, height) = match image::image_dimensions(filename) {
+                Ok(dimensions) => dimensions,
+                Err(_) => {
+                    let file_bytes = fs::read(filename)
+                        .map_err(|e| format!("Failed to read image {}: {}", filename, e))?;
+                    let dynamic_image = crate::image_loader::load_base_image_from_bytes(
+                        &file_bytes,
+                        filename,
+                        false,
+                        &settings,
+                        None,
+                    )
+                    .map_err(|e| format!("Failed to load image {}: {}", filename, e))?;
+
+                    dynamic_image.dimensions()
+                }
+            };
+
+            Ok(PanoramaSourceMetadata {
+                height,
+                index,
+                path: filename.clone(),
+                width,
+            })
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -579,6 +748,180 @@ fn estimate_legacy_panorama_peak_memory_bytes(
         + overhead_bytes
 }
 
+fn estimate_panorama_plan_from_sources(
+    sources: Vec<PanoramaSourceMetadata>,
+    memory_budget_bytes: u64,
+    max_preview_dimension_px: u32,
+) -> PanoramaPlanResult {
+    let output_width = sources
+        .iter()
+        .fold(0_u32, |total, source| total.saturating_add(source.width));
+    let output_height = sources
+        .iter()
+        .map(|source| source.height)
+        .max()
+        .unwrap_or(1);
+    let source_pixel_count = sources
+        .iter()
+        .map(|source| source.width as u64 * source.height as u64)
+        .sum();
+    let output_pixel_count = output_width as u64 * output_height as u64;
+    let memory_components = estimate_panorama_memory_components(
+        &sources,
+        output_width,
+        output_height,
+        max_preview_dimension_px,
+    );
+    let memory_budget_ratio =
+        memory_components.total_estimated_peak_bytes as f64 / memory_budget_bytes as f64;
+
+    let mut warning_codes = vec![
+        "geometry_estimate_low_confidence".to_string(),
+        "legacy_full_frame_render".to_string(),
+    ];
+    let mut warnings = vec![
+        "Panorama dry-run uses conservative source-dimension bounds before feature matching."
+            .to_string(),
+        "Current panorama render path uses the legacy full-frame homography engine.".to_string(),
+    ];
+    let mut blocked_reasons = Vec::new();
+
+    let (status, execution_mode) = if memory_components.total_estimated_peak_bytes
+        > memory_budget_bytes
+    {
+        warning_codes.push("memory_budget_exceeded".to_string());
+        warning_codes.push("tiled_render_required".to_string());
+        blocked_reasons.push(format!(
+            "Estimated peak memory {} bytes exceeds budget {} bytes.",
+            memory_components.total_estimated_peak_bytes, memory_budget_bytes
+        ));
+        warnings.push(
+            "Estimated memory exceeds the supplied budget; render must stay plan-only.".to_string(),
+        );
+        ("blocked_plan_only".to_string(), "plan_only".to_string())
+    } else if memory_budget_ratio >= HIGH_MEMORY_BUDGET_RATIO {
+        warning_codes.push("high_memory_estimate".to_string());
+        warnings.push(
+            "Estimated memory is close to the supplied budget; render should require confirmation."
+                .to_string(),
+        );
+        ("warning".to_string(), "full_frame_legacy".to_string())
+    } else {
+        ("accepted".to_string(), "full_frame_legacy".to_string())
+    };
+
+    PanoramaPlanResult {
+        dry_run: true,
+        family: "panorama".to_string(),
+        mutates: false,
+        output_dimensions: PanoramaPlanDimensions {
+            height: output_height,
+            width: output_width,
+        },
+        preflight: PanoramaPreflightEstimate {
+            blocked_reasons,
+            engine_capabilities: PanoramaPlanEngineCapabilities {
+                full_frame_legacy: true,
+                max_preview_dimension_px,
+                plan_only: true,
+                tile_backed_render: false,
+            },
+            execution_mode,
+            geometry_estimate: PanoramaGeometryEstimate {
+                output_pixel_count,
+                projected_bounds: PanoramaProjectedBounds {
+                    height: output_height,
+                    width: output_width,
+                    x: 0,
+                    y: 0,
+                },
+                source_count: sources.len(),
+                source_pixel_count,
+            },
+            memory_budget_bytes,
+            memory_budget_ratio,
+            memory_components,
+            status,
+            tile_count: 1,
+            warning_codes,
+        },
+        source_image_refs: sources
+            .iter()
+            .map(|source| PanoramaPlanSourceRef {
+                height: source.height,
+                image_path: source.path.clone(),
+                raw_defaults_applied: is_raw_file(&source.path),
+                role: "panorama_tile".to_string(),
+                source_index: source.index,
+                width: source.width,
+            })
+            .collect(),
+        warnings,
+    }
+}
+
+fn estimate_panorama_memory_components(
+    sources: &[PanoramaSourceMetadata],
+    output_width: u32,
+    output_height: u32,
+    max_preview_dimension_px: u32,
+) -> PanoramaMemoryComponents {
+    const RGB32F_BYTES_PER_PIXEL: u64 = 12;
+    const MASK_BYTES_PER_PIXEL: u64 = 1;
+    const RGB8_BYTES_PER_PIXEL: u64 = 3;
+
+    let source_decode_bytes: u64 = sources
+        .iter()
+        .map(|source| source.width as u64 * source.height as u64 * RGB32F_BYTES_PER_PIXEL)
+        .sum();
+    let low_detail_mask_bytes: u64 = sources
+        .iter()
+        .map(|source| source.width as u64 * source.height as u64 * MASK_BYTES_PER_PIXEL)
+        .sum();
+    let output_pixels = output_width as u64 * output_height as u64;
+    let output_canvas_bytes = output_pixels * RGB32F_BYTES_PER_PIXEL;
+    let output_mask_bytes = output_pixels * MASK_BYTES_PER_PIXEL;
+    let seam_workspace_bytes = output_pixels * 4;
+    let preview_pixels =
+        estimate_preview_pixel_count(output_width, output_height, max_preview_dimension_px);
+    let preview_bytes = preview_pixels * RGB8_BYTES_PER_PIXEL;
+    let overhead_bytes = (source_decode_bytes + output_canvas_bytes) / 10;
+    let total_estimated_peak_bytes = source_decode_bytes
+        + low_detail_mask_bytes
+        + output_canvas_bytes
+        + output_mask_bytes
+        + overhead_bytes
+        + preview_bytes
+        + seam_workspace_bytes;
+
+    PanoramaMemoryComponents {
+        low_detail_mask_bytes,
+        output_canvas_bytes,
+        output_mask_bytes,
+        overhead_bytes,
+        preview_bytes,
+        seam_workspace_bytes,
+        source_decode_bytes,
+        total_estimated_peak_bytes,
+    }
+}
+
+fn estimate_preview_pixel_count(
+    output_width: u32,
+    output_height: u32,
+    max_preview_dimension_px: u32,
+) -> u64 {
+    let largest_dimension = output_width.max(output_height);
+    if largest_dimension <= max_preview_dimension_px {
+        return output_width as u64 * output_height as u64;
+    }
+
+    let scale = max_preview_dimension_px as f64 / largest_dimension as f64;
+    let preview_width = (output_width as f64 * scale).round().max(1.0) as u64;
+    let preview_height = (output_height as f64 * scale).round().max(1.0) as u64;
+    preview_width * preview_height
+}
+
 struct Dsu {
     parent: Vec<usize>,
 }
@@ -749,5 +1092,91 @@ mod tests {
         let estimate = estimate_legacy_panorama_peak_memory_bytes(&sources, 300, 100);
 
         assert_eq!(estimate, 1_114_000);
+    }
+
+    #[test]
+    fn estimate_panorama_plan_accepts_renderable_memory_budget() {
+        let plan = estimate_panorama_plan_from_sources(sample_plan_sources(), 1_000_000, 800);
+
+        assert!(plan.dry_run);
+        assert!(!plan.mutates);
+        assert_eq!(plan.family, "panorama");
+        assert_eq!(
+            plan.output_dimensions,
+            PanoramaPlanDimensions {
+                height: 50,
+                width: 200,
+            }
+        );
+        assert_eq!(plan.preflight.status, "accepted");
+        assert_eq!(plan.preflight.execution_mode, "full_frame_legacy");
+        assert_eq!(plan.preflight.blocked_reasons, Vec::<String>::new());
+        assert_eq!(
+            plan.preflight.geometry_estimate.projected_bounds,
+            PanoramaProjectedBounds {
+                height: 50,
+                width: 200,
+                x: 0,
+                y: 0,
+            }
+        );
+        assert_eq!(
+            plan.preflight.memory_components.total_estimated_peak_bytes,
+            354_000
+        );
+        assert_eq!(plan.source_image_refs.len(), 2);
+        assert_eq!(plan.source_image_refs[0].role, "panorama_tile");
+    }
+
+    #[test]
+    fn estimate_panorama_plan_warns_near_memory_budget() {
+        let plan = estimate_panorama_plan_from_sources(sample_plan_sources(), 400_000, 800);
+
+        assert_eq!(plan.preflight.status, "warning");
+        assert_eq!(plan.preflight.execution_mode, "full_frame_legacy");
+        assert!(plan.preflight.blocked_reasons.is_empty());
+        assert!(
+            plan.preflight
+                .warning_codes
+                .contains(&"high_memory_estimate".to_string())
+        );
+    }
+
+    #[test]
+    fn estimate_panorama_plan_blocks_over_memory_budget_without_rendering() {
+        let plan = estimate_panorama_plan_from_sources(sample_plan_sources(), 300_000, 800);
+
+        assert_eq!(plan.preflight.status, "blocked_plan_only");
+        assert_eq!(plan.preflight.execution_mode, "plan_only");
+        assert_eq!(plan.preflight.tile_count, 1);
+        assert_eq!(plan.preflight.memory_budget_bytes, 300_000);
+        assert!(!plan.preflight.blocked_reasons.is_empty());
+        assert!(
+            plan.preflight
+                .warning_codes
+                .contains(&"memory_budget_exceeded".to_string())
+        );
+        assert!(
+            plan.preflight
+                .warning_codes
+                .contains(&"tiled_render_required".to_string())
+        );
+    }
+
+    fn sample_plan_sources() -> Vec<PanoramaSourceMetadata> {
+        vec![
+            PanoramaSourceMetadata {
+                height: 50,
+                index: 0,
+                path: "left.dng".to_string(),
+                width: 100,
+            },
+            PanoramaSourceMetadata {
+                height: 50,
+                index: 1,
+                path: "right.dng".to_string(),
+                width: 100,
+            },
+        ]
     }
 }
