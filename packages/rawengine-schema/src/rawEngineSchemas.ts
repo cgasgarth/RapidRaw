@@ -181,6 +181,60 @@ export const rawEngineRenderBitDepthV1Schema = z.union([z.literal(8), z.literal(
 
 export const rawEngineRenderingIntentV1Schema = z.enum(['relative_colorimetric', 'perceptual', 'scene_referred']);
 
+export const rawEngineWhitePointXyV1Schema = z
+  .object({
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+  })
+  .strict();
+
+export const rawEngineChromaticAdaptationMethodV1Schema = z.enum([
+  'bradford_v1',
+  'identity_same_white_v1',
+  'unsupported_or_unknown_v1',
+]);
+
+export const rawEngineChromaticAdaptationStatusV1Schema = z.enum(['applied', 'skipped', 'blocked']);
+
+export const rawEngineChromaticAdaptationV1Schema = z
+  .object({
+    method: rawEngineChromaticAdaptationMethodV1Schema,
+    sourceWhitePoint: rawEngineWhitePointXyV1Schema,
+    status: rawEngineChromaticAdaptationStatusV1Schema,
+    targetWhitePoint: rawEngineWhitePointXyV1Schema,
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+  .superRefine((adaptation, context) => {
+    const sameWhitePoint =
+      adaptation.sourceWhitePoint.x === adaptation.targetWhitePoint.x &&
+      adaptation.sourceWhitePoint.y === adaptation.targetWhitePoint.y;
+
+    if (adaptation.method === 'identity_same_white_v1' && !sameWhitePoint) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Identity chromatic adaptation requires matching source and target white points.',
+        path: ['method'],
+      });
+    }
+
+    if (adaptation.method === 'unsupported_or_unknown_v1' && adaptation.status !== 'blocked') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Unsupported chromatic adaptation must be blocked.',
+        path: ['status'],
+      });
+    }
+
+    if (adaptation.status === 'blocked' && adaptation.warnings.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Blocked chromatic adaptation requires at least one warning.',
+        path: ['warnings'],
+      });
+    }
+  });
+
 export const rawEngineRenderTargetV1Schema = z
   .object({
     bitDepth: rawEngineRenderBitDepthV1Schema,
@@ -193,6 +247,7 @@ export const rawEngineRenderTargetV1Schema = z
 
 export const rawEngineColorPipelineContextV1Schema = z
   .object({
+    chromaticAdaptation: rawEngineChromaticAdaptationV1Schema,
     inputDomain: rawEngineColorDomainV1Schema,
     operationDomain: rawEngineColorDomainV1Schema,
     renderTarget: rawEngineRenderTargetV1Schema.optional(),
