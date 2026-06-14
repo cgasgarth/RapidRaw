@@ -1,0 +1,78 @@
+[
+  {
+    "expected": {
+      "centerHueDegrees": 358,
+      "feather": 0.35,
+      "hueToleranceDegrees": 17.5,
+      "maxLuma": 0.98,
+      "maxSaturation": 1,
+      "minLuma": 0.02,
+      "minSaturation": 0.08,
+      "rangeKind": "color",
+      "sourceRangeKey": "reds"
+    },
+    "id": "default-red-range",
+    "input": { "rangeKey": "reds" },
+    "samples": [
+      { "hueDegrees": 358, "luma": 0.5, "saturation": 0.7, "weight": 1 },
+      { "hueDegrees": 0, "luma": 0.5, "saturation": 0.7, "weight": 1 },
+      { "hueDegrees": 25, "luma": 0.5, "saturation": 0.7, "weight": 0 }
+    ]
+  },
+  {
+    "expected": {
+      "centerHueDegrees": 225,
+      "feather": 0.5,
+      "hueToleranceDegrees": 30,
+      "maxLuma": 0.85,
+      "maxSaturation": 0.9,
+      "minLuma": 0.15,
+      "minSaturation": 0.2,
+      "rangeKind": "color",
+      "sourceRangeKey": "blues"
+    },
+    "id": "blue-range-with-gates",
+    "input": {
+      "options": {
+        "feather": 0.5,
+        "hueToleranceDegrees": 30,
+        "maxLuma": 0.85,
+        "maxSaturation": 0.9,
+        "minLuma": 0.15,
+        "minSaturation": 0.2
+      },
+      "rangeKey": "blues"
+    },
+    "samples": [
+      { "hueDegrees": 225, "luma": 0.5, "saturation": 0.5, "weight": 1 },
+      { "hueDegrees": 247.5, "luma": 0.5, "saturation": 0.5, "weight": 0.5 },
+      { "hueDegrees": 225, "luma": 0.1, "saturation": 0.5, "weight": 0 },
+      { "hueDegrees": 225, "luma": 0.5, "saturation": 0.1, "weight": 0 }
+    ]
+  },
+  {
+    "expected": {
+      "centerHueDegrees": 330,
+      "feather": 0,
+      "hueToleranceDegrees": 18,
+      "maxLuma": 0.98,
+      "maxSaturation": 1,
+      "minLuma": 0.02,
+      "minSaturation": 0.08,
+      "rangeKind": "color",
+      "sourceRangeKey": "magentas"
+    },
+    "id": "hard-edge-magenta-range",
+    "input": {
+      "options": {
+        "feather": 0,
+        "hueToleranceDegrees": 18
+      },
+      "rangeKey": "magentas"
+    },
+    "samples": [
+      { "hueDegrees": 330, "luma": 0.5, "saturation": 0.5, "weight": 1 },
+      { "hueDegrees": 349, "luma": 0.5, "saturation": 0.5, "weight": 0 }
+    ]
+  }
+]

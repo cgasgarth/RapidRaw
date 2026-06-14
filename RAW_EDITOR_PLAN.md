@@ -3907,6 +3907,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(range): add luminance range masks`
   - Runtime status: luminance range schemas, normalization, weight evaluation, and fixture validation are present; renderer integration remains future work.
 - `masks(range): add color range masks`
+  - Runtime status: color range schemas, selective color range parameter conversion, hue/luma/saturation weight evaluation, and fixture validation are present; renderer integration remains future work.
 - `masks(compose): add add subtract intersect`
 - `masks(refine): add feather density and edge refine`
 - `masks(overlay): add mask overlay modes`
