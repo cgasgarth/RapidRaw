@@ -2478,6 +2478,18 @@ export const computationalMergeCommandEnvelopeV1Schema = z
       });
     }
 
+    if (
+      command.commandType === 'computationalMerge.createSuperResolution' &&
+      command.parameters.outputScale > 1 &&
+      command.parameters.alignmentMode === 'none'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied super-resolution commands above 1x require an alignment mode.',
+        path: ['parameters', 'alignmentMode'],
+      });
+    }
+
     if (!command.parameters.acceptedDryRunPlanId) {
       context.addIssue({
         code: 'custom',
@@ -7200,6 +7212,145 @@ export const negativeLabAppServerToolManifestV1Schema = z
   })
   .strict();
 
+export const computationalMergeAppServerExecutionModeV1Schema = z.enum(['dry_run_command', 'apply_dry_run_plan']);
+
+export const computationalMergeAppServerAuditEventV1Schema = z.enum([
+  'computational_merge_dry_run_requested',
+  'computational_merge_dry_run_completed',
+  'computational_merge_apply_requested',
+  'computational_merge_apply_completed',
+]);
+
+export const computationalMergeAppServerToolDefinitionV1Schema = z
+  .object({
+    allowedCommandTypes: z.array(computationalMergeCommandTypeV1Schema).min(1),
+    approvalClass: approvalClassSchema,
+    auditEvents: z.array(computationalMergeAppServerAuditEventV1Schema).min(1),
+    description: z.string().trim().min(1),
+    executionMode: computationalMergeAppServerExecutionModeV1Schema,
+    inputSchemaName: z.string().trim().min(1),
+    localOnly: z.boolean(),
+    mutates: z.boolean(),
+    outputSchemaName: z.string().trim().min(1),
+    recordsProvenance: z.boolean(),
+    requiresDryRunPlan: z.boolean(),
+    returnsArtifactHandles: z.boolean(),
+    toolName: z
+      .string()
+      .trim()
+      .regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_]*)+$/u),
+  })
+  .strict()
+  .superRefine((tool, context) => {
+    if (!tool.localOnly) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational merge app-server tools must be local-only for source RAW access and provenance.',
+        path: ['localOnly'],
+      });
+    }
+
+    if (tool.executionMode === 'dry_run_command') {
+      if (tool.inputSchemaName !== 'ComputationalMergeCommandEnvelopeV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge dry-run app-server tools must accept ComputationalMergeCommandEnvelopeV1.',
+          path: ['inputSchemaName'],
+        });
+      }
+
+      if (tool.outputSchemaName !== 'ComputationalMergeDryRunResultV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge dry-run app-server tools must return ComputationalMergeDryRunResultV1.',
+          path: ['outputSchemaName'],
+        });
+      }
+
+      if (tool.mutates) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge dry-run app-server tools must not mutate project state.',
+          path: ['mutates'],
+        });
+      }
+
+      if (tool.requiresDryRunPlan) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge dry-run app-server tools create dry-run plans and must not require one.',
+          path: ['requiresDryRunPlan'],
+        });
+      }
+
+      if (tool.approvalClass !== ApprovalClass.PreviewOnly) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge dry-run app-server tools require preview-only approval classification.',
+          path: ['approvalClass'],
+        });
+      }
+    }
+
+    if (tool.executionMode === 'apply_dry_run_plan') {
+      if (tool.inputSchemaName !== 'ComputationalMergeCommandEnvelopeV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge apply app-server tools must accept ComputationalMergeCommandEnvelopeV1.',
+          path: ['inputSchemaName'],
+        });
+      }
+
+      if (tool.outputSchemaName !== 'ComputationalMergeMutationResultV1') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge apply app-server tools must return ComputationalMergeMutationResultV1.',
+          path: ['outputSchemaName'],
+        });
+      }
+
+      if (!tool.mutates) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge apply app-server tools must be marked as mutating.',
+          path: ['mutates'],
+        });
+      }
+
+      if (!tool.requiresDryRunPlan) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge apply app-server tools must require a prior dry-run plan.',
+          path: ['requiresDryRunPlan'],
+        });
+      }
+
+      if (tool.approvalClass !== ApprovalClass.EditApply) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Computational merge apply app-server tools require edit-apply approval classification.',
+          path: ['approvalClass'],
+        });
+      }
+    }
+
+    if ((tool.mutates || tool.returnsArtifactHandles) && !tool.recordsProvenance) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Computational merge app-server tools that mutate or return artifacts must record provenance.',
+        path: ['recordsProvenance'],
+      });
+    }
+  });
+
+export const computationalMergeAppServerToolManifestV1Schema = z
+  .object({
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    serverRuntime: z.literal('openai_app_server'),
+    tools: z.array(computationalMergeAppServerToolDefinitionV1Schema).min(1),
+  })
+  .strict();
+
 export type ActorKind = z.infer<typeof actorKindSchema>;
 export type AiAppServerAuditEventV1 = z.infer<typeof aiAppServerAuditEventV1Schema>;
 export type AiAppServerExecutionModeV1 = z.infer<typeof aiAppServerExecutionModeV1Schema>;
@@ -7222,6 +7373,14 @@ export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
 export type ComputationalMergeAlignmentModeV1 = z.infer<typeof computationalMergeAlignmentModeV1Schema>;
+export type ComputationalMergeAppServerAuditEventV1 = z.infer<typeof computationalMergeAppServerAuditEventV1Schema>;
+export type ComputationalMergeAppServerExecutionModeV1 = z.infer<
+  typeof computationalMergeAppServerExecutionModeV1Schema
+>;
+export type ComputationalMergeAppServerToolDefinitionV1 = z.infer<
+  typeof computationalMergeAppServerToolDefinitionV1Schema
+>;
+export type ComputationalMergeAppServerToolManifestV1 = z.infer<typeof computationalMergeAppServerToolManifestV1Schema>;
 export type ComputationalMergeCommandEnvelopeV1 = z.infer<typeof computationalMergeCommandEnvelopeV1Schema>;
 export type ComputationalMergeCommandTypeV1 = z.infer<typeof computationalMergeCommandTypeV1Schema>;
 export type ComputationalMergeDryRunResultV1 = z.infer<typeof computationalMergeDryRunResultV1Schema>;

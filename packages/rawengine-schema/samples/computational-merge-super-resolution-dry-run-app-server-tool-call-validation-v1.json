@@ -1,12 +1,4 @@
 {
-  "actor": {
-    "id": "codex-app-server",
-    "kind": "agent",
-    "sessionId": "session_sample"
-  },
-  "deterministicReplayHash": "sha256:sample-ai-subject-mask-replay",
-  "finalGraphRevision": "graph_rev_47",
-  "initialGraphRevision": "graph_rev_44",
   "registry": {
     "schemaVersion": 1,
     "tools": [
@@ -252,198 +244,83 @@
       }
     ]
   },
-  "replayId": "replay_ai_subject_mask_001",
-  "replayKind": "agent_tool_replay",
   "schemaVersion": 1,
-  "steps": [
-    {
-      "approval": {
-        "approvalClass": "external_model",
-        "reason": "Local subject-mask model reads pixels and returns a non-mutating dry-run mask artifact.",
-        "state": "approved"
-      },
-      "deterministic": true,
-      "dryRun": true,
-      "input": {
-        "actor": {
-          "id": "codex-app-server",
-          "kind": "agent",
-          "sessionId": "session_sample"
-        },
-        "approval": {
-          "approvalClass": "external_model",
-          "reason": "Local subject-mask model reads pixels and returns a non-mutating dry-run mask artifact.",
-          "state": "approved"
-        },
-        "commandId": "command_ai_subject_mask_dry_run_sample",
-        "commandType": "ai.mask.generateSubject",
-        "correlationId": "corr_ai_subject_mask_sample",
-        "dryRun": true,
-        "expectedGraphRevision": "graph_rev_44",
-        "parameters": {
-          "cachePolicy": "reuse_allowed",
-          "capability": "subject_mask",
-          "maskName": "Subject mask",
-          "maxPreviewDimensionPx": 2048,
-          "modelHash": "sha256:local-sam2-subject-mask-model",
-          "modelId": "local_sam2_subject_mask",
-          "modelVersion": "2026.06",
-          "promptPolicy": "none",
-          "providerClass": "local_model",
-          "providerId": "rawengine-local-ai",
-          "sourceContentHash": "sha256:sample-raw-source-hash",
-          "sourcePixelDisclosure": "local_only"
-        },
-        "schemaVersion": 1,
-        "target": {
-          "imagePath": "/photos/session/IMG_0001.CR3",
-          "kind": "image",
-          "virtualCopyId": null
-        }
-      },
-      "inputContentHash": "sha256:sample-ai-subject-mask-dry-run-input",
-      "inputSchemaName": "AiToolCommandEnvelopeV1",
-      "mutates": false,
-      "output": {
-        "commandId": "command_ai_subject_mask_dry_run_sample",
-        "commandType": "ai.mask.generateSubject",
-        "correlationId": "corr_ai_subject_mask_sample",
-        "dryRunPlanHash": "sha256:sample-ai-subject-mask-plan",
-        "dryRunPlanId": "dryrun_ai_subject_mask_001",
-        "maskArtifacts": [
-          {
-            "artifactId": "artifact_ai_subject_mask_alpha",
-            "contentHash": "sha256:sample-ai-subject-mask-alpha",
-            "dimensions": {
-              "height": 1080,
-              "width": 1620
-            },
-            "kind": "mask",
-            "storage": "temp_cache"
-          }
-        ],
-        "modelId": "local_sam2_subject_mask",
-        "modelVersion": "2026.06",
-        "previewArtifacts": [
-          {
-            "artifactId": "artifact_ai_subject_mask_preview",
-            "contentHash": "sha256:sample-ai-subject-mask-preview",
-            "dimensions": {
-              "height": 1080,
-              "width": 1620
-            },
-            "kind": "preview",
-            "storage": "temp_cache"
-          }
-        ],
-        "providerClass": "local_model",
-        "providerId": "rawengine-local-ai",
-        "schemaVersion": 1,
-        "sourceContentHash": "sha256:sample-raw-source-hash",
-        "warnings": []
-      },
-      "outputContentHash": "sha256:sample-ai-subject-mask-dry-run-output",
-      "outputSchemaName": "AiToolDryRunResultV1",
-      "prerequisiteStepIds": [],
-      "sourceGraphRevision": "graph_rev_44",
-      "stepId": "step_ai_subject_mask_dry_run",
-      "toolKind": "dry_run",
-      "toolName": "ai.mask.dry_run_subject",
-      "warnings": []
+  "toolCall": {
+    "approval": {
+      "approvalClass": "preview_only",
+      "reason": "Previewing a super-resolution merge estimates registration quality and detail gain without synthesis.",
+      "state": "not_required"
     },
-    {
+    "arguments": {
+      "actor": {
+        "id": "codex-app-server",
+        "kind": "agent",
+        "sessionId": "session_merge_sample"
+      },
       "approval": {
-        "approvalClass": "generative_edit",
-        "reason": "Apply the accepted AI-generated subject mask into the non-destructive edit graph.",
-        "recordId": "approval_ai_subject_mask_apply_001",
-        "state": "approved"
+        "approvalClass": "preview_only",
+        "reason": "Previewing a super-resolution merge estimates registration quality and detail gain without synthesis.",
+        "state": "not_required"
       },
-      "deterministic": true,
-      "dryRun": false,
-      "input": {
-        "actor": {
-          "id": "codex-app-server",
-          "kind": "agent",
-          "sessionId": "session_sample"
-        },
-        "approval": {
-          "approvalClass": "generative_edit",
-          "reason": "Apply the accepted AI-generated subject mask into the non-destructive edit graph.",
-          "recordId": "approval_ai_subject_mask_apply_001",
-          "state": "approved"
-        },
-        "commandId": "command_ai_subject_mask_apply_sample",
-        "commandType": "ai.mask.applySubject",
-        "correlationId": "corr_ai_subject_mask_sample",
-        "dryRun": false,
-        "expectedGraphRevision": "graph_rev_44",
-        "parameters": {
-          "acceptedDryRunPlanHash": "sha256:sample-ai-subject-mask-plan",
-          "acceptedDryRunPlanId": "dryrun_ai_subject_mask_001",
-          "cachePolicy": "reuse_allowed",
-          "capability": "subject_mask",
-          "maskName": "Subject mask",
-          "maxPreviewDimensionPx": 2048,
-          "modelHash": "sha256:local-sam2-subject-mask-model",
-          "modelId": "local_sam2_subject_mask",
-          "modelVersion": "2026.06",
-          "promptPolicy": "none",
-          "providerClass": "local_model",
-          "providerId": "rawengine-local-ai",
-          "sourceContentHash": "sha256:sample-raw-source-hash",
-          "sourcePixelDisclosure": "local_only"
-        },
-        "schemaVersion": 1,
-        "target": {
-          "imagePath": "/photos/session/IMG_0001.CR3",
-          "kind": "image",
-          "virtualCopyId": null
-        }
+      "commandId": "command_merge_super_resolution_preview_sample",
+      "correlationId": "corr_merge_super_resolution_preview_sample",
+      "dryRun": true,
+      "expectedGraphRevision": "graph_rev_44",
+      "idempotencyKey": "idem_merge_super_resolution_preview_sample",
+      "schemaVersion": 1,
+      "target": {
+        "id": "project_local_library",
+        "kind": "project"
       },
-      "inputContentHash": "sha256:sample-ai-subject-mask-apply-input",
-      "inputSchemaName": "AiToolCommandEnvelopeV1",
-      "mutates": true,
-      "output": {
-        "appliedGraphRevision": "graph_rev_47",
-        "changedMaskIds": ["mask_ai_subject_001"],
-        "commandId": "command_ai_subject_mask_apply_sample",
-        "commandType": "ai.mask.applySubject",
-        "correlationId": "corr_ai_subject_mask_sample",
-        "dryRunPlanHash": "sha256:sample-ai-subject-mask-plan",
-        "dryRunPlanId": "dryrun_ai_subject_mask_001",
-        "outputArtifacts": [
+      "commandType": "computationalMerge.createSuperResolution",
+      "parameters": {
+        "alignmentMode": "optical_flow",
+        "detailPolicy": "conservative",
+        "maxPreviewDimensionPx": 2400,
+        "outputName": "Handheld Burst Super Resolution",
+        "outputScale": 2,
+        "qualityPreference": "best",
+        "sources": [
           {
-            "artifactId": "artifact_ai_subject_mask_sidecar",
-            "contentHash": "sha256:sample-ai-subject-mask-sidecar",
-            "dimensions": {
-              "height": 1080,
-              "width": 1620
-            },
-            "kind": "mask",
-            "storage": "sidecar_artifact"
+            "colorSpaceHint": "camera_rgb",
+            "exposureEv": 0,
+            "imageId": "img_sr_001",
+            "imagePath": "/photos/session/SR_0001.CR3",
+            "rawDefaultsApplied": true,
+            "role": "sr_frame",
+            "sourceIndex": 0
+          },
+          {
+            "colorSpaceHint": "camera_rgb",
+            "exposureEv": 0,
+            "imageId": "img_sr_002",
+            "imagePath": "/photos/session/SR_0002.CR3",
+            "rawDefaultsApplied": true,
+            "role": "sr_frame",
+            "sourceIndex": 1
+          },
+          {
+            "colorSpaceHint": "camera_rgb",
+            "exposureEv": 0,
+            "imageId": "img_sr_003",
+            "imagePath": "/photos/session/SR_0003.CR3",
+            "rawDefaultsApplied": true,
+            "role": "sr_frame",
+            "sourceIndex": 2
           }
-        ],
-        "provenanceEntryIds": ["prov_ai_subject_mask_001"],
-        "schemaVersion": 1,
-        "sourceGraphRevision": "graph_rev_44",
-        "warnings": []
-      },
-      "outputContentHash": "sha256:sample-ai-subject-mask-apply-output",
-      "outputSchemaName": "AiToolApplyResultV1",
-      "prerequisiteStepIds": ["step_ai_subject_mask_dry_run"],
-      "resultingGraphRevision": "graph_rev_47",
-      "sourceGraphRevision": "graph_rev_44",
-      "stepId": "step_ai_subject_mask_apply",
-      "toolKind": "apply",
-      "toolName": "ai.mask.apply_subject",
-      "warnings": []
-    }
-  ],
-  "target": {
-    "imagePath": "/photos/session/IMG_0001.CR3",
-    "kind": "image",
-    "virtualCopyId": null
-  },
-  "validationProfile": "schema_contract",
-  "warnings": []
+        ]
+      }
+    },
+    "dryRun": true,
+    "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+    "itemId": "item_tool_call_sr_dry_run",
+    "jsonRpcRequestId": 48,
+    "protocol": "codex_app_server_json_rpc",
+    "schemaVersion": 1,
+    "threadId": "thread_rawengine_agent_sample",
+    "toolKind": "dry_run",
+    "toolName": "computationalmerge.super_resolution.dry_run_command",
+    "transport": "stdio",
+    "turnId": "turn_rawengine_agent_sample"
+  }
 }
