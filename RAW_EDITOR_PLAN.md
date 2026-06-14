@@ -4006,6 +4006,9 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Tool manifest: `packages/rawengine-schema/samples/computational-merge-app-server-tool-manifest-v1.json`
 - `panorama(adapter): evaluate OpenCV stitching backend`
 - `validation(panorama): add panorama performance tests`
+  - Fixture manifest: `fixtures/panorama/panorama-performance-fixtures.json`
+  - Validation: `bun run check:panorama-performance-fixtures`
+  - Doc: `docs/panorama/performance-validation-contract-2026-06-14.md`
 
 #### Milestone 12: Focus Stacking
 
@@ -4796,6 +4799,8 @@ Issues:
 - Decide OpenCV required-CI promotion criteria. Initial policy captured in
   `docs/panorama/opencv-required-ci-promotion-2026-06-13.md`.
 - Add panorama performance tests.
+  Initial metadata-only gate captured in
+  `docs/panorama/performance-validation-contract-2026-06-14.md`.
 
 Definition of done:
 
