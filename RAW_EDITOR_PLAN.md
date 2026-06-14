@@ -4021,6 +4021,9 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(focus): add focus bracket fixture set`
   - Doc: `docs/focus-stacking/focus-bracket-fixture-manifest-2026-06-14.md`
 - `ui(focus): add focus stack UI`
+  - Component: `src/components/modals/FocusStackModal.tsx`
+  - Schema: `src/schemas/focusStackUiSchemas.ts`
+  - Surface: thumbnail multi-select productivity menu and plan-only preflight modal.
 - `api(focus): add focus stack API tools`
   - Doc: `docs/focus-stacking/api-tool-contract-2026-06-14.md`
 - `validation(focus): add focus stack performance tests`

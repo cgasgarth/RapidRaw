@@ -193,7 +193,8 @@
       "stitchPanorama": "Unir panorama",
       "tagging": "Etiquetado",
       "undo": "Deshacer",
-      "superResolution": "Super Resolution"
+      "superResolution": "Super Resolution",
+      "focusStack": "Focus Stack"
     },
     "folders": {
       "changeIcon": "Cambiar icono",
@@ -1369,6 +1370,74 @@
       "title": "Super Resolution",
       "workflowStatus": "Plan-only surface until API wiring lands.",
       "workflowTitle": "Super-resolution plan"
+    },
+    "focusStack": {
+      "apiPending": "API pending",
+      "alignment": {
+        "auto": "Auto",
+        "homography": "Homography",
+        "none": "None",
+        "translation": "Translation"
+      },
+      "alignmentAuto": "Auto",
+      "alignmentHomography": "Homography",
+      "alignmentLabel": "Alignment",
+      "alignmentNone": "None",
+      "alignmentTranslation": "Translation",
+      "blendLabel": "Blend method",
+      "blendMethod": {
+        "depth_map": {
+          "label": "Depth map",
+          "status": "Preview planning"
+        },
+        "laplacian_pyramid": {
+          "label": "Laplacian pyramid",
+          "status": "Professional default"
+        },
+        "weighted_sharpness": {
+          "label": "Weighted sharpness",
+          "status": "Fast preview"
+        }
+      },
+      "close": "Close",
+      "depthMapNotice": "Depth-map blending is preview-only until validated depth estimation and edge refinement land.",
+      "planDependency": "Final apply requires an accepted dry-run plan from the focus-stack API.",
+      "preflight": {
+        "alignment": "Alignment",
+        "blend": "Blend",
+        "memory": "Memory",
+        "pending": "Not estimated",
+        "provenance": "Provenance",
+        "required": "Required",
+        "retouch": "Retouch",
+        "sources": "Sources"
+      },
+      "preflightTitle": "Preflight",
+      "previewBudgetLabel": "Preview budget",
+      "previewBudgetValue": "{{value}} px",
+      "previewPlan": "Preview plan",
+      "qualityBalanced": "Balanced",
+      "qualityBest": "Best",
+      "qualityLabel": "Quality",
+      "qualityPreview": "Preview",
+      "retouchLabel": "Retouch layer",
+      "retouchPolicy": {
+        "generate_retouch_layer": {
+          "label": "Generate retouch layer",
+          "status": "Editable defects"
+        },
+        "none": {
+          "label": "None",
+          "status": "Flattened preview"
+        }
+      },
+      "sourceCountBlocked": "Focus stacking needs at least two focus-bracketed source frames.",
+      "sourceSummary": "{{count}} focus frames selected",
+      "sourceSummary_one": "{{count}} focus frame selected",
+      "sourceSummary_other": "{{count}} focus frames selected",
+      "title": "Focus Stack",
+      "workflowStatus": "Plan-only surface until API wiring lands.",
+      "workflowTitle": "Focus-stack plan"
     }
   },
   "settings": {
