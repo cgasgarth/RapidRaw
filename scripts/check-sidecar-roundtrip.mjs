@@ -4,7 +4,10 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { z } from 'zod';
-import { panoramaArtifactV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  aiSidecarProvenanceEntryV1Schema,
+  panoramaArtifactV1Schema,
+} from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const ROOT = process.cwd();
 const FIXTURE_DIR = 'fixtures/sidecar-roundtrip';
@@ -33,6 +36,7 @@ const JsonValueSchema = z.lazy(() =>
 
 const RawEngineArtifactsSchema = z
   .object({
+    aiProvenanceEntries: z.array(aiSidecarProvenanceEntryV1Schema).default([]),
     panoramaArtifacts: z.array(panoramaArtifactV1Schema).default([]),
     schemaVersion: z.literal(1),
     staleArtifactIds: z.array(z.string().trim().min(1)).default([]),
@@ -207,6 +211,23 @@ if (!primary.metadata.exif) {
 
 assertEqual(primary.metadata.exif.Make, 'FixtureCam', 'primary EXIF Make');
 assertEqual(primary.metadata.exif.Model, 'Deterministic 1', 'primary EXIF Model');
+
+const primaryArtifacts = RawEngineArtifactsSchema.parse(primary.metadata.rawEngineArtifacts);
+assertEqual(primaryArtifacts.schemaVersion, 1, 'primary rawEngineArtifacts schema version');
+assertEqual(primaryArtifacts.aiProvenanceEntries.length, 2, 'primary AI provenance entry count');
+assertEqual(primaryArtifacts.panoramaArtifacts.length, 0, 'primary panorama artifact count');
+
+const [maskProvenance, enhancementProvenance] = primaryArtifacts.aiProvenanceEntries;
+assertEqual(maskProvenance.providerId, 'rawengine-local-ai', 'AI mask provider id');
+assertEqual(maskProvenance.modelId, 'local_sam2_subject_mask', 'AI mask model id');
+assertEqual(maskProvenance.settingsHash, 'sha256:sample-ai-subject-mask-settings', 'AI mask settings hash');
+assertEqual(enhancementProvenance.capability, 'denoise', 'AI enhancement capability');
+assertEqual(enhancementProvenance.qualityPreference, 'balanced', 'AI enhancement quality preference');
+
+const roundtrippedPrimaryArtifacts = SidecarSchema.parse(
+  JSON.parse(JSON.stringify(primary.metadata, null, 2)),
+).rawEngineArtifacts;
+assertJsonEqual(roundtrippedPrimaryArtifacts, primaryArtifacts, 'AI provenance sidecar roundtrip');
 
 assertEqual(deriveSidecarPath(PRIMARY_IMAGE_PATH), '/fixture-roll/IMG_0001.CR3.rrdata', 'primary sidecar path');
 assertEqual(

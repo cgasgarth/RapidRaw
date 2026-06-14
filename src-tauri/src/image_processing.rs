@@ -53,6 +53,8 @@ impl<'a> IntoCowImage<'a> for &'a std::sync::Arc<DynamicImage> {
 pub struct RawEngineArtifacts {
     pub schema_version: u32,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ai_provenance_entries: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub panorama_artifacts: Vec<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stale_artifact_ids: Vec<String>,
@@ -3298,6 +3300,12 @@ mod tests {
             exif: None,
             raw_engine_artifacts: Some(RawEngineArtifacts {
                 schema_version: 1,
+                ai_provenance_entries: vec![json!({
+                    "provenanceEntryId": "prov_ai_subject_mask_001",
+                    "providerId": "rawengine-local-ai",
+                    "modelId": "local_sam2_subject_mask",
+                    "settingsHash": "sha256:sample-ai-subject-mask-settings"
+                })],
                 panorama_artifacts: vec![json!({
                     "artifactId": "artifact_panorama_session_0001",
                     "provenance": { "runtimeStatus": "rendered" }
@@ -3320,6 +3328,10 @@ mod tests {
         assert_eq!(
             artifacts.panorama_artifacts[0]["artifactId"],
             "artifact_panorama_session_0001"
+        );
+        assert_eq!(
+            artifacts.ai_provenance_entries[0]["provenanceEntryId"],
+            "prov_ai_subject_mask_001"
         );
         assert!(artifacts.stale_artifact_ids.is_empty());
     }

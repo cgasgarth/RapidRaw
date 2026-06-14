@@ -22,5 +22,59 @@
     "Make": "FixtureCam",
     "Model": "Deterministic 1",
     "ISO": "200"
+  },
+  "rawEngineArtifacts": {
+    "schemaVersion": 1,
+    "aiProvenanceEntries": [
+      {
+        "schemaVersion": 1,
+        "provenanceEntryId": "prov_ai_subject_mask_001",
+        "commandId": "command_ai_subject_mask_apply_sample",
+        "commandType": "ai.mask.applySubject",
+        "correlationId": "corr_ai_subject_mask_sample",
+        "sourceGraphRevision": "graph_rev_44",
+        "acceptedDryRunPlanId": "dryrun_ai_subject_mask_001",
+        "acceptedDryRunPlanHash": "sha256:sample-ai-subject-mask-plan",
+        "approvalClass": "generative_edit",
+        "approvalRecordId": "approval_ai_subject_mask_apply_001",
+        "providerClass": "local_model",
+        "providerId": "rawengine-local-ai",
+        "modelId": "local_sam2_subject_mask",
+        "modelVersion": "2026.06",
+        "modelHash": "sha256:local-sam2-subject-mask-model",
+        "capability": "subject_mask",
+        "promptPolicy": "none",
+        "sourcePixelDisclosure": "local_only",
+        "sourceContentHash": "sha256:sample-raw-source-hash",
+        "settingsHash": "sha256:sample-ai-subject-mask-settings",
+        "outputArtifactIds": ["artifact_ai_subject_mask_sidecar"]
+      },
+      {
+        "schemaVersion": 1,
+        "provenanceEntryId": "prov_ai_denoise_001",
+        "commandId": "command_ai_denoise_apply_sample",
+        "commandType": "ai.enhancement.apply",
+        "correlationId": "corr_ai_denoise_sample",
+        "sourceGraphRevision": "graph_rev_44",
+        "acceptedDryRunPlanId": "dryrun_ai_denoise_001",
+        "acceptedDryRunPlanHash": "sha256:sample-ai-denoise-plan",
+        "approvalClass": "generative_edit",
+        "approvalRecordId": "approval_ai_denoise_apply_001",
+        "providerClass": "local_model",
+        "providerId": "rawengine-local-ai",
+        "modelId": "local_raw_denoise",
+        "modelVersion": "2026.06",
+        "modelHash": "sha256:local-denoise-model",
+        "capability": "denoise",
+        "promptPolicy": "none",
+        "qualityPreference": "balanced",
+        "sourcePixelDisclosure": "local_only",
+        "sourceContentHash": "sha256:sample-raw-source-hash",
+        "settingsHash": "sha256:sample-ai-denoise-settings",
+        "outputArtifactIds": ["artifact_ai_denoise_sidecar"]
+      }
+    ],
+    "panoramaArtifacts": [],
+    "staleArtifactIds": []
   }
 }
