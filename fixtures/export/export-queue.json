@@ -1,0 +1,50 @@
+{
+  "activeJobId": "export-job-running",
+  "jobs": [
+    {
+      "completedAt": null,
+      "createdAt": "2026-06-14T08:00:00.000Z",
+      "errorMessage": null,
+      "id": "export-job-running",
+      "outputTarget": "/Users/example/Pictures/Exports",
+      "priority": "high",
+      "progress": {
+        "current": 2,
+        "total": 6
+      },
+      "recipe": {
+        "fileFormat": "jpeg",
+        "recipeId": "client-proof-jpeg",
+        "recipeName": "Client Proof JPEG"
+      },
+      "sourcePaths": [
+        "/Users/example/Pictures/Session/DSC_0001.ARW",
+        "/Users/example/Pictures/Session/DSC_0002.ARW",
+        "/Users/example/Pictures/Session/DSC_0003.ARW"
+      ],
+      "startedAt": "2026-06-14T08:01:00.000Z",
+      "status": "running"
+    },
+    {
+      "completedAt": null,
+      "createdAt": "2026-06-14T08:02:00.000Z",
+      "errorMessage": null,
+      "id": "export-job-queued",
+      "outputTarget": "/Users/example/Pictures/Exports",
+      "priority": "normal",
+      "progress": {
+        "current": 0,
+        "total": 3
+      },
+      "recipe": {
+        "fileFormat": "tiff",
+        "recipeId": "archive-tiff",
+        "recipeName": "Archive TIFF"
+      },
+      "sourcePaths": ["/Users/example/Pictures/Session/DSC_0004.ARW", "/Users/example/Pictures/Session/DSC_0005.ARW"],
+      "startedAt": null,
+      "status": "queued"
+    }
+  ],
+  "maxConcurrentJobs": 1
+}
