@@ -360,6 +360,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       requiresDryRun: true,
       returnsArtifactHandles: true,
       toolKind: 'dry_run',
+      toolName: 'computationalmerge.panorama.dry_run_command',
+    },
+    {
+      approvalClass: ApprovalClass.EditApply,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'ComputationalMergeMutationResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: true,
+      toolKind: 'apply',
+      toolName: 'computationalmerge.panorama.apply_command',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'ComputationalMergeDryRunResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
       toolName: 'computationalmerge.focus_stack.dry_run_command',
     },
     {
@@ -2099,6 +2119,48 @@ export const sampleComputationalMergeMutationResultV1: ComputationalMergeMutatio
     sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
     undoRevision: sampleEditGraphSnapshotV1.graphRevision,
     warnings: [],
+  });
+
+export const sampleComputationalMergePanoramaDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleComputationalMergeCommandEnvelopeV1.approval,
+      arguments: sampleComputationalMergeCommandEnvelopeV1,
+      dryRun: true,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      itemId: 'item_tool_call_panorama_dry_run',
+      jsonRpcRequestId: 44,
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_sample',
+      toolKind: 'dry_run',
+      toolName: 'computationalmerge.panorama.dry_run_command',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_sample',
+    },
+  });
+
+export const sampleComputationalMergePanoramaApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleComputationalMergeApplyCommandEnvelopeV1.approval,
+      arguments: sampleComputationalMergeApplyCommandEnvelopeV1,
+      dryRun: false,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      itemId: 'item_tool_call_panorama_apply',
+      jsonRpcRequestId: 45,
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_sample',
+      toolKind: 'apply',
+      toolName: 'computationalmerge.panorama.apply_command',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_sample',
+    },
   });
 
 export const sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
@@ -4687,6 +4749,38 @@ export const sampleComputationalMergeAppServerToolManifestV1: ComputationalMerge
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     serverRuntime: 'openai_app_server',
     tools: [
+      {
+        allowedCommandTypes: ['computationalMerge.createPanorama'],
+        approvalClass: ApprovalClass.PreviewOnly,
+        auditEvents: ['computational_merge_dry_run_requested', 'computational_merge_dry_run_completed'],
+        description:
+          'Preview a local panorama stitch and return a non-mutating dry-run plan with geometry, memory, and artifact handles.',
+        executionMode: 'dry_run_command',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: false,
+        outputSchemaName: 'ComputationalMergeDryRunResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: false,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.panorama.dry_run_command',
+      },
+      {
+        allowedCommandTypes: ['computationalMerge.createPanorama'],
+        approvalClass: ApprovalClass.EditApply,
+        auditEvents: ['computational_merge_apply_requested', 'computational_merge_apply_completed'],
+        description:
+          'Apply an accepted local panorama dry-run plan into the non-destructive edit graph after approval.',
+        executionMode: 'apply_dry_run_plan',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: true,
+        outputSchemaName: 'ComputationalMergeMutationResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: true,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.panorama.apply_command',
+      },
       {
         allowedCommandTypes: ['computationalMerge.createFocusStack'],
         approvalClass: ApprovalClass.PreviewOnly,

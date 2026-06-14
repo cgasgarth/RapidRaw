@@ -4001,6 +4001,9 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(panorama): add panorama fixture set`
 - `ui(panorama): add panorama UI`
 - `api(panorama): add panorama API tools`
+  - Schema samples: `packages/rawengine-schema/samples/computational-merge-panorama-dry-run-app-server-tool-call-validation-v1.json`
+    and `packages/rawengine-schema/samples/computational-merge-panorama-apply-app-server-tool-call-validation-v1.json`
+  - Tool manifest: `packages/rawengine-schema/samples/computational-merge-app-server-tool-manifest-v1.json`
 - `panorama(adapter): evaluate OpenCV stitching backend`
 - `validation(panorama): add panorama performance tests`
 
@@ -4775,6 +4778,8 @@ Issues:
 - Add panorama fixture set.
 - Add panorama UI.
 - Add panorama API tools.
+  Initial app-server dry-run/apply tool contracts captured in
+  `packages/rawengine-schema/samples/computational-merge-app-server-tool-manifest-v1.json`.
 - Evaluate OpenCV stitching backend. Initial evaluation captured in
   `docs/panorama/opencv-backend-evaluation-2026-06-13.md`; recommendation is
   optional spike behind the panorama adapter, not a default dependency.

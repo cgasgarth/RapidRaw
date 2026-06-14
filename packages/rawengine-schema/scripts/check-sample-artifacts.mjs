@@ -102,6 +102,8 @@ import {
   sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1,
   sampleComputationalMergeHdrCommandEnvelopeV1,
   sampleComputationalMergeMutationResultV1,
+  sampleComputationalMergePanoramaApplyAppServerToolCallValidationV1,
+  sampleComputationalMergePanoramaDryRunAppServerToolCallValidationV1,
   sampleComputationalMergeSuperResolutionApplyAppServerToolCallValidationV1,
   sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
   sampleComputationalMergeSuperResolutionDryRunAppServerToolCallValidationV1,
@@ -456,6 +458,18 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/computational-merge-app-server-tool-manifest-v1.json',
     schema: computationalMergeAppServerToolManifestV1Schema,
     value: sampleComputationalMergeAppServerToolManifestV1,
+  },
+  {
+    name: 'computational merge panorama dry-run app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/computational-merge-panorama-dry-run-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergePanoramaDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'computational merge panorama apply app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/computational-merge-panorama-apply-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergePanoramaApplyAppServerToolCallValidationV1,
   },
   {
     name: 'computational merge focus stack dry-run app-server tool call validation',
