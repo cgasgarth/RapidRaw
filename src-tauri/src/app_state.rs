@@ -16,6 +16,7 @@ use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
 use crate::lens_correction::LensDatabase;
 use crate::lut_processing::Lut;
+use crate::panorama_stitching::PendingPanoramaResult;
 
 #[derive(Serialize, Deserialize)]
 pub struct WindowState {
@@ -118,7 +119,7 @@ pub struct AppState {
     pub ai_init_lock: TokioMutex<()>,
     pub export_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
-    pub panorama_result: Arc<Mutex<Option<DynamicImage>>>,
+    pub panorama_result: Arc<Mutex<Option<PendingPanoramaResult>>>,
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub lut_cache: Mutex<HashMap<String, Arc<Lut>>>,

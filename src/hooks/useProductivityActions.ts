@@ -37,6 +37,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
     try {
       const savedPath: string = await invoke(Invokes.SavePanorama, {
         firstPathStr: panoramaModalState.stitchingSourcePaths[0],
+        sourcePaths: panoramaModalState.stitchingSourcePaths,
       });
       await refreshImageList();
       return savedPath;

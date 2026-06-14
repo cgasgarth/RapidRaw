@@ -7,13 +7,13 @@ use rand::prelude::*;
 use rand::rng;
 use rayon::prelude::*;
 
-const MAX_PROCESSING_DIMENSION: u32 = 1600;
+pub const MAX_PROCESSING_DIMENSION: u32 = 1600;
 const FAST_THRESHOLD: u8 = 15;
 const NON_MAXIMA_SUPPRESSION_RADIUS: f32 = 15.0;
 const BRIEF_PATCH_SIZE: u32 = 32;
 const MATCH_RATIO_THRESHOLD: f32 = 0.8;
-const RANSAC_ITERATIONS: usize = 2500;
-const RANSAC_INLIER_THRESHOLD: f64 = 5.0;
+pub const RANSAC_ITERATIONS: usize = 2500;
+pub const RANSAC_INLIER_THRESHOLD: f64 = 5.0;
 pub const MIN_INLIERS_FOR_CONNECTION: usize = 15;
 const LOW_DETAIL_WINDOW_RADIUS: u32 = 16;
 const LOW_DETAIL_VARIANCE_THRESHOLD: f64 = 60.0;

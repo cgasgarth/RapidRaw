@@ -372,7 +372,12 @@ pub async fn load_image(
     let (source_path, sidecar_path) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
 
-    let metadata: ImageMetadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    let mut metadata: ImageMetadata = crate::exif_processing::load_sidecar(&sidecar_path);
+    if crate::panorama_stitching::refresh_panorama_stale_artifacts(&mut metadata)
+        && let Ok(json) = serde_json::to_string_pretty(&metadata)
+    {
+        let _ = fs::write(&sidecar_path, json);
+    }
 
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
