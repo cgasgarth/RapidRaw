@@ -83,6 +83,6 @@
     }
   ],
   "missingLicenseFileAllowed": {
-    "@pkgr/core@0.2.9": "Package reports MIT license metadata but does not ship a license file in node_modules; keep explicit until upstream package metadata changes."
+    "@pkgr/core@0.3.6": "Package reports MIT license metadata but does not ship a license file in node_modules; keep explicit until upstream package metadata changes."
   }
 }
