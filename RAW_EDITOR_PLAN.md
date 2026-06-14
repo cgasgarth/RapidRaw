@@ -4016,6 +4016,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `ui(focus): add focus stack UI`
 - `api(focus): add focus stack API tools`
 - `validation(focus): add focus stack performance tests`
+  - Doc: `docs/focus-stacking/performance-validation-contract-2026-06-14.md`
 
 #### Milestone 13: Super-Resolution
 
