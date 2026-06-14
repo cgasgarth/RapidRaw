@@ -43,6 +43,7 @@ import {
   type AiProviderId as AiProviderIdType,
 } from '../../schemas/aiProviderSchemas';
 import { cloudUsageSchema, type CloudUsage } from '../../schemas/cloudUsageSchemas';
+import { normalizeKeyboardShortcutMap, parseKeyboardShortcutCombo } from '../../schemas/keyboardShortcutSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
   formatKeyCode,
@@ -143,6 +144,7 @@ const formatUnknownError = (error: unknown): string => (error instanceof Error ?
 
 const EXECUTE_TIMEOUT = 3000;
 const translateDynamicKey = (translate: TFunction, key: string): string => translate(key, { defaultValue: key });
+const KEYBIND_ACTIONS = new Set(KEYBIND_DEFINITIONS.map((definition) => definition.action));
 
 const adjustmentVisibilityDefaults = {
   sharpening: true,
@@ -1053,13 +1055,15 @@ export default function SettingsPanel({
   };
 
   const handleKeybindSave = (action: string, combo: string[]) => {
-    const newKeybinds = { ...(appSettings.keybinds || {}), [action]: combo };
+    const validatedCombo = parseKeyboardShortcutCombo(combo);
+    const currentKeybinds = normalizeKeyboardShortcutMap(appSettings.keybinds, KEYBIND_ACTIONS);
+    const newKeybinds = { ...currentKeybinds, [action]: validatedCombo };
     saveSettings({ ...appSettings, keybinds: newKeybinds });
   };
 
   const conflictingKeys = useMemo(() => {
     const map = new Map<string, Set<string>>();
-    const userKb = appSettings.keybinds || {};
+    const userKb = normalizeKeyboardShortcutMap(appSettings.keybinds, KEYBIND_ACTIONS);
     for (const def of KEYBIND_DEFINITIONS) {
       const userCombo = userKb[def.action];
       const effective = userCombo?.length ? userCombo : userCombo === undefined ? def.defaultCombo : null;
@@ -2536,7 +2540,7 @@ export default function SettingsPanel({
                     {' '}
                     {KEYBIND_SECTIONS.map((section) => {
                       const sectionDefs = KEYBIND_DEFINITIONS.filter((d) => d.section === section.id);
-                      const userKb = appSettings.keybinds || {};
+                      const userKb = normalizeKeyboardShortcutMap(appSettings.keybinds, KEYBIND_ACTIONS);
                       return (
                         <div key={section.id}>
                           <UiText variant={TextVariants.heading}>{translateDynamicKey(t, section.label)}</UiText>
