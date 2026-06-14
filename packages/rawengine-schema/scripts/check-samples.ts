@@ -98,7 +98,10 @@ import {
   sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
   sampleComputationalMergeFocusStackCommandEnvelopeV1,
   sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1,
+  sampleComputationalMergeHdrApplyAppServerToolCallValidationV1,
+  sampleComputationalMergeHdrApplyCommandEnvelopeV1,
   sampleComputationalMergeHdrCommandEnvelopeV1,
+  sampleComputationalMergeHdrDryRunAppServerToolCallValidationV1,
   sampleComputationalMergeMutationResultV1,
   sampleComputationalMergePanoramaApplyAppServerToolCallValidationV1,
   sampleComputationalMergePanoramaDryRunAppServerToolCallValidationV1,
@@ -393,6 +396,11 @@ const validSamples: ReadonlyArray<{
     value: sampleComputationalMergeHdrCommandEnvelopeV1,
   },
   {
+    name: 'computational merge HDR apply command envelope',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeHdrApplyCommandEnvelopeV1,
+  },
+  {
     name: 'computational merge focus stack command envelope',
     schema: computationalMergeCommandEnvelopeV1Schema,
     value: sampleComputationalMergeFocusStackCommandEnvelopeV1,
@@ -441,6 +449,16 @@ const validSamples: ReadonlyArray<{
     name: 'computational merge panorama apply app-server tool call validation',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleComputationalMergePanoramaApplyAppServerToolCallValidationV1,
+  },
+  {
+    name: 'computational merge HDR dry-run app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergeHdrDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'computational merge HDR apply app-server tool call validation',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergeHdrApplyAppServerToolCallValidationV1,
   },
   {
     name: 'computational merge focus stack dry-run app-server tool call validation',

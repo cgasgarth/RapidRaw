@@ -1,12 +1,4 @@
 {
-  "actor": {
-    "id": "codex-app-server",
-    "kind": "agent",
-    "sessionId": "session_sample"
-  },
-  "deterministicReplayHash": "sha256:sample-ai-denoise-replay",
-  "finalGraphRevision": "graph_rev_48",
-  "initialGraphRevision": "graph_rev_44",
   "registry": {
     "schemaVersion": 1,
     "tools": [
@@ -312,200 +304,87 @@
       }
     ]
   },
-  "replayId": "replay_ai_denoise_001",
-  "replayKind": "agent_tool_replay",
   "schemaVersion": 1,
-  "steps": [
-    {
-      "approval": {
-        "approvalClass": "external_model",
-        "reason": "Local AI denoise model reads pixels and returns a non-mutating dry-run enhancement artifact.",
-        "state": "approved"
-      },
-      "deterministic": true,
-      "dryRun": true,
-      "input": {
-        "actor": {
-          "id": "codex-app-server",
-          "kind": "agent",
-          "sessionId": "session_sample"
-        },
-        "approval": {
-          "approvalClass": "external_model",
-          "reason": "Local AI denoise model reads pixels and returns a non-mutating dry-run enhancement artifact.",
-          "state": "approved"
-        },
-        "commandId": "command_ai_denoise_dry_run_sample",
-        "commandType": "ai.enhancement.dryRun",
-        "correlationId": "corr_ai_denoise_sample",
-        "dryRun": true,
-        "expectedGraphRevision": "graph_rev_44",
-        "parameters": {
-          "cachePolicy": "reuse_allowed",
-          "capability": "denoise",
-          "maxPreviewDimensionPx": 2048,
-          "modelHash": "sha256:local-denoise-model",
-          "modelId": "local_raw_denoise",
-          "modelVersion": "2026.06",
-          "promptPolicy": "none",
-          "providerClass": "local_model",
-          "providerId": "rawengine-local-ai",
-          "qualityPreference": "balanced",
-          "sourceContentHash": "sha256:sample-raw-source-hash",
-          "sourcePixelDisclosure": "local_only",
-          "strength": 0.42
-        },
-        "schemaVersion": 1,
-        "target": {
-          "imagePath": "/photos/session/IMG_0001.CR3",
-          "kind": "image",
-          "virtualCopyId": null
-        }
-      },
-      "inputContentHash": "sha256:sample-ai-denoise-dry-run-input",
-      "inputSchemaName": "AiEnhancementCommandEnvelopeV1",
-      "mutates": false,
-      "output": {
-        "commandId": "command_ai_denoise_dry_run_sample",
-        "commandType": "ai.enhancement.dryRun",
-        "correlationId": "corr_ai_denoise_sample",
-        "dryRunPlanHash": "sha256:sample-ai-denoise-plan",
-        "dryRunPlanId": "dryrun_ai_denoise_001",
-        "enhancementArtifacts": [
-          {
-            "artifactId": "artifact_ai_denoise_preview_patch",
-            "contentHash": "sha256:sample-ai-denoise-preview-patch",
-            "dimensions": {
-              "height": 1080,
-              "width": 1620
-            },
-            "kind": "denoise_output",
-            "storage": "temp_cache"
-          }
-        ],
-        "modelId": "local_raw_denoise",
-        "modelVersion": "2026.06",
-        "previewArtifacts": [
-          {
-            "artifactId": "artifact_ai_denoise_preview",
-            "contentHash": "sha256:sample-ai-denoise-preview",
-            "dimensions": {
-              "height": 1080,
-              "width": 1620
-            },
-            "kind": "preview",
-            "storage": "temp_cache"
-          }
-        ],
-        "providerClass": "local_model",
-        "providerId": "rawengine-local-ai",
-        "schemaVersion": 1,
-        "sourceContentHash": "sha256:sample-raw-source-hash",
-        "warnings": []
-      },
-      "outputContentHash": "sha256:sample-ai-denoise-dry-run-output",
-      "outputSchemaName": "AiEnhancementDryRunResultV1",
-      "prerequisiteStepIds": [],
-      "sourceGraphRevision": "graph_rev_44",
-      "stepId": "step_ai_denoise_dry_run",
-      "toolKind": "dry_run",
-      "toolName": "ai.enhancement.dry_run_command",
-      "warnings": []
+  "toolCall": {
+    "approval": {
+      "approvalClass": "edit_apply",
+      "reason": "Applying the accepted HDR dry-run creates an editable scene-linear derived asset.",
+      "state": "approved"
     },
-    {
+    "arguments": {
+      "actor": {
+        "id": "codex-app-server",
+        "kind": "agent",
+        "sessionId": "session_merge_sample"
+      },
       "approval": {
-        "approvalClass": "generative_edit",
-        "reason": "Apply the accepted AI denoise dry-run plan into the non-destructive edit graph.",
-        "recordId": "approval_ai_denoise_apply_001",
+        "approvalClass": "edit_apply",
+        "reason": "Applying the accepted HDR dry-run creates an editable scene-linear derived asset.",
         "state": "approved"
       },
-      "deterministic": true,
+      "commandId": "command_merge_hdr_apply_sample",
+      "correlationId": "corr_merge_hdr_apply_sample",
       "dryRun": false,
-      "input": {
-        "actor": {
-          "id": "codex-app-server",
-          "kind": "agent",
-          "sessionId": "session_sample"
-        },
-        "approval": {
-          "approvalClass": "generative_edit",
-          "reason": "Apply the accepted AI denoise dry-run plan into the non-destructive edit graph.",
-          "recordId": "approval_ai_denoise_apply_001",
-          "state": "approved"
-        },
-        "commandId": "command_ai_denoise_apply_sample",
-        "commandType": "ai.enhancement.apply",
-        "correlationId": "corr_ai_denoise_sample",
-        "dryRun": false,
-        "expectedGraphRevision": "graph_rev_44",
-        "parameters": {
-          "acceptedDryRunPlanHash": "sha256:sample-ai-denoise-plan",
-          "acceptedDryRunPlanId": "dryrun_ai_denoise_001",
-          "cachePolicy": "reuse_allowed",
-          "capability": "denoise",
-          "maxPreviewDimensionPx": 2048,
-          "modelHash": "sha256:local-denoise-model",
-          "modelId": "local_raw_denoise",
-          "modelVersion": "2026.06",
-          "promptPolicy": "none",
-          "providerClass": "local_model",
-          "providerId": "rawengine-local-ai",
-          "qualityPreference": "balanced",
-          "sourceContentHash": "sha256:sample-raw-source-hash",
-          "sourcePixelDisclosure": "local_only",
-          "strength": 0.42
-        },
-        "schemaVersion": 1,
-        "target": {
-          "imagePath": "/photos/session/IMG_0001.CR3",
-          "kind": "image",
-          "virtualCopyId": null
-        }
+      "expectedGraphRevision": "graph_rev_44",
+      "idempotencyKey": "idem_merge_hdr_apply_sample",
+      "schemaVersion": 1,
+      "target": {
+        "id": "project_local_library",
+        "kind": "project"
       },
-      "inputContentHash": "sha256:sample-ai-denoise-apply-input",
-      "inputSchemaName": "AiEnhancementCommandEnvelopeV1",
-      "mutates": true,
-      "output": {
-        "appliedGraphRevision": "graph_rev_48",
-        "changedEditNodeIds": ["edit_node_ai_denoise_001"],
-        "commandId": "command_ai_denoise_apply_sample",
-        "commandType": "ai.enhancement.apply",
-        "correlationId": "corr_ai_denoise_sample",
-        "dryRunPlanHash": "sha256:sample-ai-denoise-plan",
-        "dryRunPlanId": "dryrun_ai_denoise_001",
-        "outputArtifacts": [
+      "commandType": "computationalMerge.createHdr",
+      "parameters": {
+        "acceptedDryRunPlanHash": "sha256:sample-merge-hdr-plan",
+        "acceptedDryRunPlanId": "merge_plan_hdr_001",
+        "alignmentMode": "auto",
+        "bracketValidation": "required",
+        "deghosting": "medium",
+        "maxPreviewDimensionPx": 2400,
+        "mergeStrategy": "scene_linear_radiance",
+        "outputName": "Window Light HDR",
+        "qualityPreference": "balanced",
+        "sources": [
           {
-            "artifactId": "artifact_ai_denoise_sidecar",
-            "contentHash": "sha256:sample-ai-denoise-sidecar",
-            "dimensions": {
-              "height": 1080,
-              "width": 1620
-            },
-            "kind": "denoise_output",
-            "storage": "sidecar_artifact"
+            "colorSpaceHint": "camera_rgb",
+            "exposureEv": -2,
+            "imageId": "img_hdr_001",
+            "imagePath": "/photos/session/HDR_0001.CR3",
+            "rawDefaultsApplied": true,
+            "role": "hdr_bracket",
+            "sourceIndex": 0
+          },
+          {
+            "colorSpaceHint": "camera_rgb",
+            "exposureEv": 0,
+            "imageId": "img_hdr_002",
+            "imagePath": "/photos/session/HDR_0002.CR3",
+            "rawDefaultsApplied": true,
+            "role": "hdr_bracket",
+            "sourceIndex": 1
+          },
+          {
+            "colorSpaceHint": "camera_rgb",
+            "exposureEv": 2,
+            "imageId": "img_hdr_003",
+            "imagePath": "/photos/session/HDR_0003.CR3",
+            "rawDefaultsApplied": true,
+            "role": "hdr_bracket",
+            "sourceIndex": 2
           }
         ],
-        "provenanceEntryIds": ["prov_ai_denoise_001"],
-        "schemaVersion": 1,
-        "sourceGraphRevision": "graph_rev_44",
-        "warnings": []
-      },
-      "outputContentHash": "sha256:sample-ai-denoise-apply-output",
-      "outputSchemaName": "AiEnhancementApplyResultV1",
-      "prerequisiteStepIds": ["step_ai_denoise_dry_run"],
-      "resultingGraphRevision": "graph_rev_48",
-      "sourceGraphRevision": "graph_rev_44",
-      "stepId": "step_ai_denoise_apply",
-      "toolKind": "apply",
-      "toolName": "ai.enhancement.apply_command",
-      "warnings": []
-    }
-  ],
-  "target": {
-    "imagePath": "/photos/session/IMG_0001.CR3",
-    "kind": "image",
-    "virtualCopyId": null
-  },
-  "validationProfile": "schema_contract",
-  "warnings": []
+        "toneMapPreview": true
+      }
+    },
+    "dryRun": false,
+    "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+    "itemId": "item_tool_call_hdr_apply",
+    "jsonRpcRequestId": 47,
+    "protocol": "codex_app_server_json_rpc",
+    "schemaVersion": 1,
+    "threadId": "thread_rawengine_agent_sample",
+    "toolKind": "apply",
+    "toolName": "computationalmerge.hdr.apply_command",
+    "transport": "stdio",
+    "turnId": "turn_rawengine_agent_sample"
+  }
 }

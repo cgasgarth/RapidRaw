@@ -362,6 +362,26 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
       requiresDryRun: true,
       returnsArtifactHandles: true,
       toolKind: 'dry_run',
+      toolName: 'computationalmerge.hdr.dry_run_command',
+    },
+    {
+      approvalClass: ApprovalClass.EditApply,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      mutates: true,
+      outputSchemaName: 'ComputationalMergeMutationResultV1',
+      requiresDryRun: false,
+      returnsArtifactHandles: true,
+      toolKind: 'apply',
+      toolName: 'computationalmerge.hdr.apply_command',
+    },
+    {
+      approvalClass: ApprovalClass.PreviewOnly,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      mutates: false,
+      outputSchemaName: 'ComputationalMergeDryRunResultV1',
+      requiresDryRun: true,
+      returnsArtifactHandles: true,
+      toolKind: 'dry_run',
       toolName: 'computationalmerge.panorama.dry_run_command',
     },
     {
@@ -1709,6 +1729,25 @@ export const sampleComputationalMergeHdrCommandEnvelopeV1: ComputationalMergeCom
     },
   });
 
+export const sampleComputationalMergeHdrApplyCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
+  computationalMergeCommandEnvelopeV1Schema.parse({
+    ...sampleComputationalMergeHdrCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'Applying the accepted HDR dry-run creates an editable scene-linear derived asset.',
+      state: 'approved',
+    },
+    commandId: 'command_merge_hdr_apply_sample',
+    correlationId: 'corr_merge_hdr_apply_sample',
+    dryRun: false,
+    idempotencyKey: 'idem_merge_hdr_apply_sample',
+    parameters: {
+      ...sampleComputationalMergeHdrCommandEnvelopeV1.parameters,
+      acceptedDryRunPlanHash: 'sha256:sample-merge-hdr-plan',
+      acceptedDryRunPlanId: 'merge_plan_hdr_001',
+    },
+  });
+
 export const sampleHdrMergeArtifactV1: HdrMergeArtifactV1 = hdrMergeArtifactV1Schema.parse({
   alignment: {
     alignmentConfidence: 0.91,
@@ -2378,6 +2417,48 @@ export const sampleComputationalMergePanoramaApplyAppServerToolCallValidationV1:
     },
   });
 
+export const sampleComputationalMergeHdrDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleComputationalMergeHdrCommandEnvelopeV1.approval,
+      arguments: sampleComputationalMergeHdrCommandEnvelopeV1,
+      dryRun: true,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      itemId: 'item_tool_call_hdr_dry_run',
+      jsonRpcRequestId: 46,
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_sample',
+      toolKind: 'dry_run',
+      toolName: 'computationalmerge.hdr.dry_run_command',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_sample',
+    },
+  });
+
+export const sampleComputationalMergeHdrApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
+  rawEngineAppServerToolCallValidationV1Schema.parse({
+    registry: sampleToolRegistryV1,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    toolCall: {
+      approval: sampleComputationalMergeHdrApplyCommandEnvelopeV1.approval,
+      arguments: sampleComputationalMergeHdrApplyCommandEnvelopeV1,
+      dryRun: false,
+      inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+      itemId: 'item_tool_call_hdr_apply',
+      jsonRpcRequestId: 47,
+      protocol: 'codex_app_server_json_rpc',
+      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+      threadId: 'thread_rawengine_agent_sample',
+      toolKind: 'apply',
+      toolName: 'computationalmerge.hdr.apply_command',
+      transport: 'stdio',
+      turnId: 'turn_rawengine_agent_sample',
+    },
+  });
+
 export const sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
   rawEngineAppServerToolCallValidationV1Schema.parse({
     registry: sampleToolRegistryV1,
@@ -2388,7 +2469,7 @@ export const sampleComputationalMergeFocusStackDryRunAppServerToolCallValidation
       dryRun: true,
       inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
       itemId: 'item_tool_call_focus_stack_dry_run',
-      jsonRpcRequestId: 46,
+      jsonRpcRequestId: 48,
       protocol: 'codex_app_server_json_rpc',
       schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
@@ -2409,7 +2490,7 @@ export const sampleComputationalMergeFocusStackApplyAppServerToolCallValidationV
       dryRun: false,
       inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
       itemId: 'item_tool_call_focus_stack_apply',
-      jsonRpcRequestId: 47,
+      jsonRpcRequestId: 49,
       protocol: 'codex_app_server_json_rpc',
       schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
@@ -2430,7 +2511,7 @@ export const sampleComputationalMergeSuperResolutionDryRunAppServerToolCallValid
       dryRun: true,
       inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
       itemId: 'item_tool_call_sr_dry_run',
-      jsonRpcRequestId: 48,
+      jsonRpcRequestId: 50,
       protocol: 'codex_app_server_json_rpc',
       schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
@@ -2451,7 +2532,7 @@ export const sampleComputationalMergeSuperResolutionApplyAppServerToolCallValida
       dryRun: false,
       inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
       itemId: 'item_tool_call_sr_apply',
-      jsonRpcRequestId: 49,
+      jsonRpcRequestId: 51,
       protocol: 'codex_app_server_json_rpc',
       schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
@@ -4995,6 +5076,37 @@ export const sampleComputationalMergeAppServerToolManifestV1: ComputationalMerge
         requiresDryRunPlan: true,
         returnsArtifactHandles: true,
         toolName: 'computationalmerge.panorama.apply_command',
+      },
+      {
+        allowedCommandTypes: ['computationalMerge.createHdr'],
+        approvalClass: ApprovalClass.PreviewOnly,
+        auditEvents: ['computational_merge_dry_run_requested', 'computational_merge_dry_run_completed'],
+        description:
+          'Preview a local HDR merge and return a non-mutating dry-run plan with bracket, alignment, deghosting, and artifact handles.',
+        executionMode: 'dry_run_command',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: false,
+        outputSchemaName: 'ComputationalMergeDryRunResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: false,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.hdr.dry_run_command',
+      },
+      {
+        allowedCommandTypes: ['computationalMerge.createHdr'],
+        approvalClass: ApprovalClass.EditApply,
+        auditEvents: ['computational_merge_apply_requested', 'computational_merge_apply_completed'],
+        description: 'Apply an accepted local HDR dry-run plan into the non-destructive edit graph after approval.',
+        executionMode: 'apply_dry_run_plan',
+        inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
+        localOnly: true,
+        mutates: true,
+        outputSchemaName: 'ComputationalMergeMutationResultV1',
+        recordsProvenance: true,
+        requiresDryRunPlan: true,
+        returnsArtifactHandles: true,
+        toolName: 'computationalmerge.hdr.apply_command',
       },
       {
         allowedCommandTypes: ['computationalMerge.createFocusStack'],

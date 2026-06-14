@@ -1,0 +1,64 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_merge_sample"
+  },
+  "approval": {
+    "approvalClass": "edit_apply",
+    "reason": "Applying the accepted HDR dry-run creates an editable scene-linear derived asset.",
+    "state": "approved"
+  },
+  "commandId": "command_merge_hdr_apply_sample",
+  "correlationId": "corr_merge_hdr_apply_sample",
+  "dryRun": false,
+  "expectedGraphRevision": "graph_rev_44",
+  "idempotencyKey": "idem_merge_hdr_apply_sample",
+  "schemaVersion": 1,
+  "target": {
+    "id": "project_local_library",
+    "kind": "project"
+  },
+  "commandType": "computationalMerge.createHdr",
+  "parameters": {
+    "acceptedDryRunPlanHash": "sha256:sample-merge-hdr-plan",
+    "acceptedDryRunPlanId": "merge_plan_hdr_001",
+    "alignmentMode": "auto",
+    "bracketValidation": "required",
+    "deghosting": "medium",
+    "maxPreviewDimensionPx": 2400,
+    "mergeStrategy": "scene_linear_radiance",
+    "outputName": "Window Light HDR",
+    "qualityPreference": "balanced",
+    "sources": [
+      {
+        "colorSpaceHint": "camera_rgb",
+        "exposureEv": -2,
+        "imageId": "img_hdr_001",
+        "imagePath": "/photos/session/HDR_0001.CR3",
+        "rawDefaultsApplied": true,
+        "role": "hdr_bracket",
+        "sourceIndex": 0
+      },
+      {
+        "colorSpaceHint": "camera_rgb",
+        "exposureEv": 0,
+        "imageId": "img_hdr_002",
+        "imagePath": "/photos/session/HDR_0002.CR3",
+        "rawDefaultsApplied": true,
+        "role": "hdr_bracket",
+        "sourceIndex": 1
+      },
+      {
+        "colorSpaceHint": "camera_rgb",
+        "exposureEv": 2,
+        "imageId": "img_hdr_003",
+        "imagePath": "/photos/session/HDR_0003.CR3",
+        "rawDefaultsApplied": true,
+        "role": "hdr_bracket",
+        "sourceIndex": 2
+      }
+    ],
+    "toneMapPreview": true
+  }
+}

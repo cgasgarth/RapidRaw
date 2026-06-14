@@ -101,7 +101,10 @@ import {
   sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
   sampleComputationalMergeFocusStackCommandEnvelopeV1,
   sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1,
+  sampleComputationalMergeHdrApplyAppServerToolCallValidationV1,
+  sampleComputationalMergeHdrApplyCommandEnvelopeV1,
   sampleComputationalMergeHdrCommandEnvelopeV1,
+  sampleComputationalMergeHdrDryRunAppServerToolCallValidationV1,
   sampleComputationalMergeMutationResultV1,
   sampleComputationalMergePanoramaApplyAppServerToolCallValidationV1,
   sampleComputationalMergePanoramaDryRunAppServerToolCallValidationV1,
@@ -414,6 +417,12 @@ const sampleArtifacts = [
     value: sampleComputationalMergeHdrCommandEnvelopeV1,
   },
   {
+    name: 'computational merge HDR apply command envelope',
+    path: 'packages/rawengine-schema/samples/computational-merge-hdr-apply-command-envelope-v1.json',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeHdrApplyCommandEnvelopeV1,
+  },
+  {
     name: 'computational merge focus stack command envelope',
     path: 'packages/rawengine-schema/samples/computational-merge-focus-stack-command-envelope-v1.json',
     schema: computationalMergeCommandEnvelopeV1Schema,
@@ -478,6 +487,18 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/computational-merge-panorama-apply-app-server-tool-call-validation-v1.json',
     schema: rawEngineAppServerToolCallValidationV1Schema,
     value: sampleComputationalMergePanoramaApplyAppServerToolCallValidationV1,
+  },
+  {
+    name: 'computational merge HDR dry-run app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/computational-merge-hdr-dry-run-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergeHdrDryRunAppServerToolCallValidationV1,
+  },
+  {
+    name: 'computational merge HDR apply app-server tool call validation',
+    path: 'packages/rawengine-schema/samples/computational-merge-hdr-apply-app-server-tool-call-validation-v1.json',
+    schema: rawEngineAppServerToolCallValidationV1Schema,
+    value: sampleComputationalMergeHdrApplyAppServerToolCallValidationV1,
   },
   {
     name: 'computational merge focus stack dry-run app-server tool call validation',
