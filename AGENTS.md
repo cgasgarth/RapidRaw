@@ -68,6 +68,12 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   processing, film simulations, panorama stitching, HDR, focus stacking,
   super-resolution, app-server/agent architecture, GitHub Actions strategy, and
   tricky UI architecture.
+- Use consult for science-heavy or math-heavy image processing decisions,
+  especially deblur, denoise, sharpening, demosaic-adjacent behavior, gamut and
+  color science, tone mapping, reconstruction, fusion, and validation metrics.
+- Advanced image-quality features should improve iteratively with measured
+  evidence. Do not treat the first working implementation as final when better
+  math, fixtures, thresholds, UI controls, or runtime proofs are still available.
 - When using consult for repo-aware decisions, prefer the RapidRaw ChatGPT
   project with the GitHub repo attached when available.
 - Treat consult output as advice. Verify it against current repo state before

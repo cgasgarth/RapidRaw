@@ -3503,6 +3503,9 @@ Use the consult skill for:
 - New UI feature design where workflow tradeoffs matter.
 - Color science changes.
 - Scene-referred/display-referred pipeline changes.
+- Science-heavy or math-heavy image processing changes, including deblur,
+  denoise, sharpening, reconstruction, tone mapping, gamut mapping, fusion, and
+  validation metric design.
 - Camera profile strategy.
 - Film simulation design.
 - Panorama stitching implementation strategy.
@@ -4662,12 +4665,19 @@ Issues:
 - Add defringe improvements.
 - Add dust spot visualization.
 - Add AI denoise research issue.
+- Add iterative quality loops for deblur, denoise, color science, and other
+  science-heavy image processing: each pass should define the next measurable
+  image-quality target, consult-backed math decision, fixture set, artifact
+  review, and runtime proof before claiming feature maturity.
 
 Definition of done:
 
 - Detail controls are strong enough for real RAW finishing.
 - Changes are tested on high ISO, fine texture, and edge fixtures.
 - Performance remains interactive for common files.
+- Deblur, denoise, sharpening, and color-science-adjacent changes document the
+  consult-backed math choice, rejected alternatives, numeric gates, and next
+  iteration target.
 
 ### Milestone 9: Film Simulation Lab
 
