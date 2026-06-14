@@ -1,0 +1,43 @@
+{
+  "defaultTemplateId": "copyright-client-delivery",
+  "templates": [
+    {
+      "applyFields": ["Artist", "Copyright", "tags"],
+      "createdAt": "2026-06-14T10:30:00.000Z",
+      "id": "copyright-client-delivery",
+      "mergeMode": "append_tags",
+      "name": "Copyright Client Delivery",
+      "requireApproval": false,
+      "updatedAt": "2026-06-14T10:35:00.000Z",
+      "values": {
+        "Artist": "RawEngine Studio",
+        "Copyright": "Copyright 2026 RawEngine Studio. All rights reserved.",
+        "ImageDescription": null,
+        "UserComment": null,
+        "colorLabel": null,
+        "rating": null,
+        "tags": ["client-delivery", "copyrighted"]
+      },
+      "version": 1
+    },
+    {
+      "applyFields": ["ImageDescription", "UserComment", "colorLabel", "rating"],
+      "createdAt": "2026-06-14T10:32:00.000Z",
+      "id": "review-select",
+      "mergeMode": "replace_fields",
+      "name": "Review Select",
+      "requireApproval": true,
+      "updatedAt": "2026-06-14T10:32:00.000Z",
+      "values": {
+        "Artist": null,
+        "Copyright": null,
+        "ImageDescription": "Review select for client proofing.",
+        "UserComment": "Selected during first cull.",
+        "colorLabel": "green",
+        "rating": 4,
+        "tags": []
+      },
+      "version": 1
+    }
+  ]
+}

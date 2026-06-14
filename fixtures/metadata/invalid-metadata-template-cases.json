@@ -1,0 +1,102 @@
+[
+  {
+    "case": "rejects duplicate template ids",
+    "catalog": {
+      "defaultTemplateId": null,
+      "templates": [
+        {
+          "applyFields": ["Artist"],
+          "createdAt": "2026-06-14T10:30:00.000Z",
+          "id": "duplicate",
+          "mergeMode": "append_tags",
+          "name": "A",
+          "requireApproval": false,
+          "updatedAt": "2026-06-14T10:30:00.000Z",
+          "values": {
+            "Artist": "A",
+            "Copyright": null,
+            "ImageDescription": null,
+            "UserComment": null,
+            "colorLabel": null,
+            "rating": null,
+            "tags": []
+          },
+          "version": 1
+        },
+        {
+          "applyFields": ["Artist"],
+          "createdAt": "2026-06-14T10:30:00.000Z",
+          "id": "duplicate",
+          "mergeMode": "append_tags",
+          "name": "B",
+          "requireApproval": false,
+          "updatedAt": "2026-06-14T10:30:00.000Z",
+          "values": {
+            "Artist": "B",
+            "Copyright": null,
+            "ImageDescription": null,
+            "UserComment": null,
+            "colorLabel": null,
+            "rating": null,
+            "tags": []
+          },
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "case": "rejects empty applied field value",
+    "catalog": {
+      "defaultTemplateId": "empty-field",
+      "templates": [
+        {
+          "applyFields": ["Copyright"],
+          "createdAt": "2026-06-14T10:30:00.000Z",
+          "id": "empty-field",
+          "mergeMode": "append_tags",
+          "name": "Empty Field",
+          "requireApproval": false,
+          "updatedAt": "2026-06-14T10:30:00.000Z",
+          "values": {
+            "Artist": null,
+            "Copyright": null,
+            "ImageDescription": null,
+            "UserComment": null,
+            "colorLabel": null,
+            "rating": null,
+            "tags": []
+          },
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "case": "rejects replace without approval",
+    "catalog": {
+      "defaultTemplateId": "replace-no-approval",
+      "templates": [
+        {
+          "applyFields": ["Artist"],
+          "createdAt": "2026-06-14T10:30:00.000Z",
+          "id": "replace-no-approval",
+          "mergeMode": "replace_fields",
+          "name": "Replace No Approval",
+          "requireApproval": false,
+          "updatedAt": "2026-06-14T10:30:00.000Z",
+          "values": {
+            "Artist": "A",
+            "Copyright": null,
+            "ImageDescription": null,
+            "UserComment": null,
+            "colorLabel": null,
+            "rating": null,
+            "tags": []
+          },
+          "version": 1
+        }
+      ]
+    }
+  }
+]
