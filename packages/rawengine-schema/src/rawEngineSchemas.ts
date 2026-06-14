@@ -2067,6 +2067,8 @@ export const computationalMergeAlignmentModeV1Schema = z.enum([
 
 export const computationalMergeQualityPreferenceV1Schema = z.enum(['preview', 'balanced', 'best']);
 
+export const superResolutionModeV1Schema = z.enum(['single_image', 'multi_image']);
+
 export const superResolutionDetailPolicyV1Schema = z.enum(['conservative', 'balanced', 'aggressive_preview_only']);
 
 export const superResolutionDecisionStatusV1Schema = z.enum([
@@ -2366,6 +2368,19 @@ const computationalMergeSourcesSchema = z
     }
   });
 
+const superResolutionSourcesSchema = z
+  .array(computationalMergeSourceImageRefV1Schema)
+  .min(1)
+  .superRefine((sources, context) => {
+    const sourceIndexes = new Set(sources.map((source) => source.sourceIndex));
+    if (sourceIndexes.size !== sources.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Super-resolution commands require unique source indexes.',
+      });
+    }
+  });
+
 const computationalMergeAcceptedDryRunSchema = z.object({
   acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
   acceptedDryRunPlanId: z.string().trim().min(1).optional(),
@@ -2476,14 +2491,51 @@ export const computationalMergeCommandEnvelopeV1Schema = z
             alignmentMode: computationalMergeAlignmentModeV1Schema,
             detailPolicy: superResolutionDetailPolicyV1Schema,
             maxPreviewDimensionPx: z.number().int().positive().max(8192),
+            mode: superResolutionModeV1Schema,
             outputName: z.string().trim().min(1),
             outputScale: z.number().min(1.1).max(4),
             qualityPreference: computationalMergeQualityPreferenceV1Schema,
-            sources: computationalMergeSourcesSchema,
+            sources: superResolutionSourcesSchema,
           })
           .strict()
           .superRefine((parameters, context) => {
             validateComputationalMergeSourceRole(parameters.sources, 'sr_frame', context);
+
+            if (parameters.mode === 'single_image') {
+              if (parameters.sources.length !== 1) {
+                context.addIssue({
+                  code: 'custom',
+                  message: 'Single-image super-resolution requires exactly one source image.',
+                  path: ['sources'],
+                });
+              }
+
+              if (parameters.alignmentMode !== 'none') {
+                context.addIssue({
+                  code: 'custom',
+                  message: 'Single-image super-resolution must not request multi-frame alignment.',
+                  path: ['alignmentMode'],
+                });
+              }
+            }
+
+            if (parameters.mode === 'multi_image') {
+              if (parameters.sources.length < 2) {
+                context.addIssue({
+                  code: 'custom',
+                  message: 'Multi-image super-resolution requires at least two source images.',
+                  path: ['sources'],
+                });
+              }
+
+              if (parameters.alignmentMode === 'none') {
+                context.addIssue({
+                  code: 'custom',
+                  message: 'Multi-image super-resolution requires an alignment mode.',
+                  path: ['alignmentMode'],
+                });
+              }
+            }
           }),
       })
       .strict(),
@@ -2531,6 +2583,7 @@ export const computationalMergeCommandEnvelopeV1Schema = z
     if (
       command.commandType === 'computationalMerge.createSuperResolution' &&
       command.parameters.outputScale > 1 &&
+      command.parameters.mode === 'multi_image' &&
       command.parameters.alignmentMode === 'none'
     ) {
       context.addIssue({
@@ -7740,6 +7793,7 @@ export type SuperResolutionDecisionStatusV1 = z.infer<typeof superResolutionDeci
 export type SuperResolutionDetailPolicyV1 = z.infer<typeof superResolutionDetailPolicyV1Schema>;
 export type SuperResolutionDryRunSummaryV1 = z.infer<typeof superResolutionDryRunSummaryV1Schema>;
 export type SuperResolutionInvalidationReasonV1 = z.infer<typeof superResolutionInvalidationReasonV1Schema>;
+export type SuperResolutionModeV1 = z.infer<typeof superResolutionModeV1Schema>;
 export type SuperResolutionReviewStatusV1 = z.infer<typeof superResolutionReviewStatusV1Schema>;
 export type SuperResolutionStaleStateV1 = z.infer<typeof superResolutionStaleStateV1Schema>;
 export type SuperResolutionWarningCodeV1 = z.infer<typeof superResolutionWarningCodeV1Schema>;

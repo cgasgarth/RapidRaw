@@ -279,6 +279,7 @@
         "alignmentMode": "optical_flow",
         "detailPolicy": "conservative",
         "maxPreviewDimensionPx": 2400,
+        "mode": "multi_image",
         "outputName": "Handheld Burst Super Resolution",
         "outputScale": 2,
         "qualityPreference": "best",

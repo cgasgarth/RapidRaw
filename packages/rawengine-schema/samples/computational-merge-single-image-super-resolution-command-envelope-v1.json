@@ -1,0 +1,43 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_merge_sample"
+  },
+  "approval": {
+    "approvalClass": "preview_only",
+    "reason": "Previewing single-image super-resolution estimates conservative detail gain without alignment.",
+    "state": "not_required"
+  },
+  "commandId": "command_merge_single_image_super_resolution_preview_sample",
+  "correlationId": "corr_merge_single_image_super_resolution_preview_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_44",
+  "idempotencyKey": "idem_merge_single_image_super_resolution_preview_sample",
+  "schemaVersion": 1,
+  "target": {
+    "id": "project_local_library",
+    "kind": "project"
+  },
+  "commandType": "computationalMerge.createSuperResolution",
+  "parameters": {
+    "alignmentMode": "none",
+    "detailPolicy": "conservative",
+    "maxPreviewDimensionPx": 2400,
+    "mode": "single_image",
+    "outputName": "Single Image Super Resolution",
+    "outputScale": 2,
+    "qualityPreference": "best",
+    "sources": [
+      {
+        "colorSpaceHint": "camera_rgb",
+        "exposureEv": 0,
+        "imageId": "img_sr_single_001",
+        "imagePath": "/photos/session/SR_SINGLE_0001.CR3",
+        "rawDefaultsApplied": true,
+        "role": "sr_frame",
+        "sourceIndex": 0
+      }
+    ]
+  }
+}

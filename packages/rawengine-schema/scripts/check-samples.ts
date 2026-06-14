@@ -98,6 +98,7 @@ import {
   sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1,
   sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
   sampleComputationalMergeSuperResolutionDryRunAppServerToolCallValidationV1,
+  sampleComputationalMergeSingleImageSuperResolutionCommandEnvelopeV1,
   sampleEditGraphApplyCommandEnvelopeV1,
   sampleEditGraphCommandEnvelopeV1,
   sampleEditGraphDryRunResultV1,
@@ -390,6 +391,11 @@ const validSamples: ReadonlyArray<{
     name: 'computational merge super-resolution command envelope',
     schema: computationalMergeCommandEnvelopeV1Schema,
     value: sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
+  },
+  {
+    name: 'computational merge single-image super-resolution command envelope',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeSingleImageSuperResolutionCommandEnvelopeV1,
   },
   {
     name: 'computational merge apply command envelope',
@@ -1379,6 +1385,7 @@ expectInvalid('super-resolution merge command with invalid scale', computational
     alignmentMode: 'optical_flow',
     detailPolicy: 'conservative',
     maxPreviewDimensionPx: 2048,
+    mode: 'multi_image',
     outputName: 'Burst Super Resolution',
     outputScale: 8,
     qualityPreference: 'best',
@@ -1386,6 +1393,44 @@ expectInvalid('super-resolution merge command with invalid scale', computational
       ...source,
       role: 'sr_frame',
     })),
+  },
+});
+
+expectInvalid(
+  'single-image super-resolution command with multiple sources',
+  computationalMergeCommandEnvelopeV1Schema,
+  {
+    ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
+    parameters: {
+      ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1.parameters,
+      alignmentMode: 'none',
+      mode: 'single_image',
+    },
+  },
+);
+
+expectInvalid('single-image super-resolution command with alignment', computationalMergeCommandEnvelopeV1Schema, {
+  ...sampleComputationalMergeSingleImageSuperResolutionCommandEnvelopeV1,
+  parameters: {
+    ...sampleComputationalMergeSingleImageSuperResolutionCommandEnvelopeV1.parameters,
+    alignmentMode: 'optical_flow',
+  },
+});
+
+expectInvalid('multi-image super-resolution command with one source', computationalMergeCommandEnvelopeV1Schema, {
+  ...sampleComputationalMergeSingleImageSuperResolutionCommandEnvelopeV1,
+  parameters: {
+    ...sampleComputationalMergeSingleImageSuperResolutionCommandEnvelopeV1.parameters,
+    alignmentMode: 'optical_flow',
+    mode: 'multi_image',
+  },
+});
+
+expectInvalid('multi-image super-resolution command without alignment', computationalMergeCommandEnvelopeV1Schema, {
+  ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
+  parameters: {
+    ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1.parameters,
+    alignmentMode: 'none',
   },
 });
 
