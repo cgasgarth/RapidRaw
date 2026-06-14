@@ -288,7 +288,7 @@
   "toolCall": {
     "approval": {
       "approvalClass": "preview_only",
-      "reason": "Previewing a super-resolution merge estimates registration quality and detail gain without synthesis.",
+      "reason": "Previewing a panorama merge estimates alignment, output dimensions, and artifacts without writing sidecars.",
       "state": "not_required"
     },
     "arguments": {
@@ -299,54 +299,55 @@
       },
       "approval": {
         "approvalClass": "preview_only",
-        "reason": "Previewing a super-resolution merge estimates registration quality and detail gain without synthesis.",
+        "reason": "Previewing a panorama merge estimates alignment, output dimensions, and artifacts without writing sidecars.",
         "state": "not_required"
       },
-      "commandId": "command_merge_super_resolution_preview_sample",
-      "correlationId": "corr_merge_super_resolution_preview_sample",
+      "commandId": "command_merge_panorama_preview_sample",
+      "correlationId": "corr_merge_panorama_preview_sample",
       "dryRun": true,
       "expectedGraphRevision": "graph_rev_44",
-      "idempotencyKey": "idem_merge_super_resolution_preview_sample",
+      "idempotencyKey": "idem_merge_panorama_preview_sample",
       "schemaVersion": 1,
       "target": {
         "id": "project_local_library",
         "kind": "project"
       },
-      "commandType": "computationalMerge.createSuperResolution",
+      "commandType": "computationalMerge.createPanorama",
       "parameters": {
-        "alignmentMode": "optical_flow",
-        "detailPolicy": "conservative",
+        "boundaryMode": "auto_crop",
+        "exposureNormalization": "auto",
+        "lensCorrectionPolicy": "required_before_stitch",
         "maxPreviewDimensionPx": 2400,
-        "mode": "multi_image",
-        "outputName": "Handheld Burst Super Resolution",
-        "outputScale": 2,
-        "qualityPreference": "best",
+        "memoryBudgetBytes": 4000000000,
+        "outputName": "Ridge Overlook Panorama",
+        "projection": "cylindrical",
+        "qualityPreference": "balanced",
         "sources": [
           {
             "colorSpaceHint": "camera_rgb",
             "exposureEv": 0,
-            "imageId": "img_sr_001",
-            "imagePath": "/photos/session/SR_0001.CR3",
+            "imageId": "img_panorama_001",
+            "imagePath": "/photos/session/PANO_0001.CR3",
             "rawDefaultsApplied": true,
-            "role": "sr_frame",
+            "role": "panorama_tile",
             "sourceIndex": 0
           },
           {
             "colorSpaceHint": "camera_rgb",
             "exposureEv": 0,
-            "imageId": "img_sr_002",
-            "imagePath": "/photos/session/SR_0002.CR3",
+            "imageId": "img_panorama_002",
+            "imagePath": "/photos/session/PANO_0002.CR3",
             "rawDefaultsApplied": true,
-            "role": "sr_frame",
+            "role": "panorama_tile",
             "sourceIndex": 1
           },
           {
             "colorSpaceHint": "camera_rgb",
             "exposureEv": 0,
-            "imageId": "img_sr_003",
-            "imagePath": "/photos/session/SR_0003.CR3",
+            "imageId": "img_panorama_003",
+            "imagePath": "/photos/session/PANO_0003.CR3",
             "rawDefaultsApplied": true,
-            "role": "sr_frame",
+            "role": "panorama_tile",
             "sourceIndex": 2
           }
         ]
@@ -354,13 +355,13 @@
     },
     "dryRun": true,
     "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
-    "itemId": "item_tool_call_sr_dry_run",
-    "jsonRpcRequestId": 48,
+    "itemId": "item_tool_call_panorama_dry_run",
+    "jsonRpcRequestId": 44,
     "protocol": "codex_app_server_json_rpc",
     "schemaVersion": 1,
     "threadId": "thread_rawengine_agent_sample",
     "toolKind": "dry_run",
-    "toolName": "computationalmerge.super_resolution.dry_run_command",
+    "toolName": "computationalmerge.panorama.dry_run_command",
     "transport": "stdio",
     "turnId": "turn_rawengine_agent_sample"
   }
