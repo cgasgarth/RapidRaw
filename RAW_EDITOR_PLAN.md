@@ -3986,6 +3986,9 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `hdr(merge): add merge weighting strategy`
 - `hdr(deghost): add deghosting strategy`
 - `validation(hdr): add HDR fixture set`
+  - Issue: #169
+  - Fixture manifest: `fixtures/hdr/hdr-synthetic-bracket-fixtures.json`
+  - Check: `bun run check:hdr-fixtures`
 - `hdr(pipeline): make merged output editable source`
 - `ui(hdr): add HDR merge UI`
 - `api(hdr): add HDR merge API tools`

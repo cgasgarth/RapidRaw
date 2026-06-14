@@ -1,0 +1,181 @@
+{
+  "$schema": "https://rawengine.dev/schemas/hdr-synthetic-bracket-fixtures.v1.json",
+  "fixtures": [
+    {
+      "class": "synthetic",
+      "expectedGeneratedSha256": "f33ed3bb5a064029f3934b5d43d5b41a21e40cf8a97221f7ce166f80c529d005",
+      "expectedWarningCodes": [],
+      "fixtureId": "hdr.synthetic.static-window.v1",
+      "generator": {
+        "id": "synthetic-hdr-static-window",
+        "seed": "rawengine-hdr-static-window-v1",
+        "version": 1
+      },
+      "highlightRecoveryRegions": [
+        {
+          "height": 32,
+          "regionId": "window-highlight",
+          "width": 42,
+          "x": 172,
+          "y": 30,
+          "requiresShortExposure": true
+        }
+      ],
+      "memoryBudgetBytes": 64000000,
+      "motionRegions": [],
+      "notes": "Static three-frame bracket for baseline scene-linear merge fixtures.",
+      "sourceFrames": [
+        {
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "exposureEv": -2,
+          "height": 160,
+          "sourceIndex": 0,
+          "width": 240
+        },
+        {
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "exposureEv": 0,
+          "height": 160,
+          "sourceIndex": 1,
+          "width": 240
+        },
+        {
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "exposureEv": 2,
+          "height": 160,
+          "sourceIndex": 2,
+          "width": 240
+        }
+      ],
+      "status": "active_generated_asset",
+      "validationPurpose": "Baseline static bracket with recoverable highlights and shadow detail."
+    },
+    {
+      "class": "synthetic",
+      "expectedGeneratedSha256": "eba637cf4c8c56291d575d6db542c089b9e4a45e13192c78e9e51813f40e3a7f",
+      "expectedWarningCodes": ["alignment_translation_required", "deghosting_required"],
+      "fixtureId": "hdr.synthetic.handheld-motion.v1",
+      "generator": {
+        "id": "synthetic-hdr-handheld-motion",
+        "seed": "rawengine-hdr-handheld-motion-v1",
+        "version": 1
+      },
+      "highlightRecoveryRegions": [
+        {
+          "height": 30,
+          "regionId": "backlit-sign",
+          "width": 48,
+          "x": 154,
+          "y": 36,
+          "requiresShortExposure": true
+        }
+      ],
+      "memoryBudgetBytes": 64000000,
+      "motionRegions": [
+        {
+          "height": 26,
+          "regionId": "walking-subject",
+          "width": 24,
+          "x": 72,
+          "y": 92,
+          "expectedGhostRisk": "high"
+        }
+      ],
+      "notes": "Handheld bracket with small integer translations and a moving subject for deghosting fixtures.",
+      "sourceFrames": [
+        {
+          "expectedTranslationX": -2,
+          "expectedTranslationY": 1,
+          "exposureEv": -2,
+          "height": 160,
+          "sourceIndex": 0,
+          "width": 240
+        },
+        {
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "exposureEv": 0,
+          "height": 160,
+          "sourceIndex": 1,
+          "width": 240
+        },
+        {
+          "expectedTranslationX": 2,
+          "expectedTranslationY": -1,
+          "exposureEv": 2,
+          "height": 160,
+          "sourceIndex": 2,
+          "width": 240
+        }
+      ],
+      "status": "active_generated_asset",
+      "validationPurpose": "Alignment and deghosting metadata fixture for handheld HDR merge validation."
+    },
+    {
+      "class": "synthetic",
+      "expectedGeneratedSha256": "2ad292e53ee93052acafcc9ba972e98d2c119489b11c148eec8aff6905a9a264",
+      "expectedWarningCodes": ["clipped_highlight_recovery"],
+      "fixtureId": "hdr.synthetic.highlight-clipping.v1",
+      "generator": {
+        "id": "synthetic-hdr-highlight-clipping",
+        "seed": "rawengine-hdr-highlight-clipping-v1",
+        "version": 1
+      },
+      "highlightRecoveryRegions": [
+        {
+          "height": 36,
+          "regionId": "sunlit-window",
+          "width": 54,
+          "x": 142,
+          "y": 24,
+          "requiresShortExposure": true
+        },
+        {
+          "height": 18,
+          "regionId": "specular-trim",
+          "width": 70,
+          "x": 48,
+          "y": 64,
+          "requiresShortExposure": true
+        }
+      ],
+      "memoryBudgetBytes": 64000000,
+      "motionRegions": [],
+      "notes": "Static bracket that intentionally clips middle and long exposures in bright regions.",
+      "sourceFrames": [
+        {
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "exposureEv": -3,
+          "height": 160,
+          "sourceIndex": 0,
+          "width": 240
+        },
+        {
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "exposureEv": 0,
+          "height": 160,
+          "sourceIndex": 1,
+          "width": 240
+        },
+        {
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "exposureEv": 3,
+          "height": 160,
+          "sourceIndex": 2,
+          "width": 240
+        }
+      ],
+      "status": "active_generated_asset",
+      "validationPurpose": "Highlight clipping stress fixture for future scene-linear HDR merge weighting."
+    }
+  ],
+  "issue": 169,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14"
+}
