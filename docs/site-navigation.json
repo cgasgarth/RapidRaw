@@ -107,6 +107,10 @@
           "path": "docs/layers/layer-workflow-model-2026-06-14.md"
         },
         {
+          "title": "Selective color mask contract",
+          "path": "docs/color/selective-color-mask-contract-2026-06-14.md"
+        },
+        {
           "title": "Film simulation architecture",
           "path": "docs/film/film-simulation-architecture-2026-06-13.md"
         },

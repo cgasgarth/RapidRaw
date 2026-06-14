@@ -3876,6 +3876,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Docs: `docs/color/skin-tone-uniformity-2026-06-14.md`
   - Runtime status: uniformity math is available and fixture-backed; full UI and renderer integration remain future work.
 - `color(mask): create color masks from selected ranges`
+  - Contract: `src/utils/selectiveColorMask.ts`
+  - Fixtures: `fixtures/color/selective-color-mask-fixtures.json`
+  - Docs: `docs/color/selective-color-mask-contract-2026-06-14.md`
+  - Runtime status: selected-range to color-mask conversion is fixture-backed; full UI command wiring remains future work.
 - `color(grading): refine color grading wheels`
 - `color(balance-rgb): add color balance RGB style module`
 - `color(channel-mixer): add channel mixer`
@@ -4570,6 +4574,7 @@ Issues:
 - Add skin tone uniformity controls.
   - Uniformity math and fixture validation are present.
 - Add color mask creation from selected range.
+  - Selected-range to color-mask conversion is present.
 - Add color grading wheels refinement.
 - Add color balance RGB-style module.
 - Add channel mixer.

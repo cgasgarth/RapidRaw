@@ -1,0 +1,67 @@
+{
+  "$schema": "https://rawengine.dev/schemas/selective-color-mask-fixtures-v1.json",
+  "cases": [
+    {
+      "expected": {
+        "centerHueDegrees": 358,
+        "feather": 0.35,
+        "hueToleranceDegrees": 17.5,
+        "maxLuma": 0.98,
+        "maxSaturation": 1,
+        "minLuma": 0.02,
+        "minSaturation": 0.08,
+        "rangeKind": "color",
+        "sourceRangeKey": "reds"
+      },
+      "id": "color.mask.selective-red-default.v1",
+      "rangeKey": "reds"
+    },
+    {
+      "expected": {
+        "centerHueDegrees": 115,
+        "feather": 0.2,
+        "hueToleranceDegrees": 45,
+        "maxLuma": 0.9,
+        "maxSaturation": 0.92,
+        "minLuma": 0.18,
+        "minSaturation": 0.22,
+        "rangeKind": "color",
+        "sourceRangeKey": "greens"
+      },
+      "id": "color.mask.selective-green-constrained.v1",
+      "options": {
+        "feather": 0.2,
+        "maxLuma": 0.9,
+        "maxSaturation": 0.92,
+        "minLuma": 0.18,
+        "minSaturation": 0.22
+      },
+      "rangeKey": "greens"
+    },
+    {
+      "expected": {
+        "centerHueDegrees": 330,
+        "feather": 1,
+        "hueToleranceDegrees": 25,
+        "maxLuma": 0.91,
+        "maxSaturation": 0.51,
+        "minLuma": 0.9,
+        "minSaturation": 0.5,
+        "rangeKind": "color",
+        "sourceRangeKey": "magentas"
+      },
+      "id": "color.mask.selective-magenta-clamped.v1",
+      "options": {
+        "feather": 2,
+        "maxLuma": 0.2,
+        "maxSaturation": 0.1,
+        "minLuma": 0.9,
+        "minSaturation": 0.5
+      },
+      "rangeKey": "magentas"
+    }
+  ],
+  "issue": 99,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14"
+}
