@@ -3929,6 +3929,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `detail(local-contrast): refine local contrast`
 - `detail(wavelet): design detail-by-scale controls`
 - `detail(wavelet): implement detail-by-scale controls`
+  - Adds a CPU runtime wavelet detail helper, Zod recipe schema, fixture
+    contract, and `bun run check:wavelet-detail` gate.
 - `detail(noise): separate chroma and luma noise`
 - `validation(noise): add high ISO fixture set`
 - `detail(defringe): improve defringe controls`

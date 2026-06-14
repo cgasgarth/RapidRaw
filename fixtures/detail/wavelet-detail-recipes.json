@@ -1,0 +1,71 @@
+[
+  {
+    "schemaVersion": 1,
+    "id": "portrait-micro-texture",
+    "colorSpace": "linear_rec2020",
+    "previewMode": "before_after",
+    "edgeThreshold": 0.28,
+    "haloSuppression": 0.82,
+    "fine": {
+      "enabled": true,
+      "amount": 36,
+      "radiusPx": 1.2
+    },
+    "medium": {
+      "enabled": true,
+      "amount": 18,
+      "radiusPx": 4.5
+    },
+    "coarse": {
+      "enabled": false,
+      "amount": 0,
+      "radiusPx": 14
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "landscape-rock-structure",
+    "colorSpace": "display_p3",
+    "previewMode": "luma_detail",
+    "edgeThreshold": 0.34,
+    "haloSuppression": 0.74,
+    "fine": {
+      "enabled": true,
+      "amount": 22,
+      "radiusPx": 1
+    },
+    "medium": {
+      "enabled": true,
+      "amount": 31,
+      "radiusPx": 6
+    },
+    "coarse": {
+      "enabled": true,
+      "amount": 12,
+      "radiusPx": 18
+    }
+  },
+  {
+    "schemaVersion": 1,
+    "id": "disabled-baseline",
+    "colorSpace": "srgb",
+    "previewMode": "off",
+    "edgeThreshold": 0.2,
+    "haloSuppression": 0.6,
+    "fine": {
+      "enabled": false,
+      "amount": 0,
+      "radiusPx": 1
+    },
+    "medium": {
+      "enabled": false,
+      "amount": 0,
+      "radiusPx": 4
+    },
+    "coarse": {
+      "enabled": false,
+      "amount": 0,
+      "radiusPx": 16
+    }
+  }
+]

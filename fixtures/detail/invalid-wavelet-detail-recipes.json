@@ -1,0 +1,80 @@
+[
+  {
+    "case": "radii_not_increasing",
+    "recipe": {
+      "schemaVersion": 1,
+      "id": "bad-radii",
+      "colorSpace": "linear_rec2020",
+      "previewMode": "before_after",
+      "edgeThreshold": 0.25,
+      "haloSuppression": 0.7,
+      "fine": {
+        "enabled": true,
+        "amount": 20,
+        "radiusPx": 6
+      },
+      "medium": {
+        "enabled": true,
+        "amount": 20,
+        "radiusPx": 4
+      },
+      "coarse": {
+        "enabled": true,
+        "amount": 8,
+        "radiusPx": 16
+      }
+    }
+  },
+  {
+    "case": "disabled_scale_with_amount",
+    "recipe": {
+      "schemaVersion": 1,
+      "id": "disabled-with-amount",
+      "colorSpace": "display_p3",
+      "previewMode": "off",
+      "edgeThreshold": 0.25,
+      "haloSuppression": 0.7,
+      "fine": {
+        "enabled": false,
+        "amount": 12,
+        "radiusPx": 1
+      },
+      "medium": {
+        "enabled": false,
+        "amount": 0,
+        "radiusPx": 4
+      },
+      "coarse": {
+        "enabled": false,
+        "amount": 0,
+        "radiusPx": 16
+      }
+    }
+  },
+  {
+    "case": "preview_without_active_scale",
+    "recipe": {
+      "schemaVersion": 1,
+      "id": "preview-without-active-scale",
+      "colorSpace": "srgb",
+      "previewMode": "luma_detail",
+      "edgeThreshold": 0.25,
+      "haloSuppression": 0.7,
+      "fine": {
+        "enabled": false,
+        "amount": 0,
+        "radiusPx": 1
+      },
+      "medium": {
+        "enabled": false,
+        "amount": 0,
+        "radiusPx": 4
+      },
+      "coarse": {
+        "enabled": false,
+        "amount": 0,
+        "radiusPx": 16
+      }
+    }
+  }
+]
