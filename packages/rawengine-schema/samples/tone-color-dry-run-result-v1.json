@@ -31,6 +31,19 @@
       "storage": "temp_cache"
     }
   ],
+  "colorPipeline": {
+    "inputDomain": "camera_linear_rgb",
+    "operationDomain": "acescg_linear_v1",
+    "renderTarget": {
+      "bitDepth": 8,
+      "embedIcc": true,
+      "intent": "relative_colorimetric",
+      "outputProfile": "display_p3",
+      "viewTransform": "rawengine_agx_v1"
+    },
+    "sceneToDisplayTransform": "rawengine_agx_v1",
+    "workingSpace": "acescg_linear_v1"
+  },
   "schemaVersion": 1,
   "sourceGraphRevision": "graph_rev_44",
   "warnings": []

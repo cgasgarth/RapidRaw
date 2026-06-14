@@ -317,6 +317,19 @@
         },
         "commandId": "command_tone_color_basic_preview_sample",
         "correlationId": "corr_tone_color_basic_preview_sample",
+        "colorPipeline": {
+          "inputDomain": "camera_linear_rgb",
+          "operationDomain": "acescg_linear_v1",
+          "renderTarget": {
+            "bitDepth": 8,
+            "embedIcc": true,
+            "intent": "relative_colorimetric",
+            "outputProfile": "display_p3",
+            "viewTransform": "rawengine_agx_v1"
+          },
+          "sceneToDisplayTransform": "rawengine_agx_v1",
+          "workingSpace": "acescg_linear_v1"
+        },
         "dryRun": true,
         "expectedGraphRevision": "graph_rev_44",
         "idempotencyKey": "idem_tone_color_basic_preview_sample",
@@ -373,6 +386,19 @@
             "storage": "temp_cache"
           }
         ],
+        "colorPipeline": {
+          "inputDomain": "camera_linear_rgb",
+          "operationDomain": "acescg_linear_v1",
+          "renderTarget": {
+            "bitDepth": 8,
+            "embedIcc": true,
+            "intent": "relative_colorimetric",
+            "outputProfile": "display_p3",
+            "viewTransform": "rawengine_agx_v1"
+          },
+          "sceneToDisplayTransform": "rawengine_agx_v1",
+          "workingSpace": "acescg_linear_v1"
+        },
         "schemaVersion": 1,
         "sourceGraphRevision": "graph_rev_44",
         "warnings": []
@@ -407,6 +433,19 @@
         },
         "commandId": "command_tone_color_basic_apply_sample",
         "correlationId": "corr_tone_color_basic_apply_sample",
+        "colorPipeline": {
+          "inputDomain": "camera_linear_rgb",
+          "operationDomain": "acescg_linear_v1",
+          "renderTarget": {
+            "bitDepth": 8,
+            "embedIcc": true,
+            "intent": "relative_colorimetric",
+            "outputProfile": "display_p3",
+            "viewTransform": "rawengine_agx_v1"
+          },
+          "sceneToDisplayTransform": "rawengine_agx_v1",
+          "workingSpace": "acescg_linear_v1"
+        },
         "dryRun": false,
         "expectedGraphRevision": "graph_rev_44",
         "idempotencyKey": "idem_tone_color_basic_apply_sample",
@@ -436,6 +475,19 @@
         "commandId": "command_tone_color_basic_apply_sample",
         "commandType": "toneColor.setBasicTone",
         "correlationId": "corr_tone_color_basic_apply_sample",
+        "colorPipeline": {
+          "inputDomain": "camera_linear_rgb",
+          "operationDomain": "acescg_linear_v1",
+          "renderTarget": {
+            "bitDepth": 8,
+            "embedIcc": true,
+            "intent": "relative_colorimetric",
+            "outputProfile": "display_p3",
+            "viewTransform": "rawengine_agx_v1"
+          },
+          "sceneToDisplayTransform": "rawengine_agx_v1",
+          "workingSpace": "acescg_linear_v1"
+        },
         "dryRun": false,
         "mutates": true,
         "schemaVersion": 1,
