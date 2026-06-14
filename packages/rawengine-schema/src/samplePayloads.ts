@@ -1732,6 +1732,7 @@ export const sampleComputationalMergeSuperResolutionCommandEnvelopeV1: Computati
       alignmentMode: 'optical_flow',
       detailPolicy: 'conservative',
       maxPreviewDimensionPx: 2400,
+      mode: 'multi_image',
       outputName: 'Handheld Burst Super Resolution',
       outputScale: 2,
       qualityPreference: 'best',
@@ -1762,6 +1763,33 @@ export const sampleComputationalMergeSuperResolutionCommandEnvelopeV1: Computati
           rawDefaultsApplied: true,
           role: 'sr_frame',
           sourceIndex: 2,
+        },
+      ],
+    },
+  });
+
+export const sampleComputationalMergeSingleImageSuperResolutionCommandEnvelopeV1: ComputationalMergeCommandEnvelopeV1 =
+  computationalMergeCommandEnvelopeV1Schema.parse({
+    ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.PreviewOnly,
+      reason: 'Previewing single-image super-resolution estimates conservative detail gain without alignment.',
+      state: 'not_required',
+    },
+    commandId: 'command_merge_single_image_super_resolution_preview_sample',
+    correlationId: 'corr_merge_single_image_super_resolution_preview_sample',
+    idempotencyKey: 'idem_merge_single_image_super_resolution_preview_sample',
+    parameters: {
+      ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1.parameters,
+      alignmentMode: 'none',
+      mode: 'single_image',
+      outputName: 'Single Image Super Resolution',
+      sources: [
+        {
+          ...sampleComputationalMergeSuperResolutionCommandEnvelopeV1.parameters.sources[0],
+          imageId: 'img_sr_single_001',
+          imagePath: '/photos/session/SR_SINGLE_0001.CR3',
+          sourceIndex: 0,
         },
       ],
     },

@@ -101,6 +101,7 @@ import {
   sampleComputationalMergeSuperResolutionApplyAppServerToolCallValidationV1,
   sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
   sampleComputationalMergeSuperResolutionDryRunAppServerToolCallValidationV1,
+  sampleComputationalMergeSingleImageSuperResolutionCommandEnvelopeV1,
   sampleEditGraphCommandEnvelopeV1,
   sampleEditGraphDryRunResultV1,
   sampleEditGraphMutationResultV1,
@@ -414,6 +415,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/computational-merge-super-resolution-command-envelope-v1.json',
     schema: computationalMergeCommandEnvelopeV1Schema,
     value: sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
+  },
+  {
+    name: 'computational merge single-image super-resolution command envelope',
+    path: 'packages/rawengine-schema/samples/computational-merge-single-image-super-resolution-command-envelope-v1.json',
+    schema: computationalMergeCommandEnvelopeV1Schema,
+    value: sampleComputationalMergeSingleImageSuperResolutionCommandEnvelopeV1,
   },
   {
     name: 'computational merge dry-run result',
