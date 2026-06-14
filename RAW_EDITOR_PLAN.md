@@ -4680,7 +4680,9 @@ Issues:
 - Audit current sharpening/noise tools.
 - Add capture sharpening.
 - Add output sharpening.
-- Add deconvolution/lens deblur research.
+- Add deconvolution/lens deblur research. Accepted initial direction: classical
+  bounded deconvolution only, with fixture proof before runtime UI or API
+  application.
 - Add local contrast refinement.
 - Add wavelet/detail-by-scale design.
 - Add wavelet/detail-by-scale implementation.
