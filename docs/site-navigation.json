@@ -99,6 +99,10 @@
           "path": "docs/color/selective-color-falloff-2026-06-14.md"
         },
         {
+          "title": "Skin-tone uniformity",
+          "path": "docs/color/skin-tone-uniformity-2026-06-14.md"
+        },
+        {
           "title": "Film simulation architecture",
           "path": "docs/film/film-simulation-architecture-2026-06-13.md"
         },
