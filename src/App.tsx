@@ -848,6 +848,7 @@ function App() {
           handleSaveCollage={handleSaveCollage}
           handleCreateAlbumItem={handleCreateAlbumItem}
           handleRenameAlbumItem={handleRenameAlbumItem}
+          handleBackToLibrary={handleBackToLibrary}
         />
         <ToastContainer
           position="bottom-right"
