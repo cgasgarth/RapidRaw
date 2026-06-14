@@ -4008,6 +4008,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 
 - `consult(focus-stack): get focus stacking architecture review`
 - `focus(schema): define focus stack artifact schema`
+  - Schema: `packages/rawengine-schema/src/rawEngineSchemas.ts#focusStackArtifactV1Schema`
+  - Sample: `packages/rawengine-schema/samples/focus-stack-artifact-v1.json`
 - `focus(align): add alignment path`
 - `focus(sharpness): add sharpness map generation`
 - `focus(blend): add blending strategy`

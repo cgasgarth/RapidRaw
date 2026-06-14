@@ -32,6 +32,7 @@ import {
   filmGrainModelV1Schema,
   filmHalationModelV1Schema,
   filmLookCatalogV1Schema,
+  focusStackArtifactV1Schema,
   layerMaskCommandEnvelopeV1Schema,
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
@@ -118,6 +119,7 @@ import {
   sampleFilmGrainModelV1,
   sampleFilmHalationModelV1,
   sampleFilmLookCatalogV1,
+  sampleFocusStackArtifactV1,
   sampleLayerMaskCommandEnvelopeV1,
   sampleLayerMaskDryRunResultV1,
   sampleLayerMaskMutationResultV1,
@@ -409,6 +411,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/computational-merge-focus-stack-command-envelope-v1.json',
     schema: computationalMergeCommandEnvelopeV1Schema,
     value: sampleComputationalMergeFocusStackCommandEnvelopeV1,
+  },
+  {
+    name: 'focus stack artifact',
+    path: 'packages/rawengine-schema/samples/focus-stack-artifact-v1.json',
+    schema: focusStackArtifactV1Schema,
+    value: sampleFocusStackArtifactV1,
   },
   {
     name: 'computational merge super-resolution command envelope',

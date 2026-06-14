@@ -2644,6 +2644,209 @@ export const computationalMergeMutationResultV1Schema = z
   })
   .strict();
 
+export const focusStackBlendMethodV1Schema = z.enum(['depth_map', 'laplacian_pyramid', 'weighted_sharpness']);
+
+export const focusStackRetouchLayerPolicyV1Schema = z.enum(['none', 'generate_retouch_layer']);
+
+export const focusStackWarningCodeV1Schema = z.enum([
+  'alignment_low_confidence',
+  'focus_coverage_low',
+  'high_memory_estimate',
+  'human_review_required',
+  'parallax_detected',
+  'retouch_layer_required',
+  'runtime_estimate_high',
+  'source_order_unverified',
+]);
+
+export const focusStackInvalidationReasonV1Schema = z.enum([
+  'alignment_settings_changed',
+  'blend_method_changed',
+  'engine_version_changed',
+  'output_artifact_changed',
+  'retouch_layer_changed',
+  'source_content_hash_changed',
+  'source_graph_revision_changed',
+  'source_order_changed',
+  'source_set_changed',
+]);
+
+export const focusStackStaleStateV1Schema = z.enum(['current', 'stale', 'unknown']);
+
+const focusStackSourceStateV1Schema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    focusDistanceMm: z.number().positive().optional(),
+    graphRevision: z.string().trim().min(1),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const validateFocusStackSourceState = (
+  sourceImageRefs: Array<ComputationalMergeSourceImageRefV1>,
+  sourceStates: Array<z.infer<typeof focusStackSourceStateV1Schema>>,
+  context: z.RefinementCtx,
+  path: Array<string | number>,
+) => {
+  const sourceIndexes = new Set(sourceImageRefs.map((source) => source.sourceIndex));
+  const stateIndexes = new Set<number>();
+
+  for (const [index, sourceState] of sourceStates.entries()) {
+    if (stateIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Focus stack source state entries require unique source indexes.',
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+
+    stateIndexes.add(sourceState.sourceIndex);
+
+    if (!sourceIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Focus stack source state entry must reference a source image index.',
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+  }
+
+  if (stateIndexes.size !== sourceIndexes.size) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Focus stack source state entries must cover every source image.',
+      path,
+    });
+  }
+};
+
+export const focusStackArtifactV1Schema = z
+  .object({
+    artifactId: z.string().trim().min(1),
+    blendMethod: focusStackBlendMethodV1Schema,
+    createdAt: z.iso.datetime({ offset: true }),
+    depthConfidenceMapArtifact: artifactHandleV1Schema.optional(),
+    dryRun: z
+      .object({
+        acceptedDryRunPlanHash: z.string().trim().min(1),
+        acceptedDryRunPlanId: z.string().trim().min(1),
+      })
+      .strict(),
+    engine: z
+      .object({
+        backendType: z.enum(['local_cpu', 'local_gpu', 'schema_only']),
+        engineId: z.string().trim().min(1),
+        engineVersion: z.string().trim().min(1),
+      })
+      .strict(),
+    family: z.literal('focus_stack'),
+    outputArtifact: artifactHandleV1Schema,
+    outputColorSpace: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema),
+    qualityPreference: computationalMergeQualityPreferenceV1Schema,
+    requestedAlignmentMode: computationalMergeAlignmentModeV1Schema,
+    resolvedAlignmentMode: computationalMergeAlignmentModeV1Schema,
+    retouchLayerArtifact: artifactHandleV1Schema.optional(),
+    retouchLayerPolicy: focusStackRetouchLayerPolicyV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sharpnessMapArtifact: artifactHandleV1Schema.optional(),
+    sourceImageRefs: z.array(computationalMergeSourceImageRefV1Schema).min(2),
+    sourceState: z.array(focusStackSourceStateV1Schema).min(2),
+    staleState: z
+      .object({
+        checkedAt: z.iso.datetime({ offset: true }).optional(),
+        invalidationReasons: z.array(focusStackInvalidationReasonV1Schema),
+        state: focusStackStaleStateV1Schema,
+      })
+      .strict(),
+    validationSummary: z
+      .object({
+        actualPeakMemoryBytes: z.number().int().nonnegative().optional(),
+        actualRuntimeMs: z.number().int().nonnegative().optional(),
+        alignmentConfidence: z.number().min(0).max(1).optional(),
+        focusCoverageRatio: z.number().min(0).max(1),
+        parallaxRisk: z.enum(['unknown', 'low', 'medium', 'high']),
+        rejectedSourceIndexes: z.array(z.number().int().nonnegative()),
+        retouchRequired: z.boolean(),
+        sourceCount: z.number().int().positive(),
+      })
+      .strict(),
+    warningCodes: z.array(focusStackWarningCodeV1Schema),
+  })
+  .strict()
+  .superRefine((artifact, context) => {
+    for (const [sourceIndex, source] of artifact.sourceImageRefs.entries()) {
+      if (source.role !== 'focus_slice') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Focus stack artifacts require every source to use the focus_slice role.',
+          path: ['sourceImageRefs', sourceIndex, 'role'],
+        });
+      }
+    }
+
+    if (artifact.outputArtifact.kind !== 'merge_output' || artifact.outputArtifact.storage !== 'sidecar_artifact') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Focus stack artifacts must reference a durable merge output sidecar artifact.',
+        path: ['outputArtifact'],
+      });
+    }
+
+    if (artifact.retouchLayerPolicy === 'generate_retouch_layer' && artifact.retouchLayerArtifact === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generated focus stack retouch layers require a retouchLayerArtifact.',
+        path: ['retouchLayerArtifact'],
+      });
+    }
+
+    if (artifact.retouchLayerPolicy === 'none' && artifact.retouchLayerArtifact !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Focus stack artifacts without retouch layers must not include retouchLayerArtifact.',
+        path: ['retouchLayerArtifact'],
+      });
+    }
+
+    if (artifact.staleState.state === 'current' && artifact.staleState.invalidationReasons.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Current focus stack artifacts must not include invalidation reasons.',
+        path: ['staleState', 'invalidationReasons'],
+      });
+    }
+
+    if (artifact.staleState.state === 'stale' && artifact.staleState.invalidationReasons.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Stale focus stack artifacts require invalidation reasons.',
+        path: ['staleState', 'invalidationReasons'],
+      });
+    }
+
+    if (artifact.validationSummary.sourceCount !== artifact.sourceImageRefs.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Focus stack validation sourceCount must match sourceImageRefs length.',
+        path: ['validationSummary', 'sourceCount'],
+      });
+    }
+
+    const sourceIndexes = new Set(artifact.sourceImageRefs.map((source) => source.sourceIndex));
+    for (const [index, rejectedSourceIndex] of artifact.validationSummary.rejectedSourceIndexes.entries()) {
+      if (!sourceIndexes.has(rejectedSourceIndex)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Rejected focus stack source indexes must reference a source image.',
+          path: ['validationSummary', 'rejectedSourceIndexes', index],
+        });
+      }
+    }
+
+    validateFocusStackSourceState(artifact.sourceImageRefs, artifact.sourceState, context, ['sourceState']);
+  });
+
 const superResolutionSourceStateV1Schema = z
   .object({
     contentHash: z.string().trim().min(1),
@@ -7787,6 +7990,12 @@ export type ComputationalMergeQualityMetricsV1 = z.infer<typeof computationalMer
 export type ComputationalMergeQualityPreferenceV1 = z.infer<typeof computationalMergeQualityPreferenceV1Schema>;
 export type ComputationalMergeSourceImageRefV1 = z.infer<typeof computationalMergeSourceImageRefV1Schema>;
 export type ComputationalMergeSourceRoleV1 = z.infer<typeof computationalMergeSourceRoleV1Schema>;
+export type FocusStackArtifactV1 = z.infer<typeof focusStackArtifactV1Schema>;
+export type FocusStackBlendMethodV1 = z.infer<typeof focusStackBlendMethodV1Schema>;
+export type FocusStackInvalidationReasonV1 = z.infer<typeof focusStackInvalidationReasonV1Schema>;
+export type FocusStackRetouchLayerPolicyV1 = z.infer<typeof focusStackRetouchLayerPolicyV1Schema>;
+export type FocusStackStaleStateV1 = z.infer<typeof focusStackStaleStateV1Schema>;
+export type FocusStackWarningCodeV1 = z.infer<typeof focusStackWarningCodeV1Schema>;
 export type SuperResolutionArtifactV1 = z.infer<typeof superResolutionArtifactV1Schema>;
 export type SuperResolutionBlockCodeV1 = z.infer<typeof superResolutionBlockCodeV1Schema>;
 export type SuperResolutionDecisionStatusV1 = z.infer<typeof superResolutionDecisionStatusV1Schema>;
