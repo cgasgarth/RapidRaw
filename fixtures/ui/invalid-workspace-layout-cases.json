@@ -1,0 +1,68 @@
+[
+  {
+    "case": "rejects duplicate panel ids",
+    "catalog": {
+      "activeLayoutId": "bad-panels",
+      "layouts": [
+        {
+          "activePanelId": "metadata",
+          "createdAt": "2026-06-14T11:00:00.000Z",
+          "density": "dense",
+          "hiddenAdjustmentSections": [],
+          "id": "bad-panels",
+          "name": "Bad Panels",
+          "panels": [
+            { "collapsed": false, "dock": "right", "id": "metadata", "order": 0, "widthPx": 320 },
+            { "collapsed": false, "dock": "right", "id": "metadata", "order": 1, "widthPx": 320 }
+          ],
+          "primarySurface": "library",
+          "shortcutScope": "surface",
+          "updatedAt": "2026-06-14T11:00:00.000Z",
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "case": "rejects hidden panel width",
+    "catalog": {
+      "activeLayoutId": "bad-hidden",
+      "layouts": [
+        {
+          "activePanelId": null,
+          "createdAt": "2026-06-14T11:00:00.000Z",
+          "density": "dense",
+          "hiddenAdjustmentSections": [],
+          "id": "bad-hidden",
+          "name": "Bad Hidden",
+          "panels": [{ "collapsed": false, "dock": "hidden", "id": "ai", "order": 0, "widthPx": 320 }],
+          "primarySurface": "editor",
+          "shortcutScope": "global",
+          "updatedAt": "2026-06-14T11:00:00.000Z",
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "case": "rejects active panel outside layout",
+    "catalog": {
+      "activeLayoutId": "bad-active",
+      "layouts": [
+        {
+          "activePanelId": "export",
+          "createdAt": "2026-06-14T11:00:00.000Z",
+          "density": "dense",
+          "hiddenAdjustmentSections": [],
+          "id": "bad-active",
+          "name": "Bad Active",
+          "panels": [{ "collapsed": false, "dock": "right", "id": "metadata", "order": 0, "widthPx": 320 }],
+          "primarySurface": "library",
+          "shortcutScope": "surface",
+          "updatedAt": "2026-06-14T11:00:00.000Z",
+          "version": 1
+        }
+      ]
+    }
+  }
+]
