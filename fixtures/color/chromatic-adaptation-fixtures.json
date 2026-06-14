@@ -1,0 +1,162 @@
+[
+  {
+    "case": "identity leaves XYZ unchanged",
+    "input": {
+      "sourceWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "targetWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "xyz": [0.25, 0.4, 0.1]
+    },
+    "expectedXyz": [0.25, 0.4, 0.1],
+    "tolerance": 0.000001
+  },
+  {
+    "case": "D65 white adapts to D50 white",
+    "input": {
+      "sourceWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "targetWhitePoint": {
+        "x": 0.3457,
+        "y": 0.3585
+      },
+      "xyz": [0.950456, 1, 1.089058]
+    },
+    "expectedXyz": [0.964296, 1, 0.825105],
+    "tolerance": 0.000001
+  },
+  {
+    "case": "D50 white adapts to D65 white",
+    "input": {
+      "sourceWhitePoint": {
+        "x": 0.3457,
+        "y": 0.3585
+      },
+      "targetWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "xyz": [0.964296, 1, 0.825105]
+    },
+    "expectedXyz": [0.950456, 1, 1.089058],
+    "tolerance": 0.000001
+  },
+  {
+    "case": "D65 neutral gray adapts to D50 without clipping",
+    "input": {
+      "sourceWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "targetWhitePoint": {
+        "x": 0.3457,
+        "y": 0.3585
+      },
+      "xyz": [0.5, 0.5, 0.5]
+    },
+    "expectedXyz": [0.510342, 0.501494, 0.378843],
+    "tolerance": 0.000001
+  },
+  {
+    "case": "D65 red primary adapts to D50",
+    "input": {
+      "sourceWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "targetWhitePoint": {
+        "x": 0.3457,
+        "y": 0.3585
+      },
+      "xyz": [0.412456, 0.212673, 0.019334]
+    },
+    "expectedXyz": [0.436135, 0.222529, 0.013926],
+    "tolerance": 0.000001
+  },
+  {
+    "case": "D65 green primary adapts to D50",
+    "input": {
+      "sourceWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "targetWhitePoint": {
+        "x": 0.3457,
+        "y": 0.3585
+      },
+      "xyz": [0.357576, 0.715152, 0.119192]
+    },
+    "expectedXyz": [0.385143, 0.716871, 0.097079],
+    "tolerance": 0.000001
+  },
+  {
+    "case": "D65 blue primary adapts to D50",
+    "input": {
+      "sourceWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "targetWhitePoint": {
+        "x": 0.3457,
+        "y": 0.3585
+      },
+      "xyz": [0.180438, 0.072175, 0.950304]
+    },
+    "expectedXyz": [0.143044, 0.060605, 0.713928],
+    "tolerance": 0.000001
+  },
+  {
+    "case": "D65 negative component adapts to D50 without clipping",
+    "input": {
+      "sourceWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "targetWhitePoint": {
+        "x": 0.3457,
+        "y": 0.3585
+      },
+      "xyz": [-0.05, 0.2, 0.1]
+    },
+    "expectedXyz": [-0.052826, 0.194898, 0.078661],
+    "tolerance": 0.000001
+  },
+  {
+    "case": "D65 HDR component adapts to D50 without clipping",
+    "input": {
+      "sourceWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "targetWhitePoint": {
+        "x": 0.3457,
+        "y": 0.3585
+      },
+      "xyz": [1.8, 1.2, 0.4]
+    },
+    "expectedXyz": [1.893733, 1.235022, 0.302178],
+    "tolerance": 0.000001
+  },
+  {
+    "case": "D65 to D50 to D65 neutral gray round trip",
+    "input": {
+      "sourceWhitePoint": {
+        "x": 0.3457,
+        "y": 0.3585
+      },
+      "targetWhitePoint": {
+        "x": 0.3127,
+        "y": 0.329
+      },
+      "xyz": [0.510342, 0.501494, 0.378843]
+    },
+    "expectedXyz": [0.5, 0.5, 0.5],
+    "tolerance": 0.000001
+  }
+]

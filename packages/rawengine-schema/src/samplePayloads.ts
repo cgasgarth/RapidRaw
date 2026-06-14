@@ -218,7 +218,7 @@ export const sampleRawEngineSceneColorPipelineV1: RawEngineColorPipelineContextV
       x: 0.3457,
       y: 0.3585,
     },
-    status: 'applied',
+    status: 'math_validated',
     targetWhitePoint: {
       x: 0.32168,
       y: 0.33767,

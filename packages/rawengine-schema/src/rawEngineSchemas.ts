@@ -194,7 +194,14 @@ export const rawEngineChromaticAdaptationMethodV1Schema = z.enum([
   'unsupported_or_unknown_v1',
 ]);
 
-export const rawEngineChromaticAdaptationStatusV1Schema = z.enum(['applied', 'skipped', 'blocked']);
+export const rawEngineChromaticAdaptationStatusV1Schema = z.enum([
+  'schema_only',
+  'math_validated',
+  'applied_preview',
+  'applied_render',
+  'skipped',
+  'blocked',
+]);
 
 export const rawEngineChromaticAdaptationV1Schema = z
   .object({
@@ -223,6 +230,14 @@ export const rawEngineChromaticAdaptationV1Schema = z
         code: 'custom',
         message: 'Unsupported chromatic adaptation must be blocked.',
         path: ['status'],
+      });
+    }
+
+    if (adaptation.status === 'schema_only' && adaptation.warnings.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Schema-only chromatic adaptation requires at least one warning.',
+        path: ['warnings'],
       });
     }
 
