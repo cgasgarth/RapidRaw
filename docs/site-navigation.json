@@ -71,6 +71,10 @@
           "path": "docs/color/working-color-space-adr-2026-06-14.md"
         },
         {
+          "title": "Scene-to-display transform ADR",
+          "path": "docs/color/scene-to-display-transform-adr-2026-06-14.md"
+        },
+        {
           "title": "Film simulation architecture",
           "path": "docs/film/film-simulation-architecture-2026-06-13.md"
         },

@@ -3839,6 +3839,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `color(adr): decide working color space`
   - ADR: `docs/color/working-color-space-adr-2026-06-14.md`
 - `color(adr): decide scene-to-display transform strategy`
+  - ADR: `docs/color/scene-to-display-transform-adr-2026-06-14.md`
 - `color(adr): decide camera profile strategy`
 - `color(docs): add color pipeline design doc`
 - `validation(color): add ColorChecker fixture set`
