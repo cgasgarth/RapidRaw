@@ -4011,6 +4011,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Schema: `packages/rawengine-schema/src/rawEngineSchemas.ts#focusStackArtifactV1Schema`
   - Sample: `packages/rawengine-schema/samples/focus-stack-artifact-v1.json`
 - `focus(align): add alignment path`
+  - Doc: `docs/focus-stacking/alignment-path-2026-06-14.md`
 - `focus(sharpness): add sharpness map generation`
 - `focus(blend): add blending strategy`
 - `focus(retouch): add artifact retouch strategy`
