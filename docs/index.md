@@ -46,6 +46,7 @@ generator before the release workflow needs one.
 - [Film simulation architecture](film/film-simulation-architecture-2026-06-13.md)
 - [Built-In Film Look catalog schema](film/built-in-look-catalog-schema-2026-06-13.md)
 - [Bundled look legal review checklist](film/bundled-look-legal-review-checklist-2026-06-13.md)
+- [Tethering support research](tethering/tethering-support-research-2026-06-14.md)
 - [Negative Lab architecture overview](negative-lab/architecture-overview-2026-06-13.md)
 - [Negative Lab consult design review](negative-lab/consult-design-review-2026-06-13.md)
 - [Negative Lab density-domain inversion ADR](negative-lab/density-domain-inversion-adr-2026-06-13.md)
