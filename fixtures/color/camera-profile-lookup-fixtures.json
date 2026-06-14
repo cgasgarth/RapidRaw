@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "camera.apple-iphone-15-pro.generic-dng-v1",
+      "manufacturer": "Apple",
+      "models": ["iPhone 15 Pro", "iPhone16,1"],
+      "rawExtensions": ["dng"],
+      "inputTransform": "dng_color_matrix",
+      "profileClass": "generic_camera_profile",
+      "source": "dng_metadata",
+      "priority": 90
+    },
+    {
+      "id": "camera.sony-ilce-7m4.generic-arw-v1",
+      "manufacturer": "Sony",
+      "models": ["ILCE-7M4", "Alpha 7 IV", "A7 IV"],
+      "rawExtensions": ["arw"],
+      "inputTransform": "libraw_camera_matrix",
+      "profileClass": "generic_camera_profile",
+      "source": "raw_decoder_metadata",
+      "priority": 80
+    },
+    {
+      "id": "camera.fujifilm-x-t5.generic-raf-v1",
+      "manufacturer": "Fujifilm",
+      "models": ["X-T5", "X-T5 Ver1.00"],
+      "rawExtensions": ["raf"],
+      "inputTransform": "libraw_camera_matrix",
+      "profileClass": "generic_camera_profile",
+      "source": "raw_decoder_metadata",
+      "priority": 80
+    }
+  ],
+  "fallbacks": [
+    {
+      "id": "fallback.dng-embedded-matrix",
+      "rawExtensions": ["dng"],
+      "inputTransform": "embedded_dng_color_matrix",
+      "warning": "camera_profile_embedded_fallback"
+    },
+    {
+      "id": "fallback.raw-decoder-neutral",
+      "rawExtensions": ["arw", "cr2", "cr3", "nef", "orf", "raf", "rw2"],
+      "inputTransform": "raw_decoder_neutral_matrix",
+      "warning": "camera_profile_generic_fallback"
+    }
+  ],
+  "cases": [
+    {
+      "id": "camera-profile.exact-sony-ilce-7m4",
+      "metadata": {
+        "manufacturer": "Sony",
+        "model": "ILCE-7M4",
+        "rawExtension": "ARW"
+      },
+      "expectedProfileId": "camera.sony-ilce-7m4.generic-arw-v1",
+      "expectedWarning": null
+    },
+    {
+      "id": "camera-profile.alias-fujifilm-x-t5",
+      "metadata": {
+        "manufacturer": "FUJIFILM",
+        "model": "X-T5 Ver1.00",
+        "rawExtension": "raf"
+      },
+      "expectedProfileId": "camera.fujifilm-x-t5.generic-raf-v1",
+      "expectedWarning": null
+    },
+    {
+      "id": "camera-profile.alias-apple-dng",
+      "metadata": {
+        "manufacturer": "Apple",
+        "model": "iPhone16,1",
+        "rawExtension": "DNG"
+      },
+      "expectedProfileId": "camera.apple-iphone-15-pro.generic-dng-v1",
+      "expectedWarning": null
+    },
+    {
+      "id": "camera-profile.embedded-dng-fallback",
+      "metadata": {
+        "manufacturer": "Unknown",
+        "model": "DNG Camera",
+        "rawExtension": "dng"
+      },
+      "expectedProfileId": "fallback.dng-embedded-matrix",
+      "expectedWarning": "camera_profile_embedded_fallback"
+    },
+    {
+      "id": "camera-profile.generic-raw-fallback",
+      "metadata": {
+        "manufacturer": "Unknown",
+        "model": "Unlisted Camera",
+        "rawExtension": "cr3"
+      },
+      "expectedProfileId": "fallback.raw-decoder-neutral",
+      "expectedWarning": "camera_profile_generic_fallback"
+    }
+  ]
+}
