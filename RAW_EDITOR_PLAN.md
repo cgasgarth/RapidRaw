@@ -4007,6 +4007,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 #### Milestone 12: Focus Stacking
 
 - `consult(focus-stack): get focus stacking architecture review`
+  - Doc: `docs/focus-stacking/architecture-consult-summary-2026-06-14.md`
 - `focus(schema): define focus stack artifact schema`
   - Schema: `packages/rawengine-schema/src/rawEngineSchemas.ts#focusStackArtifactV1Schema`
   - Sample: `packages/rawengine-schema/samples/focus-stack-artifact-v1.json`
@@ -4028,6 +4029,20 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Doc: `docs/focus-stacking/api-tool-contract-2026-06-14.md`
 - `validation(focus): add focus stack performance tests`
   - Doc: `docs/focus-stacking/performance-validation-contract-2026-06-14.md`
+- `docs(focus): define RAW normalization and color policy`
+  - Issue: #1057
+- `focus(runtime): add plan-only dry-run preflight`
+  - Issue: #1058
+- `validation(focus): add tiny synthetic bracket generator`
+  - Issue: #1059
+- `focus(runtime): add CPU translation alignment smoke`
+  - Issue: #1060
+- `focus(runtime): add CPU sharpness-map smoke`
+  - Issue: #1061
+- `focus(runtime): add weighted-sharpness preview blend smoke`
+  - Issue: #1062
+- `agent(focus): bind app-server focus tools to command bus`
+  - Issue: #1063
 
 #### Milestone 13: Super-Resolution
 
