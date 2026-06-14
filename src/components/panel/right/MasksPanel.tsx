@@ -1538,7 +1538,9 @@ export default function MasksPanel() {
           activeMaskContainerId={activeMaskContainerId}
           masks={adjustments.masks}
           onSelectMaskContainer={onSelectContainer}
-          onUpdateMaskContainer={updateContainer}
+          onSetMaskContainers={(masks) => {
+            setAdjustments((prev: Adjustments) => ({ ...prev, masks }));
+          }}
         />
 
         <AnimatePresence initial={false}>

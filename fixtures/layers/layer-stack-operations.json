@@ -1,0 +1,46 @@
+[
+  {
+    "id": "opacity-clamps-to-range",
+    "initialLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true }
+    ],
+    "operations": [{ "type": "setOpacity", "layerId": "sky", "opacity": 144 }],
+    "expectedLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 100, "visible": true }
+    ]
+  },
+  {
+    "id": "visibility-and-reorder",
+    "initialLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true }
+    ],
+    "operations": [
+      { "type": "setVisibility", "layerId": "skin", "visible": false },
+      { "type": "move", "layerId": "sky", "direction": "up" }
+    ],
+    "expectedLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true },
+      { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": false }
+    ]
+  },
+  {
+    "id": "duplicate-and-delete",
+    "initialLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": true }
+    ],
+    "operations": [
+      { "type": "duplicate", "layerId": "skin", "newLayerId": "skin-copy", "name": "Skin Uniformity Copy" },
+      { "type": "delete", "layerId": "tone" }
+    ],
+    "expectedLayers": [
+      { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": true },
+      { "id": "skin-copy", "name": "Skin Uniformity Copy", "opacity": 65, "visible": true }
+    ]
+  }
+]
