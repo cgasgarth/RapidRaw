@@ -3911,6 +3911,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(compose): add add subtract intersect`
   - Runtime status: add/subtract/intersect weight composition is typed, clamped, and fixture-validated; renderer integration remains future work.
 - `masks(refine): add feather density and edge refine`
+  - Runtime status: feather, density, edge shift, smoothness, and edge contrast schemas plus refined weight evaluation are fixture-validated; renderer integration remains future work.
 - `masks(overlay): add mask overlay modes`
 - `masks(copy): add mask copy paste`
 - `masks(ai): audit subject sky background masks`

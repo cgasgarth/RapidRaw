@@ -86,6 +86,16 @@ export const colorRangeMaskParametersSchema = z
     path: ['minSaturation'],
   });
 
+export const maskRefinementParametersSchema = z
+  .object({
+    density: z.number().min(0).max(1),
+    edgeContrast: z.number().min(0).max(1),
+    edgeShiftPx: z.number().min(-512).max(512),
+    featherPx: z.number().min(0).max(4096),
+    smoothness: z.number().min(0).max(1),
+  })
+  .strict();
+
 export const aiDepthMaskParametersSchema = z.object({
   feather: z.number(),
   maxDepth: z.number(),
@@ -102,3 +112,4 @@ export type LinearGradientMaskParameters = z.infer<typeof linearGradientMaskPara
 export type RadialGradientMaskParameters = z.infer<typeof radialGradientMaskParametersSchema>;
 export type LuminanceRangeMaskParameters = z.infer<typeof luminanceRangeMaskParametersSchema>;
 export type ColorRangeMaskParameters = z.infer<typeof colorRangeMaskParametersSchema>;
+export type MaskRefinementParameters = z.infer<typeof maskRefinementParametersSchema>;
