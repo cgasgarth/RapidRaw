@@ -12,6 +12,7 @@ import {
   HueSatLum,
   INITIAL_ADJUSTMENTS,
 } from '../../utils/adjustments';
+import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
 import { AppSettings } from '../ui/AppProperties';
 import ColorWheel from '../ui/ColorWheel';
 import Slider from '../ui/Slider';
@@ -449,35 +450,17 @@ export default function ColorPanel({
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
 
   const HSL_COLORS = useMemo<Array<ColorProps>>(
-    () => [
-      { name: 'reds', color: '#f87171', label: t('adjustments.color.mixerColors.reds') },
-      { name: 'oranges', color: '#fb923c', label: t('adjustments.color.mixerColors.oranges') },
-      { name: 'yellows', color: '#facc15', label: t('adjustments.color.mixerColors.yellows') },
-      { name: 'greens', color: '#4ade80', label: t('adjustments.color.mixerColors.greens') },
-      { name: 'aquas', color: '#2dd4bf', label: t('adjustments.color.mixerColors.aquas') },
-      { name: 'blues', color: '#60a5fa', label: t('adjustments.color.mixerColors.blues') },
-      { name: 'purples', color: '#a78bfa', label: t('adjustments.color.mixerColors.purples') },
-      { name: 'magentas', color: '#f472b6', label: t('adjustments.color.mixerColors.magentas') },
-    ],
+    () =>
+      SELECTIVE_COLOR_RANGES.map((range) => ({
+        color: range.color,
+        label: t(range.labelKey),
+        name: range.key,
+      })),
     [t],
   );
 
-  const colorHueMap = useMemo<Record<string, number>>(
-    () => ({
-      reds: 0,
-      oranges: 30,
-      yellows: 60,
-      greens: 120,
-      aquas: 180,
-      blues: 240,
-      purples: 300,
-      magentas: 340,
-    }),
-    [],
-  );
-
   const currentHsl = adjustments.hsl[activeColor] || { hue: 0, saturation: 0, luminance: 0 };
-  const baseHue = colorHueMap[activeColor] || 0;
+  const baseHue = getSelectiveColorRange(activeColor).centerHueDegrees;
   const effectiveHue = baseHue + (currentHsl.hue || 0);
 
   useEffect(() => {
