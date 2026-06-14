@@ -87,6 +87,10 @@
           "path": "docs/super-resolution/multi-image-alignment-path-2026-06-13.md"
         },
         {
+          "title": "Super-Resolution detail reconstruction strategy",
+          "path": "docs/super-resolution/detail-reconstruction-strategy-2026-06-13.md"
+        },
+        {
           "title": "Negative Lab architecture overview",
           "path": "docs/negative-lab/architecture-overview-2026-06-13.md"
         },
