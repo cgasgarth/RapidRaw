@@ -13,6 +13,7 @@ import NegativeConversionModal from './NegativeConversionModal';
 import PanoramaModal from './PanoramaModal';
 import RenameFileModal from './RenameFileModal';
 import RenameFolderModal from './RenameFolderModal';
+import SuperResolutionModal from './SuperResolutionModal';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -79,6 +80,7 @@ export default function AppModals(props: AppModalsProps) {
     confirmModalState,
     panoramaModalState,
     hdrModalState,
+    superResolutionModalState,
     negativeModalState,
     denoiseModalState,
     cullingModalState,
@@ -101,6 +103,7 @@ export default function AppModals(props: AppModalsProps) {
       confirmModalState: state.confirmModalState,
       panoramaModalState: state.panoramaModalState,
       hdrModalState: state.hdrModalState,
+      superResolutionModalState: state.superResolutionModalState,
       negativeModalState: state.negativeModalState,
       denoiseModalState: state.denoiseModalState,
       cullingModalState: state.cullingModalState,
@@ -227,6 +230,38 @@ export default function AppModals(props: AppModalsProps) {
           props.handleStartHdr(hdrModalState.stitchingSourcePaths);
         }}
         progressMessage={hdrModalState.progressMessage}
+      />
+      <SuperResolutionModal
+        isOpen={superResolutionModalState.isOpen}
+        loadingImageUrl={
+          superResolutionModalState.sourcePaths.length > 0
+            ? thumbnails[
+                superResolutionModalState.sourcePaths[Math.floor(superResolutionModalState.sourcePaths.length / 2)] ??
+                  ''
+              ] || null
+            : selectedImage
+              ? finalPreviewUrl
+              : null
+        }
+        onClose={() => {
+          setUI((state) => ({
+            superResolutionModalState: {
+              ...state.superResolutionModalState,
+              isOpen: false,
+              sourcePaths: [],
+            },
+          }));
+        }}
+        onSettingsChange={(settings) => {
+          setUI((state) => ({
+            superResolutionModalState: {
+              ...state.superResolutionModalState,
+              settings,
+            },
+          }));
+        }}
+        settings={superResolutionModalState.settings}
+        sourceCount={superResolutionModalState.sourcePaths.length}
       />
       <NegativeConversionModal
         isOpen={negativeModalState.isOpen}

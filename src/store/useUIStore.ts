@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 
 import { ImageFile, Panel, UiVisibility, CullingSuggestions } from '../components/ui/AppProperties';
+import {
+  DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
+  type SuperResolutionUiSettings,
+} from '../schemas/superResolutionUiSchemas';
 
 const RIGHT_PANEL_ORDER = [
   Panel.Metadata,
@@ -50,6 +54,12 @@ export interface HdrModalState {
   isProcessing: boolean;
   progressMessage: string | null;
   stitchingSourcePaths: Array<string>;
+}
+
+export interface SuperResolutionModalState {
+  isOpen: boolean;
+  settings: SuperResolutionUiSettings;
+  sourcePaths: Array<string>;
 }
 
 export interface DenoiseModalState {
@@ -119,6 +129,7 @@ interface UIState {
   confirmModalState: ConfirmModalState;
   panoramaModalState: PanoramaModalState;
   hdrModalState: HdrModalState;
+  superResolutionModalState: SuperResolutionModalState;
   negativeModalState: NegativeConversionModalState;
   denoiseModalState: DenoiseModalState;
   cullingModalState: CullingModalState;
@@ -181,6 +192,11 @@ export const useUIStore = create<UIState>((set, get) => ({
     isProcessing: false,
     progressMessage: '',
     stitchingSourcePaths: [],
+  },
+  superResolutionModalState: {
+    isOpen: false,
+    settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
+    sourcePaths: [],
   },
   negativeModalState: { isOpen: false, targetPaths: [] },
   denoiseModalState: {
