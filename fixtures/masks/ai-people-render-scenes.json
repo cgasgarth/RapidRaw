@@ -1,0 +1,64 @@
+[
+  {
+    "canvas": {
+      "colorSpace": "linear_rec2020",
+      "height": 2048,
+      "width": 2048
+    },
+    "layers": [
+      {
+        "blendMode": "normal",
+        "id": "layer.people.person-1",
+        "maskOperationIds": ["mask.people.person-1.fake"],
+        "name": "Person 1",
+        "opacity": 1,
+        "visible": true
+      },
+      {
+        "blendMode": "normal",
+        "id": "layer.people.background",
+        "maskOperationIds": ["mask.people.background.fake"],
+        "name": "Background",
+        "opacity": 0.75,
+        "visible": true
+      }
+    ],
+    "maskOperations": [
+      {
+        "id": "mask.people.person-1.fake",
+        "mode": "add",
+        "opacity": 1,
+        "peopleMask": {
+          "artifactId": "fake.people.person-1.full_person.v1",
+          "coverage": 0.1875,
+          "height": 8,
+          "rows": ["........", ".##.....", ".##.....", ".##.....", ".##.....", ".##.....", ".##.....", "........"],
+          "target": {
+            "part": "full_person",
+            "personId": "person-1"
+          },
+          "width": 8
+        },
+        "type": "ai_people_fake"
+      },
+      {
+        "id": "mask.people.background.fake",
+        "mode": "subtract",
+        "opacity": 0.6,
+        "peopleMask": {
+          "artifactId": "fake.people.all.background.v1",
+          "coverage": 0.578125,
+          "height": 8,
+          "rows": ["########", "#..#####", "#..#...#", "#..#...#", "#..#...#", "#..#...#", "#..#...#", "########"],
+          "target": {
+            "part": "background",
+            "personId": null
+          },
+          "width": 8
+        },
+        "type": "ai_people_fake"
+      }
+    ],
+    "schemaVersion": 1
+  }
+]
