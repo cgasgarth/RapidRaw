@@ -5013,7 +5013,8 @@ Issues:
 - Add reference image workflow.
 - Add export recipes UI.
 - Add batch export queue.
-- Add tethering research issue.
+- Add tethering research issue. Initial research captured in
+  `docs/tethering/tethering-support-research-2026-06-14.md`.
 - Add sessions workflow.
 - Add smart albums/filters.
 - Add import presets.
