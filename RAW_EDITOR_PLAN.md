@@ -4636,7 +4636,9 @@ Issues:
 - Add output sharpening.
 - Add deconvolution/lens deblur research.
 - Add local contrast refinement.
-- Add wavelet/detail-by-scale design.
+- Add wavelet/detail-by-scale design. Accepted initial direction: luma-first
+  micro/fine/medium/coarse/residual bands, with schema and fixture gates before
+  runtime UI is considered production-ready.
 - Add wavelet/detail-by-scale implementation.
 - Add chroma/luma noise separation.
 - Add high ISO fixture set.

@@ -139,6 +139,10 @@
           "path": "docs/super-resolution/resolution-chart-fixture-manifest-2026-06-13.md"
         },
         {
+          "title": "Wavelet detail-by-scale design",
+          "path": "docs/detail/wavelet-detail-by-scale-design-2026-06-14.md"
+        },
+        {
           "title": "Super-Resolution real-photo fixture manifest",
           "path": "docs/super-resolution/real-photo-fixture-manifest-2026-06-13.md"
         },
