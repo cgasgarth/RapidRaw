@@ -4647,6 +4647,15 @@ Issues:
 - Add wavelet/detail-by-scale design.
 - Add wavelet/detail-by-scale implementation.
 - Add chroma/luma noise separation.
+- Add synthetic noise metric harness.
+  - Consult result: accepted a validation-only first PR with deterministic
+    public fixtures, Zod manifest checks, luma/chroma sigma, edge, texture, and
+    high-frequency sentinel metrics.
+  - Runtime status: synthetic validation only. This does not prove real RAW
+    quality, preview/export parity, or runtime denoise quality.
+  - Next iterations: private RAW evidence, preview/export metric parity,
+    runtime chroma/luma denoise candidates, then consult-backed threshold
+    tightening.
 - Add high ISO fixture set.
 - Add defringe improvements.
 - Add dust spot visualization.

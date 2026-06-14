@@ -1,0 +1,160 @@
+[
+  {
+    "case": "duplicate_case_ids",
+    "payload": {
+      "schemaVersion": 1,
+      "metricVersion": 1,
+      "runtimeStatus": "synthetic_validation",
+      "validationScope": {
+        "proves": ["synthetic metrics"],
+        "doesNotProve": ["real_raw_quality", "preview_export_parity", "runtime_denoise_quality"]
+      },
+      "cases": [
+        {
+          "id": "detail.noise.duplicate.v1",
+          "description": "duplicate",
+          "sourceKind": "synthetic_public",
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "seed": "a",
+            "basePattern": "flat_patch_edge_texture",
+            "lumaNoiseSigma": 0.03,
+            "chromaNoiseSigma": 0.02
+          },
+          "regions": {
+            "flatPatch": { "id": "flat.a", "x": 0, "y": 0, "width": 16, "height": 16 },
+            "edge": { "id": "edge.a", "x": 16, "y": 0, "width": 16, "height": 16 },
+            "texture": { "id": "texture.a", "x": 0, "y": 16, "width": 16, "height": 16 }
+          },
+          "expectedMetrics": {
+            "lumaSigma": { "min": 0, "max": 1 },
+            "chromaSigma": { "min": 0, "max": 1 },
+            "edgeContrast": { "min": 0, "max": 1 },
+            "textureEnergy": { "min": 0, "max": 1 },
+            "highFrequencyEnergy": { "min": 0, "max": 1 }
+          },
+          "warningThresholds": {
+            "chromaDominanceRatio": 1,
+            "minEdgeContrast": 0.1,
+            "minTextureEnergy": 0.1
+          }
+        },
+        {
+          "id": "detail.noise.duplicate.v1",
+          "description": "duplicate",
+          "sourceKind": "synthetic_public",
+          "width": 64,
+          "height": 64,
+          "generator": {
+            "seed": "b",
+            "basePattern": "flat_patch_edge_texture",
+            "lumaNoiseSigma": 0.03,
+            "chromaNoiseSigma": 0.02
+          },
+          "regions": {
+            "flatPatch": { "id": "flat.b", "x": 0, "y": 0, "width": 16, "height": 16 },
+            "edge": { "id": "edge.b", "x": 16, "y": 0, "width": 16, "height": 16 },
+            "texture": { "id": "texture.b", "x": 0, "y": 16, "width": 16, "height": 16 }
+          },
+          "expectedMetrics": {
+            "lumaSigma": { "min": 0, "max": 1 },
+            "chromaSigma": { "min": 0, "max": 1 },
+            "edgeContrast": { "min": 0, "max": 1 },
+            "textureEnergy": { "min": 0, "max": 1 },
+            "highFrequencyEnergy": { "min": 0, "max": 1 }
+          },
+          "warningThresholds": {
+            "chromaDominanceRatio": 1,
+            "minEdgeContrast": 0.1,
+            "minTextureEnergy": 0.1
+          }
+        }
+      ]
+    }
+  },
+  {
+    "case": "roi_out_of_bounds",
+    "payload": {
+      "schemaVersion": 1,
+      "metricVersion": 1,
+      "runtimeStatus": "synthetic_validation",
+      "validationScope": {
+        "proves": ["synthetic metrics"],
+        "doesNotProve": ["real_raw_quality", "preview_export_parity", "runtime_denoise_quality"]
+      },
+      "cases": [
+        {
+          "id": "detail.noise.out-of-bounds.v1",
+          "description": "out of bounds",
+          "sourceKind": "synthetic_public",
+          "width": 32,
+          "height": 32,
+          "generator": {
+            "seed": "bounds",
+            "basePattern": "flat_patch_edge_texture",
+            "lumaNoiseSigma": 0.03,
+            "chromaNoiseSigma": 0.02
+          },
+          "regions": {
+            "flatPatch": { "id": "flat.bounds", "x": 24, "y": 24, "width": 16, "height": 16 },
+            "edge": { "id": "edge.bounds", "x": 0, "y": 0, "width": 16, "height": 16 },
+            "texture": { "id": "texture.bounds", "x": 0, "y": 16, "width": 16, "height": 16 }
+          },
+          "expectedMetrics": {
+            "lumaSigma": { "min": 0, "max": 1 },
+            "chromaSigma": { "min": 0, "max": 1 },
+            "edgeContrast": { "min": 0, "max": 1 },
+            "textureEnergy": { "min": 0, "max": 1 },
+            "highFrequencyEnergy": { "min": 0, "max": 1 }
+          },
+          "warningThresholds": {
+            "chromaDominanceRatio": 1,
+            "minEdgeContrast": 0.1,
+            "minTextureEnergy": 0.1
+          }
+        }
+      ]
+    }
+  },
+  {
+    "case": "runtime_status_overclaim",
+    "payload": {
+      "schemaVersion": 1,
+      "metricVersion": 1,
+      "runtimeStatus": "runtime_apply_capable",
+      "validationScope": {
+        "proves": ["synthetic metrics"],
+        "doesNotProve": ["real_raw_quality", "preview_export_parity", "runtime_denoise_quality"]
+      },
+      "cases": []
+    }
+  },
+  {
+    "case": "private_asset_reference",
+    "payload": {
+      "schemaVersion": 1,
+      "metricVersion": 1,
+      "runtimeStatus": "synthetic_validation",
+      "validationScope": {
+        "proves": ["synthetic metrics"],
+        "doesNotProve": ["real_raw_quality", "preview_export_parity", "runtime_denoise_quality"]
+      },
+      "rawFilePath": "/private/raw/IMG_0001.CR3",
+      "cases": []
+    }
+  },
+  {
+    "case": "missing_limitations",
+    "payload": {
+      "schemaVersion": 1,
+      "metricVersion": 1,
+      "runtimeStatus": "synthetic_validation",
+      "validationScope": {
+        "proves": ["synthetic metrics"],
+        "doesNotProve": ["real_raw_quality"]
+      },
+      "cases": []
+    }
+  }
+]
