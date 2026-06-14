@@ -4040,6 +4040,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Utility: `packages/rawengine-schema/src/focusStackPreflight.ts`
 - `validation(focus): add tiny synthetic bracket generator`
   - Issue: #1059
+  - Fixture manifest: `fixtures/focus-stacking/focus-synthetic-bracket-fixtures.json`
+  - Check: `bun run check:focus-fixtures`
 - `focus(runtime): add CPU translation alignment smoke`
   - Issue: #1060
 - `focus(runtime): add CPU sharpness-map smoke`

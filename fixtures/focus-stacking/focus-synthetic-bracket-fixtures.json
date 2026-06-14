@@ -1,0 +1,215 @@
+{
+  "$schema": "https://rawengine.dev/schemas/focus-synthetic-bracket-fixtures.v1.json",
+  "fixtures": [
+    {
+      "class": "synthetic",
+      "expectedGeneratedSha256": "71efb03b6acd134fa02c5b4da796b5e0c5a1555e2faef9128a89d8d70c403364",
+      "expectedWarningCodes": [],
+      "expectedWinnerRegions": [
+        {
+          "expectedSourceIndex": 0,
+          "height": 48,
+          "regionId": "foreground-left",
+          "width": 68,
+          "x": 24,
+          "y": 116
+        },
+        {
+          "expectedSourceIndex": 1,
+          "height": 56,
+          "regionId": "midground-center",
+          "width": 64,
+          "x": 96,
+          "y": 72
+        },
+        {
+          "expectedSourceIndex": 2,
+          "height": 56,
+          "regionId": "background-right",
+          "width": 56,
+          "x": 176,
+          "y": 24
+        }
+      ],
+      "fixtureId": "focus.synthetic.three-plane.v1",
+      "generator": {
+        "id": "synthetic-focus-three-plane",
+        "seed": "rawengine-focus-three-plane-v1",
+        "version": 1
+      },
+      "memoryBudgetBytes": 64000000,
+      "notes": "Generated in temp during validation; no committed raster assets are required.",
+      "sourceFrames": [
+        {
+          "expectedScale": 1,
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "height": 192,
+          "sourceIndex": 0,
+          "width": 256
+        },
+        {
+          "expectedScale": 1,
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "height": 192,
+          "sourceIndex": 1,
+          "width": 256
+        },
+        {
+          "expectedScale": 1,
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "height": 192,
+          "sourceIndex": 2,
+          "width": 256
+        }
+      ],
+      "status": "active_generated_asset",
+      "validationPurpose": "Baseline three-slice fixture with foreground, midground, and background winner regions."
+    },
+    {
+      "class": "synthetic",
+      "expectedGeneratedSha256": "78f97c2a0500a4bdecee605f3d5169b5439e17c4f4c189f6d66056338cbc373b",
+      "expectedWarningCodes": ["alignment_translation_required"],
+      "expectedWinnerRegions": [
+        {
+          "expectedSourceIndex": 0,
+          "height": 52,
+          "regionId": "foreground-left",
+          "width": 64,
+          "x": 28,
+          "y": 112
+        },
+        {
+          "expectedSourceIndex": 1,
+          "height": 58,
+          "regionId": "midground-center",
+          "width": 64,
+          "x": 96,
+          "y": 70
+        },
+        {
+          "expectedSourceIndex": 2,
+          "height": 56,
+          "regionId": "background-right",
+          "width": 56,
+          "x": 176,
+          "y": 24
+        }
+      ],
+      "fixtureId": "focus.synthetic.translated-three-plane.v1",
+      "generator": {
+        "id": "synthetic-focus-translated-three-plane",
+        "seed": "rawengine-focus-translated-three-plane-v1",
+        "version": 1
+      },
+      "memoryBudgetBytes": 64000000,
+      "notes": "Expected transforms are integer translations so the first runtime smoke can stay deterministic.",
+      "sourceFrames": [
+        {
+          "expectedScale": 1,
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "height": 192,
+          "sourceIndex": 0,
+          "width": 256
+        },
+        {
+          "expectedScale": 1,
+          "expectedTranslationX": 3,
+          "expectedTranslationY": -2,
+          "height": 192,
+          "sourceIndex": 1,
+          "width": 256
+        },
+        {
+          "expectedScale": 1,
+          "expectedTranslationX": -3,
+          "expectedTranslationY": 2,
+          "height": 192,
+          "sourceIndex": 2,
+          "width": 256
+        }
+      ],
+      "status": "active_generated_asset",
+      "validationPurpose": "Tiny translation fixture for CPU alignment smoke tests."
+    },
+    {
+      "class": "synthetic",
+      "expectedGeneratedSha256": "ce24e74b6c88eadbae602fe599706b50b04f1b3c6306dd2a4940fa7906301e7e",
+      "expectedWarningCodes": ["alignment_translation_required", "focus_breathing_detected"],
+      "expectedWinnerRegions": [
+        {
+          "expectedSourceIndex": 0,
+          "height": 48,
+          "regionId": "foreground-product-edge",
+          "width": 80,
+          "x": 32,
+          "y": 128
+        },
+        {
+          "expectedSourceIndex": 1,
+          "height": 56,
+          "regionId": "midground-label",
+          "width": 72,
+          "x": 124,
+          "y": 76
+        },
+        {
+          "expectedSourceIndex": 2,
+          "height": 60,
+          "regionId": "background-texture",
+          "width": 64,
+          "x": 220,
+          "y": 28
+        }
+      ],
+      "fixtureId": "focus.synthetic.breathing-stale-source.v1",
+      "generator": {
+        "id": "synthetic-focus-breathing-stale-source",
+        "seed": "rawengine-focus-breathing-stale-source-v1",
+        "version": 1
+      },
+      "memoryBudgetBytes": 64000000,
+      "notes": "The stale-source case is metadata only until apply commands execute accepted dry-run plans.",
+      "sourceFrames": [
+        {
+          "expectedScale": 1,
+          "expectedTranslationX": 0,
+          "expectedTranslationY": 0,
+          "height": 208,
+          "sourceIndex": 0,
+          "width": 320
+        },
+        {
+          "expectedScale": 1.015,
+          "expectedTranslationX": 2,
+          "expectedTranslationY": 0,
+          "height": 208,
+          "sourceIndex": 1,
+          "width": 320
+        },
+        {
+          "expectedScale": 0.985,
+          "expectedTranslationX": -2,
+          "expectedTranslationY": 0,
+          "height": 208,
+          "sourceIndex": 2,
+          "width": 320
+        }
+      ],
+      "staleSourceNegativeCase": {
+        "expectedBlockCode": "stale_source_graph_revision",
+        "originalGraphRevision": "graph-focus-midground-a",
+        "sourceIndex": 1,
+        "staleGraphRevision": "graph-focus-midground-b"
+      },
+      "status": "active_generated_asset",
+      "validationPurpose": "Tiny focus-breathing and stale-source negative-case fixture for dry-run/apply validation."
+    }
+  ],
+  "issue": 1059,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14"
+}
