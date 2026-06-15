@@ -44,6 +44,7 @@ export enum BasicAdjustment {
 }
 
 export enum ColorAdjustment {
+  ColorBalanceRgb = 'colorBalanceRgb',
   ColorGrading = 'colorGrading',
   Hsl = 'hsl',
   Hue = 'hue',
@@ -165,6 +166,7 @@ export interface Adjustments {
   clarity: number;
   chromaticAberrationBlueYellow: number;
   chromaticAberrationRedCyan: number;
+  colorBalanceRgb: ColorBalanceRgbSettings;
   colorCalibration: ColorCalibration;
   colorGrading: ColorGradingProps;
   colorNoiseReduction: number;
@@ -301,6 +303,20 @@ interface Hsl {
   yellows: HueSatLum;
 }
 
+export interface ColorBalanceRgbRangeSettings {
+  blue: number;
+  green: number;
+  red: number;
+}
+
+export interface ColorBalanceRgbSettings {
+  enabled: boolean;
+  highlights: ColorBalanceRgbRangeSettings;
+  midtones: ColorBalanceRgbRangeSettings;
+  preserveLuminance: boolean;
+  shadows: ColorBalanceRgbRangeSettings;
+}
+
 export interface MaskAdjustments {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy mask adjustment indexing mirrors Adjustments until mask-specific keyed helpers are introduced.
   [index: string]: any;
@@ -388,6 +404,14 @@ const INITIAL_COLOR_CALIBRATION: ColorCalibration = {
   greenSaturation: 0,
   blueHue: 0,
   blueSaturation: 0,
+};
+
+const INITIAL_COLOR_BALANCE_RGB: ColorBalanceRgbSettings = {
+  enabled: false,
+  highlights: { red: 0, green: 0, blue: 0 },
+  midtones: { red: 0, green: 0, blue: 0 },
+  preserveLuminance: true,
+  shadows: { red: 0, green: 0, blue: 0 },
 };
 
 export const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
@@ -495,6 +519,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   clarity: 0,
   chromaticAberrationBlueYellow: 0,
   chromaticAberrationRedCyan: 0,
+  colorBalanceRgb: structuredClone(INITIAL_COLOR_BALANCE_RGB),
   colorCalibration: { ...INITIAL_COLOR_CALIBRATION },
   colorGrading: { ...INITIAL_COLOR_GRADING },
   colorNoiseReduction: 0,
@@ -690,6 +715,22 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     transformScale: loadedAdjustments.transformScale ?? INITIAL_ADJUSTMENTS.transformScale,
     transformXOffset: loadedAdjustments.transformXOffset ?? INITIAL_ADJUSTMENTS.transformXOffset,
     transformYOffset: loadedAdjustments.transformYOffset ?? INITIAL_ADJUSTMENTS.transformYOffset,
+    colorBalanceRgb: {
+      ...INITIAL_ADJUSTMENTS.colorBalanceRgb,
+      ...(loadedAdjustments.colorBalanceRgb || {}),
+      highlights: {
+        ...INITIAL_ADJUSTMENTS.colorBalanceRgb.highlights,
+        ...(loadedAdjustments.colorBalanceRgb?.highlights || {}),
+      },
+      midtones: {
+        ...INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones,
+        ...(loadedAdjustments.colorBalanceRgb?.midtones || {}),
+      },
+      shadows: {
+        ...INITIAL_ADJUSTMENTS.colorBalanceRgb.shadows,
+        ...(loadedAdjustments.colorBalanceRgb?.shadows || {}),
+      },
+    },
     colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
@@ -742,6 +783,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
   color: [
     { label: 'modals.copyPaste.groups.whiteBalance', keys: [ColorAdjustment.Temperature, ColorAdjustment.Tint] },
     { label: 'modals.copyPaste.groups.presence', keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance] },
+    { label: 'modals.copyPaste.groups.colorBalanceRgb', keys: [ColorAdjustment.ColorBalanceRgb] },
     { label: 'modals.copyPaste.groups.colorGrading', keys: [ColorAdjustment.ColorGrading] },
     { label: 'modals.copyPaste.groups.colorMixer', keys: [ColorAdjustment.Hsl] },
     { label: 'modals.copyPaste.groups.colorCalibration', keys: ['colorCalibration'] },
@@ -846,6 +888,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.Temperature,
     ColorAdjustment.Tint,
     ColorAdjustment.Vibrance,
+    ColorAdjustment.ColorBalanceRgb,
     ColorAdjustment.Hsl,
     ColorAdjustment.ColorGrading,
     'colorCalibration',

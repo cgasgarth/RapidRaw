@@ -32,6 +32,22 @@
         "tint": "色调",
         "title": "颜色校准"
       },
+      "colorBalanceRgb": {
+        "channels": {
+          "blue": "蓝色",
+          "green": "绿色",
+          "red": "红色"
+        },
+        "disabled": "关",
+        "enabled": "开",
+        "preserveLuminance": "保留亮度",
+        "ranges": {
+          "highlights": "高光",
+          "midtones": "中间调",
+          "shadows": "阴影"
+        },
+        "title": "RGB 色彩平衡"
+      },
       "colorGrading": "颜色分级",
       "colorMixer": "颜色混合器",
       "grading": {
@@ -1134,6 +1150,7 @@
       "groups": {
         "chromaticAberration": "色差",
         "clarityDehaze": "清晰度与去雾",
+        "colorBalanceRgb": "RGB 色彩平衡",
         "colorCalibration": "颜色校准",
         "colorGrading": "颜色分级",
         "colorMixer": "颜色混合器",

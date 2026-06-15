@@ -32,6 +32,22 @@
         "tint": "Zabarwienie",
         "title": "Kalibracja kolorów"
       },
+      "colorBalanceRgb": {
+        "channels": {
+          "blue": "Niebieski",
+          "green": "Zielony",
+          "red": "Czerwony"
+        },
+        "disabled": "Wył.",
+        "enabled": "Wł.",
+        "preserveLuminance": "Zachowaj L",
+        "ranges": {
+          "highlights": "Światła",
+          "midtones": "Półtony",
+          "shadows": "Cienie"
+        },
+        "title": "Balans RGB"
+      },
       "colorGrading": "Gradacja kolorów",
       "colorMixer": "Mikser kolorów",
       "grading": {
@@ -1180,6 +1196,7 @@
       "groups": {
         "chromaticAberration": "Aberracja chromatyczna",
         "clarityDehaze": "Przejrzystość i Usuwanie mgły",
+        "colorBalanceRgb": "Balans RGB",
         "colorCalibration": "Kalibracja kolorów",
         "colorGrading": "Gradacja kolorów",
         "colorMixer": "Mikser kolorów",

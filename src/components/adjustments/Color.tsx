@@ -3,6 +3,7 @@ import { Pipette, Sliders } from 'lucide-react';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type ColorBalanceRgbChannel, type ColorBalanceRgbRange } from '../../schemas/colorBalanceRgbSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
   Adjustments,
@@ -446,6 +447,7 @@ export default function ColorPanel({
 }: ColorPanelProps) {
   const { t } = useTranslation();
   const [activeColor, setActiveColor] = useState('reds');
+  const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
 
@@ -458,8 +460,28 @@ export default function ColorPanel({
       })),
     [t],
   );
+  const colorBalanceRanges = useMemo(
+    () =>
+      [
+        { key: 'shadows', label: t('adjustments.color.colorBalanceRgb.ranges.shadows') },
+        { key: 'midtones', label: t('adjustments.color.colorBalanceRgb.ranges.midtones') },
+        { key: 'highlights', label: t('adjustments.color.colorBalanceRgb.ranges.highlights') },
+      ] satisfies Array<{ key: ColorBalanceRgbRange; label: string }>,
+    [t],
+  );
+  const colorBalanceChannels = useMemo(
+    () =>
+      [
+        { key: 'red', label: t('adjustments.color.colorBalanceRgb.channels.red') },
+        { key: 'green', label: t('adjustments.color.colorBalanceRgb.channels.green') },
+        { key: 'blue', label: t('adjustments.color.colorBalanceRgb.channels.blue') },
+      ] satisfies Array<{ key: ColorBalanceRgbChannel; label: string }>,
+    [t],
+  );
 
   const currentHsl = adjustments.hsl[activeColor] || { hue: 0, saturation: 0, luminance: 0 };
+  const colorBalanceRgb = adjustments.colorBalanceRgb;
+  const activeColorBalance = colorBalanceRgb[activeColorBalanceRange];
   const baseHue = getSelectiveColorRange(activeColor).centerHueDegrees;
   const effectiveHue = baseHue + (currentHsl.hue || 0);
 
@@ -486,6 +508,51 @@ export default function ColorPanel({
         },
       },
     }));
+  };
+
+  const handleColorBalanceToggle = () => {
+    setAdjustments((prev: Partial<Adjustments>) => {
+      const current = prev.colorBalanceRgb || INITIAL_ADJUSTMENTS.colorBalanceRgb;
+
+      return {
+        ...prev,
+        colorBalanceRgb: {
+          ...current,
+          enabled: !current.enabled,
+        },
+      };
+    });
+  };
+
+  const handleColorBalancePreserveLuminance = () => {
+    setAdjustments((prev: Partial<Adjustments>) => {
+      const current = prev.colorBalanceRgb || INITIAL_ADJUSTMENTS.colorBalanceRgb;
+
+      return {
+        ...prev,
+        colorBalanceRgb: {
+          ...current,
+          preserveLuminance: !current.preserveLuminance,
+        },
+      };
+    });
+  };
+
+  const handleColorBalanceChange = (channel: ColorBalanceRgbChannel, value: number | string) => {
+    setAdjustments((prev: Partial<Adjustments>) => {
+      const current = prev.colorBalanceRgb || INITIAL_ADJUSTMENTS.colorBalanceRgb;
+
+      return {
+        ...prev,
+        colorBalanceRgb: {
+          ...current,
+          [activeColorBalanceRange]: {
+            ...current[activeColorBalanceRange],
+            [channel]: parseFloat(String(value)),
+          },
+        },
+      };
+    });
   };
 
   const hue_slider = `hue-slider-${activeColor}`;
@@ -569,6 +636,73 @@ export default function ColorPanel({
           onDragStateChange={onDragStateChange}
         />
       </div>
+
+      {!isForMask && adjustmentVisibility[ColorAdjustment.ColorBalanceRgb] !== false && (
+        <div className="p-2 bg-bg-tertiary rounded-md">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <UiText variant={TextVariants.heading}>{t('adjustments.color.colorBalanceRgb.title')}</UiText>
+            <div className="flex gap-1">
+              <button
+                aria-pressed={colorBalanceRgb.preserveLuminance}
+                className={`rounded px-2 py-1 text-xs font-medium ${
+                  colorBalanceRgb.preserveLuminance
+                    ? 'bg-bg-secondary text-text-primary'
+                    : 'bg-surface text-text-secondary'
+                }`}
+                onClick={handleColorBalancePreserveLuminance}
+                type="button"
+              >
+                {t('adjustments.color.colorBalanceRgb.preserveLuminance')}
+              </button>
+              <button
+                aria-pressed={colorBalanceRgb.enabled}
+                className={`rounded px-2 py-1 text-xs font-medium ${
+                  colorBalanceRgb.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary'
+                }`}
+                onClick={handleColorBalanceToggle}
+                type="button"
+              >
+                {colorBalanceRgb.enabled
+                  ? t('adjustments.color.colorBalanceRgb.enabled')
+                  : t('adjustments.color.colorBalanceRgb.disabled')}
+              </button>
+            </div>
+          </div>
+          <div className="mb-3 grid grid-cols-3 gap-1">
+            {colorBalanceRanges.map((range) => (
+              <button
+                aria-pressed={activeColorBalanceRange === range.key}
+                className={`rounded px-2 py-1 text-xs font-medium ${
+                  activeColorBalanceRange === range.key
+                    ? 'bg-accent text-button-text'
+                    : 'bg-bg-secondary text-text-secondary'
+                }`}
+                key={range.key}
+                onClick={() => {
+                  setActiveColorBalanceRange(range.key);
+                }}
+                type="button"
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+          {colorBalanceChannels.map((channel) => (
+            <Slider
+              key={channel.key}
+              label={channel.label}
+              max={100}
+              min={-100}
+              onChange={(e: SliderChangeEvent) => {
+                handleColorBalanceChange(channel.key, e.target.value);
+              }}
+              step={1}
+              value={activeColorBalance[channel.key]}
+              onDragStateChange={onDragStateChange}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="p-2 bg-bg-tertiary rounded-md">
         <UiText variant={TextVariants.heading} className="mb-3">
