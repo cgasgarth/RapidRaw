@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { writeBoundedOutput } from './compact-output.mjs';
+import { readBoundedStream, writeBoundedOutput } from './compact-output.mjs';
 
 const args = process.argv.slice(2);
 let label = 'command';
@@ -57,8 +57,8 @@ try {
   process.exit(1);
 }
 
-const output = await new Response(proc.stdout).text();
-const errorOutput = await new Response(proc.stderr).text();
+const stdout = readBoundedStream(proc.stdout);
+const stderr = readBoundedStream(proc.stderr);
 const exitCode = await proc.exited;
 
 if (exitCode === 0) {
@@ -68,6 +68,8 @@ if (exitCode === 0) {
 
 console.error(`${label} failed`);
 console.error(`$ ${command.join(' ')}`);
+const output = await stdout;
+const errorOutput = await stderr;
 writeBoundedOutput('stdout', output);
 writeBoundedOutput('stderr', errorOutput);
 process.exit(exitCode);

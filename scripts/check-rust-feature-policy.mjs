@@ -18,7 +18,7 @@ const checkedFiles = [
 const requiredCargoCommandPatterns = [
   /cargo check --locked --no-default-features --features required-ci/u,
   /cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings/u,
-  /cargo test --locked --all-targets --no-default-features --features required-ci --no-fail-fast/u,
+  /cargo test (?:--quiet )?--locked --all-targets --no-default-features --features required-ci --no-fail-fast/u,
 ];
 
 const violations = [];
