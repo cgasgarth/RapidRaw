@@ -9,6 +9,13 @@ const SMOKE_MODES = {
   RELEASE: 'release',
 };
 
+const SMOKE_DECISIONS = {
+  FAIL_CLOSED: 'unclassified-fail-closed',
+  MAIN: 'main-smoke-needed',
+  MANUAL: 'manual-smoke-recommended',
+  NONE: 'no-smoke-needed',
+};
+
 const SMOKE_ARGS = {
   [SMOKE_MODES.NONE]: '',
   [SMOKE_MODES.DEBUG]: '--verbose --ci --no-bundle --debug --target aarch64-apple-darwin',
@@ -146,23 +153,31 @@ function classifyPathChange(change) {
   const path = change.filename;
 
   if (path === 'package.json' && isSafePackageJsonScriptPatch(change.patch)) {
-    return { mode: SMOKE_MODES.NONE, reason: 'schema-only package script change is covered by schema validation' };
+    return {
+      decision: SMOKE_DECISIONS.NONE,
+      mode: SMOKE_MODES.NONE,
+      reason: 'schema-only package script change is covered by schema validation',
+    };
   }
 
   if (ALWAYS_REQUIRE_FILES.has(path)) {
-    return { mode: SMOKE_MODES.RELEASE, reason: 'build configuration changed' };
+    return { decision: SMOKE_DECISIONS.MAIN, mode: SMOKE_MODES.RELEASE, reason: 'build configuration changed' };
   }
 
   if (RELEASE_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-    return { mode: SMOKE_MODES.RELEASE, reason: 'Rust or Tauri path changed' };
+    return { decision: SMOKE_DECISIONS.MAIN, mode: SMOKE_MODES.RELEASE, reason: 'Rust or Tauri path changed' };
   }
 
   if (path.startsWith('.github/')) {
-    return { mode: SMOKE_MODES.NONE, reason: 'GitHub automation is covered by actionlint and pin audits' };
+    return {
+      decision: SMOKE_DECISIONS.MAIN,
+      mode: SMOKE_MODES.RELEASE,
+      reason: 'GitHub automation changed; main smoke should observe the merged workflow',
+    };
   }
 
   if (path.startsWith('src/') && path.endsWith('.rs')) {
-    return { mode: SMOKE_MODES.RELEASE, reason: 'Rust source changed' };
+    return { decision: SMOKE_DECISIONS.MAIN, mode: SMOKE_MODES.RELEASE, reason: 'Rust source changed' };
   }
 
   if (
@@ -175,10 +190,14 @@ function classifyPathChange(change) {
     isSafeValidationScript(path) ||
     isSafeFrontendLeaf(path)
   ) {
-    return { mode: SMOKE_MODES.NONE, reason: 'covered by faster frontend/docs validation gates' };
+    return {
+      decision: SMOKE_DECISIONS.NONE,
+      mode: SMOKE_MODES.NONE,
+      reason: 'covered by faster frontend/docs validation gates',
+    };
   }
 
-  return { mode: SMOKE_MODES.RELEASE, reason: 'unclassified path changed' };
+  return { decision: SMOKE_DECISIONS.FAIL_CLOSED, mode: SMOKE_MODES.RELEASE, reason: 'unclassified path changed' };
 }
 
 function maxMode(left, right) {
@@ -198,6 +217,7 @@ export function classifyFileChanges(changes) {
       macosSmokeRequired: true,
       macosSmokeMode: SMOKE_MODES.RELEASE,
       macosSmokeArgs: SMOKE_ARGS[SMOKE_MODES.RELEASE],
+      smokeDecision: SMOKE_DECISIONS.FAIL_CLOSED,
       reason: 'no changed files were reported; failing closed',
       requiredPaths: [],
       safePaths: [],
@@ -207,6 +227,7 @@ export function classifyFileChanges(changes) {
   const requiredPaths = [];
   const safePaths = [];
   let macosSmokeMode = SMOKE_MODES.NONE;
+  let smokeDecision = SMOKE_DECISIONS.NONE;
 
   for (const change of normalizedChanges) {
     const path = change.filename;
@@ -219,12 +240,21 @@ export function classifyFileChanges(changes) {
     } else {
       requiredPaths.push(entry);
     }
+
+    if (classification.decision === SMOKE_DECISIONS.FAIL_CLOSED) {
+      smokeDecision = SMOKE_DECISIONS.FAIL_CLOSED;
+    } else if (smokeDecision !== SMOKE_DECISIONS.FAIL_CLOSED && classification.decision === SMOKE_DECISIONS.MAIN) {
+      smokeDecision = SMOKE_DECISIONS.MAIN;
+    } else if (smokeDecision === SMOKE_DECISIONS.NONE && classification.decision === SMOKE_DECISIONS.MANUAL) {
+      smokeDecision = SMOKE_DECISIONS.MANUAL;
+    }
   }
 
   return {
     macosSmokeRequired: macosSmokeMode !== SMOKE_MODES.NONE,
     macosSmokeMode,
     macosSmokeArgs: SMOKE_ARGS[macosSmokeMode],
+    smokeDecision,
     reason:
       macosSmokeMode === SMOKE_MODES.NONE
         ? `macOS smoke skipped; ${safePaths.length} changed path(s) are covered by faster gates`
@@ -249,6 +279,7 @@ function emitGitHubOutput(result) {
   console.log(`macos_smoke_required=${result.macosSmokeRequired ? 'true' : 'false'}`);
   console.log(`macos_smoke_mode=${result.macosSmokeMode}`);
   console.log(`macos_smoke_args=${result.macosSmokeArgs}`);
+  console.log(`macos_smoke_decision=${result.smokeDecision}`);
   writeMultilineOutput('macos_smoke_reason', result.reason);
   writeMultilineOutput('macos_smoke_required_paths', result.requiredPaths.join(EOL));
   writeMultilineOutput('macos_smoke_safe_paths', result.safePaths.join(EOL));
@@ -275,6 +306,20 @@ function readPullFilesFromArg(path) {
   }));
 }
 
+function readPullFilesNdjsonFromArg(path) {
+  return readFileSync(path, 'utf8')
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const entry = JSON.parse(line);
+      return {
+        filename: typeof entry.filename === 'string' ? entry.filename : '',
+        patch: typeof entry.patch === 'string' ? entry.patch : undefined,
+      };
+    });
+}
+
 function assertClassification(name, files, expectedMode) {
   const result = classifyFiles(files);
   const expectedRequired = expectedMode !== SMOKE_MODES.NONE;
@@ -283,6 +328,13 @@ function assertClassification(name, files, expectedMode) {
     throw new Error(
       `${name}: expected macOS smoke mode=${expectedMode}, required=${expectedRequired}; got mode=${result.macosSmokeMode}, required=${result.macosSmokeRequired}. ${result.reason}`,
     );
+  }
+}
+
+function assertDecision(name, files, expectedDecision) {
+  const result = classifyFiles(files);
+  if (result.smokeDecision !== expectedDecision) {
+    throw new Error(`${name}: expected decision=${expectedDecision}; got ${result.smokeDecision}. ${result.reason}`);
   }
 }
 
@@ -299,12 +351,18 @@ function assertChangeClassification(name, changes, expectedMode) {
 
 function runSelfTest() {
   assertClassification('empty file list fails closed', [], SMOKE_MODES.RELEASE);
-  assertClassification('workflow changes skip smoke', ['.github/workflows/lint.yml'], SMOKE_MODES.NONE);
   assertClassification(
-    'github action changes skip smoke',
-    ['.github/actions/setup-bun-deps/action.yml'],
-    SMOKE_MODES.NONE,
+    'workflow changes require main smoke decision',
+    ['.github/workflows/lint.yml'],
+    SMOKE_MODES.RELEASE,
   );
+  assertDecision('workflow changes are main-smoke-needed', ['.github/workflows/lint.yml'], SMOKE_DECISIONS.MAIN);
+  assertClassification(
+    'github action changes require main smoke decision',
+    ['.github/actions/setup-bun-deps/action.yml'],
+    SMOKE_MODES.RELEASE,
+  );
+  assertDecision('empty file list fails closed decision', [], SMOKE_DECISIONS.FAIL_CLOSED);
   assertClassification('tauri changes require release smoke', ['src-tauri/src/main.rs'], SMOKE_MODES.RELEASE);
   assertClassification('package changes require release smoke', ['package.json'], SMOKE_MODES.RELEASE);
   assertChangeClassification(
@@ -391,6 +449,7 @@ function runSelfTest() {
     SMOKE_MODES.RELEASE,
   );
   assertClassification('unknown paths require release smoke', ['tools/new-helper.sh'], SMOKE_MODES.RELEASE);
+  assertDecision('unknown paths fail closed', ['tools/new-helper.sh'], SMOKE_DECISIONS.FAIL_CLOSED);
   assertClassification(
     'frontend leaf changes can skip smoke',
     ['src/components/panel/library/LibraryGrid.tsx'],
@@ -405,9 +464,9 @@ function runSelfTest() {
   );
   assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], SMOKE_MODES.NONE);
   assertClassification(
-    'mixed safe and workflow paths skip smoke',
+    'mixed safe and workflow paths require main smoke decision',
     ['README.md', '.github/workflows/lint.yml'],
-    SMOKE_MODES.NONE,
+    SMOKE_MODES.RELEASE,
   );
   assertClassification(
     'mixed safe and release paths require release smoke',
@@ -424,17 +483,21 @@ if (args.includes('--self-test')) {
 } else {
   const pullFilesJsonIndex = args.indexOf('--pull-files-json');
   const pullFilesJsonPath = pullFilesJsonIndex >= 0 ? args[pullFilesJsonIndex + 1] : undefined;
+  const pullFilesNdjsonIndex = args.indexOf('--pull-files-ndjson');
+  const pullFilesNdjsonPath = pullFilesNdjsonIndex >= 0 ? args[pullFilesNdjsonIndex + 1] : undefined;
   const fileArgIndex = args.indexOf('--files');
   const filesPath = fileArgIndex >= 0 ? args[fileArgIndex + 1] : undefined;
 
-  if (!filesPath && !pullFilesJsonPath) {
+  if (!filesPath && !pullFilesJsonPath && !pullFilesNdjsonPath) {
     throw new Error(
-      'Usage: bun scripts/ci-classify-macos-smoke.mjs --files <changed-files.txt> | --pull-files-json <pull-files.json>',
+      'Usage: bun scripts/ci-classify-macos-smoke.mjs --files <changed-files.txt> | --pull-files-json <pull-files.json> | --pull-files-ndjson <pull-files.ndjson>',
     );
   }
 
-  const result = pullFilesJsonPath
-    ? classifyFileChanges(readPullFilesFromArg(pullFilesJsonPath))
-    : classifyFiles(readFilesFromArg(filesPath));
+  const result = pullFilesNdjsonPath
+    ? classifyFileChanges(readPullFilesNdjsonFromArg(pullFilesNdjsonPath))
+    : pullFilesJsonPath
+      ? classifyFileChanges(readPullFilesFromArg(pullFilesJsonPath))
+      : classifyFiles(readFilesFromArg(filesPath));
   emitGitHubOutput(result);
 }
