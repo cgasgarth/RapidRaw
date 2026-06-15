@@ -21,6 +21,7 @@ const CHECK_GROUPS = {
     'check:keyboard-shortcuts',
     'check:keyboard-shortcut-conflicts',
     'check:edit-graph-history',
+    'check:edit-history-replay',
     'check:workspace-layouts',
     'check:compare-survey',
     'check:mask-render',

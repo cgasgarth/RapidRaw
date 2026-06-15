@@ -529,6 +529,10 @@
           "path": "docs/validation/public-fixture-manifest-2026-06-11.md"
         },
         {
+          "title": "Edit history replay validation",
+          "path": "docs/validation/edit-history-replay-2026-06-15.md"
+        },
+        {
           "title": "Performance smoke",
           "path": "docs/validation/performance-smoke-2026-06-13.md"
         },

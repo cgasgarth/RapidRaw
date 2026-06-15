@@ -3833,6 +3833,9 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `audit(ai): document current AI and generative hooks`
 - `validation(sidecar): add sidecar roundtrip tests`
 - `validation(history): add edit history replay tests`
+  - Docs: `docs/validation/edit-history-replay-2026-06-15.md`
+  - Validation: `scripts/check-edit-history-replay.mjs`
+  - Runtime status: current in-memory editor history push, undo, redo, jump, branch truncation, and 50-entry bound are helper-backed and fixture-validated; graph-native command replay remains future work.
 - `validation(render): add baseline render smoke tests`
 - `validation(fixtures): add fixture download policy`
 - `validation(fixtures): create public fixture manifest`
