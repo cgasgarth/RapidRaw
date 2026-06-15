@@ -158,6 +158,7 @@ generator before the release workflow needs one.
 - [Script entrypoints](tooling/rapidraw-script-entrypoints-2026-06-10.md)
 - [Staged hook checks](tooling/staged-hook-checks-2026-06-11.md)
 - [TypeScript compiler options audit](tooling/typescript-compiler-options-audit-2026-06-10.md)
+- [Skip lib check evaluation](tooling/skip-lib-check-evaluation-2026-06-15.md)
 - [Vite bundle budget](tooling/vite-bundle-budget-2026-06-11.md)
 - [Workflow topology](ci/workflow-topology-2026-06-11.md)
 - [Dependency vulnerability checks](ci/dependency-vulnerability-checks-2026-06-11.md)

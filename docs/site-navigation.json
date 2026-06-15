@@ -576,6 +576,10 @@
           "path": "docs/tooling/typescript-compiler-options-audit-2026-06-10.md"
         },
         {
+          "title": "Skip lib check evaluation",
+          "path": "docs/tooling/skip-lib-check-evaluation-2026-06-15.md"
+        },
+        {
           "title": "Vite bundle budget",
           "path": "docs/tooling/vite-bundle-budget-2026-06-11.md"
         },
