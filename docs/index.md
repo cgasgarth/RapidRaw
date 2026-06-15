@@ -128,6 +128,7 @@ generator before the release workflow needs one.
 - [Lint zero-warning default](tooling/lint-zero-warning-default-2026-06-15.md)
 - [TypeScript control-flow flags](tooling/ts-control-flow-flags-2026-06-15.md)
 - [Unsafe cast AST guard](tooling/unsafe-cast-ast-guard-2026-06-15.md)
+- [Assertion narrowing lint](tooling/assertion-narrowing-lint-2026-06-15.md)
 - [Tauri invoke boundary ratchet](tooling/tauri-invoke-boundary-ratchet-2026-06-15.md)
 - [Compact quality command policy](tooling/compact-quality-command-policy-2026-06-15.md)
 - [React refresh lint](tooling/react-refresh-lint-2026-06-15.md)
