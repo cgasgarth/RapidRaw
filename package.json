@@ -32,6 +32,7 @@
     "check:edit-graph-history": "bun scripts/check-edit-graph-history-commands.mjs",
     "check:edit-history-replay": "bun scripts/check-edit-history-replay.mjs",
     "check:tauri-schema-validation": "bun scripts/check-tauri-schema-validation.mjs",
+    "check:tauri-invoke-boundaries": "bun scripts/check-tauri-invoke-boundaries.mjs",
     "check:color-abi": "bun scripts/check-color-adjustment-abi-parity.mjs",
     "check:color-pipeline-audit": "bun scripts/check-color-pipeline-audit.mjs",
     "check:preview-scopes": "bun scripts/check-preview-scopes.mjs",
