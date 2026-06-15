@@ -105,6 +105,7 @@ generator before the release workflow needs one.
 - [Focus Stack performance validation contract](focus-stacking/performance-validation-contract-2026-06-14.md)
 - [Architecture baseline](baseline/rapidraw-architecture-baseline-2026-06-11.md)
 - [Image pipeline baseline](baseline/rapidraw-image-pipeline-baseline-2026-06-13.md)
+- [Layer and mask model audit](baseline/rapidraw-layer-mask-model-audit-2026-06-15.md)
 - [AI hooks baseline](baseline/rapidraw-ai-hooks-baseline-2026-06-11.md)
 - [GPU shader baseline](baseline/rapidraw-gpu-shader-baseline-2026-06-11.md)
 - [Command baseline](baseline/rapidraw-command-baseline-2026-06-10.md)
