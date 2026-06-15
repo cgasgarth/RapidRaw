@@ -13,6 +13,7 @@ dist
 dist-ssr
 artifacts/visual-smoke/
 artifacts/performance-smoke/
+artifacts/focus-sharpness-map/
 artifacts/release-benchmarks/
 *.local
 
