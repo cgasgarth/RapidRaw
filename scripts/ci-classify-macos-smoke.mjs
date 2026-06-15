@@ -67,6 +67,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set([
       'bun run check:actions:lint && bun run check:workflow-policy',
       'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test',
+      'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test && bun run check:compact-commands && bun run check:rust-feature-policy && bun run schema:contract-gate:self-test',
     ]),
   ],
   [
@@ -92,6 +93,8 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['schema:samples', new Set(['bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs'])],
   ['schema:samples:update', new Set(['bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs --update'])],
+  ['schema:contract-gate', new Set(['bun scripts/ci-schema-contract-gate.mjs'])],
+  ['schema:contract-gate:self-test', new Set(['bun scripts/ci-schema-contract-gate.mjs --self-test'])],
 ]);
 
 function hasExtension(path, extensions) {
