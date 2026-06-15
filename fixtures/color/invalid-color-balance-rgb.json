@@ -1,0 +1,22 @@
+[
+  {
+    "case": "enabled identity",
+    "input": {
+      "enabled": true,
+      "preserveLuminance": true,
+      "shadows": { "red": 0, "green": 0, "blue": 0 },
+      "midtones": { "red": 0, "green": 0, "blue": 0 },
+      "highlights": { "red": 0, "green": 0, "blue": 0 }
+    }
+  },
+  {
+    "case": "channel out of range",
+    "input": {
+      "enabled": true,
+      "preserveLuminance": true,
+      "shadows": { "red": -101, "green": 0, "blue": 0 },
+      "midtones": { "red": 0, "green": 0, "blue": 0 },
+      "highlights": { "red": 0, "green": 0, "blue": 0 }
+    }
+  }
+]
