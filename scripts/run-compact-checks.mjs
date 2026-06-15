@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { writeBoundedOutput } from './compact-output.mjs';
+
 const CHECK_GROUPS = {
   'check:quick': [
     'check:types',
@@ -66,41 +68,8 @@ const CHECK_GROUPS = {
 };
 
 const args = process.argv.slice(2);
-const MAX_FAILURE_CHARS = 100_000;
-const MAX_FAILURE_LINES = 240;
-const HEAD_LINES = 80;
-const TAIL_LINES = 140;
 let label = 'checks';
 const scripts = [];
-
-const writeBounded = (name, value) => {
-  if (!value) return;
-
-  const normalized = value.endsWith('\n') ? value : `${value}\n`;
-  const lines = normalized.split(/\r?\n/u);
-  const tooManyChars = normalized.length > MAX_FAILURE_CHARS;
-  const tooManyLines = lines.length > MAX_FAILURE_LINES;
-
-  if (!tooManyChars && !tooManyLines) {
-    process.stderr.write(normalized);
-    return;
-  }
-
-  console.error(`${name} truncated (${lines.length} lines, ${normalized.length} chars)`);
-
-  if (tooManyLines) {
-    const head = lines.slice(0, HEAD_LINES).join('\n');
-    const tail = lines.slice(-TAIL_LINES).join('\n');
-    if (head) process.stderr.write(`${head}\n`);
-    console.error('[...]');
-    if (tail) process.stderr.write(`${tail}\n`);
-    return;
-  }
-
-  process.stderr.write(normalized.slice(0, 60_000));
-  console.error('\n[...]');
-  process.stderr.write(normalized.slice(-40_000));
-};
 
 for (let index = 0; index < args.length; index += 1) {
   if (args[index] === '--label') {
@@ -150,8 +119,8 @@ for (const script of scripts) {
   console.error(`$ bun run ${script}`);
   const output = await stdout;
   const errorOutput = await stderr;
-  writeBounded('stdout', output);
-  writeBounded('stderr', errorOutput);
+  writeBoundedOutput('stdout', output);
+  writeBoundedOutput('stderr', errorOutput);
   process.exit(exitCode);
 }
 
