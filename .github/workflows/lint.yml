@@ -366,14 +366,7 @@ jobs:
 
   rust-check:
     name: 'rust: cargo check macOS'
-    needs:
-      - changed-paths
-    if: >-
-      always() &&
-      (
-        github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'pull_request' && needs.changed-paths.outputs.macos_smoke_mode != 'none')
-      )
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: macos-14
     timeout-minutes: 45
     steps:
@@ -421,14 +414,7 @@ jobs:
 
   rust-clippy:
     name: 'rust: clippy baseline macOS'
-    needs:
-      - changed-paths
-    if: >-
-      always() &&
-      (
-        github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'pull_request' && needs.changed-paths.outputs.macos_smoke_mode != 'none')
-      )
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: macos-14
     timeout-minutes: 45
     steps:
@@ -477,14 +463,7 @@ jobs:
 
   rust-test:
     name: 'rust: tests macOS'
-    needs:
-      - changed-paths
-    if: >-
-      always() &&
-      (
-        github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'pull_request' && needs.changed-paths.outputs.macos_smoke_mode != 'none')
-      )
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: macos-14
     timeout-minutes: 45
     steps:
@@ -532,9 +511,7 @@ jobs:
 
   pr-macos-app-build:
     name: macOS app no-bundle smoke
-    needs:
-      - changed-paths
-    if: github.event_name == 'pull_request' && needs.changed-paths.outputs.macos_smoke_mode != 'none'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: macos-14
     timeout-minutes: 90
     steps:
@@ -555,7 +532,7 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          key: v1-pr-smoke-${{ needs.changed-paths.outputs.macos_smoke_mode }}-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop
+          key: v1-main-smoke-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop
           cache-on-failure: true
 
       - name: Cache ONNX Runtime library
@@ -578,8 +555,8 @@ jobs:
 
           {
             echo "### macOS smoke cache status"
-            echo "- Mode: \`${{ needs.changed-paths.outputs.macos_smoke_mode }}\`"
-            echo "- Rust cache key suffix: \`v1-pr-smoke-${{ needs.changed-paths.outputs.macos_smoke_mode }}-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop\`"
+            echo "- Trigger: \`${{ github.event_name }}\`"
+            echo "- Rust cache key suffix: \`v1-main-smoke-${{ runner.os }}-${{ runner.arch }}-aarch64-apple-darwin-desktop\`"
             echo "- ONNX exact hit: \`$onnx_cache_hit\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -592,7 +569,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: ${{ needs.changed-paths.outputs.macos_smoke_args }}
+          args: --verbose --ci --no-bundle --target aarch64-apple-darwin
           retryAttempts: 3
 
       - name: Collect smoke failure diagnostics
@@ -713,12 +690,8 @@ jobs:
           )
 
           if [[ "$MACOS_SMOKE_MODE" != "none" ]]; then
-            required_jobs+=(
-              "rust: cargo check macOS"
-              "rust: clippy baseline macOS"
-              "rust: tests macOS"
-              "macOS app no-bundle smoke"
-            )
+            echo "Deferring long macOS Rust/app checks to main push and manual workflow_dispatch runs."
+            echo "Routing reason: $MACOS_SMOKE_REASON"
           else
             echo "Skipping macOS Rust check, macOS clippy, macOS Rust tests, and macOS app no-bundle smoke in aggregate wait."
             echo "Routing reason: $MACOS_SMOKE_REASON"

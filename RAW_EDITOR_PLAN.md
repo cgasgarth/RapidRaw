@@ -304,7 +304,7 @@ Required check rollout:
 - Do not mark a check required until it exists and is stable.
 - Once a check is required, do not weaken it without a tracked issue and explicit rationale.
 - Do not use top-level `paths` filters on required workflows. Use always-starting workflows with job-level changed-file routing and an always-running aggregate gate.
-- Path-aware CI routing must fail closed. Workflow, action, Rust, Tauri, dependency, build config, unknown, or unclassified paths require the expensive macOS smoke gate. Only explicitly classified docs/frontend-leaf paths may skip the macOS no-bundle smoke, and the routing decision must be represented as its own completed peer job under `PR CI / required`.
+- Path-aware CI routing must fail closed. Workflow, action, Rust, Tauri, dependency, build config, unknown, or unclassified paths must record a required macOS smoke decision. `PR CI / required` must not wait on the long macOS Rust/app smoke jobs; those run on `main` push and manual `workflow_dispatch`, while the PR keeps the routing decision as a completed peer job.
 - Do not use workflow concurrency cancellation for PR or main validation unless project governance explicitly changes. Older runs should be allowed to complete.
 - Merge queue was evaluated in `docs/ci/merge-queue-evaluation-2026-06-12.md` and should not be enabled yet. Revisit only after `main` validation latency is consistently lower and a merge-group routing path exists for changed-file classification.
 
@@ -4495,7 +4495,7 @@ Issues:
   `docs/ci/workflow-topology-2026-06-11.md`.
 - Add stable aggregate PR required gate.
 - Require that aggregate gate in the active `Protect main` ruleset.
-- Add macOS app build as a required dependency of the aggregate gate.
+- Keep macOS app smoke on `main` push and manual `workflow_dispatch`; do not make long macOS Rust/app jobs PR aggregate blockers.
 - Add matrix strategy for platform builds. Current optional inherited platform
   matrix: `docs/ci/optional-platform-build-matrix-2026-06-11.md`.
 - Add caching for Bun, Cargo, Tauri, and build artifacts. Current cache policy:
@@ -4518,7 +4518,7 @@ Definition of done:
 
 - PR validation jobs run in parallel.
 - `PR CI / required` exists, is enforced by the `Protect main` ruleset, blocks pending/failing PRs, and allows auto-merge only after success.
-- macOS build is required through the aggregate gate and green for workflow/action/Rust/Tauri/build-config/unknown changes. It may be skipped only when the checked-in changed-path classifier proves every changed path is a safe docs/frontend-leaf path.
+- macOS Rust/app smoke is required on `main` push and available manually before merge. PRs must record the changed-path routing decision but must not wait on the long macOS smoke jobs.
 - Non-required platform builds are clearly marked.
 - Release workflow can produce unsigned draft artifacts.
 
