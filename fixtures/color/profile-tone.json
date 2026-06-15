@@ -1,0 +1,20 @@
+[
+  {
+    "case": "landscape with high contrast tone",
+    "input": {
+      "cameraProfile": "camera_landscape",
+      "toneCurve": "high_contrast"
+    },
+    "expectedProfile": "camera_landscape",
+    "expectedToneCurve": "high_contrast"
+  },
+  {
+    "case": "linear raw with linear tone",
+    "input": {
+      "cameraProfile": "linear_raw",
+      "toneCurve": "linear"
+    },
+    "expectedProfile": "linear_raw",
+    "expectedToneCurve": "linear"
+  }
+]

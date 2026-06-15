@@ -95,6 +95,25 @@
         "yellows": "Żółte"
       },
       "presence": "Prezencja",
+      "profileTone": {
+        "cameraProfile": "Profil aparatu",
+        "cameraProfiles": {
+          "camera_landscape": "Krajobraz",
+          "camera_neutral": "Neutralny",
+          "camera_portrait": "Portret",
+          "camera_standard": "Standard",
+          "linear_raw": "Liniowy RAW"
+        },
+        "title": "Profil i tony",
+        "toneCurve": "Krzywa tonalna",
+        "toneCurves": {
+          "auto_filmic": "Automatyczna filmowa",
+          "high_contrast": "Wysoki kontrast",
+          "linear": "Liniowa",
+          "shadow_lift": "Podbite cienie",
+          "soft_contrast": "Miękki kontrast"
+        }
+      },
       "saturation": "Nasycenie",
       "temperature": "Temperatura",
       "tint": "Zabarwienie",
@@ -1265,6 +1284,7 @@
         "masks": "Maski",
         "noiseReduction": "Redukcja szumu",
         "presence": "Prezencja",
+        "profileTone": "Profil i tony",
         "sharpness": "Ostrość",
         "tone": "Tony",
         "transformRotation": "Przekształcanie i Obrót",

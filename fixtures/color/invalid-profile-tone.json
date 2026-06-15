@@ -1,0 +1,16 @@
+[
+  {
+    "case": "unknown camera profile",
+    "input": {
+      "cameraProfile": "vendor_secret_profile",
+      "toneCurve": "linear"
+    }
+  },
+  {
+    "case": "unknown tone curve",
+    "input": {
+      "cameraProfile": "camera_standard",
+      "toneCurve": "copied_competitor_curve"
+    }
+  }
+]

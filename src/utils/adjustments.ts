@@ -45,6 +45,7 @@ export enum BasicAdjustment {
 
 export enum ColorAdjustment {
   BlackWhiteMixer = 'blackWhiteMixer',
+  CameraProfile = 'cameraProfile',
   ColorBalanceRgb = 'colorBalanceRgb',
   ChannelMixer = 'channelMixer',
   ColorGrading = 'colorGrading',
@@ -54,6 +55,7 @@ export enum ColorAdjustment {
   Saturation = 'saturation',
   Temperature = 'temperature',
   Tint = 'tint',
+  ToneCurve = 'toneCurve',
   Vibrance = 'vibrance',
 }
 
@@ -172,6 +174,7 @@ export interface Adjustments {
   chromaticAberrationBlueYellow: number;
   chromaticAberrationRedCyan: number;
   blackWhiteMixer: BlackWhiteMixerSettings;
+  cameraProfile: CameraProfileId;
   colorBalanceRgb: ColorBalanceRgbSettings;
   channelMixer: ChannelMixerSettings;
   colorCalibration: ColorCalibration;
@@ -240,6 +243,7 @@ export interface Adjustments {
   temperature: number;
   tint: number;
   toneMapper: 'agx' | 'basic';
+  toneCurve: ToneCurveId;
   transformDistortion: number;
   transformVertical: number;
   transformHorizontal: number;
@@ -340,6 +344,14 @@ export interface ColorBalanceRgbSettings {
   preserveLuminance: boolean;
   shadows: ColorBalanceRgbRangeSettings;
 }
+
+export type CameraProfileId =
+  | 'camera_standard'
+  | 'camera_neutral'
+  | 'camera_portrait'
+  | 'camera_landscape'
+  | 'linear_raw';
+export type ToneCurveId = 'auto_filmic' | 'linear' | 'soft_contrast' | 'high_contrast' | 'shadow_lift';
 
 export interface ChannelMixerRow {
   blue: number;
@@ -581,6 +593,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   chromaticAberrationBlueYellow: 0,
   chromaticAberrationRedCyan: 0,
   blackWhiteMixer: structuredClone(INITIAL_BLACK_WHITE_MIXER),
+  cameraProfile: 'camera_standard',
   colorBalanceRgb: structuredClone(INITIAL_COLOR_BALANCE_RGB),
   channelMixer: structuredClone(INITIAL_CHANNEL_MIXER),
   colorCalibration: { ...INITIAL_COLOR_CALIBRATION },
@@ -654,6 +667,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   temperature: 0,
   tint: 0,
   toneMapper: 'basic',
+  toneCurve: 'auto_filmic',
   transformDistortion: 0,
   transformVertical: 0,
   transformHorizontal: 0,
@@ -785,6 +799,8 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     transformScale: loadedAdjustments.transformScale ?? INITIAL_ADJUSTMENTS.transformScale,
     transformXOffset: loadedAdjustments.transformXOffset ?? INITIAL_ADJUSTMENTS.transformXOffset,
     transformYOffset: loadedAdjustments.transformYOffset ?? INITIAL_ADJUSTMENTS.transformYOffset,
+    cameraProfile: loadedAdjustments.cameraProfile ?? INITIAL_ADJUSTMENTS.cameraProfile,
+    toneCurve: loadedAdjustments.toneCurve ?? INITIAL_ADJUSTMENTS.toneCurve,
     blackWhiteMixer: {
       ...INITIAL_ADJUSTMENTS.blackWhiteMixer,
       ...(loadedAdjustments.blackWhiteMixer || {}),
@@ -866,6 +882,10 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     },
   ],
   color: [
+    {
+      label: 'modals.copyPaste.groups.profileTone',
+      keys: [ColorAdjustment.CameraProfile, ColorAdjustment.ToneCurve, 'parametricCurve', 'curveMode'],
+    },
     { label: 'modals.copyPaste.groups.whiteBalance', keys: [ColorAdjustment.Temperature, ColorAdjustment.Tint] },
     { label: 'modals.copyPaste.groups.presence', keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance] },
     { label: 'modals.copyPaste.groups.colorBalanceRgb', keys: [ColorAdjustment.ColorBalanceRgb] },
@@ -975,6 +995,8 @@ export const ADJUSTMENT_SECTIONS: Sections = {
   curves: ['curves', 'pointCurves', 'parametricCurve', 'curveMode'],
   color: [
     ColorAdjustment.Saturation,
+    ColorAdjustment.CameraProfile,
+    ColorAdjustment.ToneCurve,
     ColorAdjustment.Temperature,
     ColorAdjustment.Tint,
     ColorAdjustment.Vibrance,

@@ -26,6 +26,7 @@ export const colorStylePresetAdjustmentKeySchema = z.enum([
   'colorGrading',
   'curveMode',
   'curves',
+  'cameraProfile',
   'hsl',
   'lutData',
   'lutIntensity',
@@ -37,6 +38,7 @@ export const colorStylePresetAdjustmentKeySchema = z.enum([
   'saturation',
   'temperature',
   'tint',
+  'toneCurve',
   'vibrance',
 ]);
 
