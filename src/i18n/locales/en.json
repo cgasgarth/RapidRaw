@@ -19,6 +19,13 @@
     },
     "color": {
       "ariaSelectColor": "Select {{name}} color",
+      "blackWhiteMixer": {
+        "ariaSelectChannel": "Select {{name}} black and white channel",
+        "contribution": "{{name}} contribution",
+        "disabled": "Off",
+        "enabled": "On",
+        "title": "Black & White Mixer"
+      },
       "calibration": {
         "colors": {
           "blue": "Blue",
@@ -1143,6 +1150,7 @@
       "descMerge": "Adds your copied changes, leaving other settings untouched.",
       "descReplace": "Overwrites all selected settings, resetting the rest to their defaults.",
       "groups": {
+        "blackWhiteMixer": "Black & White Mixer",
         "chromaticAberration": "Chromatic Aberration",
         "clarityDehaze": "Clarity & Dehaze",
         "colorCalibration": "Color Calibration",

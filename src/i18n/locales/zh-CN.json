@@ -19,6 +19,13 @@
     },
     "color": {
       "ariaSelectColor": "选择 {{name}} 颜色",
+      "blackWhiteMixer": {
+        "ariaSelectChannel": "选择 {{name}} 黑白通道",
+        "contribution": "{{name}} 贡献",
+        "disabled": "关",
+        "enabled": "开",
+        "title": "黑白混合器"
+      },
       "calibration": {
         "colors": {
           "blue": "蓝色",
@@ -1142,6 +1149,7 @@
       "descMerge": "添加您复制的更改，保留其他设置不变。",
       "descReplace": "覆盖所有选中的设置，其余重置为默认值。",
       "groups": {
+        "blackWhiteMixer": "黑白混合器",
         "chromaticAberration": "色差",
         "clarityDehaze": "清晰度与去雾",
         "colorCalibration": "颜色校准",

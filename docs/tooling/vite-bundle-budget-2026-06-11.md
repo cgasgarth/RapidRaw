@@ -28,7 +28,7 @@ This command builds the frontend and then runs
 
 - The current monolithic JavaScript chunk is accepted as temporary debt.
 - Growth beyond the raw or gzip budget fails validation.
-- HDR, panorama, and color style setup UI increased the temporary JavaScript
+- HDR, panorama, color style, and advanced color setup UI increased the temporary JavaScript
   gzip ceiling; future code-splitting should lower this again.
 - A future code-splitting PR should lower the JavaScript budget after reducing
   the largest chunk.

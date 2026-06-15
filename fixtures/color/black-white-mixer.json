@@ -1,0 +1,36 @@
+[
+  {
+    "case": "portrait red lift",
+    "input": {
+      "enabled": true,
+      "weights": {
+        "reds": 24,
+        "oranges": 14,
+        "yellows": 4,
+        "greens": -8,
+        "aquas": -12,
+        "blues": -18,
+        "purples": -6,
+        "magentas": 8
+      }
+    },
+    "expectedActiveChannels": ["reds", "oranges", "magentas"]
+  },
+  {
+    "case": "landscape sky control",
+    "input": {
+      "enabled": true,
+      "weights": {
+        "reds": 0,
+        "oranges": 2,
+        "yellows": 8,
+        "greens": 18,
+        "aquas": -10,
+        "blues": -28,
+        "purples": -12,
+        "magentas": 0
+      }
+    },
+    "expectedActiveChannels": ["oranges", "yellows", "greens"]
+  }
+]

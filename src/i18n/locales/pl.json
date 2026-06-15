@@ -19,6 +19,13 @@
     },
     "color": {
       "ariaSelectColor": "Wybierz kolor {{name}}",
+      "blackWhiteMixer": {
+        "ariaSelectChannel": "Wybierz kanał czarno-biały {{name}}",
+        "contribution": "Wkład {{name}}",
+        "disabled": "Wył.",
+        "enabled": "Wł.",
+        "title": "Mikser czarno-biały"
+      },
       "calibration": {
         "colors": {
           "blue": "Niebieski",
@@ -1191,6 +1198,7 @@
       "descMerge": "Dodaje skopiowane zmiany, pozostawiając resztę ustawień nienaruszoną.",
       "descReplace": "Nadpisuje wszystkie wybrane ustawienia, przywracając resztę do wartości domyślnych.",
       "groups": {
+        "blackWhiteMixer": "Mikser czarno-biały",
         "chromaticAberration": "Aberracja chromatyczna",
         "clarityDehaze": "Przejrzystość i Usuwanie mgły",
         "colorCalibration": "Kalibracja kolorów",

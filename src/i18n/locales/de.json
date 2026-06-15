@@ -19,6 +19,13 @@
     },
     "color": {
       "ariaSelectColor": "{{name}}-Farbe auswählen",
+      "blackWhiteMixer": {
+        "ariaSelectChannel": "{{name}} Schwarzweißkanal auswählen",
+        "contribution": "{{name}} Beitrag",
+        "disabled": "Aus",
+        "enabled": "Ein",
+        "title": "Schwarzweiß-Mischer"
+      },
       "calibration": {
         "colors": {
           "blue": "Blau",
@@ -1143,6 +1150,7 @@
       "descMerge": "Fügt Ihre kopierten Änderungen hinzu und lässt andere Einstellungen unberührt.",
       "descReplace": "Überschreibt alle ausgewählten Einstellungen und setzt den Rest auf Standardwerte zurück.",
       "groups": {
+        "blackWhiteMixer": "Schwarzweiß-Mischer",
         "chromaticAberration": "Chromatische Aberration",
         "clarityDehaze": "Klarheit & Dunst entfernen",
         "colorCalibration": "Farbkalibrierung",

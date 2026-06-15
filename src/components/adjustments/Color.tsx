@@ -3,6 +3,7 @@ import { Pipette, Sliders } from 'lucide-react';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type BlackWhiteMixerChannel } from '../../schemas/blackWhiteMixerSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
   Adjustments,
@@ -20,7 +21,7 @@ import UiText from '../ui/Text';
 
 interface ColorProps {
   color: string;
-  name: string;
+  name: BlackWhiteMixerChannel;
   label: string;
 }
 
@@ -46,15 +47,15 @@ type SliderChangeEvent =
 
 const formatPercent = (value: number) => `${String(value)}%`;
 
-interface ColorSwatchProps {
+interface ColorSwatchProps<T extends string> {
   color: string;
   isActive: boolean;
-  name: string;
+  name: T;
   ariaLabel: string;
-  onClick: (name: string) => void;
+  onClick: (name: T) => void;
 }
 
-const ColorSwatch = ({ color, name, isActive, ariaLabel, onClick }: ColorSwatchProps) => {
+const ColorSwatch = <T extends string>({ color, name, isActive, ariaLabel, onClick }: ColorSwatchProps<T>) => {
   const [isPressed, setIsPressed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -445,7 +446,7 @@ export default function ColorPanel({
   onDragStateChange,
 }: ColorPanelProps) {
   const { t } = useTranslation();
-  const [activeColor, setActiveColor] = useState('reds');
+  const [activeColor, setActiveColor] = useState<BlackWhiteMixerChannel>('reds');
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
 
@@ -459,7 +460,9 @@ export default function ColorPanel({
     [t],
   );
 
-  const currentHsl = adjustments.hsl[activeColor] || { hue: 0, saturation: 0, luminance: 0 };
+  const currentHsl = adjustments.hsl[activeColor];
+  const blackWhiteMixer = adjustments.blackWhiteMixer;
+  const currentBlackWhiteWeight = blackWhiteMixer.weights[activeColor];
   const baseHue = getSelectiveColorRange(activeColor).centerHueDegrees;
   const effectiveHue = baseHue + (currentHsl.hue || 0);
 
@@ -486,6 +489,37 @@ export default function ColorPanel({
         },
       },
     }));
+  };
+
+  const handleBlackWhiteToggle = () => {
+    setAdjustments((prev: Partial<Adjustments>) => {
+      const current = prev.blackWhiteMixer || INITIAL_ADJUSTMENTS.blackWhiteMixer;
+
+      return {
+        ...prev,
+        blackWhiteMixer: {
+          ...current,
+          enabled: !current.enabled,
+        },
+      };
+    });
+  };
+
+  const handleBlackWhiteWeightChange = (value: number | string) => {
+    setAdjustments((prev: Partial<Adjustments>) => {
+      const current = prev.blackWhiteMixer || INITIAL_ADJUSTMENTS.blackWhiteMixer;
+
+      return {
+        ...prev,
+        blackWhiteMixer: {
+          ...current,
+          weights: {
+            ...current.weights,
+            [activeColor]: parseFloat(String(value)),
+          },
+        },
+      };
+    });
   };
 
   const hue_slider = `hue-slider-${activeColor}`;
@@ -569,6 +603,51 @@ export default function ColorPanel({
           onDragStateChange={onDragStateChange}
         />
       </div>
+
+      {!isForMask && adjustmentVisibility[ColorAdjustment.BlackWhiteMixer] !== false && (
+        <div className="p-2 bg-bg-tertiary rounded-md">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <UiText variant={TextVariants.heading}>{t('adjustments.color.blackWhiteMixer.title')}</UiText>
+            <button
+              aria-pressed={blackWhiteMixer.enabled}
+              className={`rounded px-2 py-1 text-xs font-medium ${
+                blackWhiteMixer.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary'
+              }`}
+              onClick={handleBlackWhiteToggle}
+              type="button"
+            >
+              {blackWhiteMixer.enabled
+                ? t('adjustments.color.blackWhiteMixer.enabled')
+                : t('adjustments.color.blackWhiteMixer.disabled')}
+            </button>
+          </div>
+          <div className="mb-3 flex justify-between px-1">
+            {HSL_COLORS.map(({ name, color, label }) => (
+              <ColorSwatch
+                ariaLabel={t('adjustments.color.blackWhiteMixer.ariaSelectChannel', { name: label })}
+                color={color}
+                isActive={activeColor === name}
+                key={name}
+                name={name}
+                onClick={setActiveColor}
+              />
+            ))}
+          </div>
+          <Slider
+            label={t('adjustments.color.blackWhiteMixer.contribution', {
+              name: t(getSelectiveColorRange(activeColor).labelKey),
+            })}
+            max={100}
+            min={-100}
+            onChange={(e: SliderChangeEvent) => {
+              handleBlackWhiteWeightChange(e.target.value);
+            }}
+            step={1}
+            value={currentBlackWhiteWeight}
+            onDragStateChange={onDragStateChange}
+          />
+        </div>
+      )}
 
       <div className="p-2 bg-bg-tertiary rounded-md">
         <UiText variant={TextVariants.heading} className="mb-3">
