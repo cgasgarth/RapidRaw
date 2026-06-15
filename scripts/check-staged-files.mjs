@@ -72,7 +72,7 @@ const eslintFiles = stagedFiles.filter((filePath) => ESLINT_EXTENSIONS.has(exten
 const checks = [];
 
 if (formatFiles.length > 0) {
-  checks.push(await run('format', 'bun', ['prettier', '--check', '--log-level', 'warn', ...formatFiles]));
+  checks.push(await run('format', 'bun', ['prettier', '--list-different', '--log-level', 'warn', ...formatFiles]));
 }
 
 if (eslintFiles.length > 0) {
