@@ -9,8 +9,9 @@ const ROOT = process.cwd();
 const SELF_PATH = 'scripts/check-eslint-escape-hatches.mjs';
 const CHECKED_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx']);
 const IGNORED_DIRS = new Set(['.git', 'dist', 'node_modules', 'src-tauri/target', 'target']);
-const ALLOWED_DIRECTIVE_PATTERN =
-  /eslint-disable-next-line\s+[@a-z0-9-/, ]+\s+--\s+[A-Z0-9][A-Za-z0-9 .,:;'"()/_-]{11,}/u;
+const DIRECTIVE_PREFIX = 'eslint-disable-next-line';
+const REASON_MARKER = ' -- ';
+const RULE_NAME_PATTERN = /^@?[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9._-]*)?$/u;
 
 const isIgnored = (path) => {
   const normalized = path.split('/').join('/');
@@ -18,6 +19,44 @@ const isIgnored = (path) => {
 };
 
 const getLine = (sourceFile, position) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
+
+const stripCommentSyntax = (token, text) => {
+  if (token === ts.SyntaxKind.SingleLineCommentTrivia) return text.replace(/^\/\//u, '').trim();
+  if (token === ts.SyntaxKind.MultiLineCommentTrivia) return text.replace(/^\/\*/u, '').replace(/\*\/$/u, '').trim();
+  return text.trim();
+};
+
+const parseDirective = (token, text) => {
+  const body = stripCommentSyntax(token, text);
+  if (!body.includes('eslint-disable')) return { kind: 'none' };
+
+  if (token !== ts.SyntaxKind.SingleLineCommentTrivia || !body.startsWith(DIRECTIVE_PREFIX)) {
+    return { kind: 'invalid', reason: 'use eslint-disable-next-line, not broader disable scopes' };
+  }
+
+  const rest = body.slice(DIRECTIVE_PREFIX.length).trim();
+  const reasonIndex = rest.indexOf(REASON_MARKER);
+  if (reasonIndex < 0) {
+    return { kind: 'invalid', reason: 'eslint-disable-next-line requires rule names and a descriptive "-- reason"' };
+  }
+
+  const ruleText = rest.slice(0, reasonIndex).trim();
+  const reason = rest.slice(reasonIndex + REASON_MARKER.length).trim();
+  const rules = ruleText
+    .split(/[\s,]+/u)
+    .map((rule) => rule.trim())
+    .filter(Boolean);
+
+  if (rules.length === 0 || rules.some((rule) => !RULE_NAME_PATTERN.test(rule))) {
+    return { kind: 'invalid', reason: 'eslint-disable-next-line requires explicit ESLint rule names' };
+  }
+
+  if (reason.length < 12 || !/[A-Z0-9]/u.test(reason[0] ?? '')) {
+    return { kind: 'invalid', reason: 'eslint-disable-next-line requires a descriptive "-- reason"' };
+  }
+
+  return { kind: 'valid' };
+};
 
 const findEslintEscapeViolations = (filePath, contents) => {
   const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true);
@@ -28,15 +67,10 @@ const findEslintEscapeViolations = (filePath, contents) => {
   while (token !== ts.SyntaxKind.EndOfFileToken) {
     if (token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia) {
       const text = scanner.getTokenText();
-      if (text.includes('eslint-disable')) {
+      const directive = parseDirective(token, text);
+      if (directive.kind === 'invalid') {
         const line = getLine(sourceFile, scanner.getTokenPos());
-        if (token !== ts.SyntaxKind.SingleLineCommentTrivia || !text.includes('eslint-disable-next-line')) {
-          violations.push(`${filePath}:${line}: use eslint-disable-next-line, not broader disable scopes`);
-        } else if (!ALLOWED_DIRECTIVE_PATTERN.test(text)) {
-          violations.push(
-            `${filePath}:${line}: eslint-disable-next-line requires rule names and a descriptive "-- reason"`,
-          );
-        }
+        violations.push(`${filePath}:${line}: ${directive.reason}`);
       }
     }
     token = scanner.scan();
@@ -80,8 +114,24 @@ const runSelfTest = () => {
     },
     {
       expected: 1,
+      name: 'rejects same-line disable',
+      source:
+        '// eslint-disable-line @typescript-eslint/no-explicit-any -- Legacy adapter is typed in follow-up issue.\n',
+    },
+    {
+      expected: 1,
       name: 'rejects missing reason',
       source: '// eslint-disable-next-line @typescript-eslint/no-explicit-any\n',
+    },
+    {
+      expected: 1,
+      name: 'rejects missing rule name',
+      source: '// eslint-disable-next-line -- Legacy adapter is typed in follow-up issue.\n',
+    },
+    {
+      expected: 1,
+      name: 'rejects lowercase short reason',
+      source: '// eslint-disable-next-line @typescript-eslint/no-explicit-any -- too short\n',
     },
     {
       expected: 0,
