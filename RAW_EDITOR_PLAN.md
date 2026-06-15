@@ -4658,7 +4658,9 @@ Issues:
   - Next iterations: private RAW evidence, preview/export metric parity,
     runtime chroma/luma denoise candidates, then consult-backed threshold
     tightening.
-- Add high ISO fixture set.
+- Add high ISO fixture set. Initial manifest entries separate project-generated
+  public-CI placeholders from real-photo private-review placeholders until
+  payload rights, hashes, and thresholds are supplied.
 - Add defringe improvements.
 - Add dust spot visualization.
 - Add AI denoise research issue.
