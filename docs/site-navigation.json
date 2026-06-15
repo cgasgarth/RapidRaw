@@ -524,6 +524,10 @@
           "path": "docs/tooling/rust-clippy-pedantic-nursery-evaluation-2026-06-15.md"
         },
         {
+          "title": "Rust unused dependency gate evaluation",
+          "path": "docs/tooling/rust-unused-dependency-gate-2026-06-15.md"
+        },
+        {
           "title": "Strict type-checked ESLint",
           "path": "docs/tooling/eslint-strict-type-checked-2026-06-11.md"
         },
