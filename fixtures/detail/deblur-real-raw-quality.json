@@ -1,0 +1,70 @@
+{
+  "$schema": "https://rawengine.dev/schemas/deblur-real-raw-quality-v1.json",
+  "issue": 1182,
+  "qualityCases": [
+    {
+      "acceptanceStatus": "pending_private_asset",
+      "artifactClass": "edge_halo_ringing",
+      "artifacts": [
+        {
+          "hash": null,
+          "kind": "private_raw_crop_placeholder",
+          "path": "private-fixtures/detail/edge-ringing-v1.crop.json",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_before_placeholder",
+          "path": "private-artifacts/detail/deblur/edge-ringing-preview-before.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_after_placeholder",
+          "path": "private-artifacts/detail/deblur/edge-ringing-preview-after.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "export_after_placeholder",
+          "path": "private-artifacts/detail/deblur/edge-ringing-export-after.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "ringing_probe_placeholder",
+          "path": "private-artifacts/detail/deblur/edge-ringing-ringing-probe.json",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "manual_review_notes_placeholder",
+          "path": "private-artifacts/detail/deblur/edge-ringing-review-notes.md",
+          "publicRepoAllowed": false
+        }
+      ],
+      "evidenceId": "raw-evidence.detail.edge-ringing.v1",
+      "expectedMetrics": {
+        "edgeAcutanceRatio": { "min": 1.03, "max": 1.35 },
+        "falseEdgeRatio": { "min": 0, "max": 0.035 },
+        "haloWidthPx": { "min": 0, "max": 1.8 },
+        "noiseAmplificationRatio": { "min": 0.95, "max": 1.18 },
+        "ringingOvershootRatio": { "min": 0, "max": 0.06 },
+        "textureEnergyRatio": { "min": 0.68, "max": 1.16 }
+      },
+      "fixtureId": "detail.deblur.real-raw.edge-ringing.v1",
+      "localRelativePath": "private-fixtures/detail/edge-ringing-v1.cr3",
+      "manualReviewChecklist": [
+        "Compare before/after at 100 percent and 200 percent around high-contrast edges.",
+        "Reject visible bright or dark halos wider than the metric threshold.",
+        "Reject crunchy texture or false edges in adjacent low-contrast detail.",
+        "Confirm preview and export artifacts match the same deblur parameter set."
+      ],
+      "notes": "Private RAW placeholder tied to the edge-ringing evidence ledger entry. Public repo stores contract metadata only until a project-owned or user-provided asset is available.",
+      "rightsStatus": "planned_private_capture"
+    }
+  ],
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-15",
+  "validationMode": "schema_public_assets_private"
+}
