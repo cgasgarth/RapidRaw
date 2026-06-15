@@ -364,6 +364,19 @@ Each issue should include a "PR budget":
 
 PR size target: one issue, one behavior change, and one validation story. Prefer under about 500 changed lines excluding lockfiles, generated schemas, and approved snapshots. Split any PR that changes both tooling and product behavior, changes more than one major subsystem, requires more than one design decision, or cannot be validated with one coherent command/artifact set.
 
+Feature-completion rule:
+
+- Planning, ADR, schema, API, UI shell, fixture, or dry-run work is useful
+  progress, but it does not complete the user-visible feature by itself.
+- A feature is complete only when the end-to-end workflow is implemented and
+  validated: representative UI path, typed command/API path, runtime processing
+  behavior, persistence/replay where applicable, and screenshot or image-output
+  proof for user-visible behavior.
+- If a PR ships only one slice, its PR body, plan entry, and linked issue must
+  say the runtime status precisely, such as `planning-only`, `schema-only`,
+  `API-only`, `UI-only`, `dry-run-only`, or `runtime apply-capable`, and must
+  link follow-up E2E/workflow-proof issues.
+
 ### 2.1.3 Definition Of Ready
 
 An issue is ready for implementation when it has:

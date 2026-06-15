@@ -34,8 +34,11 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Concise Output Discipline
 
 - Optimize long-running work for low-token operation.
-- Keep routine thread updates to one short sentence. Skip obvious narration and
-  do not repeat the same PR queue, CI, or branch facts unless something changed.
+- Keep routine thread updates extremely terse. Fragments like `compile done`,
+  `CI pending`, `fixing lint`, or arrow/symbol shorthand are acceptable. Grammar
+  can be sacrificed for token efficiency.
+- Skip obvious narration and do not repeat the same PR queue, CI, or branch facts
+  unless something changed.
 - Summarize tool output only when it changes the next action, proves validation,
   or explains a blocker.
 - Use concise conventional commit subjects. Add commit bodies only when the
@@ -101,6 +104,13 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   all proven or explicitly tracked.
 - For image-editing features, verify with real image processing behavior and
   artifacts, not only type/lint checks.
+- Do not count planning, schema, API, or UI-only work as a complete feature
+  unless end-to-end workflow proof exists in the same PR. If E2E proof is not
+  included, state the runtime status explicitly and keep or create a follow-up
+  issue for E2E validation.
+- Keep frequently reused local checks and hooks token-efficient. On success,
+  prefer compact summaries over full command/file lists; on failure, preserve
+  actionable tool output.
 - Keep GitHub Actions current on supported major versions and maintain the
   stable `PR CI / required` aggregate gate.
 - New `main` or PR workflow runs should not cancel older validation runs.
