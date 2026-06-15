@@ -35,6 +35,7 @@ generator before the release workflow needs one.
 - [Scene-to-display transform ADR](color/scene-to-display-transform-adr-2026-06-14.md)
 - [Camera profile strategy ADR](color/camera-profile-strategy-adr-2026-06-14.md)
 - [Color pipeline design](color/color-pipeline-design-2026-06-14.md)
+- [Current color pipeline audit](color/current-color-pipeline-audit-2026-06-15.md)
 - [White balance picker validation](color/white-balance-picker-validation-2026-06-14.md)
 - [ColorChecker fixture manifest](color/colorchecker-fixtures-2026-06-14.md)
 - [Selective color ranges](color/selective-color-ranges-2026-06-14.md)

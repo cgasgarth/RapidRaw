@@ -3892,6 +3892,9 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 #### Milestone 5: Color Pipeline Foundation
 
 - `color(audit): audit current RapidRAW color pipeline`
+  - Audit: `docs/color/current-color-pipeline-audit-2026-06-15.md`
+  - Validation: `scripts/check-color-pipeline-audit.mjs`
+  - Runtime status: audit/doc guard only; no pixel-path changes.
 - `color(adr): decide working color space`
   - ADR: `docs/color/working-color-space-adr-2026-06-14.md`
 - `color(adr): decide scene-to-display transform strategy`
