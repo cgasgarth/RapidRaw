@@ -44,12 +44,16 @@ const proc = Bun.spawn(['cargo', ...resolveCargoArgs()], {
     ...process.env,
     RAWENGINE_DENOISE_CPU_REPORT: REPORT_PATH,
   },
-  stderr: 'inherit',
-  stdout: 'inherit',
+  stderr: 'pipe',
+  stdout: 'pipe',
 });
+const stdout = new Response(proc.stdout).text();
+const stderr = new Response(proc.stderr).text();
 
 const exitCode = await proc.exited;
 if (exitCode !== 0) {
+  console.error(await stdout);
+  console.error(await stderr);
   process.exit(exitCode);
 }
 
