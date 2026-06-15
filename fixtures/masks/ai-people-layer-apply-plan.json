@@ -1,0 +1,51 @@
+{
+  "$schema": "https://rawengine.local/schemas/ai-people-layer-apply-plan.v1.json",
+  "expectedPlan": {
+    "imageHash": "fixture://portrait-two-people",
+    "layers": [
+      {
+        "artifactId": "fake.people.person-1.full_person.v1",
+        "layerId": "layer.fake.people.person-1.full_person.v1",
+        "maskOperationId": "operation.fake.people.person-1.full_person.v1",
+        "name": "People Full Person person-1",
+        "opacity": 100,
+        "target": {
+          "part": "full_person",
+          "personId": "person-1"
+        },
+        "visible": true
+      },
+      {
+        "artifactId": "fake.people.all.background.v1",
+        "layerId": "layer.fake.people.all.background.v1",
+        "maskOperationId": "operation.fake.people.all.background.v1",
+        "name": "People Background",
+        "opacity": 100,
+        "target": {
+          "part": "background",
+          "personId": null
+        },
+        "visible": true
+      },
+      {
+        "artifactId": "fake.people.person-1.face.v1",
+        "layerId": "layer.fake.people.person-1.face.v1",
+        "maskOperationId": "operation.fake.people.person-1.face.v1",
+        "name": "People Face person-1",
+        "opacity": 100,
+        "target": {
+          "part": "face",
+          "personId": "person-1"
+        },
+        "visible": true
+      }
+    ],
+    "providerTier": "fake_provider",
+    "schemaVersion": 1,
+    "status": "dry_run",
+    "warnings": ["fake_provider_rectangular_masks_not_model_quality"]
+  },
+  "issue": 1136,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14"
+}
