@@ -73,6 +73,9 @@ export enum DetailsAdjustment {
   DeblurSigmaPx = 'deblurSigmaPx',
   DeblurStrength = 'deblurStrength',
   LumaNoiseReduction = 'lumaNoiseReduction',
+  LocalContrastHaloGuard = 'localContrastHaloGuard',
+  LocalContrastMidtoneMask = 'localContrastMidtoneMask',
+  LocalContrastRadiusPx = 'localContrastRadiusPx',
   Sharpness = 'sharpness',
   SharpnessThreshold = 'sharpnessThreshold',
   ChromaticAberrationRedCyan = 'chromaticAberrationRedCyan',
@@ -209,6 +212,9 @@ export interface Adjustments {
   } | null;
   lensMaker: string | null;
   lensModel: string | null;
+  localContrastHaloGuard: number;
+  localContrastMidtoneMask: number;
+  localContrastRadiusPx: number;
   lumaNoiseReduction: number;
   lutData?: string | null;
   lutIntensity?: number;
@@ -538,6 +544,9 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   lensDistortionParams: null,
   lensMaker: null,
   lensModel: null,
+  localContrastHaloGuard: 50,
+  localContrastMidtoneMask: 50,
+  localContrastRadiusPx: 24,
   lumaNoiseReduction: 0,
   lutData: null,
   lutIntensity: 100,
@@ -682,6 +691,10 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     lensTcaEnabled: loadedAdjustments.lensTcaEnabled ?? INITIAL_ADJUSTMENTS.lensTcaEnabled,
     lensVignetteEnabled: loadedAdjustments.lensVignetteEnabled ?? INITIAL_ADJUSTMENTS.lensVignetteEnabled,
     lensDistortionParams: loadedAdjustments.lensDistortionParams ?? INITIAL_ADJUSTMENTS.lensDistortionParams,
+    localContrastHaloGuard: loadedAdjustments.localContrastHaloGuard ?? INITIAL_ADJUSTMENTS.localContrastHaloGuard,
+    localContrastMidtoneMask:
+      loadedAdjustments.localContrastMidtoneMask ?? INITIAL_ADJUSTMENTS.localContrastMidtoneMask,
+    localContrastRadiusPx: loadedAdjustments.localContrastRadiusPx ?? INITIAL_ADJUSTMENTS.localContrastRadiusPx,
     transformDistortion: loadedAdjustments.transformDistortion ?? INITIAL_ADJUSTMENTS.transformDistortion,
     transformVertical: loadedAdjustments.transformVertical ?? INITIAL_ADJUSTMENTS.transformVertical,
     transformHorizontal: loadedAdjustments.transformHorizontal ?? INITIAL_ADJUSTMENTS.transformHorizontal,
@@ -754,6 +767,9 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         DetailsAdjustment.Structure,
         DetailsAdjustment.Dehaze,
         DetailsAdjustment.Centré,
+        DetailsAdjustment.LocalContrastRadiusPx,
+        DetailsAdjustment.LocalContrastHaloGuard,
+        DetailsAdjustment.LocalContrastMidtoneMask,
       ],
     },
     {

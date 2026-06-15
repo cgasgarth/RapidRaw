@@ -30,6 +30,7 @@
     "check:selective-color-ranges": "bun scripts/check-selective-color-ranges.mjs",
     "check:selective-color-falloff": "bun scripts/check-selective-color-falloff.mjs",
     "check:skin-tone-uniformity": "bun scripts/check-skin-tone-uniformity.mjs",
+    "check:local-contrast-controls": "bun scripts/check-local-contrast-controls.mjs",
     "check:selective-color-mask": "bun scripts/check-selective-color-mask-fixtures.mjs",
     "check:layer-stack": "bun scripts/check-layer-stack-operations.mjs",
     "check:layer-adjustments": "bun scripts/check-layer-adjustment-operations.mjs",

@@ -1,0 +1,22 @@
+[
+  {
+    "case": "weak-halo-guard",
+    "payload": {
+      "amount": 20,
+      "haloGuard": 10,
+      "midtoneMask": 50,
+      "mode": "edge_protected",
+      "radiusPx": 24
+    }
+  },
+  {
+    "case": "weak-midtone-mask",
+    "payload": {
+      "amount": 20,
+      "haloGuard": 50,
+      "midtoneMask": 10,
+      "mode": "midtone_masked",
+      "radiusPx": 24
+    }
+  }
+]
