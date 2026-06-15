@@ -722,6 +722,15 @@
     },
     "presets": {
       "applyPresetLabel": "Zastosuj preset {{name}}",
+      "colorStyles": {
+        "applyLabel": "Zastosuj styl koloru {{name}}",
+        "count": "{{count}} style",
+        "count_one": "{{count}} styl",
+        "count_few": "{{count}} style",
+        "count_many": "{{count}} stylów",
+        "count_other": "{{count}} stylu",
+        "title": "Style kolorów"
+      },
       "dialog": {
         "allPresetFiles": "Wszystkie pliki presetów",
         "exportAllTitle": "Eksportuj wszystkie presety",

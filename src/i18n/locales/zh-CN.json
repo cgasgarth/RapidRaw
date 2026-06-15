@@ -682,6 +682,12 @@
     },
     "presets": {
       "applyPresetLabel": "应用预设 {{name}}",
+      "colorStyles": {
+        "applyLabel": "应用色彩风格 {{name}}",
+        "count": "{{count}} 个风格",
+        "count_other": "{{count}} 个风格",
+        "title": "色彩风格"
+      },
       "dialog": {
         "allPresetFiles": "所有预设文件",
         "exportAllTitle": "导出所有预设",

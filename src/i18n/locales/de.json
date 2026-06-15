@@ -682,6 +682,13 @@
     },
     "presets": {
       "applyPresetLabel": "Vorgabe {{name}} anwenden",
+      "colorStyles": {
+        "applyLabel": "Farbstil {{name}} anwenden",
+        "count": "{{count}} Stile",
+        "count_one": "{{count}} Stil",
+        "count_other": "{{count}} Stile",
+        "title": "Farbstile"
+      },
       "dialog": {
         "allPresetFiles": "Alle Vorgabendateien",
         "exportAllTitle": "Alle Vorgaben exportieren",

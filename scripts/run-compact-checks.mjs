@@ -44,6 +44,7 @@ const CHECK_GROUPS = {
     'check:color-abi',
     'check:camera-profile-lookup',
     'check:colorchecker-fixtures',
+    'check:color-style-presets',
     'check:selective-color-ranges',
     'check:selective-color-falloff',
     'check:skin-tone-uniformity',
