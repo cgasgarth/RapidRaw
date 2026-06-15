@@ -25,3 +25,6 @@ bun run hooks:verify
 
 The hook is intentionally changed-file scoped so commits are not blocked by
 unrelated baseline files.
+
+Hook output is compact by default. Successful commits print only a short staged
+summary, while failures keep bounded head/tail output for the failing command.

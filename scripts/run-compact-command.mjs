@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { readBoundedStream, writeBoundedOutput } from './compact-output.mjs';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from './compact-output.mjs';
 
 const args = process.argv.slice(2);
 let label = 'command';
@@ -52,7 +52,7 @@ try {
   });
 } catch (error) {
   console.error(`${label} failed`);
-  console.error(`$ ${command.join(' ')}`);
+  console.error(`$ ${formatCommandForLog(command[0], command.slice(1))}`);
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 }
@@ -67,7 +67,7 @@ if (exitCode === 0) {
 }
 
 console.error(`${label} failed`);
-console.error(`$ ${command.join(' ')}`);
+console.error(`$ ${formatCommandForLog(command[0], command.slice(1))}`);
 const output = await stdout;
 const errorOutput = await stderr;
 writeBoundedOutput('stdout', output);
