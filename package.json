@@ -85,6 +85,7 @@
     "check:hdr-alignment-smoke": "bun scripts/check-hdr-alignment-smoke.mjs",
     "check:hdr-deghosting-smoke": "bun scripts/check-hdr-deghosting-smoke.mjs",
     "check:hdr-merge-weighting-smoke": "bun scripts/check-hdr-merge-weighting-smoke.mjs",
+    "check:hdr-ui-api": "bun scripts/check-hdr-ui-api.mjs",
     "check:focus-fixtures": "bun scripts/check-focus-synthetic-fixtures.mjs",
     "check:focus-fixtures:update": "bun scripts/check-focus-synthetic-fixtures.mjs --update",
     "check:focus-alignment-smoke": "bun scripts/check-focus-translation-alignment-smoke.mjs",
