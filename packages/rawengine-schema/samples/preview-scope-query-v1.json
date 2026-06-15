@@ -10,7 +10,15 @@
     "includeScopes": ["histogram", "waveform", "rgb_parade", "vectorscope"],
     "maxDimensionPx": 2048,
     "renderBasis": "editor_preview",
-    "sourceArtifactId": "artifact_preview_sample"
+    "renderTarget": {
+      "bitDepth": 8,
+      "embedIcc": true,
+      "intent": "relative_colorimetric",
+      "outputProfile": "display_p3",
+      "viewTransform": "rawengine_agx_v1"
+    },
+    "sourceArtifactId": "artifact_preview_sample",
+    "workingSpace": "acescg_linear_v1"
   },
   "queryId": "query_preview_scope_sample",
   "queryType": "preview.scopes.read",

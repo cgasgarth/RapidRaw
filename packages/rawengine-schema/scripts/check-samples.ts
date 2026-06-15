@@ -1160,6 +1160,26 @@ expectInvalid('tone color custom white balance without tint', toneColorCommandEn
   },
 });
 
+expectInvalid('tone color identity CAT with mismatched white points', toneColorCommandEnvelopeV1Schema, {
+  ...sampleToneColorCommandEnvelopeV1,
+  colorPipeline: {
+    ...sampleToneColorCommandEnvelopeV1.colorPipeline,
+    chromaticAdaptation: {
+      method: 'identity_same_white_v1',
+      sourceWhitePoint: {
+        x: 0.3457,
+        y: 0.3585,
+      },
+      status: 'skipped',
+      targetWhitePoint: {
+        x: 0.32168,
+        y: 0.33767,
+      },
+      warnings: [],
+    },
+  },
+});
+
 expectInvalid('layer mask apply command without approved state', layerMaskCommandEnvelopeV1Schema, {
   ...sampleLayerMaskApplyCommandEnvelopeV1,
   approval: {

@@ -133,6 +133,8 @@ import {
   type ProjectLibrarySnapshotQueryV1,
   type ProjectLibrarySnapshotV1,
   type QueryEnvelopeV1,
+  type RawEngineColorPipelineContextV1,
+  type RawEngineRenderTargetV1,
   type RawEngineAgentReplayFixtureV1,
   type RawEngineAppServerToolCallValidationV1,
   type RawEngineToolRegistryV1,
@@ -200,6 +202,35 @@ export const sampleArtifactHandleV1: ArtifactHandleV1 = artifactHandleV1Schema.p
   kind: 'preview',
   storage: 'temp_cache',
 });
+
+export const sampleRawEngineRenderTargetV1: RawEngineRenderTargetV1 = {
+  bitDepth: 8,
+  embedIcc: true,
+  intent: 'relative_colorimetric',
+  outputProfile: 'display_p3',
+  viewTransform: 'rawengine_agx_v1',
+};
+
+export const sampleRawEngineSceneColorPipelineV1: RawEngineColorPipelineContextV1 = {
+  chromaticAdaptation: {
+    method: 'bradford_v1',
+    sourceWhitePoint: {
+      x: 0.3457,
+      y: 0.3585,
+    },
+    status: 'math_validated',
+    targetWhitePoint: {
+      x: 0.32168,
+      y: 0.33767,
+    },
+    warnings: [],
+  },
+  inputDomain: 'camera_linear_rgb',
+  operationDomain: 'acescg_linear_v1',
+  renderTarget: sampleRawEngineRenderTargetV1,
+  sceneToDisplayTransform: 'rawengine_agx_v1',
+  workingSpace: 'acescg_linear_v1',
+};
 
 export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegistryV1Schema.parse({
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
@@ -736,6 +767,7 @@ export const sampleToneColorCommandEnvelopeV1: ToneColorCommandEnvelopeV1 = tone
   dryRun: true,
   expectedGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
   idempotencyKey: 'idem_tone_color_basic_preview_sample',
+  colorPipeline: sampleRawEngineSceneColorPipelineV1,
   parameters: {
     blackPoint: -2,
     clarity: 8,
@@ -801,6 +833,7 @@ export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorD
       storage: 'temp_cache',
     },
   ],
+  colorPipeline: sampleRawEngineSceneColorPipelineV1,
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
   sourceGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
   warnings: [],
@@ -812,6 +845,7 @@ export const sampleToneColorMutationResultV1: ToneColorMutationResultV1 = toneCo
   commandId: sampleToneColorApplyCommandEnvelopeV1.commandId,
   commandType: sampleToneColorApplyCommandEnvelopeV1.commandType,
   correlationId: sampleToneColorApplyCommandEnvelopeV1.correlationId,
+  colorPipeline: sampleRawEngineSceneColorPipelineV1,
   dryRun: false,
   mutates: true,
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
@@ -1337,6 +1371,7 @@ export const sampleExportCommandEnvelopeV1: ExportCommandEnvelopeV1 = exportComm
     jpegQuality: 92,
     maxLongEdgePx: 4096,
     outputSharpening: 'screen',
+    renderTarget: sampleRawEngineRenderTargetV1,
     resizeMode: 'fit_long_edge',
   },
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
@@ -2593,7 +2628,9 @@ export const samplePreviewScopeQueryV1: PreviewScopeQueryV1 = previewScopeQueryV
     includeScopes: ['histogram', 'waveform', 'rgb_parade', 'vectorscope'],
     maxDimensionPx: 2048,
     renderBasis: 'editor_preview',
+    renderTarget: sampleRawEngineRenderTargetV1,
     sourceArtifactId: sampleArtifactHandleV1.artifactId,
+    workingSpace: 'acescg_linear_v1',
   },
   queryId: 'query_preview_scope_sample',
   queryType: 'preview.scopes.read',
@@ -2606,6 +2643,7 @@ export const samplePreviewScopeQueryV1: PreviewScopeQueryV1 = previewScopeQueryV
 
 export const samplePreviewScopeResultV1: PreviewScopeResultV1 = previewScopeResultV1Schema.parse({
   colorManaged: true,
+  colorPipeline: sampleRawEngineSceneColorPipelineV1,
   histogram: {
     binCount: 256,
     channels: [

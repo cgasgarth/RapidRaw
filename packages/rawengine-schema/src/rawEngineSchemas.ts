@@ -161,6 +161,125 @@ export const rawEngineToolRegistryV1Schema = z
   })
   .strict();
 
+export const rawEngineColorDomainV1Schema = z.enum([
+  'camera_linear_rgb',
+  'acescg_linear_v1',
+  'scene_referred_lut_input',
+  'display_referred_rgb',
+  'display_profile_output',
+  'negative_acquisition_rgb',
+  'derived_artifact_source',
+]);
+
+export const rawEngineWorkingColorSpaceV1Schema = z.enum(['acescg_linear_v1']);
+
+export const rawEngineSceneToDisplayTransformV1Schema = z.enum(['rawengine_agx_v1', 'rawengine_basic_v1']);
+
+export const rawEngineOutputProfileV1Schema = z.enum(['srgb', 'display_p3']);
+
+export const rawEngineRenderBitDepthV1Schema = z.union([z.literal(8), z.literal(16), z.literal(32)]);
+
+export const rawEngineRenderingIntentV1Schema = z.enum(['relative_colorimetric', 'perceptual', 'scene_referred']);
+
+export const rawEngineWhitePointXyV1Schema = z
+  .object({
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+  })
+  .strict();
+
+export const rawEngineChromaticAdaptationMethodV1Schema = z.enum([
+  'bradford_v1',
+  'identity_same_white_v1',
+  'unsupported_or_unknown_v1',
+]);
+
+export const rawEngineChromaticAdaptationStatusV1Schema = z.enum([
+  'schema_only',
+  'math_validated',
+  'applied_preview',
+  'applied_render',
+  'skipped',
+  'blocked',
+]);
+
+export const rawEngineChromaticAdaptationV1Schema = z
+  .object({
+    method: rawEngineChromaticAdaptationMethodV1Schema,
+    sourceWhitePoint: rawEngineWhitePointXyV1Schema,
+    status: rawEngineChromaticAdaptationStatusV1Schema,
+    targetWhitePoint: rawEngineWhitePointXyV1Schema,
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+  .superRefine((adaptation, context) => {
+    const sameWhitePoint =
+      adaptation.sourceWhitePoint.x === adaptation.targetWhitePoint.x &&
+      adaptation.sourceWhitePoint.y === adaptation.targetWhitePoint.y;
+
+    if (adaptation.method === 'identity_same_white_v1' && !sameWhitePoint) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Identity chromatic adaptation requires matching source and target white points.',
+        path: ['method'],
+      });
+    }
+
+    if (adaptation.method === 'unsupported_or_unknown_v1' && adaptation.status !== 'blocked') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Unsupported chromatic adaptation must be blocked.',
+        path: ['status'],
+      });
+    }
+
+    if (adaptation.status === 'schema_only' && adaptation.warnings.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Schema-only chromatic adaptation requires at least one warning.',
+        path: ['warnings'],
+      });
+    }
+
+    if (adaptation.status === 'blocked' && adaptation.warnings.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Blocked chromatic adaptation requires at least one warning.',
+        path: ['warnings'],
+      });
+    }
+  });
+
+export const rawEngineRenderTargetV1Schema = z
+  .object({
+    bitDepth: rawEngineRenderBitDepthV1Schema,
+    embedIcc: z.boolean(),
+    intent: rawEngineRenderingIntentV1Schema,
+    outputProfile: rawEngineOutputProfileV1Schema,
+    viewTransform: rawEngineSceneToDisplayTransformV1Schema,
+  })
+  .strict();
+
+export const rawEngineColorPipelineContextV1Schema = z
+  .object({
+    chromaticAdaptation: rawEngineChromaticAdaptationV1Schema,
+    inputDomain: rawEngineColorDomainV1Schema,
+    operationDomain: rawEngineColorDomainV1Schema,
+    renderTarget: rawEngineRenderTargetV1Schema.optional(),
+    sceneToDisplayTransform: rawEngineSceneToDisplayTransformV1Schema.optional(),
+    workingSpace: rawEngineWorkingColorSpaceV1Schema,
+  })
+  .strict()
+  .superRefine((contextValue, context) => {
+    if (contextValue.operationDomain === 'display_referred_rgb' && contextValue.sceneToDisplayTransform === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Display-referred operations require an explicit scene-to-display transform.',
+        path: ['sceneToDisplayTransform'],
+      });
+    }
+  });
+
 export const previewScopeKindV1Schema = z.enum(['histogram', 'waveform', 'rgb_parade', 'vectorscope']);
 
 export const previewScopeChannelV1Schema = z.enum(['red', 'green', 'blue', 'luma', 'rgb']);
@@ -180,7 +299,9 @@ export const previewScopeQueryV1Schema = queryEnvelopeV1Schema
         includeScopes: z.array(previewScopeKindV1Schema).min(1),
         maxDimensionPx: z.number().int().positive().max(8192),
         renderBasis: previewScopeRenderBasisV1Schema,
+        renderTarget: rawEngineRenderTargetV1Schema.optional(),
         sourceArtifactId: z.string().trim().min(1).optional(),
+        workingSpace: rawEngineWorkingColorSpaceV1Schema,
       })
       .strict(),
     queryType: z.literal('preview.scopes.read'),
@@ -219,6 +340,7 @@ export const previewRasterScopeV1Schema = z
 export const previewScopeResultV1Schema = z
   .object({
     colorManaged: z.boolean(),
+    colorPipeline: rawEngineColorPipelineContextV1Schema,
     histogram: previewHistogramScopeV1Schema.optional(),
     queryId: z.string().trim().min(1),
     renderBasis: previewScopeRenderBasisV1Schema,
@@ -286,6 +408,7 @@ export const exportCommandEnvelopeV1Schema = commandEnvelopeV1Schema
         maxLongEdgePx: z.number().int().positive().optional(),
         maxWidthPx: z.number().int().positive().optional(),
         outputSharpening: z.enum(['none', 'screen', 'matte_paper', 'glossy_paper']),
+        renderTarget: rawEngineRenderTargetV1Schema,
         resizeMode: exportResizeModeV1Schema,
       })
       .strict(),
@@ -977,6 +1100,7 @@ const toneColorCommandBaseV1Schema = z.object({
   approval: approvalRequirementSchema,
   commandId: z.string().trim().min(1),
   correlationId: z.string().trim().min(1),
+  colorPipeline: rawEngineColorPipelineContextV1Schema,
   dryRun: z.boolean(),
   expectedGraphRevision: z.string().trim().min(1),
   idempotencyKey: z.string().trim().min(1).optional(),
@@ -1137,6 +1261,7 @@ export const toneColorDryRunResultV1Schema = z
     parameterDiff: z.array(toneColorParameterDiffV1Schema),
     predictedGraphRevision: z.string().trim().min(1),
     previewArtifacts: z.array(artifactHandleV1Schema),
+    colorPipeline: rawEngineColorPipelineContextV1Schema,
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
     sourceGraphRevision: z.string().trim().min(1),
     warnings: z.array(z.string().trim().min(1)),
@@ -1150,6 +1275,7 @@ export const toneColorMutationResultV1Schema = z
     commandId: z.string().trim().min(1),
     commandType: toneColorCommandTypeV1Schema,
     correlationId: z.string().trim().min(1),
+    colorPipeline: rawEngineColorPipelineContextV1Schema,
     dryRun: z.literal(false),
     mutates: z.literal(true),
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
@@ -8407,6 +8533,14 @@ export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
 export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
+export type RawEngineColorDomainV1 = z.infer<typeof rawEngineColorDomainV1Schema>;
+export type RawEngineColorPipelineContextV1 = z.infer<typeof rawEngineColorPipelineContextV1Schema>;
+export type RawEngineOutputProfileV1 = z.infer<typeof rawEngineOutputProfileV1Schema>;
+export type RawEngineRenderBitDepthV1 = z.infer<typeof rawEngineRenderBitDepthV1Schema>;
+export type RawEngineRenderingIntentV1 = z.infer<typeof rawEngineRenderingIntentV1Schema>;
+export type RawEngineRenderTargetV1 = z.infer<typeof rawEngineRenderTargetV1Schema>;
+export type RawEngineSceneToDisplayTransformV1 = z.infer<typeof rawEngineSceneToDisplayTransformV1Schema>;
+export type RawEngineWorkingColorSpaceV1 = z.infer<typeof rawEngineWorkingColorSpaceV1Schema>;
 export type ComputationalMergeAlignmentModeV1 = z.infer<typeof computationalMergeAlignmentModeV1Schema>;
 export type ComputationalMergeAppServerAuditEventV1 = z.infer<typeof computationalMergeAppServerAuditEventV1Schema>;
 export type ComputationalMergeAppServerExecutionModeV1 = z.infer<
