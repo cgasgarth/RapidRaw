@@ -18,7 +18,8 @@
       "watermarkOpacity": 75,
       "watermarkPath": null,
       "watermarkScale": 10,
-      "watermarkSpacing": 5
+      "watermarkSpacing": 5,
+      "colorProfile": "srgb"
     }
   },
   {
@@ -40,7 +41,8 @@
       "watermarkOpacity": 75,
       "watermarkPath": null,
       "watermarkScale": 10,
-      "watermarkSpacing": 5
+      "watermarkSpacing": 5,
+      "colorProfile": "srgb"
     }
   },
   {
@@ -55,6 +57,30 @@
       "jpegQuality": 95,
       "keepMetadata": true,
       "name": "Bad TIFF Quality",
+      "resizeMode": "longEdge",
+      "resizeValue": 2048,
+      "stripGps": false,
+      "watermarkAnchor": "bottomRight",
+      "watermarkOpacity": 75,
+      "watermarkPath": null,
+      "watermarkScale": 10,
+      "watermarkSpacing": 5,
+      "colorProfile": "srgb"
+    }
+  },
+  {
+    "case": "rejects unknown color profile",
+    "recipe": {
+      "colorProfile": "camera-native",
+      "dontEnlarge": true,
+      "enableResize": false,
+      "enableWatermark": false,
+      "fileFormat": "jpeg",
+      "filenameTemplate": "{original_filename}",
+      "id": "bad-color-profile",
+      "jpegQuality": 95,
+      "keepMetadata": true,
+      "name": "Bad Color Profile",
       "resizeMode": "longEdge",
       "resizeValue": 2048,
       "stripGps": false,

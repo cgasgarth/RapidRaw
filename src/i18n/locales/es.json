@@ -721,7 +721,8 @@
       "exportMasks": "Exportar máscaras como archivos separados",
       "preserveFolders": "Preservar estructura de carpetas",
       "preserveTimestamps": "Establecer marcas de tiempo del archivo desde la fecha de captura EXIF",
-      "title": "Ajustes de exportación"
+      "title": "Ajustes de exportación",
+      "colorProfile": "Perfil de color"
     },
     "bytes": {
       "bytes": "Bytes",
@@ -807,6 +808,13 @@
       "scale": "Escala",
       "spacing": "Espaciado",
       "watermarkImage": "Imagen de la marca de agua"
+    },
+    "colorProfiles": {
+      "srgb": "sRGB",
+      "displayP3": "Display P3",
+      "adobeRgb1998": "Adobe RGB (1998)",
+      "proPhotoRgb": "ProPhoto RGB",
+      "sourceEmbedded": "Perfil incrustado de origen"
     }
   },
   "library": {

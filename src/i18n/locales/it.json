@@ -721,7 +721,8 @@
       "exportMasks": "Esporta maschere come file separati",
       "preserveFolders": "Mantieni Struttura Cartelle",
       "preserveTimestamps": "Imposta Timestamp File dalla Data di Acquisizione EXIF",
-      "title": "Impostazioni di Esportazione"
+      "title": "Impostazioni di Esportazione",
+      "colorProfile": "Profilo colore"
     },
     "bytes": {
       "bytes": "Byte",
@@ -807,6 +808,13 @@
       "scale": "Scala",
       "spacing": "Spaziatura",
       "watermarkImage": "Immagine Filigrana"
+    },
+    "colorProfiles": {
+      "srgb": "sRGB",
+      "displayP3": "Display P3",
+      "adobeRgb1998": "Adobe RGB (1998)",
+      "proPhotoRgb": "ProPhoto RGB",
+      "sourceEmbedded": "Profilo incorporato sorgente"
     }
   },
   "library": {

@@ -19,7 +19,8 @@
     "watermarkOpacity": 75,
     "watermarkPath": null,
     "watermarkScale": 10,
-    "watermarkSpacing": 5
+    "watermarkSpacing": 5,
+    "colorProfile": "srgb"
   },
   {
     "dontEnlarge": true,
@@ -41,7 +42,8 @@
     "watermarkOpacity": 75,
     "watermarkPath": null,
     "watermarkScale": 10,
-    "watermarkSpacing": 5
+    "watermarkSpacing": 5,
+    "colorProfile": "displayP3"
   },
   {
     "dontEnlarge": true,
@@ -63,6 +65,7 @@
     "watermarkOpacity": 60,
     "watermarkPath": "/fixtures/watermark/logo.png",
     "watermarkScale": 12,
-    "watermarkSpacing": 4
+    "watermarkSpacing": 4,
+    "colorProfile": "proPhotoRgb"
   }
 ]

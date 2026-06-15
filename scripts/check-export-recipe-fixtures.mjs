@@ -9,13 +9,22 @@ const invalidFixturePath = 'fixtures/export/invalid-export-recipes.json';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
-const validRecipes = parseExportRecipes(await readJson(validFixturePath));
+const rawValidRecipes = await readJson(validFixturePath);
+const validRecipes = parseExportRecipes(rawValidRecipes);
 const invalidCases = await readJson(invalidFixturePath);
 
 const failures = [];
 const ids = new Set();
 
-for (const recipe of validRecipes) {
+for (const [index, recipe] of validRecipes.entries()) {
+  const rawRecipe = rawValidRecipes[index];
+  if (!recipe.colorProfile) {
+    failures.push(`${recipe.id} must declare colorProfile`);
+  }
+  if (!rawRecipe || typeof rawRecipe.colorProfile !== 'string') {
+    failures.push(`${recipe.id} fixture must explicitly declare colorProfile`);
+  }
+
   if (ids.has(recipe.id)) {
     failures.push(`Duplicate export recipe id: ${recipe.id}`);
   }
