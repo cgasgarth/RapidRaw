@@ -69,6 +69,9 @@ export enum DetailsAdjustment {
   Structure = 'structure',
   Centré = 'centré',
   ColorNoiseReduction = 'colorNoiseReduction',
+  DeblurEnabled = 'deblurEnabled',
+  DeblurSigmaPx = 'deblurSigmaPx',
+  DeblurStrength = 'deblurStrength',
   LumaNoiseReduction = 'lumaNoiseReduction',
   Sharpness = 'sharpness',
   SharpnessThreshold = 'sharpnessThreshold',
@@ -171,6 +174,9 @@ export interface Adjustments {
   parametricCurve?: ParametricCurve;
   curveMode?: 'point' | 'parametric';
   crop: Crop | null;
+  deblurEnabled: boolean;
+  deblurSigmaPx: number;
+  deblurStrength: number;
   dehaze: number;
   exposure: number;
   flipHorizontal: boolean;
@@ -498,6 +504,9 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   pointCurves: getDefaultCurves(),
   parametricCurve: getDefaultParametricCurve(),
   curveMode: 'point',
+  deblurEnabled: false,
+  deblurSigmaPx: 0.8,
+  deblurStrength: 0,
   dehaze: 0,
   exposure: 0,
   flipHorizontal: false,
@@ -690,6 +699,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
       ? deepCloneParametric(loadedAdjustments.parametricCurve)
       : getDefaultParametricCurve(),
     curveMode: loadedAdjustments.curveMode ?? 'point',
+    deblurEnabled: loadedAdjustments.deblurEnabled ?? INITIAL_ADJUSTMENTS.deblurEnabled,
+    deblurSigmaPx: loadedAdjustments.deblurSigmaPx ?? INITIAL_ADJUSTMENTS.deblurSigmaPx,
+    deblurStrength: loadedAdjustments.deblurStrength ?? INITIAL_ADJUSTMENTS.deblurStrength,
     masks: normalizedMasks,
     aiPatches: normalizedAiPatches,
     sectionVisibility: {
@@ -751,6 +763,10 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     {
       label: 'modals.copyPaste.groups.noiseReduction',
       keys: [DetailsAdjustment.LumaNoiseReduction, DetailsAdjustment.ColorNoiseReduction],
+    },
+    {
+      label: 'modals.copyPaste.groups.deblur',
+      keys: [DetailsAdjustment.DeblurEnabled, DetailsAdjustment.DeblurStrength, DetailsAdjustment.DeblurSigmaPx],
     },
     {
       label: 'modals.copyPaste.groups.chromaticAberration',

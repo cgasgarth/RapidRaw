@@ -1059,6 +1059,185 @@ export const editGraphMutationResultV1Schema = z
   })
   .strict();
 
+export const detailDeblurPsfV1Schema = z.enum(['gaussian']);
+
+export const detailDeblurControlsV1Schema = z
+  .object({
+    enabled: z.boolean(),
+    psf: detailDeblurPsfV1Schema,
+    sigmaPx: z.number().min(0.45).max(1.35),
+    strength: z.number().min(0).max(1),
+  })
+  .strict();
+
+export const detailDeblurUiControlsV1Schema = z
+  .object({
+    deblurEnabled: z.boolean(),
+    deblurSigmaPx: z.number().min(0.45).max(1.35),
+    deblurStrength: z.number().int().min(0).max(100),
+  })
+  .strict();
+
+export const toDetailDeblurControlsV1 = (
+  controls: z.infer<typeof detailDeblurUiControlsV1Schema>,
+): z.infer<typeof detailDeblurControlsV1Schema> => ({
+  enabled: controls.deblurEnabled,
+  psf: 'gaussian',
+  sigmaPx: controls.deblurSigmaPx,
+  strength: controls.deblurEnabled ? controls.deblurStrength / 100 : 0,
+});
+
+export const detailDeblurSkipReasonV1Schema = z.enum([
+  'disabled',
+  'unsupported_psf',
+  'sigma_out_of_range',
+  'noise_too_high',
+  'saturated_edge_risk',
+  'invalid_dimensions',
+  'memory_budget_exceeded',
+  'non_finite_input',
+  'preview_not_wired',
+  'export_not_wired',
+  'cpu_reference_unavailable',
+]);
+
+export const detailDeblurRuntimeStatusV1Schema = z.enum([
+  'contract_only',
+  'ui_api_wired',
+  'cpu_reference_only',
+  'preview_export_not_wired',
+  'applied_preview',
+  'applied_export',
+  'preview_export_parity',
+  'skipped',
+  'blocked',
+]);
+
+export const detailDeblurApplyStatusV1Schema = z.enum([
+  'not_requested',
+  'not_executed',
+  'applied',
+  'skipped',
+  'blocked',
+]);
+
+export const detailDeblurLimitationV1Schema = z.enum([
+  'preview_export_parity',
+  'real_raw_quality',
+  'gpu_parity',
+  'e2e_workflow',
+  'runtime_image_change',
+]);
+
+export const detailDeblurRuntimeStateV1Schema = z
+  .object({
+    applyStatus: detailDeblurApplyStatusV1Schema,
+    doesNotProve: z.array(detailDeblurLimitationV1Schema),
+    effectiveControls: detailDeblurControlsV1Schema,
+    orderedAfter: z.literal('scene_linear_denoise'),
+    orderedBefore: z.literal('capture_sharpen'),
+    runtimeStatus: detailDeblurRuntimeStatusV1Schema,
+    skipReason: detailDeblurSkipReasonV1Schema.optional(),
+    stage: z.literal('scene_linear_post_denoise'),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+  .superRefine((state, context) => {
+    if ((state.applyStatus === 'skipped' || state.applyStatus === 'blocked') && state.skipReason === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Skipped or blocked deblur results require a skipReason.',
+        path: ['skipReason'],
+      });
+    }
+
+    if (state.runtimeStatus === 'ui_api_wired' && !state.doesNotProve.includes('preview_export_parity')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'UI/API-only deblur status must not imply preview/export parity.',
+        path: ['doesNotProve'],
+      });
+    }
+  });
+
+export const detailDeblurCommandTypeV1Schema = z.enum(['detailDeblur.dryRunControls', 'detailDeblur.applyControls']);
+
+const detailDeblurCommandBaseV1Schema = z.object({
+  actor: rawEngineActorSchema,
+  approval: approvalRequirementSchema,
+  commandId: z.string().trim().min(1),
+  correlationId: z.string().trim().min(1),
+  dryRun: z.boolean(),
+  expectedGraphRevision: z.string().trim().min(1),
+  idempotencyKey: z.string().trim().min(1).optional(),
+  schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'virtual_copy']) }).strict(),
+});
+
+export const detailDeblurCommandEnvelopeV1Schema = z
+  .discriminatedUnion('commandType', [
+    detailDeblurCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('detailDeblur.dryRunControls'),
+        dryRun: z.literal(true),
+        parameters: detailDeblurControlsV1Schema,
+      })
+      .strict(),
+    detailDeblurCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('detailDeblur.applyControls'),
+        dryRun: z.literal(false),
+        parameters: detailDeblurControlsV1Schema,
+      })
+      .strict(),
+  ])
+  .superRefine((command, context) => {
+    if (command.dryRun) {
+      if (command.approval.approvalClass !== ApprovalClass.PreviewOnly) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Dry-run deblur commands require preview-only approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+
+      return;
+    }
+
+    if (command.approval.approvalClass !== ApprovalClass.EditApply) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied deblur commands require edit-apply approval classification.',
+        path: ['approval', 'approvalClass'],
+      });
+    }
+
+    if (command.approval.state !== 'approved') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Applied deblur commands require approved user approval before execution.',
+        path: ['approval', 'state'],
+      });
+    }
+  });
+
+export const detailDeblurDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('detailDeblur.dryRunControls'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(true),
+    mutates: z.literal(false),
+    parameterDiff: z.array(editGraphParameterDiffV1Schema),
+    predictedGraphRevision: z.string().trim().min(1),
+    previewArtifacts: z.array(artifactHandleV1Schema).length(0),
+    runtime: detailDeblurRuntimeStateV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sourceGraphRevision: z.string().trim().min(1),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const toneColorCommandTypeV1Schema = z.enum([
   'toneColor.setBasicTone',
   'toneColor.setToneCurve',
@@ -8612,6 +8791,17 @@ export type EditGraphParameterDiffV1 = z.infer<typeof editGraphParameterDiffV1Sc
 export type EditGraphParameterPatchOperationV1 = z.infer<typeof editGraphParameterPatchOperationV1Schema>;
 export type EditGraphSnapshotQueryV1 = z.infer<typeof editGraphSnapshotQueryV1Schema>;
 export type EditGraphSnapshotV1 = z.infer<typeof editGraphSnapshotV1Schema>;
+export type DetailDeblurApplyStatusV1 = z.infer<typeof detailDeblurApplyStatusV1Schema>;
+export type DetailDeblurCommandEnvelopeV1 = z.infer<typeof detailDeblurCommandEnvelopeV1Schema>;
+export type DetailDeblurCommandTypeV1 = z.infer<typeof detailDeblurCommandTypeV1Schema>;
+export type DetailDeblurControlsV1 = z.infer<typeof detailDeblurControlsV1Schema>;
+export type DetailDeblurDryRunResultV1 = z.infer<typeof detailDeblurDryRunResultV1Schema>;
+export type DetailDeblurLimitationV1 = z.infer<typeof detailDeblurLimitationV1Schema>;
+export type DetailDeblurPsfV1 = z.infer<typeof detailDeblurPsfV1Schema>;
+export type DetailDeblurRuntimeStateV1 = z.infer<typeof detailDeblurRuntimeStateV1Schema>;
+export type DetailDeblurRuntimeStatusV1 = z.infer<typeof detailDeblurRuntimeStatusV1Schema>;
+export type DetailDeblurSkipReasonV1 = z.infer<typeof detailDeblurSkipReasonV1Schema>;
+export type DetailDeblurUiControlsV1 = z.infer<typeof detailDeblurUiControlsV1Schema>;
 export type ExportApplyResultV1 = z.infer<typeof exportApplyResultV1Schema>;
 export type ExportColorSpaceV1 = z.infer<typeof exportColorSpaceV1Schema>;
 export type ExportCommandEnvelopeV1 = z.infer<typeof exportCommandEnvelopeV1Schema>;

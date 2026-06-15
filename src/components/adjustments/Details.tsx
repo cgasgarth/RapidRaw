@@ -5,6 +5,7 @@ import { TextVariants } from '../../types/typography';
 import { Adjustments, DetailsAdjustment } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
 import Slider from '../ui/Slider';
+import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
 
 interface DetailsPanelProps {
@@ -39,10 +40,64 @@ export default function DetailsPanel({
     setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: numericValue }));
   };
 
+  const handleFloatAdjustmentChange = (key: string, value: number | string) => {
+    const numericValue = parseFloat(String(value));
+    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: numericValue }));
+  };
+
+  const handleBooleanAdjustmentChange = (key: string, value: boolean) => {
+    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: value }));
+  };
+
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
 
   return (
     <div className="space-y-4">
+      {!isForMask && adjustmentVisibility['deblur'] !== false && (
+        <div className="p-2 bg-bg-tertiary rounded-md">
+          <UiText variant={TextVariants.heading} className="mb-2">
+            {t('adjustments.details.deblur')}
+          </UiText>
+          <Switch
+            checked={adjustments.deblurEnabled}
+            label={t('adjustments.details.enableDeblur')}
+            onChange={(checked) => {
+              handleBooleanAdjustmentChange(DetailsAdjustment.DeblurEnabled, checked);
+            }}
+          />
+          <Slider
+            label={t('adjustments.details.amount')}
+            max={100}
+            min={0}
+            onChange={(e: SliderChangeEvent) => {
+              handleAdjustmentChange(DetailsAdjustment.DeblurStrength, e.target.value);
+            }}
+            step={1}
+            value={adjustments.deblurStrength}
+            onDragStateChange={onDragStateChange}
+            disabled={!adjustments.deblurEnabled}
+            fillOrigin="min"
+          />
+          <Slider
+            label={t('adjustments.details.blurRadius')}
+            max={1.35}
+            min={0.45}
+            onChange={(e: SliderChangeEvent) => {
+              handleFloatAdjustmentChange(DetailsAdjustment.DeblurSigmaPx, e.target.value);
+            }}
+            step={0.05}
+            value={adjustments.deblurSigmaPx}
+            onDragStateChange={onDragStateChange}
+            disabled={!adjustments.deblurEnabled}
+            defaultValue={0.8}
+            suffix=" px"
+          />
+          <UiText variant={TextVariants.small} className="mt-2 text-text-secondary">
+            {t('adjustments.details.deblurStatus')}
+          </UiText>
+        </div>
+      )}
+
       {adjustmentVisibility['sharpening'] !== false && (
         <div className="p-2 bg-bg-tertiary rounded-md">
           <UiText variant={TextVariants.heading} className="mb-2">
