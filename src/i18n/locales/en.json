@@ -1169,6 +1169,7 @@
         "clarityDehaze": "Clarity & Dehaze",
         "colorCalibration": "Color Calibration",
         "colorGrading": "Color Grading",
+        "colorGradingPresets": "Color Grading Presets",
         "colorMixer": "Color Mixer",
         "cropAspectRatio": "Crop & Aspect Ratio",
         "curves": "Curves",

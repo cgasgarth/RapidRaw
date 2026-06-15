@@ -1217,6 +1217,7 @@
         "clarityDehaze": "Przejrzystość i Usuwanie mgły",
         "colorCalibration": "Kalibracja kolorów",
         "colorGrading": "Gradacja kolorów",
+        "colorGradingPresets": "Presety gradacji kolorów",
         "colorMixer": "Mikser kolorów",
         "cropAspectRatio": "Kadrowanie i Proporcje",
         "curves": "Krzywe",

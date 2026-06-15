@@ -45,6 +45,7 @@ const CHECK_GROUPS = {
     'check:ai-fallbacks',
     'check:color-abi',
     'check:black-white-mixer',
+    'check:color-grading-presets',
     'check:camera-profile-lookup',
     'check:colorchecker-fixtures',
     'check:color-style-presets',
