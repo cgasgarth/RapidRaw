@@ -124,6 +124,45 @@ jobs:
       - name: Check edit command bus
         run: bun run schema:command-bus
 
+  schema-contract-gate:
+    name: 'schemas: path-gated contract suite'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Collect changed files
+        id: schema-contract-files
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            gh api \
+              "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" \
+              --paginate \
+              --jq '.[] | @json' > .schema-contract-files.ndjson
+            echo "args=--pull-files-ndjson .schema-contract-files.ndjson" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            gh api \
+              "repos/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}" \
+              --jq '.files[] | @json' > .schema-contract-files.ndjson
+            echo "args=--pull-files-ndjson .schema-contract-files.ndjson" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "args=" >> "$GITHUB_OUTPUT"
+
+      - name: Run schema contract checks when relevant
+        run: bun run schema:contract-gate -- ${{ steps.schema-contract-files.outputs.args }}
+
   frontend-lint-escapes:
     name: 'frontend: lint escape hatch policy'
     runs-on: ubuntu-latest
@@ -345,6 +384,7 @@ jobs:
       - generated-type-drift
       - schema-check
       - schema-command-bus
+      - schema-contract-gate
       - frontend-lint-escapes
       - docs-check
       - rust-fmt
