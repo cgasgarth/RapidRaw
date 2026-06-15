@@ -4706,6 +4706,33 @@ Issues:
   each step should name whether it is research-only, schema-only,
   validation-only, dry-run/app-server-capable, runtime apply-capable, or
   real-image-proven.
+- Denoise/deblur consult sequence, 2026-06-14:
+  - Accepted: implement denoise before deblur runtime because deblur metrics are
+    contaminated by noise amplification.
+  - Accepted: start with deterministic contracts and fixtures, then CPU
+    reference kernels, then preview/export parity, then UI/API wiring, then E2E
+    or equivalent workflow proof.
+  - Accepted: first credible denoise should separate luma/chroma noise in a
+    scene-linear post-demosaic path before any raw-domain or AI denoise claims.
+  - Accepted: first credible deblur should be constrained deconvolution with
+    synthetic PSF fixtures, ringing/halo metrics, and conservative strength
+    limits before lens-profile or AI deblur claims.
+  - Accepted: GPU/Metal implementations must follow CPU references with
+    explicit tolerances; no GPU-only detail feature PRs.
+  - Deferred: AI denoise/deblur as the first runtime path, raw-domain
+    CFA-aware denoise, exact lens deconvolution, model weights, and broad
+    generative enhancement claims.
+  - Required gates to add over iterations: `check:denoise-fixtures`,
+    `check:denoise-cpu-reference`, `check:denoise-preview-runtime`,
+    `check:denoise-preview-export-parity`, `check:denoise-e2e`,
+    `check:deblur-fixtures`, `check:deblur-cpu-reference`,
+    `check:deblur-ringing`, `check:deblur-preview-runtime`,
+    `check:deblur-preview-export-parity`, `check:deblur-e2e`,
+    `check:detail-stage-order`, `check:detail-artifacts`, and
+    `check:detail-performance-macos`.
+  - Partial states must stay explicit: contracts, schemas, metrics, CPU
+    references, preview-only runtime, export parity, UI/API wiring, and E2E
+    proof are separate closure states.
 - Add high ISO fixture set. Initial manifest entries separate project-generated
   public-CI placeholders from real-photo private-review placeholders until
   payload rights, hashes, and thresholds are supplied.
@@ -4718,6 +4745,9 @@ Definition of done:
 
 - Detail controls are strong enough for real RAW finishing.
 - Changes are tested on high ISO, fine texture, and edge fixtures.
+- Denoise/deblur feature issues are not complete until the same parameters
+  affect preview and export, artifacts are generated, objective metrics pass,
+  recipe/API state persists, and E2E or equivalent workflow proof exists.
 - Performance remains interactive for common files.
 
 ### Milestone 9: Film Simulation Lab
