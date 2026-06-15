@@ -136,9 +136,9 @@ export function useAiMasking() {
       if (!patchId) return;
 
       setEditor({ isGeneratingAi: true });
-      setAdjustments((prev: Partial<Adjustments>) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
-        aiPatches: prev.aiPatches?.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: true } : p)),
+        aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: true } : p)),
       }));
 
       try {
@@ -187,9 +187,9 @@ export function useAiMasking() {
         const newPatchData = parseAiPatchDataJson(newPatchDataJson);
         patchesSentToBackend.delete(patchId);
 
-        setAdjustments((prev: Partial<Adjustments>) => ({
+        setAdjustments((prev: Adjustments) => ({
           ...prev,
-          aiPatches: prev.aiPatches?.map((p: AiPatch) =>
+          aiPatches: prev.aiPatches.map((p: AiPatch) =>
             p.id === patchId
               ? {
                   ...p,
@@ -205,9 +205,9 @@ export function useAiMasking() {
         setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
       } catch (err) {
         toast.error(`Quick Erase Failed: ${err instanceof Error ? err.message : String(err)}`);
-        setAdjustments((prev: Partial<Adjustments>) => ({
+        setAdjustments((prev: Adjustments) => ({
           ...prev,
-          aiPatches: prev.aiPatches?.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
+          aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
         }));
       } finally {
         setEditor({ isGeneratingAi: false });

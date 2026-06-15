@@ -23,7 +23,7 @@ interface ToneMapperSwitchProps {
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
-type AdjustmentUpdate = Partial<Adjustments> | ((prev: Partial<Adjustments>) => Partial<Adjustments>);
+type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 
 type SliderChangeEvent =
   | ChangeEvent<HTMLInputElement>
@@ -188,11 +188,11 @@ export default function BasicAdjustments({
 
   const handleAdjustmentChange = (key: BasicAdjustment, value: number | string) => {
     const numericValue = parseFloat(String(value));
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: numericValue }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: numericValue }));
   };
 
   const handleToneMapperChange = (mapper: string) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       toneMapper: mapper as 'basic' | 'agx',
     }));

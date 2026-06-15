@@ -21,7 +21,7 @@ interface EffectsPanelProps {
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
-type AdjustmentUpdate = Partial<Adjustments> | ((prev: Partial<Adjustments>) => Partial<Adjustments>);
+type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 
 type PresetExportItem = { preset: Preset };
 
@@ -57,15 +57,15 @@ export default function EffectsPanel({
 
   const handleAdjustmentChange = (key: string, value: number | string) => {
     const numericValue = parseInt(String(value), 10);
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: numericValue }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: numericValue }));
   };
 
   const handleLutIntensityChange = (intensity: number) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, lutIntensity: intensity }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, lutIntensity: intensity }));
   };
 
   const handleLutClear = () => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       lutPath: null,
       lutName: null,
@@ -76,7 +76,7 @@ export default function EffectsPanel({
   };
 
   const handleFilmLookApply = (look: FilmLookBrowserItem) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       ...look.adjustmentPatch,
     }));

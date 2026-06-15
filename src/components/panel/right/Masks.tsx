@@ -17,6 +17,8 @@ import {
 
 import type { LucideIcon } from 'lucide-react';
 
+export type SubMaskParameters = Record<string, unknown>;
+
 export enum Mask {
   AiDepth = 'ai-depth',
   AiForeground = 'ai-foreground',
@@ -60,8 +62,7 @@ export interface SubMask {
   mode: SubMaskMode;
   name?: string;
   opacity: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy mask tools use a dynamic parameter bag; type per-mask shapes when ImageCanvas and mask controls are tightened together.
-  parameters?: any;
+  parameters?: SubMaskParameters;
   type: Mask;
   visible: boolean;
 }

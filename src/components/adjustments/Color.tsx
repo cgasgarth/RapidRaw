@@ -41,7 +41,7 @@ interface ColorPanelProps {
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
-type AdjustmentUpdate = Partial<Adjustments> | ((prev: Partial<Adjustments>) => Partial<Adjustments>);
+type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 
 type SliderChangeEvent =
   | ChangeEvent<HTMLInputElement>
@@ -160,7 +160,7 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
   const colorGrading = adjustments.colorGrading;
 
   const handleApplyPreset = (preset: (typeof COLOR_GRADING_PRESETS)[number]) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       colorGrading: {
         balance: preset.balance,
@@ -174,20 +174,20 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
   };
 
   const handleChange = (grading: ColorGrading, newValue: HueSatLum) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       colorGrading: {
-        ...(prev.colorGrading || INITIAL_ADJUSTMENTS.colorGrading),
+        ...prev.colorGrading,
         [grading]: newValue,
       },
     }));
   };
 
   const handleGlobalChange = (grading: ColorGrading, value: number | string) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       colorGrading: {
-        ...(prev.colorGrading || INITIAL_ADJUSTMENTS.colorGrading),
+        ...prev.colorGrading,
         [grading]: parseFloat(String(value)),
       },
     }));
@@ -395,10 +395,10 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
   );
 
   const handleShadowsChange = (value: number | string) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       colorCalibration: {
-        ...(prev.colorCalibration || INITIAL_ADJUSTMENTS.colorCalibration),
+        ...prev.colorCalibration,
         shadowsTint: parseFloat(String(value)),
       },
     }));
@@ -406,10 +406,10 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
 
   const handlePrimaryChange = (key: 'Hue' | 'Saturation', value: number | string) => {
     const fullKey = `${activePrimary}${key}` as keyof ColorCalibration;
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       colorCalibration: {
-        ...(prev.colorCalibration || INITIAL_ADJUSTMENTS.colorCalibration),
+        ...prev.colorCalibration,
         [fullKey]: parseFloat(String(value)),
       },
     }));
@@ -596,16 +596,16 @@ export default function ColorPanel({
   }, [effectiveHue, currentHsl.saturation, activeColor]);
 
   const handleGlobalChange = (key: ColorAdjustment, value: number | string) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: parseFloat(String(value)) }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: parseFloat(String(value)) }));
   };
 
   const handleHslChange = (key: ColorAdjustment, value: number | string) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       hsl: {
-        ...(prev.hsl || {}),
+        ...prev.hsl,
         [activeColor]: {
-          ...(prev.hsl?.[activeColor] || {}),
+          ...prev.hsl[activeColor],
           [key]: parseFloat(String(value)),
         },
       },
@@ -613,8 +613,8 @@ export default function ColorPanel({
   };
 
   const handleBlackWhiteToggle = () => {
-    setAdjustments((prev: Partial<Adjustments>) => {
-      const current = prev.blackWhiteMixer || INITIAL_ADJUSTMENTS.blackWhiteMixer;
+    setAdjustments((prev: Adjustments) => {
+      const current = prev.blackWhiteMixer;
 
       return {
         ...prev,
@@ -627,8 +627,8 @@ export default function ColorPanel({
   };
 
   const handleBlackWhiteWeightChange = (value: number | string) => {
-    setAdjustments((prev: Partial<Adjustments>) => {
-      const current = prev.blackWhiteMixer || INITIAL_ADJUSTMENTS.blackWhiteMixer;
+    setAdjustments((prev: Adjustments) => {
+      const current = prev.blackWhiteMixer;
 
       return {
         ...prev,
@@ -644,8 +644,8 @@ export default function ColorPanel({
   };
 
   const handleColorBalanceToggle = () => {
-    setAdjustments((prev: Partial<Adjustments>) => {
-      const current = prev.colorBalanceRgb || INITIAL_ADJUSTMENTS.colorBalanceRgb;
+    setAdjustments((prev: Adjustments) => {
+      const current = prev.colorBalanceRgb;
 
       return {
         ...prev,
@@ -658,8 +658,8 @@ export default function ColorPanel({
   };
 
   const handleColorBalancePreserveLuminance = () => {
-    setAdjustments((prev: Partial<Adjustments>) => {
-      const current = prev.colorBalanceRgb || INITIAL_ADJUSTMENTS.colorBalanceRgb;
+    setAdjustments((prev: Adjustments) => {
+      const current = prev.colorBalanceRgb;
 
       return {
         ...prev,
@@ -672,8 +672,8 @@ export default function ColorPanel({
   };
 
   const handleColorBalanceChange = (channel: ColorBalanceRgbChannel, value: number | string) => {
-    setAdjustments((prev: Partial<Adjustments>) => {
-      const current = prev.colorBalanceRgb || INITIAL_ADJUSTMENTS.colorBalanceRgb;
+    setAdjustments((prev: Adjustments) => {
+      const current = prev.colorBalanceRgb;
 
       return {
         ...prev,
@@ -689,8 +689,8 @@ export default function ColorPanel({
   };
 
   const handleChannelMixerToggle = () => {
-    setAdjustments((prev: Partial<Adjustments>) => {
-      const current = prev.channelMixer || INITIAL_ADJUSTMENTS.channelMixer;
+    setAdjustments((prev: Adjustments) => {
+      const current = prev.channelMixer;
 
       return {
         ...prev,
@@ -703,8 +703,8 @@ export default function ColorPanel({
   };
 
   const handleChannelMixerPreserveLuminance = () => {
-    setAdjustments((prev: Partial<Adjustments>) => {
-      const current = prev.channelMixer || INITIAL_ADJUSTMENTS.channelMixer;
+    setAdjustments((prev: Adjustments) => {
+      const current = prev.channelMixer;
 
       return {
         ...prev,
@@ -717,8 +717,8 @@ export default function ColorPanel({
   };
 
   const handleChannelMixerChange = (source: ChannelMixerSource, value: number | string) => {
-    setAdjustments((prev: Partial<Adjustments>) => {
-      const current = prev.channelMixer || INITIAL_ADJUSTMENTS.channelMixer;
+    setAdjustments((prev: Adjustments) => {
+      const current = prev.channelMixer;
 
       return {
         ...prev,
@@ -734,14 +734,14 @@ export default function ColorPanel({
   };
 
   const handleCameraProfileChange = (cameraProfile: CameraProfileId) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       cameraProfile,
     }));
   };
 
   const handleToneCurveChange = (toneCurve: ToneCurveId) => {
-    setAdjustments((prev: Partial<Adjustments>) => {
+    setAdjustments((prev: Adjustments) => {
       const currentParametricCurve =
         prev.parametricCurve || INITIAL_ADJUSTMENTS.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
 

@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useContextMenu } from '../../context/ContextMenuContext';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { ActiveChannel, Adjustments, Coord, MaskAdjustments, ParametricCurveSettings } from '../../utils/adjustments';
+import { ActiveChannel, Adjustments, Coord, ParametricCurveSettings } from '../../utils/adjustments';
 import { Theme, OPTION_SEPARATOR } from '../ui/AppProperties';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
@@ -22,8 +22,7 @@ import UiText from '../ui/Text';
 let curveClipboard: Array<Coord> | null = null;
 let parametricClipboard: ParametricCurveSettings | null = null;
 
-type CurveAdjustmentState = Adjustments | MaskAdjustments;
-type CurveAdjustmentUpdater = (prev: CurveAdjustmentState) => CurveAdjustmentState;
+type CurveAdjustmentUpdater = (prev: Adjustments) => Adjustments;
 type PointerInputEvent = globalThis.MouseEvent | TouchEvent | ReactMouseEvent | ReactTouchEvent;
 type SliderChangeEvent = ChangeEvent<HTMLInputElement> | { target: { value: number | string } };
 
@@ -43,7 +42,7 @@ interface ColorData {
 }
 
 interface CurveGraphProps {
-  adjustments: Adjustments | MaskAdjustments;
+  adjustments: Adjustments;
   histogram: ChannelConfig | null;
   isForMask?: boolean;
   setAdjustments: (updater: CurveAdjustmentUpdater) => void;
@@ -390,7 +389,7 @@ export default function CurveGraph({
     if (newMode === curveMode) return;
     setCurveMode(newMode);
 
-    setAdjustments((prev: CurveAdjustmentState) => {
+    setAdjustments((prev: Adjustments) => {
       if (newMode === 'parametric') {
         const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
         return {
@@ -417,7 +416,7 @@ export default function CurveGraph({
 
   const updateParametricValue = useCallback(
     (key: keyof ParametricCurveSettings, value: number) => {
-      setAdjustments((prev: CurveAdjustmentState) => {
+      setAdjustments((prev: Adjustments) => {
         const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
         const updatedSettings = { ...pC[activeChannel], [key]: value };
         const newPoints = buildParametricPoints(updatedSettings);
@@ -542,7 +541,7 @@ export default function CurveGraph({
         localPointsRef.current = newPoints;
         setLocalPoints(newPoints);
 
-        setAdjustments((prev: CurveAdjustmentState) => ({
+        setAdjustments((prev: Adjustments) => ({
           ...prev,
           curves: { ...prev.curves, [activeChannelRef.current]: newPoints },
         }));
@@ -627,7 +626,7 @@ export default function CurveGraph({
       const newPoints = activePoints.filter((_, i) => i !== index);
       setLocalPoints(newPoints);
       localPointsRef.current = newPoints;
-      setAdjustments((prev: CurveAdjustmentState) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: newPoints },
       }));
@@ -653,7 +652,7 @@ export default function CurveGraph({
 
     setLocalPoints(newPoints);
     localPointsRef.current = newPoints;
-    setAdjustments((prev: CurveAdjustmentState) => ({
+    setAdjustments((prev: Adjustments) => ({
       ...prev,
       curves: { ...prev.curves, [activeChannel]: newPoints },
     }));
@@ -664,7 +663,7 @@ export default function CurveGraph({
   const handleDoubleClick = () => {
     if (isParametricMode) {
       const defaultSettings = { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS };
-      setAdjustments((prev: CurveAdjustmentState) => {
+      setAdjustments((prev: Adjustments) => {
         const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
         return {
           ...prev,
@@ -678,7 +677,7 @@ export default function CurveGraph({
         { x: 255, y: 255 },
       ];
       setLocalPoints(defaultPoints);
-      setAdjustments((prev: CurveAdjustmentState) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: defaultPoints },
       }));
@@ -701,7 +700,7 @@ export default function CurveGraph({
       const handlePasteParametric = () => {
         if (!parametricClipboard) return;
         const clipboard = parametricClipboard;
-        setAdjustments((prev: CurveAdjustmentState) => {
+        setAdjustments((prev: Adjustments) => {
           const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
           return {
             ...prev,
@@ -712,7 +711,7 @@ export default function CurveGraph({
       };
 
       const handleResetParametric = () => {
-        setAdjustments((prev: CurveAdjustmentState) => {
+        setAdjustments((prev: Adjustments) => {
           const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
           return {
             ...prev,
@@ -728,7 +727,7 @@ export default function CurveGraph({
       const handleResetAllParametric = () => {
         setLocalParametricSettings(null);
         localParametricSettingsRef.current = null;
-        setAdjustments((prev: CurveAdjustmentState) => {
+        setAdjustments((prev: Adjustments) => {
           return {
             ...prev,
             parametricCurve: {
@@ -795,7 +794,7 @@ export default function CurveGraph({
       const newPoints = curveClipboard.map((p) => ({ ...p }));
       setLocalPoints(newPoints);
       localPointsRef.current = newPoints;
-      setAdjustments((prev: CurveAdjustmentState) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: newPoints },
       }));
@@ -806,7 +805,7 @@ export default function CurveGraph({
       const newPoints = convertParametricToPoints(parametricClipboard);
       setLocalPoints(newPoints);
       localPointsRef.current = newPoints;
-      setAdjustments((prev: CurveAdjustmentState) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: newPoints },
       }));
@@ -819,7 +818,7 @@ export default function CurveGraph({
       ];
       setLocalPoints(defaultPoints);
       localPointsRef.current = defaultPoints;
-      setAdjustments((prev: CurveAdjustmentState) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: defaultPoints },
       }));
@@ -832,7 +831,7 @@ export default function CurveGraph({
       ];
       setLocalPoints(defaultPoints);
       localPointsRef.current = defaultPoints;
-      setAdjustments((prev: CurveAdjustmentState) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
         curves: {
           [ActiveChannel.Luma]: [...defaultPoints],
