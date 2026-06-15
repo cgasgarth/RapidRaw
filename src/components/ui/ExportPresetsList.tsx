@@ -1,5 +1,5 @@
-import { Plus, Trash2, Save, X, Check } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Check, CheckCircle, Plus, Save, Trash2, TriangleAlert, X } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,6 +8,7 @@ import Dropdown from './Dropdown';
 import { ExportPreset } from './ExportImportProperties';
 import UiText from './Text';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { buildExportRecipeUiRows } from '../../schemas/exportRecipeUiSchemas';
 import { TextVariants } from '../../types/typography';
 
 interface ExportPresetsListProps {
@@ -29,7 +30,8 @@ export default function ExportPresetsList({
   const [selectedPresetId, setSelectedPresetId] = useState<string>('');
   const [isSaved, setIsSaved] = useState(false);
   const newPresetInputRef = useRef<HTMLInputElement>(null);
-  const presets = appSettings?.exportPresets || [];
+  const presets = useMemo(() => appSettings?.exportPresets ?? [], [appSettings?.exportPresets]);
+  const recipeRows = useMemo(() => buildExportRecipeUiRows(presets), [presets]);
 
   useManagedFocus(newPresetInputRef, isCreating);
 
@@ -181,6 +183,50 @@ export default function ExportPresetsList({
           >
             <X size={18} />
           </button>
+        </div>
+      )}
+
+      {recipeRows.length > 0 && (
+        <div className="mt-3 grid gap-2">
+          {recipeRows.map((row) => (
+            <button
+              className={`rounded-md border p-3 text-left transition-colors ${
+                selectedPresetId === row.id
+                  ? 'border-accent bg-accent/10'
+                  : 'border-surface bg-bg-primary hover:bg-card-active'
+              }`}
+              key={row.id}
+              onClick={() => {
+                handleSelect(row.id);
+              }}
+              type="button"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <UiText as="div" variant={TextVariants.label} className="truncate">
+                    {row.label}
+                  </UiText>
+                  <UiText as="div" variant={TextVariants.small} className="mt-1 text-text-secondary">
+                    {row.subtitle}
+                  </UiText>
+                </div>
+                {row.isValidRecipe ? (
+                  <CheckCircle className="h-4 w-4 shrink-0 text-green-400" />
+                ) : (
+                  <TriangleAlert className="h-4 w-4 shrink-0 text-yellow-400" />
+                )}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1">
+                <span className="rounded bg-surface px-2 py-0.5 text-xs text-text-secondary">{row.resizeLabel}</span>
+                <span className="rounded bg-surface px-2 py-0.5 text-xs text-text-secondary">{row.metadataLabel}</span>
+                {row.isBuiltIn && (
+                  <span className="rounded bg-accent/15 px-2 py-0.5 text-xs text-accent">
+                    {t('ui.exportPresets.builtIn')}
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
         </div>
       )}
     </div>

@@ -2034,6 +2034,7 @@
       "saturationAbbreviation": "S:"
     },
     "exportPresets": {
+      "builtIn": "Built-in",
       "deleteTooltip": "Delete preset",
       "heading": "Export Presets",
       "overwriteTooltip": "Overwrite selected preset",

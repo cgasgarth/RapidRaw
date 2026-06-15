@@ -1918,6 +1918,7 @@
       "saturationAbbreviation": "S:"
     },
     "exportPresets": {
+      "builtIn": "Built-in",
       "deleteTooltip": "Elimina predefinito",
       "heading": "Predefiniti di Esportazione",
       "overwriteTooltip": "Sovrascrivi predefinito selezionato",

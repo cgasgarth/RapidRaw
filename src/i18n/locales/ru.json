@@ -1917,6 +1917,7 @@
       "saturationAbbreviation": "Нас:"
     },
     "exportPresets": {
+      "builtIn": "Built-in",
       "deleteTooltip": "Удалить пресет",
       "heading": "Пресеты экспорта",
       "overwriteTooltip": "Перезаписать выбранный пресет",

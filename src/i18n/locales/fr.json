@@ -1918,6 +1918,7 @@
       "saturationAbbreviation": "S :"
     },
     "exportPresets": {
+      "builtIn": "Built-in",
       "deleteTooltip": "Supprimer le paramètre prédéfini",
       "heading": "Paramètres d'exportation",
       "overwriteTooltip": "Écraser le paramètre sélectionné",
