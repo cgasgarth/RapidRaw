@@ -14,6 +14,7 @@ const CHECK_GROUPS = {
     'check:export-recipes-ui',
     'check:import-presets',
     'check:library-sessions',
+    'check:library-session-ui',
     'check:export-queue',
     'check:smart-albums',
     'check:metadata-templates',

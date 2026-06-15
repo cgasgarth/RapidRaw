@@ -11,13 +11,17 @@ import {
   RefreshCw,
   Settings,
   Search,
+  Star,
   Users,
   SlidersHorizontal,
 } from 'lucide-react';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import LibraryGrid from './library/LibraryGrid';
+import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 import SettingsPanel from './SettingsPanel';
+import { buildLibrarySessionUiCard } from '../../schemas/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
@@ -35,8 +39,6 @@ import {
 import Button from '../ui/Button';
 import { ImportState, Status } from '../ui/ExportImportProperties';
 import UiText from '../ui/Text';
-import LibraryGrid from './library/LibraryGrid';
-import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 
 interface MainLibraryProps {
   activePath: string | null;
@@ -172,6 +174,26 @@ export default function MainLibrary(props: MainLibraryProps) {
     props.isLoading ||
     (props.thumbnailProgress.total > 0 && props.thumbnailProgress.current < props.thumbnailProgress.total);
   const importProgress = props.importState.progress;
+  const sessionCard = useMemo(
+    () =>
+      buildLibrarySessionUiCard({
+        assetCount: props.imageList.length,
+        exportRecipeCount:
+          props.appSettings?.exportPresets?.filter((preset) => preset.id !== '__last_used__').length ?? 0,
+        folderPath: props.currentFolderPath,
+        id: 'current-library-session',
+        name: props.currentFolderPath?.split('/').pop() || t('library.splash.continueSession'),
+        selectedCount: props.multiSelectedPaths.length,
+        stage: props.multiSelectedPaths.length > 0 ? 'cull' : 'edit',
+      }),
+    [
+      props.appSettings?.exportPresets,
+      props.currentFolderPath,
+      props.imageList.length,
+      props.multiSelectedPaths.length,
+      t,
+    ],
+  );
 
   useEffect(() => {
     let timer: number | undefined;
@@ -525,6 +547,33 @@ export default function MainLibrary(props: MainLibraryProps) {
           </Button>
         </div>
       </header>
+
+      <section className="border-b border-surface bg-bg-primary/45 px-4 py-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2 rounded-md border border-surface bg-bg-secondary px-3 py-2">
+            <Star className="h-4 w-4 shrink-0 text-accent" />
+            <div className="min-w-0">
+              <UiText as="div" variant={TextVariants.label} className="truncate">
+                {sessionCard.name}
+              </UiText>
+              <UiText as="div" variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+                {sessionCard.folderLabel}
+              </UiText>
+            </div>
+          </div>
+          {[sessionCard.assetLabel, sessionCard.selectedLabel, sessionCard.recipeLabel].map((label) => (
+            <UiText
+              as="span"
+              key={label}
+              variant={TextVariants.small}
+              color={TextColors.secondary}
+              className="rounded bg-surface px-2 py-1"
+            >
+              {label}
+            </UiText>
+          ))}
+        </div>
+      </section>
 
       {props.imageList.length > 0 ? (
         <LibraryGrid {...props} thumbnailSizeOptions={translatedThumbnailSizeOptions} />

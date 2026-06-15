@@ -63,6 +63,7 @@
     "check:export-recipes": "bun scripts/check-export-recipe-fixtures.mjs",
     "check:import-presets": "bun scripts/check-import-preset-fixtures.mjs",
     "check:library-sessions": "bun scripts/check-library-session-fixtures.mjs",
+    "check:library-session-ui": "bun scripts/check-library-session-ui.mjs",
     "check:export-queue": "bun scripts/check-export-queue-fixtures.mjs",
     "check:smart-albums": "bun scripts/check-smart-album-fixtures.mjs",
     "check:metadata-templates": "bun scripts/check-metadata-template-fixtures.mjs",
