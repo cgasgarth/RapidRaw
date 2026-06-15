@@ -47,6 +47,10 @@
           "path": "docs/api/mask-refinement-command-2026-06-15.md"
         },
         {
+          "title": "Edit command bus",
+          "path": "docs/api/edit-command-bus-2026-06-15.md"
+        },
+        {
           "title": "RawEngine schema package",
           "path": "docs/api/rawengine-schema-package-2026-06-13.md"
         },
