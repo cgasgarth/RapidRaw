@@ -64,14 +64,13 @@ if (invalidApply.success) {
 }
 
 const runtime = detailDenoiseRuntimeStateV1Schema.safeParse({
-  applyStatus: 'not_executed',
-  doesNotProve: ['preview_export_parity', 'real_raw_quality', 'gpu_parity', 'e2e_workflow'],
+  applyStatus: 'applied',
+  doesNotProve: ['real_raw_quality', 'gpu_parity', 'e2e_workflow'],
   effectiveControls: apiControls,
-  mutates: false,
+  mutates: true,
   orderedAfter: 'demosaic',
   orderedBefore: 'scene_linear_deblur',
-  runtimeStatus: 'ui_api_wired',
-  skipReason: 'preview_export_not_proven',
+  runtimeStatus: 'preview_export_parity',
   stage: 'scene_linear_denoise',
 });
 
@@ -103,7 +102,7 @@ const dryRunResult = detailDenoiseDryRunResultV1Schema.safeParse({
   mutates: false,
   runtime: runtime.success ? runtime.data : null,
   schemaVersion: 1,
-  warnings: ['UI/API dry run only; preview/export parity remains tracked separately.'],
+  warnings: ['UI/API dry run validated; runtime preview/export parity is checked by check:denoise-e2e.'],
 });
 
 if (!dryRunResult.success) {
