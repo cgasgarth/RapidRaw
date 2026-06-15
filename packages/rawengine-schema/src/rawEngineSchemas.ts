@@ -1848,6 +1848,16 @@ export const layerMaskRangeSelectionV1Schema = z.discriminatedUnion('rangeKind',
     }),
 ]);
 
+export const layerMaskRefinementParametersV1Schema = z
+  .object({
+    density: z.number().min(0).max(1),
+    edgeContrast: z.number().min(0).max(1),
+    edgeShiftPx: z.number().min(-512).max(512),
+    featherPx: z.number().min(0).max(4096),
+    smoothness: z.number().min(0).max(1),
+  })
+  .strict();
+
 const layerMaskCommandBaseV1Schema = z.object({
   actor: rawEngineActorSchema,
   approval: approvalRequirementSchema,
@@ -1987,10 +1997,8 @@ export const layerMaskCommandEnvelopeV1Schema = z
         commandType: z.literal('layerMask.refineMask'),
         parameters: z
           .object({
-            density: z.number().min(0).max(1),
-            edgeAware: z.boolean(),
-            featherPx: z.number().min(0).max(500),
             maskId: z.string().trim().min(1),
+            refinement: layerMaskRefinementParametersV1Schema,
           })
           .strict(),
       })
@@ -9152,6 +9160,7 @@ export type LayerMaskCommandEnvelopeV1 = z.infer<typeof layerMaskCommandEnvelope
 export type LayerMaskCommandTypeV1 = z.infer<typeof layerMaskCommandTypeV1Schema>;
 export type LayerMaskDryRunResultV1 = z.infer<typeof layerMaskDryRunResultV1Schema>;
 export type LayerMaskGradientV1 = z.infer<typeof layerMaskGradientV1Schema>;
+export type LayerMaskRefinementParametersV1 = z.infer<typeof layerMaskRefinementParametersV1Schema>;
 export type LayerMaskMutationResultV1 = z.infer<typeof layerMaskMutationResultV1Schema>;
 export type LayerMaskParameterDiffV1 = z.infer<typeof layerMaskParameterDiffV1Schema>;
 export type LayerMaskPointV1 = z.infer<typeof layerMaskPointV1Schema>;

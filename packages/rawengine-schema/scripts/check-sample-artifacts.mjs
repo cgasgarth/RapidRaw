@@ -130,6 +130,7 @@ import {
   sampleLayerMaskCommandEnvelopeV1,
   sampleLayerMaskDryRunResultV1,
   sampleLayerMaskMutationResultV1,
+  sampleLayerMaskRefineCommandEnvelopeV1,
   sampleNegativeAcquisitionProfileV1,
   sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabApplyPlanRequestV1,
@@ -388,6 +389,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/layer-mask-command-envelope-v1.json',
     schema: layerMaskCommandEnvelopeV1Schema,
     value: sampleLayerMaskCommandEnvelopeV1,
+  },
+  {
+    name: 'layer mask refine command envelope',
+    path: 'packages/rawengine-schema/samples/layer-mask-refine-command-envelope-v1.json',
+    schema: layerMaskCommandEnvelopeV1Schema,
+    value: sampleLayerMaskRefineCommandEnvelopeV1,
   },
   {
     name: 'layer mask dry-run result',

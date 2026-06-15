@@ -130,6 +130,7 @@ import {
   sampleLayerMaskCommandEnvelopeV1,
   sampleLayerMaskDryRunResultV1,
   sampleLayerMaskMutationResultV1,
+  sampleLayerMaskRefineCommandEnvelopeV1,
   sampleNegativeAcquisitionProfileV1,
   sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabApplyPlanRequestV1,
@@ -371,6 +372,11 @@ const validSamples: ReadonlyArray<{
     name: 'layer mask apply command envelope',
     schema: layerMaskCommandEnvelopeV1Schema,
     value: sampleLayerMaskApplyCommandEnvelopeV1,
+  },
+  {
+    name: 'layer mask refine command envelope',
+    schema: layerMaskCommandEnvelopeV1Schema,
+    value: sampleLayerMaskRefineCommandEnvelopeV1,
   },
   {
     name: 'layer mask dry-run result',
@@ -1293,6 +1299,20 @@ expectInvalid('layer mask combine command with repeated source masks', layerMask
     combineMode: 'add',
     maskName: 'Combined Portrait',
     sourceMaskIds: ['mask_subject', 'mask_subject'],
+  },
+});
+
+expectInvalid('layer mask refine command with out-of-range edge shift', layerMaskCommandEnvelopeV1Schema, {
+  ...sampleLayerMaskRefineCommandEnvelopeV1,
+  parameters: {
+    ...sampleLayerMaskRefineCommandEnvelopeV1.parameters,
+    refinement: {
+      density: 0.8,
+      edgeContrast: 0.3,
+      edgeShiftPx: 900,
+      featherPx: 8,
+      smoothness: 0.2,
+    },
   },
 });
 

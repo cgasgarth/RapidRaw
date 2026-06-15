@@ -1,0 +1,33 @@
+{
+  "actor": {
+    "id": "codex-app-server",
+    "kind": "agent",
+    "sessionId": "session_layer_mask_sample"
+  },
+  "approval": {
+    "approvalClass": "preview_only",
+    "reason": "Previewing a brush mask computes a non-mutating matte and edit graph diff before apply.",
+    "state": "not_required"
+  },
+  "commandId": "command_layer_mask_refine_preview_sample",
+  "correlationId": "corr_layer_mask_refine_preview_sample",
+  "dryRun": true,
+  "expectedGraphRevision": "graph_rev_44",
+  "idempotencyKey": "idem_layer_mask_refine_preview_sample",
+  "schemaVersion": 1,
+  "target": {
+    "imagePath": "/photos/session/IMG_0001.CR3",
+    "kind": "image"
+  },
+  "commandType": "layerMask.refineMask",
+  "parameters": {
+    "maskId": "mask_brush_portrait",
+    "refinement": {
+      "density": 0.82,
+      "edgeContrast": 0.35,
+      "edgeShiftPx": 3,
+      "featherPx": 8,
+      "smoothness": 0.2
+    }
+  }
+}
