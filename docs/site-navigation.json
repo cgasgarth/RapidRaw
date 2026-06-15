@@ -127,6 +127,10 @@
           "path": "docs/layers/mask-refinement-runtime-2026-06-15.md"
         },
         {
+          "title": "Mask refinement controls",
+          "path": "docs/layers/mask-refinement-controls-2026-06-15.md"
+        },
+        {
           "title": "Selective color mask contract",
           "path": "docs/color/selective-color-mask-contract-2026-06-14.md"
         },

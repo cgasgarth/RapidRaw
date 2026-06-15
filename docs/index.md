@@ -46,6 +46,7 @@ generator before the release workflow needs one.
 - [AI mask capability audit](layers/ai-mask-capability-audit-2026-06-15.md)
 - [Mask overlay runtime modes](layers/mask-overlay-runtime-2026-06-15.md)
 - [Mask refinement runtime](layers/mask-refinement-runtime-2026-06-15.md)
+- [Mask refinement controls](layers/mask-refinement-controls-2026-06-15.md)
 - [Selective color mask contract](color/selective-color-mask-contract-2026-06-14.md)
 - [DeltaE harness](color/deltae-harness-2026-06-14.md)
 - [Color CPU/GPU parity fixtures](color/color-cpu-gpu-parity-2026-06-14.md)

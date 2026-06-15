@@ -3985,6 +3985,11 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(refine): add feather density and edge refine`
   - Docs: `docs/layers/mask-refinement-runtime-2026-06-15.md`
   - Validation: `scripts/check-mask-refinement-parameters.mjs`
+- 2026-06-15: Added runtime-backed mask refinement controls to the masks panel.
+  - Issue: #1245
+  - Docs: `docs/layers/mask-refinement-controls-2026-06-15.md`
+  - Validation: `scripts/check-mask-refinement-controls.mjs`
+  - Status: UI-to-runtime plumbing; real-image quality tuning remains a follow-up.
   - Runtime status: feather, density, edge shift, smoothness, and edge contrast schemas plus refined weight evaluation are fixture-validated and wired into the Rust mask renderer; user-facing controls remain future work.
 - `masks(overlay): add mask overlay modes`
   - Docs: `docs/layers/mask-overlay-runtime-2026-06-15.md`

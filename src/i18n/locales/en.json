@@ -668,6 +668,15 @@
         "maskName_one": "Mask {{count}}",
         "maskName_other": "Mask {{count}}"
       },
+      "refinement": {
+        "density": "Density",
+        "edgeContrast": "Edge Contrast",
+        "edgeShiftPx": "Edge Shift",
+        "featherPx": "Feather",
+        "reset": "Reset",
+        "smoothness": "Smoothness",
+        "title": "Refinement"
+      },
       "resetMaskingTooltip": "Reset Masking",
       "settings": {
         "aiModelDownloading": "AI Model Downloading: ",

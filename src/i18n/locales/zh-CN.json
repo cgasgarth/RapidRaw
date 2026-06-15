@@ -668,6 +668,15 @@
         "maskName_one": "蒙版 {{count}}",
         "maskName_other": "蒙版 {{count}}"
       },
+      "refinement": {
+        "density": "Density",
+        "edgeContrast": "Edge Contrast",
+        "edgeShiftPx": "Edge Shift",
+        "featherPx": "Feather",
+        "reset": "Reset",
+        "smoothness": "Smoothness",
+        "title": "Refinement"
+      },
       "resetMaskingTooltip": "重置蒙版",
       "settings": {
         "aiModelDownloading": "AI 模型下载中：",
