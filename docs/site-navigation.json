@@ -508,6 +508,10 @@
           "path": "docs/tooling/dependency-version-audit-2026-06-13.md"
         },
         {
+          "title": "Unused code gate evaluation",
+          "path": "docs/tooling/unused-code-gate-2026-06-15.md"
+        },
+        {
           "title": "Rust required feature policy",
           "path": "docs/tooling/rust-required-feature-policy-2026-06-13.md"
         },

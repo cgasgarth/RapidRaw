@@ -141,6 +141,7 @@ generator before the release workflow needs one.
 - [Bun package manager support](tooling/bun-package-manager-support-2026-06-10.md)
 - [Major dependency migration process](tooling/major-dependency-migration-process-2026-06-13.md)
 - [Dependency version audit](tooling/dependency-version-audit-2026-06-13.md)
+- [Unused code gate evaluation](tooling/unused-code-gate-2026-06-15.md)
 - [Rust required feature policy](tooling/rust-required-feature-policy-2026-06-13.md)
 - [Rust feature matrix](tooling/rust-feature-matrix-2026-06-15.md)
 - [Rust clippy pedantic and nursery evaluation](tooling/rust-clippy-pedantic-nursery-evaluation-2026-06-15.md)
