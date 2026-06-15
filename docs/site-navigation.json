@@ -115,6 +115,10 @@
           "path": "docs/layers/mask-copy-paste-runtime-2026-06-15.md"
         },
         {
+          "title": "AI mask capability audit",
+          "path": "docs/layers/ai-mask-capability-audit-2026-06-15.md"
+        },
+        {
           "title": "Selective color mask contract",
           "path": "docs/color/selective-color-mask-contract-2026-06-14.md"
         },
