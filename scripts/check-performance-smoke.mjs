@@ -68,6 +68,13 @@ const smokeChecks = z.array(SmokeCheckSchema).parse([
     summary: 'Built-in film look fixture fingerprint check',
   },
   {
+    args: ['run', 'check:hdr-fixtures'],
+    budgetMs: 5_000,
+    command: 'bun',
+    id: 'hdr-fixtures',
+    summary: 'Synthetic HDR bracket fixture validation',
+  },
+  {
     args: ['run', 'schema:samples'],
     budgetMs: 10_000,
     command: 'bun',
