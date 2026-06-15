@@ -10,6 +10,11 @@ const i18next = require('eslint-plugin-i18next');
 
 const tsFiles = ['**/*.{ts,tsx,mts}'];
 const reactRefreshFiles = ['**/*.{tsx,jsx}'];
+const publicApiSignatureFiles = [
+  'packages/rawengine-schema/src/**/*.ts',
+  'src/schemas/**/*.ts',
+  'src/utils/tauriSchemaInvoke.ts',
+];
 
 const jsRecommendedForTs = {
   ...js.configs.recommended,
@@ -272,6 +277,20 @@ module.exports = [
             'fill',
             'viewBox',
           ],
+        },
+      ],
+    },
+  },
+  {
+    files: publicApiSignatureFiles,
+    rules: {
+      '@typescript-eslint/typedef': [
+        'error',
+        {
+          memberVariableDeclaration: true,
+          parameter: true,
+          propertyDeclaration: true,
+          variableDeclaration: false,
         },
       ],
     },

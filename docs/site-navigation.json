@@ -456,6 +456,10 @@
           "path": "docs/tooling/type-only-import-rules-2026-06-15.md"
         },
         {
+          "title": "Public API signature rules",
+          "path": "docs/tooling/public-api-signature-rules-2026-06-15.md"
+        },
+        {
           "title": "Unsafe cast AST guard",
           "path": "docs/tooling/unsafe-cast-ast-guard-2026-06-15.md"
         },

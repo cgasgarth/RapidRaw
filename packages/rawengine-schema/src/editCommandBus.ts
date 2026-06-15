@@ -35,7 +35,7 @@ interface RegisteredEditCommandHandler {
 }
 
 export class EditCommandBus {
-  readonly #handlers = new Map<string, RegisteredEditCommandHandler>();
+  readonly #handlers: Map<string, RegisteredEditCommandHandler> = new Map<string, RegisteredEditCommandHandler>();
 
   listCommandTypes(): Array<string> {
     return [...this.#handlers.keys()].sort();
