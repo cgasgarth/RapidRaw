@@ -6,16 +6,19 @@ import { useTranslation } from 'react-i18next';
 import { type BlackWhiteMixerChannel } from '../../schemas/blackWhiteMixerSchemas';
 import { type ChannelMixerOutput, type ChannelMixerSource } from '../../schemas/channelMixerSchemas';
 import { type ColorBalanceRgbChannel, type ColorBalanceRgbRange } from '../../schemas/colorBalanceRgbSchemas';
+import { type CameraProfileId, type ToneCurveId } from '../../schemas/profileToneSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
   Adjustments,
   ColorAdjustment,
   ColorCalibration,
   ColorGrading,
+  DEFAULT_PARAMETRIC_CURVE,
   HueSatLum,
   INITIAL_ADJUSTMENTS,
 } from '../../utils/adjustments';
 import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
+import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
 import { AppSettings } from '../ui/AppProperties';
 import ColorWheel from '../ui/ColorWheel';
@@ -49,6 +52,26 @@ type SliderChangeEvent =
     };
 
 const formatPercent = (value: number) => `${String(value)}%`;
+const CAMERA_PROFILE_IDS = [
+  'camera_standard',
+  'camera_neutral',
+  'camera_portrait',
+  'camera_landscape',
+  'linear_raw',
+] satisfies Array<CameraProfileId>;
+const TONE_CURVE_IDS = [
+  'auto_filmic',
+  'linear',
+  'soft_contrast',
+  'high_contrast',
+  'shadow_lift',
+] satisfies Array<ToneCurveId>;
+
+const parseCameraProfileId = (value: string): CameraProfileId =>
+  CAMERA_PROFILE_IDS.find((cameraProfile) => cameraProfile === value) ?? 'camera_standard';
+
+const parseToneCurveId = (value: string): ToneCurveId =>
+  TONE_CURVE_IDS.find((toneCurve) => toneCurve === value) ?? 'auto_filmic';
 
 interface ColorSwatchProps<T extends string> {
   color: string;
@@ -532,7 +555,28 @@ export default function ColorPanel({
       ] satisfies Array<{ key: ChannelMixerSource; label: string }>,
     [t],
   );
-
+  const cameraProfileOptions = useMemo(
+    () =>
+      [
+        { key: 'camera_standard', label: t('adjustments.color.profileTone.cameraProfiles.camera_standard') },
+        { key: 'camera_neutral', label: t('adjustments.color.profileTone.cameraProfiles.camera_neutral') },
+        { key: 'camera_portrait', label: t('adjustments.color.profileTone.cameraProfiles.camera_portrait') },
+        { key: 'camera_landscape', label: t('adjustments.color.profileTone.cameraProfiles.camera_landscape') },
+        { key: 'linear_raw', label: t('adjustments.color.profileTone.cameraProfiles.linear_raw') },
+      ] satisfies Array<{ key: CameraProfileId; label: string }>,
+    [t],
+  );
+  const toneCurveOptions = useMemo(
+    () =>
+      [
+        { key: 'auto_filmic', label: t('adjustments.color.profileTone.toneCurves.auto_filmic') },
+        { key: 'linear', label: t('adjustments.color.profileTone.toneCurves.linear') },
+        { key: 'soft_contrast', label: t('adjustments.color.profileTone.toneCurves.soft_contrast') },
+        { key: 'high_contrast', label: t('adjustments.color.profileTone.toneCurves.high_contrast') },
+        { key: 'shadow_lift', label: t('adjustments.color.profileTone.toneCurves.shadow_lift') },
+      ] satisfies Array<{ key: ToneCurveId; label: string }>,
+    [t],
+  );
   const currentHsl = adjustments.hsl[activeColor];
   const blackWhiteMixer = adjustments.blackWhiteMixer;
   const currentBlackWhiteWeight = blackWhiteMixer.weights[activeColor];
@@ -689,12 +733,86 @@ export default function ColorPanel({
     });
   };
 
+  const handleCameraProfileChange = (cameraProfile: CameraProfileId) => {
+    setAdjustments((prev: Partial<Adjustments>) => ({
+      ...prev,
+      cameraProfile,
+    }));
+  };
+
+  const handleToneCurveChange = (toneCurve: ToneCurveId) => {
+    setAdjustments((prev: Partial<Adjustments>) => {
+      const currentParametricCurve =
+        prev.parametricCurve || INITIAL_ADJUSTMENTS.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
+
+      return {
+        ...prev,
+        curveMode: 'parametric',
+        parametricCurve: {
+          ...currentParametricCurve,
+          luma: { ...TONE_CURVE_PARAMETRIC_PRESETS[toneCurve] },
+        },
+        toneCurve,
+      };
+    });
+  };
+
   const hue_slider = `hue-slider-${activeColor}`;
   const saturation_slider = `sat-slider-${activeColor}`;
   const luminance_slider = `lum-slider-${activeColor}`;
 
   return (
     <div className="space-y-4">
+      {!isForMask &&
+        (adjustmentVisibility[ColorAdjustment.CameraProfile] !== false ||
+          adjustmentVisibility[ColorAdjustment.ToneCurve] !== false) && (
+          <div className="p-2 bg-bg-tertiary rounded-md">
+            <UiText variant={TextVariants.heading} className="mb-3">
+              {t('adjustments.color.profileTone.title')}
+            </UiText>
+            {adjustmentVisibility[ColorAdjustment.CameraProfile] !== false && (
+              <div className="mb-3">
+                <UiText variant={TextVariants.label} color={TextColors.secondary} className="mb-2 block">
+                  {t('adjustments.color.profileTone.cameraProfile')}
+                </UiText>
+                <select
+                  className="w-full rounded bg-bg-secondary px-2 py-1 text-xs text-text-primary"
+                  onChange={(event) => {
+                    handleCameraProfileChange(parseCameraProfileId(event.target.value));
+                  }}
+                  value={adjustments.cameraProfile}
+                >
+                  {cameraProfileOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {adjustmentVisibility[ColorAdjustment.ToneCurve] !== false && (
+              <div>
+                <UiText variant={TextVariants.label} color={TextColors.secondary} className="mb-2 block">
+                  {t('adjustments.color.profileTone.toneCurve')}
+                </UiText>
+                <select
+                  className="w-full rounded bg-bg-secondary px-2 py-1 text-xs text-text-primary"
+                  onChange={(event) => {
+                    handleToneCurveChange(parseToneCurveId(event.target.value));
+                  }}
+                  value={adjustments.toneCurve}
+                >
+                  {toneCurveOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+
       <div className="p-2 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
           <UiText variant={TextVariants.heading}>{t('adjustments.color.whiteBalance')}</UiText>

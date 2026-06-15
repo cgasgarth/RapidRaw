@@ -50,6 +50,7 @@ const CHECK_GROUPS = {
     'check:color-balance-rgb',
     'check:channel-mixer',
     'check:color-grading-presets',
+    'check:profile-tone',
     'check:camera-profile-lookup',
     'check:colorchecker-fixtures',
     'check:color-style-presets',

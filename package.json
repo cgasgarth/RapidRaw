@@ -30,6 +30,7 @@
     "check:color-balance-rgb": "bun scripts/check-color-balance-rgb.mjs",
     "check:channel-mixer": "bun scripts/check-channel-mixer.mjs",
     "check:color-grading-presets": "bun scripts/check-color-grading-presets.mjs",
+    "check:profile-tone": "bun scripts/check-profile-tone.mjs",
     "check:camera-profile-lookup": "bun scripts/check-camera-profile-lookup-fixtures.mjs",
     "check:colorchecker-fixtures": "bun scripts/check-colorchecker-fixtures.mjs",
     "check:color-style-presets": "bun scripts/check-color-style-presets.mjs",

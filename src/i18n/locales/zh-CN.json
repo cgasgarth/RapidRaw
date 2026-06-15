@@ -95,6 +95,25 @@
         "yellows": "黄色"
       },
       "presence": "质感",
+      "profileTone": {
+        "cameraProfile": "相机配置",
+        "cameraProfiles": {
+          "camera_landscape": "风景",
+          "camera_neutral": "中性",
+          "camera_portrait": "人像",
+          "camera_standard": "标准",
+          "linear_raw": "线性 RAW"
+        },
+        "title": "配置与色调",
+        "toneCurve": "色调曲线",
+        "toneCurves": {
+          "auto_filmic": "自动胶片感",
+          "high_contrast": "高对比",
+          "linear": "线性",
+          "shadow_lift": "提升阴影",
+          "soft_contrast": "柔和对比"
+        }
+      },
       "saturation": "饱和度",
       "temperature": "色温",
       "tint": "色调",
@@ -1216,6 +1235,7 @@
         "masks": "蒙版",
         "noiseReduction": "降噪",
         "presence": "质感",
+        "profileTone": "配置与色调",
         "sharpness": "锐度",
         "tone": "色调",
         "transformRotation": "变换与旋转",
