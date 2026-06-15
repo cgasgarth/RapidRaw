@@ -26,6 +26,7 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
+import { normalizeMaskOverlaySettings } from '../../utils/maskOverlayModes';
 import { toMaskParameterRecord } from '../../utils/maskParameterAccess';
 import { Panel, TransformState, Invokes } from '../ui/AppProperties';
 
@@ -1118,6 +1119,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         cropOffset,
         height: Math.round(renderSize.height),
         maskDef: strippedMaskDef,
+        overlaySettings: normalizeMaskOverlaySettings(),
         scale: renderSize.scale,
         width: Math.round(renderSize.width),
         jsAdjustments: strippedAdjustments,

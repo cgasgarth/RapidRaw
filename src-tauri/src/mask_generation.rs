@@ -58,6 +58,87 @@ pub struct MaskDefinition {
     pub sub_masks: Vec<SubMask>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(crate = "serde")]
+#[serde(rename_all = "camelCase")]
+pub enum MaskOverlayMode {
+    Hidden,
+    Rubylith,
+    Green,
+    Blue,
+    White,
+    Black,
+    Grayscale,
+    Inverse,
+    Edges,
+}
+
+fn default_overlay_mode() -> MaskOverlayMode {
+    MaskOverlayMode::Rubylith
+}
+
+fn default_overlay_opacity() -> f32 {
+    0.5
+}
+
+fn default_overlay_edge_threshold() -> f32 {
+    0.5
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
+#[serde(crate = "serde")]
+#[serde(rename_all = "camelCase")]
+pub struct MaskOverlaySettings {
+    #[serde(default = "default_overlay_edge_threshold")]
+    pub edge_threshold: f32,
+    #[serde(default = "default_overlay_mode")]
+    pub mode: MaskOverlayMode,
+    #[serde(default = "default_overlay_opacity")]
+    pub opacity: f32,
+}
+
+impl Default for MaskOverlaySettings {
+    fn default() -> Self {
+        Self {
+            edge_threshold: default_overlay_edge_threshold(),
+            mode: default_overlay_mode(),
+            opacity: default_overlay_opacity(),
+        }
+    }
+}
+
+fn mask_overlay_pixel(intensity: u8, settings: MaskOverlaySettings) -> Rgba<u8> {
+    let weight = (intensity as f32 / 255.0).clamp(0.0, 1.0);
+    let opacity = settings.opacity.clamp(0.0, 1.0);
+    let alpha_from_weight = (255.0 * opacity * weight) as u8;
+
+    match settings.mode {
+        MaskOverlayMode::Hidden => Rgba([0, 0, 0, 0]),
+        MaskOverlayMode::Rubylith => Rgba([255, 24, 48, alpha_from_weight]),
+        MaskOverlayMode::Green => Rgba([32, 224, 72, alpha_from_weight]),
+        MaskOverlayMode::Blue => Rgba([32, 112, 255, alpha_from_weight]),
+        MaskOverlayMode::White => Rgba([255, 255, 255, alpha_from_weight]),
+        MaskOverlayMode::Black => Rgba([0, 0, 0, alpha_from_weight]),
+        MaskOverlayMode::Grayscale => {
+            let channel = (255.0 * weight).round() as u8;
+            Rgba([channel, channel, channel, (255.0 * opacity) as u8])
+        }
+        MaskOverlayMode::Inverse => {
+            let channel = (255.0 * (1.0 - weight)).round() as u8;
+            Rgba([channel, channel, channel, (255.0 * opacity) as u8])
+        }
+        MaskOverlayMode::Edges => {
+            let edge_threshold = settings.edge_threshold.clamp(0.0, 1.0);
+            let edge_alpha = if (weight - edge_threshold).abs() <= 0.05 {
+                (255.0 * opacity) as u8
+            } else {
+                0
+            };
+            Rgba([255, 255, 255, edge_alpha])
+        }
+    }
+}
+
 impl MaskDefinition {
     pub fn requires_warped_image(&self) -> bool {
         self.sub_masks
@@ -1394,6 +1475,7 @@ pub fn generate_mask_overlay(
     height: u32,
     scale: f32,
     crop_offset: (f32, f32),
+    overlay_settings: Option<MaskOverlaySettings>,
     mut js_adjustments: Option<serde_json::Value>,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
@@ -1423,11 +1505,10 @@ pub fn generate_mask_overlay(
         scaled_crop_offset,
         warped_image.as_deref(),
     ) {
+        let settings = overlay_settings.unwrap_or_default();
         let mut rgba_mask = RgbaImage::new(width, height);
         for (x, y, pixel) in gray_mask.enumerate_pixels() {
-            let intensity = pixel[0];
-            let alpha = (intensity as f32 * 0.5) as u8;
-            rgba_mask.put_pixel(x, y, Rgba([255, 0, 0, alpha]));
+            rgba_mask.put_pixel(x, y, mask_overlay_pixel(pixel[0], settings));
         }
 
         let mut buf = Cursor::new(Vec::new());
@@ -1508,4 +1589,67 @@ pub fn get_cached_or_generate_mask(
     }
 
     generated
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mask_overlay_pixel_preserves_default_rubylith_contract() {
+        assert_eq!(
+            mask_overlay_pixel(128, MaskOverlaySettings::default()),
+            Rgba([255, 24, 48, 64])
+        );
+    }
+
+    #[test]
+    fn mask_overlay_pixel_supports_hidden_grayscale_inverse_and_edges() {
+        assert_eq!(
+            mask_overlay_pixel(
+                255,
+                MaskOverlaySettings {
+                    mode: MaskOverlayMode::Hidden,
+                    ..MaskOverlaySettings::default()
+                },
+            ),
+            Rgba([0, 0, 0, 0])
+        );
+
+        assert_eq!(
+            mask_overlay_pixel(
+                128,
+                MaskOverlaySettings {
+                    mode: MaskOverlayMode::Grayscale,
+                    opacity: 0.75,
+                    ..MaskOverlaySettings::default()
+                },
+            ),
+            Rgba([128, 128, 128, 191])
+        );
+
+        assert_eq!(
+            mask_overlay_pixel(
+                64,
+                MaskOverlaySettings {
+                    mode: MaskOverlayMode::Inverse,
+                    opacity: 0.4,
+                    ..MaskOverlaySettings::default()
+                },
+            ),
+            Rgba([191, 191, 191, 102])
+        );
+
+        assert_eq!(
+            mask_overlay_pixel(
+                153,
+                MaskOverlaySettings {
+                    edge_threshold: 0.6,
+                    mode: MaskOverlayMode::Edges,
+                    opacity: 1.0,
+                },
+            ),
+            Rgba([255, 255, 255, 255])
+        );
+    }
 }
