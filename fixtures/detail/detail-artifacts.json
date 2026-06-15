@@ -38,6 +38,17 @@
       "sourceIssue": 1172
     },
     {
+      "artifactId": "detail.denoise.workflow-preview.v1",
+      "capabilityState": "e2e_proven",
+      "feature": "denoise",
+      "hash": null,
+      "kind": "preview_artifact",
+      "limitations": ["real_raw_quality", "gpu_parity"],
+      "path": "src-tauri/target/rawengine-denoise-workflow-preview.png",
+      "publicRepoAllowed": true,
+      "sourceIssue": 1177
+    },
+    {
       "artifactId": "detail.deblur.psf-placeholder.v1",
       "capabilityState": "validation_only",
       "feature": "deblur",
