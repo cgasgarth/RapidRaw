@@ -371,6 +371,10 @@
           "path": "docs/baseline/rapidraw-image-pipeline-baseline-2026-06-13.md"
         },
         {
+          "title": "Layer and mask model audit",
+          "path": "docs/baseline/rapidraw-layer-mask-model-audit-2026-06-15.md"
+        },
+        {
           "title": "AI hooks baseline",
           "path": "docs/baseline/rapidraw-ai-hooks-baseline-2026-06-11.md"
         },

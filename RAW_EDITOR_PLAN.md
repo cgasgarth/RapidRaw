@@ -3827,6 +3827,9 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `audit(sidecar): document current sidecar format`
 - `audit(gpu): document current GPU and shader pipeline`
 - `audit(layers): document current layer and mask model`
+  - Docs: `docs/baseline/rapidraw-layer-mask-model-audit-2026-06-15.md`
+  - Validation: `scripts/check-layer-mask-model-audit.mjs`
+  - Runtime status: audit only; current mask-container layer model and graph-native gaps are documented.
 - `audit(ai): document current AI and generative hooks`
 - `validation(sidecar): add sidecar roundtrip tests`
 - `validation(history): add edit history replay tests`
