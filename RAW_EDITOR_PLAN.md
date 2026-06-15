@@ -3985,6 +3985,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Validation: `scripts/check-mask-copy-paste.mjs`
   - Runtime status: masks panel context menus expose copy/paste/paste-adjustments and helper fixtures validate clone, insert, invert, rename, and reset-adjustment behavior; typed command/API routing remains future work.
 - `masks(ai): audit subject sky background masks`
+  - Docs: `docs/layers/ai-mask-capability-audit-2026-06-15.md`
+  - Validation: `scripts/check-ai-mask-capabilities.mjs`
   - Runtime status: subject, sky, foreground, depth, and derived background capability coverage is schema-backed, fixture-validated, and checked against frontend invoke commands plus Rust command/render branches; runtime quality benchmarking remains future work.
 - `masks(ai): research people and parts masks`
   - Consult: 2026-06-14 RapidRaw Pro Extended consultation recommended a staged path: schema contract, deterministic fake provider, render/apply plumbing, dry-run UI, then macOS whole-person runtime before fine portrait parts.

@@ -43,6 +43,7 @@ generator before the release workflow needs one.
 - [Skin-tone uniformity](color/skin-tone-uniformity-2026-06-14.md)
 - [Layer workflow model](layers/layer-workflow-model-2026-06-14.md)
 - [Mask copy paste runtime evidence](layers/mask-copy-paste-runtime-2026-06-15.md)
+- [AI mask capability audit](layers/ai-mask-capability-audit-2026-06-15.md)
 - [Selective color mask contract](color/selective-color-mask-contract-2026-06-14.md)
 - [DeltaE harness](color/deltae-harness-2026-06-14.md)
 - [Color CPU/GPU parity fixtures](color/color-cpu-gpu-parity-2026-06-14.md)
