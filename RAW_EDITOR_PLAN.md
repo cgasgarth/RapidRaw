@@ -4743,6 +4743,11 @@ Issues:
     synthetic and private-placeholder coverage for denoise metrics, but does
     not prove runtime denoise quality, preview/export parity, real RAW quality,
     or E2E workflow behavior.
+- Add detail stage-order and artifact gates.
+  - Runtime status: validation-only. This proves detail stage ordering and
+    artifact completion-state bookkeeping, but does not prove denoise/deblur
+    preview/export parity, real RAW quality, UI/API wiring, or E2E workflow
+    behavior.
 - Add defringe improvements.
 - Add dust spot visualization.
 - Add AI denoise research issue.
