@@ -12,9 +12,13 @@ auditable.
 - Include a descriptive `-- reason` explaining the temporary boundary.
 - Remove stale disables; ESLint reports unused disable directives as errors.
 
+The repository check scans parsed comment tokens, not raw source lines, so
+strings and ordinary code text cannot satisfy or trip the policy.
+
 ## Validation
 
 ```sh
+bun scripts/check-eslint-escape-hatches.mjs --self-test
 bun run check:lint-escapes
 ```
 
