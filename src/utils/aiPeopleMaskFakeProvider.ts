@@ -35,8 +35,8 @@ const containsPoint = (rect: NormalizedRect, x: number, y: number): boolean =>
 const rowsToCoverage = (rows: Array<string>): number => {
   const filledPixels = rows.reduce((total, row) => {
     let rowFilledPixels = 0;
-    for (let index = 0; index < row.length; index += 1) {
-      if (row[index] === '#') {
+    for (const cell of row) {
+      if (cell === '#') {
         rowFilledPixels += 1;
       }
     }

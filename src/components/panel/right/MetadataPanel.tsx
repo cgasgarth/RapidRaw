@@ -56,7 +56,7 @@ function formatExifTag(str: string) {
 
 function parseDms(dmsString: string) {
   if (!dmsString) return null;
-  const parts = dmsString.match(/(\d+\.?\d*)\s+deg\s+(\d+\.?\d*)\s+min\s+(\d+\.?\d*)\s+sec/);
+  const parts = /(\d+\.?\d*)\s+deg\s+(\d+\.?\d*)\s+min\s+(\d+\.?\d*)\s+sec/.exec(dmsString);
   if (!parts) return null;
   const degrees = parseFloat(parts[1] ?? '0');
   const minutes = parseFloat(parts[2] ?? '0');
