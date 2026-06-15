@@ -6,12 +6,14 @@ import { join, relative } from 'node:path';
 import { z } from 'zod';
 import {
   aiSidecarProvenanceEntryV1Schema,
+  hdrMergeArtifactV1Schema,
   panoramaArtifactV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const ROOT = process.cwd();
 const FIXTURE_DIR = 'fixtures/sidecar-roundtrip';
 const PRIMARY_IMAGE_PATH = '/fixture-roll/IMG_0001.CR3';
+const HDR_IMAGE_PATH = '/fixture-roll/IMG_HDR_0001.CR3';
 const PANORAMA_IMAGE_PATH = '/fixture-roll/IMG_PANO_0001.CR3';
 const VIRTUAL_COPY_ID = 'a1b2c3';
 
@@ -37,6 +39,7 @@ const JsonValueSchema = z.lazy(() =>
 const RawEngineArtifactsSchema = z
   .object({
     aiProvenanceEntries: z.array(aiSidecarProvenanceEntryV1Schema).default([]),
+    hdrMergeArtifacts: z.array(hdrMergeArtifactV1Schema).default([]),
     panoramaArtifacts: z.array(panoramaArtifactV1Schema).default([]),
     schemaVersion: z.literal(1),
     staleArtifactIds: z.array(z.string().trim().min(1)).default([]),
@@ -177,14 +180,17 @@ const assertRoundtripPreservesAdjustments = (metadata) => {
 };
 
 const primaryFixturePath = `${FIXTURE_DIR}/IMG_0001.CR3.rrdata`;
+const hdrFixturePath = `${FIXTURE_DIR}/IMG_HDR_0001.CR3.rrdata`;
 const panoramaFixturePath = `${FIXTURE_DIR}/IMG_PANO_0001.CR3.rrdata`;
 const virtualFixturePath = `${FIXTURE_DIR}/IMG_0001.CR3.${VIRTUAL_COPY_ID}.rrdata`;
 
 const primaryContents = await readFixture(primaryFixturePath);
+const hdrContents = await readFixture(hdrFixturePath);
 const panoramaContents = await readFixture(panoramaFixturePath);
 const virtualContents = await readFixture(virtualFixturePath);
 
 const primary = loadSidecarFixture(primaryContents);
+const hdr = loadSidecarFixture(hdrContents);
 const panorama = loadSidecarFixture(panoramaContents);
 const virtualCopy = loadSidecarFixture(virtualContents);
 
@@ -194,6 +200,10 @@ if (primary.usedDefault) {
 
 if (virtualCopy.usedDefault) {
   fail(`${virtualFixturePath} should parse as a valid virtual copy sidecar fixture`);
+}
+
+if (hdr.usedDefault) {
+  fail(`${hdrFixturePath} should parse as a valid HDR artifact sidecar fixture`);
 }
 
 if (panorama.usedDefault) {
@@ -215,6 +225,7 @@ assertEqual(primary.metadata.exif.Model, 'Deterministic 1', 'primary EXIF Model'
 const primaryArtifacts = RawEngineArtifactsSchema.parse(primary.metadata.rawEngineArtifacts);
 assertEqual(primaryArtifacts.schemaVersion, 1, 'primary rawEngineArtifacts schema version');
 assertEqual(primaryArtifacts.aiProvenanceEntries.length, 2, 'primary AI provenance entry count');
+assertEqual(primaryArtifacts.hdrMergeArtifacts.length, 0, 'primary HDR artifact count');
 assertEqual(primaryArtifacts.panoramaArtifacts.length, 0, 'primary panorama artifact count');
 
 const [maskProvenance, enhancementProvenance] = primaryArtifacts.aiProvenanceEntries;
@@ -235,6 +246,7 @@ assertEqual(
   '/fixture-roll/IMG_PANO_0001.CR3.rrdata',
   'panorama artifact sidecar path',
 );
+assertEqual(deriveSidecarPath(HDR_IMAGE_PATH), '/fixture-roll/IMG_HDR_0001.CR3.rrdata', 'HDR artifact sidecar path');
 assertEqual(
   deriveSidecarPath(`${PRIMARY_IMAGE_PATH}?vc=${VIRTUAL_COPY_ID}`),
   `/fixture-roll/IMG_0001.CR3.${VIRTUAL_COPY_ID}.rrdata`,
@@ -263,6 +275,22 @@ if (invalidVirtualFailures.length > 0) {
 
 assertRoundtripPreservesAdjustments(virtualCopy.metadata);
 assertTagConventions(virtualCopy.metadata.tags);
+
+const hdrArtifacts = RawEngineArtifactsSchema.parse(hdr.metadata.rawEngineArtifacts);
+assertEqual(hdrArtifacts.schemaVersion, 1, 'HDR rawEngineArtifacts schema version');
+assertEqual(hdrArtifacts.hdrMergeArtifacts.length, 1, 'HDR artifact count');
+assertEqual(hdrArtifacts.staleArtifactIds.length, 0, 'HDR stale artifact count');
+
+const [hdrArtifact] = hdrArtifacts.hdrMergeArtifacts;
+assertEqual(hdrArtifact.family, 'hdr', 'HDR artifact family');
+assertEqual(hdrArtifact.editableDerivedAssetId, 'derived_hdr_window_light', 'HDR editable derived asset id');
+assertEqual(hdrArtifact.outputArtifact.storage, 'sidecar_artifact', 'HDR output artifact storage');
+assertEqual(hdrArtifact.outputEncoding, 'scene_linear_half_float', 'HDR output encoding');
+
+const roundtrippedHdrArtifacts = SidecarSchema.parse(
+  JSON.parse(JSON.stringify(hdr.metadata, null, 2)),
+).rawEngineArtifacts;
+assertJsonEqual(roundtrippedHdrArtifacts, hdrArtifacts, 'HDR artifact sidecar roundtrip');
 
 const panoramaArtifacts = RawEngineArtifactsSchema.parse(panorama.metadata.rawEngineArtifacts);
 assertEqual(panoramaArtifacts.schemaVersion, 1, 'rawEngineArtifacts schema version');
@@ -300,8 +328,9 @@ console.log(
   [
     'Sidecar roundtrip fixture validation passed.',
     `Checked ${toRepoPath(toAbsolutePath(primaryFixturePath))}`,
+    `Checked ${toRepoPath(toAbsolutePath(hdrFixturePath))}`,
     `Checked ${toRepoPath(toAbsolutePath(panoramaFixturePath))}`,
     `Checked ${toRepoPath(toAbsolutePath(virtualFixturePath))}`,
-    'Coverage: schema shape, virtual-copy naming, adjustment preservation, tag conventions, panorama artifacts, missing/invalid defaults.',
+    'Coverage: schema shape, virtual-copy naming, adjustment preservation, tag conventions, HDR/panorama artifacts, missing/invalid defaults.',
   ].join('\n'),
 );

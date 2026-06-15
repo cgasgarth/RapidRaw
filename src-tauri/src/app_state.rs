@@ -84,6 +84,16 @@ pub struct AnalyticsConfig {
     pub sender: Sender<AnalyticsJob>,
 }
 
+#[derive(Clone)]
+pub struct PendingHdrSourceRef {
+    pub image_path: String,
+    pub width: u32,
+    pub height: u32,
+    pub exposure_time_seconds: f32,
+    pub iso: f32,
+    pub source_index: usize,
+}
+
 pub struct ThumbnailProgressTracker {
     pub total: usize,
     pub completed: usize,
@@ -119,6 +129,7 @@ pub struct AppState {
     pub ai_init_lock: TokioMutex<()>,
     pub export_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
+    pub hdr_source_refs: Arc<Mutex<Vec<PendingHdrSourceRef>>>,
     pub panorama_result: Arc<Mutex<Option<PendingPanoramaResult>>>,
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,

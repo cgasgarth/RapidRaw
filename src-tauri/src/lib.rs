@@ -57,6 +57,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use base64::{Engine as _, engine::general_purpose};
+use chrono::Utc;
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, ImageBuffer, ImageFormat, Luma, RgbImage, Rgba};
 use image_hdr::hdr_merge_images;
@@ -73,6 +74,7 @@ use serde_json::Value;
 use tauri::{Emitter, Manager, ipc::Response};
 use tempfile::NamedTempFile;
 use tokio::sync::Mutex as TokioMutex;
+use uuid::Uuid;
 
 use crate::cache_utils::{
     DecodedImageCache, GEOMETRY_KEYS, calculate_full_job_hash, calculate_geometry_hash,
@@ -85,10 +87,10 @@ use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
 };
 use crate::image_processing::{
-    Crop, GeometryParams, RenderRequest, apply_coarse_rotation, apply_cpu_default_raw_processing,
-    apply_flip, apply_geometry_warp, apply_linear_to_srgb, apply_srgb_to_linear,
-    downscale_f32_image, get_all_adjustments_from_json, get_or_init_gpu_context,
-    process_and_get_dynamic_image, resolve_tonemapper_override,
+    Crop, GeometryParams, ImageMetadata, RawEngineArtifacts, RenderRequest, apply_coarse_rotation,
+    apply_cpu_default_raw_processing, apply_flip, apply_geometry_warp, apply_linear_to_srgb,
+    apply_srgb_to_linear, downscale_f32_image, get_all_adjustments_from_json,
+    get_or_init_gpu_context, process_and_get_dynamic_image, resolve_tonemapper_override,
     resolve_tonemapper_override_from_handle, warp_image_geometry,
 };
 use crate::lut_processing::Lut;
@@ -1450,6 +1452,7 @@ async fn merge_hdr(
     }
 
     let hdr_result_handle = state.hdr_result.clone();
+    let hdr_source_refs_handle = state.hdr_source_refs.clone();
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
     let loaded_items: Vec<(String, DynamicImage, Duration, f32)> = paths
@@ -1492,6 +1495,21 @@ async fn merge_hdr(
 
     validate_hdr_merge_dimensions(&loaded_items)?;
 
+    let source_refs = loaded_items
+        .iter()
+        .enumerate()
+        .map(
+            |(source_index, (path, img, exposure, iso))| app_state::PendingHdrSourceRef {
+                image_path: parse_virtual_path(path).0.to_string_lossy().into_owned(),
+                width: img.width(),
+                height: img.height(),
+                exposure_time_seconds: exposure.as_secs_f32(),
+                iso: *iso,
+                source_index,
+            },
+        )
+        .collect::<Vec<_>>();
+
     let images: Vec<HDRInput> = loaded_items
         .iter()
         .map(|(path, img, exposure, gains)| {
@@ -1516,6 +1534,7 @@ async fn merge_hdr(
     let _ = app_handle.emit("hdr-progress", "Creating preview...");
 
     *hdr_result_handle.lock().unwrap() = Some(hdr_merged);
+    *hdr_source_refs_handle.lock().unwrap() = source_refs;
 
     let _ = app_handle.emit(
         "hdr-complete",
@@ -1565,11 +1584,231 @@ async fn save_hdr(
         .save(&output_path)
         .map_err(|e| format!("Failed to save hdr image: {}", e))?;
 
+    let source_refs = state.hdr_source_refs.lock().unwrap().clone();
+    if source_refs.len() >= 2 {
+        write_hdr_output_sidecar(
+            &output_path,
+            &source_refs,
+            image_to_save.width(),
+            image_to_save.height(),
+        )?;
+        state.hdr_source_refs.lock().unwrap().clear();
+    }
+
     let (real_path, _) = crate::file_management::parse_virtual_path(&first_path_str);
     let _ =
         crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path);
 
     Ok(output_path.to_string_lossy().to_string())
+}
+
+fn write_hdr_output_sidecar(
+    output_path: &Path,
+    source_refs: &[app_state::PendingHdrSourceRef],
+    output_width: u32,
+    output_height: u32,
+) -> Result<(), String> {
+    let sidecar_path = output_path.with_file_name(format!(
+        "{}.rrdata",
+        output_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+    ));
+    let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+    upsert_hdr_artifact_metadata(
+        &mut sidecar,
+        output_path,
+        source_refs,
+        output_width,
+        output_height,
+    )?;
+    let json = serde_json::to_string_pretty(&sidecar)
+        .map_err(|e| format!("Failed to serialize HDR sidecar: {}", e))?;
+    fs::write(&sidecar_path, json).map_err(|e| {
+        format!(
+            "Failed to write HDR sidecar {}: {}",
+            sidecar_path.display(),
+            e
+        )
+    })
+}
+
+fn upsert_hdr_artifact_metadata(
+    sidecar: &mut ImageMetadata,
+    output_path: &Path,
+    source_refs: &[app_state::PendingHdrSourceRef],
+    output_width: u32,
+    output_height: u32,
+) -> Result<(), String> {
+    let artifact_id = format!("artifact_hdr_{}", Uuid::new_v4().simple());
+    let output_hash = hash_hdr_output_file(output_path)?;
+    let reference_index = source_refs.len() / 2;
+    let source_image_refs = source_refs
+        .iter()
+        .map(|source| {
+            serde_json::json!({
+                "colorSpaceHint": if is_raw_file(&source.image_path) { "camera_rgb" } else { "linear_rgb" },
+                "exposureEv": source.exposure_time_seconds.log2(),
+                "imagePath": source.image_path.clone(),
+                "rawDefaultsApplied": is_raw_file(&source.image_path),
+                "role": "hdr_bracket",
+                "sourceIndex": source.source_index,
+            })
+        })
+        .collect::<Vec<_>>();
+    let source_metadata = source_refs
+        .iter()
+        .map(|source| {
+            serde_json::json!({
+                "exposureTimeSeconds": source.exposure_time_seconds,
+                "height": source.height,
+                "imagePath": source.image_path.clone(),
+                "iso": source.iso,
+                "rawBlackLevelKnown": false,
+                "rawWhiteLevelKnown": false,
+                "resolvedBracketRole": if source.source_index == reference_index {
+                    "reference"
+                } else if source.source_index < reference_index {
+                    "under_exposed"
+                } else {
+                    "over_exposed"
+                },
+                "resolvedExposureEv": source.exposure_time_seconds.log2(),
+                "sourceIndex": source.source_index,
+                "whiteBalanceComparable": false,
+                "width": source.width,
+            })
+        })
+        .collect::<Vec<_>>();
+    let transforms = source_refs
+        .iter()
+        .map(|source| {
+            serde_json::json!({
+                "confidence": if source.source_index == reference_index { 1.0 } else { 0.7 },
+                "sourceIndex": source.source_index,
+                "transformType": "identity",
+            })
+        })
+        .collect::<Vec<_>>();
+    let clipped_metrics = source_refs
+        .iter()
+        .map(|source| {
+            serde_json::json!({
+                "clippedHighRatio": 0.0,
+                "nearClippedHighRatio": 0.0,
+                "sourceIndex": source.source_index,
+            })
+        })
+        .collect::<Vec<_>>();
+    let source_state = source_refs
+        .iter()
+        .map(|source| {
+            serde_json::json!({
+                "contentHash": format!("path:{}", source.image_path),
+                "graphRevision": "hdr_legacy_runtime_v1",
+                "resolvedExposureEv": source.exposure_time_seconds.log2(),
+                "sourceIndex": source.source_index,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let artifact = serde_json::json!({
+        "alignment": {
+            "alignmentConfidence": 0.7,
+            "referenceSourceIndex": reference_index,
+            "rejectedSourceIndexes": [],
+            "requestedAlignmentMode": "none",
+            "resolvedAlignmentMode": "none",
+            "transforms": transforms,
+        },
+        "artifactId": artifact_id,
+        "blockCodes": [],
+        "bracketDetection": {
+            "accepted": true,
+            "blockCodes": [],
+            "bracketSpanEv": 0.0,
+            "detectionConfidence": 0.7,
+            "detectionMethod": "metadata_exposure_time_iso_aperture",
+            "referenceSourceIndex": reference_index,
+            "sourceMetadata": source_metadata,
+            "warningCodes": ["tone_mapped_preview_only"],
+        },
+        "createdAt": Utc::now().to_rfc3339(),
+        "deghosting": {
+            "masks": [],
+            "motionCoverageRatio": 0.0,
+            "motionRisk": "none",
+            "referenceSourceIndex": reference_index,
+            "requestedDeghosting": "off",
+            "resolvedDeghosting": "off",
+        },
+        "dryRun": {
+            "acceptedDryRunPlanHash": "legacy-hdr-runtime-save",
+            "acceptedDryRunPlanId": "legacy-hdr-runtime-save",
+        },
+        "editableDerivedAssetId": artifact_id,
+        "engine": {
+            "backendType": "legacy_image_hdr",
+            "capabilityLevel": "runtime_apply_capable",
+            "engineId": "rapidraw_image_hdr_legacy_v1",
+            "engineVersion": "0.1.0",
+        },
+        "family": "hdr",
+        "highlightRecovery": {
+            "clippedInputPixelRatioBySource": clipped_metrics,
+            "highlightDetailGainRatio": 1.0,
+            "recoveredHighlightPixelRatio": 0.0,
+            "shadowNoiseAmplificationRisk": "unknown",
+            "unrecoveredClippedPixelRatio": 0.0,
+        },
+        "mergeStrategy": "exposure_fusion_preview",
+        "outputArtifact": {
+            "artifactId": format!("{}_output", artifact_id),
+            "contentHash": output_hash,
+            "dimensions": {
+                "height": output_height,
+                "width": output_width,
+            },
+            "kind": "merge_output",
+            "storage": "sidecar_artifact",
+        },
+        "outputColorSpace": "srgb_display_referred_v1",
+        "outputEncoding": "display_referred_preview",
+        "outputName": output_path.file_name().unwrap_or_default().to_string_lossy(),
+        "previewArtifacts": [],
+        "previewToneMapped": true,
+        "schemaVersion": 1,
+        "sourceImageRefs": source_image_refs,
+        "sourceState": source_state,
+        "staleState": {
+            "checkedAt": Utc::now().to_rfc3339(),
+            "invalidationReasons": [],
+            "state": "current",
+        },
+        "warningCodes": ["tone_mapped_preview_only"],
+        "workingColorSpace": "srgb_display_referred_v1",
+    });
+
+    let artifacts = sidecar
+        .raw_engine_artifacts
+        .get_or_insert_with(|| RawEngineArtifacts {
+            schema_version: 1,
+            ai_provenance_entries: Vec::new(),
+            hdr_merge_artifacts: Vec::new(),
+            panorama_artifacts: Vec::new(),
+            stale_artifact_ids: Vec::new(),
+        });
+    artifacts.schema_version = 1;
+    artifacts.hdr_merge_artifacts.push(artifact);
+    artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
+    Ok(())
+}
+
+fn hash_hdr_output_file(path: &Path) -> Result<String, String> {
+    let bytes = fs::read(path)
+        .map_err(|e| format!("Failed to read HDR output for artifact hash: {}", e))?;
+    Ok(format!("blake3:{}", blake3::hash(&bytes).to_hex()))
 }
 
 #[tauri::command]
@@ -2226,6 +2465,7 @@ pub fn run() {
             ai_init_lock: TokioMutex::new(()),
             export_task_handle: Mutex::new(None),
             hdr_result: Arc::new(Mutex::new(None)),
+            hdr_source_refs: Arc::new(Mutex::new(Vec::new())),
             panorama_result: Arc::new(Mutex::new(None)),
             denoise_result: Arc::new(Mutex::new(None)),
             indexing_task_handle: Mutex::new(None),
@@ -2421,5 +2661,59 @@ mod tests {
         assert!(error.contains("Dimension mismatch detected."));
         assert!(error.contains("Base image (base.exr): 64x48"));
         assert!(error.contains("Target image (wrong-size.exr): 32x48"));
+    }
+
+    #[test]
+    fn write_hdr_output_sidecar_records_editable_artifact_provenance() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let output_path = temp_dir.path().join("IMG_0001_Hdr.png");
+        fs::write(&output_path, b"hdr-output").expect("output should be written");
+        let source_refs = vec![
+            app_state::PendingHdrSourceRef {
+                image_path: temp_dir
+                    .path()
+                    .join("IMG_0001.CR3")
+                    .to_string_lossy()
+                    .into_owned(),
+                width: 64,
+                height: 48,
+                exposure_time_seconds: 0.125,
+                iso: 100.0,
+                source_index: 0,
+            },
+            app_state::PendingHdrSourceRef {
+                image_path: temp_dir
+                    .path()
+                    .join("IMG_0002.CR3")
+                    .to_string_lossy()
+                    .into_owned(),
+                width: 64,
+                height: 48,
+                exposure_time_seconds: 0.25,
+                iso: 100.0,
+                source_index: 1,
+            },
+        ];
+
+        write_hdr_output_sidecar(&output_path, &source_refs, 64, 48)
+            .expect("HDR sidecar should be written");
+
+        let sidecar_path = output_path.with_file_name("IMG_0001_Hdr.png.rrdata");
+        let sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+        let artifacts = sidecar
+            .raw_engine_artifacts
+            .expect("raw engine artifacts should be present");
+        assert_eq!(artifacts.schema_version, 1);
+        assert_eq!(artifacts.hdr_merge_artifacts.len(), 1);
+
+        let artifact = &artifacts.hdr_merge_artifacts[0];
+        assert_eq!(artifact["family"], "hdr");
+        assert_eq!(artifact["engine"]["backendType"], "legacy_image_hdr");
+        assert_eq!(
+            artifact["engine"]["capabilityLevel"],
+            "runtime_apply_capable"
+        );
+        assert_eq!(artifact["outputArtifact"]["storage"], "sidecar_artifact");
+        assert_eq!(artifact["sourceImageRefs"].as_array().unwrap().len(), 2);
     }
 }
