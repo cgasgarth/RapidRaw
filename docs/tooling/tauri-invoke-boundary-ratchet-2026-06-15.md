@@ -10,9 +10,9 @@ Raw Tauri `invoke` calls should move behind `invokeWithSchema` so TypeScript-fac
 
 ## Current Caps
 
-- Raw invoke import files: 30
-- Raw invoke calls: 157
-- Typed raw invoke calls: 60
+- Raw invoke import files: 29
+- Raw invoke calls: 154
+- Typed raw invoke calls: 59
 
 The script parses TypeScript/TSX with the TypeScript compiler API. It detects named `invoke` imports from `@tauri-apps/api/core`, including aliases, then counts direct calls. `src/utils/tauriSchemaInvoke.ts` is allowlisted because it owns the schema wrapper.
 

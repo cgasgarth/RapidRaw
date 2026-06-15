@@ -11,9 +11,9 @@ const CHECKED_EXTENSIONS = new Set(['.ts', '.tsx']);
 const IGNORED_DIRS = new Set(['.git', 'dist', 'node_modules', 'src-tauri/target', 'target']);
 const SCHEMA_WRAPPER_PATH = 'src/utils/tauriSchemaInvoke.ts';
 
-const MAX_RAW_INVOKE_IMPORT_FILES = 30;
-const MAX_RAW_INVOKE_CALLS = 157;
-const MAX_TYPED_RAW_INVOKE_CALLS = 60;
+const MAX_RAW_INVOKE_IMPORT_FILES = 29;
+const MAX_RAW_INVOKE_CALLS = 154;
+const MAX_TYPED_RAW_INVOKE_CALLS = 59;
 
 const getExtension = (path) => extname(path);
 
