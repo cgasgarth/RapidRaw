@@ -39,6 +39,22 @@
         "tint": "Tonung",
         "title": "Farbkalibrierung"
       },
+      "colorBalanceRgb": {
+        "channels": {
+          "blue": "Blau",
+          "green": "Grün",
+          "red": "Rot"
+        },
+        "disabled": "Aus",
+        "enabled": "Ein",
+        "preserveLuminance": "L erhalten",
+        "ranges": {
+          "highlights": "Lichter",
+          "midtones": "Mitteltöne",
+          "shadows": "Schatten"
+        },
+        "title": "RGB-Farbbalance"
+      },
       "colorGrading": "Color Grading",
       "colorMixer": "Farbmischer",
       "grading": {
@@ -1167,6 +1183,7 @@
         "blackWhiteMixer": "Schwarzweiß-Mischer",
         "chromaticAberration": "Chromatische Aberration",
         "clarityDehaze": "Klarheit & Dunst entfernen",
+        "colorBalanceRgb": "RGB-Farbbalance",
         "colorCalibration": "Farbkalibrierung",
         "colorGrading": "Color Grading",
         "colorGradingPresets": "Color-Grading-Vorgaben",

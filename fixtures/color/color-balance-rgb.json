@@ -1,0 +1,24 @@
+[
+  {
+    "case": "cinematic shadow cool highlight warm",
+    "input": {
+      "enabled": true,
+      "preserveLuminance": true,
+      "shadows": { "red": -8, "green": 0, "blue": 12 },
+      "midtones": { "red": 2, "green": 0, "blue": -2 },
+      "highlights": { "red": 10, "green": 2, "blue": -8 }
+    },
+    "expectedNonZeroRanges": ["shadows", "midtones", "highlights"]
+  },
+  {
+    "case": "portrait midtone warmth",
+    "input": {
+      "enabled": true,
+      "preserveLuminance": true,
+      "shadows": { "red": 0, "green": 0, "blue": 0 },
+      "midtones": { "red": 8, "green": 1, "blue": -6 },
+      "highlights": { "red": 3, "green": 0, "blue": -2 }
+    },
+    "expectedNonZeroRanges": ["midtones", "highlights"]
+  }
+]

@@ -39,6 +39,22 @@
         "tint": "Tint",
         "title": "Color Calibration"
       },
+      "colorBalanceRgb": {
+        "channels": {
+          "blue": "Blue",
+          "green": "Green",
+          "red": "Red"
+        },
+        "disabled": "Off",
+        "enabled": "On",
+        "preserveLuminance": "Preserve L",
+        "ranges": {
+          "highlights": "Highlights",
+          "midtones": "Midtones",
+          "shadows": "Shadows"
+        },
+        "title": "RGB Color Balance"
+      },
       "colorGrading": "Color Grading",
       "colorMixer": "Color Mixer",
       "grading": {
@@ -1167,6 +1183,7 @@
         "blackWhiteMixer": "Black & White Mixer",
         "chromaticAberration": "Chromatic Aberration",
         "clarityDehaze": "Clarity & Dehaze",
+        "colorBalanceRgb": "RGB Color Balance",
         "colorCalibration": "Color Calibration",
         "colorGrading": "Color Grading",
         "colorGradingPresets": "Color Grading Presets",
