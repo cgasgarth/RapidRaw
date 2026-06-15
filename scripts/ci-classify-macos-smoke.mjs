@@ -51,7 +51,7 @@ const ALWAYS_REQUIRE_FILES = new Set([
 
 const SAFE_ROOT_FILES = new Set(['.gitignore', 'AGENTS.md', 'LICENSE', 'README.md', 'RAW_EDITOR_PLAN.md']);
 
-const SAFE_TOOLING_FILES = new Set(['eslint.config.js', 'i18next.config.ts']);
+const SAFE_TOOLING_FILES = new Set(['eslint.config.js', 'i18next.config.ts', 'knip.jsonc']);
 
 const SAFE_FRONTEND_EXTENSIONS = new Set([
   '.css',
@@ -457,6 +457,7 @@ function runSelfTest() {
   );
   assertClassification('public styles can skip smoke', ['public/theme.css'], SMOKE_MODES.NONE);
   assertClassification('lint config changes can skip smoke', ['eslint.config.js'], SMOKE_MODES.NONE);
+  assertClassification('unused-code config changes can skip smoke', ['knip.jsonc'], SMOKE_MODES.NONE);
   assertClassification(
     'validation scripts can skip smoke',
     ['scripts/check-eslint-escape-hatches.mjs'],

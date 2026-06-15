@@ -1,0 +1,24 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "src/App.tsx",
+    "src/validation/visual/main.tsx",
+    "vite.config.js",
+    "eslint.config.js",
+    "i18next.config.ts",
+    "scripts/**/*.mjs",
+    "packages/rawengine-schema/scripts/**/*.ts",
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "scripts/**/*.mjs",
+    "packages/rawengine-schema/src/**/*.ts",
+    "packages/rawengine-schema/scripts/**/*.ts",
+    "*.config.{js,ts}",
+    "vite.config.js",
+    "i18next.config.ts",
+  ],
+  "ignore": ["dist/**", "node_modules/**", "src-tauri/**"],
+  "ignoreBinaries": ["scripts/run-compact-command.mjs"],
+}
