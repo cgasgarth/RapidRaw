@@ -48,6 +48,7 @@
     "check:ai-people-fake-provider": "bun scripts/check-ai-people-fake-provider.mjs",
     "check:deltae-fixtures": "bun scripts/check-deltae-fixtures.mjs",
     "check:defringe": "bun scripts/check-defringe-fixtures.mjs",
+    "check:dust-spot-visualization": "bun scripts/check-dust-spot-visualization.mjs",
     "check:ai-people-render": "bun scripts/check-ai-people-render-fixtures.mjs",
     "check:ai-people-apply-plan": "bun scripts/check-ai-people-layer-apply-plan.mjs",
     "check:denoise-fixtures": "bun scripts/check-denoise-fixtures.mjs",

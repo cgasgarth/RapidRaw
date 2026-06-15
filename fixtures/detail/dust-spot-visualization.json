@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "candidateCount": 0,
+      "falsePositiveGuards": ["edge_texture"],
+      "minRadiusPx": 2,
+      "mode": "off",
+      "sensitivity": 0
+    },
+    {
+      "candidateCount": 18,
+      "falsePositiveGuards": ["edge_texture", "film_grain", "highlight_specular"],
+      "minRadiusPx": 2,
+      "mode": "candidate_overlay",
+      "sensitivity": 55
+    },
+    {
+      "candidateCount": 7,
+      "falsePositiveGuards": ["edge_texture", "film_grain"],
+      "minRadiusPx": 4,
+      "mode": "edge_guard",
+      "sensitivity": 70
+    }
+  ],
+  "notes": "UI overlay contract only. Runtime dust detection and healing remain follow-up work.",
+  "validationStatus": "ui_overlay_contract"
+}
