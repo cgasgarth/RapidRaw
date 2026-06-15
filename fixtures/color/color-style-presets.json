@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "defaultPresetId": "color_style.portrait.clean_skin.v1",
+  "presets": [
+    {
+      "version": 1,
+      "id": "color_style.portrait.clean_skin.v1",
+      "name": "Clean Skin Balance",
+      "description": "Restrained portrait color with warmer white balance and protected saturation.",
+      "category": "portrait",
+      "previewTags": ["portrait", "skin", "natural"],
+      "createdAt": "2026-06-11T00:00:00.000Z",
+      "updatedAt": "2026-06-11T00:00:00.000Z",
+      "adjustmentPatch": {
+        "temperature": 4,
+        "tint": 2,
+        "vibrance": 8,
+        "saturation": -3,
+        "colorGrading": {
+          "global": { "hue": 34, "saturation": 6, "luminance": 0 },
+          "shadows": { "hue": 220, "saturation": 3, "luminance": 0 },
+          "midtones": { "hue": 32, "saturation": 4, "luminance": 1 },
+          "highlights": { "hue": 42, "saturation": 5, "luminance": 0 },
+          "balance": 8,
+          "blending": 55
+        }
+      }
+    },
+    {
+      "version": 1,
+      "id": "color_style.landscape.clean_chrome.v1",
+      "name": "Clean Chrome Landscape",
+      "description": "Landscape color preset with cooler shadows, richer greens, and controlled blue saturation.",
+      "category": "landscape",
+      "previewTags": ["landscape", "greens", "blue-sky"],
+      "createdAt": "2026-06-11T00:00:00.000Z",
+      "updatedAt": "2026-06-12T00:00:00.000Z",
+      "adjustmentPatch": {
+        "vibrance": 12,
+        "saturation": 4,
+        "hsl": {
+          "greens": { "hue": -6, "saturation": 8, "luminance": 2 },
+          "blues": { "hue": -4, "saturation": -5, "luminance": -3 },
+          "yellows": { "hue": -5, "saturation": 4, "luminance": 1 }
+        },
+        "colorCalibration": {
+          "redHue": 2,
+          "redSaturation": 3,
+          "greenHue": -3,
+          "greenSaturation": 5,
+          "blueHue": -4,
+          "blueSaturation": -2
+        }
+      }
+    },
+    {
+      "version": 1,
+      "id": "color_style.product.neutral_catalog.v1",
+      "name": "Neutral Catalog Color",
+      "description": "Product preset for neutral catalog color and consistent baseline saturation.",
+      "category": "product",
+      "previewTags": ["product", "catalog", "neutral"],
+      "createdAt": "2026-06-11T00:00:00.000Z",
+      "updatedAt": "2026-06-11T00:00:00.000Z",
+      "adjustmentPatch": {
+        "temperature": 0,
+        "tint": 0,
+        "vibrance": 0,
+        "saturation": -2,
+        "curveMode": "parametric"
+      }
+    }
+  ]
+}

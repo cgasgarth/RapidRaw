@@ -48,11 +48,13 @@ import { useTranslation } from 'react-i18next';
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { PresetListType, usePresets, UserPreset } from '../../../hooks/usePresets';
+import { type ColorStylePreset } from '../../../schemas/colorStylePresetSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
 import { createBlobFromUint8Array } from '../../../utils/blobUtils';
+import { BUILT_IN_COLOR_STYLE_PRESETS } from '../../../utils/colorStylePresetCatalog';
 import ConfigurePresetModal from '../../modals/ConfigurePresetModal';
 import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
@@ -719,6 +721,13 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     }));
   };
 
+  const handleApplyColorStylePreset = (preset: ColorStylePreset) => {
+    setAdjustments((prevAdjustments: Adjustments) => ({
+      ...prevAdjustments,
+      ...preset.adjustmentPatch,
+    }));
+  };
+
   const handleSaveConfiguredPreset = async (
     name: string,
     includeMasks: boolean,
@@ -1095,6 +1104,42 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
             </div>
           ) : (
             <>
+              <section className="space-y-2 pb-2" aria-label={t('editor.presets.colorStyles.title')}>
+                <div className="flex items-center justify-between gap-2">
+                  <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
+                    {t('editor.presets.colorStyles.title')}
+                  </UiText>
+                  <UiText variant={TextVariants.small} className="tabular-nums text-text-secondary">
+                    {t('editor.presets.colorStyles.count', { count: BUILT_IN_COLOR_STYLE_PRESETS.length })}
+                  </UiText>
+                </div>
+                <div className="grid gap-2">
+                  {BUILT_IN_COLOR_STYLE_PRESETS.map((preset) => (
+                    <button
+                      aria-label={t('editor.presets.colorStyles.applyLabel', { name: preset.name })}
+                      className="rounded-md border border-surface bg-bg-secondary p-2 text-left transition-colors hover:bg-surface"
+                      data-tooltip={preset.description}
+                      key={preset.id}
+                      onClick={() => {
+                        handleApplyColorStylePreset(preset);
+                      }}
+                      type="button"
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <UiText className="truncate" weight={TextWeights.medium}>
+                          {preset.name}
+                        </UiText>
+                        <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
+                          {preset.category.replaceAll('_', ' ')}
+                        </UiText>
+                      </span>
+                      <UiText variant={TextVariants.small} className="mt-1 block text-text-secondary">
+                        {preset.previewTags.join(' / ')}
+                      </UiText>
+                    </button>
+                  ))}
+                </div>
+              </section>
               <AnimatePresence>
                 {folders
                   .filter((item) => item.folder.id !== deletingItemId)

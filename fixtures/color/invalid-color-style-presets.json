@@ -1,0 +1,93 @@
+[
+  {
+    "case": "non-color adjustment key",
+    "catalog": {
+      "version": 1,
+      "defaultPresetId": "color_style.bad.exposure.v1",
+      "presets": [
+        {
+          "version": 1,
+          "id": "color_style.bad.exposure.v1",
+          "name": "Bad Exposure",
+          "description": "Invalid color preset with a tonal exposure key.",
+          "category": "utility",
+          "previewTags": ["bad"],
+          "createdAt": "2026-06-11T00:00:00.000Z",
+          "updatedAt": "2026-06-11T00:00:00.000Z",
+          "adjustmentPatch": { "exposure": 0.5 }
+        }
+      ]
+    }
+  },
+  {
+    "case": "duplicate ids",
+    "catalog": {
+      "version": 1,
+      "defaultPresetId": "color_style.bad.duplicate.v1",
+      "presets": [
+        {
+          "version": 1,
+          "id": "color_style.bad.duplicate.v1",
+          "name": "Duplicate A",
+          "description": "Invalid duplicate preset.",
+          "category": "utility",
+          "previewTags": ["bad"],
+          "createdAt": "2026-06-11T00:00:00.000Z",
+          "updatedAt": "2026-06-11T00:00:00.000Z",
+          "adjustmentPatch": { "saturation": 1 }
+        },
+        {
+          "version": 1,
+          "id": "color_style.bad.duplicate.v1",
+          "name": "Duplicate B",
+          "description": "Invalid duplicate preset.",
+          "category": "utility",
+          "previewTags": ["bad"],
+          "createdAt": "2026-06-11T00:00:00.000Z",
+          "updatedAt": "2026-06-11T00:00:00.000Z",
+          "adjustmentPatch": { "vibrance": 1 }
+        }
+      ]
+    }
+  },
+  {
+    "case": "lut missing intensity",
+    "catalog": {
+      "version": 1,
+      "defaultPresetId": "color_style.bad.lut.v1",
+      "presets": [
+        {
+          "version": 1,
+          "id": "color_style.bad.lut.v1",
+          "name": "Bad LUT",
+          "description": "Invalid LUT preset without intensity.",
+          "category": "cinematic",
+          "previewTags": ["bad"],
+          "createdAt": "2026-06-11T00:00:00.000Z",
+          "updatedAt": "2026-06-11T00:00:00.000Z",
+          "adjustmentPatch": { "lutPath": "/styles/look.cube" }
+        }
+      ]
+    }
+  },
+  {
+    "case": "stale updatedAt",
+    "catalog": {
+      "version": 1,
+      "defaultPresetId": "color_style.bad.time.v1",
+      "presets": [
+        {
+          "version": 1,
+          "id": "color_style.bad.time.v1",
+          "name": "Bad Time",
+          "description": "Invalid updatedAt ordering.",
+          "category": "utility",
+          "previewTags": ["bad"],
+          "createdAt": "2026-06-12T00:00:00.000Z",
+          "updatedAt": "2026-06-11T00:00:00.000Z",
+          "adjustmentPatch": { "saturation": 1 }
+        }
+      ]
+    }
+  }
+]
