@@ -22,7 +22,7 @@ export async function invokeWithSchema<TPayload>(
   command: string,
   args: Record<string, unknown>,
   schema: z.ZodType<TPayload>,
-  context = command,
+  context: string = command,
 ): Promise<TPayload> {
   const payload = await invoke<unknown>(command, args);
   return parseTauriPayload(schema, payload, context);

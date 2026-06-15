@@ -150,7 +150,7 @@ export type MaskRenderOperation = z.infer<typeof maskRenderOperationSchema>;
 export type MaskRenderScene = z.infer<typeof maskRenderSceneSchema>;
 export type MaskComposeMode = z.infer<typeof maskComposeModeSchema>;
 
-export function estimateMaskRenderTileCount(scene: MaskRenderScene, tileSizePx = 512): number {
+export function estimateMaskRenderTileCount(scene: MaskRenderScene, tileSizePx: number = 512): number {
   const columns = Math.ceil(scene.canvas.width / tileSizePx);
   const rows = Math.ceil(scene.canvas.height / tileSizePx);
   return columns * rows * scene.layers.length;
