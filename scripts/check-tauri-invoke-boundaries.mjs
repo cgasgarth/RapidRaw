@@ -33,6 +33,7 @@ export const inspectTauriInvokeSource = (filePath, contents) => {
 
   const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true, getScriptKind(filePath));
   const importedNames = new Set();
+  const namespaceNames = new Set();
   const rawCalls = [];
   const typedRawCalls = [];
 
@@ -50,10 +51,24 @@ export const inspectTauriInvokeSource = (filePath, contents) => {
             importedNames.add(element.name.text);
           }
         }
+      } else if (namedBindings && ts.isNamespaceImport(namedBindings)) {
+        namespaceNames.add(namedBindings.name.text);
       }
     }
 
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && importedNames.has(node.expression.text)) {
+    if (!ts.isCallExpression(node)) {
+      ts.forEachChild(node, visit);
+      return;
+    }
+
+    const isNamedInvokeCall = ts.isIdentifier(node.expression) && importedNames.has(node.expression.text);
+    const isNamespaceInvokeCall =
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === 'invoke' &&
+      ts.isIdentifier(node.expression.expression) &&
+      namespaceNames.has(node.expression.expression.text);
+
+    if (isNamedInvokeCall || isNamespaceInvokeCall) {
       const line = getLine(sourceFile, node.getStart(sourceFile));
       rawCalls.push(line);
       if ((node.typeArguments?.length ?? 0) > 0) {
@@ -65,7 +80,7 @@ export const inspectTauriInvokeSource = (filePath, contents) => {
   };
 
   visit(sourceFile);
-  return { importedNames: [...importedNames], rawCalls, typedRawCalls };
+  return { importedNames: [...importedNames], namespaceNames: [...namespaceNames], rawCalls, typedRawCalls };
 };
 
 const files = [];
@@ -103,6 +118,11 @@ const value = await invoke<string>('not_imported');`,
     `import { invoke } from '@tauri-apps/api/core';
 const payload = await invoke<unknown>(command, args);`,
   );
+  const namespace = inspectTauriInvokeSource(
+    'src/App.tsx',
+    `import * as tauri from '@tauri-apps/api/core';
+const value = await tauri.invoke<string>('load_settings');`,
+  );
 
   if (blocked.importedNames.length !== 1 || blocked.rawCalls.length !== 1 || blocked.typedRawCalls.length !== 1) {
     throw new Error('tauri invoke self-test failed: raw typed invoke was not detected');
@@ -112,6 +132,13 @@ const payload = await invoke<unknown>(command, args);`,
   }
   if (wrapper.importedNames.length !== 0 || wrapper.rawCalls.length !== 0 || wrapper.typedRawCalls.length !== 0) {
     throw new Error('tauri invoke self-test failed: schema wrapper was not allowlisted');
+  }
+  if (
+    namespace.namespaceNames.length !== 1 ||
+    namespace.rawCalls.length !== 1 ||
+    namespace.typedRawCalls.length !== 1
+  ) {
+    throw new Error('tauri invoke self-test failed: namespace invoke was not detected');
   }
 
   console.log('tauri invoke boundary self-test ok');
@@ -133,7 +160,7 @@ for (const file of files) {
   }
 }
 
-const rawImportFiles = inventory.filter((item) => item.importedNames.length > 0);
+const rawImportFiles = inventory.filter((item) => item.importedNames.length > 0 || item.namespaceNames.length > 0);
 const rawCallCount = inventory.reduce((total, item) => total + item.rawCalls.length, 0);
 const typedRawCallCount = inventory.reduce((total, item) => total + item.typedRawCalls.length, 0);
 
