@@ -1,0 +1,96 @@
+[
+  {
+    "case": "missing disabled no-op case",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/detail-preview-export-parity-v1.json",
+      "issue": 1150,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-15",
+      "cases": [
+        {
+          "caseId": "detail.capture-sharpen.enabled-synthetic-parity.v1",
+          "claim": "enabled_synthetic_parity",
+          "doesNotProve": ["real_app_pipeline"],
+          "exportPath": "shared_detail_stage",
+          "feature": "capture_sharpen",
+          "maxAllowedChannelDiff": 0.000001,
+          "minRequiredPixelDelta": 0.01,
+          "previewPath": "shared_detail_stage",
+          "sourceIssue": 1150,
+          "stage": "capture_sharpen",
+          "syntheticFixture": {
+            "height": 9,
+            "leftValue": 0.25,
+            "pattern": "vertical_edge",
+            "rightValue": 0.75,
+            "width": 17
+          },
+          "tuning": {
+            "amount": 0.7,
+            "radiusPx": 1,
+            "threshold": 0
+          }
+        }
+      ]
+    }
+  },
+  {
+    "case": "enabled parity without shared export path",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/detail-preview-export-parity-v1.json",
+      "issue": 1150,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-15",
+      "cases": [
+        {
+          "caseId": "detail.capture-sharpen.disabled-noop-parity.v1",
+          "claim": "disabled_noop_parity",
+          "doesNotProve": ["real_app_pipeline"],
+          "exportPath": "shared_detail_stage",
+          "feature": "capture_sharpen",
+          "maxAllowedChannelDiff": 0,
+          "minRequiredPixelDelta": 0,
+          "previewPath": "shared_detail_stage",
+          "sourceIssue": 1150,
+          "stage": "capture_sharpen",
+          "syntheticFixture": {
+            "height": 9,
+            "leftValue": 0.25,
+            "pattern": "vertical_edge",
+            "rightValue": 0.75,
+            "width": 17
+          },
+          "tuning": {
+            "amount": 0,
+            "radiusPx": 1,
+            "threshold": 0
+          }
+        },
+        {
+          "caseId": "detail.capture-sharpen.enabled-synthetic-parity.v1",
+          "claim": "enabled_synthetic_parity",
+          "doesNotProve": ["real_app_pipeline"],
+          "exportPath": "output_intent_stage",
+          "feature": "capture_sharpen",
+          "maxAllowedChannelDiff": 0.000001,
+          "minRequiredPixelDelta": 0.01,
+          "previewPath": "shared_detail_stage",
+          "sourceIssue": 1150,
+          "stage": "capture_sharpen",
+          "syntheticFixture": {
+            "height": 9,
+            "leftValue": 0.25,
+            "pattern": "vertical_edge",
+            "rightValue": 0.75,
+            "width": 17
+          },
+          "tuning": {
+            "amount": 0.7,
+            "radiusPx": 1,
+            "threshold": 0
+          }
+        }
+      ]
+    }
+  }
+]

@@ -33,6 +33,132 @@ export const detailLimitationSchema = z.enum([
   'ui_api_wiring',
 ]);
 
+export const detailPreviewExportParityClaimSchema = z.enum([
+  'disabled_noop_parity',
+  'enabled_synthetic_parity',
+  'export_intent_separated',
+]);
+
+export const detailPreviewExportParityLimitationSchema = z.enum([
+  'e2e_workflow',
+  'gpu_parity',
+  'real_app_pipeline',
+  'real_raw_quality',
+]);
+
+export const detailPreviewExportParityCaseSchema = z
+  .object({
+    caseId: z.string().regex(/^detail\.[a-z0-9.-]+\.v[0-9]+$/u),
+    claim: detailPreviewExportParityClaimSchema,
+    doesNotProve: z.array(detailPreviewExportParityLimitationSchema).min(1),
+    exportPath: z.enum(['shared_detail_stage', 'output_intent_stage']),
+    feature: z.enum(['capture_sharpen', 'output_sharpen']),
+    maxAllowedChannelDiff: z.number().min(0).max(0.01),
+    minRequiredPixelDelta: z.number().min(0).max(0.5),
+    previewPath: z.literal('shared_detail_stage'),
+    sourceIssue: z.literal(1150),
+    stage: detailStageKindSchema,
+    syntheticFixture: z
+      .object({
+        height: z.number().int().min(5).max(128),
+        leftValue: z.number().min(0).max(1),
+        pattern: z.literal('vertical_edge'),
+        rightValue: z.number().min(0).max(1),
+        width: z.number().int().min(5).max(128),
+      })
+      .strict(),
+    tuning: z
+      .object({
+        amount: z.number().min(0).max(1.5),
+        radiusPx: z.number().min(0.3).max(3),
+        threshold: z.number().min(0).max(1),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const detailPreviewExportParityManifestSchema = z
+  .object({
+    $schema: z.url(),
+    cases: z.array(detailPreviewExportParityCaseSchema).min(2),
+    issue: z.literal(1150),
+    schemaVersion: z.literal(1),
+    snapshotDate: z.iso.date(),
+  })
+  .strict()
+  .superRefine((manifest, context) => {
+    const caseIds = new Set<string>();
+    let hasDisabledNoop = false;
+    let hasEnabledSynthetic = false;
+
+    for (const [index, parityCase] of manifest.cases.entries()) {
+      if (caseIds.has(parityCase.caseId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Detail parity case IDs must be unique.',
+          path: ['cases', index, 'caseId'],
+        });
+      }
+      caseIds.add(parityCase.caseId);
+
+      if (!parityCase.doesNotProve.includes('real_app_pipeline')) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Synthetic parity cases must not imply full app pipeline proof.',
+          path: ['cases', index, 'doesNotProve'],
+        });
+      }
+
+      if (parityCase.claim === 'disabled_noop_parity') {
+        hasDisabledNoop = true;
+        if (parityCase.minRequiredPixelDelta !== 0 || parityCase.tuning.amount !== 0) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Disabled no-op parity cases must not require a pixel delta.',
+            path: ['cases', index],
+          });
+        }
+      }
+
+      if (parityCase.claim === 'enabled_synthetic_parity') {
+        hasEnabledSynthetic = true;
+        if (parityCase.exportPath !== 'shared_detail_stage' || parityCase.minRequiredPixelDelta <= 0) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Enabled synthetic parity cases must use the shared detail stage and require a pixel delta.',
+            path: ['cases', index],
+          });
+        }
+      }
+
+      if (parityCase.claim === 'export_intent_separated') {
+        if (parityCase.feature !== 'output_sharpen' || parityCase.exportPath !== 'output_intent_stage') {
+          context.addIssue({
+            code: 'custom',
+            message: 'Export intent separation cases must be output-sharpen export-stage cases.',
+            path: ['cases', index],
+          });
+        }
+      }
+    }
+
+    if (!hasDisabledNoop) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Detail parity manifest must include a disabled no-op parity case.',
+        path: ['cases'],
+      });
+    }
+
+    if (!hasEnabledSynthetic) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Detail parity manifest must include an enabled synthetic parity case.',
+        path: ['cases'],
+      });
+    }
+  });
+
 export const detailStageEntrySchema = z
   .object({
     order: positiveIntegerSchema,
@@ -189,6 +315,7 @@ export const detailArtifactManifestSchema = z
   });
 
 export type DetailArtifactManifest = z.infer<typeof detailArtifactManifestSchema>;
+export type DetailPreviewExportParityManifest = z.infer<typeof detailPreviewExportParityManifestSchema>;
 export type DetailStageOrderManifest = z.infer<typeof detailStageOrderManifestSchema>;
 
 export const parseDetailStageOrderManifest = (value: unknown): DetailStageOrderManifest =>
@@ -196,3 +323,6 @@ export const parseDetailStageOrderManifest = (value: unknown): DetailStageOrderM
 
 export const parseDetailArtifactManifest = (value: unknown): DetailArtifactManifest =>
   detailArtifactManifestSchema.parse(value);
+
+export const parseDetailPreviewExportParityManifest = (value: unknown): DetailPreviewExportParityManifest =>
+  detailPreviewExportParityManifestSchema.parse(value);
