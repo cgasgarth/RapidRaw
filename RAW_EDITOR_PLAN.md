@@ -3885,6 +3885,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `api(commands): add edit command bus`
 - `api(commands): route representative UI operations through command bus`
 - `api(history): add undo redo command tests`
+  - Validation: `scripts/check-edit-graph-history-commands.mjs`
 - `api(cli): add headless render command`
 - `docs(api): document edit command API`
 

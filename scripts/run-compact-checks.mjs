@@ -20,6 +20,7 @@ const CHECK_GROUPS = {
     'check:metadata-templates',
     'check:keyboard-shortcuts',
     'check:keyboard-shortcut-conflicts',
+    'check:edit-graph-history',
     'check:workspace-layouts',
     'check:compare-survey',
     'check:mask-render',
