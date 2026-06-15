@@ -14,6 +14,7 @@ mod app_settings;
 mod app_state;
 mod cache_utils;
 mod culling;
+mod deblur_api;
 pub mod deblur_cpu_reference;
 pub mod denoise_cpu_reference;
 mod denoising;
@@ -2328,6 +2329,7 @@ pub fn run() {
             tagging::add_tag_for_paths,
             tagging::remove_tag_for_paths,
             culling::cull_images,
+            deblur_api::dry_run_deblur_controls,
             lens_correction::get_lensfun_makers,
             lens_correction::get_lensfun_lenses_for_maker,
             lens_correction::autodetect_lens,

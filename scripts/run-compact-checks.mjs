@@ -30,6 +30,7 @@ const CHECK_GROUPS = {
     'check:deblur-fixtures',
     'check:deblur-ringing',
     'check:deblur-cpu-reference',
+    'check:deblur-ui-api',
     'check:detail-stage-order',
     'check:detail-artifacts',
     'check:noise-metrics',
