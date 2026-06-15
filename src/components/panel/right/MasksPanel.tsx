@@ -79,6 +79,7 @@ import {
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
+import { createMaskRefinementCommand, dispatchMaskRefinementCommand } from '../../../utils/maskRefinementCommandBus';
 import { createSubMask } from '../../../utils/maskUtils';
 import BasicAdjustments from '../../adjustments/Basic';
 import ColorPanel from '../../adjustments/Color';
@@ -2721,15 +2722,24 @@ function SettingsPanel({
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
+  const handleMaskRefinementParametersChange = (changes: Record<string, number>) => {
+    if (!isActive || !activeSubMask) return;
+    const command = createMaskRefinementCommand(activeSubMask.id, activeSubMask.parameters, changes);
+    const refinedParameters = dispatchMaskRefinementCommand(command);
+    const newParams = mergeMaskParameters(activeSubMask.parameters, refinedParameters);
+    updateSubMask(activeSubMask.id, { parameters: newParams });
+  };
+
   const handleResetMaskRefinement = () => {
     if (!isActive || !activeSubMask) return;
-    const newParams = mergeMaskParameters(activeSubMask.parameters, {
+    const command = createMaskRefinementCommand(activeSubMask.id, activeSubMask.parameters, {
       density: 1,
       edgeContrast: 0,
       edgeShiftPx: 0,
       featherPx: 0,
       smoothness: 0,
     });
+    const newParams = mergeMaskParameters(activeSubMask.parameters, dispatchMaskRefinementCommand(command));
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
@@ -3025,7 +3035,7 @@ function SettingsPanel({
 
               <MaskRefinementControls
                 parameters={toMaskParameterRecord(activeSubMask.parameters)}
-                onChange={handleSubMaskParametersChange}
+                onChange={handleMaskRefinementParametersChange}
                 onReset={handleResetMaskRefinement}
                 onDragStateChange={onDragStateChange}
               />

@@ -3854,6 +3854,11 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Docs: `docs/api/edit-command-bus-2026-06-15.md`
   - Validation: `bun run schema:command-bus`
   - Status: schema-package dispatch foundation only; live UI/store/Tauri routing remains follow-up.
+- `api(commands): route representative UI operations through command bus`
+  - Issue: #79
+  - Docs: `docs/api/mask-refinement-command-ui-routing-2026-06-15.md`
+  - Validation: `bun run check:mask-refine-command-ui`
+  - Status: mask refinement UI dispatches typed in-process command; schema-package command bus/runtime replay/Tauri routing remain follow-up.
 
 #### Milestone 3.5: Contract Freeze And Validation Contracts
 
