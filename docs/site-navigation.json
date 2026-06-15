@@ -43,6 +43,10 @@
           "path": "docs/api/edit-command-api-2026-06-11.md"
         },
         {
+          "title": "Tauri schema validation boundary",
+          "path": "docs/api/tauri-schema-validation-2026-06-15.md"
+        },
+        {
           "title": "Mask refinement command",
           "path": "docs/api/mask-refinement-command-2026-06-15.md"
         },

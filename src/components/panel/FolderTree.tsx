@@ -46,8 +46,8 @@ export interface FolderTree {
   isDir: boolean;
   name: string;
   path: string;
-  imageCount?: number;
-  hasSubdirs?: boolean;
+  imageCount?: number | undefined;
+  hasSubdirs?: boolean | undefined;
 }
 
 interface FolderTreeProps {

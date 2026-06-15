@@ -41,12 +41,14 @@ import { useSortedLibrary } from './hooks/useSortedLibrary';
 import { useTauriListeners } from './hooks/useTauriListeners';
 import { useThumbnails } from './hooks/useThumbnails';
 import './i18n';
+import { folderTreeListSchema } from './schemas/folderTreeSchemas';
 import { parseAiConnectorStatusPayload } from './schemas/tauriEventSchemas';
 import { useEditorStore } from './store/useEditorStore';
 import { useLibraryStore } from './store/useLibraryStore';
 import { useProcessStore } from './store/useProcessStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
+import { invokeWithSchema } from './utils/tauriSchemaInvoke';
 import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
 
@@ -653,10 +655,14 @@ function App() {
       });
       if (!isExpanding) return;
       try {
-        const newChildren = await invoke<FolderTreeNode[]>(Invokes.GetFolderChildren, {
-          path,
-          showImageCounts: enableFolderImageCounts,
-        });
+        const newChildren = await invokeWithSchema(
+          Invokes.GetFolderChildren,
+          {
+            path,
+            showImageCounts: enableFolderImageCounts,
+          },
+          folderTreeListSchema,
+        );
         setLibrary((state) => ({
           folderTrees: state.folderTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
         }));
