@@ -32,6 +32,23 @@
         "tint": "Tonung",
         "title": "Farbkalibrierung"
       },
+      "channelMixer": {
+        "disabled": "Aus",
+        "enabled": "Ein",
+        "outputs": {
+          "blue": "Blau aus",
+          "green": "Grün aus",
+          "red": "Rot aus"
+        },
+        "preserveLuminance": "L erhalten",
+        "sources": {
+          "blue": "Blauquelle",
+          "constant": "Konstante",
+          "green": "Grünquelle",
+          "red": "Rotquelle"
+        },
+        "title": "Kanalmischer"
+      },
       "colorGrading": "Color Grading",
       "colorMixer": "Farbmischer",
       "grading": {
@@ -1132,6 +1149,7 @@
       "descMerge": "Fügt Ihre kopierten Änderungen hinzu und lässt andere Einstellungen unberührt.",
       "descReplace": "Überschreibt alle ausgewählten Einstellungen und setzt den Rest auf Standardwerte zurück.",
       "groups": {
+        "channelMixer": "Kanalmischer",
         "chromaticAberration": "Chromatische Aberration",
         "clarityDehaze": "Klarheit & Dunst entfernen",
         "colorCalibration": "Farbkalibrierung",

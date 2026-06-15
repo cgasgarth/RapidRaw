@@ -44,6 +44,7 @@ export enum BasicAdjustment {
 }
 
 export enum ColorAdjustment {
+  ChannelMixer = 'channelMixer',
   ColorGrading = 'colorGrading',
   Hsl = 'hsl',
   Hue = 'hue',
@@ -165,6 +166,7 @@ export interface Adjustments {
   clarity: number;
   chromaticAberrationBlueYellow: number;
   chromaticAberrationRedCyan: number;
+  channelMixer: ChannelMixerSettings;
   colorCalibration: ColorCalibration;
   colorGrading: ColorGradingProps;
   colorNoiseReduction: number;
@@ -301,6 +303,21 @@ interface Hsl {
   yellows: HueSatLum;
 }
 
+export interface ChannelMixerRow {
+  blue: number;
+  constant: number;
+  green: number;
+  red: number;
+}
+
+export interface ChannelMixerSettings {
+  blue: ChannelMixerRow;
+  enabled: boolean;
+  green: ChannelMixerRow;
+  preserveLuminance: boolean;
+  red: ChannelMixerRow;
+}
+
 export interface MaskAdjustments {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy mask adjustment indexing mirrors Adjustments until mask-specific keyed helpers are introduced.
   [index: string]: any;
@@ -388,6 +405,14 @@ const INITIAL_COLOR_CALIBRATION: ColorCalibration = {
   greenSaturation: 0,
   blueHue: 0,
   blueSaturation: 0,
+};
+
+const INITIAL_CHANNEL_MIXER: ChannelMixerSettings = {
+  blue: { red: 0, green: 0, blue: 100, constant: 0 },
+  enabled: false,
+  green: { red: 0, green: 100, blue: 0, constant: 0 },
+  preserveLuminance: true,
+  red: { red: 100, green: 0, blue: 0, constant: 0 },
 };
 
 export const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
@@ -495,6 +520,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   clarity: 0,
   chromaticAberrationBlueYellow: 0,
   chromaticAberrationRedCyan: 0,
+  channelMixer: structuredClone(INITIAL_CHANNEL_MIXER),
   colorCalibration: { ...INITIAL_COLOR_CALIBRATION },
   colorGrading: { ...INITIAL_COLOR_GRADING },
   colorNoiseReduction: 0,
@@ -690,6 +716,13 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     transformScale: loadedAdjustments.transformScale ?? INITIAL_ADJUSTMENTS.transformScale,
     transformXOffset: loadedAdjustments.transformXOffset ?? INITIAL_ADJUSTMENTS.transformXOffset,
     transformYOffset: loadedAdjustments.transformYOffset ?? INITIAL_ADJUSTMENTS.transformYOffset,
+    channelMixer: {
+      ...INITIAL_ADJUSTMENTS.channelMixer,
+      ...(loadedAdjustments.channelMixer || {}),
+      blue: { ...INITIAL_ADJUSTMENTS.channelMixer.blue, ...(loadedAdjustments.channelMixer?.blue || {}) },
+      green: { ...INITIAL_ADJUSTMENTS.channelMixer.green, ...(loadedAdjustments.channelMixer?.green || {}) },
+      red: { ...INITIAL_ADJUSTMENTS.channelMixer.red, ...(loadedAdjustments.channelMixer?.red || {}) },
+    },
     colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
@@ -744,6 +777,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     { label: 'modals.copyPaste.groups.presence', keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance] },
     { label: 'modals.copyPaste.groups.colorGrading', keys: [ColorAdjustment.ColorGrading] },
     { label: 'modals.copyPaste.groups.colorMixer', keys: [ColorAdjustment.Hsl] },
+    { label: 'modals.copyPaste.groups.channelMixer', keys: [ColorAdjustment.ChannelMixer] },
     { label: 'modals.copyPaste.groups.colorCalibration', keys: ['colorCalibration'] },
   ],
   details: [
@@ -846,6 +880,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.Temperature,
     ColorAdjustment.Tint,
     ColorAdjustment.Vibrance,
+    ColorAdjustment.ChannelMixer,
     ColorAdjustment.Hsl,
     ColorAdjustment.ColorGrading,
     'colorCalibration',

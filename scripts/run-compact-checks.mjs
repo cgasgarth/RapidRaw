@@ -42,6 +42,7 @@ const CHECK_GROUPS = {
     'check:defringe',
     'check:ai-fallbacks',
     'check:color-abi',
+    'check:channel-mixer',
     'check:camera-profile-lookup',
     'check:colorchecker-fixtures',
     'check:selective-color-ranges',

@@ -1,0 +1,24 @@
+[
+  {
+    "case": "warm red separation",
+    "input": {
+      "enabled": true,
+      "preserveLuminance": true,
+      "red": { "red": 112, "green": -8, "blue": -4, "constant": 0 },
+      "green": { "red": -5, "green": 105, "blue": 0, "constant": 0 },
+      "blue": { "red": -6, "green": 4, "blue": 102, "constant": 0 }
+    },
+    "expectedChangedOutputs": ["red", "green", "blue"]
+  },
+  {
+    "case": "cyan shadow bias",
+    "input": {
+      "enabled": true,
+      "preserveLuminance": false,
+      "red": { "red": 96, "green": 2, "blue": -8, "constant": -2 },
+      "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
+      "blue": { "red": 8, "green": 0, "blue": 108, "constant": 2 }
+    },
+    "expectedChangedOutputs": ["red", "blue"]
+  }
+]

@@ -25,6 +25,7 @@
     "check:keyboard-shortcuts": "bun scripts/check-keyboard-shortcuts.mjs",
     "check:keyboard-shortcut-conflicts": "bun scripts/check-keyboard-shortcut-conflicts.mjs",
     "check:color-abi": "bun scripts/check-color-adjustment-abi-parity.mjs",
+    "check:channel-mixer": "bun scripts/check-channel-mixer.mjs",
     "check:camera-profile-lookup": "bun scripts/check-camera-profile-lookup-fixtures.mjs",
     "check:colorchecker-fixtures": "bun scripts/check-colorchecker-fixtures.mjs",
     "check:selective-color-ranges": "bun scripts/check-selective-color-ranges.mjs",
