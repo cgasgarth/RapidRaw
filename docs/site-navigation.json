@@ -444,6 +444,10 @@
           "path": "docs/tooling/script-type-coverage-2026-06-15.md"
         },
         {
+          "title": "Lint zero-warning default",
+          "path": "docs/tooling/lint-zero-warning-default-2026-06-15.md"
+        },
+        {
           "title": "Bun CI script migration",
           "path": "docs/tooling/bun-ci-script-migration-2026-06-10.md"
         },

@@ -12,7 +12,7 @@
     "tauri": "tauri",
     "start": "tauri dev",
     "typecheck": "bun scripts/run-compact-command.mjs --label typecheck -- tsc --noEmit --pretty false",
-    "lint": "bun scripts/run-compact-command.mjs --label lint -- eslint .",
+    "lint": "bun scripts/run-compact-command.mjs --label lint -- eslint . --max-warnings 0",
     "lint:fix": "bun scripts/run-compact-command.mjs --label lint:fix -- eslint . --fix",
     "format": "bun scripts/run-compact-command.mjs --label format -- prettier --write . --log-level warn",
     "format:check": "bun scripts/run-compact-command.mjs --label format -- prettier --check .",

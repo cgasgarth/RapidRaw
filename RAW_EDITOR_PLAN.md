@@ -3802,6 +3802,11 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Docs: `docs/validation/unused-vars-error-2026-06-15.md`
   - Validation: `bun run check:lint`, `bun run check:types`
   - Status: rule severity hardening only; no runtime product behavior change.
+- `tooling(eslint): make default lint zero-warning`
+  - Issue: #1302
+  - Docs: `docs/tooling/lint-zero-warning-default-2026-06-15.md`
+  - Validation: `bun run lint`, `bun run check:lint`
+  - Status: local command parity with PR lint only; no runtime product behavior change.
 - `tooling(eslint): define allowed escape hatches`
 - `tooling(check): add local check scripts mirroring CI`
 - `tooling(hooks): add pre-commit main guard`
