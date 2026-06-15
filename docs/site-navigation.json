@@ -119,6 +119,10 @@
           "path": "docs/layers/ai-mask-capability-audit-2026-06-15.md"
         },
         {
+          "title": "Mask overlay runtime modes",
+          "path": "docs/layers/mask-overlay-runtime-2026-06-15.md"
+        },
+        {
           "title": "Selective color mask contract",
           "path": "docs/color/selective-color-mask-contract-2026-06-14.md"
         },

@@ -3979,7 +3979,9 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(refine): add feather density and edge refine`
   - Runtime status: feather, density, edge shift, smoothness, and edge contrast schemas plus refined weight evaluation are fixture-validated; renderer integration remains future work.
 - `masks(overlay): add mask overlay modes`
-  - Runtime status: rubylith, color, grayscale, inverse, edge, and hidden overlay modes are schema-backed and fixture-validated for preview color evaluation; UI integration remains future work.
+  - Docs: `docs/layers/mask-overlay-runtime-2026-06-15.md`
+  - Validation: `scripts/check-mask-overlay-modes.mjs`
+  - Runtime status: rubylith, green, blue, white, black, grayscale, inverse, edge, and hidden overlay modes are schema-backed, fixture-validated for preview color evaluation, and wired into the live `generate_mask_overlay` command; user-facing UI controls remain future work.
 - `masks(copy): add mask copy paste`
   - Docs: `docs/layers/mask-copy-paste-runtime-2026-06-15.md`
   - Validation: `scripts/check-mask-copy-paste.mjs`

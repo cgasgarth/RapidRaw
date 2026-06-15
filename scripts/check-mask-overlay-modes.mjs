@@ -57,6 +57,7 @@ const invalidFixtures = z
   .array(invalidFixtureSchema)
   .min(1)
   .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid-mask-overlay-modes.json'), 'utf8')));
+const rustMaskGenerationSource = readFileSync(resolve('src-tauri/src/mask_generation.rs'), 'utf8');
 
 for (const fixture of fixtures) {
   const actual = normalizeMaskOverlaySettings(fixture.input);
@@ -80,6 +81,28 @@ for (const fixture of invalidFixtures) {
   const result = maskOverlaySettingsSchema.safeParse(fixture.payload);
   if (result.success) {
     console.error(`${fixture.id}: expected mask overlay schema rejection`);
+    process.exit(1);
+  }
+}
+
+const requiredRustFragments = [
+  'pub enum MaskOverlayMode',
+  'pub struct MaskOverlaySettings',
+  'overlay_settings: Option<MaskOverlaySettings>',
+  'MaskOverlayMode::Hidden',
+  'MaskOverlayMode::Rubylith',
+  'MaskOverlayMode::Green',
+  'MaskOverlayMode::Blue',
+  'MaskOverlayMode::White',
+  'MaskOverlayMode::Black',
+  'MaskOverlayMode::Grayscale',
+  'MaskOverlayMode::Inverse',
+  'MaskOverlayMode::Edges',
+];
+
+for (const fragment of requiredRustFragments) {
+  if (!rustMaskGenerationSource.includes(fragment)) {
+    console.error(`Missing Rust mask overlay runtime fragment: ${fragment}`);
     process.exit(1);
   }
 }
