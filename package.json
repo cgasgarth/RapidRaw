@@ -21,6 +21,7 @@
     "check:types": "bun scripts/run-compact-command.mjs --label types -- tsc --noEmit --pretty false",
     "check:i18n": "bun scripts/run-compact-command.mjs --label i18n -- i18next-cli extract --ci --dry-run",
     "check:unsafe-casts": "bun scripts/check-unsafe-casts.mjs",
+    "check:a11y": "bun scripts/check-accessibility-pass.mjs",
     "check:ai-fallbacks": "bun scripts/check-ai-provider-fallbacks.mjs",
     "check:keyboard-shortcuts": "bun scripts/check-keyboard-shortcuts.mjs",
     "check:keyboard-shortcut-conflicts": "bun scripts/check-keyboard-shortcut-conflicts.mjs",
