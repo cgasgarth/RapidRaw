@@ -49,6 +49,7 @@ const invalidFixtures = z
   .array(invalidFixtureSchema)
   .min(1)
   .parse(JSON.parse(readFileSync(resolve('fixtures/masks/invalid-mask-refinement-parameters.json'), 'utf8')));
+const rustMaskGenerationSource = readFileSync(resolve('src-tauri/src/mask_generation.rs'), 'utf8');
 
 for (const fixture of fixtures) {
   const actual = normalizeMaskRefinementParameters(fixture.input);
@@ -72,6 +73,23 @@ for (const fixture of invalidFixtures) {
   const result = maskRefinementParametersSchema.safeParse(fixture.payload);
   if (result.success) {
     console.error(`${fixture.id}: expected mask refinement schema rejection`);
+    process.exit(1);
+  }
+}
+
+const requiredRustFragments = [
+  'pub struct MaskRefinementParameters',
+  'fn apply_mask_refinement',
+  'edge_shift_px',
+  'feather_px',
+  'grayscale_dilate',
+  'grayscale_erode',
+  'apply_mask_refinement(mask, &sub_mask.parameters, scale)',
+];
+
+for (const fragment of requiredRustFragments) {
+  if (!rustMaskGenerationSource.includes(fragment)) {
+    console.error(`Missing Rust mask refinement runtime fragment: ${fragment}`);
     process.exit(1);
   }
 }
