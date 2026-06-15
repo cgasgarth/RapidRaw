@@ -16,6 +16,7 @@ mod cache_utils;
 mod culling;
 mod deblur_api;
 pub mod deblur_cpu_reference;
+mod deblur_render;
 mod denoise_api;
 pub mod denoise_cpu_reference;
 mod denoising;
@@ -449,7 +450,13 @@ fn process_preview_job(
         (final_preview_base, scale_for_gpu, 94)
     };
 
-    let (preview_width, preview_height) = processing_image.dimensions();
+    let deblurred_processing_image =
+        deblur_render::apply_deblur_stage(processing_image.as_ref(), &adjustments_clone);
+    let render_input_hash =
+        deblur_render::calculate_deblur_render_hash(new_transform_hash, &adjustments_clone);
+    let processing_image_ref = deblurred_processing_image.image.as_ref();
+
+    let (preview_width, preview_height) = processing_image_ref.dimensions();
 
     let pixel_roi = if is_interactive {
         roi.map(|(nx, ny, nw, nh)| crate::gpu_processing::Roi {
@@ -520,8 +527,8 @@ fn process_preview_job(
         crate::image_processing::process_and_get_dynamic_image_with_analytics(
             &context,
             &state,
-            &processing_image,
-            new_transform_hash,
+            processing_image_ref,
+            render_input_hash,
             RenderRequest {
                 adjustments: final_adjustments,
                 mask_bitmaps: &mask_bitmaps,
@@ -1665,10 +1672,12 @@ fn generate_preview_for_path(
     let lut_path = js_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
     let unique_hash = calculate_full_job_hash(&source_path_str, &js_adjustments);
+    let deblurred_image =
+        deblur_render::apply_deblur_stage(transformed_image.as_ref(), &js_adjustments);
     let final_image = process_and_get_dynamic_image(
         &context,
         &state,
-        transformed_image.as_ref(),
+        deblurred_image.image.as_ref(),
         unique_hash,
         RenderRequest {
             adjustments: all_adjustments,
