@@ -44,8 +44,8 @@ promoted to blocking lint rules after focused cleanup PRs.
 
 ## Dependency Cycle Audit
 
-Issue #542 measured `import-x/no-cycle` against the current TypeScript graph on
-June 11, 2026. The rule is not enabled yet because the remaining cycles cross
+Issue #542 measured `import-x/no-cycle` against the TypeScript graph on
+June 11, 2026 and #1286 re-probed it on June 15, 2026. The rule is not enabled yet because the remaining cycles cross
 type/value boundaries that should be split in focused refactor PRs rather than
 hidden inside a lint-only change.
 
@@ -56,6 +56,10 @@ bun run check:lint
 ```
 
 with `import-x/no-cycle` temporarily set to `error`.
+
+June 15, 2026 probe result: 10 violations, about 42 seconds wall time. This is
+high signal, but still too noisy for a global PR gate until the listed
+component/store cycles are split.
 
 Measured findings:
 
