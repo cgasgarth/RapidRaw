@@ -1,0 +1,201 @@
+{
+  "$schema": "https://rawengine.dev/schemas/denoise-fixtures-v1.json",
+  "issue": 1171,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14",
+  "runtimeStatus": "validation_only",
+  "validationScope": {
+    "proves": [
+      "denoise fixture manifest schema stability",
+      "synthetic and private-placeholder denoise fixture coverage",
+      "denoise metric contract coverage for luma, chroma, edge, texture, and DeltaE drift"
+    ],
+    "doesNotProve": ["real_raw_quality", "runtime_denoise_quality", "preview_export_parity", "e2e_workflow"]
+  },
+  "followUpIssues": {
+    "cpuReference": 1172,
+    "previewExportParity": 1150,
+    "uiApi": 1176,
+    "e2eWorkflow": 1177
+  },
+  "fixtures": [
+    {
+      "fixtureId": "detail.denoise.flat-shadow.v1",
+      "sourceKind": "synthetic_public",
+      "kind": "flat_shadow",
+      "stage": "scene_linear_post_demosaic",
+      "iso": 12800,
+      "notes": "Synthetic flat shadow ramp for bounded luma denoise without banding or color drift.",
+      "generator": {
+        "seed": "detail-denoise-flat-shadow-v1",
+        "basePattern": "flat_shadow_ramp",
+        "width": 128,
+        "height": 128,
+        "lumaNoiseSigma": 0.075,
+        "chromaNoiseSigma": 0.025,
+        "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000000111"
+      },
+      "privateRawEvidence": null,
+      "expectedMetrics": {
+        "lumaSigmaAfter": { "min": 0.018, "max": 0.045 },
+        "chromaSigmaAfter": { "min": 0.006, "max": 0.018 },
+        "edgePreservationRatio": { "min": 0.82, "max": 1.08 },
+        "textureEnergyRatio": { "min": 0.65, "max": 1.05 },
+        "deltaEMax": { "min": 0, "max": 1.2 }
+      },
+      "artifacts": [
+        {
+          "kind": "synthetic_clean_reference",
+          "path": "artifacts/detail/denoise/flat-shadow-clean-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000111",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "synthetic_noisy_input",
+          "path": "artifacts/detail/denoise/flat-shadow-noisy-input.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000112",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "expected_denoised_reference",
+          "path": "artifacts/detail/denoise/flat-shadow-expected-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000113",
+          "publicRepoAllowed": true
+        }
+      ]
+    },
+    {
+      "fixtureId": "detail.denoise.chroma-edge.v1",
+      "sourceKind": "synthetic_public",
+      "kind": "chroma_edge",
+      "stage": "scene_linear_post_demosaic",
+      "iso": 6400,
+      "notes": "Synthetic chroma edge fixture for color noise cleanup without edge bleeding or hue shift.",
+      "generator": {
+        "seed": "detail-denoise-chroma-edge-v1",
+        "basePattern": "chroma_edge",
+        "width": 128,
+        "height": 128,
+        "lumaNoiseSigma": 0.035,
+        "chromaNoiseSigma": 0.085,
+        "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000000221"
+      },
+      "privateRawEvidence": null,
+      "expectedMetrics": {
+        "lumaSigmaAfter": { "min": 0.012, "max": 0.035 },
+        "chromaSigmaAfter": { "min": 0.012, "max": 0.035 },
+        "edgePreservationRatio": { "min": 0.88, "max": 1.08 },
+        "textureEnergyRatio": { "min": 0.68, "max": 1.06 },
+        "deltaEMax": { "min": 0, "max": 1.6 }
+      },
+      "artifacts": [
+        {
+          "kind": "synthetic_clean_reference",
+          "path": "artifacts/detail/denoise/chroma-edge-clean-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000221",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "synthetic_noisy_input",
+          "path": "artifacts/detail/denoise/chroma-edge-noisy-input.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000222",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "expected_denoised_reference",
+          "path": "artifacts/detail/denoise/chroma-edge-expected-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000223",
+          "publicRepoAllowed": true
+        }
+      ]
+    },
+    {
+      "fixtureId": "detail.denoise.fine-texture.v1",
+      "sourceKind": "synthetic_public",
+      "kind": "fine_texture",
+      "stage": "scene_linear_post_demosaic",
+      "iso": 25600,
+      "notes": "Synthetic fine texture patch for preventing waxy detail loss while reducing high ISO noise.",
+      "generator": {
+        "seed": "detail-denoise-fine-texture-v1",
+        "basePattern": "fine_texture_patch",
+        "width": 128,
+        "height": 128,
+        "lumaNoiseSigma": 0.09,
+        "chromaNoiseSigma": 0.04,
+        "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000000331"
+      },
+      "privateRawEvidence": null,
+      "expectedMetrics": {
+        "lumaSigmaAfter": { "min": 0.025, "max": 0.055 },
+        "chromaSigmaAfter": { "min": 0.008, "max": 0.024 },
+        "edgePreservationRatio": { "min": 0.8, "max": 1.1 },
+        "textureEnergyRatio": { "min": 0.72, "max": 1.08 },
+        "deltaEMax": { "min": 0, "max": 1.4 }
+      },
+      "artifacts": [
+        {
+          "kind": "synthetic_clean_reference",
+          "path": "artifacts/detail/denoise/fine-texture-clean-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000331",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "synthetic_noisy_input",
+          "path": "artifacts/detail/denoise/fine-texture-noisy-input.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000332",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "expected_denoised_reference",
+          "path": "artifacts/detail/denoise/fine-texture-expected-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000333",
+          "publicRepoAllowed": true
+        }
+      ]
+    },
+    {
+      "fixtureId": "detail.denoise.private-high-iso-chroma.v1",
+      "sourceKind": "private_raw_placeholder",
+      "kind": "private_high_iso_chroma",
+      "stage": "scene_linear_post_demosaic",
+      "iso": 12800,
+      "notes": "Private RAW placeholder tied to the evidence ledger for future real high-ISO chroma noise review.",
+      "generator": null,
+      "privateRawEvidence": {
+        "evidenceId": "raw-evidence.detail.high-iso-chroma.v1",
+        "localRelativePath": "private-fixtures/detail/high-iso-chroma-v1.arw",
+        "sourceHash": null,
+        "cropHash": null,
+        "rightsStatus": "planned_private_capture"
+      },
+      "expectedMetrics": {
+        "lumaSigmaAfter": { "min": 0.01, "max": 0.07 },
+        "chromaSigmaAfter": { "min": 0.006, "max": 0.04 },
+        "edgePreservationRatio": { "min": 0.78, "max": 1.12 },
+        "textureEnergyRatio": { "min": 0.6, "max": 1.1 },
+        "deltaEMax": { "min": 0, "max": 2 }
+      },
+      "artifacts": [
+        {
+          "kind": "private_raw_crop_placeholder",
+          "path": "private-fixtures/detail/high-iso-chroma-v1.crop.json",
+          "hash": null,
+          "publicRepoAllowed": false
+        },
+        {
+          "kind": "preview_artifact_placeholder",
+          "path": "private-artifacts/detail/denoise/high-iso-chroma-preview.json",
+          "hash": null,
+          "publicRepoAllowed": false
+        },
+        {
+          "kind": "export_artifact_placeholder",
+          "path": "private-artifacts/detail/denoise/high-iso-chroma-export.json",
+          "hash": null,
+          "publicRepoAllowed": false
+        }
+      ]
+    }
+  ]
+}

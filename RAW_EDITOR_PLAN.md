@@ -25,6 +25,7 @@ The goal is not complete merely because the current backlog slice feels exhauste
 - Update this plan in the same PR when product direction, architecture, validation policy, or execution order changes.
 - Record exact local commands, CI runs, screenshots, render artifacts, skipped checks, and residual risk in every PR.
 - Keep capability status explicit: plan-only, schema-only, API-only, dry-run-only, UI-only, runtime apply-capable, and E2E-proven work are different states. A PR may make useful partial progress, but it must not close a full feature issue unless runtime behavior, preview/export behavior, E2E or equivalent workflow coverage, screenshots or artifacts, and remaining gaps are all proven or tracked.
+- Any planning, API-only, or UI-only PR for a user-visible feature must link an E2E or equivalent workflow proof issue unless that proof ships in the same PR.
 - Use the consult skill for major design decisions and high-risk color science, negative processing, panorama, HDR, focus stacking, super-resolution, agent, or UI architecture work.
 - Use Browser/Chrome and sample internet images only with source/license/provenance care. Use image generation when synthetic visual assets or controlled visual test material are appropriate.
 - Do not mark the goal blocked unless the same blocker has repeated across the required blocked audit and no meaningful progress is possible without user input or external-state change.
@@ -4737,6 +4738,11 @@ Issues:
   public-CI placeholders from real-photo private-review placeholders until
   payload rights, hashes, and thresholds are supplied.
 - Add private real RAW crop evidence ledger.
+- Add denoise fixture contract.
+  - Runtime status: validation-only fixture/schema contract. This proves
+    synthetic and private-placeholder coverage for denoise metrics, but does
+    not prove runtime denoise quality, preview/export parity, real RAW quality,
+    or E2E workflow behavior.
 - Add defringe improvements.
 - Add dust spot visualization.
 - Add AI denoise research issue.

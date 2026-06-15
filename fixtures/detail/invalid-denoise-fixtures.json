@@ -1,0 +1,149 @@
+[
+  {
+    "case": "missing-runtime-limitation",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/denoise-fixtures-v1.json",
+      "issue": 1171,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-14",
+      "runtimeStatus": "validation_only",
+      "validationScope": {
+        "proves": ["schema only"],
+        "doesNotProve": ["real_raw_quality", "preview_export_parity", "e2e_workflow"]
+      },
+      "followUpIssues": {
+        "cpuReference": 1172,
+        "previewExportParity": 1150,
+        "uiApi": 1176,
+        "e2eWorkflow": 1177
+      },
+      "fixtures": []
+    }
+  },
+  {
+    "case": "private-placeholder-allows-public-repo",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/denoise-fixtures-v1.json",
+      "issue": 1171,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-14",
+      "runtimeStatus": "validation_only",
+      "validationScope": {
+        "proves": ["schema only"],
+        "doesNotProve": ["real_raw_quality", "runtime_denoise_quality", "preview_export_parity", "e2e_workflow"]
+      },
+      "followUpIssues": {
+        "cpuReference": 1172,
+        "previewExportParity": 1150,
+        "uiApi": 1176,
+        "e2eWorkflow": 1177
+      },
+      "fixtures": [
+        {
+          "fixtureId": "detail.denoise.private-public-leak.v1",
+          "sourceKind": "private_raw_placeholder",
+          "kind": "private_high_iso_chroma",
+          "stage": "scene_linear_post_demosaic",
+          "iso": 12800,
+          "notes": "Invalid private placeholder that marks the crop as public.",
+          "generator": null,
+          "privateRawEvidence": {
+            "evidenceId": "raw-evidence.detail.high-iso-chroma.v1",
+            "localRelativePath": "private-fixtures/detail/high-iso-chroma-v1.arw",
+            "sourceHash": null,
+            "cropHash": null,
+            "rightsStatus": "planned_private_capture"
+          },
+          "expectedMetrics": {
+            "lumaSigmaAfter": { "min": 0.01, "max": 0.07 },
+            "chromaSigmaAfter": { "min": 0.006, "max": 0.04 },
+            "edgePreservationRatio": { "min": 0.78, "max": 1.12 },
+            "textureEnergyRatio": { "min": 0.6, "max": 1.1 },
+            "deltaEMax": { "min": 0, "max": 2 }
+          },
+          "artifacts": [
+            {
+              "kind": "private_raw_crop_placeholder",
+              "path": "private-fixtures/detail/high-iso-chroma-v1.crop.json",
+              "hash": null,
+              "publicRepoAllowed": true
+            },
+            {
+              "kind": "preview_artifact_placeholder",
+              "path": "private-artifacts/detail/denoise/high-iso-chroma-preview.json",
+              "hash": null,
+              "publicRepoAllowed": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "weak-edge-preservation",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/denoise-fixtures-v1.json",
+      "issue": 1171,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-14",
+      "runtimeStatus": "validation_only",
+      "validationScope": {
+        "proves": ["schema only"],
+        "doesNotProve": ["real_raw_quality", "runtime_denoise_quality", "preview_export_parity", "e2e_workflow"]
+      },
+      "followUpIssues": {
+        "cpuReference": 1172,
+        "previewExportParity": 1150,
+        "uiApi": 1176,
+        "e2eWorkflow": 1177
+      },
+      "fixtures": [
+        {
+          "fixtureId": "detail.denoise.weak-edge.v1",
+          "sourceKind": "synthetic_public",
+          "kind": "flat_shadow",
+          "stage": "scene_linear_post_demosaic",
+          "iso": 3200,
+          "notes": "Invalid fixture with too-weak edge preservation.",
+          "generator": {
+            "seed": "weak-edge-v1",
+            "basePattern": "flat_shadow_ramp",
+            "width": 128,
+            "height": 128,
+            "lumaNoiseSigma": 0.05,
+            "chromaNoiseSigma": 0.02,
+            "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000000441"
+          },
+          "privateRawEvidence": null,
+          "expectedMetrics": {
+            "lumaSigmaAfter": { "min": 0.01, "max": 0.04 },
+            "chromaSigmaAfter": { "min": 0.004, "max": 0.02 },
+            "edgePreservationRatio": { "min": 0.4, "max": 1.05 },
+            "textureEnergyRatio": { "min": 0.65, "max": 1.05 },
+            "deltaEMax": { "min": 0, "max": 1.2 }
+          },
+          "artifacts": [
+            {
+              "kind": "synthetic_clean_reference",
+              "path": "artifacts/detail/denoise/weak-edge-clean-reference.json",
+              "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000441",
+              "publicRepoAllowed": true
+            },
+            {
+              "kind": "synthetic_noisy_input",
+              "path": "artifacts/detail/denoise/weak-edge-noisy-input.json",
+              "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000442",
+              "publicRepoAllowed": true
+            },
+            {
+              "kind": "expected_denoised_reference",
+              "path": "artifacts/detail/denoise/weak-edge-expected-reference.json",
+              "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000443",
+              "publicRepoAllowed": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+]
