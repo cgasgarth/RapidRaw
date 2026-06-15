@@ -440,6 +440,10 @@
           "path": "docs/tooling/local-check-command-contract-2026-06-10.md"
         },
         {
+          "title": "Script type coverage",
+          "path": "docs/tooling/script-type-coverage-2026-06-15.md"
+        },
+        {
           "title": "Bun CI script migration",
           "path": "docs/tooling/bun-ci-script-migration-2026-06-10.md"
         },
