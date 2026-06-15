@@ -3884,6 +3884,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Manifest: `fixtures/color/colorchecker-fixture-manifest.json`
   - Docs: `docs/color/colorchecker-fixtures-2026-06-14.md`
 - `validation(color): add DeltaE measurement harness`
+  - Fixtures: `fixtures/color/deltae-reference-fixtures.json`
+  - Docs: `docs/color/deltae-harness-2026-06-14.md`
 - `validation(color): add histogram and scope validation`
 - `color(wb): add white balance picker tests`
   - Validation doc: `docs/color/white-balance-picker-validation-2026-06-14.md`
