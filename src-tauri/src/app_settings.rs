@@ -283,6 +283,7 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             last_export_path: None,
         },
         ExportPreset {
+            color_profile: Default::default(),
             id: "client-proof-tiff".to_string(),
             name: "Client Proof TIFF".to_string(),
             file_format: "tiff".to_string(),
