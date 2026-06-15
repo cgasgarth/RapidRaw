@@ -1,0 +1,125 @@
+{
+  "$schema": "https://rawengine.local/schemas/ai-people-picker-model.v1.json",
+  "expectedModel": {
+    "groups": [
+      {
+        "id": "core",
+        "options": [
+          {
+            "disabledReason": null,
+            "label": "Full person",
+            "part": "full_person",
+            "recommendedDefault": true,
+            "status": "supported",
+            "validationMode": "runtime_apply"
+          },
+          {
+            "disabledReason": null,
+            "label": "Background excluding people",
+            "part": "background",
+            "recommendedDefault": true,
+            "status": "derived",
+            "validationMode": "runtime_apply"
+          }
+        ],
+        "title": "People"
+      },
+      {
+        "id": "portrait_parts",
+        "options": [
+          {
+            "disabledReason": null,
+            "label": "Face",
+            "part": "face",
+            "recommendedDefault": false,
+            "status": "planned",
+            "validationMode": "dry_run"
+          },
+          {
+            "disabledReason": null,
+            "label": "Skin",
+            "part": "skin",
+            "recommendedDefault": false,
+            "status": "planned",
+            "validationMode": "dry_run"
+          },
+          {
+            "disabledReason": null,
+            "label": "Hair",
+            "part": "hair",
+            "recommendedDefault": false,
+            "status": "planned",
+            "validationMode": "dry_run"
+          },
+          {
+            "disabledReason": null,
+            "label": "Eyes",
+            "part": "eyes",
+            "recommendedDefault": false,
+            "status": "planned",
+            "validationMode": "dry_run"
+          },
+          {
+            "disabledReason": null,
+            "label": "Lips",
+            "part": "lips",
+            "recommendedDefault": false,
+            "status": "planned",
+            "validationMode": "dry_run"
+          },
+          {
+            "disabledReason": "Teeth need face-detail parsing and must remain unsupported until confidence is reliable.",
+            "label": "Teeth",
+            "part": "teeth",
+            "recommendedDefault": false,
+            "status": "unsupported",
+            "validationMode": "schema_only"
+          }
+        ],
+        "title": "Portrait parts"
+      },
+      {
+        "id": "body_parts",
+        "options": [
+          {
+            "disabledReason": null,
+            "label": "Clothing",
+            "part": "clothing",
+            "recommendedDefault": false,
+            "status": "planned",
+            "validationMode": "dry_run"
+          },
+          {
+            "disabledReason": null,
+            "label": "Arms",
+            "part": "arms",
+            "recommendedDefault": false,
+            "status": "planned",
+            "validationMode": "dry_run"
+          },
+          {
+            "disabledReason": null,
+            "label": "Hands",
+            "part": "hands",
+            "recommendedDefault": false,
+            "status": "planned",
+            "validationMode": "dry_run"
+          },
+          {
+            "disabledReason": null,
+            "label": "Legs",
+            "part": "legs",
+            "recommendedDefault": false,
+            "status": "planned",
+            "validationMode": "dry_run"
+          }
+        ],
+        "title": "Body and wardrobe"
+      }
+    ],
+    "schemaVersion": 1
+  },
+  "issue": 1137,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14"
+}

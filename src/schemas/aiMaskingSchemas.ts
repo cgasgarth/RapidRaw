@@ -228,7 +228,65 @@ export const aiPeopleMaskContractFixtureSchema = z
     }
   });
 
+export const aiPeopleMaskPickerOptionSchema = z
+  .object({
+    disabledReason: z.string().trim().min(1).nullable(),
+    label: z.string().trim().min(1),
+    part: aiPeopleMaskPartSchema,
+    recommendedDefault: z.boolean(),
+    status: aiPeopleMaskSupportStatusSchema,
+    validationMode: aiPeopleMaskRuntimeStatusSchema,
+  })
+  .strict()
+  .superRefine((option, context) => {
+    const isUnavailable = option.status === 'unsupported' || option.validationMode === 'schema_only';
+    if (isUnavailable && option.disabledReason === null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Unavailable people-mask picker options require a disabled reason.',
+        path: ['disabledReason'],
+      });
+    }
+
+    if (option.recommendedDefault && isUnavailable) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Unavailable people-mask picker options cannot be recommended defaults.',
+        path: ['recommendedDefault'],
+      });
+    }
+  });
+
+export const aiPeopleMaskPickerModelSchema = z
+  .object({
+    groups: z
+      .array(
+        z
+          .object({
+            id: z.enum(['core', 'portrait_parts', 'body_parts']),
+            options: z.array(aiPeopleMaskPickerOptionSchema).min(1),
+            title: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    schemaVersion: z.literal(1),
+  })
+  .strict();
+
+export const aiPeopleMaskPickerModelFixtureSchema = z
+  .object({
+    $schema: z.url(),
+    expectedModel: aiPeopleMaskPickerModelSchema,
+    issue: z.literal(1137),
+    schemaVersion: z.literal(1),
+    snapshotDate: z.iso.date(),
+  })
+  .strict();
+
 export type AiMaskCapability = z.infer<typeof aiMaskCapabilitySchema>;
 export type AiMaskCapabilityAuditEntry = z.infer<typeof aiMaskCapabilityAuditEntrySchema>;
+export type AiPeopleMaskAnalysis = z.infer<typeof aiPeopleMaskAnalysisSchema>;
+export type AiPeopleMaskPickerModel = z.infer<typeof aiPeopleMaskPickerModelSchema>;
 export type AiPeopleMaskPart = z.infer<typeof aiPeopleMaskPartSchema>;
 export type AiPeopleMaskProviderCapability = z.infer<typeof aiPeopleMaskProviderCapabilitySchema>;
