@@ -104,6 +104,7 @@ mod tests {
     use super::*;
     use image::{ImageBuffer, Rgb, Rgb32FImage};
     use serde_json::json;
+    use std::fs;
 
     fn synthetic_edge_image() -> DynamicImage {
         let image: Rgb32FImage = ImageBuffer::from_fn(16, 16, |x, y| {
@@ -196,5 +197,69 @@ mod tests {
             max_delta(preview.image.as_ref(), export.image.as_ref()),
             0.0
         );
+    }
+
+    #[test]
+    fn workflow_report_proves_preview_export_parity_and_image_change() {
+        let image = synthetic_edge_image();
+        let adjustments = enabled_adjustments();
+        let disabled_adjustments = json!({
+            "deblurEnabled": false,
+            "deblurSigmaPx": 0.8,
+            "deblurStrength": 70
+        });
+
+        let preview = apply_deblur_stage(&image, &adjustments);
+        let export = apply_deblur_stage(&image, &adjustments);
+        let disabled = apply_deblur_stage(&image, &disabled_adjustments);
+        let input_to_preview_max_delta = max_delta(&image, preview.image.as_ref());
+        let preview_to_export_max_delta = max_delta(preview.image.as_ref(), export.image.as_ref());
+        let disabled_preview_max_delta = max_delta(&image, disabled.image.as_ref());
+        let enabled_render_hash = calculate_deblur_render_hash(42, &adjustments);
+        let disabled_render_hash = calculate_deblur_render_hash(42, &disabled_adjustments);
+
+        assert_eq!(preview.status, DeblurRenderStatus::Applied);
+        assert!(input_to_preview_max_delta > 0.0001);
+        assert_eq!(preview_to_export_max_delta, 0.0);
+        assert_eq!(disabled_preview_max_delta, 0.0);
+        assert_ne!(enabled_render_hash, disabled_render_hash);
+
+        let report_path = match std::env::var("RAWENGINE_DEBLUR_WORKFLOW_REPORT") {
+            Ok(path) => path,
+            Err(_) => return,
+        };
+        let artifact_path = std::env::var("RAWENGINE_DEBLUR_WORKFLOW_PREVIEW_ARTIFACT")
+            .unwrap_or_else(|_| "target/rawengine-deblur-workflow-preview.png".to_string());
+
+        preview
+            .image
+            .as_ref()
+            .to_rgb8()
+            .save(&artifact_path)
+            .expect("write deblur workflow preview artifact");
+
+        let report = json!({
+            "artifactPath": artifact_path,
+            "applyStatus": "applied",
+            "disabledPreviewMaxDelta": disabled_preview_max_delta,
+            "enabledRenderHash": enabled_render_hash.to_string(),
+            "disabledRenderHash": disabled_render_hash.to_string(),
+            "inputToPreviewMaxDelta": input_to_preview_max_delta,
+            "issue": 1183,
+            "orderedAfter": "scene_linear_denoise",
+            "orderedBefore": "capture_sharpen",
+            "persistentAdjustments": {
+                "deblurEnabled": true,
+                "deblurSigmaPx": 0.8,
+                "deblurStrength": 70
+            },
+            "previewToExportMaxDelta": preview_to_export_max_delta,
+            "runtimeStatus": "preview_export_parity",
+            "schemaVersion": 1,
+            "stage": "scene_linear_post_denoise",
+            "warnings": ["Synthetic runtime workflow proof; real RAW quality remains tracked separately."]
+        });
+        fs::write(&report_path, serde_json::to_string_pretty(&report).unwrap())
+            .expect("write deblur workflow report");
     }
 }

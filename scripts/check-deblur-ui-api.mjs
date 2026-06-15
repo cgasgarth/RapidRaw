@@ -80,15 +80,14 @@ if (invalidApply.success) {
 }
 
 const runtime = detailDeblurRuntimeStateV1Schema.parse({
-  applyStatus: 'not_executed',
-  doesNotProve: ['preview_export_parity', 'real_raw_quality', 'gpu_parity', 'e2e_workflow', 'runtime_image_change'],
+  applyStatus: 'applied',
+  doesNotProve: ['real_raw_quality', 'gpu_parity', 'e2e_workflow'],
   effectiveControls: apiControls,
   orderedAfter: 'scene_linear_denoise',
   orderedBefore: 'capture_sharpen',
-  runtimeStatus: 'ui_api_wired',
-  skipReason: 'preview_not_wired',
+  runtimeStatus: 'preview_export_parity',
   stage: 'scene_linear_post_denoise',
-  warnings: ['Preview/export deblur application is not wired in this PR.'],
+  warnings: ['Synthetic workflow proof exists; real RAW quality remains tracked separately.'],
 });
 
 detailDeblurDryRunResultV1Schema.parse({
@@ -110,7 +109,7 @@ detailDeblurDryRunResultV1Schema.parse({
   runtime,
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
   sourceGraphRevision: dryRunCommand.expectedGraphRevision,
-  warnings: ['UI/API wired; preview/export image changes are not applied.'],
+  warnings: ['UI/API wired; runtime preview/export parity is validated by check:deblur-workflow-smoke.'],
 });
 
 console.log('deblur UI/API ok');

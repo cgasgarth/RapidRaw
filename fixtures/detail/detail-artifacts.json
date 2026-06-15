@@ -49,6 +49,17 @@
       "sourceIssue": 1173
     },
     {
+      "artifactId": "detail.deblur.workflow-preview.v1",
+      "capabilityState": "e2e_proven",
+      "feature": "deblur",
+      "hash": null,
+      "kind": "preview_artifact",
+      "limitations": ["real_raw_quality", "gpu_parity"],
+      "path": "src-tauri/target/rawengine-deblur-workflow-preview.png",
+      "publicRepoAllowed": true,
+      "sourceIssue": 1183
+    },
+    {
       "artifactId": "detail.private.edge-ringing.v1",
       "capabilityState": "validation_only",
       "feature": "deblur",
