@@ -254,6 +254,9 @@ module.exports = [
       '@typescript-eslint/restrict-plus-operands': 'error',
       '@typescript-eslint/no-unnecessary-boolean-literal-compare': 'error',
       '@typescript-eslint/no-unnecessary-type-parameters': 'error',
+      '@typescript-eslint/consistent-indexed-object-style': 'error',
+      '@typescript-eslint/prefer-for-of': 'error',
+      '@typescript-eslint/prefer-regexp-exec': 'error',
       'i18next/no-literal-string': [
         'warn',
         {

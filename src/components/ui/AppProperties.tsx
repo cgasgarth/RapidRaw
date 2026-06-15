@@ -186,7 +186,7 @@ export interface AppSettings {
   thumbnailSize?: ThumbnailSize;
   thumbnailAspectRatio?: ThumbnailAspectRatio;
   uiVisibility?: UiVisibility;
-  adjustmentVisibility?: { [key: string]: boolean };
+  adjustmentVisibility?: Record<string, boolean>;
   rawHighlightCompression?: number;
   rawPreprocessingColorNr?: number;
   rawPreprocessingSharpening?: number;
@@ -208,7 +208,7 @@ export interface AppSettings {
   useWgpuRenderer?: boolean;
   canvasInputMode?: 'mouse' | 'trackpad';
   zoomSpeedMultiplier?: number;
-  keybinds?: { [action: string]: string[] };
+  keybinds?: Record<string, string[]>;
   taggingShortcuts?: string[];
   tonemapperOverrideEnabled?: boolean;
   defaultRawTonemapper?: string;
@@ -283,7 +283,7 @@ export interface ImageFile {
   path: string;
   rating: number;
   tags: Array<string> | null;
-  exif: { [key: string]: string } | null;
+  exif: Record<string, string> | null;
   is_virtual_copy: boolean;
 }
 

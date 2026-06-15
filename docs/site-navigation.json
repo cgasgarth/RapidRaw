@@ -460,6 +460,10 @@
           "path": "docs/tooling/public-api-signature-rules-2026-06-15.md"
         },
         {
+          "title": "TypeScript stylistic rules",
+          "path": "docs/tooling/typescript-stylistic-rules-2026-06-15.md"
+        },
+        {
           "title": "Unsafe cast AST guard",
           "path": "docs/tooling/unsafe-cast-ast-guard-2026-06-15.md"
         },

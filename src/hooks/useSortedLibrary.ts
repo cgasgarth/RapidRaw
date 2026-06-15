@@ -57,14 +57,14 @@ export const parseShutter = (val: string | undefined): number => {
 
 export const parseAperture = (val: string | undefined): number => {
   if (!val) return 0;
-  const match = val.match(/(\d+(\.\d+)?)/);
+  const match = /(\d+(\.\d+)?)/.exec(val);
   const numVal = match ? parseFloat(match[0]) : 0;
   return isNaN(numVal) ? 0 : numVal;
 };
 
 export const parseFocalLength = (val: string | undefined): number => {
   if (!val) return 0;
-  const match = val.match(/(\d+(\.\d+)?)/);
+  const match = /(\d+(\.\d+)?)/.exec(val);
   if (!match) return 0;
   const numVal = parseFloat(match[0]);
   return isNaN(numVal) ? 0 : numVal;
@@ -171,7 +171,7 @@ export function computeSortedLibrary(
   const lowerCaseSearchText = searchText.trim().toLowerCase();
 
   const parsedTags: ParsedSearchTag[] = searchTags.map((tag: string) => {
-    const match = tag.match(ADVANCED_QUERY_REGEX);
+    const match = ADVANCED_QUERY_REGEX.exec(tag);
     if (match) {
       const operator = match[2] || '=';
       const field = match[1] ?? '';
