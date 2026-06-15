@@ -1057,6 +1057,69 @@ expectInvalid('preview scope result with mismatched parade channel', previewScop
   },
 });
 
+expectInvalid('preview scope result with mismatched vectorscope channel', previewScopeResultV1Schema, {
+  ...samplePreviewScopeResultV1,
+  vectorscope: {
+    ...samplePreviewScopeResultV1.vectorscope,
+    channel: 'rgb',
+  },
+});
+
+const samplePreviewHistogramV1 = samplePreviewScopeResultV1.histogram;
+if (samplePreviewHistogramV1 === undefined) {
+  throw new Error('samplePreviewScopeResultV1 must include a histogram.');
+}
+
+const [samplePreviewHistogramLumaV1, samplePreviewHistogramRedV1] = samplePreviewHistogramV1.channels;
+if (samplePreviewHistogramLumaV1 === undefined || samplePreviewHistogramRedV1 === undefined) {
+  throw new Error('samplePreviewScopeResultV1 histogram must include at least two channels.');
+}
+
+expectInvalid('preview scope result with histogram bin mismatch', previewScopeResultV1Schema, {
+  ...samplePreviewScopeResultV1,
+  histogram: {
+    ...samplePreviewHistogramV1,
+    channels: samplePreviewHistogramV1.channels.map((channel, index) =>
+      index === 0
+        ? {
+            ...channel,
+            bins: channel.bins.slice(1),
+          }
+        : channel,
+    ),
+  },
+});
+
+expectInvalid('preview scope result with duplicate histogram channel', previewScopeResultV1Schema, {
+  ...samplePreviewScopeResultV1,
+  histogram: {
+    ...samplePreviewHistogramV1,
+    channels: [
+      samplePreviewHistogramLumaV1,
+      {
+        ...samplePreviewHistogramRedV1,
+        channel: samplePreviewHistogramLumaV1.channel,
+      },
+    ],
+  },
+});
+
+expectInvalid('preview scope result with inverted histogram percentile', previewScopeResultV1Schema, {
+  ...samplePreviewScopeResultV1,
+  histogram: {
+    ...samplePreviewHistogramV1,
+    channels: samplePreviewHistogramV1.channels.map((channel, index) =>
+      index === 0
+        ? {
+            ...channel,
+            percentile01: 0.9,
+            percentile99: 0.1,
+          }
+        : channel,
+    ),
+  },
+});
+
 expectInvalid('preview scope query with empty scope selection', previewScopeQueryV1Schema, {
   ...samplePreviewScopeQueryV1,
   parameters: {

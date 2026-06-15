@@ -318,14 +318,46 @@ export const previewHistogramChannelV1Schema = z
     percentile01: z.number().min(0).max(1),
     percentile99: z.number().min(0).max(1),
   })
-  .strict();
+  .strict()
+  .superRefine((channel, context) => {
+    if (channel.percentile01 > channel.percentile99) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Histogram percentile01 must be less than or equal to percentile99.',
+        path: ['percentile01'],
+      });
+    }
+  });
 
 export const previewHistogramScopeV1Schema = z
   .object({
     binCount: z.number().int().min(16).max(4096),
     channels: z.array(previewHistogramChannelV1Schema).min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((histogram, context) => {
+    const seenChannels = new Set<string>();
+
+    histogram.channels.forEach((channel, index) => {
+      if (channel.bins.length !== histogram.binCount) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Histogram channel bin length must match binCount.',
+          path: ['channels', index, 'bins'],
+        });
+      }
+
+      if (seenChannels.has(channel.channel)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Histogram channels must be unique.',
+          path: ['channels', index, 'channel'],
+        });
+      }
+
+      seenChannels.add(channel.channel);
+    });
+  });
 
 export const previewRasterScopeV1Schema = z
   .object({
