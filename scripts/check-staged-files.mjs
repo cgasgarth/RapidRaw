@@ -1,8 +1,6 @@
 #!/usr/bin/env bun
 
-import { spawnSync } from 'node:child_process';
-
-import { writeBoundedOutput } from './compact-output.mjs';
+import { formatCommandForLog, writeBoundedOutput } from './compact-output.mjs';
 
 const FORMAT_EXTENSIONS = new Set([
   '.cjs',
@@ -21,26 +19,32 @@ const FORMAT_EXTENSIONS = new Set([
 const ESLINT_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx']);
 
 const run = (label, command, args) => {
-  const result = spawnSync(command, args, { encoding: 'utf8' });
-  if (result.status === 0) {
+  const result = Bun.spawnSync([command, ...args], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  if (result.exitCode === 0) {
     return label;
   }
 
-  console.error(`${label} failed: ${command} ${args.join(' ')}`);
-  writeBoundedOutput('stdout', result.stdout);
-  writeBoundedOutput('stderr', result.stderr);
+  console.error(`${label} failed: ${formatCommandForLog(command, args)}`);
+  writeBoundedOutput('stdout', result.stdout.toString());
+  writeBoundedOutput('stderr', result.stderr.toString());
 
-  process.exit(result.status ?? 1);
+  process.exit(result.exitCode || 1);
 };
 
 const git = (args) => {
-  const result = spawnSync('git', args, { encoding: 'utf8' });
-  if (result.status !== 0) {
-    process.stderr.write(result.stderr);
-    process.exit(result.status ?? 1);
+  const result = Bun.spawnSync(['git', ...args], {
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  if (result.exitCode !== 0) {
+    writeBoundedOutput('stderr', result.stderr.toString());
+    process.exit(result.exitCode || 1);
   }
 
-  return result.stdout;
+  return result.stdout.toString();
 };
 
 const extensionOf = (filePath) => {

@@ -1,7 +1,27 @@
-const DEFAULT_MAX_FAILURE_CHARS = 16_000;
-const DEFAULT_MAX_FAILURE_LINES = 80;
-const DEFAULT_HEAD_LINES = 25;
-const DEFAULT_TAIL_LINES = 45;
+const readPositiveInt = (name, fallback) => {
+  const value = process.env[name];
+  if (!value) return fallback;
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const DEFAULT_MAX_FAILURE_CHARS = readPositiveInt('RAWENGINE_COMPACT_MAX_CHARS', 8_000);
+const DEFAULT_MAX_FAILURE_LINES = readPositiveInt('RAWENGINE_COMPACT_MAX_LINES', 45);
+const DEFAULT_HEAD_LINES = readPositiveInt('RAWENGINE_COMPACT_HEAD_LINES', 12);
+const DEFAULT_TAIL_LINES = readPositiveInt('RAWENGINE_COMPACT_TAIL_LINES', 25);
+
+export const formatCommandForLog = (command, args = [], { maxArgs = 16, maxChars = 500 } = {}) => {
+  const parts = [command, ...args].filter(Boolean);
+  const visibleParts = parts.length > maxArgs ? [...parts.slice(0, maxArgs), `...(+${parts.length - maxArgs})`] : parts;
+  const rendered = visibleParts.join(' ');
+
+  if (rendered.length <= maxChars) {
+    return rendered;
+  }
+
+  return `${rendered.slice(0, maxChars)}...`;
+};
 
 export const writeBoundedOutput = (
   name,
