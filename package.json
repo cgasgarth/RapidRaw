@@ -130,6 +130,7 @@
     "schema:samples": "bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs",
     "schema:samples:update": "bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs --update",
     "schema:focus-app-server": "bun packages/rawengine-schema/scripts/check-focus-app-server-command-bus.ts",
+    "schema:hdr-api-tools": "bun packages/rawengine-schema/scripts/check-hdr-api-tools.ts",
     "check:rust:test": "bun scripts/run-compact-command.mjs --label rust:test --cwd src-tauri -- cargo test --locked --all-targets --no-default-features --features required-ci --no-fail-fast",
     "build:frontend": "bun scripts/run-compact-command.mjs --label build:frontend -- vite build",
     "docs:check": "bun scripts/run-compact-command.mjs --label docs:format -- prettier --check \"**/*.md\" && bun scripts/check-markdown-links.mjs",
