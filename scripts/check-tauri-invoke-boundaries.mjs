@@ -11,9 +11,37 @@ const CHECKED_EXTENSIONS = new Set(['.ts', '.tsx']);
 const IGNORED_DIRS = new Set(['.git', 'dist', 'node_modules', 'src-tauri/target', 'target']);
 const SCHEMA_WRAPPER_PATH = 'src/utils/tauriSchemaInvoke.ts';
 
-const MAX_RAW_INVOKE_IMPORT_FILES = 29;
-const MAX_RAW_INVOKE_CALLS = 154;
-const MAX_TYPED_RAW_INVOKE_CALLS = 59;
+const APPROVED_RAW_INVOKE_BUDGET = {
+  'src/App.tsx': { raw: 2, typed: 0 },
+  'src/components/adjustments/Effects.tsx': { raw: 2, typed: 0 },
+  'src/components/modals/CollageModal.tsx': { raw: 2, typed: 2 },
+  'src/components/modals/CullingModal.tsx': { raw: 1, typed: 0 },
+  'src/components/modals/LensCorrectionModal.tsx': { raw: 10, typed: 9 },
+  'src/components/modals/NegativeConversionModal.tsx': { raw: 3, typed: 1 },
+  'src/components/modals/TransformModal.tsx': { raw: 2, typed: 0 },
+  'src/components/panel/CommunityPage.tsx': { raw: 4, typed: 0 },
+  'src/components/panel/Editor.tsx': { raw: 3, typed: 0 },
+  'src/components/panel/SettingsPanel.tsx': { raw: 10, typed: 2 },
+  'src/components/panel/right/ExportPanel.tsx': { raw: 5, typed: 0 },
+  'src/components/panel/right/MetadataPanel.tsx': { raw: 2, typed: 0 },
+  'src/components/panel/right/PresetsPanel.tsx': { raw: 2, typed: 0 },
+  'src/components/ui/LUTControl.tsx': { raw: 1, typed: 1 },
+  'src/context/TaggingSubMenu.tsx': { raw: 2, typed: 0 },
+  'src/hooks/useAiMasking.ts': { raw: 8, typed: 7 },
+  'src/hooks/useAppContextMenus.ts': { raw: 26, typed: 10 },
+  'src/hooks/useAppInitialization.ts': { raw: 6, typed: 5 },
+  'src/hooks/useAppNavigation.ts': { raw: 14, typed: 10 },
+  'src/hooks/useEditorActions.ts': { raw: 8, typed: 3 },
+  'src/hooks/useFileOperations.ts': { raw: 8, typed: 1 },
+  'src/hooks/useImageLoader.ts': { raw: 3, typed: 2 },
+  'src/hooks/useImageProcessing.ts': { raw: 5, typed: 0 },
+  'src/hooks/useLibraryActions.ts': { raw: 8, typed: 3 },
+  'src/hooks/usePresets.ts': { raw: 5, typed: 2 },
+  'src/hooks/useProductivityActions.ts': { raw: 8, typed: 1 },
+  'src/hooks/useThumbnails.ts': { raw: 2, typed: 0 },
+  'src/store/useSettingsStore.ts': { raw: 1, typed: 0 },
+  'src/utils/frontendLogBridge.ts': { raw: 1, typed: 0 },
+};
 
 const getExtension = (path) => extname(path);
 
@@ -28,7 +56,7 @@ const getLine = (sourceFile, position) => sourceFile.getLineAndCharacterOfPositi
 
 export const inspectTauriInvokeSource = (filePath, contents) => {
   if (filePath === SCHEMA_WRAPPER_PATH) {
-    return { importedNames: [], rawCalls: [], typedRawCalls: [] };
+    return { importedNames: [], namespaceNames: [], rawCalls: [], typedRawCalls: [] };
   }
 
   const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true, getScriptKind(filePath));
@@ -83,6 +111,27 @@ export const inspectTauriInvokeSource = (filePath, contents) => {
   return { importedNames: [...importedNames], namespaceNames: [...namespaceNames], rawCalls, typedRawCalls };
 };
 
+const collectBoundaryFailures = (inventory, approvedBudget = APPROVED_RAW_INVOKE_BUDGET) => {
+  const failures = [];
+  for (const item of inventory) {
+    if (item.rawCalls.length === 0 && item.typedRawCalls.length === 0) continue;
+
+    const approved = approvedBudget[item.path];
+    if (!approved) {
+      failures.push(`${item.path}: raw invoke is not allowlisted`);
+      continue;
+    }
+
+    if (item.rawCalls.length > approved.raw) {
+      failures.push(`${item.path}: raw invoke calls ${item.rawCalls.length}/${approved.raw}`);
+    }
+    if (item.typedRawCalls.length > approved.typed) {
+      failures.push(`${item.path}: typed raw invoke calls ${item.typedRawCalls.length}/${approved.typed}`);
+    }
+  }
+  return failures;
+};
+
 const files = [];
 const walk = (dir) => {
   for (const entry of readdirSync(dir)) {
@@ -123,6 +172,11 @@ const payload = await invoke<unknown>(command, args);`,
     `import * as tauri from '@tauri-apps/api/core';
 const value = await tauri.invoke<string>('load_settings');`,
   );
+  const voidInvoke = inspectTauriInvokeSource(
+    'src/App.tsx',
+    `import { invoke } from '@tauri-apps/api/core';
+void invoke('frontend_ready').catch(console.error);`,
+  );
 
   if (blocked.importedNames.length !== 1 || blocked.rawCalls.length !== 1 || blocked.typedRawCalls.length !== 1) {
     throw new Error('tauri invoke self-test failed: raw typed invoke was not detected');
@@ -139,6 +193,26 @@ const value = await tauri.invoke<string>('load_settings');`,
     namespace.typedRawCalls.length !== 1
   ) {
     throw new Error('tauri invoke self-test failed: namespace invoke was not detected');
+  }
+  if (voidInvoke.rawCalls.length !== 1 || voidInvoke.typedRawCalls.length !== 0) {
+    throw new Error('tauri invoke self-test failed: void invoke exception was not classified');
+  }
+
+  const blockedFailures = collectBoundaryFailures([{ path: 'src/NewFeature.ts', ...blocked }], {});
+  if (blockedFailures.length !== 1 || !blockedFailures[0].includes('not allowlisted')) {
+    throw new Error('tauri invoke self-test failed: raw typed invoke was not rejected');
+  }
+
+  const wrapperFailures = collectBoundaryFailures([{ path: SCHEMA_WRAPPER_PATH, ...wrapper }], {});
+  if (wrapperFailures.length !== 0) {
+    throw new Error('tauri invoke self-test failed: wrapper was rejected');
+  }
+
+  const voidFailures = collectBoundaryFailures([{ path: 'src/App.tsx', ...voidInvoke }], {
+    'src/App.tsx': { raw: 1, typed: 0 },
+  });
+  if (voidFailures.length !== 0) {
+    throw new Error('tauri invoke self-test failed: void invoke budget exception was rejected');
   }
 
   console.log('tauri invoke boundary self-test ok');
@@ -164,16 +238,7 @@ const rawImportFiles = inventory.filter((item) => item.importedNames.length > 0 
 const rawCallCount = inventory.reduce((total, item) => total + item.rawCalls.length, 0);
 const typedRawCallCount = inventory.reduce((total, item) => total + item.typedRawCalls.length, 0);
 
-const failures = [];
-if (rawImportFiles.length > MAX_RAW_INVOKE_IMPORT_FILES) {
-  failures.push(`raw invoke import files ${rawImportFiles.length}/${MAX_RAW_INVOKE_IMPORT_FILES}`);
-}
-if (rawCallCount > MAX_RAW_INVOKE_CALLS) {
-  failures.push(`raw invoke calls ${rawCallCount}/${MAX_RAW_INVOKE_CALLS}`);
-}
-if (typedRawCallCount > MAX_TYPED_RAW_INVOKE_CALLS) {
-  failures.push(`typed raw invoke calls ${typedRawCallCount}/${MAX_TYPED_RAW_INVOKE_CALLS}`);
-}
+const failures = collectBoundaryFailures(inventory);
 
 if (failures.length > 0) {
   const examples = inventory
@@ -181,11 +246,11 @@ if (failures.length > 0) {
     .slice(0, 12)
     .map((item) => `${item.path}: raw=${item.rawCalls.length}, typed=${item.typedRawCalls.length}`)
     .join('\n');
-  console.error(`Tauri invoke boundary debt increased: ${failures.join('; ')}`);
+  console.error(`Raw Tauri invoke is banned outside the schema wrapper or approved baseline: ${failures.join('; ')}`);
   if (examples) console.error(examples);
   process.exit(1);
 }
 
 console.log(
-  `tauri invoke boundaries ok (files ${rawImportFiles.length}/${MAX_RAW_INVOKE_IMPORT_FILES}, raw ${rawCallCount}/${MAX_RAW_INVOKE_CALLS}, typed ${typedRawCallCount}/${MAX_TYPED_RAW_INVOKE_CALLS})`,
+  `tauri invoke boundaries ok (files ${rawImportFiles.length}, raw ${rawCallCount}, typed ${typedRawCallCount})`,
 );

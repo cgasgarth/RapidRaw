@@ -26,6 +26,7 @@ const CHECK_GROUPS = {
     'check:edit-history-replay',
     'check:tauri-schema-validation',
     'check:tauri-invoke-boundaries',
+    'check:tauri-invoke-boundaries:self-test',
     'check:rust-advisory-waivers',
     'check:workspace-layouts',
     'check:compare-survey',
