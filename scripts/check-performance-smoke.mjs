@@ -102,6 +102,13 @@ const smokeChecks = z.array(SmokeCheckSchema).parse([
     id: 'focus-sharpness-map-smoke',
     summary: 'Focus stacking CPU sharpness-map smoke',
   },
+  {
+    args: ['run', 'check:focus-preview-blend-smoke'],
+    budgetMs: 5_000,
+    command: 'bun',
+    id: 'focus-preview-blend-smoke',
+    summary: 'Focus stacking weighted-sharpness preview blend smoke',
+  },
 ]);
 
 const formatMs = (milliseconds) => `${Math.round(milliseconds)}ms`;
