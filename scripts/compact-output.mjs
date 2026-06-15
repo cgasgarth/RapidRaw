@@ -1,0 +1,64 @@
+const readPositiveInt = (name, fallback) => {
+  const value = process.env[name];
+  if (!value) return fallback;
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const DEFAULT_MAX_FAILURE_CHARS = readPositiveInt('RAWENGINE_COMPACT_MAX_CHARS', 8_000);
+const DEFAULT_MAX_FAILURE_LINES = readPositiveInt('RAWENGINE_COMPACT_MAX_LINES', 45);
+const DEFAULT_HEAD_LINES = readPositiveInt('RAWENGINE_COMPACT_HEAD_LINES', 12);
+const DEFAULT_TAIL_LINES = readPositiveInt('RAWENGINE_COMPACT_TAIL_LINES', 25);
+
+export const formatCommandForLog = (command, args = [], { maxArgs = 16, maxChars = 500 } = {}) => {
+  const parts = [command, ...args].filter(Boolean);
+  const visibleParts = parts.length > maxArgs ? [...parts.slice(0, maxArgs), `...(+${parts.length - maxArgs})`] : parts;
+  const rendered = visibleParts.join(' ');
+
+  if (rendered.length <= maxChars) {
+    return rendered;
+  }
+
+  return `${rendered.slice(0, maxChars)}...`;
+};
+
+export const writeBoundedOutput = (
+  name,
+  value,
+  {
+    maxChars = DEFAULT_MAX_FAILURE_CHARS,
+    maxLines = DEFAULT_MAX_FAILURE_LINES,
+    headLines = DEFAULT_HEAD_LINES,
+    tailLines = DEFAULT_TAIL_LINES,
+  } = {},
+) => {
+  if (!value) return;
+
+  const normalized = value.endsWith('\n') ? value : `${value}\n`;
+  const lines = normalized.split(/\r?\n/u);
+  const tooManyChars = normalized.length > maxChars;
+  const tooManyLines = lines.length > maxLines;
+
+  if (!tooManyChars && !tooManyLines) {
+    process.stderr.write(normalized);
+    return;
+  }
+
+  console.error(`${name} truncated (${lines.length} lines, ${normalized.length} chars)`);
+
+  if (tooManyLines) {
+    const head = lines.slice(0, headLines).join('\n');
+    const tail = lines.slice(-tailLines).join('\n');
+    if (head) process.stderr.write(`${head}\n`);
+    console.error('[...]');
+    if (tail) process.stderr.write(`${tail}\n`);
+    return;
+  }
+
+  const headChars = Math.ceil(maxChars * 0.55);
+  const tailChars = Math.floor(maxChars * 0.45);
+  process.stderr.write(normalized.slice(0, headChars));
+  console.error('\n[...]');
+  process.stderr.write(normalized.slice(-tailChars));
+};
