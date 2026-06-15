@@ -3812,6 +3812,11 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Docs: `docs/tooling/lint-zero-warning-default-2026-06-15.md`
   - Validation: `bun run lint`, `bun run check:lint`
   - Status: local command parity with PR lint only; no runtime product behavior change.
+- `tooling(casts): make unsafe-cast ban AST-backed`
+  - Issue: #1299
+  - Docs: `docs/tooling/unsafe-cast-ast-guard-2026-06-15.md`
+  - Validation: `bun scripts/check-unsafe-casts.mjs --self-test`, `bun run check:unsafe-casts`
+  - Status: guard hardening only; no runtime product behavior change.
 - `tooling(eslint): define allowed escape hatches`
 - `tooling(check): add local check scripts mirroring CI`
 - `tooling(hooks): add pre-commit main guard`
