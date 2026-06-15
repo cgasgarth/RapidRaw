@@ -432,6 +432,10 @@
           "path": "docs/validation/render-artifact-comparison-2026-06-15.md"
         },
         {
+          "title": "Unused vars severity",
+          "path": "docs/validation/unused-vars-error-2026-06-15.md"
+        },
+        {
           "title": "Local check command contract",
           "path": "docs/tooling/local-check-command-contract-2026-06-10.md"
         },

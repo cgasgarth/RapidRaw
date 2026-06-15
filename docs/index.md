@@ -122,6 +122,7 @@ generator before the release workflow needs one.
 - [Failure artifacts](ci/failure-artifacts-2026-06-11.md)
 - [Optional platform build matrix](ci/optional-platform-build-matrix-2026-06-11.md)
 - [Render artifact comparison](validation/render-artifact-comparison-2026-06-15.md)
+- [Unused vars severity](validation/unused-vars-error-2026-06-15.md)
 - [Local check command contract](tooling/local-check-command-contract-2026-06-10.md)
 - [Bun CI script migration](tooling/bun-ci-script-migration-2026-06-10.md)
 - [Bun package manager support](tooling/bun-package-manager-support-2026-06-10.md)
