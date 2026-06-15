@@ -456,6 +456,10 @@
           "path": "docs/tooling/unsafe-cast-ast-guard-2026-06-15.md"
         },
         {
+          "title": "Tauri invoke boundary ratchet",
+          "path": "docs/tooling/tauri-invoke-boundary-ratchet-2026-06-15.md"
+        },
+        {
           "title": "React refresh lint",
           "path": "docs/tooling/react-refresh-lint-2026-06-15.md"
         },
