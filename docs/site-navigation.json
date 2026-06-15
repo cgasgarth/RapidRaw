@@ -460,6 +460,10 @@
           "path": "docs/tooling/tauri-invoke-boundary-ratchet-2026-06-15.md"
         },
         {
+          "title": "Compact quality command policy",
+          "path": "docs/tooling/compact-quality-command-policy-2026-06-15.md"
+        },
+        {
           "title": "React refresh lint",
           "path": "docs/tooling/react-refresh-lint-2026-06-15.md"
         },
