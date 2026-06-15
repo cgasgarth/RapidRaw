@@ -24,6 +24,7 @@ The goal is not complete merely because the current backlog slice feels exhauste
 - Use this plan as the source of truth for ordering, constraints, and completion evidence.
 - Update this plan in the same PR when product direction, architecture, validation policy, or execution order changes.
 - Record exact local commands, CI runs, screenshots, render artifacts, skipped checks, and residual risk in every PR.
+- Keep capability status explicit: plan-only, schema-only, API-only, dry-run-only, UI-only, runtime apply-capable, and E2E-proven work are different states. A PR may make useful partial progress, but it must not close a full feature issue unless runtime behavior, preview/export behavior, E2E or equivalent workflow coverage, screenshots or artifacts, and remaining gaps are all proven or tracked.
 - Use the consult skill for major design decisions and high-risk color science, negative processing, panorama, HDR, focus stacking, super-resolution, agent, or UI architecture work.
 - Use Browser/Chrome and sample internet images only with source/license/provenance care. Use image generation when synthetic visual assets or controlled visual test material are appropriate.
 - Do not mark the goal blocked unless the same blocker has repeated across the required blocked audit and no meaningful progress is possible without user input or external-state change.
@@ -385,6 +386,10 @@ An issue is done when:
 - Required CI is green.
 - Local validation is recorded in the PR.
 - Tests or documented justification are included.
+- Runtime, preview/export, E2E or equivalent workflow coverage is proven when
+  the issue claims a complete user-facing or API-editing feature.
+- Partial capability states are labeled honestly, such as plan-only,
+  schema-only, API-only, dry-run-only, UI-only, or runtime apply-capable.
 - UI or image-processing artifacts are attached when relevant.
 - Documentation is updated when behavior or workflow changes.
 - Follow-up issues exist for intentional gaps.

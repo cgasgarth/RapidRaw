@@ -58,9 +58,11 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   open for more than 1 hour, while enforcing the two-open-PR cap.
 - It should also remind the agent to use the consult skill for hard decisions.
 - If a temporary reminder is needed to check consult output, update the existing
-  `check-rapidraw-consult` automation instead of creating or deleting a
+  `check-rapidraw-consult-and-prs` automation instead of creating or deleting a
   separate reminder, then restore it to the standing PR-stale/consult reminder
   afterward.
+- `check-rapidraw-consult` is an inactive older reminder and must not be
+  reactivated unless the user explicitly asks.
 
 ## Consult And Research
 
@@ -92,6 +94,11 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Run focused local validation before opening PRs and record evidence in the PR.
 - Do not treat narrow checks as proof of broad behavior. Match validation scope
   to the requirement being claimed.
+- Treat plan-only, schema-only, API-only, dry-run-only, UI-only, and runtime
+  apply-capable work as distinct completion states. Do not close or describe a
+  full feature as done until runtime behavior, preview/export behavior, E2E or
+  equivalent workflow coverage, screenshots or artifacts, and follow-up gaps are
+  all proven or explicitly tracked.
 - For image-editing features, verify with real image processing behavior and
   artifacts, not only type/lint checks.
 - Keep GitHub Actions current on supported major versions and maintain the
