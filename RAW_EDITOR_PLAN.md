@@ -3994,6 +3994,11 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Docs: `docs/layers/mask-refinement-controls-2026-06-15.md`
   - Validation: `scripts/check-mask-refinement-controls.mjs`
   - Status: UI-to-runtime plumbing; real-image quality tuning remains a follow-up.
+- 2026-06-15: Added typed mask refinement command schema and sample payload.
+  - Issue: #1258
+  - Docs: `docs/api/mask-refinement-command-2026-06-15.md`
+  - Validation: `bun run schema:check`
+  - Status: schema/sample command surface; live UI command-bus routing remains a follow-up.
   - Runtime status: feather, density, edge shift, smoothness, and edge contrast schemas plus refined weight evaluation are fixture-validated and wired into the Rust mask renderer; user-facing controls remain future work.
 - `masks(overlay): add mask overlay modes`
   - Docs: `docs/layers/mask-overlay-runtime-2026-06-15.md`

@@ -1563,6 +1563,25 @@ export const sampleLayerMaskApplyCommandEnvelopeV1: LayerMaskCommandEnvelopeV1 =
   },
 );
 
+export const sampleLayerMaskRefineCommandEnvelopeV1: LayerMaskCommandEnvelopeV1 =
+  layerMaskCommandEnvelopeV1Schema.parse({
+    ...sampleLayerMaskCommandEnvelopeV1,
+    commandId: 'command_layer_mask_refine_preview_sample',
+    commandType: 'layerMask.refineMask',
+    correlationId: 'corr_layer_mask_refine_preview_sample',
+    idempotencyKey: 'idem_layer_mask_refine_preview_sample',
+    parameters: {
+      maskId: 'mask_brush_portrait',
+      refinement: {
+        density: 0.82,
+        edgeContrast: 0.35,
+        edgeShiftPx: 3,
+        featherPx: 8,
+        smoothness: 0.2,
+      },
+    },
+  });
+
 export const sampleLayerMaskDryRunResultV1: LayerMaskDryRunResultV1 = layerMaskDryRunResultV1Schema.parse({
   commandId: sampleLayerMaskCommandEnvelopeV1.commandId,
   commandType: sampleLayerMaskCommandEnvelopeV1.commandType,

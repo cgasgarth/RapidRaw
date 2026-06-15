@@ -43,6 +43,10 @@
           "path": "docs/api/edit-command-api-2026-06-11.md"
         },
         {
+          "title": "Mask refinement command",
+          "path": "docs/api/mask-refinement-command-2026-06-15.md"
+        },
+        {
           "title": "RawEngine schema package",
           "path": "docs/api/rawengine-schema-package-2026-06-13.md"
         },
