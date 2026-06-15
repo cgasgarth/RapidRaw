@@ -35,6 +35,14 @@ Run these commands before merging accessibility lint changes:
 
 ```sh
 bun install --frozen-lockfile
+bun run check:a11y
 bun run check:lint
 bun run docs:check
 ```
+
+## Focused Pass
+
+Issue #244 adds `check:a11y` as a fast accessibility pass. It verifies the
+blocking JSX accessibility rule severities, runs focused lint over key modal and
+right-panel surfaces, and checks that primary modal dialogs keep `role="dialog"`,
+`aria-modal`, and `aria-labelledby` contracts.
