@@ -1,0 +1,54 @@
+[
+  {
+    "case": "duplicate ids",
+    "catalog": {
+      "version": 1,
+      "presets": [
+        {
+          "version": 1,
+          "id": "color_grading.bad.duplicate.v1",
+          "name": "Duplicate A",
+          "category": "neutral",
+          "shadows": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "midtones": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "highlights": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "global": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "balance": 0,
+          "blending": 50
+        },
+        {
+          "version": 1,
+          "id": "color_grading.bad.duplicate.v1",
+          "name": "Duplicate B",
+          "category": "neutral",
+          "shadows": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "midtones": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "highlights": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "global": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "balance": 0,
+          "blending": 50
+        }
+      ]
+    }
+  },
+  {
+    "case": "hue out of range",
+    "catalog": {
+      "version": 1,
+      "presets": [
+        {
+          "version": 1,
+          "id": "color_grading.bad.hue.v1",
+          "name": "Bad Hue",
+          "category": "neutral",
+          "shadows": { "hue": 360, "saturation": 1, "luminance": 0 },
+          "midtones": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "highlights": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "global": { "hue": 0, "saturation": 1, "luminance": 0 },
+          "balance": 0,
+          "blending": 50
+        }
+      ]
+    }
+  }
+]

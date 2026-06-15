@@ -1168,6 +1168,7 @@
         "clarityDehaze": "清晰度与去雾",
         "colorCalibration": "颜色校准",
         "colorGrading": "颜色分级",
+        "colorGradingPresets": "颜色分级预设",
         "colorMixer": "颜色混合器",
         "cropAspectRatio": "裁剪与宽高比",
         "curves": "曲线",

@@ -13,6 +13,7 @@ import {
   HueSatLum,
   INITIAL_ADJUSTMENTS,
 } from '../../utils/adjustments';
+import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
 import { AppSettings } from '../ui/AppProperties';
 import ColorWheel from '../ui/ColorWheel';
@@ -133,6 +134,20 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
   const [isExpanded, setIsExpanded] = useState(false);
   const colorGrading = adjustments.colorGrading;
 
+  const handleApplyPreset = (preset: (typeof COLOR_GRADING_PRESETS)[number]) => {
+    setAdjustments((prev: Partial<Adjustments>) => ({
+      ...prev,
+      colorGrading: {
+        balance: preset.balance,
+        blending: preset.blending,
+        global: preset.global,
+        highlights: preset.highlights,
+        midtones: preset.midtones,
+        shadows: preset.shadows,
+      },
+    }));
+  };
+
   const handleChange = (grading: ColorGrading, newValue: HueSatLum) => {
     setAdjustments((prev: Partial<Adjustments>) => ({
       ...prev,
@@ -214,6 +229,22 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
         >
           <Sliders size={14} />
         </button>
+      </div>
+
+      <div className="mb-4 flex gap-1 overflow-x-auto pb-1">
+        {COLOR_GRADING_PRESETS.map((preset) => (
+          <button
+            className="shrink-0 rounded bg-bg-secondary px-2 py-1 text-xs font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
+            data-tooltip={preset.category}
+            key={preset.id}
+            onClick={() => {
+              handleApplyPreset(preset);
+            }}
+            type="button"
+          >
+            {preset.name}
+          </button>
+        ))}
       </div>
 
       <div className="relative w-full mb-4">

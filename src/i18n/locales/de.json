@@ -1169,6 +1169,7 @@
         "clarityDehaze": "Klarheit & Dunst entfernen",
         "colorCalibration": "Farbkalibrierung",
         "colorGrading": "Color Grading",
+        "colorGradingPresets": "Color-Grading-Vorgaben",
         "colorMixer": "Farbmischer",
         "cropAspectRatio": "Zuschnitt & Seitenverhältnis",
         "curves": "Kurven",
