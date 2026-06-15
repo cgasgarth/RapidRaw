@@ -53,6 +53,7 @@
     "check:denoise-fixtures": "bun scripts/check-denoise-fixtures.mjs",
     "check:detail-stage-order": "bun scripts/check-detail-stage-order.mjs",
     "check:detail-artifacts": "bun scripts/check-detail-artifacts.mjs",
+    "check:denoise-cpu-reference": "bun scripts/check-denoise-cpu-reference.mjs",
     "check:export-recipes": "bun scripts/check-export-recipe-fixtures.mjs",
     "check:import-presets": "bun scripts/check-import-preset-fixtures.mjs",
     "check:library-sessions": "bun scripts/check-library-session-fixtures.mjs",

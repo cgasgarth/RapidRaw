@@ -4761,6 +4761,11 @@ Issues:
     artifact completion-state bookkeeping, but does not prove denoise/deblur
     preview/export parity, real RAW quality, UI/API wiring, or E2E workflow
     behavior.
+- Add denoise CPU reference runtime.
+  - Runtime status: CPU-reference-only. This must prove deterministic synthetic
+    before/noisy/denoised fixture artifacts and bounded metrics, but must not
+    claim preview/export parity, real RAW quality, GPU parity, UI/API wiring, or
+    E2E workflow behavior.
 - Add defringe improvements.
 - Add dust spot visualization.
 - Add AI denoise research issue.
