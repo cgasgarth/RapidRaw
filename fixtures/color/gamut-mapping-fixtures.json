@@ -1,0 +1,104 @@
+{
+  "$schema": "https://rawengine.local/schemas/gamut-mapping-fixtures-v1.json",
+  "schemaVersion": 1,
+  "issue": 94,
+  "snapshotDate": "2026-06-15",
+  "validationMode": "schema_fixture_contract",
+  "cases": [
+    {
+      "id": "gamut.srgb.neutral-in-gamut.v1",
+      "destinationLinearRgbBeforeMap": [0.18, 0.18, 0.18],
+      "expectedClassification": "in_gamut",
+      "policy": {
+        "destination": "srgb",
+        "intent": "relative_colorimetric",
+        "method": "relative_colorimetric_clip_fallback_v1",
+        "status": "schema_only",
+        "warnings": ["output_gamut_mapping_not_runtime_applied_v1"]
+      },
+      "notes": "Neutral output patch is already inside the sRGB output cube."
+    },
+    {
+      "id": "gamut.srgb.p3-primary-out-of-gamut.v1",
+      "destinationLinearRgbBeforeMap": [1.28, 0.02, 0.04],
+      "expectedClassification": "high_component",
+      "policy": {
+        "destination": "srgb",
+        "intent": "relative_colorimetric",
+        "method": "relative_colorimetric_clip_fallback_v1",
+        "status": "schema_only",
+        "warnings": ["output_gamut_high_component_v1", "output_gamut_mapping_not_runtime_applied_v1"]
+      },
+      "notes": "Wide-gamut red exceeds the sRGB output cube and must warn before clipping fallback is implemented."
+    },
+    {
+      "id": "gamut.display-p3.p3-primary-in-gamut.v1",
+      "destinationLinearRgbBeforeMap": [0.98, 0.04, 0.03],
+      "expectedClassification": "in_gamut",
+      "policy": {
+        "destination": "display_p3",
+        "intent": "relative_colorimetric",
+        "method": "relative_colorimetric_clip_fallback_v1",
+        "status": "schema_only",
+        "warnings": ["output_gamut_mapping_not_runtime_applied_v1"]
+      },
+      "notes": "Representative P3 primary stays inside the Display P3 output cube."
+    },
+    {
+      "id": "gamut.srgb.negative-component-warning.v1",
+      "destinationLinearRgbBeforeMap": [-0.08, 0.42, 0.35],
+      "expectedClassification": "negative_component",
+      "policy": {
+        "destination": "srgb",
+        "intent": "relative_colorimetric",
+        "method": "relative_colorimetric_clip_fallback_v1",
+        "status": "schema_only",
+        "warnings": ["output_gamut_negative_component_v1", "output_gamut_mapping_not_runtime_applied_v1"]
+      },
+      "notes": "Matrix conversion can produce negative channels that need explicit warning and deterministic clipping policy."
+    },
+    {
+      "id": "gamut.srgb.hdr-component-warning.v1",
+      "destinationLinearRgbBeforeMap": [2.4, 1.15, 0.72],
+      "expectedClassification": "high_component",
+      "policy": {
+        "destination": "srgb",
+        "intent": "relative_colorimetric",
+        "method": "relative_colorimetric_clip_fallback_v1",
+        "status": "schema_only",
+        "warnings": ["output_gamut_high_component_v1", "output_gamut_mapping_not_runtime_applied_v1"]
+      },
+      "notes": "HDR-like output components are not proof of display HDR support and must be warning-gated."
+    },
+    {
+      "id": "gamut.srgb.perceptual-intent-blocked.v1",
+      "destinationLinearRgbBeforeMap": [1.14, 0.22, 1.31],
+      "expectedClassification": "high_component",
+      "policy": {
+        "destination": "srgb",
+        "intent": "perceptual",
+        "method": "perceptual_oklch_chroma_reduce_planned_v1",
+        "status": "schema_only",
+        "warnings": [
+          "output_gamut_high_component_v1",
+          "output_gamut_mapping_not_runtime_applied_v1",
+          "output_gamut_perceptual_intent_unproven_v1"
+        ]
+      },
+      "notes": "Perceptual mapping remains a planned policy until image-wide runtime behavior is proven."
+    },
+    {
+      "id": "gamut.scene-referred.no-output-map.v1",
+      "destinationLinearRgbBeforeMap": [1.7, 0.55, 0.12],
+      "expectedClassification": "high_component",
+      "policy": {
+        "destination": "scene_referred",
+        "intent": "scene_referred",
+        "method": "none_scene_referred_v1",
+        "status": "schema_only",
+        "warnings": ["output_gamut_high_component_v1", "output_gamut_mapping_not_runtime_applied_v1"]
+      },
+      "notes": "Scene-referred data may exceed an output cube; no output gamut map should run before display/export conversion."
+    }
+  ]
+}

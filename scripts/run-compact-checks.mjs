@@ -49,6 +49,7 @@ const CHECK_GROUPS = {
     'check:color-abi',
     'check:preview-scopes',
     'check:color-cpu-gpu-parity',
+    'check:gamut-mapping',
     'check:black-white-mixer',
     'check:color-balance-rgb',
     'check:channel-mixer',

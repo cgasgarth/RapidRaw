@@ -260,9 +260,99 @@ export const rawEngineRenderTargetV1Schema = z
   })
   .strict();
 
+export const rawEngineGamutMappingDestinationV1Schema = z.enum(['srgb', 'display_p3', 'scene_referred']);
+
+export const rawEngineGamutMappingMethodV1Schema = z.enum([
+  'none_scene_referred_v1',
+  'relative_colorimetric_clip_fallback_v1',
+  'perceptual_oklch_chroma_reduce_planned_v1',
+]);
+
+export const rawEngineGamutMappingStatusV1Schema = z.enum(['schema_only', 'cpu_reference_planned']);
+
+export const rawEngineGamutMappingWarningCodeV1Schema = z.enum([
+  'output_gamut_high_component_v1',
+  'output_gamut_mapping_not_runtime_applied_v1',
+  'output_gamut_negative_component_v1',
+  'output_gamut_perceptual_intent_unproven_v1',
+]);
+
+export const rawEngineRgbTripletV1Schema = z.tuple([z.number(), z.number(), z.number()]);
+
+export const rawEngineGamutMappingPolicyV1Schema = z
+  .object({
+    destination: rawEngineGamutMappingDestinationV1Schema,
+    intent: rawEngineRenderingIntentV1Schema,
+    method: rawEngineGamutMappingMethodV1Schema,
+    status: rawEngineGamutMappingStatusV1Schema,
+    warnings: z.array(rawEngineGamutMappingWarningCodeV1Schema),
+  })
+  .strict()
+  .superRefine((policy, context) => {
+    if (policy.status === 'schema_only' && !policy.warnings.includes('output_gamut_mapping_not_runtime_applied_v1')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Schema-only gamut mapping must warn that runtime application is not proven.',
+        path: ['warnings'],
+      });
+    }
+
+    if (policy.intent === 'perceptual' && !policy.warnings.includes('output_gamut_perceptual_intent_unproven_v1')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Perceptual gamut mapping must remain warning-gated until runtime proof exists.',
+        path: ['warnings'],
+      });
+    }
+
+    if (policy.destination === 'scene_referred' && policy.method !== 'none_scene_referred_v1') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Scene-referred policy must not apply an output gamut map.',
+        path: ['method'],
+      });
+    }
+
+    if (policy.destination !== 'scene_referred' && policy.method === 'none_scene_referred_v1') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Output destinations require an explicit gamut mapping method.',
+        path: ['method'],
+      });
+    }
+  });
+
+export const rawEngineGamutMappingFixtureCaseV1Schema = z
+  .object({
+    destinationLinearRgbBeforeMap: rawEngineRgbTripletV1Schema,
+    expectedClassification: z.enum(['in_gamut', 'high_component', 'negative_component', 'mixed_out_of_gamut']),
+    id: z.string().regex(/^gamut\.[a-z0-9.-]+\.v[0-9]+$/u),
+    notes: z.string().trim().min(1),
+    policy: rawEngineGamutMappingPolicyV1Schema,
+  })
+  .strict();
+
+export const rawEngineGamutMappingFixtureManifestV1Schema = z
+  .object({
+    $schema: z.url(),
+    cases: z.array(rawEngineGamutMappingFixtureCaseV1Schema).min(1),
+    issue: z.literal(94),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    snapshotDate: z.iso.date(),
+    validationMode: z.literal('schema_fixture_contract'),
+  })
+  .strict()
+  .superRefine((manifest, context) => {
+    const ids = manifest.cases.map((testCase) => testCase.id);
+    if (new Set(ids).size !== ids.length) {
+      context.addIssue({ code: 'custom', message: 'Gamut mapping fixture IDs must be unique.', path: ['cases'] });
+    }
+  });
+
 export const rawEngineColorPipelineContextV1Schema = z
   .object({
     chromaticAdaptation: rawEngineChromaticAdaptationV1Schema,
+    gamutMapping: rawEngineGamutMappingPolicyV1Schema.optional(),
     inputDomain: rawEngineColorDomainV1Schema,
     operationDomain: rawEngineColorDomainV1Schema,
     renderTarget: rawEngineRenderTargetV1Schema.optional(),
@@ -8900,6 +8990,13 @@ export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
 export type RawEngineColorDomainV1 = z.infer<typeof rawEngineColorDomainV1Schema>;
 export type RawEngineColorPipelineContextV1 = z.infer<typeof rawEngineColorPipelineContextV1Schema>;
+export type RawEngineGamutMappingDestinationV1 = z.infer<typeof rawEngineGamutMappingDestinationV1Schema>;
+export type RawEngineGamutMappingFixtureCaseV1 = z.infer<typeof rawEngineGamutMappingFixtureCaseV1Schema>;
+export type RawEngineGamutMappingFixtureManifestV1 = z.infer<typeof rawEngineGamutMappingFixtureManifestV1Schema>;
+export type RawEngineGamutMappingMethodV1 = z.infer<typeof rawEngineGamutMappingMethodV1Schema>;
+export type RawEngineGamutMappingPolicyV1 = z.infer<typeof rawEngineGamutMappingPolicyV1Schema>;
+export type RawEngineGamutMappingStatusV1 = z.infer<typeof rawEngineGamutMappingStatusV1Schema>;
+export type RawEngineGamutMappingWarningCodeV1 = z.infer<typeof rawEngineGamutMappingWarningCodeV1Schema>;
 export type RawEngineOutputProfileV1 = z.infer<typeof rawEngineOutputProfileV1Schema>;
 export type RawEngineRenderBitDepthV1 = z.infer<typeof rawEngineRenderBitDepthV1Schema>;
 export type RawEngineRenderingIntentV1 = z.infer<typeof rawEngineRenderingIntentV1Schema>;
