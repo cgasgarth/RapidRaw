@@ -4775,6 +4775,11 @@ Issues:
   - Follow-ups: CPU reference runtime #1180, UI/API wiring #1181, real RAW
     quality pack #1182, E2E workflow proof #1183, and shared preview/export
     parity #1150.
+- Add deblur CPU reference runtime.
+  - Runtime status: CPU-reference-only. This proves deterministic constrained
+    Gaussian synthetic apply/skip behavior for accepted and rejected fixture
+    cases, but does not prove preview/export parity, real RAW quality, GPU
+    parity, UI/API wiring, or E2E workflow behavior.
 - Add defringe improvements.
 - Add dust spot visualization.
 - Add AI denoise research issue.

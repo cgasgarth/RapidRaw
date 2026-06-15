@@ -14,6 +14,7 @@ mod app_settings;
 mod app_state;
 mod cache_utils;
 mod culling;
+pub mod deblur_cpu_reference;
 pub mod denoise_cpu_reference;
 mod denoising;
 mod exif_processing;
