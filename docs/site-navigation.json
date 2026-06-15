@@ -484,6 +484,10 @@
           "path": "docs/tooling/eslint-strict-type-checked-2026-06-11.md"
         },
         {
+          "title": "TypeScript suppression policy",
+          "path": "docs/tooling/typescript-suppression-policy-2026-06-15.md"
+        },
+        {
           "title": "ESLint escape hatches",
           "path": "docs/tooling/eslint-escape-hatches-2026-06-11.md"
         },
