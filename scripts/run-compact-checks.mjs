@@ -6,6 +6,7 @@ const CHECK_GROUPS = {
   'check:quick': [
     'check:types',
     'check:script-type-coverage',
+    'check:script-type-coverage:self-test',
     'check:i18n',
     'check:unsafe-casts',
     'check:film-fixtures',

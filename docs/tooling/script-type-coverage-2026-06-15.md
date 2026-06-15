@@ -5,7 +5,8 @@ Status: baseline guard.
 ## Scope
 
 - Adds a compact guard for JavaScript and MJS files under `scripts/`.
-- Current baseline: `0/120` scripts contain `@ts-check`.
+- Current baseline: `5/124` scripts contain `@ts-check`.
+- Current debt cap: `119` scripts without `@ts-check`.
 - The guard prevents this debt count from increasing while follow-up work decides whether to migrate scripts to `@ts-check`, TypeScript, or a dedicated scripts tsconfig.
 
 ## Rejected For This Slice
@@ -17,3 +18,4 @@ Status: baseline guard.
 ## Validation
 
 - `bun run check:script-type-coverage`
+- `bun run check:script-type-coverage:self-test`
