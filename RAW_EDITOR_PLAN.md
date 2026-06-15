@@ -3906,12 +3906,15 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Fixtures: `fixtures/color/deltae-reference-fixtures.json`
   - Docs: `docs/color/deltae-harness-2026-06-14.md`
 - `validation(color): add histogram and scope validation`
+- `validation(color): add CPU GPU parity checks for core color operations`
+  - Fixtures: `fixtures/color/cpu-gpu-parity-fixtures.json`
+  - Docs: `docs/color/color-cpu-gpu-parity-2026-06-14.md`
+  - Runtime status: WGSL contract CPU mirror; live GPU readback remains future work.
 - `color(wb): add white balance picker tests`
   - Validation doc: `docs/color/white-balance-picker-validation-2026-06-14.md`
 - `color(profile): add camera profile lookup tests`
 - `color(cat): add chromatic adaptation plan`
 - `color(gamut): add gamut mapping plan`
-- `validation(color): add CPU GPU parity checks for core color operations`
 
 #### Milestone 6: Capture One-Class Color Editing
 
@@ -4624,11 +4627,11 @@ Issues:
 - Add ColorChecker fixture set.
 - Add DeltaE measurement harness.
 - Add histogram/scope validation.
+- Add CPU/GPU parity checks for core color operations.
 - Add white balance picker tests.
 - Add camera profile lookup tests.
 - Add chromatic adaptation module or integration plan.
 - Add gamut mapping plan.
-- Add CPU/GPU parity checks for core color operations.
 
 Definition of done:
 

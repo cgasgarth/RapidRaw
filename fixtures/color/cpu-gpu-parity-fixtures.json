@@ -1,0 +1,55 @@
+{
+  "$schema": "https://rawengine.dev/schemas/color-cpu-gpu-parity-fixtures-v1.json",
+  "cases": [
+    {
+      "expectedOutput": [0.42811456, 0.59460356, 1.18920712],
+      "id": "color.parity.linear-exposure-midgray.v1",
+      "input": [0.18, 0.25, 0.5],
+      "notes": "CPU mirror for the WGPU linear exposure shader helper on a midtone patch.",
+      "operation": "linear_exposure",
+      "parameters": {
+        "exposure": 1.25
+      },
+      "tolerance": 0.000001
+    },
+    {
+      "expectedOutput": [0.42693, 0.42735, 0.33573],
+      "id": "color.parity.white-balance-warm-tint.v1",
+      "input": [0.42, 0.4, 0.38],
+      "notes": "CPU mirror for the WGPU white-balance temperature and tint multipliers.",
+      "operation": "white_balance",
+      "parameters": {
+        "temperature": 0.35,
+        "tint": -0.2
+      },
+      "tolerance": 0.000001
+    },
+    {
+      "expectedOutput": [0.26689892, 0.83971292, 0.9649699],
+      "id": "color.parity.legacy-tonemap-highlight.v1",
+      "input": [0.18, 1.2, 3.5],
+      "notes": "CPU mirror for the legacy WGPU display tonemap over midtone and highlight values.",
+      "operation": "legacy_tonemap",
+      "parameters": {},
+      "tolerance": 0.000001
+    }
+  ],
+  "issue": 95,
+  "schemaVersion": 1,
+  "shaderFunctions": [
+    {
+      "name": "apply_linear_exposure",
+      "sha256": "sha256:221bbd78cee52da68538c489c33b324cd2c24a6ddf59b727d89407f6f83ebb4e"
+    },
+    {
+      "name": "apply_white_balance",
+      "sha256": "sha256:bf50953debcb88e69628c3e560535115e6bdf0b11123a4587416f55ff9382859"
+    },
+    {
+      "name": "legacy_tonemap",
+      "sha256": "sha256:7f5eb65bdcb6ea30cbf0d536f9e3488b0e746bdf5655d6f31b189fddd83b2e0e"
+    }
+  ],
+  "snapshotDate": "2026-06-14",
+  "validationMode": "wgsl_contract_cpu_mirror"
+}

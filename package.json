@@ -56,6 +56,7 @@
     "check:ai-people-picker": "bun scripts/check-ai-people-picker-model.mjs",
     "check:ai-people-fake-provider": "bun scripts/check-ai-people-fake-provider.mjs",
     "check:deltae-fixtures": "bun scripts/check-deltae-fixtures.mjs",
+    "check:color-cpu-gpu-parity": "bun scripts/check-color-cpu-gpu-parity.mjs",
     "check:defringe": "bun scripts/check-defringe-fixtures.mjs",
     "check:ai-people-render": "bun scripts/check-ai-people-render-fixtures.mjs",
     "check:ai-people-apply-plan": "bun scripts/check-ai-people-layer-apply-plan.mjs",

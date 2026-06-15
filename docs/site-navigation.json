@@ -115,6 +115,10 @@
           "path": "docs/color/deltae-harness-2026-06-14.md"
         },
         {
+          "title": "Color CPU/GPU parity fixtures",
+          "path": "docs/color/color-cpu-gpu-parity-2026-06-14.md"
+        },
+        {
           "title": "Film simulation architecture",
           "path": "docs/film/film-simulation-architecture-2026-06-13.md"
         },
