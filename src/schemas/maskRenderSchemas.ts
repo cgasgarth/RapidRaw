@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { aiPeopleMaskFakeAlphaMaskSchema } from './aiMaskingSchemas';
+
 const maskIdSchema = z.string().trim().min(1);
 const normalizedScalarSchema = z.number().min(0).max(1);
 
@@ -81,6 +83,15 @@ export const maskRenderOperationSchema = z
             path: ['minLuma'],
           }),
         type: z.literal('luminance_range'),
+      })
+      .strict(),
+    z
+      .object({
+        id: maskIdSchema,
+        mode: maskComposeModeSchema,
+        opacity: normalizedScalarSchema,
+        peopleMask: aiPeopleMaskFakeAlphaMaskSchema,
+        type: z.literal('ai_people_fake'),
       })
       .strict(),
   ])
