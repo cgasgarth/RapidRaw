@@ -230,6 +230,7 @@ module.exports = [
       '@typescript-eslint/unbound-method': 'error',
       '@typescript-eslint/no-misused-promises': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
       '@typescript-eslint/no-unsafe-member-access': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',
       '@typescript-eslint/no-unnecessary-type-assertion': 'error',
