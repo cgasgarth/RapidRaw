@@ -1,0 +1,62 @@
+{
+  "$schema": "https://rawengine.dev/schemas/detail-stage-order-v1.json",
+  "issue": 1174,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-15",
+  "stages": [
+    {
+      "order": 10,
+      "stage": "raw_decode",
+      "status": "cpu_reference_only",
+      "validates": ["RAW bytes are decoded before detail operations"]
+    },
+    {
+      "order": 20,
+      "stage": "demosaic",
+      "status": "cpu_reference_only",
+      "validates": ["detail denoise and deblur operate after demosaic"]
+    },
+    {
+      "order": 30,
+      "stage": "scene_linear_denoise",
+      "status": "cpu_reference_only",
+      "validates": ["denoise runs before deblur and sharpening"]
+    },
+    {
+      "order": 40,
+      "stage": "scene_linear_deblur",
+      "status": "validation_only",
+      "validates": ["deblur is constrained after denoise to limit noise amplification"]
+    },
+    {
+      "order": 50,
+      "stage": "capture_sharpen",
+      "status": "preview_only",
+      "validates": ["capture sharpening runs after denoise and deblur"]
+    },
+    {
+      "order": 60,
+      "stage": "local_contrast",
+      "status": "preview_only",
+      "validates": ["local contrast runs after detail restoration"]
+    },
+    {
+      "order": 70,
+      "stage": "tone_display_transform",
+      "status": "preview_export_parity",
+      "validates": ["tone/display transforms run after scene-linear detail work"]
+    },
+    {
+      "order": 80,
+      "stage": "output_sharpen",
+      "status": "preview_export_parity",
+      "validates": ["output sharpening runs after resize/export intent"]
+    },
+    {
+      "order": 90,
+      "stage": "export_encode",
+      "status": "preview_export_parity",
+      "validates": ["export encoding is last in the image delivery path"]
+    }
+  ]
+}

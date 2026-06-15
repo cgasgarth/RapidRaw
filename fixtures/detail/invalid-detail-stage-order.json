@@ -1,0 +1,38 @@
+[
+  {
+    "case": "missing-export-encode",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/detail-stage-order-v1.json",
+      "issue": 1174,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-15",
+      "stages": [
+        { "order": 10, "stage": "raw_decode", "status": "cpu_reference_only", "validates": ["raw"] },
+        { "order": 20, "stage": "demosaic", "status": "cpu_reference_only", "validates": ["demosaic"] },
+        { "order": 30, "stage": "scene_linear_denoise", "status": "cpu_reference_only", "validates": ["denoise"] },
+        { "order": 40, "stage": "scene_linear_deblur", "status": "validation_only", "validates": ["deblur"] },
+        { "order": 50, "stage": "capture_sharpen", "status": "preview_only", "validates": ["sharpen"] }
+      ]
+    }
+  },
+  {
+    "case": "deblur-before-denoise",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/detail-stage-order-v1.json",
+      "issue": 1174,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-15",
+      "stages": [
+        { "order": 10, "stage": "raw_decode", "status": "cpu_reference_only", "validates": ["raw"] },
+        { "order": 20, "stage": "demosaic", "status": "cpu_reference_only", "validates": ["demosaic"] },
+        { "order": 30, "stage": "scene_linear_deblur", "status": "validation_only", "validates": ["deblur"] },
+        { "order": 40, "stage": "scene_linear_denoise", "status": "cpu_reference_only", "validates": ["denoise"] },
+        { "order": 50, "stage": "capture_sharpen", "status": "preview_only", "validates": ["sharpen"] },
+        { "order": 60, "stage": "local_contrast", "status": "preview_only", "validates": ["local"] },
+        { "order": 70, "stage": "tone_display_transform", "status": "preview_export_parity", "validates": ["tone"] },
+        { "order": 80, "stage": "output_sharpen", "status": "preview_export_parity", "validates": ["output"] },
+        { "order": 90, "stage": "export_encode", "status": "preview_export_parity", "validates": ["export"] }
+      ]
+    }
+  }
+]

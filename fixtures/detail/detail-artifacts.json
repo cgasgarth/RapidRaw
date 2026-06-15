@@ -1,0 +1,63 @@
+{
+  "$schema": "https://rawengine.dev/schemas/detail-artifacts-v1.json",
+  "issue": 1174,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-15",
+  "artifacts": [
+    {
+      "artifactId": "detail.denoise.cpu-reference-report.v1",
+      "capabilityState": "cpu_reference_only",
+      "feature": "denoise",
+      "hash": null,
+      "kind": "metric_report",
+      "limitations": ["preview_export_parity", "real_raw_quality", "gpu_parity", "ui_api_wiring", "e2e_workflow"],
+      "path": "src-tauri/target/rawengine-denoise-cpu-reference-report.json",
+      "publicRepoAllowed": true,
+      "sourceIssue": 1172
+    },
+    {
+      "artifactId": "detail.denoise.synthetic-before.v1",
+      "capabilityState": "cpu_reference_only",
+      "feature": "denoise",
+      "hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "kind": "synthetic_before",
+      "limitations": ["preview_export_parity", "real_raw_quality", "gpu_parity", "ui_api_wiring", "e2e_workflow"],
+      "path": "generated://detail.denoise.synthetic.before.v1",
+      "publicRepoAllowed": true,
+      "sourceIssue": 1172
+    },
+    {
+      "artifactId": "detail.denoise.synthetic-after.v1",
+      "capabilityState": "cpu_reference_only",
+      "feature": "denoise",
+      "hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "kind": "synthetic_after",
+      "limitations": ["preview_export_parity", "real_raw_quality", "gpu_parity", "ui_api_wiring", "e2e_workflow"],
+      "path": "generated://detail.denoise.synthetic.after.v1",
+      "publicRepoAllowed": true,
+      "sourceIssue": 1172
+    },
+    {
+      "artifactId": "detail.deblur.psf-placeholder.v1",
+      "capabilityState": "validation_only",
+      "feature": "deblur",
+      "hash": null,
+      "kind": "metric_report",
+      "limitations": ["preview_export_parity", "real_raw_quality", "gpu_parity", "ui_api_wiring", "e2e_workflow"],
+      "path": "fixtures/detail/deblur-fixtures.json",
+      "publicRepoAllowed": true,
+      "sourceIssue": 1173
+    },
+    {
+      "artifactId": "detail.private.edge-ringing.v1",
+      "capabilityState": "validation_only",
+      "feature": "deblur",
+      "hash": null,
+      "kind": "private_raw_placeholder",
+      "limitations": ["preview_export_parity", "real_raw_quality", "gpu_parity", "ui_api_wiring", "e2e_workflow"],
+      "path": "private-fixtures/detail/edge-ringing-v1.arw",
+      "publicRepoAllowed": false,
+      "sourceIssue": 1174
+    }
+  ]
+}
