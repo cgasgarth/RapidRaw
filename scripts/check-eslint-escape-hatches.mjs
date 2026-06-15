@@ -3,6 +3,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 
+import ts from 'typescript';
+
 const ROOT = process.cwd();
 const SELF_PATH = 'scripts/check-eslint-escape-hatches.mjs';
 const CHECKED_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx']);
@@ -13,6 +15,34 @@ const ALLOWED_DIRECTIVE_PATTERN =
 const isIgnored = (path) => {
   const normalized = path.split('/').join('/');
   return [...IGNORED_DIRS].some((ignored) => normalized === ignored || normalized.startsWith(`${ignored}/`));
+};
+
+const getLine = (sourceFile, position) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
+
+const findEslintEscapeViolations = (filePath, contents) => {
+  const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true);
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, contents);
+  const violations = [];
+
+  let token = scanner.scan();
+  while (token !== ts.SyntaxKind.EndOfFileToken) {
+    if (token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia) {
+      const text = scanner.getTokenText();
+      if (text.includes('eslint-disable')) {
+        const line = getLine(sourceFile, scanner.getTokenPos());
+        if (token !== ts.SyntaxKind.SingleLineCommentTrivia || !text.includes('eslint-disable-next-line')) {
+          violations.push(`${filePath}:${line}: use eslint-disable-next-line, not broader disable scopes`);
+        } else if (!ALLOWED_DIRECTIVE_PATTERN.test(text)) {
+          violations.push(
+            `${filePath}:${line}: eslint-disable-next-line requires rule names and a descriptive "-- reason"`,
+          );
+        }
+      }
+    }
+    token = scanner.scan();
+  }
+
+  return violations;
 };
 
 const files = [];
@@ -35,28 +65,59 @@ const walk = (dir) => {
   }
 };
 
+const runSelfTest = () => {
+  const cases = [
+    {
+      expected: 0,
+      name: 'allows documented next-line disable',
+      source:
+        '// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy adapter is typed in follow-up issue.\n',
+    },
+    {
+      expected: 1,
+      name: 'rejects block disable',
+      source: '/* eslint-disable @typescript-eslint/no-explicit-any -- Broad disable */\n',
+    },
+    {
+      expected: 1,
+      name: 'rejects missing reason',
+      source: '// eslint-disable-next-line @typescript-eslint/no-explicit-any\n',
+    },
+    {
+      expected: 0,
+      name: 'ignores string literals',
+      source: 'const text = "eslint-disable-next-line @typescript-eslint/no-explicit-any";\n',
+    },
+  ];
+
+  const failures = [];
+  for (const testCase of cases) {
+    const actual = findEslintEscapeViolations(`${testCase.name}.ts`, testCase.source).length;
+    if (actual !== testCase.expected) {
+      failures.push(`${testCase.name}: expected ${String(testCase.expected)}, got ${String(actual)}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(`ESLint escape hatch self-test failed: ${failures.join('; ')}`);
+  }
+
+  console.log('eslint escape hatch self-test ok');
+};
+
+if (process.argv.includes('--self-test')) {
+  runSelfTest();
+  process.exit(0);
+}
+
 walk(ROOT);
 
 const violations = [];
 
 for (const file of files) {
   const contents = readFileSync(file, 'utf8');
-  const lines = contents.split(/\r?\n/u);
-
-  lines.forEach((line, index) => {
-    if (!line.includes('eslint-disable')) return;
-
-    if (!line.includes('eslint-disable-next-line')) {
-      violations.push(`${relative(ROOT, file)}:${index + 1}: use eslint-disable-next-line, not broader disable scopes`);
-      return;
-    }
-
-    if (!ALLOWED_DIRECTIVE_PATTERN.test(line)) {
-      violations.push(
-        `${relative(ROOT, file)}:${index + 1}: eslint-disable-next-line requires rule names and a descriptive "-- reason"`,
-      );
-    }
-  });
+  const repoPath = relative(ROOT, file);
+  violations.push(...findEslintEscapeViolations(repoPath, contents));
 }
 
 if (violations.length > 0) {
