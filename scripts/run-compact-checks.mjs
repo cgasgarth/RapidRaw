@@ -25,6 +25,7 @@ const CHECK_GROUPS = {
     'check:workspace-layouts',
     'check:compare-survey',
     'check:mask-render',
+    'check:render-artifacts',
     'check:reference-images',
     'check:output-sharpening',
     'check:chromatic-adaptation',

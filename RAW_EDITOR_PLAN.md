@@ -3841,6 +3841,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(fixtures): create public fixture manifest`
 - `validation(render): add golden render command`
 - `validation(render): add image artifact comparison script`
+  - Issue: #69
+  - Docs: `docs/validation/render-artifact-comparison-2026-06-15.md`
+  - Validation: `scripts/check-render-artifact-comparison.mjs`
+  - Runtime status: synthetic PPM artifact comparison foundation; renderer-produced RAW artifacts remain follow-up work.
 - `validation(performance): add performance smoke script`
 
 #### Milestone 3.5: Contract Freeze And Validation Contracts

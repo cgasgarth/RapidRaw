@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "render.synthetic.exact.v1",
+      "expected": "expected/exact.ppm",
+      "actual": "actual/exact.ppm",
+      "maxPixelDiff": 0,
+      "maxMeanDiff": 0
+    },
+    {
+      "id": "render.synthetic.tolerated-highlight.v1",
+      "expected": "expected/tolerance.ppm",
+      "actual": "actual/tolerance.ppm",
+      "maxPixelDiff": 2,
+      "maxMeanDiff": 0.25,
+      "minChangedPixels": 1
+    }
+  ]
+}

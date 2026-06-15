@@ -89,6 +89,7 @@
     "check:workspace-layouts": "bun scripts/check-workspace-layout-fixtures.mjs",
     "check:compare-survey": "bun scripts/check-compare-survey-fixtures.mjs",
     "check:mask-render": "bun scripts/check-mask-render-fixtures.mjs",
+    "check:render-artifacts": "bun scripts/check-render-artifact-comparison.mjs",
     "check:reference-images": "bun scripts/check-reference-image-fixtures.mjs",
     "check:public-fixture-manifest": "bun scripts/check-public-fixture-manifest.mjs",
     "check:output-sharpening": "bun scripts/check-output-sharpening-fixtures.mjs",

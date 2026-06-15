@@ -412,6 +412,10 @@
           "path": "docs/ci/optional-platform-build-matrix-2026-06-11.md"
         },
         {
+          "title": "Render artifact comparison",
+          "path": "docs/validation/render-artifact-comparison-2026-06-15.md"
+        },
+        {
           "title": "Local check command contract",
           "path": "docs/tooling/local-check-command-contract-2026-06-10.md"
         },
