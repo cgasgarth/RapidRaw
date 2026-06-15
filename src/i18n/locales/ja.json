@@ -1917,6 +1917,7 @@
       "saturationAbbreviation": "S:"
     },
     "exportPresets": {
+      "builtIn": "Built-in",
       "deleteTooltip": "プリセットを削除",
       "heading": "書き出しプリセット",
       "overwriteTooltip": "選択したプリセットを上書き",

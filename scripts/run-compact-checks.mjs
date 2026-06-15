@@ -11,6 +11,7 @@ const CHECK_GROUPS = {
     'check:release-notes',
     'check:release-benchmark-report',
     'check:export-recipes',
+    'check:export-recipes-ui',
     'check:import-presets',
     'check:library-sessions',
     'check:export-queue',

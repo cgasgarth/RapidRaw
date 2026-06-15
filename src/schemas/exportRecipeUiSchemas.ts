@@ -1,0 +1,65 @@
+import { z } from 'zod';
+
+import { exportRecipeSchema, type ExportRecipe } from './exportRecipeSchemas';
+
+export const exportRecipeUiRowSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    isBuiltIn: z.boolean(),
+    isValidRecipe: z.boolean(),
+    label: z.string().trim().min(1),
+    metadataLabel: z.string().trim().min(1),
+    resizeLabel: z.string().trim().min(1),
+    settings: z.unknown(),
+    subtitle: z.string().trim().min(1),
+  })
+  .strict();
+
+export type ExportRecipeUiRow = z.infer<typeof exportRecipeUiRowSchema>;
+
+const BUILT_IN_RECIPE_IDS = new Set(['default-hq', 'default-fast', 'client-proof-tiff']);
+
+const recipeIdentitySchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    name: z.string().trim().min(1).optional(),
+  })
+  .loose();
+
+const asRecipeLike = (value: unknown): ExportRecipe | null => {
+  const identity = recipeIdentitySchema.safeParse(value);
+  const parsed = exportRecipeSchema.safeParse(
+    identity.success ? { preserveTimestamps: false, ...identity.data } : value,
+  );
+  return parsed.success ? parsed.data : null;
+};
+
+export const buildExportRecipeUiRows = (values: Array<unknown>): Array<ExportRecipeUiRow> =>
+  values
+    .filter((value) => {
+      const identity = recipeIdentitySchema.safeParse(value);
+      return identity.success && identity.data.id !== undefined && identity.data.id !== '__last_used__';
+    })
+    .map((value) => {
+      const recipe = asRecipeLike(value);
+      const identity = recipeIdentitySchema.safeParse(value).data;
+      const id = identity?.id ?? 'invalid-recipe';
+      const name = identity?.name ?? id;
+      const fileFormat = recipe?.fileFormat.toUpperCase() ?? 'Custom';
+      const resizeLabel = recipe?.enableResize ? `${recipe.resizeMode} ${recipe.resizeValue}px` : 'Original size';
+      const metadataLabel = recipe?.keepMetadata ? (recipe.stripGps ? 'Metadata, no GPS' : 'Metadata') : 'No metadata';
+      const subtitle = recipe
+        ? `${fileFormat} | Q${recipe.jpegQuality} | ${resizeLabel}`
+        : 'Custom recipe needs review';
+
+      return exportRecipeUiRowSchema.parse({
+        id,
+        isBuiltIn: BUILT_IN_RECIPE_IDS.has(id),
+        isValidRecipe: recipe !== null,
+        label: name,
+        metadataLabel,
+        resizeLabel,
+        settings: value,
+        subtitle,
+      });
+    });

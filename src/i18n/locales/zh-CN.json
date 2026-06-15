@@ -2033,6 +2033,7 @@
       "saturationAbbreviation": "S:"
     },
     "exportPresets": {
+      "builtIn": "Built-in",
       "deleteTooltip": "删除预设",
       "heading": "导出预设",
       "overwriteTooltip": "覆盖所选预设",

@@ -2034,6 +2034,7 @@
       "saturationAbbreviation": "S:"
     },
     "exportPresets": {
+      "builtIn": "Built-in",
       "deleteTooltip": "Vorgabe löschen",
       "heading": "Export-Vorgaben",
       "overwriteTooltip": "Ausgewählte Vorgabe überschreiben",

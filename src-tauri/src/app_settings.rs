@@ -267,6 +267,28 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             preserve_folders: Some(false),
             last_export_path: None,
         },
+        ExportPreset {
+            id: "client-proof-tiff".to_string(),
+            name: "Client Proof TIFF".to_string(),
+            file_format: "tiff".to_string(),
+            jpeg_quality: 100,
+            enable_resize: true,
+            resize_mode: "longEdge".to_string(),
+            resize_value: 4000,
+            dont_enlarge: true,
+            keep_metadata: true,
+            strip_gps: true,
+            filename_template: "{original_filename}_client".to_string(),
+            enable_watermark: false,
+            watermark_path: None,
+            watermark_anchor: Some("bottomCenter".to_string()),
+            watermark_scale: 12,
+            watermark_spacing: 4,
+            watermark_opacity: 60,
+            export_masks: Some(true),
+            preserve_folders: Some(true),
+            last_export_path: None,
+        },
     ]
 }
 
