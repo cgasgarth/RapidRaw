@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { formatCommandForLog, writeBoundedOutput } from './compact-output.mjs';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from './compact-output.mjs';
 
 const FORMAT_EXTENSIONS = new Set([
   '.cjs',
@@ -18,20 +18,25 @@ const FORMAT_EXTENSIONS = new Set([
 ]);
 const ESLINT_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx']);
 
-const run = (label, command, args) => {
-  const result = Bun.spawnSync([command, ...args], {
+const run = async (label, command, args) => {
+  const proc = Bun.spawn([command, ...args], {
     stdout: 'pipe',
     stderr: 'pipe',
   });
-  if (result.exitCode === 0) {
+
+  const stdout = readBoundedStream(proc.stdout);
+  const stderr = readBoundedStream(proc.stderr);
+  const exitCode = await proc.exited;
+
+  if (exitCode === 0) {
     return label;
   }
 
   console.error(`${label} failed: ${formatCommandForLog(command, args)}`);
-  writeBoundedOutput('stdout', result.stdout.toString());
-  writeBoundedOutput('stderr', result.stderr.toString());
+  writeBoundedOutput('stdout', await stdout);
+  writeBoundedOutput('stderr', await stderr);
 
-  process.exit(result.exitCode || 1);
+  process.exit(exitCode || 1);
 };
 
 const git = (args) => {
@@ -67,11 +72,11 @@ const eslintFiles = stagedFiles.filter((filePath) => ESLINT_EXTENSIONS.has(exten
 const checks = [];
 
 if (formatFiles.length > 0) {
-  checks.push(run('format', 'bun', ['prettier', '--check', '--log-level', 'warn', ...formatFiles]));
+  checks.push(await run('format', 'bun', ['prettier', '--check', '--log-level', 'warn', ...formatFiles]));
 }
 
 if (eslintFiles.length > 0) {
-  checks.push(run('lint', 'bun', ['eslint', '--max-warnings', '0', '--no-warn-ignored', ...eslintFiles]));
+  checks.push(await run('lint', 'bun', ['eslint', '--max-warnings', '0', '--no-warn-ignored', ...eslintFiles]));
 }
 
 const checkSummary = checks.length > 0 ? `, ${checks.length} checks` : '';

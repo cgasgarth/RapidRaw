@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { writeBoundedOutput } from './compact-output.mjs';
+import { readBoundedStream, writeBoundedOutput } from './compact-output.mjs';
 
 const CHECK_GROUPS = {
   'check:quick': [
@@ -99,16 +99,14 @@ if (scripts.length === 0) {
   process.exit(1);
 }
 
-const text = async (stream) => await new Response(stream).text();
-
 for (const script of scripts) {
   const proc = Bun.spawn(['bun', 'run', script], {
     stdout: 'pipe',
     stderr: 'pipe',
   });
 
-  const stdout = text(proc.stdout);
-  const stderr = text(proc.stderr);
+  const stdout = readBoundedStream(proc.stdout);
+  const stderr = readBoundedStream(proc.stderr);
   const exitCode = await proc.exited;
 
   if (exitCode === 0) {

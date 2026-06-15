@@ -23,6 +23,52 @@ export const formatCommandForLog = (command, args = [], { maxArgs = 16, maxChars
   return `${rendered.slice(0, maxChars)}...`;
 };
 
+export const readBoundedStream = async (stream, { maxChars = DEFAULT_MAX_FAILURE_CHARS * 2 } = {}) => {
+  if (!stream) return '';
+
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  const headLimit = Math.ceil(maxChars * 0.55);
+  const tailLimit = Math.floor(maxChars * 0.45);
+  let full = '';
+  let head = '';
+  let tail = '';
+  let totalChars = 0;
+  let truncated = false;
+
+  const append = (chunk) => {
+    if (!chunk) return;
+
+    totalChars += chunk.length;
+    if (!truncated && full.length + chunk.length <= maxChars) {
+      full += chunk;
+      return;
+    }
+
+    if (!truncated) {
+      truncated = true;
+      head = full.slice(0, headLimit);
+      tail = full.slice(-tailLimit);
+      full = '';
+    }
+
+    tail = `${tail}${chunk}`.slice(-tailLimit);
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    append(decoder.decode(value, { stream: true }));
+  }
+  append(decoder.decode());
+
+  if (!truncated) {
+    return full;
+  }
+
+  return `${head}\n[stream truncated (${totalChars} chars, kept ${maxChars})]\n${tail}`;
+};
+
 export const writeBoundedOutput = (
   name,
   value,
