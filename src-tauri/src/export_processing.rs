@@ -33,6 +33,7 @@ use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 use crate::deblur_render::apply_deblur_stage;
+use crate::denoise_render::apply_denoise_stage;
 use crate::{
     apply_all_transformations, generate_transformed_preview, get_cached_or_generate_mask,
     get_full_image_for_processing, get_or_load_lut, hydrate_adjustments, load_settings,
@@ -331,7 +332,8 @@ fn process_image_for_export_pipeline(
 
     let unique_hash = calculate_full_job_hash(path, js_adjustments);
 
-    let deblurred_image = apply_deblur_stage(transformed_image.as_ref(), js_adjustments);
+    let denoised_image = apply_denoise_stage(transformed_image.as_ref(), js_adjustments);
+    let deblurred_image = apply_deblur_stage(denoised_image.as_ref(), js_adjustments);
 
     process_and_get_dynamic_image(
         context,

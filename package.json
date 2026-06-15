@@ -57,6 +57,7 @@
     "check:ai-people-apply-plan": "bun scripts/check-ai-people-layer-apply-plan.mjs",
     "check:denoise-fixtures": "bun scripts/check-denoise-fixtures.mjs",
     "check:denoise-ui-api": "bun scripts/check-denoise-ui-api.mjs",
+    "check:denoise-preview-runtime": "bun scripts/run-compact-command.mjs --label denoise-preview-runtime --cwd src-tauri -- cargo test --quiet denoise_render --no-default-features --features required-ci",
     "check:export-recipes-ui": "bun scripts/check-export-recipes-ui.mjs",
     "check:detail-preview-export-parity": "bun scripts/check-detail-preview-export-parity.mjs",
     "check:detail-stage-order": "bun scripts/check-detail-stage-order.mjs",
