@@ -161,6 +161,7 @@
     "check:deblur-fixtures": "bun scripts/check-deblur-fixtures.mjs",
     "check:deblur-ringing": "bun scripts/check-deblur-ringing.mjs",
     "check:deblur-cpu-reference": "bun scripts/check-deblur-cpu-reference.mjs",
+    "check:deblur-real-raw-quality": "bun scripts/check-deblur-real-raw-quality.mjs",
     "check:deblur-workflow-smoke": "bun scripts/check-deblur-workflow-smoke.mjs",
     "check:deblur-ui-api": "bun scripts/check-deblur-ui-api.mjs"
   },
