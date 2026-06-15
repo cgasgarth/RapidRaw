@@ -148,10 +148,15 @@ const getCommandIcon = (command: CommandPaletteCommand) => {
       return Images;
     case 'negativeLab':
       return Wand2;
+    case 'panelAdjustments':
+    case 'panelCrop':
+    case 'panelExport':
+    case 'panelMasks':
+    case 'panelMetadata':
+    case 'panelPresets':
+      return PanelRight;
     case 'panelAi':
       return Sparkles;
-    default:
-      return PanelRight;
   }
 };
 

@@ -47,7 +47,11 @@ export const createSubMask = (
       return { ...common, parameters: { maskDataBase64: null, grow: 0, feather: 0 } };
     case Mask.QuickEraser:
       return { ...common, parameters: { maskDataBase64: null, grow: 50, feather: 50 } };
-    default:
+    case Mask.AiDepth:
+    case Mask.AiSky:
+    case Mask.All:
+    case Mask.Color:
+    case Mask.Luminance:
       return { ...common, parameters: {} };
   }
 };

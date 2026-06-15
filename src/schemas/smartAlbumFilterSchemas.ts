@@ -176,10 +176,12 @@ export type SmartAlbum = z.infer<typeof smartAlbumSchema>;
 export type SmartAlbumAsset = z.infer<typeof smartAlbumAssetSchema>;
 export type SmartAlbumCatalog = z.infer<typeof smartAlbumCatalogSchema>;
 export type SmartAlbumCondition = z.infer<typeof smartAlbumConditionSchema>;
+type SmartAlbumNumberField = z.infer<typeof numberFieldSchema>;
+type SmartAlbumTextField = z.infer<typeof textFieldSchema>;
 
 const normalizeText = (value: string) => value.trim().toLocaleLowerCase();
 
-const getTextValues = (asset: SmartAlbumAsset, field: SmartAlbumCondition['field']): string[] => {
+const getTextValues = (asset: SmartAlbumAsset, field: SmartAlbumTextField): string[] => {
   switch (field) {
     case 'camera_make':
       return asset.cameraMake === null ? [] : [asset.cameraMake];
@@ -199,12 +201,10 @@ const getTextValues = (asset: SmartAlbumAsset, field: SmartAlbumCondition['field
       return [asset.rawStatus];
     case 'tag':
       return asset.tags;
-    default:
-      return [];
   }
 };
 
-const getNumberValue = (asset: SmartAlbumAsset, field: SmartAlbumCondition['field']): number | null => {
+const getNumberValue = (asset: SmartAlbumAsset, field: SmartAlbumNumberField): number | null => {
   switch (field) {
     case 'aperture':
       return asset.aperture;
@@ -214,15 +214,14 @@ const getNumberValue = (asset: SmartAlbumAsset, field: SmartAlbumCondition['fiel
       return asset.iso;
     case 'rating':
       return asset.rating;
-    default:
-      return null;
   }
 };
 
 export const matchesSmartAlbumCondition = (asset: SmartAlbumAsset, condition: SmartAlbumCondition): boolean => {
   let matches = false;
-  if (numberFieldSchema.safeParse(condition.field).success) {
-    const assetValue = getNumberValue(asset, condition.field);
+  const numberFieldResult = numberFieldSchema.safeParse(condition.field);
+  if (numberFieldResult.success) {
+    const assetValue = getNumberValue(asset, numberFieldResult.data);
     if (assetValue !== null) {
       if (condition.operator === 'between' && Array.isArray(condition.value)) {
         matches = assetValue >= condition.value[0] && assetValue <= condition.value[1];
@@ -237,7 +236,8 @@ export const matchesSmartAlbumCondition = (asset: SmartAlbumAsset, condition: Sm
       }
     }
   } else {
-    const values = getTextValues(asset, condition.field).map(normalizeText);
+    const textFieldResult = textFieldSchema.safeParse(condition.field);
+    const values = textFieldResult.success ? getTextValues(asset, textFieldResult.data).map(normalizeText) : [];
     if (condition.operator === 'is_empty') {
       matches = values.length === 0;
     } else if (condition.operator === 'is_not_empty') {
