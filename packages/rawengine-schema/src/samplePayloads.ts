@@ -2645,10 +2645,10 @@ export const samplePreviewScopeResultV1: PreviewScopeResultV1 = previewScopeResu
   colorManaged: true,
   colorPipeline: sampleRawEngineSceneColorPipelineV1,
   histogram: {
-    binCount: 256,
+    binCount: 16,
     channels: [
       {
-        bins: [0, 2, 8, 13, 21, 34, 21, 13, 8, 2, 0],
+        bins: [0, 1, 2, 8, 13, 21, 34, 21, 13, 8, 4, 2, 1, 1, 0, 0],
         channel: 'luma',
         clippedHighRatio: 0.001,
         clippedLowRatio: 0.002,
@@ -2656,7 +2656,7 @@ export const samplePreviewScopeResultV1: PreviewScopeResultV1 = previewScopeResu
         percentile99: 0.96,
       },
       {
-        bins: [0, 1, 6, 11, 18, 29, 18, 11, 6, 1, 0],
+        bins: [0, 1, 1, 6, 11, 18, 29, 18, 11, 6, 3, 1, 1, 0, 0, 0],
         channel: 'red',
         clippedHighRatio: 0.001,
         clippedLowRatio: 0.001,

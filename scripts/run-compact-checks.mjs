@@ -46,6 +46,7 @@ const CHECK_GROUPS = {
     'check:defringe',
     'check:ai-fallbacks',
     'check:color-abi',
+    'check:preview-scopes',
     'check:black-white-mixer',
     'check:color-balance-rgb',
     'check:channel-mixer',
