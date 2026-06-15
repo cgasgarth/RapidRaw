@@ -27,6 +27,7 @@ const CHECK_GROUPS = {
     'check:wavelet-detail',
     'check:private-raw-evidence',
     'check:denoise-fixtures',
+    'check:denoise-ui-api',
     'check:deblur-fixtures',
     'check:deblur-ringing',
     'check:deblur-cpu-reference',
