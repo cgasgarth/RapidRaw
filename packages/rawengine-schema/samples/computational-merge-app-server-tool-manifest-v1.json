@@ -33,6 +33,36 @@
       "toolName": "computationalmerge.panorama.apply_command"
     },
     {
+      "allowedCommandTypes": ["computationalMerge.createHdr"],
+      "approvalClass": "preview_only",
+      "auditEvents": ["computational_merge_dry_run_requested", "computational_merge_dry_run_completed"],
+      "description": "Preview a local HDR bracket merge and return a non-mutating dry-run plan with bracket, deghosting, and artifact handles.",
+      "executionMode": "dry_run_command",
+      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "localOnly": true,
+      "mutates": false,
+      "outputSchemaName": "ComputationalMergeDryRunResultV1",
+      "recordsProvenance": true,
+      "requiresDryRunPlan": false,
+      "returnsArtifactHandles": true,
+      "toolName": "computationalmerge.hdr.dry_run_command"
+    },
+    {
+      "allowedCommandTypes": ["computationalMerge.createHdr"],
+      "approvalClass": "edit_apply",
+      "auditEvents": ["computational_merge_apply_requested", "computational_merge_apply_completed"],
+      "description": "Apply an accepted local HDR dry-run plan into the non-destructive edit graph after approval.",
+      "executionMode": "apply_dry_run_plan",
+      "inputSchemaName": "ComputationalMergeCommandEnvelopeV1",
+      "localOnly": true,
+      "mutates": true,
+      "outputSchemaName": "ComputationalMergeMutationResultV1",
+      "recordsProvenance": true,
+      "requiresDryRunPlan": true,
+      "returnsArtifactHandles": true,
+      "toolName": "computationalmerge.hdr.apply_command"
+    },
+    {
       "allowedCommandTypes": ["computationalMerge.createFocusStack"],
       "approvalClass": "preview_only",
       "auditEvents": ["computational_merge_dry_run_requested", "computational_merge_dry_run_completed"],
