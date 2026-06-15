@@ -341,6 +341,12 @@
         "switchToSubtract": "切换到减去"
       },
       "addNewEdit": "添加新编辑",
+      "approval": {
+        "cloudMessage": "This will send the selected image area and prompt to the cloud AI provider and apply the returned edit.",
+        "confirm": "Approve edit",
+        "connectorMessage": "This will send the selected image area and prompt to the configured AI connector and apply the returned edit.",
+        "title": "Approve AI edit"
+      },
       "brush": {
         "add": "添加",
         "erase": "擦除",

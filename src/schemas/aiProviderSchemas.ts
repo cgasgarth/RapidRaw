@@ -69,6 +69,53 @@ export const aiProviderRuntimeStateSchema = z
 export type AiProviderRuntimeInput = z.input<typeof aiProviderRuntimeInputSchema>;
 export type AiProviderRuntimeState = z.infer<typeof aiProviderRuntimeStateSchema>;
 
+export const aiEditApprovalInputSchema = z
+  .object({
+    aiProvider: aiProviderIdSchema,
+    useFastInpaint: z.boolean(),
+  })
+  .strict();
+
+export const aiEditApprovalPolicySchema = z
+  .object({
+    approvalReason: z.enum(['cloud_ai', 'connector_generative_edit']).nullable(),
+    requiresApproval: z.boolean(),
+  })
+  .strict();
+
+export type AiEditApprovalInput = z.infer<typeof aiEditApprovalInputSchema>;
+export type AiEditApprovalPolicy = z.infer<typeof aiEditApprovalPolicySchema>;
+
+export const resolveAiEditApprovalPolicy = (value: AiEditApprovalInput): AiEditApprovalPolicy => {
+  const input = aiEditApprovalInputSchema.parse(value);
+
+  if (input.useFastInpaint) {
+    return aiEditApprovalPolicySchema.parse({
+      approvalReason: null,
+      requiresApproval: false,
+    });
+  }
+
+  if (input.aiProvider === AiProviderId.Cloud) {
+    return aiEditApprovalPolicySchema.parse({
+      approvalReason: 'cloud_ai',
+      requiresApproval: true,
+    });
+  }
+
+  if (input.aiProvider === AiProviderId.Connector) {
+    return aiEditApprovalPolicySchema.parse({
+      approvalReason: 'connector_generative_edit',
+      requiresApproval: true,
+    });
+  }
+
+  return aiEditApprovalPolicySchema.parse({
+    approvalReason: null,
+    requiresApproval: false,
+  });
+};
+
 export const resolveAiProviderRuntimeState = (value: AiProviderRuntimeInput): AiProviderRuntimeState => {
   const input = aiProviderRuntimeInputSchema.parse(value);
   const requestedProviderResult = aiProviderIdSchema.safeParse(input.aiProvider);

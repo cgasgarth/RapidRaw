@@ -373,6 +373,12 @@
         "switchToSubtract": "Przełącz na Odejmowanie"
       },
       "addNewEdit": "Dodaj nową edycję",
+      "approval": {
+        "cloudMessage": "This will send the selected image area and prompt to the cloud AI provider and apply the returned edit.",
+        "confirm": "Approve edit",
+        "connectorMessage": "This will send the selected image area and prompt to the configured AI connector and apply the returned edit.",
+        "title": "Approve AI edit"
+      },
       "brush": {
         "add": "Dodaj",
         "erase": "Wymaż",
