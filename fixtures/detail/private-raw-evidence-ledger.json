@@ -1,0 +1,75 @@
+{
+  "$schema": "https://rawengine.dev/schemas/private-raw-evidence-ledger-v1.json",
+  "entries": [
+    {
+      "artifactClass": "high_iso_chroma_noise",
+      "camera": {
+        "cameraMake": "Sony",
+        "cameraModel": "ILCE-7M4",
+        "lens": "FE 35mm F1.8",
+        "rawFormat": "arw"
+      },
+      "crop": {
+        "height": 512,
+        "unit": "source_pixels",
+        "width": 512,
+        "x": 1800,
+        "y": 1200
+      },
+      "evidenceId": "raw-evidence.detail.high-iso-chroma.v1",
+      "expectedUse": ["denoise", "detail"],
+      "exposure": {
+        "aperture": 2.8,
+        "exposureBiasEv": 0,
+        "iso": 12800,
+        "shutterSeconds": 0.008
+      },
+      "notes": "Reserved private crop for high-ISO chroma noise and detail retention review. Public repo stores metadata only.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private capture must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture"
+    },
+    {
+      "artifactClass": "edge_halo_ringing",
+      "camera": {
+        "cameraMake": "Canon",
+        "cameraModel": "EOS R5",
+        "lens": "RF 85mm F2 Macro IS STM",
+        "rawFormat": "cr3"
+      },
+      "crop": {
+        "height": 768,
+        "unit": "source_pixels",
+        "width": 768,
+        "x": 1024,
+        "y": 900
+      },
+      "evidenceId": "raw-evidence.detail.edge-ringing.v1",
+      "expectedUse": ["deblur", "detail", "preview_export_parity"],
+      "exposure": {
+        "aperture": 5.6,
+        "exposureBiasEv": -0.3,
+        "iso": 400,
+        "shutterSeconds": 0.002
+      },
+      "notes": "Reserved private crop for sharpening/deblur halo review against high-contrast edges.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private capture must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture"
+    }
+  ],
+  "issue": 1149,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-14",
+  "validationMode": "schema_public_assets_private"
+}

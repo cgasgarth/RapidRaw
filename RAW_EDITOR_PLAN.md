@@ -3972,6 +3972,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
     contract, and `bun run check:wavelet-detail` gate.
 - `detail(noise): separate chroma and luma noise`
 - `validation(noise): add high ISO fixture set`
+- `validation(raw): add private real RAW crop evidence ledger`
+  - Runtime status: schema-only public ledger and optional local asset check are available; no private RAW payloads are committed.
 - `detail(defringe): improve defringe controls`
 - `detail(dust): add dust spot visualization`
 - `detail(ai-denoise): research AI denoise path`
@@ -4702,6 +4704,7 @@ Issues:
 - Add high ISO fixture set. Initial manifest entries separate project-generated
   public-CI placeholders from real-photo private-review placeholders until
   payload rights, hashes, and thresholds are supplied.
+- Add private real RAW crop evidence ledger.
 - Add defringe improvements.
 - Add dust spot visualization.
 - Add AI denoise research issue.
