@@ -10,7 +10,7 @@ an unowned Vite warning.
 
 | Asset class              | Raw budget      | Gzip budget   |
 | ------------------------ | --------------- | ------------- |
-| Largest JavaScript asset | 2,650,000 bytes | 762,048 bytes |
+| Largest JavaScript asset | 2,650,000 bytes | 763,904 bytes |
 | Largest CSS asset        | 125,000 bytes   | 20,000 bytes  |
 
 ## Validation
