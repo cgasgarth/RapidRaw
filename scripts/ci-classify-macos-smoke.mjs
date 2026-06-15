@@ -68,6 +68,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
       'bun run check:actions:lint && bun run check:workflow-policy',
       'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test',
       'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test && bun run check:compact-commands && bun run check:rust-feature-policy && bun run schema:contract-gate:self-test',
+      'bun run check:actions:lint && bun run check:workflow-policy && bun run check:workflow-policy:self-test && bun run check:compact-commands && bun run check:compact-commands:self-test && bun run check:rust-feature-policy && bun run schema:contract-gate:self-test',
     ]),
   ],
   [
@@ -82,6 +83,9 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:performance-smoke', new Set(['bun scripts/check-performance-smoke.mjs'])],
   ['check:release-notes', new Set(['bun scripts/generate-release-notes.mjs --self-test'])],
   ['check:workflow-policy:self-test', new Set(['bun scripts/check-github-workflow-policy.mjs --self-test'])],
+  ['check:validation-gates', new Set(['bun run check:compact-commands && bun run check:compact-commands:self-test'])],
+  ['check:compact-commands', new Set(['bun scripts/check-compact-quality-commands.mjs'])],
+  ['check:compact-commands:self-test', new Set(['bun scripts/check-compact-quality-commands.mjs --self-test'])],
   ['deps:audit:check', new Set(['bun scripts/audit-dependency-versions.mjs --fail-on-missing-major-issues'])],
   ['release:notes', new Set(['bun scripts/generate-release-notes.mjs'])],
   [
