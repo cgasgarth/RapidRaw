@@ -19,6 +19,7 @@ pub mod deblur_cpu_reference;
 mod deblur_render;
 mod denoise_api;
 pub mod denoise_cpu_reference;
+mod denoise_render;
 mod denoising;
 mod exif_processing;
 mod export_processing;
@@ -452,10 +453,14 @@ fn process_preview_job(
         (final_preview_base, scale_for_gpu, 94)
     };
 
+    let denoised_processing_image =
+        denoise_render::apply_denoise_stage(processing_image.as_ref(), &adjustments_clone);
+    let denoise_render_hash =
+        denoise_render::calculate_denoise_render_hash(new_transform_hash, &adjustments_clone);
     let deblurred_processing_image =
-        deblur_render::apply_deblur_stage(processing_image.as_ref(), &adjustments_clone);
+        deblur_render::apply_deblur_stage(denoised_processing_image.as_ref(), &adjustments_clone);
     let render_input_hash =
-        deblur_render::calculate_deblur_render_hash(new_transform_hash, &adjustments_clone);
+        deblur_render::calculate_deblur_render_hash(denoise_render_hash, &adjustments_clone);
     let processing_image_ref = deblurred_processing_image.image.as_ref();
 
     let (preview_width, preview_height) = processing_image_ref.dimensions();
@@ -1911,8 +1916,10 @@ fn generate_preview_for_path(
     let lut_path = js_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|p| get_or_load_lut(&state, p).ok());
     let unique_hash = calculate_full_job_hash(&source_path_str, &js_adjustments);
+    let denoised_image =
+        denoise_render::apply_denoise_stage(transformed_image.as_ref(), &js_adjustments);
     let deblurred_image =
-        deblur_render::apply_deblur_stage(transformed_image.as_ref(), &js_adjustments);
+        deblur_render::apply_deblur_stage(denoised_image.as_ref(), &js_adjustments);
     let final_image = process_and_get_dynamic_image(
         &context,
         &state,
