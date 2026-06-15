@@ -3,8 +3,10 @@
 import {
   AiProviderFallbackReason,
   AiProviderId,
+  aiEditApprovalPolicySchema,
   aiProviderRuntimeStateSchema,
   normalizeAiProviderId,
+  resolveAiEditApprovalPolicy,
   resolveAiProviderRuntimeState,
 } from '../src/schemas/aiProviderSchemas.ts';
 
@@ -145,10 +147,44 @@ if (normalizeAiProviderId('legacy-app-server-provider-id') !== AiProviderId.Loca
   failures.push('normalizeAiProviderId must keep invalid persisted provider values on the local fallback.');
 }
 
+const approvalCases = [
+  {
+    expected: { approvalReason: null, requiresApproval: false },
+    input: { aiProvider: AiProviderId.Local, useFastInpaint: true },
+    name: 'local basic inpaint does not require approval',
+  },
+  {
+    expected: { approvalReason: 'cloud_ai', requiresApproval: true },
+    input: { aiProvider: AiProviderId.Cloud, useFastInpaint: false },
+    name: 'cloud generative edit requires approval',
+  },
+  {
+    expected: { approvalReason: 'connector_generative_edit', requiresApproval: true },
+    input: { aiProvider: AiProviderId.Connector, useFastInpaint: false },
+    name: 'connector generative edit requires approval',
+  },
+  {
+    expected: { approvalReason: null, requiresApproval: false },
+    input: { aiProvider: AiProviderId.Cloud, useFastInpaint: true },
+    name: 'cloud provider with local basic inpaint does not require cloud approval',
+  },
+];
+
+for (const approvalCase of approvalCases) {
+  const actual = resolveAiEditApprovalPolicy(approvalCase.input);
+  aiEditApprovalPolicySchema.parse(actual);
+
+  if (JSON.stringify(actual) !== JSON.stringify(approvalCase.expected)) {
+    failures.push(
+      `${approvalCase.name}\nexpected ${JSON.stringify(approvalCase.expected)}\nreceived ${JSON.stringify(actual)}`,
+    );
+  }
+}
+
 if (failures.length > 0) {
   console.error('AI provider fallback validation failed.');
   console.error(failures.join('\n\n'));
   process.exit(1);
 }
 
-console.log(`Validated ${fallbackCases.length} AI provider fallback cases.`);
+console.log(`Validated ${fallbackCases.length} AI provider fallback cases and ${approvalCases.length} approval cases.`);

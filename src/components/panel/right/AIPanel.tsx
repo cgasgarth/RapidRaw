@@ -63,6 +63,7 @@ import { useManagedFocus } from '../../../hooks/useManagedFocus';
 import {
   AiProviderId,
   normalizeAiProviderId,
+  resolveAiEditApprovalPolicy,
   resolveAiProviderRuntimeState,
   type AiProviderId as AiProviderIdType,
 } from '../../../schemas/aiProviderSchemas';
@@ -1231,6 +1232,7 @@ export default function AIPanel() {
                   updateSubMask={updateSubMask}
                   isGeneratingAi={isGeneratingAi}
                   isGeneratingAiMask={isGeneratingAiMask}
+                  aiProvider={aiProviderRuntimeState.effectiveProvider}
                   onGenerativeReplace={handleGenerativeReplace}
                   collapsibleState={collapsibleState}
                   setCollapsibleState={setCollapsibleState}
@@ -1982,6 +1984,7 @@ interface AiSettingsPanelProps {
   isGeneratingAi: boolean;
   isGeneratingAiMask: boolean;
   isGenerativeAvailable: boolean;
+  aiProvider: AiProviderIdType;
   onGenerativeReplace: (containerId: string, prompt: string, useFastInpaint: boolean) => void | Promise<void>;
   setBrushSettings: (updater: BrushSettingsUpdater) => void;
   setCollapsibleState: Dispatch<SetStateAction<AiPanelCollapsibleState>>;
@@ -2003,8 +2006,10 @@ function SettingsPanel({
   collapsibleState,
   setCollapsibleState,
   isGenerativeAvailable,
+  aiProvider,
 }: AiSettingsPanelProps) {
   const { t } = useTranslation();
+  const setUI = useUIStore((state) => state.setUI);
   const isActive = !!container;
   const isComponentMode = !!activeSubMask;
   const displayContainer = container || PLACEHOLDER_PATCH;
@@ -2056,8 +2061,29 @@ function SettingsPanel({
 
   const handleGenerateClick = () => {
     if (!container) return;
-    updateContainer(container.id, { prompt });
-    void onGenerativeReplace(container.id, prompt, useFastInpaint);
+    const runGenerativeEdit = () => {
+      updateContainer(container.id, { prompt });
+      void onGenerativeReplace(container.id, prompt, useFastInpaint);
+    };
+    const approvalPolicy = resolveAiEditApprovalPolicy({ aiProvider, useFastInpaint });
+
+    if (!approvalPolicy.requiresApproval) {
+      runGenerativeEdit();
+      return;
+    }
+
+    setUI({
+      confirmModalState: {
+        confirmText: t('editor.ai.approval.confirm'),
+        isOpen: true,
+        message:
+          approvalPolicy.approvalReason === 'cloud_ai'
+            ? t('editor.ai.approval.cloudMessage')
+            : t('editor.ai.approval.connectorMessage'),
+        onConfirm: runGenerativeEdit,
+        title: t('editor.ai.approval.title'),
+      },
+    });
   };
 
   const handleToggleSection = (section: keyof AiPanelCollapsibleState) => {
