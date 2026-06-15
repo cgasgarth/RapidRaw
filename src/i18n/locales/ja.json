@@ -588,6 +588,15 @@
         "addToCurrent": "{{name}}を現在のマスクに追加、または新規作成 (右クリック)",
         "createNew": "新規の {{name}} マスクを作成",
         "showMore": "他のマスクタイプを表示"
+      },
+      "refinement": {
+        "title": "Refinement",
+        "reset": "Reset",
+        "density": "Density",
+        "featherPx": "Feather",
+        "edgeShiftPx": "Edge Shift",
+        "edgeContrast": "Edge Contrast",
+        "smoothness": "Smoothness"
       }
     },
     "metadata": {

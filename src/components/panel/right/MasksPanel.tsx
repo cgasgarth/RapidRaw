@@ -110,6 +110,15 @@ interface SubMaskParameterConfig {
   step: number;
 }
 
+interface MaskRefinementParameterConfig extends SubMaskParameterConfig {
+  labelKey:
+    | 'editor.masks.refinement.density'
+    | 'editor.masks.refinement.edgeContrast'
+    | 'editor.masks.refinement.edgeShiftPx'
+    | 'editor.masks.refinement.featherPx'
+    | 'editor.masks.refinement.smoothness';
+}
+
 interface SubMaskConfig {
   parameters?: Array<SubMaskParameterConfig>;
   showBrushTools?: boolean;
@@ -131,6 +140,45 @@ type PresetMenuItem = UserPreset & {
   folder?: { children?: Array<PresetMenuItem> | undefined; name?: string | undefined } | undefined;
   preset?: { adjustments: Partial<Adjustments>; name?: string | undefined } | undefined;
 };
+
+const MASK_REFINEMENT_PARAMETERS: Array<MaskRefinementParameterConfig> = [
+  {
+    key: 'density',
+    labelKey: 'editor.masks.refinement.density',
+    min: 0,
+    max: 100,
+    step: 1,
+    multiplier: 100,
+    defaultValue: 100,
+  },
+  { key: 'featherPx', labelKey: 'editor.masks.refinement.featherPx', min: 0, max: 80, step: 1, defaultValue: 0 },
+  {
+    key: 'edgeShiftPx',
+    labelKey: 'editor.masks.refinement.edgeShiftPx',
+    min: -80,
+    max: 80,
+    step: 1,
+    defaultValue: 0,
+  },
+  {
+    key: 'edgeContrast',
+    labelKey: 'editor.masks.refinement.edgeContrast',
+    min: 0,
+    max: 100,
+    step: 1,
+    multiplier: 100,
+    defaultValue: 0,
+  },
+  {
+    key: 'smoothness',
+    labelKey: 'editor.masks.refinement.smoothness',
+    min: 0,
+    max: 100,
+    step: 1,
+    multiplier: 100,
+    defaultValue: 0,
+  },
+];
 
 function readAdjustmentValue(adjustments: Partial<Adjustments> | null | undefined, key: string): unknown {
   return adjustments ? (adjustments as Record<string, unknown>)[key] : undefined;
@@ -733,6 +781,56 @@ function DepthRangePicker({
         <span>{t('editor.masks.depthRange.near')}</span>
         <span>{t('editor.masks.depthRange.far')}</span>
       </UiText>
+    </div>
+  );
+}
+
+function MaskRefinementControls({
+  parameters,
+  onChange,
+  onReset,
+  onDragStateChange,
+}: {
+  parameters: unknown;
+  onChange: (changes: Record<string, number>) => void;
+  onReset: () => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="space-y-3 rounded-md border border-surface p-3">
+      <div className="flex items-center justify-between gap-3">
+        <UiText variant={TextVariants.label} className="select-none">
+          {t('editor.masks.refinement.title')}
+        </UiText>
+        <button
+          type="button"
+          className="text-xs text-text-secondary transition-colors hover:text-text-primary"
+          onClick={onReset}
+        >
+          {t('editor.masks.refinement.reset')}
+        </button>
+      </div>
+      {MASK_REFINEMENT_PARAMETERS.map((param) => {
+        const multiplier = param.multiplier ?? 1;
+        return (
+          <Slider
+            key={param.key}
+            label={t(param.labelKey)}
+            min={param.min}
+            max={param.max}
+            step={param.step}
+            defaultValue={param.defaultValue}
+            value={getMaskParameterNumber(parameters, param.key, param.defaultValue / multiplier) * multiplier}
+            onChange={(e: SliderChangeEvent) => {
+              onChange({ [param.key]: Number(e.target.value) / multiplier });
+            }}
+            {...(param.min >= 0 && { fillOrigin: 'min' })}
+            onDragStateChange={onDragStateChange}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -2623,6 +2721,18 @@ function SettingsPanel({
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
+  const handleResetMaskRefinement = () => {
+    if (!isActive || !activeSubMask) return;
+    const newParams = mergeMaskParameters(activeSubMask.parameters, {
+      density: 1,
+      edgeContrast: 0,
+      edgeShiftPx: 0,
+      featherPx: 0,
+      smoothness: 0,
+    });
+    updateSubMask(activeSubMask.id, { parameters: newParams });
+  };
+
   const handleDepthRangeChange = (values: { minDepth: number; maxDepth: number; minFade: number; maxFade: number }) => {
     if (!isActive || !activeSubMask) return;
 
@@ -2912,6 +3022,13 @@ function SettingsPanel({
                   onDragStateChange={onDragStateChange}
                 />
               ))}
+
+              <MaskRefinementControls
+                parameters={toMaskParameterRecord(activeSubMask.parameters)}
+                onChange={handleSubMaskParametersChange}
+                onReset={handleResetMaskRefinement}
+                onDragStateChange={onDragStateChange}
+              />
 
               {subMaskConfig.showBrushTools &&
                 brushSettings &&

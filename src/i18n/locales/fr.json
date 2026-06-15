@@ -588,6 +588,15 @@
         "addToCurrent": "Ajouter {{name}} au masque actuel ou en créer un nouveau (Clic-droit)",
         "createNew": "Créer un nouveau masque {{name}}",
         "showMore": "Afficher plus de types de masques"
+      },
+      "refinement": {
+        "title": "Refinement",
+        "reset": "Reset",
+        "density": "Density",
+        "featherPx": "Feather",
+        "edgeShiftPx": "Edge Shift",
+        "edgeContrast": "Edge Contrast",
+        "smoothness": "Smoothness"
       }
     },
     "metadata": {

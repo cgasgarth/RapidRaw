@@ -588,6 +588,15 @@
         "addToCurrent": "Добавить {{name}} к текущей маске или создать новую (правый клик)",
         "createNew": "Создать новую маску: {{name}}",
         "showMore": "Показать больше типов масок"
+      },
+      "refinement": {
+        "title": "Refinement",
+        "reset": "Reset",
+        "density": "Density",
+        "featherPx": "Feather",
+        "edgeShiftPx": "Edge Shift",
+        "edgeContrast": "Edge Contrast",
+        "smoothness": "Smoothness"
       }
     },
     "metadata": {

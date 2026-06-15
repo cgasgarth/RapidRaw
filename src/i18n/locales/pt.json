@@ -588,6 +588,15 @@
         "addToCurrent": "Adicionar {{name}} à Máscara Atual ou Criar Nova (Botão Direito)",
         "createNew": "Criar Nova Máscara de {{name}}",
         "showMore": "Mostrar Mais Tipos de Máscara"
+      },
+      "refinement": {
+        "title": "Refinement",
+        "reset": "Reset",
+        "density": "Density",
+        "featherPx": "Feather",
+        "edgeShiftPx": "Edge Shift",
+        "edgeContrast": "Edge Contrast",
+        "smoothness": "Smoothness"
       }
     },
     "metadata": {

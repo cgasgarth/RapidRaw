@@ -74,6 +74,7 @@ const CHECK_GROUPS = {
     'check:color-range-mask',
     'check:mask-compose',
     'check:mask-refine',
+    'check:mask-refine-controls',
     'check:mask-overlay',
     'check:mask-copy-paste',
     'check:ai-mask-capabilities',

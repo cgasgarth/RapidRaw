@@ -588,6 +588,15 @@
         "addToCurrent": "Aggiungi {{name}} alla Maschera Attuale o Crea Nuova (Tasto Destro)",
         "createNew": "Crea Nuova Maschera {{name}}",
         "showMore": "Mostra Più Tipi di Maschera"
+      },
+      "refinement": {
+        "title": "Refinement",
+        "reset": "Reset",
+        "density": "Density",
+        "featherPx": "Feather",
+        "edgeShiftPx": "Edge Shift",
+        "edgeContrast": "Edge Contrast",
+        "smoothness": "Smoothness"
       }
     },
     "metadata": {
