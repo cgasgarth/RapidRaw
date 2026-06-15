@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
 const REQUIRED_FEATURE_ARGS = '--no-default-features --features required-ci';
+const ALL_FEATURES_ALLOWED_FILES = new Set(['.github/workflows/panorama-opencv-spike.yml']);
 
 const workflowFiles = readdirSync('.github/workflows')
   .filter((file) => ['.yml', '.yaml'].includes(extname(file)))
@@ -33,9 +34,19 @@ const requiredCargoCommandPatterns = [
 const violations = [];
 
 for (const { path, source } of checkedFiles) {
-  if (source.includes('--all-features')) {
+  if (source.includes('--all-features') && !ALL_FEATURES_ALLOWED_FILES.has(path)) {
     violations.push(`${path}: required Rust checks must not use --all-features; use ${REQUIRED_FEATURE_ARGS}`);
   }
+}
+
+const featureMatrix = checkedFiles.find(({ path }) => path === '.github/workflows/panorama-opencv-spike.yml');
+if (
+  !featureMatrix?.source.includes('schedule:') ||
+  !featureMatrix.source.includes('cargo check --locked --all-targets --all-features')
+) {
+  violations.push(
+    'scheduled Rust feature matrix must run cargo check with --all-features in panorama-opencv-spike.yml',
+  );
 }
 
 for (const pattern of requiredCargoCommandPatterns) {
