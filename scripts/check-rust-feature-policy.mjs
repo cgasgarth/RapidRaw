@@ -1,18 +1,27 @@
 #!/usr/bin/env bun
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { extname, join } from 'node:path';
 
 const REQUIRED_FEATURE_ARGS = '--no-default-features --features required-ci';
+
+const workflowFiles = readdirSync('.github/workflows')
+  .filter((file) => ['.yml', '.yaml'].includes(extname(file)))
+  .map((file) => {
+    const path = join('.github/workflows', file);
+
+    return {
+      path,
+      source: readFileSync(path, 'utf8'),
+    };
+  });
 
 const checkedFiles = [
   {
     path: 'package.json',
     source: readFileSync('package.json', 'utf8'),
   },
-  {
-    path: '.github/workflows/lint.yml',
-    source: readFileSync('.github/workflows/lint.yml', 'utf8'),
-  },
+  ...workflowFiles,
 ];
 
 const requiredCargoCommandPatterns = [
@@ -30,10 +39,8 @@ for (const { path, source } of checkedFiles) {
 }
 
 for (const pattern of requiredCargoCommandPatterns) {
-  for (const { path, source } of checkedFiles) {
-    if (!pattern.test(source)) {
-      violations.push(`${path}: missing required Rust feature policy command matching ${pattern.source}`);
-    }
+  if (!checkedFiles.some(({ source }) => pattern.test(source))) {
+    violations.push(`missing required Rust feature policy command matching ${pattern.source}`);
   }
 }
 
