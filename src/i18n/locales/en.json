@@ -39,6 +39,23 @@
         "tint": "Tint",
         "title": "Color Calibration"
       },
+      "channelMixer": {
+        "disabled": "Off",
+        "enabled": "On",
+        "outputs": {
+          "blue": "Blue out",
+          "green": "Green out",
+          "red": "Red out"
+        },
+        "preserveLuminance": "Preserve L",
+        "sources": {
+          "blue": "Blue source",
+          "constant": "Constant",
+          "green": "Green source",
+          "red": "Red source"
+        },
+        "title": "Channel Mixer"
+      },
       "colorBalanceRgb": {
         "channels": {
           "blue": "Blue",
@@ -1181,6 +1198,7 @@
       "descReplace": "Overwrites all selected settings, resetting the rest to their defaults.",
       "groups": {
         "blackWhiteMixer": "Black & White Mixer",
+        "channelMixer": "Channel Mixer",
         "chromaticAberration": "Chromatic Aberration",
         "clarityDehaze": "Clarity & Dehaze",
         "colorBalanceRgb": "RGB Color Balance",

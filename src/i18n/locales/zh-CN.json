@@ -39,6 +39,23 @@
         "tint": "色调",
         "title": "颜色校准"
       },
+      "channelMixer": {
+        "disabled": "关",
+        "enabled": "开",
+        "outputs": {
+          "blue": "蓝色输出",
+          "green": "绿色输出",
+          "red": "红色输出"
+        },
+        "preserveLuminance": "保留亮度",
+        "sources": {
+          "blue": "蓝色源",
+          "constant": "常量",
+          "green": "绿色源",
+          "red": "红色源"
+        },
+        "title": "通道混合器"
+      },
       "colorBalanceRgb": {
         "channels": {
           "blue": "蓝色",
@@ -1180,6 +1197,7 @@
       "descReplace": "覆盖所有选中的设置，其余重置为默认值。",
       "groups": {
         "blackWhiteMixer": "黑白混合器",
+        "channelMixer": "通道混合器",
         "chromaticAberration": "色差",
         "clarityDehaze": "清晰度与去雾",
         "colorBalanceRgb": "RGB 色彩平衡",

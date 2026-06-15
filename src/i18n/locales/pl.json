@@ -39,6 +39,23 @@
         "tint": "Zabarwienie",
         "title": "Kalibracja kolorów"
       },
+      "channelMixer": {
+        "disabled": "Wył.",
+        "enabled": "Wł.",
+        "outputs": {
+          "blue": "Wyjście B",
+          "green": "Wyjście G",
+          "red": "Wyjście R"
+        },
+        "preserveLuminance": "Zachowaj L",
+        "sources": {
+          "blue": "Źródło B",
+          "constant": "Stała",
+          "green": "Źródło G",
+          "red": "Źródło R"
+        },
+        "title": "Mikser kanałów"
+      },
       "colorBalanceRgb": {
         "channels": {
           "blue": "Niebieski",
@@ -1229,6 +1246,7 @@
       "descReplace": "Nadpisuje wszystkie wybrane ustawienia, przywracając resztę do wartości domyślnych.",
       "groups": {
         "blackWhiteMixer": "Mikser czarno-biały",
+        "channelMixer": "Mikser kanałów",
         "chromaticAberration": "Aberracja chromatyczna",
         "clarityDehaze": "Przejrzystość i Usuwanie mgły",
         "colorBalanceRgb": "Balans RGB",

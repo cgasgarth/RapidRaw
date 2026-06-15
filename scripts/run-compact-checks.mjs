@@ -48,6 +48,7 @@ const CHECK_GROUPS = {
     'check:color-abi',
     'check:black-white-mixer',
     'check:color-balance-rgb',
+    'check:channel-mixer',
     'check:color-grading-presets',
     'check:camera-profile-lookup',
     'check:colorchecker-fixtures',

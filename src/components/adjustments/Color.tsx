@@ -4,6 +4,7 @@ import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type BlackWhiteMixerChannel } from '../../schemas/blackWhiteMixerSchemas';
+import { type ChannelMixerOutput, type ChannelMixerSource } from '../../schemas/channelMixerSchemas';
 import { type ColorBalanceRgbChannel, type ColorBalanceRgbRange } from '../../schemas/colorBalanceRgbSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
@@ -480,6 +481,7 @@ export default function ColorPanel({
   const { t } = useTranslation();
   const [activeColor, setActiveColor] = useState<BlackWhiteMixerChannel>('reds');
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
+  const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
 
@@ -511,12 +513,33 @@ export default function ColorPanel({
       ] satisfies Array<{ key: ColorBalanceRgbChannel; label: string }>,
     [t],
   );
+  const channelMixerOutputs = useMemo(
+    () =>
+      [
+        { key: 'red', label: t('adjustments.color.channelMixer.outputs.red') },
+        { key: 'green', label: t('adjustments.color.channelMixer.outputs.green') },
+        { key: 'blue', label: t('adjustments.color.channelMixer.outputs.blue') },
+      ] satisfies Array<{ key: ChannelMixerOutput; label: string }>,
+    [t],
+  );
+  const channelMixerSources = useMemo(
+    () =>
+      [
+        { key: 'red', label: t('adjustments.color.channelMixer.sources.red') },
+        { key: 'green', label: t('adjustments.color.channelMixer.sources.green') },
+        { key: 'blue', label: t('adjustments.color.channelMixer.sources.blue') },
+        { key: 'constant', label: t('adjustments.color.channelMixer.sources.constant') },
+      ] satisfies Array<{ key: ChannelMixerSource; label: string }>,
+    [t],
+  );
 
   const currentHsl = adjustments.hsl[activeColor];
   const blackWhiteMixer = adjustments.blackWhiteMixer;
   const currentBlackWhiteWeight = blackWhiteMixer.weights[activeColor];
   const colorBalanceRgb = adjustments.colorBalanceRgb;
   const activeColorBalance = colorBalanceRgb[activeColorBalanceRange];
+  const channelMixer = adjustments.channelMixer;
+  const activeChannelMixerRow = channelMixer[activeChannelMixerOutput];
   const baseHue = getSelectiveColorRange(activeColor).centerHueDegrees;
   const effectiveHue = baseHue + (currentHsl.hue || 0);
 
@@ -615,6 +638,51 @@ export default function ColorPanel({
           [activeColorBalanceRange]: {
             ...current[activeColorBalanceRange],
             [channel]: parseFloat(String(value)),
+          },
+        },
+      };
+    });
+  };
+
+  const handleChannelMixerToggle = () => {
+    setAdjustments((prev: Partial<Adjustments>) => {
+      const current = prev.channelMixer || INITIAL_ADJUSTMENTS.channelMixer;
+
+      return {
+        ...prev,
+        channelMixer: {
+          ...current,
+          enabled: !current.enabled,
+        },
+      };
+    });
+  };
+
+  const handleChannelMixerPreserveLuminance = () => {
+    setAdjustments((prev: Partial<Adjustments>) => {
+      const current = prev.channelMixer || INITIAL_ADJUSTMENTS.channelMixer;
+
+      return {
+        ...prev,
+        channelMixer: {
+          ...current,
+          preserveLuminance: !current.preserveLuminance,
+        },
+      };
+    });
+  };
+
+  const handleChannelMixerChange = (source: ChannelMixerSource, value: number | string) => {
+    setAdjustments((prev: Partial<Adjustments>) => {
+      const current = prev.channelMixer || INITIAL_ADJUSTMENTS.channelMixer;
+
+      return {
+        ...prev,
+        channelMixer: {
+          ...current,
+          [activeChannelMixerOutput]: {
+            ...current[activeChannelMixerOutput],
+            [source]: parseFloat(String(value)),
           },
         },
       };
@@ -814,6 +882,74 @@ export default function ColorPanel({
           ))}
         </div>
       )}
+
+      {!isForMask && adjustmentVisibility[ColorAdjustment.ChannelMixer] !== false && (
+        <div className="p-2 bg-bg-tertiary rounded-md">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <UiText variant={TextVariants.heading}>{t('adjustments.color.channelMixer.title')}</UiText>
+            <div className="flex gap-1">
+              <button
+                aria-pressed={channelMixer.preserveLuminance}
+                className={`rounded px-2 py-1 text-xs font-medium ${
+                  channelMixer.preserveLuminance
+                    ? 'bg-bg-secondary text-text-primary'
+                    : 'bg-surface text-text-secondary'
+                }`}
+                onClick={handleChannelMixerPreserveLuminance}
+                type="button"
+              >
+                {t('adjustments.color.channelMixer.preserveLuminance')}
+              </button>
+              <button
+                aria-pressed={channelMixer.enabled}
+                className={`rounded px-2 py-1 text-xs font-medium ${
+                  channelMixer.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary'
+                }`}
+                onClick={handleChannelMixerToggle}
+                type="button"
+              >
+                {channelMixer.enabled
+                  ? t('adjustments.color.channelMixer.enabled')
+                  : t('adjustments.color.channelMixer.disabled')}
+              </button>
+            </div>
+          </div>
+          <div className="mb-3 grid grid-cols-3 gap-1">
+            {channelMixerOutputs.map((output) => (
+              <button
+                aria-pressed={activeChannelMixerOutput === output.key}
+                className={`rounded px-2 py-1 text-xs font-medium ${
+                  activeChannelMixerOutput === output.key
+                    ? 'bg-accent text-button-text'
+                    : 'bg-bg-secondary text-text-secondary'
+                }`}
+                key={output.key}
+                onClick={() => {
+                  setActiveChannelMixerOutput(output.key);
+                }}
+                type="button"
+              >
+                {output.label}
+              </button>
+            ))}
+          </div>
+          {channelMixerSources.map((source) => (
+            <Slider
+              key={source.key}
+              label={source.label}
+              max={source.key === 'constant' ? 100 : 200}
+              min={source.key === 'constant' ? -100 : -200}
+              onChange={(e: SliderChangeEvent) => {
+                handleChannelMixerChange(source.key, e.target.value);
+              }}
+              step={1}
+              value={activeChannelMixerRow[source.key]}
+              onDragStateChange={onDragStateChange}
+            />
+          ))}
+        </div>
+      )}
+
       <div className="p-2 bg-bg-tertiary rounded-md">
         <UiText variant={TextVariants.heading} className="mb-3">
           {t('adjustments.color.colorGrading')}
