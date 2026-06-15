@@ -3981,7 +3981,9 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(overlay): add mask overlay modes`
   - Runtime status: rubylith, color, grayscale, inverse, edge, and hidden overlay modes are schema-backed and fixture-validated for preview color evaluation; UI integration remains future work.
 - `masks(copy): add mask copy paste`
-  - Runtime status: mask container and sub-mask clone/insert helpers are fixture-validated for paste, duplicate, invert, rename, and reset-adjustment behavior; UI extraction remains future work.
+  - Docs: `docs/layers/mask-copy-paste-runtime-2026-06-15.md`
+  - Validation: `scripts/check-mask-copy-paste.mjs`
+  - Runtime status: masks panel context menus expose copy/paste/paste-adjustments and helper fixtures validate clone, insert, invert, rename, and reset-adjustment behavior; typed command/API routing remains future work.
 - `masks(ai): audit subject sky background masks`
   - Runtime status: subject, sky, foreground, depth, and derived background capability coverage is schema-backed, fixture-validated, and checked against frontend invoke commands plus Rust command/render branches; runtime quality benchmarking remains future work.
 - `masks(ai): research people and parts masks`
