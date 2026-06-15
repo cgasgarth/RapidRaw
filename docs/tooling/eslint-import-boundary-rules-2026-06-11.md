@@ -35,8 +35,8 @@ focused follow-up PRs rather than hidden inside one large lint change.
 | ----: | ----------------------------- | ---------------------------------- |
 |    10 | `import-x/no-cycle`           | #542 dependency cycle audit        |
 |   TBD | `boundaries/dependencies`     | #543 cross-layer dependency policy |
-|   516 | `boundaries/no-unknown`       | #543 element map completion        |
-|   516 | `boundaries/no-unknown-files` | #543 element map completion        |
+|   658 | `boundaries/no-unknown`       | #1287 element map completion       |
+|    20 | `boundaries/no-unknown-files` | #1287 source descriptor completion |
 
 The duplicate-import findings were fixed in the first PR. Import ordering,
 default-export import naming, and default-member import naming were later
@@ -99,29 +99,60 @@ installed plugin recommends migrating private dependency checks to
 `boundaries/dependencies`, which requires an explicit allow/disallow graph rather
 than a legacy private-module rule.
 
-Measured command:
+June 11, 2026 measured command:
 
 ```sh
 bun run check:lint
 ```
 
+June 15, 2026 follow-up probe temporarily set `boundaries/no-unknown` and
+`boundaries/no-unknown-files` to `error`. The result was 678 total findings:
+658 `boundaries/no-unknown` import findings and 20
+`boundaries/no-unknown-files` source-file findings.
+
 Measured findings:
 
-| Rule                          | Result                                                                                                                                                           |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `boundaries/element-types`    | 0 findings with the current element map.                                                                                                                         |
-| `boundaries/entry-point`      | 0 findings with the current element map.                                                                                                                         |
-| `boundaries/dependencies`     | Not enabled yet; a real layer graph is required before this rule applies useful pressure.                                                                        |
-| `boundaries/no-unknown`       | 516 findings when enabled. Most current imports resolve as unknown elements until the map covers declaration files, config files, and all dependency categories. |
-| `boundaries/no-unknown-files` | Same 516-finding class; entry/config/declaration files need explicit element coverage before this can be useful.                                                 |
+| Rule                          | Result                                                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `boundaries/element-types`    | 0 findings with the current element map.                                                                                                     |
+| `boundaries/entry-point`      | 0 findings with the current element map.                                                                                                     |
+| `boundaries/dependencies`     | Not enabled yet; a real layer graph is required before this rule applies useful pressure.                                                    |
+| `boundaries/no-unknown`       | 658 findings when enabled. Most current imports resolve as unknown elements until dependency categories and package schema files are mapped. |
+| `boundaries/no-unknown-files` | 20 findings when enabled. This is small enough for the next focused cleanup PR to make green before broader dependency policy work.          |
+
+Current `boundaries/no-unknown-files` sources:
+
+- `i18next.config.ts`
+- `packages/rawengine-schema/scripts/check-edit-command-bus.ts`
+- `packages/rawengine-schema/scripts/check-focus-app-server-command-bus.ts`
+- `packages/rawengine-schema/scripts/check-hdr-api-tools.ts`
+- `packages/rawengine-schema/scripts/check-hdr-app-server-command-bus.ts`
+- `packages/rawengine-schema/scripts/check-samples.ts`
+- `packages/rawengine-schema/src/editCommandBus.ts`
+- `packages/rawengine-schema/src/focusStackPreflight.ts`
+- `packages/rawengine-schema/src/hdrBracketDetection.ts`
+- `packages/rawengine-schema/src/hdrMergeApiTools.ts`
+- `packages/rawengine-schema/src/hdrMergeUiControls.ts`
+- `packages/rawengine-schema/src/index.ts`
+- `packages/rawengine-schema/src/rawEngineSchemas.ts`
+- `packages/rawengine-schema/src/samplePayloads.ts`
+- `src/@types/i18next.d.ts`
+- `src/@types/react-image-crop.d.ts`
+- `src/App.tsx`
+- `src/main.tsx`
+- `src/validation/visual/VisualSmokeApp.tsx`
+- `src/validation/visual/main.tsx`
 
 Exit criteria before enabling `boundaries/dependencies`:
 
 - Define the allowed layer graph for entry, app, views, panels, adjustments,
   modals, managers, UI, context, hooks, schemas, store, types, utils, i18n, and
   window elements.
-- Add element descriptors for current unknown files such as `src/App.tsx`,
-  `src/main.tsx`, `i18next.config.ts`, and `src/@types/**`.
+- First make `boundaries/no-unknown-files` green by adding descriptors for
+  app entrypoints, visual validation entrypoints, root config, declaration
+  files, and `packages/rawengine-schema/**`.
+- Then reduce `boundaries/no-unknown` by mapping imported dependency
+  categories and package schema elements.
 - Decide whether type-only imports get a looser graph than value imports.
 - Re-run `bun run check:lint` with `boundaries/dependencies`,
   `boundaries/no-unknown`, and `boundaries/no-unknown-files` set to `error`.
