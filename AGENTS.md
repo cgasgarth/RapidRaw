@@ -111,6 +111,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Keep frequently reused local checks and hooks token-efficient. On success,
   prefer compact summaries over full command/file lists; on failure, preserve
   actionable tool output.
+- Do not edit existing tests solely to reduce token output. Compact the
+  commonly reused runner, package script, hook, or reporting layer instead.
 - Keep GitHub Actions current on supported major versions and maintain the
   stable `PR CI / required` aggregate gate.
 - New `main` or PR workflow runs should not cancel older validation runs.
