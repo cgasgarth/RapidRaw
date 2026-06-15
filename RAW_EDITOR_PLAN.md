@@ -3847,6 +3847,14 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Runtime status: synthetic PPM artifact comparison foundation; renderer-produced RAW artifacts remain follow-up work.
 - `validation(performance): add performance smoke script`
 
+2026-06-15 command foundation update:
+
+- `api(commands): add edit command bus`
+  - Issue: #78
+  - Docs: `docs/api/edit-command-bus-2026-06-15.md`
+  - Validation: `bun run schema:command-bus`
+  - Status: schema-package dispatch foundation only; live UI/store/Tauri routing remains follow-up.
+
 #### Milestone 3.5: Contract Freeze And Validation Contracts
 
 - `audit(seams): document current jsAdjustments command payload seams`

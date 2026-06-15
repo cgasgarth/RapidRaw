@@ -162,6 +162,7 @@
     "schema:fixtures": "bun scripts/run-compact-command.mjs --label schema:fixtures -- bun packages/rawengine-schema/scripts/check-samples.ts",
     "schema:samples": "bun scripts/run-compact-command.mjs --label schema:samples -- bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs",
     "schema:samples:update": "bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs --update",
+    "schema:command-bus": "bun scripts/run-compact-command.mjs --label schema:command-bus -- bun packages/rawengine-schema/scripts/check-edit-command-bus.ts",
     "schema:focus-app-server": "bun packages/rawengine-schema/scripts/check-focus-app-server-command-bus.ts",
     "schema:hdr-app-server": "bun packages/rawengine-schema/scripts/check-hdr-app-server-command-bus.ts",
     "schema:hdr-api-tools": "bun packages/rawengine-schema/scripts/check-hdr-api-tools.ts",
