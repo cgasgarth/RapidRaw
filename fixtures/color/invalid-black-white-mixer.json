@@ -1,0 +1,34 @@
+[
+  {
+    "case": "enabled with zero weights",
+    "input": {
+      "enabled": true,
+      "weights": {
+        "reds": 0,
+        "oranges": 0,
+        "yellows": 0,
+        "greens": 0,
+        "aquas": 0,
+        "blues": 0,
+        "purples": 0,
+        "magentas": 0
+      }
+    }
+  },
+  {
+    "case": "out of range",
+    "input": {
+      "enabled": true,
+      "weights": {
+        "reds": 101,
+        "oranges": 0,
+        "yellows": 0,
+        "greens": 0,
+        "aquas": 0,
+        "blues": 0,
+        "purples": 0,
+        "magentas": 0
+      }
+    }
+  }
+]
