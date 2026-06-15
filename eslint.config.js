@@ -258,9 +258,9 @@ module.exports = [
       '@typescript-eslint/prefer-for-of': 'error',
       '@typescript-eslint/prefer-regexp-exec': 'error',
       'i18next/no-literal-string': [
-        'warn',
+        'error',
         {
-          markupOnly: true,
+          markupOnly: false,
           ignoreAttribute: [
             'className',
             'style',

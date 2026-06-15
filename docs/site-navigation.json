@@ -464,6 +464,10 @@
           "path": "docs/tooling/typescript-stylistic-rules-2026-06-15.md"
         },
         {
+          "title": "User-visible string lint",
+          "path": "docs/tooling/user-visible-string-lint-2026-06-15.md"
+        },
+        {
           "title": "Unsafe cast AST guard",
           "path": "docs/tooling/unsafe-cast-ast-guard-2026-06-15.md"
         },
