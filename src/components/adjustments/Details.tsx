@@ -16,7 +16,7 @@ interface DetailsPanelProps {
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
-type AdjustmentUpdate = Partial<Adjustments> | ((prev: Partial<Adjustments>) => Partial<Adjustments>);
+type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 
 type SliderChangeEvent =
   | ChangeEvent<HTMLInputElement>
@@ -37,16 +37,16 @@ export default function DetailsPanel({
 
   const handleAdjustmentChange = (key: string, value: number | string) => {
     const numericValue = parseInt(String(value), 10);
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: numericValue }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: numericValue }));
   };
 
   const handleFloatAdjustmentChange = (key: string, value: number | string) => {
     const numericValue = parseFloat(String(value));
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: numericValue }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: numericValue }));
   };
 
   const handleBooleanAdjustmentChange = (key: string, value: boolean) => {
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [key]: value }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
   };
 
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};

@@ -163,8 +163,7 @@ export interface ParametricCurve {
 }
 
 export interface Adjustments {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy adjustment indexing is used by preset/copy-paste flows; replace with keyed helpers in a focused type-hardening PR.
-  [index: string]: any;
+  [index: string]: unknown;
   aiPatches: Array<AiPatch>;
   aspectRatio: number | null;
   blacks: number;
@@ -369,8 +368,7 @@ export interface ChannelMixerSettings {
 }
 
 export interface MaskAdjustments {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Legacy mask adjustment indexing mirrors Adjustments until mask-specific keyed helpers are introduced.
-  [index: string]: any;
+  [index: string]: unknown;
   blacks: number;
   brightness: number;
   clarity: number;

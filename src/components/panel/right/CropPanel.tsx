@@ -357,14 +357,14 @@ export default function CropPanel() {
       }
     }
 
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, aspectRatio: newAspectRatio }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio }));
   };
 
   const handleOrientationToggle = useCallback(() => {
     if (aspectRatio && aspectRatio !== 1) {
       const newRatio = 1 / aspectRatio;
       setPreferPortrait(newRatio < 1);
-      setAdjustments((prev: Partial<Adjustments>) => ({
+      setAdjustments((prev: Adjustments) => ({
         ...prev,
         aspectRatio: newRatio,
       }));
@@ -445,7 +445,7 @@ export default function CropPanel() {
 
   const resetFineRotation = () => {
     updateLocalRotation(null);
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, rotation: 0 }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
   };
 
   const handleOverlayCycle = () => {
@@ -564,7 +564,7 @@ export default function CropPanel() {
                     if (preferPortrait || (imageRatio && imageRatio < 1)) {
                       newAspectRatio = 1 / BASE_RATIO;
                     }
-                    setAdjustments((prev: Partial<Adjustments>) => ({
+                    setAdjustments((prev: Adjustments) => ({
                       ...prev,
                       aspectRatio: newAspectRatio,
                     }));
