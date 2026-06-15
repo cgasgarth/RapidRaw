@@ -169,6 +169,52 @@ export default function DetailsPanel({
             onDragStateChange={onDragStateChange}
           />
           {!isForMask && (
+            <>
+              <Slider
+                label={t('adjustments.details.localContrastRadius')}
+                max={96}
+                min={4}
+                onChange={(e: SliderChangeEvent) => {
+                  handleAdjustmentChange(DetailsAdjustment.LocalContrastRadiusPx, e.target.value);
+                }}
+                step={1}
+                value={adjustments.localContrastRadiusPx}
+                onDragStateChange={onDragStateChange}
+                defaultValue={24}
+                suffix=" px"
+              />
+              <Slider
+                label={t('adjustments.details.haloGuard')}
+                max={100}
+                min={0}
+                onChange={(e: SliderChangeEvent) => {
+                  handleAdjustmentChange(DetailsAdjustment.LocalContrastHaloGuard, e.target.value);
+                }}
+                step={1}
+                value={adjustments.localContrastHaloGuard}
+                onDragStateChange={onDragStateChange}
+                defaultValue={50}
+                fillOrigin="min"
+              />
+              <Slider
+                label={t('adjustments.details.midtoneMask')}
+                max={100}
+                min={0}
+                onChange={(e: SliderChangeEvent) => {
+                  handleAdjustmentChange(DetailsAdjustment.LocalContrastMidtoneMask, e.target.value);
+                }}
+                step={1}
+                value={adjustments.localContrastMidtoneMask}
+                onDragStateChange={onDragStateChange}
+                defaultValue={50}
+                fillOrigin="min"
+              />
+              <UiText variant={TextVariants.small} className="mt-2 text-text-secondary">
+                {t('adjustments.details.localContrastStatus')}
+              </UiText>
+            </>
+          )}
+          {!isForMask && (
             <Slider
               label={t('adjustments.details.centre')}
               max={100}

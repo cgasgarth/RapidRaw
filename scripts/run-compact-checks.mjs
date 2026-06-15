@@ -47,6 +47,7 @@ const CHECK_GROUPS = {
     'check:selective-color-ranges',
     'check:selective-color-falloff',
     'check:skin-tone-uniformity',
+    'check:local-contrast-controls',
     'check:selective-color-mask',
     'check:layer-stack',
     'check:layer-adjustments',

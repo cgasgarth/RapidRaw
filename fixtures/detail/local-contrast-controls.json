@@ -1,0 +1,26 @@
+{
+  "cases": [
+    {
+      "amount": 12,
+      "haloGuard": 50,
+      "midtoneMask": 50,
+      "mode": "classic",
+      "radiusPx": 24
+    },
+    {
+      "amount": 24,
+      "haloGuard": 65,
+      "midtoneMask": 50,
+      "mode": "edge_protected",
+      "radiusPx": 18
+    },
+    {
+      "amount": -10,
+      "haloGuard": 55,
+      "midtoneMask": 70,
+      "mode": "midtone_masked",
+      "radiusPx": 36
+    }
+  ],
+  "validationStatus": "ui_control_contract"
+}
