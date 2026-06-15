@@ -70,6 +70,11 @@ class HdrAppServerCommandBus {
       throw new Error(`${tool.toolName} requires a dry-run command envelope.`);
     }
 
+    const outputDimensions = sampleHdrMergeArtifactV1.outputArtifact.dimensions;
+    if (outputDimensions === undefined) {
+      throw new Error('Sample HDR artifact requires output dimensions for app-server dry-run planning.');
+    }
+
     const dryRunResult = computationalMergeDryRunResultV1Schema.parse({
       commandId: command.commandId,
       commandType: command.commandType,
@@ -78,8 +83,8 @@ class HdrAppServerCommandBus {
       mergePlan: {
         family: 'hdr',
         outputDimensions: {
-          height: sampleHdrMergeArtifactV1.outputArtifact.dimensions.height,
-          width: sampleHdrMergeArtifactV1.outputArtifact.dimensions.width,
+          height: outputDimensions.height,
+          width: outputDimensions.width,
         },
         outputName: command.parameters.outputName,
         performanceEstimate: {
@@ -98,12 +103,10 @@ class HdrAppServerCommandBus {
           },
           executionMode: 'full_frame_legacy',
           geometryEstimate: {
-            outputPixelCount:
-              sampleHdrMergeArtifactV1.outputArtifact.dimensions.height *
-              sampleHdrMergeArtifactV1.outputArtifact.dimensions.width,
+            outputPixelCount: outputDimensions.height * outputDimensions.width,
             projectedBounds: {
-              height: sampleHdrMergeArtifactV1.outputArtifact.dimensions.height,
-              width: sampleHdrMergeArtifactV1.outputArtifact.dimensions.width,
+              height: outputDimensions.height,
+              width: outputDimensions.width,
               x: 0,
               y: 0,
             },

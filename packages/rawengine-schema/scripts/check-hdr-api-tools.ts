@@ -1,5 +1,5 @@
-import { buildHdrMergeApiCommandV1 } from '../src/hdrMergeApiTools.ts';
-import { ApprovalClass } from '../src/rawEngineSchemas.ts';
+import { buildHdrMergeApiCommandV1 } from '../src/hdrMergeApiTools.js';
+import { ApprovalClass } from '../src/rawEngineSchemas.js';
 
 const baseRequest = {
   actor: { id: 'agent_rawengine', kind: 'agent' },
