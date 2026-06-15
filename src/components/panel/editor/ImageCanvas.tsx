@@ -1178,7 +1178,7 @@ const ImageCanvas = memo(
         prevImageIdentityRef.current = selectedImage.thumbnailUrl;
         setDisplayState({ base: newSrc, fade: null });
         setIsFadingIn(false);
-        return;
+        return undefined;
       }
 
       if (isSliderDragging) {
@@ -1212,6 +1212,7 @@ const ImageCanvas = memo(
           setIsFadingIn(false);
         }
       }
+      return undefined;
     }, [finalPreviewUrl, selectedImage.thumbnailUrl, isSliderDragging, displayState.base]);
 
     useEffect(() => {
@@ -1425,6 +1426,7 @@ const ImageCanvas = memo(
       } else {
         setIsCropViewVisible(false);
       }
+      return undefined;
     }, [isCropping, uncroppedAdjustedPreviewUrl]);
 
     const handleWbClick = useCallback(

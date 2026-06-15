@@ -141,6 +141,7 @@ export default function CullingModal({
         clearTimeout(syncTimer);
       };
     }
+    return undefined;
   }, [stage, suggestions]);
 
   const handleStartCulling = useCallback(async () => {

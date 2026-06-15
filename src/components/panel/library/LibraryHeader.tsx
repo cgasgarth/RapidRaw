@@ -193,6 +193,7 @@ export function SearchInput({ indexingProgress, isIndexing }: SearchInputProps) 
         clearTimeout(timer);
       };
     }
+    return undefined;
   }, [tags, text, isSearchActive]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

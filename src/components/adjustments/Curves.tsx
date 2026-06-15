@@ -465,6 +465,7 @@ export default function CurveGraph({
         clearTimeout(resetTimer);
       };
     }
+    return undefined;
   }, [activeCurve, draggingPointIndex]);
 
   useEffect(() => {

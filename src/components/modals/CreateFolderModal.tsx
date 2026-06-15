@@ -39,6 +39,7 @@ export default function CreateFolderModal({
         clearTimeout(timer);
       };
     }
+    return undefined;
   }, [isOpen]);
 
   const handleSave = useCallback(() => {

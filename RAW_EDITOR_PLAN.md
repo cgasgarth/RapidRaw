@@ -3783,6 +3783,11 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `tooling(tsconfig): enable exactOptionalPropertyTypes`
 - `tooling(tsconfig): enable noImplicitOverride`
 - `tooling(tsconfig): enforce noPropertyAccessFromIndexSignature`
+- `tooling(tsconfig): enable control-flow safety flags`
+  - Issue: #1298
+  - Docs: `docs/tooling/ts-control-flow-flags-2026-06-15.md`
+  - Validation: `bun run check:types`, `bun run schema:types`
+  - Status: compiler hardening only; no runtime product behavior change.
 - `tooling(types): add generated type drift checks`
 - `tooling(types): add script type coverage baseline guard`
   - Issue: #1295

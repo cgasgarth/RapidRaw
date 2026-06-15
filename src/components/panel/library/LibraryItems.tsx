@@ -211,6 +211,7 @@ const ThumbnailComponent = ({
         cancelAnimationFrame(frame);
       };
     }
+    return undefined;
   }, [layers]);
 
   const handleTransitionEnd = useCallback((finishedId: string) => {
@@ -615,6 +616,7 @@ const ListItemComponent = ({
         cancelAnimationFrame(frame);
       };
     }
+    return undefined;
   }, [layers]);
 
   const handleTransitionEnd = useCallback((finishedId: string) => {

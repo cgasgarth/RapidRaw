@@ -154,6 +154,7 @@ const FilmstripThumbnail = memo(
 
         return [...prev, { id: thumbData, url: thumbData, opacity: 0 }];
       });
+      return undefined;
     }, [thumbData, imageFile.path]);
 
     useEffect(() => {
@@ -166,6 +167,7 @@ const FilmstripThumbnail = memo(
           cancelAnimationFrame(frame);
         };
       }
+      return undefined;
     }, [layers]);
 
     const handleTransitionEnd = useCallback((finishedId: string) => {
