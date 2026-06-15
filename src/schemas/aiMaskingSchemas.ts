@@ -284,9 +284,52 @@ export const aiPeopleMaskPickerModelFixtureSchema = z
   })
   .strict();
 
+export const aiPeopleMaskFakeAlphaMaskSchema = z
+  .object({
+    artifactId: z.string().trim().min(1),
+    coverage: z.number().min(0).max(1),
+    height: z.number().int().positive().max(256),
+    rows: z.array(z.string().regex(/^[.#]+$/u)).min(1),
+    target: aiPeopleMaskTargetSchema,
+    width: z.number().int().positive().max(256),
+  })
+  .strict()
+  .superRefine((mask, context) => {
+    if (mask.rows.length !== mask.height) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Fake people-mask row count must match height.',
+        path: ['rows'],
+      });
+    }
+
+    for (const [index, row] of mask.rows.entries()) {
+      if (row.length !== mask.width) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Fake people-mask row width must match width.',
+          path: ['rows', index],
+        });
+      }
+    }
+  });
+
+export const aiPeopleMaskFakeProviderFixtureSchema = z
+  .object({
+    $schema: z.url(),
+    analysis: aiPeopleMaskAnalysisSchema,
+    expectedMasks: z.array(aiPeopleMaskFakeAlphaMaskSchema).min(1),
+    issue: z.literal(1133),
+    schemaVersion: z.literal(1),
+    snapshotDate: z.iso.date(),
+  })
+  .strict();
+
 export type AiMaskCapability = z.infer<typeof aiMaskCapabilitySchema>;
 export type AiMaskCapabilityAuditEntry = z.infer<typeof aiMaskCapabilityAuditEntrySchema>;
 export type AiPeopleMaskAnalysis = z.infer<typeof aiPeopleMaskAnalysisSchema>;
 export type AiPeopleMaskPickerModel = z.infer<typeof aiPeopleMaskPickerModelSchema>;
+export type AiPeopleMaskFakeAlphaMask = z.infer<typeof aiPeopleMaskFakeAlphaMaskSchema>;
 export type AiPeopleMaskPart = z.infer<typeof aiPeopleMaskPartSchema>;
 export type AiPeopleMaskProviderCapability = z.infer<typeof aiPeopleMaskProviderCapabilitySchema>;
+export type AiPeopleMaskTarget = z.infer<typeof aiPeopleMaskTargetSchema>;
