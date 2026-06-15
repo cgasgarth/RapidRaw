@@ -1,6 +1,8 @@
-name: Panorama OpenCV Spike
+name: Rust Feature Matrix
 
 on:
+  schedule:
+    - cron: '17 10 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -8,7 +10,7 @@ permissions:
 
 jobs:
   macos-opencv-spike:
-    name: macOS OpenCV feature spike
+    name: macOS all-features check
     runs-on: macos-14
     timeout-minutes: 60
     steps:
@@ -45,7 +47,7 @@ jobs:
             echo "- OpenCV version: \`$(pkg-config --modversion opencv4)\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Cargo check OpenCV spike
+      - name: Cargo check all features
         working-directory: src-tauri
         env:
           LIBCLANG_PATH: ${{ runner.temp }}/unused
@@ -57,9 +59,9 @@ jobs:
           export PKG_CONFIG_PATH="$opencv_prefix/lib/pkgconfig"
           export LIBCLANG_PATH="$llvm_prefix/lib"
 
-          cargo check --locked --no-default-features --features required-ci,panorama-opencv-spike
+          cargo check --locked --all-targets --all-features
 
-      - name: Cargo test OpenCV spike
+      - name: Cargo test OpenCV feature
         working-directory: src-tauri
         env:
           LIBCLANG_PATH: ${{ runner.temp }}/unused
@@ -71,4 +73,4 @@ jobs:
           export PKG_CONFIG_PATH="$opencv_prefix/lib/pkgconfig"
           export LIBCLANG_PATH="$llvm_prefix/lib"
 
-          cargo test --locked --no-default-features --features required-ci,panorama-opencv-spike opencv_spike -- --nocapture
+          cargo test --locked --all-targets --all-features opencv_spike -- --nocapture

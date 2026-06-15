@@ -136,6 +136,7 @@ generator before the release workflow needs one.
 - [Major dependency migration process](tooling/major-dependency-migration-process-2026-06-13.md)
 - [Dependency version audit](tooling/dependency-version-audit-2026-06-13.md)
 - [Rust required feature policy](tooling/rust-required-feature-policy-2026-06-13.md)
+- [Rust feature matrix](tooling/rust-feature-matrix-2026-06-15.md)
 - [Strict type-checked ESLint](tooling/eslint-strict-type-checked-2026-06-11.md)
 - [TypeScript suppression policy](tooling/typescript-suppression-policy-2026-06-15.md)
 - [ESLint escape hatches](tooling/eslint-escape-hatches-2026-06-11.md)

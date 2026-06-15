@@ -38,12 +38,12 @@ const ALLOWED_WORKFLOW_COMMANDS = new Map([
     'Main-only long validation uses quiet cargo test output.',
   ],
   [
-    'cargo check --locked --no-default-features --features required-ci,panorama-opencv-spike',
-    'Manual OpenCV spike workflow keeps direct Rust command for dependency diagnostics.',
+    'cargo check --locked --all-targets --all-features',
+    'Scheduled OpenCV feature matrix keeps direct Rust command for optional-feature diagnostics.',
   ],
   [
-    'cargo test --locked --no-default-features --features required-ci,panorama-opencv-spike opencv_spike -- --nocapture',
-    'Manual OpenCV spike workflow intentionally captures spike diagnostics.',
+    'cargo test --locked --all-targets --all-features opencv_spike -- --nocapture',
+    'Scheduled OpenCV feature matrix intentionally captures spike diagnostics.',
   ],
 ]);
 
