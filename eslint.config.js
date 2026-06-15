@@ -2,12 +2,14 @@ const js = require('@eslint/js');
 const tseslint = require('typescript-eslint');
 const react = require('eslint-plugin-react');
 const reactHooks = require('eslint-plugin-react-hooks');
+const { reactRefresh } = require('eslint-plugin-react-refresh');
 const jsxA11y = require('eslint-plugin-jsx-a11y');
 const importX = require('eslint-plugin-import-x');
 const boundaries = require('eslint-plugin-boundaries');
 const i18next = require('eslint-plugin-i18next');
 
 const tsFiles = ['**/*.{ts,tsx,mts}'];
+const reactRefreshFiles = ['**/*.{tsx,jsx}'];
 
 const jsRecommendedForTs = {
   ...js.configs.recommended,
@@ -70,6 +72,23 @@ module.exports = [
   jsxA11yRecommended,
   importXRecommended,
   importXTypeScript,
+  {
+    files: reactRefreshFiles,
+    ignores: ['src/utils/CollageVariants.tsx'],
+    plugins: {
+      'react-refresh': reactRefresh.plugin,
+    },
+    rules: {
+      'react-refresh/only-export-components': [
+        'error',
+        {
+          allowConstantExport: true,
+          // The context hook is intentionally exported with its provider.
+          allowExportNames: ['useContextMenu'],
+        },
+      ],
+    },
+  },
   {
     files: tsFiles,
     plugins: {

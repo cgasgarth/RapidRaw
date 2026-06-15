@@ -456,6 +456,10 @@
           "path": "docs/tooling/unsafe-cast-ast-guard-2026-06-15.md"
         },
         {
+          "title": "React refresh lint",
+          "path": "docs/tooling/react-refresh-lint-2026-06-15.md"
+        },
+        {
           "title": "Bun CI script migration",
           "path": "docs/tooling/bun-ci-script-migration-2026-06-10.md"
         },
