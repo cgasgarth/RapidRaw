@@ -22,6 +22,7 @@
     "check": "bun run check:quick && bun run check:bundle",
     "check:quick": "bun scripts/run-compact-checks.mjs check:quick",
     "check:types": "bun scripts/run-compact-command.mjs --label types -- tsc --noEmit --pretty false",
+    "check:script-type-coverage": "bun scripts/check-script-type-coverage.mjs",
     "check:i18n": "bun scripts/run-compact-command.mjs --label i18n -- i18next-cli extract --ci --dry-run",
     "check:unsafe-casts": "bun scripts/check-unsafe-casts.mjs",
     "check:a11y": "bun scripts/check-accessibility-pass.mjs",

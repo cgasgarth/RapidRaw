@@ -5,6 +5,7 @@ import { readBoundedStream, writeBoundedOutput } from './compact-output.mjs';
 const CHECK_GROUPS = {
   'check:quick': [
     'check:types',
+    'check:script-type-coverage',
     'check:i18n',
     'check:unsafe-casts',
     'check:film-fixtures',

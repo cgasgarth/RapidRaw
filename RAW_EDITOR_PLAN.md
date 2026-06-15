@@ -3784,6 +3784,11 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `tooling(tsconfig): enable noImplicitOverride`
 - `tooling(tsconfig): enforce noPropertyAccessFromIndexSignature`
 - `tooling(types): add generated type drift checks`
+- `tooling(types): add script type coverage baseline guard`
+  - Issue: #1295
+  - Docs: `docs/tooling/script-type-coverage-2026-06-15.md`
+  - Validation: `bun run check:script-type-coverage`
+  - Status: baseline guard only; full script `@ts-check`/TypeScript migration remains follow-up.
 - `tooling(eslint): audit current config and warning inventory`
 - `tooling(eslint): adopt type-aware parser project service`
 - `tooling(eslint): enable strict type-checked rules`
