@@ -95,6 +95,25 @@
         "yellows": "Yellows"
       },
       "presence": "Presence",
+      "profileTone": {
+        "cameraProfile": "Camera Profile",
+        "cameraProfiles": {
+          "camera_landscape": "Landscape",
+          "camera_neutral": "Neutral",
+          "camera_portrait": "Portrait",
+          "camera_standard": "Standard",
+          "linear_raw": "Linear RAW"
+        },
+        "title": "Profile & Tone",
+        "toneCurve": "Tone Curve",
+        "toneCurves": {
+          "auto_filmic": "Auto Filmic",
+          "high_contrast": "High Contrast",
+          "linear": "Linear",
+          "shadow_lift": "Shadow Lift",
+          "soft_contrast": "Soft Contrast"
+        }
+      },
       "saturation": "Saturation",
       "temperature": "Temperature",
       "tint": "Tint",
@@ -1217,6 +1236,7 @@
         "masks": "Masks",
         "noiseReduction": "Noise Reduction",
         "presence": "Presence",
+        "profileTone": "Profile & Tone",
         "sharpness": "Sharpness",
         "tone": "Tone",
         "transformRotation": "Transform & Rotation",
