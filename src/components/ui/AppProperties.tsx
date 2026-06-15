@@ -51,6 +51,7 @@ export enum Invokes {
   DeleteFolder = 'delete_folder',
   DuplicateFile = 'duplicate_file',
   DryRunDeblurControls = 'dry_run_deblur_controls',
+  DryRunDenoiseControls = 'dry_run_denoise_controls',
   EstimateExportSizes = 'estimate_export_sizes',
   ExportImages = 'export_images',
   FrontendLog = 'frontend_log',

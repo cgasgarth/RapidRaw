@@ -16,6 +16,7 @@ mod cache_utils;
 mod culling;
 mod deblur_api;
 pub mod deblur_cpu_reference;
+mod denoise_api;
 pub mod denoise_cpu_reference;
 mod denoising;
 mod exif_processing;
@@ -2269,6 +2270,7 @@ pub fn run() {
             ai_commands::check_ai_connector_status,
             ai_commands::test_ai_connector_connection,
             ai_commands::invoke_generative_replace_with_mask_def,
+            denoise_api::dry_run_denoise_controls,
             denoising::apply_denoising,
             denoising::batch_denoise_images,
             denoising::save_denoised_image,

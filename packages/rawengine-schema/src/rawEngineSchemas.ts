@@ -1238,6 +1238,156 @@ export const detailDeblurDryRunResultV1Schema = z
   })
   .strict();
 
+export const detailDenoiseControlsV1Schema = z
+  .object({
+    chromaStrength: z.number().min(0).max(1),
+    lumaStrength: z.number().min(0).max(1),
+  })
+  .strict();
+
+export const detailDenoiseUiControlsV1Schema = z
+  .object({
+    colorNoiseReduction: z.number().int().min(0).max(100),
+    lumaNoiseReduction: z.number().int().min(0).max(100),
+  })
+  .strict();
+
+export const toDetailDenoiseControlsV1 = (
+  controls: z.infer<typeof detailDenoiseUiControlsV1Schema>,
+): z.infer<typeof detailDenoiseControlsV1Schema> => ({
+  chromaStrength: controls.colorNoiseReduction / 100,
+  lumaStrength: controls.lumaNoiseReduction / 100,
+});
+
+export const detailDenoiseSkipReasonV1Schema = z.enum([
+  'disabled',
+  'preview_export_not_proven',
+  'preview_not_wired',
+  'runtime_not_available',
+]);
+
+export const detailDenoiseRuntimeStatusV1Schema = z.enum([
+  'schema_only',
+  'ui_api_wired',
+  'runtime_apply_capable',
+  'preview_export_parity',
+  'e2e_proven',
+]);
+
+export const detailDenoiseApplyStatusV1Schema = z.enum(['not_requested', 'not_executed', 'applied', 'blocked']);
+
+export const detailDenoiseLimitationV1Schema = z.enum([
+  'e2e_workflow',
+  'gpu_parity',
+  'preview_export_parity',
+  'real_raw_quality',
+]);
+
+export const detailDenoiseRuntimeStateV1Schema = z
+  .object({
+    applyStatus: detailDenoiseApplyStatusV1Schema,
+    doesNotProve: z.array(detailDenoiseLimitationV1Schema),
+    effectiveControls: detailDenoiseControlsV1Schema,
+    mutates: z.boolean(),
+    orderedAfter: z.literal('demosaic'),
+    orderedBefore: z.literal('scene_linear_deblur'),
+    runtimeStatus: detailDenoiseRuntimeStatusV1Schema,
+    skipReason: detailDenoiseSkipReasonV1Schema.optional(),
+    stage: z.literal('scene_linear_denoise'),
+  })
+  .strict()
+  .superRefine((runtime, context) => {
+    if (runtime.applyStatus !== 'applied' && runtime.skipReason === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Skipped or blocked denoise results require a skipReason.',
+        path: ['skipReason'],
+      });
+    }
+
+    if (runtime.runtimeStatus === 'ui_api_wired' && !runtime.doesNotProve.includes('preview_export_parity')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'UI/API-only denoise status must not imply preview/export parity.',
+        path: ['doesNotProve'],
+      });
+    }
+  });
+
+export const detailDenoiseCommandTypeV1Schema = z.enum(['detailDenoise.dryRunControls', 'detailDenoise.applyControls']);
+
+const detailDenoiseCommandBaseV1Schema = z.object({
+  actor: rawEngineActorSchema,
+  approval: approvalRequirementSchema,
+  commandId: z.string().trim().min(1),
+  correlationId: z.string().trim().min(1),
+  dryRun: z.boolean(),
+  expectedGraphRevision: z.string().trim().min(1),
+  idempotencyKey: z.string().trim().min(1).optional(),
+  schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+  target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'virtual_copy']) }).strict(),
+});
+
+export const detailDenoiseCommandEnvelopeV1Schema = z
+  .discriminatedUnion('commandType', [
+    detailDenoiseCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('detailDenoise.dryRunControls'),
+        dryRun: z.literal(true),
+        parameters: detailDenoiseControlsV1Schema,
+      })
+      .strict(),
+    detailDenoiseCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('detailDenoise.applyControls'),
+        dryRun: z.literal(false),
+        parameters: detailDenoiseControlsV1Schema,
+      })
+      .strict(),
+  ])
+  .superRefine((command, context) => {
+    if (
+      command.commandType === 'detailDenoise.dryRunControls' &&
+      command.approval.approvalClass !== ApprovalClass.PreviewOnly
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Dry-run denoise commands require preview-only approval classification.',
+        path: ['approval', 'approvalClass'],
+      });
+    }
+
+    if (command.commandType === 'detailDenoise.applyControls') {
+      if (command.approval.approvalClass !== ApprovalClass.EditApply) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Applied denoise commands require edit-apply approval classification.',
+          path: ['approval', 'approvalClass'],
+        });
+      }
+      if (command.approval.state !== 'approved') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Applied denoise commands require approved user approval before execution.',
+          path: ['approval', 'state'],
+        });
+      }
+    }
+  });
+
+export const detailDenoiseDryRunResultV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('detailDenoise.dryRunControls'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(true),
+    mutates: z.literal(false),
+    runtime: detailDenoiseRuntimeStateV1Schema,
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const toneColorCommandTypeV1Schema = z.enum([
   'toneColor.setBasicTone',
   'toneColor.setToneCurve',
@@ -7762,6 +7912,8 @@ const rawEngineAppServerKnownInputSchemas = {
   AiToolCommandEnvelopeV1: aiToolCommandEnvelopeV1Schema,
   CommandEnvelopeV1: commandEnvelopeV1Schema,
   ComputationalMergeCommandEnvelopeV1: computationalMergeCommandEnvelopeV1Schema,
+  DetailDeblurCommandEnvelopeV1: detailDeblurCommandEnvelopeV1Schema,
+  DetailDenoiseCommandEnvelopeV1: detailDenoiseCommandEnvelopeV1Schema,
   EditGraphCommandEnvelopeV1: editGraphCommandEnvelopeV1Schema,
   EditGraphSnapshotQueryV1: editGraphSnapshotQueryV1Schema,
   ExportCommandEnvelopeV1: exportCommandEnvelopeV1Schema,
@@ -7785,6 +7937,8 @@ export const rawEngineAppServerToolCallV1Schema = z
       'AiToolCommandEnvelopeV1',
       'CommandEnvelopeV1',
       'ComputationalMergeCommandEnvelopeV1',
+      'DetailDeblurCommandEnvelopeV1',
+      'DetailDenoiseCommandEnvelopeV1',
       'EditGraphCommandEnvelopeV1',
       'EditGraphSnapshotQueryV1',
       'ExportCommandEnvelopeV1',
@@ -8802,6 +8956,16 @@ export type DetailDeblurRuntimeStateV1 = z.infer<typeof detailDeblurRuntimeState
 export type DetailDeblurRuntimeStatusV1 = z.infer<typeof detailDeblurRuntimeStatusV1Schema>;
 export type DetailDeblurSkipReasonV1 = z.infer<typeof detailDeblurSkipReasonV1Schema>;
 export type DetailDeblurUiControlsV1 = z.infer<typeof detailDeblurUiControlsV1Schema>;
+export type DetailDenoiseApplyStatusV1 = z.infer<typeof detailDenoiseApplyStatusV1Schema>;
+export type DetailDenoiseCommandEnvelopeV1 = z.infer<typeof detailDenoiseCommandEnvelopeV1Schema>;
+export type DetailDenoiseCommandTypeV1 = z.infer<typeof detailDenoiseCommandTypeV1Schema>;
+export type DetailDenoiseControlsV1 = z.infer<typeof detailDenoiseControlsV1Schema>;
+export type DetailDenoiseDryRunResultV1 = z.infer<typeof detailDenoiseDryRunResultV1Schema>;
+export type DetailDenoiseLimitationV1 = z.infer<typeof detailDenoiseLimitationV1Schema>;
+export type DetailDenoiseRuntimeStateV1 = z.infer<typeof detailDenoiseRuntimeStateV1Schema>;
+export type DetailDenoiseRuntimeStatusV1 = z.infer<typeof detailDenoiseRuntimeStatusV1Schema>;
+export type DetailDenoiseSkipReasonV1 = z.infer<typeof detailDenoiseSkipReasonV1Schema>;
+export type DetailDenoiseUiControlsV1 = z.infer<typeof detailDenoiseUiControlsV1Schema>;
 export type ExportApplyResultV1 = z.infer<typeof exportApplyResultV1Schema>;
 export type ExportColorSpaceV1 = z.infer<typeof exportColorSpaceV1Schema>;
 export type ExportCommandEnvelopeV1 = z.infer<typeof exportCommandEnvelopeV1Schema>;
