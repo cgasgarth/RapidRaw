@@ -456,6 +456,10 @@
           "path": "docs/tooling/unsafe-cast-ast-guard-2026-06-15.md"
         },
         {
+          "title": "Assertion narrowing lint",
+          "path": "docs/tooling/assertion-narrowing-lint-2026-06-15.md"
+        },
+        {
           "title": "Tauri invoke boundary ratchet",
           "path": "docs/tooling/tauri-invoke-boundary-ratchet-2026-06-15.md"
         },
