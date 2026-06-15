@@ -1174,7 +1174,46 @@
       "savedSuccess": "HDRを正常に保存しました！",
       "speedNotice": "露出数や画像サイズによって、数分かかる場合があります。",
       "start": "開始",
-      "title": "HDRに統合"
+      "title": "HDRに統合",
+      "alignmentLabel": "Alignment",
+      "alignment": {
+        "auto": "Auto",
+        "homography": "Homography",
+        "none": "None",
+        "translation": "Translation"
+      },
+      "apiPending": "API wiring pending",
+      "bracketValidationLabel": "Bracket validation",
+      "bracketValidation": {
+        "required": "Required",
+        "warn": "Warn only",
+        "disabled": "Disabled"
+      },
+      "deghostingLabel": "Deghosting",
+      "deghosting": {
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium",
+        "off": "Off"
+      },
+      "previewBudgetLabel": "Preview budget",
+      "previewPixels": "{{value}} px",
+      "qualityLabel": "Quality",
+      "quality": {
+        "balanced": "Balanced",
+        "best": "Best",
+        "preview": "Preview"
+      },
+      "sourceCountBlocked": "Select at least two bracketed exposures before merging.",
+      "strategyLabel": "Merge strategy",
+      "strategy": {
+        "exposureFusion": "Exposure fusion preview",
+        "sceneLinear": "Scene-linear radiance"
+      },
+      "toneMapPreview": "Tone-map preview",
+      "uiOnlyNotice": "These controls define the requested HDR merge artifact. Runtime merge quality remains validated by fixture, sidecar, and image-processing checks.",
+      "workflowStatus": "Bracket, alignment, deghosting, tone-map, and preview controls are recorded for the HDR request.",
+      "workflowTitle": "HDR merge setup"
     },
     "importSettings": {
       "cancel": "キャンセル",

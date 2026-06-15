@@ -61,6 +61,7 @@ import {
 import { useContextMenu } from '../context/ContextMenuContext';
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../schemas/focusStackUiSchemas';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../schemas/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS } from '../schemas/panoramaUiSchemas';
 import { DEFAULT_SUPER_RESOLUTION_UI_SETTINGS } from '../schemas/superResolutionUiSchemas';
 import { useEditorStore } from '../store/useEditorStore';
@@ -720,6 +721,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     isOpen: true,
                     isProcessing: false,
                     progressMessage: null,
+                    settings: DEFAULT_HDR_MERGE_UI_SETTINGS,
                     stitchingSourcePaths: finalSelection,
                   },
                 });
