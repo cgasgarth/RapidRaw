@@ -75,6 +75,11 @@ export enum DetailsAdjustment {
   LumaNoiseReduction = 'lumaNoiseReduction',
   Sharpness = 'sharpness',
   SharpnessThreshold = 'sharpnessThreshold',
+  WaveletDetailCoarse = 'waveletDetailCoarse',
+  WaveletDetailEnabled = 'waveletDetailEnabled',
+  WaveletDetailFine = 'waveletDetailFine',
+  WaveletDetailHaloSuppression = 'waveletDetailHaloSuppression',
+  WaveletDetailMedium = 'waveletDetailMedium',
   ChromaticAberrationRedCyan = 'chromaticAberrationRedCyan',
   ChromaticAberrationBlueYellow = 'chromaticAberrationBlueYellow',
 }
@@ -225,6 +230,11 @@ export interface Adjustments {
   sharpnessThreshold: number;
   showClipping: boolean;
   structure: number;
+  waveletDetailCoarse: number;
+  waveletDetailEnabled: boolean;
+  waveletDetailFine: number;
+  waveletDetailHaloSuppression: number;
+  waveletDetailMedium: number;
   temperature: number;
   tint: number;
   toneMapper: 'agx' | 'basic';
@@ -560,6 +570,11 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   sharpnessThreshold: 15,
   showClipping: false,
   structure: 0,
+  waveletDetailCoarse: 0,
+  waveletDetailEnabled: false,
+  waveletDetailFine: 0,
+  waveletDetailHaloSuppression: 50,
+  waveletDetailMedium: 0,
   temperature: 0,
   tint: 0,
   toneMapper: 'basic',
@@ -702,6 +717,12 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     deblurEnabled: loadedAdjustments.deblurEnabled ?? INITIAL_ADJUSTMENTS.deblurEnabled,
     deblurSigmaPx: loadedAdjustments.deblurSigmaPx ?? INITIAL_ADJUSTMENTS.deblurSigmaPx,
     deblurStrength: loadedAdjustments.deblurStrength ?? INITIAL_ADJUSTMENTS.deblurStrength,
+    waveletDetailCoarse: loadedAdjustments.waveletDetailCoarse ?? INITIAL_ADJUSTMENTS.waveletDetailCoarse,
+    waveletDetailEnabled: loadedAdjustments.waveletDetailEnabled ?? INITIAL_ADJUSTMENTS.waveletDetailEnabled,
+    waveletDetailFine: loadedAdjustments.waveletDetailFine ?? INITIAL_ADJUSTMENTS.waveletDetailFine,
+    waveletDetailHaloSuppression:
+      loadedAdjustments.waveletDetailHaloSuppression ?? INITIAL_ADJUSTMENTS.waveletDetailHaloSuppression,
+    waveletDetailMedium: loadedAdjustments.waveletDetailMedium ?? INITIAL_ADJUSTMENTS.waveletDetailMedium,
     masks: normalizedMasks,
     aiPatches: normalizedAiPatches,
     sectionVisibility: {
@@ -759,6 +780,16 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     {
       label: 'modals.copyPaste.groups.sharpness',
       keys: [DetailsAdjustment.Sharpness, DetailsAdjustment.SharpnessThreshold],
+    },
+    {
+      label: 'modals.copyPaste.groups.waveletDetail',
+      keys: [
+        DetailsAdjustment.WaveletDetailEnabled,
+        DetailsAdjustment.WaveletDetailFine,
+        DetailsAdjustment.WaveletDetailMedium,
+        DetailsAdjustment.WaveletDetailCoarse,
+        DetailsAdjustment.WaveletDetailHaloSuppression,
+      ],
     },
     {
       label: 'modals.copyPaste.groups.noiseReduction',
@@ -857,6 +888,11 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     DetailsAdjustment.Centré,
     DetailsAdjustment.Sharpness,
     DetailsAdjustment.SharpnessThreshold,
+    DetailsAdjustment.WaveletDetailEnabled,
+    DetailsAdjustment.WaveletDetailFine,
+    DetailsAdjustment.WaveletDetailMedium,
+    DetailsAdjustment.WaveletDetailCoarse,
+    DetailsAdjustment.WaveletDetailHaloSuppression,
     DetailsAdjustment.LumaNoiseReduction,
     DetailsAdjustment.ColorNoiseReduction,
     DetailsAdjustment.ChromaticAberrationRedCyan,

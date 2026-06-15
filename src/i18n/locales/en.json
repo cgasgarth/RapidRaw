@@ -105,6 +105,8 @@
       "deblurStatus": "UI/API wired · preview/export not applied",
       "dehaze": "Dehaze",
       "enableDeblur": "Enable deblur",
+      "enableWaveletDetail": "Enable detail by scale",
+      "haloSuppression": "Halo suppression",
       "luminance": "Luminance",
       "noiseReduction": "Noise Reduction",
       "presence": "Presence",
@@ -112,7 +114,14 @@
       "sharpening": "Sharpening",
       "sharpness": "Sharpness",
       "structure": "Structure",
-      "threshold": "Threshold"
+      "threshold": "Threshold",
+      "wavelet": {
+        "coarse": "Coarse",
+        "fine": "Fine",
+        "medium": "Medium"
+      },
+      "waveletDetail": "Detail by Scale",
+      "waveletStatus": "UI controls only · preview/export wavelet rendering is tracked separately"
     },
     "effects": {
       "amount": "Amount",
@@ -1152,6 +1161,7 @@
         "tone": "Tone",
         "transformRotation": "Transform & Rotation",
         "vignette": "Vignette",
+        "waveletDetail": "Detail by Scale",
         "whiteBalance": "White Balance"
       },
       "includedAdjustments": "Included Adjustments",

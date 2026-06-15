@@ -105,6 +105,8 @@
       "deblurStatus": "UI/API 已连接 · 预览/导出尚未应用",
       "dehaze": "去雾",
       "enableDeblur": "启用去模糊",
+      "enableWaveletDetail": "",
+      "haloSuppression": "",
       "luminance": "亮度",
       "noiseReduction": "降噪",
       "presence": "质感",
@@ -112,7 +114,14 @@
       "sharpening": "锐化",
       "sharpness": "锐度",
       "structure": "结构",
-      "threshold": "阈值"
+      "threshold": "阈值",
+      "wavelet": {
+        "coarse": "",
+        "fine": "",
+        "medium": ""
+      },
+      "waveletDetail": "",
+      "waveletStatus": ""
     },
     "effects": {
       "amount": "数量",

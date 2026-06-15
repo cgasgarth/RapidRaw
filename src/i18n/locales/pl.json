@@ -105,6 +105,8 @@
       "deblurStatus": "UI/API połączone · podgląd/eksport bez zastosowania",
       "dehaze": "Usuwanie mgły",
       "enableDeblur": "Włącz usuwanie rozmycia",
+      "enableWaveletDetail": "",
+      "haloSuppression": "",
       "luminance": "Luminancja",
       "noiseReduction": "Redukcja szumu",
       "presence": "Prezencja",
@@ -112,7 +114,14 @@
       "sharpening": "Wyostrzanie",
       "sharpness": "Ostrość",
       "structure": "Struktura",
-      "threshold": "Próg"
+      "threshold": "Próg",
+      "wavelet": {
+        "coarse": "",
+        "fine": "",
+        "medium": ""
+      },
+      "waveletDetail": "",
+      "waveletStatus": ""
     },
     "effects": {
       "amount": "Ilość",
