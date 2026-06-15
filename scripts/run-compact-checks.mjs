@@ -36,6 +36,7 @@ const CHECK_GROUPS = {
     'check:deblur-ringing',
     'check:deblur-cpu-reference',
     'check:deblur-ui-api',
+    'check:detail-preview-export-parity',
     'check:detail-stage-order',
     'check:detail-artifacts',
     'check:noise-metrics',

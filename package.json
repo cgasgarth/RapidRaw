@@ -58,6 +58,7 @@
     "check:denoise-fixtures": "bun scripts/check-denoise-fixtures.mjs",
     "check:denoise-ui-api": "bun scripts/check-denoise-ui-api.mjs",
     "check:export-recipes-ui": "bun scripts/check-export-recipes-ui.mjs",
+    "check:detail-preview-export-parity": "bun scripts/check-detail-preview-export-parity.mjs",
     "check:detail-stage-order": "bun scripts/check-detail-stage-order.mjs",
     "check:detail-artifacts": "bun scripts/check-detail-artifacts.mjs",
     "check:denoise-cpu-reference": "bun scripts/check-denoise-cpu-reference.mjs",
