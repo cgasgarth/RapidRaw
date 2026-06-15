@@ -3977,7 +3977,9 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(compose): add add subtract intersect`
   - Runtime status: add/subtract/intersect weight composition is typed, clamped, and fixture-validated; renderer integration remains future work.
 - `masks(refine): add feather density and edge refine`
-  - Runtime status: feather, density, edge shift, smoothness, and edge contrast schemas plus refined weight evaluation are fixture-validated; renderer integration remains future work.
+  - Docs: `docs/layers/mask-refinement-runtime-2026-06-15.md`
+  - Validation: `scripts/check-mask-refinement-parameters.mjs`
+  - Runtime status: feather, density, edge shift, smoothness, and edge contrast schemas plus refined weight evaluation are fixture-validated and wired into the Rust mask renderer; user-facing controls remain future work.
 - `masks(overlay): add mask overlay modes`
   - Docs: `docs/layers/mask-overlay-runtime-2026-06-15.md`
   - Validation: `scripts/check-mask-overlay-modes.mjs`

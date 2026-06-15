@@ -58,6 +58,103 @@ pub struct MaskDefinition {
     pub sub_masks: Vec<SubMask>,
 }
 
+fn default_refinement_density() -> f32 {
+    1.0
+}
+
+fn default_refinement_zero() -> f32 {
+    0.0
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
+#[serde(crate = "serde")]
+#[serde(rename_all = "camelCase")]
+pub struct MaskRefinementParameters {
+    #[serde(default = "default_refinement_density")]
+    pub density: f32,
+    #[serde(default = "default_refinement_zero")]
+    pub edge_contrast: f32,
+    #[serde(default = "default_refinement_zero")]
+    pub edge_shift_px: f32,
+    #[serde(default = "default_refinement_zero")]
+    pub feather_px: f32,
+    #[serde(default = "default_refinement_zero")]
+    pub smoothness: f32,
+}
+
+impl Default for MaskRefinementParameters {
+    fn default() -> Self {
+        Self {
+            density: default_refinement_density(),
+            edge_contrast: default_refinement_zero(),
+            edge_shift_px: default_refinement_zero(),
+            feather_px: default_refinement_zero(),
+            smoothness: default_refinement_zero(),
+        }
+    }
+}
+
+fn has_refinement_parameters(params_value: &Value) -> bool {
+    params_value.as_object().is_some_and(|params| {
+        [
+            "density",
+            "edgeContrast",
+            "edgeShiftPx",
+            "featherPx",
+            "smoothness",
+        ]
+        .iter()
+        .any(|key| params.contains_key(*key))
+    })
+}
+
+fn smoothstep(value: f32) -> f32 {
+    let t = value.clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+fn apply_mask_refinement(mask: &mut GrayImage, params_value: &Value, scale: f32) {
+    if !has_refinement_parameters(params_value) {
+        return;
+    }
+
+    let params: MaskRefinementParameters =
+        serde_json::from_value(params_value.clone()).unwrap_or_default();
+    let density = params.density.clamp(0.0, 1.0);
+    let edge_contrast = params.edge_contrast.clamp(0.0, 1.0);
+    let smoothness = params.smoothness.clamp(0.0, 1.0);
+    let edge_shift_px = params.edge_shift_px.clamp(-512.0, 512.0) * scale.max(0.0);
+    let feather_px = params.feather_px.clamp(0.0, 4096.0) * scale.max(0.0);
+
+    let shift_amount = edge_shift_px.abs().round() as u8;
+    if shift_amount > 0 {
+        if edge_shift_px > 0.0 {
+            *mask = grayscale_dilate(mask, shift_amount);
+        } else {
+            *mask = grayscale_erode(mask, shift_amount);
+        }
+    }
+
+    if feather_px > 0.01 {
+        *mask = imageproc::filter::gaussian_blur_f32(mask, feather_px.max(0.01));
+    }
+
+    for pixel in mask.pixels_mut() {
+        let base = pixel[0] as f32 / 255.0;
+        let smoothed = if smoothness == 0.0 {
+            base
+        } else {
+            base * (1.0 - smoothness) + smoothstep(base) * smoothness
+        };
+        let contrasted = if edge_contrast == 0.0 {
+            smoothed
+        } else {
+            ((smoothed - 0.5) * (1.0 + edge_contrast * 3.0) + 0.5).clamp(0.0, 1.0)
+        };
+        pixel[0] = (contrasted * density * 255.0).clamp(0.0, 255.0).round() as u8;
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(crate = "serde")]
 #[serde(rename_all = "camelCase")]
@@ -1335,7 +1432,7 @@ fn generate_sub_mask_bitmap(
         return None;
     }
 
-    match sub_mask.mask_type.as_str() {
+    let mut bitmap = match sub_mask.mask_type.as_str() {
         "radial" => Some(generate_radial_bitmap(
             &sub_mask.parameters,
             width,
@@ -1395,7 +1492,13 @@ fn generate_sub_mask_bitmap(
         }
         "all" => Some(generate_all_bitmap(width, height)),
         _ => None,
+    };
+
+    if let Some(mask) = bitmap.as_mut() {
+        apply_mask_refinement(mask, &sub_mask.parameters, scale);
     }
+
+    bitmap
 }
 
 pub fn generate_mask_bitmap(
@@ -1651,5 +1754,40 @@ mod tests {
             ),
             Rgba([255, 255, 255, 255])
         );
+    }
+
+    #[test]
+    fn apply_mask_refinement_applies_density() {
+        let mut mask = GrayImage::from_pixel(1, 1, Luma([255]));
+        let params = serde_json::json!({
+            "density": 0.25,
+            "edgeContrast": 0,
+            "edgeShiftPx": 0,
+            "featherPx": 0,
+            "smoothness": 0
+        });
+
+        apply_mask_refinement(&mut mask, &params, 1.0);
+
+        assert_eq!(mask.get_pixel(0, 0)[0], 64);
+    }
+
+    #[test]
+    fn apply_mask_refinement_applies_positive_edge_shift() {
+        let mut mask = GrayImage::new(3, 1);
+        mask.put_pixel(1, 0, Luma([255]));
+        let params = serde_json::json!({
+            "density": 1,
+            "edgeContrast": 0,
+            "edgeShiftPx": 1,
+            "featherPx": 0,
+            "smoothness": 0
+        });
+
+        apply_mask_refinement(&mut mask, &params, 1.0);
+
+        assert_eq!(mask.get_pixel(0, 0)[0], 255);
+        assert_eq!(mask.get_pixel(1, 0)[0], 255);
+        assert_eq!(mask.get_pixel(2, 0)[0], 255);
     }
 }
