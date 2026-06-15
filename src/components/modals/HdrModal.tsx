@@ -94,6 +94,7 @@ export default function HdrModal({
         clearTimeout(timer);
       };
     }
+    return undefined;
   }, [isOpen]);
 
   const handleClose = useCallback(() => {

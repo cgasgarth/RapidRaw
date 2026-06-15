@@ -130,6 +130,7 @@ export default function CopyPasteSettingsModal({ isOpen, onClose, onSave, settin
         window.clearTimeout(timer);
       };
     }
+    return undefined;
   }, [isOpen, settings]);
 
   const handleSave = useCallback(() => {

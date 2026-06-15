@@ -157,11 +157,11 @@ export default function GlobalTooltip() {
 
   useLayoutEffect(() => {
     if (!tooltip) {
-      return;
+      return undefined;
     }
 
     const el = tooltipRef.current;
-    if (!el) return;
+    if (!el) return undefined;
 
     const width = el.offsetWidth;
     const minLeft = TOOLTIP_VIEWPORT_MARGIN;
@@ -180,6 +180,7 @@ export default function GlobalTooltip() {
         cancelAnimationFrame(frame);
       };
     }
+    return undefined;
   }, [tooltip, leftOverride]);
 
   const tooltipKey = tooltip ? getTooltipKey(tooltip) : null;

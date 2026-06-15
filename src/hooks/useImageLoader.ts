@@ -141,6 +141,7 @@ export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | n
         isEffectActive = false;
       };
     }
+    return undefined;
   }, [
     selectedImagePath,
     selectedImageIsReady,

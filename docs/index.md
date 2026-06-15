@@ -126,6 +126,7 @@ generator before the release workflow needs one.
 - [Local check command contract](tooling/local-check-command-contract-2026-06-10.md)
 - [Script type coverage](tooling/script-type-coverage-2026-06-15.md)
 - [Lint zero-warning default](tooling/lint-zero-warning-default-2026-06-15.md)
+- [TypeScript control-flow flags](tooling/ts-control-flow-flags-2026-06-15.md)
 - [Bun CI script migration](tooling/bun-ci-script-migration-2026-06-10.md)
 - [Bun package manager support](tooling/bun-package-manager-support-2026-06-10.md)
 - [Major dependency migration process](tooling/major-dependency-migration-process-2026-06-13.md)

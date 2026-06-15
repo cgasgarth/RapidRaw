@@ -336,6 +336,7 @@ const EditorToolbar = memo(
           clearTimeout(timer);
         };
       }
+      return undefined;
     }, [isHistoryVisible, adjustmentsHistoryIndex]);
 
     const handleButtonKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {

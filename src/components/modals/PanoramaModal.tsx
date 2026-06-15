@@ -93,6 +93,7 @@ export default function PanoramaModal({
         clearTimeout(timer);
       };
     }
+    return undefined;
   }, [isOpen]);
 
   const handleClose = useCallback(() => {
