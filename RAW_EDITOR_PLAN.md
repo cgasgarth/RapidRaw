@@ -4766,6 +4766,15 @@ Issues:
     before/noisy/denoised fixture artifacts and bounded metrics, but must not
     claim preview/export parity, real RAW quality, GPU parity, UI/API wiring, or
     E2E workflow behavior.
+- Add deblur fixture contract.
+  - Runtime status: validation-only fixture/schema contract. This proves
+    constrained PSF case coverage, ringing/halo/noise amplification threshold
+    coverage, and reject-case coverage. It does not prove CPU runtime deblur
+    quality, preview/export parity, real RAW quality, UI/API behavior, or E2E
+    workflow behavior.
+  - Follow-ups: CPU reference runtime #1180, UI/API wiring #1181, real RAW
+    quality pack #1182, E2E workflow proof #1183, and shared preview/export
+    parity #1150.
 - Add defringe improvements.
 - Add dust spot visualization.
 - Add AI denoise research issue.

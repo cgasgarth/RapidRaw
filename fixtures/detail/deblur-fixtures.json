@@ -1,0 +1,403 @@
+{
+  "$schema": "https://rawengine.dev/schemas/deblur-fixtures-v1.json",
+  "issue": 1173,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-15",
+  "runtimeStatus": "validation_only",
+  "validationScope": {
+    "proves": [
+      "deblur fixture manifest schema stability",
+      "constrained Gaussian PSF coverage for edge, texture, and low-contrast text cases",
+      "deblur failure guard coverage for ringing, halo, noise amplification, unknown motion PSF, and saturated edges"
+    ],
+    "doesNotProve": [
+      "cpu_reference_deblur",
+      "runtime_deblur_quality",
+      "real_raw_quality",
+      "preview_export_parity",
+      "ui_api",
+      "e2e_workflow"
+    ]
+  },
+  "followUpIssues": {
+    "cpuReference": 1180,
+    "previewExportParity": 1150,
+    "uiApi": 1181,
+    "realRawQuality": 1182,
+    "e2eWorkflow": 1183
+  },
+  "fixtures": [
+    {
+      "fixtureId": "detail.deblur.gaussian-edge-step.v1",
+      "sourceKind": "synthetic_public",
+      "kind": "gaussian_edge_step",
+      "stage": "scene_linear_post_denoise",
+      "notes": "Synthetic slanted edge with mild Gaussian blur for acutance recovery without halos.",
+      "acceptancePolicy": {
+        "action": "accept",
+        "rejectionReasons": []
+      },
+      "generator": {
+        "seed": "detail-deblur-gaussian-edge-step-v1",
+        "basePattern": "slanted_edge",
+        "width": 160,
+        "height": 160,
+        "blur": {
+          "type": "gaussian",
+          "sigmaPx": 0.9,
+          "radiusPx": 2,
+          "kernelSize": 7
+        },
+        "degradation": {
+          "noiseSigma": 0.012,
+          "saturationFraction": 0,
+          "motionBlurPx": 0
+        },
+        "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000001001"
+      },
+      "privateRawEvidence": null,
+      "expectedMetrics": {
+        "ringingOvershootRatio": { "min": 0, "max": 0.05 },
+        "haloWidthPx": { "min": 0, "max": 1.4 },
+        "noiseAmplificationRatio": { "min": 0.95, "max": 1.14 },
+        "edgeAcutanceRatio": { "min": 1.08, "max": 1.45 },
+        "textureEnergyRatio": { "min": 0.7, "max": 1.1 },
+        "falseEdgeRatio": { "min": 0, "max": 0.025 },
+        "deltaEMax": { "min": 0, "max": 1.2 }
+      },
+      "artifacts": [
+        {
+          "kind": "synthetic_clean_reference",
+          "path": "artifacts/detail/deblur/gaussian-edge-step-clean-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001001",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "synthetic_blurred_input",
+          "path": "artifacts/detail/deblur/gaussian-edge-step-blurred-input.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001002",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "expected_deblurred_reference",
+          "path": "artifacts/detail/deblur/gaussian-edge-step-expected-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001003",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "ringing_metric_probe",
+          "path": "artifacts/detail/deblur/gaussian-edge-step-ringing-probe.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001004",
+          "publicRepoAllowed": true
+        }
+      ]
+    },
+    {
+      "fixtureId": "detail.deblur.gaussian-fine-texture.v1",
+      "sourceKind": "synthetic_public",
+      "kind": "gaussian_fine_texture",
+      "stage": "scene_linear_post_denoise",
+      "notes": "Fine texture patch for deblur that must improve microcontrast without crunchy false edges.",
+      "acceptancePolicy": {
+        "action": "accept",
+        "rejectionReasons": []
+      },
+      "generator": {
+        "seed": "detail-deblur-gaussian-fine-texture-v1",
+        "basePattern": "fine_texture_patch",
+        "width": 160,
+        "height": 160,
+        "blur": {
+          "type": "gaussian",
+          "sigmaPx": 0.75,
+          "radiusPx": 1.8,
+          "kernelSize": 7
+        },
+        "degradation": {
+          "noiseSigma": 0.018,
+          "saturationFraction": 0,
+          "motionBlurPx": 0
+        },
+        "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000001101"
+      },
+      "privateRawEvidence": null,
+      "expectedMetrics": {
+        "ringingOvershootRatio": { "min": 0, "max": 0.055 },
+        "haloWidthPx": { "min": 0, "max": 1.6 },
+        "noiseAmplificationRatio": { "min": 0.95, "max": 1.18 },
+        "edgeAcutanceRatio": { "min": 1.02, "max": 1.35 },
+        "textureEnergyRatio": { "min": 0.78, "max": 1.16 },
+        "falseEdgeRatio": { "min": 0, "max": 0.03 },
+        "deltaEMax": { "min": 0, "max": 1.1 }
+      },
+      "artifacts": [
+        {
+          "kind": "synthetic_clean_reference",
+          "path": "artifacts/detail/deblur/gaussian-fine-texture-clean-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001101",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "synthetic_blurred_input",
+          "path": "artifacts/detail/deblur/gaussian-fine-texture-blurred-input.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001102",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "expected_deblurred_reference",
+          "path": "artifacts/detail/deblur/gaussian-fine-texture-expected-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001103",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "ringing_metric_probe",
+          "path": "artifacts/detail/deblur/gaussian-fine-texture-ringing-probe.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001104",
+          "publicRepoAllowed": true
+        }
+      ]
+    },
+    {
+      "fixtureId": "detail.deblur.gaussian-low-contrast-text.v1",
+      "sourceKind": "synthetic_public",
+      "kind": "gaussian_low_contrast_text",
+      "stage": "scene_linear_post_denoise",
+      "notes": "Low-contrast text-like strokes for avoiding local contrast overshoot and readability artifacts.",
+      "acceptancePolicy": {
+        "action": "accept",
+        "rejectionReasons": []
+      },
+      "generator": {
+        "seed": "detail-deblur-gaussian-low-contrast-text-v1",
+        "basePattern": "low_contrast_text",
+        "width": 192,
+        "height": 128,
+        "blur": {
+          "type": "gaussian",
+          "sigmaPx": 0.65,
+          "radiusPx": 1.5,
+          "kernelSize": 5
+        },
+        "degradation": {
+          "noiseSigma": 0.01,
+          "saturationFraction": 0,
+          "motionBlurPx": 0
+        },
+        "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000001201"
+      },
+      "privateRawEvidence": null,
+      "expectedMetrics": {
+        "ringingOvershootRatio": { "min": 0, "max": 0.045 },
+        "haloWidthPx": { "min": 0, "max": 1.2 },
+        "noiseAmplificationRatio": { "min": 0.95, "max": 1.12 },
+        "edgeAcutanceRatio": { "min": 1, "max": 1.3 },
+        "textureEnergyRatio": { "min": 0.66, "max": 1.08 },
+        "falseEdgeRatio": { "min": 0, "max": 0.02 },
+        "deltaEMax": { "min": 0, "max": 1 }
+      },
+      "artifacts": [
+        {
+          "kind": "synthetic_clean_reference",
+          "path": "artifacts/detail/deblur/gaussian-low-contrast-text-clean-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001201",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "synthetic_blurred_input",
+          "path": "artifacts/detail/deblur/gaussian-low-contrast-text-blurred-input.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001202",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "expected_deblurred_reference",
+          "path": "artifacts/detail/deblur/gaussian-low-contrast-text-expected-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001203",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "ringing_metric_probe",
+          "path": "artifacts/detail/deblur/gaussian-low-contrast-text-ringing-probe.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001204",
+          "publicRepoAllowed": true
+        }
+      ]
+    },
+    {
+      "fixtureId": "detail.deblur.failure-high-noise.v1",
+      "sourceKind": "synthetic_public",
+      "kind": "failure_high_noise",
+      "stage": "scene_linear_post_denoise",
+      "notes": "High-noise edge fixture that should be rejected because deconvolution would amplify noise.",
+      "acceptancePolicy": {
+        "action": "reject",
+        "rejectionReasons": ["noise_amplification_risk", "ringing_risk"]
+      },
+      "generator": {
+        "seed": "detail-deblur-failure-high-noise-v1",
+        "basePattern": "high_noise_edge",
+        "width": 160,
+        "height": 160,
+        "blur": {
+          "type": "gaussian",
+          "sigmaPx": 1.2,
+          "radiusPx": 2.5,
+          "kernelSize": 9
+        },
+        "degradation": {
+          "noiseSigma": 0.12,
+          "saturationFraction": 0,
+          "motionBlurPx": 0
+        },
+        "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000001301"
+      },
+      "privateRawEvidence": null,
+      "expectedMetrics": {
+        "ringingOvershootRatio": { "min": 0.09, "max": 0.18 },
+        "haloWidthPx": { "min": 1.5, "max": 3.2 },
+        "noiseAmplificationRatio": { "min": 1.32, "max": 1.8 },
+        "edgeAcutanceRatio": { "min": 1.1, "max": 1.9 },
+        "textureEnergyRatio": { "min": 1.1, "max": 1.9 },
+        "falseEdgeRatio": { "min": 0.04, "max": 0.12 },
+        "deltaEMax": { "min": 0, "max": 2.5 }
+      },
+      "artifacts": [
+        {
+          "kind": "synthetic_clean_reference",
+          "path": "artifacts/detail/deblur/failure-high-noise-clean-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001301",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "synthetic_blurred_input",
+          "path": "artifacts/detail/deblur/failure-high-noise-blurred-input.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001302",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "ringing_metric_probe",
+          "path": "artifacts/detail/deblur/failure-high-noise-ringing-probe.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001303",
+          "publicRepoAllowed": true
+        }
+      ]
+    },
+    {
+      "fixtureId": "detail.deblur.failure-motion-unknown.v1",
+      "sourceKind": "synthetic_public",
+      "kind": "failure_motion_unknown",
+      "stage": "scene_linear_post_denoise",
+      "notes": "Motion-streak fixture documents that v1 constrained PSF deblur must reject unknown motion blur.",
+      "acceptancePolicy": {
+        "action": "reject",
+        "rejectionReasons": ["motion_psf_unknown", "halo_risk"]
+      },
+      "generator": {
+        "seed": "detail-deblur-failure-motion-unknown-v1",
+        "basePattern": "motion_streak",
+        "width": 192,
+        "height": 128,
+        "blur": {
+          "type": "gaussian",
+          "sigmaPx": 1,
+          "radiusPx": 2,
+          "kernelSize": 7
+        },
+        "degradation": {
+          "noiseSigma": 0.025,
+          "saturationFraction": 0,
+          "motionBlurPx": 10
+        },
+        "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000001401"
+      },
+      "privateRawEvidence": null,
+      "expectedMetrics": {
+        "ringingOvershootRatio": { "min": 0.08, "max": 0.16 },
+        "haloWidthPx": { "min": 2.2, "max": 4.5 },
+        "noiseAmplificationRatio": { "min": 1.05, "max": 1.35 },
+        "edgeAcutanceRatio": { "min": 0.85, "max": 1.4 },
+        "textureEnergyRatio": { "min": 0.55, "max": 1.2 },
+        "falseEdgeRatio": { "min": 0.06, "max": 0.18 },
+        "deltaEMax": { "min": 0, "max": 2 }
+      },
+      "artifacts": [
+        {
+          "kind": "synthetic_clean_reference",
+          "path": "artifacts/detail/deblur/failure-motion-unknown-clean-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001401",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "synthetic_blurred_input",
+          "path": "artifacts/detail/deblur/failure-motion-unknown-blurred-input.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001402",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "ringing_metric_probe",
+          "path": "artifacts/detail/deblur/failure-motion-unknown-ringing-probe.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001403",
+          "publicRepoAllowed": true
+        }
+      ]
+    },
+    {
+      "fixtureId": "detail.deblur.failure-saturated-edge.v1",
+      "sourceKind": "synthetic_public",
+      "kind": "failure_saturated_edge",
+      "stage": "scene_linear_post_denoise",
+      "notes": "Saturated high-contrast edge fixture that should be rejected because clipped edges create false halos.",
+      "acceptancePolicy": {
+        "action": "reject",
+        "rejectionReasons": ["saturated_edge_risk", "halo_risk", "ringing_risk"]
+      },
+      "generator": {
+        "seed": "detail-deblur-failure-saturated-edge-v1",
+        "basePattern": "saturated_edge",
+        "width": 160,
+        "height": 160,
+        "blur": {
+          "type": "gaussian",
+          "sigmaPx": 0.85,
+          "radiusPx": 2,
+          "kernelSize": 7
+        },
+        "degradation": {
+          "noiseSigma": 0.008,
+          "saturationFraction": 0.18,
+          "motionBlurPx": 0
+        },
+        "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000001501"
+      },
+      "privateRawEvidence": null,
+      "expectedMetrics": {
+        "ringingOvershootRatio": { "min": 0.12, "max": 0.22 },
+        "haloWidthPx": { "min": 2.4, "max": 5 },
+        "noiseAmplificationRatio": { "min": 0.98, "max": 1.25 },
+        "edgeAcutanceRatio": { "min": 1.1, "max": 1.8 },
+        "textureEnergyRatio": { "min": 0.7, "max": 1.3 },
+        "falseEdgeRatio": { "min": 0.08, "max": 0.2 },
+        "deltaEMax": { "min": 0, "max": 2.2 }
+      },
+      "artifacts": [
+        {
+          "kind": "synthetic_clean_reference",
+          "path": "artifacts/detail/deblur/failure-saturated-edge-clean-reference.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001501",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "synthetic_blurred_input",
+          "path": "artifacts/detail/deblur/failure-saturated-edge-blurred-input.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001502",
+          "publicRepoAllowed": true
+        },
+        {
+          "kind": "ringing_metric_probe",
+          "path": "artifacts/detail/deblur/failure-saturated-edge-ringing-probe.json",
+          "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001503",
+          "publicRepoAllowed": true
+        }
+      ]
+    }
+  ]
+}
