@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "metricVersion": 1,
+  "runtimeStatus": "synthetic_validation",
+  "validationScope": {
+    "proves": [
+      "deterministic synthetic luma/chroma noise metric calculation",
+      "edge and texture sentinel metric calculation",
+      "public CI fixture schema stability"
+    ],
+    "doesNotProve": ["real_raw_quality", "preview_export_parity", "runtime_denoise_quality"]
+  },
+  "cases": [
+    {
+      "id": "detail.noise.signal-ramp-high.v1",
+      "description": "High luma noise synthetic ramp with an edge and texture patch.",
+      "sourceKind": "synthetic_public",
+      "width": 96,
+      "height": 96,
+      "generator": {
+        "seed": "signal-ramp-high-v1",
+        "basePattern": "flat_patch_edge_texture",
+        "lumaNoiseSigma": 0.075,
+        "chromaNoiseSigma": 0.025
+      },
+      "regions": {
+        "flatPatch": { "id": "flat.high", "x": 8, "y": 8, "width": 40, "height": 40 },
+        "edge": { "id": "edge.high", "x": 32, "y": 12, "width": 32, "height": 48 },
+        "texture": { "id": "texture.high", "x": 12, "y": 56, "width": 48, "height": 28 }
+      },
+      "expectedMetrics": {
+        "lumaSigma": { "min": 0.045, "max": 0.09 },
+        "chromaSigma": { "min": 0.012, "max": 0.03 },
+        "edgeContrast": { "min": 0.2, "max": 0.42 },
+        "textureEnergy": { "min": 0.12, "max": 0.2 },
+        "highFrequencyEnergy": { "min": 0.01, "max": 0.08 }
+      },
+      "warningThresholds": {
+        "chromaDominanceRatio": 0.8,
+        "minEdgeContrast": 0.2,
+        "minTextureEnergy": 0.01
+      }
+    },
+    {
+      "id": "detail.noise.chroma-speckle.v1",
+      "description": "Chroma-biased synthetic speckle fixture for color noise sentinel metrics.",
+      "sourceKind": "synthetic_public",
+      "width": 96,
+      "height": 96,
+      "generator": {
+        "seed": "chroma-speckle-v1",
+        "basePattern": "chroma_speckle_edge_texture",
+        "lumaNoiseSigma": 0.035,
+        "chromaNoiseSigma": 0.08
+      },
+      "regions": {
+        "flatPatch": { "id": "flat.chroma", "x": 8, "y": 8, "width": 40, "height": 40 },
+        "edge": { "id": "edge.chroma", "x": 32, "y": 12, "width": 32, "height": 48 },
+        "texture": { "id": "texture.chroma", "x": 12, "y": 56, "width": 48, "height": 28 }
+      },
+      "expectedMetrics": {
+        "lumaSigma": { "min": 0.025, "max": 0.06 },
+        "chromaSigma": { "min": 0.035, "max": 0.07 },
+        "edgeContrast": { "min": 0.2, "max": 0.42 },
+        "textureEnergy": { "min": 0.12, "max": 0.2 },
+        "highFrequencyEnergy": { "min": 0.01, "max": 0.09 }
+      },
+      "warningThresholds": {
+        "chromaDominanceRatio": 1.2,
+        "minEdgeContrast": 0.2,
+        "minTextureEnergy": 0.01
+      }
+    }
+  ]
+}
