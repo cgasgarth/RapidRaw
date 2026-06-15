@@ -33,8 +33,7 @@ const collectIgnores = (text) => [...text.matchAll(/--ignore\s+([A-Z]+SEC-\d{4}-
 
 const unique = (values) => [...new Set(values)].sort();
 
-const validateLedger = (now = new Date()) => {
-  const ledger = readJson(LEDGER_PATH);
+const validateLedgerObject = (ledger, now = new Date()) => {
   if (ledger.schemaVersion !== 1 || !Array.isArray(ledger.waivers)) {
     throw new Error('rust advisory waiver ledger must use schemaVersion 1 and a waivers array');
   }
@@ -74,6 +73,8 @@ const validateLedger = (now = new Date()) => {
   return { advisoryIds: unique([...seen]), upcoming };
 };
 
+const validateLedger = (now = new Date()) => validateLedgerObject(readJson(LEDGER_PATH), now);
+
 const validateConfiguredIgnores = (advisoryIds) => {
   const expected = advisoryIds.join(',');
   const packageJson = readJson(PACKAGE_PATH);
@@ -89,11 +90,73 @@ const validateConfiguredIgnores = (advisoryIds) => {
   }
 };
 
+const expectSelfTestError = (name, fn, expectedFragment) => {
+  try {
+    fn();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes(expectedFragment)) return;
+    throw new Error(`${name}: expected "${expectedFragment}", got "${message}"`);
+  }
+
+  throw new Error(`${name}: expected validation failure`);
+};
+
 const runSelfTest = () => {
   const ignores = collectIgnores('cargo audit --ignore RUSTSEC-2024-0429 --ignore RUSTSEC-2026-0001');
   if (ignores.join(',') !== 'RUSTSEC-2024-0429,RUSTSEC-2026-0001') {
     throw new Error('self-test failed: ignore parser missed cargo-audit flags');
   }
+
+  const now = new Date('2026-06-15T00:00:00Z');
+  const validLedger = {
+    schemaVersion: 1,
+    waivers: [
+      {
+        advisoryId: 'RUSTSEC-2024-0429',
+        ghsaId: 'GHSA-wrw7-89jp-8q8g',
+        crate: 'glib',
+        reason: 'Target-filtered dependency graph remediation is tracked separately.',
+        owner: '@cgasgarth',
+        introducedDate: '2026-06-11',
+        reviewDate: '2026-09-15',
+        expiryDate: '2026-12-15',
+        issue: 262,
+      },
+    ],
+  };
+
+  const result = validateLedgerObject(validLedger, now);
+  if (result.advisoryIds.join(',') !== 'RUSTSEC-2024-0429') {
+    throw new Error('self-test failed: valid ledger was not accepted');
+  }
+
+  expectSelfTestError(
+    'missing field',
+    () =>
+      validateLedgerObject(
+        {
+          ...validLedger,
+          waivers: validLedger.waivers.map(({ owner, ...waiver }) => waiver),
+        },
+        now,
+      ),
+    'missing owner',
+  );
+
+  expectSelfTestError(
+    'expired waiver',
+    () =>
+      validateLedgerObject(
+        {
+          ...validLedger,
+          waivers: validLedger.waivers.map((waiver) => ({ ...waiver, expiryDate: '2026-01-01' })),
+        },
+        now,
+      ),
+    'expired',
+  );
+
   console.log('rust advisory waiver self-test ok');
 };
 
