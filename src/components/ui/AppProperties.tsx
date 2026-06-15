@@ -416,7 +416,7 @@ export interface Album {
   type: 'album';
   id: string;
   name: string;
-  icon?: string;
+  icon?: string | undefined;
   images: string[];
 }
 
@@ -424,6 +424,6 @@ export interface AlbumGroup {
   type: 'group';
   id: string;
   name: string;
-  icon?: string;
+  icon?: string | undefined;
   children: AlbumItem[];
 }

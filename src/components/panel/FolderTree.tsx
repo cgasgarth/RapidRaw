@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import {
@@ -35,9 +34,11 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { albumTreeSchema } from '../../schemas/albumSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { AlbumItem, Invokes } from '../ui/AppProperties';
 import UiText from '../ui/Text';
 
@@ -494,7 +495,7 @@ export default function FolderTree({
   const folderIcons = appSettings?.folderIcons || {};
 
   useEffect(() => {
-    void invoke<Array<AlbumItem>>(Invokes.GetAlbums)
+    void invokeWithSchema(Invokes.GetAlbums, {}, albumTreeSchema)
       .then((res) => {
         useLibraryStore.getState().setLibrary({ albumTree: res });
       })

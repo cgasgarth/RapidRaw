@@ -4,12 +4,14 @@ import { toast } from 'react-toastify';
 
 import { computeSortedLibrary } from './useSortedLibrary';
 import { Invokes, ImageFile, AlbumItem } from '../components/ui/AppProperties';
+import { albumTreeSchema } from '../schemas/albumSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
 
 import type { FolderTree } from '../components/panel/FolderTree';
 
@@ -355,8 +357,8 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     if (insert(newTree, actualTarget)) {
       try {
         await invoke(Invokes.SaveAlbums, { tree: newTree });
-        const sortedTree = await invoke(Invokes.GetAlbums);
-        setLibrary({ albumTree: sortedTree as AlbumItem[] });
+        const sortedTree = await invokeWithSchema(Invokes.GetAlbums, {}, albumTreeSchema);
+        setLibrary({ albumTree: sortedTree });
       } catch (err) {
         toast.error(`Failed to create: ${formatUnknownError(err)}`);
       }
@@ -384,8 +386,8 @@ export function useLibraryActions(handleImageSelect?: (path: string) => void) {
     if (rename(newTree)) {
       try {
         await invoke(Invokes.SaveAlbums, { tree: newTree });
-        const sortedTree = await invoke(Invokes.GetAlbums);
-        setLibrary({ albumTree: sortedTree as AlbumItem[] });
+        const sortedTree = await invokeWithSchema(Invokes.GetAlbums, {}, albumTreeSchema);
+        setLibrary({ albumTree: sortedTree });
       } catch (err) {
         toast.error(`Failed to rename: ${formatUnknownError(err)}`);
       }
