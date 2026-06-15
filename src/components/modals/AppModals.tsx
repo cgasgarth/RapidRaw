@@ -235,6 +235,7 @@ export default function AppModals(props: AppModalsProps) {
               isOpen: false,
               isProcessing: false,
               progressMessage: '',
+              settings: hdrModalState.settings,
               finalImageBase64: null,
               error: null,
               stitchingSourcePaths: [],
@@ -248,7 +249,11 @@ export default function AppModals(props: AppModalsProps) {
         onMerge={() => {
           props.handleStartHdr(hdrModalState.stitchingSourcePaths);
         }}
+        onSettingsChange={(settings) => {
+          setUI((state) => ({ hdrModalState: { ...state.hdrModalState, settings } }));
+        }}
         progressMessage={hdrModalState.progressMessage}
+        settings={hdrModalState.settings}
       />
       <SuperResolutionModal
         isOpen={superResolutionModalState.isOpen}

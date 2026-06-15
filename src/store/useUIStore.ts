@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { ImageFile, Panel, UiVisibility, CullingSuggestions } from '../components/ui/AppProperties';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focusStackUiSchemas';
+import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../schemas/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS, type PanoramaUiSettings } from '../schemas/panoramaUiSchemas';
 import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
@@ -56,6 +57,7 @@ export interface HdrModalState {
   isOpen: boolean;
   isProcessing: boolean;
   progressMessage: string | null;
+  settings: HdrMergeUiSettings;
   stitchingSourcePaths: Array<string>;
 }
 
@@ -204,6 +206,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     isOpen: false,
     isProcessing: false,
     progressMessage: '',
+    settings: DEFAULT_HDR_MERGE_UI_SETTINGS,
     stitchingSourcePaths: [],
   },
   superResolutionModalState: {

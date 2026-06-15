@@ -1309,8 +1309,29 @@
       "workflowTitle": "Focus-stack plan"
     },
     "hdr": {
+      "alignment": {
+        "auto": "Auto",
+        "homography": "Homography",
+        "none": "None",
+        "translation": "Translation"
+      },
+      "alignmentLabel": "Alignment",
+      "apiPending": "API wiring pending",
+      "bracketValidation": {
+        "disabled": "Disabled",
+        "required": "Required",
+        "warn": "Warn only"
+      },
+      "bracketValidationLabel": "Bracket validation",
       "cancel": "Abbrechen",
       "close": "Schließen",
+      "deghosting": {
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium",
+        "off": "Off"
+      },
+      "deghostingLabel": "Deghosting",
       "description": "Kombinieren Sie Ihre Belichtungsreihen zu einem einzigen High Dynamic Range Bild.",
       "descriptionWithCount": "Kombinieren Sie {{count}} Belichtungen zu einem einzigen High Dynamic Range Bild.",
       "descriptionWithCount_one": "Kombinieren Sie {{count}} Belichtung zu einem einzigen High Dynamic Range Bild.",
@@ -1320,12 +1341,30 @@
       "mergedAlt": "Zusammengefuhrtes HDR",
       "merging": "HDR wird zusammengefügt",
       "openInEditor": "Im Editor öffnen",
+      "previewBudgetLabel": "Preview budget",
+      "previewPixels": "{{value}} px",
+      "quality": {
+        "balanced": "Balanced",
+        "best": "Best",
+        "preview": "Preview"
+      },
+      "qualityLabel": "Quality",
       "retry": "Wiederholen",
       "save": "Speichern",
       "savedSuccess": "HDR erfolgreich gespeichert!",
+      "sourceCountBlocked": "Select at least two bracketed exposures before merging.",
       "speedNotice": "Dies kann je nach Anzahl und Größe Ihrer Belichtungen einige Minuten dauern.",
       "start": "Start",
-      "title": "Zu HDR zusammenfügen"
+      "strategy": {
+        "exposureFusion": "Exposure fusion preview",
+        "sceneLinear": "Scene-linear radiance"
+      },
+      "strategyLabel": "Merge strategy",
+      "title": "Zu HDR zusammenfügen",
+      "toneMapPreview": "Tone-map preview",
+      "uiOnlyNotice": "These controls define the requested HDR merge artifact. Runtime merge quality remains validated by fixture, sidecar, and image-processing checks.",
+      "workflowStatus": "Bracket, alignment, deghosting, tone-map, and preview controls are recorded for the HDR request.",
+      "workflowTitle": "HDR merge setup"
     },
     "importSettings": {
       "cancel": "Abbrechen",

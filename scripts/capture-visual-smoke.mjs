@@ -20,6 +20,12 @@ const scenarios = [
     outputPath: resolve(outputDir, 'panorama-ui.png'),
     sectionMinimum: 1,
   },
+  {
+    marker: 'HDR merge setup',
+    mode: 'hdr-ui',
+    outputPath: resolve(outputDir, 'hdr-ui.png'),
+    sectionMinimum: 1,
+  },
 ];
 
 const sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds));
