@@ -10,8 +10,9 @@ Dependabot alert: #2
 Manifest: `src-tauri/Cargo.lock`
 Current vulnerable package: `glib 0.18.5`
 Patched version: `glib >= 0.20.0`
-Current audit handling: `bun run check:security:rust` ignores only `RUSTSEC-2024-0429`
-while keeping new RustSec vulnerability advisories blocking.
+Current audit handling: `bun run check:security:rust` validates
+`docs/security/rust-advisory-waivers.json`, then ignores only
+`RUSTSEC-2024-0429` while keeping new RustSec vulnerability advisories blocking.
 
 ### Reason For Deferral
 

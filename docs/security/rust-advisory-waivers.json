@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "waivers": [
+    {
+      "advisoryId": "RUSTSEC-2024-0429",
+      "ghsaId": "GHSA-wrw7-89jp-8q8g",
+      "crate": "glib",
+      "currentVersion": "0.18.5",
+      "patchedVersion": ">=0.20.0",
+      "reason": "macOS target-filtered dependency graphs do not resolve glib; all-target remediation is blocked on Linux GTK/WebKit dependency churn outside current product scope.",
+      "owner": "@cgasgarth",
+      "introducedDate": "2026-06-11",
+      "reviewDate": "2026-09-15",
+      "expiryDate": "2026-12-15",
+      "issue": 262
+    }
+  ]
+}
