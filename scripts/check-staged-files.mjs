@@ -21,8 +21,7 @@ const ESLINT_EXTENSIONS = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx']
 const run = (label, command, args) => {
   const result = spawnSync(command, args, { encoding: 'utf8' });
   if (result.status === 0) {
-    console.log(`${label} ok`);
-    return;
+    return label;
   }
 
   console.error(`${label} failed: ${command} ${args.join(' ')}`);
@@ -59,13 +58,15 @@ if (stagedFiles.length === 0) {
 
 const formatFiles = stagedFiles.filter((filePath) => FORMAT_EXTENSIONS.has(extensionOf(filePath)));
 const eslintFiles = stagedFiles.filter((filePath) => ESLINT_EXTENSIONS.has(extensionOf(filePath)));
+const checks = [];
 
 if (formatFiles.length > 0) {
-  run('format', 'bun', ['prettier', '--check', '--log-level', 'warn', ...formatFiles]);
+  checks.push(run('format', 'bun', ['prettier', '--check', '--log-level', 'warn', ...formatFiles]));
 }
 
 if (eslintFiles.length > 0) {
-  run('lint', 'bun', ['eslint', '--max-warnings', '0', '--no-warn-ignored', ...eslintFiles]);
+  checks.push(run('lint', 'bun', ['eslint', '--max-warnings', '0', '--no-warn-ignored', ...eslintFiles]));
 }
 
-console.log(`staged ok (${stagedFiles.length})`);
+const checkSummary = checks.length > 0 ? `, ${checks.length} checks` : '';
+console.log(`staged ok (${stagedFiles.length}${checkSummary})`);
