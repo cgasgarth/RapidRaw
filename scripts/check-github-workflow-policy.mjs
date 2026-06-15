@@ -3,8 +3,21 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 
+import yaml from 'js-yaml';
+
 const ROOT = process.cwd();
 const WORKFLOW_DIR = join(ROOT, '.github/workflows');
+const REQUIRED_PR_WORKFLOW_PATH = '.github/workflows/lint.yml';
+const REQUIRED_AGGREGATE_JOB_ID = 'pr-ci-required';
+const REQUIRED_AGGREGATE_JOB_NAME = 'PR CI / required';
+const WRITE_PERMISSION_ALLOWLIST = new Map([
+  ['.github/workflows/ci.yml', 'main build workflow publishes release artifacts'],
+  [
+    '.github/workflows/optional-platform-builds.yml',
+    'manual optional build workflow publishes artifacts when requested',
+  ],
+  ['.github/workflows/release.yml', 'release workflow writes release notes and package artifacts'],
+]);
 
 function* walkYamlFiles(dir) {
   for (const entry of readdirSync(dir)) {
@@ -33,6 +46,10 @@ const hasMainInlineBranch = (line) => {
   );
 };
 const hasConcurrencyKey = (line) => /^\s*concurrency\s*:/u.test(stripComment(line));
+const normalizeEventName = (eventName) => (eventName === true ? 'on' : eventName);
+const getWorkflowEvents = (workflow) => workflow.on ?? workflow.true;
+const hasWritePermission = (value) =>
+  value === 'write' || (value && typeof value === 'object' && Object.values(value).some((child) => child === 'write'));
 
 function getTopLevelSection(lines, key) {
   const startIndex = lines.findIndex((line) => new RegExp(`^${key}:`, 'u').test(stripComment(line)));
@@ -98,15 +115,87 @@ function checkWorkflowFiles(files) {
   for (const { path, source } of files) {
     const lines = source.split(/\r?\n/u);
 
-    if (!hasMainPushTrigger(lines)) continue;
+    if (hasMainPushTrigger(lines)) {
+      lines.forEach((line, index) => {
+        if (hasConcurrencyKey(line)) {
+          violations.push(
+            `${path}:${index + 1}: workflows that run on push to main must not define concurrency; main runs must proceed independently`,
+          );
+        }
+      });
+    }
 
-    lines.forEach((line, index) => {
-      if (hasConcurrencyKey(line)) {
-        violations.push(
-          `${path}:${index + 1}: workflows that run on push to main must not define concurrency; main runs must proceed independently`,
-        );
-      }
-    });
+    let parsed;
+    try {
+      parsed = yaml.load(source);
+    } catch (error) {
+      violations.push(
+        `${path}: workflow YAML failed to parse: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      continue;
+    }
+
+    if (!parsed || typeof parsed !== 'object') continue;
+
+    const events = getWorkflowEvents(parsed);
+    const eventKeys =
+      events && typeof events === 'object' && !Array.isArray(events)
+        ? Object.keys(events).map(normalizeEventName)
+        : Array.isArray(events)
+          ? events.map(normalizeEventName)
+          : typeof events === 'string'
+            ? [events]
+            : [];
+
+    if (eventKeys.includes('pull_request_target')) {
+      violations.push(`${path}: pull_request_target is not allowed without an explicit policy allowlist`);
+    }
+
+    if (hasWritePermission(parsed.permissions) && !WRITE_PERMISSION_ALLOWLIST.has(path)) {
+      violations.push(`${path}: write permissions require an allowlist reason`);
+    }
+
+    if (path !== REQUIRED_PR_WORKFLOW_PATH) continue;
+
+    if (!eventKeys.includes('pull_request')) {
+      violations.push(`${path}: required PR workflow must include pull_request`);
+    }
+
+    const pullRequestEvent =
+      events && typeof events === 'object' && !Array.isArray(events) ? events.pull_request : undefined;
+    if (
+      pullRequestEvent &&
+      typeof pullRequestEvent === 'object' &&
+      ('paths' in pullRequestEvent || 'paths-ignore' in pullRequestEvent)
+    ) {
+      violations.push(`${path}: required PR workflow pull_request trigger must not use paths or paths-ignore`);
+    }
+
+    const jobs = parsed.jobs;
+    const aggregateJob =
+      jobs && typeof jobs === 'object' && !Array.isArray(jobs) ? jobs[REQUIRED_AGGREGATE_JOB_ID] : undefined;
+    if (!aggregateJob || typeof aggregateJob !== 'object' || Array.isArray(aggregateJob)) {
+      violations.push(`${path}: missing required aggregate job ${REQUIRED_AGGREGATE_JOB_ID}`);
+      continue;
+    }
+
+    if (aggregateJob.name !== REQUIRED_AGGREGATE_JOB_NAME) {
+      violations.push(`${path}: aggregate job name must remain "${REQUIRED_AGGREGATE_JOB_NAME}"`);
+    }
+
+    if (typeof aggregateJob.if !== 'string' || !aggregateJob.if.includes('always()')) {
+      violations.push(`${path}: aggregate job must use if: always()`);
+    }
+
+    const aggregateSource = JSON.stringify(aggregateJob);
+    if (
+      !aggregateSource.includes('.value.result') ||
+      !aggregateSource.includes('!=') ||
+      !aggregateSource.includes('success') ||
+      !aggregateSource.includes('exit 1')
+    ) {
+      violations.push(`${path}: aggregate job must fail when any needs result is not success`);
+    }
   }
 
   return violations;
@@ -247,11 +336,184 @@ jobs:
       - run: true
 `,
     },
+    {
+      name: 'allows required PR aggregate policy',
+      expectedViolations: 0,
+      path: REQUIRED_PR_WORKFLOW_PATH,
+      source: `name: Baseline Validation
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  frontend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+  pr-ci-required:
+    name: PR CI / required
+    runs-on: ubuntu-latest
+    needs:
+      - frontend-lint
+    if: always() && github.event_name == 'pull_request'
+    steps:
+      - run: |
+          failures="$(jq -r 'to_entries[] | select(.value.result != "success")' <<< "$NEEDS_CONTEXT")"
+          if [[ -n "$failures" ]]; then
+            exit 1
+          fi
+`,
+    },
+    {
+      name: 'rejects required PR workflow without pull_request',
+      expectedViolations: 1,
+      path: REQUIRED_PR_WORKFLOW_PATH,
+      source: `name: Baseline Validation
+on:
+  push:
+    branches:
+      - main
+jobs:
+  pr-ci-required:
+    name: PR CI / required
+    if: always()
+    steps:
+      - run: |
+          failures="$(jq -r 'to_entries[] | select(.value.result != "success")' <<< "$NEEDS_CONTEXT")"
+          if [[ -n "$failures" ]]; then
+            exit 1
+          fi
+`,
+    },
+    {
+      name: 'rejects required PR paths filter',
+      expectedViolations: 1,
+      path: REQUIRED_PR_WORKFLOW_PATH,
+      source: `name: Baseline Validation
+on:
+  pull_request:
+    paths:
+      - src/**
+jobs:
+  pr-ci-required:
+    name: PR CI / required
+    if: always()
+    steps:
+      - run: |
+          failures="$(jq -r 'to_entries[] | select(.value.result != "success")' <<< "$NEEDS_CONTEXT")"
+          if [[ -n "$failures" ]]; then
+            exit 1
+          fi
+`,
+    },
+    {
+      name: 'rejects renamed aggregate',
+      expectedViolations: 1,
+      path: REQUIRED_PR_WORKFLOW_PATH,
+      source: `name: Baseline Validation
+on:
+  pull_request:
+jobs:
+  pr-ci-required:
+    name: PR CI / optional
+    if: always()
+    steps:
+      - run: |
+          failures="$(jq -r 'to_entries[] | select(.value.result != "success")' <<< "$NEEDS_CONTEXT")"
+          if [[ -n "$failures" ]]; then
+            exit 1
+          fi
+`,
+    },
+    {
+      name: 'rejects aggregate without always',
+      expectedViolations: 1,
+      path: REQUIRED_PR_WORKFLOW_PATH,
+      source: `name: Baseline Validation
+on:
+  pull_request:
+jobs:
+  pr-ci-required:
+    name: PR CI / required
+    if: github.event_name == 'pull_request'
+    steps:
+      - run: |
+          failures="$(jq -r 'to_entries[] | select(.value.result != "success")' <<< "$NEEDS_CONTEXT")"
+          if [[ -n "$failures" ]]; then
+            exit 1
+          fi
+`,
+    },
+    {
+      name: 'rejects aggregate without needs failure check',
+      expectedViolations: 1,
+      path: REQUIRED_PR_WORKFLOW_PATH,
+      source: `name: Baseline Validation
+on:
+  pull_request:
+jobs:
+  pr-ci-required:
+    name: PR CI / required
+    if: always()
+    steps:
+      - run: echo ok
+`,
+    },
+    {
+      name: 'rejects pull_request_target',
+      expectedViolations: 1,
+      source: `name: unsafe
+on:
+  pull_request_target:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'rejects unallowlisted write permissions',
+      expectedViolations: 1,
+      source: `name: unsafe
+on:
+  pull_request:
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'allows allowlisted write permissions',
+      expectedViolations: 0,
+      path: '.github/workflows/release.yml',
+      source: `name: release
+on:
+  release:
+    types: [created]
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
+`,
+    },
   ];
 
   const failures = cases
     .map((testCase) => {
-      const violations = checkWorkflowFiles([{ path: `${testCase.name}.yml`, source: testCase.source }]);
+      const violations = checkWorkflowFiles([
+        { path: testCase.path ?? `${testCase.name}.yml`, source: testCase.source },
+      ]);
       if (violations.length === testCase.expectedViolations) {
         return null;
       }
