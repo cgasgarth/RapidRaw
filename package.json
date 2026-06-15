@@ -56,6 +56,7 @@
     "check:mask-compose": "bun scripts/check-mask-compose-operations.mjs",
     "check:mask-refine": "bun scripts/check-mask-refinement-parameters.mjs",
     "check:mask-refine-controls": "bun scripts/check-mask-refinement-controls.mjs",
+    "check:mask-refine-command-ui": "bun scripts/check-mask-refinement-command-ui.mjs",
     "check:mask-overlay": "bun scripts/check-mask-overlay-modes.mjs",
     "check:mask-copy-paste": "bun scripts/check-mask-copy-paste.mjs",
     "check:ai-mask-capabilities": "bun scripts/check-ai-mask-capabilities.mjs",

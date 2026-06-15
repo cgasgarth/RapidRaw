@@ -76,6 +76,7 @@ const CHECK_GROUPS = {
     'check:mask-compose',
     'check:mask-refine',
     'check:mask-refine-controls',
+    'check:mask-refine-command-ui',
     'check:mask-overlay',
     'check:mask-copy-paste',
     'check:ai-mask-capabilities',
