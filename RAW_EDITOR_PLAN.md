@@ -3919,6 +3919,8 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `masks(ai): audit subject sky background masks`
   - Runtime status: subject, sky, foreground, depth, and derived background capability coverage is schema-backed, fixture-validated, and checked against frontend invoke commands plus Rust command/render branches; runtime quality benchmarking remains future work.
 - `masks(ai): research people and parts masks`
+  - Consult: 2026-06-14 RapidRaw Pro Extended consultation recommended a staged path: schema contract, deterministic fake provider, render/apply plumbing, dry-run UI, then macOS whole-person runtime before fine portrait parts.
+  - Runtime status: people/parts taxonomy, provider tiers, target/artifact schemas, and fixture validation are present; fake provider, UI, and runtime whole-person generation remain future work.
 - `validation(masks): add mask schema and render tests`
 
 #### Milestone 8: Detail Denoise And Wavelet Tools
