@@ -196,6 +196,7 @@ export default function AppModals(props: AppModalsProps) {
               isOpen: false,
               isProcessing: false,
               progressMessage: '',
+              settings: panoramaModalState.settings,
               finalImageBase64: null,
               error: null,
               stitchingSourcePaths: [],
@@ -209,7 +210,11 @@ export default function AppModals(props: AppModalsProps) {
         onStitch={() => {
           props.handleStartPanorama(panoramaModalState.stitchingSourcePaths);
         }}
+        onSettingsChange={(settings) => {
+          setUI((state) => ({ panoramaModalState: { ...state.panoramaModalState, settings } }));
+        }}
         progressMessage={panoramaModalState.progressMessage}
+        settings={panoramaModalState.settings}
       />
       <HdrModal
         error={hdrModalState.error}
