@@ -3502,6 +3502,9 @@ Use the consult skill for:
 - Product architecture decisions with long-term consequences.
 - New UI feature design where workflow tradeoffs matter.
 - Color science changes.
+- Deblur/lens deconvolution math.
+- Denoise, AI denoise, and noise metric strategy.
+- Sharpening/detail math.
 - Scene-referred/display-referred pipeline changes.
 - Camera profile strategy.
 - Film simulation design.
@@ -3514,12 +3517,43 @@ Use the consult skill for:
 
 Do not use consult as a substitute for reading the code, running tests, or validating real output. Treat it as a second design review.
 
+Science/math-heavy image features must improve through repeatable iterations:
+
+- Consult on the math, validation strategy, and rejected alternatives before
+  implementation when the work affects deblur, denoise, sharpening/detail,
+  color science, HDR/fusion, panorama/focus/super-resolution reconstruction, or
+  negative processing.
+- Convert consult advice into executable evidence: Zod-backed fixtures,
+  deterministic public metrics, private real-image ledgers when assets cannot
+  ship, preview/export parity checks, and runtime apply proof.
+- Do not close runtime quality issues from plan-only, dry-run-only,
+  schema-only, or fixture-only work. Label the runtime status explicitly until
+  the feature can process representative images end to end.
+- Tighten thresholds over multiple PRs as the implementation matures, preserving
+  accepted/rejected consult advice and validation commands in the plan, issue,
+  or PR.
+
 ### 11.6 Consult Tracking
 
 Consultations should be tracked when they affect the plan.
 
 Current planning consults:
 
+- Advanced image-science iteration roadmap:
+  - Status: completed and incorporated.
+  - Response checked time: 2026-06-14.
+  - Doc: `docs/detail/image-science-iteration-consult-2026-06-14.md`.
+  - Incorporated advice:
+    - Rank science work as color correctness first, noise model second,
+      detail/sharpening separation third, AI denoise fourth, and deblur/lens
+      deconvolution last.
+    - Require contract, deterministic fixtures, runtime implementation,
+      preview/export parity, real-image proof, and threshold tightening before
+      maturity claims.
+    - Use explicit runtime-status labels so plan-only, schema-only,
+      dry-run-only, synthetic-only, and real-image-proven work cannot be mixed.
+    - Keep app-server image-science tools typed, auditable, dry-run capable,
+      approval-aware, and routed through the same command layer as the UI.
 - Initial RawEngine product plan consult:
   - Status: completed.
   - Incorporated advice:
@@ -4658,6 +4692,11 @@ Issues:
   - Next iterations: private RAW evidence, preview/export metric parity,
     runtime chroma/luma denoise candidates, then consult-backed threshold
     tightening.
+- Iterate advanced detail quality in small consult-backed steps. For deblur,
+  denoise, AI denoise, sharpening, and color-science-adjacent detail behavior,
+  each step should name whether it is research-only, schema-only,
+  validation-only, dry-run/app-server-capable, runtime apply-capable, or
+  real-image-proven.
 - Add high ISO fixture set. Initial manifest entries separate project-generated
   public-CI placeholders from real-photo private-review placeholders until
   payload rights, hashes, and thresholds are supplied.

@@ -51,7 +51,7 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Recurring Reminder Automation
 
-- The standing reminder automation is `check-rapidraw-consult`.
+- The standing reminder automation is `check-rapidraw-consult-and-prs`.
 - Do not delete that automation unless the user explicitly asks to remove that
   exact reminder.
 - It should run every 15 minutes and check for stale open PRs, especially PRs
@@ -65,9 +65,14 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Consult And Research
 
 - Use the consult skill heavily for design decisions, color science, negative
-  processing, film simulations, panorama stitching, HDR, focus stacking,
-  super-resolution, app-server/agent architecture, GitHub Actions strategy, and
-  tricky UI architecture.
+  processing, film simulations, deblur, denoise, sharpening/detail math,
+  panorama stitching, HDR, focus stacking, super-resolution, app-server/agent
+  architecture, GitHub Actions strategy, and tricky UI architecture.
+- For science/math-heavy image features, iterate rather than claiming maturity
+  in one PR: consult first, define the math and rejected alternatives, add
+  fixtures/metrics, implement runtime behavior, verify preview/export parity,
+  then prove quality on representative real images before closing runtime
+  feature issues.
 - When using consult for repo-aware decisions, prefer the RapidRaw ChatGPT
   project with the GitHub repo attached when available.
 - Treat consult output as advice. Verify it against current repo state before
