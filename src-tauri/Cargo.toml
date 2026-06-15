@@ -37,10 +37,8 @@ imageproc = "0.26.2"
 opencv = { version = "0.98.2", default-features = false, features = ["imgcodecs", "imgproc", "stitching"], optional = true }
 ort = { version = "=2.0.0-rc.10", features = ["ndarray", "load-dynamic"] }
 ndarray = "0.16"
-futures-util = "0.3"
 tauri-plugin-process = "2.3.1"
 tauri-plugin-os = "2.3.2"
-os_info = "3"
 log = "0.4"
 fern = "0.7"
 little_exif = "0.6.23"
@@ -96,6 +94,9 @@ tauri-build = { version = "2.6", features = [] }
 sha2 = "0.11"
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
 hex = "0.4"
+
+[package.metadata.cargo-machete]
+ignored = ["tauri-build"]
 
 [profile.dev]
 opt-level = 2

@@ -145,6 +145,7 @@ generator before the release workflow needs one.
 - [Rust required feature policy](tooling/rust-required-feature-policy-2026-06-13.md)
 - [Rust feature matrix](tooling/rust-feature-matrix-2026-06-15.md)
 - [Rust clippy pedantic and nursery evaluation](tooling/rust-clippy-pedantic-nursery-evaluation-2026-06-15.md)
+- [Rust unused dependency gate evaluation](tooling/rust-unused-dependency-gate-2026-06-15.md)
 - [Strict type-checked ESLint](tooling/eslint-strict-type-checked-2026-06-11.md)
 - [TypeScript suppression policy](tooling/typescript-suppression-policy-2026-06-15.md)
 - [ESLint escape hatches](tooling/eslint-escape-hatches-2026-06-11.md)
