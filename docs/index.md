@@ -25,6 +25,7 @@ generator before the release workflow needs one.
 
 - [Developer API guide](api/developer-api-guide-2026-06-11.md)
 - [Edit command API baseline](api/edit-command-api-2026-06-11.md)
+- [Tauri schema validation boundary](api/tauri-schema-validation-2026-06-15.md)
 - [Mask refinement command](api/mask-refinement-command-2026-06-15.md)
 - [Edit command bus](api/edit-command-bus-2026-06-15.md)
 - [Mask refinement UI command routing](api/mask-refinement-command-ui-routing-2026-06-15.md)

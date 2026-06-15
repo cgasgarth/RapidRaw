@@ -3904,6 +3904,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `api(merge): define merge artifact schema`
 - `api(export): define export recipe schema`
 - `api(schema): add schema validation`
+  - Issue: #76
+  - Docs: `docs/api/tauri-schema-validation-2026-06-15.md`
+  - Validation: `bun run check:tauri-schema-validation`
+  - Status: first representative Tauri bridge response parses `get_folder_children` through Zod from `unknown`; full bridge/schema parity remains follow-up work.
 - `api(schema): add schema migration mechanism`
 - `api(commands): add edit command bus`
 - `api(commands): route representative UI operations through command bus`

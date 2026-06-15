@@ -22,6 +22,7 @@ const CHECK_GROUPS = {
     'check:keyboard-shortcut-conflicts',
     'check:edit-graph-history',
     'check:edit-history-replay',
+    'check:tauri-schema-validation',
     'check:workspace-layouts',
     'check:compare-survey',
     'check:mask-render',
