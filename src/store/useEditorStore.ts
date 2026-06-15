@@ -6,6 +6,7 @@ import { ToolType } from '../components/panel/right/Masks';
 import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
 import { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
 import { Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, MaskContainer } from '../utils/adjustments';
+import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
 
 export interface InteractivePatch {
   url: string;
@@ -140,32 +141,22 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   pushHistory: (newAdj) => {
     set((state) => {
-      const newHistory = state.history.slice(0, state.historyIndex + 1);
-      newHistory.push(newAdj);
-      if (newHistory.length > 50) newHistory.shift();
-      return { history: newHistory, historyIndex: newHistory.length - 1 };
+      const nextHistory = pushEditHistoryEntry(state.history, state.historyIndex, newAdj);
+      return nextHistory;
     });
   },
 
   undo: () => {
     set((state) => {
-      if (state.historyIndex > 0) {
-        const newIndex = state.historyIndex - 1;
-        const adjustments = state.history[newIndex];
-        return adjustments ? { historyIndex: newIndex, adjustments } : state;
-      }
-      return state;
+      const nextState = undoEditHistory(state);
+      return { adjustments: nextState.adjustments, historyIndex: nextState.historyIndex };
     });
   },
 
   redo: () => {
     set((state) => {
-      if (state.historyIndex < state.history.length - 1) {
-        const newIndex = state.historyIndex + 1;
-        const adjustments = state.history[newIndex];
-        return adjustments ? { historyIndex: newIndex, adjustments } : state;
-      }
-      return state;
+      const nextState = redoEditHistory(state);
+      return { adjustments: nextState.adjustments, historyIndex: nextState.historyIndex };
     });
   },
 
@@ -179,11 +170,8 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   goToHistoryIndex: (index) => {
     set((state) => {
-      if (index >= 0 && index < state.history.length) {
-        const adjustments = state.history[index];
-        return adjustments ? { historyIndex: index, adjustments } : state;
-      }
-      return state;
+      const nextState = goToEditHistoryIndex(state, index);
+      return { adjustments: nextState.adjustments, historyIndex: nextState.historyIndex };
     });
   },
 }));

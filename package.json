@@ -29,6 +29,7 @@
     "check:keyboard-shortcuts": "bun scripts/check-keyboard-shortcuts.mjs",
     "check:keyboard-shortcut-conflicts": "bun scripts/check-keyboard-shortcut-conflicts.mjs",
     "check:edit-graph-history": "bun scripts/check-edit-graph-history-commands.mjs",
+    "check:edit-history-replay": "bun scripts/check-edit-history-replay.mjs",
     "check:color-abi": "bun scripts/check-color-adjustment-abi-parity.mjs",
     "check:color-pipeline-audit": "bun scripts/check-color-pipeline-audit.mjs",
     "check:preview-scopes": "bun scripts/check-preview-scopes.mjs",
