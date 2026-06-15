@@ -119,6 +119,10 @@
           "path": "docs/color/color-cpu-gpu-parity-2026-06-14.md"
         },
         {
+          "title": "Gamut mapping plan",
+          "path": "docs/color/gamut-mapping-plan-2026-06-15.md"
+        },
+        {
           "title": "Film simulation architecture",
           "path": "docs/film/film-simulation-architecture-2026-06-13.md"
         },

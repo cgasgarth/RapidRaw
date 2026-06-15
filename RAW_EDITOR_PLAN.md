@@ -3916,6 +3916,10 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `color(profile): add camera profile lookup tests`
 - `color(cat): add chromatic adaptation plan`
 - `color(gamut): add gamut mapping plan`
+  - Design: `docs/color/gamut-mapping-plan-2026-06-15.md`
+  - Fixtures: `fixtures/color/gamut-mapping-fixtures.json`
+  - Validation: `scripts/check-gamut-mapping-fixtures.mjs`
+  - Runtime status: schema/fixture contract only; preview/export pixel mapping remains future work.
 
 #### Milestone 6: Capture One-Class Color Editing
 
@@ -4633,6 +4637,8 @@ Issues:
 - Add camera profile lookup tests.
 - Add chromatic adaptation module or integration plan.
 - Add gamut mapping plan.
+  - Schema/fixture contract: `docs/color/gamut-mapping-plan-2026-06-15.md`.
+  - Runtime proof required later before any preview/export applied claim.
 
 Definition of done:
 

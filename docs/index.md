@@ -44,6 +44,7 @@ generator before the release workflow needs one.
 - [Selective color mask contract](color/selective-color-mask-contract-2026-06-14.md)
 - [DeltaE harness](color/deltae-harness-2026-06-14.md)
 - [Color CPU/GPU parity fixtures](color/color-cpu-gpu-parity-2026-06-14.md)
+- [Gamut mapping plan](color/gamut-mapping-plan-2026-06-15.md)
 - [Film simulation architecture](film/film-simulation-architecture-2026-06-13.md)
 - [Built-In Film Look catalog schema](film/built-in-look-catalog-schema-2026-06-13.md)
 - [Bundled look legal review checklist](film/bundled-look-legal-review-checklist-2026-06-13.md)
