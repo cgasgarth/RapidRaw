@@ -721,7 +721,8 @@
       "exportMasks": "Exporter les masques sous forme de fichiers séparés",
       "preserveFolders": "Conserver la structure des dossiers",
       "preserveTimestamps": "Définir l'horodatage des fichiers à partir de la date de prise de vue EXIF",
-      "title": "Paramètres d'exportation"
+      "title": "Paramètres d'exportation",
+      "colorProfile": "Profil colorimétrique"
     },
     "bytes": {
       "bytes": "Octets",
@@ -807,6 +808,13 @@
       "scale": "Échelle",
       "spacing": "Espacement",
       "watermarkImage": "Image en filigrane"
+    },
+    "colorProfiles": {
+      "srgb": "sRGB",
+      "displayP3": "Display P3",
+      "adobeRgb1998": "Adobe RGB (1998)",
+      "proPhotoRgb": "ProPhoto RGB",
+      "sourceEmbedded": "Profil source intégré"
     }
   },
   "library": {

@@ -34,6 +34,7 @@ export const FILENAME_VARIABLES: Array<string> = [
 ];
 
 export interface ExportSettings {
+  colorProfile?: ExportColorProfile | undefined;
   filenameTemplate: string | null;
   jpegQuality: number;
   keepMetadata: boolean;
@@ -48,6 +49,14 @@ export interface ExportSettings {
   exportMasks?: boolean | undefined;
   outputSharpening?: OutputSharpeningSettings | null | undefined;
   preserveFolders?: boolean | undefined;
+}
+
+export enum ExportColorProfile {
+  Srgb = 'srgb',
+  DisplayP3 = 'displayP3',
+  AdobeRgb1998 = 'adobeRgb1998',
+  ProPhotoRgb = 'proPhotoRgb',
+  SourceEmbedded = 'sourceEmbedded',
 }
 
 export interface OutputSharpeningSettings {
@@ -106,6 +115,7 @@ export enum Status {
 }
 
 export interface ExportPreset {
+  colorProfile?: ExportColorProfile;
   id: string;
   name: string;
   fileFormat: string;

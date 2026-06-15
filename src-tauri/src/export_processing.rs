@@ -59,6 +59,8 @@ pub struct ResizeOptions {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportSettings {
+    #[serde(default)]
+    pub color_profile: ExportColorProfile,
     pub jpeg_quality: u8,
     pub resize: Option<ResizeOptions>,
     pub keep_metadata: bool,
@@ -72,6 +74,17 @@ pub struct ExportSettings {
     pub output_sharpening: Option<OutputSharpeningSettings>,
     #[serde(default)]
     pub preserve_folders: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportColorProfile {
+    #[default]
+    Srgb,
+    DisplayP3,
+    AdobeRgb1998,
+    ProPhotoRgb,
+    SourceEmbedded,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1390,6 +1403,7 @@ mod tests {
 
     fn base_export_settings(output_sharpening: Option<OutputSharpeningSettings>) -> ExportSettings {
         ExportSettings {
+            color_profile: Default::default(),
             jpeg_quality: 90,
             resize: None,
             keep_metadata: false,

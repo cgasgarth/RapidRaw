@@ -15,6 +15,7 @@ import { Invokes, SelectedImage, AppSettings } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import Dropdown from '../../ui/Dropdown';
 import {
+  ExportColorProfile,
   ExportPreset,
   ExportSettings,
   FileFormat,
@@ -243,6 +244,8 @@ export default function ExportPanel({
     setWatermarkOpacity,
     preserveFolders,
     setPreserveFolders,
+    colorProfile,
+    setColorProfile,
     handleApplyPreset,
     currentSettingsObject,
   } = useExportSettings();
@@ -358,6 +361,17 @@ export default function ExportPanel({
     [t],
   );
 
+  const colorProfileOptions = useMemo(
+    () => [
+      { label: t('export.colorProfiles.srgb'), value: ExportColorProfile.Srgb },
+      { label: t('export.colorProfiles.displayP3'), value: ExportColorProfile.DisplayP3 },
+      { label: t('export.colorProfiles.adobeRgb1998'), value: ExportColorProfile.AdobeRgb1998 },
+      { label: t('export.colorProfiles.proPhotoRgb'), value: ExportColorProfile.ProPhotoRgb },
+      { label: t('export.colorProfiles.sourceEmbedded'), value: ExportColorProfile.SourceEmbedded },
+    ],
+    [t],
+  );
+
   const debouncedEstimateSize = useMemo(
     () =>
       debounce(
@@ -395,6 +409,7 @@ export default function ExportPanel({
 
   useEffect(() => {
     const exportSettings: ExportSettings = {
+      colorProfile,
       filenameTemplate,
       jpegQuality,
       keepMetadata,
@@ -425,6 +440,7 @@ export default function ExportPanel({
     adjustments,
     selectedImage?.path,
     fileFormat,
+    colorProfile,
     jpegQuality,
     enableResize,
     resizeMode,
@@ -474,6 +490,7 @@ export default function ExportPanel({
     }
 
     const exportSettings: ExportSettings = {
+      colorProfile,
       filenameTemplate: finalFilenameTemplate,
       jpegQuality,
       keepMetadata,
@@ -880,6 +897,16 @@ export default function ExportPanel({
                                 trackClassName="bg-surface"
                               />
                             )}
+                            <div className="space-y-1">
+                              <UiText variant={TextVariants.label}>{t('export.advanced.colorProfile')}</UiText>
+                              <Dropdown
+                                options={colorProfileOptions}
+                                value={colorProfile}
+                                onChange={setColorProfile}
+                                disabled={isExporting}
+                                className="w-full"
+                              />
+                            </div>
                           </>
                         )}
                       </div>

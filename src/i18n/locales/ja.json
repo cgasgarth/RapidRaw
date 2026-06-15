@@ -721,7 +721,8 @@
       "exportMasks": "マスクを個別ファイルとして書き出す",
       "preserveFolders": "フォルダ構造を維持",
       "preserveTimestamps": "EXIFの撮影日時からファイルタイムスタンプを設定",
-      "title": "書き出し設定"
+      "title": "書き出し設定",
+      "colorProfile": "カラープロファイル"
     },
     "bytes": {
       "bytes": "バイト",
@@ -806,6 +807,13 @@
       "scale": "倍率",
       "spacing": "間隔",
       "watermarkImage": "ウォーターマーク画像"
+    },
+    "colorProfiles": {
+      "srgb": "sRGB",
+      "displayP3": "Display P3",
+      "adobeRgb1998": "Adobe RGB (1998)",
+      "proPhotoRgb": "ProPhoto RGB",
+      "sourceEmbedded": "埋め込み元プロファイル"
     }
   },
   "library": {

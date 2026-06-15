@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const exportFileFormatSchema = z.enum(['jpeg', 'png', 'tiff', 'webp']);
+export const exportColorProfileSchema = z.enum(['srgb', 'displayP3', 'adobeRgb1998', 'proPhotoRgb', 'sourceEmbedded']);
 export const exportResizeModeSchema = z.enum(['longEdge', 'shortEdge', 'width', 'height']);
 export const watermarkAnchorSchema = z.enum([
   'topLeft',
@@ -16,6 +17,7 @@ export const watermarkAnchorSchema = z.enum([
 
 export const exportRecipeSchema = z
   .object({
+    colorProfile: exportColorProfileSchema.default('srgb'),
     dontEnlarge: z.boolean(),
     enableResize: z.boolean(),
     enableWatermark: z.boolean(),

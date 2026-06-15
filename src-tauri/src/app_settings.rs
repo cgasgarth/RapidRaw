@@ -196,6 +196,8 @@ impl Default for CopyPasteSettings {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportPreset {
+    #[serde(default)]
+    pub color_profile: ExportColorProfile,
     pub id: String,
     pub name: String,
     pub file_format: String,
@@ -221,9 +223,21 @@ pub struct ExportPreset {
     pub last_export_path: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ExportColorProfile {
+    #[default]
+    Srgb,
+    DisplayP3,
+    AdobeRgb1998,
+    ProPhotoRgb,
+    SourceEmbedded,
+}
+
 pub fn default_export_presets() -> Vec<ExportPreset> {
     vec![
         ExportPreset {
+            color_profile: Default::default(),
             id: "default-hq".to_string(),
             name: "High Quality".to_string(),
             file_format: "jpeg".to_string(),
@@ -246,6 +260,7 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             last_export_path: None,
         },
         ExportPreset {
+            color_profile: Default::default(),
             id: "default-fast".to_string(),
             name: "Fast (Web)".to_string(),
             file_format: "jpeg".to_string(),

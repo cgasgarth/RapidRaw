@@ -777,6 +777,7 @@
   },
   "export": {
     "advanced": {
+      "colorProfile": "Farbprofil",
       "exportMasks": "Masken als separate Dateien exportieren",
       "preserveFolders": "Ordnerstruktur beibehalten",
       "preserveTimestamps": "Dateizeitstempel aus EXIF-Aufnahmedatum setzen",
@@ -788,6 +789,13 @@
       "kb": "KB",
       "mb": "MB",
       "tb": "TB"
+    },
+    "colorProfiles": {
+      "adobeRgb1998": "Adobe RGB (1998)",
+      "displayP3": "Display P3",
+      "proPhotoRgb": "ProPhoto RGB",
+      "sourceEmbedded": "Eingebettetes Quellprofil",
+      "srgb": "sRGB"
     },
     "dialog": {
       "saveEditedImageTitle": "Bearbeitetes Bild speichern",

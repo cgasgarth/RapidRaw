@@ -721,7 +721,8 @@
       "exportMasks": "Экспортировать маски отдельными файлами",
       "preserveFolders": "Сохранять структуру папок",
       "preserveTimestamps": "Установить дату файла из EXIF даты съемки",
-      "title": "Настройки экспорта"
+      "title": "Настройки экспорта",
+      "colorProfile": "Цветовой профиль"
     },
     "bytes": {
       "bytes": "Байт",
@@ -806,6 +807,13 @@
       "scale": "Масштаб",
       "spacing": "Отступы",
       "watermarkImage": "Изображение водяного знака"
+    },
+    "colorProfiles": {
+      "srgb": "sRGB",
+      "displayP3": "Display P3",
+      "adobeRgb1998": "Adobe RGB (1998)",
+      "proPhotoRgb": "ProPhoto RGB",
+      "sourceEmbedded": "Встроенный исходный профиль"
     }
   },
   "library": {
