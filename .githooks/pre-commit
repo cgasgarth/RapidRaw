@@ -8,4 +8,4 @@ if [ "$branch" = "main" ]; then
   exit 1
 fi
 
-bun run hooks:check-staged
+bun scripts/check-staged-files.mjs
