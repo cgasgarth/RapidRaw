@@ -464,6 +464,10 @@
           "path": "docs/tooling/assertion-narrowing-lint-2026-06-15.md"
         },
         {
+          "title": "Strict boolean expressions evaluation",
+          "path": "docs/tooling/strict-boolean-expressions-evaluation-2026-06-15.md"
+        },
+        {
           "title": "Tauri invoke boundary ratchet",
           "path": "docs/tooling/tauri-invoke-boundary-ratchet-2026-06-15.md"
         },
