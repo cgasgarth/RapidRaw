@@ -1400,23 +1400,64 @@
       "zoomOutTooltip": "Verkleinern"
     },
     "panorama": {
+      "apiPending": "API wiring pending",
+      "blend": {
+        "feather": {
+          "label": "Feather",
+          "status": "Fast preview blend for small overlaps"
+        },
+        "multi_band": {
+          "label": "Multi-band",
+          "status": "Best quality for complex seams"
+        }
+      },
+      "blendLabel": "Blend method",
+      "boundary": {
+        "autoCrop": "Auto crop",
+        "manualCrop": "Manual crop",
+        "transparent": "Transparent edge"
+      },
+      "boundaryLabel": "Boundary handling",
       "cancel": "Abbrechen",
       "close": "Schließen",
       "descCount": "Kombinieren Sie {{count}} überlappende Bilder zu einem nahtlosen Panorama.",
       "descCount_one": "Kombinieren Sie {{count}} überlappendes Bild zu einem nahtlosen Panorama.",
       "descCount_other": "Kombinieren Sie {{count}} überlappende Bilder zu einem nahtlosen Panorama.",
       "descGeneric": "Kombinieren Sie Ihre überlappenden Bilder zu einem nahtlosen Panorama.",
+      "exposure": {
+        "gainCompensation": "Gain compensation",
+        "none": "None"
+      },
+      "exposureLabel": "Exposure normalization",
       "failed": "Panorama fehlgeschlagen",
       "initializing": "Wird initialisiert...",
       "openInEditor": "Im Editor öffnen",
+      "previewBudgetLabel": "Preview budget",
+      "previewPixels": "{{value}} px",
+      "projection": {
+        "cylindrical": "Cylindrical",
+        "rectilinear": "Rectilinear",
+        "spherical": "Spherical"
+      },
+      "projectionLabel": "Projection",
+      "quality": {
+        "balanced": "Balanced",
+        "best": "Best",
+        "preview": "Preview"
+      },
+      "qualityLabel": "Quality",
       "retry": "Wiederholen",
       "save": "Speichern",
       "savedSuccess": "Panorama erfolgreich gespeichert!",
+      "sourceCountBlocked": "Select at least two overlapping source images before stitching.",
       "speedNotice": "Dies kann je nach Anzahl und Größe der Bilder einige Minuten dauern.",
       "start": "Start",
       "stitchedAlt": "Zusammengesetztes Panorama",
       "stitchingProgress": "Panorama wird zusammengefügt",
-      "title": "Panorama zusammenfügen"
+      "title": "Panorama zusammenfügen",
+      "uiOnlyNotice": "These controls define the requested panorama artifact. Runtime projection and boundary support will be applied as engine capability checks land.",
+      "workflowStatus": "Projection, blend, boundary, and preview controls are recorded for the panorama request.",
+      "workflowTitle": "Panorama setup"
     },
     "renameAlbum": {
       "placeholder": "Neuen Albumnamen eingeben..."

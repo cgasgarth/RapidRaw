@@ -1,4 +1,8 @@
 import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+
+import PanoramaModal from '../../components/modals/PanoramaModal';
+import { DEFAULT_PANORAMA_UI_SETTINGS, type PanoramaUiSettings } from '../../schemas/panoramaUiSchemas';
 
 interface VisualSmokeAppProps {
   mode: string;
@@ -31,6 +35,7 @@ const copy = {
   activeLayerCount: '3 active',
   filmLook: 'Film look',
   filmPreset: 'Neutral 400',
+  panoramaSmoke: 'Panorama UI Smoke',
   frameStatus: (rating: string) => `Rating ${rating} / RAW / edited`,
 } as const;
 
@@ -41,7 +46,66 @@ const scopes = [
   ['B', '73'],
 ] as const;
 
+const panoramaPreviewSvg = encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640">
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#8fd5ff"/>
+      <stop offset="0.5" stop-color="#f7d08c"/>
+      <stop offset="1" stop-color="#9c7be8"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="640" fill="url(#sky)"/>
+  <path d="M0 430 C160 380 290 410 430 350 C590 285 730 340 960 250 L960 640 L0 640 Z" fill="#293841"/>
+  <path d="M0 510 C180 470 320 520 480 465 C660 405 800 430 960 370 L960 640 L0 640 Z" fill="#16252b"/>
+  <rect x="80" y="120" width="220" height="330" rx="18" fill="#ffffff" opacity="0.12"/>
+  <rect x="370" y="90" width="220" height="360" rx="18" fill="#ffffff" opacity="0.16"/>
+  <rect x="660" y="130" width="220" height="320" rx="18" fill="#ffffff" opacity="0.12"/>
+</svg>`);
+
+const panoramaPreviewUrl = `data:image/svg+xml,${panoramaPreviewSvg}`;
+
+function PanoramaVisualSmoke() {
+  const [settings, setSettings] = useState<PanoramaUiSettings>(DEFAULT_PANORAMA_UI_SETTINGS);
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="panorama-ui"
+    >
+      <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="panorama-modal">
+        <div className="flex h-11 items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+          <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+          <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+            {copy.panoramaSmoke}
+          </span>
+        </div>
+        <PanoramaModal
+          error={null}
+          finalImageBase64={null}
+          imageCount={5}
+          isOpen
+          isProcessing={false}
+          loadingImageUrl={panoramaPreviewUrl}
+          onClose={() => {}}
+          onOpenFile={() => {}}
+          onSave={() => Promise.resolve('/tmp/panorama.tif')}
+          onSettingsChange={setSettings}
+          onStitch={() => {}}
+          progressMessage={null}
+          settings={settings}
+        />
+      </div>
+    </main>
+  );
+}
+
 function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
+  if (mode === 'panorama-ui') {
+    return <PanoramaVisualSmoke />;
+  }
+
   const scenario = mode === 'empty-library' ? 'Empty Library Startup' : 'Editor Shell Smoke';
 
   return (

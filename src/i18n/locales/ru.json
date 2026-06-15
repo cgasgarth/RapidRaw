@@ -1262,7 +1262,48 @@
       "speedNotice": "Это может занять несколько минут в зависимости от количества снимков и их разрешения.",
       "start": "Начать",
       "stitchingProgress": "Сшивание панорамы",
-      "title": "Сборка панорамы"
+      "title": "Сборка панорамы",
+      "apiPending": "API wiring pending",
+      "blendLabel": "Blend method",
+      "blend": {
+        "feather": {
+          "label": "Feather",
+          "status": "Fast preview blend for small overlaps"
+        },
+        "multi_band": {
+          "label": "Multi-band",
+          "status": "Best quality for complex seams"
+        }
+      },
+      "boundaryLabel": "Boundary handling",
+      "boundary": {
+        "autoCrop": "Auto crop",
+        "manualCrop": "Manual crop",
+        "transparent": "Transparent edge"
+      },
+      "exposureLabel": "Exposure normalization",
+      "exposure": {
+        "gainCompensation": "Gain compensation",
+        "none": "None"
+      },
+      "previewBudgetLabel": "Preview budget",
+      "previewPixels": "{{value}} px",
+      "projectionLabel": "Projection",
+      "projection": {
+        "cylindrical": "Cylindrical",
+        "rectilinear": "Rectilinear",
+        "spherical": "Spherical"
+      },
+      "qualityLabel": "Quality",
+      "quality": {
+        "balanced": "Balanced",
+        "best": "Best",
+        "preview": "Preview"
+      },
+      "sourceCountBlocked": "Select at least two overlapping source images before stitching.",
+      "uiOnlyNotice": "These controls define the requested panorama artifact. Runtime projection and boundary support will be applied as engine capability checks land.",
+      "workflowStatus": "Projection, blend, boundary, and preview controls are recorded for the panorama request.",
+      "workflowTitle": "Panorama setup"
     },
     "renameAlbum": {
       "placeholder": "Введите новое название альбома..."
