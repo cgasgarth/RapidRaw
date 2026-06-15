@@ -7,9 +7,9 @@ const readPositiveInt = (name, fallback) => {
 };
 
 const DEFAULT_MAX_FAILURE_CHARS = readPositiveInt('RAWENGINE_COMPACT_MAX_CHARS', 4_000);
-const DEFAULT_MAX_FAILURE_LINES = readPositiveInt('RAWENGINE_COMPACT_MAX_LINES', 32);
+const DEFAULT_MAX_FAILURE_LINES = readPositiveInt('RAWENGINE_COMPACT_MAX_LINES', 24);
 const DEFAULT_HEAD_LINES = readPositiveInt('RAWENGINE_COMPACT_HEAD_LINES', 8);
-const DEFAULT_TAIL_LINES = readPositiveInt('RAWENGINE_COMPACT_TAIL_LINES', 18);
+const DEFAULT_TAIL_LINES = readPositiveInt('RAWENGINE_COMPACT_TAIL_LINES', 12);
 
 export const formatCommandForLog = (command, args = [], { maxArgs = 10, maxChars = 240 } = {}) => {
   const parts = [command, ...args].filter(Boolean);
