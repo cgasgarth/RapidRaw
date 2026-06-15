@@ -4,6 +4,7 @@ import { mkdir, readFile, rm } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 import { parseDenoiseFixtureManifest } from '../src/schemas/denoiseFixtureSchemas.ts';
+import { writeBoundedOutput } from './compact-output.mjs';
 
 const REPORT_PATH = resolve('src-tauri/target/rawengine-denoise-cpu-reference-report.json');
 const REQUIRED_RUST_TOOLCHAIN = '1.95.0';
@@ -52,8 +53,8 @@ const stderr = new Response(proc.stderr).text();
 
 const exitCode = await proc.exited;
 if (exitCode !== 0) {
-  console.error(await stdout);
-  console.error(await stderr);
+  writeBoundedOutput('stdout', await stdout);
+  writeBoundedOutput('stderr', await stderr);
   process.exit(exitCode);
 }
 

@@ -2,6 +2,8 @@
 
 import { spawnSync } from 'node:child_process';
 
+import { writeBoundedOutput } from './compact-output.mjs';
+
 const FORMAT_EXTENSIONS = new Set([
   '.cjs',
   '.css',
@@ -25,8 +27,8 @@ const run = (label, command, args) => {
   }
 
   console.error(`${label} failed: ${command} ${args.join(' ')}`);
-  if (result.stdout) process.stderr.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
+  writeBoundedOutput('stdout', result.stdout);
+  writeBoundedOutput('stderr', result.stderr);
 
   process.exit(result.status ?? 1);
 };
