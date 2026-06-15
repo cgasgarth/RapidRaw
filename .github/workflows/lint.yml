@@ -112,6 +112,18 @@ jobs:
       - name: Check RawEngine schema package
         run: bun run schema:check
 
+  schema-command-bus:
+    name: 'schemas: edit command bus'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Check edit command bus
+        run: bun run schema:command-bus
+
   frontend-lint-escapes:
     name: 'frontend: lint escape hatch policy'
     runs-on: ubuntu-latest
@@ -332,6 +344,7 @@ jobs:
       - frontend-unsafe-casts
       - generated-type-drift
       - schema-check
+      - schema-command-bus
       - frontend-lint-escapes
       - docs-check
       - rust-fmt

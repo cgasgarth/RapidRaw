@@ -148,6 +148,7 @@ generator before the release workflow needs one.
 - [ESLint warning inventory](tooling/eslint-warning-inventory-2026-06-11.md)
 - [ESLint zero-warning CI](tooling/eslint-zero-warning-ci-2026-06-11.md)
 - [Generated type drift checks](tooling/generated-type-drift-checks-2026-06-11.md)
+- [Schema command bus CI](tooling/schema-command-bus-ci-2026-06-15.md)
 - [Markdown link checks](tooling/markdown-link-checks-2026-06-11.md)
 - [macOS smoke routing](tooling/macos-smoke-routing-2026-06-11.md)
 - [Pre-commit main guard](tooling/pre-commit-main-guard-2026-06-10.md)
