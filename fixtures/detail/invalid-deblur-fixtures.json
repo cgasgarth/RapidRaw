@@ -1,0 +1,297 @@
+[
+  {
+    "case": "missing-runtime-limitation",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/deblur-fixtures-v1.json",
+      "issue": 1173,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-15",
+      "runtimeStatus": "validation_only",
+      "validationScope": {
+        "proves": ["schema only"],
+        "doesNotProve": ["real_raw_quality", "preview_export_parity", "ui_api", "e2e_workflow"]
+      },
+      "followUpIssues": {
+        "cpuReference": 1180,
+        "previewExportParity": 1150,
+        "uiApi": 1181,
+        "realRawQuality": 1182,
+        "e2eWorkflow": 1183
+      },
+      "fixtures": []
+    }
+  },
+  {
+    "case": "runtime-status-overclaim",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/deblur-fixtures-v1.json",
+      "issue": 1173,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-15",
+      "runtimeStatus": "runtime_apply_capable",
+      "validationScope": {
+        "proves": ["schema only"],
+        "doesNotProve": [
+          "cpu_reference_deblur",
+          "runtime_deblur_quality",
+          "real_raw_quality",
+          "preview_export_parity",
+          "ui_api",
+          "e2e_workflow"
+        ]
+      },
+      "followUpIssues": {
+        "cpuReference": 1180,
+        "previewExportParity": 1150,
+        "uiApi": 1181,
+        "realRawQuality": 1182,
+        "e2eWorkflow": 1183
+      },
+      "fixtures": []
+    }
+  },
+  {
+    "case": "unsupported-motion-psf",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/deblur-fixtures-v1.json",
+      "issue": 1173,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-15",
+      "runtimeStatus": "validation_only",
+      "validationScope": {
+        "proves": ["schema only"],
+        "doesNotProve": [
+          "cpu_reference_deblur",
+          "runtime_deblur_quality",
+          "real_raw_quality",
+          "preview_export_parity",
+          "ui_api",
+          "e2e_workflow"
+        ]
+      },
+      "followUpIssues": {
+        "cpuReference": 1180,
+        "previewExportParity": 1150,
+        "uiApi": 1181,
+        "realRawQuality": 1182,
+        "e2eWorkflow": 1183
+      },
+      "fixtures": [
+        {
+          "fixtureId": "detail.deblur.unsupported-motion-psf.v1",
+          "sourceKind": "synthetic_public",
+          "kind": "gaussian_edge_step",
+          "stage": "scene_linear_post_denoise",
+          "notes": "Invalid fixture because v1 only accepts Gaussian PSF metadata.",
+          "acceptancePolicy": {
+            "action": "accept",
+            "rejectionReasons": []
+          },
+          "generator": {
+            "seed": "unsupported-motion-psf-v1",
+            "basePattern": "slanted_edge",
+            "width": 128,
+            "height": 128,
+            "blur": {
+              "type": "motion",
+              "sigmaPx": 0.8,
+              "radiusPx": 2,
+              "kernelSize": 7
+            },
+            "degradation": {
+              "noiseSigma": 0.01,
+              "saturationFraction": 0,
+              "motionBlurPx": 8
+            },
+            "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000001701"
+          },
+          "privateRawEvidence": null,
+          "expectedMetrics": {
+            "ringingOvershootRatio": { "min": 0, "max": 0.05 },
+            "haloWidthPx": { "min": 0, "max": 1.4 },
+            "noiseAmplificationRatio": { "min": 0.95, "max": 1.14 },
+            "edgeAcutanceRatio": { "min": 1.08, "max": 1.45 },
+            "textureEnergyRatio": { "min": 0.7, "max": 1.1 },
+            "falseEdgeRatio": { "min": 0, "max": 0.025 },
+            "deltaEMax": { "min": 0, "max": 1.2 }
+          },
+          "artifacts": [
+            {
+              "kind": "synthetic_clean_reference",
+              "path": "artifacts/detail/deblur/unsupported-motion-psf-clean-reference.json",
+              "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001701",
+              "publicRepoAllowed": true
+            },
+            {
+              "kind": "synthetic_blurred_input",
+              "path": "artifacts/detail/deblur/unsupported-motion-psf-blurred-input.json",
+              "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001702",
+              "publicRepoAllowed": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "private-placeholder-allows-public-repo",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/deblur-fixtures-v1.json",
+      "issue": 1173,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-15",
+      "runtimeStatus": "validation_only",
+      "validationScope": {
+        "proves": ["schema only"],
+        "doesNotProve": [
+          "cpu_reference_deblur",
+          "runtime_deblur_quality",
+          "real_raw_quality",
+          "preview_export_parity",
+          "ui_api",
+          "e2e_workflow"
+        ]
+      },
+      "followUpIssues": {
+        "cpuReference": 1180,
+        "previewExportParity": 1150,
+        "uiApi": 1181,
+        "realRawQuality": 1182,
+        "e2eWorkflow": 1183
+      },
+      "fixtures": [
+        {
+          "fixtureId": "detail.deblur.private-public-leak.v1",
+          "sourceKind": "private_raw_placeholder",
+          "kind": "private_raw_lens_blur",
+          "stage": "scene_linear_post_denoise",
+          "notes": "Invalid private placeholder that marks the crop as public.",
+          "acceptancePolicy": {
+            "action": "reject",
+            "rejectionReasons": ["halo_risk"]
+          },
+          "generator": null,
+          "privateRawEvidence": {
+            "evidenceId": "raw-evidence.detail.lens-blur.v1",
+            "localRelativePath": "private-fixtures/detail/lens-blur-v1.arw",
+            "sourceHash": null,
+            "cropHash": null,
+            "rightsStatus": "planned_private_capture"
+          },
+          "expectedMetrics": {
+            "ringingOvershootRatio": { "min": 0, "max": 0.12 },
+            "haloWidthPx": { "min": 0, "max": 3 },
+            "noiseAmplificationRatio": { "min": 0.95, "max": 1.35 },
+            "edgeAcutanceRatio": { "min": 0.9, "max": 1.5 },
+            "textureEnergyRatio": { "min": 0.55, "max": 1.2 },
+            "falseEdgeRatio": { "min": 0, "max": 0.08 },
+            "deltaEMax": { "min": 0, "max": 2.5 }
+          },
+          "artifacts": [
+            {
+              "kind": "private_raw_crop_placeholder",
+              "path": "private-fixtures/detail/lens-blur-v1.crop.json",
+              "hash": null,
+              "publicRepoAllowed": true
+            },
+            {
+              "kind": "preview_artifact_placeholder",
+              "path": "private-artifacts/detail/deblur/lens-blur-preview.json",
+              "hash": null,
+              "publicRepoAllowed": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "accepted-fixture-missing-ringing-probe",
+    "payload": {
+      "$schema": "https://rawengine.dev/schemas/deblur-fixtures-v1.json",
+      "issue": 1173,
+      "schemaVersion": 1,
+      "snapshotDate": "2026-06-15",
+      "runtimeStatus": "validation_only",
+      "validationScope": {
+        "proves": ["schema only"],
+        "doesNotProve": [
+          "cpu_reference_deblur",
+          "runtime_deblur_quality",
+          "real_raw_quality",
+          "preview_export_parity",
+          "ui_api",
+          "e2e_workflow"
+        ]
+      },
+      "followUpIssues": {
+        "cpuReference": 1180,
+        "previewExportParity": 1150,
+        "uiApi": 1181,
+        "realRawQuality": 1182,
+        "e2eWorkflow": 1183
+      },
+      "fixtures": [
+        {
+          "fixtureId": "detail.deblur.missing-probe.v1",
+          "sourceKind": "synthetic_public",
+          "kind": "gaussian_edge_step",
+          "stage": "scene_linear_post_denoise",
+          "notes": "Invalid accepted fixture without a ringing metric probe.",
+          "acceptancePolicy": {
+            "action": "accept",
+            "rejectionReasons": []
+          },
+          "generator": {
+            "seed": "missing-probe-v1",
+            "basePattern": "slanted_edge",
+            "width": 128,
+            "height": 128,
+            "blur": {
+              "type": "gaussian",
+              "sigmaPx": 0.8,
+              "radiusPx": 2,
+              "kernelSize": 7
+            },
+            "degradation": {
+              "noiseSigma": 0.01,
+              "saturationFraction": 0,
+              "motionBlurPx": 0
+            },
+            "cleanReferenceHash": "sha256:0000000000000000000000000000000000000000000000000000000000001601"
+          },
+          "privateRawEvidence": null,
+          "expectedMetrics": {
+            "ringingOvershootRatio": { "min": 0, "max": 0.05 },
+            "haloWidthPx": { "min": 0, "max": 1.4 },
+            "noiseAmplificationRatio": { "min": 0.95, "max": 1.14 },
+            "edgeAcutanceRatio": { "min": 1.08, "max": 1.45 },
+            "textureEnergyRatio": { "min": 0.7, "max": 1.1 },
+            "falseEdgeRatio": { "min": 0, "max": 0.025 },
+            "deltaEMax": { "min": 0, "max": 1.2 }
+          },
+          "artifacts": [
+            {
+              "kind": "synthetic_clean_reference",
+              "path": "artifacts/detail/deblur/missing-probe-clean-reference.json",
+              "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001601",
+              "publicRepoAllowed": true
+            },
+            {
+              "kind": "synthetic_blurred_input",
+              "path": "artifacts/detail/deblur/missing-probe-blurred-input.json",
+              "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001602",
+              "publicRepoAllowed": true
+            },
+            {
+              "kind": "expected_deblurred_reference",
+              "path": "artifacts/detail/deblur/missing-probe-expected-reference.json",
+              "hash": "sha256:0000000000000000000000000000000000000000000000000000000000001603",
+              "publicRepoAllowed": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+]
