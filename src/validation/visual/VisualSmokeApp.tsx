@@ -112,7 +112,7 @@ function HdrVisualSmoke() {
       data-visual-smoke-ready="true"
       data-visual-smoke-mode="hdr-ui"
     >
-      <div className="absolute inset-0 bg-[#0f1114]" />
+      <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="hdr-modal" />
       <HdrModal
         error={null}
         finalImageBase64={null}
