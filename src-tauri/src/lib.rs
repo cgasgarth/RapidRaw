@@ -1568,22 +1568,22 @@ async fn save_hdr(
         .and_then(|s| s.to_str())
         .unwrap_or("hdr");
 
-    let (output_filename, image_to_save): (String, DynamicImage) = if hdr_image.color().has_alpha()
-    {
+    let (output_path, image_to_save): (PathBuf, DynamicImage) = if hdr_image.color().has_alpha() {
         (
-            format!("{}_Hdr.png", stem),
+            build_unique_hdr_output_path(parent_dir, stem, "png"),
             DynamicImage::ImageRgba8(hdr_image.to_rgba8()),
         )
     } else if hdr_image.as_rgb32f().is_some() {
-        (format!("{}_Hdr.tiff", stem), hdr_image)
+        (
+            build_unique_hdr_output_path(parent_dir, stem, "tiff"),
+            hdr_image,
+        )
     } else {
         (
-            format!("{}_Hdr.png", stem),
+            build_unique_hdr_output_path(parent_dir, stem, "png"),
             DynamicImage::ImageRgb8(hdr_image.to_rgb8()),
         )
     };
-
-    let output_path = parent_dir.join(output_filename);
 
     image_to_save
         .save(&output_path)
@@ -1605,6 +1605,27 @@ async fn save_hdr(
         crate::exif_processing::write_rrexif_sidecar(&real_path.to_string_lossy(), &output_path);
 
     Ok(output_path.to_string_lossy().to_string())
+}
+
+fn build_unique_hdr_output_path(parent_dir: &Path, stem: &str, extension: &str) -> PathBuf {
+    let first_candidate = parent_dir.join(format!("{}_Hdr.{}", stem, extension));
+    if !first_candidate.exists() {
+        return first_candidate;
+    }
+
+    for suffix in 2..10_000 {
+        let candidate = parent_dir.join(format!("{}_Hdr_{}.{}", stem, suffix, extension));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+
+    parent_dir.join(format!(
+        "{}_Hdr_{}.{}",
+        stem,
+        Uuid::new_v4().simple(),
+        extension
+    ))
 }
 
 fn write_hdr_output_sidecar(
@@ -2669,6 +2690,18 @@ mod tests {
         assert!(error.contains("Dimension mismatch detected."));
         assert!(error.contains("Base image (base.exr): 64x48"));
         assert!(error.contains("Target image (wrong-size.exr): 32x48"));
+    }
+
+    #[test]
+    fn hdr_output_path_does_not_overwrite_existing_merge() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let first_output = temp_dir.path().join("IMG_0001_Hdr.png");
+        fs::write(&first_output, b"existing hdr").expect("existing HDR output should be written");
+
+        let output_path = build_unique_hdr_output_path(temp_dir.path(), "IMG_0001", "png");
+
+        assert_eq!(output_path, temp_dir.path().join("IMG_0001_Hdr_2.png"));
+        assert_ne!(output_path, first_output);
     }
 
     #[test]
