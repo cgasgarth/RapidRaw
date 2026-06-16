@@ -217,7 +217,6 @@
     "lucide-react": "^1.18.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-draggable": "^4.6.0",
     "react-i18next": "^17.0.8",
     "react-image-crop": "^11.0.10",
     "react-konva": "^19.2.5",
