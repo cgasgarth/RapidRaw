@@ -1532,10 +1532,13 @@
       "convertAndSaveAll_other": "Convert & Save All ({{count}})",
       "converting": "Converting",
       "convertingProgress": "Converting {{current}}/{{total}}",
+      "excludeScan": "Exclude",
       "exportOptions": "Export Options",
       "exposure": "Exposure",
       "genericPresets": "Generic Presets",
       "greenWeight": "Green (Magenta)",
+      "includedScans": "{{includedCount}} included",
+      "includeScan": "Include",
       "noticeText": "Inversion logic inspired by <0>NegPy</0> created by marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Original Negative",
       "outputFormats": {

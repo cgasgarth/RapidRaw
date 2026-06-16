@@ -36,6 +36,7 @@ const DEFAULT_SAVE_OPTIONS = {
   outputFormat: 'tiff16' as NegativeOutputFormat,
   suffix: 'Positive',
 };
+const getInitialIncludedPaths = (paths: string[]) => new Set(paths);
 const getNegativeLabScanLabel = (path: string, index: number) => {
   const pathParts = path.split(/[\\/]/u).filter(Boolean);
   return pathParts.at(-1) ?? String(index + 1);
@@ -85,6 +86,7 @@ export default function NegativeConversionModal({
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
   const [conversionScope, setConversionScope] = useState<NegativeConversionScope>('all');
+  const [includedPathSet, setIncludedPathSet] = useState<Set<string>>(() => getInitialIncludedPaths(targetPaths));
   const [activePathIndex, setActivePathIndex] = useState(0);
 
   const { isMounted, show } = useModalTransition(isOpen);
@@ -101,8 +103,8 @@ export default function NegativeConversionModal({
   const hasMultipleScans = targetPaths.length > 1;
   const pathsToConvert = useMemo(() => {
     if (conversionScope === 'active' && selectedImagePath !== null) return [selectedImagePath];
-    return targetPaths;
-  }, [conversionScope, selectedImagePath, targetPaths]);
+    return targetPaths.filter((path) => includedPathSet.has(path));
+  }, [conversionScope, includedPathSet, selectedImagePath, targetPaths]);
 
   const selectedPreset = useMemo(
     () =>
@@ -159,7 +161,7 @@ export default function NegativeConversionModal({
               queuedCount: pathsToConvert.length,
             }),
         id: 'export',
-        isComplete: !isLoading && previewUrl !== null,
+        isComplete: !isLoading && previewUrl !== null && pathsToConvert.length > 0,
         label: t('modals.negativeConversion.workflowExport'),
       },
     ],
@@ -297,11 +299,12 @@ export default function NegativeConversionModal({
       setProgress(null);
       setSaveOptions(DEFAULT_SAVE_OPTIONS);
       setConversionScope('all');
+      setIncludedPathSet(getInitialIncludedPaths(targetPaths));
     }, 300);
     return () => {
       window.clearTimeout(timer);
     };
-  }, [isOpen, selectedImagePath, updatePreview]);
+  }, [isOpen, selectedImagePath, targetPaths, updatePreview]);
 
   const handleParamChange = (key: keyof NegativeParams, value: number) => {
     const newParams = { ...params, [key]: value };
@@ -410,6 +413,18 @@ export default function NegativeConversionModal({
     }
   };
 
+  const handleToggleIncludedPath = (path: string) => {
+    setIncludedPathSet((currentIncludedPaths) => {
+      const nextIncludedPaths = new Set(currentIncludedPaths);
+      if (nextIncludedPaths.has(path)) {
+        nextIncludedPaths.delete(path);
+      } else {
+        nextIncludedPaths.add(path);
+      }
+      return nextIncludedPaths;
+    });
+  };
+
   const imageTransformStyle = {
     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
     transition: isDragging ? 'none' : 'transform 0.1s ease-out',
@@ -445,6 +460,12 @@ export default function NegativeConversionModal({
           {baseFogConfidence === null
             ? t('modals.negativeConversion.basePending')
             : t('modals.negativeConversion.baseReady', { confidence: Math.round(baseFogConfidence * 100) })}
+        </span>
+        <span
+          className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
+          data-testid="negative-lab-included-status"
+        >
+          {t('modals.negativeConversion.includedScans', { includedCount: includedPathSet.size })}
         </span>
       </div>
     </div>
@@ -484,30 +505,56 @@ export default function NegativeConversionModal({
             <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
               {targetPaths.map((path, index) => {
                 const isActiveScan = index === effectiveActivePathIndex;
+                const isIncludedScan = includedPathSet.has(path);
                 const scanLabel = getNegativeLabScanLabel(path, index);
 
                 return (
-                  <button
-                    aria-current={isActiveScan ? 'true' : undefined}
+                  <div
                     className={cx(
-                      'flex w-full min-w-0 items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors',
+                      'grid grid-cols-[1fr_auto] gap-2 rounded-md border p-1 text-xs transition-colors',
                       isActiveScan
                         ? 'border-accent bg-accent/10 text-text-primary'
                         : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface',
                     )}
-                    disabled={isSaving || isEstimatingBaseFog}
                     key={`${path}-${index}`}
-                    onClick={() => {
-                      setActivePathIndex(index);
-                      setZoom(1);
-                      setPan({ x: 0, y: 0 });
-                    }}
-                    title={path}
-                    type="button"
                   >
-                    <span className="truncate">{scanLabel}</span>
-                    {isActiveScan && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-accent" />}
-                  </button>
+                    <button
+                      aria-current={isActiveScan ? 'true' : undefined}
+                      className="flex min-w-0 items-center justify-between gap-2 rounded px-1.5 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={isSaving || isEstimatingBaseFog}
+                      onClick={() => {
+                        setActivePathIndex(index);
+                        setZoom(1);
+                        setPan({ x: 0, y: 0 });
+                      }}
+                      title={path}
+                      type="button"
+                    >
+                      <span className={cx('truncate', !isIncludedScan && 'line-through opacity-60')}>{scanLabel}</span>
+                      {isActiveScan && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-accent" />}
+                    </button>
+                    <button
+                      aria-pressed={isIncludedScan}
+                      className={cx(
+                        'rounded px-2 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                        isIncludedScan
+                          ? 'bg-accent/15 text-text-primary'
+                          : 'bg-bg-primary text-text-secondary hover:bg-surface',
+                      )}
+                      data-testid={`negative-lab-include-toggle-${index}`}
+                      disabled={isSaving || isEstimatingBaseFog}
+                      onClick={() => {
+                        handleToggleIncludedPath(path);
+                      }}
+                      type="button"
+                    >
+                      {t(
+                        isIncludedScan
+                          ? 'modals.negativeConversion.excludeScan'
+                          : 'modals.negativeConversion.includeScan',
+                      )}
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -989,7 +1036,7 @@ export default function NegativeConversionModal({
                 onClick={() => {
                   void handleSave();
                 }}
-                disabled={isSaving || isLoading || !previewUrl}
+                disabled={isSaving || isLoading || !previewUrl || pathsToConvert.length === 0}
               >
                 {isSaving ? (
                   <>

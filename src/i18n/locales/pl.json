@@ -1590,10 +1590,13 @@
       "convertAndSaveAll_other": "Konwertuj i Zapisz Wszystkie ({{count}})",
       "converting": "Konwertowanie",
       "convertingProgress": "Konwertowanie {{current}}/{{total}}",
+      "excludeScan": "Exclude",
       "exportOptions": "Opcje eksportu",
       "exposure": "Ekspozycja",
       "genericPresets": "Presety generyczne",
       "greenWeight": "Zielony (Magenta)",
+      "includedScans": "{{includedCount}} included",
+      "includeScan": "Include",
       "noticeText": "Logika inwersji inspirowana przez projekt <0>NegPy</0> stworzony przez marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Oryginalny Negatyw",
       "outputFormats": {

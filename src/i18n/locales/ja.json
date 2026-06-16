@@ -1345,7 +1345,10 @@
       "queuedScans": "{{queuedCount}} queued",
       "scopeActive": "Active scan",
       "scopeAll": "All scans",
-      "workflowExportReadyCount": "{{format}} / {{queuedCount}} queued"
+      "workflowExportReadyCount": "{{format}} / {{queuedCount}} queued",
+      "excludeScan": "Exclude",
+      "includeScan": "Include",
+      "includedScans": "{{includedCount}} included"
     },
     "panorama": {
       "cancel": "キャンセル",
