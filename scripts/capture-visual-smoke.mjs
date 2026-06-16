@@ -109,6 +109,12 @@ async function prepareScenario(page, mode) {
 
   await page.getByTestId('negative-lab-workspace').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-workflow-rail').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-batch-readiness').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-scope-active').click();
+  await page
+    .getByTestId('negative-lab-queued-count')
+    .getByText('1 queued', { exact: true })
+    .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-sample-left-edge').click();
   await page.getByTestId('negative-lab-base-sample-overlay').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-confidence').waitFor({ timeout: 10_000 });
