@@ -1,12 +1,18 @@
 import { z } from 'zod';
 
+import { negativeLabFrameHealthReportSchema } from './negativeLabFrameHealthSchemas';
 import {
   negativeLabBaseFogSampleRectSchema,
   negativeLabPresetIdSchema,
   negativeLabPresetParamsSchema,
 } from './negativeLabPresetCatalogSchemas';
 
-export const negativeLabAppServerCommandNameSchema = z.literal('negative.lab.build_conversion_plan');
+export const negativeLabConversionPlanCommandNameSchema = z.literal('negative.lab.build_conversion_plan');
+export const negativeLabFrameHealthCommandNameSchema = z.literal('negative.lab.build_frame_health_report');
+export const negativeLabAppServerCommandNameSchema = z.union([
+  negativeLabConversionPlanCommandNameSchema,
+  negativeLabFrameHealthCommandNameSchema,
+]);
 export const negativeLabAppServerOutputFormatSchema = z.enum(['jpeg_proof', 'tiff16']);
 export const negativeLabAppServerScopeSchema = z.enum(['active', 'all']);
 
@@ -21,15 +27,40 @@ export const negativeLabAppServerCommandSchema = z
   })
   .strict();
 
-export const negativeLabAppServerRouteSchema = z
+export const negativeLabFrameHealthAppServerCommandSchema = z
   .object({
-    commandName: negativeLabAppServerCommandNameSchema,
+    activePathIndex: z.number().int().nonnegative(),
+    baseFogConfidence: z.number().min(0).max(1).nullable(),
+    includedPaths: z.array(z.string().trim().min(1)).min(1),
+    previewReady: z.boolean(),
+    targetPaths: z.array(z.string().trim().min(1)).min(1),
+  })
+  .strict();
+
+export const negativeLabConversionPlanRouteSchema = z
+  .object({
+    commandName: negativeLabConversionPlanCommandNameSchema,
     inputSchemaName: z.literal('NegativeLabAppServerCommandV1'),
     outputSchemaName: z.literal('NegativeLabConversionPlanResultV1'),
     reason: z.string().trim().min(1),
     status: z.literal('mapped'),
   })
   .strict();
+
+export const negativeLabFrameHealthRouteSchema = z
+  .object({
+    commandName: negativeLabFrameHealthCommandNameSchema,
+    inputSchemaName: z.literal('NegativeLabFrameHealthAppServerCommandV1'),
+    outputSchemaName: z.literal('NegativeLabFrameHealthReportV1'),
+    reason: z.string().trim().min(1),
+    status: z.literal('mapped'),
+  })
+  .strict();
+
+export const negativeLabAppServerRouteSchema = z.union([
+  negativeLabConversionPlanRouteSchema,
+  negativeLabFrameHealthRouteSchema,
+]);
 
 export const negativeLabAppServerRouteManifestSchema = z
   .object({
@@ -40,7 +71,7 @@ export const negativeLabAppServerRouteManifestSchema = z
 
 export const negativeLabConversionPlanResultSchema = z
   .object({
-    commandName: negativeLabAppServerCommandNameSchema,
+    commandName: negativeLabConversionPlanCommandNameSchema,
     outputFormat: negativeLabAppServerOutputFormatSchema,
     params: negativeLabPresetParamsSchema,
     paths: z.array(z.string().trim().min(1)).min(1),
@@ -57,5 +88,9 @@ export const negativeLabConversionPlanResultSchema = z
   })
   .strict();
 
+export const negativeLabFrameHealthAppServerResultSchema = negativeLabFrameHealthReportSchema;
+
 export type NegativeLabAppServerCommand = z.infer<typeof negativeLabAppServerCommandSchema>;
 export type NegativeLabConversionPlanResult = z.infer<typeof negativeLabConversionPlanResultSchema>;
+export type NegativeLabFrameHealthAppServerCommand = z.infer<typeof negativeLabFrameHealthAppServerCommandSchema>;
+export type NegativeLabFrameHealthAppServerResult = z.infer<typeof negativeLabFrameHealthAppServerResultSchema>;
