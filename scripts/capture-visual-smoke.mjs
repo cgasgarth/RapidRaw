@@ -26,6 +26,12 @@ const scenarios = [
     sectionMinimum: 1,
   },
   {
+    marker: 'Focus-stack plan',
+    mode: 'focus-ui',
+    outputPath: resolve(outputDir, 'focus-ui.png'),
+    sectionMinimum: 1,
+  },
+  {
     marker: 'HDR merge setup',
     mode: 'hdr-ui',
     outputPath: resolve(outputDir, 'hdr-ui.png'),
@@ -86,6 +92,13 @@ const panoramaUiSettingsProofSchema = z.object({
   maxPreviewDimensionPx: z.literal('8192'),
   projection: z.literal('spherical'),
   qualityPreference: z.literal('preview'),
+});
+const focusUiSettingsProofSchema = z.object({
+  alignmentMode: z.literal('homography'),
+  blendMethod: z.literal('depth_map'),
+  maxPreviewDimensionPx: z.literal('8192'),
+  qualityPreference: z.literal('preview'),
+  retouchLayerPolicy: z.literal('none'),
 });
 const selectedScenarios =
   requestedScenario === null ? scenarios : scenarios.filter((scenario) => scenario.mode === requestedScenario);
@@ -181,6 +194,20 @@ async function assertFilmLookExportProof(page) {
 }
 
 async function prepareScenario(page, mode) {
+  if (mode === 'focus-ui') {
+    await page.getByRole('button', { exact: true, name: 'Auto' }).click();
+    await page.getByRole('option', { name: 'Homography' }).click();
+    await page.getByRole('button', { exact: true, name: 'Best' }).click();
+    await page.getByRole('option', { name: 'Preview' }).click();
+    await page.getByRole('button', { name: /Depth map/u }).click();
+    await page.getByRole('button', { name: /None\s+Flattened preview/u }).click();
+    await page.getByRole('button', { name: '8192 px' }).click();
+    focusUiSettingsProofSchema.parse(
+      await page.getByTestId('focus-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    return;
+  }
+
   if (mode === 'hdr-ui') {
     await page.getByRole('button', { name: 'High' }).click();
     await page.getByRole('button', { name: '8192 px' }).click();

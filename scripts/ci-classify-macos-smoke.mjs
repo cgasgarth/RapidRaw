@@ -90,6 +90,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['check:ai-fallbacks', new Set(['bun scripts/check-ai-provider-fallbacks.mjs'])],
   ['check:film-look-browser-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario film-look-browser'])],
+  ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario focus-ui'])],
   ['check:hdr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario hdr-ui'])],
   ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario panorama-ui'])],
   ['check:negative-lab-fixtures', new Set(['bun scripts/check-negative-lab-fixtures.mjs'])],
@@ -463,6 +464,17 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -120,6 +120,7 @@\n+    "check:film-look-browser-smoke": "bun scripts/capture-visual-smoke.mjs --scenario film-look-browser",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'focus UI smoke package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -120,6 +120,7 @@\n+    "check:focus-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario focus-ui",',
       },
     ],
     SMOKE_MODES.NONE,
