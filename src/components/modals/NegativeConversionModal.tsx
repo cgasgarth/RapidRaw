@@ -35,6 +35,10 @@ const DEFAULT_SAVE_OPTIONS = {
   outputFormat: 'tiff16' as NegativeOutputFormat,
   suffix: 'Positive',
 };
+const getNegativeLabScanLabel = (path: string, index: number) => {
+  const pathParts = path.split(/[\\/]/u).filter(Boolean);
+  return pathParts.at(-1) ?? String(index + 1);
+};
 const BASE_FOG_SAMPLE_PRESETS = [
   {
     labelKey: 'modals.negativeConversion.sampleLeftEdge',
@@ -79,6 +83,7 @@ export default function NegativeConversionModal({
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
+  const [activePathIndex, setActivePathIndex] = useState(0);
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [zoom, setZoom] = useState(1);
@@ -89,7 +94,8 @@ export default function NegativeConversionModal({
   const containerRef = useRef<HTMLDivElement>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
-  const selectedImagePath = targetPaths.length > 0 ? targetPaths[0] : null;
+  const effectiveActivePathIndex = targetPaths[activePathIndex] === undefined ? 0 : activePathIndex;
+  const selectedImagePath = targetPaths[effectiveActivePathIndex] ?? null;
 
   const selectedPreset = useMemo(
     () =>
@@ -266,6 +272,7 @@ export default function NegativeConversionModal({
       setPan({ x: 0, y: 0 });
       setBaseFogConfidence(null);
       setActiveBaseFogSampleLabel(null);
+      setActivePathIndex(0);
       setIsLoading(true);
       setProgress(null);
       setSaveOptions(DEFAULT_SAVE_OPTIONS);
@@ -411,6 +418,49 @@ export default function NegativeConversionModal({
       <div className="grow overflow-y-auto p-4 flex flex-col gap-8">
         <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
           <UiText variant={TextVariants.heading} className="mb-2">
+            {t('modals.negativeConversion.workflowSetup')}
+          </UiText>
+          <div className="space-y-2 rounded-md border border-surface bg-bg-primary p-2">
+            <UiText variant={TextVariants.small} className="text-text-secondary">
+              {targetPaths.length === 1
+                ? t('modals.negativeConversion.workflowSetupDetailSingle')
+                : t('modals.negativeConversion.workflowSetupDetailMultiple', { scanCount: targetPaths.length })}
+            </UiText>
+            <div className="max-h-44 space-y-1 overflow-y-auto pr-1">
+              {targetPaths.map((path, index) => {
+                const isActiveScan = index === effectiveActivePathIndex;
+                const scanLabel = getNegativeLabScanLabel(path, index);
+
+                return (
+                  <button
+                    aria-current={isActiveScan ? 'true' : undefined}
+                    className={cx(
+                      'flex w-full min-w-0 items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors',
+                      isActiveScan
+                        ? 'border-accent bg-accent/10 text-text-primary'
+                        : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface',
+                    )}
+                    disabled={isSaving || isEstimatingBaseFog}
+                    key={`${path}-${index}`}
+                    onClick={() => {
+                      setActivePathIndex(index);
+                      setZoom(1);
+                      setPan({ x: 0, y: 0 });
+                    }}
+                    title={path}
+                    type="button"
+                  >
+                    <span className="truncate">{scanLabel}</span>
+                    {isActiveScan && <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-accent" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
+          <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.genericPresets')}
           </UiText>
           <div className="grid grid-cols-1 gap-2">
@@ -447,6 +497,7 @@ export default function NegativeConversionModal({
                 void handleAutoBaseFog();
               }}
               disabled={!selectedImagePath || isEstimatingBaseFog || isSaving}
+              data-testid="negative-lab-auto-base-fog"
               data-tooltip={t('modals.negativeConversion.autoBaseFogTooltip')}
               className="inline-flex items-center gap-1 rounded-md border border-surface bg-bg-primary px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -483,6 +534,11 @@ export default function NegativeConversionModal({
                   <button
                     key={samplePreset.labelKey}
                     type="button"
+                    data-testid={
+                      samplePreset.labelKey === 'modals.negativeConversion.sampleLeftEdge'
+                        ? 'negative-lab-sample-left-edge'
+                        : 'negative-lab-sample-center-patch'
+                    }
                     onClick={() => {
                       void handleSampleBaseFog(samplePreset.labelKey, samplePreset.rect);
                     }}
@@ -495,7 +551,7 @@ export default function NegativeConversionModal({
               </div>
             </div>
             {baseFogConfidence !== null && (
-              <UiText variant={TextVariants.small} className="text-text-tertiary">
+              <UiText data-testid="negative-lab-confidence" variant={TextVariants.small} className="text-text-tertiary">
                 {t('modals.negativeConversion.baseFogConfidence', {
                   confidence: Math.round(baseFogConfidence * 100),
                 })}
@@ -581,6 +637,7 @@ export default function NegativeConversionModal({
                 <button
                   key={format}
                   type="button"
+                  data-testid={format === 'tiff16' ? 'negative-lab-export-tiff16' : 'negative-lab-export-jpeg-proof'}
                   aria-pressed={saveOptions.outputFormat === format}
                   onClick={() => {
                     setSaveOptions((current) => ({ ...current, outputFormat: format }));
@@ -650,7 +707,10 @@ export default function NegativeConversionModal({
 
   const renderWorkflowRail = () => (
     <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none">
-      <div className="pointer-events-auto grid grid-cols-5 gap-2 rounded-md border border-white/10 bg-black/65 p-2 shadow-xl backdrop-blur-md">
+      <div
+        className="pointer-events-auto grid grid-cols-5 gap-2 rounded-md border border-white/10 bg-black/65 p-2 shadow-xl backdrop-blur-md"
+        data-testid="negative-lab-workflow-rail"
+      >
         {workflowStages.map((stage) => {
           return (
             <div key={stage.id} className="min-w-0 rounded-sm bg-white/5 px-3 py-2">
@@ -829,6 +889,7 @@ export default function NegativeConversionModal({
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="bg-surface rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden"
+            data-testid="negative-lab-workspace"
             onMouseDown={(e) => {
               e.stopPropagation();
             }}

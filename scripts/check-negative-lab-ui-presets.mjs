@@ -63,6 +63,17 @@ for (const marker of [
   'base_fog_strength',
   'outputFormat',
   'suffix',
+  'activePathIndex',
+  'getNegativeLabScanLabel',
+  'effectiveActivePathIndex',
+  'negative-lab-workspace',
+  'negative-lab-workflow-rail',
+  'negative-lab-auto-base-fog',
+  'negative-lab-sample-left-edge',
+  'negative-lab-sample-center-patch',
+  'negative-lab-confidence',
+  'negative-lab-export-tiff16',
+  'negative-lab-export-jpeg-proof',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`negative conversion modal is missing workflow marker: ${marker}`);
