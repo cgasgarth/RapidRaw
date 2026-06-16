@@ -3,6 +3,8 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import { z } from 'zod';
+
 const host = '127.0.0.1';
 const port = 1420;
 const baseUrl = `http://${host}:${port}`;
@@ -46,6 +48,26 @@ const highDpiTargets = [
   { deviceScaleFactor: 1, name: 'empty-library-1x.png' },
   { deviceScaleFactor: 2, name: 'empty-library-2x.png' },
 ];
+const warmPrintPresetSchema = z
+  .object({
+    adjustments: z.object({
+      contrast: z.literal(5),
+      highlights: z.literal(-6),
+      temperature: z.literal(5),
+    }),
+    includeCropTransform: z.literal(false),
+    includeMasks: z.literal(false),
+    name: z.literal('Warm Print 65%'),
+    presetType: z.literal('style'),
+  })
+  .passthrough();
+const visualSmokeInvokeLogSchema = z.array(
+  z.object({
+    args: z.unknown().optional(),
+    command: z.string(),
+    options: z.unknown().optional(),
+  }),
+);
 const selectedScenarios =
   requestedScenario === null ? scenarios : scenarios.filter((scenario) => scenario.mode === requestedScenario);
 
@@ -110,6 +132,35 @@ async function assertSectionCount(page, minimum) {
   }
 }
 
+async function assertFilmLookExportProof(page) {
+  const invokeLog = visualSmokeInvokeLogSchema.parse(
+    await page.evaluate(() => window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []),
+  );
+  const savedPreset = invokeLog.find((call) => call.command === 'save_community_preset');
+  const exportedPreset = invokeLog.find((call) => call.command === 'handle_export_presets_to_file');
+
+  if (savedPreset === undefined) {
+    throw new Error('Film look save invoke was not recorded.');
+  }
+
+  warmPrintPresetSchema.parse(savedPreset.args);
+
+  if (exportedPreset === undefined) {
+    throw new Error('Film look export invoke was not recorded.');
+  }
+
+  z.object({
+    filePath: z.literal('/tmp/rawengine-film-look-smoke.rrpreset'),
+    presetsToExport: z
+      .array(
+        z.object({
+          preset: warmPrintPresetSchema.extend({ id: z.string().uuid() }),
+        }),
+      )
+      .length(1),
+  }).parse(exportedPreset.args);
+}
+
 async function prepareScenario(page, mode) {
   if (mode === 'film-look-browser') {
     await page.getByLabel('Warm Print', { exact: true }).click();
@@ -123,6 +174,7 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('film-look-preset-status').getByText('Exported Warm Print 65%', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await assertFilmLookExportProof(page);
     return;
   }
 
