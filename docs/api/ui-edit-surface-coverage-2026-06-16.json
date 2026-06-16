@@ -51,12 +51,20 @@
       "validation": ["schema:fixtures", "schema:samples"]
     },
     {
-      "appServerTool": "computational_merge.dry_run_command / computational_merge.apply_plan",
+      "appServerTool": "computationalmerge.hdr.dry_run_command / computationalmerge.hdr.apply_command / computationalmerge.panorama.dry_run_command / computationalmerge.panorama.apply_command / computationalmerge.focus_stack.dry_run_command / computationalmerge.focus_stack.apply_command / computationalmerge.super_resolution.dry_run_command / computationalmerge.super_resolution.apply_command",
       "commandSchema": "ComputationalMergeCommandEnvelopeV1",
       "coverageLevel": "mapped",
       "surface": "HDR, focus stack, panorama, and super-resolution merge commands",
-      "uiFiles": ["src/components/panel/right/ControlsPanel.tsx"],
+      "uiFiles": [
+        "src/components/modals/HdrModal.tsx",
+        "src/components/modals/PanoramaModal.tsx",
+        "src/components/modals/FocusStackModal.tsx",
+        "src/components/modals/SuperResolutionModal.tsx",
+        "src/components/ui/ComputationalMergeAppServerBadge.tsx"
+      ],
       "validation": [
+        "check:computational-merge-app-server-routes",
+        "check:computational-merge-ui-route-badges",
         "schema:hdr-app-server",
         "schema:focus-app-server",
         "schema:panorama-app-server",

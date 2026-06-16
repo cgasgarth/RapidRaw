@@ -72,4 +72,5 @@ export const computationalMergeAppServerRouteManifestSchema = z
   });
 
 export type ComputationalMergeAppServerRoute = z.infer<typeof computationalMergeAppServerRouteSchema>;
+export type ComputationalMergeAppServerRouteFamily = z.infer<typeof computationalMergeAppServerRouteFamilySchema>;
 export type ComputationalMergeAppServerRouteManifest = z.infer<typeof computationalMergeAppServerRouteManifestSchema>;

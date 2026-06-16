@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { CheckCircle, Clock3, Layers, Loader2, RefreshCw, Save, ShieldCheck, XCircle } from 'lucide-react';
+import { CheckCircle, Layers, Loader2, RefreshCw, Save, ShieldCheck, XCircle } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,6 +14,7 @@ import {
 } from '../../schemas/panoramaUiSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
+import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
 
@@ -258,10 +259,7 @@ export default function PanoramaModal({
                 {t('modals.panorama.workflowStatus')}
               </UiText>
             </div>
-            <div className="flex shrink-0 items-center gap-2 rounded-md border border-border-color bg-surface px-3 py-2">
-              <Clock3 className="h-4 w-4 text-text-secondary" />
-              <UiText variant={TextVariants.small}>{t('modals.panorama.apiPending')}</UiText>
-            </div>
+            <ComputationalMergeAppServerBadge family="panorama" statusLabel={t('editor.ai.connection.ready')} />
           </div>
 
           {!isSourceCountValid && (

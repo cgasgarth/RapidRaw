@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { AlertTriangle, Aperture, CheckCircle2, Clock3, Layers3, ShieldCheck, XCircle } from 'lucide-react';
+import { AlertTriangle, Aperture, CheckCircle2, Layers3, ShieldCheck, XCircle } from 'lucide-react';
 import { useCallback, useRef, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,6 +11,7 @@ import {
 } from '../../schemas/focusStackUiSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
+import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
 
@@ -131,10 +132,7 @@ export default function FocusStackModal({
                     {t('modals.focusStack.workflowStatus')}
                   </UiText>
                 </div>
-                <div className="shrink-0 flex items-center gap-2 rounded-md border border-border-color px-3 py-2 bg-bg-primary">
-                  <Clock3 className="w-4 h-4 text-text-secondary" />
-                  <UiText variant={TextVariants.small}>{t('modals.focusStack.apiPending')}</UiText>
-                </div>
+                <ComputationalMergeAppServerBadge family="focus_stack" statusLabel={t('editor.ai.connection.ready')} />
               </div>
             </div>
 

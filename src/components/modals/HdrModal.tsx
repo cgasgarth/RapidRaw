@@ -13,6 +13,7 @@ import {
 } from '../../schemas/hdrMergeUiSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
+import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
 
@@ -259,10 +260,7 @@ export default function HdrModal({
                 {t('modals.hdr.workflowStatus')}
               </UiText>
             </div>
-            <div className="flex shrink-0 items-center gap-2 rounded-md border border-border-color bg-surface px-3 py-2">
-              <Loader2 className="h-4 w-4 text-text-secondary" />
-              <UiText variant={TextVariants.small}>{t('modals.hdr.apiPending')}</UiText>
-            </div>
+            <ComputationalMergeAppServerBadge family="hdr" statusLabel={t('editor.ai.connection.ready')} />
           </div>
 
           {!isSourceCountValid && (
