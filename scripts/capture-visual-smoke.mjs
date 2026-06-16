@@ -56,6 +56,13 @@ const scenarios = [
     sectionMinimum: 1,
   },
   {
+    appMode: 'negative-lab-workspace',
+    marker: 'Negative Conversion',
+    mode: 'negative-lab-batch-color-workspace',
+    outputPath: resolve(outputDir, 'negative-lab-batch-color-workspace.png'),
+    sectionMinimum: 1,
+  },
+  {
     marker: 'Film Looks',
     mode: 'film-look-browser',
     outputPath: resolve(outputDir, 'film-look-browser.png'),
@@ -175,6 +182,32 @@ const negativeLabConvertArgsSchema = z.object({
   }),
   params: negativeLabOrthoPresetParamsSchema,
   paths: z.array(z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif')).length(1),
+});
+const negativeLabBatchColorParamsSchema = z
+  .object({
+    base_fog_sample: z.null(),
+    base_fog_strength: z.literal(1),
+    blue_weight: z.literal(1.14),
+    contrast: z.literal(1),
+    exposure: z.literal(0),
+    green_weight: z.literal(0.91),
+    red_weight: z.literal(1.23),
+  })
+  .passthrough();
+const negativeLabBatchConvertArgsSchema = z.object({
+  options: z.object({
+    outputFormat: z.literal('jpeg_proof'),
+    suffix: z.literal('Positive'),
+  }),
+  params: negativeLabBatchColorParamsSchema,
+  paths: z
+    .array(
+      z.union([
+        z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
+        z.literal('/fixtures/negative-lab/synthetic-gray-ramp-negative-002.tif'),
+      ]),
+    )
+    .length(2),
 });
 const hdrUiSettingsProofSchema = z.object({
   deghosting: z.literal('high'),
@@ -300,6 +333,19 @@ async function assertNegativeLabInvokeProof(page) {
   }
 
   negativeLabConvertArgsSchema.parse(convertCall.args);
+}
+
+async function assertNegativeLabBatchColorInvokeProof(page) {
+  const invokeLog = visualSmokeInvokeLogSchema.parse(
+    await page.evaluate(() => window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []),
+  );
+  const convertCall = invokeLog.find((call) => call.command === 'convert_negatives');
+
+  if (convertCall === undefined) {
+    throw new Error('Negative Lab batch convert invoke was not recorded.');
+  }
+
+  negativeLabBatchConvertArgsSchema.parse(convertCall.args);
 }
 
 async function prepareScenario(page, mode) {
@@ -446,6 +492,30 @@ async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === 'negative-lab-batch-color-workspace') {
+    await page.getByTestId('negative-lab-workspace').waitFor({ timeout: 10_000 });
+    await page.getByTestId('negative-lab-batch-readiness').waitFor({ timeout: 10_000 });
+    await page
+      .getByTestId('negative-lab-queued-count')
+      .getByText('2 queued', { exact: true })
+      .waitFor({ timeout: 10_000 });
+    const colorSliders = page.locator('input[type="range"]');
+    await colorSliders.nth(1).fill('1.23');
+    await colorSliders.nth(2).fill('0.91');
+    await colorSliders.nth(3).fill('1.14');
+    await page.getByTestId('negative-lab-export-jpeg-proof').click();
+    await page.getByRole('button', { name: 'Convert & Save All (2)' }).click();
+    await page.waitForFunction(() =>
+      (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some((call) => call.command === 'convert_negatives'),
+    );
+    await assertNegativeLabBatchColorInvokeProof(page);
+    await page
+      .getByTestId('negative-lab-saved-path-proof')
+      .getByText('/tmp/rawengine-negative-smoke-positive.tif', { exact: true })
+      .waitFor({ timeout: 10_000 });
+    return;
+  }
+
   if (mode !== 'negative-lab-workspace') return;
 
   await page.getByTestId('negative-lab-workspace').waitFor({ timeout: 10_000 });
@@ -522,7 +592,9 @@ async function main() {
     });
 
     for (const scenario of selectedScenarios) {
-      await page.goto(`${baseUrl}/visual-smoke.html?scenario=${scenario.mode}`, { waitUntil: 'networkidle' });
+      await page.goto(`${baseUrl}/visual-smoke.html?scenario=${scenario.appMode ?? scenario.mode}`, {
+        waitUntil: 'networkidle',
+      });
       await page.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
       await page.getByText(scenario.marker, { exact: true }).waitFor({ timeout: 10_000 });
       await assertSectionCount(page, scenario.sectionMinimum);
