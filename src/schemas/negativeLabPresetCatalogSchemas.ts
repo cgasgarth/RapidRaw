@@ -214,8 +214,19 @@ export const negativeBaseFogSampleReadoutSchema = z
   })
   .strict();
 
+export const negativeBaseFogDensitometerStatusSchema = z.enum(['balanced', 'minor_cast', 'strong_cast']);
+export const negativeBaseFogDensitometerChannelSchema = z.enum(['red', 'green', 'blue']);
+export const negativeBaseFogDensitometerReadoutSchema = z
+  .object({
+    densityRange: z.number().min(0),
+    dominantChannel: negativeBaseFogDensitometerChannelSchema,
+    status: negativeBaseFogDensitometerStatusSchema,
+  })
+  .strict();
+
 export const negativeConversionSavedPathsSchema = z.array(z.string().trim().min(1)).min(1);
 
+export type NegativeBaseFogDensitometerReadout = z.infer<typeof negativeBaseFogDensitometerReadoutSchema>;
 export type NegativeBaseFogEstimate = z.infer<typeof negativeBaseFogEstimateSchema>;
 export type NegativeBaseFogSampleReadout = z.infer<typeof negativeBaseFogSampleReadoutSchema>;
 

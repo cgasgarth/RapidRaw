@@ -49,6 +49,9 @@ for (const marker of [
   'baseFogEstimate',
   'handleCopyBaseFogReadout',
   'negative-lab-density-readout',
+  'negative-lab-densitometer-readout',
+  'negative-lab-density-spread',
+  'negative-lab-neutrality-status',
   'negative-lab-base-rgb-readout',
   'negative-lab-base-density-readout',
   'negative-lab-copy-readout',
@@ -59,6 +62,7 @@ for (const marker of [
 for (const marker of [
   'negativeLabBaseFogSampleRectSchema',
   'negativeBaseFogEstimateSchema',
+  'negativeBaseFogDensitometerReadoutSchema',
   'negativeConversionSavedPathsSchema',
   'base_fog_strength',
   'base_fog_sample',

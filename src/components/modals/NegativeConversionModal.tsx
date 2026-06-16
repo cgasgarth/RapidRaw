@@ -21,9 +21,11 @@ import { useTranslation, Trans } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
 import {
+  negativeBaseFogDensitometerReadoutSchema,
   negativeBaseFogEstimateSchema,
   negativeBaseFogSampleReadoutSchema,
   negativeConversionSavedPathsSchema,
+  type NegativeBaseFogDensitometerReadout,
   type NegativeBaseFogEstimate,
   type NegativeLabBaseFogSampleRect,
   type NegativeLabBuiltInUiPreset,
@@ -55,6 +57,26 @@ const getInitialIncludedPaths = (paths: string[]) => new Set(paths);
 const formatPercentValue = (value: number) => `${Math.round(value)}%`;
 const formatDensityValue = (value: number) => value.toFixed(3);
 const formatRgbValue = (value: number) => `${Math.round(value * 255)}`;
+const DENSITOMETER_CHANNEL_LABEL_KEYS: Record<
+  NegativeBaseFogDensitometerReadout['dominantChannel'],
+  | 'modals.negativeConversion.densitometerChannelRed'
+  | 'modals.negativeConversion.densitometerChannelGreen'
+  | 'modals.negativeConversion.densitometerChannelBlue'
+> = {
+  blue: 'modals.negativeConversion.densitometerChannelBlue',
+  green: 'modals.negativeConversion.densitometerChannelGreen',
+  red: 'modals.negativeConversion.densitometerChannelRed',
+};
+const DENSITOMETER_STATUS_LABEL_KEYS: Record<
+  NegativeBaseFogDensitometerReadout['status'],
+  | 'modals.negativeConversion.densitometerStatusBalanced'
+  | 'modals.negativeConversion.densitometerStatusMinorCast'
+  | 'modals.negativeConversion.densitometerStatusStrongCast'
+> = {
+  balanced: 'modals.negativeConversion.densitometerStatusBalanced',
+  minor_cast: 'modals.negativeConversion.densitometerStatusMinorCast',
+  strong_cast: 'modals.negativeConversion.densitometerStatusStrongCast',
+};
 const BASE_FOG_SAMPLE_PRESETS = [
   {
     labelKey: 'modals.negativeConversion.sampleLeftEdge',
@@ -65,6 +87,26 @@ const BASE_FOG_SAMPLE_PRESETS = [
     rect: { height: 0.22, width: 0.22, x: 0.39, y: 0.39 },
   },
 ] satisfies Array<{ labelKey: BaseFogSampleLabelKey; rect: NegativeLabBaseFogSampleRect }>;
+
+function buildDensitometerReadout(estimate: NegativeBaseFogEstimate): NegativeBaseFogDensitometerReadout {
+  const [redDensity, greenDensity, blueDensity] = estimate.baseDensity;
+  const channelDensities = [
+    { channel: 'red', density: redDensity },
+    { channel: 'green', density: greenDensity },
+    { channel: 'blue', density: blueDensity },
+  ] satisfies Array<{ channel: NegativeBaseFogDensitometerReadout['dominantChannel']; density: number }>;
+  const densityValues = channelDensities.map(({ density }) => density);
+  const densityRange = Math.max(...densityValues) - Math.min(...densityValues);
+  const dominantChannel = channelDensities.reduce((maxChannel, channel) =>
+    channel.density > maxChannel.density ? channel : maxChannel,
+  ).channel;
+
+  return negativeBaseFogDensitometerReadoutSchema.parse({
+    densityRange,
+    dominantChannel,
+    status: densityRange <= 0.08 ? 'balanced' : densityRange <= 0.18 ? 'minor_cast' : 'strong_cast',
+  });
+}
 
 type NegativeLabWorkflowStageId = 'setup' | 'preset' | 'colorTiming' | 'printGrade' | 'export';
 
@@ -135,6 +177,10 @@ export default function NegativeConversionModal({
       yPercent: sampleRect.y * 100,
     });
   }, [activeBaseFogSampleLabel, baseFogConfidence, params.base_fog_sample]);
+  const densitometerReadout = useMemo(
+    () => (baseFogEstimate === null ? null : buildDensitometerReadout(baseFogEstimate)),
+    [baseFogEstimate],
+  );
 
   const selectedPreset = useMemo(
     () =>
@@ -938,6 +984,25 @@ export default function NegativeConversionModal({
                     ? t('modals.negativeConversion.readoutCopied')
                     : t('modals.negativeConversion.copyReadout')}
                 </button>
+              </div>
+            )}
+            {densitometerReadout !== null && (
+              <div
+                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-primary p-2 text-xs text-text-tertiary"
+                data-testid="negative-lab-densitometer-readout"
+              >
+                <span className="text-text-secondary">{t('modals.negativeConversion.densitometer')}</span>
+                <span className="text-right tabular-nums" data-testid="negative-lab-density-spread">
+                  {formatDensityValue(densitometerReadout.densityRange)}
+                </span>
+                <span className="text-text-secondary">{t('modals.negativeConversion.densitometerDominant')}</span>
+                <span className="text-right" data-testid="negative-lab-dominant-density-channel">
+                  {t(DENSITOMETER_CHANNEL_LABEL_KEYS[densitometerReadout.dominantChannel])}
+                </span>
+                <span className="text-text-secondary">{t('modals.negativeConversion.densitometerNeutrality')}</span>
+                <span className="text-right" data-testid="negative-lab-neutrality-status">
+                  {t(DENSITOMETER_STATUS_LABEL_KEYS[densitometerReadout.status])}
+                </span>
               </div>
             )}
             <Slider
