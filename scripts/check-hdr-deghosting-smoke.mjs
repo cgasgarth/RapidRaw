@@ -5,6 +5,14 @@ const MIN_RECALL = 0.95;
 const MIN_PRECISION = 0.9;
 const MAX_GHOST_MAE = 0.01;
 
+import {
+  countHdrMotionPixelsV1,
+  detectHdrMotionMaskV1,
+  measureHdrMotionMaskV1,
+  measureHdrMotionRegionMaeV1,
+  mergeHdrWithReferenceInMotionRegionsV1,
+} from '../packages/rawengine-schema/src/hdrDeghostRuntime.ts';
+
 const background = createBackground(WIDTH, HEIGHT);
 const objectMasks = [
   createRectangleMask(WIDTH, HEIGHT, 8, 20, 10, 10),
@@ -12,17 +20,27 @@ const objectMasks = [
   createRectangleMask(WIDTH, HEIGHT, 54, 20, 10, 10),
 ];
 const expectedMotionMask = unionMasks(objectMasks);
-const frames = objectMasks.map((mask) => compositeMovingObject(background, mask));
+const frames = objectMasks.map((mask, sourceIndex) => ({
+  height: HEIGHT,
+  pixels: compositeMovingObject(background, mask),
+  sourceIndex,
+  width: WIDTH,
+}));
 const referenceFrame = frames[1];
 
 if (referenceFrame === undefined) {
   throw new Error('HDR deghosting smoke requires a reference frame.');
 }
 
-const detectedMotionMask = detectMotionMask(frames, referenceFrame, MOTION_THRESHOLD);
-const metrics = measureMask(expectedMotionMask, detectedMotionMask);
-const deghosted = mergeWithReferenceInMotionRegions(frames, detectedMotionMask, referenceFrame);
-const ghostMeanAbsoluteError = measureMotionRegionMae(referenceFrame, deghosted, expectedMotionMask);
+const request = {
+  frames,
+  motionThreshold: MOTION_THRESHOLD,
+  referenceSourceIndex: referenceFrame.sourceIndex,
+};
+const detectedMotionMask = detectHdrMotionMaskV1(request);
+const metrics = measureHdrMotionMaskV1(expectedMotionMask, detectedMotionMask);
+const deghosted = mergeHdrWithReferenceInMotionRegionsV1(request, detectedMotionMask);
+const ghostMeanAbsoluteError = measureHdrMotionRegionMaeV1(referenceFrame.pixels, deghosted, expectedMotionMask);
 
 if (metrics.recall < MIN_RECALL) {
   throw new Error(`Expected deghosting motion-mask recall >= ${MIN_RECALL}, got ${metrics.recall}.`);
@@ -42,7 +60,7 @@ console.log(
       fixture: 'synthetic_hdr_deghosting_v1',
       ghostMeanAbsoluteError,
       metrics,
-      motionCoverageRatio: roundMetric(countTrue(detectedMotionMask) / detectedMotionMask.length),
+      motionCoverageRatio: roundMetric(countHdrMotionPixelsV1(detectedMotionMask) / detectedMotionMask.length),
       referenceSourceIndex: 1,
       threshold: MOTION_THRESHOLD,
     },
@@ -102,73 +120,6 @@ function compositeMovingObject(background, mask) {
   }
 
   return image;
-}
-
-function detectMotionMask(frames, referenceFrame, threshold) {
-  const mask = new Uint8Array(referenceFrame.length);
-
-  for (let index = 0; index < referenceFrame.length; index += 1) {
-    const maxDelta = Math.max(...frames.map((frame) => Math.abs(frame[index] - referenceFrame[index])));
-    mask[index] = maxDelta >= threshold ? 1 : 0;
-  }
-
-  return mask;
-}
-
-function mergeWithReferenceInMotionRegions(frames, motionMask, referenceFrame) {
-  const merged = new Float64Array(referenceFrame.length);
-
-  for (let index = 0; index < merged.length; index += 1) {
-    if (motionMask[index] === 1) {
-      merged[index] = referenceFrame[index];
-      continue;
-    }
-
-    merged[index] = frames.reduce((total, frame) => total + frame[index], 0) / frames.length;
-  }
-
-  return merged;
-}
-
-function measureMask(expectedMask, detectedMask) {
-  let truePositive = 0;
-  let falsePositive = 0;
-  let falseNegative = 0;
-
-  for (let index = 0; index < expectedMask.length; index += 1) {
-    if (expectedMask[index] === 1 && detectedMask[index] === 1) truePositive += 1;
-    if (expectedMask[index] === 0 && detectedMask[index] === 1) falsePositive += 1;
-    if (expectedMask[index] === 1 && detectedMask[index] === 0) falseNegative += 1;
-  }
-
-  return {
-    falseNegative,
-    falsePositive,
-    precision: roundMetric(truePositive / (truePositive + falsePositive)),
-    recall: roundMetric(truePositive / (truePositive + falseNegative)),
-    truePositive,
-  };
-}
-
-function measureMotionRegionMae(referenceFrame, candidateFrame, motionMask) {
-  let absoluteError = 0;
-  let count = 0;
-
-  for (let index = 0; index < motionMask.length; index += 1) {
-    if (motionMask[index] !== 1) continue;
-    absoluteError += Math.abs(referenceFrame[index] - candidateFrame[index]);
-    count += 1;
-  }
-
-  if (count === 0) {
-    throw new Error('HDR deghosting smoke expected a non-empty motion region.');
-  }
-
-  return roundMetric(absoluteError / count);
-}
-
-function countTrue(mask) {
-  return mask.reduce((total, value) => total + value, 0);
 }
 
 function getPixelIndex(x, y, width) {
