@@ -1335,7 +1335,17 @@
         "tiff16": "16-бит TIFF"
       },
       "workflowExportReadyJpeg": "JPEG-проба готова",
-      "workflowExportReadyTiff": "16-бит TIFF готов"
+      "workflowExportReadyTiff": "16-бит TIFF готов",
+      "basePending": "Base pending",
+      "baseReady": "Base {{confidence}}%",
+      "batchReadiness": "Batch readiness",
+      "convertAndSaveActive": "Convert & Save Active",
+      "previewPending": "Preview pending",
+      "previewReady": "Preview ready",
+      "queuedScans": "{{queuedCount}} queued",
+      "scopeActive": "Active scan",
+      "scopeAll": "All scans",
+      "workflowExportReadyCount": "{{format}} / {{queuedCount}} queued"
     },
     "panorama": {
       "cancel": "Отмена",

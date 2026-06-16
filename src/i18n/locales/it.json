@@ -1336,7 +1336,17 @@
         "tiff16": "TIFF 16 bit"
       },
       "workflowExportReadyJpeg": "Prova JPEG pronta",
-      "workflowExportReadyTiff": "TIFF 16 bit pronto"
+      "workflowExportReadyTiff": "TIFF 16 bit pronto",
+      "basePending": "Base pending",
+      "baseReady": "Base {{confidence}}%",
+      "batchReadiness": "Batch readiness",
+      "convertAndSaveActive": "Convert & Save Active",
+      "previewPending": "Preview pending",
+      "previewReady": "Preview ready",
+      "queuedScans": "{{queuedCount}} queued",
+      "scopeActive": "Active scan",
+      "scopeAll": "All scans",
+      "workflowExportReadyCount": "{{format}} / {{queuedCount}} queued"
     },
     "panorama": {
       "cancel": "Annulla",

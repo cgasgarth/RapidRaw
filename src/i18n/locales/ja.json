@@ -1335,7 +1335,17 @@
         "tiff16": "16-bit TIFF"
       },
       "workflowExportReadyJpeg": "JPEGプルーフ準備完了",
-      "workflowExportReadyTiff": "16-bit TIFF準備完了"
+      "workflowExportReadyTiff": "16-bit TIFF準備完了",
+      "basePending": "Base pending",
+      "baseReady": "Base {{confidence}}%",
+      "batchReadiness": "Batch readiness",
+      "convertAndSaveActive": "Convert & Save Active",
+      "previewPending": "Preview pending",
+      "previewReady": "Preview ready",
+      "queuedScans": "{{queuedCount}} queued",
+      "scopeActive": "Active scan",
+      "scopeAll": "All scans",
+      "workflowExportReadyCount": "{{format}} / {{queuedCount}} queued"
     },
     "panorama": {
       "cancel": "キャンセル",

@@ -28,6 +28,7 @@ import UiText from '../ui/Text';
 
 type NegativeParams = NegativeLabPresetParams;
 type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
+type NegativeConversionScope = 'active' | 'all';
 type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
@@ -83,6 +84,7 @@ export default function NegativeConversionModal({
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
+  const [conversionScope, setConversionScope] = useState<NegativeConversionScope>('all');
   const [activePathIndex, setActivePathIndex] = useState(0);
 
   const { isMounted, show } = useModalTransition(isOpen);
@@ -96,6 +98,11 @@ export default function NegativeConversionModal({
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const effectiveActivePathIndex = targetPaths[activePathIndex] === undefined ? 0 : activePathIndex;
   const selectedImagePath = targetPaths[effectiveActivePathIndex] ?? null;
+  const hasMultipleScans = targetPaths.length > 1;
+  const pathsToConvert = useMemo(() => {
+    if (conversionScope === 'active' && selectedImagePath !== null) return [selectedImagePath];
+    return targetPaths;
+  }, [conversionScope, selectedImagePath, targetPaths]);
 
   const selectedPreset = useMemo(
     () =>
@@ -143,17 +150,30 @@ export default function NegativeConversionModal({
       {
         detail: isSaving
           ? t('modals.negativeConversion.workflowExportConverting')
-          : t(
-              saveOptions.outputFormat === 'tiff16'
-                ? 'modals.negativeConversion.workflowExportReadyTiff'
-                : 'modals.negativeConversion.workflowExportReadyJpeg',
-            ),
+          : t('modals.negativeConversion.workflowExportReadyCount', {
+              format: t(
+                saveOptions.outputFormat === 'tiff16'
+                  ? 'modals.negativeConversion.outputFormats.tiff16'
+                  : 'modals.negativeConversion.outputFormats.jpeg_proof',
+              ),
+              queuedCount: pathsToConvert.length,
+            }),
         id: 'export',
         isComplete: !isLoading && previewUrl !== null,
         label: t('modals.negativeConversion.workflowExport'),
       },
     ],
-    [isLoading, isSaving, params, previewUrl, saveOptions.outputFormat, selectedPreset, t, targetPaths.length],
+    [
+      isLoading,
+      isSaving,
+      params,
+      pathsToConvert.length,
+      previewUrl,
+      saveOptions.outputFormat,
+      selectedPreset,
+      t,
+      targetPaths.length,
+    ],
   );
 
   useEffect(() => {
@@ -276,6 +296,7 @@ export default function NegativeConversionModal({
       setIsLoading(true);
       setProgress(null);
       setSaveOptions(DEFAULT_SAVE_OPTIONS);
+      setConversionScope('all');
     }, 300);
     return () => {
       window.clearTimeout(timer);
@@ -366,14 +387,14 @@ export default function NegativeConversionModal({
   };
 
   const handleSave = async () => {
-    if (targetPaths.length === 0) return;
+    if (pathsToConvert.length === 0) return;
     setIsSaving(true);
     setProgress(null);
     try {
       const savedPaths = await invokeWithSchema(
         'convert_negatives',
         {
-          paths: targetPaths,
+          paths: pathsToConvert,
           params,
           options: saveOptions,
         },
@@ -394,6 +415,40 @@ export default function NegativeConversionModal({
     transition: isDragging ? 'none' : 'transform 0.1s ease-out',
     transformOrigin: 'center center',
   };
+
+  const renderBatchReadiness = () => (
+    <div
+      className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+      data-testid="negative-lab-batch-readiness"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <UiText variant={TextVariants.small} className="font-medium text-text-primary">
+          {t('modals.negativeConversion.batchReadiness')}
+        </UiText>
+        <UiText data-testid="negative-lab-queued-count" variant={TextVariants.small} className="text-text-tertiary">
+          {t('modals.negativeConversion.queuedScans', { queuedCount: pathsToConvert.length })}
+        </UiText>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <span
+          className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
+          data-testid="negative-lab-preview-status"
+        >
+          {previewUrl === null
+            ? t('modals.negativeConversion.previewPending')
+            : t('modals.negativeConversion.previewReady')}
+        </span>
+        <span
+          className="rounded-sm bg-bg-secondary px-2 py-1 text-text-secondary"
+          data-testid="negative-lab-base-status"
+        >
+          {baseFogConfidence === null
+            ? t('modals.negativeConversion.basePending')
+            : t('modals.negativeConversion.baseReady', { confidence: Math.round(baseFogConfidence * 100) })}
+        </span>
+      </div>
+    </div>
+  );
 
   const renderControls = () => (
     <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
@@ -456,6 +511,32 @@ export default function NegativeConversionModal({
                 );
               })}
             </div>
+            {hasMultipleScans && (
+              <div className="grid grid-cols-2 gap-2" data-testid="negative-lab-conversion-scope">
+                {(['all', 'active'] satisfies Array<NegativeConversionScope>).map((scope) => (
+                  <button
+                    aria-pressed={conversionScope === scope}
+                    className={cx(
+                      'rounded-md border px-2 py-1.5 text-xs transition-colors',
+                      conversionScope === scope
+                        ? 'border-accent bg-accent/10 text-text-primary'
+                        : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface',
+                    )}
+                    data-testid={scope === 'all' ? 'negative-lab-scope-all' : 'negative-lab-scope-active'}
+                    key={scope}
+                    onClick={() => {
+                      setConversionScope(scope);
+                    }}
+                    type="button"
+                  >
+                    {t(
+                      scope === 'all' ? 'modals.negativeConversion.scopeAll' : 'modals.negativeConversion.scopeActive',
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+            {renderBatchReadiness()}
           </div>
         </div>
 
@@ -923,9 +1004,11 @@ export default function NegativeConversionModal({
                 ) : (
                   <>
                     <Save className="mr-2" size={16} />
-                    {targetPaths.length > 1
+                    {hasMultipleScans && conversionScope === 'all'
                       ? t('modals.negativeConversion.convertAndSaveAll', { count: targetPaths.length })
-                      : t('modals.negativeConversion.convertAndSave')}
+                      : hasMultipleScans
+                        ? t('modals.negativeConversion.convertAndSaveActive')
+                        : t('modals.negativeConversion.convertAndSave')}
                   </>
                 )}
               </Button>
