@@ -7,9 +7,14 @@ import FocusStackModal from '../../components/modals/FocusStackModal';
 import HdrModal from '../../components/modals/HdrModal';
 import NegativeConversionModal from '../../components/modals/NegativeConversionModal';
 import PanoramaModal from '../../components/modals/PanoramaModal';
+import SuperResolutionModal from '../../components/modals/SuperResolutionModal';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS, type PanoramaUiSettings } from '../../schemas/panoramaUiSchemas';
+import {
+  DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
+  type SuperResolutionUiSettings,
+} from '../../schemas/superResolutionUiSchemas';
 import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../utils/adjustments';
 
 interface VisualSmokeAppProps {
@@ -45,6 +50,7 @@ const copy = {
   filmPreset: 'Neutral 400',
   focusStackSmoke: 'Focus Stack Smoke',
   panoramaSmoke: 'Panorama UI Smoke',
+  superResolutionSmoke: 'Super Resolution Smoke',
   colorWorkflow: 'Color Workflow',
   frameStatus: (rating: string) => `Rating ${rating} / RAW / edited`,
 } as const;
@@ -120,6 +126,44 @@ function FocusStackVisualSmoke() {
           onSettingsChange={setSettings}
           settings={settings}
           sourceCount={6}
+        />
+      </div>
+    </main>
+  );
+}
+
+function SuperResolutionVisualSmoke() {
+  const [settings, setSettings] = useState<SuperResolutionUiSettings>(DEFAULT_SUPER_RESOLUTION_UI_SETTINGS);
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="sr-ui"
+    >
+      <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="sr-modal">
+        <div
+          className="sr-only"
+          data-alignment-mode={settings.alignmentMode}
+          data-detail-policy={settings.detailPolicy}
+          data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
+          data-output-scale={settings.outputScale}
+          data-quality-preference={settings.qualityPreference}
+          data-testid="sr-ui-settings-proof"
+        />
+        <div className="flex h-11 items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+          <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+          <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+            {copy.superResolutionSmoke}
+          </span>
+        </div>
+        <SuperResolutionModal
+          isOpen
+          loadingImageUrl={panoramaPreviewUrl}
+          onClose={() => {}}
+          onSettingsChange={setSettings}
+          settings={settings}
+          sourceCount={5}
         />
       </div>
     </main>
@@ -331,6 +375,10 @@ function ColorWorkflowVisualSmoke() {
 function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
   if (mode === 'focus-ui') {
     return <FocusStackVisualSmoke />;
+  }
+
+  if (mode === 'sr-ui') {
+    return <SuperResolutionVisualSmoke />;
   }
 
   if (mode === 'panorama-ui') {
