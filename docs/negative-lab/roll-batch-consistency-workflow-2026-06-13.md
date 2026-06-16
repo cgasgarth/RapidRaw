@@ -53,5 +53,14 @@ The Zod schema rejects workflows that:
 
 The Negative Lab UI can use this record to show a roll queue, anchor-frame
 choices, batch dry-run readiness, consistency warnings, and QC proof status.
+
+## Frame Health Dry-Run Summary
+
+`src/schemas/negativeLabFrameHealthSchemas.ts` now defines a frame health report
+and batch dry-run summary for the workspace. The summary records affected frame
+IDs, skipped frame IDs, planned apply count, and rolled-up warning codes before a
+batch conversion mutates files. The public checker
+`bun run check:negative-lab-frame-health` proves the schema builder keeps those
+counts and warning lists consistent.
 App-server tools can use the same record to explain why a batch is ready,
 blocked, or waiting for review before any mutating apply step.

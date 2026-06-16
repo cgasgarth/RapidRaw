@@ -1,6 +1,8 @@
 import {
   NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION,
+  parseNegativeLabBatchDryRunSummary,
   parseNegativeLabFrameHealthReport,
+  type NegativeLabBatchDryRunSummary,
   type NegativeLabFrameHealthReport,
   type NegativeLabFrameWarningCode,
 } from '../schemas/negativeLabFrameHealthSchemas';
@@ -56,5 +58,26 @@ export const buildNegativeLabFrameHealthReport = ({
     queuedCount: frames.filter((frame) => frame.healthStatus !== 'skipped').length,
     schemaVersion: NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION,
     warningCodes: [...new Set(frames.flatMap((frame) => frame.warningCodes))],
+  });
+};
+
+export const buildNegativeLabBatchDryRunSummary = (
+  frameHealthReport: NegativeLabFrameHealthReport,
+): NegativeLabBatchDryRunSummary => {
+  const affectedFrameIds = frameHealthReport.frames
+    .filter((frame) => frame.healthStatus !== 'skipped')
+    .map((frame) => frame.frameId);
+  const skippedFrameIds = frameHealthReport.frames
+    .filter((frame) => frame.healthStatus === 'skipped')
+    .map((frame) => frame.frameId);
+
+  return parseNegativeLabBatchDryRunSummary({
+    affectedFrameIds,
+    blocked: affectedFrameIds.length === 0,
+    frameHealthReport,
+    plannedApplyCount: affectedFrameIds.length,
+    rollWarningCodes: frameHealthReport.warningCodes,
+    schemaVersion: NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION,
+    skippedFrameIds,
   });
 };
