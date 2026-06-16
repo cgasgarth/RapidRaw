@@ -31,6 +31,25 @@ const readOnlySurfaceSchema = z
   })
   .strict();
 
+const runtimeApplySurfaceSchema = z
+  .object({
+    appServerTool: z.string().trim().min(1),
+    commandSchema: z.string().trim().min(1),
+    coverageLevel: z.literal('runtime_apply_capable'),
+    e2eIssues: z
+      .array(
+        z
+          .string()
+          .trim()
+          .regex(/^#[1-9][0-9]*$/u),
+      )
+      .min(1),
+    surface: z.string().trim().min(1),
+    uiFiles: z.array(z.string().trim().min(1)).min(1),
+    validation: z.array(z.string().trim().min(1)).min(1),
+  })
+  .strict();
+
 const deferredSurfaceSchema = z
   .object({
     coverageLevel: z.literal('deferred'),
@@ -49,7 +68,14 @@ const manifestSchema = z
     generatedMarkdownPath: z.string().trim().min(1),
     schemaVersion: z.literal(1),
     surfaces: z
-      .array(z.discriminatedUnion('coverageLevel', [mappedSurfaceSchema, readOnlySurfaceSchema, deferredSurfaceSchema]))
+      .array(
+        z.discriminatedUnion('coverageLevel', [
+          mappedSurfaceSchema,
+          readOnlySurfaceSchema,
+          runtimeApplySurfaceSchema,
+          deferredSurfaceSchema,
+        ]),
+      )
       .min(1),
   })
   .strict();
@@ -57,6 +83,9 @@ const manifestSchema = z
 const manifest = manifestSchema.parse(JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')));
 
 const mappedCount = manifest.surfaces.filter((surface) => surface.coverageLevel === 'mapped').length;
+const runtimeApplyCount = manifest.surfaces.filter(
+  (surface) => surface.coverageLevel === 'runtime_apply_capable',
+).length;
 const deferredCount = manifest.surfaces.filter((surface) => surface.coverageLevel === 'deferred').length;
 
 const escapeCell = (value) => value.replaceAll('|', '\\|');
@@ -69,7 +98,10 @@ const rows = manifest.surfaces
       return `| ${escapeCell(surface.surface)} | deferred | ${uiFiles} | ${surface.deferredIssue}: ${escapeCell(surface.deferredReason)} | | |`;
     }
 
-    return `| ${escapeCell(surface.surface)} | ${surface.coverageLevel} | ${uiFiles} | \`${escapeCell(surface.commandSchema)}\` | \`${escapeCell(surface.appServerTool)}\` | ${surface.validation.map((check) => `\`${check}\``).join('<br>')} |`;
+    const validation = surface.validation.map((check) => `\`${check}\``).join('<br>');
+    const e2eIssues =
+      surface.coverageLevel === 'runtime_apply_capable' ? `<br>E2E follow-ups: ${surface.e2eIssues.join(', ')}` : '';
+    return `| ${escapeCell(surface.surface)} | ${surface.coverageLevel} | ${uiFiles} | \`${escapeCell(surface.commandSchema)}\`${e2eIssues} | \`${escapeCell(surface.appServerTool)}\` | ${validation} |`;
   })
   .join('\n');
 
@@ -78,6 +110,8 @@ const markdown = `# UI Edit Surface API Coverage
 Generated from \`${MANIFEST_PATH}\`.
 
 Mapped surfaces: ${mappedCount}
+
+Runtime apply-capable surfaces: ${runtimeApplyCount}
 
 Deferred surfaces with explicit issue owners: ${deferredCount}
 
