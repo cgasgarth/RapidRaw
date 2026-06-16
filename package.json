@@ -129,6 +129,7 @@
     "check:panorama-app-server-runtime": "bun scripts/check-panorama-app-server-runtime.mjs",
     "check:panorama-runtime-plan-smoke": "bun scripts/check-panorama-runtime-plan-smoke.mjs",
     "check:panorama-ui-api": "bun scripts/check-panorama-ui-api.mjs",
+    "check:panorama-ui-runtime-bridge": "bun scripts/check-panorama-ui-runtime-bridge.mjs",
     "check:panorama-ui": "bun scripts/check-panorama-ui.mjs",
     "check:panorama-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario panorama-ui",
     "check:hdr-alignment-smoke": "bun scripts/check-hdr-alignment-smoke.mjs",
