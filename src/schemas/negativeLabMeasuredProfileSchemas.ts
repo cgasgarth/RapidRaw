@@ -24,6 +24,88 @@ export const negativeLabMeasuredProfileRuntimeLimitationSchema = z.enum([
 ]);
 
 export const negativeLabMeasuredProfileRuntimeStatusSchema = z.enum(['ui_catalog_only', 'runtime_parameter_applied']);
+export const negativeLabMeasuredProfileCalibrationMethodSchema = z.enum([
+  'density_curve_process_family_v1',
+  'density_matrix_process_family_v1',
+]);
+export const negativeLabMeasuredProfileFixtureLegalStatusSchema = z.enum([
+  'licensed_private_ci',
+  'project_owned_private_ci',
+]);
+export const negativeLabMeasuredProfileRenderProofStatusSchema = z.enum([
+  'metadata_only',
+  'runtime_render_verified',
+  'runtime_route_verified',
+]);
+export const negativeLabMeasuredProfileEvidenceDigestSchema = z
+  .object({
+    fixtureLegalStatus: negativeLabMeasuredProfileFixtureLegalStatusSchema,
+    renderProofStatus: negativeLabMeasuredProfileRenderProofStatusSchema,
+    sourceFixtureContentHashes: z.array(z.string().regex(/^sha256:[a-f0-9]{64}$/u)).min(1),
+  })
+  .strict();
+export const negativeLabMeasurementReportPatchMetricsSchema = z
+  .object({
+    deltaE00Max: z.number().min(0),
+    deltaE00Mean: z.number().min(0),
+    deltaE00P95: z.number().min(0),
+    rejectedPatchCount: z.number().int().nonnegative(),
+    usedPatchCount: z.number().int().positive(),
+  })
+  .strict()
+  .refine((metrics) => metrics.deltaE00Mean <= metrics.deltaE00P95 && metrics.deltaE00P95 <= metrics.deltaE00Max, {
+    message: 'Negative Lab measurement Delta E metrics must be ordered mean <= p95 <= max.',
+  });
+export const negativeLabMeasurementReportTargetReferenceSchema = z
+  .object({
+    id: z.string().trim().min(1),
+    patchCount: z.number().int().min(12),
+    referenceHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    type: z.enum(['colorchecker_sg', 'it8_transparency', 'project_synthetic_target', 'step_wedge']),
+  })
+  .strict();
+export const negativeLabMeasurementReportSchema = z
+  .object({
+    calibrationMethod: negativeLabMeasuredProfileCalibrationMethodSchema,
+    doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema).min(1),
+    evidenceDigest: negativeLabMeasuredProfileEvidenceDigestSchema,
+    fittedParams: negativeLabPresetParamsSchema,
+    generatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+    measurementSoftware: z.string().trim().min(1),
+    operator: z.string().trim().min(1),
+    patchMetrics: negativeLabMeasurementReportPatchMetricsSchema,
+    profileId: negativeLabMeasuredProfileIdSchema,
+    reportHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    reportId: z.string().regex(/^negative_lab_measurement_report\.[a-z0-9_]+\.v[0-9]+$/u),
+    sourceFixtureIds: z.array(z.string().trim().min(1)).min(1),
+    targetReference: negativeLabMeasurementReportTargetReferenceSchema,
+  })
+  .strict()
+  .superRefine((report, context) => {
+    if (!report.doesNotProve.includes('no_stock_emulation_claim')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab measurement reports must avoid stock-emulation claims.',
+        path: ['doesNotProve'],
+      });
+    }
+
+    if (!report.doesNotProve.includes('no_colorimetric_match_claim')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab measurement reports must avoid colorimetric-match claims until render proof matures.',
+        path: ['doesNotProve'],
+      });
+    }
+
+    if (report.sourceFixtureIds.length !== report.evidenceDigest.sourceFixtureContentHashes.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab measurement reports must pair each source fixture with a content hash.',
+        path: ['evidenceDigest', 'sourceFixtureContentHashes'],
+      });
+    }
+  });
 
 export const negativeLabRuntimePresetIdSchema = z.union([
   negativeLabPresetIdSchema,
@@ -34,8 +116,10 @@ export const negativeLabMeasuredProfileSchema = z
   .object({
     claimLevel: z.literal('measured_profile'),
     claimPolicy: negativeLabMeasuredProfileClaimPolicySchema,
+    calibrationMethod: negativeLabMeasuredProfileCalibrationMethodSchema,
     displayName: z.string().trim().min(1).max(80),
     doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema).min(1),
+    evidenceDigest: negativeLabMeasuredProfileEvidenceDigestSchema,
     evidenceFixtureIds: z.array(z.string().trim().min(1)).min(1),
     filmClass: negativeLabUiPresetFilmClassSchema,
     measurementProfileId: negativeLabMeasuredProfileIdSchema,
@@ -102,6 +186,17 @@ export const negativeLabMeasuredProfileSchema = z
     }
 
     if (
+      profile.runtimeStatus === 'runtime_parameter_applied' &&
+      profile.evidenceDigest.renderProofStatus === 'metadata_only'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Runtime-applied measured profiles require route or render proof status.',
+        path: ['evidenceDigest', 'renderProofStatus'],
+      });
+    }
+
+    if (
       profile.claimPolicy === 'named_stock_profile_requires_license_review' &&
       !profile.doesNotProve.includes('no_stock_emulation_claim')
     ) {
@@ -156,12 +251,20 @@ export const negativeLabMeasuredProfileCatalogSchema = z
 
 export type NegativeLabMeasuredProfile = z.infer<typeof negativeLabMeasuredProfileSchema>;
 export type NegativeLabMeasuredProfileCatalog = z.infer<typeof negativeLabMeasuredProfileCatalogSchema>;
+export type NegativeLabMeasuredProfileCalibrationMethod = z.infer<
+  typeof negativeLabMeasuredProfileCalibrationMethodSchema
+>;
 export type NegativeLabMeasuredProfileClaimPolicy = z.infer<typeof negativeLabMeasuredProfileClaimPolicySchema>;
+export type NegativeLabMeasuredProfileEvidenceDigest = z.infer<typeof negativeLabMeasuredProfileEvidenceDigestSchema>;
+export type NegativeLabMeasurementReport = z.infer<typeof negativeLabMeasurementReportSchema>;
 export type NegativeLabMeasuredProfileRuntimeStatus = z.infer<typeof negativeLabMeasuredProfileRuntimeStatusSchema>;
 export type NegativeLabRuntimePresetId = z.infer<typeof negativeLabRuntimePresetIdSchema>;
 
 export const parseNegativeLabMeasuredProfileCatalog = (value: unknown): NegativeLabMeasuredProfileCatalog =>
   negativeLabMeasuredProfileCatalogSchema.parse(value);
+
+export const parseNegativeLabMeasurementReport = (value: unknown): NegativeLabMeasurementReport =>
+  negativeLabMeasurementReportSchema.parse(value);
 
 export const negativeLabRuntimeProfileBrowserRowSchema = z
   .object({
@@ -227,6 +330,7 @@ export const negativeLabResolvedRuntimeProfileSchema = z
     ]),
     displayName: z.string().trim().min(1).max(80),
     doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
+    evidenceDigest: negativeLabMeasuredProfileEvidenceDigestSchema.nullable(),
     evidenceFixtureIds: z.array(z.string().trim().min(1)),
     measurementProfileId: negativeLabMeasuredProfileIdSchema.nullable(),
     params: negativeLabPresetParamsSchema,
@@ -241,6 +345,7 @@ export const negativeLabResolvedRuntimeProfileSchema = z
     if (profile.profileStatus === 'generic_unmeasured') {
       if (
         profile.claimLevel !== 'generic_starting_point_only' ||
+        profile.evidenceDigest !== null ||
         profile.measurementProfileId !== null ||
         profile.runtimeStatus !== 'runtime_parameter_applied' ||
         profile.sourceGenericPresetId !== null ||
@@ -256,6 +361,7 @@ export const negativeLabResolvedRuntimeProfileSchema = z
     if (profile.profileStatus === 'fixture_measured') {
       if (
         profile.claimLevel !== 'measured_profile' ||
+        profile.evidenceDigest === null ||
         profile.measurementProfileId === null ||
         profile.runtimeStatus !== 'runtime_parameter_applied' ||
         profile.sourceGenericPresetId === null ||
