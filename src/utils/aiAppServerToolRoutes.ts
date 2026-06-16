@@ -19,9 +19,10 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
       toolCapability: 'subject_mask',
     },
     {
-      deferredIssue: '#1276',
-      reason: 'Depth mask generation needs a dedicated AI mask capability and command payload before app-server apply.',
-      status: 'deferred',
+      appServerToolName: 'ai.mask.dry_run_subject',
+      commandSchemaName: 'AiToolCommandEnvelopeV1',
+      reason: 'Depth mask generation is supported by the typed AI mask dry-run tool capability set.',
+      status: 'mapped',
       tauriInvoke: 'generate_ai_depth_mask',
       toolCapability: 'depth_mask',
     },
