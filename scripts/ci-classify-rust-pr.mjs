@@ -12,10 +12,7 @@ const PullFileSchema = z.object({
 
 const RUST_RELEVANT_PREFIXES = [
   '.cargo/',
-  '.github/actions/setup-bun-deps/',
   '.github/workflows/lint.yml',
-  'package.json',
-  'bun.lock',
   'scripts/ci-classify-rust-pr.mjs',
   'scripts/check-rust-feature-policy.mjs',
   'src-tauri/',
@@ -68,6 +65,7 @@ const runSelfTest = () => {
     { expected: true, name: 'src-tauri source', paths: ['src-tauri/src/lib.rs'] },
     { expected: true, name: 'cargo lock', paths: ['src-tauri/Cargo.lock'] },
     { expected: true, name: 'workflow change', paths: ['.github/workflows/lint.yml'] },
+    { expected: false, name: 'frontend package change', paths: ['package.json', 'bun.lock'] },
     { expected: false, name: 'docs only', paths: ['docs/README.md'] },
     { expected: true, name: 'empty fail closed', paths: [] },
   ];
