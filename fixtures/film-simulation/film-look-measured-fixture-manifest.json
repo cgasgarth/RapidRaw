@@ -1,0 +1,26 @@
+{
+  "fixtures": [
+    {
+      "allowedValidationUses": ["preview_export_parity", "render_bounds"],
+      "autoCorrectionBakedIn": "known_absent",
+      "colorProfile": "rawengine_camera_tiff_profile_v1",
+      "copyrightOwner": "RawEngine project",
+      "developmentProcessKnown": true,
+      "disallowedValidationUses": ["stock_reference_mapping", "marketing_screenshot"],
+      "expectedRenderBounds": {
+        "maxBaselinePreviewDelta": 0.36,
+        "maxPreviewExportDelta": 0
+      },
+      "fixtureId": "film_look.project_owned.tiff_color_checker_001",
+      "licenseName": "Project-owned private CI fixture",
+      "localRelativePath": "private-fixtures/film-simulation/color-checker-001.tiff",
+      "measurementStatus": "approved_private_payload_metadata",
+      "payloadAccess": "private_ci_payload",
+      "sourceKind": "project_owned",
+      "state": "approved_render_measurement",
+      "targetOrStepWedgePresent": true
+    }
+  ],
+  "generatedFrom": "fixtures/film-simulation/film-look-measured-fixture-manifest.json",
+  "schemaVersion": 1
+}
