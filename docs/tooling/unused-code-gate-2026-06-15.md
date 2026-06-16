@@ -28,3 +28,32 @@ Follow-up candidates:
 - Remove `react-draggable` if `bun run unused:report`, `bun run check:types`, and UI smoke stay clean.
 - Split schema package Knip config from app config so public exports are evaluated with package-specific rules.
 - Add a blocking dependency-only gate after false positives are reduced.
+
+## Schema Package Split
+
+Issue: #1387
+
+Decision: model `packages/rawengine-schema` as its own Knip workspace and ignore unused export/type reports for `packages/rawengine-schema/src/**/*.ts`.
+
+Why:
+
+- The package is a public contract surface for edit graph/API/runtime schemas.
+- Many schema exports are intentionally published before the app consumes every contract.
+- Treating package exports like app-private dead code creates noisy false positives and weakens trust in the report.
+
+Remaining cleanup candidates after the split:
+
+- App runtime files that may need entrypoint modeling or removal:
+  - `src/validation/visual/main.tsx`
+  - `src/validation/visual/VisualSmokeApp.tsx`
+  - `src/schemas/agentRuntimeSchemas.ts`
+- Tooling scripts/configs that may need explicit entry modeling:
+  - `i18next.config.ts`
+  - `scripts/check-agent-approval-boundaries.mjs`
+  - `scripts/check-markdown-links.mjs`
+- Dependency candidates:
+  - `eslint-config-prettier`
+  - `eslint-plugin-prettier`
+  - `i18next-cli`
+  - `license-checker-rseidelsohn`
+- App-level unused exports remain report-only until each candidate is verified against runtime usage, dynamic imports, and intended public API use.
