@@ -641,6 +641,10 @@
           "path": "docs/validation/edit-history-replay-2026-06-15.md"
         },
         {
+          "title": "Agent replay proof gallery",
+          "path": "docs/validation/agent-replay-proof-gallery-2026-06-16.html"
+        },
+        {
           "title": "Performance smoke",
           "path": "docs/validation/performance-smoke-2026-06-13.md"
         },
