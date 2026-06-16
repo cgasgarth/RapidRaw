@@ -1411,7 +1411,10 @@
         "y": "Y",
         "width": "Width",
         "height": "Height"
-      }
+      },
+      "stockRegistry": "Stock families",
+      "stockRegistrySummary": "{{runtimeSafeCount}} runtime-safe / {{referenceOnlyCount}} reference-only",
+      "stockRegistryVersion": "v{{version}}"
     },
     "panorama": {
       "cancel": "Annulla",
