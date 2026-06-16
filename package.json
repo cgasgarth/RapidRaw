@@ -112,6 +112,7 @@
     "check:generated-types": "bun scripts/check-generated-type-drift.mjs",
     "check:film-fixtures": "bun scripts/check-film-look-fixture-outputs.mjs",
     "check:film-fixtures:update": "bun scripts/check-film-look-fixture-outputs.mjs --update",
+    "check:film-look-browser-smoke": "bun scripts/capture-visual-smoke.mjs --scenario film-look-browser",
     "check:hdr-fixtures": "bun scripts/check-hdr-synthetic-fixtures.mjs",
     "check:hdr-fixtures:update": "bun scripts/check-hdr-synthetic-fixtures.mjs --update",
     "check:panorama-fixtures": "bun scripts/check-panorama-fixture-manifest.mjs",

@@ -35,6 +35,12 @@ const scenarios = [
     outputPath: resolve(outputDir, 'negative-lab-workspace.png'),
     sectionMinimum: 1,
   },
+  {
+    marker: 'Film Looks',
+    mode: 'film-look-browser',
+    outputPath: resolve(outputDir, 'film-look-browser.png'),
+    sectionMinimum: 2,
+  },
 ];
 const highDpiTargets = [
   { deviceScaleFactor: 1, name: 'empty-library-1x.png' },
@@ -105,6 +111,13 @@ async function assertSectionCount(page, minimum) {
 }
 
 async function prepareScenario(page, mode) {
+  if (mode === 'film-look-browser') {
+    await page.getByLabel('Warm Print', { exact: true }).click();
+    await page.getByTestId('film-look-adjustment-proof').getByText('Temp 5').waitFor({ timeout: 10_000 });
+    await page.getByLabel('Compare A: Warm Print').click();
+    return;
+  }
+
   if (mode !== 'negative-lab-workspace') return;
 
   await page.getByTestId('negative-lab-workspace').waitFor({ timeout: 10_000 });
