@@ -90,6 +90,14 @@ for (const marker of [
   }
 }
 
+const visualSmokeSourceUrl = new URL('../src/validation/visual/VisualSmokeApp.tsx', import.meta.url);
+const visualSmokeSource = await readFile(visualSmokeSourceUrl, 'utf8');
+for (const marker of ['FilmLookVisualSmoke', 'film-look-browser', 'film-look-adjustment-proof']) {
+  if (!visualSmokeSource.includes(marker)) {
+    throw new Error(`Visual smoke app is missing film look marker: ${marker}`);
+  }
+}
+
 const utilsSource = await readFile(utilsSourceUrl, 'utf8');
 for (const marker of ['buildFilmLookPresetDraft', 'formatFilmLookPresetName', 'scaleFilmLookAdjustmentPatch']) {
   if (!utilsSource.includes(marker)) {

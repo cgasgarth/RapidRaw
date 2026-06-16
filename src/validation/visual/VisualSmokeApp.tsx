@@ -1,11 +1,13 @@
 import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
+import EffectsPanel from '../../components/adjustments/Effects';
 import HdrModal from '../../components/modals/HdrModal';
 import NegativeConversionModal from '../../components/modals/NegativeConversionModal';
 import PanoramaModal from '../../components/modals/PanoramaModal';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS, type PanoramaUiSettings } from '../../schemas/panoramaUiSchemas';
+import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../utils/adjustments';
 
 interface VisualSmokeAppProps {
   mode: string;
@@ -67,6 +69,13 @@ const panoramaPreviewSvg = encodeURIComponent(`
 </svg>`);
 
 const panoramaPreviewUrl = `data:image/svg+xml,${panoramaPreviewSvg}`;
+const filmSmokeMetricLabels = {
+  contrast: 'Contrast',
+  grain: 'Grain',
+  highlights: 'Highlights',
+  temperature: 'Temp',
+} as const;
+const formatFilmSmokeMetric = (label: string, value: number) => `${label} ${value}`;
 
 function PanoramaVisualSmoke() {
   const [settings, setSettings] = useState<PanoramaUiSettings>(DEFAULT_PANORAMA_UI_SETTINGS);
@@ -154,6 +163,52 @@ function NegativeLabVisualSmoke() {
   );
 }
 
+function FilmLookVisualSmoke() {
+  const [adjustments, setAdjustments] = useState<Adjustments>(() => structuredClone(INITIAL_ADJUSTMENTS));
+  const handleAdjustmentsChange = (update: Partial<Adjustments> | ((current: Adjustments) => Adjustments)) => {
+    setAdjustments((current) => (typeof update === 'function' ? update(current) : { ...current, ...update }));
+  };
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="film-look-browser"
+    >
+      <div className="grid h-screen grid-cols-[1fr_380px] overflow-hidden">
+        <section className="relative min-w-0 bg-[#0f1114] p-6" data-visual-smoke-section="film-look-preview">
+          <div className="mx-auto flex h-full max-w-4xl flex-col justify-center gap-5">
+            <div className="aspect-[4/3] overflow-hidden rounded-md border border-white/10 bg-gradient-to-br from-[#293c42] via-[#52645f] to-[#d4b173] shadow-2xl">
+              <div className="h-full w-full bg-[radial-gradient(circle_at_42%_35%,rgba(255,244,215,0.45),transparent_22%),linear-gradient(170deg,transparent_42%,rgba(12,31,37,0.72)_43%)]" />
+            </div>
+            <div
+              className="grid grid-cols-4 gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-sm"
+              data-testid="film-look-adjustment-proof"
+            >
+              <span>{formatFilmSmokeMetric(filmSmokeMetricLabels.temperature, adjustments.temperature)}</span>
+              <span>{formatFilmSmokeMetric(filmSmokeMetricLabels.contrast, adjustments.contrast)}</span>
+              <span>{formatFilmSmokeMetric(filmSmokeMetricLabels.highlights, adjustments.highlights)}</span>
+              <span>{formatFilmSmokeMetric(filmSmokeMetricLabels.grain, adjustments.grainAmount)}</span>
+            </div>
+          </div>
+        </section>
+        <aside
+          className="overflow-y-auto border-l border-white/10 bg-[#15181c] p-3"
+          data-visual-smoke-section="film-look-browser"
+        >
+          <EffectsPanel
+            adjustments={adjustments}
+            appSettings={null}
+            handleLutSelect={() => {}}
+            isForMask={false}
+            setAdjustments={handleAdjustmentsChange}
+          />
+        </aside>
+      </div>
+    </main>
+  );
+}
+
 function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
   if (mode === 'panorama-ui') {
     return <PanoramaVisualSmoke />;
@@ -165,6 +220,10 @@ function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
 
   if (mode === 'negative-lab-workspace') {
     return <NegativeLabVisualSmoke />;
+  }
+
+  if (mode === 'film-look-browser') {
+    return <FilmLookVisualSmoke />;
   }
 
   const scenario = mode === 'empty-library' ? 'Empty Library Startup' : 'Editor Shell Smoke';
