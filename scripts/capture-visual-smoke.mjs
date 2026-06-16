@@ -115,6 +115,14 @@ async function prepareScenario(page, mode) {
     await page.getByLabel('Warm Print', { exact: true }).click();
     await page.getByTestId('film-look-adjustment-proof').getByText('Temp 5').waitFor({ timeout: 10_000 });
     await page.getByLabel('Compare A: Warm Print').click();
+    await page.getByLabel('Save Warm Print as preset').click();
+    await page.getByTestId('film-look-preset-status').getByText('Saved Warm Print 65%', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByLabel('Share Warm Print preset').click();
+    await page.getByTestId('film-look-preset-status').getByText('Exported Warm Print 65%', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     return;
   }
 

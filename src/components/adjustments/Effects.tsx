@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { type ChangeEvent } from 'react';
+import { type ChangeEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import FilmLookBrowser from './FilmLookBrowser';
@@ -40,6 +40,12 @@ type SliderChangeEvent =
 
 const FILM_LOOK_PRESET_FILE_EXTENSION = 'rrpreset';
 const FILM_LOOK_PRESET_FILE_TYPE = 'RapidRaw Preset';
+const FILM_LOOK_SAVE_FAILED = 'Film look preset save failed.';
+const FILM_LOOK_SHARE_FAILED = 'Film look preset export failed.';
+const formatFilmLookSavedStatus = (look: FilmLookBrowserItem, strength: number) =>
+  `Saved ${formatFilmLookPresetName(look, strength)}`;
+const formatFilmLookSharedStatus = (look: FilmLookBrowserItem, strength: number) =>
+  `Exported ${formatFilmLookPresetName(look, strength)}`;
 const sanitizeFilmLookPresetFileName = (look: FilmLookBrowserItem, strength: number) =>
   `${formatFilmLookPresetName(look, strength)}.rrpreset`.replace(/[<>:"/\\|?*]/g, '_');
 const createFilmLookPreset = (look: FilmLookBrowserItem, strength: number): Preset => ({
@@ -56,6 +62,7 @@ export default function EffectsPanel({
   onDragStateChange,
 }: EffectsPanelProps) {
   const { t } = useTranslation();
+  const [filmLookPresetStatus, setFilmLookPresetStatus] = useState<string | null>(null);
 
   const handleAdjustmentChange = (key: string, value: number | string) => {
     const numericValue = parseInt(String(value), 10);
@@ -85,7 +92,13 @@ export default function EffectsPanel({
   };
 
   const saveFilmLookPreset = async (look: FilmLookBrowserItem, strength: number) => {
-    await invoke(Invokes.SaveCommunityPreset, buildFilmLookPresetDraft(look, strength));
+    try {
+      await invoke(Invokes.SaveCommunityPreset, buildFilmLookPresetDraft(look, strength));
+      setFilmLookPresetStatus(formatFilmLookSavedStatus(look, strength));
+    } catch (error) {
+      setFilmLookPresetStatus(FILM_LOOK_SAVE_FAILED);
+      console.error(FILM_LOOK_SAVE_FAILED, error);
+    }
   };
 
   const shareFilmLookPreset = async (look: FilmLookBrowserItem, strength: number) => {
@@ -102,7 +115,13 @@ export default function EffectsPanel({
     }
 
     const presetsToExport: Array<PresetExportItem> = [{ preset: createFilmLookPreset(look, strength) }];
-    await invoke(Invokes.HandleExportPresetsToFile, { presetsToExport, filePath });
+    try {
+      await invoke(Invokes.HandleExportPresetsToFile, { presetsToExport, filePath });
+      setFilmLookPresetStatus(formatFilmLookSharedStatus(look, strength));
+    } catch (error) {
+      setFilmLookPresetStatus(FILM_LOOK_SHARE_FAILED);
+      console.error(FILM_LOOK_SHARE_FAILED, error);
+    }
   };
 
   const handleFilmLookSave = (look: FilmLookBrowserItem, strength: number) => {
@@ -169,6 +188,16 @@ export default function EffectsPanel({
               onSaveLook={handleFilmLookSave}
               onShareLook={handleFilmLookShare}
             />
+            {filmLookPresetStatus !== null && (
+              <UiText
+                aria-live="polite"
+                className="mt-2 rounded-md border border-surface bg-bg-secondary px-3 py-2 text-text-secondary"
+                data-testid="film-look-preset-status"
+                variant={TextVariants.small}
+              >
+                {filmLookPresetStatus}
+              </UiText>
+            )}
           </div>
 
           <div className="p-2 bg-bg-tertiary rounded-md">
