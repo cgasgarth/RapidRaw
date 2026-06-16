@@ -917,81 +917,78 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
     const isFolder = isFolderEntry(item);
 
-    let options: Array<Option> = [];
-    if (isFolder) {
-      options = [
-        {
-          icon: Edit,
-          label: t('editor.presets.menu.renameFolder'),
-          onClick: () => {
-            setRenameFolderState({ isOpen: true, folder: item.folder });
+    const options: Array<Option> = isFolder
+      ? [
+          {
+            icon: Edit,
+            label: t('editor.presets.menu.renameFolder'),
+            onClick: () => {
+              setRenameFolderState({ isOpen: true, folder: item.folder });
+            },
           },
-        },
-        {
-          icon: FileDown,
-          label: t('editor.presets.menu.exportFolder'),
-          onClick: () => {
-            void handleExport(item);
+          {
+            icon: FileDown,
+            label: t('editor.presets.menu.exportFolder'),
+            onClick: () => {
+              void handleExport(item);
+            },
           },
-        },
-        { type: OPTION_SEPARATOR },
-        {
-          icon: Trash2,
-          isDestructive: true,
-          label: t('editor.presets.menu.deleteFolder'),
-          onClick: () => {
-            handleDeleteItem(item.folder.id, true);
+          { type: OPTION_SEPARATOR },
+          {
+            icon: Trash2,
+            isDestructive: true,
+            label: t('editor.presets.menu.deleteFolder'),
+            onClick: () => {
+              handleDeleteItem(item.folder.id, true);
+            },
           },
-        },
-      ];
-    } else {
-      options = [
-        {
-          icon: Save,
-          label: t('editor.presets.menu.overwrite'),
-          onClick: () => {
-            const updated = overwritePreset(item.preset.id);
-            if (updated) {
-              void generateSinglePreview(updated);
-            }
+        ]
+      : [
+          {
+            icon: Save,
+            label: t('editor.presets.menu.overwrite'),
+            onClick: () => {
+              const updated = overwritePreset(item.preset.id);
+              if (updated) {
+                void generateSinglePreview(updated);
+              }
+            },
           },
-        },
-        {
-          icon: Settings2,
-          label: t('editor.presets.menu.configurePreset'),
-          onClick: () => {
-            setConfigureModalState({ isOpen: true, preset: item.preset });
+          {
+            icon: Settings2,
+            label: t('editor.presets.menu.configurePreset'),
+            onClick: () => {
+              setConfigureModalState({ isOpen: true, preset: item.preset });
+            },
           },
-        },
-        { type: OPTION_SEPARATOR },
-        {
-          icon: CopyPlus,
-          label: t('editor.presets.menu.duplicatePreset'),
-          onClick: () => {
-            const duplicated = duplicatePreset(item.preset.id);
-            if (duplicated) {
-              void generateSinglePreview(duplicated);
-            }
+          { type: OPTION_SEPARATOR },
+          {
+            icon: CopyPlus,
+            label: t('editor.presets.menu.duplicatePreset'),
+            onClick: () => {
+              const duplicated = duplicatePreset(item.preset.id);
+              if (duplicated) {
+                void generateSinglePreview(duplicated);
+              }
+            },
           },
-        },
-        {
-          icon: FileDown,
-          label: t('editor.presets.menu.exportPreset'),
-          onClick: () => {
-            void handleExport(item);
+          {
+            icon: FileDown,
+            label: t('editor.presets.menu.exportPreset'),
+            onClick: () => {
+              void handleExport(item);
+            },
           },
-        },
-        { type: OPTION_SEPARATOR },
-        {
-          icon: Trash2,
-          isDestructive: true,
-          label: t('editor.presets.menu.deletePreset'),
-          onClick: () => {
-            handleDeleteItem(item.preset.id, false);
+          { type: OPTION_SEPARATOR },
+          {
+            icon: Trash2,
+            isDestructive: true,
+            label: t('editor.presets.menu.deletePreset'),
+            onClick: () => {
+              handleDeleteItem(item.preset.id, false);
+            },
           },
-        },
-      ];
-    }
+        ];
 
     showContextMenu(event.clientX, event.clientY, options);
   };

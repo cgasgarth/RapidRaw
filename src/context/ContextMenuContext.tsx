@@ -127,25 +127,21 @@ function SubMenu({ cancelCloseSubmenu, closeSubmenu, hideContextMenu, options, p
       setStyle({ top: cssPx(top), left: cssPx(left), opacity: 1 });
 
       const isRightSide = left >= parentRect.right - 10;
-      let path = '';
-
-      if (isRightSide) {
-        path = `
+      const path = isRightSide
+        ? `
           M ${svgNumber(parentRect.right)} ${svgNumber(parentRect.top)}
           L ${svgNumber(left)} ${svgNumber(top)}
           L ${svgNumber(left)} ${svgNumber(top + subMenuHeight)}
           L ${svgNumber(parentRect.right)} ${svgNumber(parentRect.bottom)}
           Z
-        `;
-      } else {
-        path = `
+        `
+        : `
           M ${svgNumber(parentRect.left)} ${svgNumber(parentRect.top)}
           L ${svgNumber(left + subMenuWidth)} ${svgNumber(top)}
           L ${svgNumber(left + subMenuWidth)} ${svgNumber(top + subMenuHeight)}
           L ${svgNumber(parentRect.left)} ${svgNumber(parentRect.bottom)}
           Z
         `;
-      }
       setSafeAreaPath(path);
     }
   }, [parentRef, options]);
