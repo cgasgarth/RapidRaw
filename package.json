@@ -130,6 +130,7 @@
     "check:panorama-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario panorama-ui",
     "check:hdr-alignment-smoke": "bun scripts/check-hdr-alignment-smoke.mjs",
     "check:hdr-deghosting-smoke": "bun scripts/check-hdr-deghosting-smoke.mjs",
+    "check:hdr-app-server-runtime": "bun scripts/check-hdr-app-server-runtime.mjs",
     "check:hdr-runtime-plan-smoke": "bun scripts/check-hdr-runtime-plan-smoke.mjs",
     "check:hdr-merge-weighting-smoke": "bun scripts/check-hdr-merge-weighting-smoke.mjs",
     "check:hdr-merge-ui": "bun scripts/check-hdr-merge-ui.mjs",
