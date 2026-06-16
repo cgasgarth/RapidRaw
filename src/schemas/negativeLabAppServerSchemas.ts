@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
-import { negativeLabFrameHealthReportSchema } from './negativeLabFrameHealthSchemas';
+import {
+  negativeLabBatchDryRunSummarySchema,
+  negativeLabFrameHealthReportSchema,
+} from './negativeLabFrameHealthSchemas';
 import {
   negativeLabBaseFogSampleRectSchema,
   negativeLabPresetIdSchema,
@@ -8,8 +11,10 @@ import {
 } from './negativeLabPresetCatalogSchemas';
 
 export const negativeLabConversionPlanCommandNameSchema = z.literal('negative.lab.build_conversion_plan');
+export const negativeLabBatchSummaryCommandNameSchema = z.literal('negative.lab.build_batch_dry_run_summary');
 export const negativeLabFrameHealthCommandNameSchema = z.literal('negative.lab.build_frame_health_report');
 export const negativeLabAppServerCommandNameSchema = z.union([
+  negativeLabBatchSummaryCommandNameSchema,
   negativeLabConversionPlanCommandNameSchema,
   negativeLabFrameHealthCommandNameSchema,
 ]);
@@ -37,6 +42,18 @@ export const negativeLabFrameHealthAppServerCommandSchema = z
   })
   .strict();
 
+export const negativeLabBatchSummaryAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema;
+
+export const negativeLabBatchSummaryRouteSchema = z
+  .object({
+    commandName: negativeLabBatchSummaryCommandNameSchema,
+    inputSchemaName: z.literal('NegativeLabBatchSummaryAppServerCommandV1'),
+    outputSchemaName: z.literal('NegativeLabBatchDryRunSummaryV1'),
+    reason: z.string().trim().min(1),
+    status: z.literal('mapped'),
+  })
+  .strict();
+
 export const negativeLabConversionPlanRouteSchema = z
   .object({
     commandName: negativeLabConversionPlanCommandNameSchema,
@@ -58,6 +75,7 @@ export const negativeLabFrameHealthRouteSchema = z
   .strict();
 
 export const negativeLabAppServerRouteSchema = z.union([
+  negativeLabBatchSummaryRouteSchema,
   negativeLabConversionPlanRouteSchema,
   negativeLabFrameHealthRouteSchema,
 ]);
@@ -89,8 +107,11 @@ export const negativeLabConversionPlanResultSchema = z
   .strict();
 
 export const negativeLabFrameHealthAppServerResultSchema = negativeLabFrameHealthReportSchema;
+export const negativeLabBatchSummaryAppServerResultSchema = negativeLabBatchDryRunSummarySchema;
 
 export type NegativeLabAppServerCommand = z.infer<typeof negativeLabAppServerCommandSchema>;
+export type NegativeLabBatchSummaryAppServerCommand = z.infer<typeof negativeLabBatchSummaryAppServerCommandSchema>;
+export type NegativeLabBatchSummaryAppServerResult = z.infer<typeof negativeLabBatchSummaryAppServerResultSchema>;
 export type NegativeLabConversionPlanResult = z.infer<typeof negativeLabConversionPlanResultSchema>;
 export type NegativeLabFrameHealthAppServerCommand = z.infer<typeof negativeLabFrameHealthAppServerCommandSchema>;
 export type NegativeLabFrameHealthAppServerResult = z.infer<typeof negativeLabFrameHealthAppServerResultSchema>;

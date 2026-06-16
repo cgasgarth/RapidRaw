@@ -5,14 +5,19 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import {
+  buildNegativeLabBatchSummaryRouteResult,
   buildNegativeLabConversionPlanResult,
   buildNegativeLabFrameHealthRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../src/utils/negativeLabAppServerRoutes.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
 
+const expectedBatchSummaryCommandName = 'negative.lab.build_batch_dry_run_summary';
 const expectedCommandName = 'negative.lab.build_conversion_plan';
 const expectedFrameHealthCommandName = 'negative.lab.build_frame_health_report';
+const batchSummaryRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
+  (candidate) => candidate.commandName === expectedBatchSummaryCommandName,
+);
 const route = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedCommandName,
 );
@@ -20,6 +25,9 @@ const frameHealthRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedFrameHealthCommandName,
 );
 
+if (batchSummaryRoute === undefined) {
+  throw new Error(`Missing Negative Lab app-server route for ${expectedBatchSummaryCommandName}.`);
+}
 if (route === undefined) {
   throw new Error(`Missing Negative Lab app-server route for ${expectedCommandName}.`);
 }
@@ -76,6 +84,13 @@ const frameHealthResult = buildNegativeLabFrameHealthRouteResult({
   previewReady: false,
   targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
 });
+const batchSummaryResult = buildNegativeLabBatchSummaryRouteResult({
+  activePathIndex: 1,
+  baseFogConfidence: 0.82,
+  includedPaths: ['/roll/001.CR3', '/roll/002.CR3'],
+  previewReady: false,
+  targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
+});
 
 if (frameHealthResult.activeFrameId !== 'negative-lab-frame-2') {
   throw new Error('Negative Lab app-server frame health route did not report the active frame.');
@@ -85,6 +100,12 @@ if (frameHealthResult.includedCount !== 2 || frameHealthResult.queuedCount !== 2
 }
 if (!frameHealthResult.warningCodes.includes('excluded_from_batch')) {
   throw new Error('Negative Lab app-server frame health route did not roll up skipped-frame warnings.');
+}
+if (batchSummaryResult.plannedApplyCount !== 2 || batchSummaryResult.skippedFrameIds[0] !== 'negative-lab-frame-3') {
+  throw new Error('Negative Lab app-server batch summary route did not report apply/skip counts.');
+}
+if (!batchSummaryResult.rollWarningCodes.includes('excluded_from_batch')) {
+  throw new Error('Negative Lab app-server batch summary route did not roll up warnings.');
 }
 
 for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
@@ -133,7 +154,9 @@ try {
 }
 
 for (const [filePath, marker] of [
+  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabBatchSummaryAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabFrameHealthAppServerCommandSchema'],
+  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabBatchSummaryRouteResult'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabConversionPlanResultSchema'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabFrameHealthRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabConversionPlanResult'],
