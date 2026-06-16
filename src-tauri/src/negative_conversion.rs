@@ -10,7 +10,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 
 use crate::AppState;
@@ -134,6 +134,21 @@ fn sanitize_output_suffix(suffix: &str) -> String {
     } else {
         sanitized
     }
+}
+
+fn build_negative_output_path(
+    real_path: &str,
+    save_options: &NegativeConversionSaveOptions,
+) -> PathBuf {
+    let p = Path::new(real_path);
+    let parent = p.parent().unwrap_or(Path::new(""));
+    let stem = p.file_stem().unwrap_or_default().to_string_lossy();
+    let extension = match save_options.output_format {
+        NegativeConversionOutputFormat::JpegProof => "jpg",
+        NegativeConversionOutputFormat::Tiff16 => "tiff",
+    };
+    let filename = format!("{}_{}.{}", stem, save_options.suffix, extension);
+    parent.join(&filename)
 }
 
 impl NegativeConversionParams {
@@ -603,15 +618,12 @@ pub async fn convert_negatives(
 
             let processed = run_pipeline(&img, &params, Some(bounds));
 
-            let p = Path::new(&real_path);
-            let parent = p.parent().unwrap_or(Path::new(""));
-            let stem = p.file_stem().unwrap_or_default().to_string_lossy();
-            let extension = match save_options.output_format {
-                NegativeConversionOutputFormat::JpegProof => "jpg",
-                NegativeConversionOutputFormat::Tiff16 => "tiff",
-            };
-            let filename = format!("{}_{}.{}", stem, save_options.suffix, extension);
-            let out_path = parent.join(&filename);
+            let out_path = build_negative_output_path(&real_path, &save_options);
+            let filename = out_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
 
             match save_options.output_format {
                 NegativeConversionOutputFormat::JpegProof => {
@@ -726,6 +738,35 @@ mod tests {
         .sanitized();
 
         assert_eq!(sanitized.suffix, DEFAULT_OUTPUT_SUFFIX);
+    }
+
+    #[test]
+    fn negative_conversion_output_paths_keep_original_safe() {
+        let jpeg_options = NegativeConversionSaveOptions {
+            output_format: NegativeConversionOutputFormat::JpegProof,
+            suffix: "Web Proof".to_string(),
+        }
+        .sanitized();
+        let tiff_options = NegativeConversionSaveOptions {
+            output_format: NegativeConversionOutputFormat::Tiff16,
+            suffix: "".to_string(),
+        }
+        .sanitized();
+
+        let source_path = "/roll_01/frame_001.tif";
+        let jpeg_output = build_negative_output_path(source_path, &jpeg_options);
+        let tiff_output = build_negative_output_path(source_path, &tiff_options);
+
+        assert_eq!(
+            jpeg_output,
+            PathBuf::from("/roll_01/frame_001_Web_Proof.jpg")
+        );
+        assert_eq!(
+            tiff_output,
+            PathBuf::from("/roll_01/frame_001_Positive.tiff")
+        );
+        assert_ne!(jpeg_output, PathBuf::from(source_path));
+        assert_ne!(tiff_output, PathBuf::from(source_path));
     }
 
     #[test]
