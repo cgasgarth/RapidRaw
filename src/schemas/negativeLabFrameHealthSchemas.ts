@@ -81,10 +81,49 @@ export const negativeLabFrameHealthReportSchema = z
     }
   });
 
+export const negativeLabBatchDryRunSummarySchema = z
+  .object({
+    affectedFrameIds: z.array(z.string().trim().min(1)).min(1),
+    blocked: z.boolean(),
+    frameHealthReport: negativeLabFrameHealthReportSchema,
+    plannedApplyCount: z.number().int().nonnegative(),
+    rollWarningCodes: z.array(negativeLabFrameWarningCodeSchema),
+    schemaVersion: z.literal(NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION),
+    skippedFrameIds: z.array(z.string().trim().min(1)),
+  })
+  .strict()
+  .superRefine((summary, context) => {
+    const affectedFrameIds = summary.frameHealthReport.frames
+      .filter((frame) => frame.healthStatus !== 'skipped')
+      .map((frame) => frame.frameId);
+    if (summary.affectedFrameIds.join('\n') !== affectedFrameIds.join('\n')) {
+      context.addIssue({ code: 'custom', message: 'Negative Lab dry-run affected frames are stale.' });
+    }
+
+    const skippedFrameIds = summary.frameHealthReport.frames
+      .filter((frame) => frame.healthStatus === 'skipped')
+      .map((frame) => frame.frameId);
+    if (summary.skippedFrameIds.join('\n') !== skippedFrameIds.join('\n')) {
+      context.addIssue({ code: 'custom', message: 'Negative Lab dry-run skipped frames are stale.' });
+    }
+
+    if (summary.plannedApplyCount !== summary.affectedFrameIds.length) {
+      context.addIssue({ code: 'custom', message: 'Negative Lab dry-run apply count is stale.' });
+    }
+
+    if (summary.blocked && summary.affectedFrameIds.length > 0) {
+      context.addIssue({ code: 'custom', message: 'Blocked Negative Lab dry-runs cannot include apply frames.' });
+    }
+  });
+
 export type NegativeLabFrameHealthStatus = z.infer<typeof negativeLabFrameHealthStatusSchema>;
 export type NegativeLabFrameWarningCode = z.infer<typeof negativeLabFrameWarningCodeSchema>;
 export type NegativeLabFrameHealthEntry = z.infer<typeof negativeLabFrameHealthEntrySchema>;
 export type NegativeLabFrameHealthReport = z.infer<typeof negativeLabFrameHealthReportSchema>;
+export type NegativeLabBatchDryRunSummary = z.infer<typeof negativeLabBatchDryRunSummarySchema>;
 
 export const parseNegativeLabFrameHealthReport = (value: unknown): NegativeLabFrameHealthReport =>
   negativeLabFrameHealthReportSchema.parse(value);
+
+export const parseNegativeLabBatchDryRunSummary = (value: unknown): NegativeLabBatchDryRunSummary =>
+  negativeLabBatchDryRunSummarySchema.parse(value);
