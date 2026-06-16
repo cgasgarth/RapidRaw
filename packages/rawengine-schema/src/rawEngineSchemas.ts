@@ -6277,6 +6277,46 @@ export const negativeLabFixtureSourceV1Schema = z
     }
   });
 
+export const negativeLabMeasuredProfileEvidenceV1Schema = z
+  .object({
+    baseFogSampleCount: z.number().int().positive(),
+    claimPolicy: z.enum(['process_family_profile_no_stock_claim', 'named_stock_profile_requires_license_review']),
+    deltaE: z
+      .object({
+        max: z.number().min(0),
+        mean: z.number().min(0),
+        percentile95: z.number().min(0),
+      })
+      .strict(),
+    measurementDate: isoDateSchema,
+    measurementReportHash: contentHashSchema,
+    measurementSoftware: z.string().trim().min(1),
+    operator: z.string().trim().min(1),
+    profileId: z
+      .string()
+      .trim()
+      .regex(/^negative_lab\.measured\.[a-z0-9_]+\.[a-z0-9_]+\.v[0-9]+$/u),
+    sourceFixtureIds: z.array(negativeLabFixtureIdSchema).min(1),
+    targetReference: z
+      .object({
+        id: z.string().trim().min(1),
+        patchCount: z.number().int().min(12),
+        referenceHash: contentHashSchema,
+        type: z.enum(['it8_transparency', 'colorchecker_sg', 'step_wedge', 'project_synthetic_target']),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((evidence, context) => {
+    if (evidence.deltaE.mean > evidence.deltaE.percentile95 || evidence.deltaE.percentile95 > evidence.deltaE.max) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Measured profile Delta E summary must be ordered mean <= p95 <= max.',
+        path: ['deltaE'],
+      });
+    }
+  });
+
 export const negativeLabFixtureManifestEntryV1Schema = z
   .object({
     allowedDistribution: negativeLabFixtureDistributionV1Schema,
@@ -6305,6 +6345,7 @@ export const negativeLabFixtureManifestEntryV1Schema = z
     lightSource: z.string().trim().min(1),
     lossyCompression: z.boolean(),
     measurementClaimAllowed: z.boolean(),
+    measuredProfileEvidence: negativeLabMeasuredProfileEvidenceV1Schema.optional(),
     negativeFixtureTier: negativeLabFixtureTierV1Schema,
     payloadAccess: z.enum([
       'metadata_only',
@@ -6388,6 +6429,7 @@ export const negativeLabFixtureManifestEntryV1Schema = z
         fixture.state !== 'approved_profile_measurement' ||
         !profileEligibleTier ||
         !fixture.targetOrStepWedgePresent ||
+        fixture.measuredProfileEvidence === undefined ||
         !fixture.measurementClaimAllowed ||
         !fixture.profileClaimAllowed
       ) {
@@ -6398,6 +6440,41 @@ export const negativeLabFixtureManifestEntryV1Schema = z
           path: ['allowedValidationUses'],
         });
       }
+    }
+
+    if (
+      (fixture.state === 'approved_profile_measurement' ||
+        fixture.measurementClaimAllowed ||
+        fixture.profileClaimAllowed) &&
+      fixture.measuredProfileEvidence === undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Measured profile state or claim approval requires measured-profile evidence.',
+        path: ['measuredProfileEvidence'],
+      });
+    }
+
+    if (fixture.profileClaimAllowed && !fixture.measurementClaimAllowed) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Profile claim approval requires measurement claim approval.',
+        path: ['profileClaimAllowed'],
+      });
+    }
+
+    if (
+      fixture.measuredProfileEvidence?.claimPolicy === 'named_stock_profile_requires_license_review' &&
+      (!fixture.filmStockKnown ||
+        fixture.source.sourceKind === 'generated_synthetic' ||
+        fixture.source.sourceKind === 'registry_metadata_only' ||
+        fixture.reviewIssue === undefined)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Named-stock measured profiles require known stock, non-synthetic source, and review issue.',
+        path: ['measuredProfileEvidence', 'claimPolicy'],
+      });
     }
 
     for (const validationUse of fixture.allowedValidationUses) {
@@ -9388,6 +9465,7 @@ export type NegativeLabFixtureStateV1 = z.infer<typeof negativeLabFixtureStateV1
 export type NegativeLabFixtureTierV1 = z.infer<typeof negativeLabFixtureTierV1Schema>;
 export type NegativeLabFixtureValidationUseV1 = z.infer<typeof negativeLabFixtureValidationUseV1Schema>;
 export type NegativeLabFixtureWarningCodeV1 = z.infer<typeof negativeLabFixtureWarningCodeV1Schema>;
+export type NegativeLabMeasuredProfileEvidenceV1 = z.infer<typeof negativeLabMeasuredProfileEvidenceV1Schema>;
 export type NegativeLabFrameBorderMetricsV1 = z.infer<typeof negativeLabFrameBorderMetricsV1Schema>;
 export type NegativeLabFrameDetectionRequestV1 = z.infer<typeof negativeLabFrameDetectionRequestV1Schema>;
 export type NegativeLabFrameDetectionResultV1 = z.infer<typeof negativeLabFrameDetectionResultV1Schema>;
