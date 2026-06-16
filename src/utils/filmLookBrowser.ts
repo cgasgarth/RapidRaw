@@ -41,6 +41,14 @@ export interface FilmLookAdjustmentSummary {
   value: number;
 }
 
+export interface FilmLookPresetDraft extends Record<string, unknown> {
+  adjustments: FilmLookAdjustmentPatch;
+  includeCropTransform: false;
+  includeMasks: false;
+  name: string;
+  presetType: 'style';
+}
+
 const MIN_FILM_LOOK_STRENGTH = 0;
 const MAX_FILM_LOOK_STRENGTH = 100;
 
@@ -188,6 +196,11 @@ export const getFilmLookAdjustmentSummaries = (look: FilmLookBrowserItem): Array
 export const clampFilmLookStrength = (strength: number): number =>
   Math.min(MAX_FILM_LOOK_STRENGTH, Math.max(MIN_FILM_LOOK_STRENGTH, Math.round(strength)));
 
+export const formatFilmLookStrength = (strength: number) => `${clampFilmLookStrength(strength)}%`;
+
+export const formatFilmLookPresetName = (look: FilmLookBrowserItem, strength: number) =>
+  `${look.displayName} ${formatFilmLookStrength(strength)}`;
+
 export const scaleFilmLookAdjustmentPatch = (look: FilmLookBrowserItem, strength: number): FilmLookAdjustmentPatch => {
   const scale = clampFilmLookStrength(strength) / MAX_FILM_LOOK_STRENGTH;
   const scaledPatch: FilmLookAdjustmentPatch = {};
@@ -202,3 +215,11 @@ export const scaleFilmLookAdjustmentPatch = (look: FilmLookBrowserItem, strength
 
   return scaledPatch;
 };
+
+export const buildFilmLookPresetDraft = (look: FilmLookBrowserItem, strength: number): FilmLookPresetDraft => ({
+  adjustments: scaleFilmLookAdjustmentPatch(look, strength),
+  includeCropTransform: false,
+  includeMasks: false,
+  name: formatFilmLookPresetName(look, strength),
+  presetType: 'style',
+});
