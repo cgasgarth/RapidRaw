@@ -270,6 +270,7 @@ const runtimeConversionPlan = buildNegativeLabConversionPlanResult(
 if (
   runtimeConversionPlan.profile.profileStatus !== 'fixture_measured' ||
   runtimeConversionPlan.profile.measurementProfileId !== validRuntimeAppliedMeasuredProfile.profileId ||
+  !runtimeConversionPlan.profileProvenanceHash.startsWith('fnv1a32:') ||
   runtimeConversionPlan.params.blue_weight !== validRuntimeAppliedMeasuredProfile.params.blue_weight
 ) {
   throw new Error('Measured Negative Lab app-server conversion plan did not apply measured runtime params.');
@@ -301,6 +302,8 @@ const runtimeAcceptedApply = buildNegativeLabAcceptedBatchApplyRouteResult(
 
 if (
   runtimeAcceptedApply.conversionPlan.profile.profileStatus !== 'fixture_measured' ||
+  runtimeAcceptedApply.apply.options.profileProvenanceHash !==
+    runtimeAcceptedApply.conversionPlan.profileProvenanceHash ||
   runtimeAcceptedApply.apply.params.green_weight !== validRuntimeAppliedMeasuredProfile.params.green_weight
 ) {
   throw new Error('Measured Negative Lab accepted apply plan did not preserve measured profile params.');

@@ -88,6 +88,7 @@ const conversionPlanResultSchema = z.object({
     profileStatus: z.enum(['generic_unmeasured', 'fixture_measured']),
     runtimeStatus: z.enum(['ui_catalog_only', 'runtime_parameter_applied']),
   }),
+  profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
   proof: z.object({
     deterministic: z.literal(true),
     generatedFrom: z.literal('src/utils/negativeLabMeasuredProfileRuntime.ts'),
@@ -191,6 +192,8 @@ if (
   acceptedBatchApplyResult.commandName !== expectedAcceptedBatchApplyCommandName ||
   acceptedBatchApplyResult.acceptedDryRunPlanHash !== acceptedBatchPlanResult.acceptedDryRunPlanHash ||
   acceptedBatchApplyResult.apply.options.acceptedDryRunPlanId !== acceptedBatchPlanResult.acceptedDryRunPlanId ||
+  acceptedBatchApplyResult.apply.options.profileProvenanceHash !==
+    acceptedBatchApplyResult.conversionPlan.profileProvenanceHash ||
   acceptedBatchApplyResult.apply.paths.join('|') !== '/roll/001.CR3|/roll/002.CR3' ||
   acceptedBatchApplyResult.dryRunSummary.skippedFrameIds[0] !== 'negative-lab-frame-3'
 ) {

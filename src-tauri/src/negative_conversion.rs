@@ -58,6 +58,8 @@ pub struct NegativeConversionSaveOptions {
     pub accepted_dry_run_plan_hash: Option<String>,
     #[serde(default)]
     pub accepted_dry_run_plan_id: Option<String>,
+    #[serde(default)]
+    pub profile_provenance_hash: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone, Copy)]
@@ -93,6 +95,7 @@ impl Default for NegativeConversionSaveOptions {
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
             accepted_dry_run_plan_hash: None,
             accepted_dry_run_plan_id: None,
+            profile_provenance_hash: None,
         }
     }
 }
@@ -106,6 +109,9 @@ impl NegativeConversionSaveOptions {
             suffix,
             accepted_dry_run_plan_hash: self.accepted_dry_run_plan_hash,
             accepted_dry_run_plan_id: self.accepted_dry_run_plan_id,
+            profile_provenance_hash: self
+                .profile_provenance_hash
+                .filter(|hash| is_valid_negative_lab_profile_provenance_hash(hash)),
         }
     }
 
@@ -181,6 +187,10 @@ fn is_valid_negative_lab_plan_hash(plan_hash: &str) -> bool {
     };
 
     hash_suffix.len() == 8 && hash_suffix.chars().all(|value| value.is_ascii_hexdigit())
+}
+
+fn is_valid_negative_lab_profile_provenance_hash(profile_hash: &str) -> bool {
+    is_valid_negative_lab_plan_hash(profile_hash)
 }
 
 fn build_negative_output_path(
@@ -801,6 +811,7 @@ mod tests {
         let sanitized = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: None,
             accepted_dry_run_plan_id: None,
+            profile_provenance_hash: Some("fnv1a32:2f4a91bc".to_string()),
             output_format: NegativeConversionOutputFormat::JpegProof,
             suffix: " Proof / Final:01 ".to_string(),
         }
@@ -811,6 +822,10 @@ mod tests {
             NegativeConversionOutputFormat::JpegProof
         ));
         assert_eq!(sanitized.suffix, "_Proof__Final01_");
+        assert_eq!(
+            sanitized.profile_provenance_hash.as_deref(),
+            Some("fnv1a32:2f4a91bc")
+        );
     }
 
     #[test]
@@ -818,12 +833,14 @@ mod tests {
         let sanitized = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: None,
             accepted_dry_run_plan_id: None,
+            profile_provenance_hash: Some("not-a-hash".to_string()),
             output_format: NegativeConversionOutputFormat::Tiff16,
             suffix: "///".to_string(),
         }
         .sanitized();
 
         assert_eq!(sanitized.suffix, DEFAULT_OUTPUT_SUFFIX);
+        assert!(sanitized.profile_provenance_hash.is_none());
     }
 
     #[test]
@@ -831,6 +848,7 @@ mod tests {
         let jpeg_options = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: None,
             accepted_dry_run_plan_id: None,
+            profile_provenance_hash: None,
             output_format: NegativeConversionOutputFormat::JpegProof,
             suffix: "Web Proof".to_string(),
         }
@@ -838,6 +856,7 @@ mod tests {
         let tiff_options = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: None,
             accepted_dry_run_plan_id: None,
+            profile_provenance_hash: None,
             output_format: NegativeConversionOutputFormat::Tiff16,
             suffix: "".to_string(),
         }
@@ -871,6 +890,7 @@ mod tests {
         let accepted_plan = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
+            profile_provenance_hash: Some("fnv1a32:aaaaaaaa".to_string()),
             output_format: NegativeConversionOutputFormat::Tiff16,
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
@@ -879,6 +899,7 @@ mod tests {
         let mismatched_plan = NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_deadbeef".to_string()),
+            profile_provenance_hash: None,
             output_format: NegativeConversionOutputFormat::Tiff16,
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };

@@ -1,3 +1,4 @@
+import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCatalog';
 import {
   type NegativeLabMeasuredProfileCatalog,
@@ -72,4 +73,24 @@ export const resolveNegativeLabRuntimeProfile = (
     runtimeStatus: measuredProfile.runtimeStatus,
     sourceGenericPresetId: measuredProfile.sourceGenericPresetId,
   });
+};
+
+export const buildNegativeLabRuntimeProfileProvenanceHash = (
+  profile: NegativeLabResolvedRuntimeProfile,
+): `fnv1a32:${string}` => {
+  const provenancePayload = {
+    claimLevel: profile.claimLevel,
+    claimPolicy: profile.claimPolicy,
+    displayName: profile.displayName,
+    doesNotProve: profile.doesNotProve,
+    evidenceFixtureIds: profile.evidenceFixtureIds,
+    measurementProfileId: profile.measurementProfileId,
+    params: profile.params,
+    presetId: profile.presetId,
+    profileStatus: profile.profileStatus,
+    runtimeStatus: profile.runtimeStatus,
+    sourceGenericPresetId: profile.sourceGenericPresetId,
+  };
+
+  return `fnv1a32:${buildNegativeLabPlanHash(JSON.stringify(provenancePayload))}`;
 };
