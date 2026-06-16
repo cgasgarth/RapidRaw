@@ -382,6 +382,12 @@ async function prepareScenario(page, mode) {
       timeout: 10_000,
     });
     await page.getByLabel('Mono Silver', { exact: true }).click();
+    await page.getByTestId('film-look-adjustment-proof').getByText('Temp 0', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('film-look-adjustment-proof').getByText('Grain 17', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     await page.getByRole('slider', { name: 'Strength' }).fill('100');
     await page.getByTestId('film-look-adjustment-proof').getByText('Grain 22', { exact: true }).waitFor({
       timeout: 10_000,

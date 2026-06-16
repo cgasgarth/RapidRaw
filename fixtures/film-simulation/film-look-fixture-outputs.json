@@ -24,6 +24,17 @@
       "id": "film_look.generic.clean_color.v1",
       "strengthDefault": 70,
       "strengthPreviews": {
+        "appliedFull": {
+          "temperature": 0,
+          "contrast": 12,
+          "highlights": 0,
+          "shadows": 0,
+          "blacks": 0,
+          "saturation": 4,
+          "glowAmount": 0,
+          "grainAmount": 0,
+          "grainSize": 25
+        },
         "default": {
           "contrast": 8,
           "saturation": 3
@@ -92,6 +103,17 @@
       "id": "film_look.generic.warm_print.v1",
       "strengthDefault": 65,
       "strengthPreviews": {
+        "appliedFull": {
+          "temperature": 8,
+          "contrast": 8,
+          "highlights": -10,
+          "shadows": 0,
+          "blacks": 0,
+          "saturation": 0,
+          "glowAmount": 0,
+          "grainAmount": 0,
+          "grainSize": 25
+        },
         "default": {
           "temperature": 5,
           "contrast": 5,
@@ -170,6 +192,17 @@
       "id": "film_look.generic.cool_contrast.v1",
       "strengthDefault": 60,
       "strengthPreviews": {
+        "appliedFull": {
+          "temperature": -8,
+          "contrast": 18,
+          "highlights": 0,
+          "shadows": -10,
+          "blacks": 0,
+          "saturation": -2,
+          "glowAmount": 0,
+          "grainAmount": 0,
+          "grainSize": 25
+        },
         "default": {
           "temperature": -5,
           "contrast": 11,
@@ -250,6 +283,17 @@
       "id": "film_look.generic.soft_fade.v1",
       "strengthDefault": 55,
       "strengthPreviews": {
+        "appliedFull": {
+          "temperature": 0,
+          "contrast": -10,
+          "highlights": 0,
+          "shadows": 0,
+          "blacks": 8,
+          "saturation": -18,
+          "glowAmount": 0,
+          "grainAmount": 0,
+          "grainSize": 25
+        },
         "default": {
           "contrast": -5,
           "blacks": 4,
@@ -328,6 +372,17 @@
       "id": "film_look.generic.mono_silver.v1",
       "strengthDefault": 75,
       "strengthPreviews": {
+        "appliedFull": {
+          "temperature": 0,
+          "contrast": 12,
+          "highlights": 0,
+          "shadows": 0,
+          "blacks": 0,
+          "saturation": -100,
+          "glowAmount": 0,
+          "grainAmount": 22,
+          "grainSize": 42
+        },
         "default": {
           "contrast": 9,
           "saturation": -75,
@@ -408,6 +463,17 @@
       "id": "film_look.generic.punch_color.v1",
       "strengthDefault": 60,
       "strengthPreviews": {
+        "appliedFull": {
+          "temperature": 0,
+          "contrast": 24,
+          "highlights": 0,
+          "shadows": 0,
+          "blacks": -3,
+          "saturation": 0,
+          "glowAmount": 8,
+          "grainAmount": 0,
+          "grainSize": 25
+        },
         "default": {
           "contrast": 14,
           "blacks": -2,

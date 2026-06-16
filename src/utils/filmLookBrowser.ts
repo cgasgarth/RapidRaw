@@ -1,4 +1,4 @@
-import { type Adjustments } from './adjustments';
+import { INITIAL_ADJUSTMENTS, type Adjustments } from './adjustments';
 
 export type FilmLookCategory =
   | 'black_and_white'
@@ -215,6 +215,24 @@ export const scaleFilmLookAdjustmentPatch = (look: FilmLookBrowserItem, strength
 
   return scaledPatch;
 };
+
+export const resetFilmLookControlledAdjustments = (): FilmLookAdjustmentPatch => {
+  const resetPatch: FilmLookAdjustmentPatch = {};
+
+  for (const key of FILM_LOOK_ADJUSTMENT_KEYS) {
+    resetPatch[key] = INITIAL_ADJUSTMENTS[key];
+  }
+
+  return resetPatch;
+};
+
+export const buildFilmLookAppliedAdjustmentPatch = (
+  look: FilmLookBrowserItem,
+  strength: number,
+): FilmLookAdjustmentPatch => ({
+  ...resetFilmLookControlledAdjustments(),
+  ...scaleFilmLookAdjustmentPatch(look, strength),
+});
 
 export const buildFilmLookPresetDraft = (look: FilmLookBrowserItem, strength: number): FilmLookPresetDraft => ({
   adjustments: scaleFilmLookAdjustmentPatch(look, strength),
