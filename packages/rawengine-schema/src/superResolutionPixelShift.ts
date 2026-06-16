@@ -52,16 +52,21 @@ export const applyPixelShiftSuperResolutionV1 = (requestValue: unknown): SuperRe
   }
 
   for (let index = 0; index < outputPixels.length; index += 1) {
-    if (weights[index] === 0) {
+    const weight = weights[index] ?? 0;
+    if (weight === 0) {
       throw new Error(`Pixel-shift super-resolution left output pixel ${index} unfilled.`);
     }
-    outputPixels[index] /= weights[index];
+    outputPixels[index] = (outputPixels[index] ?? 0) / weight;
+  }
+  const referenceFrame = request.frames[0];
+  if (referenceFrame === undefined) {
+    throw new Error('Pixel-shift super-resolution requires at least one reference frame.');
   }
 
   return {
     changedPixelRatioAgainstNearest: calculateChangedPixelRatio(
       outputPixels,
-      createNearestNeighborBaselineV1(request.frames[0].pixels, request.width, request.height, request.scale),
+      createNearestNeighborBaselineV1(referenceFrame.pixels, request.width, request.height, request.scale),
     ),
     outputHeight,
     outputPixels,
