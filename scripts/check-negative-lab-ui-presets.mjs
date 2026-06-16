@@ -273,6 +273,9 @@ const workflowStageKeys = [
   'readoutCopied',
   'scopeActive',
   'scopeAll',
+  'stockRegistry',
+  'stockRegistrySummary',
+  'stockRegistryVersion',
   'workflowExportReadyCount',
 ];
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
@@ -351,6 +354,9 @@ for (const marker of [
   'negative-lab-profile-non-claims',
   'negative-lab-profile-row-',
   'negative-lab-profile-runtime-status',
+  'negative-lab-stock-family-',
+  'negative-lab-stock-registry',
+  'NEGATIVE_LAB_STOCK_REGISTRY',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`negative conversion modal is missing workflow marker: ${marker}`);

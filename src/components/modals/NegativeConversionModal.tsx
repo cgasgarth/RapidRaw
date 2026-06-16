@@ -44,6 +44,7 @@ import {
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
 } from '../../utils/negativeLabPresetCatalog';
 import { buildNegativeLabProfileBrowserRows } from '../../utils/negativeLabProfileBrowserRows';
+import { NEGATIVE_LAB_STOCK_REGISTRY, buildNegativeLabStockRegistryCounts } from '../../utils/negativeLabStockRegistry';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
@@ -90,6 +91,8 @@ const formatPercentValue = (value: number) => `${Math.round(value)}%`;
 const formatDensityValue = (value: number) => value.toFixed(3);
 const formatRgbValue = (value: number) => `${Math.round(value * 255)}`;
 const NEGATIVE_LAB_PROFILE_BROWSER_ROWS = buildNegativeLabProfileBrowserRows();
+const NEGATIVE_LAB_STOCK_REGISTRY_COUNTS = buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY);
+const formatStockRegistryToken = (value: string) => value.split('_').join(' ');
 const DENSITOMETER_CHANNEL_LABEL_KEYS: Record<
   NegativeBaseFogDensitometerReadout['dominantChannel'],
   | 'modals.negativeConversion.densitometerChannelRed'
@@ -1121,6 +1124,59 @@ export default function NegativeConversionModal({
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.genericPresets')}
           </UiText>
+          <div
+            className="mb-3 rounded-md border border-surface bg-bg-primary p-3"
+            data-testid="negative-lab-stock-registry"
+          >
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div>
+                <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
+                  {t('modals.negativeConversion.stockRegistry')}
+                </UiText>
+                <UiText variant={TextVariants.small} className="text-text-tertiary">
+                  {t('modals.negativeConversion.stockRegistrySummary', {
+                    referenceOnlyCount: NEGATIVE_LAB_STOCK_REGISTRY_COUNTS.referenceOnlyCount,
+                    runtimeSafeCount: NEGATIVE_LAB_STOCK_REGISTRY_COUNTS.runtimeSafeCount,
+                  })}
+                </UiText>
+              </div>
+              <span className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary">
+                {t('modals.negativeConversion.stockRegistryVersion', {
+                  version: NEGATIVE_LAB_STOCK_REGISTRY.registryVersion,
+                })}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {NEGATIVE_LAB_STOCK_REGISTRY.entries.map((entry) => {
+                const isActiveFamily = entry.genericPresetId !== null && entry.genericPresetId === selectedPresetId;
+
+                return (
+                  <div
+                    className={cx(
+                      'rounded-md border p-2 text-xs',
+                      isActiveFamily
+                        ? 'border-accent bg-accent/10 text-text-primary'
+                        : 'border-surface bg-bg-secondary text-text-secondary',
+                    )}
+                    data-testid={`negative-lab-stock-family-${entry.registryId}`}
+                    key={entry.registryId}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium text-text-primary">{entry.stockFamilyDescriptor}</span>
+                      <span className="shrink-0 text-[10px] text-text-tertiary">
+                        {formatStockRegistryToken(entry.claimTier)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] text-text-tertiary">
+                      <span>{formatStockRegistryToken(entry.processFamily)}</span>
+                      <span>{formatStockRegistryToken(entry.legalNamingStatus)}</span>
+                      <span>{formatStockRegistryToken(entry.fixtureStatus)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           <div className="grid grid-cols-1 gap-2">
             {NEGATIVE_LAB_PROFILE_BROWSER_ROWS.map((preset) => {
               const isSelected = selectedPresetId === preset.presetId;
