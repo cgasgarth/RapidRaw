@@ -14,3 +14,4 @@ export * from './panoramaRuntimePlan.js';
 export * from './panoramaSyntheticStitch.js';
 export * from './rawEngineSchemas.js';
 export * from './samplePayloads.js';
+export * from './superResolutionRuntimePlan.js';
