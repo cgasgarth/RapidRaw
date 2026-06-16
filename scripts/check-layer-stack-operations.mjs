@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import {
+  buildLayerRenderPlan,
   deleteLayer,
   duplicateLayer,
   moveLayer,
@@ -19,6 +20,17 @@ const layerFixtureSchema = z
     name: z.string().trim().min(1),
     opacity: z.number(),
     visible: z.boolean(),
+  })
+  .strict();
+
+const renderPlanItemSchema = z
+  .object({
+    adjustmentKeys: z.array(z.string().trim().min(1)),
+    layerId: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    opacity: z.number().int().min(0).max(100),
+    opacityFraction: z.number().min(0).max(1),
+    subMaskCount: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -63,6 +75,7 @@ const operationSchema = z.discriminatedUnion('type', [
 const fixtureSchema = z
   .object({
     expectedLayers: z.array(layerFixtureSchema).min(1),
+    expectedRenderPlan: z.array(renderPlanItemSchema).optional(),
     id: z.string().trim().min(1),
     initialLayers: z.array(layerFixtureSchema).min(1),
     operations: z.array(operationSchema).min(1),
@@ -123,6 +136,16 @@ for (const fixture of fixtures) {
     console.error('Expected:', JSON.stringify(expected, null, 2));
     console.error('Actual:', JSON.stringify(actual, null, 2));
     process.exit(1);
+  }
+
+  if (fixture.expectedRenderPlan !== undefined) {
+    const actualRenderPlan = buildLayerRenderPlan(result);
+    if (JSON.stringify(actualRenderPlan) !== JSON.stringify(fixture.expectedRenderPlan)) {
+      console.error(`${fixture.id}: layer render plan mismatch`);
+      console.error('Expected:', JSON.stringify(fixture.expectedRenderPlan, null, 2));
+      console.error('Actual:', JSON.stringify(actualRenderPlan, null, 2));
+      process.exit(1);
+    }
   }
 }
 
