@@ -26,8 +26,19 @@ pub struct NegativeConversionParams {
 
     #[serde(default = "default_base_fog_strength")]
     pub base_fog_strength: f32,
+    #[serde(default)]
+    pub base_fog_sample: Option<NegativeBaseFogSampleRect>,
     pub exposure: f32,
     pub contrast: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeBaseFogSampleRect {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Default)]
@@ -96,6 +107,7 @@ impl Default for NegativeConversionParams {
             green_weight: 1.0,
             blue_weight: 1.0,
             base_fog_strength: default_base_fog_strength(),
+            base_fog_sample: None,
             exposure: 0.0,
             contrast: 1.0,
         }
@@ -144,6 +156,7 @@ impl NegativeConversionParams {
                 defaults.base_fog_strength,
             )
             .clamp(MIN_BASE_FOG_STRENGTH, MAX_BASE_FOG_STRENGTH),
+            base_fog_sample: self.base_fog_sample.and_then(sanitize_sample_rect),
             exposure: finite_or_default(self.exposure, defaults.exposure)
                 .clamp(MIN_EXPOSURE, MAX_EXPOSURE),
             contrast: finite_or_default(self.contrast, defaults.contrast)
@@ -158,21 +171,66 @@ pub struct ChannelBounds {
     pub max: f32,
 }
 
-fn analyze_bounds(log_data: &[f32], width: usize, height: usize) -> [ChannelBounds; 3] {
-    let margin_x = (width as f32 * 0.12) as usize;
-    let margin_y = (height as f32 * 0.12) as usize;
+fn sanitize_sample_rect(rect: NegativeBaseFogSampleRect) -> Option<NegativeBaseFogSampleRect> {
+    if !rect.x.is_finite()
+        || !rect.y.is_finite()
+        || !rect.width.is_finite()
+        || !rect.height.is_finite()
+    {
+        return None;
+    }
 
-    let est_pixels = (width.saturating_sub(margin_x * 2)) * (height.saturating_sub(margin_y * 2));
+    let x = rect.x.clamp(0.0, 0.98);
+    let y = rect.y.clamp(0.0, 0.98);
+    let width = rect.width.clamp(0.02, 1.0 - x);
+    let height = rect.height.clamp(0.02, 1.0 - y);
+
+    Some(NegativeBaseFogSampleRect {
+        x,
+        y,
+        width,
+        height,
+    })
+}
+
+fn analyze_bounds(
+    log_data: &[f32],
+    width: usize,
+    height: usize,
+    sample_rect: Option<NegativeBaseFogSampleRect>,
+) -> [ChannelBounds; 3] {
+    let sanitized_rect = sample_rect.and_then(sanitize_sample_rect);
+    let (start_x, end_x, start_y, end_y) = if let Some(rect) = sanitized_rect {
+        let start_x = ((rect.x * width as f32).floor() as usize).min(width.saturating_sub(1));
+        let start_y = ((rect.y * height as f32).floor() as usize).min(height.saturating_sub(1));
+        let end_x =
+            (((rect.x + rect.width) * width as f32).ceil() as usize).clamp(start_x + 1, width);
+        let end_y =
+            (((rect.y + rect.height) * height as f32).ceil() as usize).clamp(start_y + 1, height);
+        (start_x, end_x, start_y, end_y)
+    } else {
+        let margin_x = (width as f32 * 0.12) as usize;
+        let margin_y = (height as f32 * 0.12) as usize;
+        (
+            margin_x,
+            width.saturating_sub(margin_x),
+            margin_y,
+            height.saturating_sub(margin_y),
+        )
+    };
+
+    let est_pixels = (end_x.saturating_sub(start_x)) * (end_y.saturating_sub(start_y));
     let step = (est_pixels / 40_000).max(1);
+    let row_step = if sanitized_rect.is_some() { 1 } else { 3 };
 
     let mut r_vals = Vec::with_capacity(est_pixels / step);
     let mut g_vals = Vec::with_capacity(est_pixels / step);
     let mut b_vals = Vec::with_capacity(est_pixels / step);
 
-    for y in (margin_y..(height - margin_y)).step_by(3) {
+    for y in (start_y..end_y).step_by(row_step) {
         let row_offset = y * width * 3;
 
-        for x in (margin_x..(width - margin_x)).step_by(step) {
+        for x in (start_x..end_x).step_by(step) {
             let idx = row_offset + (x * 3);
 
             if idx + 2 < log_data.len() {
@@ -216,7 +274,10 @@ fn analyze_bounds(log_data: &[f32], width: usize, height: usize) -> [ChannelBoun
     [get_bounds(r_vals), get_bounds(g_vals), get_bounds(b_vals)]
 }
 
-fn estimate_base_fog_from_image(input: &DynamicImage) -> NegativeBaseFogEstimate {
+fn estimate_base_fog_from_image(
+    input: &DynamicImage,
+    sample_rect: Option<NegativeBaseFogSampleRect>,
+) -> NegativeBaseFogEstimate {
     let rgb = input.to_rgb32f();
     let (width, height) = rgb.dimensions();
     let log_pixels: Vec<f32> = rgb
@@ -224,7 +285,7 @@ fn estimate_base_fog_from_image(input: &DynamicImage) -> NegativeBaseFogEstimate
         .par_iter()
         .map(|&v| -v.clamp(1e-6, 1.0).log10())
         .collect();
-    let bounds = analyze_bounds(&log_pixels, width as usize, height as usize);
+    let bounds = analyze_bounds(&log_pixels, width as usize, height as usize, sample_rect);
 
     let base_densities = [
         bounds[0].min.max(0.001),
@@ -272,7 +333,12 @@ fn run_pipeline(
     let bounds = if let Some(b) = override_bounds {
         b
     } else {
-        analyze_bounds(&log_pixels, width as usize, height as usize)
+        analyze_bounds(
+            &log_pixels,
+            width as usize,
+            height as usize,
+            params.base_fog_sample,
+        )
     };
 
     let mut out_buffer = vec![0.0f32; raw_pixels.len()];
@@ -438,6 +504,7 @@ pub async fn preview_negative_conversion(
 #[tauri::command]
 pub async fn estimate_negative_base_fog(
     path: String,
+    sample_rect: Option<NegativeBaseFogSampleRect>,
     state: tauri::State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<NegativeBaseFogEstimate, String> {
@@ -481,7 +548,7 @@ pub async fn estimate_negative_base_fog(
     };
 
     let downscaled = downscale_f32_image(&image, 1080, 1080);
-    Ok(estimate_base_fog_from_image(&downscaled))
+    Ok(estimate_base_fog_from_image(&downscaled, sample_rect))
 }
 
 #[tauri::command]
@@ -527,7 +594,12 @@ pub async fn convert_negatives(
                 .par_iter()
                 .map(|&v| -v.clamp(1e-6, 1.0).log10())
                 .collect();
-            let bounds = analyze_bounds(&log_pixels, ref_w as usize, ref_h as usize);
+            let bounds = analyze_bounds(
+                &log_pixels,
+                ref_w as usize,
+                ref_h as usize,
+                params.sanitized().base_fog_sample,
+            );
 
             let processed = run_pipeline(&img, &params, Some(bounds));
 
@@ -598,6 +670,12 @@ mod tests {
             green_weight: 99.0,
             blue_weight: -99.0,
             base_fog_strength: f32::NAN,
+            base_fog_sample: Some(NegativeBaseFogSampleRect {
+                x: f32::NAN,
+                y: 0.0,
+                width: 0.1,
+                height: 0.1,
+            }),
             exposure: f32::INFINITY,
             contrast: f32::NEG_INFINITY,
         }
@@ -613,6 +691,7 @@ mod tests {
             sanitized.base_fog_strength,
             NegativeConversionParams::default().base_fog_strength
         );
+        assert!(sanitized.base_fog_sample.is_none());
         assert_eq!(
             sanitized.exposure,
             NegativeConversionParams::default().exposure
@@ -662,6 +741,7 @@ mod tests {
                 green_weight: f32::INFINITY,
                 blue_weight: f32::NEG_INFINITY,
                 base_fog_strength: 99.0,
+                base_fog_sample: None,
                 exposure: 50.0,
                 contrast: -50.0,
             },
@@ -702,6 +782,7 @@ mod tests {
                 green_weight: 1.0,
                 blue_weight: 0.75,
                 base_fog_strength: 1.0,
+                base_fog_sample: None,
                 exposure: 0.0,
                 contrast: 1.0,
             },
@@ -852,10 +933,48 @@ mod tests {
             .unwrap(),
         );
 
-        let estimate = estimate_base_fog_from_image(&input);
+        let estimate = estimate_base_fog_from_image(&input, None);
         assert!((MIN_CHANNEL_WEIGHT..=MAX_CHANNEL_WEIGHT).contains(&estimate.red_weight));
         assert!((MIN_CHANNEL_WEIGHT..=MAX_CHANNEL_WEIGHT).contains(&estimate.green_weight));
         assert!((MIN_CHANNEL_WEIGHT..=MAX_CHANNEL_WEIGHT).contains(&estimate.blue_weight));
         assert!((0.0..=1.0).contains(&estimate.confidence));
+    }
+
+    #[test]
+    fn sampled_base_fog_estimate_uses_requested_patch() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                4,
+                1,
+                vec![
+                    0.95, 0.82, 0.45, 0.95, 0.82, 0.45, 0.30, 0.28, 0.26, 0.28, 0.26, 0.24,
+                ],
+            )
+            .unwrap(),
+        );
+
+        let full_frame = estimate_base_fog_from_image(&input, None);
+        let right_patch = estimate_base_fog_from_image(
+            &input,
+            Some(NegativeBaseFogSampleRect {
+                x: 0.5,
+                y: 0.0,
+                width: 0.5,
+                height: 1.0,
+            }),
+        );
+
+        assert_ne!(
+            (
+                full_frame.red_weight,
+                full_frame.green_weight,
+                full_frame.blue_weight
+            ),
+            (
+                right_patch.red_weight,
+                right_patch.green_weight,
+                right_patch.blue_weight
+            )
+        );
     }
 }

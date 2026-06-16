@@ -2,10 +2,23 @@ import { z } from 'zod';
 
 export const negativeLabPresetIdSchema = z.string().regex(/^negative_lab\.generic\.(?:c41|bw)\.[a-z0-9_]+\.v[0-9]+$/u);
 
+export const negativeLabBaseFogSampleRectSchema = z
+  .object({
+    height: z.number().min(0.02).max(1),
+    width: z.number().min(0.02).max(1),
+    x: z.number().min(0).max(0.98),
+    y: z.number().min(0).max(0.98),
+  })
+  .strict()
+  .refine((rect) => rect.x + rect.width <= 1.000001 && rect.y + rect.height <= 1.000001, {
+    message: 'Negative Lab base/fog sample rect must stay within normalized image bounds.',
+  });
+
 export const negativeLabPresetParamsSchema = z
   .object({
     blue_weight: z.number().min(0.5).max(2),
     base_fog_strength: z.number().min(0).max(1.25).default(1),
+    base_fog_sample: negativeLabBaseFogSampleRectSchema.nullable().default(null),
     contrast: z.number().min(0.5).max(2.5),
     exposure: z.number().min(-2).max(2),
     green_weight: z.number().min(0.5).max(2),
@@ -69,6 +82,7 @@ export const negativeLabBuiltInUiPresetCatalogSchema = z
   });
 
 export type NegativeLabBuiltInUiPreset = z.infer<typeof negativeLabBuiltInUiPresetSchema>;
+export type NegativeLabBaseFogSampleRect = z.infer<typeof negativeLabBaseFogSampleRectSchema>;
 export type NegativeLabPresetParams = z.infer<typeof negativeLabPresetParamsSchema>;
 export type NegativeLabBuiltInUiPresetCatalog = z.infer<typeof negativeLabBuiltInUiPresetCatalogSchema>;
 

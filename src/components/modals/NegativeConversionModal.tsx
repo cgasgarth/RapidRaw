@@ -11,6 +11,7 @@ import { useModalTransition } from '../../hooks/useModalTransition';
 import {
   negativeBaseFogEstimateSchema,
   negativeConversionSavedPathsSchema,
+  type NegativeLabBaseFogSampleRect,
   type NegativeLabBuiltInUiPreset,
   type NegativeLabPresetParams,
 } from '../../schemas/negativeLabPresetCatalogSchemas';
@@ -27,12 +28,23 @@ import UiText from '../ui/Text';
 
 type NegativeParams = NegativeLabPresetParams;
 type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
+type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
   outputFormat: 'tiff16' as NegativeOutputFormat,
   suffix: 'Positive',
 };
+const BASE_FOG_SAMPLE_PRESETS = [
+  {
+    labelKey: 'modals.negativeConversion.sampleLeftEdge',
+    rect: { height: 0.6, width: 0.12, x: 0.02, y: 0.2 },
+  },
+  {
+    labelKey: 'modals.negativeConversion.sampleCenterPatch',
+    rect: { height: 0.22, width: 0.22, x: 0.39, y: 0.39 },
+  },
+] satisfies Array<{ labelKey: BaseFogSampleLabelKey; rect: NegativeLabBaseFogSampleRect }>;
 
 type NegativeLabWorkflowStageId = 'setup' | 'preset' | 'colorTiming' | 'printGrade' | 'export';
 
@@ -64,6 +76,7 @@ export default function NegativeConversionModal({
   const [isSaving, setIsSaving] = useState(false);
   const [isEstimatingBaseFog, setIsEstimatingBaseFog] = useState(false);
   const [baseFogConfidence, setBaseFogConfidence] = useState<number | null>(null);
+  const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
 
@@ -252,6 +265,7 @@ export default function NegativeConversionModal({
       setZoom(1);
       setPan({ x: 0, y: 0 });
       setBaseFogConfidence(null);
+      setActiveBaseFogSampleLabel(null);
       setIsLoading(true);
       setProgress(null);
       setSaveOptions(DEFAULT_SAVE_OPTIONS);
@@ -266,6 +280,7 @@ export default function NegativeConversionModal({
     setSelectedPresetId('');
     if (key !== 'base_fog_strength') {
       setBaseFogConfidence(null);
+      setActiveBaseFogSampleLabel(null);
     }
     setParams(newParams);
     void updatePreview(newParams);
@@ -274,6 +289,7 @@ export default function NegativeConversionModal({
   const handlePresetSelect = (preset: NegativeLabBuiltInUiPreset) => {
     setSelectedPresetId(preset.presetId);
     setBaseFogConfidence(null);
+    setActiveBaseFogSampleLabel(null);
     setParams(preset.params);
     void updatePreview(preset.params);
   };
@@ -286,22 +302,57 @@ export default function NegativeConversionModal({
         'estimate_negative_base_fog',
         {
           path: selectedImagePath,
+          sampleRect: null,
         },
         negativeBaseFogEstimateSchema,
       );
       const nextParams = {
         ...params,
         base_fog_strength: 1,
+        base_fog_sample: null,
         blue_weight: estimate.blueWeight,
         green_weight: estimate.greenWeight,
         red_weight: estimate.redWeight,
       };
       setBaseFogConfidence(estimate.confidence);
+      setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
       setSelectedPresetId('');
       setParams(nextParams);
       void updatePreview(nextParams);
     } catch (e) {
       console.error('Negative base/fog estimate failed', e);
+    } finally {
+      setIsEstimatingBaseFog(false);
+    }
+  };
+
+  const handleSampleBaseFog = async (labelKey: BaseFogSampleLabelKey, sampleRect: NegativeLabBaseFogSampleRect) => {
+    if (!selectedImagePath) return;
+    setIsEstimatingBaseFog(true);
+    try {
+      const estimate = await invokeWithSchema(
+        'estimate_negative_base_fog',
+        {
+          path: selectedImagePath,
+          sampleRect,
+        },
+        negativeBaseFogEstimateSchema,
+      );
+      const nextParams = {
+        ...params,
+        base_fog_strength: 1,
+        base_fog_sample: sampleRect,
+        blue_weight: estimate.blueWeight,
+        green_weight: estimate.greenWeight,
+        red_weight: estimate.redWeight,
+      };
+      setBaseFogConfidence(estimate.confidence);
+      setActiveBaseFogSampleLabel(t(labelKey));
+      setSelectedPresetId('');
+      setParams(nextParams);
+      void updatePreview(nextParams);
+    } catch (e) {
+      console.error('Negative base/fog sample failed', e);
     } finally {
       setIsEstimatingBaseFog(false);
     }
@@ -346,6 +397,7 @@ export default function NegativeConversionModal({
             setParams(DEFAULT_PARAMS);
             setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
             setBaseFogConfidence(null);
+            setActiveBaseFogSampleLabel(null);
             void updatePreview(DEFAULT_PARAMS);
           }}
           disabled={isSaving || isEstimatingBaseFog}
@@ -415,6 +467,33 @@ export default function NegativeConversionModal({
               }}
               fillOrigin="min"
             />
+            <div className="space-y-2 rounded-md border border-surface bg-bg-primary p-2">
+              <div className="flex items-center justify-between gap-2">
+                <UiText variant={TextVariants.small} className="text-text-secondary">
+                  {t('modals.negativeConversion.baseFogSample')}
+                </UiText>
+                {activeBaseFogSampleLabel !== null && (
+                  <UiText variant={TextVariants.small} className="truncate text-text-tertiary">
+                    {activeBaseFogSampleLabel}
+                  </UiText>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {BASE_FOG_SAMPLE_PRESETS.map((samplePreset) => (
+                  <button
+                    key={samplePreset.labelKey}
+                    type="button"
+                    onClick={() => {
+                      void handleSampleBaseFog(samplePreset.labelKey, samplePreset.rect);
+                    }}
+                    disabled={!selectedImagePath || isEstimatingBaseFog || isSaving}
+                    className="rounded-md border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {t(samplePreset.labelKey)}
+                  </button>
+                ))}
+              </div>
+            </div>
             {baseFogConfidence !== null && (
               <UiText variant={TextVariants.small} className="text-text-tertiary">
                 {t('modals.negativeConversion.baseFogConfidence', {
