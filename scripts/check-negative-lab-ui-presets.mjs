@@ -3,6 +3,8 @@
 
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
 import { parseNegativeLabBuiltInUiPresetCatalog } from '../src/schemas/negativeLabPresetCatalogSchemas.ts';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const unsafeClaims =
   /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|ilford|kodak|lightroom|mastin|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;
@@ -24,10 +26,44 @@ if (!ids.has(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.defaultPresetId)) {
   failures.push('default preset id is missing from catalog');
 }
 
+const workflowStageKeys = [
+  'workflowSetup',
+  'workflowSetupDetailMultiple',
+  'workflowSetupDetailSingle',
+  'workflowPreset',
+  'workflowCustomPresetDetail',
+  'workflowColorTiming',
+  'workflowColorDetail',
+  'workflowPrintGrade',
+  'workflowPrintDetail',
+  'workflowExport',
+  'workflowExportReady',
+  'workflowExportConverting',
+];
+const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+
+for (const marker of ['NegativeLabWorkflowStage', 'workflowStages', 'renderWorkflowRail']) {
+  if (!modalSource.includes(marker)) {
+    failures.push(`negative conversion modal is missing workflow marker: ${marker}`);
+  }
+}
+
+for (const fileName of readdirSync('src/i18n/locales')) {
+  if (!fileName.endsWith('.json')) continue;
+  const locale = JSON.parse(readFileSync(join('src/i18n/locales', fileName), 'utf8'));
+  const negativeConversion = locale?.modals?.negativeConversion;
+
+  for (const key of workflowStageKeys) {
+    if (typeof negativeConversion?.[key] !== 'string' || negativeConversion[key].trim().length === 0) {
+      failures.push(`${fileName}: missing modals.negativeConversion.${key}`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error('Negative Lab UI preset validation failed:');
   console.error(failures.join('\n'));
   process.exit(1);
 }
 
-console.log(`negative lab UI presets ok (${NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length})`);
+console.log(`negative lab UI ok (${NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length} presets)`);

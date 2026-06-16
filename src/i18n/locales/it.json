@@ -1308,7 +1308,19 @@
       "resetViewTooltip": "Ripristina Visualizzazione",
       "title": "Conversione Negativo",
       "zoomInTooltip": "Ingrandisci",
-      "zoomOutTooltip": "Riduci"
+      "zoomOutTooltip": "Riduci",
+      "workflowColorDetail": "R {{red}}  G {{green}}  B {{blue}}",
+      "workflowColorTiming": "Colore",
+      "workflowCustomPresetDetail": "Mix personalizzato",
+      "workflowExport": "Esporta",
+      "workflowExportConverting": "Conversione",
+      "workflowExportReady": "Anteprima pronta",
+      "workflowPreset": "Preset",
+      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}",
+      "workflowPrintGrade": "Grado",
+      "workflowSetup": "Setup",
+      "workflowSetupDetailSingle": "1 scansione",
+      "workflowSetupDetailMultiple": "{{scanCount}} scansioni"
     },
     "panorama": {
       "cancel": "Annulla",

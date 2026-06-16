@@ -1307,7 +1307,19 @@
       "resetViewTooltip": "Сбросить вид",
       "title": "Преобразование негатива",
       "zoomInTooltip": "Увеличить",
-      "zoomOutTooltip": "Уменьшить"
+      "zoomOutTooltip": "Уменьшить",
+      "workflowColorDetail": "R {{red}}  G {{green}}  B {{blue}}",
+      "workflowColorTiming": "Цвет",
+      "workflowCustomPresetDetail": "Своя смесь",
+      "workflowExport": "Экспорт",
+      "workflowExportConverting": "Конвертация",
+      "workflowExportReady": "Превью готово",
+      "workflowPreset": "Пресет",
+      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}",
+      "workflowPrintGrade": "Градация",
+      "workflowSetup": "Setup",
+      "workflowSetupDetailSingle": "1 скан",
+      "workflowSetupDetailMultiple": "{{scanCount}} сканов"
     },
     "panorama": {
       "cancel": "Отмена",

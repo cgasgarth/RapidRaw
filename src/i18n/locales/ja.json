@@ -1307,7 +1307,19 @@
       "resetViewTooltip": "表示をリセット",
       "title": "ネガ反転",
       "zoomInTooltip": "拡大",
-      "zoomOutTooltip": "縮小"
+      "zoomOutTooltip": "縮小",
+      "workflowColorDetail": "R {{red}}  G {{green}}  B {{blue}}",
+      "workflowColorTiming": "カラー",
+      "workflowCustomPresetDetail": "カスタムミックス",
+      "workflowExport": "書き出し",
+      "workflowExportConverting": "変換中",
+      "workflowExportReady": "プレビュー準備完了",
+      "workflowPreset": "プリセット",
+      "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}",
+      "workflowPrintGrade": "グレード",
+      "workflowSetup": "セットアップ",
+      "workflowSetupDetailSingle": "1 件のスキャン",
+      "workflowSetupDetailMultiple": "{{scanCount}} 件のスキャン"
     },
     "panorama": {
       "cancel": "キャンセル",
