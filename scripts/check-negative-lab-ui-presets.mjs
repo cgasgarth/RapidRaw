@@ -16,14 +16,49 @@ parseNegativeLabBuiltInUiPresetCatalog(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG);
 for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
   ids.add(preset.presetId);
 
-  const text = `${preset.presetId} ${preset.displayName}`;
+  const text = [
+    preset.presetId,
+    preset.displayName,
+    preset.intent,
+    preset.legalNote,
+    preset.processFamily,
+    preset.processHint,
+    preset.runtimeStatus,
+    preset.stockFamilyDescriptor,
+  ].join(' ');
   if (unsafeClaims.test(text)) {
     failures.push(`${preset.presetId}: generic preset contains unsafe stock or brand claim`);
+  }
+
+  if (preset.claimPolicy !== 'generic_starting_point_no_stock_claim') {
+    failures.push(`${preset.presetId}: UI catalog preset must be a generic no-stock-claim preset`);
+  }
+
+  if (preset.profileStatus !== 'generic_unmeasured' || preset.measurementProfileId !== null) {
+    failures.push(`${preset.presetId}: UI catalog preset must remain unmeasured until fixture proof exists`);
+  }
+
+  if (preset.runtimeStatus !== 'runtime_parameter_applied') {
+    failures.push(`${preset.presetId}: UI catalog preset must be applied through the existing runtime parameter path`);
+  }
+
+  const expectedProcessFamily =
+    preset.filmClass === 'black_and_white_silver' ? 'black_and_white_silver_negative' : 'c41_color_negative';
+  if (preset.processFamily !== expectedProcessFamily) {
+    failures.push(`${preset.presetId}: process family does not match film class`);
+  }
+
+  if (preset.stockFamilyDescriptor.length < 8) {
+    failures.push(`${preset.presetId}: stock family descriptor is too vague`);
   }
 }
 
 if (!ids.has(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.defaultPresetId)) {
   failures.push('default preset id is missing from catalog');
+}
+
+if (NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length < 12) {
+  failures.push('Negative Lab UI preset catalog must include at least 12 generic family starters');
 }
 
 const workflowStageKeys = [
@@ -101,6 +136,10 @@ for (const marker of [
   'negative-lab-confidence',
   'negative-lab-export-tiff16',
   'negative-lab-export-jpeg-proof',
+  'negative-lab-preset-claim-policy',
+  'negative-lab-preset-film-class',
+  'negative-lab-preset-intent',
+  'negative-lab-preset-process',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`negative conversion modal is missing workflow marker: ${marker}`);
