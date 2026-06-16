@@ -111,6 +111,8 @@ export default function NegativeConversionModal({
       NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.find((preset) => preset.presetId === selectedPresetId) ?? null,
     [selectedPresetId],
   );
+  const selectedPresetFilmClass =
+    selectedPreset?.presetId.includes('.bw.') === true ? 'Black and white silver' : 'Color negative';
 
   const workflowStages = useMemo<NegativeLabWorkflowStage[]>(
     () => [
@@ -614,6 +616,40 @@ export default function NegativeConversionModal({
               );
             })}
           </div>
+          {selectedPreset !== null && (
+            <div
+              className="mt-3 rounded-md border border-surface bg-bg-primary p-3"
+              data-testid="negative-lab-preset-inspector"
+            >
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <div>
+                  <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
+                    {selectedPreset.displayName}
+                  </UiText>
+                  <UiText
+                    data-testid="negative-lab-preset-process"
+                    variant={TextVariants.small}
+                    className="text-text-tertiary"
+                  >
+                    {selectedPreset.processHint}
+                  </UiText>
+                </div>
+                <span
+                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary"
+                  data-testid="negative-lab-preset-film-class"
+                >
+                  {selectedPresetFilmClass}
+                </span>
+              </div>
+              <UiText
+                data-testid="negative-lab-preset-intent"
+                variant={TextVariants.small}
+                className="text-text-secondary"
+              >
+                {selectedPreset.intent}
+              </UiText>
+            </div>
+          )}
         </div>
 
         <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>

@@ -29,8 +29,10 @@ export const negativeLabPresetParamsSchema = z
 export const negativeLabBuiltInUiPresetSchema = z
   .object({
     displayName: z.string().trim().min(1).max(80),
+    intent: z.string().trim().min(1).max(160),
     params: negativeLabPresetParamsSchema,
     presetId: negativeLabPresetIdSchema,
+    processHint: z.string().trim().min(1).max(80),
   })
   .strict();
 
