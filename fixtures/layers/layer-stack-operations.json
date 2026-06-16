@@ -26,6 +26,24 @@
       { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
       { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true },
       { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": false }
+    ],
+    "expectedRenderPlan": [
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "tone",
+        "name": "Tone Balance",
+        "opacity": 100,
+        "opacityFraction": 1,
+        "subMaskCount": 0
+      },
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "opacityFraction": 0.8,
+        "subMaskCount": 0
+      }
     ]
   },
   {

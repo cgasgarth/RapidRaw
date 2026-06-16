@@ -2,6 +2,15 @@ import type { MaskContainer } from './adjustments';
 
 export type LayerStackMoveDirection = 'down' | 'up';
 
+export interface LayerRenderPlanItem {
+  adjustmentKeys: Array<string>;
+  layerId: string;
+  name: string;
+  opacity: number;
+  opacityFraction: number;
+  subMaskCount: number;
+}
+
 export class LayerStackOperationError extends Error {
   constructor(message: string) {
     super(message);
@@ -82,4 +91,25 @@ export function moveLayer(
   }
   nextLayers.splice(targetIndex, 0, layer);
   return nextLayers;
+}
+
+export function buildLayerRenderPlan(layers: Array<MaskContainer>): Array<LayerRenderPlanItem> {
+  return layers
+    .filter((layer) => layer.visible && clampLayerOpacity(layer.opacity) > 0)
+    .map((layer) => {
+      const opacity = clampLayerOpacity(layer.opacity);
+      const adjustmentKeys = Object.entries(layer.adjustments)
+        .filter(([, value]) => typeof value === 'number' && value !== 0)
+        .map(([key]) => key)
+        .toSorted();
+
+      return {
+        adjustmentKeys,
+        layerId: layer.id,
+        name: layer.name,
+        opacity,
+        opacityFraction: opacity / 100,
+        subMaskCount: layer.subMasks.length,
+      };
+    });
 }

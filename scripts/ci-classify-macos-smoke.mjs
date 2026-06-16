@@ -148,6 +148,7 @@ function isSafeFixturePath(path) {
   return (
     path.startsWith('fixtures/docs/') ||
     (path.startsWith('fixtures/film-simulation/') && path.endsWith('.json')) ||
+    (path.startsWith('fixtures/layers/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/negative-lab/') && path.endsWith('.json'))
   );
 }
@@ -545,6 +546,11 @@ function runSelfTest() {
   assertClassification(
     'negative lab fixture outputs can skip smoke',
     ['fixtures/negative-lab/negative-lab-synthetic-fixture-proof.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'layer fixture outputs can skip smoke',
+    ['fixtures/layers/layer-stack-operations.json'],
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(
