@@ -1512,6 +1512,7 @@
       "zoomOutTooltip": "Verkleinern"
     },
     "negativeConversion": {
+      "acceptBatchPlan": "Accept batch plan",
       "autoBaseFog": "Auto base",
       "autoBaseFogTooltip": "Estimate film base and balance color weights",
       "baseDensity": "Base density",
@@ -1524,6 +1525,7 @@
       "baseSampleArea": "Area {{area}}",
       "baseSampleOrigin": "X {{x}} / Y {{y}}",
       "baseSampleSize": "{{width}} x {{height}}",
+      "batchPlanAccepted": "Batch plan accepted",
       "batchPlanApplyCount": "Apply {{applyCount}}",
       "batchPlanCopied": "Copied plan",
       "batchPlanSkippedCount": "Skip {{skippedCount}}",
