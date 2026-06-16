@@ -10,6 +10,7 @@ import {
   sampleHdrMergeArtifactV1,
   sampleSuperResolutionArtifactV1,
 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { deriveArtifactInvalidationReasons } from '../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
 
 const CASES = [
   {
@@ -58,14 +59,34 @@ const markStale = (artifact, reason) => {
   const stale = clone(artifact);
   stale.staleState = {
     checkedAt: '2026-06-15T23:10:00.000Z',
-    invalidationReasons: [reason],
+    invalidationReasons: Array.isArray(reason) ? reason : [reason],
     state: 'stale',
   };
   return stale;
 };
 
+const currentStateFor = (artifact) => ({
+  outputContentHash: artifact.outputArtifact.contentHash,
+  sourceState: clone(artifact.sourceState),
+});
+
+const mutateFirstSource = (currentState, patch) => {
+  const [firstSource] = currentState.sourceState;
+  if (firstSource === undefined) {
+    throw new Error('Expected at least one source state entry.');
+  }
+
+  Object.assign(firstSource, patch);
+  return currentState;
+};
+
 for (const testCase of CASES) {
   const current = expectValid(`${testCase.family} current sample`, testCase.schema, testCase.artifact);
+  const unchangedReasons = deriveArtifactInvalidationReasons(current, currentStateFor(current));
+
+  if (unchangedReasons.length !== 0) {
+    throw new Error(`${testCase.family}: unchanged source state must not invalidate the artifact`);
+  }
 
   const currentWithReason = clone(current);
   currentWithReason.staleState = {
@@ -91,6 +112,58 @@ for (const testCase of CASES) {
   if (stale.outputArtifact.contentHash !== current.outputArtifact.contentHash) {
     throw new Error(`${testCase.family}: invalidation must not mutate the existing output artifact hash`);
   }
+
+  const sourceHashReasons = deriveArtifactInvalidationReasons(
+    current,
+    mutateFirstSource(currentStateFor(current), { contentHash: 'sha256:changed-source-content' }),
+  );
+  if (!sourceHashReasons.includes('source_content_hash_changed')) {
+    throw new Error(`${testCase.family}: source content hash changes must invalidate the artifact`);
+  }
+  expectValid(
+    `${testCase.family} stale-after-source-hash-change`,
+    testCase.schema,
+    markStale(current, sourceHashReasons),
+  );
+
+  const graphRevisionReasons = deriveArtifactInvalidationReasons(
+    current,
+    mutateFirstSource(currentStateFor(current), { graphRevision: 'graph_rev_changed' }),
+  );
+  if (!graphRevisionReasons.includes('source_graph_revision_changed')) {
+    throw new Error(`${testCase.family}: source graph revision changes must invalidate the artifact`);
+  }
+  expectValid(
+    `${testCase.family} stale-after-graph-revision-change`,
+    testCase.schema,
+    markStale(current, graphRevisionReasons),
+  );
+
+  const sourceSetReasons = deriveArtifactInvalidationReasons(current, {
+    outputContentHash: current.outputArtifact.contentHash,
+    sourceState: current.sourceState.slice(1),
+  });
+  if (!sourceSetReasons.includes('source_set_changed')) {
+    throw new Error(`${testCase.family}: source set changes must invalidate the artifact`);
+  }
+  expectValid(
+    `${testCase.family} stale-after-source-set-change`,
+    testCase.schema,
+    markStale(current, sourceSetReasons),
+  );
+
+  const outputArtifactReasons = deriveArtifactInvalidationReasons(current, {
+    outputContentHash: 'sha256:changed-output-artifact',
+    sourceState: current.sourceState,
+  });
+  if (!outputArtifactReasons.includes('output_artifact_changed')) {
+    throw new Error(`${testCase.family}: output artifact changes must invalidate the artifact`);
+  }
+  expectValid(
+    `${testCase.family} stale-after-output-artifact-change`,
+    testCase.schema,
+    markStale(current, outputArtifactReasons),
+  );
 }
 
 console.log(`derived artifact invalidation ok (${CASES.length})`);
