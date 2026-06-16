@@ -1,12 +1,16 @@
-import { buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
+import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCatalog';
 import {
   negativeLabAppServerCommandSchema,
   negativeLabAppServerRouteManifestSchema,
+  negativeLabBatchSummaryAppServerCommandSchema,
+  negativeLabBatchSummaryAppServerResultSchema,
   negativeLabConversionPlanResultSchema,
   negativeLabFrameHealthAppServerCommandSchema,
   negativeLabFrameHealthAppServerResultSchema,
   type NegativeLabAppServerCommand,
+  type NegativeLabBatchSummaryAppServerCommand,
+  type NegativeLabBatchSummaryAppServerResult,
   type NegativeLabConversionPlanResult,
   type NegativeLabFrameHealthAppServerCommand,
   type NegativeLabFrameHealthAppServerResult,
@@ -14,6 +18,13 @@ import {
 
 export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteManifestSchema.parse({
   routes: [
+    {
+      commandName: 'negative.lab.build_batch_dry_run_summary',
+      inputSchemaName: 'NegativeLabBatchSummaryAppServerCommandV1',
+      outputSchemaName: 'NegativeLabBatchDryRunSummaryV1',
+      reason: 'Negative Lab app-server calls expose the same non-destructive batch apply/skip plan used by UI.',
+      status: 'mapped',
+    },
     {
       commandName: 'negative.lab.build_conversion_plan',
       inputSchemaName: 'NegativeLabAppServerCommandV1',
@@ -79,4 +90,13 @@ export const buildNegativeLabFrameHealthRouteResult = (
       targetPaths: parsedCommand.targetPaths,
     }),
   );
+};
+
+export const buildNegativeLabBatchSummaryRouteResult = (
+  command: NegativeLabBatchSummaryAppServerCommand,
+): NegativeLabBatchSummaryAppServerResult => {
+  const parsedCommand = negativeLabBatchSummaryAppServerCommandSchema.parse(command);
+  const frameHealthReport = buildNegativeLabFrameHealthRouteResult(parsedCommand);
+
+  return negativeLabBatchSummaryAppServerResultSchema.parse(buildNegativeLabBatchDryRunSummary(frameHealthReport));
 };
