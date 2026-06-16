@@ -1364,7 +1364,9 @@
       "presetRuntimeApplied": "Runtime applied",
       "presetRuntimeCatalogOnly": "Catalog only",
       "baseRgb": "Base RGB",
-      "baseDensity": "Base density"
+      "baseDensity": "Base density",
+      "copyReadout": "Copy readout JSON",
+      "readoutCopied": "Copied readout"
     },
     "panorama": {
       "cancel": "Отмена",

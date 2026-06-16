@@ -3,7 +3,19 @@ import { listen } from '@tauri-apps/api/event';
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import throttle from 'lodash.throttle';
-import { RotateCcw, ZoomIn, ZoomOut, Maximize, Save, Loader2, Eye, EyeOff, Info, WandSparkles } from 'lucide-react';
+import {
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  Save,
+  Loader2,
+  Eye,
+  EyeOff,
+  Info,
+  WandSparkles,
+  Copy,
+} from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 
@@ -85,6 +97,7 @@ export default function NegativeConversionModal({
   const [isEstimatingBaseFog, setIsEstimatingBaseFog] = useState(false);
   const [baseFogConfidence, setBaseFogConfidence] = useState<number | null>(null);
   const [baseFogEstimate, setBaseFogEstimate] = useState<NegativeBaseFogEstimate | null>(null);
+  const [baseFogReadoutCopied, setBaseFogReadoutCopied] = useState(false);
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
@@ -332,6 +345,7 @@ export default function NegativeConversionModal({
       setPan({ x: 0, y: 0 });
       setBaseFogConfidence(null);
       setBaseFogEstimate(null);
+      setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(null);
       setActivePathIndex(0);
       setIsLoading(true);
@@ -360,6 +374,7 @@ export default function NegativeConversionModal({
     setSelectedPresetId(preset.presetId);
     setBaseFogConfidence(null);
     setBaseFogEstimate(null);
+    setBaseFogReadoutCopied(false);
     setActiveBaseFogSampleLabel(null);
     setParams(preset.params);
     void updatePreview(preset.params);
@@ -387,6 +402,7 @@ export default function NegativeConversionModal({
       };
       setBaseFogConfidence(estimate.confidence);
       setBaseFogEstimate(estimate);
+      setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
       setSelectedPresetId('');
       setParams(nextParams);
@@ -420,6 +436,7 @@ export default function NegativeConversionModal({
       };
       setBaseFogConfidence(estimate.confidence);
       setBaseFogEstimate(estimate);
+      setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(t(labelKey));
       setSelectedPresetId('');
       setParams(nextParams);
@@ -428,6 +445,27 @@ export default function NegativeConversionModal({
       console.error('Negative base/fog sample failed', e);
     } finally {
       setIsEstimatingBaseFog(false);
+    }
+  };
+
+  const handleCopyBaseFogReadout = async () => {
+    if (baseFogEstimate === null || selectedImagePath === null) return;
+
+    const payload = {
+      baseDensity: baseFogEstimate.baseDensity,
+      baseRgb: baseFogEstimate.baseRgb,
+      confidence: baseFogEstimate.confidence,
+      imagePath: selectedImagePath,
+      sampleLabel: activeBaseFogSampleLabel,
+      sampleRect: params.base_fog_sample,
+    };
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      setBaseFogReadoutCopied(true);
+    } catch (error) {
+      console.error('Negative Lab readout copy failed', error);
+      setBaseFogReadoutCopied(false);
     }
   };
 
@@ -887,6 +925,19 @@ export default function NegativeConversionModal({
                 <span className="text-right tabular-nums" data-testid="negative-lab-base-density-readout">
                   {baseFogEstimate.baseDensity.map(formatDensityValue).join(' / ')}
                 </span>
+                <button
+                  type="button"
+                  className="col-span-2 mt-1 inline-flex items-center justify-center gap-1 rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-surface"
+                  data-testid="negative-lab-copy-readout"
+                  onClick={() => {
+                    void handleCopyBaseFogReadout();
+                  }}
+                >
+                  <Copy size={12} />
+                  {baseFogReadoutCopied
+                    ? t('modals.negativeConversion.readoutCopied')
+                    : t('modals.negativeConversion.copyReadout')}
+                </button>
               </div>
             )}
             <Slider
