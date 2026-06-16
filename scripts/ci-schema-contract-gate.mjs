@@ -18,6 +18,7 @@ const CONTRACT_CHECKS = [
   'check:agent-rollback-proof',
   'check:agent-proof-gallery',
   'check:ui-api-coverage',
+  'check:ai-app-server-routes',
   'schema:check',
   'schema:command-bus',
   'schema:focus-app-server',
@@ -41,6 +42,7 @@ const RELEVANT_FILES = new Set([
 
 const PACKAGE_SCRIPT_NAMES = new Set([
   'check:actions',
+  'check:ai-app-server-routes',
   'check:agent-proof-gallery',
   'check:agent-rollback-proof',
   'check:generated-types',
