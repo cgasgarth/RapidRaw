@@ -42,6 +42,26 @@ const formatFilmLookStrength = (strength: number) => `${strength}%`;
 const formatFilmLookAdjustmentValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
 const formatFilmLookSaveLabel = (displayName: string) => `Save ${displayName} as preset`;
 const formatFilmLookShareLabel = (displayName: string) => `Share ${displayName} preset`;
+const getFilmLookSwatchStyle = (look: FilmLookBrowserItem) => {
+  const warmth = look.adjustmentPatch.temperature ?? 0;
+  const saturation = look.adjustmentPatch.saturation ?? 0;
+  const contrast = look.adjustmentPatch.contrast ?? 0;
+  const hue = warmth >= 0 ? 34 : 210;
+  const secondaryHue = look.category === 'black_and_white' ? 0 : hue + 18;
+  const chroma = Math.max(8, Math.min(80, 38 + saturation));
+  const lift = Math.max(18, Math.min(72, 44 + contrast));
+
+  if (look.category === 'black_and_white') {
+    return {
+      background:
+        'linear-gradient(135deg, hsl(0 0% 18%), hsl(0 0% 54%) 48%, hsl(0 0% 86%)), radial-gradient(circle at 22% 18%, hsl(0 0% 100% / 0.28), transparent 34%)',
+    };
+  }
+
+  return {
+    background: `linear-gradient(135deg, hsl(${hue} ${chroma}% ${lift - 16}%), hsl(${secondaryHue} ${chroma + 8}% ${lift + 6}%) 54%, hsl(${hue + 54} ${Math.max(20, chroma - 8)}% ${lift + 22}%))`,
+  };
+};
 const isStringArray = (value: unknown): value is Array<string> =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 
@@ -230,6 +250,7 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                     <UiText className="block truncate" variant={TextVariants.body}>
                       {look.displayName}
                     </UiText>
+                    <div className="h-5 rounded-sm border border-surface" style={getFilmLookSwatchStyle(look)} />
                     <div className="flex flex-wrap gap-1">
                       {adjustmentSummaries.map((summary) => (
                         <span
@@ -319,6 +340,10 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                     >
                       <span className="flex items-center justify-between gap-2">
                         <Film size={16} aria-hidden="true" />
+                        <span
+                          className="h-5 flex-1 rounded-sm border border-surface"
+                          style={getFilmLookSwatchStyle(look)}
+                        />
                         <span className="flex items-center gap-1">
                           {isFavorite && <span className="size-2 rounded-full bg-accent" aria-hidden="true" />}
                           {isSelected && <Check size={15} aria-hidden="true" />}

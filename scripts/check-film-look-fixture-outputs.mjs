@@ -64,7 +64,13 @@ if (currentFixture !== expectedFixture) {
 }
 
 const browserSource = await readFile(browserSourceUrl, 'utf8');
-for (const marker of ['showFavoritesOnly', 'favoriteLookCount', 'visibleGroups', 'FILM_LOOK_FAVORITES_STORAGE_KEY']) {
+for (const marker of [
+  'showFavoritesOnly',
+  'favoriteLookCount',
+  'visibleGroups',
+  'FILM_LOOK_FAVORITES_STORAGE_KEY',
+  'getFilmLookSwatchStyle',
+]) {
   if (!browserSource.includes(marker)) {
     throw new Error(`Film look browser is missing UI marker: ${marker}`);
   }
