@@ -163,6 +163,59 @@ export type NegativeLabRuntimePresetId = z.infer<typeof negativeLabRuntimePreset
 export const parseNegativeLabMeasuredProfileCatalog = (value: unknown): NegativeLabMeasuredProfileCatalog =>
   negativeLabMeasuredProfileCatalogSchema.parse(value);
 
+export const negativeLabRuntimeProfileBrowserRowSchema = z
+  .object({
+    claimLevel: z.enum(['generic_starting_point_only', 'measured_profile']),
+    claimPolicy: z.enum([
+      'generic_starting_point_no_stock_claim',
+      'measured_profile_required_before_stock_claim',
+      'process_family_profile_no_stock_claim',
+      'named_stock_profile_requires_license_review',
+    ]),
+    disabledReason: z.enum(['catalog_only', 'license_review_required']).nullable(),
+    displayName: z.string().trim().min(1).max(80),
+    doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
+    evidenceFixtureCount: z.number().int().nonnegative(),
+    filmClass: negativeLabUiPresetFilmClassSchema,
+    isSelectable: z.boolean(),
+    measurementProfileId: negativeLabMeasuredProfileIdSchema.nullable(),
+    params: negativeLabPresetParamsSchema,
+    presetId: negativeLabRuntimePresetIdSchema,
+    processFamily: negativeLabUiPresetProcessFamilySchema,
+    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured']),
+    provenanceSummary: z.string().trim().min(1).max(220),
+    runtimeStatus: negativeLabMeasuredProfileRuntimeStatusSchema,
+    sourceGenericPresetId: negativeLabPresetIdSchema.nullable(),
+  })
+  .strict()
+  .superRefine((row, context) => {
+    if (row.isSelectable && row.disabledReason !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Selectable Negative Lab browser rows must not carry disabled reasons.',
+        path: ['disabledReason'],
+      });
+    }
+
+    if (!row.isSelectable && row.disabledReason === null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Disabled Negative Lab browser rows must explain why they cannot be applied.',
+        path: ['disabledReason'],
+      });
+    }
+
+    if (row.profileStatus === 'generic_unmeasured' && row.evidenceFixtureCount !== 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generic Negative Lab browser rows must not carry measured fixture evidence.',
+        path: ['evidenceFixtureCount'],
+      });
+    }
+  });
+
+export type NegativeLabRuntimeProfileBrowserRow = z.infer<typeof negativeLabRuntimeProfileBrowserRowSchema>;
+
 export const negativeLabResolvedRuntimeProfileSchema = z
   .object({
     claimLevel: z.enum(['generic_starting_point_only', 'measured_profile']),

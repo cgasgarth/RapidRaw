@@ -2,7 +2,9 @@
 // @ts-check
 
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
+import { negativeLabMeasuredProfileCatalogSchema } from '../src/schemas/negativeLabMeasuredProfileSchemas.ts';
 import { parseNegativeLabBuiltInUiPresetCatalog } from '../src/schemas/negativeLabPresetCatalogSchemas.ts';
+import { buildNegativeLabRuntimeProfileBrowserRows } from '../src/utils/negativeLabMeasuredProfileRuntime.ts';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -12,6 +14,7 @@ const unsafeClaims =
 const failures = [];
 const ids = new Set();
 parseNegativeLabBuiltInUiPresetCatalog(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG);
+const runtimeProfileRows = buildNegativeLabRuntimeProfileBrowserRows();
 
 for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
   ids.add(preset.presetId);
@@ -92,6 +95,113 @@ if (NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length < 12) {
   failures.push('Negative Lab UI preset catalog must include at least 12 generic family starters');
 }
 
+if (runtimeProfileRows.length !== NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length) {
+  failures.push('Negative Lab profile browser rows must expose every public generic preset');
+}
+
+for (const row of runtimeProfileRows) {
+  if (row.profileStatus !== 'generic_unmeasured' || !row.isSelectable || row.disabledReason !== null) {
+    failures.push(`${row.presetId}: public profile browser row must remain a selectable generic starter`);
+  }
+}
+
+const measuredProfileBase = {
+  claimLevel: 'measured_profile',
+  displayName: 'Measured C-41 Process Family',
+  evidenceFixtureIds: ['negative_lab.project_owned.c41_profile_measurement_001'],
+  filmClass: 'color_negative',
+  measurementProfileId: 'negative_lab.measured.c41.process_family.v1',
+  measurementSource: 'fixture_measured_profile',
+  params: {
+    base_fog_sample: null,
+    base_fog_strength: 1,
+    blue_weight: 1.02,
+    contrast: 1.04,
+    exposure: 0,
+    green_weight: 0.99,
+    red_weight: 1.03,
+  },
+  processFamily: 'c41_color_negative',
+  profileId: 'negative_lab.measured.c41.process_family.v1',
+  profileStatus: 'fixture_measured',
+  sourceGenericPresetId: 'negative_lab.generic.c41.neutral.v1',
+};
+const measuredBrowserRows = buildNegativeLabRuntimeProfileBrowserRows({
+  genericCatalog: NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
+  measuredCatalog: negativeLabMeasuredProfileCatalogSchema.parse({
+    catalogId: 'negative_lab_measured_profile_catalog',
+    catalogVersion: 'ui-self-test',
+    profiles: [
+      {
+        ...measuredProfileBase,
+        claimPolicy: 'process_family_profile_no_stock_claim',
+        doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],
+        runtimeLimitations: ['Runtime applies measured process-family parameters; no stock-emulation claim is made.'],
+        runtimeStatus: 'runtime_parameter_applied',
+      },
+      {
+        ...measuredProfileBase,
+        displayName: 'Catalog C-41 Process Family',
+        doesNotProve: [
+          'schema_only',
+          'no_runtime_profile_resolver',
+          'no_stock_emulation_claim',
+          'no_colorimetric_match_claim',
+        ],
+        claimPolicy: 'process_family_profile_no_stock_claim',
+        measurementProfileId: 'negative_lab.measured.c41.catalog_only.v1',
+        profileId: 'negative_lab.measured.c41.catalog_only.v1',
+        runtimeLimitations: ['Catalog and evidence gate only; no measured profile runtime resolver is applied yet.'],
+        runtimeStatus: 'ui_catalog_only',
+      },
+      {
+        ...measuredProfileBase,
+        displayName: 'Named Stock Review Profile',
+        doesNotProve: [
+          'schema_only',
+          'no_runtime_profile_resolver',
+          'no_stock_emulation_claim',
+          'no_colorimetric_match_claim',
+        ],
+        claimPolicy: 'named_stock_profile_requires_license_review',
+        measurementProfileId: 'negative_lab.measured.c41.named_review.v1',
+        profileId: 'negative_lab.measured.c41.named_review.v1',
+        runtimeLimitations: ['Named-stock language requires separate license review before runtime use.'],
+        runtimeStatus: 'ui_catalog_only',
+      },
+    ],
+    schemaVersion: 1,
+  }),
+});
+const runtimeAppliedMeasuredRow = measuredBrowserRows.find(
+  (row) => row.presetId === 'negative_lab.measured.c41.process_family.v1',
+);
+const catalogOnlyMeasuredRow = measuredBrowserRows.find(
+  (row) => row.presetId === 'negative_lab.measured.c41.catalog_only.v1',
+);
+const licenseReviewMeasuredRow = measuredBrowserRows.find(
+  (row) => row.presetId === 'negative_lab.measured.c41.named_review.v1',
+);
+
+if (
+  runtimeAppliedMeasuredRow?.profileStatus !== 'fixture_measured' ||
+  runtimeAppliedMeasuredRow.evidenceFixtureCount !== 1 ||
+  !runtimeAppliedMeasuredRow.isSelectable
+) {
+  failures.push('Runtime-applied measured profile browser row must be selectable with fixture evidence.');
+}
+
+if (catalogOnlyMeasuredRow?.isSelectable !== false || catalogOnlyMeasuredRow.disabledReason !== 'catalog_only') {
+  failures.push('Catalog-only measured profile browser row must be disabled with catalog-only reason.');
+}
+
+if (
+  licenseReviewMeasuredRow?.isSelectable !== false ||
+  licenseReviewMeasuredRow.disabledReason !== 'license_review_required'
+) {
+  failures.push('Named-stock review measured profile browser row must be disabled behind license review.');
+}
+
 const workflowStageKeys = [
   'workflowSetup',
   'workflowSetupDetailMultiple',
@@ -144,6 +254,9 @@ const workflowStageKeys = [
   'presetRuntimeApplied',
   'presetRuntimeCatalogOnly',
   'presetSpeedClass',
+  'profileEvidenceCount',
+  'profileMeasuredBadge',
+  'profileMeasuredClaimPolicy',
   'previewPending',
   'previewReady',
   'queuedScans',
@@ -222,6 +335,12 @@ for (const marker of [
   'negative-lab-preset-provenance',
   'negative-lab-preset-runtime-status',
   'negative-lab-preset-speed-class',
+  'negative-lab-profile-disabled-reason',
+  'negative-lab-profile-evidence-count',
+  'negative-lab-profile-measured-badge',
+  'negative-lab-profile-non-claims',
+  'negative-lab-profile-row-',
+  'negative-lab-profile-runtime-status',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`negative conversion modal is missing workflow marker: ${marker}`);
@@ -248,6 +367,15 @@ for (const fileName of readdirSync('src/i18n/locales')) {
   for (const key of workflowStageKeys) {
     if (typeof negativeConversion?.[key] !== 'string' || negativeConversion[key].trim().length === 0) {
       failures.push(`${fileName}: missing modals.negativeConversion.${key}`);
+    }
+  }
+
+  for (const key of ['catalog_only', 'license_review_required']) {
+    if (
+      typeof negativeConversion?.profileDisabledReasons?.[key] !== 'string' ||
+      negativeConversion.profileDisabledReasons[key].trim().length === 0
+    ) {
+      failures.push(`${fileName}: missing modals.negativeConversion.profileDisabledReasons.${key}`);
     }
   }
 

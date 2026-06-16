@@ -1,9 +1,12 @@
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCatalog';
 import {
+  type NegativeLabMeasuredProfile,
   type NegativeLabMeasuredProfileCatalog,
+  type NegativeLabRuntimeProfileBrowserRow,
   type NegativeLabResolvedRuntimeProfile,
   type NegativeLabRuntimePresetId,
+  negativeLabRuntimeProfileBrowserRowSchema,
   negativeLabResolvedRuntimeProfileSchema,
 } from '../schemas/negativeLabMeasuredProfileSchemas';
 import {
@@ -27,6 +30,65 @@ export const NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG = {
   genericCatalog: parseNegativeLabBuiltInUiPresetCatalog(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG),
   measuredCatalog: NEGATIVE_LAB_EMPTY_MEASURED_PROFILE_CATALOG,
 } satisfies NegativeLabRuntimeProfileCatalog;
+
+const getMeasuredProfileDisabledReason = (profile: NegativeLabMeasuredProfile) => {
+  if (profile.claimPolicy === 'named_stock_profile_requires_license_review') return 'license_review_required';
+  if (profile.runtimeStatus !== 'runtime_parameter_applied') return 'catalog_only';
+  return null;
+};
+
+export const buildNegativeLabRuntimeProfileBrowserRows = (
+  catalog: NegativeLabRuntimeProfileCatalog = NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
+): NegativeLabRuntimeProfileBrowserRow[] => {
+  const genericRows = catalog.genericCatalog.presets.map((preset) =>
+    negativeLabRuntimeProfileBrowserRowSchema.parse({
+      claimLevel: preset.claimLevel,
+      claimPolicy: preset.claimPolicy,
+      disabledReason: null,
+      displayName: preset.displayName,
+      doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],
+      evidenceFixtureCount: 0,
+      filmClass: preset.filmClass,
+      isSelectable: true,
+      measurementProfileId: preset.measurementProfileId,
+      params: preset.params,
+      presetId: preset.presetId,
+      processFamily: preset.processFamily,
+      profileStatus: preset.profileStatus,
+      provenanceSummary: preset.provenanceSummary,
+      runtimeStatus: preset.runtimeStatus,
+      sourceGenericPresetId: null,
+    }),
+  );
+
+  const measuredRows = catalog.measuredCatalog.profiles.map((profile) => {
+    const disabledReason = getMeasuredProfileDisabledReason(profile);
+
+    return negativeLabRuntimeProfileBrowserRowSchema.parse({
+      claimLevel: profile.claimLevel,
+      claimPolicy: profile.claimPolicy,
+      disabledReason,
+      displayName: profile.displayName,
+      doesNotProve: profile.doesNotProve,
+      evidenceFixtureCount: profile.evidenceFixtureIds.length,
+      filmClass: profile.filmClass,
+      isSelectable: disabledReason === null,
+      measurementProfileId: profile.measurementProfileId,
+      params: profile.params,
+      presetId: profile.profileId,
+      processFamily: profile.processFamily,
+      profileStatus: profile.profileStatus,
+      provenanceSummary:
+        disabledReason === null
+          ? `Fixture-measured process-family profile from ${profile.evidenceFixtureIds.length} approved fixture(s); no named-stock emulation claim.`
+          : profile.runtimeLimitations.join(' '),
+      runtimeStatus: profile.runtimeStatus,
+      sourceGenericPresetId: profile.sourceGenericPresetId,
+    });
+  });
+
+  return [...genericRows, ...measuredRows];
+};
 
 export const resolveNegativeLabRuntimeProfile = (
   presetId: NegativeLabRuntimePresetId,
