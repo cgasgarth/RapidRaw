@@ -564,6 +564,15 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-base-density-readout')
     .getByText('0.145 / 0.238 / 0.356', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-density-spread').getByText('0.211', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-dominant-density-channel').getByText('Blue', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-neutrality-status').getByText('Strong cast', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId('negative-lab-copy-readout').click();
   await page.getByTestId('negative-lab-copy-readout').getByText('Copied readout', { exact: true }).waitFor({
     timeout: 10_000,

@@ -1367,6 +1367,15 @@
       "baseRgb": "Base RGB",
       "baseDensity": "Base density",
       "copyReadout": "Copy readout JSON",
+      "densitometer": "Densitometer spread",
+      "densitometerChannelBlue": "Blue",
+      "densitometerChannelGreen": "Green",
+      "densitometerChannelRed": "Red",
+      "densitometerDominant": "Dominant density",
+      "densitometerNeutrality": "Neutrality",
+      "densitometerStatusBalanced": "Balanced",
+      "densitometerStatusMinorCast": "Minor cast",
+      "densitometerStatusStrongCast": "Strong cast",
       "readoutCopied": "Copied readout"
     },
     "panorama": {
