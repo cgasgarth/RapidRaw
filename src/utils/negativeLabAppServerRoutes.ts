@@ -1,10 +1,15 @@
+import { buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCatalog';
 import {
   negativeLabAppServerCommandSchema,
   negativeLabAppServerRouteManifestSchema,
   negativeLabConversionPlanResultSchema,
+  negativeLabFrameHealthAppServerCommandSchema,
+  negativeLabFrameHealthAppServerResultSchema,
   type NegativeLabAppServerCommand,
   type NegativeLabConversionPlanResult,
+  type NegativeLabFrameHealthAppServerCommand,
+  type NegativeLabFrameHealthAppServerResult,
 } from '../schemas/negativeLabAppServerSchemas';
 
 export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteManifestSchema.parse({
@@ -15,6 +20,13 @@ export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteM
       outputSchemaName: 'NegativeLabConversionPlanResultV1',
       reason:
         'Negative Lab app-server calls share the UI built-in preset catalog and deterministic conversion plan shape.',
+      status: 'mapped',
+    },
+    {
+      commandName: 'negative.lab.build_frame_health_report',
+      inputSchemaName: 'NegativeLabFrameHealthAppServerCommandV1',
+      outputSchemaName: 'NegativeLabFrameHealthReportV1',
+      reason: 'Negative Lab app-server calls expose the same roll frame health report used by the workspace UI.',
       status: 'mapped',
     },
   ],
@@ -50,4 +62,21 @@ export const buildNegativeLabConversionPlanResult = (
     scope: parsedCommand.scope,
     suffix: parsedCommand.suffix,
   });
+};
+
+export const buildNegativeLabFrameHealthRouteResult = (
+  command: NegativeLabFrameHealthAppServerCommand,
+): NegativeLabFrameHealthAppServerResult => {
+  const parsedCommand = negativeLabFrameHealthAppServerCommandSchema.parse(command);
+  const includedPathSet = new Set(parsedCommand.includedPaths);
+
+  return negativeLabFrameHealthAppServerResultSchema.parse(
+    buildNegativeLabFrameHealthReport({
+      activePathIndex: parsedCommand.activePathIndex,
+      baseFogConfidence: parsedCommand.baseFogConfidence,
+      includedPathSet,
+      previewReady: parsedCommand.previewReady,
+      targetPaths: parsedCommand.targetPaths,
+    }),
+  );
 };

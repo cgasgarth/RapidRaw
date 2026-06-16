@@ -6,17 +6,25 @@ import { z } from 'zod';
 
 import {
   buildNegativeLabConversionPlanResult,
+  buildNegativeLabFrameHealthRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../src/utils/negativeLabAppServerRoutes.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
 
 const expectedCommandName = 'negative.lab.build_conversion_plan';
+const expectedFrameHealthCommandName = 'negative.lab.build_frame_health_report';
 const route = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedCommandName,
+);
+const frameHealthRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
+  (candidate) => candidate.commandName === expectedFrameHealthCommandName,
 );
 
 if (route === undefined) {
   throw new Error(`Missing Negative Lab app-server route for ${expectedCommandName}.`);
+}
+if (frameHealthRoute === undefined) {
+  throw new Error(`Missing Negative Lab app-server route for ${expectedFrameHealthCommandName}.`);
 }
 
 const sampleRect = { height: 0.6, width: 0.12, x: 0.02, y: 0.2 };
@@ -60,6 +68,24 @@ const assertParamsMatch = (actualParams, expectedParams, label) => {
     }
   }
 };
+
+const frameHealthResult = buildNegativeLabFrameHealthRouteResult({
+  activePathIndex: 1,
+  baseFogConfidence: 0.82,
+  includedPaths: ['/roll/001.CR3', '/roll/002.CR3'],
+  previewReady: false,
+  targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
+});
+
+if (frameHealthResult.activeFrameId !== 'negative-lab-frame-2') {
+  throw new Error('Negative Lab app-server frame health route did not report the active frame.');
+}
+if (frameHealthResult.includedCount !== 2 || frameHealthResult.queuedCount !== 2) {
+  throw new Error('Negative Lab app-server frame health route did not report roll counts.');
+}
+if (!frameHealthResult.warningCodes.includes('excluded_from_batch')) {
+  throw new Error('Negative Lab app-server frame health route did not roll up skipped-frame warnings.');
+}
 
 for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
   const activeResult = conversionPlanResultSchema.parse(
@@ -107,7 +133,9 @@ try {
 }
 
 for (const [filePath, marker] of [
+  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabFrameHealthAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabConversionPlanResultSchema'],
+  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabFrameHealthRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabConversionPlanResult'],
   ['src/utils/negativeLabPresetCatalog.ts', 'NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG'],
 ]) {
@@ -117,4 +145,6 @@ for (const [filePath, marker] of [
   }
 }
 
-console.log(`negative lab app-server routes ok (${NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length} presets)`);
+console.log(
+  `negative lab app-server routes ok (${NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length} presets, ${NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.length} routes)`,
+);
