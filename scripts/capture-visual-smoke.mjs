@@ -166,13 +166,18 @@ const visualSmokeInvokeLogSchema = z.array(
 );
 const negativeLabOrthoPresetParamsSchema = z
   .object({
-    base_fog_sample: z.null(),
+    base_fog_sample: z.object({
+      height: z.literal(0.6),
+      width: z.literal(0.12),
+      x: z.literal(0.02),
+      y: z.literal(0.2),
+    }),
     base_fog_strength: z.literal(1),
-    blue_weight: z.literal(1.2),
+    blue_weight: z.literal(1.18),
     contrast: z.literal(1.2),
     exposure: z.literal(-0.05),
-    green_weight: z.literal(1.05),
-    red_weight: z.literal(0.75),
+    green_weight: z.literal(0.96),
+    red_weight: z.literal(1.07),
   })
   .passthrough();
 const negativeLabConvertArgsSchema = z.object({
@@ -549,6 +554,15 @@ async function prepareScenario(page, mode) {
   await page
     .getByTestId('negative-lab-preset-claim-policy')
     .getByText('Generic family descriptor only; no manufacturer, stock, or emulation claim.', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-sample-left-edge').click();
+  await page
+    .getByTestId('negative-lab-base-rgb-readout')
+    .getByText('183 / 147 / 112', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-base-density-readout')
+    .getByText('0.145 / 0.238 / 0.356', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-include-toggle-1').click();
   await page
