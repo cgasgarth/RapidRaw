@@ -97,6 +97,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:focus-ui-api', new Set(['bun scripts/check-focus-ui-api.mjs'])],
   ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario focus-ui'])],
   ['check:hdr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario hdr-ui'])],
+  ['check:panorama-ui-api', new Set(['bun scripts/check-panorama-ui-api.mjs'])],
   ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario panorama-ui'])],
   ['check:sr-ui-api', new Set(['bun scripts/check-sr-ui-api.mjs'])],
   ['check:sr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario sr-ui'])],
