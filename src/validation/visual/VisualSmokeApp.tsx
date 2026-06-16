@@ -55,6 +55,7 @@ const filmLookParityProofCases = [
 ] as const;
 const FILM_LOOK_PARITY_TITLE = 'Rendered parity proof';
 const FILM_LOOK_PARITY_FIXTURE_LABEL = 'Synthetic fixture';
+const NEGATIVE_LAB_NO_SAVED_PATHS_LABEL = 'No saved positives yet';
 const formatFilmLookParityDelta = (maxDelta: string) => `Delta ${maxDelta}`;
 
 const copy = {
@@ -329,6 +330,8 @@ function HdrVisualSmoke() {
 }
 
 function NegativeLabVisualSmoke() {
+  const [savedPaths, setSavedPaths] = useState<Array<string>>([]);
+
   return (
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
@@ -339,12 +342,18 @@ function NegativeLabVisualSmoke() {
       <NegativeConversionModal
         isOpen
         onClose={() => {}}
-        onSave={() => {}}
+        onSave={setSavedPaths}
         targetPaths={[
           '/fixtures/negative-lab/synthetic-color-negative-001.tif',
           '/fixtures/negative-lab/synthetic-gray-ramp-negative-002.tif',
         ]}
       />
+      <div
+        className="absolute bottom-4 left-4 z-30 rounded-md border border-white/10 bg-black/70 px-3 py-2 text-xs text-[#f3f4f1]"
+        data-testid="negative-lab-saved-path-proof"
+      >
+        {savedPaths.length > 0 ? savedPaths.join(', ') : NEGATIVE_LAB_NO_SAVED_PATHS_LABEL}
+      </div>
     </main>
   );
 }

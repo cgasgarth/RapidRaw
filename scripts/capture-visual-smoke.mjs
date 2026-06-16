@@ -496,6 +496,10 @@ async function prepareScenario(page, mode) {
     (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some((call) => call.command === 'convert_negatives'),
   );
   await assertNegativeLabInvokeProof(page);
+  await page
+    .getByTestId('negative-lab-saved-path-proof')
+    .getByText('/tmp/rawengine-negative-smoke-positive.tif', { exact: true })
+    .waitFor({ timeout: 10_000 });
 }
 
 async function main() {
