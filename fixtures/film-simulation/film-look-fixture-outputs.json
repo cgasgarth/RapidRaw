@@ -22,6 +22,12 @@
       "description": "Neutral creative color with modest contrast and restrained saturation.",
       "displayName": "Clean Color",
       "id": "film_look.generic.clean_color.v1",
+      "provenance": {
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
+      },
       "strengthDefault": 70,
       "strengthPreviews": {
         "appliedFull": {
@@ -101,6 +107,12 @@
       "description": "Warm print-style color with gentle highlight compression.",
       "displayName": "Warm Print",
       "id": "film_look.generic.warm_print.v1",
+      "provenance": {
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
+      },
       "strengthDefault": 65,
       "strengthPreviews": {
         "appliedFull": {
@@ -190,6 +202,12 @@
       "description": "Cool contrast color with deeper shadows and controlled saturation.",
       "displayName": "Cool Contrast",
       "id": "film_look.generic.cool_contrast.v1",
+      "provenance": {
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
+      },
       "strengthDefault": 60,
       "strengthPreviews": {
         "appliedFull": {
@@ -281,6 +299,12 @@
       "description": "Low-contrast faded color with lifted blacks and soft saturation.",
       "displayName": "Soft Fade",
       "id": "film_look.generic.soft_fade.v1",
+      "provenance": {
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
+      },
       "strengthDefault": 55,
       "strengthPreviews": {
         "appliedFull": {
@@ -370,6 +394,12 @@
       "description": "Monochrome rendering with balanced channel response and gentle texture defaults.",
       "displayName": "Mono Silver",
       "id": "film_look.generic.mono_silver.v1",
+      "provenance": {
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
+      },
       "strengthDefault": 75,
       "strengthPreviews": {
         "appliedFull": {
@@ -461,6 +491,12 @@
       "description": "Punchy color with stronger curve separation and subtle glow defaults.",
       "displayName": "Punch Color",
       "id": "film_look.generic.punch_color.v1",
+      "provenance": {
+        "claimLevel": "generic_engineered",
+        "legalNamingStatus": "generic_safe_name",
+        "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
+        "measurementSource": "generic_engineered_starting_point"
+      },
       "strengthDefault": 60,
       "strengthPreviews": {
         "appliedFull": {

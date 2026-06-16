@@ -35,6 +35,7 @@ const buildFixture = () => ({
       description: look.description,
       displayName: look.displayName,
       id: look.id,
+      provenance: look.provenance,
       strengthDefault: look.strengthDefault,
       strengthPreviews: {
         appliedFull: buildFilmLookAppliedAdjustmentPatch(look, 100),
@@ -101,9 +102,42 @@ for (const marker of ['FilmLookVisualSmoke', 'film-look-browser', 'film-look-adj
 }
 
 const utilsSource = await readFile(utilsSourceUrl, 'utf8');
+const unsafeClaims =
+  /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|identical|ilford|kodak|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;
+
+for (const look of FILM_LOOK_BROWSER_ITEMS) {
+  const claimText = [
+    look.id,
+    look.displayName,
+    look.description,
+    look.category,
+    look.provenance.claimLevel,
+    look.provenance.legalNamingStatus,
+    look.provenance.legalNote,
+    look.provenance.measurementSource,
+  ].join(' ');
+
+  if (unsafeClaims.test(claimText)) {
+    throw new Error(`${look.id}: generic film look contains unsafe stock, brand, or exact-emulation claim`);
+  }
+
+  if (
+    look.provenance.claimLevel !== 'generic_engineered' ||
+    look.provenance.legalNamingStatus !== 'generic_safe_name' ||
+    look.provenance.measurementSource !== 'generic_engineered_starting_point'
+  ) {
+    throw new Error(`${look.id}: built-in film look must use generic-safe provenance`);
+  }
+
+  if (!/\bnot measured\b/iu.test(look.provenance.legalNote)) {
+    throw new Error(`${look.id}: built-in film look legal note must disclose unmeasured status`);
+  }
+}
+
 for (const marker of [
   'buildFilmLookAppliedAdjustmentPatch',
   'buildFilmLookPresetDraft',
+  'GENERIC_FILM_LOOK_PROVENANCE',
   'formatFilmLookPresetName',
   'resetFilmLookControlledAdjustments',
   'scaleFilmLookAdjustmentPatch',
