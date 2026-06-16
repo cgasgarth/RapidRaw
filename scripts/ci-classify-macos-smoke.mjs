@@ -137,6 +137,10 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'schema:sr-app-server',
     new Set(['bun packages/rawengine-schema/scripts/check-super-resolution-app-server-command-bus.ts']),
   ],
+  [
+    'schema:panorama-app-server',
+    new Set(['bun packages/rawengine-schema/scripts/check-panorama-app-server-command-bus.ts']),
+  ],
 ]);
 
 function hasExtension(path, extensions) {

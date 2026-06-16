@@ -21,6 +21,7 @@ const CONTRACT_CHECKS = [
   'schema:hdr-app-server',
   'schema:hdr-api-tools',
   'schema:sr-app-server',
+  'schema:panorama-app-server',
   'check:tauri-schema-validation',
 ];
 
@@ -48,6 +49,7 @@ const PACKAGE_SCRIPT_NAMES = new Set([
   'schema:hdr-api-tools',
   'schema:hdr-app-server',
   'schema:sr-app-server',
+  'schema:panorama-app-server',
   'schema:samples',
   'schema:types',
 ]);
