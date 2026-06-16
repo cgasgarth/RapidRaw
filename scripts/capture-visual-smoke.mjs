@@ -526,6 +526,12 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-workspace').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-workflow-rail').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-batch-readiness').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-frame-count').getByText('Frames 2', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 0', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId('negative-lab-preset-inspector').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-preset-film-class').getByText('Color negative', { exact: true }).waitFor({
     timeout: 10_000,
@@ -556,6 +562,9 @@ async function prepareScenario(page, mode) {
     .getByText('Generic family descriptor only; no manufacturer, stock, or emulation claim.', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-sample-left-edge').click();
+  await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 1', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page
     .getByTestId('negative-lab-base-rgb-readout')
     .getByText('183 / 147 / 112', { exact: true })
