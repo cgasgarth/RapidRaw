@@ -133,6 +133,7 @@
     "check:focus-alignment-smoke": "bun scripts/check-focus-translation-alignment-smoke.mjs",
     "check:focus-sharpness-map-smoke": "bun scripts/check-focus-sharpness-map-smoke.mjs",
     "check:focus-preview-blend-smoke": "bun scripts/check-focus-preview-blend-smoke.mjs",
+    "check:focus-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario focus-ui",
     "check:sr-performance-fixtures": "bun scripts/check-super-resolution-performance-fixtures.mjs",
     "check:negative-lab-base-fog": "bun scripts/check-negative-lab-base-fog.mjs",
     "check:negative-lab-fixtures": "bun scripts/check-negative-lab-fixtures.mjs",
