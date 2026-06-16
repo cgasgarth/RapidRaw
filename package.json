@@ -164,6 +164,7 @@
     "check:negative-lab-base-fog": "bun scripts/check-negative-lab-base-fog.mjs",
     "check:negative-lab-fixtures": "bun scripts/check-negative-lab-fixtures.mjs",
     "check:negative-lab-fixtures:update": "bun scripts/check-negative-lab-fixtures.mjs --update",
+    "check:negative-lab-real-fixtures": "bun scripts/check-negative-lab-real-fixtures.mjs",
     "check:negative-lab-frame-health": "bun scripts/check-negative-lab-frame-health-report.mjs",
     "check:negative-lab-workspace": "bun scripts/check-negative-lab-workspace.mjs",
     "check:negative-lab-roll-cockpit": "bun scripts/check-negative-lab-roll-cockpit.mjs",
