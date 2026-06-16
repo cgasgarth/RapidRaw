@@ -43,6 +43,12 @@ const scenarios = [
     outputPath: resolve(outputDir, 'film-look-browser.png'),
     sectionMinimum: 2,
   },
+  {
+    marker: 'Color Workflow',
+    mode: 'color-workflow',
+    outputPath: resolve(outputDir, 'color-workflow.png'),
+    sectionMinimum: 2,
+  },
 ];
 const highDpiTargets = [
   { deviceScaleFactor: 1, name: 'empty-library-1x.png' },
@@ -162,6 +168,27 @@ async function assertFilmLookExportProof(page) {
 }
 
 async function prepareScenario(page, mode) {
+  if (mode === 'color-workflow') {
+    const colorSliders = page.locator('[data-visual-smoke-mode="color-workflow"] input[type="range"]');
+    await colorSliders.nth(0).fill('12');
+    await colorSliders.nth(3).fill('18');
+    await page.getByRole('button', { name: 'Off' }).nth(1).click();
+    await page.getByRole('button', { name: 'Off' }).nth(1).click();
+    await page.getByTestId('color-workflow-adjustment-proof').getByText('Temp 12', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('color-workflow-adjustment-proof').getByText('Sat 18', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('color-workflow-adjustment-proof').getByText('CB on', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('color-workflow-adjustment-proof').getByText('CM on', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    return;
+  }
+
   if (mode === 'film-look-browser') {
     await page.getByLabel('Warm Print', { exact: true }).click();
     await page.getByTestId('film-look-adjustment-proof').getByText('Temp 5').waitFor({ timeout: 10_000 });

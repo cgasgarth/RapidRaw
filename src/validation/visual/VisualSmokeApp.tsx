@@ -1,6 +1,7 @@
 import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
+import ColorPanel from '../../components/adjustments/Color';
 import EffectsPanel from '../../components/adjustments/Effects';
 import HdrModal from '../../components/modals/HdrModal';
 import NegativeConversionModal from '../../components/modals/NegativeConversionModal';
@@ -41,6 +42,7 @@ const copy = {
   filmLook: 'Film look',
   filmPreset: 'Neutral 400',
   panoramaSmoke: 'Panorama UI Smoke',
+  colorWorkflow: 'Color Workflow',
   frameStatus: (rating: string) => `Rating ${rating} / RAW / edited`,
 } as const;
 
@@ -75,7 +77,13 @@ const filmSmokeMetricLabels = {
   highlights: 'Highlights',
   temperature: 'Temp',
 } as const;
-const formatFilmSmokeMetric = (label: string, value: number) => `${label} ${value}`;
+const formatSmokeMetric = (label: string, value: number | string) => `${label} ${value}`;
+const colorSmokeMetricLabels = {
+  channelMixer: 'CM',
+  colorBalance: 'CB',
+  saturation: 'Sat',
+  temperature: 'Temp',
+} as const;
 
 function PanoramaVisualSmoke() {
   const [settings, setSettings] = useState<PanoramaUiSettings>(DEFAULT_PANORAMA_UI_SETTINGS);
@@ -185,10 +193,10 @@ function FilmLookVisualSmoke() {
               className="grid grid-cols-4 gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-sm"
               data-testid="film-look-adjustment-proof"
             >
-              <span>{formatFilmSmokeMetric(filmSmokeMetricLabels.temperature, adjustments.temperature)}</span>
-              <span>{formatFilmSmokeMetric(filmSmokeMetricLabels.contrast, adjustments.contrast)}</span>
-              <span>{formatFilmSmokeMetric(filmSmokeMetricLabels.highlights, adjustments.highlights)}</span>
-              <span>{formatFilmSmokeMetric(filmSmokeMetricLabels.grain, adjustments.grainAmount)}</span>
+              <span>{formatSmokeMetric(filmSmokeMetricLabels.temperature, adjustments.temperature)}</span>
+              <span>{formatSmokeMetric(filmSmokeMetricLabels.contrast, adjustments.contrast)}</span>
+              <span>{formatSmokeMetric(filmSmokeMetricLabels.highlights, adjustments.highlights)}</span>
+              <span>{formatSmokeMetric(filmSmokeMetricLabels.grain, adjustments.grainAmount)}</span>
             </div>
           </div>
         </section>
@@ -203,6 +211,59 @@ function FilmLookVisualSmoke() {
             isForMask={false}
             setAdjustments={handleAdjustmentsChange}
           />
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function ColorWorkflowVisualSmoke() {
+  const [adjustments, setAdjustments] = useState<Adjustments>(() => structuredClone(INITIAL_ADJUSTMENTS));
+  const handleAdjustmentsChange = (update: Partial<Adjustments> | ((current: Adjustments) => Adjustments)) => {
+    setAdjustments((current) => (typeof update === 'function' ? update(current) : { ...current, ...update }));
+  };
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="color-workflow"
+    >
+      <div className="grid h-screen grid-cols-[1fr_420px] overflow-hidden">
+        <section className="relative min-w-0 bg-[#0f1114] p-6" data-visual-smoke-section="color-workflow-preview">
+          <div className="mx-auto flex h-full max-w-4xl flex-col justify-center gap-5">
+            <div className="aspect-[4/3] overflow-hidden rounded-md border border-white/10 bg-[linear-gradient(135deg,#182629,#435b5a_42%,#c79c63_72%,#f4d6a1)] shadow-2xl">
+              <div className="h-full w-full bg-[radial-gradient(circle_at_38%_32%,rgba(255,246,219,0.48),transparent_20%),linear-gradient(170deg,transparent_45%,rgba(24,43,50,0.72)_46%)]" />
+            </div>
+            <div
+              className="grid grid-cols-4 gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-sm"
+              data-testid="color-workflow-adjustment-proof"
+            >
+              <span>{formatSmokeMetric(colorSmokeMetricLabels.temperature, adjustments.temperature)}</span>
+              <span>{formatSmokeMetric(colorSmokeMetricLabels.saturation, adjustments.saturation)}</span>
+              <span>
+                {formatSmokeMetric(
+                  colorSmokeMetricLabels.colorBalance,
+                  adjustments.colorBalanceRgb.enabled ? 'on' : 'off',
+                )}
+              </span>
+              <span>
+                {formatSmokeMetric(
+                  colorSmokeMetricLabels.channelMixer,
+                  adjustments.channelMixer.enabled ? 'on' : 'off',
+                )}
+              </span>
+            </div>
+          </div>
+        </section>
+        <aside
+          className="overflow-y-auto border-l border-white/10 bg-[#15181c] p-3"
+          data-visual-smoke-section="color-workflow-panel"
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-semibold">{copy.colorWorkflow}</span>
+          </div>
+          <ColorPanel adjustments={adjustments} appSettings={null} setAdjustments={handleAdjustmentsChange} />
         </aside>
       </div>
     </main>
@@ -224,6 +285,10 @@ function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
 
   if (mode === 'film-look-browser') {
     return <FilmLookVisualSmoke />;
+  }
+
+  if (mode === 'color-workflow') {
+    return <ColorWorkflowVisualSmoke />;
   }
 
   const scenario = mode === 'empty-library' ? 'Empty Library Startup' : 'Editor Shell Smoke';
