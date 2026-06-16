@@ -200,6 +200,7 @@
     "schema:contract-gate": "bun scripts/ci-schema-contract-gate.mjs",
     "schema:contract-gate:self-test": "bun scripts/ci-schema-contract-gate.mjs --self-test",
     "check:agent-rollback-proof": "bun scripts/check-agent-rollback-proof.mjs",
+    "check:agent-proof-gallery": "bun scripts/generate-agent-proof-gallery.mjs",
     "schema:focus-app-server": "bun packages/rawengine-schema/scripts/check-focus-app-server-command-bus.ts",
     "schema:hdr-app-server": "bun packages/rawengine-schema/scripts/check-hdr-app-server-command-bus.ts",
     "schema:hdr-api-tools": "bun packages/rawengine-schema/scripts/check-hdr-api-tools.ts",
