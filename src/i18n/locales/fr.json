@@ -1393,7 +1393,18 @@
       "patchSamplerHint": "Probe shadows, highlights, and base strips without changing the active conversion.",
       "patchSampleOverlayLabel": "Densitometer patch sample",
       "sampleHighlightPatch": "Highlight patch",
-      "sampleShadowPatch": "Shadow patch"
+      "sampleShadowPatch": "Shadow patch",
+      "applyCustomBase": "Apply sample",
+      "customBaseSample": "Custom base sample",
+      "customBaseSampleHint": "Measure a normalized base/fog rectangle, then explicitly apply it to conversion.",
+      "customBaseSampleOverlayLabel": "Custom base sample overlay",
+      "measureCustomBase": "Measure sample",
+      "customSample": {
+        "x": "X",
+        "y": "Y",
+        "width": "Width",
+        "height": "Height"
+      }
     },
     "panorama": {
       "cancel": "Annuler",
