@@ -1,5 +1,10 @@
 import { computationalMergeAppServerRouteManifestSchema } from '../schemas/computationalMergeAppServerSchemas';
 
+import type {
+  ComputationalMergeAppServerRoute,
+  ComputationalMergeAppServerRouteFamily,
+} from '../schemas/computationalMergeAppServerSchemas';
+
 const dryRunOutputSchemaName = 'ComputationalMergeDryRunResultV1';
 const applyOutputSchemaName = 'ComputationalMergeMutationResultV1';
 const inputSchemaName = 'ComputationalMergeCommandEnvelopeV1';
@@ -99,3 +104,25 @@ export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST = computationalMergeA
 });
 
 export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTES = COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_MANIFEST.routes;
+
+export interface ComputationalMergeAppServerRoutePair {
+  apply: ComputationalMergeAppServerRoute;
+  dryRun: ComputationalMergeAppServerRoute;
+}
+
+export function getComputationalMergeAppServerRoutePair(
+  family: ComputationalMergeAppServerRouteFamily,
+): ComputationalMergeAppServerRoutePair {
+  const dryRun = COMPUTATIONAL_MERGE_APP_SERVER_ROUTES.find(
+    (route) => route.family === family && route.executionMode === 'dry_run_command',
+  );
+  const apply = COMPUTATIONAL_MERGE_APP_SERVER_ROUTES.find(
+    (route) => route.family === family && route.executionMode === 'apply_dry_run_plan',
+  );
+
+  if (dryRun === undefined || apply === undefined) {
+    throw new Error(`Computational merge app-server route pair is incomplete for ${family}.`);
+  }
+
+  return { apply, dryRun };
+}
