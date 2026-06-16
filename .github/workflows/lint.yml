@@ -76,6 +76,18 @@ jobs:
       - name: Lint translations
         run: bun run i18n:lint
 
+  frontend-unused-deps:
+    name: 'frontend: unused dependency gate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - uses: ./.github/actions/setup-bun-deps
+
+      - name: Check unused dependencies
+        run: bun run check:unused-deps
+
   frontend-unsafe-casts:
     name: 'frontend: unsafe cast ban'
     runs-on: ubuntu-latest
@@ -553,6 +565,7 @@ jobs:
       - frontend-lint
       - frontend-format
       - frontend-i18n-lint
+      - frontend-unused-deps
       - frontend-unsafe-casts
       - generated-type-drift
       - schema-check

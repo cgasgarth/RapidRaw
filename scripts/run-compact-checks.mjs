@@ -7,6 +7,7 @@ const CHECK_GROUPS = {
     'check:types',
     'check:script-type-coverage',
     'check:script-type-coverage:self-test',
+    'check:unused-deps',
     'check:i18n',
     'check:unsafe-casts',
     'check:film-fixtures',
