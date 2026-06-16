@@ -21,7 +21,6 @@ import { useTranslation, Trans } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
 import {
-  negativeBaseFogDensitometerReadoutSchema,
   negativeBaseFogEstimateSchema,
   negativeBaseFogSampleReadoutSchema,
   negativeConversionSavedPathsSchema,
@@ -33,6 +32,7 @@ import {
 } from '../../schemas/negativeLabPresetCatalogSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildNegativeBaseFogDensitometerReadout } from '../../utils/negativeLabDensitometer';
 import {
   buildNegativeLabBatchDryRunSummary,
   buildNegativeLabFrameHealthReport,
@@ -91,26 +91,6 @@ const BASE_FOG_SAMPLE_PRESETS = [
     rect: { height: 0.22, width: 0.22, x: 0.39, y: 0.39 },
   },
 ] satisfies Array<{ labelKey: BaseFogSampleLabelKey; rect: NegativeLabBaseFogSampleRect }>;
-
-function buildDensitometerReadout(estimate: NegativeBaseFogEstimate): NegativeBaseFogDensitometerReadout {
-  const [redDensity, greenDensity, blueDensity] = estimate.baseDensity;
-  const channelDensities = [
-    { channel: 'red', density: redDensity },
-    { channel: 'green', density: greenDensity },
-    { channel: 'blue', density: blueDensity },
-  ] satisfies Array<{ channel: NegativeBaseFogDensitometerReadout['dominantChannel']; density: number }>;
-  const densityValues = channelDensities.map(({ density }) => density);
-  const densityRange = Math.max(...densityValues) - Math.min(...densityValues);
-  const dominantChannel = channelDensities.reduce((maxChannel, channel) =>
-    channel.density > maxChannel.density ? channel : maxChannel,
-  ).channel;
-
-  return negativeBaseFogDensitometerReadoutSchema.parse({
-    densityRange,
-    dominantChannel,
-    status: densityRange <= 0.08 ? 'balanced' : densityRange <= 0.18 ? 'minor_cast' : 'strong_cast',
-  });
-}
 
 type NegativeLabWorkflowStageId = 'setup' | 'preset' | 'colorTiming' | 'printGrade' | 'export';
 
@@ -183,7 +163,7 @@ export default function NegativeConversionModal({
     });
   }, [activeBaseFogSampleLabel, baseFogConfidence, params.base_fog_sample]);
   const densitometerReadout = useMemo(
-    () => (baseFogEstimate === null ? null : buildDensitometerReadout(baseFogEstimate)),
+    () => (baseFogEstimate === null ? null : buildNegativeBaseFogDensitometerReadout(baseFogEstimate)),
     [baseFogEstimate],
   );
 
