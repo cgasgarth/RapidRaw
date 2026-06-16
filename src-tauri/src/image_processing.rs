@@ -57,6 +57,8 @@ pub struct RawEngineArtifacts {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hdr_merge_artifacts: Vec<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub negative_lab_artifacts: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub panorama_artifacts: Vec<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stale_artifact_ids: Vec<String>,
@@ -3534,6 +3536,7 @@ mod tests {
                     "settingsHash": "sha256:sample-ai-subject-mask-settings"
                 })],
                 hdr_merge_artifacts: Vec::new(),
+                negative_lab_artifacts: Vec::new(),
                 panorama_artifacts: vec![json!({
                     "artifactId": "artifact_panorama_session_0001",
                     "provenance": { "runtimeStatus": "rendered" }
