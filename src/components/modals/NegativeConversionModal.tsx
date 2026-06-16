@@ -24,8 +24,13 @@ import type {
 } from '../../schemas/negativeLabPresetCatalogSchemas';
 
 type NegativeParams = NegativeLabPresetParams;
+type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
+const DEFAULT_SAVE_OPTIONS = {
+  outputFormat: 'tiff16' as NegativeOutputFormat,
+  suffix: 'Positive',
+};
 
 type NegativeLabWorkflowStageId = 'setup' | 'preset' | 'colorTiming' | 'printGrade' | 'export';
 
@@ -56,6 +61,7 @@ export default function NegativeConversionModal({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+  const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [zoom, setZoom] = useState(1);
@@ -113,13 +119,17 @@ export default function NegativeConversionModal({
       {
         detail: isSaving
           ? t('modals.negativeConversion.workflowExportConverting')
-          : t('modals.negativeConversion.workflowExportReady'),
+          : t(
+              saveOptions.outputFormat === 'tiff16'
+                ? 'modals.negativeConversion.workflowExportReadyTiff'
+                : 'modals.negativeConversion.workflowExportReadyJpeg',
+            ),
         id: 'export',
         isComplete: !isLoading && previewUrl !== null,
         label: t('modals.negativeConversion.workflowExport'),
       },
     ],
-    [isLoading, isSaving, params, previewUrl, selectedPreset, t, targetPaths.length],
+    [isLoading, isSaving, params, previewUrl, saveOptions.outputFormat, selectedPreset, t, targetPaths.length],
   );
 
   useEffect(() => {
@@ -238,6 +248,7 @@ export default function NegativeConversionModal({
       setPan({ x: 0, y: 0 });
       setIsLoading(true);
       setProgress(null);
+      setSaveOptions(DEFAULT_SAVE_OPTIONS);
     }, 300);
     return () => {
       window.clearTimeout(timer);
@@ -265,6 +276,7 @@ export default function NegativeConversionModal({
       const savedPaths: string[] = await invoke('convert_negatives', {
         paths: targetPaths,
         params,
+        options: saveOptions,
       });
       onSave(savedPaths);
       onClose();
@@ -402,6 +414,47 @@ export default function NegativeConversionModal({
               }}
               fillOrigin="min"
             />
+          </div>
+        </div>
+
+        <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
+          <UiText variant={TextVariants.heading} className="mb-2">
+            {t('modals.negativeConversion.exportOptions')}
+          </UiText>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              {(['tiff16', 'jpeg_proof'] satisfies Array<NegativeOutputFormat>).map((format) => (
+                <button
+                  key={format}
+                  type="button"
+                  aria-pressed={saveOptions.outputFormat === format}
+                  onClick={() => {
+                    setSaveOptions((current) => ({ ...current, outputFormat: format }));
+                  }}
+                  className={cx(
+                    'rounded-md border px-3 py-2 text-sm transition-colors',
+                    saveOptions.outputFormat === format
+                      ? 'border-accent bg-accent/10 text-text-primary'
+                      : 'border-surface bg-bg-primary text-text-secondary hover:bg-surface',
+                  )}
+                >
+                  {t(`modals.negativeConversion.outputFormats.${format}`)}
+                </button>
+              ))}
+            </div>
+            <label className="block">
+              <UiText as="span" variant={TextVariants.small} className="mb-1 block text-text-secondary">
+                {t('modals.negativeConversion.outputSuffix')}
+              </UiText>
+              <input
+                className="w-full rounded-md border border-surface bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none focus:border-accent"
+                maxLength={40}
+                onChange={(event) => {
+                  setSaveOptions((current) => ({ ...current, suffix: event.target.value }));
+                }}
+                value={saveOptions.suffix}
+              />
+            </label>
           </div>
         </div>
 

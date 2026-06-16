@@ -1314,13 +1314,20 @@
       "workflowCustomPresetDetail": "Mix personalizzato",
       "workflowExport": "Esporta",
       "workflowExportConverting": "Conversione",
-      "workflowExportReady": "Anteprima pronta",
       "workflowPreset": "Preset",
       "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}",
       "workflowPrintGrade": "Grado",
       "workflowSetup": "Setup",
       "workflowSetupDetailSingle": "1 scansione",
-      "workflowSetupDetailMultiple": "{{scanCount}} scansioni"
+      "workflowSetupDetailMultiple": "{{scanCount}} scansioni",
+      "exportOptions": "Opzioni di esportazione",
+      "outputSuffix": "Suffisso output",
+      "outputFormats": {
+        "jpeg_proof": "Prova JPEG",
+        "tiff16": "TIFF 16 bit"
+      },
+      "workflowExportReadyJpeg": "Prova JPEG pronta",
+      "workflowExportReadyTiff": "TIFF 16 bit pronto"
     },
     "panorama": {
       "cancel": "Annulla",

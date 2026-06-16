@@ -1313,13 +1313,20 @@
       "workflowCustomPresetDetail": "Своя смесь",
       "workflowExport": "Экспорт",
       "workflowExportConverting": "Конвертация",
-      "workflowExportReady": "Превью готово",
       "workflowPreset": "Пресет",
       "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}",
       "workflowPrintGrade": "Градация",
       "workflowSetup": "Setup",
       "workflowSetupDetailSingle": "1 скан",
-      "workflowSetupDetailMultiple": "{{scanCount}} сканов"
+      "workflowSetupDetailMultiple": "{{scanCount}} сканов",
+      "exportOptions": "Параметры экспорта",
+      "outputSuffix": "Суффикс вывода",
+      "outputFormats": {
+        "jpeg_proof": "JPEG-проба",
+        "tiff16": "16-бит TIFF"
+      },
+      "workflowExportReadyJpeg": "JPEG-проба готова",
+      "workflowExportReadyTiff": "16-бит TIFF готов"
     },
     "panorama": {
       "cancel": "Отмена",
