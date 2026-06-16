@@ -114,25 +114,25 @@ impl NegativeConversionSaveOptions {
             return Ok(());
         }
 
-        let plan_hash = self
-            .accepted_dry_run_plan_hash
-            .as_deref()
-            .ok_or_else(|| "Batch negative export requires an accepted dry-run plan hash.".to_string())?;
-        let plan_id = self
-            .accepted_dry_run_plan_id
-            .as_deref()
-            .ok_or_else(|| "Batch negative export requires an accepted dry-run plan id.".to_string())?;
+        let plan_hash = self.accepted_dry_run_plan_hash.as_deref().ok_or_else(|| {
+            "Batch negative export requires an accepted dry-run plan hash.".to_string()
+        })?;
+        let plan_id = self.accepted_dry_run_plan_id.as_deref().ok_or_else(|| {
+            "Batch negative export requires an accepted dry-run plan id.".to_string()
+        })?;
 
         if !is_valid_negative_lab_plan_hash(plan_hash) {
             return Err("Batch negative export accepted dry-run plan hash is invalid.".to_string());
         }
 
-        let hash_suffix = plan_hash
-            .strip_prefix("fnv1a32:")
-            .ok_or_else(|| "Batch negative export accepted dry-run plan hash is invalid.".to_string())?;
+        let hash_suffix = plan_hash.strip_prefix("fnv1a32:").ok_or_else(|| {
+            "Batch negative export accepted dry-run plan hash is invalid.".to_string()
+        })?;
         let expected_plan_id = format!("negative_lab_batch_plan_{hash_suffix}");
         if plan_id != expected_plan_id {
-            return Err("Batch negative export accepted dry-run plan id does not match hash.".to_string());
+            return Err(
+                "Batch negative export accepted dry-run plan id does not match hash.".to_string(),
+            );
         }
 
         Ok(())
