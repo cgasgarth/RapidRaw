@@ -7,6 +7,7 @@ import {
   negativeLabFixtureManifestV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
+  negativeLabMeasurementReportSchema,
   negativeLabMeasuredProfileCatalogSchema,
   negativeLabMeasuredProfileSchema,
 } from '../src/schemas/negativeLabMeasuredProfileSchemas.ts';
@@ -98,6 +99,7 @@ const validMeasuredFixture = negativeLabFixtureManifestEntryV1Schema.parse({
   bitDepth: 16,
   captureProfile: 'camera_tiff_profile',
   colorProfile: 'rawengine_camera_tiff_profile_v1',
+  contentHash: 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
   derivativeDistributionAllowed: false,
   developmentNotes: 'Project-owned measured process-family fixture; no named-stock emulation claim.',
   developmentProcessKnown: true,
@@ -163,6 +165,7 @@ const validMeasuredFixture = negativeLabFixtureManifestEntryV1Schema.parse({
 });
 
 const validMeasuredProfile = {
+  calibrationMethod: 'density_matrix_process_family_v1',
   claimLevel: 'measured_profile',
   claimPolicy: 'process_family_profile_no_stock_claim',
   displayName: 'Measured C-41 Process Family',
@@ -172,6 +175,11 @@ const validMeasuredProfile = {
     'no_stock_emulation_claim',
     'no_colorimetric_match_claim',
   ],
+  evidenceDigest: {
+    fixtureLegalStatus: 'project_owned_private_ci',
+    renderProofStatus: 'metadata_only',
+    sourceFixtureContentHashes: [validMeasuredFixture.contentHash],
+  },
   evidenceFixtureIds: [validMeasuredFixture.fixtureId],
   filmClass: 'color_negative',
   measurementProfileId: 'negative_lab.measured.c41.process_family.v1',
@@ -196,6 +204,10 @@ const validMeasuredProfile = {
 const validRuntimeAppliedMeasuredProfile = {
   ...validMeasuredProfile,
   doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],
+  evidenceDigest: {
+    ...validMeasuredProfile.evidenceDigest,
+    renderProofStatus: 'runtime_route_verified',
+  },
   params: {
     ...validMeasuredProfile.params,
     blue_weight: 1.07,
@@ -206,6 +218,27 @@ const validRuntimeAppliedMeasuredProfile = {
   runtimeLimitations: ['Runtime applies measured process-family parameters; no stock-emulation claim is made.'],
   runtimeStatus: 'runtime_parameter_applied',
 };
+const validMeasurementReport = {
+  calibrationMethod: validRuntimeAppliedMeasuredProfile.calibrationMethod,
+  doesNotProve: validRuntimeAppliedMeasuredProfile.doesNotProve,
+  evidenceDigest: validRuntimeAppliedMeasuredProfile.evidenceDigest,
+  fittedParams: validRuntimeAppliedMeasuredProfile.params,
+  generatedAt: '2026-06-16',
+  measurementSoftware: 'rawengine_negative_lab_measurement_harness.v1',
+  operator: 'RawEngine fixture validator',
+  patchMetrics: {
+    deltaE00Max: 5.4,
+    deltaE00Mean: 1.2,
+    deltaE00P95: 3.1,
+    rejectedPatchCount: 1,
+    usedPatchCount: 23,
+  },
+  profileId: validRuntimeAppliedMeasuredProfile.profileId,
+  reportHash: 'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+  reportId: 'negative_lab_measurement_report.c41_process_family.v1',
+  sourceFixtureIds: validRuntimeAppliedMeasuredProfile.evidenceFixtureIds,
+  targetReference: validMeasuredFixture.measuredProfileEvidence.targetReference,
+};
 
 const expectReject = (label, catalog, fixtures) => {
   try {
@@ -213,6 +246,16 @@ const expectReject = (label, catalog, fixtures) => {
     throw new Error(`accepted invalid measured profile case: ${label}`);
   } catch (error) {
     if (error instanceof Error && error.message === `accepted invalid measured profile case: ${label}`) {
+      throw error;
+    }
+  }
+};
+const expectMeasurementReportReject = (label, report) => {
+  try {
+    negativeLabMeasurementReportSchema.parse(report);
+    throw new Error(`accepted invalid measurement report case: ${label}`);
+  } catch (error) {
+    if (error instanceof Error && error.message === `accepted invalid measurement report case: ${label}`) {
       throw error;
     }
   }
@@ -232,6 +275,7 @@ validateMeasuredProfileCatalog(
   }),
   [validMeasuredFixture],
 );
+negativeLabMeasurementReportSchema.parse(validMeasurementReport);
 
 const runtimeSelfTestCatalog = {
   genericCatalog: NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
@@ -253,6 +297,13 @@ if (
   resolvedRuntimeProfile.params.red_weight !== validRuntimeAppliedMeasuredProfile.params.red_weight
 ) {
   throw new Error('Measured Negative Lab runtime resolver did not preserve measured profile provenance and params.');
+}
+
+if (
+  resolvedRuntimeProfile.evidenceDigest?.renderProofStatus !== 'runtime_route_verified' ||
+  resolvedRuntimeProfile.evidenceDigest.sourceFixtureContentHashes[0] !== validMeasuredFixture.contentHash
+) {
+  throw new Error('Measured Negative Lab runtime resolver did not preserve evidence digest.');
 }
 
 const runtimeConversionPlan = buildNegativeLabConversionPlanResult(
@@ -362,6 +413,21 @@ expectReject(
   [validMeasuredFixture],
 );
 expectReject(
+  'runtime applied without proof status',
+  {
+    catalogId: 'negative_lab_measured_profile_catalog',
+    catalogVersion: 'self-test',
+    profiles: [
+      {
+        ...validRuntimeAppliedMeasuredProfile,
+        evidenceDigest: { ...validRuntimeAppliedMeasuredProfile.evidenceDigest, renderProofStatus: 'metadata_only' },
+      },
+    ],
+    schemaVersion: 1,
+  },
+  [validMeasuredFixture],
+);
+expectReject(
   'catalog only without no resolver disclosure',
   {
     catalogId: 'negative_lab_measured_profile_catalog',
@@ -401,5 +467,31 @@ expectReject(
   },
   [validMeasuredFixture],
 );
+expectMeasurementReportReject('missing stock disclaimer', {
+  ...validMeasurementReport,
+  doesNotProve: ['no_colorimetric_match_claim'],
+});
+expectMeasurementReportReject('missing colorimetric disclaimer', {
+  ...validMeasurementReport,
+  doesNotProve: ['no_stock_emulation_claim'],
+});
+expectMeasurementReportReject('fixture hash mismatch', {
+  ...validMeasurementReport,
+  evidenceDigest: {
+    ...validMeasurementReport.evidenceDigest,
+    sourceFixtureContentHashes: [
+      validMeasurementReport.evidenceDigest.sourceFixtureContentHashes[0],
+      validMeasurementReport.evidenceDigest.sourceFixtureContentHashes[0],
+    ],
+  },
+});
+expectMeasurementReportReject('unordered delta e', {
+  ...validMeasurementReport,
+  patchMetrics: {
+    ...validMeasurementReport.patchMetrics,
+    deltaE00Mean: 4,
+    deltaE00P95: 3,
+  },
+});
 
 console.log(`negative lab measured profiles ok (${measuredCatalog.profiles.length} shipped profiles)`);
