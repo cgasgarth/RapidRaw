@@ -200,9 +200,22 @@ export const negativeBaseFogEstimateSchema = z
   })
   .strict();
 
+export const negativeBaseFogSampleReadoutSchema = z
+  .object({
+    areaPercent: z.number().min(0).max(100),
+    confidencePercent: z.number().int().min(0).max(100).nullable(),
+    heightPercent: z.number().min(0).max(100),
+    label: z.string().trim().min(1),
+    widthPercent: z.number().min(0).max(100),
+    xPercent: z.number().min(0).max(100),
+    yPercent: z.number().min(0).max(100),
+  })
+  .strict();
+
 export const negativeConversionSavedPathsSchema = z.array(z.string().trim().min(1)).min(1);
 
 export type NegativeBaseFogEstimate = z.infer<typeof negativeBaseFogEstimateSchema>;
+export type NegativeBaseFogSampleReadout = z.infer<typeof negativeBaseFogSampleReadoutSchema>;
 
 export const parseNegativeBaseFogEstimate = (value: unknown): NegativeBaseFogEstimate =>
   negativeBaseFogEstimateSchema.parse(value);
