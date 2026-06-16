@@ -2170,6 +2170,67 @@ export const panoramaBackendExposureModeV1Schema = z.enum([
   'opencv_channels_blocks',
 ]);
 
+export const panoramaInvalidationReasonV1Schema = z.enum([
+  'alignment_settings_changed',
+  'boundary_settings_changed',
+  'engine_version_changed',
+  'exposure_settings_changed',
+  'output_artifact_changed',
+  'projection_settings_changed',
+  'source_content_hash_changed',
+  'source_graph_revision_changed',
+  'source_order_changed',
+  'source_set_changed',
+]);
+
+export const panoramaStaleStateV1Schema = z.enum(['current', 'stale', 'unknown']);
+
+const panoramaSourceStateV1Schema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    graphRevision: z.string().trim().min(1),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const validatePanoramaSourceState = (
+  sourceImageRefs: Array<{ sourceIndex: number }>,
+  sourceStates: Array<z.infer<typeof panoramaSourceStateV1Schema>>,
+  context: z.RefinementCtx,
+  path: Array<string | number>,
+) => {
+  const sourceIndexes = new Set(sourceImageRefs.map((source) => source.sourceIndex));
+  const stateIndexes = new Set<number>();
+
+  for (const [index, sourceState] of sourceStates.entries()) {
+    if (stateIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Panorama source state entries require unique source indexes.',
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+
+    stateIndexes.add(sourceState.sourceIndex);
+
+    if (!sourceIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Panorama source state entries must reference sourceImageRefs.',
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+  }
+
+  if (stateIndexes.size !== sourceIndexes.size) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Panorama source state entries must cover every source image.',
+      path,
+    });
+  }
+};
+
 export const panoramaBackendCapabilityReportV1Schema = z
   .object({
     backendId: panoramaBackendIdV1Schema,
@@ -2462,6 +2523,14 @@ export const panoramaArtifactV1Schema = z
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
     seamPolicy: panoramaSeamPolicyV1Schema,
     sourceImageRefs: z.array(panoramaSourceImageRefV1Schema).min(2),
+    sourceState: z.array(panoramaSourceStateV1Schema).min(2),
+    staleState: z
+      .object({
+        checkedAt: z.iso.datetime({ offset: true }).optional(),
+        invalidationReasons: z.array(panoramaInvalidationReasonV1Schema),
+        state: panoramaStaleStateV1Schema,
+      })
+      .strict(),
     validationMetrics: panoramaValidationMetricsV1Schema,
     warnings: z.array(panoramaWarningCodeSchema),
   })
@@ -2534,6 +2603,22 @@ export const panoramaArtifactV1Schema = z
       });
     }
 
+    if (artifact.staleState.state === 'current' && artifact.staleState.invalidationReasons.length > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Current panorama artifacts must not include invalidation reasons.',
+        path: ['staleState', 'invalidationReasons'],
+      });
+    }
+
+    if (artifact.staleState.state === 'stale' && artifact.staleState.invalidationReasons.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Stale panorama artifacts require invalidation reasons.',
+        path: ['staleState', 'invalidationReasons'],
+      });
+    }
+
     const sourceIndices = new Set<number>();
     for (const [sourceIndex, source] of artifact.sourceImageRefs.entries()) {
       if (sourceIndices.has(source.sourceIndex)) {
@@ -2546,6 +2631,8 @@ export const panoramaArtifactV1Schema = z
 
       sourceIndices.add(source.sourceIndex);
     }
+
+    validatePanoramaSourceState(artifact.sourceImageRefs, artifact.sourceState, context, ['sourceState']);
 
     if (
       artifact.projectionSettings.support === 'implemented_current_engine' &&
@@ -9293,6 +9380,8 @@ export type PanoramaBackendCapabilityReportV1 = z.infer<typeof panoramaBackendCa
 export type PanoramaBackendExposureModeV1 = z.infer<typeof panoramaBackendExposureModeV1Schema>;
 export type PanoramaBackendIdV1 = z.infer<typeof panoramaBackendIdV1Schema>;
 export type PanoramaBackendSeamMethodV1 = z.infer<typeof panoramaBackendSeamMethodV1Schema>;
+export type PanoramaInvalidationReasonV1 = z.infer<typeof panoramaInvalidationReasonV1Schema>;
+export type PanoramaStaleStateV1 = z.infer<typeof panoramaStaleStateV1Schema>;
 export type PreviewHistogramChannelV1 = z.infer<typeof previewHistogramChannelV1Schema>;
 export type PreviewHistogramScopeV1 = z.infer<typeof previewHistogramScopeV1Schema>;
 export type PreviewRasterScopeV1 = z.infer<typeof previewRasterScopeV1Schema>;

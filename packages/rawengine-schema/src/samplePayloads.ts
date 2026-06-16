@@ -3022,6 +3022,28 @@ export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Sc
       virtualCopyId: null,
     },
   ],
+  sourceState: [
+    {
+      contentHash: 'sha256:panorama-source-0001',
+      graphRevision: 'graph_rev_43',
+      sourceIndex: 0,
+    },
+    {
+      contentHash: 'sha256:panorama-source-0002',
+      graphRevision: 'graph_rev_43',
+      sourceIndex: 1,
+    },
+    {
+      contentHash: 'sha256:panorama-source-0003',
+      graphRevision: 'graph_rev_43',
+      sourceIndex: 2,
+    },
+  ],
+  staleState: {
+    checkedAt: '2026-06-13T07:31:00.000Z',
+    invalidationReasons: [],
+    state: 'current',
+  },
   validationMetrics: {
     estimatedPeakMemoryBytes: 2200000000,
     excludedSourceCount: 0,
