@@ -138,6 +138,7 @@
     "check:focus-ui-api": "bun scripts/check-focus-ui-api.mjs",
     "check:focus-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario focus-ui",
     "check:sr-performance-fixtures": "bun scripts/check-super-resolution-performance-fixtures.mjs",
+    "check:sr-synthetic-smoke": "bun scripts/check-super-resolution-synthetic-smoke.mjs",
     "check:sr-ui-api": "bun scripts/check-sr-ui-api.mjs",
     "check:sr-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario sr-ui",
     "check:negative-lab-base-fog": "bun scripts/check-negative-lab-base-fog.mjs",

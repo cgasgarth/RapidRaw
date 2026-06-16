@@ -141,6 +141,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'schema:panorama-app-server',
     new Set(['bun packages/rawengine-schema/scripts/check-panorama-app-server-command-bus.ts']),
   ],
+  ['check:sr-synthetic-smoke', new Set(['bun scripts/check-super-resolution-synthetic-smoke.mjs'])],
 ]);
 
 function hasExtension(path, extensions) {

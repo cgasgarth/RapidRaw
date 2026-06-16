@@ -44,6 +44,7 @@ const SmokeReportSchema = z
 const budgetMultiplier = BudgetMultiplierSchema.parse(process.env.RAWENGINE_PERFORMANCE_SMOKE_BUDGET_MULTIPLIER);
 const outputDir = resolve('artifacts/performance-smoke');
 const outputPath = resolve(outputDir, 'performance-smoke-report.json');
+const MAX_FAILURE_OUTPUT_CHARS = 8_000;
 
 const smokeChecks = z.array(SmokeCheckSchema).parse([
   {
@@ -89,6 +90,13 @@ const smokeChecks = z.array(SmokeCheckSchema).parse([
     summary: 'Super-resolution performance fixture budget validation',
   },
   {
+    args: ['run', 'check:sr-synthetic-smoke'],
+    budgetMs: 5_000,
+    command: 'bun',
+    id: 'sr-synthetic-smoke',
+    summary: 'Super-resolution synthetic pixel-shift smoke',
+  },
+  {
     args: ['run', 'check:panorama-performance-fixtures'],
     budgetMs: 5_000,
     command: 'bun',
@@ -127,10 +135,24 @@ const smokeChecks = z.array(SmokeCheckSchema).parse([
 
 const formatMs = (milliseconds) => `${Math.round(milliseconds)}ms`;
 
+const appendBounded = (current, chunk) => {
+  const next = `${current}${String(chunk)}`;
+  if (next.length <= MAX_FAILURE_OUTPUT_CHARS) return next;
+  return next.slice(-MAX_FAILURE_OUTPUT_CHARS);
+};
+
+const writeFailureOutput = (label, output) => {
+  if (output.trim().length === 0) return;
+  console.error(`${label} tail:`);
+  console.error(output.trimEnd());
+};
+
 const runSmokeCheck = (check) =>
   new Promise((resolveCheck) => {
     const startedAt = performance.now();
     const effectiveBudgetMs = Math.ceil(check.budgetMs * budgetMultiplier);
+    let stderr = '';
+    let stdout = '';
     const child = spawn(check.command, check.args, {
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -141,17 +163,21 @@ const runSmokeCheck = (check) =>
     }, effectiveBudgetMs);
 
     child.stdout.on('data', (chunk) => {
-      process.stdout.write(chunk);
+      stdout = appendBounded(stdout, chunk);
     });
 
     child.stderr.on('data', (chunk) => {
-      process.stderr.write(chunk);
+      stderr = appendBounded(stderr, chunk);
     });
 
     child.on('close', (exitCode, signal) => {
       clearTimeout(timeout);
       const elapsedMs = performance.now() - startedAt;
       const status = exitCode === 0 && elapsedMs <= effectiveBudgetMs ? 'pass' : 'fail';
+      if (status === 'fail') {
+        writeFailureOutput(`${check.id} stdout`, stdout);
+        writeFailureOutput(`${check.id} stderr`, stderr);
+      }
 
       resolveCheck(
         SmokeResultSchema.parse({
