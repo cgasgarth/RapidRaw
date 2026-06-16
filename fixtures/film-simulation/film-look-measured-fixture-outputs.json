@@ -1,0 +1,117 @@
+{
+  "cases": [
+    {
+      "baselinePreviewMaxDelta": 0.060099,
+      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.generic.clean_color.v1",
+      "displayName": "Clean Color",
+      "exportHash": "a0db01a1a1eb421a",
+      "fixtureId": "film_look.project_owned.tiff_color_checker_001",
+      "lookId": "film_look.generic.clean_color.v1",
+      "maxAllowedBaselinePreviewDelta": 0.36,
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "a0db01a1a1eb421a",
+      "proofLevel": "private_payload_metadata_and_adjustment_domain",
+      "renderBoundsStatus": "within_bounds"
+    },
+    {
+      "baselinePreviewMaxDelta": 0.041515,
+      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.generic.warm_print.v1",
+      "displayName": "Warm Print",
+      "exportHash": "0052caf2ec5d5a39",
+      "fixtureId": "film_look.project_owned.tiff_color_checker_001",
+      "lookId": "film_look.generic.warm_print.v1",
+      "maxAllowedBaselinePreviewDelta": 0.36,
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "0052caf2ec5d5a39",
+      "proofLevel": "private_payload_metadata_and_adjustment_domain",
+      "renderBoundsStatus": "within_bounds"
+    },
+    {
+      "baselinePreviewMaxDelta": 0.089935,
+      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.generic.cool_contrast.v1",
+      "displayName": "Cool Contrast",
+      "exportHash": "1a08b2c9ca21721c",
+      "fixtureId": "film_look.project_owned.tiff_color_checker_001",
+      "lookId": "film_look.generic.cool_contrast.v1",
+      "maxAllowedBaselinePreviewDelta": 0.36,
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "1a08b2c9ca21721c",
+      "proofLevel": "private_payload_metadata_and_adjustment_domain",
+      "renderBoundsStatus": "within_bounds"
+    },
+    {
+      "baselinePreviewMaxDelta": 0.079235,
+      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.generic.soft_fade.v1",
+      "displayName": "Soft Fade",
+      "exportHash": "5bfceb4df3b37eea",
+      "fixtureId": "film_look.project_owned.tiff_color_checker_001",
+      "lookId": "film_look.generic.soft_fade.v1",
+      "maxAllowedBaselinePreviewDelta": 0.36,
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "5bfceb4df3b37eea",
+      "proofLevel": "private_payload_metadata_and_adjustment_domain",
+      "renderBoundsStatus": "within_bounds"
+    },
+    {
+      "baselinePreviewMaxDelta": 0.252504,
+      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.generic.mono_silver.v1",
+      "displayName": "Mono Silver",
+      "exportHash": "fc54f1aeeeb0ccc3",
+      "fixtureId": "film_look.project_owned.tiff_color_checker_001",
+      "lookId": "film_look.generic.mono_silver.v1",
+      "maxAllowedBaselinePreviewDelta": 0.36,
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "fc54f1aeeeb0ccc3",
+      "proofLevel": "private_payload_metadata_and_adjustment_domain",
+      "renderBoundsStatus": "within_bounds"
+    },
+    {
+      "baselinePreviewMaxDelta": 0.098337,
+      "caseId": "film.look.measured.film_look.project_owned.tiff_color_checker_001.film_look.generic.punch_color.v1",
+      "displayName": "Punch Color",
+      "exportHash": "417edab7086c5472",
+      "fixtureId": "film_look.project_owned.tiff_color_checker_001",
+      "lookId": "film_look.generic.punch_color.v1",
+      "maxAllowedBaselinePreviewDelta": 0.36,
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "417edab7086c5472",
+      "proofLevel": "private_payload_metadata_and_adjustment_domain",
+      "renderBoundsStatus": "within_bounds"
+    }
+  ],
+  "doesNotProve": ["public_raw_payload_render", "measured_film_stock_emulation", "photochemical_density_domain"],
+  "fixtureManifest": {
+    "fixtures": [
+      {
+        "allowedValidationUses": ["preview_export_parity", "render_bounds"],
+        "autoCorrectionBakedIn": "known_absent",
+        "colorProfile": "rawengine_camera_tiff_profile_v1",
+        "copyrightOwner": "RawEngine project",
+        "developmentProcessKnown": true,
+        "disallowedValidationUses": ["stock_reference_mapping", "marketing_screenshot"],
+        "expectedRenderBounds": {
+          "maxBaselinePreviewDelta": 0.36,
+          "maxPreviewExportDelta": 0
+        },
+        "fixtureId": "film_look.project_owned.tiff_color_checker_001",
+        "licenseName": "Project-owned private CI fixture",
+        "localRelativePath": "private-fixtures/film-simulation/color-checker-001.tiff",
+        "measurementStatus": "approved_private_payload_metadata",
+        "payloadAccess": "private_ci_payload",
+        "sourceKind": "project_owned",
+        "state": "approved_render_measurement",
+        "targetOrStepWedgePresent": true
+      }
+    ],
+    "generatedFrom": "fixtures/film-simulation/film-look-measured-fixture-manifest.json",
+    "schemaVersion": 1
+  },
+  "generatedFrom": "scripts/check-film-look-measured-fixtures.mjs",
+  "version": 1
+}

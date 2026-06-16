@@ -117,6 +117,8 @@
     "check:film-fixtures:update": "bun scripts/check-film-look-fixture-outputs.mjs --update",
     "check:film-look-preview-export-parity": "bun scripts/check-film-look-preview-export-parity.mjs",
     "check:film-look-preview-export-parity:update": "bun scripts/check-film-look-preview-export-parity.mjs --update",
+    "check:film-look-measured-fixtures": "bun scripts/check-film-look-measured-fixtures.mjs",
+    "check:film-look-measured-fixtures:update": "bun scripts/check-film-look-measured-fixtures.mjs --update",
     "check:film-look-app-server-routes": "bun scripts/check-film-look-app-server-routes.mjs",
     "check:computational-merge-app-server-routes": "bun scripts/check-computational-merge-app-server-routes.mjs",
     "check:computational-merge-ui-route-badges": "bun scripts/check-computational-merge-ui-route-badges.mjs",
