@@ -55,6 +55,10 @@
           "path": "docs/api/edit-command-bus-2026-06-15.md"
         },
         {
+          "title": "UI edit surface API coverage",
+          "path": "docs/api/ui-edit-surface-coverage-2026-06-16.md"
+        },
+        {
           "title": "Mask refinement UI command routing",
           "path": "docs/api/mask-refinement-command-ui-routing-2026-06-15.md"
         },
