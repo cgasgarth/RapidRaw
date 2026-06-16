@@ -5,6 +5,8 @@ const MAX_ALLOWED_TRANSLATION_ERROR_PX = 0;
 const MAX_ALLOWED_RMS_ERROR = 0.000001;
 const MIN_OVERLAP_RATIO = 0.75;
 
+import { estimateHdrAlignmentTransformsV1 } from '../packages/rawengine-schema/src/hdrAlignmentRuntime.ts';
+
 const baseImage = createSyntheticHdrReference(WIDTH, HEIGHT);
 const fixtures = [
   {
@@ -23,7 +25,7 @@ const fixtures = [
 
 const sources = fixtures.map((fixture, sourceIndex) => ({
   ...fixture,
-  image: shiftImage(baseImage, WIDTH, HEIGHT, fixture.shift.x, fixture.shift.y),
+  pixels: shiftImage(baseImage, WIDTH, HEIGHT, fixture.shift.x, fixture.shift.y),
   sourceIndex,
 }));
 
@@ -32,37 +34,51 @@ if (referenceSource === undefined) {
   throw new Error('HDR alignment smoke requires a reference source.');
 }
 
-const transforms = sources.map((source) => {
-  const estimated = estimateTranslation(referenceSource.image, source.image, WIDTH, HEIGHT, SEARCH_RADIUS);
+const alignment = estimateHdrAlignmentTransformsV1({
+  frames: sources.map((source) => ({
+    height: HEIGHT,
+    pixels: source.pixels,
+    sourceIndex: source.sourceIndex,
+    width: WIDTH,
+  })),
+  referenceSourceIndex: referenceSource.sourceIndex,
+  searchRadiusPx: SEARCH_RADIUS,
+});
+
+const transforms = alignment.transforms.map((transform) => {
+  const source = sources.find((candidate) => candidate.sourceIndex === transform.sourceIndex);
+  if (source === undefined) {
+    throw new Error(`Missing alignment source ${transform.sourceIndex}.`);
+  }
   const expected = {
     x: -source.shift.x,
     y: -source.shift.y,
   };
   const translationErrorPx =
-    Math.abs(estimated.translation.x - expected.x) + Math.abs(estimated.translation.y - expected.y);
+    Math.abs(transform.translationPx.x - expected.x) + Math.abs(transform.translationPx.y - expected.y);
 
   if (translationErrorPx > MAX_ALLOWED_TRANSLATION_ERROR_PX) {
     throw new Error(
-      `Expected ${source.label} translation ${formatPoint(expected)}, got ${formatPoint(estimated.translation)}.`,
+      `Expected ${source.label} translation ${formatPoint(expected)}, got ${formatPoint(transform.translationPx)}.`,
     );
   }
 
-  if (estimated.rmsError > MAX_ALLOWED_RMS_ERROR) {
-    throw new Error(`Expected ${source.label} RMS <= ${MAX_ALLOWED_RMS_ERROR}, got ${estimated.rmsError}.`);
+  if (transform.rmsError > MAX_ALLOWED_RMS_ERROR) {
+    throw new Error(`Expected ${source.label} RMS <= ${MAX_ALLOWED_RMS_ERROR}, got ${transform.rmsError}.`);
   }
 
-  if (estimated.overlapRatio < MIN_OVERLAP_RATIO) {
-    throw new Error(`Expected ${source.label} overlap >= ${MIN_OVERLAP_RATIO}, got ${estimated.overlapRatio}.`);
+  if (transform.overlapRatio < MIN_OVERLAP_RATIO) {
+    throw new Error(`Expected ${source.label} overlap >= ${MIN_OVERLAP_RATIO}, got ${transform.overlapRatio}.`);
   }
 
   return {
-    confidence: 1 - estimated.rmsError,
+    confidence: transform.confidence,
     expectedTranslationPx: expected,
-    overlapRatio: estimated.overlapRatio,
-    rmsError: estimated.rmsError,
-    sourceIndex: source.sourceIndex,
-    transformType: expected.x === 0 && expected.y === 0 ? 'identity' : 'translation',
-    translationPx: estimated.translation,
+    overlapRatio: transform.overlapRatio,
+    rmsError: transform.rmsError,
+    sourceIndex: transform.sourceIndex,
+    transformType: transform.transformType,
+    translationPx: transform.translationPx,
   };
 });
 
@@ -110,63 +126,6 @@ function shiftImage(image, width, height, shiftX, shiftY) {
   }
 
   return shifted;
-}
-
-function estimateTranslation(reference, candidate, width, height, searchRadius) {
-  let bestEstimate;
-
-  for (let y = -searchRadius; y <= searchRadius; y += 1) {
-    for (let x = -searchRadius; x <= searchRadius; x += 1) {
-      const estimate = scoreTranslation(reference, candidate, width, height, x, y);
-
-      if (bestEstimate === undefined || estimate.rmsError < bestEstimate.rmsError) {
-        bestEstimate = estimate;
-      }
-    }
-  }
-
-  if (bestEstimate === undefined) {
-    throw new Error('HDR alignment smoke could not evaluate any translation candidates.');
-  }
-
-  return bestEstimate;
-}
-
-function scoreTranslation(reference, candidate, width, height, translationX, translationY) {
-  let squaredError = 0;
-  let overlapCount = 0;
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const candidateX = x - translationX;
-      const candidateY = y - translationY;
-      if (!isInsideImage(candidateX, candidateY, width, height)) continue;
-
-      const delta = reference[getPixelIndex(x, y, width)] - candidate[getPixelIndex(candidateX, candidateY, width)];
-      squaredError += delta * delta;
-      overlapCount += 1;
-    }
-  }
-
-  if (overlapCount === 0) {
-    return {
-      overlapRatio: 0,
-      rmsError: Number.POSITIVE_INFINITY,
-      translation: {
-        x: translationX,
-        y: translationY,
-      },
-    };
-  }
-
-  return {
-    overlapRatio: overlapCount / (width * height),
-    rmsError: Math.sqrt(squaredError / overlapCount),
-    translation: {
-      x: translationX,
-      y: translationY,
-    },
-  };
 }
 
 function isInsideCircle(x, y, centerX, centerY, radius) {
