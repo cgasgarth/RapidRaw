@@ -4,20 +4,38 @@ type NegativeLabBuiltInUiPreset = NegativeLabBuiltInUiPresetCatalog['presets'][n
 type NegativeLabPresetParams = NegativeLabBuiltInUiPreset['params'];
 
 const GENERIC_NEGATIVE_LAB_PRESET_METADATA = {
+  claimLevel: 'generic_starting_point_only',
   claimPolicy: 'generic_starting_point_no_stock_claim',
   legalNote: 'Generic family descriptor only; no manufacturer, stock, or emulation claim.',
   measurementProfileId: null,
+  measurementSource: 'generic_engineered_starting_point',
   profileStatus: 'generic_unmeasured',
+  provenanceSummary: 'Engineered starter settings; not measured from a named stock or manufacturer profile.',
   runtimeStatus: 'runtime_parameter_applied',
 } satisfies Pick<
   NegativeLabBuiltInUiPreset,
-  'claimPolicy' | 'legalNote' | 'measurementProfileId' | 'profileStatus' | 'runtimeStatus'
+  | 'claimLevel'
+  | 'claimPolicy'
+  | 'legalNote'
+  | 'measurementProfileId'
+  | 'measurementSource'
+  | 'profileStatus'
+  | 'provenanceSummary'
+  | 'runtimeStatus'
 >;
 
 const makeNegativeLabPreset = (
   preset: Omit<
     NegativeLabBuiltInUiPreset,
-    'claimPolicy' | 'legalNote' | 'measurementProfileId' | 'params' | 'profileStatus' | 'runtimeStatus'
+    | 'claimLevel'
+    | 'claimPolicy'
+    | 'legalNote'
+    | 'measurementProfileId'
+    | 'measurementSource'
+    | 'params'
+    | 'profileStatus'
+    | 'provenanceSummary'
+    | 'runtimeStatus'
   > & {
     params: Omit<NegativeLabPresetParams, 'base_fog_sample'>;
   },
