@@ -1,0 +1,120 @@
+#!/usr/bin/env bun
+
+import { PanoramaAppServerRuntimeToolBusV1 } from '../packages/rawengine-schema/src/panoramaAppServerRuntime.ts';
+import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+
+const sourceFrames = [
+  { expectedOffsetX: 0, expectedOffsetY: 0, sourceIndex: 0 },
+  { expectedOffsetX: 48, expectedOffsetY: 2, sourceIndex: 1 },
+  { expectedOffsetX: 96, expectedOffsetY: -1, sourceIndex: 2 },
+].map((frame) => ({
+  ...frame,
+  contentHash: `sha256:panorama-app-server-runtime-${frame.sourceIndex}`,
+  graphRevision: 'graph_rev_panorama_app_server_runtime_source',
+  height: 48,
+  width: 72,
+}));
+
+const dryRunCommand = {
+  actor: { id: 'agent_rawengine', kind: 'agent' },
+  approval: {
+    approvalClass: ApprovalClass.PreviewOnly,
+    reason: 'Panorama app-server runtime smoke validates dry-run dispatch.',
+    state: 'not_required',
+  },
+  commandId: 'command_panorama_app_server_runtime',
+  commandType: 'computationalMerge.createPanorama',
+  correlationId: 'corr_panorama_app_server_runtime',
+  dryRun: true,
+  expectedGraphRevision: 'graph_rev_panorama_app_server_runtime',
+  parameters: {
+    boundaryMode: 'auto_crop',
+    exposureNormalization: 'auto',
+    lensCorrectionPolicy: 'required_before_stitch',
+    maxPreviewDimensionPx: 1200,
+    memoryBudgetBytes: 64_000_000,
+    outputName: 'Synthetic App Server Runtime Panorama',
+    projection: 'cylindrical',
+    qualityPreference: 'balanced',
+    sources: sourceFrames.map((frame) => ({
+      colorSpaceHint: 'camera_rgb',
+      exposureEv: 0,
+      imageId: `img_panorama_app_server_runtime_${frame.sourceIndex}`,
+      imagePath: `/synthetic/panorama/app-server-runtime-${frame.sourceIndex}.dng`,
+      rawDefaultsApplied: true,
+      role: 'panorama_tile',
+      sourceIndex: frame.sourceIndex,
+    })),
+  },
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  target: { id: 'project_panorama_app_server_runtime', kind: 'project' },
+};
+
+const bus = new PanoramaAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1);
+const dryRun = bus.execute({
+  request: buildRequest(dryRunCommand),
+  toolName: 'computationalmerge.panorama.dry_run_command',
+});
+if (dryRun.kind !== 'dry_run') throw new Error('Expected panorama dry-run dispatch result.');
+
+const applyCommand = {
+  ...dryRunCommand,
+  approval: {
+    approvalClass: ApprovalClass.EditApply,
+    reason: 'Panorama app-server runtime smoke applies accepted plan.',
+    state: 'approved',
+  },
+  commandId: 'command_panorama_app_server_runtime_apply',
+  correlationId: 'corr_panorama_app_server_runtime_apply',
+  dryRun: false,
+  parameters: {
+    ...dryRunCommand.parameters,
+    acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+  },
+};
+const applied = bus.execute({
+  request: buildRequest(applyCommand),
+  toolName: 'computationalmerge.panorama.apply_command',
+});
+if (applied.kind !== 'apply') throw new Error('Expected panorama apply dispatch result.');
+if (applied.apply.outputPixels.length <= sourceFrames[0].width * sourceFrames[0].height * 3) {
+  throw new Error('Expected panorama runtime output to be wider than one source frame.');
+}
+
+expectThrows('unaccepted panorama apply plan', () =>
+  new PanoramaAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1).execute({
+    request: buildRequest(applyCommand),
+    toolName: 'computationalmerge.panorama.apply_command',
+  }),
+);
+
+console.log(
+  JSON.stringify({
+    fixture: 'synthetic_panorama_app_server_runtime_v1',
+    output: dryRun.dryRun.dryRunResult.mergePlan.outputDimensions,
+    outputSha256: new Bun.CryptoHasher('sha256').update(applied.apply.outputPixels).digest('hex'),
+    planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+  }),
+);
+
+function buildRequest(command) {
+  return {
+    command,
+    connectedSourceIndices: [0, 1, 2],
+    outputArtifactId: 'artifact_panorama_app_server_runtime_output',
+    previewArtifactId: 'artifact_panorama_app_server_runtime_preview',
+    seed: 'rawengine-panorama-app-server-runtime-v1',
+    sourceFrames,
+  };
+}
+
+function expectThrows(label, callback) {
+  try {
+    callback();
+  } catch {
+    return;
+  }
+  throw new Error(`Expected ${label} to throw.`);
+}
