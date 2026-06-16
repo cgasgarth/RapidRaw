@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
 export const aiAppServerToolRouteStatusSchema = z.enum(['mapped', 'deferred', 'connector_status', 'metadata_cleanup']);
+export const aiAppServerToolCapabilitySchema = z.enum([
+  'depth_mask',
+  'denoise',
+  'enhance',
+  'foreground_mask',
+  'inpaint',
+  'sky_mask',
+  'subject_mask',
+]);
 
 export const aiAppServerToolRouteSchema = z
   .object({
@@ -10,6 +19,7 @@ export const aiAppServerToolRouteSchema = z
       .regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_]*)+$/u)
       .optional(),
     commandSchemaName: z.string().trim().min(1).optional(),
+    toolCapability: aiAppServerToolCapabilitySchema.optional(),
     deferredIssue: z
       .string()
       .trim()
@@ -35,6 +45,14 @@ export const aiAppServerToolRouteSchema = z
           code: 'custom',
           message: 'Mapped AI routes require a command schema name.',
           path: ['commandSchemaName'],
+        });
+      }
+
+      if (route.toolCapability === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Mapped AI routes require a tool capability.',
+          path: ['toolCapability'],
         });
       }
     }
