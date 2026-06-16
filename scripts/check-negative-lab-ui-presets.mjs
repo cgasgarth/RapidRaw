@@ -40,19 +40,37 @@ const workflowStageKeys = [
   'workflowExportReadyJpeg',
   'workflowExportReadyTiff',
   'workflowExportConverting',
+  'autoBaseFog',
+  'autoBaseFogTooltip',
+  'baseFogConfidence',
+  'baseFogStrength',
   'exportOptions',
   'outputSuffix',
 ];
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
 const backendSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8');
 
-for (const marker of ['NegativeLabWorkflowStage', 'workflowStages', 'renderWorkflowRail', 'outputFormat', 'suffix']) {
+for (const marker of [
+  'NegativeLabWorkflowStage',
+  'workflowStages',
+  'renderWorkflowRail',
+  'handleAutoBaseFog',
+  'base_fog_strength',
+  'outputFormat',
+  'suffix',
+]) {
   if (!modalSource.includes(marker)) {
     failures.push(`negative conversion modal is missing workflow marker: ${marker}`);
   }
 }
 
-for (const marker of ['NegativeConversionSaveOptions', 'NegativeConversionOutputFormat', 'sanitize_output_suffix']) {
+for (const marker of [
+  'NegativeConversionSaveOptions',
+  'NegativeConversionOutputFormat',
+  'NegativeBaseFogEstimate',
+  'estimate_negative_base_fog',
+  'sanitize_output_suffix',
+]) {
   if (!backendSource.includes(marker)) {
     failures.push(`negative conversion backend is missing export marker: ${marker}`);
   }

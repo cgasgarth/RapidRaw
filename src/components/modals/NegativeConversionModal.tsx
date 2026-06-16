@@ -3,25 +3,27 @@ import { listen } from '@tauri-apps/api/event';
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import throttle from 'lodash.throttle';
-import { RotateCcw, ZoomIn, ZoomOut, Maximize, Save, Loader2, Eye, EyeOff, Info } from 'lucide-react';
+import { RotateCcw, ZoomIn, ZoomOut, Maximize, Save, Loader2, Eye, EyeOff, Info, WandSparkles } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
+import {
+  negativeBaseFogEstimateSchema,
+  negativeConversionSavedPathsSchema,
+  type NegativeLabBuiltInUiPreset,
+  type NegativeLabPresetParams,
+} from '../../schemas/negativeLabPresetCatalogSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
 } from '../../utils/negativeLabPresetCatalog';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
-
-import type {
-  NegativeLabBuiltInUiPreset,
-  NegativeLabPresetParams,
-} from '../../schemas/negativeLabPresetCatalogSchemas';
 
 type NegativeParams = NegativeLabPresetParams;
 type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
@@ -60,6 +62,8 @@ export default function NegativeConversionModal({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isEstimatingBaseFog, setIsEstimatingBaseFog] = useState(false);
+  const [baseFogConfidence, setBaseFogConfidence] = useState<number | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
 
@@ -99,6 +103,7 @@ export default function NegativeConversionModal({
       },
       {
         detail: t('modals.negativeConversion.workflowColorDetail', {
+          base: Math.round(params.base_fog_strength * 100),
           blue: params.blue_weight.toFixed(2),
           green: params.green_weight.toFixed(2),
           red: params.red_weight.toFixed(2),
@@ -246,6 +251,7 @@ export default function NegativeConversionModal({
       setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
       setZoom(1);
       setPan({ x: 0, y: 0 });
+      setBaseFogConfidence(null);
       setIsLoading(true);
       setProgress(null);
       setSaveOptions(DEFAULT_SAVE_OPTIONS);
@@ -258,14 +264,47 @@ export default function NegativeConversionModal({
   const handleParamChange = (key: keyof NegativeParams, value: number) => {
     const newParams = { ...params, [key]: value };
     setSelectedPresetId('');
+    if (key !== 'base_fog_strength') {
+      setBaseFogConfidence(null);
+    }
     setParams(newParams);
     void updatePreview(newParams);
   };
 
   const handlePresetSelect = (preset: NegativeLabBuiltInUiPreset) => {
     setSelectedPresetId(preset.presetId);
+    setBaseFogConfidence(null);
     setParams(preset.params);
     void updatePreview(preset.params);
+  };
+
+  const handleAutoBaseFog = async () => {
+    if (!selectedImagePath) return;
+    setIsEstimatingBaseFog(true);
+    try {
+      const estimate = await invokeWithSchema(
+        'estimate_negative_base_fog',
+        {
+          path: selectedImagePath,
+        },
+        negativeBaseFogEstimateSchema,
+      );
+      const nextParams = {
+        ...params,
+        base_fog_strength: 1,
+        blue_weight: estimate.blueWeight,
+        green_weight: estimate.greenWeight,
+        red_weight: estimate.redWeight,
+      };
+      setBaseFogConfidence(estimate.confidence);
+      setSelectedPresetId('');
+      setParams(nextParams);
+      void updatePreview(nextParams);
+    } catch (e) {
+      console.error('Negative base/fog estimate failed', e);
+    } finally {
+      setIsEstimatingBaseFog(false);
+    }
   };
 
   const handleSave = async () => {
@@ -273,11 +312,15 @@ export default function NegativeConversionModal({
     setIsSaving(true);
     setProgress(null);
     try {
-      const savedPaths: string[] = await invoke('convert_negatives', {
-        paths: targetPaths,
-        params,
-        options: saveOptions,
-      });
+      const savedPaths = await invokeWithSchema(
+        'convert_negatives',
+        {
+          paths: targetPaths,
+          params,
+          options: saveOptions,
+        },
+        negativeConversionSavedPathsSchema,
+      );
       onSave(savedPaths);
       onClose();
     } catch (e) {
@@ -302,9 +345,10 @@ export default function NegativeConversionModal({
           onClick={() => {
             setParams(DEFAULT_PARAMS);
             setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
+            setBaseFogConfidence(null);
             void updatePreview(DEFAULT_PARAMS);
           }}
-          disabled={isSaving}
+          disabled={isSaving || isEstimatingBaseFog}
           data-tooltip={t('modals.negativeConversion.resetTooltip')}
           className="p-2 rounded-full hover:bg-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -343,10 +387,41 @@ export default function NegativeConversionModal({
         </div>
 
         <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
-          <UiText variant={TextVariants.heading} className="mb-2">
-            {t('modals.negativeConversion.colorTiming')}
-          </UiText>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <UiText variant={TextVariants.heading}>{t('modals.negativeConversion.colorTiming')}</UiText>
+            <button
+              type="button"
+              onClick={() => {
+                void handleAutoBaseFog();
+              }}
+              disabled={!selectedImagePath || isEstimatingBaseFog || isSaving}
+              data-tooltip={t('modals.negativeConversion.autoBaseFogTooltip')}
+              className="inline-flex items-center gap-1 rounded-md border border-surface bg-bg-primary px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isEstimatingBaseFog ? <Loader2 size={13} className="animate-spin" /> : <WandSparkles size={13} />}
+              {t('modals.negativeConversion.autoBaseFog')}
+            </button>
+          </div>
           <div className="space-y-3">
+            <Slider
+              label={t('modals.negativeConversion.baseFogStrength')}
+              value={params.base_fog_strength}
+              min={0}
+              max={1.25}
+              step={0.01}
+              defaultValue={1}
+              onChange={(e) => {
+                handleParamChange('base_fog_strength', Number(e.target.value));
+              }}
+              fillOrigin="min"
+            />
+            {baseFogConfidence !== null && (
+              <UiText variant={TextVariants.small} className="text-text-tertiary">
+                {t('modals.negativeConversion.baseFogConfidence', {
+                  confidence: Math.round(baseFogConfidence * 100),
+                })}
+              </UiText>
+            )}
             <Slider
               label={t('modals.negativeConversion.redWeight')}
               value={params.red_weight}

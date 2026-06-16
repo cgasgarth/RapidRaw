@@ -1287,6 +1287,10 @@
     },
     "negativeConversion": {
       "blueWeight": "Bleu (Jaune)",
+      "autoBaseFog": "Auto base",
+      "autoBaseFogTooltip": "Estimate film base and balance color weights",
+      "baseFogConfidence": "Base estimate confidence {{confidence}}%",
+      "baseFogStrength": "Base/Fog",
       "cancel": "Annuler",
       "colorTiming": "Colorimétrie globale",
       "compareTooltip": "Maintenir pour voir l'original",

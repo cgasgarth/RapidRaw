@@ -24,6 +24,8 @@ pub struct NegativeConversionParams {
     pub green_weight: f32,
     pub blue_weight: f32,
 
+    #[serde(default = "default_base_fog_strength")]
+    pub base_fog_strength: f32,
     pub exposure: f32,
     pub contrast: f32,
 }
@@ -43,14 +45,29 @@ pub struct NegativeConversionSaveOptions {
     pub suffix: String,
 }
 
+#[derive(Serialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeBaseFogEstimate {
+    pub red_weight: f32,
+    pub green_weight: f32,
+    pub blue_weight: f32,
+    pub confidence: f32,
+}
+
 const MIN_CHANNEL_WEIGHT: f32 = 0.5;
 const MAX_CHANNEL_WEIGHT: f32 = 2.0;
+const MIN_BASE_FOG_STRENGTH: f32 = 0.0;
+const MAX_BASE_FOG_STRENGTH: f32 = 1.25;
 const MIN_EXPOSURE: f32 = -2.0;
 const MAX_EXPOSURE: f32 = 2.0;
 const MIN_CONTRAST: f32 = 0.5;
 const MAX_CONTRAST: f32 = 2.5;
 const DEFAULT_OUTPUT_SUFFIX: &str = "Positive";
 const JPEG_PROOF_QUALITY: u8 = 92;
+
+fn default_base_fog_strength() -> f32 {
+    1.0
+}
 
 impl Default for NegativeConversionSaveOptions {
     fn default() -> Self {
@@ -78,6 +95,7 @@ impl Default for NegativeConversionParams {
             red_weight: 1.0,
             green_weight: 1.0,
             blue_weight: 1.0,
+            base_fog_strength: default_base_fog_strength(),
             exposure: 0.0,
             contrast: 1.0,
         }
@@ -121,6 +139,11 @@ impl NegativeConversionParams {
                 .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
             blue_weight: finite_or_default(self.blue_weight, defaults.blue_weight)
                 .clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT),
+            base_fog_strength: finite_or_default(
+                self.base_fog_strength,
+                defaults.base_fog_strength,
+            )
+            .clamp(MIN_BASE_FOG_STRENGTH, MAX_BASE_FOG_STRENGTH),
             exposure: finite_or_default(self.exposure, defaults.exposure)
                 .clamp(MIN_EXPOSURE, MAX_EXPOSURE),
             contrast: finite_or_default(self.contrast, defaults.contrast)
@@ -193,6 +216,44 @@ fn analyze_bounds(log_data: &[f32], width: usize, height: usize) -> [ChannelBoun
     [get_bounds(r_vals), get_bounds(g_vals), get_bounds(b_vals)]
 }
 
+fn estimate_base_fog_from_image(input: &DynamicImage) -> NegativeBaseFogEstimate {
+    let rgb = input.to_rgb32f();
+    let (width, height) = rgb.dimensions();
+    let log_pixels: Vec<f32> = rgb
+        .as_raw()
+        .par_iter()
+        .map(|&v| -v.clamp(1e-6, 1.0).log10())
+        .collect();
+    let bounds = analyze_bounds(&log_pixels, width as usize, height as usize);
+
+    let base_densities = [
+        bounds[0].min.max(0.001),
+        bounds[1].min.max(0.001),
+        bounds[2].min.max(0.001),
+    ];
+    let mean_density = (base_densities[0] + base_densities[1] + base_densities[2]) / 3.0;
+    let channel_spread = base_densities.iter().fold(0.0_f32, |max_value, value| {
+        max_value.max((value - mean_density).abs())
+    });
+    let density_range = [
+        bounds[0].max - bounds[0].min,
+        bounds[1].max - bounds[1].min,
+        bounds[2].max - bounds[2].min,
+    ];
+    let mean_range = (density_range[0] + density_range[1] + density_range[2]) / 3.0;
+
+    let to_weight = |density: f32| {
+        (mean_density / density.max(0.001)).clamp(MIN_CHANNEL_WEIGHT, MAX_CHANNEL_WEIGHT)
+    };
+
+    NegativeBaseFogEstimate {
+        red_weight: to_weight(base_densities[0]),
+        green_weight: to_weight(base_densities[1]),
+        blue_weight: to_weight(base_densities[2]),
+        confidence: ((mean_range * 2.0) + (channel_spread * 1.5)).clamp(0.0, 1.0),
+    }
+}
+
 fn run_pipeline(
     input: &DynamicImage,
     params: &NegativeConversionParams,
@@ -230,9 +291,13 @@ fn run_pipeline(
         .for_each(|(i, out_pixel)| {
             let idx = i * 3;
 
-            let mut n_r = (log_pixels[idx] - bounds[0].min) / (bounds[0].max - bounds[0].min);
-            let mut n_g = (log_pixels[idx + 1] - bounds[1].min) / (bounds[1].max - bounds[1].min);
-            let mut n_b = (log_pixels[idx + 2] - bounds[2].min) / (bounds[2].max - bounds[2].min);
+            let base_r = bounds[0].min * params.base_fog_strength;
+            let base_g = bounds[1].min * params.base_fog_strength;
+            let base_b = bounds[2].min * params.base_fog_strength;
+
+            let mut n_r = (log_pixels[idx] - base_r) / (bounds[0].max - base_r).max(0.0001);
+            let mut n_g = (log_pixels[idx + 1] - base_g) / (bounds[1].max - base_g).max(0.0001);
+            let mut n_b = (log_pixels[idx + 2] - base_b) / (bounds[2].max - base_b).max(0.0001);
 
             n_r = n_r.max(0.0) * params.red_weight;
             n_g = n_g.max(0.0) * params.green_weight;
@@ -371,6 +436,55 @@ pub async fn preview_negative_conversion(
 }
 
 #[tauri::command]
+pub async fn estimate_negative_base_fog(
+    path: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: AppHandle,
+) -> Result<NegativeBaseFogEstimate, String> {
+    let (source_path, _) = parse_virtual_path(&path);
+    let source_path_str = source_path.to_string_lossy().to_string();
+
+    let image = {
+        let original_lock = state.original_image.lock().unwrap();
+        if let Some(loaded) = original_lock.as_ref() {
+            if loaded.path == source_path_str {
+                loaded.image.clone().as_ref().clone()
+            } else {
+                drop(original_lock);
+                let settings = load_settings(app_handle.clone()).unwrap_or_default();
+                match read_file_mapped(Path::new(&source_path_str)) {
+                    Ok(mmap) => {
+                        load_base_image_from_bytes(&mmap, &source_path_str, false, &settings, None)
+                    }
+                    Err(_) => {
+                        let bytes =
+                            fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
+                        load_base_image_from_bytes(&bytes, &source_path_str, false, &settings, None)
+                    }
+                }
+                .map_err(|e| e.to_string())?
+            }
+        } else {
+            drop(original_lock);
+            let settings = load_settings(app_handle.clone()).unwrap_or_default();
+            match read_file_mapped(Path::new(&source_path_str)) {
+                Ok(mmap) => {
+                    load_base_image_from_bytes(&mmap, &source_path_str, false, &settings, None)
+                }
+                Err(_) => {
+                    let bytes = fs::read(&source_path_str).map_err(|io_err| io_err.to_string())?;
+                    load_base_image_from_bytes(&bytes, &source_path_str, false, &settings, None)
+                }
+            }
+            .map_err(|e| e.to_string())?
+        }
+    };
+
+    let downscaled = downscale_f32_image(&image, 1080, 1080);
+    Ok(estimate_base_fog_from_image(&downscaled))
+}
+
+#[tauri::command]
 pub async fn convert_negatives(
     paths: Vec<String>,
     params: NegativeConversionParams,
@@ -483,6 +597,7 @@ mod tests {
             red_weight: f32::NAN,
             green_weight: 99.0,
             blue_weight: -99.0,
+            base_fog_strength: f32::NAN,
             exposure: f32::INFINITY,
             contrast: f32::NEG_INFINITY,
         }
@@ -494,6 +609,10 @@ mod tests {
         );
         assert_eq!(sanitized.green_weight, MAX_CHANNEL_WEIGHT);
         assert_eq!(sanitized.blue_weight, MIN_CHANNEL_WEIGHT);
+        assert_eq!(
+            sanitized.base_fog_strength,
+            NegativeConversionParams::default().base_fog_strength
+        );
         assert_eq!(
             sanitized.exposure,
             NegativeConversionParams::default().exposure
@@ -542,6 +661,7 @@ mod tests {
                 red_weight: f32::NAN,
                 green_weight: f32::INFINITY,
                 blue_weight: f32::NEG_INFINITY,
+                base_fog_strength: 99.0,
                 exposure: 50.0,
                 contrast: -50.0,
             },
@@ -581,6 +701,7 @@ mod tests {
                 red_weight: 1.2,
                 green_weight: 1.0,
                 blue_weight: 0.75,
+                base_fog_strength: 1.0,
                 exposure: 0.0,
                 contrast: 1.0,
             },
@@ -678,5 +799,63 @@ mod tests {
                 "black-and-white fixture should remain neutral"
             );
         }
+    }
+
+    #[test]
+    fn base_fog_strength_changes_thin_density_rendering() {
+        let pixels = vec![
+            0.72, 0.56, 0.38, //
+            0.30, 0.22, 0.16, //
+            0.08, 0.06, 0.04,
+        ];
+        let bounds = [
+            ChannelBounds {
+                min: 0.12,
+                max: 1.2,
+            },
+            ChannelBounds {
+                min: 0.16,
+                max: 1.25,
+            },
+            ChannelBounds {
+                min: 0.22,
+                max: 1.35,
+            },
+        ];
+        let corrected = render_fixture(pixels.clone(), NegativeConversionParams::default(), bounds);
+        let uncorrected = render_fixture(
+            pixels,
+            NegativeConversionParams {
+                base_fog_strength: 0.0,
+                ..NegativeConversionParams::default()
+            },
+            bounds,
+        );
+
+        assert_ne!(
+            corrected.get_pixel(0, 0).channels(),
+            uncorrected.get_pixel(0, 0).channels()
+        );
+    }
+
+    #[test]
+    fn base_fog_estimate_returns_bounded_weights_and_confidence() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                3,
+                2,
+                vec![
+                    0.90, 0.74, 0.42, 0.72, 0.50, 0.28, 0.40, 0.26, 0.14, //
+                    0.88, 0.72, 0.40, 0.68, 0.46, 0.24, 0.36, 0.22, 0.12,
+                ],
+            )
+            .unwrap(),
+        );
+
+        let estimate = estimate_base_fog_from_image(&input);
+        assert!((MIN_CHANNEL_WEIGHT..=MAX_CHANNEL_WEIGHT).contains(&estimate.red_weight));
+        assert!((MIN_CHANNEL_WEIGHT..=MAX_CHANNEL_WEIGHT).contains(&estimate.green_weight));
+        assert!((MIN_CHANNEL_WEIGHT..=MAX_CHANNEL_WEIGHT).contains(&estimate.blue_weight));
+        assert!((0.0..=1.0).contains(&estimate.confidence));
     }
 }

@@ -130,6 +130,7 @@
     "check:focus-sharpness-map-smoke": "bun scripts/check-focus-sharpness-map-smoke.mjs",
     "check:focus-preview-blend-smoke": "bun scripts/check-focus-preview-blend-smoke.mjs",
     "check:sr-performance-fixtures": "bun scripts/check-super-resolution-performance-fixtures.mjs",
+    "check:negative-lab-base-fog": "bun scripts/check-negative-lab-base-fog.mjs",
     "check:negative-lab-ui-presets": "bun scripts/check-negative-lab-ui-presets.mjs",
     "check:lint-escapes": "bun scripts/check-eslint-escape-hatches.mjs",
     "check:lint": "bun scripts/run-compact-command.mjs --label lint -- eslint . --max-warnings 0",
