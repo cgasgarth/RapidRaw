@@ -37,6 +37,8 @@ const FILM_LOOK_FAVORITES_STORAGE_KEY = 'rapidraw.filmLookFavorites.v1';
 const FILM_LOOK_FAVORITES_LABEL = 'Favorites';
 const FILM_LOOK_ALL_LABEL = 'All looks';
 const FILM_LOOK_EMPTY_FAVORITES = 'No favorites yet';
+const FILM_LOOK_SEARCH_LABEL = 'Search looks';
+const FILM_LOOK_EMPTY_SEARCH = 'No matching looks';
 const formatFilmLookCount = (count: number) => `${count} looks`;
 const formatFilmLookStrength = (strength: number) => `${strength}%`;
 const formatFilmLookAdjustmentValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
@@ -85,7 +87,6 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
     () => new Map(groups.flatMap((group) => group.looks.map((look): [string, FilmLookBrowserItem] => [look.id, look]))),
     [groups],
   );
-  const lookCount = groups.reduce((total, group) => total + group.looks.length, 0);
   const [selectedLookId, setSelectedLookId] = useState<string | null>(null);
   const [comparisonSelection, setComparisonSelection] = useState<FilmLookComparisonSelection>({
     a: null,
@@ -94,21 +95,37 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
   const [favoriteLookIds, setFavoriteLookIds] = useState<Set<string>>(readFavoriteLookIds);
   const [strengthPercent, setStrengthPercent] = useState<number>(70);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const favoriteLookCount = useMemo(
     () => groups.reduce((count, group) => count + group.looks.filter((look) => favoriteLookIds.has(look.id)).length, 0),
     [favoriteLookIds, groups],
   );
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('en-US');
   const visibleGroups = useMemo(
     () =>
       groups
         .map((group) => ({
           ...group,
-          looks: showFavoritesOnly ? group.looks.filter((look) => favoriteLookIds.has(look.id)) : group.looks,
+          looks: group.looks.filter((look) => {
+            if (showFavoritesOnly && !favoriteLookIds.has(look.id)) {
+              return false;
+            }
+
+            if (normalizedSearchQuery.length === 0) {
+              return true;
+            }
+
+            return [look.displayName, look.description, group.displayName]
+              .join(' ')
+              .toLocaleLowerCase('en-US')
+              .includes(normalizedSearchQuery);
+          }),
         }))
         .filter((group) => group.looks.length > 0),
-    [favoriteLookIds, groups, showFavoritesOnly],
+    [favoriteLookIds, groups, normalizedSearchQuery, showFavoritesOnly],
   );
+  const visibleLookCount = visibleGroups.reduce((total, group) => total + group.looks.length, 0);
 
   useEffect(() => {
     window.localStorage.setItem(FILM_LOOK_FAVORITES_STORAGE_KEY, JSON.stringify([...favoriteLookIds].toSorted()));
@@ -172,9 +189,20 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
       <div className="flex items-center justify-between gap-3">
         <UiText variant={TextVariants.heading}>{FILM_LOOK_BROWSER_TITLE}</UiText>
         <UiText className="tabular-nums" variant={TextVariants.small}>
-          {formatFilmLookCount(showFavoritesOnly ? favoriteLookCount : lookCount)}
+          {formatFilmLookCount(visibleLookCount)}
         </UiText>
       </div>
+
+      <input
+        aria-label={FILM_LOOK_SEARCH_LABEL}
+        className="w-full rounded-md border border-surface bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent"
+        onChange={(event) => {
+          setSearchQuery(event.target.value);
+        }}
+        placeholder={FILM_LOOK_SEARCH_LABEL}
+        type="search"
+        value={searchQuery}
+      />
 
       <div className="grid grid-cols-2 gap-2">
         <button
@@ -306,6 +334,13 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
           <div className="rounded-md border border-dashed border-surface bg-bg-secondary p-3 text-center">
             <UiText variant={TextVariants.small} className="text-text-secondary">
               {FILM_LOOK_EMPTY_FAVORITES}
+            </UiText>
+          </div>
+        )}
+        {visibleLookCount === 0 && !(showFavoritesOnly && favoriteLookCount === 0) && (
+          <div className="rounded-md border border-dashed border-surface bg-bg-secondary p-3 text-center">
+            <UiText variant={TextVariants.small} className="text-text-secondary">
+              {FILM_LOOK_EMPTY_SEARCH}
             </UiText>
           </div>
         )}

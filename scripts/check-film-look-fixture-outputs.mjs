@@ -70,6 +70,8 @@ for (const marker of [
   'visibleGroups',
   'FILM_LOOK_FAVORITES_STORAGE_KEY',
   'getFilmLookSwatchStyle',
+  'searchQuery',
+  'FILM_LOOK_SEARCH_LABEL',
 ]) {
   if (!browserSource.includes(marker)) {
     throw new Error(`Film look browser is missing UI marker: ${marker}`);
