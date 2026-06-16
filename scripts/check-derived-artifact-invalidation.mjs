@@ -3,11 +3,13 @@
 import {
   focusStackArtifactV1Schema,
   hdrMergeArtifactV1Schema,
+  panoramaArtifactV1Schema,
   superResolutionArtifactV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   sampleFocusStackArtifactV1,
   sampleHdrMergeArtifactV1,
+  samplePanoramaArtifactV1,
   sampleSuperResolutionArtifactV1,
 } from '../packages/rawengine-schema/src/samplePayloads.ts';
 import { deriveArtifactInvalidationReasons } from '../packages/rawengine-schema/src/derivedArtifactInvalidation.ts';
@@ -30,6 +32,12 @@ const CASES = [
     family: 'super_resolution',
     reason: 'output_artifact_changed',
     schema: superResolutionArtifactV1Schema,
+  },
+  {
+    artifact: samplePanoramaArtifactV1,
+    family: 'panorama',
+    reason: 'source_graph_revision_changed',
+    schema: panoramaArtifactV1Schema,
   },
 ];
 
@@ -65,8 +73,18 @@ const markStale = (artifact, reason) => {
   return stale;
 };
 
+const outputContentHashFor = (artifact) =>
+  artifact.outputArtifact?.contentHash ?? artifact.outputArtifacts?.[0]?.contentHash;
+
 const currentStateFor = (artifact) => ({
-  outputContentHash: artifact.outputArtifact.contentHash,
+  outputContentHash: outputContentHashFor(artifact),
+  sourceState: clone(artifact.sourceState),
+});
+
+const invalidationArtifactFor = (artifact) => ({
+  outputArtifact: {
+    contentHash: outputContentHashFor(artifact),
+  },
   sourceState: clone(artifact.sourceState),
 });
 
@@ -82,7 +100,10 @@ const mutateFirstSource = (currentState, patch) => {
 
 for (const testCase of CASES) {
   const current = expectValid(`${testCase.family} current sample`, testCase.schema, testCase.artifact);
-  const unchangedReasons = deriveArtifactInvalidationReasons(current, currentStateFor(current));
+  const unchangedReasons = deriveArtifactInvalidationReasons(
+    invalidationArtifactFor(current),
+    currentStateFor(current),
+  );
 
   if (unchangedReasons.length !== 0) {
     throw new Error(`${testCase.family}: unchanged source state must not invalidate the artifact`);
@@ -109,12 +130,12 @@ for (const testCase of CASES) {
     testCase.schema,
     markStale(current, testCase.reason),
   );
-  if (stale.outputArtifact.contentHash !== current.outputArtifact.contentHash) {
+  if (outputContentHashFor(stale) !== outputContentHashFor(current)) {
     throw new Error(`${testCase.family}: invalidation must not mutate the existing output artifact hash`);
   }
 
   const sourceHashReasons = deriveArtifactInvalidationReasons(
-    current,
+    invalidationArtifactFor(current),
     mutateFirstSource(currentStateFor(current), { contentHash: 'sha256:changed-source-content' }),
   );
   if (!sourceHashReasons.includes('source_content_hash_changed')) {
@@ -127,7 +148,7 @@ for (const testCase of CASES) {
   );
 
   const graphRevisionReasons = deriveArtifactInvalidationReasons(
-    current,
+    invalidationArtifactFor(current),
     mutateFirstSource(currentStateFor(current), { graphRevision: 'graph_rev_changed' }),
   );
   if (!graphRevisionReasons.includes('source_graph_revision_changed')) {
@@ -139,8 +160,8 @@ for (const testCase of CASES) {
     markStale(current, graphRevisionReasons),
   );
 
-  const sourceSetReasons = deriveArtifactInvalidationReasons(current, {
-    outputContentHash: current.outputArtifact.contentHash,
+  const sourceSetReasons = deriveArtifactInvalidationReasons(invalidationArtifactFor(current), {
+    outputContentHash: outputContentHashFor(current),
     sourceState: current.sourceState.slice(1),
   });
   if (!sourceSetReasons.includes('source_set_changed')) {
@@ -152,7 +173,7 @@ for (const testCase of CASES) {
     markStale(current, sourceSetReasons),
   );
 
-  const outputArtifactReasons = deriveArtifactInvalidationReasons(current, {
+  const outputArtifactReasons = deriveArtifactInvalidationReasons(invalidationArtifactFor(current), {
     outputContentHash: 'sha256:changed-output-artifact',
     sourceState: current.sourceState,
   });
