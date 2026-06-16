@@ -6,7 +6,10 @@ import { dirname } from 'node:path';
 
 import { z } from 'zod';
 
-import { negativeLabFixtureManifestV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  negativeLabFixtureManifestEntryV1Schema,
+  negativeLabFixtureManifestV1Schema,
+} from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const manifestUrl = new URL('../fixtures/negative-lab/negative-lab-fixture-manifest.json', import.meta.url);
 const proofUrl = new URL('../fixtures/negative-lab/negative-lab-synthetic-fixture-proof.json', import.meta.url);
@@ -402,6 +405,110 @@ const buildPlannedRealScanEntries = () => [
   }),
 ];
 
+const validMeasuredProfileEvidence = {
+  baseFogSampleCount: 4,
+  claimPolicy: 'process_family_profile_no_stock_claim',
+  deltaE: {
+    max: 5.4,
+    mean: 1.2,
+    percentile95: 3.1,
+  },
+  measurementDate: '2026-06-16',
+  measurementReportHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  measurementSoftware: 'rawengine_negative_lab_measurement_harness.v1',
+  operator: 'RawEngine fixture validator',
+  profileId: 'negative_lab.measured.c41.process_family.v1',
+  sourceFixtureIds: ['negative_lab.project_owned.c41_profile_measurement_001'],
+  targetReference: {
+    id: 'project_target_transparency_001',
+    patchCount: 24,
+    referenceHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    type: 'it8_transparency',
+  },
+};
+
+const buildMeasuredProfilePromotionFixture = (overrides = {}) => {
+  const allowedValidationUses = ['schema_roundtrip', 'profile_measurement'];
+
+  return {
+    ...buildPlannedRealScanEntry({
+      bitDepth: 16,
+      captureProfile: 'camera_tiff_profile',
+      developmentNotes: 'Project-owned measured process-family profile fixture; no named-stock emulation claim.',
+      expectedNegativeWarningCodes: [],
+      fileFormat: 'tiff',
+      fixtureId: 'negative_lab.project_owned.c41_profile_measurement_001',
+      fixtureRole: 'profile_measurement',
+      frameFormat: '35mm_color_negative_frame_project_owned',
+      lightSource: 'calibrated_even_backlight_d65',
+      processFamily: 'c41_color_negative',
+      rollOrSheetIdentifier: 'project_owned_c41_profile_measurement_roll_001',
+      scanInputMode: 'camera_tiff',
+    }),
+    allowedDistribution: 'private_ci_only',
+    allowedValidationUses,
+    autoCorrectionBakedIn: 'known_absent',
+    baseFogSampleRegions: [baseRegion],
+    colorProfile: 'rawengine_camera_tiff_profile_v1',
+    developmentProcessKnown: true,
+    disallowedValidationUses: buildDisallowedUses(allowedValidationUses),
+    expectedFixtureWarningCodes: [],
+    filmStockDisplayName: 'Measured C-41 Process-Family Fixture',
+    filmStockKnown: false,
+    filmStockSource: 'Project-owned measured process-family fixture; no manufacturer or stock claim.',
+    measurementClaimAllowed: true,
+    measuredProfileEvidence: validMeasuredProfileEvidence,
+    negativeFixtureTier: 'project_owned_scan',
+    payloadAccess: 'private_ci_payload',
+    profileClaimAllowed: true,
+    reviewIssue: 'https://github.com/cgasgarth/RapidRaw/issues/1539',
+    reviewedAt: '2026-06-16',
+    reviewer: 'RawEngine fixture validator',
+    scannerOrCamera: 'project_owned_camera_scan_station_v1',
+    scannerSoftware: 'rawengine_fixture_measurement_harness.v1',
+    scannerSoftwareSettingsKnown: true,
+    source: {
+      copyrightOwner: 'RawEngine project',
+      licenseName: 'Project-owned private CI fixture',
+      redistributionEvidence: 'Private CI payload; public repository stores metadata only.',
+      sourceKind: 'project_owned',
+    },
+    state: 'approved_profile_measurement',
+    targetOrStepWedgePresent: true,
+    ...overrides,
+  };
+};
+
+const assertMeasuredProfilePromotionGate = () => {
+  negativeLabFixtureManifestEntryV1Schema.parse(buildMeasuredProfilePromotionFixture());
+
+  for (const [label, fixture] of [
+    ['missing measured evidence', buildMeasuredProfilePromotionFixture({ measuredProfileEvidence: undefined })],
+    [
+      'insufficient target patches',
+      buildMeasuredProfilePromotionFixture({
+        measuredProfileEvidence: {
+          ...validMeasuredProfileEvidence,
+          targetReference: { ...validMeasuredProfileEvidence.targetReference, patchCount: 6 },
+        },
+      }),
+    ],
+    [
+      'named stock claim without known stock',
+      buildMeasuredProfilePromotionFixture({
+        measuredProfileEvidence: {
+          ...validMeasuredProfileEvidence,
+          claimPolicy: 'named_stock_profile_requires_license_review',
+        },
+      }),
+    ],
+  ]) {
+    if (negativeLabFixtureManifestEntryV1Schema.safeParse(fixture).success) {
+      throw new Error(`Measured profile promotion gate accepted invalid fixture: ${label}.`);
+    }
+  }
+};
+
 const buildSyntheticProof = () =>
   syntheticProofSchema.parse({ cases: buildSyntheticCases(), generator, issue: 1377, schemaVersion: 1 });
 
@@ -464,6 +571,7 @@ const proof = buildSyntheticProof();
 const manifest = buildManifest(proof);
 assertProofHashes(proof);
 assertCoverage(proof, manifest);
+assertMeasuredProfilePromotionGate();
 
 if (updateFixtures) {
   await mkdir(dirname(manifestUrl.pathname), { recursive: true });
