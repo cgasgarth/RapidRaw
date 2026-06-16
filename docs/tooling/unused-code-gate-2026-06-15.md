@@ -51,9 +51,24 @@ Remaining cleanup candidates after the split:
   - `i18next.config.ts`
   - `scripts/check-agent-approval-boundaries.mjs`
   - `scripts/check-markdown-links.mjs`
-- Dependency candidates:
-  - `eslint-config-prettier`
-  - `eslint-plugin-prettier`
+- Wrapped binary dependencies modeled in `ignoreDependencies`:
   - `i18next-cli`
   - `license-checker-rseidelsohn`
 - App-level unused exports remain report-only until each candidate is verified against runtime usage, dynamic imports, and intended public API use.
+
+## Dependency-Only Gate
+
+Issue: #1386
+
+Decision: add `bun run check:unused-deps` as a blocking dependency-only Knip gate.
+
+Why:
+
+- Dependency findings are now reliable enough to block after removing unused ESLint/Prettier integration packages.
+- `i18next-cli` and `license-checker-rseidelsohn` are intentionally kept because repo-owned package scripts invoke their binaries through compact wrappers or direct `.bin` execution.
+- Full unused files/exports remain report-only until dynamic entrypoints and public API surfaces are modeled.
+
+Validation:
+
+- `bun run check:unused-deps`
+- `bun run unused:report`

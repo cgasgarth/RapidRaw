@@ -12,6 +12,7 @@
   "project": ["src/**/*.{ts,tsx}", "scripts/**/*.mjs", "*.config.{js,ts}", "vite.config.js", "i18next.config.ts"],
   "ignore": ["dist/**", "node_modules/**", "src-tauri/**"],
   "ignoreBinaries": ["scripts/run-compact-command.mjs"],
+  "ignoreDependencies": ["i18next-cli", "license-checker-rseidelsohn"],
   "ignoreIssues": {
     "packages/rawengine-schema/src/**/*.ts": ["exports", "types"],
   },
