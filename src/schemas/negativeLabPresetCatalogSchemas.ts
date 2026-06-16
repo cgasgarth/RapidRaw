@@ -6,6 +6,11 @@ export const negativeLabUiPresetFilmClassSchema = z.enum(['color_negative', 'bla
 export const negativeLabUiPresetProcessFamilySchema = z.enum(['c41_color_negative', 'black_and_white_silver_negative']);
 export const negativeLabUiPresetProfileStatusSchema = z.enum(['generic_unmeasured', 'fixture_measured']);
 export const negativeLabUiPresetRuntimeStatusSchema = z.enum(['ui_catalog_only', 'runtime_parameter_applied']);
+export const negativeLabUiPresetClaimLevelSchema = z.enum(['generic_starting_point_only', 'measured_profile']);
+export const negativeLabUiPresetMeasurementSourceSchema = z.enum([
+  'generic_engineered_starting_point',
+  'fixture_measured_profile',
+]);
 export const negativeLabUiPresetClaimPolicySchema = z.enum([
   'generic_starting_point_no_stock_claim',
   'measured_profile_required_before_stock_claim',
@@ -37,17 +42,20 @@ export const negativeLabPresetParamsSchema = z
 
 export const negativeLabBuiltInUiPresetSchema = z
   .object({
+    claimLevel: negativeLabUiPresetClaimLevelSchema,
     claimPolicy: negativeLabUiPresetClaimPolicySchema,
     displayName: z.string().trim().min(1).max(80),
     filmClass: negativeLabUiPresetFilmClassSchema,
     intent: z.string().trim().min(1).max(160),
     legalNote: z.string().trim().min(1).max(180),
     measurementProfileId: z.string().trim().min(1).nullable(),
+    measurementSource: negativeLabUiPresetMeasurementSourceSchema,
     params: negativeLabPresetParamsSchema,
     presetId: negativeLabPresetIdSchema,
     profileStatus: negativeLabUiPresetProfileStatusSchema,
     processFamily: negativeLabUiPresetProcessFamilySchema,
     processHint: z.string().trim().min(1).max(80),
+    provenanceSummary: z.string().trim().min(1).max(180),
     runtimeStatus: negativeLabUiPresetRuntimeStatusSchema,
     stockFamilyDescriptor: z.string().trim().min(1).max(80),
   })
@@ -61,11 +69,34 @@ export const negativeLabBuiltInUiPresetSchema = z
       });
     }
 
+    if (
+      preset.profileStatus === 'generic_unmeasured' &&
+      (preset.claimLevel !== 'generic_starting_point_only' ||
+        preset.measurementSource !== 'generic_engineered_starting_point')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generic unmeasured Negative Lab presets must use generic claim and measurement metadata.',
+        path: ['claimLevel'],
+      });
+    }
+
     if (preset.profileStatus === 'fixture_measured' && preset.measurementProfileId === null) {
       context.addIssue({
         code: 'custom',
         message: 'Fixture-measured Negative Lab presets must reference a measurement profile.',
         path: ['measurementProfileId'],
+      });
+    }
+
+    if (
+      preset.profileStatus === 'fixture_measured' &&
+      (preset.claimLevel !== 'measured_profile' || preset.measurementSource !== 'fixture_measured_profile')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Fixture-measured Negative Lab presets must use measured-profile claim and source metadata.',
+        path: ['claimLevel'],
       });
     }
   });
@@ -125,12 +156,13 @@ export const negativeLabBuiltInUiPresetCatalogSchema = z
 
       if (
         preset.claimPolicy === 'generic_starting_point_no_stock_claim' &&
-        preset.profileStatus !== 'generic_unmeasured'
+        (preset.profileStatus !== 'generic_unmeasured' ||
+          preset.claimLevel !== 'generic_starting_point_only' ||
+          preset.measurementSource !== 'generic_engineered_starting_point')
       ) {
         context.addIssue({
           code: 'custom',
-          message:
-            'Generic no-stock-claim presets must stay unmeasured until a measured profile policy is implemented.',
+          message: 'Generic no-stock-claim presets must stay generic until measured profile policy is implemented.',
           path: ['presets', index, 'profileStatus'],
         });
       }
@@ -153,6 +185,8 @@ export type NegativeLabUiPresetFilmClass = z.infer<typeof negativeLabUiPresetFil
 export type NegativeLabUiPresetProcessFamily = z.infer<typeof negativeLabUiPresetProcessFamilySchema>;
 export type NegativeLabUiPresetProfileStatus = z.infer<typeof negativeLabUiPresetProfileStatusSchema>;
 export type NegativeLabUiPresetRuntimeStatus = z.infer<typeof negativeLabUiPresetRuntimeStatusSchema>;
+export type NegativeLabUiPresetClaimLevel = z.infer<typeof negativeLabUiPresetClaimLevelSchema>;
+export type NegativeLabUiPresetMeasurementSource = z.infer<typeof negativeLabUiPresetMeasurementSourceSchema>;
 
 export const parseNegativeLabBuiltInUiPresetCatalog = (value: unknown): NegativeLabBuiltInUiPresetCatalog =>
   negativeLabBuiltInUiPresetCatalogSchema.parse(value);

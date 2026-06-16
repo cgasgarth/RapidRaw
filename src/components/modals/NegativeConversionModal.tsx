@@ -655,6 +655,13 @@ export default function NegativeConversionModal({
               >
                 {selectedPreset.legalNote}
               </UiText>
+              <UiText
+                data-testid="negative-lab-preset-provenance"
+                variant={TextVariants.small}
+                className="mt-1 text-text-tertiary"
+              >
+                {selectedPreset.provenanceSummary}
+              </UiText>
             </div>
           )}
         </div>
