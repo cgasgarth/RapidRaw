@@ -1582,6 +1582,7 @@
       "converting": "Konwertowanie",
       "convertingProgress": "Konwertowanie {{current}}/{{total}}",
       "exposure": "Ekspozycja",
+      "genericPresets": "Presety generyczne",
       "greenWeight": "Zielony (Magenta)",
       "noticeText": "Logika inwersji inspirowana przez projekt <0>NegPy</0> stworzony przez marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Oryginalny Negatyw",

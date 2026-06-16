@@ -1523,6 +1523,7 @@
       "converting": "转换中",
       "convertingProgress": "转换中 {{current}}/{{total}}",
       "exposure": "曝光",
+      "genericPresets": "通用预设",
       "greenWeight": "绿色（洋红）",
       "noticeText": "反转逻辑受 <0>NegPy</0>（作者 marcinz606，<1>GPL-3.0</1>）启发。",
       "originalLabel": "原始负片",

@@ -94,6 +94,7 @@ const CHECK_GROUPS = {
     'check:ai-people-fake-provider',
     'check:ai-people-render',
     'check:ai-people-apply-plan',
+    'check:negative-lab-ui-presets',
   ],
 };
 

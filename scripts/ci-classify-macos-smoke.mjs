@@ -89,6 +89,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     ]),
   ],
   ['check:ai-fallbacks', new Set(['bun scripts/check-ai-provider-fallbacks.mjs'])],
+  ['check:negative-lab-ui-presets', new Set(['bun scripts/check-negative-lab-ui-presets.mjs'])],
   ['check:performance-smoke', new Set(['bun scripts/check-performance-smoke.mjs'])],
   [
     'check:pure-ts-tests',
@@ -433,6 +434,17 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch: '@@ -42,6 +42,7 @@\n+    "check:performance-smoke": "bun scripts/check-performance-smoke.mjs",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'negative lab UI preset package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -125,6 +125,7 @@\n+    "check:negative-lab-ui-presets": "bun scripts/check-negative-lab-ui-presets.mjs",',
       },
     ],
     SMOKE_MODES.NONE,
