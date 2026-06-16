@@ -2995,6 +2995,7 @@ export const computationalMergeCommandEnvelopeV1Schema = z
         parameters: z
           .object({
             ...computationalMergeAcceptedDryRunSchema.shape,
+            blendMode: z.enum(['feather', 'multi_band']).optional(),
             boundaryMode: panoramaBoundaryModeSchema,
             exposureNormalization: z.enum(['none', 'auto']),
             lensCorrectionPolicy: z.enum(['unchanged', 'required_before_stitch', 'applied_before_stitch']),
