@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// @ts-check
 
 import { readBoundedStream, writeBoundedOutput } from './compact-output.mjs';
 

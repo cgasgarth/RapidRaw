@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// @ts-check
 
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from './compact-output.mjs';
 
