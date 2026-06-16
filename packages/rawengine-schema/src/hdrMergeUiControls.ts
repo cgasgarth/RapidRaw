@@ -45,8 +45,17 @@ export const hdrMergeDryRunContextV1Schema = z
   })
   .strict();
 
+export const hdrMergeApplyContextV1Schema = hdrMergeDryRunContextV1Schema
+  .extend({
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    idempotencyKey: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
 export type HdrMergeUiControlsV1 = z.infer<typeof hdrMergeUiControlsV1Schema>;
 export type HdrMergeDryRunContextV1 = z.infer<typeof hdrMergeDryRunContextV1Schema>;
+export type HdrMergeApplyContextV1 = z.infer<typeof hdrMergeApplyContextV1Schema>;
 
 export const buildHdrMergeUiDryRunCommandV1 = (
   controlsValue: unknown,
@@ -68,6 +77,53 @@ export const buildHdrMergeUiDryRunCommandV1 = (
     dryRun: true,
     expectedGraphRevision: context.expectedGraphRevision,
     parameters: {
+      alignmentMode: controls.alignmentMode,
+      bracketValidation: controls.bracketValidation,
+      deghosting: controls.deghosting,
+      maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
+      mergeStrategy: controls.mergeStrategy,
+      outputName: controls.outputName,
+      qualityPreference: controls.qualityPreference,
+      sources: controls.sources.map((source) => ({
+        colorSpaceHint: source.colorSpaceHint,
+        exposureEv: source.exposureEv,
+        imageId: source.imageId,
+        imagePath: source.imagePath,
+        rawDefaultsApplied: source.rawDefaultsApplied,
+        role: 'hdr_bracket',
+        sourceIndex: source.sourceIndex,
+        virtualCopyId: source.virtualCopyId,
+      })),
+      toneMapPreview: controls.toneMapPreview,
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: { id: context.targetId, kind: context.targetKind },
+  });
+};
+
+export const buildHdrMergeUiApplyCommandV1 = (
+  controlsValue: unknown,
+  contextValue: unknown,
+): ComputationalMergeCommandEnvelopeV1 => {
+  const controls = hdrMergeUiControlsV1Schema.parse(controlsValue);
+  const context = hdrMergeApplyContextV1Schema.parse(contextValue);
+
+  return computationalMergeCommandEnvelopeV1Schema.parse({
+    actor: { id: context.actorId, kind: 'agent' },
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'HDR merge UI apply uses an accepted dry-run plan before mutating the edit graph.',
+      state: 'approved',
+    },
+    commandId: context.commandId,
+    commandType: 'computationalMerge.createHdr',
+    correlationId: context.correlationId,
+    dryRun: false,
+    expectedGraphRevision: context.expectedGraphRevision,
+    idempotencyKey: context.idempotencyKey,
+    parameters: {
+      acceptedDryRunPlanHash: context.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: context.acceptedDryRunPlanId,
       alignmentMode: controls.alignmentMode,
       bracketValidation: controls.bracketValidation,
       deghosting: controls.deghosting,
