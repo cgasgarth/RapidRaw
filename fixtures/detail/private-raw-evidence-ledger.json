@@ -24,6 +24,7 @@
         "iso": 12800,
         "shutterSeconds": 0.008
       },
+      "featureFamily": "detail",
       "notes": "Reserved private crop for high-ISO chroma noise and detail retention review. Public repo stores metadata only.",
       "rights": {
         "allowedUse": "local_validation_only",
@@ -32,7 +33,8 @@
         "publicRepoAllowed": false,
         "rightsStatus": "project_owned"
       },
-      "status": "planned_private_capture"
+      "status": "planned_private_capture",
+      "trackingIssue": 1149
     },
     {
       "artifactClass": "edge_halo_ringing",
@@ -57,6 +59,7 @@
         "iso": 400,
         "shutterSeconds": 0.002
       },
+      "featureFamily": "detail",
       "notes": "Reserved private crop for sharpening/deblur halo review against high-contrast edges.",
       "rights": {
         "allowedUse": "local_validation_only",
@@ -65,7 +68,148 @@
         "publicRepoAllowed": false,
         "rightsStatus": "project_owned"
       },
-      "status": "planned_private_capture"
+      "status": "planned_private_capture",
+      "trackingIssue": 1149
+    },
+    {
+      "artifactClass": "bracket_alignment",
+      "camera": {
+        "cameraMake": "Sony",
+        "cameraModel": "ILCE-7M4",
+        "lens": "FE 35mm F1.8",
+        "rawFormat": "arw"
+      },
+      "crop": {
+        "height": 1024,
+        "unit": "source_pixels",
+        "width": 1024,
+        "x": 1400,
+        "y": 900
+      },
+      "evidenceId": "raw-evidence.hdr.bracket-alignment.v1",
+      "expectedUse": ["hdr_merge", "preview_export_parity"],
+      "exposure": {
+        "aperture": 8,
+        "exposureBiasEv": 0,
+        "iso": 100,
+        "shutterSeconds": 0.0166666667
+      },
+      "featureFamily": "hdr_merge",
+      "notes": "Reserved private bracket set for real RAW HDR alignment, ghost handling, merge tonality, and preview/export parity proof.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private bracket capture must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1509
+    },
+    {
+      "artifactClass": "overlap_stitch_alignment",
+      "camera": {
+        "cameraMake": "Fujifilm",
+        "cameraModel": "X-T5",
+        "lens": "XF 23mm F2 R WR",
+        "rawFormat": "raf"
+      },
+      "crop": {
+        "height": 768,
+        "unit": "source_pixels",
+        "width": 1024,
+        "x": 1200,
+        "y": 850
+      },
+      "evidenceId": "raw-evidence.panorama.overlap-stitch.v1",
+      "expectedUse": ["panorama_stitch", "preview_export_parity"],
+      "exposure": {
+        "aperture": 8,
+        "exposureBiasEv": 0,
+        "iso": 200,
+        "shutterSeconds": 0.004
+      },
+      "featureFamily": "panorama_stitch",
+      "notes": "Reserved private overlap sequence for real RAW panorama feature matching, seam/blend inspection, and export parity proof.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private panorama sequence must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1508
+    },
+    {
+      "artifactClass": "focus_plane_transition",
+      "camera": {
+        "cameraMake": "Canon",
+        "cameraModel": "EOS R5",
+        "lens": "RF 85mm F2 Macro IS STM",
+        "rawFormat": "cr3"
+      },
+      "crop": {
+        "height": 768,
+        "unit": "source_pixels",
+        "width": 768,
+        "x": 900,
+        "y": 700
+      },
+      "evidenceId": "raw-evidence.focus-stack.plane-transition.v1",
+      "expectedUse": ["focus_stack", "preview_export_parity"],
+      "exposure": {
+        "aperture": 5.6,
+        "exposureBiasEv": 0,
+        "iso": 200,
+        "shutterSeconds": 0.01
+      },
+      "featureFamily": "focus_stack",
+      "notes": "Reserved private macro bracket for real RAW focus-map accuracy, transition artifacts, alignment drift, and export parity proof.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private focus bracket capture must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1507
+    },
+    {
+      "artifactClass": "subpixel_detail_reconstruction",
+      "camera": {
+        "cameraMake": "Nikon",
+        "cameraModel": "Z 8",
+        "lens": "NIKKOR Z 50mm f/1.8 S",
+        "rawFormat": "nef"
+      },
+      "crop": {
+        "height": 1024,
+        "unit": "source_pixels",
+        "width": 1024,
+        "x": 1600,
+        "y": 1200
+      },
+      "evidenceId": "raw-evidence.super-resolution.subpixel-detail.v1",
+      "expectedUse": ["super_resolution", "detail", "preview_export_parity"],
+      "exposure": {
+        "aperture": 5.6,
+        "exposureBiasEv": 0,
+        "iso": 100,
+        "shutterSeconds": 0.002
+      },
+      "featureFamily": "super_resolution",
+      "notes": "Reserved private burst for real RAW super-resolution alignment, detail gain, zippering artifacts, and export parity proof.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private burst capture must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1506
     }
   ],
   "issue": 1149,

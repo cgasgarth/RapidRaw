@@ -36,7 +36,12 @@ if (root !== undefined) {
 }
 
 const plannedEntries = ledger.entries.filter((entry) => entry.status === 'planned_private_capture');
+const familyCounts = new Map();
+for (const entry of ledger.entries) {
+  familyCounts.set(entry.featureFamily, (familyCounts.get(entry.featureFamily) ?? 0) + 1);
+}
+
 const mode = root === undefined ? 'schema-only public mode' : `local asset mode (${availableEntries.length} active)`;
 console.log(
-  `Validated ${ledger.entries.length} private RAW evidence entries (${plannedEntries.length} planned, ${mode}).`,
+  `private RAW evidence ok (${ledger.entries.length} entries, ${plannedEntries.length} planned, ${familyCounts.size} families, ${mode})`,
 );
