@@ -39,6 +39,8 @@ for (const marker of [
   'invokeWithSchema',
   'negativeBaseFogEstimateSchema',
   'BASE_FOG_SAMPLE_PRESETS',
+  'renderBaseFogSampleOverlay',
+  'negative-lab-base-sample-overlay',
   'base_fog_strength',
   'base_fog_sample',
   'baseFogConfidence',

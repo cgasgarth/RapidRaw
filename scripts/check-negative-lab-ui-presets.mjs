@@ -48,6 +48,7 @@ const workflowStageKeys = [
   'sampleCenterPatch',
   'sampleFullFrame',
   'sampleLeftEdge',
+  'sampleOverlayLabel',
   'exportOptions',
   'outputSuffix',
 ];

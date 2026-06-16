@@ -673,6 +673,30 @@ export default function NegativeConversionModal({
     </div>
   );
 
+  const renderBaseFogSampleOverlay = () => {
+    if (params.base_fog_sample === null) return null;
+
+    const sampleRect = params.base_fog_sample;
+
+    return (
+      <div
+        aria-label={t('modals.negativeConversion.sampleOverlayLabel')}
+        className="absolute border-2 border-accent bg-accent/15 shadow-[0_0_0_1px_rgba(0,0,0,0.8)]"
+        data-testid="negative-lab-base-sample-overlay"
+        style={{
+          height: `${sampleRect.height * 100}%`,
+          left: `${sampleRect.x * 100}%`,
+          top: `${sampleRect.y * 100}%`,
+          width: `${sampleRect.width * 100}%`,
+        }}
+      >
+        <span className="absolute left-0 top-0 -translate-y-full rounded-sm bg-accent px-1.5 py-0.5 text-[10px] font-medium text-button-text shadow">
+          {activeBaseFogSampleLabel ?? t('modals.negativeConversion.baseFogSample')}
+        </span>
+      </div>
+    );
+  };
+
   const renderContent = () => (
     <div className="modal-preview-adjustments flex flex-row h-full w-full overflow-hidden">
       <div className="modal-preview-pane grow flex flex-col relative min-h-0 bg-[#0f0f0f] overflow-hidden">
@@ -706,6 +730,7 @@ export default function NegativeConversionModal({
                     alt={t('modals.negativeConversion.previewAlt')}
                     draggable={false}
                   />
+                  {renderBaseFogSampleOverlay()}
                   {isCompareActive && (
                     <UiText
                       as="div"

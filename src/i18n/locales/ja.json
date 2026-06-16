@@ -1294,6 +1294,7 @@
       "sampleCenterPatch": "Center patch",
       "sampleFullFrame": "Full frame",
       "sampleLeftEdge": "Left edge",
+      "sampleOverlayLabel": "Base sample overlay",
       "cancel": "キャンセル",
       "colorTiming": "カラータイミング",
       "compareTooltip": "長押しでオリジナルを表示",
