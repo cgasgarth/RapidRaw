@@ -1524,6 +1524,7 @@
       "converting": "Converting",
       "convertingProgress": "Converting {{current}}/{{total}}",
       "exposure": "Exposure",
+      "genericPresets": "Generic Presets",
       "greenWeight": "Green (Magenta)",
       "noticeText": "Inversion logic inspired by <0>NegPy</0> created by marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Original Negative",

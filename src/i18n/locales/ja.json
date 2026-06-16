@@ -1298,6 +1298,7 @@
       "convertingProgress": "変換中 {{current}}/{{total}}",
       "exposure": "露光量",
       "greenWeight": "グリーン (マゼンタ)",
+      "genericPresets": "汎用プリセット",
       "noticeText": "反転処理は marcinz606 氏が作成した <0>NegPy</0> (<1>GPL-3.0</1>) のアルゴリズムに着想を得ています。",
       "originalLabel": "オリジナルのネガ",
       "printGrade": "プリントグレード",

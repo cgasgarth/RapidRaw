@@ -1299,6 +1299,7 @@
       "convertingProgress": "Convertendo {{current}}/{{total}}",
       "exposure": "Exposição",
       "greenWeight": "Verde (Magenta)",
+      "genericPresets": "Predefinições genéricas",
       "noticeText": "Lógica de inversão inspirada pelo <0>NegPy</0> criado por marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Negativo Original",
       "printGrade": "Nível de Impressão",

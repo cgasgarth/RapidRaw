@@ -10,25 +10,22 @@ import { useTranslation, Trans } from 'react-i18next';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
+import {
+  DEFAULT_NEGATIVE_LAB_UI_PRESET,
+  NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
+} from '../../utils/negativeLabPresetCatalog';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
 
-interface NegativeParams {
-  red_weight: number;
-  green_weight: number;
-  blue_weight: number;
-  contrast: number;
-  exposure: number;
-}
+import type {
+  NegativeLabBuiltInUiPreset,
+  NegativeLabPresetParams,
+} from '../../schemas/negativeLabPresetCatalogSchemas';
 
-const DEFAULT_PARAMS: NegativeParams = {
-  red_weight: 1.0,
-  green_weight: 1.0,
-  blue_weight: 1.0,
-  contrast: 1.0,
-  exposure: 0.0,
-};
+type NegativeParams = NegativeLabPresetParams;
+
+const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 
 interface NegativeConversionModalProps {
   isOpen: boolean;
@@ -45,6 +42,7 @@ export default function NegativeConversionModal({
 }: NegativeConversionModalProps) {
   const { t } = useTranslation();
   const [params, setParams] = useState<NegativeParams>(DEFAULT_PARAMS);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -172,6 +170,7 @@ export default function NegativeConversionModal({
       setPreviewUrl(null);
       setOriginalUrl(null);
       setParams(DEFAULT_PARAMS);
+      setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
       setZoom(1);
       setPan({ x: 0, y: 0 });
       setIsLoading(true);
@@ -184,8 +183,15 @@ export default function NegativeConversionModal({
 
   const handleParamChange = (key: keyof NegativeParams, value: number) => {
     const newParams = { ...params, [key]: value };
+    setSelectedPresetId('');
     setParams(newParams);
     void updatePreview(newParams);
+  };
+
+  const handlePresetSelect = (preset: NegativeLabBuiltInUiPreset) => {
+    setSelectedPresetId(preset.presetId);
+    setParams(preset.params);
+    void updatePreview(preset.params);
   };
 
   const handleSave = async () => {
@@ -220,6 +226,7 @@ export default function NegativeConversionModal({
         <button
           onClick={() => {
             setParams(DEFAULT_PARAMS);
+            setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
             void updatePreview(DEFAULT_PARAMS);
           }}
           disabled={isSaving}
@@ -231,6 +238,35 @@ export default function NegativeConversionModal({
       </div>
 
       <div className="grow overflow-y-auto p-4 flex flex-col gap-8">
+        <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
+          <UiText variant={TextVariants.heading} className="mb-2">
+            {t('modals.negativeConversion.genericPresets')}
+          </UiText>
+          <div className="grid grid-cols-1 gap-2">
+            {NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.map((preset) => {
+              const isSelected = selectedPresetId === preset.presetId;
+
+              return (
+                <button
+                  key={preset.presetId}
+                  type="button"
+                  onClick={() => {
+                    handlePresetSelect(preset);
+                  }}
+                  className={cx(
+                    'text-left rounded-md border p-3 transition-colors',
+                    isSelected
+                      ? 'border-accent bg-accent/10 text-text-primary'
+                      : 'border-surface bg-bg-primary hover:bg-surface text-text-secondary',
+                  )}
+                >
+                  <span className="block text-sm font-medium">{preset.displayName}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className={cx('transition-opacity duration-200', isSaving && 'opacity-50 pointer-events-none grayscale')}>
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.negativeConversion.colorTiming')}

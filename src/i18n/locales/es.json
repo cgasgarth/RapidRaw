@@ -1299,6 +1299,7 @@
       "convertingProgress": "Convirtiendo {{current}}/{{total}}",
       "exposure": "Exposición",
       "greenWeight": "Verde (Magenta)",
+      "genericPresets": "Ajustes genéricos",
       "noticeText": "Lógica de inversión inspirada por <0>NegPy</0> creado por marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Negativo original",
       "printGrade": "Grado de impresión",
