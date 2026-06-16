@@ -95,6 +95,16 @@ function PanoramaVisualSmoke() {
       data-visual-smoke-mode="panorama-ui"
     >
       <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="panorama-modal">
+        <div
+          className="sr-only"
+          data-blend-mode={settings.blendMode}
+          data-boundary-mode={settings.boundaryMode}
+          data-exposure-mode={settings.exposureMode}
+          data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
+          data-projection={settings.projection}
+          data-quality-preference={settings.qualityPreference}
+          data-testid="panorama-ui-settings-proof"
+        />
         <div className="flex h-11 items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
           <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
           <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">

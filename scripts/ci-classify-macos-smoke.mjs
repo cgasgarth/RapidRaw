@@ -91,6 +91,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:ai-fallbacks', new Set(['bun scripts/check-ai-provider-fallbacks.mjs'])],
   ['check:film-look-browser-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario film-look-browser'])],
   ['check:hdr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario hdr-ui'])],
+  ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario panorama-ui'])],
   ['check:negative-lab-fixtures', new Set(['bun scripts/check-negative-lab-fixtures.mjs'])],
   ['check:negative-lab-fixtures:update', new Set(['bun scripts/check-negative-lab-fixtures.mjs --update'])],
   ['check:negative-lab-ui-presets', new Set(['bun scripts/check-negative-lab-ui-presets.mjs'])],
@@ -473,6 +474,17 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -120,6 +120,7 @@\n+    "check:hdr-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario hdr-ui",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'panorama UI smoke package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -120,6 +120,7 @@\n+    "check:panorama-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario panorama-ui",',
       },
     ],
     SMOKE_MODES.NONE,
