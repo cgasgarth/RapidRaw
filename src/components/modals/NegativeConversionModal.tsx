@@ -38,6 +38,7 @@ import {
   buildNegativeLabFrameHealthReport,
   getNegativeLabScanLabel,
 } from '../../utils/negativeLabFrameHealth';
+import { buildNegativeLabAcceptedPlanIdentity } from '../../utils/negativeLabPlanIdentity';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
@@ -196,6 +197,10 @@ export default function NegativeConversionModal({
   );
   const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
   const batchDryRunPlanJson = useMemo(() => JSON.stringify(batchDryRunSummary, null, 2), [batchDryRunSummary]);
+  const acceptedBatchPlanIdentity = useMemo(
+    () => buildNegativeLabAcceptedPlanIdentity(batchDryRunPlanJson),
+    [batchDryRunPlanJson],
+  );
   const isBatchPlanCopied = copiedBatchPlanJson === batchDryRunPlanJson;
   const isBatchPlanAccepted = acceptedBatchPlanJson === batchDryRunPlanJson && !batchDryRunSummary.blocked;
   const requiresAcceptedBatchPlan = hasMultipleScans && conversionScope === 'all';
@@ -537,7 +542,10 @@ export default function NegativeConversionModal({
         {
           paths: pathsToConvert,
           params,
-          options: saveOptions,
+          options: {
+            ...saveOptions,
+            ...(requiresAcceptedBatchPlan ? acceptedBatchPlanIdentity : {}),
+          },
         },
         negativeConversionSavedPathsSchema,
       );
