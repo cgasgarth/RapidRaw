@@ -8,6 +8,7 @@ export * from './hdrDeghostRuntime.js';
 export * from './hdrMergeApiTools.js';
 export * from './hdrMergeWeightingRuntime.js';
 export * from './hdrMergeUiControls.js';
+export * from './hdrRuntimePlan.js';
 export * from './panoramaSyntheticStitch.js';
 export * from './rawEngineSchemas.js';
 export * from './samplePayloads.js';

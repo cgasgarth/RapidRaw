@@ -1,0 +1,421 @@
+import { z } from 'zod';
+
+import { estimateHdrAlignmentTransformsV1 } from './hdrAlignmentRuntime.js';
+import { countHdrMotionPixelsV1, detectHdrMotionMaskV1 } from './hdrDeghostRuntime.js';
+import { mergeExposureWeightedRadianceV1 } from './hdrMergeWeightingRuntime.js';
+import {
+  RAW_ENGINE_SCHEMA_VERSION,
+  computationalMergeCommandEnvelopeV1Schema,
+  computationalMergeDryRunResultV1Schema,
+  computationalMergeMutationResultV1Schema,
+  type ComputationalMergeCommandEnvelopeV1,
+  type ComputationalMergeDryRunResultV1,
+  type ComputationalMergeMutationResultV1,
+} from './rawEngineSchemas.js';
+
+const HDR_RUNTIME_ENGINE_ID = 'rawengine_hdr_runtime_v1';
+const HDR_RUNTIME_ENGINE_VERSION = '0.1.0';
+
+export const hdrRuntimeFrameV1Schema = z
+  .object({
+    contentHash: z.string().trim().min(1),
+    exposureEv: z.number(),
+    graphRevision: z.string().trim().min(1),
+    height: z.number().int().positive(),
+    pixels: z.instanceof(Float64Array),
+    sourceIndex: z.number().int().nonnegative(),
+    width: z.number().int().positive(),
+  })
+  .strict();
+
+export const hdrRuntimePlanRequestV1Schema = z
+  .object({
+    clipThreshold: z.number().min(0).max(1).default(0.99),
+    command: computationalMergeCommandEnvelopeV1Schema,
+    frames: z.array(hdrRuntimeFrameV1Schema).min(2),
+    maxReconstructionMae: z.number().positive().default(0.015),
+    motionThreshold: z.number().nonnegative().default(0.22),
+    outputArtifactId: z.string().trim().min(1),
+    previewArtifactId: z.string().trim().min(1),
+    sensorWhiteRadiance: z.number().positive().default(1),
+    syntheticScenePixels: z.instanceof(Float64Array).optional(),
+    searchRadiusPx: z.number().int().nonnegative().default(5),
+  })
+  .strict();
+
+export const hdrRuntimeProvenanceV1Schema = z
+  .object({
+    acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
+    acceptedDryRunPlanId: z.string().trim().min(1).optional(),
+    alignmentConfidence: z.number().min(0).max(1),
+    alignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
+    deghosting: z.enum(['off', 'low', 'medium', 'high']),
+    engineId: z.literal(HDR_RUNTIME_ENGINE_ID),
+    engineVersion: z.literal(HDR_RUNTIME_ENGINE_VERSION),
+    mergeStrategy: z.enum(['scene_linear_radiance', 'exposure_fusion_preview']),
+    motionCoverageRatio: z.number().min(0).max(1),
+    referenceSourceIndex: z.number().int().nonnegative(),
+    runtimeStatus: z.enum(['dry_run_rendered', 'apply_rendered']),
+    sourceState: z.array(
+      z
+        .object({
+          contentHash: z.string().trim().min(1),
+          graphRevision: z.string().trim().min(1),
+          resolvedExposureEv: z.number(),
+          sourceIndex: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+    toneMapPreview: z.boolean(),
+  })
+  .strict();
+
+export type HdrRuntimeFrameV1 = z.infer<typeof hdrRuntimeFrameV1Schema>;
+export type HdrRuntimePlanRequestV1 = z.infer<typeof hdrRuntimePlanRequestV1Schema>;
+export type HdrRuntimeProvenanceV1 = z.infer<typeof hdrRuntimeProvenanceV1Schema>;
+type HdrRuntimeCommandV1 = Extract<
+  ComputationalMergeCommandEnvelopeV1,
+  { commandType: 'computationalMerge.createHdr' }
+>;
+type ParsedHdrRuntimePlanRequestV1 = Omit<HdrRuntimePlanRequestV1, 'command'> & {
+  command: HdrRuntimeCommandV1;
+};
+
+export interface HdrRuntimeDryRunResultV1 {
+  dryRunResult: ComputationalMergeDryRunResultV1;
+  mergedPixels: Float64Array;
+  motionMask: Uint8Array;
+  provenance: HdrRuntimeProvenanceV1;
+}
+
+export interface HdrRuntimeApplyResultV1 {
+  mergedPixels: Float64Array;
+  mutationResult: ComputationalMergeMutationResultV1;
+  provenance: HdrRuntimeProvenanceV1;
+}
+
+export const buildHdrRuntimeDryRunV1 = (requestValue: unknown): HdrRuntimeDryRunResultV1 => {
+  const request = parseHdrRuntimePlanRequest(requestValue, true);
+  const runtime = renderHdrRuntimePixels(request);
+  const planId = `hdr_plan_${request.command.commandId}`;
+  const planHash = `sha256:${stableHdrRuntimeHash(`${planId}:${runtime.provenance.alignmentMode}:${runtime.provenance.deghosting}`)}`;
+  const previewArtifacts = [
+    {
+      artifactId: request.previewArtifactId,
+      contentHash: `sha256:${stableHdrRuntimeHash(`${planHash}:preview`)}`,
+      dimensions: {
+        height: runtime.height,
+        width: runtime.width,
+      },
+      kind: 'preview' as const,
+      storage: 'temp_cache' as const,
+    },
+  ];
+
+  const dryRunResult = computationalMergeDryRunResultV1Schema.parse({
+    commandId: request.command.commandId,
+    commandType: request.command.commandType,
+    correlationId: request.command.correlationId,
+    dryRun: true,
+    mergePlan: {
+      family: 'hdr',
+      outputDimensions: {
+        height: runtime.height,
+        width: runtime.width,
+      },
+      outputName: request.command.parameters.outputName,
+      performanceEstimate: {
+        estimatedPeakMemoryBytes: runtime.width * runtime.height * request.frames.length * 8,
+        estimatedRuntimeMs: 1,
+        requiresBackgroundJob: false,
+      },
+      planId,
+      preflight: buildHdrPreflightEstimate(request, runtime.width, runtime.height),
+      qualityMetrics: {
+        alignmentConfidence: runtime.provenance.alignmentConfidence,
+        deghostingRisk: motionRiskForCoverage(runtime.provenance.motionCoverageRatio),
+        sourceCount: request.frames.length,
+      },
+      sourceImageRefs: request.command.parameters.sources,
+      warnings: runtime.warnings,
+    },
+    mutates: false,
+    predictedGraphRevision: `${request.command.expectedGraphRevision}:hdr-preview`,
+    previewArtifacts,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sourceGraphRevision: request.command.expectedGraphRevision,
+    warnings: runtime.warnings,
+  });
+
+  return {
+    dryRunResult,
+    mergedPixels: runtime.mergedPixels,
+    motionMask: runtime.motionMask,
+    provenance: runtime.provenance,
+  };
+};
+
+export const applyHdrRuntimePlanV1 = (requestValue: unknown): HdrRuntimeApplyResultV1 => {
+  const request = parseHdrRuntimePlanRequest(requestValue, false);
+  const runtime = renderHdrRuntimePixels(request);
+  const acceptedDryRunPlanHash = request.command.parameters.acceptedDryRunPlanHash;
+  const acceptedDryRunPlanId = request.command.parameters.acceptedDryRunPlanId;
+  if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
+    throw new Error('HDR runtime apply requires an accepted dry-run plan id and hash.');
+  }
+  const outputArtifacts = [
+    {
+      artifactId: request.outputArtifactId,
+      contentHash: `sha256:${stableHdrRuntimeHash(`${acceptedDryRunPlanHash}:${request.outputArtifactId}`)}`,
+      dimensions: {
+        height: runtime.height,
+        width: runtime.width,
+      },
+      kind: 'merge_output' as const,
+      storage: 'sidecar_artifact' as const,
+    },
+  ];
+
+  const mutationResult = computationalMergeMutationResultV1Schema.parse({
+    appliedGraphRevision: `${request.command.expectedGraphRevision}:hdr-apply`,
+    changedNodeIds: [`node_${request.command.commandId}`],
+    commandId: request.command.commandId,
+    commandType: request.command.commandType,
+    correlationId: request.command.correlationId,
+    derivedAssetId: `derived_${request.command.commandId}`,
+    dryRun: false,
+    mutates: true,
+    outputArtifacts,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sourceGraphRevision: request.command.expectedGraphRevision,
+    undoRevision: `${request.command.expectedGraphRevision}:undo-hdr-apply`,
+    warnings: runtime.warnings,
+  });
+
+  return {
+    mergedPixels: runtime.mergedPixels,
+    mutationResult,
+    provenance: hdrRuntimeProvenanceV1Schema.parse({
+      ...runtime.provenance,
+      acceptedDryRunPlanHash,
+      acceptedDryRunPlanId,
+      runtimeStatus: 'apply_rendered',
+    }),
+  };
+};
+
+const parseHdrRuntimePlanRequest = (requestValue: unknown, dryRun: boolean): ParsedHdrRuntimePlanRequestV1 => {
+  const request = hdrRuntimePlanRequestV1Schema.parse(requestValue);
+  if (!isHdrRuntimeCommand(request.command)) {
+    throw new Error('HDR runtime plan only supports computationalMerge.createHdr commands.');
+  }
+  if (request.command.dryRun !== dryRun) {
+    throw new Error(`HDR runtime plan expected dryRun=${String(dryRun)}.`);
+  }
+
+  const firstFrame = request.frames[0];
+  if (firstFrame === undefined) {
+    throw new Error('HDR runtime plan requires at least one frame.');
+  }
+
+  for (const frame of request.frames) {
+    if (frame.width !== firstFrame.width || frame.height !== firstFrame.height) {
+      throw new Error('HDR runtime plan requires equal-size frames.');
+    }
+    if (frame.pixels.length !== frame.width * frame.height) {
+      throw new Error('HDR runtime plan frame pixel length does not match dimensions.');
+    }
+  }
+
+  const frameIndexes = new Set(request.frames.map((frame) => frame.sourceIndex));
+  for (const source of request.command.parameters.sources) {
+    if (!frameIndexes.has(source.sourceIndex)) {
+      throw new Error(`HDR runtime plan missing frame for command source ${source.sourceIndex}.`);
+    }
+  }
+
+  return { ...request, command: request.command };
+};
+
+const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
+  const referenceSourceIndex = findReferenceSourceIndex(request.command);
+  const captures = request.frames.map((frame) => ({
+    exposureEv: frame.exposureEv,
+    pixels: frame.pixels,
+    sourceIndex: frame.sourceIndex,
+  }));
+  const mergedPixels = mergeExposureWeightedRadianceV1({
+    captures,
+    clipThreshold: request.clipThreshold,
+    height: request.frames[0]?.height,
+    sensorWhiteRadiance: request.sensorWhiteRadiance,
+    width: request.frames[0]?.width,
+  });
+  const motionMask = detectHdrMotionMaskV1({
+    frames: request.frames.map((frame) => ({
+      height: frame.height,
+      pixels: normalizeFrameForAlignment(frame),
+      sourceIndex: frame.sourceIndex,
+      width: frame.width,
+    })),
+    motionThreshold: request.command.parameters.deghosting === 'off' ? 1_000_000_000 : request.motionThreshold,
+    referenceSourceIndex,
+  });
+  const motionCoverageRatio = countHdrMotionPixelsV1(motionMask) / motionMask.length;
+  applyReferencePixelsInMotionRegions(mergedPixels, request.frames, motionMask, referenceSourceIndex);
+
+  const alignment = estimateHdrAlignmentTransformsV1({
+    frames: request.frames.map((frame) => ({
+      height: frame.height,
+      pixels: normalizeFrameForAlignment(frame),
+      sourceIndex: frame.sourceIndex,
+      width: frame.width,
+    })),
+    referenceSourceIndex,
+    searchRadiusPx: request.command.parameters.alignmentMode === 'none' ? 0 : request.searchRadiusPx,
+  });
+  const warnings = deriveRuntimeWarnings(
+    alignment.alignmentConfidence,
+    motionCoverageRatio,
+    request.command.parameters.deghosting,
+  );
+  const firstFrame = request.frames[0];
+  if (firstFrame === undefined) {
+    throw new Error('HDR runtime plan requires at least one frame.');
+  }
+
+  return {
+    height: firstFrame.height,
+    mergedPixels,
+    motionMask,
+    provenance: hdrRuntimeProvenanceV1Schema.parse({
+      alignmentConfidence: alignment.alignmentConfidence,
+      alignmentMode: request.command.parameters.alignmentMode,
+      deghosting: request.command.parameters.deghosting,
+      engineId: HDR_RUNTIME_ENGINE_ID,
+      engineVersion: HDR_RUNTIME_ENGINE_VERSION,
+      mergeStrategy: request.command.parameters.mergeStrategy,
+      motionCoverageRatio: roundHdrRuntimeMetric(motionCoverageRatio),
+      referenceSourceIndex,
+      runtimeStatus: 'dry_run_rendered',
+      sourceState: request.frames.map((frame) => ({
+        contentHash: frame.contentHash,
+        graphRevision: frame.graphRevision,
+        resolvedExposureEv: frame.exposureEv,
+        sourceIndex: frame.sourceIndex,
+      })),
+      toneMapPreview: request.command.parameters.toneMapPreview,
+    }),
+    warnings,
+    width: firstFrame.width,
+  };
+};
+
+const applyReferencePixelsInMotionRegions = (
+  mergedPixels: Float64Array,
+  frames: HdrRuntimeFrameV1[],
+  motionMask: Uint8Array,
+  referenceSourceIndex: number,
+): void => {
+  const referenceFrame = frames.find((frame) => frame.sourceIndex === referenceSourceIndex);
+  if (referenceFrame === undefined) {
+    throw new Error('HDR runtime plan reference frame was not found.');
+  }
+
+  for (let index = 0; index < motionMask.length; index += 1) {
+    if (motionMask[index] !== 1) continue;
+    mergedPixels[index] = (referenceFrame.pixels[index] ?? 0) / 2 ** referenceFrame.exposureEv;
+  }
+};
+
+const normalizeFrameForAlignment = (frame: HdrRuntimeFrameV1): Float64Array => {
+  const pixels = new Float64Array(frame.pixels.length);
+  for (let index = 0; index < frame.pixels.length; index += 1) {
+    pixels[index] = (frame.pixels[index] ?? 0) / 2 ** frame.exposureEv;
+  }
+  return pixels;
+};
+
+const findReferenceSourceIndex = (command: HdrRuntimeCommandV1): number => {
+  const referenceSource = command.parameters.sources.find((source) => source.exposureEv === 0);
+  return referenceSource?.sourceIndex ?? command.parameters.sources[0]?.sourceIndex ?? 0;
+};
+
+const buildHdrPreflightEstimate = (request: ParsedHdrRuntimePlanRequestV1, width: number, height: number) => {
+  const sourcePixelCount = request.frames.reduce((total, frame) => total + frame.width * frame.height, 0);
+  const outputPixelCount = width * height;
+  const sourceDecodeBytes = sourcePixelCount * 8;
+  const outputCanvasBytes = outputPixelCount * 8;
+  const previewBytes = outputPixelCount * 4;
+  const memoryComponents = {
+    lowDetailMaskBytes: outputPixelCount,
+    outputCanvasBytes,
+    outputMaskBytes: outputPixelCount,
+    overheadBytes: 4096,
+    previewBytes,
+    seamWorkspaceBytes: outputPixelCount,
+    sourceDecodeBytes,
+    totalEstimatedPeakBytes: sourceDecodeBytes + outputCanvasBytes + previewBytes + outputPixelCount * 3 + 4096,
+  };
+  const memoryBudgetBytes = Math.max(memoryComponents.totalEstimatedPeakBytes * 2, 1);
+  return {
+    blockedReasons: [],
+    engineCapabilities: {
+      fullFrameLegacy: true,
+      maxPreviewDimensionPx: request.command.parameters.maxPreviewDimensionPx,
+      planOnly: true,
+      tileBackedRender: false,
+    },
+    executionMode: 'full_frame_legacy',
+    geometryEstimate: {
+      outputPixelCount,
+      projectedBounds: {
+        height,
+        width,
+        x: 0,
+        y: 0,
+      },
+      sourceCount: request.frames.length,
+      sourcePixelCount,
+    },
+    memoryBudgetBytes,
+    memoryBudgetRatio: memoryComponents.totalEstimatedPeakBytes / memoryBudgetBytes,
+    memoryComponents,
+    status: 'accepted',
+    tileCount: 1,
+    warningCodes: ['legacy_full_frame_render'],
+  };
+};
+
+const deriveRuntimeWarnings = (
+  alignmentConfidence: number,
+  motionCoverageRatio: number,
+  deghosting: HdrRuntimeProvenanceV1['deghosting'],
+): string[] => {
+  const warnings = new Set<string>(['legacy_full_frame_render']);
+  if (alignmentConfidence < 0.95) warnings.add('alignment_low_confidence');
+  if (motionCoverageRatio > 0) warnings.add('motion_detected');
+  if (motionCoverageRatio > 0 && deghosting !== 'off') warnings.add('deghost_mask_generated');
+  return [...warnings].sort();
+};
+
+const motionRiskForCoverage = (coverage: number): 'none' | 'low' | 'medium' | 'high' => {
+  if (coverage === 0) return 'none';
+  if (coverage < 0.05) return 'low';
+  if (coverage < 0.15) return 'medium';
+  return 'high';
+};
+
+const stableHdrRuntimeHash = (input: string): string => {
+  let value = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    value ^= input.charCodeAt(index);
+    value = Math.imul(value, 16777619) >>> 0;
+  }
+  return value.toString(16).padStart(8, '0');
+};
+
+const isHdrRuntimeCommand = (command: ComputationalMergeCommandEnvelopeV1): command is HdrRuntimeCommandV1 =>
+  command.commandType === 'computationalMerge.createHdr';
+
+const roundHdrRuntimeMetric = (value: number): number => Math.round(value * 1_000_000) / 1_000_000;
