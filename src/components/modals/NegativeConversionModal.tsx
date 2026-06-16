@@ -126,6 +126,14 @@ export default function NegativeConversionModal({
   );
   const selectedPresetFilmClass =
     selectedPreset?.filmClass === 'black_and_white_silver' ? 'Black and white silver' : 'Color negative';
+  const selectedPresetClaimLabel =
+    selectedPreset?.claimLevel === 'measured_profile'
+      ? t('modals.negativeConversion.presetClaimMeasured')
+      : t('modals.negativeConversion.presetClaimGeneric');
+  const selectedPresetRuntimeLabel =
+    selectedPreset?.runtimeStatus === 'runtime_parameter_applied'
+      ? t('modals.negativeConversion.presetRuntimeApplied')
+      : t('modals.negativeConversion.presetRuntimeCatalogOnly');
   const frameHealthReport = useMemo(
     () =>
       buildNegativeLabFrameHealthReport({
@@ -723,6 +731,20 @@ export default function NegativeConversionModal({
                   data-testid="negative-lab-preset-film-class"
                 >
                   {selectedPresetFilmClass}
+                </span>
+              </div>
+              <div className="mb-2 flex flex-wrap gap-2">
+                <span
+                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary"
+                  data-testid="negative-lab-preset-claim-level"
+                >
+                  {selectedPresetClaimLabel}
+                </span>
+                <span
+                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary"
+                  data-testid="negative-lab-preset-runtime-status"
+                >
+                  {selectedPresetRuntimeLabel}
                 </span>
               </div>
               <UiText

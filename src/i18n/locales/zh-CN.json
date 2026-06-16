@@ -1555,6 +1555,10 @@
         "tiff16": "16 位 TIFF"
       },
       "outputSuffix": "输出后缀",
+      "presetClaimGeneric": "Generic starting point",
+      "presetClaimMeasured": "Measured profile",
+      "presetRuntimeApplied": "Runtime applied",
+      "presetRuntimeCatalogOnly": "Catalog only",
       "previewAlt": "预览",
       "previewPending": "Preview pending",
       "previewReady": "Preview ready",

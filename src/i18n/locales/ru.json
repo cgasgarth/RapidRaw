@@ -1358,7 +1358,11 @@
       "frameWarningExcluded": "Excluded",
       "frameWarningPreviewNotReady": "Preview pending",
       "includeScan": "Include",
-      "includedScans": "{{includedCount}} included"
+      "includedScans": "{{includedCount}} included",
+      "presetClaimGeneric": "Generic starting point",
+      "presetClaimMeasured": "Measured profile",
+      "presetRuntimeApplied": "Runtime applied",
+      "presetRuntimeCatalogOnly": "Catalog only"
     },
     "panorama": {
       "cancel": "Отмена",
