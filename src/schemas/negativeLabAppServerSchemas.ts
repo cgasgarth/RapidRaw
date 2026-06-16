@@ -13,12 +13,14 @@ import {
 } from './negativeLabPresetCatalogSchemas';
 
 export const negativeLabConversionPlanCommandNameSchema = z.literal('negative.lab.build_conversion_plan');
+export const negativeLabAcceptedBatchApplyCommandNameSchema = z.literal('negative.lab.build_accepted_batch_apply');
 export const negativeLabAcceptBatchPlanCommandNameSchema = z.literal('negative.lab.accept_batch_dry_run_plan');
 export const negativeLabBatchSummaryCommandNameSchema = z.literal('negative.lab.build_batch_dry_run_summary');
 export const negativeLabDensitometerCommandNameSchema = z.literal('negative.lab.build_densitometer_readout');
 export const negativeLabFrameHealthCommandNameSchema = z.literal('negative.lab.build_frame_health_report');
 export const negativeLabAppServerCommandNameSchema = z.union([
   negativeLabAcceptBatchPlanCommandNameSchema,
+  negativeLabAcceptedBatchApplyCommandNameSchema,
   negativeLabBatchSummaryCommandNameSchema,
   negativeLabConversionPlanCommandNameSchema,
   negativeLabDensitometerCommandNameSchema,
@@ -50,6 +52,15 @@ export const negativeLabFrameHealthAppServerCommandSchema = z
 
 export const negativeLabBatchSummaryAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema;
 export const negativeLabAcceptBatchPlanAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema;
+export const negativeLabAcceptedBatchApplyAppServerCommandSchema = z
+  .object({
+    acceptedPlan: z.lazy(() => negativeLabAcceptedBatchPlanSchema),
+    conversion: negativeLabAppServerCommandSchema.extend({
+      scope: z.literal('all'),
+    }),
+    dryRun: negativeLabAcceptBatchPlanAppServerCommandSchema,
+  })
+  .strict();
 
 export const negativeLabDensitometerAppServerCommandSchema = z
   .object({
@@ -72,6 +83,16 @@ export const negativeLabAcceptBatchPlanRouteSchema = z
     commandName: negativeLabAcceptBatchPlanCommandNameSchema,
     inputSchemaName: z.literal('NegativeLabAcceptBatchPlanAppServerCommandV1'),
     outputSchemaName: z.literal('NegativeLabAcceptedBatchPlanV1'),
+    reason: z.string().trim().min(1),
+    status: z.literal('mapped'),
+  })
+  .strict();
+
+export const negativeLabAcceptedBatchApplyRouteSchema = z
+  .object({
+    commandName: negativeLabAcceptedBatchApplyCommandNameSchema,
+    inputSchemaName: z.literal('NegativeLabAcceptedBatchApplyAppServerCommandV1'),
+    outputSchemaName: z.literal('NegativeLabAcceptedBatchApplyPlanV1'),
     reason: z.string().trim().min(1),
     status: z.literal('mapped'),
   })
@@ -109,6 +130,7 @@ export const negativeLabFrameHealthRouteSchema = z
 
 export const negativeLabAppServerRouteSchema = z.union([
   negativeLabAcceptBatchPlanRouteSchema,
+  negativeLabAcceptedBatchApplyRouteSchema,
   negativeLabBatchSummaryRouteSchema,
   negativeLabConversionPlanRouteSchema,
   negativeLabDensitometerRouteSchema,
@@ -161,7 +183,48 @@ export const negativeLabAcceptedBatchPlanSchema = z
     }
   });
 
+export const negativeLabAcceptedBatchApplyPlanSchema = z
+  .object({
+    acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
+    apply: z
+      .object({
+        options: z
+          .object({
+            acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+            acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
+            outputFormat: negativeLabAppServerOutputFormatSchema,
+            suffix: z.string().trim().min(1).max(40),
+          })
+          .strict(),
+        params: negativeLabPresetParamsSchema,
+        paths: z.array(z.string().trim().min(1)).min(1),
+      })
+      .strict(),
+    commandName: negativeLabAcceptedBatchApplyCommandNameSchema,
+    conversionPlan: negativeLabConversionPlanResultSchema,
+    dryRunSummary: negativeLabBatchDryRunSummarySchema,
+    proof: z
+      .object({
+        dryRunRequired: z.literal(true),
+        generatedFrom: z.literal('src/utils/negativeLabAppServerRoutes.ts'),
+        identityMatched: z.literal(true),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((plan, context) => {
+    if (plan.acceptedDryRunPlanHash !== plan.apply.options.acceptedDryRunPlanHash) {
+      context.addIssue({ code: 'custom', message: 'Apply options must preserve accepted dry-run hash.' });
+    }
+
+    if (plan.acceptedDryRunPlanId !== plan.apply.options.acceptedDryRunPlanId) {
+      context.addIssue({ code: 'custom', message: 'Apply options must preserve accepted dry-run id.' });
+    }
+  });
+
 export const negativeLabFrameHealthAppServerResultSchema = negativeLabFrameHealthReportSchema;
+export const negativeLabAcceptedBatchApplyAppServerResultSchema = negativeLabAcceptedBatchApplyPlanSchema;
 export const negativeLabAcceptBatchPlanAppServerResultSchema = negativeLabAcceptedBatchPlanSchema;
 export const negativeLabBatchSummaryAppServerResultSchema = negativeLabBatchDryRunSummarySchema;
 export const negativeLabDensitometerAppServerResultSchema = negativeBaseFogDensitometerReadoutSchema;
@@ -171,6 +234,12 @@ export type NegativeLabAcceptBatchPlanAppServerCommand = z.infer<
   typeof negativeLabAcceptBatchPlanAppServerCommandSchema
 >;
 export type NegativeLabAcceptBatchPlanAppServerResult = z.infer<typeof negativeLabAcceptBatchPlanAppServerResultSchema>;
+export type NegativeLabAcceptedBatchApplyAppServerCommand = z.infer<
+  typeof negativeLabAcceptedBatchApplyAppServerCommandSchema
+>;
+export type NegativeLabAcceptedBatchApplyAppServerResult = z.infer<
+  typeof negativeLabAcceptedBatchApplyAppServerResultSchema
+>;
 export type NegativeLabBatchSummaryAppServerCommand = z.infer<typeof negativeLabBatchSummaryAppServerCommandSchema>;
 export type NegativeLabBatchSummaryAppServerResult = z.infer<typeof negativeLabBatchSummaryAppServerResultSchema>;
 export type NegativeLabConversionPlanResult = z.infer<typeof negativeLabConversionPlanResultSchema>;
