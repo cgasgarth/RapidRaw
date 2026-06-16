@@ -62,7 +62,25 @@ const DEFAULT_SAVE_OPTIONS = {
   outputFormat: 'tiff16' as NegativeOutputFormat,
   suffix: 'Positive',
 };
+const CUSTOM_BASE_SAMPLE_DEFAULT = {
+  height: 0.18,
+  width: 0.18,
+  x: 0.25,
+  y: 0.25,
+} satisfies NegativeLabBaseFogSampleRect;
 const getInitialIncludedPaths = (paths: string[]) => new Set(paths);
+const clampSampleValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+const normalizeSampleRect = (rect: NegativeLabBaseFogSampleRect): NegativeLabBaseFogSampleRect => {
+  const width = clampSampleValue(rect.width, 0.02, 1);
+  const height = clampSampleValue(rect.height, 0.02, 1);
+
+  return {
+    height,
+    width,
+    x: clampSampleValue(rect.x, 0, 1 - width),
+    y: clampSampleValue(rect.y, 0, 1 - height),
+  };
+};
 const formatPercentValue = (value: number) => `${Math.round(value)}%`;
 const formatDensityValue = (value: number) => value.toFixed(3);
 const formatRgbValue = (value: number) => `${Math.round(value * 255)}`;
@@ -155,6 +173,10 @@ export default function NegativeConversionModal({
   const [patchProbeRect, setPatchProbeRect] = useState<NegativeLabBaseFogSampleRect | null>(null);
   const [patchProbeLabel, setPatchProbeLabel] = useState<string | null>(null);
   const [isSamplingPatchProbe, setIsSamplingPatchProbe] = useState(false);
+  const [customBaseSampleRect, setCustomBaseSampleRect] =
+    useState<NegativeLabBaseFogSampleRect>(CUSTOM_BASE_SAMPLE_DEFAULT);
+  const [customBaseSampleEstimate, setCustomBaseSampleEstimate] = useState<NegativeBaseFogEstimate | null>(null);
+  const [isMeasuringCustomBaseSample, setIsMeasuringCustomBaseSample] = useState(false);
   const [copiedBatchPlanJson, setCopiedBatchPlanJson] = useState<string | null>(null);
   const [acceptedBatchPlanJson, setAcceptedBatchPlanJson] = useState<string | null>(null);
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
@@ -215,6 +237,20 @@ export default function NegativeConversionModal({
       yPercent: patchProbeRect.y * 100,
     });
   }, [patchProbeEstimate, patchProbeLabel, patchProbeRect]);
+  const customBaseSampleReadout = useMemo(
+    () =>
+      negativeBaseFogSampleReadoutSchema.parse({
+        areaPercent: customBaseSampleRect.width * customBaseSampleRect.height * 100,
+        confidencePercent:
+          customBaseSampleEstimate === null ? null : Math.round(customBaseSampleEstimate.confidence * 100),
+        heightPercent: customBaseSampleRect.height * 100,
+        label: t('modals.negativeConversion.customBaseSample'),
+        widthPercent: customBaseSampleRect.width * 100,
+        xPercent: customBaseSampleRect.x * 100,
+        yPercent: customBaseSampleRect.y * 100,
+      }),
+    [customBaseSampleEstimate, customBaseSampleRect, t],
+  );
 
   const selectedPreset = useMemo(
     () =>
@@ -442,6 +478,8 @@ export default function NegativeConversionModal({
       setBaseFogEstimate(null);
       setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(null);
+      setCustomBaseSampleRect(CUSTOM_BASE_SAMPLE_DEFAULT);
+      setCustomBaseSampleEstimate(null);
       setActivePathIndex(0);
       setIsLoading(true);
       setProgress(null);
@@ -462,6 +500,7 @@ export default function NegativeConversionModal({
       setActiveBaseFogSampleLabel(null);
     }
     setParams(newParams);
+    setAcceptedBatchPlanJson(null);
     void updatePreview(newParams);
   };
 
@@ -501,6 +540,7 @@ export default function NegativeConversionModal({
       setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
       setSelectedPresetId('');
       setParams(nextParams);
+      setAcceptedBatchPlanJson(null);
       void updatePreview(nextParams);
     } catch (e) {
       console.error('Negative base/fog estimate failed', e);
@@ -535,12 +575,60 @@ export default function NegativeConversionModal({
       setActiveBaseFogSampleLabel(t(labelKey));
       setSelectedPresetId('');
       setParams(nextParams);
+      setAcceptedBatchPlanJson(null);
       void updatePreview(nextParams);
     } catch (e) {
       console.error('Negative base/fog sample failed', e);
     } finally {
       setIsEstimatingBaseFog(false);
     }
+  };
+
+  const handleCustomBaseSampleRectChange = (key: keyof NegativeLabBaseFogSampleRect, valuePercent: number) => {
+    const normalizedValue = Number.isFinite(valuePercent) ? valuePercent / 100 : CUSTOM_BASE_SAMPLE_DEFAULT[key];
+    const nextRect = normalizeSampleRect({ ...customBaseSampleRect, [key]: normalizedValue });
+    setCustomBaseSampleRect(nextRect);
+    setCustomBaseSampleEstimate(null);
+  };
+
+  const handleMeasureCustomBaseSample = async () => {
+    if (!selectedImagePath) return;
+    setIsMeasuringCustomBaseSample(true);
+    try {
+      const estimate = await invokeWithSchema(
+        'estimate_negative_base_fog',
+        {
+          path: selectedImagePath,
+          sampleRect: customBaseSampleRect,
+        },
+        negativeBaseFogEstimateSchema,
+      );
+      setCustomBaseSampleEstimate(estimate);
+    } catch (e) {
+      console.error('Negative custom base sample failed', e);
+    } finally {
+      setIsMeasuringCustomBaseSample(false);
+    }
+  };
+
+  const handleApplyCustomBaseSample = () => {
+    if (customBaseSampleEstimate === null) return;
+    const nextParams = {
+      ...params,
+      base_fog_strength: 1,
+      base_fog_sample: customBaseSampleRect,
+      blue_weight: customBaseSampleEstimate.blueWeight,
+      green_weight: customBaseSampleEstimate.greenWeight,
+      red_weight: customBaseSampleEstimate.redWeight,
+    };
+    setBaseFogConfidence(customBaseSampleEstimate.confidence);
+    setBaseFogEstimate(customBaseSampleEstimate);
+    setBaseFogReadoutCopied(false);
+    setActiveBaseFogSampleLabel(t('modals.negativeConversion.customBaseSample'));
+    setSelectedPresetId('');
+    setParams(nextParams);
+    setAcceptedBatchPlanJson(null);
+    void updatePreview(nextParams);
   };
 
   const handleSamplePatchProbe = async (
@@ -1178,6 +1266,93 @@ export default function NegativeConversionModal({
             <div className="space-y-2 rounded-md border border-surface bg-bg-primary p-2">
               <div>
                 <UiText variant={TextVariants.small} className="text-text-secondary">
+                  {t('modals.negativeConversion.customBaseSample')}
+                </UiText>
+                <UiText variant={TextVariants.small} className="text-text-tertiary">
+                  {t('modals.negativeConversion.customBaseSampleHint')}
+                </UiText>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(['x', 'y', 'width', 'height'] satisfies Array<keyof NegativeLabBaseFogSampleRect>).map((field) => (
+                  <label key={field} className="block text-[11px] text-text-tertiary">
+                    <span className="mb-1 block">{t(`modals.negativeConversion.customSample.${field}`)}</span>
+                    <input
+                      className="w-full rounded-md border border-surface bg-bg-secondary px-2 py-1 text-xs text-text-primary outline-none focus:border-accent"
+                      data-testid={`negative-lab-custom-base-${field}`}
+                      max={field === 'x' || field === 'y' ? 98 : 100}
+                      min={field === 'x' || field === 'y' ? 0 : 2}
+                      onChange={(event) => {
+                        handleCustomBaseSampleRectChange(field, Number(event.target.value));
+                      }}
+                      step={1}
+                      type="number"
+                      value={Math.round(customBaseSampleRect[field] * 100)}
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="negative-lab-measure-custom-base"
+                  disabled={!selectedImagePath || isMeasuringCustomBaseSample || isSaving}
+                  onClick={() => {
+                    void handleMeasureCustomBaseSample();
+                  }}
+                >
+                  {isMeasuringCustomBaseSample ? <Loader2 size={13} className="animate-spin" /> : null}
+                  {t('modals.negativeConversion.measureCustomBase')}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-accent bg-accent/10 px-2 py-1.5 text-xs text-text-primary transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="negative-lab-apply-custom-base"
+                  disabled={customBaseSampleEstimate === null || isSaving}
+                  onClick={handleApplyCustomBaseSample}
+                >
+                  {t('modals.negativeConversion.applyCustomBase')}
+                </button>
+              </div>
+              <div
+                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-xs text-text-tertiary"
+                data-testid="negative-lab-custom-base-readout"
+              >
+                <span className="text-text-secondary">{customBaseSampleReadout.label}</span>
+                <span className="text-right tabular-nums" data-testid="negative-lab-custom-base-area">
+                  {t('modals.negativeConversion.baseSampleArea', {
+                    area: formatPercentValue(customBaseSampleReadout.areaPercent),
+                  })}
+                </span>
+                <span>
+                  {t('modals.negativeConversion.baseSampleOrigin', {
+                    x: formatPercentValue(customBaseSampleReadout.xPercent),
+                    y: formatPercentValue(customBaseSampleReadout.yPercent),
+                  })}
+                </span>
+                <span className="text-right">
+                  {t('modals.negativeConversion.baseSampleSize', {
+                    height: formatPercentValue(customBaseSampleReadout.heightPercent),
+                    width: formatPercentValue(customBaseSampleReadout.widthPercent),
+                  })}
+                </span>
+                {customBaseSampleEstimate !== null && (
+                  <>
+                    <span className="text-text-secondary">{t('modals.negativeConversion.baseRgb')}</span>
+                    <span className="text-right tabular-nums" data-testid="negative-lab-custom-base-rgb">
+                      {customBaseSampleEstimate.baseRgb.map(formatRgbValue).join(' / ')}
+                    </span>
+                    <span className="text-text-secondary">{t('modals.negativeConversion.baseDensity')}</span>
+                    <span className="text-right tabular-nums" data-testid="negative-lab-custom-base-density">
+                      {customBaseSampleEstimate.baseDensity.map(formatDensityValue).join(' / ')}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2 rounded-md border border-surface bg-bg-primary p-2">
+              <div>
+                <UiText variant={TextVariants.small} className="text-text-secondary">
                   {t('modals.negativeConversion.patchSampler')}
                 </UiText>
                 <UiText variant={TextVariants.small} className="text-text-tertiary">
@@ -1450,6 +1625,24 @@ export default function NegativeConversionModal({
     );
   };
 
+  const renderCustomBaseSampleOverlay = () => (
+    <div
+      aria-label={t('modals.negativeConversion.customBaseSampleOverlayLabel')}
+      className="absolute border-2 border-cyan-300 bg-cyan-300/10 shadow-[0_0_0_1px_rgba(0,0,0,0.8)]"
+      data-testid="negative-lab-custom-base-overlay"
+      style={{
+        height: `${customBaseSampleRect.height * 100}%`,
+        left: `${customBaseSampleRect.x * 100}%`,
+        top: `${customBaseSampleRect.y * 100}%`,
+        width: `${customBaseSampleRect.width * 100}%`,
+      }}
+    >
+      <span className="absolute right-0 top-0 -translate-y-full rounded-sm bg-cyan-300 px-1.5 py-0.5 text-[10px] font-medium text-black shadow">
+        {t('modals.negativeConversion.customBaseSample')}
+      </span>
+    </div>
+  );
+
   const renderContent = () => (
     <div className="modal-preview-adjustments flex flex-row h-full w-full overflow-hidden">
       <div className="modal-preview-pane grow flex flex-col relative min-h-0 bg-[#0f0f0f] overflow-hidden">
@@ -1483,6 +1676,7 @@ export default function NegativeConversionModal({
                     alt={t('modals.negativeConversion.previewAlt')}
                     draggable={false}
                   />
+                  {renderCustomBaseSampleOverlay()}
                   {renderBaseFogSampleOverlay()}
                   {renderPatchProbeOverlay()}
                   {isCompareActive && (

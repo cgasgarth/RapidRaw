@@ -1512,6 +1512,7 @@
     },
     "negativeConversion": {
       "acceptBatchPlan": "Accept batch plan",
+      "applyCustomBase": "Apply sample",
       "autoBaseFog": "Auto base",
       "autoBaseFogTooltip": "Estimate film base and balance color weights",
       "baseDensity": "Base density",
@@ -1543,6 +1544,15 @@
       "convertingProgress": "转换中 {{current}}/{{total}}",
       "copyBatchPlan": "Copy batch plan JSON",
       "copyReadout": "Copy readout JSON",
+      "customBaseSample": "Custom base sample",
+      "customBaseSampleHint": "Measure a normalized base/fog rectangle, then explicitly apply it to conversion.",
+      "customBaseSampleOverlayLabel": "Custom base sample overlay",
+      "customSample": {
+        "height": "Height",
+        "width": "Width",
+        "x": "X",
+        "y": "Y"
+      },
       "densitometer": "Densitometer spread",
       "densitometerChannelBlue": "Blue",
       "densitometerChannelGreen": "Green",
@@ -1568,6 +1578,7 @@
       "greenWeight": "绿色（洋红）",
       "includedScans": "{{includedCount}} included",
       "includeScan": "Include",
+      "measureCustomBase": "Measure sample",
       "noticeText": "反转逻辑受 <0>NegPy</0>（作者 marcinz606，<1>GPL-3.0</1>）启发。",
       "originalLabel": "原始负片",
       "outputFormats": {

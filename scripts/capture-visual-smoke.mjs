@@ -164,14 +164,27 @@ const visualSmokeInvokeLogSchema = z.array(
     options: z.unknown().optional(),
   }),
 );
+const negativeLabLeftEdgeSampleSchema = z.object({
+  height: z.literal(0.6),
+  width: z.literal(0.12),
+  x: z.literal(0.02),
+  y: z.literal(0.2),
+});
+const negativeLabCustomBaseSampleSchema = z.object({
+  height: z.literal(0.18),
+  width: z.literal(0.18),
+  x: z.literal(0.25),
+  y: z.literal(0.25),
+});
+const negativeLabShadowPatchSampleSchema = z.object({
+  height: z.literal(0.18),
+  width: z.literal(0.18),
+  x: z.literal(0.18),
+  y: z.literal(0.62),
+});
 const negativeLabOrthoPresetParamsSchema = z
   .object({
-    base_fog_sample: z.object({
-      height: z.literal(0.6),
-      width: z.literal(0.12),
-      x: z.literal(0.02),
-      y: z.literal(0.2),
-    }),
+    base_fog_sample: z.union([negativeLabLeftEdgeSampleSchema, negativeLabCustomBaseSampleSchema]),
     base_fog_strength: z.literal(1),
     blue_weight: z.literal(1.18),
     contrast: z.literal(1.2),
@@ -180,21 +193,9 @@ const negativeLabOrthoPresetParamsSchema = z
     red_weight: z.literal(1.07),
   })
   .passthrough();
-const negativeLabLeftEdgeSampleSchema = z.object({
-  height: z.literal(0.6),
-  width: z.literal(0.12),
-  x: z.literal(0.02),
-  y: z.literal(0.2),
-});
-const negativeLabShadowPatchSampleSchema = z.object({
-  height: z.literal(0.18),
-  width: z.literal(0.18),
-  x: z.literal(0.18),
-  y: z.literal(0.62),
-});
 const negativeLabPreviewParamsSchema = z
   .object({
-    base_fog_sample: z.union([z.null(), negativeLabLeftEdgeSampleSchema]),
+    base_fog_sample: z.union([z.null(), negativeLabLeftEdgeSampleSchema, negativeLabCustomBaseSampleSchema]),
     base_fog_strength: z.literal(1),
     blue_weight: z.number(),
     contrast: z.number(),
@@ -218,7 +219,12 @@ const negativeLabPreviewInvokeSchema = z.object({
 const negativeLabBaseFogEstimateInvokeSchema = z.object({
   args: z.object({
     path: z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
-    sampleRect: z.union([z.null(), negativeLabLeftEdgeSampleSchema, negativeLabShadowPatchSampleSchema]),
+    sampleRect: z.union([
+      z.null(),
+      negativeLabLeftEdgeSampleSchema,
+      negativeLabCustomBaseSampleSchema,
+      negativeLabShadowPatchSampleSchema,
+    ]),
   }),
   command: z.literal('estimate_negative_base_fog'),
   options: z.unknown().optional(),
@@ -408,6 +414,9 @@ async function assertNegativeLabBaseFogPreviewExportProof(page) {
   );
   const hasAutoEstimate = estimateCalls.some((call) => call.args.sampleRect === null);
   const hasManualEstimate = estimateCalls.some((call) => call.args.sampleRect !== null);
+  const hasCustomBaseEstimate = estimateCalls.some(
+    (call) => negativeLabCustomBaseSampleSchema.safeParse(call.args.sampleRect).success,
+  );
   const hasPatchProbeEstimate = estimateCalls.some(
     (call) => negativeLabShadowPatchSampleSchema.safeParse(call.args.sampleRect).success,
   );
@@ -417,8 +426,19 @@ async function assertNegativeLabBaseFogPreviewExportProof(page) {
   const hasManualPreview = previewCalls.some(
     (call) => call.args.params.base_fog_sample !== null && call.args.params.blue_weight === 1.18,
   );
+  const hasCustomBasePreview = previewCalls.some(
+    (call) => negativeLabCustomBaseSampleSchema.safeParse(call.args.params.base_fog_sample).success,
+  );
 
-  if (!hasAutoEstimate || !hasManualEstimate || !hasPatchProbeEstimate || !hasAutoPreview || !hasManualPreview) {
+  if (
+    !hasAutoEstimate ||
+    !hasManualEstimate ||
+    !hasCustomBaseEstimate ||
+    !hasPatchProbeEstimate ||
+    !hasAutoPreview ||
+    !hasManualPreview ||
+    !hasCustomBasePreview
+  ) {
     throw new Error('Negative Lab base/fog proof did not exercise auto and sampled preview paths.');
   }
 
@@ -600,6 +620,11 @@ async function prepareScenario(page, mode) {
     await colorSliders.nth(1).fill('1.23');
     await colorSliders.nth(2).fill('0.91');
     await colorSliders.nth(3).fill('1.14');
+    await page.getByTestId('negative-lab-accept-batch-plan').click();
+    await page
+      .getByTestId('negative-lab-accept-batch-plan')
+      .getByText('Batch plan accepted', { exact: true })
+      .waitFor({ timeout: 10_000 });
     await page.getByTestId('negative-lab-export-jpeg-proof').click();
     await page.getByRole('button', { name: 'Convert & Save All (2)' }).click();
     await page.waitForFunction(() =>
@@ -718,6 +743,19 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-patch-probe-dominant-channel').getByText('Blue', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-custom-base-overlay').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-custom-base-area').getByText('Area 3%', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-measure-custom-base').click();
+  await page.getByTestId('negative-lab-custom-base-rgb').getByText('183 / 147 / 112', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-apply-custom-base').click();
+  await page
+    .getByTestId('negative-lab-base-sample-readout')
+    .getByText('Custom base sample', { exact: true })
+    .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-copy-readout').click();
   await page.getByTestId('negative-lab-copy-readout').getByText('Copied readout', { exact: true }).waitFor({
     timeout: 10_000,
