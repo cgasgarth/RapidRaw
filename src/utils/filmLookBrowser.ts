@@ -27,7 +27,15 @@ export interface FilmLookBrowserItem {
   description: string;
   displayName: string;
   id: string;
+  provenance: FilmLookBrowserItemProvenance;
   strengthDefault: number;
+}
+
+export interface FilmLookBrowserItemProvenance {
+  claimLevel: 'generic_engineered';
+  legalNamingStatus: 'generic_safe_name';
+  legalNote: string;
+  measurementSource: 'generic_engineered_starting_point';
 }
 
 export interface FilmLookBrowserGroup {
@@ -94,8 +102,20 @@ const FILM_LOOK_CATEGORY_LABELS: Record<FilmLookCategory, string> = {
   color_warm: 'Warm',
 };
 
+const GENERIC_FILM_LOOK_PROVENANCE = {
+  claimLevel: 'generic_engineered',
+  legalNamingStatus: 'generic_safe_name',
+  legalNote: 'Generic creative look; not measured from, endorsed by, or claiming to match a film stock.',
+  measurementSource: 'generic_engineered_starting_point',
+} satisfies FilmLookBrowserItemProvenance;
+
+const makeGenericFilmLook = (look: Omit<FilmLookBrowserItem, 'provenance'>): FilmLookBrowserItem => ({
+  ...look,
+  provenance: GENERIC_FILM_LOOK_PROVENANCE,
+});
+
 export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
-  {
+  makeGenericFilmLook({
     adjustmentPatch: {
       contrast: 12,
       saturation: 4,
@@ -105,8 +125,8 @@ export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
     displayName: 'Clean Color',
     id: 'film_look.generic.clean_color.v1',
     strengthDefault: 70,
-  },
-  {
+  }),
+  makeGenericFilmLook({
     adjustmentPatch: {
       contrast: 8,
       highlights: -10,
@@ -117,8 +137,8 @@ export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
     displayName: 'Warm Print',
     id: 'film_look.generic.warm_print.v1',
     strengthDefault: 65,
-  },
-  {
+  }),
+  makeGenericFilmLook({
     adjustmentPatch: {
       contrast: 18,
       saturation: -2,
@@ -130,8 +150,8 @@ export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
     displayName: 'Cool Contrast',
     id: 'film_look.generic.cool_contrast.v1',
     strengthDefault: 60,
-  },
-  {
+  }),
+  makeGenericFilmLook({
     adjustmentPatch: {
       blacks: 8,
       contrast: -10,
@@ -142,8 +162,8 @@ export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
     displayName: 'Soft Fade',
     id: 'film_look.generic.soft_fade.v1',
     strengthDefault: 55,
-  },
-  {
+  }),
+  makeGenericFilmLook({
     adjustmentPatch: {
       contrast: 12,
       grainAmount: 22,
@@ -155,8 +175,8 @@ export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
     displayName: 'Mono Silver',
     id: 'film_look.generic.mono_silver.v1',
     strengthDefault: 75,
-  },
-  {
+  }),
+  makeGenericFilmLook({
     adjustmentPatch: {
       blacks: -3,
       contrast: 24,
@@ -167,7 +187,7 @@ export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
     displayName: 'Punch Color',
     id: 'film_look.generic.punch_color.v1',
     strengthDefault: 60,
-  },
+  }),
 ];
 
 export const getFilmLookBrowserGroups = (): Array<FilmLookBrowserGroup> =>
