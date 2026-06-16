@@ -6,7 +6,12 @@ import { useTranslation } from 'react-i18next';
 import FilmLookBrowser from './FilmLookBrowser';
 import { TextVariants } from '../../types/typography';
 import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
-import { scaleFilmLookAdjustmentPatch, type FilmLookBrowserItem } from '../../utils/filmLookBrowser';
+import {
+  buildFilmLookPresetDraft,
+  formatFilmLookPresetName,
+  scaleFilmLookAdjustmentPatch,
+  type FilmLookBrowserItem,
+} from '../../utils/filmLookBrowser';
 import { AppSettings, Invokes, type Preset } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
 import Slider from '../ui/Slider';
@@ -35,18 +40,11 @@ type SliderChangeEvent =
 
 const FILM_LOOK_PRESET_FILE_EXTENSION = 'rrpreset';
 const FILM_LOOK_PRESET_FILE_TYPE = 'RapidRaw Preset';
-const formatFilmLookStrength = (strength: number) => `${strength}%`;
-const formatFilmLookPresetName = (look: FilmLookBrowserItem, strength: number) =>
-  `${look.displayName} ${formatFilmLookStrength(strength)}`;
 const sanitizeFilmLookPresetFileName = (look: FilmLookBrowserItem, strength: number) =>
   `${formatFilmLookPresetName(look, strength)}.rrpreset`.replace(/[<>:"/\\|?*]/g, '_');
 const createFilmLookPreset = (look: FilmLookBrowserItem, strength: number): Preset => ({
-  adjustments: scaleFilmLookAdjustmentPatch(look, strength),
+  ...buildFilmLookPresetDraft(look, strength),
   id: crypto.randomUUID(),
-  includeCropTransform: false,
-  includeMasks: false,
-  name: formatFilmLookPresetName(look, strength),
-  presetType: 'style',
 });
 
 export default function EffectsPanel({
@@ -87,13 +85,7 @@ export default function EffectsPanel({
   };
 
   const saveFilmLookPreset = async (look: FilmLookBrowserItem, strength: number) => {
-    await invoke(Invokes.SaveCommunityPreset, {
-      adjustments: scaleFilmLookAdjustmentPatch(look, strength),
-      includeCropTransform: false,
-      includeMasks: false,
-      name: formatFilmLookPresetName(look, strength),
-      presetType: 'style',
-    });
+    await invoke(Invokes.SaveCommunityPreset, buildFilmLookPresetDraft(look, strength));
   };
 
   const shareFilmLookPreset = async (look: FilmLookBrowserItem, strength: number) => {

@@ -36,6 +36,38 @@
           "contrast": 12,
           "saturation": 4
         }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "contrast": 8,
+            "saturation": 3
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Clean Color 70%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "contrast": 6,
+            "saturation": 2
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Clean Color 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "contrast": 12,
+            "saturation": 4
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Clean Color 100%",
+          "presetType": "style"
+        }
       }
     },
     {
@@ -74,6 +106,41 @@
           "temperature": 8,
           "contrast": 8,
           "highlights": -10
+        }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "temperature": 5,
+            "contrast": 5,
+            "highlights": -6
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Warm Print 65%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "temperature": 4,
+            "contrast": 4,
+            "highlights": -5
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Warm Print 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "temperature": 8,
+            "contrast": 8,
+            "highlights": -10
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Warm Print 100%",
+          "presetType": "style"
         }
       }
     },
@@ -121,6 +188,44 @@
           "shadows": -10,
           "saturation": -2
         }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "temperature": -5,
+            "contrast": 11,
+            "shadows": -6,
+            "saturation": -1
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Cool Contrast 60%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "temperature": -4,
+            "contrast": 9,
+            "shadows": -5,
+            "saturation": -1
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Cool Contrast 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "temperature": -8,
+            "contrast": 18,
+            "shadows": -10,
+            "saturation": -2
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Cool Contrast 100%",
+          "presetType": "style"
+        }
       }
     },
     {
@@ -159,6 +264,41 @@
           "contrast": -10,
           "blacks": 8,
           "saturation": -18
+        }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "contrast": -5,
+            "blacks": 4,
+            "saturation": -10
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Soft Fade 55%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "contrast": -5,
+            "blacks": 4,
+            "saturation": -9
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Soft Fade 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "contrast": -10,
+            "blacks": 8,
+            "saturation": -18
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Soft Fade 100%",
+          "presetType": "style"
         }
       }
     },
@@ -206,6 +346,44 @@
           "grainAmount": 22,
           "grainSize": 42
         }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "contrast": 9,
+            "saturation": -75,
+            "grainAmount": 17,
+            "grainSize": 32
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Mono Silver 75%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "contrast": 6,
+            "saturation": -50,
+            "grainAmount": 11,
+            "grainSize": 21
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Mono Silver 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "contrast": 12,
+            "saturation": -100,
+            "grainAmount": 22,
+            "grainSize": 42
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Mono Silver 100%",
+          "presetType": "style"
+        }
       }
     },
     {
@@ -244,6 +422,41 @@
           "contrast": 24,
           "blacks": -3,
           "glowAmount": 8
+        }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "contrast": 14,
+            "blacks": -2,
+            "glowAmount": 5
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Punch Color 60%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "contrast": 12,
+            "blacks": -1,
+            "glowAmount": 4
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Punch Color 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "contrast": 24,
+            "blacks": -3,
+            "glowAmount": 8
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Punch Color 100%",
+          "presetType": "style"
         }
       }
     }

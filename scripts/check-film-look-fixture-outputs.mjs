@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import {
+  buildFilmLookPresetDraft,
   FILM_LOOK_BROWSER_ITEMS,
   getFilmLookAdjustmentSummaries,
   scaleFilmLookAdjustmentPatch,
@@ -10,6 +11,7 @@ import {
 
 const fixtureUrl = new URL('../fixtures/film-simulation/film-look-fixture-outputs.json', import.meta.url);
 const browserSourceUrl = new URL('../src/components/adjustments/FilmLookBrowser.tsx', import.meta.url);
+const utilsSourceUrl = new URL('../src/utils/filmLookBrowser.ts', import.meta.url);
 const updateFixture = process.argv.includes('--update');
 
 const getAdjustmentFingerprint = (adjustmentSummaries) =>
@@ -37,6 +39,11 @@ const buildFixture = () => ({
         default: scaleFilmLookAdjustmentPatch(look, look.strengthDefault),
         half: scaleFilmLookAdjustmentPatch(look, 50),
         full: scaleFilmLookAdjustmentPatch(look, 100),
+      },
+      presetDrafts: {
+        default: buildFilmLookPresetDraft(look, look.strengthDefault),
+        half: buildFilmLookPresetDraft(look, 50),
+        full: buildFilmLookPresetDraft(look, 100),
       },
     };
   }),
@@ -80,6 +87,21 @@ for (const marker of [
 ]) {
   if (!browserSource.includes(marker)) {
     throw new Error(`Film look browser is missing UI marker: ${marker}`);
+  }
+}
+
+const utilsSource = await readFile(utilsSourceUrl, 'utf8');
+for (const marker of ['buildFilmLookPresetDraft', 'formatFilmLookPresetName', 'scaleFilmLookAdjustmentPatch']) {
+  if (!utilsSource.includes(marker)) {
+    throw new Error(`Film look utilities are missing preset parity marker: ${marker}`);
+  }
+}
+
+const effectsSourceUrl = new URL('../src/components/adjustments/Effects.tsx', import.meta.url);
+const effectsSource = await readFile(effectsSourceUrl, 'utf8');
+for (const marker of ['buildFilmLookPresetDraft', 'Invokes.SaveCommunityPreset', 'Invokes.HandleExportPresetsToFile']) {
+  if (!effectsSource.includes(marker)) {
+    throw new Error(`Effects panel is missing film preset export marker: ${marker}`);
   }
 }
 
