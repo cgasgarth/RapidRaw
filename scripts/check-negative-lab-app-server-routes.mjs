@@ -11,6 +11,7 @@ import {
   buildNegativeLabConversionPlanResult,
   buildNegativeLabDensitometerRouteResult,
   buildNegativeLabFrameHealthRouteResult,
+  buildNegativeLabStockRegistryRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../src/utils/negativeLabAppServerRoutes.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
@@ -21,6 +22,7 @@ const expectedBatchSummaryCommandName = 'negative.lab.build_batch_dry_run_summar
 const expectedCommandName = 'negative.lab.build_conversion_plan';
 const expectedDensitometerCommandName = 'negative.lab.build_densitometer_readout';
 const expectedFrameHealthCommandName = 'negative.lab.build_frame_health_report';
+const expectedStockRegistryCommandName = 'negative.lab.list_stock_registry';
 const acceptBatchPlanRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedAcceptBatchPlanCommandName,
 );
@@ -38,6 +40,9 @@ const densitometerRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
 );
 const frameHealthRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedFrameHealthCommandName,
+);
+const stockRegistryRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
+  (candidate) => candidate.commandName === expectedStockRegistryCommandName,
 );
 
 if (acceptBatchPlanRoute === undefined) {
@@ -57,6 +62,9 @@ if (densitometerRoute === undefined) {
 }
 if (frameHealthRoute === undefined) {
   throw new Error(`Missing Negative Lab app-server route for ${expectedFrameHealthCommandName}.`);
+}
+if (stockRegistryRoute === undefined) {
+  throw new Error(`Missing Negative Lab app-server route for ${expectedStockRegistryCommandName}.`);
 }
 
 const sampleRect = { height: 0.6, width: 0.12, x: 0.02, y: 0.2 };
@@ -164,6 +172,7 @@ const densitometerResult = densitometerReadoutSchema.parse(
     },
   }),
 );
+const stockRegistryResult = buildNegativeLabStockRegistryRouteResult({});
 
 if (frameHealthResult.activeFrameId !== 'negative-lab-frame-2') {
   throw new Error('Negative Lab app-server frame health route did not report the active frame.');
@@ -205,6 +214,14 @@ if (
   Math.abs(densitometerResult.densityRange - 0.211) > 0.000001
 ) {
   throw new Error('Negative Lab app-server densitometer route did not match UI density math.');
+}
+if (
+  stockRegistryResult.counts.totalCount !== stockRegistryResult.registry.entries.length ||
+  stockRegistryResult.counts.runtimeSafeCount < 5 ||
+  stockRegistryResult.counts.referenceOnlyCount < 2 ||
+  !stockRegistryResult.proof.namedStockClaimsRuntimeGated
+) {
+  throw new Error('Negative Lab app-server stock registry route did not expose governed registry proof.');
 }
 
 try {
@@ -302,6 +319,7 @@ for (const [filePath, marker] of [
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabAcceptedBatchApplyAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabDensitometerAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabFrameHealthAppServerCommandSchema'],
+  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabStockRegistryAppServerCommandSchema'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabAcceptedBatchPlanRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabAcceptedBatchApplyRouteResult'],
   ['src/utils/negativeLabPlanIdentity.ts', 'buildNegativeLabAcceptedPlanIdentity'],
@@ -310,9 +328,11 @@ for (const [filePath, marker] of [
   ['src/utils/negativeLabDensitometer.ts', 'buildNegativeBaseFogDensitometerReadout'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabConversionPlanResultSchema'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabFrameHealthRouteResult'],
+  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabStockRegistryRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabConversionPlanResult'],
   ['src/utils/negativeLabMeasuredProfileRuntime.ts', 'resolveNegativeLabRuntimeProfile'],
   ['src/utils/negativeLabPresetCatalog.ts', 'NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG'],
+  ['src/utils/negativeLabStockRegistry.ts', 'NEGATIVE_LAB_STOCK_REGISTRY'],
 ]) {
   const source = await readFile(filePath, 'utf8');
   if (!source.includes(marker)) {

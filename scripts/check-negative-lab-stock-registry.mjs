@@ -6,7 +6,9 @@ import { negativeLabStockRegistrySchema } from '../src/schemas/negativeLabStockR
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
 
 const registryUrl = new URL('../fixtures/negative-lab/negative-lab-stock-registry.json', import.meta.url);
+const sourceRegistryUrl = new URL('../src/data/negativeLabStockRegistry.json', import.meta.url);
 const registry = negativeLabStockRegistrySchema.parse(JSON.parse(await readFile(registryUrl, 'utf8')));
+const sourceRegistry = negativeLabStockRegistrySchema.parse(JSON.parse(await readFile(sourceRegistryUrl, 'utf8')));
 const genericPresetIds = new Set(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.map((preset) => preset.presetId));
 const bannedRuntimeText =
   /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|ilford|kodak|lightroom|mastin|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;
@@ -38,6 +40,10 @@ if (runtimeMappings.length < 5) {
 
 if (referenceOnly.length < 2) {
   throw new Error('Stock registry needs reference-only coverage for slide and cinema families.');
+}
+
+if (JSON.stringify(registry) !== JSON.stringify(sourceRegistry)) {
+  throw new Error('Public stock registry fixture must match the source-owned runtime registry.');
 }
 
 console.log(

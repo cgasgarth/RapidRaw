@@ -7,6 +7,7 @@ import {
   resolveNegativeLabRuntimeProfile,
 } from './negativeLabMeasuredProfileRuntime';
 import { buildNegativeLabAcceptedPlanIdentity } from './negativeLabPlanIdentity';
+import { NEGATIVE_LAB_STOCK_REGISTRY, buildNegativeLabStockRegistryCounts } from './negativeLabStockRegistry';
 import {
   negativeLabAppServerCommandSchema,
   negativeLabAppServerRouteManifestSchema,
@@ -21,6 +22,8 @@ import {
   negativeLabDensitometerAppServerResultSchema,
   negativeLabFrameHealthAppServerCommandSchema,
   negativeLabFrameHealthAppServerResultSchema,
+  negativeLabStockRegistryAppServerCommandSchema,
+  negativeLabStockRegistryAppServerResultSchema,
   type NegativeLabAppServerCommand,
   type NegativeLabAcceptedBatchApplyAppServerCommand,
   type NegativeLabAcceptedBatchApplyAppServerResult,
@@ -33,6 +36,8 @@ import {
   type NegativeLabDensitometerAppServerResult,
   type NegativeLabFrameHealthAppServerCommand,
   type NegativeLabFrameHealthAppServerResult,
+  type NegativeLabStockRegistryAppServerCommand,
+  type NegativeLabStockRegistryAppServerResult,
 } from '../schemas/negativeLabAppServerSchemas';
 
 export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteManifestSchema.parse({
@@ -78,6 +83,13 @@ export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteM
       inputSchemaName: 'NegativeLabFrameHealthAppServerCommandV1',
       outputSchemaName: 'NegativeLabFrameHealthReportV1',
       reason: 'Negative Lab app-server calls expose the same roll frame health report used by the workspace UI.',
+      status: 'mapped',
+    },
+    {
+      commandName: 'negative.lab.list_stock_registry',
+      inputSchemaName: 'NegativeLabStockRegistryAppServerCommandV1',
+      outputSchemaName: 'NegativeLabStockRegistryAppServerResultV1',
+      reason: 'Negative Lab app-server calls expose the governed stock-family registry used by preset workflows.',
       status: 'mapped',
     },
   ],
@@ -218,4 +230,21 @@ export const buildNegativeLabDensitometerRouteResult = (
   return negativeLabDensitometerAppServerResultSchema.parse(
     buildNegativeBaseFogDensitometerReadout(parsedCommand.baseFogEstimate),
   );
+};
+
+export const buildNegativeLabStockRegistryRouteResult = (
+  command: NegativeLabStockRegistryAppServerCommand,
+): NegativeLabStockRegistryAppServerResult => {
+  negativeLabStockRegistryAppServerCommandSchema.parse(command);
+
+  return negativeLabStockRegistryAppServerResultSchema.parse({
+    commandName: 'negative.lab.list_stock_registry',
+    counts: buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY),
+    proof: {
+      deterministic: true,
+      generatedFrom: 'src/utils/negativeLabStockRegistry.ts',
+      namedStockClaimsRuntimeGated: true,
+    },
+    registry: NEGATIVE_LAB_STOCK_REGISTRY,
+  });
 };
