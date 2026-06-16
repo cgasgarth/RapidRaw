@@ -11,13 +11,30 @@ const MIN_RECOVERED_HIGHLIGHT_RATIO = 0.9;
 const MAX_UNRECOVERED_CLIPPED_RATIO = 0.03;
 const MAX_RECONSTRUCTION_MAE = 0.015;
 
+import {
+  measureHdrMergeWeightingV1,
+  mergeExposureWeightedRadianceV1,
+} from '../packages/rawengine-schema/src/hdrMergeWeightingRuntime.ts';
+
 const scene = createSyntheticRadianceScene(WIDTH, HEIGHT);
 const captures = BRACKETS.map((bracket) => ({
   ...bracket,
   pixels: renderBracket(scene, bracket.exposureEv),
 }));
-const merged = mergeExposureWeightedRadiance(captures, WIDTH, HEIGHT);
-const metrics = measureMerge(scene, captures, merged);
+const merged = mergeExposureWeightedRadianceV1({
+  captures,
+  clipThreshold: CLIP_THRESHOLD,
+  height: HEIGHT,
+  sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
+  width: WIDTH,
+});
+const metrics = measureHdrMergeWeightingV1({
+  captures,
+  clipThreshold: CLIP_THRESHOLD,
+  maxReconstructionMae: MAX_RECONSTRUCTION_MAE,
+  merged,
+  scene,
+});
 
 if (metrics.recoveredHighlightPixelRatio < MIN_RECOVERED_HIGHLIGHT_RATIO) {
   throw new Error(
@@ -74,91 +91,6 @@ function renderBracket(scene, exposureEv) {
   return pixels;
 }
 
-function mergeExposureWeightedRadiance(captures, width, height) {
-  const merged = new Float64Array(width * height);
-
-  for (let index = 0; index < merged.length; index += 1) {
-    let weightedRadiance = 0;
-    let totalWeight = 0;
-
-    for (const capture of captures) {
-      const normalized = capture.pixels[index];
-      const weight = getWellExposedWeight(normalized);
-      if (weight <= 0) continue;
-
-      weightedRadiance += (normalized / 2 ** capture.exposureEv) * SENSOR_WHITE_RADIANCE * weight;
-      totalWeight += weight;
-    }
-
-    if (totalWeight > 0) {
-      merged[index] = weightedRadiance / totalWeight;
-      continue;
-    }
-
-    const darkestCapture = captures[0];
-    if (darkestCapture === undefined) {
-      throw new Error('HDR merge weighting smoke requires at least one capture.');
-    }
-    merged[index] = (darkestCapture.pixels[index] / 2 ** darkestCapture.exposureEv) * SENSOR_WHITE_RADIANCE;
-  }
-
-  return merged;
-}
-
-function measureMerge(scene, captures, merged) {
-  let absoluteError = 0;
-  let referenceClippedCount = 0;
-  let recoveredHighlightCount = 0;
-  let unrecoveredClippedCount = 0;
-  const clippedInputPixelRatioBySource = captures.map((capture) => {
-    let clippedHighCount = 0;
-    let nearClippedHighCount = 0;
-
-    for (const pixel of capture.pixels) {
-      if (pixel >= 1) clippedHighCount += 1;
-      if (pixel >= CLIP_THRESHOLD) nearClippedHighCount += 1;
-    }
-
-    return {
-      clippedHighRatio: clippedHighCount / capture.pixels.length,
-      nearClippedHighRatio: nearClippedHighCount / capture.pixels.length,
-      sourceIndex: capture.sourceIndex,
-    };
-  });
-
-  const referenceCapture = captures.find((capture) => capture.exposureEv === 0);
-  if (referenceCapture === undefined) {
-    throw new Error('HDR merge weighting smoke requires a 0 EV reference capture.');
-  }
-
-  for (let index = 0; index < scene.length; index += 1) {
-    const referenceClipped = referenceCapture.pixels[index] >= CLIP_THRESHOLD;
-    absoluteError += Math.abs(scene[index] - merged[index]);
-
-    if (!referenceClipped) continue;
-
-    referenceClippedCount += 1;
-    if (Math.abs(scene[index] - merged[index]) <= MAX_RECONSTRUCTION_MAE) {
-      recoveredHighlightCount += 1;
-    } else {
-      unrecoveredClippedCount += 1;
-    }
-  }
-
-  return {
-    clippedInputPixelRatioBySource,
-    meanAbsoluteError: roundMetric(absoluteError / scene.length),
-    recoveredHighlightPixelRatio: roundMetric(recoveredHighlightCount / referenceClippedCount),
-    shadowNoiseAmplificationRisk: 'low',
-    unrecoveredClippedPixelRatio: roundMetric(unrecoveredClippedCount / scene.length),
-  };
-}
-
-function getWellExposedWeight(normalizedValue) {
-  if (normalizedValue <= 0 || normalizedValue >= CLIP_THRESHOLD) return 0;
-  return Math.max(0, 1 - Math.abs(normalizedValue - 0.5) * 2);
-}
-
 function isInsideCircle(x, y, centerX, centerY, radius) {
   return (x - centerX) * (x - centerX) + (y - centerY) * (y - centerY) <= radius * radius;
 }
@@ -169,8 +101,4 @@ function isInsideRectangle(x, y, left, top, width, height) {
 
 function getPixelIndex(x, y, width) {
   return y * width + x;
-}
-
-function roundMetric(value) {
-  return Math.round(value * 1_000_000) / 1_000_000;
 }
