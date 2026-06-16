@@ -19,8 +19,11 @@ const requireMarker = (source, marker, label) => {
 
 for (const marker of [
   'base_fog_strength',
+  'base_fog_sample',
+  'NegativeBaseFogSampleRect',
   'NegativeBaseFogEstimate',
   'estimate_base_fog_from_image',
+  'sampled_base_fog_estimate_uses_requested_patch',
   'base_fog_strength_changes_thin_density_rendering',
   'base_fog_estimate_returns_bounded_weights_and_confidence',
 ]) {
@@ -31,16 +34,25 @@ requireMarker(files.lib, 'negative_conversion::estimate_negative_base_fog', 'com
 
 for (const marker of [
   'handleAutoBaseFog',
+  'handleSampleBaseFog',
   'estimate_negative_base_fog',
   'invokeWithSchema',
   'negativeBaseFogEstimateSchema',
+  'BASE_FOG_SAMPLE_PRESETS',
   'base_fog_strength',
+  'base_fog_sample',
   'baseFogConfidence',
 ]) {
   requireMarker(files.modal, marker, 'modal');
 }
 
-for (const marker of ['negativeBaseFogEstimateSchema', 'negativeConversionSavedPathsSchema', 'base_fog_strength']) {
+for (const marker of [
+  'negativeLabBaseFogSampleRectSchema',
+  'negativeBaseFogEstimateSchema',
+  'negativeConversionSavedPathsSchema',
+  'base_fog_strength',
+  'base_fog_sample',
+]) {
   requireMarker(files.schema, marker, 'schema');
 }
 

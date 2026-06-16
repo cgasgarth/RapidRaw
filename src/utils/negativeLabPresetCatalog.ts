@@ -5,7 +5,15 @@ export const NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG = {
   presets: [
     {
       displayName: 'C-41 Neutral',
-      params: { blue_weight: 1, base_fog_strength: 1, contrast: 1, exposure: 0, green_weight: 1, red_weight: 1 },
+      params: {
+        blue_weight: 1,
+        base_fog_strength: 1,
+        base_fog_sample: null,
+        contrast: 1,
+        exposure: 0,
+        green_weight: 1,
+        red_weight: 1,
+      },
       presetId: 'negative_lab.generic.c41.neutral.v1',
     },
     {
@@ -13,6 +21,7 @@ export const NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG = {
       params: {
         blue_weight: 0.98,
         base_fog_strength: 1,
+        base_fog_sample: null,
         contrast: 0.95,
         exposure: 0.05,
         green_weight: 1,
@@ -25,6 +34,7 @@ export const NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG = {
       params: {
         blue_weight: 0.94,
         base_fog_strength: 1,
+        base_fog_sample: null,
         contrast: 1.15,
         exposure: 0.15,
         green_weight: 0.98,
@@ -37,6 +47,7 @@ export const NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG = {
       params: {
         blue_weight: 1.06,
         base_fog_strength: 1,
+        base_fog_sample: null,
         contrast: 1.15,
         exposure: 0,
         green_weight: 1.02,
@@ -49,6 +60,7 @@ export const NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG = {
       params: {
         blue_weight: 0.9,
         base_fog_strength: 1,
+        base_fog_sample: null,
         contrast: 1.3,
         exposure: 0.05,
         green_weight: 1.05,
@@ -58,7 +70,15 @@ export const NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG = {
     },
     {
       displayName: 'Black and White Fine Grain',
-      params: { blue_weight: 0.95, base_fog_strength: 1, contrast: 1.05, exposure: 0, green_weight: 1, red_weight: 1 },
+      params: {
+        blue_weight: 0.95,
+        base_fog_strength: 1,
+        base_fog_sample: null,
+        contrast: 1.05,
+        exposure: 0,
+        green_weight: 1,
+        red_weight: 1,
+      },
       presetId: 'negative_lab.generic.bw.fine_grain.v1',
     },
     {
@@ -66,6 +86,7 @@ export const NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG = {
       params: {
         blue_weight: 1.2,
         base_fog_strength: 1,
+        base_fog_sample: null,
         contrast: 1.2,
         exposure: -0.05,
         green_weight: 1.05,

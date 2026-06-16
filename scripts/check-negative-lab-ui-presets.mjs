@@ -44,6 +44,10 @@ const workflowStageKeys = [
   'autoBaseFogTooltip',
   'baseFogConfidence',
   'baseFogStrength',
+  'baseFogSample',
+  'sampleCenterPatch',
+  'sampleFullFrame',
+  'sampleLeftEdge',
   'exportOptions',
   'outputSuffix',
 ];
