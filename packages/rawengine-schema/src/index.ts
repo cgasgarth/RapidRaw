@@ -1,4 +1,5 @@
 export * from './focusStackPreflight.js';
+export * from './focusStackRuntimePlan.js';
 export * from './focusStackWeightedBlend.js';
 export * from './derivedArtifactInvalidation.js';
 export * from './editCommandBus.js';
