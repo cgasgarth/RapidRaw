@@ -27,8 +27,8 @@ const bundleBudget = BundleBudgetSchema.parse({
     {
       extension: '.js',
       label: 'largest JavaScript asset',
-      maxBytes: 2_650_000,
-      maxGzipBytes: 774_144,
+      maxBytes: 2_656_256,
+      maxGzipBytes: 776_192,
     },
     {
       extension: '.css',

@@ -27,6 +27,15 @@ type NegativeParams = NegativeLabPresetParams;
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 
+type NegativeLabWorkflowStageId = 'setup' | 'preset' | 'colorTiming' | 'printGrade' | 'export';
+
+interface NegativeLabWorkflowStage {
+  detail: string;
+  id: NegativeLabWorkflowStageId;
+  isComplete: boolean;
+  label: string;
+}
+
 interface NegativeConversionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -58,6 +67,60 @@ export default function NegativeConversionModal({
   const lastMousePos = useRef({ x: 0, y: 0 });
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const selectedImagePath = targetPaths.length > 0 ? targetPaths[0] : null;
+
+  const selectedPreset = useMemo(
+    () =>
+      NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.find((preset) => preset.presetId === selectedPresetId) ?? null,
+    [selectedPresetId],
+  );
+
+  const workflowStages = useMemo<NegativeLabWorkflowStage[]>(
+    () => [
+      {
+        detail:
+          targetPaths.length === 1
+            ? t('modals.negativeConversion.workflowSetupDetailSingle')
+            : t('modals.negativeConversion.workflowSetupDetailMultiple', { scanCount: targetPaths.length }),
+        id: 'setup',
+        isComplete: targetPaths.length > 0,
+        label: t('modals.negativeConversion.workflowSetup'),
+      },
+      {
+        detail: selectedPreset?.displayName ?? t('modals.negativeConversion.workflowCustomPresetDetail'),
+        id: 'preset',
+        isComplete: true,
+        label: t('modals.negativeConversion.workflowPreset'),
+      },
+      {
+        detail: t('modals.negativeConversion.workflowColorDetail', {
+          blue: params.blue_weight.toFixed(2),
+          green: params.green_weight.toFixed(2),
+          red: params.red_weight.toFixed(2),
+        }),
+        id: 'colorTiming',
+        isComplete: true,
+        label: t('modals.negativeConversion.workflowColorTiming'),
+      },
+      {
+        detail: t('modals.negativeConversion.workflowPrintDetail', {
+          contrast: params.contrast.toFixed(2),
+          exposure: params.exposure.toFixed(2),
+        }),
+        id: 'printGrade',
+        isComplete: true,
+        label: t('modals.negativeConversion.workflowPrintGrade'),
+      },
+      {
+        detail: isSaving
+          ? t('modals.negativeConversion.workflowExportConverting')
+          : t('modals.negativeConversion.workflowExportReady'),
+        id: 'export',
+        isComplete: !isLoading && previewUrl !== null,
+        label: t('modals.negativeConversion.workflowExport'),
+      },
+    ],
+    [isLoading, isSaving, params, previewUrl, selectedPreset, t, targetPaths.length],
+  );
 
   useEffect(() => {
     const unlisten = listen<unknown>('negative-batch-progress', (event) => {
@@ -378,9 +441,35 @@ export default function NegativeConversionModal({
     </div>
   );
 
+  const renderWorkflowRail = () => (
+    <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none">
+      <div className="pointer-events-auto grid grid-cols-5 gap-2 rounded-md border border-white/10 bg-black/65 p-2 shadow-xl backdrop-blur-md">
+        {workflowStages.map((stage) => {
+          return (
+            <div key={stage.id} className="min-w-0 rounded-sm bg-white/5 px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2 text-white">
+                <span className={cx('shrink-0', stage.isComplete ? 'text-accent' : 'text-white/35')} aria-hidden="true">
+                  <span
+                    className={cx(
+                      'block size-3 rounded-full border',
+                      stage.isComplete ? 'border-accent bg-accent' : 'border-white/35',
+                    )}
+                  />
+                </span>
+                <span className="truncate text-xs font-semibold">{stage.label}</span>
+              </div>
+              <div className="mt-1 truncate text-[11px] leading-tight text-white/60">{stage.detail}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   const renderContent = () => (
     <div className="modal-preview-adjustments flex flex-row h-full w-full overflow-hidden">
       <div className="modal-preview-pane grow flex flex-col relative min-h-0 bg-[#0f0f0f] overflow-hidden">
+        {renderWorkflowRail()}
         <div
           ref={containerRef}
           className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing select-none"
