@@ -2,7 +2,7 @@ use crate::gpu_processing::WgpuDisplay;
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat3, Vec2, Vec3};
 use image::{DynamicImage, GenericImageView, Rgb32FImage, Rgba};
-use imageproc::geometric_transformations::{Interpolation, rotate_about_center};
+use imageproc::geometric_transformations::{Border, Interpolation, rotate_about_center};
 use nalgebra::{Matrix3 as NaMatrix3, Vector3 as NaVector3};
 use rawler::decoders::Orientation;
 use rayon::prelude::*;
@@ -1108,7 +1108,7 @@ pub fn apply_rotation<'a>(
         &rgba_image,
         rotation_degrees * PI / 180.0,
         Interpolation::Bilinear,
-        Rgba([0.0f32, 0.0, 0.0, 0.0]),
+        Border::Constant(Rgba([0.0f32, 0.0, 0.0, 0.0])),
     );
 
     Cow::Owned(DynamicImage::ImageRgba32F(rotated))
