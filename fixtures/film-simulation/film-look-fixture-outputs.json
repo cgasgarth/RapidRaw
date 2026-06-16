@@ -22,7 +22,21 @@
       "description": "Neutral creative color with modest contrast and restrained saturation.",
       "displayName": "Clean Color",
       "id": "film_look.generic.clean_color.v1",
-      "strengthDefault": 70
+      "strengthDefault": 70,
+      "strengthPreviews": {
+        "default": {
+          "contrast": 8,
+          "saturation": 3
+        },
+        "half": {
+          "contrast": 6,
+          "saturation": 2
+        },
+        "full": {
+          "contrast": 12,
+          "saturation": 4
+        }
+      }
     },
     {
       "adjustmentFingerprint": "d13a52724cebba02bfde10373967d04c51d47ebc776620f5d405f10cc6e1458f",
@@ -44,7 +58,24 @@
       "description": "Warm print-style color with gentle highlight compression.",
       "displayName": "Warm Print",
       "id": "film_look.generic.warm_print.v1",
-      "strengthDefault": 65
+      "strengthDefault": 65,
+      "strengthPreviews": {
+        "default": {
+          "temperature": 5,
+          "contrast": 5,
+          "highlights": -6
+        },
+        "half": {
+          "temperature": 4,
+          "contrast": 4,
+          "highlights": -5
+        },
+        "full": {
+          "temperature": 8,
+          "contrast": 8,
+          "highlights": -10
+        }
+      }
     },
     {
       "adjustmentFingerprint": "0986f4c10fe06483f279621125ab422fba20ed382dfb948216178b6fc379d448",
@@ -70,7 +101,27 @@
       "description": "Cool contrast color with deeper shadows and controlled saturation.",
       "displayName": "Cool Contrast",
       "id": "film_look.generic.cool_contrast.v1",
-      "strengthDefault": 60
+      "strengthDefault": 60,
+      "strengthPreviews": {
+        "default": {
+          "temperature": -5,
+          "contrast": 11,
+          "shadows": -6,
+          "saturation": -1
+        },
+        "half": {
+          "temperature": -4,
+          "contrast": 9,
+          "shadows": -5,
+          "saturation": -1
+        },
+        "full": {
+          "temperature": -8,
+          "contrast": 18,
+          "shadows": -10,
+          "saturation": -2
+        }
+      }
     },
     {
       "adjustmentFingerprint": "42f57e3c2e83337ba8ceba1bc4ed96ca7171212205794fb1f9f633cdd857390f",
@@ -92,7 +143,24 @@
       "description": "Low-contrast faded color with lifted blacks and soft saturation.",
       "displayName": "Soft Fade",
       "id": "film_look.generic.soft_fade.v1",
-      "strengthDefault": 55
+      "strengthDefault": 55,
+      "strengthPreviews": {
+        "default": {
+          "contrast": -5,
+          "blacks": 4,
+          "saturation": -10
+        },
+        "half": {
+          "contrast": -5,
+          "blacks": 4,
+          "saturation": -9
+        },
+        "full": {
+          "contrast": -10,
+          "blacks": 8,
+          "saturation": -18
+        }
+      }
     },
     {
       "adjustmentFingerprint": "572b894e7421f8f8c20808754f8668d805f050b2b6701740b3176690367c182f",
@@ -118,7 +186,27 @@
       "description": "Monochrome rendering with balanced channel response and gentle texture defaults.",
       "displayName": "Mono Silver",
       "id": "film_look.generic.mono_silver.v1",
-      "strengthDefault": 75
+      "strengthDefault": 75,
+      "strengthPreviews": {
+        "default": {
+          "contrast": 9,
+          "saturation": -75,
+          "grainAmount": 17,
+          "grainSize": 32
+        },
+        "half": {
+          "contrast": 6,
+          "saturation": -50,
+          "grainAmount": 11,
+          "grainSize": 21
+        },
+        "full": {
+          "contrast": 12,
+          "saturation": -100,
+          "grainAmount": 22,
+          "grainSize": 42
+        }
+      }
     },
     {
       "adjustmentFingerprint": "c5ece814b40d96905250e31abe8adc992fa5c59c88affa11f2ef19fdd2a58f74",
@@ -140,7 +228,24 @@
       "description": "Punchy color with stronger curve separation and subtle glow defaults.",
       "displayName": "Punch Color",
       "id": "film_look.generic.punch_color.v1",
-      "strengthDefault": 60
+      "strengthDefault": 60,
+      "strengthPreviews": {
+        "default": {
+          "contrast": 14,
+          "blacks": -2,
+          "glowAmount": 5
+        },
+        "half": {
+          "contrast": 12,
+          "blacks": -1,
+          "glowAmount": 4
+        },
+        "full": {
+          "contrast": 24,
+          "blacks": -3,
+          "glowAmount": 8
+        }
+      }
     }
   ],
   "version": 1

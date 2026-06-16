@@ -41,6 +41,9 @@ export interface FilmLookAdjustmentSummary {
   value: number;
 }
 
+const MIN_FILM_LOOK_STRENGTH = 0;
+const MAX_FILM_LOOK_STRENGTH = 100;
+
 const FILM_LOOK_ADJUSTMENT_KEYS = [
   'temperature',
   'contrast',
@@ -181,3 +184,21 @@ export const getFilmLookAdjustmentSummaries = (look: FilmLookBrowserItem): Array
       },
     ];
   });
+
+export const clampFilmLookStrength = (strength: number): number =>
+  Math.min(MAX_FILM_LOOK_STRENGTH, Math.max(MIN_FILM_LOOK_STRENGTH, Math.round(strength)));
+
+export const scaleFilmLookAdjustmentPatch = (look: FilmLookBrowserItem, strength: number): FilmLookAdjustmentPatch => {
+  const scale = clampFilmLookStrength(strength) / MAX_FILM_LOOK_STRENGTH;
+  const scaledPatch: FilmLookAdjustmentPatch = {};
+
+  for (const key of FILM_LOOK_ADJUSTMENT_KEYS) {
+    const value = look.adjustmentPatch[key];
+
+    if (typeof value === 'number') {
+      scaledPatch[key] = Math.round(value * scale);
+    }
+  }
+
+  return scaledPatch;
+};
