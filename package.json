@@ -133,6 +133,7 @@
     "check:negative-lab-base-fog": "bun scripts/check-negative-lab-base-fog.mjs",
     "check:negative-lab-fixtures": "bun scripts/check-negative-lab-fixtures.mjs",
     "check:negative-lab-fixtures:update": "bun scripts/check-negative-lab-fixtures.mjs --update",
+    "check:negative-lab-workspace-smoke": "bun scripts/capture-visual-smoke.mjs --scenario negative-lab-workspace",
     "check:negative-lab-ui-presets": "bun scripts/check-negative-lab-ui-presets.mjs",
     "check:lint-escapes": "bun scripts/check-eslint-escape-hatches.mjs",
     "check:lint": "bun scripts/run-compact-command.mjs --label lint -- eslint . --max-warnings 0",

@@ -8,6 +8,8 @@ const port = 1420;
 const baseUrl = `http://${host}:${port}`;
 const outputDir = resolve('artifacts/visual-smoke');
 const viewport = { width: 1440, height: 960 };
+const scenarioArgIndex = process.argv.indexOf('--scenario');
+const requestedScenario = scenarioArgIndex >= 0 ? process.argv[scenarioArgIndex + 1] : null;
 const scenarios = [
   {
     marker: 'Editor Preview',
@@ -27,11 +29,23 @@ const scenarios = [
     outputPath: resolve(outputDir, 'hdr-ui.png'),
     sectionMinimum: 1,
   },
+  {
+    marker: 'Negative Conversion',
+    mode: 'negative-lab-workspace',
+    outputPath: resolve(outputDir, 'negative-lab-workspace.png'),
+    sectionMinimum: 1,
+  },
 ];
 const highDpiTargets = [
   { deviceScaleFactor: 1, name: 'empty-library-1x.png' },
   { deviceScaleFactor: 2, name: 'empty-library-2x.png' },
 ];
+const selectedScenarios =
+  requestedScenario === null ? scenarios : scenarios.filter((scenario) => scenario.mode === requestedScenario);
+
+if (selectedScenarios.length === 0) {
+  throw new Error(`Unknown visual smoke scenario: ${requestedScenario ?? '<missing>'}`);
+}
 
 const sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds));
 
@@ -90,20 +104,33 @@ async function assertSectionCount(page, minimum) {
   }
 }
 
+async function prepareScenario(page, mode) {
+  if (mode !== 'negative-lab-workspace') return;
+
+  await page.getByTestId('negative-lab-workspace').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-workflow-rail').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-sample-left-edge').click();
+  await page.getByTestId('negative-lab-base-sample-overlay').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-confidence').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-export-tiff16').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-export-jpeg-proof').click();
+}
+
 async function main() {
   await mkdir(outputDir, { recursive: true });
 
+  let serverOutput = '';
   const server = spawn('bun', ['run', 'dev', '--', '--host', host], {
     env: { ...process.env, RAWENGINE_VISUAL_SMOKE: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
-  server.stdout.on('data', (chunk) => {
-    process.stdout.write(chunk);
-  });
-  server.stderr.on('data', (chunk) => {
-    process.stderr.write(chunk);
-  });
+  const captureServerOutput = (chunk) => {
+    serverOutput = `${serverOutput}${chunk.toString()}`.slice(-4_000);
+  };
+
+  server.stdout.on('data', captureServerOutput);
+  server.stderr.on('data', captureServerOutput);
 
   let browser;
 
@@ -116,18 +143,25 @@ async function main() {
       throw error;
     });
 
-    for (const scenario of scenarios) {
+    for (const scenario of selectedScenarios) {
       await page.goto(`${baseUrl}/visual-smoke.html?scenario=${scenario.mode}`, { waitUntil: 'networkidle' });
       await page.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
       await page.getByText(scenario.marker, { exact: true }).waitFor({ timeout: 10_000 });
       await assertSectionCount(page, scenario.sectionMinimum);
+      await prepareScenario(page, scenario.mode);
       await page.screenshot({ path: scenario.outputPath, fullPage: false });
-      console.log(`Captured visual smoke screenshot: ${scenario.outputPath}`);
+      const dimensions = await readPngDimensions(scenario.outputPath);
+      if (dimensions.width !== viewport.width || dimensions.height !== viewport.height) {
+        throw new Error(
+          `${scenario.mode} dimensions mismatch: expected ${viewport.width}x${viewport.height}, got ${dimensions.width}x${dimensions.height}`,
+        );
+      }
     }
 
     await page.close();
 
-    for (const target of highDpiTargets) {
+    const shouldCheckHighDpi = requestedScenario === null || requestedScenario === 'empty-library';
+    for (const target of shouldCheckHighDpi ? highDpiTargets : []) {
       const highDpiPage = await browser.newPage({ deviceScaleFactor: target.deviceScaleFactor, viewport });
       highDpiPage.on('pageerror', (error) => {
         throw error;
@@ -152,10 +186,14 @@ async function main() {
 
       console.log(`visual-smoke ${target.name} ok ${dimensions.width}x${dimensions.height}`);
     }
+    console.log(`visual-smoke ok (${selectedScenarios.map((scenario) => scenario.mode).join(', ')})`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('Executable doesn')) {
       console.error('Playwright Chromium is not installed. Run: bunx playwright install chromium');
+    }
+    if (serverOutput.trim().length > 0) {
+      console.error(`Vite output excerpt:\n${serverOutput.trim()}`);
     }
     throw error;
   } finally {

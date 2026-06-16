@@ -2,6 +2,7 @@ import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles }
 import { useState } from 'react';
 
 import HdrModal from '../../components/modals/HdrModal';
+import NegativeConversionModal from '../../components/modals/NegativeConversionModal';
 import PanoramaModal from '../../components/modals/PanoramaModal';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS, type PanoramaUiSettings } from '../../schemas/panoramaUiSchemas';
@@ -132,6 +133,27 @@ function HdrVisualSmoke() {
   );
 }
 
+function NegativeLabVisualSmoke() {
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="negative-lab-workspace"
+    >
+      <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="negative-lab-modal" />
+      <NegativeConversionModal
+        isOpen
+        onClose={() => {}}
+        onSave={() => {}}
+        targetPaths={[
+          '/fixtures/negative-lab/synthetic-color-negative-001.tif',
+          '/fixtures/negative-lab/synthetic-gray-ramp-negative-002.tif',
+        ]}
+      />
+    </main>
+  );
+}
+
 function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
   if (mode === 'panorama-ui') {
     return <PanoramaVisualSmoke />;
@@ -139,6 +161,10 @@ function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
 
   if (mode === 'hdr-ui') {
     return <HdrVisualSmoke />;
+  }
+
+  if (mode === 'negative-lab-workspace') {
+    return <NegativeLabVisualSmoke />;
   }
 
   const scenario = mode === 'empty-library' ? 'Empty Library Startup' : 'Editor Shell Smoke';
