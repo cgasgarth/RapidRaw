@@ -1,0 +1,45 @@
+{
+  "cases": [
+    {
+      "baselinePreviewMaxDelta": 0.04,
+      "caseId": "film.look.preview_export.film-look.generic.warm-print.v1",
+      "displayName": "Warm Print",
+      "exportHash": "ce1b5b9dfc974109",
+      "lookId": "film_look.generic.warm_print.v1",
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "ce1b5b9dfc974109",
+      "strength": 100
+    },
+    {
+      "baselinePreviewMaxDelta": 0.248547,
+      "caseId": "film.look.preview_export.film-look.generic.mono-silver.v1",
+      "displayName": "Mono Silver",
+      "exportHash": "7e4b525fd7be754b",
+      "lookId": "film_look.generic.mono_silver.v1",
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "7e4b525fd7be754b",
+      "strength": 100
+    },
+    {
+      "baselinePreviewMaxDelta": 0.096471,
+      "caseId": "film.look.preview_export.film-look.generic.punch-color.v1",
+      "displayName": "Punch Color",
+      "exportHash": "942aa1199eb4a1d3",
+      "lookId": "film_look.generic.punch_color.v1",
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "942aa1199eb4a1d3",
+      "strength": 100
+    }
+  ],
+  "doesNotProve": ["real_raw_quality", "gpu_parity", "measured_film_stock_emulation", "photochemical_density_domain"],
+  "fixtureInput": {
+    "colorSpace": "synthetic-display-linear-rgb",
+    "kind": "synthetic-film-look-preview-export-parity",
+    "scene": "ramp-color-chips-highlight-edge"
+  },
+  "generatedFrom": "scripts/check-film-look-preview-export-parity.mjs",
+  "version": 1
+}
