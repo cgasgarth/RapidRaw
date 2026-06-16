@@ -89,6 +89,10 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     ]),
   ],
   ['check:ai-fallbacks', new Set(['bun scripts/check-ai-provider-fallbacks.mjs'])],
+  [
+    'check:command-palette-workflows',
+    new Set(['bun scripts/capture-visual-smoke.mjs --scenario command-palette-workflows']),
+  ],
   ['check:film-look-browser-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario film-look-browser'])],
   ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario focus-ui'])],
   ['check:hdr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario hdr-ui'])],
@@ -465,6 +469,17 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -120,6 +120,7 @@\n+    "check:film-look-browser-smoke": "bun scripts/capture-visual-smoke.mjs --scenario film-look-browser",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'command palette workflow package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -120,6 +120,7 @@\n+    "check:command-palette-workflows": "bun scripts/capture-visual-smoke.mjs --scenario command-palette-workflows",',
       },
     ],
     SMOKE_MODES.NONE,

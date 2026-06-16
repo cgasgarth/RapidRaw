@@ -20,6 +20,12 @@ const scenarios = [
     sectionMinimum: 4,
   },
   {
+    marker: 'Command Palette Workflows',
+    mode: 'command-palette-workflows',
+    outputPath: resolve(outputDir, 'command-palette-workflows.png'),
+    sectionMinimum: 1,
+  },
+  {
     marker: 'Panorama setup',
     mode: 'panorama-ui',
     outputPath: resolve(outputDir, 'panorama-ui.png'),
@@ -112,6 +118,13 @@ const superResolutionUiSettingsProofSchema = z.object({
   maxPreviewDimensionPx: z.literal('8192'),
   outputScale: z.literal('4'),
   qualityPreference: z.literal('preview'),
+});
+const commandPaletteWorkflowProofSchema = z.object({
+  focusOpen: z.literal('true'),
+  hdrOpen: z.literal('true'),
+  negativeOpen: z.literal('true'),
+  panoramaOpen: z.literal('true'),
+  srOpen: z.literal('true'),
 });
 const selectedScenarios =
   requestedScenario === null ? scenarios : scenarios.filter((scenario) => scenario.mode === requestedScenario);
@@ -207,6 +220,24 @@ async function assertFilmLookExportProof(page) {
 }
 
 async function prepareScenario(page, mode) {
+  if (mode === 'command-palette-workflows') {
+    const runCommand = async (query, name) => {
+      await page.getByLabel('Search commands').fill(query);
+      await page.getByRole('button', { name }).click();
+      await page.getByTestId('command-palette-open').click();
+    };
+
+    await runCommand('focus', /Open focus stacking/u);
+    await runCommand('super', /Open super resolution/u);
+    await runCommand('panorama', /Open panorama stitching/u);
+    await runCommand('hdr', /Open HDR merge/u);
+    await runCommand('negative', /Open negative lab/u);
+    commandPaletteWorkflowProofSchema.parse(
+      await page.getByTestId('command-palette-workflow-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    return;
+  }
+
   if (mode === 'focus-ui') {
     await page.getByRole('button', { exact: true, name: 'Auto' }).click();
     await page.getByRole('option', { name: 'Homography' }).click();
