@@ -596,9 +596,21 @@ export default function NegativeConversionModal({
       </div>
       {frameHealthReport.frames.length > 0 && (
         <div className="space-y-1" data-testid="negative-lab-frame-health-grid">
-          <UiText variant={TextVariants.small} className="text-text-tertiary">
-            {t('modals.negativeConversion.frameHealth')}
-          </UiText>
+          <div className="flex items-center justify-between gap-2">
+            <UiText variant={TextVariants.small} className="text-text-tertiary">
+              {t('modals.negativeConversion.frameHealth')}
+            </UiText>
+            <div className="flex items-center gap-1 text-[11px] text-text-tertiary">
+              <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-frame-count">
+                {t('modals.negativeConversion.frameHealthFrameCount', { frameCount: frameHealthReport.frames.length })}
+              </span>
+              <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-roll-warning-count">
+                {t('modals.negativeConversion.frameHealthWarningCount', {
+                  warningCount: frameHealthReport.warningCodes.length,
+                })}
+              </span>
+            </div>
+          </div>
           <div className="grid gap-1">
             {frameHealthReport.frames.map((row, index) => (
               <div
