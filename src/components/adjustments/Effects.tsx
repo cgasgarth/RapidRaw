@@ -7,9 +7,9 @@ import FilmLookBrowser from './FilmLookBrowser';
 import { TextVariants } from '../../types/typography';
 import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
 import {
+  buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
   formatFilmLookPresetName,
-  scaleFilmLookAdjustmentPatch,
   type FilmLookBrowserItem,
 } from '../../utils/filmLookBrowser';
 import { AppSettings, Invokes, type Preset } from '../ui/AppProperties';
@@ -87,7 +87,7 @@ export default function EffectsPanel({
   const handleFilmLookApply = (look: FilmLookBrowserItem, strength: number) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      ...scaleFilmLookAdjustmentPatch(look, strength),
+      ...buildFilmLookAppliedAdjustmentPatch(look, strength),
     }));
   };
 

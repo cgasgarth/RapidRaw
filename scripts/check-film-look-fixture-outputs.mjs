@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import {
+  buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
   FILM_LOOK_BROWSER_ITEMS,
   getFilmLookAdjustmentSummaries,
@@ -36,6 +37,7 @@ const buildFixture = () => ({
       id: look.id,
       strengthDefault: look.strengthDefault,
       strengthPreviews: {
+        appliedFull: buildFilmLookAppliedAdjustmentPatch(look, 100),
         default: scaleFilmLookAdjustmentPatch(look, look.strengthDefault),
         half: scaleFilmLookAdjustmentPatch(look, 50),
         full: scaleFilmLookAdjustmentPatch(look, 100),
@@ -99,7 +101,13 @@ for (const marker of ['FilmLookVisualSmoke', 'film-look-browser', 'film-look-adj
 }
 
 const utilsSource = await readFile(utilsSourceUrl, 'utf8');
-for (const marker of ['buildFilmLookPresetDraft', 'formatFilmLookPresetName', 'scaleFilmLookAdjustmentPatch']) {
+for (const marker of [
+  'buildFilmLookAppliedAdjustmentPatch',
+  'buildFilmLookPresetDraft',
+  'formatFilmLookPresetName',
+  'resetFilmLookControlledAdjustments',
+  'scaleFilmLookAdjustmentPatch',
+]) {
   if (!utilsSource.includes(marker)) {
     throw new Error(`Film look utilities are missing preset parity marker: ${marker}`);
   }
