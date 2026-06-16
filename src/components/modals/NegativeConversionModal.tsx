@@ -513,6 +513,26 @@ export default function NegativeConversionModal({
                     ? t('modals.negativeConversion.baseReady', { confidence: Math.round(row.baseConfidence * 100) })
                     : t('modals.negativeConversion.basePending')}
                 </span>
+                {row.warningCodes.length > 0 && (
+                  <span
+                    className="col-span-3 flex flex-wrap gap-1"
+                    data-testid={`negative-lab-frame-warning-row-${index}`}
+                  >
+                    {row.warningCodes.map((warningCode) => (
+                      <span
+                        className="rounded bg-bg-primary px-1.5 py-0.5 text-[11px] text-text-tertiary"
+                        data-testid={`negative-lab-frame-warning-chip-${warningCode}`}
+                        key={warningCode}
+                      >
+                        {warningCode === 'base_estimate_active_frame_only'
+                          ? t('modals.negativeConversion.frameWarningBaseEstimateActiveOnly')
+                          : warningCode === 'excluded_from_batch'
+                            ? t('modals.negativeConversion.frameWarningExcluded')
+                            : t('modals.negativeConversion.frameWarningPreviewNotReady')}
+                      </span>
+                    ))}
+                  </span>
+                )}
               </div>
             ))}
           </div>
