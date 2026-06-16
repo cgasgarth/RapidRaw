@@ -94,6 +94,12 @@ pub struct PendingHdrSourceRef {
     pub source_index: usize,
 }
 
+#[derive(Clone)]
+pub struct PendingHdrMergePlan {
+    pub accepted_dry_run_plan_hash: String,
+    pub accepted_dry_run_plan_id: String,
+}
+
 pub struct ThumbnailProgressTracker {
     pub total: usize,
     pub completed: usize,
@@ -129,6 +135,7 @@ pub struct AppState {
     pub ai_init_lock: TokioMutex<()>,
     pub export_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
+    pub hdr_runtime_plan: Arc<Mutex<Option<PendingHdrMergePlan>>>,
     pub hdr_source_refs: Arc<Mutex<Vec<PendingHdrSourceRef>>>,
     pub panorama_result: Arc<Mutex<Option<PendingPanoramaResult>>>,
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,

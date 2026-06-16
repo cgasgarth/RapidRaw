@@ -1457,6 +1457,7 @@ async fn merge_hdr(
     }
 
     let hdr_result_handle = state.hdr_result.clone();
+    let hdr_runtime_plan_handle = state.hdr_runtime_plan.clone();
     let hdr_source_refs_handle = state.hdr_source_refs.clone();
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
@@ -1535,10 +1536,13 @@ async fn merge_hdr(
 
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
     let final_base64 = format!("data:image/png;base64,{}", base64_str);
+    let runtime_plan =
+        build_hdr_runtime_plan(&source_refs, hdr_merged.width(), hdr_merged.height());
 
     let _ = app_handle.emit("hdr-progress", "Creating preview...");
 
     *hdr_result_handle.lock().unwrap() = Some(hdr_merged);
+    *hdr_runtime_plan_handle.lock().unwrap() = Some(runtime_plan);
     *hdr_source_refs_handle.lock().unwrap() = source_refs;
 
     let _ = app_handle.emit(
@@ -1591,13 +1595,21 @@ async fn save_hdr(
 
     let source_refs = state.hdr_source_refs.lock().unwrap().clone();
     if source_refs.len() >= 2 {
+        let runtime_plan = state
+            .hdr_runtime_plan
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| "HDR merge plan missing; rerun HDR merge before saving.".to_string())?;
         write_hdr_output_sidecar(
             &output_path,
             &source_refs,
+            &runtime_plan,
             image_to_save.width(),
             image_to_save.height(),
         )?;
         state.hdr_source_refs.lock().unwrap().clear();
+        *state.hdr_runtime_plan.lock().unwrap() = None;
     }
 
     let (real_path, _) = crate::file_management::parse_virtual_path(&first_path_str);
@@ -1628,9 +1640,49 @@ fn build_unique_hdr_output_path(parent_dir: &Path, stem: &str, extension: &str) 
     ))
 }
 
+fn build_hdr_runtime_plan(
+    source_refs: &[app_state::PendingHdrSourceRef],
+    output_width: u32,
+    output_height: u32,
+) -> app_state::PendingHdrMergePlan {
+    let plan_source_state = source_refs
+        .iter()
+        .map(|source| {
+            serde_json::json!({
+                "exposureTimeSeconds": source.exposure_time_seconds,
+                "height": source.height,
+                "imagePath": source.image_path.clone(),
+                "iso": source.iso,
+                "sourceIndex": source.source_index,
+                "width": source.width,
+            })
+        })
+        .collect::<Vec<_>>();
+    let plan_payload = serde_json::json!({
+        "engineId": "rapidraw_image_hdr_legacy_v1",
+        "mergeStrategy": "exposure_fusion_preview",
+        "outputDimensions": {
+            "height": output_height,
+            "width": output_width,
+        },
+        "schemaVersion": 1,
+        "sourceState": plan_source_state,
+        "workingColorSpace": "srgb_display_referred_v1",
+    });
+    let plan_bytes = serde_json::to_vec(&plan_payload).unwrap_or_default();
+    let plan_hash_hex = blake3::hash(&plan_bytes).to_hex().to_string();
+    let plan_id_suffix = &plan_hash_hex[..16];
+
+    app_state::PendingHdrMergePlan {
+        accepted_dry_run_plan_hash: format!("blake3:{}", plan_hash_hex),
+        accepted_dry_run_plan_id: format!("hdr_runtime_plan_{}", plan_id_suffix),
+    }
+}
+
 fn write_hdr_output_sidecar(
     output_path: &Path,
     source_refs: &[app_state::PendingHdrSourceRef],
+    runtime_plan: &app_state::PendingHdrMergePlan,
     output_width: u32,
     output_height: u32,
 ) -> Result<(), String> {
@@ -1646,6 +1698,7 @@ fn write_hdr_output_sidecar(
         &mut sidecar,
         output_path,
         source_refs,
+        runtime_plan,
         output_width,
         output_height,
     )?;
@@ -1664,6 +1717,7 @@ fn upsert_hdr_artifact_metadata(
     sidecar: &mut ImageMetadata,
     output_path: &Path,
     source_refs: &[app_state::PendingHdrSourceRef],
+    runtime_plan: &app_state::PendingHdrMergePlan,
     output_width: u32,
     output_height: u32,
 ) -> Result<(), String> {
@@ -1770,8 +1824,8 @@ fn upsert_hdr_artifact_metadata(
             "resolvedDeghosting": "off",
         },
         "dryRun": {
-            "acceptedDryRunPlanHash": "legacy-hdr-runtime-save",
-            "acceptedDryRunPlanId": "legacy-hdr-runtime-save",
+            "acceptedDryRunPlanHash": runtime_plan.accepted_dry_run_plan_hash,
+            "acceptedDryRunPlanId": runtime_plan.accepted_dry_run_plan_id,
         },
         "editableDerivedAssetId": artifact_id,
         "engine": {
@@ -2493,6 +2547,7 @@ pub fn run() {
             ai_init_lock: TokioMutex::new(()),
             export_task_handle: Mutex::new(None),
             hdr_result: Arc::new(Mutex::new(None)),
+            hdr_runtime_plan: Arc::new(Mutex::new(None)),
             hdr_source_refs: Arc::new(Mutex::new(Vec::new())),
             panorama_result: Arc::new(Mutex::new(None)),
             denoise_result: Arc::new(Mutex::new(None)),
@@ -2705,6 +2760,46 @@ mod tests {
     }
 
     #[test]
+    fn hdr_runtime_plan_is_deterministic_for_merge_sources() {
+        let source_refs = vec![
+            app_state::PendingHdrSourceRef {
+                image_path: "/tmp/IMG_0001.CR3".to_string(),
+                width: 64,
+                height: 48,
+                exposure_time_seconds: 0.125,
+                iso: 100.0,
+                source_index: 0,
+            },
+            app_state::PendingHdrSourceRef {
+                image_path: "/tmp/IMG_0002.CR3".to_string(),
+                width: 64,
+                height: 48,
+                exposure_time_seconds: 0.25,
+                iso: 100.0,
+                source_index: 1,
+            },
+        ];
+
+        let first_plan = build_hdr_runtime_plan(&source_refs, 64, 48);
+        let second_plan = build_hdr_runtime_plan(&source_refs, 64, 48);
+
+        assert_eq!(
+            first_plan.accepted_dry_run_plan_id,
+            second_plan.accepted_dry_run_plan_id
+        );
+        assert_eq!(
+            first_plan.accepted_dry_run_plan_hash,
+            second_plan.accepted_dry_run_plan_hash
+        );
+        assert!(
+            first_plan
+                .accepted_dry_run_plan_id
+                .starts_with("hdr_runtime_plan_")
+        );
+        assert!(first_plan.accepted_dry_run_plan_hash.starts_with("blake3:"));
+    }
+
+    #[test]
     fn write_hdr_output_sidecar_records_editable_artifact_provenance() {
         let temp_dir = tempfile::tempdir().expect("temp dir should be created");
         let output_path = temp_dir.path().join("IMG_0001_Hdr.png");
@@ -2735,8 +2830,9 @@ mod tests {
                 source_index: 1,
             },
         ];
+        let runtime_plan = build_hdr_runtime_plan(&source_refs, 64, 48);
 
-        write_hdr_output_sidecar(&output_path, &source_refs, 64, 48)
+        write_hdr_output_sidecar(&output_path, &source_refs, &runtime_plan, 64, 48)
             .expect("HDR sidecar should be written");
 
         let sidecar_path = output_path.with_file_name("IMG_0001_Hdr.png.rrdata");
@@ -2756,11 +2852,11 @@ mod tests {
         );
         assert_eq!(
             artifact["dryRun"]["acceptedDryRunPlanId"],
-            "legacy-hdr-runtime-save"
+            runtime_plan.accepted_dry_run_plan_id
         );
         assert_eq!(
             artifact["dryRun"]["acceptedDryRunPlanHash"],
-            "legacy-hdr-runtime-save"
+            runtime_plan.accepted_dry_run_plan_hash
         );
         assert_eq!(artifact["outputName"], "IMG_0001_Hdr.png");
         assert_eq!(artifact["outputArtifact"]["storage"], "sidecar_artifact");
