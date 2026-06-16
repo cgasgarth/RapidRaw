@@ -50,8 +50,17 @@ export const panoramaDryRunContextV1Schema = z
   })
   .strict();
 
+export const panoramaApplyContextV1Schema = panoramaDryRunContextV1Schema
+  .extend({
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    idempotencyKey: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
 export type PanoramaUiControlsV1 = z.infer<typeof panoramaUiControlsV1Schema>;
 export type PanoramaDryRunContextV1 = z.infer<typeof panoramaDryRunContextV1Schema>;
+export type PanoramaApplyContextV1 = z.infer<typeof panoramaApplyContextV1Schema>;
 
 export const buildPanoramaUiDryRunCommandV1 = (
   controlsValue: unknown,
@@ -73,6 +82,54 @@ export const buildPanoramaUiDryRunCommandV1 = (
     dryRun: true,
     expectedGraphRevision: context.expectedGraphRevision,
     parameters: {
+      blendMode: controls.blendMode,
+      boundaryMode: controls.boundaryMode,
+      exposureNormalization: controls.exposureMode === 'gain_compensation' ? 'auto' : 'none',
+      lensCorrectionPolicy: controls.lensCorrectionPolicy,
+      maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
+      memoryBudgetBytes: controls.memoryBudgetBytes,
+      outputName: controls.outputName,
+      projection: controls.projection,
+      qualityPreference: controls.qualityPreference,
+      sources: controls.sources.map((source) => ({
+        colorSpaceHint: source.colorSpaceHint,
+        exposureEv: source.exposureEv,
+        imageId: source.imageId,
+        imagePath: source.imagePath,
+        rawDefaultsApplied: source.rawDefaultsApplied,
+        role: 'panorama_tile',
+        sourceIndex: source.sourceIndex,
+        virtualCopyId: source.virtualCopyId,
+      })),
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: { id: context.targetId, kind: context.targetKind },
+  });
+};
+
+export const buildPanoramaUiApplyCommandV1 = (
+  controlsValue: unknown,
+  contextValue: unknown,
+): ComputationalMergeCommandEnvelopeV1 => {
+  const controls = panoramaUiControlsV1Schema.parse(controlsValue);
+  const context = panoramaApplyContextV1Schema.parse(contextValue);
+
+  return computationalMergeCommandEnvelopeV1Schema.parse({
+    actor: { id: context.actorId, kind: 'agent' },
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'Panorama UI apply uses an accepted stitch dry-run plan before mutating the edit graph.',
+      state: 'approved',
+    },
+    commandId: context.commandId,
+    commandType: 'computationalMerge.createPanorama',
+    correlationId: context.correlationId,
+    dryRun: false,
+    expectedGraphRevision: context.expectedGraphRevision,
+    idempotencyKey: context.idempotencyKey,
+    parameters: {
+      acceptedDryRunPlanHash: context.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: context.acceptedDryRunPlanId,
       blendMode: controls.blendMode,
       boundaryMode: controls.boundaryMode,
       exposureNormalization: controls.exposureMode === 'gain_compensation' ? 'auto' : 'none',
