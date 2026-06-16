@@ -1295,6 +1295,7 @@
       "sampleCenterPatch": "Center patch",
       "sampleFullFrame": "Full frame",
       "sampleLeftEdge": "Left edge",
+      "sampleOverlayLabel": "Base sample overlay",
       "cancel": "Cancelar",
       "colorTiming": "Ajuste de Cores",
       "compareTooltip": "Segure para Ver Original",

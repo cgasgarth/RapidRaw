@@ -1546,6 +1546,7 @@
       "sampleCenterPatch": "Center patch",
       "sampleFullFrame": "Full frame",
       "sampleLeftEdge": "Left edge",
+      "sampleOverlayLabel": "Base sample overlay",
       "title": "负片转换",
       "workflowColorDetail": "Base {{base}}%  R {{red}}  G {{green}}  B {{blue}}",
       "workflowColorTiming": "色彩",
