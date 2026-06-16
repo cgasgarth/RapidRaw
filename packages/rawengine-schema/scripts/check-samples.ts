@@ -982,6 +982,7 @@ expectInvalid('AI inpaint enhancement without region mask', aiEnhancementCommand
   parameters: {
     ...sampleAiEnhancementCommandEnvelopeV1.parameters,
     capability: 'inpaint',
+    regionMaskArtifactId: undefined,
   },
 });
 
