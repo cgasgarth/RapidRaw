@@ -45,8 +45,17 @@ export const superResolutionDryRunContextV1Schema = z
   })
   .strict();
 
+export const superResolutionApplyContextV1Schema = superResolutionDryRunContextV1Schema
+  .extend({
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    idempotencyKey: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
 export type SuperResolutionUiControlsV1 = z.infer<typeof superResolutionUiControlsV1Schema>;
 export type SuperResolutionDryRunContextV1 = z.infer<typeof superResolutionDryRunContextV1Schema>;
+export type SuperResolutionApplyContextV1 = z.infer<typeof superResolutionApplyContextV1Schema>;
 
 export const buildSuperResolutionUiDryRunCommandV1 = (
   controlsValue: unknown,
@@ -68,6 +77,52 @@ export const buildSuperResolutionUiDryRunCommandV1 = (
     dryRun: true,
     expectedGraphRevision: context.expectedGraphRevision,
     parameters: {
+      alignmentMode: controls.alignmentMode,
+      detailPolicy: controls.detailPolicy,
+      maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
+      mode: 'multi_image',
+      outputName: controls.outputName,
+      outputScale: controls.outputScale,
+      qualityPreference: controls.qualityPreference,
+      sources: controls.sources.map((source) => ({
+        colorSpaceHint: source.colorSpaceHint,
+        exposureEv: source.exposureEv,
+        imageId: source.imageId,
+        imagePath: source.imagePath,
+        rawDefaultsApplied: source.rawDefaultsApplied,
+        role: 'sr_frame',
+        sourceIndex: source.sourceIndex,
+        virtualCopyId: source.virtualCopyId,
+      })),
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: { id: context.targetId, kind: context.targetKind },
+  });
+};
+
+export const buildSuperResolutionUiApplyCommandV1 = (
+  controlsValue: unknown,
+  contextValue: unknown,
+): ComputationalMergeCommandEnvelopeV1 => {
+  const controls = superResolutionUiControlsV1Schema.parse(controlsValue);
+  const context = superResolutionApplyContextV1Schema.parse(contextValue);
+
+  return computationalMergeCommandEnvelopeV1Schema.parse({
+    actor: { id: context.actorId, kind: 'agent' },
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'Super-resolution UI apply uses an accepted dry-run plan before mutating the edit graph.',
+      state: 'approved',
+    },
+    commandId: context.commandId,
+    commandType: 'computationalMerge.createSuperResolution',
+    correlationId: context.correlationId,
+    dryRun: false,
+    expectedGraphRevision: context.expectedGraphRevision,
+    idempotencyKey: context.idempotencyKey,
+    parameters: {
+      acceptedDryRunPlanHash: context.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: context.acceptedDryRunPlanId,
       alignmentMode: controls.alignmentMode,
       detailPolicy: controls.detailPolicy,
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,

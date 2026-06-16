@@ -1,6 +1,9 @@
 #!/usr/bin/env bun
 
-import { buildSuperResolutionUiDryRunCommandV1 } from '../packages/rawengine-schema/src/superResolutionUiControls.ts';
+import {
+  buildSuperResolutionUiApplyCommandV1,
+  buildSuperResolutionUiDryRunCommandV1,
+} from '../packages/rawengine-schema/src/superResolutionUiControls.ts';
 
 const command = buildSuperResolutionUiDryRunCommandV1(
   {
@@ -40,6 +43,98 @@ if (command.parameters.sources.some((source) => source.role !== 'sr_frame')) {
 }
 if (command.parameters.outputScale !== 2 || command.parameters.detailPolicy !== 'balanced') {
   failures.push('SR UI mapper must preserve output scale and detail policy.');
+}
+
+const applyCommand = buildSuperResolutionUiApplyCommandV1(
+  {
+    alignmentMode: 'homography',
+    detailPolicy: 'balanced',
+    outputName: 'Burst Super Resolution',
+    outputScale: 3,
+    qualityPreference: 'balanced',
+    sources: [
+      { exposureEv: 0, imagePath: '/photos/sr/SR_0001.CR3', sourceIndex: 0 },
+      { exposureEv: 0, imagePath: '/photos/sr/SR_0002.CR3', sourceIndex: 1 },
+    ],
+  },
+  {
+    acceptedDryRunPlanHash: 'sha256:sr-ui-plan-001',
+    acceptedDryRunPlanId: 'sr_ui_plan_001',
+    commandId: 'command_sr_ui_apply_001',
+    correlationId: 'corr_sr_ui_apply_001',
+    expectedGraphRevision: 'graph_rev_sr_ui_001',
+    idempotencyKey: 'idem_sr_ui_apply_001',
+    targetId: 'project_sr_ui_001',
+  },
+);
+
+if (applyCommand.dryRun || applyCommand.approval.approvalClass !== 'edit_apply') {
+  failures.push('SR UI apply mapper must produce approved edit-apply commands.');
+}
+if (applyCommand.parameters.acceptedDryRunPlanId !== 'sr_ui_plan_001') {
+  failures.push('SR UI apply mapper must require and preserve accepted dry-run plan IDs.');
+}
+if (applyCommand.parameters.outputScale !== 3 || applyCommand.parameters.detailPolicy !== 'balanced') {
+  failures.push('SR UI apply mapper must preserve UI control overrides.');
+}
+
+let blockedAggressiveApply = false;
+try {
+  buildSuperResolutionUiApplyCommandV1(
+    {
+      alignmentMode: 'homography',
+      detailPolicy: 'aggressive_preview_only',
+      outputName: 'Invalid Aggressive SR Apply',
+      outputScale: 2,
+      sources: [
+        { imagePath: '/photos/sr/SR_0001.CR3', sourceIndex: 0 },
+        { imagePath: '/photos/sr/SR_0002.CR3', sourceIndex: 1 },
+      ],
+    },
+    {
+      acceptedDryRunPlanHash: 'sha256:sr-ui-plan-001',
+      acceptedDryRunPlanId: 'sr_ui_plan_001',
+      commandId: 'command_sr_ui_apply_invalid_aggressive',
+      correlationId: 'corr_sr_ui_apply_invalid_aggressive',
+      expectedGraphRevision: 'graph_rev_sr_ui_001',
+      targetId: 'project_sr_ui_001',
+    },
+  );
+} catch {
+  blockedAggressiveApply = true;
+}
+
+if (!blockedAggressiveApply) {
+  failures.push('SR UI apply mapper accepted aggressive preview-only detail policy.');
+}
+
+let blockedMissingPlan = false;
+try {
+  buildSuperResolutionUiApplyCommandV1(
+    {
+      alignmentMode: 'auto',
+      detailPolicy: 'conservative',
+      outputName: 'Invalid SR Apply',
+      outputScale: 2,
+      sources: [
+        { imagePath: '/photos/sr/SR_0001.CR3', sourceIndex: 0 },
+        { imagePath: '/photos/sr/SR_0002.CR3', sourceIndex: 1 },
+      ],
+    },
+    {
+      acceptedDryRunPlanId: 'sr_ui_plan_001',
+      commandId: 'command_sr_ui_apply_invalid',
+      correlationId: 'corr_sr_ui_apply_invalid',
+      expectedGraphRevision: 'graph_rev_sr_ui_001',
+      targetId: 'project_sr_ui_001',
+    },
+  );
+} catch {
+  blockedMissingPlan = true;
+}
+
+if (!blockedMissingPlan) {
+  failures.push('SR UI apply mapper accepted a missing acceptedDryRunPlanHash.');
 }
 
 let blockedSingleSource = false;
