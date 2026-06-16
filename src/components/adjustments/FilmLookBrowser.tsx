@@ -7,6 +7,7 @@ import {
   getFilmLookAdjustmentSummaries,
   getFilmLookBrowserGroups,
   type FilmLookBrowserItem,
+  type FilmLookCategory,
 } from '../../utils/filmLookBrowser';
 import UiText from '../ui/Text';
 
@@ -17,6 +18,7 @@ interface FilmLookBrowserProps {
 }
 
 type FilmLookComparisonSlot = 'a' | 'b';
+type FilmLookCategoryFilter = FilmLookCategory | 'all';
 
 type FilmLookComparisonSelection = Record<FilmLookComparisonSlot, string | null>;
 
@@ -36,6 +38,8 @@ const FILM_LOOK_STRENGTH_LABEL = 'Strength';
 const FILM_LOOK_FAVORITES_STORAGE_KEY = 'rapidraw.filmLookFavorites.v1';
 const FILM_LOOK_FAVORITES_LABEL = 'Favorites';
 const FILM_LOOK_ALL_LABEL = 'All looks';
+const FILM_LOOK_CATEGORY_FILTER_LABEL = 'Look family';
+const FILM_LOOK_ALL_FAMILIES_LABEL = 'All families';
 const FILM_LOOK_EMPTY_FAVORITES = 'No favorites yet';
 const FILM_LOOK_SEARCH_LABEL = 'Search looks';
 const FILM_LOOK_EMPTY_SEARCH = 'No matching looks';
@@ -95,6 +99,7 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
   const [favoriteLookIds, setFavoriteLookIds] = useState<Set<string>>(readFavoriteLookIds);
   const [strengthPercent, setStrengthPercent] = useState<number>(70);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<FilmLookCategoryFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const favoriteLookCount = useMemo(
@@ -102,9 +107,25 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
     [favoriteLookIds, groups],
   );
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('en-US');
+  const categoryTabs = useMemo(
+    () => [
+      {
+        category: 'all' as const,
+        count: groups.reduce((count, group) => count + group.looks.length, 0),
+        displayName: FILM_LOOK_ALL_FAMILIES_LABEL,
+      },
+      ...groups.map((group) => ({
+        category: group.category,
+        count: group.looks.length,
+        displayName: group.displayName,
+      })),
+    ],
+    [groups],
+  );
   const visibleGroups = useMemo(
     () =>
       groups
+        .filter((group) => activeCategory === 'all' || group.category === activeCategory)
         .map((group) => ({
           ...group,
           looks: group.looks.filter((look) => {
@@ -123,7 +144,7 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
           }),
         }))
         .filter((group) => group.looks.length > 0),
-    [favoriteLookIds, groups, normalizedSearchQuery, showFavoritesOnly],
+    [activeCategory, favoriteLookIds, groups, normalizedSearchQuery, showFavoritesOnly],
   );
   const visibleLookCount = visibleGroups.reduce((total, group) => total + group.looks.length, 0);
 
@@ -234,6 +255,36 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
           {FILM_LOOK_FAVORITES_LABEL}
         </button>
       </div>
+
+      <section className="space-y-2" aria-label={FILM_LOOK_CATEGORY_FILTER_LABEL}>
+        <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
+          {FILM_LOOK_CATEGORY_FILTER_LABEL}
+        </UiText>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {categoryTabs.map((tab) => {
+            const isActive = activeCategory === tab.category;
+
+            return (
+              <button
+                aria-pressed={isActive}
+                className={`shrink-0 rounded-md border px-3 py-2 text-left text-xs transition-colors ${
+                  isActive
+                    ? 'border-accent bg-accent/10 text-text-primary'
+                    : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface'
+                }`}
+                key={tab.category}
+                onClick={() => {
+                  setActiveCategory(tab.category);
+                }}
+                type="button"
+              >
+                <span className="block font-medium">{tab.displayName}</span>
+                <span className="block tabular-nums opacity-70">{formatFilmLookCount(tab.count)}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="space-y-2" aria-label={FILM_LOOK_COMPARE_TITLE}>
         <div className="flex items-center justify-between gap-2">

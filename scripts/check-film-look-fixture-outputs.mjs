@@ -72,6 +72,9 @@ for (const marker of [
   'getFilmLookSwatchStyle',
   'searchQuery',
   'FILM_LOOK_SEARCH_LABEL',
+  'activeCategory',
+  'categoryTabs',
+  'FILM_LOOK_CATEGORY_FILTER_LABEL',
 ]) {
   if (!browserSource.includes(marker)) {
     throw new Error(`Film look browser is missing UI marker: ${marker}`);
