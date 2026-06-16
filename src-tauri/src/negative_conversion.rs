@@ -740,6 +740,23 @@ mod tests {
         }
     }
 
+    fn mean_abs_delta(left: &Rgb32FImage, right: &Rgb32FImage) -> f32 {
+        assert_eq!(left.dimensions(), right.dimensions());
+
+        let mut total = 0.0_f32;
+        let mut count = 0_u32;
+        for (left_pixel, right_pixel) in left.pixels().zip(right.pixels()) {
+            for (left_channel, right_channel) in
+                left_pixel.channels().iter().zip(right_pixel.channels())
+            {
+                total += (left_channel - right_channel).abs();
+                count += 1;
+            }
+        }
+
+        total / count.max(1) as f32
+    }
+
     #[test]
     fn negative_conversion_params_clamp_to_supported_api_range() {
         let sanitized = NegativeConversionParams {
@@ -1108,6 +1125,79 @@ mod tests {
             preview_render.get_pixel(0, 0).channels(),
             preview_render.get_pixel(3, 1).channels()
         );
+    }
+
+    #[test]
+    fn sampled_base_fog_preview_export_acceptance_changes_render() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                6,
+                2,
+                vec![
+                    0.95, 0.83, 0.44, 0.93, 0.80, 0.40, 0.56, 0.36, 0.20, 0.38, 0.23, 0.14, 0.21,
+                    0.13, 0.08, 0.10, 0.06, 0.04, //
+                    0.92, 0.78, 0.38, 0.89, 0.72, 0.34, 0.50, 0.31, 0.18, 0.32, 0.20, 0.12, 0.18,
+                    0.11, 0.07, 0.08, 0.05, 0.03,
+                ],
+            )
+            .unwrap(),
+        );
+        let sample_rect = NegativeBaseFogSampleRect {
+            x: 0.0,
+            y: 0.0,
+            width: 0.34,
+            height: 1.0,
+        };
+        let auto_estimate = estimate_base_fog_from_image(&input, None);
+        let sampled_estimate = estimate_base_fog_from_image(&input, Some(sample_rect));
+        let default_params = NegativeConversionParams::default();
+        let auto_params = NegativeConversionParams {
+            red_weight: auto_estimate.red_weight,
+            green_weight: auto_estimate.green_weight,
+            blue_weight: auto_estimate.blue_weight,
+            base_fog_strength: 1.0,
+            base_fog_sample: None,
+            exposure: 0.0,
+            contrast: 1.0,
+        };
+        let sampled_params = NegativeConversionParams {
+            red_weight: sampled_estimate.red_weight,
+            green_weight: sampled_estimate.green_weight,
+            blue_weight: sampled_estimate.blue_weight,
+            base_fog_strength: 1.0,
+            base_fog_sample: Some(sample_rect),
+            exposure: 0.0,
+            contrast: 1.0,
+        };
+        let rgb = input.to_rgb32f();
+        let (width, height) = rgb.dimensions();
+        let log_pixels: Vec<f32> = rgb
+            .as_raw()
+            .iter()
+            .map(|&value| -value.clamp(1e-6, 1.0).log10())
+            .collect();
+        let sampled_export_bounds = analyze_bounds(
+            &log_pixels,
+            width as usize,
+            height as usize,
+            sampled_params.base_fog_sample,
+        );
+
+        let default_preview = run_pipeline(&input, &default_params, None).to_rgb32f();
+        let auto_preview = run_pipeline(&input, &auto_params, None).to_rgb32f();
+        let sampled_preview = run_pipeline(&input, &sampled_params, None).to_rgb32f();
+        let sampled_export =
+            run_pipeline(&input, &sampled_params, Some(sampled_export_bounds)).to_rgb32f();
+
+        assert!(
+            mean_abs_delta(&default_preview, &auto_preview) > 0.01,
+            "auto base/fog should visibly alter the preview render"
+        );
+        assert!(
+            mean_abs_delta(&auto_preview, &sampled_preview) > 0.01,
+            "sampled base/fog should visibly alter the accepted preview render"
+        );
+        assert_images_near(&sampled_preview, &sampled_export);
     }
 
     #[test]

@@ -180,6 +180,43 @@ const negativeLabOrthoPresetParamsSchema = z
     red_weight: z.literal(1.07),
   })
   .passthrough();
+const negativeLabLeftEdgeSampleSchema = z.object({
+  height: z.literal(0.6),
+  width: z.literal(0.12),
+  x: z.literal(0.02),
+  y: z.literal(0.2),
+});
+const negativeLabPreviewParamsSchema = z
+  .object({
+    base_fog_sample: z.union([z.null(), negativeLabLeftEdgeSampleSchema]),
+    base_fog_strength: z.literal(1),
+    blue_weight: z.number(),
+    contrast: z.number(),
+    exposure: z.number(),
+    green_weight: z.number(),
+    red_weight: z.number(),
+  })
+  .passthrough();
+const negativeLabFixturePathSchema = z.union([
+  z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
+  z.literal('/fixtures/negative-lab/synthetic-gray-ramp-negative-002.tif'),
+]);
+const negativeLabPreviewInvokeSchema = z.object({
+  args: z.object({
+    params: negativeLabPreviewParamsSchema,
+    path: negativeLabFixturePathSchema,
+  }),
+  command: z.literal('preview_negative_conversion'),
+  options: z.unknown().optional(),
+});
+const negativeLabBaseFogEstimateInvokeSchema = z.object({
+  args: z.object({
+    path: z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
+    sampleRect: z.union([z.null(), negativeLabLeftEdgeSampleSchema]),
+  }),
+  command: z.literal('estimate_negative_base_fog'),
+  options: z.unknown().optional(),
+});
 const negativeLabConvertArgsSchema = z.object({
   options: z.object({
     outputFormat: z.literal('jpeg_proof'),
@@ -223,6 +260,7 @@ const negativeLabBatchConvertArgsSchema = z.object({
     )
     .length(2),
 });
+const negativeLabPreviewReturnProofSchema = z.array(z.string().startsWith('data:image/svg+xml,')).min(3);
 const hdrUiSettingsProofSchema = z.object({
   deghosting: z.literal('high'),
   maxPreviewDimensionPx: z.literal('8192'),
@@ -347,6 +385,37 @@ async function assertNegativeLabInvokeProof(page) {
   }
 
   negativeLabConvertArgsSchema.parse(convertCall.args);
+}
+
+async function assertNegativeLabBaseFogPreviewExportProof(page) {
+  const rawInvokeLog = visualSmokeInvokeLogSchema.parse(
+    await page.evaluate(() => window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []),
+  );
+  const previewCalls = z
+    .array(negativeLabPreviewInvokeSchema)
+    .parse(rawInvokeLog.filter((call) => call.command === 'preview_negative_conversion'));
+  const estimateCalls = z
+    .array(negativeLabBaseFogEstimateInvokeSchema)
+    .parse(rawInvokeLog.filter((call) => call.command === 'estimate_negative_base_fog'));
+  const previewReturns = negativeLabPreviewReturnProofSchema.parse(
+    await page.evaluate(() => window.__RAWENGINE_NEGATIVE_LAB_PREVIEW_RETURNS__ ?? []),
+  );
+  const hasAutoEstimate = estimateCalls.some((call) => call.args.sampleRect === null);
+  const hasManualEstimate = estimateCalls.some((call) => call.args.sampleRect !== null);
+  const hasAutoPreview = previewCalls.some(
+    (call) => call.args.params.base_fog_sample === null && call.args.params.red_weight === 1.07,
+  );
+  const hasManualPreview = previewCalls.some(
+    (call) => call.args.params.base_fog_sample !== null && call.args.params.blue_weight === 1.18,
+  );
+
+  if (!hasAutoEstimate || !hasManualEstimate || !hasAutoPreview || !hasManualPreview) {
+    throw new Error('Negative Lab base/fog proof did not exercise auto and sampled preview paths.');
+  }
+
+  if (new Set(previewReturns).size < 2) {
+    throw new Error('Negative Lab sampled preview proof did not produce distinct preview render payloads.');
+  }
 }
 
 async function assertNegativeLabBatchColorInvokeProof(page) {
@@ -604,6 +673,10 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-preset-claim-policy')
     .getByText('Generic family descriptor only; no manufacturer, stock, or emulation claim.', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-auto-base-fog').click();
+  await page.getByTestId('negative-lab-base-status').getByText('Base 91%', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId('negative-lab-sample-left-edge').click();
   await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 1', { exact: true }).waitFor({
     timeout: 10_000,
@@ -672,6 +745,7 @@ async function prepareScenario(page, mode) {
     (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some((call) => call.command === 'convert_negatives'),
   );
   await assertNegativeLabInvokeProof(page);
+  await assertNegativeLabBaseFogPreviewExportProof(page);
   await page
     .getByTestId('negative-lab-saved-path-proof')
     .getByText('/tmp/rawengine-negative-smoke-positive.tif', { exact: true })
