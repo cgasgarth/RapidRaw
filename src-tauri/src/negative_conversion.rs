@@ -62,6 +62,8 @@ pub struct NegativeBaseFogEstimate {
     pub red_weight: f32,
     pub green_weight: f32,
     pub blue_weight: f32,
+    pub base_rgb: [f32; 3],
+    pub base_density: [f32; 3],
     pub confidence: f32,
 }
 
@@ -326,6 +328,8 @@ fn estimate_base_fog_from_image(
         red_weight: to_weight(base_densities[0]),
         green_weight: to_weight(base_densities[1]),
         blue_weight: to_weight(base_densities[2]),
+        base_rgb: base_densities.map(|density| 10.0_f32.powf(-density).clamp(0.0, 1.0)),
+        base_density: base_densities,
         confidence: ((mean_range * 2.0) + (channel_spread * 1.5)).clamp(0.0, 1.0),
     }
 }
@@ -1045,6 +1049,15 @@ mod tests {
         assert!((MIN_CHANNEL_WEIGHT..=MAX_CHANNEL_WEIGHT).contains(&estimate.green_weight));
         assert!((MIN_CHANNEL_WEIGHT..=MAX_CHANNEL_WEIGHT).contains(&estimate.blue_weight));
         assert!((0.0..=1.0).contains(&estimate.confidence));
+        assert_eq!(estimate.base_rgb.len(), 3);
+        assert_eq!(estimate.base_density.len(), 3);
+        for value in estimate.base_rgb {
+            assert!((0.0..=1.0).contains(&value));
+        }
+        for value in estimate.base_density {
+            assert!(value.is_finite());
+            assert!(value >= 0.0);
+        }
     }
 
     #[test]

@@ -193,6 +193,8 @@ export const parseNegativeLabBuiltInUiPresetCatalog = (value: unknown): Negative
 
 export const negativeBaseFogEstimateSchema = z
   .object({
+    baseDensity: z.tuple([z.number().min(0), z.number().min(0), z.number().min(0)]),
+    baseRgb: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]),
     blueWeight: z.number().min(0.5).max(2),
     confidence: z.number().min(0).max(1),
     greenWeight: z.number().min(0.5).max(2),

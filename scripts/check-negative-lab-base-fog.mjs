@@ -22,6 +22,8 @@ for (const marker of [
   'base_fog_sample',
   'NegativeBaseFogSampleRect',
   'NegativeBaseFogEstimate',
+  'base_rgb',
+  'base_density',
   'estimate_base_fog_from_image',
   'sampled_base_fog_estimate_uses_requested_patch',
   'base_fog_strength_changes_thin_density_rendering',
