@@ -33,7 +33,11 @@ import {
 } from '../../schemas/negativeLabPresetCatalogSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
-import { buildNegativeLabFrameHealthReport, getNegativeLabScanLabel } from '../../utils/negativeLabFrameHealth';
+import {
+  buildNegativeLabBatchDryRunSummary,
+  buildNegativeLabFrameHealthReport,
+  getNegativeLabScanLabel,
+} from '../../utils/negativeLabFrameHealth';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
@@ -208,6 +212,7 @@ export default function NegativeConversionModal({
       }),
     [baseFogConfidence, effectiveActivePathIndex, includedPathSet, previewUrl, targetPaths],
   );
+  const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
 
   const workflowStages = useMemo<NegativeLabWorkflowStage[]>(
     () => [
@@ -610,6 +615,18 @@ export default function NegativeConversionModal({
                 })}
               </span>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-1 text-[11px] text-text-tertiary">
+            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-planned-apply-count">
+              {t('modals.negativeConversion.batchPlanApplyCount', {
+                applyCount: batchDryRunSummary.plannedApplyCount,
+              })}
+            </span>
+            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-skipped-frame-count">
+              {t('modals.negativeConversion.batchPlanSkippedCount', {
+                skippedCount: batchDryRunSummary.skippedFrameIds.length,
+              })}
+            </span>
           </div>
           <div className="grid gap-1">
             {frameHealthReport.frames.map((row, index) => (

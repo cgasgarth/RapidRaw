@@ -1524,6 +1524,8 @@
       "baseSampleArea": "Area {{area}}",
       "baseSampleOrigin": "X {{x}} / Y {{y}}",
       "baseSampleSize": "{{width}} x {{height}}",
+      "batchPlanApplyCount": "Apply {{applyCount}}",
+      "batchPlanSkippedCount": "Skip {{skippedCount}}",
       "batchReadiness": "Batch readiness",
       "blueWeight": "Blau (Gelb)",
       "cancel": "Abbrechen",

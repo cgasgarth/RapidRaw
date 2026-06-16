@@ -532,6 +532,12 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 0', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-planned-apply-count').getByText('Apply 2', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-skipped-frame-count').getByText('Skip 0', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId('negative-lab-active-scan-1').click();
   await page.getByTestId('negative-lab-frame-health-row-1').getByText('Active', { exact: true }).waitFor({
     timeout: 10_000,
@@ -599,6 +605,12 @@ async function prepareScenario(page, mode) {
     throw new Error('Negative Lab readout copy did not include density/sample JSON.');
   }
   await page.getByTestId('negative-lab-include-toggle-1').click();
+  await page.getByTestId('negative-lab-planned-apply-count').getByText('Apply 1', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-skipped-frame-count').getByText('Skip 1', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page
     .getByTestId('negative-lab-queued-count')
     .getByText('1 queued', { exact: true })
