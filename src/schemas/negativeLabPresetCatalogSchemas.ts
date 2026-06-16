@@ -5,6 +5,7 @@ export const negativeLabPresetIdSchema = z.string().regex(/^negative_lab\.generi
 export const negativeLabPresetParamsSchema = z
   .object({
     blue_weight: z.number().min(0.5).max(2),
+    base_fog_strength: z.number().min(0).max(1.25).default(1),
     contrast: z.number().min(0.5).max(2.5),
     exposure: z.number().min(-2).max(2),
     green_weight: z.number().min(0.5).max(2),
@@ -73,3 +74,22 @@ export type NegativeLabBuiltInUiPresetCatalog = z.infer<typeof negativeLabBuiltI
 
 export const parseNegativeLabBuiltInUiPresetCatalog = (value: unknown): NegativeLabBuiltInUiPresetCatalog =>
   negativeLabBuiltInUiPresetCatalogSchema.parse(value);
+
+export const negativeBaseFogEstimateSchema = z
+  .object({
+    blueWeight: z.number().min(0.5).max(2),
+    confidence: z.number().min(0).max(1),
+    greenWeight: z.number().min(0.5).max(2),
+    redWeight: z.number().min(0.5).max(2),
+  })
+  .strict();
+
+export const negativeConversionSavedPathsSchema = z.array(z.string().trim().min(1)).min(1);
+
+export type NegativeBaseFogEstimate = z.infer<typeof negativeBaseFogEstimateSchema>;
+
+export const parseNegativeBaseFogEstimate = (value: unknown): NegativeBaseFogEstimate =>
+  negativeBaseFogEstimateSchema.parse(value);
+
+export const parseNegativeConversionSavedPaths = (value: unknown): string[] =>
+  negativeConversionSavedPathsSchema.parse(value);

@@ -2593,6 +2593,7 @@ pub fn run() {
             lens_correction::autodetect_lens,
             lens_correction::get_lens_distortion_params,
             negative_conversion::preview_negative_conversion,
+            negative_conversion::estimate_negative_base_fog,
             negative_conversion::convert_negatives,
         ])
         .build(tauri::generate_context!())

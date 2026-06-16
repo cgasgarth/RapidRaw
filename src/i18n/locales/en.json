@@ -1512,6 +1512,10 @@
       "zoomOutTooltip": "Zoom Out"
     },
     "negativeConversion": {
+      "autoBaseFog": "Auto base",
+      "autoBaseFogTooltip": "Estimate film base and balance color weights",
+      "baseFogConfidence": "Base estimate confidence {{confidence}}%",
+      "baseFogStrength": "Base/Fog",
       "blueWeight": "Blue (Yellow)",
       "cancel": "Cancel",
       "colorTiming": "Color Timing",
@@ -1540,7 +1544,7 @@
       "resetTooltip": "Reset",
       "resetViewTooltip": "Reset View",
       "title": "Negative Conversion",
-      "workflowColorDetail": "R {{red}}  G {{green}}  B {{blue}}",
+      "workflowColorDetail": "Base {{base}}%  R {{red}}  G {{green}}  B {{blue}}",
       "workflowColorTiming": "Color",
       "workflowCustomPresetDetail": "Custom mix",
       "workflowExport": "Export",
