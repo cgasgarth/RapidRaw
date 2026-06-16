@@ -160,6 +160,7 @@
     "check:bundle": "bun run build:frontend && bun run check:bundle:budget",
     "check:bundle:budget": "bun scripts/check-vite-bundle-budget.mjs",
     "check:ci-paths": "bun scripts/ci-classify-macos-smoke.mjs --self-test",
+    "check:ci-rust-pr-paths": "bun scripts/ci-classify-rust-pr.mjs --self-test",
     "check:sidecar-roundtrip": "bun scripts/check-sidecar-roundtrip.mjs",
     "check:docs": "bun run docs:check",
     "check:release-metadata": "bun scripts/generate-release-metadata.mjs --self-test",
