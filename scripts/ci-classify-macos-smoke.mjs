@@ -89,6 +89,8 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     ]),
   ],
   ['check:ai-fallbacks', new Set(['bun scripts/check-ai-provider-fallbacks.mjs'])],
+  ['check:negative-lab-fixtures', new Set(['bun scripts/check-negative-lab-fixtures.mjs'])],
+  ['check:negative-lab-fixtures:update', new Set(['bun scripts/check-negative-lab-fixtures.mjs --update'])],
   ['check:negative-lab-ui-presets', new Set(['bun scripts/check-negative-lab-ui-presets.mjs'])],
   ['check:performance-smoke', new Set(['bun scripts/check-performance-smoke.mjs'])],
   [
@@ -138,7 +140,11 @@ function isSafePureTestPath(path) {
 }
 
 function isSafeFixturePath(path) {
-  return path.startsWith('fixtures/docs/') || (path.startsWith('fixtures/film-simulation/') && path.endsWith('.json'));
+  return (
+    path.startsWith('fixtures/docs/') ||
+    (path.startsWith('fixtures/film-simulation/') && path.endsWith('.json')) ||
+    (path.startsWith('fixtures/negative-lab/') && path.endsWith('.json'))
+  );
 }
 
 function isSafeValidationScript(path) {
@@ -454,6 +460,17 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(
+    'negative lab fixture package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -125,6 +125,8 @@\n+    "check:negative-lab-fixtures": "bun scripts/check-negative-lab-fixtures.mjs",\n+    "check:negative-lab-fixtures:update": "bun scripts/check-negative-lab-fixtures.mjs --update",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
     'pure TS test package script changes skip smoke',
     [
       {
@@ -496,6 +513,11 @@ function runSelfTest() {
   assertClassification(
     'film fixture outputs can skip smoke',
     ['fixtures/film-simulation/film-look-fixture-outputs.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'negative lab fixture outputs can skip smoke',
+    ['fixtures/negative-lab/negative-lab-synthetic-fixture-proof.json'],
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(

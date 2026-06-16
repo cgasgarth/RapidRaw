@@ -1,0 +1,135 @@
+{
+  "cases": [
+    {
+      "baseFogRgb": [0.713, 0.486, 0.338],
+      "category": "gray_ramp",
+      "contentHash": "sha256:f482dd48e522ae50ec6187ea0191dc37f3a31e14c6ff827928372339d1121f5a",
+      "expectedNegativeWarningCodes": [],
+      "exposureStops": [0],
+      "fixtureId": "negative_lab.synthetic.gray_ramp_base_fog_001",
+      "generator": {
+        "id": "rawengine_negative_lab_synthetic_fixture_generator.v1",
+        "seed": "negative-lab-fixture-proof-1377",
+        "version": 1
+      },
+      "knownPositiveRgb": [
+        [0.18, 0.18, 0.18],
+        [0.5, 0.5, 0.5],
+        [0.82, 0.82, 0.82]
+      ],
+      "negativeRgb": [
+        [0.9177, 0.7327, 0.6319],
+        [0.8378, 0.6364, 0.5172],
+        [0.7579, 0.5401, 0.4025]
+      ],
+      "notes": "Known positive gray ramp with visible base/fog for density math smoke checks."
+    },
+    {
+      "baseFogRgb": [0.705, 0.492, 0.35],
+      "category": "color_ramp",
+      "contentHash": "sha256:4aeb49f7ee7810d97661309c78c99bd41b1b5faf9dd86e79f9d9a8e844308582",
+      "expectedNegativeWarningCodes": [],
+      "exposureStops": [-1, 0, 1],
+      "fixtureId": "negative_lab.synthetic.color_ramp_exposure_offsets_001",
+      "generator": {
+        "id": "rawengine_negative_lab_synthetic_fixture_generator.v1",
+        "seed": "negative-lab-fixture-proof-1377",
+        "version": 1
+      },
+      "knownPositiveRgb": [
+        [0.75, 0.12, 0.12],
+        [0.12, 0.72, 0.16],
+        [0.13, 0.16, 0.77],
+        [0.7, 0.7, 0.18],
+        [0.18, 0.68, 0.7],
+        [0.68, 0.2, 0.7]
+      ],
+      "negativeRgb": [
+        [0.7674, 0.7567, 0.6654],
+        [0.9246, 0.5762, 0.6511],
+        [0.9222, 0.7447, 0.4324],
+        [0.7799, 0.5822, 0.6439],
+        [0.9097, 0.5883, 0.4575],
+        [0.7849, 0.7326, 0.4575]
+      ],
+      "notes": "Known positive color ramp with exposure-offset metadata; no stock/profile quality claim."
+    },
+    {
+      "baseFogRgb": null,
+      "category": "missing_base_sample",
+      "contentHash": "sha256:880d9dc67079f912de19a5932763f69823375fd24abbcc42375c1b8080821ed6",
+      "expectedNegativeWarningCodes": ["missing_visible_base"],
+      "exposureStops": [0],
+      "fixtureId": "negative_lab.synthetic.missing_base_sample_warning_001",
+      "generator": {
+        "id": "rawengine_negative_lab_synthetic_fixture_generator.v1",
+        "seed": "negative-lab-fixture-proof-1377",
+        "version": 1
+      },
+      "knownPositiveRgb": [[0.5, 0.5, 0.5]],
+      "negativeRgb": [[0.86, 0.78, 0.7]],
+      "notes": "Failure-mode fixture with no acceptable base/fog sample region."
+    },
+    {
+      "baseFogRgb": [0.72, 0.49, 0.34],
+      "category": "dense_thin_exposure_offsets",
+      "contentHash": "sha256:caa2965f9f1972ac8d374fcfc23b9937be7799f57020cbe5f82724eae0985dd0",
+      "expectedNegativeWarningCodes": ["low_acquisition_confidence"],
+      "exposureStops": [-2, 2],
+      "fixtureId": "negative_lab.synthetic.dense_thin_exposure_offsets_001",
+      "generator": {
+        "id": "rawengine_negative_lab_synthetic_fixture_generator.v1",
+        "seed": "negative-lab-fixture-proof-1377",
+        "version": 1
+      },
+      "knownPositiveRgb": [
+        [0.28, 0.28, 0.28],
+        [0.72, 0.72, 0.72]
+      ],
+      "negativeRgb": [
+        [1, 0.8418, 0.7592],
+        [0.763, 0.5418, 0.4018]
+      ],
+      "notes": "Dense and thin negative variants are represented as metadata; numeric quality thresholds are deferred."
+    },
+    {
+      "baseFogRgb": [1, 0.51, 0.35],
+      "category": "clipped_channel",
+      "contentHash": "sha256:cdf1ac8e7cc9e3c966916fe004ed608f7a27502e9a4ce0505492f6b842c9fefc",
+      "expectedNegativeWarningCodes": ["clipped_base_channel"],
+      "exposureStops": [0],
+      "fixtureId": "negative_lab.synthetic.clipped_channel_warning_001",
+      "generator": {
+        "id": "rawengine_negative_lab_synthetic_fixture_generator.v1",
+        "seed": "negative-lab-fixture-proof-1377",
+        "version": 1
+      },
+      "knownPositiveRgb": [[0.4, 0.4, 0.4]],
+      "negativeRgb": [[1, 0.6905, 0.565]],
+      "notes": "Failure-mode fixture with clipped red base/fog channel."
+    },
+    {
+      "baseFogRgb": [0.72, 0.49, 0.34],
+      "category": "unknown_acquisition_profile",
+      "contentHash": "sha256:d168654595d313935d8d1405e046fcdf40f30af20712771f282dd7fa36300580",
+      "expectedNegativeWarningCodes": ["unknown_input_profile", "low_acquisition_confidence"],
+      "exposureStops": [0],
+      "fixtureId": "negative_lab.synthetic.unknown_profile_warning_001",
+      "generator": {
+        "id": "rawengine_negative_lab_synthetic_fixture_generator.v1",
+        "seed": "negative-lab-fixture-proof-1377",
+        "version": 1
+      },
+      "knownPositiveRgb": [[0.6, 0.6, 0.6]],
+      "negativeRgb": [[0.8198, 0.6103, 0.4834]],
+      "notes": "Failure-mode fixture for unknown acquisition profile handling."
+    }
+  ],
+  "generator": {
+    "id": "rawengine_negative_lab_synthetic_fixture_generator.v1",
+    "seed": "negative-lab-fixture-proof-1377",
+    "version": 1
+  },
+  "issue": 1377,
+  "schemaVersion": 1
+}
