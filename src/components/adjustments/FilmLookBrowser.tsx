@@ -1,8 +1,9 @@
 import { Check, Film, Save, Share2, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { TextVariants } from '../../types/typography';
 import {
+  clampFilmLookStrength,
   getFilmLookAdjustmentSummaries,
   getFilmLookBrowserGroups,
   type FilmLookBrowserItem,
@@ -10,9 +11,9 @@ import {
 import UiText from '../ui/Text';
 
 interface FilmLookBrowserProps {
-  onApplyLook: (look: FilmLookBrowserItem) => void;
-  onSaveLook: (look: FilmLookBrowserItem) => void;
-  onShareLook: (look: FilmLookBrowserItem) => void;
+  onApplyLook: (look: FilmLookBrowserItem, strength: number) => void;
+  onSaveLook: (look: FilmLookBrowserItem, strength: number) => void;
+  onShareLook: (look: FilmLookBrowserItem, strength: number) => void;
 }
 
 type FilmLookComparisonSlot = 'a' | 'b';
@@ -31,11 +32,29 @@ const FILM_LOOK_COMPARE_APPLY_LABELS: Record<FilmLookComparisonSlot, string> = {
   b: 'Apply B',
 };
 const FILM_LOOK_COMPARE_SLOTS: Array<FilmLookComparisonSlot> = ['a', 'b'];
+const FILM_LOOK_STRENGTH_LABEL = 'Strength';
+const FILM_LOOK_FAVORITES_STORAGE_KEY = 'rapidraw.filmLookFavorites.v1';
 const formatFilmLookCount = (count: number) => `${count} looks`;
 const formatFilmLookStrength = (strength: number) => `${strength}%`;
 const formatFilmLookAdjustmentValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
 const formatFilmLookSaveLabel = (displayName: string) => `Save ${displayName} as preset`;
 const formatFilmLookShareLabel = (displayName: string) => `Share ${displayName} preset`;
+const isStringArray = (value: unknown): value is Array<string> =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+const readFavoriteLookIds = (): Set<string> => {
+  if (typeof window === 'undefined') {
+    return new Set();
+  }
+
+  const storedFavorites = window.localStorage.getItem(FILM_LOOK_FAVORITES_STORAGE_KEY);
+  if (storedFavorites === null) {
+    return new Set();
+  }
+
+  const parsedFavorites: unknown = JSON.parse(storedFavorites);
+  return isStringArray(parsedFavorites) ? new Set(parsedFavorites) : new Set();
+};
 
 export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLookBrowserProps) {
   const groups = useMemo(() => getFilmLookBrowserGroups(), []);
@@ -49,10 +68,50 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
     a: null,
     b: null,
   });
+  const [favoriteLookIds, setFavoriteLookIds] = useState<Set<string>>(readFavoriteLookIds);
+  const [strengthPercent, setStrengthPercent] = useState<number>(70);
+
+  useEffect(() => {
+    window.localStorage.setItem(FILM_LOOK_FAVORITES_STORAGE_KEY, JSON.stringify([...favoriteLookIds].toSorted()));
+  }, [favoriteLookIds]);
 
   const handleApplyLook = (look: FilmLookBrowserItem) => {
     setSelectedLookId(look.id);
-    onApplyLook(look);
+    setStrengthPercent(look.strengthDefault);
+    onApplyLook(look, look.strengthDefault);
+  };
+
+  const handleApplyLookAtCurrentStrength = (look: FilmLookBrowserItem) => {
+    const lookStrength = selectedLookId === look.id ? strengthPercent : look.strengthDefault;
+    setSelectedLookId(look.id);
+    setStrengthPercent(lookStrength);
+    onApplyLook(look, lookStrength);
+  };
+
+  const handleStrengthChange = (value: number) => {
+    const nextStrength = clampFilmLookStrength(value);
+    setStrengthPercent(nextStrength);
+
+    if (selectedLookId !== null) {
+      const look = looksById.get(selectedLookId);
+      if (look !== undefined) {
+        onApplyLook(look, nextStrength);
+      }
+    }
+  };
+
+  const toggleFavoriteLook = (look: FilmLookBrowserItem) => {
+    setFavoriteLookIds((currentFavorites) => {
+      const nextFavorites = new Set(currentFavorites);
+
+      if (nextFavorites.has(look.id)) {
+        nextFavorites.delete(look.id);
+      } else {
+        nextFavorites.add(look.id);
+      }
+
+      return nextFavorites;
+    });
   };
 
   const handlePinComparisonLook = (slot: FilmLookComparisonSlot, look: FilmLookBrowserItem) => {
@@ -134,7 +193,7 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                     <button
                       className="w-full rounded bg-accent px-2 py-1 text-xs font-medium text-white hover:opacity-90"
                       onClick={() => {
-                        handleApplyLook(look);
+                        handleApplyLookAtCurrentStrength(look);
                       }}
                       type="button"
                     >
@@ -148,6 +207,29 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
         </div>
       </section>
 
+      <section className="space-y-2" aria-label={FILM_LOOK_STRENGTH_LABEL}>
+        <div className="flex items-center justify-between gap-2">
+          <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
+            {FILM_LOOK_STRENGTH_LABEL}
+          </UiText>
+          <UiText variant={TextVariants.small} className="tabular-nums text-text-secondary">
+            {formatFilmLookStrength(strengthPercent)}
+          </UiText>
+        </div>
+        <input
+          aria-label={FILM_LOOK_STRENGTH_LABEL}
+          className="w-full accent-accent"
+          max={100}
+          min={0}
+          onChange={(event) => {
+            handleStrengthChange(Number(event.target.value));
+          }}
+          step={1}
+          type="range"
+          value={strengthPercent}
+        />
+      </section>
+
       <div className="space-y-3">
         {groups.map((group) => (
           <section className="space-y-2" key={group.category}>
@@ -157,10 +239,12 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
             <div className="flex gap-2 overflow-x-auto pb-1">
               {group.looks.map((look) => {
                 const isSelected = selectedLookId === look.id;
+                const isFavorite = favoriteLookIds.has(look.id);
+                const activeStrength = isSelected ? strengthPercent : look.strengthDefault;
 
                 return (
                   <div
-                    className={`flex h-36 min-w-40 max-w-40 flex-col rounded-md border p-2 transition-colors ${
+                    className={`flex h-40 min-w-40 max-w-40 flex-col rounded-md border p-2 transition-colors ${
                       isSelected
                         ? 'border-accent bg-surface text-text-primary'
                         : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface hover:text-text-primary'
@@ -178,18 +262,21 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                     >
                       <span className="flex items-center justify-between gap-2">
                         <Film size={16} aria-hidden="true" />
-                        {isSelected && <Check size={15} aria-hidden="true" />}
+                        <span className="flex items-center gap-1">
+                          {isFavorite && <span className="size-2 rounded-full bg-accent" aria-hidden="true" />}
+                          {isSelected && <Check size={15} aria-hidden="true" />}
+                        </span>
                       </span>
                       <span className="space-y-1">
                         <UiText className="block truncate" variant={TextVariants.body}>
                           {look.displayName}
                         </UiText>
                         <UiText className="block" variant={TextVariants.small}>
-                          {formatFilmLookStrength(look.strengthDefault)}
+                          {formatFilmLookStrength(activeStrength)}
                         </UiText>
                       </span>
                     </button>
-                    <div className="mt-2 grid grid-cols-4 gap-1">
+                    <div className="mt-2 grid grid-cols-5 gap-1">
                       {FILM_LOOK_COMPARE_SLOTS.map((slot) => {
                         const slotLabel = FILM_LOOK_COMPARE_SLOT_LABELS[slot];
                         const isPinned = comparisonSelection[slot] === look.id;
@@ -213,11 +300,27 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                         );
                       })}
                       <button
+                        aria-label={`${isFavorite ? 'Unfavorite' : 'Favorite'} ${look.displayName}`}
+                        aria-pressed={isFavorite}
+                        className={`rounded bg-bg-tertiary px-2 py-1 text-text-secondary hover:bg-surface ${
+                          isFavorite ? 'text-accent' : ''
+                        }`}
+                        data-tooltip={`${isFavorite ? 'Unfavorite' : 'Favorite'} ${look.displayName}`}
+                        onClick={() => {
+                          toggleFavoriteLook(look);
+                        }}
+                        type="button"
+                      >
+                        <span aria-hidden="true" className="block text-center text-xs font-semibold">
+                          F
+                        </span>
+                      </button>
+                      <button
                         aria-label={formatFilmLookSaveLabel(look.displayName)}
                         className="rounded bg-bg-tertiary px-2 py-1 text-text-secondary hover:bg-surface"
                         data-tooltip={formatFilmLookSaveLabel(look.displayName)}
                         onClick={() => {
-                          onSaveLook(look);
+                          onSaveLook(look, activeStrength);
                         }}
                         type="button"
                       >
@@ -228,7 +331,7 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                         className="rounded bg-bg-tertiary px-2 py-1 text-text-secondary hover:bg-surface"
                         data-tooltip={formatFilmLookShareLabel(look.displayName)}
                         onClick={() => {
-                          onShareLook(look);
+                          onShareLook(look, activeStrength);
                         }}
                         type="button"
                       >

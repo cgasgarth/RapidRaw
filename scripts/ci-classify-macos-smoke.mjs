@@ -137,6 +137,10 @@ function isSafePureTestPath(path) {
   return path.startsWith('tests/pure-ts/') && hasExtension(path, SAFE_PURE_TEST_EXTENSIONS);
 }
 
+function isSafeFixturePath(path) {
+  return path.startsWith('fixtures/docs/') || (path.startsWith('fixtures/film-simulation/') && path.endsWith('.json'));
+}
+
 function isSafeValidationScript(path) {
   return path.startsWith('scripts/') && path.endsWith('.mjs');
 }
@@ -195,7 +199,7 @@ function classifyPathChange(change) {
     SAFE_TOOLING_FILES.has(path) ||
     isMarkdown(path) ||
     path.startsWith('docs/') ||
-    path.startsWith('fixtures/docs/') ||
+    isSafeFixturePath(path) ||
     isSafePureTestPath(path) ||
     isSafeSchemaPackagePath(path) ||
     isSafeValidationScript(path) ||
@@ -218,7 +222,7 @@ function maxMode(left, right) {
 export function classifyFileChanges(changes) {
   const normalizedChanges = changes
     .map((change) => ({
-      filename: change.filename.trim(),
+      filename: (change.filename ?? change.path ?? '').trim(),
       patch: change.patch,
     }))
     .filter((change) => change.filename);
@@ -312,7 +316,7 @@ function readPullFilesFromArg(path) {
   }
 
   return entries.map((entry) => ({
-    filename: typeof entry.filename === 'string' ? entry.filename : '',
+    filename: typeof entry.filename === 'string' ? entry.filename : typeof entry.path === 'string' ? entry.path : '',
     patch: typeof entry.patch === 'string' ? entry.patch : undefined,
   }));
 }
@@ -489,6 +493,16 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification('public styles can skip smoke', ['public/theme.css'], SMOKE_MODES.NONE);
+  assertClassification(
+    'film fixture outputs can skip smoke',
+    ['fixtures/film-simulation/film-look-fixture-outputs.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'GitHub pull files with path fields can skip smoke',
+    [{ path: 'fixtures/film-simulation/film-look-fixture-outputs.json' }],
+    SMOKE_MODES.NONE,
+  );
   assertClassification('pure TS tests can skip smoke', ['tests/pure-ts/edit-command-bus.test.mjs'], SMOKE_MODES.NONE);
   assertClassification('lint config changes can skip smoke', ['eslint.config.js'], SMOKE_MODES.NONE);
   assertClassification('unused-code config changes can skip smoke', ['knip.jsonc'], SMOKE_MODES.NONE);

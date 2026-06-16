@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import FilmLookBrowser from './FilmLookBrowser';
 import { TextVariants } from '../../types/typography';
 import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
-import { type FilmLookBrowserItem } from '../../utils/filmLookBrowser';
+import { scaleFilmLookAdjustmentPatch, type FilmLookBrowserItem } from '../../utils/filmLookBrowser';
 import { AppSettings, Invokes, type Preset } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
 import Slider from '../ui/Slider';
@@ -35,13 +35,17 @@ type SliderChangeEvent =
 
 const FILM_LOOK_PRESET_FILE_EXTENSION = 'rrpreset';
 const FILM_LOOK_PRESET_FILE_TYPE = 'RapidRaw Preset';
-const sanitizeFilmLookPresetFileName = (displayName: string) => `${displayName}.rrpreset`.replace(/[<>:"/\\|?*]/g, '_');
-const createFilmLookPreset = (look: FilmLookBrowserItem): Preset => ({
-  adjustments: { ...look.adjustmentPatch },
+const formatFilmLookStrength = (strength: number) => `${strength}%`;
+const formatFilmLookPresetName = (look: FilmLookBrowserItem, strength: number) =>
+  `${look.displayName} ${formatFilmLookStrength(strength)}`;
+const sanitizeFilmLookPresetFileName = (look: FilmLookBrowserItem, strength: number) =>
+  `${formatFilmLookPresetName(look, strength)}.rrpreset`.replace(/[<>:"/\\|?*]/g, '_');
+const createFilmLookPreset = (look: FilmLookBrowserItem, strength: number): Preset => ({
+  adjustments: scaleFilmLookAdjustmentPatch(look, strength),
   id: crypto.randomUUID(),
   includeCropTransform: false,
   includeMasks: false,
-  name: look.displayName,
+  name: formatFilmLookPresetName(look, strength),
   presetType: 'style',
 });
 
@@ -75,26 +79,26 @@ export default function EffectsPanel({
     }));
   };
 
-  const handleFilmLookApply = (look: FilmLookBrowserItem) => {
+  const handleFilmLookApply = (look: FilmLookBrowserItem, strength: number) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      ...look.adjustmentPatch,
+      ...scaleFilmLookAdjustmentPatch(look, strength),
     }));
   };
 
-  const saveFilmLookPreset = async (look: FilmLookBrowserItem) => {
+  const saveFilmLookPreset = async (look: FilmLookBrowserItem, strength: number) => {
     await invoke(Invokes.SaveCommunityPreset, {
-      adjustments: look.adjustmentPatch,
+      adjustments: scaleFilmLookAdjustmentPatch(look, strength),
       includeCropTransform: false,
       includeMasks: false,
-      name: look.displayName,
+      name: formatFilmLookPresetName(look, strength),
       presetType: 'style',
     });
   };
 
-  const shareFilmLookPreset = async (look: FilmLookBrowserItem) => {
+  const shareFilmLookPreset = async (look: FilmLookBrowserItem, strength: number) => {
     const filePath = await saveDialog({
-      defaultPath: sanitizeFilmLookPresetFileName(look.displayName),
+      defaultPath: sanitizeFilmLookPresetFileName(look, strength),
       filters: [{ name: FILM_LOOK_PRESET_FILE_TYPE, extensions: [FILM_LOOK_PRESET_FILE_EXTENSION] }],
       title: t('editor.presets.dialog.exportTitle', {
         type: t('editor.presets.types.preset'),
@@ -105,16 +109,16 @@ export default function EffectsPanel({
       return;
     }
 
-    const presetsToExport: Array<PresetExportItem> = [{ preset: createFilmLookPreset(look) }];
+    const presetsToExport: Array<PresetExportItem> = [{ preset: createFilmLookPreset(look, strength) }];
     await invoke(Invokes.HandleExportPresetsToFile, { presetsToExport, filePath });
   };
 
-  const handleFilmLookSave = (look: FilmLookBrowserItem) => {
-    void saveFilmLookPreset(look);
+  const handleFilmLookSave = (look: FilmLookBrowserItem, strength: number) => {
+    void saveFilmLookPreset(look, strength);
   };
 
-  const handleFilmLookShare = (look: FilmLookBrowserItem) => {
-    void shareFilmLookPreset(look);
+  const handleFilmLookShare = (look: FilmLookBrowserItem, strength: number) => {
+    void shareFilmLookPreset(look, strength);
   };
 
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};

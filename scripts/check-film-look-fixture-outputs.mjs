@@ -2,7 +2,11 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
-import { FILM_LOOK_BROWSER_ITEMS, getFilmLookAdjustmentSummaries } from '../src/utils/filmLookBrowser.ts';
+import {
+  FILM_LOOK_BROWSER_ITEMS,
+  getFilmLookAdjustmentSummaries,
+  scaleFilmLookAdjustmentPatch,
+} from '../src/utils/filmLookBrowser.ts';
 
 const fixtureUrl = new URL('../fixtures/film-simulation/film-look-fixture-outputs.json', import.meta.url);
 const updateFixture = process.argv.includes('--update');
@@ -28,6 +32,11 @@ const buildFixture = () => ({
       displayName: look.displayName,
       id: look.id,
       strengthDefault: look.strengthDefault,
+      strengthPreviews: {
+        default: scaleFilmLookAdjustmentPatch(look, look.strengthDefault),
+        half: scaleFilmLookAdjustmentPatch(look, 50),
+        full: scaleFilmLookAdjustmentPatch(look, 100),
+      },
     };
   }),
   version: 1,
