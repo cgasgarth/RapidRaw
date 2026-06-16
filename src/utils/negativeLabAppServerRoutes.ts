@@ -1,3 +1,4 @@
+import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitometer';
 import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCatalog';
 import {
@@ -6,12 +7,16 @@ import {
   negativeLabBatchSummaryAppServerCommandSchema,
   negativeLabBatchSummaryAppServerResultSchema,
   negativeLabConversionPlanResultSchema,
+  negativeLabDensitometerAppServerCommandSchema,
+  negativeLabDensitometerAppServerResultSchema,
   negativeLabFrameHealthAppServerCommandSchema,
   negativeLabFrameHealthAppServerResultSchema,
   type NegativeLabAppServerCommand,
   type NegativeLabBatchSummaryAppServerCommand,
   type NegativeLabBatchSummaryAppServerResult,
   type NegativeLabConversionPlanResult,
+  type NegativeLabDensitometerAppServerCommand,
+  type NegativeLabDensitometerAppServerResult,
   type NegativeLabFrameHealthAppServerCommand,
   type NegativeLabFrameHealthAppServerResult,
 } from '../schemas/negativeLabAppServerSchemas';
@@ -31,6 +36,13 @@ export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteM
       outputSchemaName: 'NegativeLabConversionPlanResultV1',
       reason:
         'Negative Lab app-server calls share the UI built-in preset catalog and deterministic conversion plan shape.',
+      status: 'mapped',
+    },
+    {
+      commandName: 'negative.lab.build_densitometer_readout',
+      inputSchemaName: 'NegativeLabDensitometerAppServerCommandV1',
+      outputSchemaName: 'NegativeBaseFogDensitometerReadoutV1',
+      reason: 'Negative Lab app-server calls expose the same base/fog densitometer math used by UI.',
       status: 'mapped',
     },
     {
@@ -99,4 +111,14 @@ export const buildNegativeLabBatchSummaryRouteResult = (
   const frameHealthReport = buildNegativeLabFrameHealthRouteResult(parsedCommand);
 
   return negativeLabBatchSummaryAppServerResultSchema.parse(buildNegativeLabBatchDryRunSummary(frameHealthReport));
+};
+
+export const buildNegativeLabDensitometerRouteResult = (
+  command: NegativeLabDensitometerAppServerCommand,
+): NegativeLabDensitometerAppServerResult => {
+  const parsedCommand = negativeLabDensitometerAppServerCommandSchema.parse(command);
+
+  return negativeLabDensitometerAppServerResultSchema.parse(
+    buildNegativeBaseFogDensitometerReadout(parsedCommand.baseFogEstimate),
+  );
 };
