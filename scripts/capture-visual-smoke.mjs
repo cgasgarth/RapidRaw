@@ -157,21 +157,15 @@ const visualSmokeInvokeLogSchema = z.array(
     options: z.unknown().optional(),
   }),
 );
-const negativeLabLeftEdgeSampleRectSchema = z.object({
-  height: z.literal(0.6),
-  width: z.literal(0.12),
-  x: z.literal(0.02),
-  y: z.literal(0.2),
-});
-const negativeLabParamsWithBaseSampleSchema = z
+const negativeLabOrthoPresetParamsSchema = z
   .object({
-    base_fog_sample: negativeLabLeftEdgeSampleRectSchema,
+    base_fog_sample: z.null(),
     base_fog_strength: z.literal(1),
-    blue_weight: z.literal(1.18),
-    contrast: z.number(),
-    exposure: z.number(),
-    green_weight: z.literal(0.96),
-    red_weight: z.literal(1.07),
+    blue_weight: z.literal(1.2),
+    contrast: z.literal(1.2),
+    exposure: z.literal(-0.05),
+    green_weight: z.literal(1.05),
+    red_weight: z.literal(0.75),
   })
   .passthrough();
 const negativeLabConvertArgsSchema = z.object({
@@ -179,12 +173,8 @@ const negativeLabConvertArgsSchema = z.object({
     outputFormat: z.literal('jpeg_proof'),
     suffix: z.literal('Positive'),
   }),
-  params: negativeLabParamsWithBaseSampleSchema,
+  params: negativeLabOrthoPresetParamsSchema,
   paths: z.array(z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif')).length(1),
-});
-const negativeLabEstimateArgsSchema = z.object({
-  path: z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
-  sampleRect: negativeLabLeftEdgeSampleRectSchema,
 });
 const hdrUiSettingsProofSchema = z.object({
   deghosting: z.literal('high'),
@@ -303,15 +293,7 @@ async function assertNegativeLabInvokeProof(page) {
   const invokeLog = visualSmokeInvokeLogSchema.parse(
     await page.evaluate(() => window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []),
   );
-  const sampledBaseFogCall = invokeLog.find(
-    (call) =>
-      call.command === 'estimate_negative_base_fog' && negativeLabEstimateArgsSchema.safeParse(call.args).success,
-  );
   const convertCall = invokeLog.find((call) => call.command === 'convert_negatives');
-
-  if (sampledBaseFogCall === undefined) {
-    throw new Error('Negative Lab sampled base/fog estimate invoke was not recorded.');
-  }
 
   if (convertCall === undefined) {
     throw new Error('Negative Lab convert invoke was not recorded.');
@@ -473,6 +455,19 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-preset-film-class').getByText('Color negative', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByRole('button', { name: 'Black and White Ortho' }).click();
+  await page
+    .getByTestId('negative-lab-preset-process')
+    .getByText('Silver gelatin family', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-preset-film-class')
+    .getByText('Black and white silver', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-preset-intent')
+    .getByText('Orthochromatic-style tonal separation with reduced red response.', { exact: true })
+    .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-include-toggle-1').click();
   await page
     .getByTestId('negative-lab-queued-count')
@@ -486,9 +481,6 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-queued-count')
     .getByText('1 queued', { exact: true })
     .waitFor({ timeout: 10_000 });
-  await page.getByTestId('negative-lab-sample-left-edge').click();
-  await page.getByTestId('negative-lab-base-sample-overlay').waitFor({ timeout: 10_000 });
-  await page.getByTestId('negative-lab-confidence').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-export-tiff16').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-export-jpeg-proof').click();
   await page.getByRole('button', { name: 'Convert & Save Active' }).click();
