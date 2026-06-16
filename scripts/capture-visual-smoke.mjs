@@ -74,6 +74,11 @@ const visualSmokeInvokeLogSchema = z.array(
     options: z.unknown().optional(),
   }),
 );
+const hdrUiSettingsProofSchema = z.object({
+  deghosting: z.literal('high'),
+  maxPreviewDimensionPx: z.literal('8192'),
+  toneMapPreview: z.literal('false'),
+});
 const selectedScenarios =
   requestedScenario === null ? scenarios : scenarios.filter((scenario) => scenario.mode === requestedScenario);
 
@@ -168,6 +173,16 @@ async function assertFilmLookExportProof(page) {
 }
 
 async function prepareScenario(page, mode) {
+  if (mode === 'hdr-ui') {
+    await page.getByRole('button', { name: 'High' }).click();
+    await page.getByRole('button', { name: '8192 px' }).click();
+    await page.getByLabel('Tone-map preview').uncheck();
+    hdrUiSettingsProofSchema.parse(
+      await page.getByTestId('hdr-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    return;
+  }
+
   if (mode === 'color-workflow') {
     const colorSliders = page.locator('[data-visual-smoke-mode="color-workflow"] input[type="range"]');
     await colorSliders.nth(0).fill('12');
