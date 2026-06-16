@@ -163,6 +163,7 @@
     "check:negative-lab-fixtures": "bun scripts/check-negative-lab-fixtures.mjs",
     "check:negative-lab-fixtures:update": "bun scripts/check-negative-lab-fixtures.mjs --update",
     "check:negative-lab-frame-health": "bun scripts/check-negative-lab-frame-health-report.mjs",
+    "check:negative-lab-roll-cockpit": "bun scripts/check-negative-lab-roll-cockpit.mjs",
     "check:negative-lab-measured-profiles": "bun scripts/check-negative-lab-measured-profiles.mjs",
     "check:negative-lab-workspace-smoke": "bun scripts/capture-visual-smoke.mjs --scenario negative-lab-workspace",
     "check:negative-lab-batch-color-smoke": "bun scripts/capture-visual-smoke.mjs --scenario negative-lab-batch-color-workspace",
