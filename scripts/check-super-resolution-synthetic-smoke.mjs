@@ -5,6 +5,12 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
+import {
+  applyPixelShiftSuperResolutionV1,
+  calculateMeanAbsoluteErrorV1,
+  createNearestNeighborBaselineV1,
+} from '../packages/rawengine-schema/src/superResolutionPixelShift.ts';
+
 const SCALE = 2;
 const LOW_WIDTH = 48;
 const LOW_HEIGHT = 32;
@@ -66,59 +72,23 @@ const lowFrames = sourceFrames.map((frame) => {
   return pixels;
 });
 
-const nearestBaseline = new Float32Array(HIGH_WIDTH * HIGH_HEIGHT);
-const referenceLowFrame = lowFrames[0];
-for (let y = 0; y < HIGH_HEIGHT; y += 1) {
-  for (let x = 0; x < HIGH_WIDTH; x += 1) {
-    nearestBaseline[y * HIGH_WIDTH + x] = referenceLowFrame[Math.floor(y / SCALE) * LOW_WIDTH + Math.floor(x / SCALE)];
-  }
-}
-
-const sr = new Float32Array(HIGH_WIDTH * HIGH_HEIGHT);
-const weights = new Uint8Array(HIGH_WIDTH * HIGH_HEIGHT);
-for (const [frameIndex, frame] of sourceFrames.entries()) {
-  const pixels = lowFrames[frameIndex];
-  for (let y = 0; y < LOW_HEIGHT; y += 1) {
-    for (let x = 0; x < LOW_WIDTH; x += 1) {
-      const outputX = x * SCALE + frame.shiftX;
-      const outputY = y * SCALE + frame.shiftY;
-      const outputIndex = outputY * HIGH_WIDTH + outputX;
-      sr[outputIndex] += pixels[y * LOW_WIDTH + x] ?? 0;
-      weights[outputIndex] += 1;
-    }
-  }
-}
-
-for (let index = 0; index < sr.length; index += 1) {
-  if (weights[index] === 0) {
-    throw new Error(`SR synthetic smoke left output pixel ${index} unfilled.`);
-  }
-  sr[index] /= weights[index];
-}
-
-const meanAbsoluteError = (left, right) => {
-  let total = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    total += Math.abs((left[index] ?? 0) - (right[index] ?? 0));
-  }
-  return total / left.length;
-};
-
-const changedPixelRatio = (() => {
-  let changed = 0;
-  for (let index = 0; index < sr.length; index += 1) {
-    if (Math.abs((sr[index] ?? 0) - (nearestBaseline[index] ?? 0)) > 0.001) changed += 1;
-  }
-  return changed / sr.length;
-})();
-
-const baselineMae = meanAbsoluteError(nearestBaseline, truth);
-const srMae = meanAbsoluteError(sr, truth);
+const sr = applyPixelShiftSuperResolutionV1({
+  frames: sourceFrames.map((frame, frameIndex) => ({
+    ...frame,
+    pixels: lowFrames[frameIndex],
+  })),
+  height: LOW_HEIGHT,
+  scale: SCALE,
+  width: LOW_WIDTH,
+});
+const nearestBaseline = createNearestNeighborBaselineV1(lowFrames[0], LOW_WIDTH, LOW_HEIGHT, SCALE);
+const baselineMae = calculateMeanAbsoluteErrorV1(nearestBaseline, truth);
+const srMae = calculateMeanAbsoluteErrorV1(sr.outputPixels, truth);
 const improvementRatio = (baselineMae - srMae) / baselineMae;
 
 const report = SrSyntheticSmokeReportSchema.parse({
   baselineMae,
-  changedPixelRatio,
+  changedPixelRatio: sr.changedPixelRatioAgainstNearest,
   fixtureId: 'sr.synthetic.pixel-shift-chart.v1',
   highResolutionDimensions: { height: HIGH_HEIGHT, width: HIGH_WIDTH },
   improvementRatio,
