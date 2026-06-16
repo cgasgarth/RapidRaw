@@ -104,6 +104,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:negative-lab-fixtures', new Set(['bun scripts/check-negative-lab-fixtures.mjs'])],
   ['check:negative-lab-fixtures:update', new Set(['bun scripts/check-negative-lab-fixtures.mjs --update'])],
   ['check:negative-lab-ui-presets', new Set(['bun scripts/check-negative-lab-ui-presets.mjs'])],
+  ['check:private-raw-evidence', new Set(['bun scripts/check-private-raw-evidence-ledger.mjs'])],
   [
     'check:negative-lab-workspace-smoke',
     new Set(['bun scripts/capture-visual-smoke.mjs --scenario negative-lab-workspace']),
@@ -166,6 +167,7 @@ function isSafePureTestPath(path) {
 
 function isSafeFixturePath(path) {
   return (
+    (path.startsWith('fixtures/detail/') && path.endsWith('.json')) ||
     path.startsWith('fixtures/docs/') ||
     (path.startsWith('fixtures/film-simulation/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/layers/') && path.endsWith('.json')) ||
@@ -621,6 +623,11 @@ function runSelfTest() {
   assertClassification(
     'negative lab fixture outputs can skip smoke',
     ['fixtures/negative-lab/negative-lab-synthetic-fixture-proof.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'private RAW evidence fixture ledger can skip smoke',
+    ['fixtures/detail/private-raw-evidence-ledger.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(

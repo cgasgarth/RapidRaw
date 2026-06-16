@@ -52,14 +52,26 @@ const rightsSchema = z
   });
 
 export const privateRawEvidenceArtifactClassSchema = z.enum([
+  'bracket_alignment',
+  'focus_plane_transition',
   'high_iso_chroma_noise',
   'high_iso_luma_noise',
   'fine_texture_detail',
   'edge_halo_ringing',
   'motion_blur',
+  'overlap_stitch_alignment',
   'lens_softness',
   'color_checker_reference',
   'skin_tone_reference',
+  'subpixel_detail_reconstruction',
+]);
+
+const privateRawEvidenceFeatureFamilySchema = z.enum([
+  'detail',
+  'focus_stack',
+  'hdr_merge',
+  'panorama_stitch',
+  'super_resolution',
 ]);
 
 export const privateRawEvidenceEntrySchema = z
@@ -68,16 +80,47 @@ export const privateRawEvidenceEntrySchema = z
     camera: cameraMetadataSchema,
     crop: cropRectangleSchema,
     evidenceId: z.string().regex(/^raw-evidence\.[a-z0-9.-]+\.v[0-9]+$/u),
-    expectedUse: z.array(z.enum(['denoise', 'deblur', 'detail', 'color_science', 'preview_export_parity'])).min(1),
+    expectedUse: z
+      .array(
+        z.enum([
+          'color_science',
+          'deblur',
+          'denoise',
+          'detail',
+          'focus_stack',
+          'hdr_merge',
+          'panorama_stitch',
+          'preview_export_parity',
+          'super_resolution',
+        ]),
+      )
+      .min(1),
     exposure: exposureMetadataSchema,
+    featureFamily: privateRawEvidenceFeatureFamilySchema,
     fileSha256: sha256Schema.optional(),
     localRelativePath: z.string().trim().min(1).optional(),
     notes: z.string().trim().min(1),
     rights: rightsSchema,
     status: z.enum(['planned_private_capture', 'private_asset_available', 'retired']),
+    trackingIssue: z.number().int().positive(),
   })
   .strict()
   .superRefine((entry, context) => {
+    const expectedUseByFamily = {
+      detail: 'detail',
+      focus_stack: 'focus_stack',
+      hdr_merge: 'hdr_merge',
+      panorama_stitch: 'panorama_stitch',
+      super_resolution: 'super_resolution',
+    } as const;
+    if (!entry.expectedUse.includes(expectedUseByFamily[entry.featureFamily])) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Private RAW evidence expectedUse must include its feature family.',
+        path: ['expectedUse'],
+      });
+    }
+
     if (entry.status === 'private_asset_available' && entry.fileSha256 === undefined) {
       context.addIssue({
         code: 'custom',
@@ -121,6 +164,18 @@ export const privateRawEvidenceLedgerSchema = z
         message: 'Private RAW evidence IDs must be unique.',
         path: ['entries'],
       });
+    }
+
+    const requiredFamilies = ['detail', 'focus_stack', 'hdr_merge', 'panorama_stitch', 'super_resolution'] as const;
+    const featureFamilies = new Set(ledger.entries.map((entry) => entry.featureFamily));
+    for (const featureFamily of requiredFamilies) {
+      if (!featureFamilies.has(featureFamily)) {
+        context.addIssue({
+          code: 'custom',
+          message: `Private RAW evidence ledger requires a ${featureFamily} slot.`,
+          path: ['entries'],
+        });
+      }
     }
   });
 
