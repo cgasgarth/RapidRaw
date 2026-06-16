@@ -125,6 +125,7 @@ const backendSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8
 
 for (const marker of [
   'NegativeLabWorkflowStage',
+  'buildNegativeLabFrameHealthReport',
   'workflowStages',
   'renderWorkflowRail',
   'handleAutoBaseFog',

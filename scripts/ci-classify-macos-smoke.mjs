@@ -103,6 +103,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:sr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario sr-ui'])],
   ['check:negative-lab-fixtures', new Set(['bun scripts/check-negative-lab-fixtures.mjs'])],
   ['check:negative-lab-fixtures:update', new Set(['bun scripts/check-negative-lab-fixtures.mjs --update'])],
+  ['check:negative-lab-frame-health', new Set(['bun scripts/check-negative-lab-frame-health-report.mjs'])],
   ['check:negative-lab-ui-presets', new Set(['bun scripts/check-negative-lab-ui-presets.mjs'])],
   ['check:private-raw-evidence', new Set(['bun scripts/check-private-raw-evidence-ledger.mjs'])],
   [
@@ -571,6 +572,17 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -125,6 +125,8 @@\n+    "check:negative-lab-fixtures": "bun scripts/check-negative-lab-fixtures.mjs",\n+    "check:negative-lab-fixtures:update": "bun scripts/check-negative-lab-fixtures.mjs --update",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'negative lab frame health package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -125,6 +125,7 @@\n+    "check:negative-lab-frame-health": "bun scripts/check-negative-lab-frame-health-report.mjs",',
       },
     ],
     SMOKE_MODES.NONE,
