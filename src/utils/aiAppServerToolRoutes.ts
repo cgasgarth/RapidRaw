@@ -50,9 +50,11 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
       toolCapability: 'inpaint',
     },
     {
-      deferredIssue: '#1276',
-      reason: 'Mask-definition generative inpaint shares the legacy connector path until app-server plan wiring lands.',
-      status: 'deferred',
+      appServerToolName: 'ai.enhancement.apply_command',
+      commandSchemaName: 'AiEnhancementCommandEnvelopeV1',
+      reason:
+        'Mask-definition generative inpaint mutates the edit graph and maps to the typed enhancement apply tool; dry-run parity remains tracked separately.',
+      status: 'mapped',
       tauriInvoke: 'invoke_generative_replace_with_mask_def',
       toolCapability: 'inpaint',
     },
