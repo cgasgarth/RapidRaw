@@ -157,7 +157,13 @@ const validateToolCall = (validation, source, failures) => {
 };
 
 const validateReplayFixture = (fixture, source, failures) => {
+  let sawInpaintEnhancementCommand = false;
+
   for (const step of fixture.steps) {
+    if (step.inputSchemaName === 'AiEnhancementCommandEnvelopeV1' && step.input?.parameters?.capability === 'inpaint') {
+      sawInpaintEnhancementCommand = true;
+    }
+
     if (step.mutates && step.approval.state !== 'approved') {
       pushFailure(failures, source, `${step.stepId} mutates without approved approval state`);
     }
@@ -173,6 +179,10 @@ const validateReplayFixture = (fixture, source, failures) => {
         `${step.stepId} is non-mutating with apply approval ${step.approval.approvalClass}`,
       );
     }
+  }
+
+  if (source.endsWith('ai-enhancement-agent-replay-fixture-v1.json') && !sawInpaintEnhancementCommand) {
+    pushFailure(failures, source, 'AI enhancement replay fixture must cover inpaint capability.');
   }
 };
 

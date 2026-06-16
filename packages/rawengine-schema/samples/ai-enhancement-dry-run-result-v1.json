@@ -1,27 +1,27 @@
 {
-  "commandId": "command_ai_denoise_dry_run_sample",
+  "commandId": "command_ai_inpaint_dry_run_sample",
   "commandType": "ai.enhancement.dryRun",
-  "correlationId": "corr_ai_denoise_sample",
-  "dryRunPlanHash": "sha256:sample-ai-denoise-plan",
-  "dryRunPlanId": "dryrun_ai_denoise_001",
+  "correlationId": "corr_ai_inpaint_sample",
+  "dryRunPlanHash": "sha256:sample-ai-inpaint-plan",
+  "dryRunPlanId": "dryrun_ai_inpaint_001",
   "enhancementArtifacts": [
     {
-      "artifactId": "artifact_ai_denoise_preview_patch",
-      "contentHash": "sha256:sample-ai-denoise-preview-patch",
+      "artifactId": "artifact_ai_inpaint_preview_patch",
+      "contentHash": "sha256:sample-ai-inpaint-preview-patch",
       "dimensions": {
         "height": 1080,
         "width": 1620
       },
-      "kind": "denoise_output",
+      "kind": "generated_patch",
       "storage": "temp_cache"
     }
   ],
-  "modelId": "local_raw_denoise",
+  "modelId": "local_raw_inpaint",
   "modelVersion": "2026.06",
   "previewArtifacts": [
     {
-      "artifactId": "artifact_ai_denoise_preview",
-      "contentHash": "sha256:sample-ai-denoise-preview",
+      "artifactId": "artifact_ai_inpaint_preview",
+      "contentHash": "sha256:sample-ai-inpaint-preview",
       "dimensions": {
         "height": 1080,
         "width": 1620

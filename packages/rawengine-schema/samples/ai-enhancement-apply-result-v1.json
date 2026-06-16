@@ -1,24 +1,24 @@
 {
   "appliedGraphRevision": "graph_rev_48",
-  "changedEditNodeIds": ["edit_node_ai_denoise_001"],
-  "commandId": "command_ai_denoise_apply_sample",
+  "changedEditNodeIds": ["edit_node_ai_inpaint_001"],
+  "commandId": "command_ai_inpaint_apply_sample",
   "commandType": "ai.enhancement.apply",
-  "correlationId": "corr_ai_denoise_sample",
-  "dryRunPlanHash": "sha256:sample-ai-denoise-plan",
-  "dryRunPlanId": "dryrun_ai_denoise_001",
+  "correlationId": "corr_ai_inpaint_sample",
+  "dryRunPlanHash": "sha256:sample-ai-inpaint-plan",
+  "dryRunPlanId": "dryrun_ai_inpaint_001",
   "outputArtifacts": [
     {
-      "artifactId": "artifact_ai_denoise_sidecar",
-      "contentHash": "sha256:sample-ai-denoise-sidecar",
+      "artifactId": "artifact_ai_inpaint_sidecar",
+      "contentHash": "sha256:sample-ai-inpaint-sidecar",
       "dimensions": {
         "height": 1080,
         "width": 1620
       },
-      "kind": "denoise_output",
+      "kind": "generated_patch",
       "storage": "sidecar_artifact"
     }
   ],
-  "provenanceEntryIds": ["prov_ai_denoise_001"],
+  "provenanceEntryIds": ["prov_ai_inpaint_001"],
   "schemaVersion": 1,
   "sourceGraphRevision": "graph_rev_44",
   "warnings": []
