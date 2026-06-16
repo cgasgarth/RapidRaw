@@ -532,6 +532,14 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 0', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-active-scan-1').click();
+  await page.getByTestId('negative-lab-frame-health-row-1').getByText('Active', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-frame-health-row-0').getByText('Queued', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-active-scan-0').click();
   await page.getByTestId('negative-lab-preset-inspector').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-preset-film-class').getByText('Color negative', { exact: true }).waitFor({
     timeout: 10_000,
