@@ -27,7 +27,6 @@ import {
   type NegativeBaseFogDensitometerReadout,
   type NegativeBaseFogEstimate,
   type NegativeLabBaseFogSampleRect,
-  type NegativeLabBuiltInUiPreset,
   type NegativeLabPresetParams,
 } from '../../schemas/negativeLabPresetCatalogSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
@@ -43,10 +42,13 @@ import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
 } from '../../utils/negativeLabPresetCatalog';
+import { buildNegativeLabProfileBrowserRows } from '../../utils/negativeLabProfileBrowserRows';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
+
+import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
 
 type NegativeParams = NegativeLabPresetParams;
 type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
@@ -84,6 +86,7 @@ const normalizeSampleRect = (rect: NegativeLabBaseFogSampleRect): NegativeLabBas
 const formatPercentValue = (value: number) => `${Math.round(value)}%`;
 const formatDensityValue = (value: number) => value.toFixed(3);
 const formatRgbValue = (value: number) => `${Math.round(value * 255)}`;
+const NEGATIVE_LAB_PROFILE_BROWSER_ROWS = buildNegativeLabProfileBrowserRows();
 const DENSITOMETER_CHANNEL_LABEL_KEYS: Record<
   NegativeBaseFogDensitometerReadout['dominantChannel'],
   | 'modals.negativeConversion.densitometerChannelRed'
@@ -257,33 +260,37 @@ export default function NegativeConversionModal({
       NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.find((preset) => preset.presetId === selectedPresetId) ?? null,
     [selectedPresetId],
   );
+  const selectedProfile = useMemo(
+    () => NEGATIVE_LAB_PROFILE_BROWSER_ROWS.find((profile) => profile.presetId === selectedPresetId) ?? null,
+    [selectedPresetId],
+  );
   const selectedProfileProvenanceHash = useMemo(() => {
-    if (selectedPreset === null) return null;
+    if (selectedProfile === null) return null;
 
     return `fnv1a32:${buildNegativeLabPlanHash(
       JSON.stringify({
-        claimLevel: selectedPreset.claimLevel,
-        claimPolicy: selectedPreset.claimPolicy,
-        displayName: selectedPreset.displayName,
-        doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],
-        evidenceFixtureIds: [],
-        measurementProfileId: selectedPreset.measurementProfileId,
-        params: selectedPreset.params,
-        presetId: selectedPreset.presetId,
-        profileStatus: selectedPreset.profileStatus,
-        runtimeStatus: selectedPreset.runtimeStatus,
-        sourceGenericPresetId: null,
+        claimLevel: selectedProfile.claimLevel,
+        claimPolicy: selectedProfile.claimPolicy,
+        displayName: selectedProfile.displayName,
+        doesNotProve: selectedProfile.doesNotProve,
+        evidenceFixtureCount: selectedProfile.evidenceFixtureCount,
+        measurementProfileId: selectedProfile.measurementProfileId,
+        params: selectedProfile.params,
+        presetId: selectedProfile.presetId,
+        profileStatus: selectedProfile.profileStatus,
+        runtimeStatus: selectedProfile.runtimeStatus,
+        sourceGenericPresetId: selectedProfile.sourceGenericPresetId,
       }),
     )}`;
-  }, [selectedPreset]);
+  }, [selectedProfile]);
   const selectedPresetFilmClass =
-    selectedPreset?.filmClass === 'black_and_white_silver' ? 'Black and white silver' : 'Color negative';
+    selectedProfile?.filmClass === 'black_and_white_silver' ? 'Black and white silver' : 'Color negative';
   const selectedPresetClaimLabel =
-    selectedPreset?.claimLevel === 'measured_profile'
+    selectedProfile?.claimLevel === 'measured_profile'
       ? t('modals.negativeConversion.presetClaimMeasured')
       : t('modals.negativeConversion.presetClaimGeneric');
   const selectedPresetRuntimeLabel =
-    selectedPreset?.runtimeStatus === 'runtime_parameter_applied'
+    selectedProfile?.runtimeStatus === 'runtime_parameter_applied'
       ? t('modals.negativeConversion.presetRuntimeApplied')
       : t('modals.negativeConversion.presetRuntimeCatalogOnly');
   const frameHealthReport = useMemo(
@@ -325,7 +332,7 @@ export default function NegativeConversionModal({
         label: t('modals.negativeConversion.workflowSetup'),
       },
       {
-        detail: selectedPreset?.displayName ?? t('modals.negativeConversion.workflowCustomPresetDetail'),
+        detail: selectedProfile?.displayName ?? t('modals.negativeConversion.workflowCustomPresetDetail'),
         id: 'preset',
         isComplete: true,
         label: t('modals.negativeConversion.workflowPreset'),
@@ -373,7 +380,7 @@ export default function NegativeConversionModal({
       pathsToConvert.length,
       previewUrl,
       saveOptions.outputFormat,
-      selectedPreset,
+      selectedProfile,
       t,
       targetPaths.length,
     ],
@@ -523,7 +530,9 @@ export default function NegativeConversionModal({
     void updatePreview(newParams);
   };
 
-  const handlePresetSelect = (preset: NegativeLabBuiltInUiPreset) => {
+  const handlePresetSelect = (preset: NegativeLabRuntimeProfileBrowserRow) => {
+    if (!preset.isSelectable) return;
+
     setSelectedPresetId(preset.presetId);
     setBaseFogConfidence(null);
     setBaseFogEstimate(null);
@@ -1032,7 +1041,7 @@ export default function NegativeConversionModal({
             {t('modals.negativeConversion.genericPresets')}
           </UiText>
           <div className="grid grid-cols-1 gap-2">
-            {NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.map((preset) => {
+            {NEGATIVE_LAB_PROFILE_BROWSER_ROWS.map((preset) => {
               const isSelected = selectedPresetId === preset.presetId;
 
               return (
@@ -1042,19 +1051,48 @@ export default function NegativeConversionModal({
                   onClick={() => {
                     handlePresetSelect(preset);
                   }}
+                  disabled={!preset.isSelectable}
+                  data-testid={`negative-lab-profile-row-${preset.presetId}`}
                   className={cx(
-                    'text-left rounded-md border p-3 transition-colors',
+                    'text-left rounded-md border p-3 transition-colors disabled:cursor-not-allowed disabled:opacity-55',
                     isSelected
                       ? 'border-accent bg-accent/10 text-text-primary'
                       : 'border-surface bg-bg-primary hover:bg-surface text-text-secondary',
                   )}
                 >
-                  <span className="block text-sm font-medium">{preset.displayName}</span>
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate text-sm font-medium">{preset.displayName}</span>
+                    {preset.profileStatus === 'fixture_measured' && (
+                      <span
+                        className="shrink-0 rounded border border-surface bg-bg-secondary px-2 py-0.5 text-[10px] text-text-tertiary"
+                        data-testid="negative-lab-profile-measured-badge"
+                      >
+                        {t('modals.negativeConversion.profileMeasuredBadge')}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-text-tertiary">
+                    <span data-testid="negative-lab-profile-runtime-status">
+                      {preset.runtimeStatus === 'runtime_parameter_applied'
+                        ? t('modals.negativeConversion.presetRuntimeApplied')
+                        : t('modals.negativeConversion.presetRuntimeCatalogOnly')}
+                    </span>
+                    <span data-testid="negative-lab-profile-evidence-count">
+                      {t('modals.negativeConversion.profileEvidenceCount', {
+                        fixtureCount: preset.evidenceFixtureCount,
+                      })}
+                    </span>
+                    {preset.disabledReason !== null && (
+                      <span data-testid="negative-lab-profile-disabled-reason">
+                        {t(`modals.negativeConversion.profileDisabledReasons.${preset.disabledReason}`)}
+                      </span>
+                    )}
+                  </span>
                 </button>
               );
             })}
           </div>
-          {selectedPreset !== null && (
+          {selectedProfile !== null && (
             <div
               className="mt-3 rounded-md border border-surface bg-bg-primary p-3"
               data-testid="negative-lab-preset-inspector"
@@ -1062,14 +1100,16 @@ export default function NegativeConversionModal({
               <div className="mb-2 flex items-start justify-between gap-3">
                 <div>
                   <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
-                    {selectedPreset.displayName}
+                    {selectedProfile.displayName}
                   </UiText>
                   <UiText
                     data-testid="negative-lab-preset-process"
                     variant={TextVariants.small}
                     className="text-text-tertiary"
                   >
-                    {selectedPreset.processHint} / {selectedPreset.stockFamilyDescriptor}
+                    {selectedPreset === null
+                      ? selectedProfile.processFamily
+                      : `${selectedPreset.processHint} / ${selectedPreset.stockFamilyDescriptor}`}
                   </UiText>
                 </div>
                 <span
@@ -1099,44 +1139,59 @@ export default function NegativeConversionModal({
               >
                 <span>{t('modals.negativeConversion.presetSpeedClass')}</span>
                 <span className="text-right text-text-secondary" data-testid="negative-lab-preset-speed-class">
-                  {selectedPreset.nominalSpeedClass}
+                  {selectedPreset?.nominalSpeedClass ?? t('modals.negativeConversion.profileMeasuredBadge')}
                 </span>
                 <span>{t('modals.negativeConversion.presetContrastCurve')}</span>
                 <span className="text-right text-text-secondary" data-testid="negative-lab-preset-contrast-curve">
-                  {selectedPreset.contrastCurveDescriptor}
+                  {selectedPreset?.contrastCurveDescriptor ??
+                    t('modals.negativeConversion.profileEvidenceCount', {
+                      fixtureCount: selectedProfile.evidenceFixtureCount,
+                    })}
                 </span>
                 <span>{t('modals.negativeConversion.presetGrainModel')}</span>
                 <span className="text-right text-text-secondary" data-testid="negative-lab-preset-grain-model">
-                  {selectedPreset.grainModelDescriptor}
+                  {selectedPreset?.grainModelDescriptor ??
+                    selectedProfile.measurementProfileId ??
+                    t('modals.negativeConversion.presetRuntimeCatalogOnly')}
                 </span>
               </div>
-              <UiText
-                data-testid="negative-lab-preset-intent"
-                variant={TextVariants.small}
-                className="text-text-secondary"
-              >
-                {selectedPreset.intent}
-              </UiText>
+              {selectedPreset !== null && (
+                <UiText
+                  data-testid="negative-lab-preset-intent"
+                  variant={TextVariants.small}
+                  className="text-text-secondary"
+                >
+                  {selectedPreset.intent}
+                </UiText>
+              )}
               <UiText
                 data-testid="negative-lab-preset-color-response"
                 variant={TextVariants.small}
                 className="mt-1 text-text-tertiary"
               >
-                {t('modals.negativeConversion.presetColorResponse')}: {selectedPreset.colorResponseNotes}
+                {t('modals.negativeConversion.presetColorResponse')}:{' '}
+                {selectedPreset?.colorResponseNotes ?? selectedProfile.provenanceSummary}
               </UiText>
               <UiText
                 data-testid="negative-lab-preset-claim-policy"
                 variant={TextVariants.small}
                 className="mt-2 text-text-tertiary"
               >
-                {selectedPreset.legalNote}
+                {selectedPreset?.legalNote ?? t('modals.negativeConversion.profileMeasuredClaimPolicy')}
               </UiText>
               <UiText
                 data-testid="negative-lab-preset-provenance"
                 variant={TextVariants.small}
                 className="mt-1 text-text-tertiary"
               >
-                {selectedPreset.provenanceSummary}
+                {selectedProfile.provenanceSummary}
+              </UiText>
+              <UiText
+                data-testid="negative-lab-profile-non-claims"
+                variant={TextVariants.small}
+                className="mt-1 text-text-tertiary"
+              >
+                {selectedProfile.doesNotProve.join(', ')}
               </UiText>
             </div>
           )}

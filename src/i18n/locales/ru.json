@@ -1372,6 +1372,13 @@
       "presetColorResponse": "Color response",
       "presetContrastCurve": "Contrast curve",
       "presetGrainModel": "Grain model",
+      "profileDisabledReasons": {
+        "catalog_only": "Catalog only",
+        "license_review_required": "License review required"
+      },
+      "profileEvidenceCount": "{{fixtureCount}} fixture(s)",
+      "profileMeasuredBadge": "Measured",
+      "profileMeasuredClaimPolicy": "Process-family measured profile; no named-stock or colorimetric-match claim.",
       "presetRuntimeApplied": "Runtime applied",
       "presetRuntimeCatalogOnly": "Catalog only",
       "presetSpeedClass": "Speed class",

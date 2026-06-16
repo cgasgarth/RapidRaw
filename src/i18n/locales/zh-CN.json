@@ -1601,6 +1601,13 @@
       "previewPending": "Preview pending",
       "previewReady": "Preview ready",
       "printGrade": "打印分级",
+      "profileDisabledReasons": {
+        "catalog_only": "Catalog only",
+        "license_review_required": "License review required"
+      },
+      "profileEvidenceCount": "{{fixtureCount}} fixture(s)",
+      "profileMeasuredBadge": "Measured",
+      "profileMeasuredClaimPolicy": "Process-family measured profile; no named-stock or colorimetric-match claim.",
       "queuedScans": "{{queuedCount}} queued",
       "readoutCopied": "Copied readout",
       "redWeight": "红色（青色）",
