@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 
 import { z } from 'zod';
 
+import { applyWeightedSharpnessFocusStackV1 } from '../packages/rawengine-schema/src/focusStackWeightedBlend.ts';
 import { parseFocusPreviewBlendReport } from '../src/schemas/focusPreviewBlendSchemas.ts';
 import { parseFocusSharpnessMapReport } from '../src/schemas/focusSharpnessMapSchemas.ts';
 
@@ -145,52 +146,34 @@ function sampleAligned(luma, sourceFrame, referenceFrame, x, y) {
   return luma[sourceY * sourceFrame.width + sourceX];
 }
 
-function cellForPixel(sharpnessFixture, x, y) {
-  const cellSize = sharpnessFixture.map.cellSize;
-  const cellX = Math.floor(x / cellSize) * cellSize;
-  const cellY = Math.floor(y / cellSize) * cellSize;
-  const cell = sharpnessFixture.map.cells.find((candidate) => candidate.x === cellX && candidate.y === cellY);
-  if (cell === undefined) fail(`${sharpnessFixture.fixtureId}: missing sharpness cell`, { x, y, cellX, cellY });
-  return cell;
-}
-
-function weightsForCell(cell) {
-  const rawWeights = cell.sourceScores.map((score) => ({
-    sourceIndex: score.sourceIndex,
-    weight: Math.max(score.relativeConfidence, cell.lowConfidence ? LOW_CONFIDENCE_WEIGHT_FLOOR : 0) ** WEIGHT_POWER,
-  }));
-  const total = rawWeights.reduce((sum, item) => sum + item.weight, 0);
-  return rawWeights.map((item) => ({
-    sourceIndex: item.sourceIndex,
-    weight: item.weight / Math.max(total, Number.EPSILON),
-  }));
-}
-
 function blendFixture(fixture, sharpnessFixture) {
   const referenceFrame = fixture.sourceFrames.find((sourceFrame) => sourceFrame.sourceIndex === 0);
   if (referenceFrame === undefined) fail(`${fixture.fixtureId}: missing reference source 0`);
   const sourceLumas = new Map(
     fixture.sourceFrames.map((sourceFrame) => [sourceFrame.sourceIndex, createLumaFrame(fixture, sourceFrame)]),
   );
-  const blended = new Float32Array(referenceFrame.width * referenceFrame.height);
-
-  for (let y = 0; y < referenceFrame.height; y += 1) {
-    for (let x = 0; x < referenceFrame.width; x += 1) {
-      const cell = cellForPixel(sharpnessFixture, x, y);
-      let value = 0;
-      for (const { sourceIndex, weight } of weightsForCell(cell)) {
-        const sourceFrame = fixture.sourceFrames.find((candidate) => candidate.sourceIndex === sourceIndex);
-        const sourceLuma = sourceLumas.get(sourceIndex);
-        if (sourceFrame === undefined || sourceLuma === undefined) {
-          fail(`${fixture.fixtureId}: missing source frame for preview blend`, { sourceIndex });
-        }
-        value += (sampleAligned(sourceLuma, sourceFrame, referenceFrame, x, y) ?? 0) * weight;
+  const blendResult = applyWeightedSharpnessFocusStackV1({
+    cells: sharpnessFixture.map.cells,
+    frames: fixture.sourceFrames.map((sourceFrame) => {
+      const pixels = sourceLumas.get(sourceFrame.sourceIndex);
+      if (pixels === undefined) {
+        fail(`${fixture.fixtureId}: missing source frame for preview blend`, { sourceIndex: sourceFrame.sourceIndex });
       }
-      blended[y * referenceFrame.width + x] = value;
-    }
-  }
+      return {
+        height: sourceFrame.height,
+        pixels,
+        sourceIndex: sourceFrame.sourceIndex,
+        translationX: sourceFrame.expectedTranslationX,
+        translationY: sourceFrame.expectedTranslationY,
+        width: sourceFrame.width,
+      };
+    }),
+    lowConfidenceWeightFloor: LOW_CONFIDENCE_WEIGHT_FLOOR,
+    referenceSourceIndex: 0,
+    weightPower: WEIGHT_POWER,
+  });
 
-  return { blended, referenceFrame, sourceLumas };
+  return { blended: blendResult.outputPixels, referenceFrame, sourceLumas };
 }
 
 function meanAbsoluteErrorForRegion(blended, sourceLumas, fixture, referenceFrame, region) {
