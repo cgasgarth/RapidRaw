@@ -1,6 +1,8 @@
 use crate::file_management::{parse_virtual_path, read_file_mapped};
 use crate::image_loader::load_base_image_from_bytes;
+use crate::image_processing::RawEngineArtifacts;
 use base64::{Engine as _, engine::general_purpose};
+use chrono::Utc;
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, Rgb32FImage};
 use rayon::prelude::*;
@@ -12,6 +14,7 @@ use std::hash::{Hash, Hasher};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
+use uuid::Uuid;
 
 use crate::AppState;
 use crate::image_processing::downscale_f32_image;
@@ -206,6 +209,104 @@ fn build_negative_output_path(
     };
     let filename = format!("{}_{}.{}", stem, save_options.suffix, extension);
     parent.join(&filename)
+}
+
+fn negative_lab_output_sidecar_path(output_path: &Path) -> PathBuf {
+    output_path.with_file_name(format!(
+        "{}.rrdata",
+        output_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+    ))
+}
+
+fn hash_negative_lab_output_file(output_path: &Path) -> Result<String, String> {
+    let bytes = fs::read(output_path)
+        .map_err(|e| format!("Failed to read Negative Lab output for sidecar hash: {}", e))?;
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in bytes {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    Ok(format!("fnv1a64:{hash:016x}"))
+}
+
+fn write_negative_lab_output_sidecar(
+    output_path: &Path,
+    source_path: &Path,
+    params: &NegativeConversionParams,
+    save_options: &NegativeConversionSaveOptions,
+    output_width: u32,
+    output_height: u32,
+) -> Result<(), String> {
+    let sidecar_path = negative_lab_output_sidecar_path(output_path);
+    let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+    let artifact_id = format!("artifact_negative_lab_{}", Uuid::new_v4().simple());
+    let output_artifact_id = format!("{}_output", artifact_id);
+    let content_hash = hash_negative_lab_output_file(output_path)?;
+    let output_format = match save_options.output_format {
+        NegativeConversionOutputFormat::JpegProof => "jpeg_proof",
+        NegativeConversionOutputFormat::Tiff16 => "tiff16",
+    };
+
+    let artifact = serde_json::json!({
+        "artifactId": artifact_id,
+        "createdAt": Utc::now().to_rfc3339(),
+        "conversion": {
+            "acceptedDryRunPlanHash": save_options.accepted_dry_run_plan_hash,
+            "acceptedDryRunPlanId": save_options.accepted_dry_run_plan_id,
+            "outputFormat": output_format,
+            "params": params,
+            "profileProvenanceHash": save_options.profile_provenance_hash,
+        },
+        "operationId": "negative_lab.convert",
+        "operationVersion": 1,
+        "outputArtifacts": [{
+            "artifactId": output_artifact_id,
+            "contentHash": content_hash,
+            "dimensions": {
+                "height": output_height,
+                "width": output_width,
+            },
+            "kind": "negative_lab_positive",
+            "storage": "sidecar_artifact",
+        }],
+        "provenance": {
+            "commandId": "command_negative_lab_convert",
+            "profileProvenanceHash": save_options.profile_provenance_hash,
+            "runtimeStatus": "rendered",
+        },
+        "schemaVersion": 1,
+        "sourceImageRefs": [{
+            "imagePath": source_path.to_string_lossy(),
+        }],
+        "warnings": [],
+    });
+
+    let artifacts = sidecar
+        .raw_engine_artifacts
+        .get_or_insert_with(|| RawEngineArtifacts {
+            schema_version: 1,
+            ai_provenance_entries: Vec::new(),
+            hdr_merge_artifacts: Vec::new(),
+            negative_lab_artifacts: Vec::new(),
+            panorama_artifacts: Vec::new(),
+            stale_artifact_ids: Vec::new(),
+        });
+    artifacts.schema_version = 1;
+    artifacts.negative_lab_artifacts.push(artifact);
+    artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
+
+    let json = serde_json::to_string_pretty(&sidecar)
+        .map_err(|e| format!("Failed to serialize Negative Lab sidecar: {}", e))?;
+    fs::write(&sidecar_path, json).map_err(|e| {
+        format!(
+            "Failed to write Negative Lab sidecar {}: {}",
+            sidecar_path.display(),
+            e
+        )
+    })
 }
 
 impl NegativeConversionParams {
@@ -649,6 +750,7 @@ pub async fn convert_negatives(
 
             let (source_path, _) = parse_virtual_path(path_str);
             let real_path = source_path.to_string_lossy().to_string();
+            let sanitized_params = params.sanitized();
 
             let settings = load_settings(app_handle.clone()).unwrap_or_default();
 
@@ -673,10 +775,10 @@ pub async fn convert_negatives(
                 &log_pixels,
                 ref_w as usize,
                 ref_h as usize,
-                params.sanitized().base_fog_sample,
+                sanitized_params.base_fog_sample,
             );
 
-            let processed = run_pipeline(&img, &params, Some(bounds));
+            let processed = run_pipeline(&img, &sanitized_params, Some(bounds));
 
             let out_path = build_negative_output_path(&real_path, &save_options);
             let filename = out_path
@@ -707,6 +809,14 @@ pub async fn convert_negatives(
             }
 
             let _ = crate::exif_processing::write_rrexif_sidecar(&real_path, &out_path);
+            write_negative_lab_output_sidecar(
+                &out_path,
+                Path::new(&real_path),
+                &sanitized_params,
+                &save_options,
+                processed.width(),
+                processed.height(),
+            )?;
             results.push(out_path.to_string_lossy().to_string());
         }
 
@@ -904,6 +1014,76 @@ mod tests {
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         assert!(mismatched_plan.validate_accepted_batch_plan(2).is_err());
+    }
+
+    #[test]
+    fn negative_lab_output_sidecar_records_profile_provenance() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let source_path = temp_dir.path().join("frame_001.tif");
+        let output_path = temp_dir.path().join("frame_001_Positive.tiff");
+        fs::write(&source_path, b"negative-source").expect("source should be written");
+        fs::write(&output_path, b"positive-output").expect("output should be written");
+        let params = NegativeConversionParams {
+            red_weight: 1.03,
+            green_weight: 0.99,
+            blue_weight: 1.02,
+            base_fog_strength: 1.0,
+            base_fog_sample: None,
+            exposure: 0.1,
+            contrast: 1.08,
+        };
+        let save_options = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
+            accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
+            profile_provenance_hash: Some("fnv1a32:aaaaaaaa".to_string()),
+            output_format: NegativeConversionOutputFormat::Tiff16,
+            suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
+        };
+
+        write_negative_lab_output_sidecar(
+            &output_path,
+            &source_path,
+            &params,
+            &save_options,
+            12,
+            8,
+        )
+        .expect("sidecar should be written");
+
+        let sidecar_path = negative_lab_output_sidecar_path(&output_path);
+        let sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+        let artifact = sidecar
+            .raw_engine_artifacts
+            .expect("rawEngineArtifacts should be present")
+            .negative_lab_artifacts
+            .pop()
+            .expect("Negative Lab artifact should be present");
+
+        assert_eq!(artifact["operationId"], "negative_lab.convert");
+        assert_eq!(
+            artifact["conversion"]["profileProvenanceHash"],
+            "fnv1a32:aaaaaaaa"
+        );
+        assert_eq!(
+            artifact["conversion"]["acceptedDryRunPlanId"],
+            "negative_lab_batch_plan_2f4a91bc"
+        );
+        assert_eq!(artifact["outputArtifacts"][0]["dimensions"]["width"], 12);
+        assert_eq!(artifact["outputArtifacts"][0]["dimensions"]["height"], 8);
+        assert_eq!(
+            artifact["outputArtifacts"][0]["kind"],
+            "negative_lab_positive"
+        );
+        assert_eq!(
+            artifact["outputArtifacts"][0]["storage"],
+            "sidecar_artifact"
+        );
+        assert!(
+            artifact["outputArtifacts"][0]["contentHash"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("fnv1a64:")
+        );
     }
 
     #[test]

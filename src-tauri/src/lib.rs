@@ -1876,6 +1876,7 @@ fn upsert_hdr_artifact_metadata(
             schema_version: 1,
             ai_provenance_entries: Vec::new(),
             hdr_merge_artifacts: Vec::new(),
+            negative_lab_artifacts: Vec::new(),
             panorama_artifacts: Vec::new(),
             stale_artifact_ids: Vec::new(),
         });
