@@ -15,6 +15,7 @@ const GITHUB_FILE_SCHEMA = z
 
 const CONTRACT_CHECKS = [
   'check:generated-types',
+  'check:agent-approval-boundaries',
   'check:agent-rollback-proof',
   'check:agent-proof-gallery',
   'check:ui-api-coverage',
@@ -57,6 +58,7 @@ const RELEVANT_FILES = new Set([
 const PACKAGE_SCRIPT_NAMES = new Set([
   'check:actions',
   'check:ai-app-server-routes',
+  'check:agent-approval-boundaries',
   'check:agent-proof-gallery',
   'check:agent-rollback-proof',
   'check:computational-merge-app-server-routes',
