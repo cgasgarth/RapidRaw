@@ -133,6 +133,10 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['schema:samples:update', new Set(['bun packages/rawengine-schema/scripts/check-sample-artifacts.mjs --update'])],
   ['schema:contract-gate', new Set(['bun scripts/ci-schema-contract-gate.mjs'])],
   ['schema:contract-gate:self-test', new Set(['bun scripts/ci-schema-contract-gate.mjs --self-test'])],
+  [
+    'schema:sr-app-server',
+    new Set(['bun packages/rawengine-schema/scripts/check-super-resolution-app-server-command-bus.ts']),
+  ],
 ]);
 
 function hasExtension(path, extensions) {
