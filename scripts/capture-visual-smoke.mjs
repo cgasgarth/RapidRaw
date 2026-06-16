@@ -366,6 +366,15 @@ async function prepareScenario(page, mode) {
   }
 
   if (mode === 'film-look-browser') {
+    await page.getByTestId('film-look-rendered-proof').getByText('Rendered parity proof', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('film-look-rendered-proof').getByText('Mono Silver', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('film-look-rendered-proof').getByText('7e4b525fd7be754b', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     await page.getByLabel('Warm Print', { exact: true }).click();
     await page.getByTestId('film-look-adjustment-proof').getByText('Temp 5').waitFor({ timeout: 10_000 });
     await page.getByRole('slider', { name: 'Strength' }).fill('100');

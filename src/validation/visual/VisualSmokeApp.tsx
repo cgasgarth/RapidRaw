@@ -36,6 +36,27 @@ const adjustmentGroups = [
   { label: 'Film Grain', value: '18', width: '46%' },
 ] as const;
 
+const filmLookParityProofCases = [
+  {
+    displayName: 'Warm Print',
+    maxDelta: '0',
+    previewHash: 'ce1b5b9dfc974109',
+  },
+  {
+    displayName: 'Mono Silver',
+    maxDelta: '0',
+    previewHash: '7e4b525fd7be754b',
+  },
+  {
+    displayName: 'Punch Color',
+    maxDelta: '0',
+    previewHash: '942aa1199eb4a1d3',
+  },
+] as const;
+const FILM_LOOK_PARITY_TITLE = 'Rendered parity proof';
+const FILM_LOOK_PARITY_FIXTURE_LABEL = 'Synthetic fixture';
+const formatFilmLookParityDelta = (maxDelta: string) => `Delta ${maxDelta}`;
+
 const copy = {
   brand: 'RapidRAW',
   harness: 'Visual smoke harness',
@@ -354,6 +375,24 @@ function FilmLookVisualSmoke() {
               <span>{formatSmokeMetric(filmSmokeMetricLabels.contrast, adjustments.contrast)}</span>
               <span>{formatSmokeMetric(filmSmokeMetricLabels.highlights, adjustments.highlights)}</span>
               <span>{formatSmokeMetric(filmSmokeMetricLabels.grain, adjustments.grainAmount)}</span>
+            </div>
+            <div
+              className="rounded-md border border-white/10 bg-black/45 p-3 text-xs text-[#cdd4cc]"
+              data-testid="film-look-rendered-proof"
+            >
+              <div className="mb-2 flex items-center justify-between gap-3 text-[#f3f4f1]">
+                <span className="font-medium">{FILM_LOOK_PARITY_TITLE}</span>
+                <span>{FILM_LOOK_PARITY_FIXTURE_LABEL}</span>
+              </div>
+              <div className="grid gap-1">
+                {filmLookParityProofCases.map((proofCase) => (
+                  <div className="grid grid-cols-[1fr_auto_auto] gap-2" key={proofCase.displayName}>
+                    <span>{proofCase.displayName}</span>
+                    <span>{formatFilmLookParityDelta(proofCase.maxDelta)}</span>
+                    <span>{proofCase.previewHash}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
