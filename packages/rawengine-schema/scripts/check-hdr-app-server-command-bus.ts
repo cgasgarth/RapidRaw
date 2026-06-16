@@ -35,7 +35,7 @@ const HdrAppServerCommandBusResultSchema = z.discriminatedUnion('kind', [
 ]);
 
 class HdrAppServerCommandBus {
-  readonly #acceptedDryRunPlanIds = new Set<string>();
+  readonly #acceptedDryRunPlanHashesById = new Map<string, string>();
   readonly #toolsByName = new Map<string, ComputationalMergeAppServerToolDefinitionV1>();
 
   constructor(manifestValue: unknown) {
@@ -145,7 +145,10 @@ class HdrAppServerCommandBus {
       warnings: ['HDR preview is tone mapped; final scene-linear output remains an apply step.'],
     });
 
-    this.#acceptedDryRunPlanIds.add(dryRunResult.mergePlan.planId);
+    this.#acceptedDryRunPlanHashesById.set(
+      dryRunResult.mergePlan.planId,
+      sampleHdrMergeArtifactV1.dryRun.acceptedDryRunPlanHash,
+    );
     return HdrAppServerCommandBusResultSchema.parse({
       dryRunResult,
       kind: 'dry_run',
@@ -163,8 +166,12 @@ class HdrAppServerCommandBus {
     }
 
     const acceptedPlanId = command.parameters.acceptedDryRunPlanId;
-    if (acceptedPlanId === undefined || !this.#acceptedDryRunPlanIds.has(acceptedPlanId)) {
+    const acceptedPlanHash = command.parameters.acceptedDryRunPlanHash;
+    if (acceptedPlanId === undefined || !this.#acceptedDryRunPlanHashesById.has(acceptedPlanId)) {
       throw new Error(`${tool.toolName} rejected unaccepted dry-run plan ${String(acceptedPlanId)}.`);
+    }
+    if (acceptedPlanHash !== this.#acceptedDryRunPlanHashesById.get(acceptedPlanId)) {
+      throw new Error(`${tool.toolName} rejected mismatched dry-run plan hash ${String(acceptedPlanHash)}.`);
     }
 
     const mutationResult = computationalMergeMutationResultV1Schema.parse({
@@ -243,6 +250,16 @@ expectThrows('HDR apply tool before accepted dry-run', () =>
     'computationalmerge.hdr.apply_command',
     acceptedApplyCommand,
   ),
+);
+
+expectThrows('HDR apply tool with mismatched dry-run plan hash', () =>
+  commandBus.execute('computationalmerge.hdr.apply_command', {
+    ...acceptedApplyCommand,
+    parameters: {
+      ...acceptedApplyCommand.parameters,
+      acceptedDryRunPlanHash: 'sha256:mismatched-hdr-plan',
+    },
+  }),
 );
 
 console.log('HDR app-server command bus ok');
