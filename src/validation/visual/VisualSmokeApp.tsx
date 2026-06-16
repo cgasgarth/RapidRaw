@@ -131,6 +131,13 @@ function HdrVisualSmoke() {
       data-visual-smoke-mode="hdr-ui"
     >
       <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="hdr-modal" />
+      <div
+        className="sr-only"
+        data-deghosting={hdrSettings.deghosting}
+        data-max-preview-dimension-px={hdrSettings.maxPreviewDimensionPx}
+        data-testid="hdr-ui-settings-proof"
+        data-tone-map-preview={hdrSettings.toneMapPreview}
+      />
       <HdrModal
         error={null}
         finalImageBase64={null}

@@ -126,6 +126,7 @@
     "check:hdr-merge-ui": "bun scripts/check-hdr-merge-ui.mjs",
     "check:hdr-ui-api": "bun scripts/check-hdr-ui-api.mjs",
     "check:hdr-performance-smoke": "bun scripts/check-hdr-performance-smoke.mjs",
+    "check:hdr-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario hdr-ui",
     "check:focus-fixtures": "bun scripts/check-focus-synthetic-fixtures.mjs",
     "check:focus-fixtures:update": "bun scripts/check-focus-synthetic-fixtures.mjs --update",
     "check:focus-alignment-smoke": "bun scripts/check-focus-translation-alignment-smoke.mjs",
