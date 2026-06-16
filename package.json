@@ -157,6 +157,7 @@
     "check:sr-runtime-plan-smoke": "bun scripts/check-super-resolution-runtime-plan-smoke.mjs",
     "check:sr-synthetic-smoke": "bun scripts/check-super-resolution-synthetic-smoke.mjs",
     "check:sr-ui-api": "bun scripts/check-sr-ui-api.mjs",
+    "check:sr-ui-runtime-bridge": "bun scripts/check-sr-ui-runtime-bridge.mjs",
     "check:sr-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario sr-ui",
     "check:negative-lab-base-fog": "bun scripts/check-negative-lab-base-fog.mjs",
     "check:negative-lab-fixtures": "bun scripts/check-negative-lab-fixtures.mjs",
