@@ -17,6 +17,7 @@ import {
 } from '../../schemas/negativeLabPresetCatalogSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildNegativeLabFrameHealthReport, getNegativeLabScanLabel } from '../../utils/negativeLabFrameHealth';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
@@ -30,7 +31,6 @@ type NegativeParams = NegativeLabPresetParams;
 type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
 type NegativeConversionScope = 'active' | 'all';
 type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
-type FrameHealthTone = 'active' | 'queued' | 'skipped';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
@@ -38,10 +38,6 @@ const DEFAULT_SAVE_OPTIONS = {
   suffix: 'Positive',
 };
 const getInitialIncludedPaths = (paths: string[]) => new Set(paths);
-const getNegativeLabScanLabel = (path: string, index: number) => {
-  const pathParts = path.split(/[\\/]/u).filter(Boolean);
-  return pathParts.at(-1) ?? String(index + 1);
-};
 const BASE_FOG_SAMPLE_PRESETS = [
   {
     labelKey: 'modals.negativeConversion.sampleLeftEdge',
@@ -60,13 +56,6 @@ interface NegativeLabWorkflowStage {
   id: NegativeLabWorkflowStageId;
   isComplete: boolean;
   label: string;
-}
-
-interface NegativeLabFrameHealthRow {
-  baseLabel: string;
-  label: string;
-  statusLabel: string;
-  tone: FrameHealthTone;
 }
 
 interface NegativeConversionModalProps {
@@ -121,32 +110,16 @@ export default function NegativeConversionModal({
   );
   const selectedPresetFilmClass =
     selectedPreset?.filmClass === 'black_and_white_silver' ? 'Black and white silver' : 'Color negative';
-  const frameHealthRows = useMemo<NegativeLabFrameHealthRow[]>(
+  const frameHealthReport = useMemo(
     () =>
-      targetPaths.map((path, index) => {
-        const isActiveScan = index === effectiveActivePathIndex;
-        const isIncludedScan = includedPathSet.has(path);
-        const tone: FrameHealthTone = !isIncludedScan ? 'skipped' : isActiveScan ? 'active' : 'queued';
-        const statusLabel = t(
-          tone === 'skipped'
-            ? 'modals.negativeConversion.frameHealthSkipped'
-            : tone === 'active'
-              ? 'modals.negativeConversion.frameHealthActive'
-              : 'modals.negativeConversion.frameHealthQueued',
-        );
-        const baseLabel =
-          isActiveScan && baseFogConfidence !== null
-            ? t('modals.negativeConversion.baseReady', { confidence: Math.round(baseFogConfidence * 100) })
-            : t('modals.negativeConversion.basePending');
-
-        return {
-          baseLabel,
-          label: getNegativeLabScanLabel(path, index),
-          statusLabel,
-          tone,
-        };
+      buildNegativeLabFrameHealthReport({
+        activePathIndex: effectiveActivePathIndex,
+        baseFogConfidence,
+        includedPathSet,
+        previewReady: previewUrl !== null,
+        targetPaths,
       }),
-    [baseFogConfidence, effectiveActivePathIndex, includedPathSet, t, targetPaths],
+    [baseFogConfidence, effectiveActivePathIndex, includedPathSet, previewUrl, targetPaths],
   );
 
   const workflowStages = useMemo<NegativeLabWorkflowStage[]>(
@@ -505,30 +478,41 @@ export default function NegativeConversionModal({
           {t('modals.negativeConversion.includedScans', { includedCount: includedPathSet.size })}
         </span>
       </div>
-      {frameHealthRows.length > 0 && (
+      {frameHealthReport.frames.length > 0 && (
         <div className="space-y-1" data-testid="negative-lab-frame-health-grid">
           <UiText variant={TextVariants.small} className="text-text-tertiary">
             {t('modals.negativeConversion.frameHealth')}
           </UiText>
           <div className="grid gap-1">
-            {frameHealthRows.map((row, index) => (
+            {frameHealthReport.frames.map((row, index) => (
               <div
                 className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+                data-warning-count={row.warningCodes.length}
                 data-testid={`negative-lab-frame-health-row-${index}`}
-                key={`${row.label}-${index}`}
+                key={row.frameId}
               >
-                <span className="truncate text-text-secondary">{row.label}</span>
+                <span className="truncate text-text-secondary">{row.scanLabel}</span>
                 <span
                   className={cx(
                     'rounded px-1.5 py-0.5',
-                    row.tone === 'active' && 'bg-accent/15 text-text-primary',
-                    row.tone === 'queued' && 'bg-surface text-text-secondary',
-                    row.tone === 'skipped' && 'bg-bg-primary text-text-tertiary',
+                    row.healthStatus === 'active' && 'bg-accent/15 text-text-primary',
+                    row.healthStatus === 'queued' && 'bg-surface text-text-secondary',
+                    row.healthStatus === 'skipped' && 'bg-bg-primary text-text-tertiary',
                   )}
                 >
-                  {row.statusLabel}
+                  {t(
+                    row.healthStatus === 'skipped'
+                      ? 'modals.negativeConversion.frameHealthSkipped'
+                      : row.healthStatus === 'active'
+                        ? 'modals.negativeConversion.frameHealthActive'
+                        : 'modals.negativeConversion.frameHealthQueued',
+                  )}
                 </span>
-                <span className="text-text-tertiary">{row.baseLabel}</span>
+                <span className="text-text-tertiary">
+                  {row.baseStatus === 'estimated' && row.baseConfidence !== null
+                    ? t('modals.negativeConversion.baseReady', { confidence: Math.round(row.baseConfidence * 100) })
+                    : t('modals.negativeConversion.basePending')}
+                </span>
               </div>
             ))}
           </div>
