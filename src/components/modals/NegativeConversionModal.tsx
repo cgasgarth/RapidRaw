@@ -10,6 +10,7 @@ import { useTranslation, Trans } from 'react-i18next';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import {
   negativeBaseFogEstimateSchema,
+  negativeBaseFogSampleReadoutSchema,
   negativeConversionSavedPathsSchema,
   type NegativeLabBaseFogSampleRect,
   type NegativeLabBuiltInUiPreset,
@@ -38,6 +39,7 @@ const DEFAULT_SAVE_OPTIONS = {
   suffix: 'Positive',
 };
 const getInitialIncludedPaths = (paths: string[]) => new Set(paths);
+const formatPercentValue = (value: number) => `${Math.round(value)}%`;
 const BASE_FOG_SAMPLE_PRESETS = [
   {
     labelKey: 'modals.negativeConversion.sampleLeftEdge',
@@ -102,6 +104,20 @@ export default function NegativeConversionModal({
     if (conversionScope === 'active' && selectedImagePath !== null) return [selectedImagePath];
     return targetPaths.filter((path) => includedPathSet.has(path));
   }, [conversionScope, includedPathSet, selectedImagePath, targetPaths]);
+  const baseFogSampleReadout = useMemo(() => {
+    if (params.base_fog_sample === null || activeBaseFogSampleLabel === null) return null;
+
+    const sampleRect = params.base_fog_sample;
+    return negativeBaseFogSampleReadoutSchema.parse({
+      areaPercent: sampleRect.width * sampleRect.height * 10_000,
+      confidencePercent: baseFogConfidence === null ? null : Math.round(baseFogConfidence * 100),
+      heightPercent: sampleRect.height * 100,
+      label: activeBaseFogSampleLabel,
+      widthPercent: sampleRect.width * 100,
+      xPercent: sampleRect.x * 100,
+      yPercent: sampleRect.y * 100,
+    });
+  }, [activeBaseFogSampleLabel, baseFogConfidence, params.base_fog_sample]);
 
   const selectedPreset = useMemo(
     () =>
@@ -802,6 +818,31 @@ export default function NegativeConversionModal({
                   confidence: Math.round(baseFogConfidence * 100),
                 })}
               </UiText>
+            )}
+            {baseFogSampleReadout !== null && (
+              <div
+                className="grid grid-cols-2 gap-1 rounded-md border border-surface bg-bg-primary p-2 text-xs text-text-tertiary"
+                data-testid="negative-lab-base-sample-readout"
+              >
+                <span className="truncate text-text-secondary">{baseFogSampleReadout.label}</span>
+                <span className="text-right" data-testid="negative-lab-base-sample-area">
+                  {t('modals.negativeConversion.baseSampleArea', {
+                    area: formatPercentValue(baseFogSampleReadout.areaPercent),
+                  })}
+                </span>
+                <span data-testid="negative-lab-base-sample-origin">
+                  {t('modals.negativeConversion.baseSampleOrigin', {
+                    x: formatPercentValue(baseFogSampleReadout.xPercent),
+                    y: formatPercentValue(baseFogSampleReadout.yPercent),
+                  })}
+                </span>
+                <span className="text-right" data-testid="negative-lab-base-sample-size">
+                  {t('modals.negativeConversion.baseSampleSize', {
+                    height: formatPercentValue(baseFogSampleReadout.heightPercent),
+                    width: formatPercentValue(baseFogSampleReadout.widthPercent),
+                  })}
+                </span>
+              </div>
             )}
             <Slider
               label={t('modals.negativeConversion.redWeight')}
