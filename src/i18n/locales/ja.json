@@ -1285,6 +1285,7 @@
       "zoomOutTooltip": "縮小"
     },
     "negativeConversion": {
+      "acceptBatchPlan": "Accept batch plan",
       "blueWeight": "ブルー (イエロー)",
       "autoBaseFog": "Auto base",
       "autoBaseFogTooltip": "Estimate film base and balance color weights",
@@ -1342,6 +1343,7 @@
       "baseSampleOrigin": "X {{x}} / Y {{y}}",
       "baseSampleSize": "{{width}} x {{height}}",
       "batchReadiness": "Batch readiness",
+      "batchPlanAccepted": "Batch plan accepted",
       "batchPlanApplyCount": "Apply {{applyCount}}",
       "batchPlanSkippedCount": "Skip {{skippedCount}}",
       "batchPlanCopied": "Copied plan",

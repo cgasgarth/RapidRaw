@@ -125,6 +125,7 @@ export default function NegativeConversionModal({
   const [baseFogEstimate, setBaseFogEstimate] = useState<NegativeBaseFogEstimate | null>(null);
   const [baseFogReadoutCopied, setBaseFogReadoutCopied] = useState(false);
   const [copiedBatchPlanJson, setCopiedBatchPlanJson] = useState<string | null>(null);
+  const [acceptedBatchPlanJson, setAcceptedBatchPlanJson] = useState<string | null>(null);
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
@@ -196,6 +197,14 @@ export default function NegativeConversionModal({
   const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
   const batchDryRunPlanJson = useMemo(() => JSON.stringify(batchDryRunSummary, null, 2), [batchDryRunSummary]);
   const isBatchPlanCopied = copiedBatchPlanJson === batchDryRunPlanJson;
+  const isBatchPlanAccepted = acceptedBatchPlanJson === batchDryRunPlanJson && !batchDryRunSummary.blocked;
+  const requiresAcceptedBatchPlan = hasMultipleScans && conversionScope === 'all';
+  const canSave =
+    !isSaving &&
+    !isLoading &&
+    previewUrl !== null &&
+    pathsToConvert.length > 0 &&
+    (!requiresAcceptedBatchPlan || isBatchPlanAccepted);
 
   const workflowStages = useMemo<NegativeLabWorkflowStage[]>(
     () => [
@@ -513,8 +522,13 @@ export default function NegativeConversionModal({
     }
   };
 
+  const handleAcceptBatchPlan = () => {
+    if (batchDryRunSummary.blocked) return;
+    setAcceptedBatchPlanJson(batchDryRunPlanJson);
+  };
+
   const handleSave = async () => {
-    if (pathsToConvert.length === 0) return;
+    if (!canSave) return;
     setIsSaving(true);
     setProgress(null);
     try {
@@ -632,6 +646,22 @@ export default function NegativeConversionModal({
               {isBatchPlanCopied
                 ? t('modals.negativeConversion.batchPlanCopied')
                 : t('modals.negativeConversion.copyBatchPlan')}
+            </button>
+            <button
+              type="button"
+              className={cx(
+                'col-span-2 inline-flex items-center justify-center rounded px-1.5 py-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                isBatchPlanAccepted
+                  ? 'bg-accent/15 text-text-primary'
+                  : 'bg-bg-secondary text-text-secondary hover:bg-surface',
+              )}
+              data-testid="negative-lab-accept-batch-plan"
+              disabled={batchDryRunSummary.blocked}
+              onClick={handleAcceptBatchPlan}
+            >
+              {isBatchPlanAccepted
+                ? t('modals.negativeConversion.batchPlanAccepted')
+                : t('modals.negativeConversion.acceptBatchPlan')}
             </button>
           </div>
           <div className="grid gap-1">
@@ -1416,7 +1446,7 @@ export default function NegativeConversionModal({
                 onClick={() => {
                   void handleSave();
                 }}
-                disabled={isSaving || isLoading || !previewUrl || pathsToConvert.length === 0}
+                disabled={!canSave}
               >
                 {isSaving ? (
                   <>

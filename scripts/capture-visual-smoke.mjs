@@ -504,6 +504,11 @@ async function prepareScenario(page, mode) {
       .getByTestId('negative-lab-queued-count')
       .getByText('2 queued', { exact: true })
       .waitFor({ timeout: 10_000 });
+    await page.getByTestId('negative-lab-accept-batch-plan').click();
+    await page
+      .getByTestId('negative-lab-accept-batch-plan')
+      .getByText('Batch plan accepted', { exact: true })
+      .waitFor({ timeout: 10_000 });
     const colorSliders = page.locator('input[type="range"]');
     await colorSliders.nth(1).fill('1.23');
     await colorSliders.nth(2).fill('0.91');
@@ -634,6 +639,11 @@ async function prepareScenario(page, mode) {
   if (!copiedBatchPlan.includes('"plannedApplyCount"') || !copiedBatchPlan.includes('"skippedFrameIds"')) {
     throw new Error('Negative Lab batch plan copy did not include apply/skip JSON.');
   }
+  await page.getByTestId('negative-lab-accept-batch-plan').click();
+  await page
+    .getByTestId('negative-lab-accept-batch-plan')
+    .getByText('Batch plan accepted', { exact: true })
+    .waitFor({ timeout: 10_000 });
   await page
     .getByTestId('negative-lab-queued-count')
     .getByText('1 queued', { exact: true })
