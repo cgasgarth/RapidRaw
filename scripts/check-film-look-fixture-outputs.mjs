@@ -107,7 +107,13 @@ for (const marker of ['buildFilmLookPresetDraft', 'formatFilmLookPresetName', 's
 
 const effectsSourceUrl = new URL('../src/components/adjustments/Effects.tsx', import.meta.url);
 const effectsSource = await readFile(effectsSourceUrl, 'utf8');
-for (const marker of ['buildFilmLookPresetDraft', 'Invokes.SaveCommunityPreset', 'Invokes.HandleExportPresetsToFile']) {
+for (const marker of [
+  'buildFilmLookPresetDraft',
+  'Invokes.SaveCommunityPreset',
+  'Invokes.HandleExportPresetsToFile',
+  'filmLookPresetStatus',
+  'film-look-preset-status',
+]) {
   if (!effectsSource.includes(marker)) {
     throw new Error(`Effects panel is missing film preset export marker: ${marker}`);
   }

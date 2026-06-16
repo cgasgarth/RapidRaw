@@ -61,6 +61,9 @@ window.__TAURI_INTERNALS__ = {
       return Promise.resolve({ blueWeight: 1.18, confidence: 0.91, greenWeight: 0.96, redWeight: 1.07 });
     }
     if (command === 'convert_negatives') return Promise.resolve(['/tmp/rawengine-negative-smoke-positive.tif']);
+    if (command === 'save_community_preset') return Promise.resolve(null);
+    if (command === 'handle_export_presets_to_file') return Promise.resolve(null);
+    if (command === 'plugin:dialog|save') return Promise.resolve('/tmp/rawengine-film-look-smoke.rrpreset');
     if (command === 'plugin:event|listen') return Promise.resolve(1);
     if (command === 'plugin:event|unlisten') return Promise.resolve(null);
     return Promise.reject(new Error(`Unhandled visual smoke Tauri command: ${command}`));
