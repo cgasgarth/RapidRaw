@@ -1343,6 +1343,8 @@
       "baseSampleOrigin": "X {{x}} / Y {{y}}",
       "baseSampleSize": "{{width}} x {{height}}",
       "batchReadiness": "Batch readiness",
+      "batchPlanApplyCount": "Apply {{applyCount}}",
+      "batchPlanSkippedCount": "Skip {{skippedCount}}",
       "convertAndSaveActive": "Convert & Save Active",
       "previewPending": "Preview pending",
       "previewReady": "Preview ready",

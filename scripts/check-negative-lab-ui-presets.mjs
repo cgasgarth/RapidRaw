@@ -160,6 +160,8 @@ for (const marker of [
   'negative-lab-frame-health-grid',
   'negative-lab-frame-count',
   'negative-lab-roll-warning-count',
+  'negative-lab-planned-apply-count',
+  'negative-lab-skipped-frame-count',
   'negative-lab-frame-health-row-',
   'negative-lab-frame-warning-chip-',
   'negative-lab-frame-warning-row-',
