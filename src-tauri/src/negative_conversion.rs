@@ -54,6 +54,10 @@ pub enum NegativeConversionOutputFormat {
 pub struct NegativeConversionSaveOptions {
     pub output_format: NegativeConversionOutputFormat,
     pub suffix: String,
+    #[serde(default)]
+    pub accepted_dry_run_plan_hash: Option<String>,
+    #[serde(default)]
+    pub accepted_dry_run_plan_id: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone, Copy)]
@@ -87,6 +91,8 @@ impl Default for NegativeConversionSaveOptions {
         Self {
             output_format: NegativeConversionOutputFormat::Tiff16,
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
+            accepted_dry_run_plan_hash: None,
+            accepted_dry_run_plan_id: None,
         }
     }
 }
@@ -98,7 +104,38 @@ impl NegativeConversionSaveOptions {
         Self {
             output_format: self.output_format,
             suffix,
+            accepted_dry_run_plan_hash: self.accepted_dry_run_plan_hash,
+            accepted_dry_run_plan_id: self.accepted_dry_run_plan_id,
         }
+    }
+
+    fn validate_accepted_batch_plan(&self, paths_len: usize) -> Result<(), String> {
+        if paths_len <= 1 {
+            return Ok(());
+        }
+
+        let plan_hash = self
+            .accepted_dry_run_plan_hash
+            .as_deref()
+            .ok_or_else(|| "Batch negative export requires an accepted dry-run plan hash.".to_string())?;
+        let plan_id = self
+            .accepted_dry_run_plan_id
+            .as_deref()
+            .ok_or_else(|| "Batch negative export requires an accepted dry-run plan id.".to_string())?;
+
+        if !is_valid_negative_lab_plan_hash(plan_hash) {
+            return Err("Batch negative export accepted dry-run plan hash is invalid.".to_string());
+        }
+
+        let hash_suffix = plan_hash
+            .strip_prefix("fnv1a32:")
+            .ok_or_else(|| "Batch negative export accepted dry-run plan hash is invalid.".to_string())?;
+        let expected_plan_id = format!("negative_lab_batch_plan_{hash_suffix}");
+        if plan_id != expected_plan_id {
+            return Err("Batch negative export accepted dry-run plan id does not match hash.".to_string());
+        }
+
+        Ok(())
     }
 }
 
@@ -136,6 +173,14 @@ fn sanitize_output_suffix(suffix: &str) -> String {
     } else {
         sanitized
     }
+}
+
+fn is_valid_negative_lab_plan_hash(plan_hash: &str) -> bool {
+    let Some(hash_suffix) = plan_hash.strip_prefix("fnv1a32:") else {
+        return false;
+    };
+
+    hash_suffix.len() == 8 && hash_suffix.chars().all(|value| value.is_ascii_hexdigit())
 }
 
 fn build_negative_output_path(
@@ -580,6 +625,7 @@ pub async fn convert_negatives(
     tokio::task::spawn_blocking(move || {
         let mut results = Vec::new();
         let save_options = options.unwrap_or_default().sanitized();
+        save_options.validate_accepted_batch_plan(paths.len())?;
 
         for (i, path_str) in paths.iter().enumerate() {
             let _ = app_handle.emit(
@@ -736,6 +782,8 @@ mod tests {
     #[test]
     fn negative_conversion_save_options_sanitize_output_suffix() {
         let sanitized = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: None,
+            accepted_dry_run_plan_id: None,
             output_format: NegativeConversionOutputFormat::JpegProof,
             suffix: " Proof / Final:01 ".to_string(),
         }
@@ -751,6 +799,8 @@ mod tests {
     #[test]
     fn negative_conversion_save_options_default_empty_suffix() {
         let sanitized = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: None,
+            accepted_dry_run_plan_id: None,
             output_format: NegativeConversionOutputFormat::Tiff16,
             suffix: "///".to_string(),
         }
@@ -762,11 +812,15 @@ mod tests {
     #[test]
     fn negative_conversion_output_paths_keep_original_safe() {
         let jpeg_options = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: None,
+            accepted_dry_run_plan_id: None,
             output_format: NegativeConversionOutputFormat::JpegProof,
             suffix: "Web Proof".to_string(),
         }
         .sanitized();
         let tiff_options = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: None,
+            accepted_dry_run_plan_id: None,
             output_format: NegativeConversionOutputFormat::Tiff16,
             suffix: "".to_string(),
         }
@@ -786,6 +840,32 @@ mod tests {
         );
         assert_ne!(jpeg_output, PathBuf::from(source_path));
         assert_ne!(tiff_output, PathBuf::from(source_path));
+    }
+
+    #[test]
+    fn negative_conversion_batch_exports_require_accepted_plan_identity() {
+        let missing_plan = NegativeConversionSaveOptions::default();
+        assert!(
+            missing_plan.validate_accepted_batch_plan(2).is_err(),
+            "batch export without accepted plan should fail"
+        );
+        assert!(missing_plan.validate_accepted_batch_plan(1).is_ok());
+
+        let accepted_plan = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
+            accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
+            output_format: NegativeConversionOutputFormat::Tiff16,
+            suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
+        };
+        assert!(accepted_plan.validate_accepted_batch_plan(2).is_ok());
+
+        let mismatched_plan = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
+            accepted_dry_run_plan_id: Some("negative_lab_batch_plan_deadbeef".to_string()),
+            output_format: NegativeConversionOutputFormat::Tiff16,
+            suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
+        };
+        assert!(mismatched_plan.validate_accepted_batch_plan(2).is_err());
     }
 
     #[test]

@@ -200,10 +200,19 @@ const negativeLabBatchColorParamsSchema = z
   })
   .passthrough();
 const negativeLabBatchConvertArgsSchema = z.object({
-  options: z.object({
-    outputFormat: z.literal('jpeg_proof'),
-    suffix: z.literal('Positive'),
-  }),
+  options: z
+    .object({
+      acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
+      outputFormat: z.literal('jpeg_proof'),
+      suffix: z.literal('Positive'),
+    })
+    .refine(
+      (options) =>
+        options.acceptedDryRunPlanId ===
+        `negative_lab_batch_plan_${options.acceptedDryRunPlanHash.replace('fnv1a32:', '')}`,
+      'accepted batch plan id must match hash',
+    ),
   params: negativeLabBatchColorParamsSchema,
   paths: z
     .array(

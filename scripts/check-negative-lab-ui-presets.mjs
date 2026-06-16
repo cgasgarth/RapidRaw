@@ -172,6 +172,8 @@ for (const marker of [
   'pathsToConvert',
   'handleToggleIncludedPath',
   'renderBatchReadiness',
+  'acceptedBatchPlanIdentity',
+  'buildNegativeLabAcceptedPlanIdentity',
   'negative-lab-workspace',
   'negative-lab-workflow-rail',
   'negative-lab-batch-readiness',

@@ -1,5 +1,6 @@
 import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitometer';
 import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
+import { buildNegativeLabAcceptedPlanIdentity } from './negativeLabPlanIdentity';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCatalog';
 import {
   negativeLabAppServerCommandSchema,
@@ -24,15 +25,6 @@ import {
   type NegativeLabFrameHealthAppServerCommand,
   type NegativeLabFrameHealthAppServerResult,
 } from '../schemas/negativeLabAppServerSchemas';
-
-const buildPlanHash = (value: string) => {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash.toString(16).padStart(8, '0');
-};
 
 export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteManifestSchema.parse({
   routes: [
@@ -138,11 +130,10 @@ export const buildNegativeLabAcceptedBatchPlanRouteResult = (
 ): NegativeLabAcceptBatchPlanAppServerResult => {
   const parsedCommand = negativeLabAcceptBatchPlanAppServerCommandSchema.parse(command);
   const dryRunSummary = buildNegativeLabBatchSummaryRouteResult(parsedCommand);
-  const planHash = buildPlanHash(JSON.stringify(dryRunSummary));
+  const planIdentity = buildNegativeLabAcceptedPlanIdentity(JSON.stringify(dryRunSummary));
 
   return negativeLabAcceptBatchPlanAppServerResultSchema.parse({
-    acceptedDryRunPlanHash: `fnv1a32:${planHash}`,
-    acceptedDryRunPlanId: `negative_lab_batch_plan_${planHash}`,
+    ...planIdentity,
     commandName: 'negative.lab.accept_batch_dry_run_plan',
     dryRunSummary,
     proof: {
