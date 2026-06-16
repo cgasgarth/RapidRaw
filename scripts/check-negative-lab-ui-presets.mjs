@@ -116,6 +116,10 @@ const workflowStageKeys = [
   'includeScan',
   'includedScans',
   'outputSuffix',
+  'presetClaimGeneric',
+  'presetClaimMeasured',
+  'presetRuntimeApplied',
+  'presetRuntimeCatalogOnly',
   'previewPending',
   'previewReady',
   'queuedScans',
@@ -169,10 +173,12 @@ for (const marker of [
   'negative-lab-export-tiff16',
   'negative-lab-export-jpeg-proof',
   'negative-lab-preset-claim-policy',
+  'negative-lab-preset-claim-level',
   'negative-lab-preset-film-class',
   'negative-lab-preset-intent',
   'negative-lab-preset-process',
   'negative-lab-preset-provenance',
+  'negative-lab-preset-runtime-status',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`negative conversion modal is missing workflow marker: ${marker}`);

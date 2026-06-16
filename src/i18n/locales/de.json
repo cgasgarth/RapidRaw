@@ -1556,6 +1556,10 @@
         "tiff16": "16-Bit-TIFF"
       },
       "outputSuffix": "Ausgabe-Suffix",
+      "presetClaimGeneric": "Generic starting point",
+      "presetClaimMeasured": "Measured profile",
+      "presetRuntimeApplied": "Runtime applied",
+      "presetRuntimeCatalogOnly": "Catalog only",
       "previewAlt": "Vorschau",
       "previewPending": "Preview pending",
       "previewReady": "Preview ready",

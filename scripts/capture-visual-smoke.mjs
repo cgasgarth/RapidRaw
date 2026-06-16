@@ -535,6 +535,14 @@ async function prepareScenario(page, mode) {
     .getByText('Black and white silver', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
+    .getByTestId('negative-lab-preset-claim-level')
+    .getByText('Generic starting point', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-preset-runtime-status')
+    .getByText('Runtime applied', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
     .getByTestId('negative-lab-preset-intent')
     .getByText('Orthochromatic-style tonal separation with reduced red response.', { exact: true })
     .waitFor({ timeout: 10_000 });
