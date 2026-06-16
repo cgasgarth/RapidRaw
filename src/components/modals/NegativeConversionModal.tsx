@@ -52,6 +52,10 @@ type NegativeParams = NegativeLabPresetParams;
 type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
 type NegativeConversionScope = 'active' | 'all';
 type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
+type DensitometerPatchLabelKey =
+  | BaseFogSampleLabelKey
+  | 'modals.negativeConversion.sampleHighlightPatch'
+  | 'modals.negativeConversion.sampleShadowPatch';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
@@ -92,6 +96,28 @@ const BASE_FOG_SAMPLE_PRESETS = [
     rect: { height: 0.22, width: 0.22, x: 0.39, y: 0.39 },
   },
 ] satisfies Array<{ labelKey: BaseFogSampleLabelKey; rect: NegativeLabBaseFogSampleRect }>;
+const DENSITOMETER_PATCH_PRESETS = [
+  {
+    labelKey: 'modals.negativeConversion.sampleLeftEdge',
+    rect: { height: 0.6, width: 0.12, x: 0.02, y: 0.2 },
+    testId: 'negative-lab-patch-probe-left-edge',
+  },
+  {
+    labelKey: 'modals.negativeConversion.sampleCenterPatch',
+    rect: { height: 0.22, width: 0.22, x: 0.39, y: 0.39 },
+    testId: 'negative-lab-patch-probe-center-patch',
+  },
+  {
+    labelKey: 'modals.negativeConversion.sampleShadowPatch',
+    rect: { height: 0.18, width: 0.18, x: 0.18, y: 0.62 },
+    testId: 'negative-lab-patch-probe-shadow-patch',
+  },
+  {
+    labelKey: 'modals.negativeConversion.sampleHighlightPatch',
+    rect: { height: 0.16, width: 0.16, x: 0.66, y: 0.18 },
+    testId: 'negative-lab-patch-probe-highlight-patch',
+  },
+] satisfies Array<{ labelKey: DensitometerPatchLabelKey; rect: NegativeLabBaseFogSampleRect; testId: string }>;
 
 type NegativeLabWorkflowStageId = 'setup' | 'preset' | 'colorTiming' | 'printGrade' | 'export';
 
@@ -125,6 +151,10 @@ export default function NegativeConversionModal({
   const [baseFogConfidence, setBaseFogConfidence] = useState<number | null>(null);
   const [baseFogEstimate, setBaseFogEstimate] = useState<NegativeBaseFogEstimate | null>(null);
   const [baseFogReadoutCopied, setBaseFogReadoutCopied] = useState(false);
+  const [patchProbeEstimate, setPatchProbeEstimate] = useState<NegativeBaseFogEstimate | null>(null);
+  const [patchProbeRect, setPatchProbeRect] = useState<NegativeLabBaseFogSampleRect | null>(null);
+  const [patchProbeLabel, setPatchProbeLabel] = useState<string | null>(null);
+  const [isSamplingPatchProbe, setIsSamplingPatchProbe] = useState(false);
   const [copiedBatchPlanJson, setCopiedBatchPlanJson] = useState<string | null>(null);
   const [acceptedBatchPlanJson, setAcceptedBatchPlanJson] = useState<string | null>(null);
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
@@ -168,6 +198,23 @@ export default function NegativeConversionModal({
     () => (baseFogEstimate === null ? null : buildNegativeBaseFogDensitometerReadout(baseFogEstimate)),
     [baseFogEstimate],
   );
+  const patchProbeDensitometerReadout = useMemo(
+    () => (patchProbeEstimate === null ? null : buildNegativeBaseFogDensitometerReadout(patchProbeEstimate)),
+    [patchProbeEstimate],
+  );
+  const patchProbeSampleReadout = useMemo(() => {
+    if (patchProbeRect === null || patchProbeLabel === null) return null;
+
+    return negativeBaseFogSampleReadoutSchema.parse({
+      areaPercent: patchProbeRect.width * patchProbeRect.height * 100,
+      confidencePercent: patchProbeEstimate === null ? null : Math.round(patchProbeEstimate.confidence * 100),
+      heightPercent: patchProbeRect.height * 100,
+      label: patchProbeLabel,
+      widthPercent: patchProbeRect.width * 100,
+      xPercent: patchProbeRect.x * 100,
+      yPercent: patchProbeRect.y * 100,
+    });
+  }, [patchProbeEstimate, patchProbeLabel, patchProbeRect]);
 
   const selectedPreset = useMemo(
     () =>
@@ -493,6 +540,31 @@ export default function NegativeConversionModal({
       console.error('Negative base/fog sample failed', e);
     } finally {
       setIsEstimatingBaseFog(false);
+    }
+  };
+
+  const handleSamplePatchProbe = async (
+    labelKey: DensitometerPatchLabelKey,
+    sampleRect: NegativeLabBaseFogSampleRect,
+  ) => {
+    if (!selectedImagePath) return;
+    setIsSamplingPatchProbe(true);
+    try {
+      const estimate = await invokeWithSchema(
+        'estimate_negative_base_fog',
+        {
+          path: selectedImagePath,
+          sampleRect,
+        },
+        negativeBaseFogEstimateSchema,
+      );
+      setPatchProbeEstimate(estimate);
+      setPatchProbeRect(sampleRect);
+      setPatchProbeLabel(t(labelKey));
+    } catch (e) {
+      console.error('Negative patch probe sample failed', e);
+    } finally {
+      setIsSamplingPatchProbe(false);
     }
   };
 
@@ -1103,6 +1175,59 @@ export default function NegativeConversionModal({
                 </span>
               </div>
             )}
+            <div className="space-y-2 rounded-md border border-surface bg-bg-primary p-2">
+              <div>
+                <UiText variant={TextVariants.small} className="text-text-secondary">
+                  {t('modals.negativeConversion.patchSampler')}
+                </UiText>
+                <UiText variant={TextVariants.small} className="text-text-tertiary">
+                  {t('modals.negativeConversion.patchSamplerHint')}
+                </UiText>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {DENSITOMETER_PATCH_PRESETS.map((samplePreset) => (
+                  <button
+                    key={samplePreset.labelKey}
+                    type="button"
+                    data-testid={samplePreset.testId}
+                    onClick={() => {
+                      void handleSamplePatchProbe(samplePreset.labelKey, samplePreset.rect);
+                    }}
+                    disabled={!selectedImagePath || isSamplingPatchProbe || isSaving}
+                    className="rounded-md border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {t(samplePreset.labelKey)}
+                  </button>
+                ))}
+              </div>
+              {patchProbeEstimate !== null &&
+                patchProbeDensitometerReadout !== null &&
+                patchProbeSampleReadout !== null && (
+                  <div
+                    className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-xs text-text-tertiary"
+                    data-testid="negative-lab-patch-probe-readout"
+                  >
+                    <span className="text-text-secondary">{patchProbeSampleReadout.label}</span>
+                    <span className="text-right tabular-nums" data-testid="negative-lab-patch-probe-area">
+                      {t('modals.negativeConversion.baseSampleArea', {
+                        area: formatPercentValue(patchProbeSampleReadout.areaPercent),
+                      })}
+                    </span>
+                    <span className="text-text-secondary">{t('modals.negativeConversion.baseRgb')}</span>
+                    <span className="text-right tabular-nums" data-testid="negative-lab-patch-probe-rgb">
+                      {patchProbeEstimate.baseRgb.map(formatRgbValue).join(' / ')}
+                    </span>
+                    <span className="text-text-secondary">{t('modals.negativeConversion.densitometer')}</span>
+                    <span className="text-right tabular-nums" data-testid="negative-lab-patch-probe-density-spread">
+                      {formatDensityValue(patchProbeDensitometerReadout.densityRange)}
+                    </span>
+                    <span className="text-text-secondary">{t('modals.negativeConversion.densitometerDominant')}</span>
+                    <span className="text-right" data-testid="negative-lab-patch-probe-dominant-channel">
+                      {t(DENSITOMETER_CHANNEL_LABEL_KEYS[patchProbeDensitometerReadout.dominantChannel])}
+                    </span>
+                  </div>
+                )}
+            </div>
             <Slider
               label={t('modals.negativeConversion.redWeight')}
               value={params.red_weight}
@@ -1303,6 +1428,28 @@ export default function NegativeConversionModal({
     );
   };
 
+  const renderPatchProbeOverlay = () => {
+    if (patchProbeRect === null) return null;
+
+    return (
+      <div
+        aria-label={t('modals.negativeConversion.patchSampleOverlayLabel')}
+        className="absolute border-2 border-yellow-300 bg-yellow-300/10 shadow-[0_0_0_1px_rgba(0,0,0,0.8)]"
+        data-testid="negative-lab-patch-probe-overlay"
+        style={{
+          height: `${patchProbeRect.height * 100}%`,
+          left: `${patchProbeRect.x * 100}%`,
+          top: `${patchProbeRect.y * 100}%`,
+          width: `${patchProbeRect.width * 100}%`,
+        }}
+      >
+        <span className="absolute bottom-0 left-0 translate-y-full rounded-sm bg-yellow-300 px-1.5 py-0.5 text-[10px] font-medium text-black shadow">
+          {patchProbeLabel ?? t('modals.negativeConversion.patchSampler')}
+        </span>
+      </div>
+    );
+  };
+
   const renderContent = () => (
     <div className="modal-preview-adjustments flex flex-row h-full w-full overflow-hidden">
       <div className="modal-preview-pane grow flex flex-col relative min-h-0 bg-[#0f0f0f] overflow-hidden">
@@ -1337,6 +1484,7 @@ export default function NegativeConversionModal({
                     draggable={false}
                   />
                   {renderBaseFogSampleOverlay()}
+                  {renderPatchProbeOverlay()}
                   {isCompareActive && (
                     <UiText
                       as="div"

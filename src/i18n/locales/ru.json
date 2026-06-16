@@ -1387,7 +1387,12 @@
       "densitometerStatusBalanced": "Balanced",
       "densitometerStatusMinorCast": "Minor cast",
       "densitometerStatusStrongCast": "Strong cast",
-      "readoutCopied": "Copied readout"
+      "readoutCopied": "Copied readout",
+      "patchSampler": "Patch sampler",
+      "patchSamplerHint": "Probe shadows, highlights, and base strips without changing the active conversion.",
+      "patchSampleOverlayLabel": "Densitometer patch sample",
+      "sampleHighlightPatch": "Highlight patch",
+      "sampleShadowPatch": "Shadow patch"
     },
     "panorama": {
       "cancel": "Отмена",
