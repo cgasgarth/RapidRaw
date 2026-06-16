@@ -1,10 +1,15 @@
 #!/usr/bin/env bun
 
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { z } from 'zod';
+
+import {
+  encodeSyntheticPanoramaPpmV1,
+  renderSyntheticPanoramaStitchV1,
+} from '../packages/rawengine-schema/src/panoramaSyntheticStitch.ts';
 
 const FixtureStatusSchema = z.enum(['active_metadata_only', 'active_generated_asset', 'planned']);
 const WarningCodeSchema = z.enum([
@@ -70,7 +75,7 @@ const PanoramaFixtureManifestSchema = z
   .passthrough();
 
 const MANIFEST_PATH = resolve('fixtures/panorama/panorama-fixture-manifest.json');
-const BYTES_PER_PIXEL_RGBA = 4;
+const OUTPUT_DIR = resolve('artifacts/panorama-synthetic-parity');
 const MAX_SYNTHETIC_SOURCE_PIXELS = 1_000_000;
 
 function fail(message, detail) {
@@ -132,41 +137,17 @@ async function hashGeneratedSources(sources) {
 }
 
 function deriveLegacyParityReport(fixture, generatedSources) {
-  const connected = new Set(fixture.expectedMatchGraph.expectedConnectedSourceIndices);
-  const excluded = new Set(fixture.expectedMatchGraph.expectedExcludedSourceIndices);
-  const connectedFrames = fixture.sourceFrames.filter((sourceFrame) => connected.has(sourceFrame.sourceIndex));
-
-  const maxRight = Math.max(
-    ...connectedFrames.map((sourceFrame) => (sourceFrame.expectedOffsetX ?? 0) + sourceFrame.width),
-  );
-  const minLeft = Math.min(...connectedFrames.map((sourceFrame) => sourceFrame.expectedOffsetX ?? 0));
-  const maxBottom = Math.max(
-    ...connectedFrames.map((sourceFrame) => (sourceFrame.expectedOffsetY ?? 0) + sourceFrame.height),
-  );
-  const minTop = Math.min(...connectedFrames.map((sourceFrame) => sourceFrame.expectedOffsetY ?? 0));
-  const estimatedOutputPixels = fixture.expectedOutput.width * fixture.expectedOutput.height;
-  const estimatedOutputBytes = estimatedOutputPixels * BYTES_PER_PIXEL_RGBA;
-  const warningCodes = new Set(fixture.expectedWarningCodes);
-
-  if (excluded.size > 0) {
-    warningCodes.add('excluded_sources');
-  }
-  if (estimatedOutputBytes > fixture.memoryBudgetBytes) {
-    warningCodes.add('memory_budget_exceeded');
-    warningCodes.add('tiled_render_required');
-  }
-
   return {
-    excludedSourceCount: excluded.size,
     generatedSourceCount: generatedSources.length,
     minimumConnectedComponents: fixture.expectedMatchGraph.minimumConnectedComponents,
-    output: {
-      height: maxBottom - minTop,
-      projection: 'rectilinear',
-      width: maxRight - minLeft,
-    },
-    stitchedSourceCount: connected.size,
-    warningCodes: [...warningCodes].sort(),
+    ...renderSyntheticPanoramaStitchV1({
+      connectedSourceIndices: fixture.expectedMatchGraph.expectedConnectedSourceIndices,
+      expectedWarningCodes: fixture.expectedWarningCodes,
+      fixtureId: fixture.fixtureId,
+      memoryBudgetBytes: fixture.memoryBudgetBytes,
+      seed: fixture.generator.seed,
+      sourceFrames: fixture.sourceFrames,
+    }),
   };
 }
 
@@ -187,6 +168,7 @@ function assertArrayEqual(actual, expected, label, fixtureId) {
 const manifestJson = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
 const manifest = PanoramaFixtureManifestSchema.parse(manifestJson);
 const tempDir = await mkdtemp(join(tmpdir(), 'rawengine-panorama-parity-'));
+await mkdir(OUTPUT_DIR, { recursive: true });
 
 try {
   const parityResults = [];
@@ -221,9 +203,23 @@ try {
     );
     assertArrayEqual(parityReport.warningCodes, fixture.expectedWarningCodes, 'warning codes', fixture.fixtureId);
 
+    const outputArtifactPath = join(OUTPUT_DIR, `${fixture.fixtureId}.stitched.ppm`);
+    let outputHash = null;
+    if (parityReport.outputPixels !== null) {
+      const outputBytes = encodeSyntheticPanoramaPpmV1(
+        parityReport.outputPixels,
+        parityReport.output.width,
+        parityReport.output.height,
+      );
+      await writeFile(outputArtifactPath, outputBytes);
+      outputHash = new Bun.CryptoHasher('sha256').update(outputBytes).digest('hex');
+    }
+
     parityResults.push({
       fixtureId: fixture.fixtureId,
       generatedSourceCount: generatedSources.length,
+      outputArtifactPath: parityReport.outputPixels === null ? null : outputArtifactPath,
+      outputHash,
       sourceHash: await hashGeneratedSources(generatedSources),
     });
   }
@@ -234,7 +230,9 @@ try {
 
   console.log(`Validated ${parityResults.length} synthetic panorama parity fixtures.`);
   for (const result of parityResults) {
-    console.log(`${result.fixtureId}: generated=${result.generatedSourceCount} sha256=${result.sourceHash}`);
+    console.log(
+      `${result.fixtureId}: generated=${result.generatedSourceCount} sourceSha256=${result.sourceHash} outputSha256=${result.outputHash ?? 'plan-only'}`,
+    );
   }
 } finally {
   await rm(tempDir, { force: true, recursive: true });
