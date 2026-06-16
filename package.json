@@ -27,6 +27,7 @@
     "check:script-type-coverage:self-test": "bun scripts/check-script-type-coverage.mjs --self-test",
     "check:i18n": "bun scripts/run-compact-command.mjs --label i18n -- i18next-cli extract --ci --dry-run",
     "check:unsafe-casts": "bun scripts/check-unsafe-casts.mjs",
+    "check:pure-ts-tests": "bun scripts/run-compact-command.mjs --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts",
     "check:a11y": "bun scripts/check-accessibility-pass.mjs",
     "check:ai-fallbacks": "bun scripts/check-ai-provider-fallbacks.mjs",
     "check:keyboard-shortcuts": "bun scripts/check-keyboard-shortcuts.mjs",

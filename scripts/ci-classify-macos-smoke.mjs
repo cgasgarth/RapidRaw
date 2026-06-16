@@ -67,6 +67,7 @@ const SAFE_FRONTEND_EXTENSIONS = new Set([
 ]);
 
 const SAFE_SCHEMA_PACKAGE_EXTENSIONS = new Set(['.json', '.md', '.mjs', '.ts']);
+const SAFE_PURE_TEST_EXTENSIONS = new Set(['.js', '.mjs', '.ts']);
 
 const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   [
@@ -89,6 +90,10 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['check:ai-fallbacks', new Set(['bun scripts/check-ai-provider-fallbacks.mjs'])],
   ['check:performance-smoke', new Set(['bun scripts/check-performance-smoke.mjs'])],
+  [
+    'check:pure-ts-tests',
+    new Set(['bun scripts/run-compact-command.mjs --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts']),
+  ],
   ['check:release-notes', new Set(['bun scripts/generate-release-notes.mjs --self-test'])],
   ['check:workflow-policy:self-test', new Set(['bun scripts/check-github-workflow-policy.mjs --self-test'])],
   ['check:validation-gates', new Set(['bun run check:compact-commands && bun run check:compact-commands:self-test'])],
@@ -125,6 +130,10 @@ function isSafeFrontendLeaf(path) {
 
 function isSafeSchemaPackagePath(path) {
   return path.startsWith('packages/rawengine-schema/') && hasExtension(path, SAFE_SCHEMA_PACKAGE_EXTENSIONS);
+}
+
+function isSafePureTestPath(path) {
+  return path.startsWith('tests/pure-ts/') && hasExtension(path, SAFE_PURE_TEST_EXTENSIONS);
 }
 
 function isSafeValidationScript(path) {
@@ -186,6 +195,7 @@ function classifyPathChange(change) {
     isMarkdown(path) ||
     path.startsWith('docs/') ||
     path.startsWith('fixtures/docs/') ||
+    isSafePureTestPath(path) ||
     isSafeSchemaPackagePath(path) ||
     isSafeValidationScript(path) ||
     isSafeFrontendLeaf(path)
@@ -428,6 +438,17 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(
+    'pure TS test package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -29,6 +29,7 @@\n+    "check:pure-ts-tests": "bun scripts/run-compact-command.mjs --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
     'AI fallback package script changes skip smoke',
     [
       {
@@ -456,6 +477,7 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification('public styles can skip smoke', ['public/theme.css'], SMOKE_MODES.NONE);
+  assertClassification('pure TS tests can skip smoke', ['tests/pure-ts/edit-command-bus.test.mjs'], SMOKE_MODES.NONE);
   assertClassification('lint config changes can skip smoke', ['eslint.config.js'], SMOKE_MODES.NONE);
   assertClassification('unused-code config changes can skip smoke', ['knip.jsonc'], SMOKE_MODES.NONE);
   assertClassification(
