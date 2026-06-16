@@ -135,6 +135,7 @@ import {
   type QueryEnvelopeV1,
   type RawEngineColorPipelineContextV1,
   type RawEngineRenderTargetV1,
+  type RawEngineAgentReplayAuditLogV1,
   type RawEngineAgentReplayFixtureV1,
   type RawEngineAppServerToolCallValidationV1,
   type RawEngineToolRegistryV1,
@@ -750,6 +751,77 @@ export const sampleEditGraphMutationResultV1: EditGraphMutationResultV1 = editGr
   warnings: [],
 });
 
+export const sampleEditGraphRollbackCommandEnvelopeV1: EditGraphCommandEnvelopeV1 =
+  editGraphCommandEnvelopeV1Schema.parse({
+    ...sampleEditGraphCommandEnvelopeV1,
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'Rolling back the accepted agent edit restores the pre-apply graph revision without touching originals.',
+      state: 'approved',
+    },
+    commandId: 'command_edit_graph_patch_rollback_sample',
+    commandType: 'editGraph.revertToRevision',
+    correlationId: 'corr_edit_graph_patch_rollback_sample',
+    dryRun: false,
+    expectedGraphRevision: sampleEditGraphMutationResultV1.appliedGraphRevision,
+    idempotencyKey: 'idem_edit_graph_patch_rollback_sample',
+    parameters: {
+      graphRevision: sampleEditGraphMutationResultV1.undoRevision,
+    },
+  });
+
+export const sampleEditGraphRollbackMutationResultV1: EditGraphMutationResultV1 = editGraphMutationResultV1Schema.parse(
+  {
+    appliedGraphRevision: sampleEditGraphMutationResultV1.undoRevision,
+    changedNodeIds: ['node_agent_refinement'],
+    commandId: sampleEditGraphRollbackCommandEnvelopeV1.commandId,
+    commandType: sampleEditGraphRollbackCommandEnvelopeV1.commandType,
+    correlationId: sampleEditGraphRollbackCommandEnvelopeV1.correlationId,
+    dryRun: false,
+    mutates: true,
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    sourceGraphRevision: sampleEditGraphMutationResultV1.appliedGraphRevision,
+    undoRevision: sampleEditGraphMutationResultV1.appliedGraphRevision,
+    warnings: [],
+  },
+);
+
+const sampleAgentReplayImageId = '/photos/session/IMG_0001.CR3';
+
+const createSampleReplayAuditLog = ({
+  affectedArtifactIds = [],
+  inputSchemaName = 'EditGraphCommandEnvelopeV1',
+  parameterDiff = sampleEditGraphDryRunResultV1.parameterDiff.map(({ path, previousValue, value }) => ({
+    path,
+    previousValue,
+    value,
+  })),
+  rollbackPoint,
+  toolKind,
+  toolName,
+  warnings = [],
+}: {
+  affectedArtifactIds?: string[];
+  inputSchemaName?: string;
+  parameterDiff?: RawEngineAgentReplayAuditLogV1['parameterDiff'];
+  rollbackPoint?: RawEngineAgentReplayAuditLogV1['rollbackPoint'];
+  toolKind: RawEngineAgentReplayAuditLogV1['toolCall']['toolKind'];
+  toolName: string;
+  warnings?: string[];
+}): RawEngineAgentReplayAuditLogV1 => ({
+  affectedArtifactIds,
+  affectedImageIds: [sampleAgentReplayImageId],
+  noOverwritePolicy: 'never_overwrite_original',
+  parameterDiff,
+  rollbackPoint,
+  toolCall: {
+    inputSchemaName,
+    toolKind,
+    toolName,
+  },
+  warnings,
+});
+
 export const sampleToneColorCommandEnvelopeV1: ToneColorCommandEnvelopeV1 = toneColorCommandEnvelopeV1Schema.parse({
   actor: {
     id: 'codex-app-server',
@@ -856,55 +928,98 @@ export const sampleToneColorMutationResultV1: ToneColorMutationResultV1 = toneCo
 
 export const sampleRawEngineAgentReplayFixtureV1: RawEngineAgentReplayFixtureV1 =
   rawEngineAgentReplayFixtureV1Schema.parse({
-    actor: sampleToneColorCommandEnvelopeV1.actor,
-    deterministicReplayHash: 'sha256:sample-agent-tone-color-replay',
-    finalGraphRevision: sampleToneColorMutationResultV1.appliedGraphRevision,
-    initialGraphRevision: sampleToneColorDryRunResultV1.sourceGraphRevision,
+    actor: sampleEditGraphCommandEnvelopeV1.actor,
+    deterministicReplayHash: 'sha256:sample-agent-edit-rollback-replay',
+    finalGraphRevision: sampleEditGraphRollbackMutationResultV1.appliedGraphRevision,
+    initialGraphRevision: sampleEditGraphDryRunResultV1.sourceGraphRevision,
     registry: sampleToolRegistryV1,
-    replayId: 'replay_agent_tone_color_basic_001',
+    replayId: 'replay_agent_edit_rollback_001',
     replayKind: 'agent_tool_replay',
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     steps: [
       {
-        approval: sampleToneColorCommandEnvelopeV1.approval,
+        auditLog: createSampleReplayAuditLog({
+          affectedArtifactIds: sampleEditGraphDryRunResultV1.previewArtifacts.map(({ artifactId }) => artifactId),
+          toolKind: 'dry_run',
+          toolName: 'editgraph.dry_run_command',
+          warnings: sampleEditGraphDryRunResultV1.warnings,
+        }),
+        approval: sampleEditGraphCommandEnvelopeV1.approval,
         deterministic: true,
         dryRun: true,
-        input: sampleToneColorCommandEnvelopeV1,
-        inputContentHash: 'sha256:sample-tone-color-dry-run-input',
-        inputSchemaName: 'ToneColorCommandEnvelopeV1',
+        input: sampleEditGraphCommandEnvelopeV1,
+        inputContentHash: 'sha256:sample-edit-graph-dry-run-input',
+        inputSchemaName: 'EditGraphCommandEnvelopeV1',
         mutates: false,
-        output: sampleToneColorDryRunResultV1,
-        outputContentHash: 'sha256:sample-tone-color-dry-run-output',
-        outputSchemaName: 'ToneColorDryRunResultV1',
+        output: sampleEditGraphDryRunResultV1,
+        outputContentHash: 'sha256:sample-edit-graph-dry-run-output',
+        outputSchemaName: 'EditGraphDryRunResultV1',
         prerequisiteStepIds: [],
-        sourceGraphRevision: sampleToneColorDryRunResultV1.sourceGraphRevision,
-        stepId: 'step_tone_color_dry_run',
+        sourceGraphRevision: sampleEditGraphDryRunResultV1.sourceGraphRevision,
+        stepId: 'step_edit_graph_dry_run',
         toolKind: 'dry_run',
-        toolName: 'tonecolor.dry_run_command',
-        warnings: sampleToneColorDryRunResultV1.warnings,
+        toolName: 'editgraph.dry_run_command',
+        warnings: sampleEditGraphDryRunResultV1.warnings,
       },
       {
-        approval: sampleToneColorApplyCommandEnvelopeV1.approval,
+        auditLog: createSampleReplayAuditLog({
+          rollbackPoint: {
+            graphRevision: sampleEditGraphMutationResultV1.sourceGraphRevision,
+            undoRevision: sampleEditGraphMutationResultV1.undoRevision,
+          },
+          toolKind: 'apply',
+          toolName: 'editgraph.apply_command',
+          warnings: sampleEditGraphMutationResultV1.warnings,
+        }),
+        approval: sampleEditGraphApplyCommandEnvelopeV1.approval,
         deterministic: true,
         dryRun: false,
-        input: sampleToneColorApplyCommandEnvelopeV1,
-        inputContentHash: 'sha256:sample-tone-color-apply-input',
-        inputSchemaName: 'ToneColorCommandEnvelopeV1',
+        input: sampleEditGraphApplyCommandEnvelopeV1,
+        inputContentHash: 'sha256:sample-edit-graph-apply-input',
+        inputSchemaName: 'EditGraphCommandEnvelopeV1',
         mutates: true,
-        output: sampleToneColorMutationResultV1,
-        outputContentHash: 'sha256:sample-tone-color-apply-output',
-        outputSchemaName: 'ToneColorMutationResultV1',
-        prerequisiteStepIds: ['step_tone_color_dry_run'],
-        resultingGraphRevision: sampleToneColorMutationResultV1.appliedGraphRevision,
-        sourceGraphRevision: sampleToneColorMutationResultV1.sourceGraphRevision,
-        stepId: 'step_tone_color_apply',
+        output: sampleEditGraphMutationResultV1,
+        outputContentHash: 'sha256:sample-edit-graph-apply-output',
+        outputSchemaName: 'EditGraphMutationResultV1',
+        prerequisiteStepIds: ['step_edit_graph_dry_run'],
+        resultingGraphRevision: sampleEditGraphMutationResultV1.appliedGraphRevision,
+        sourceGraphRevision: sampleEditGraphMutationResultV1.sourceGraphRevision,
+        stepId: 'step_edit_graph_apply',
         toolKind: 'apply',
-        toolName: 'tonecolor.apply_command',
-        warnings: sampleToneColorMutationResultV1.warnings,
+        toolName: 'editgraph.apply_command',
+        warnings: sampleEditGraphMutationResultV1.warnings,
+      },
+      {
+        auditLog: createSampleReplayAuditLog({
+          rollbackPoint: {
+            graphRevision: sampleEditGraphRollbackMutationResultV1.sourceGraphRevision,
+            undoRevision: sampleEditGraphRollbackMutationResultV1.undoRevision,
+          },
+          toolKind: 'apply',
+          toolName: 'editgraph.apply_command',
+          warnings: sampleEditGraphRollbackMutationResultV1.warnings,
+        }),
+        approval: sampleEditGraphRollbackCommandEnvelopeV1.approval,
+        deterministic: true,
+        dryRun: false,
+        input: sampleEditGraphRollbackCommandEnvelopeV1,
+        inputContentHash: 'sha256:sample-edit-graph-rollback-input',
+        inputSchemaName: 'EditGraphCommandEnvelopeV1',
+        mutates: true,
+        output: sampleEditGraphRollbackMutationResultV1,
+        outputContentHash: 'sha256:sample-edit-graph-rollback-output',
+        outputSchemaName: 'EditGraphMutationResultV1',
+        prerequisiteStepIds: ['step_edit_graph_apply'],
+        resultingGraphRevision: sampleEditGraphRollbackMutationResultV1.appliedGraphRevision,
+        sourceGraphRevision: sampleEditGraphRollbackMutationResultV1.sourceGraphRevision,
+        stepId: 'step_edit_graph_rollback',
+        toolKind: 'apply',
+        toolName: 'editgraph.apply_command',
+        warnings: sampleEditGraphRollbackMutationResultV1.warnings,
       },
     ],
-    target: sampleToneColorCommandEnvelopeV1.target,
-    validationProfile: 'schema_contract',
+    target: sampleEditGraphCommandEnvelopeV1.target,
+    validationProfile: 'golden_replay',
     warnings: [],
   });
 
@@ -1041,6 +1156,19 @@ export const sampleAiToolAgentReplayFixtureV1: RawEngineAgentReplayFixtureV1 =
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     steps: [
       {
+        auditLog: createSampleReplayAuditLog({
+          affectedArtifactIds: sampleAiToolDryRunResultV1.maskArtifacts.map(({ artifactId }) => artifactId),
+          inputSchemaName: 'AiToolCommandEnvelopeV1',
+          parameterDiff: [
+            {
+              path: '/parameters/maskName',
+              value: sampleAiToolCommandEnvelopeV1.parameters.maskName,
+            },
+          ],
+          toolKind: 'dry_run',
+          toolName: 'ai.mask.dry_run_subject',
+          warnings: sampleAiToolDryRunResultV1.warnings,
+        }),
         approval: sampleAiToolCommandEnvelopeV1.approval,
         deterministic: true,
         dryRun: true,
@@ -1059,6 +1187,21 @@ export const sampleAiToolAgentReplayFixtureV1: RawEngineAgentReplayFixtureV1 =
         warnings: sampleAiToolDryRunResultV1.warnings,
       },
       {
+        auditLog: createSampleReplayAuditLog({
+          inputSchemaName: 'AiToolCommandEnvelopeV1',
+          parameterDiff: [
+            {
+              path: '/parameters/acceptedDryRunPlanId',
+              value: sampleAiToolApplyCommandEnvelopeV1.parameters.acceptedDryRunPlanId,
+            },
+          ],
+          rollbackPoint: {
+            graphRevision: sampleAiToolApplyResultV1.sourceGraphRevision,
+          },
+          toolKind: 'apply',
+          toolName: 'ai.mask.apply_subject',
+          warnings: sampleAiToolApplyResultV1.warnings,
+        }),
         approval: sampleAiToolApplyCommandEnvelopeV1.approval,
         deterministic: true,
         dryRun: false,
@@ -1261,6 +1404,22 @@ export const sampleAiEnhancementAgentReplayFixtureV1: RawEngineAgentReplayFixtur
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     steps: [
       {
+        auditLog: createSampleReplayAuditLog({
+          affectedArtifactIds: [
+            ...sampleAiEnhancementDryRunResultV1.enhancementArtifacts.map(({ artifactId }) => artifactId),
+            ...sampleAiEnhancementDryRunResultV1.previewArtifacts.map(({ artifactId }) => artifactId),
+          ],
+          inputSchemaName: 'AiEnhancementCommandEnvelopeV1',
+          parameterDiff: [
+            {
+              path: '/parameters/strength',
+              value: sampleAiEnhancementCommandEnvelopeV1.parameters.strength,
+            },
+          ],
+          toolKind: 'dry_run',
+          toolName: 'ai.enhancement.dry_run_command',
+          warnings: sampleAiEnhancementDryRunResultV1.warnings,
+        }),
         approval: sampleAiEnhancementCommandEnvelopeV1.approval,
         deterministic: true,
         dryRun: true,
@@ -1279,6 +1438,21 @@ export const sampleAiEnhancementAgentReplayFixtureV1: RawEngineAgentReplayFixtur
         warnings: sampleAiEnhancementDryRunResultV1.warnings,
       },
       {
+        auditLog: createSampleReplayAuditLog({
+          inputSchemaName: 'AiEnhancementCommandEnvelopeV1',
+          parameterDiff: [
+            {
+              path: '/parameters/acceptedDryRunPlanId',
+              value: sampleAiEnhancementApplyCommandEnvelopeV1.parameters.acceptedDryRunPlanId,
+            },
+          ],
+          rollbackPoint: {
+            graphRevision: sampleAiEnhancementApplyResultV1.sourceGraphRevision,
+          },
+          toolKind: 'apply',
+          toolName: 'ai.enhancement.apply_command',
+          warnings: sampleAiEnhancementApplyResultV1.warnings,
+        }),
         approval: sampleAiEnhancementApplyCommandEnvelopeV1.approval,
         deterministic: true,
         dryRun: false,

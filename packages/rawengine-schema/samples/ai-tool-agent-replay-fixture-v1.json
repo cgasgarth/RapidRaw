@@ -297,6 +297,23 @@
   "schemaVersion": 1,
   "steps": [
     {
+      "auditLog": {
+        "affectedArtifactIds": ["artifact_ai_subject_mask_alpha"],
+        "affectedImageIds": ["/photos/session/IMG_0001.CR3"],
+        "noOverwritePolicy": "never_overwrite_original",
+        "parameterDiff": [
+          {
+            "path": "/parameters/maskName",
+            "value": "Subject mask"
+          }
+        ],
+        "toolCall": {
+          "inputSchemaName": "AiToolCommandEnvelopeV1",
+          "toolKind": "dry_run",
+          "toolName": "ai.mask.dry_run_subject"
+        },
+        "warnings": []
+      },
       "approval": {
         "approvalClass": "external_model",
         "reason": "Local subject-mask model reads pixels and returns a non-mutating dry-run mask artifact.",
@@ -392,6 +409,26 @@
       "warnings": []
     },
     {
+      "auditLog": {
+        "affectedArtifactIds": [],
+        "affectedImageIds": ["/photos/session/IMG_0001.CR3"],
+        "noOverwritePolicy": "never_overwrite_original",
+        "parameterDiff": [
+          {
+            "path": "/parameters/acceptedDryRunPlanId",
+            "value": "dryrun_ai_subject_mask_001"
+          }
+        ],
+        "rollbackPoint": {
+          "graphRevision": "graph_rev_44"
+        },
+        "toolCall": {
+          "inputSchemaName": "AiToolCommandEnvelopeV1",
+          "toolKind": "apply",
+          "toolName": "ai.mask.apply_subject"
+        },
+        "warnings": []
+      },
       "approval": {
         "approvalClass": "generative_edit",
         "reason": "Apply the accepted AI-generated subject mask into the non-destructive edit graph.",

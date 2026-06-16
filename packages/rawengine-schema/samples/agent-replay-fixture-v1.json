@@ -2,10 +2,10 @@
   "actor": {
     "id": "codex-app-server",
     "kind": "agent",
-    "sessionId": "session_tone_color_sample"
+    "sessionId": "session_edit_graph_sample"
   },
-  "deterministicReplayHash": "sha256:sample-agent-tone-color-replay",
-  "finalGraphRevision": "graph_rev_46",
+  "deterministicReplayHash": "sha256:sample-agent-edit-rollback-replay",
+  "finalGraphRevision": "graph_rev_44",
   "initialGraphRevision": "graph_rev_44",
   "registry": {
     "schemaVersion": 1,
@@ -292,14 +292,37 @@
       }
     ]
   },
-  "replayId": "replay_agent_tone_color_basic_001",
+  "replayId": "replay_agent_edit_rollback_001",
   "replayKind": "agent_tool_replay",
   "schemaVersion": 1,
   "steps": [
     {
+      "auditLog": {
+        "affectedArtifactIds": ["artifact_edit_graph_patch_preview"],
+        "affectedImageIds": ["/photos/session/IMG_0001.CR3"],
+        "noOverwritePolicy": "never_overwrite_original",
+        "parameterDiff": [
+          {
+            "path": "/parameters/exposure",
+            "previousValue": 0.22,
+            "value": 0.3
+          },
+          {
+            "path": "/parameters/contrast",
+            "previousValue": 12,
+            "value": 14
+          }
+        ],
+        "toolCall": {
+          "inputSchemaName": "EditGraphCommandEnvelopeV1",
+          "toolKind": "dry_run",
+          "toolName": "editgraph.dry_run_command"
+        },
+        "warnings": []
+      },
       "approval": {
         "approvalClass": "preview_only",
-        "reason": "Previewing tone and color changes renders a non-mutating graph diff before apply.",
+        "reason": "Previewing an edit graph patch computes a non-mutating graph diff and preview artifact.",
         "state": "not_required"
       },
       "deterministic": true,
@@ -308,89 +331,72 @@
         "actor": {
           "id": "codex-app-server",
           "kind": "agent",
-          "sessionId": "session_tone_color_sample"
+          "sessionId": "session_edit_graph_sample"
         },
         "approval": {
           "approvalClass": "preview_only",
-          "reason": "Previewing tone and color changes renders a non-mutating graph diff before apply.",
+          "reason": "Previewing an edit graph patch computes a non-mutating graph diff and preview artifact.",
           "state": "not_required"
         },
-        "commandId": "command_tone_color_basic_preview_sample",
-        "correlationId": "corr_tone_color_basic_preview_sample",
-        "colorPipeline": {
-          "chromaticAdaptation": {
-            "method": "bradford_v1",
-            "sourceWhitePoint": {
-              "x": 0.3457,
-              "y": 0.3585
-            },
-            "status": "math_validated",
-            "targetWhitePoint": {
-              "x": 0.32168,
-              "y": 0.33767
-            },
-            "warnings": []
-          },
-          "inputDomain": "camera_linear_rgb",
-          "operationDomain": "acescg_linear_v1",
-          "renderTarget": {
-            "bitDepth": 8,
-            "embedIcc": true,
-            "intent": "relative_colorimetric",
-            "outputProfile": "display_p3",
-            "viewTransform": "rawengine_agx_v1"
-          },
-          "sceneToDisplayTransform": "rawengine_agx_v1",
-          "workingSpace": "acescg_linear_v1"
-        },
+        "commandId": "command_edit_graph_patch_preview_sample",
+        "correlationId": "corr_edit_graph_patch_preview_sample",
         "dryRun": true,
         "expectedGraphRevision": "graph_rev_44",
-        "idempotencyKey": "idem_tone_color_basic_preview_sample",
+        "idempotencyKey": "idem_edit_graph_patch_preview_sample",
         "schemaVersion": 1,
         "target": {
           "imagePath": "/photos/session/IMG_0001.CR3",
           "kind": "image"
         },
-        "commandType": "toneColor.setBasicTone",
+        "commandType": "editGraph.applyParameterPatch",
         "parameters": {
-          "blackPoint": -2,
-          "clarity": 8,
-          "contrast": 14,
-          "exposureEv": 0.35,
-          "highlights": -24,
-          "saturation": 4,
-          "shadows": 18,
-          "whitePoint": 6
+          "label": "Preview exposure and contrast refinement",
+          "operations": [
+            {
+              "nodeId": "node_agent_refinement",
+              "op": "replace",
+              "path": "/parameters/exposure",
+              "previousValue": 0.22,
+              "value": 0.3
+            },
+            {
+              "nodeId": "node_agent_refinement",
+              "op": "replace",
+              "path": "/parameters/contrast",
+              "previousValue": 12,
+              "value": 14
+            }
+          ]
         }
       },
-      "inputContentHash": "sha256:sample-tone-color-dry-run-input",
-      "inputSchemaName": "ToneColorCommandEnvelopeV1",
+      "inputContentHash": "sha256:sample-edit-graph-dry-run-input",
+      "inputSchemaName": "EditGraphCommandEnvelopeV1",
       "mutates": false,
       "output": {
-        "commandId": "command_tone_color_basic_preview_sample",
-        "commandType": "toneColor.setBasicTone",
-        "correlationId": "corr_tone_color_basic_preview_sample",
+        "commandId": "command_edit_graph_patch_preview_sample",
+        "commandType": "editGraph.applyParameterPatch",
+        "correlationId": "corr_edit_graph_patch_preview_sample",
         "dryRun": true,
         "mutates": false,
         "parameterDiff": [
           {
-            "module": "basic_tone",
-            "path": "/parameters/exposureEv",
+            "nodeId": "node_agent_refinement",
+            "path": "/parameters/exposure",
             "previousValue": 0.22,
-            "value": 0.35
+            "value": 0.3
           },
           {
-            "module": "basic_tone",
-            "path": "/parameters/highlights",
-            "previousValue": -12,
-            "value": -24
+            "nodeId": "node_agent_refinement",
+            "path": "/parameters/contrast",
+            "previousValue": 12,
+            "value": 14
           }
         ],
-        "predictedGraphRevision": "graph_rev_46_preview",
+        "predictedGraphRevision": "graph_rev_45_preview",
         "previewArtifacts": [
           {
-            "artifactId": "artifact_tone_color_basic_preview",
-            "contentHash": "sha256:sample-tone-color-preview",
+            "artifactId": "artifact_edit_graph_patch_preview",
+            "contentHash": "sha256:sample-edit-graph-preview",
             "dimensions": {
               "height": 1080,
               "width": 1620
@@ -399,49 +405,50 @@
             "storage": "temp_cache"
           }
         ],
-        "colorPipeline": {
-          "chromaticAdaptation": {
-            "method": "bradford_v1",
-            "sourceWhitePoint": {
-              "x": 0.3457,
-              "y": 0.3585
-            },
-            "status": "math_validated",
-            "targetWhitePoint": {
-              "x": 0.32168,
-              "y": 0.33767
-            },
-            "warnings": []
-          },
-          "inputDomain": "camera_linear_rgb",
-          "operationDomain": "acescg_linear_v1",
-          "renderTarget": {
-            "bitDepth": 8,
-            "embedIcc": true,
-            "intent": "relative_colorimetric",
-            "outputProfile": "display_p3",
-            "viewTransform": "rawengine_agx_v1"
-          },
-          "sceneToDisplayTransform": "rawengine_agx_v1",
-          "workingSpace": "acescg_linear_v1"
-        },
         "schemaVersion": 1,
         "sourceGraphRevision": "graph_rev_44",
         "warnings": []
       },
-      "outputContentHash": "sha256:sample-tone-color-dry-run-output",
-      "outputSchemaName": "ToneColorDryRunResultV1",
+      "outputContentHash": "sha256:sample-edit-graph-dry-run-output",
+      "outputSchemaName": "EditGraphDryRunResultV1",
       "prerequisiteStepIds": [],
       "sourceGraphRevision": "graph_rev_44",
-      "stepId": "step_tone_color_dry_run",
+      "stepId": "step_edit_graph_dry_run",
       "toolKind": "dry_run",
-      "toolName": "tonecolor.dry_run_command",
+      "toolName": "editgraph.dry_run_command",
       "warnings": []
     },
     {
+      "auditLog": {
+        "affectedArtifactIds": [],
+        "affectedImageIds": ["/photos/session/IMG_0001.CR3"],
+        "noOverwritePolicy": "never_overwrite_original",
+        "parameterDiff": [
+          {
+            "path": "/parameters/exposure",
+            "previousValue": 0.22,
+            "value": 0.3
+          },
+          {
+            "path": "/parameters/contrast",
+            "previousValue": 12,
+            "value": 14
+          }
+        ],
+        "rollbackPoint": {
+          "graphRevision": "graph_rev_44",
+          "undoRevision": "graph_rev_44"
+        },
+        "toolCall": {
+          "inputSchemaName": "EditGraphCommandEnvelopeV1",
+          "toolKind": "apply",
+          "toolName": "editgraph.apply_command"
+        },
+        "warnings": []
+      },
       "approval": {
         "approvalClass": "edit_apply",
-        "reason": "Applying the accepted tone and color command persists the edit graph revision.",
+        "reason": "Applying the accepted edit graph patch persists the graph revision to the image sidecar.",
         "state": "approved"
       },
       "deterministic": true,
@@ -450,96 +457,53 @@
         "actor": {
           "id": "codex-app-server",
           "kind": "agent",
-          "sessionId": "session_tone_color_sample"
+          "sessionId": "session_edit_graph_sample"
         },
         "approval": {
           "approvalClass": "edit_apply",
-          "reason": "Applying the accepted tone and color command persists the edit graph revision.",
+          "reason": "Applying the accepted edit graph patch persists the graph revision to the image sidecar.",
           "state": "approved"
         },
-        "commandId": "command_tone_color_basic_apply_sample",
-        "correlationId": "corr_tone_color_basic_apply_sample",
-        "colorPipeline": {
-          "chromaticAdaptation": {
-            "method": "bradford_v1",
-            "sourceWhitePoint": {
-              "x": 0.3457,
-              "y": 0.3585
-            },
-            "status": "math_validated",
-            "targetWhitePoint": {
-              "x": 0.32168,
-              "y": 0.33767
-            },
-            "warnings": []
-          },
-          "inputDomain": "camera_linear_rgb",
-          "operationDomain": "acescg_linear_v1",
-          "renderTarget": {
-            "bitDepth": 8,
-            "embedIcc": true,
-            "intent": "relative_colorimetric",
-            "outputProfile": "display_p3",
-            "viewTransform": "rawengine_agx_v1"
-          },
-          "sceneToDisplayTransform": "rawengine_agx_v1",
-          "workingSpace": "acescg_linear_v1"
-        },
+        "commandId": "command_edit_graph_patch_apply_sample",
+        "correlationId": "corr_edit_graph_patch_apply_sample",
         "dryRun": false,
         "expectedGraphRevision": "graph_rev_44",
-        "idempotencyKey": "idem_tone_color_basic_apply_sample",
+        "idempotencyKey": "idem_edit_graph_patch_apply_sample",
         "schemaVersion": 1,
         "target": {
           "imagePath": "/photos/session/IMG_0001.CR3",
           "kind": "image"
         },
-        "commandType": "toneColor.setBasicTone",
+        "commandType": "editGraph.applyParameterPatch",
         "parameters": {
-          "blackPoint": -2,
-          "clarity": 8,
-          "contrast": 14,
-          "exposureEv": 0.35,
-          "highlights": -24,
-          "saturation": 4,
-          "shadows": 18,
-          "whitePoint": 6
+          "label": "Preview exposure and contrast refinement",
+          "operations": [
+            {
+              "nodeId": "node_agent_refinement",
+              "op": "replace",
+              "path": "/parameters/exposure",
+              "previousValue": 0.22,
+              "value": 0.3
+            },
+            {
+              "nodeId": "node_agent_refinement",
+              "op": "replace",
+              "path": "/parameters/contrast",
+              "previousValue": 12,
+              "value": 14
+            }
+          ]
         }
       },
-      "inputContentHash": "sha256:sample-tone-color-apply-input",
-      "inputSchemaName": "ToneColorCommandEnvelopeV1",
+      "inputContentHash": "sha256:sample-edit-graph-apply-input",
+      "inputSchemaName": "EditGraphCommandEnvelopeV1",
       "mutates": true,
       "output": {
-        "appliedGraphRevision": "graph_rev_46",
-        "changedNodeIds": ["node_tone_color_basic"],
-        "commandId": "command_tone_color_basic_apply_sample",
-        "commandType": "toneColor.setBasicTone",
-        "correlationId": "corr_tone_color_basic_apply_sample",
-        "colorPipeline": {
-          "chromaticAdaptation": {
-            "method": "bradford_v1",
-            "sourceWhitePoint": {
-              "x": 0.3457,
-              "y": 0.3585
-            },
-            "status": "math_validated",
-            "targetWhitePoint": {
-              "x": 0.32168,
-              "y": 0.33767
-            },
-            "warnings": []
-          },
-          "inputDomain": "camera_linear_rgb",
-          "operationDomain": "acescg_linear_v1",
-          "renderTarget": {
-            "bitDepth": 8,
-            "embedIcc": true,
-            "intent": "relative_colorimetric",
-            "outputProfile": "display_p3",
-            "viewTransform": "rawengine_agx_v1"
-          },
-          "sceneToDisplayTransform": "rawengine_agx_v1",
-          "workingSpace": "acescg_linear_v1"
-        },
+        "appliedGraphRevision": "graph_rev_45",
+        "changedNodeIds": ["node_agent_refinement"],
+        "commandId": "command_edit_graph_patch_apply_sample",
+        "commandType": "editGraph.applyParameterPatch",
+        "correlationId": "corr_edit_graph_patch_apply_sample",
         "dryRun": false,
         "mutates": true,
         "schemaVersion": 1,
@@ -547,14 +511,101 @@
         "undoRevision": "graph_rev_44",
         "warnings": []
       },
-      "outputContentHash": "sha256:sample-tone-color-apply-output",
-      "outputSchemaName": "ToneColorMutationResultV1",
-      "prerequisiteStepIds": ["step_tone_color_dry_run"],
-      "resultingGraphRevision": "graph_rev_46",
+      "outputContentHash": "sha256:sample-edit-graph-apply-output",
+      "outputSchemaName": "EditGraphMutationResultV1",
+      "prerequisiteStepIds": ["step_edit_graph_dry_run"],
+      "resultingGraphRevision": "graph_rev_45",
       "sourceGraphRevision": "graph_rev_44",
-      "stepId": "step_tone_color_apply",
+      "stepId": "step_edit_graph_apply",
       "toolKind": "apply",
-      "toolName": "tonecolor.apply_command",
+      "toolName": "editgraph.apply_command",
+      "warnings": []
+    },
+    {
+      "auditLog": {
+        "affectedArtifactIds": [],
+        "affectedImageIds": ["/photos/session/IMG_0001.CR3"],
+        "noOverwritePolicy": "never_overwrite_original",
+        "parameterDiff": [
+          {
+            "path": "/parameters/exposure",
+            "previousValue": 0.22,
+            "value": 0.3
+          },
+          {
+            "path": "/parameters/contrast",
+            "previousValue": 12,
+            "value": 14
+          }
+        ],
+        "rollbackPoint": {
+          "graphRevision": "graph_rev_45",
+          "undoRevision": "graph_rev_45"
+        },
+        "toolCall": {
+          "inputSchemaName": "EditGraphCommandEnvelopeV1",
+          "toolKind": "apply",
+          "toolName": "editgraph.apply_command"
+        },
+        "warnings": []
+      },
+      "approval": {
+        "approvalClass": "edit_apply",
+        "reason": "Rolling back the accepted agent edit restores the pre-apply graph revision without touching originals.",
+        "state": "approved"
+      },
+      "deterministic": true,
+      "dryRun": false,
+      "input": {
+        "actor": {
+          "id": "codex-app-server",
+          "kind": "agent",
+          "sessionId": "session_edit_graph_sample"
+        },
+        "approval": {
+          "approvalClass": "edit_apply",
+          "reason": "Rolling back the accepted agent edit restores the pre-apply graph revision without touching originals.",
+          "state": "approved"
+        },
+        "commandId": "command_edit_graph_patch_rollback_sample",
+        "correlationId": "corr_edit_graph_patch_rollback_sample",
+        "dryRun": false,
+        "expectedGraphRevision": "graph_rev_45",
+        "idempotencyKey": "idem_edit_graph_patch_rollback_sample",
+        "schemaVersion": 1,
+        "target": {
+          "imagePath": "/photos/session/IMG_0001.CR3",
+          "kind": "image"
+        },
+        "commandType": "editGraph.revertToRevision",
+        "parameters": {
+          "graphRevision": "graph_rev_44"
+        }
+      },
+      "inputContentHash": "sha256:sample-edit-graph-rollback-input",
+      "inputSchemaName": "EditGraphCommandEnvelopeV1",
+      "mutates": true,
+      "output": {
+        "appliedGraphRevision": "graph_rev_44",
+        "changedNodeIds": ["node_agent_refinement"],
+        "commandId": "command_edit_graph_patch_rollback_sample",
+        "commandType": "editGraph.revertToRevision",
+        "correlationId": "corr_edit_graph_patch_rollback_sample",
+        "dryRun": false,
+        "mutates": true,
+        "schemaVersion": 1,
+        "sourceGraphRevision": "graph_rev_45",
+        "undoRevision": "graph_rev_45",
+        "warnings": []
+      },
+      "outputContentHash": "sha256:sample-edit-graph-rollback-output",
+      "outputSchemaName": "EditGraphMutationResultV1",
+      "prerequisiteStepIds": ["step_edit_graph_apply"],
+      "resultingGraphRevision": "graph_rev_44",
+      "sourceGraphRevision": "graph_rev_45",
+      "stepId": "step_edit_graph_rollback",
+      "toolKind": "apply",
+      "toolName": "editgraph.apply_command",
       "warnings": []
     }
   ],
@@ -562,6 +613,6 @@
     "imagePath": "/photos/session/IMG_0001.CR3",
     "kind": "image"
   },
-  "validationProfile": "schema_contract",
+  "validationProfile": "golden_replay",
   "warnings": []
 }
