@@ -65,6 +65,10 @@
       "validation": [
         "check:computational-merge-app-server-routes",
         "check:computational-merge-ui-route-badges",
+        "check:hdr-ui-runtime-bridge",
+        "check:panorama-ui-runtime-bridge",
+        "check:focus-ui-runtime-bridge",
+        "check:sr-ui-runtime-bridge",
         "schema:hdr-app-server",
         "schema:focus-app-server",
         "schema:panorama-app-server",
