@@ -117,6 +117,7 @@
     "check:film-fixtures:update": "bun scripts/check-film-look-fixture-outputs.mjs --update",
     "check:film-look-preview-export-parity": "bun scripts/check-film-look-preview-export-parity.mjs",
     "check:film-look-preview-export-parity:update": "bun scripts/check-film-look-preview-export-parity.mjs --update",
+    "check:film-look-app-server-routes": "bun scripts/check-film-look-app-server-routes.mjs",
     "check:film-look-browser-smoke": "bun scripts/capture-visual-smoke.mjs --scenario film-look-browser",
     "check:hdr-fixtures": "bun scripts/check-hdr-synthetic-fixtures.mjs",
     "check:hdr-fixtures:update": "bun scripts/check-hdr-synthetic-fixtures.mjs --update",
