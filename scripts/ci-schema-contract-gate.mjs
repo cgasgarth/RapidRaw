@@ -15,6 +15,7 @@ const GITHUB_FILE_SCHEMA = z
 
 const CONTRACT_CHECKS = [
   'check:generated-types',
+  'check:agent-rollback-proof',
   'schema:check',
   'schema:command-bus',
   'schema:focus-app-server',
@@ -38,6 +39,7 @@ const RELEVANT_FILES = new Set([
 
 const PACKAGE_SCRIPT_NAMES = new Set([
   'check:actions',
+  'check:agent-rollback-proof',
   'check:generated-types',
   'check:tauri-schema-validation',
   'schema:check',

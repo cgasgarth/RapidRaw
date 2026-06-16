@@ -8265,8 +8265,46 @@ export const rawEngineAppServerToolCallValidationV1Schema = z
     }
   });
 
+export const rawEngineAgentReplayNoOverwritePolicyV1Schema = z.literal('never_overwrite_original');
+
+export const rawEngineAgentReplayAuditParameterDiffV1Schema = z
+  .object({
+    path: z.string().trim().min(1),
+    previousValue: z.unknown().optional(),
+    value: z.unknown().optional(),
+  })
+  .strict();
+
+export const rawEngineAgentReplayAuditLogV1Schema = z
+  .object({
+    affectedArtifactIds: z.array(z.string().trim().min(1)),
+    affectedImageIds: z.array(z.string().trim().min(1)).min(1),
+    noOverwritePolicy: rawEngineAgentReplayNoOverwritePolicyV1Schema,
+    parameterDiff: z.array(rawEngineAgentReplayAuditParameterDiffV1Schema).min(1),
+    rollbackPoint: z
+      .object({
+        graphRevision: z.string().trim().min(1),
+        undoRevision: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+    toolCall: z
+      .object({
+        inputSchemaName: z.string().trim().min(1),
+        toolKind: rawEngineToolKindSchema,
+        toolName: z
+          .string()
+          .trim()
+          .regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_]*)+$/u),
+      })
+      .strict(),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export const rawEngineAgentReplayStepV1Schema = z
   .object({
+    auditLog: rawEngineAgentReplayAuditLogV1Schema,
     approval: approvalRequirementSchema,
     deterministic: z.boolean(),
     dryRun: z.boolean(),
@@ -8331,6 +8369,46 @@ export const rawEngineAgentReplayStepV1Schema = z
         code: 'custom',
         message: 'Replay mutation steps must advance the graph revision.',
         path: ['resultingGraphRevision'],
+      });
+    }
+
+    if (step.auditLog.toolCall.toolName !== step.toolName) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay audit log tool name must match the step tool name.',
+        path: ['auditLog', 'toolCall', 'toolName'],
+      });
+    }
+
+    if (step.auditLog.toolCall.toolKind !== step.toolKind) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay audit log tool kind must match the step tool kind.',
+        path: ['auditLog', 'toolCall', 'toolKind'],
+      });
+    }
+
+    if (step.auditLog.toolCall.inputSchemaName !== step.inputSchemaName) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay audit log input schema must match the step input schema.',
+        path: ['auditLog', 'toolCall', 'inputSchemaName'],
+      });
+    }
+
+    if (step.mutates && step.auditLog.rollbackPoint === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay mutation audit logs require a rollback point.',
+        path: ['auditLog', 'rollbackPoint'],
+      });
+    }
+
+    if (step.auditLog.warnings.length !== step.warnings.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Replay audit log warnings must mirror step warnings.',
+        path: ['auditLog', 'warnings'],
       });
     }
   });
@@ -9400,6 +9478,7 @@ export type ProjectLibrarySnapshotV1 = z.infer<typeof projectLibrarySnapshotV1Sc
 export type ProjectLibrarySortCriteriaV1 = z.infer<typeof projectLibrarySortCriteriaV1Schema>;
 export type QueryEnvelopeV1 = z.infer<typeof queryEnvelopeV1Schema>;
 export type RawEngineActor = z.infer<typeof rawEngineActorSchema>;
+export type RawEngineAgentReplayAuditLogV1 = z.infer<typeof rawEngineAgentReplayAuditLogV1Schema>;
 export type RawEngineAgentReplayFixtureV1 = z.infer<typeof rawEngineAgentReplayFixtureV1Schema>;
 export type RawEngineAgentReplayStepV1 = z.infer<typeof rawEngineAgentReplayStepV1Schema>;
 export type RawEngineTarget = z.infer<typeof rawEngineTargetSchema>;
