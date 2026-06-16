@@ -307,6 +307,16 @@ const commandPaletteWorkflowProofSchema = z.object({
   panoramaOpen: z.literal('true'),
   srOpen: z.literal('true'),
 });
+const negativeLabWorkspaceProofDatasetSchema = z.object({
+  activeStage: z.enum(['colorInversion', 'export', 'inspection']),
+  exportReady: z.enum(['false', 'true']),
+  previewReady: z.literal('true'),
+  queuedCount: z.string().regex(/^[1-9][0-9]*$/u),
+  reviewCount: z.string().regex(/^[0-9]+$/u),
+  retouchCount: z.literal('0'),
+  schemaVersion: z.literal('1'),
+  targetCount: z.string().regex(/^[1-9][0-9]*$/u),
+});
 const selectedScenarios =
   requestedScenario === null ? scenarios : scenarios.filter((scenario) => scenario.mode === requestedScenario);
 
@@ -641,8 +651,18 @@ async function prepareScenario(page, mode) {
   if (mode !== 'negative-lab-workspace') return;
 
   await page.getByTestId('negative-lab-workspace').waitFor({ timeout: 10_000 });
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="negative-lab-workspace-proof"]')?.dataset.previewReady === 'true',
+  );
+  negativeLabWorkspaceProofDatasetSchema.parse(
+    await page.getByTestId('negative-lab-workspace-proof').evaluate((element) => ({ ...element.dataset })),
+  );
   await page.getByTestId('negative-lab-workflow-rail').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-batch-readiness').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-dust-review').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-retouch-count').getByText('Retouch 0', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId('negative-lab-frame-count').getByText('Frames 2', { exact: true }).waitFor({
     timeout: 10_000,
   });

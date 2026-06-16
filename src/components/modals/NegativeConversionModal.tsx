@@ -32,6 +32,7 @@ import {
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildNegativeBaseFogDensitometerReadout } from '../../utils/negativeLabDensitometer';
+import { buildNegativeLabDustScratchReviewReport } from '../../utils/negativeLabDustScratchReview';
 import {
   buildNegativeLabBatchDryRunSummary,
   buildNegativeLabFrameHealthReport,
@@ -49,6 +50,7 @@ import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
 
 import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
+import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspaceSchemas';
 
 type NegativeParams = NegativeLabPresetParams;
 type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
@@ -70,6 +72,7 @@ const CUSTOM_BASE_SAMPLE_DEFAULT = {
   x: 0.25,
   y: 0.25,
 } satisfies NegativeLabBaseFogSampleRect;
+const NEGATIVE_LAB_WORKSPACE_UI_SCHEMA_VERSION = 1 satisfies NegativeLabWorkspaceProof['schemaVersion'];
 const getInitialIncludedPaths = (paths: string[]) => new Set(paths);
 const clampSampleValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 const normalizeSampleRect = (rect: NegativeLabBaseFogSampleRect): NegativeLabBaseFogSampleRect => {
@@ -107,6 +110,11 @@ const DENSITOMETER_STATUS_LABEL_KEYS: Record<
   minor_cast: 'modals.negativeConversion.densitometerStatusMinorCast',
   strong_cast: 'modals.negativeConversion.densitometerStatusStrongCast',
 };
+const DUST_SCRATCH_SEVERITY_LABEL_KEYS = {
+  clear: 'modals.negativeConversion.dustSeverity.clear',
+  retouch: 'modals.negativeConversion.dustSeverity.retouch',
+  review: 'modals.negativeConversion.dustSeverity.review',
+} as const;
 const BASE_FOG_SAMPLE_PRESETS = [
   {
     labelKey: 'modals.negativeConversion.sampleLeftEdge',
@@ -140,7 +148,7 @@ const DENSITOMETER_PATCH_PRESETS = [
   },
 ] satisfies Array<{ labelKey: DensitometerPatchLabelKey; rect: NegativeLabBaseFogSampleRect; testId: string }>;
 
-type NegativeLabWorkflowStageId = 'setup' | 'preset' | 'colorTiming' | 'printGrade' | 'export';
+type NegativeLabWorkflowStageId = 'setup' | 'preset' | 'colorTiming' | 'inspection' | 'printGrade' | 'export';
 
 interface NegativeLabWorkflowStage {
   detail: string;
@@ -305,6 +313,10 @@ export default function NegativeConversionModal({
     [baseFogConfidence, effectiveActivePathIndex, includedPathSet, previewUrl, targetPaths],
   );
   const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
+  const dustScratchReviewReport = useMemo(
+    () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewUrl !== null),
+    [frameHealthReport, previewUrl],
+  );
   const batchDryRunPlanJson = useMemo(() => JSON.stringify(batchDryRunSummary, null, 2), [batchDryRunSummary]);
   const acceptedBatchPlanIdentity = useMemo(
     () => buildNegativeLabAcceptedPlanIdentity(batchDryRunPlanJson),
@@ -319,6 +331,18 @@ export default function NegativeConversionModal({
     previewUrl !== null &&
     pathsToConvert.length > 0 &&
     (!requiresAcceptedBatchPlan || isBatchPlanAccepted);
+  const workspaceProof = useMemo(
+    (): NegativeLabWorkspaceProof => ({
+      activeStage: canSave ? 'export' : previewUrl === null ? 'colorInversion' : 'inspection',
+      exportReady: canSave,
+      previewReady: previewUrl !== null,
+      queuedCount: pathsToConvert.length,
+      reviewReport: dustScratchReviewReport,
+      schemaVersion: NEGATIVE_LAB_WORKSPACE_UI_SCHEMA_VERSION,
+      targetCount: targetPaths.length,
+    }),
+    [canSave, dustScratchReviewReport, pathsToConvert.length, previewUrl, targetPaths.length],
+  );
 
   const workflowStages = useMemo<NegativeLabWorkflowStage[]>(
     () => [
@@ -347,6 +371,15 @@ export default function NegativeConversionModal({
         id: 'colorTiming',
         isComplete: true,
         label: t('modals.negativeConversion.workflowColorTiming'),
+      },
+      {
+        detail: t('modals.negativeConversion.workflowInspectionDetail', {
+          reviewCount: dustScratchReviewReport.reviewCount,
+          retouchCount: dustScratchReviewReport.retouchCount,
+        }),
+        id: 'inspection',
+        isComplete: previewUrl !== null && dustScratchReviewReport.retouchCount === 0,
+        label: t('modals.negativeConversion.workflowInspection'),
       },
       {
         detail: t('modals.negativeConversion.workflowPrintDetail', {
@@ -381,6 +414,8 @@ export default function NegativeConversionModal({
       previewUrl,
       saveOptions.outputFormat,
       selectedProfile,
+      dustScratchReviewReport.reviewCount,
+      dustScratchReviewReport.retouchCount,
       t,
       targetPaths.length,
     ],
@@ -916,6 +951,52 @@ export default function NegativeConversionModal({
           </div>
         </div>
       )}
+    </div>
+  );
+
+  const renderDustScratchReview = () => (
+    <div
+      className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+      data-testid="negative-lab-dust-review"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <UiText variant={TextVariants.small} className="font-medium text-text-primary">
+          {t('modals.negativeConversion.dustScratchReview')}
+        </UiText>
+        <div className="flex gap-1 text-[11px] text-text-tertiary">
+          <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-review-count">
+            {t('modals.negativeConversion.dustReviewCount', { reviewCount: dustScratchReviewReport.reviewCount })}
+          </span>
+          <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-retouch-count">
+            {t('modals.negativeConversion.dustRetouchCount', { retouchCount: dustScratchReviewReport.retouchCount })}
+          </span>
+        </div>
+      </div>
+      <UiText variant={TextVariants.small} className="text-text-tertiary">
+        {t('modals.negativeConversion.dustScratchReviewHint')}
+      </UiText>
+      <div className="space-y-1">
+        {dustScratchReviewReport.frames.map((frame, index) => (
+          <div
+            className="grid grid-cols-[1fr_auto] gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+            data-testid={`negative-lab-dust-review-row-${index}`}
+            key={frame.frameId}
+          >
+            <span className="min-w-0 truncate text-text-secondary">{frame.scanLabel}</span>
+            <span
+              className={cx(
+                'rounded px-1.5 py-0.5',
+                frame.severity === 'clear' && 'bg-accent/15 text-text-primary',
+                frame.severity === 'review' && 'bg-surface text-text-secondary',
+                frame.severity === 'retouch' && 'bg-bg-primary text-text-tertiary',
+              )}
+            >
+              {t(DUST_SCRATCH_SEVERITY_LABEL_KEYS[frame.severity])}
+            </span>
+            <span className="col-span-2 text-[11px] text-text-tertiary">{frame.recommendation}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 
@@ -1478,6 +1559,7 @@ export default function NegativeConversionModal({
                   </div>
                 )}
             </div>
+            {renderDustScratchReview()}
             <Slider
               label={t('modals.negativeConversion.redWeight')}
               value={params.red_weight}
@@ -1629,7 +1711,7 @@ export default function NegativeConversionModal({
   const renderWorkflowRail = () => (
     <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none">
       <div
-        className="pointer-events-auto grid grid-cols-5 gap-2 rounded-md border border-white/10 bg-black/65 p-2 shadow-xl backdrop-blur-md"
+        className="pointer-events-auto grid grid-cols-6 gap-2 rounded-md border border-white/10 bg-black/65 p-2 shadow-xl backdrop-blur-md"
         data-testid="negative-lab-workflow-rail"
       >
         {workflowStages.map((stage) => {
@@ -1720,6 +1802,18 @@ export default function NegativeConversionModal({
 
   const renderContent = () => (
     <div className="modal-preview-adjustments flex flex-row h-full w-full overflow-hidden">
+      <div
+        className="sr-only"
+        data-active-stage={workspaceProof.activeStage}
+        data-export-ready={String(workspaceProof.exportReady)}
+        data-preview-ready={String(workspaceProof.previewReady)}
+        data-queued-count={workspaceProof.queuedCount}
+        data-review-count={workspaceProof.reviewReport.reviewCount}
+        data-retouch-count={workspaceProof.reviewReport.retouchCount}
+        data-schema-version={workspaceProof.schemaVersion}
+        data-target-count={workspaceProof.targetCount}
+        data-testid="negative-lab-workspace-proof"
+      />
       <div className="modal-preview-pane grow flex flex-col relative min-h-0 bg-[#0f0f0f] overflow-hidden">
         {renderWorkflowRail()}
         <div
