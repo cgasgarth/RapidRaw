@@ -10,7 +10,7 @@ an unowned Vite warning.
 
 | Asset class              | Raw budget      | Gzip budget   |
 | ------------------------ | --------------- | ------------- |
-| Largest JavaScript asset | 2,676,000 bytes | 784,000 bytes |
+| Largest JavaScript asset | 2,697,000 bytes | 789,000 bytes |
 | Largest CSS asset        | 125,000 bytes   | 20,000 bytes  |
 
 ## Validation
@@ -28,9 +28,9 @@ This command builds the frontend and then runs
 
 - The current monolithic JavaScript chunk is accepted as temporary debt.
 - Growth beyond the raw or gzip budget fails validation.
-- HDR, panorama, color style, advanced color setup UI, and Negative Lab frame
-  queue UI increased the temporary JavaScript ceiling; future code-splitting
-  should lower this again.
+- HDR, panorama, color style, advanced color setup UI, Negative Lab frame queue,
+  and frame health UI increased the temporary JavaScript ceiling; future
+  code-splitting should lower this again.
 - A future code-splitting PR should lower the JavaScript budget after reducing
   the largest chunk.
 - `vite.config.js` sets `chunkSizeWarningLimit` to the same raw budget range so

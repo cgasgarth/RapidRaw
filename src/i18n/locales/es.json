@@ -1348,6 +1348,10 @@
       "scopeAll": "All scans",
       "workflowExportReadyCount": "{{format}} / {{queuedCount}} queued",
       "excludeScan": "Exclude",
+      "frameHealth": "Frame health",
+      "frameHealthActive": "Active",
+      "frameHealthQueued": "Queued",
+      "frameHealthSkipped": "Skipped",
       "includeScan": "Include",
       "includedScans": "{{includedCount}} included"
     },
