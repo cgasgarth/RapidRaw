@@ -75,13 +75,13 @@ const highDpiTargets = [
 const warmPrintPresetSchema = z
   .object({
     adjustments: z.object({
-      contrast: z.literal(5),
-      highlights: z.literal(-6),
-      temperature: z.literal(5),
+      contrast: z.literal(8),
+      highlights: z.literal(-10),
+      temperature: z.literal(8),
     }),
     includeCropTransform: z.literal(false),
     includeMasks: z.literal(false),
-    name: z.literal('Warm Print 65%'),
+    name: z.literal('Warm Print 100%'),
     presetType: z.literal('style'),
   })
   .passthrough();
@@ -317,13 +317,17 @@ async function prepareScenario(page, mode) {
   if (mode === 'film-look-browser') {
     await page.getByLabel('Warm Print', { exact: true }).click();
     await page.getByTestId('film-look-adjustment-proof').getByText('Temp 5').waitFor({ timeout: 10_000 });
+    await page.getByRole('slider', { name: 'Strength' }).fill('100');
+    await page.getByTestId('film-look-adjustment-proof').getByText('Temp 8', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     await page.getByLabel('Compare A: Warm Print').click();
     await page.getByLabel('Save Warm Print as preset').click();
-    await page.getByTestId('film-look-preset-status').getByText('Saved Warm Print 65%', { exact: true }).waitFor({
+    await page.getByTestId('film-look-preset-status').getByText('Saved Warm Print 100%', { exact: true }).waitFor({
       timeout: 10_000,
     });
     await page.getByLabel('Share Warm Print preset').click();
-    await page.getByTestId('film-look-preset-status').getByText('Exported Warm Print 65%', { exact: true }).waitFor({
+    await page.getByTestId('film-look-preset-status').getByText('Exported Warm Print 100%', { exact: true }).waitFor({
       timeout: 10_000,
     });
     await assertFilmLookExportProof(page);
