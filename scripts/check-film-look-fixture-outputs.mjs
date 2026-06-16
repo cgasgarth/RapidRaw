@@ -75,6 +75,8 @@ for (const marker of [
   'activeCategory',
   'categoryTabs',
   'FILM_LOOK_CATEGORY_FILTER_LABEL',
+  'handleSwapComparisonLooks',
+  'FILM_LOOK_COMPARE_SWAP_LABEL',
 ]) {
   if (!browserSource.includes(marker)) {
     throw new Error(`Film look browser is missing UI marker: ${marker}`);
