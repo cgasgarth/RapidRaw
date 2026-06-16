@@ -82,9 +82,15 @@ const conversionPlanResultSchema = z.object({
   }),
   paths: z.array(z.string()).min(1),
   presetId: z.string(),
+  profile: z.object({
+    measurementProfileId: z.string().nullable(),
+    presetId: z.string(),
+    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured']),
+    runtimeStatus: z.enum(['ui_catalog_only', 'runtime_parameter_applied']),
+  }),
   proof: z.object({
     deterministic: z.literal(true),
-    generatedFrom: z.literal('src/utils/negativeLabPresetCatalog.ts'),
+    generatedFrom: z.literal('src/utils/negativeLabMeasuredProfileRuntime.ts'),
   }),
   sampleRect: z.union([z.null(), z.object({ height: z.number(), width: z.number(), x: z.number(), y: z.number() })]),
   scope: z.enum(['active', 'all']),
@@ -302,6 +308,7 @@ for (const [filePath, marker] of [
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabConversionPlanResultSchema'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabFrameHealthRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabConversionPlanResult'],
+  ['src/utils/negativeLabMeasuredProfileRuntime.ts', 'resolveNegativeLabRuntimeProfile'],
   ['src/utils/negativeLabPresetCatalog.ts', 'NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG'],
 ]) {
   const source = await readFile(filePath, 'utf8');

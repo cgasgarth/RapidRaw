@@ -23,6 +23,13 @@ export const negativeLabMeasuredProfileRuntimeLimitationSchema = z.enum([
   'no_colorimetric_match_claim',
 ]);
 
+export const negativeLabMeasuredProfileRuntimeStatusSchema = z.enum(['ui_catalog_only', 'runtime_parameter_applied']);
+
+export const negativeLabRuntimePresetIdSchema = z.union([
+  negativeLabPresetIdSchema,
+  negativeLabMeasuredProfileIdSchema,
+]);
+
 export const negativeLabMeasuredProfileSchema = z
   .object({
     claimLevel: z.literal('measured_profile'),
@@ -38,7 +45,7 @@ export const negativeLabMeasuredProfileSchema = z
     profileId: negativeLabMeasuredProfileIdSchema,
     profileStatus: z.literal('fixture_measured'),
     runtimeLimitations: z.array(z.string().trim().min(1)).min(1),
-    runtimeStatus: z.literal('ui_catalog_only'),
+    runtimeStatus: negativeLabMeasuredProfileRuntimeStatusSchema,
     sourceGenericPresetId: negativeLabPresetIdSchema,
   })
   .strict()
@@ -76,6 +83,53 @@ export const negativeLabMeasuredProfileSchema = z
         path: ['processFamily'],
       });
     }
+
+    const noRuntimeResolverClaimed = profile.doesNotProve.includes('no_runtime_profile_resolver');
+    if (profile.runtimeStatus === 'runtime_parameter_applied' && noRuntimeResolverClaimed) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Runtime-applied measured profiles must not claim there is no runtime resolver.',
+        path: ['doesNotProve'],
+      });
+    }
+
+    if (profile.runtimeStatus === 'ui_catalog_only' && !noRuntimeResolverClaimed) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Catalog-only measured profiles must disclose that no runtime resolver applies them yet.',
+        path: ['doesNotProve'],
+      });
+    }
+
+    if (
+      profile.claimPolicy === 'named_stock_profile_requires_license_review' &&
+      !profile.doesNotProve.includes('no_stock_emulation_claim')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Named-stock measured profiles must explicitly avoid stock-emulation claims.',
+        path: ['doesNotProve'],
+      });
+    }
+
+    if (
+      profile.claimPolicy === 'named_stock_profile_requires_license_review' &&
+      profile.runtimeStatus === 'runtime_parameter_applied'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Named-stock measured profiles cannot be runtime-applied without a separate license review gate.',
+        path: ['runtimeStatus'],
+      });
+    }
+
+    if (!profile.doesNotProve.includes('no_colorimetric_match_claim')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Measured Negative Lab profiles must avoid colorimetric match claims until fixture proof exists.',
+        path: ['doesNotProve'],
+      });
+    }
   });
 
 export const negativeLabMeasuredProfileCatalogSchema = z
@@ -103,6 +157,63 @@ export const negativeLabMeasuredProfileCatalogSchema = z
 export type NegativeLabMeasuredProfile = z.infer<typeof negativeLabMeasuredProfileSchema>;
 export type NegativeLabMeasuredProfileCatalog = z.infer<typeof negativeLabMeasuredProfileCatalogSchema>;
 export type NegativeLabMeasuredProfileClaimPolicy = z.infer<typeof negativeLabMeasuredProfileClaimPolicySchema>;
+export type NegativeLabMeasuredProfileRuntimeStatus = z.infer<typeof negativeLabMeasuredProfileRuntimeStatusSchema>;
+export type NegativeLabRuntimePresetId = z.infer<typeof negativeLabRuntimePresetIdSchema>;
 
 export const parseNegativeLabMeasuredProfileCatalog = (value: unknown): NegativeLabMeasuredProfileCatalog =>
   negativeLabMeasuredProfileCatalogSchema.parse(value);
+
+export const negativeLabResolvedRuntimeProfileSchema = z
+  .object({
+    claimLevel: z.enum(['generic_starting_point_only', 'measured_profile']),
+    claimPolicy: z.enum([
+      'generic_starting_point_no_stock_claim',
+      'measured_profile_required_before_stock_claim',
+      'process_family_profile_no_stock_claim',
+      'named_stock_profile_requires_license_review',
+    ]),
+    displayName: z.string().trim().min(1).max(80),
+    doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
+    evidenceFixtureIds: z.array(z.string().trim().min(1)),
+    measurementProfileId: negativeLabMeasuredProfileIdSchema.nullable(),
+    params: negativeLabPresetParamsSchema,
+    presetId: negativeLabRuntimePresetIdSchema,
+    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured']),
+    provenanceSummary: z.string().trim().min(1).max(220),
+    runtimeStatus: negativeLabMeasuredProfileRuntimeStatusSchema,
+    sourceGenericPresetId: negativeLabPresetIdSchema.nullable(),
+  })
+  .strict()
+  .superRefine((profile, context) => {
+    if (profile.profileStatus === 'generic_unmeasured') {
+      if (
+        profile.claimLevel !== 'generic_starting_point_only' ||
+        profile.measurementProfileId !== null ||
+        profile.runtimeStatus !== 'runtime_parameter_applied' ||
+        profile.sourceGenericPresetId !== null ||
+        profile.evidenceFixtureIds.length !== 0
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Generic runtime profiles must remain unmeasured and provenance-light.',
+        });
+      }
+    }
+
+    if (profile.profileStatus === 'fixture_measured') {
+      if (
+        profile.claimLevel !== 'measured_profile' ||
+        profile.measurementProfileId === null ||
+        profile.runtimeStatus !== 'runtime_parameter_applied' ||
+        profile.sourceGenericPresetId === null ||
+        profile.evidenceFixtureIds.length === 0
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Fixture-measured runtime profiles must carry applied measured provenance.',
+        });
+      }
+    }
+  });
+
+export type NegativeLabResolvedRuntimeProfile = z.infer<typeof negativeLabResolvedRuntimeProfileSchema>;

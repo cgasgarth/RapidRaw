@@ -5,10 +5,13 @@ import {
   negativeLabFrameHealthReportSchema,
 } from './negativeLabFrameHealthSchemas';
 import {
+  negativeLabResolvedRuntimeProfileSchema,
+  negativeLabRuntimePresetIdSchema,
+} from './negativeLabMeasuredProfileSchemas';
+import {
   negativeBaseFogDensitometerReadoutSchema,
   negativeBaseFogEstimateSchema,
   negativeLabBaseFogSampleRectSchema,
-  negativeLabPresetIdSchema,
   negativeLabPresetParamsSchema,
 } from './negativeLabPresetCatalogSchemas';
 
@@ -33,7 +36,7 @@ export const negativeLabAppServerCommandSchema = z
   .object({
     outputFormat: negativeLabAppServerOutputFormatSchema,
     paths: z.array(z.string().trim().min(1)).min(1),
-    presetId: negativeLabPresetIdSchema,
+    presetId: negativeLabRuntimePresetIdSchema,
     sampleRect: negativeLabBaseFogSampleRectSchema.nullable(),
     scope: negativeLabAppServerScopeSchema,
     suffix: z.string().trim().min(1).max(40),
@@ -150,11 +153,12 @@ export const negativeLabConversionPlanResultSchema = z
     outputFormat: negativeLabAppServerOutputFormatSchema,
     params: negativeLabPresetParamsSchema,
     paths: z.array(z.string().trim().min(1)).min(1),
-    presetId: negativeLabPresetIdSchema,
+    presetId: negativeLabRuntimePresetIdSchema,
+    profile: negativeLabResolvedRuntimeProfileSchema,
     proof: z
       .object({
         deterministic: z.literal(true),
-        generatedFrom: z.literal('src/utils/negativeLabPresetCatalog.ts'),
+        generatedFrom: z.literal('src/utils/negativeLabMeasuredProfileRuntime.ts'),
       })
       .strict(),
     sampleRect: negativeLabBaseFogSampleRectSchema.nullable(),
