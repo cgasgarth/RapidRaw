@@ -14,8 +14,15 @@ interface VisualSmokeTauriInternals {
   unregisterCallback: (id: number) => void;
 }
 
+interface VisualSmokeInvokeCall {
+  args?: Record<string, unknown> | undefined;
+  command: string;
+  options?: unknown;
+}
+
 declare global {
   interface Window {
+    __RAWENGINE_VISUAL_SMOKE_INVOKES__?: Array<VisualSmokeInvokeCall>;
     __TAURI_INTERNALS__?: VisualSmokeTauriInternals;
     isTauri?: boolean;
   }
@@ -48,13 +55,15 @@ const generatedPreviewBytes = [
 ];
 
 let callbackId = 0;
+window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ = [];
 window.isTauri = true;
 window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
   unregisterListener: () => {},
 };
 window.__TAURI_INTERNALS__ = {
   convertFileSrc: (filePath) => filePath,
-  invoke: (command) => {
+  invoke: (command, args, options) => {
+    window.__RAWENGINE_VISUAL_SMOKE_INVOKES__?.push({ args, command, options });
     if (command === 'preview_negative_conversion') return Promise.resolve(negativeLabPreviewUrl);
     if (command === 'generate_preview_for_path') return Promise.resolve(generatedPreviewBytes);
     if (command === 'estimate_negative_base_fog') {
