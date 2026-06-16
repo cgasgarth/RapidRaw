@@ -4,6 +4,8 @@ import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCata
 import {
   negativeLabAppServerCommandSchema,
   negativeLabAppServerRouteManifestSchema,
+  negativeLabAcceptBatchPlanAppServerCommandSchema,
+  negativeLabAcceptBatchPlanAppServerResultSchema,
   negativeLabBatchSummaryAppServerCommandSchema,
   negativeLabBatchSummaryAppServerResultSchema,
   negativeLabConversionPlanResultSchema,
@@ -12,6 +14,8 @@ import {
   negativeLabFrameHealthAppServerCommandSchema,
   negativeLabFrameHealthAppServerResultSchema,
   type NegativeLabAppServerCommand,
+  type NegativeLabAcceptBatchPlanAppServerCommand,
+  type NegativeLabAcceptBatchPlanAppServerResult,
   type NegativeLabBatchSummaryAppServerCommand,
   type NegativeLabBatchSummaryAppServerResult,
   type NegativeLabConversionPlanResult,
@@ -21,8 +25,24 @@ import {
   type NegativeLabFrameHealthAppServerResult,
 } from '../schemas/negativeLabAppServerSchemas';
 
+const buildPlanHash = (value: string) => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+};
+
 export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteManifestSchema.parse({
   routes: [
+    {
+      commandName: 'negative.lab.accept_batch_dry_run_plan',
+      inputSchemaName: 'NegativeLabAcceptBatchPlanAppServerCommandV1',
+      outputSchemaName: 'NegativeLabAcceptedBatchPlanV1',
+      reason: 'Negative Lab app-server calls require an accepted non-destructive batch plan before apply.',
+      status: 'mapped',
+    },
     {
       commandName: 'negative.lab.build_batch_dry_run_summary',
       inputSchemaName: 'NegativeLabBatchSummaryAppServerCommandV1',
@@ -111,6 +131,25 @@ export const buildNegativeLabBatchSummaryRouteResult = (
   const frameHealthReport = buildNegativeLabFrameHealthRouteResult(parsedCommand);
 
   return negativeLabBatchSummaryAppServerResultSchema.parse(buildNegativeLabBatchDryRunSummary(frameHealthReport));
+};
+
+export const buildNegativeLabAcceptedBatchPlanRouteResult = (
+  command: NegativeLabAcceptBatchPlanAppServerCommand,
+): NegativeLabAcceptBatchPlanAppServerResult => {
+  const parsedCommand = negativeLabAcceptBatchPlanAppServerCommandSchema.parse(command);
+  const dryRunSummary = buildNegativeLabBatchSummaryRouteResult(parsedCommand);
+  const planHash = buildPlanHash(JSON.stringify(dryRunSummary));
+
+  return negativeLabAcceptBatchPlanAppServerResultSchema.parse({
+    acceptedDryRunPlanHash: `fnv1a32:${planHash}`,
+    acceptedDryRunPlanId: `negative_lab_batch_plan_${planHash}`,
+    commandName: 'negative.lab.accept_batch_dry_run_plan',
+    dryRunSummary,
+    proof: {
+      deterministic: true,
+      generatedFrom: 'src/utils/negativeLabFrameHealth.ts',
+    },
+  });
 };
 
 export const buildNegativeLabDensitometerRouteResult = (
