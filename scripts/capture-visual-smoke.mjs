@@ -335,6 +335,10 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-workspace').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-workflow-rail').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-batch-readiness').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-preset-inspector').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-preset-film-class').getByText('Color negative', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId('negative-lab-include-toggle-1').click();
   await page
     .getByTestId('negative-lab-queued-count')
