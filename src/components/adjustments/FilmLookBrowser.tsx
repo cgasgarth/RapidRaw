@@ -1,4 +1,4 @@
-import { Check, Film, Save, Share2, X } from 'lucide-react';
+import { ArrowLeftRight, Check, Film, Save, Share2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { TextVariants } from '../../types/typography';
@@ -25,6 +25,7 @@ type FilmLookComparisonSelection = Record<FilmLookComparisonSlot, string | null>
 const FILM_LOOK_BROWSER_TITLE = 'Film Looks';
 const FILM_LOOK_COMPARE_TITLE = 'A/B Compare';
 const FILM_LOOK_COMPARE_EMPTY = 'Choose look';
+const FILM_LOOK_COMPARE_SWAP_LABEL = 'Swap A/B';
 const FILM_LOOK_COMPARE_SLOT_LABELS: Record<FilmLookComparisonSlot, string> = {
   a: 'A',
   b: 'B',
@@ -205,6 +206,13 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
     }));
   };
 
+  const handleSwapComparisonLooks = () => {
+    setComparisonSelection((currentSelection) => ({
+      a: currentSelection.b,
+      b: currentSelection.a,
+    }));
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -291,6 +299,17 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
           <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
             {FILM_LOOK_COMPARE_TITLE}
           </UiText>
+          <button
+            aria-label={FILM_LOOK_COMPARE_SWAP_LABEL}
+            className="inline-flex items-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+            data-tooltip={FILM_LOOK_COMPARE_SWAP_LABEL}
+            disabled={comparisonSelection.a === null && comparisonSelection.b === null}
+            onClick={handleSwapComparisonLooks}
+            type="button"
+          >
+            <ArrowLeftRight size={13} aria-hidden="true" />
+            {FILM_LOOK_COMPARE_SWAP_LABEL}
+          </button>
         </div>
         <div className="grid grid-cols-2 gap-2">
           {FILM_LOOK_COMPARE_SLOTS.map((slot) => {
