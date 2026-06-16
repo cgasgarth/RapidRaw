@@ -9,6 +9,7 @@ import {
 } from '../src/utils/filmLookBrowser.ts';
 
 const fixtureUrl = new URL('../fixtures/film-simulation/film-look-fixture-outputs.json', import.meta.url);
+const browserSourceUrl = new URL('../src/components/adjustments/FilmLookBrowser.tsx', import.meta.url);
 const updateFixture = process.argv.includes('--update');
 
 const getAdjustmentFingerprint = (adjustmentSummaries) =>
@@ -60,6 +61,13 @@ try {
 
 if (currentFixture !== expectedFixture) {
   throw new Error('Film look fixture outputs are stale. Run bun run check:film-fixtures:update and review the diff.');
+}
+
+const browserSource = await readFile(browserSourceUrl, 'utf8');
+for (const marker of ['showFavoritesOnly', 'favoriteLookCount', 'visibleGroups', 'FILM_LOOK_FAVORITES_STORAGE_KEY']) {
+  if (!browserSource.includes(marker)) {
+    throw new Error(`Film look browser is missing UI marker: ${marker}`);
+  }
 }
 
 console.log('Film look fixture outputs are current.');

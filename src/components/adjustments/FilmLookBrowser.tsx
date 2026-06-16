@@ -34,6 +34,9 @@ const FILM_LOOK_COMPARE_APPLY_LABELS: Record<FilmLookComparisonSlot, string> = {
 const FILM_LOOK_COMPARE_SLOTS: Array<FilmLookComparisonSlot> = ['a', 'b'];
 const FILM_LOOK_STRENGTH_LABEL = 'Strength';
 const FILM_LOOK_FAVORITES_STORAGE_KEY = 'rapidraw.filmLookFavorites.v1';
+const FILM_LOOK_FAVORITES_LABEL = 'Favorites';
+const FILM_LOOK_ALL_LABEL = 'All looks';
+const FILM_LOOK_EMPTY_FAVORITES = 'No favorites yet';
 const formatFilmLookCount = (count: number) => `${count} looks`;
 const formatFilmLookStrength = (strength: number) => `${strength}%`;
 const formatFilmLookAdjustmentValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
@@ -70,6 +73,22 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
   });
   const [favoriteLookIds, setFavoriteLookIds] = useState<Set<string>>(readFavoriteLookIds);
   const [strengthPercent, setStrengthPercent] = useState<number>(70);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+
+  const favoriteLookCount = useMemo(
+    () => groups.reduce((count, group) => count + group.looks.filter((look) => favoriteLookIds.has(look.id)).length, 0),
+    [favoriteLookIds, groups],
+  );
+  const visibleGroups = useMemo(
+    () =>
+      groups
+        .map((group) => ({
+          ...group,
+          looks: showFavoritesOnly ? group.looks.filter((look) => favoriteLookIds.has(look.id)) : group.looks,
+        }))
+        .filter((group) => group.looks.length > 0),
+    [favoriteLookIds, groups, showFavoritesOnly],
+  );
 
   useEffect(() => {
     window.localStorage.setItem(FILM_LOOK_FAVORITES_STORAGE_KEY, JSON.stringify([...favoriteLookIds].toSorted()));
@@ -133,8 +152,39 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
       <div className="flex items-center justify-between gap-3">
         <UiText variant={TextVariants.heading}>{FILM_LOOK_BROWSER_TITLE}</UiText>
         <UiText className="tabular-nums" variant={TextVariants.small}>
-          {formatFilmLookCount(lookCount)}
+          {formatFilmLookCount(showFavoritesOnly ? favoriteLookCount : lookCount)}
         </UiText>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          aria-pressed={!showFavoritesOnly}
+          className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+            showFavoritesOnly
+              ? 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface'
+              : 'border-accent bg-accent/10 text-text-primary'
+          }`}
+          onClick={() => {
+            setShowFavoritesOnly(false);
+          }}
+          type="button"
+        >
+          {FILM_LOOK_ALL_LABEL}
+        </button>
+        <button
+          aria-pressed={showFavoritesOnly}
+          className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+            showFavoritesOnly
+              ? 'border-accent bg-accent/10 text-text-primary'
+              : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface'
+          }`}
+          onClick={() => {
+            setShowFavoritesOnly(true);
+          }}
+          type="button"
+        >
+          {FILM_LOOK_FAVORITES_LABEL}
+        </button>
       </div>
 
       <section className="space-y-2" aria-label={FILM_LOOK_COMPARE_TITLE}>
@@ -231,7 +281,14 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
       </section>
 
       <div className="space-y-3">
-        {groups.map((group) => (
+        {showFavoritesOnly && favoriteLookCount === 0 && (
+          <div className="rounded-md border border-dashed border-surface bg-bg-secondary p-3 text-center">
+            <UiText variant={TextVariants.small} className="text-text-secondary">
+              {FILM_LOOK_EMPTY_FAVORITES}
+            </UiText>
+          </div>
+        )}
+        {visibleGroups.map((group) => (
           <section className="space-y-2" key={group.category}>
             <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
               {group.displayName}
