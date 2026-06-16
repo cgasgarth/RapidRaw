@@ -110,6 +110,7 @@
     "check:chromatic-adaptation": "bun scripts/check-chromatic-adaptation-fixtures.mjs",
     "check:gamut-mapping": "bun scripts/check-gamut-mapping-fixtures.mjs",
     "check:generated-types": "bun scripts/check-generated-type-drift.mjs",
+    "check:command-palette-workflows": "bun scripts/capture-visual-smoke.mjs --scenario command-palette-workflows",
     "check:color-workflow-smoke": "bun scripts/capture-visual-smoke.mjs --scenario color-workflow",
     "check:film-fixtures": "bun scripts/check-film-look-fixture-outputs.mjs",
     "check:film-fixtures:update": "bun scripts/check-film-look-fixture-outputs.mjs --update",

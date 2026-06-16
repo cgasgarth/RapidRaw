@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import ColorPanel from '../../components/adjustments/Color';
 import EffectsPanel from '../../components/adjustments/Effects';
+import CommandPaletteModal from '../../components/modals/CommandPaletteModal';
 import FocusStackModal from '../../components/modals/FocusStackModal';
 import HdrModal from '../../components/modals/HdrModal';
 import NegativeConversionModal from '../../components/modals/NegativeConversionModal';
@@ -15,6 +16,7 @@ import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
 } from '../../schemas/superResolutionUiSchemas';
+import { useUIStore } from '../../store/useUIStore';
 import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../utils/adjustments';
 
 interface VisualSmokeAppProps {
@@ -46,6 +48,7 @@ const copy = {
   adjustments: 'Adjustments',
   layerStack: 'Layer stack',
   activeLayerCount: '3 active',
+  commandPaletteSmoke: 'Command Palette Workflows',
   filmLook: 'Film look',
   filmPreset: 'Neutral 400',
   focusStackSmoke: 'Focus Stack Smoke',
@@ -93,6 +96,58 @@ const colorSmokeMetricLabels = {
   saturation: 'Sat',
   temperature: 'Temp',
 } as const;
+
+function CommandPaletteWorkflowSmoke() {
+  const [isOpen, setIsOpen] = useState(true);
+  const focusOpen = useUIStore((state) => state.focusStackModalState.isOpen);
+  const hdrOpen = useUIStore((state) => state.hdrModalState.isOpen);
+  const negativeOpen = useUIStore((state) => state.negativeModalState.isOpen);
+  const panoramaOpen = useUIStore((state) => state.panoramaModalState.isOpen);
+  const srOpen = useUIStore((state) => state.superResolutionModalState.isOpen);
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="command-palette-workflows"
+    >
+      <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="command-palette-workflows">
+        <div
+          className="sr-only"
+          data-focus-open={focusOpen}
+          data-hdr-open={hdrOpen}
+          data-negative-open={negativeOpen}
+          data-panorama-open={panoramaOpen}
+          data-sr-open={srOpen}
+          data-testid="command-palette-workflow-proof"
+        />
+        <div className="flex h-11 items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+          <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+          <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+            {copy.commandPaletteSmoke}
+          </span>
+        </div>
+        <button
+          className="m-6 rounded border border-white/10 bg-white/5 px-3 py-2 text-sm"
+          data-testid="command-palette-open"
+          onClick={() => {
+            setIsOpen(true);
+          }}
+          type="button"
+        >
+          {copy.harness}
+        </button>
+        <CommandPaletteModal
+          isOpen={isOpen}
+          onBackToLibrary={() => {}}
+          onClose={() => {
+            setIsOpen(false);
+          }}
+        />
+      </div>
+    </main>
+  );
+}
 
 function FocusStackVisualSmoke() {
   const [settings, setSettings] = useState<FocusStackUiSettings>(DEFAULT_FOCUS_STACK_UI_SETTINGS);
@@ -373,6 +428,10 @@ function ColorWorkflowVisualSmoke() {
 }
 
 function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
+  if (mode === 'command-palette-workflows') {
+    return <CommandPaletteWorkflowSmoke />;
+  }
+
   if (mode === 'focus-ui') {
     return <FocusStackVisualSmoke />;
   }
