@@ -93,6 +93,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario focus-ui'])],
   ['check:hdr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario hdr-ui'])],
   ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario panorama-ui'])],
+  ['check:sr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario sr-ui'])],
   ['check:negative-lab-fixtures', new Set(['bun scripts/check-negative-lab-fixtures.mjs'])],
   ['check:negative-lab-fixtures:update', new Set(['bun scripts/check-negative-lab-fixtures.mjs --update'])],
   ['check:negative-lab-ui-presets', new Set(['bun scripts/check-negative-lab-ui-presets.mjs'])],
@@ -497,6 +498,17 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -120,6 +120,7 @@\n+    "check:panorama-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario panorama-ui",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'super-resolution UI smoke package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -120,6 +120,7 @@\n+    "check:sr-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario sr-ui",',
       },
     ],
     SMOKE_MODES.NONE,

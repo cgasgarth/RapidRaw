@@ -38,6 +38,12 @@ const scenarios = [
     sectionMinimum: 1,
   },
   {
+    marker: 'Super-resolution plan',
+    mode: 'sr-ui',
+    outputPath: resolve(outputDir, 'sr-ui.png'),
+    sectionMinimum: 1,
+  },
+  {
     marker: 'Negative Conversion',
     mode: 'negative-lab-workspace',
     outputPath: resolve(outputDir, 'negative-lab-workspace.png'),
@@ -99,6 +105,13 @@ const focusUiSettingsProofSchema = z.object({
   maxPreviewDimensionPx: z.literal('8192'),
   qualityPreference: z.literal('preview'),
   retouchLayerPolicy: z.literal('none'),
+});
+const superResolutionUiSettingsProofSchema = z.object({
+  alignmentMode: z.literal('optical_flow'),
+  detailPolicy: z.literal('aggressive_preview_only'),
+  maxPreviewDimensionPx: z.literal('8192'),
+  outputScale: z.literal('4'),
+  qualityPreference: z.literal('preview'),
 });
 const selectedScenarios =
   requestedScenario === null ? scenarios : scenarios.filter((scenario) => scenario.mode === requestedScenario);
@@ -204,6 +217,20 @@ async function prepareScenario(page, mode) {
     await page.getByRole('button', { name: '8192 px' }).click();
     focusUiSettingsProofSchema.parse(
       await page.getByTestId('focus-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    return;
+  }
+
+  if (mode === 'sr-ui') {
+    await page.getByRole('button', { name: '4x' }).click();
+    await page.getByRole('button', { exact: true, name: 'Auto' }).click();
+    await page.getByRole('option', { name: 'Optical flow' }).click();
+    await page.getByRole('button', { exact: true, name: 'Best' }).click();
+    await page.getByRole('option', { name: 'Preview' }).click();
+    await page.getByRole('button', { name: /Aggressive preview/u }).click();
+    await page.getByRole('button', { name: '8192 px' }).click();
+    superResolutionUiSettingsProofSchema.parse(
+      await page.getByTestId('sr-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
     );
     return;
   }
