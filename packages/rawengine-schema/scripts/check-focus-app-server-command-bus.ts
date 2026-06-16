@@ -42,7 +42,7 @@ const sampleFocusStackPreflightSourceStates = sampleFocusStackArtifactV1.sourceS
 }));
 
 class FocusAppServerCommandBus {
-  readonly #acceptedDryRunPlanIds = new Set<string>();
+  readonly #acceptedDryRunPlanHashesById = new Map<string, string>();
   readonly #toolsByName = new Map<string, ComputationalMergeAppServerToolDefinitionV1>();
 
   constructor(manifestValue: unknown) {
@@ -87,7 +87,10 @@ class FocusAppServerCommandBus {
       throw new Error(`${tool.toolName} expected an accepted dry-run plan.`);
     }
 
-    this.#acceptedDryRunPlanIds.add(dryRunResult.mergePlan.planId);
+    this.#acceptedDryRunPlanHashesById.set(
+      dryRunResult.mergePlan.planId,
+      sampleFocusStackArtifactV1.dryRun.acceptedDryRunPlanHash,
+    );
     return FocusAppServerCommandBusResultSchema.parse({
       dryRunResult,
       kind: 'dry_run',
@@ -106,12 +109,12 @@ class FocusAppServerCommandBus {
 
     const acceptedPlanId = command.parameters.acceptedDryRunPlanId;
     const acceptedPlanHash = command.parameters.acceptedDryRunPlanHash;
-    if (acceptedPlanId === undefined || acceptedPlanHash === undefined) {
-      throw new Error(`${tool.toolName} requires accepted dry-run plan id and hash.`);
+    if (acceptedPlanId === undefined || !this.#acceptedDryRunPlanHashesById.has(acceptedPlanId)) {
+      throw new Error(`${tool.toolName} rejected unaccepted dry-run plan ${String(acceptedPlanId)}.`);
     }
 
-    if (!this.#acceptedDryRunPlanIds.has(acceptedPlanId)) {
-      throw new Error(`${tool.toolName} rejected unaccepted dry-run plan ${acceptedPlanId}.`);
+    if (acceptedPlanHash !== this.#acceptedDryRunPlanHashesById.get(acceptedPlanId)) {
+      throw new Error(`${tool.toolName} rejected mismatched dry-run plan hash ${String(acceptedPlanHash)}.`);
     }
 
     const mutationResult = computationalMergeMutationResultV1Schema.parse({
@@ -171,6 +174,7 @@ const acceptedApplyCommand = computationalMergeCommandEnvelopeV1Schema.parse({
   ...sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
   parameters: {
     ...sampleComputationalMergeFocusStackApplyCommandEnvelopeV1.parameters,
+    acceptedDryRunPlanHash: sampleFocusStackArtifactV1.dryRun.acceptedDryRunPlanHash,
     acceptedDryRunPlanId: dryRun.dryRunResult.mergePlan.planId,
   },
 });
@@ -195,6 +199,16 @@ expectThrows('focus apply tool without accepted dry-run plan', () =>
     'computationalmerge.focus_stack.apply_command',
     sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
   ),
+);
+
+expectThrows('focus apply tool with mismatched dry-run plan hash', () =>
+  commandBus.execute('computationalmerge.focus_stack.apply_command', {
+    ...acceptedApplyCommand,
+    parameters: {
+      ...acceptedApplyCommand.parameters,
+      acceptedDryRunPlanHash: 'sha256:mismatched-focus-plan',
+    },
+  }),
 );
 
 expectThrows('focus apply tool with dry-run command', () =>

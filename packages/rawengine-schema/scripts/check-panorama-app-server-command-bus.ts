@@ -36,7 +36,7 @@ const PanoramaAppServerCommandBusResultSchema = z.discriminatedUnion('kind', [
 ]);
 
 class PanoramaAppServerCommandBus {
-  readonly #acceptedDryRunPlanIds = new Set<string>();
+  readonly #acceptedDryRunPlanHashesById = new Map<string, string>();
   readonly #toolsByName = new Map<string, ComputationalMergeAppServerToolDefinitionV1>();
 
   constructor(manifestValue: unknown) {
@@ -83,7 +83,12 @@ class PanoramaAppServerCommandBus {
       sourceGraphRevision: command.expectedGraphRevision,
     };
 
-    this.#acceptedDryRunPlanIds.add(dryRunResult.mergePlan.planId);
+    const acceptedPlanHash = sampleComputationalMergeApplyCommandEnvelopeV1.parameters.acceptedDryRunPlanHash;
+    if (acceptedPlanHash === undefined) {
+      throw new Error(`${tool.toolName} sample apply command is missing an accepted dry-run plan hash.`);
+    }
+
+    this.#acceptedDryRunPlanHashesById.set(dryRunResult.mergePlan.planId, acceptedPlanHash);
     return PanoramaAppServerCommandBusResultSchema.parse({
       dryRunResult,
       kind: 'dry_run',
@@ -102,12 +107,12 @@ class PanoramaAppServerCommandBus {
 
     const acceptedPlanId = command.parameters.acceptedDryRunPlanId;
     const acceptedPlanHash = command.parameters.acceptedDryRunPlanHash;
-    if (acceptedPlanId === undefined || acceptedPlanHash === undefined) {
-      throw new Error(`${tool.toolName} requires accepted dry-run plan id and hash.`);
+    if (acceptedPlanId === undefined || !this.#acceptedDryRunPlanHashesById.has(acceptedPlanId)) {
+      throw new Error(`${tool.toolName} rejected unaccepted dry-run plan ${String(acceptedPlanId)}.`);
     }
 
-    if (!this.#acceptedDryRunPlanIds.has(acceptedPlanId)) {
-      throw new Error(`${tool.toolName} rejected unaccepted dry-run plan ${acceptedPlanId}.`);
+    if (acceptedPlanHash !== this.#acceptedDryRunPlanHashesById.get(acceptedPlanId)) {
+      throw new Error(`${tool.toolName} rejected mismatched dry-run plan hash ${String(acceptedPlanHash)}.`);
     }
 
     const mutationResult = computationalMergeMutationResultV1Schema.parse({
@@ -148,6 +153,7 @@ const acceptedApplyCommand = computationalMergeCommandEnvelopeV1Schema.parse({
   ...sampleComputationalMergeApplyCommandEnvelopeV1,
   parameters: {
     ...sampleComputationalMergeApplyCommandEnvelopeV1.parameters,
+    acceptedDryRunPlanHash: sampleComputationalMergeApplyCommandEnvelopeV1.parameters.acceptedDryRunPlanHash,
     acceptedDryRunPlanId: dryRun.dryRunResult.mergePlan.planId,
   },
 });
@@ -172,6 +178,16 @@ expectThrows('panorama apply tool before accepted dry-run', () =>
     'computationalmerge.panorama.apply_command',
     acceptedApplyCommand,
   ),
+);
+
+expectThrows('panorama apply tool with mismatched dry-run plan hash', () =>
+  commandBus.execute('computationalmerge.panorama.apply_command', {
+    ...acceptedApplyCommand,
+    parameters: {
+      ...acceptedApplyCommand.parameters,
+      acceptedDryRunPlanHash: 'sha256:mismatched-panorama-plan',
+    },
+  }),
 );
 
 console.log('Panorama app-server command bus ok');

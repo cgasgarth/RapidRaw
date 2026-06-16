@@ -42,7 +42,7 @@ const sampleSuperResolutionPreflightSourceStates = sampleSuperResolutionArtifact
 }));
 
 class SuperResolutionAppServerCommandBus {
-  readonly #acceptedDryRunPlanIds = new Set<string>();
+  readonly #acceptedDryRunPlanHashesById = new Map<string, string>();
   readonly #toolsByName = new Map<string, ComputationalMergeAppServerToolDefinitionV1>();
 
   constructor(manifestValue: unknown) {
@@ -87,7 +87,10 @@ class SuperResolutionAppServerCommandBus {
       throw new Error(`${tool.toolName} expected an accepted dry-run plan.`);
     }
 
-    this.#acceptedDryRunPlanIds.add(dryRunResult.mergePlan.planId);
+    this.#acceptedDryRunPlanHashesById.set(
+      dryRunResult.mergePlan.planId,
+      sampleSuperResolutionArtifactV1.dryRun.acceptedDryRunPlanHash,
+    );
     return SuperResolutionAppServerCommandBusResultSchema.parse({
       dryRunResult,
       kind: 'dry_run',
@@ -106,12 +109,12 @@ class SuperResolutionAppServerCommandBus {
 
     const acceptedPlanId = command.parameters.acceptedDryRunPlanId;
     const acceptedPlanHash = command.parameters.acceptedDryRunPlanHash;
-    if (acceptedPlanId === undefined || acceptedPlanHash === undefined) {
-      throw new Error(`${tool.toolName} requires accepted dry-run plan id and hash.`);
+    if (acceptedPlanId === undefined || !this.#acceptedDryRunPlanHashesById.has(acceptedPlanId)) {
+      throw new Error(`${tool.toolName} rejected unaccepted dry-run plan ${String(acceptedPlanId)}.`);
     }
 
-    if (!this.#acceptedDryRunPlanIds.has(acceptedPlanId)) {
-      throw new Error(`${tool.toolName} rejected unaccepted dry-run plan ${acceptedPlanId}.`);
+    if (acceptedPlanHash !== this.#acceptedDryRunPlanHashesById.get(acceptedPlanId)) {
+      throw new Error(`${tool.toolName} rejected mismatched dry-run plan hash ${String(acceptedPlanHash)}.`);
     }
 
     const mutationResult = computationalMergeMutationResultV1Schema.parse({
@@ -171,6 +174,7 @@ const acceptedApplyCommand = computationalMergeCommandEnvelopeV1Schema.parse({
   ...sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1,
   parameters: {
     ...sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1.parameters,
+    acceptedDryRunPlanHash: sampleSuperResolutionArtifactV1.dryRun.acceptedDryRunPlanHash,
     acceptedDryRunPlanId: dryRun.dryRunResult.mergePlan.planId,
   },
 });
@@ -195,6 +199,16 @@ expectThrows('super-resolution apply tool without accepted dry-run plan', () =>
     'computationalmerge.super_resolution.apply_command',
     sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1,
   ),
+);
+
+expectThrows('super-resolution apply tool with mismatched dry-run plan hash', () =>
+  commandBus.execute('computationalmerge.super_resolution.apply_command', {
+    ...acceptedApplyCommand,
+    parameters: {
+      ...acceptedApplyCommand.parameters,
+      acceptedDryRunPlanHash: 'sha256:mismatched-super-resolution-plan',
+    },
+  }),
 );
 
 expectThrows('super-resolution apply tool with dry-run command', () =>
