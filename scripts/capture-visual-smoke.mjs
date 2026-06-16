@@ -79,6 +79,14 @@ const hdrUiSettingsProofSchema = z.object({
   maxPreviewDimensionPx: z.literal('8192'),
   toneMapPreview: z.literal('false'),
 });
+const panoramaUiSettingsProofSchema = z.object({
+  blendMode: z.literal('feather'),
+  boundaryMode: z.literal('transparent'),
+  exposureMode: z.literal('none'),
+  maxPreviewDimensionPx: z.literal('8192'),
+  projection: z.literal('spherical'),
+  qualityPreference: z.literal('preview'),
+});
 const selectedScenarios =
   requestedScenario === null ? scenarios : scenarios.filter((scenario) => scenario.mode === requestedScenario);
 
@@ -179,6 +187,23 @@ async function prepareScenario(page, mode) {
     await page.getByLabel('Tone-map preview').uncheck();
     hdrUiSettingsProofSchema.parse(
       await page.getByTestId('hdr-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    return;
+  }
+
+  if (mode === 'panorama-ui') {
+    await page.getByRole('button', { name: 'Cylindrical' }).click();
+    await page.getByRole('option', { name: 'Spherical' }).click();
+    await page.getByRole('button', { exact: true, name: 'Best' }).click();
+    await page.getByRole('option', { name: 'Preview' }).click();
+    await page.getByRole('button', { name: /Feather/u }).click();
+    await page.getByRole('button', { name: 'Auto crop' }).click();
+    await page.getByRole('option', { name: 'Transparent edge' }).click();
+    await page.getByRole('button', { name: 'Gain compensation' }).click();
+    await page.getByRole('option', { name: 'None' }).click();
+    await page.getByRole('button', { name: '8192 px' }).click();
+    panoramaUiSettingsProofSchema.parse(
+      await page.getByTestId('panorama-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
     );
     return;
   }
