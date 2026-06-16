@@ -226,6 +226,8 @@ export const resetFilmLookControlledAdjustments = (): FilmLookAdjustmentPatch =>
   return resetPatch;
 };
 
+export const getFilmLookControlledAdjustmentKeys = (): Array<FilmLookAdjustmentKey> => [...FILM_LOOK_ADJUSTMENT_KEYS];
+
 export const buildFilmLookAppliedAdjustmentPatch = (
   look: FilmLookBrowserItem,
   strength: number,
