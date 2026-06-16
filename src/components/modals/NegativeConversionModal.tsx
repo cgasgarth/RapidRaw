@@ -30,6 +30,7 @@ type NegativeParams = NegativeLabPresetParams;
 type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
 type NegativeConversionScope = 'active' | 'all';
 type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
+type FrameHealthTone = 'active' | 'queued' | 'skipped';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
@@ -59,6 +60,13 @@ interface NegativeLabWorkflowStage {
   id: NegativeLabWorkflowStageId;
   isComplete: boolean;
   label: string;
+}
+
+interface NegativeLabFrameHealthRow {
+  baseLabel: string;
+  label: string;
+  statusLabel: string;
+  tone: FrameHealthTone;
 }
 
 interface NegativeConversionModalProps {
@@ -113,6 +121,33 @@ export default function NegativeConversionModal({
   );
   const selectedPresetFilmClass =
     selectedPreset?.filmClass === 'black_and_white_silver' ? 'Black and white silver' : 'Color negative';
+  const frameHealthRows = useMemo<NegativeLabFrameHealthRow[]>(
+    () =>
+      targetPaths.map((path, index) => {
+        const isActiveScan = index === effectiveActivePathIndex;
+        const isIncludedScan = includedPathSet.has(path);
+        const tone: FrameHealthTone = !isIncludedScan ? 'skipped' : isActiveScan ? 'active' : 'queued';
+        const statusLabel = t(
+          tone === 'skipped'
+            ? 'modals.negativeConversion.frameHealthSkipped'
+            : tone === 'active'
+              ? 'modals.negativeConversion.frameHealthActive'
+              : 'modals.negativeConversion.frameHealthQueued',
+        );
+        const baseLabel =
+          isActiveScan && baseFogConfidence !== null
+            ? t('modals.negativeConversion.baseReady', { confidence: Math.round(baseFogConfidence * 100) })
+            : t('modals.negativeConversion.basePending');
+
+        return {
+          baseLabel,
+          label: getNegativeLabScanLabel(path, index),
+          statusLabel,
+          tone,
+        };
+      }),
+    [baseFogConfidence, effectiveActivePathIndex, includedPathSet, t, targetPaths],
+  );
 
   const workflowStages = useMemo<NegativeLabWorkflowStage[]>(
     () => [
@@ -470,6 +505,35 @@ export default function NegativeConversionModal({
           {t('modals.negativeConversion.includedScans', { includedCount: includedPathSet.size })}
         </span>
       </div>
+      {frameHealthRows.length > 0 && (
+        <div className="space-y-1" data-testid="negative-lab-frame-health-grid">
+          <UiText variant={TextVariants.small} className="text-text-tertiary">
+            {t('modals.negativeConversion.frameHealth')}
+          </UiText>
+          <div className="grid gap-1">
+            {frameHealthRows.map((row, index) => (
+              <div
+                className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+                data-testid={`negative-lab-frame-health-row-${index}`}
+                key={`${row.label}-${index}`}
+              >
+                <span className="truncate text-text-secondary">{row.label}</span>
+                <span
+                  className={cx(
+                    'rounded px-1.5 py-0.5',
+                    row.tone === 'active' && 'bg-accent/15 text-text-primary',
+                    row.tone === 'queued' && 'bg-surface text-text-secondary',
+                    row.tone === 'skipped' && 'bg-bg-primary text-text-tertiary',
+                  )}
+                >
+                  {row.statusLabel}
+                </span>
+                <span className="text-text-tertiary">{row.baseLabel}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 
