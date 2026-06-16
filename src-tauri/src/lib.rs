@@ -2754,7 +2754,35 @@ mod tests {
             artifact["engine"]["capabilityLevel"],
             "runtime_apply_capable"
         );
+        assert_eq!(
+            artifact["dryRun"]["acceptedDryRunPlanId"],
+            "legacy-hdr-runtime-save"
+        );
+        assert_eq!(
+            artifact["dryRun"]["acceptedDryRunPlanHash"],
+            "legacy-hdr-runtime-save"
+        );
+        assert_eq!(artifact["outputName"], "IMG_0001_Hdr.png");
         assert_eq!(artifact["outputArtifact"]["storage"], "sidecar_artifact");
+        assert_eq!(artifact["outputArtifact"]["dimensions"]["width"], 64);
+        assert_eq!(artifact["outputArtifact"]["dimensions"]["height"], 48);
+        assert!(
+            artifact["outputArtifact"]["contentHash"]
+                .as_str()
+                .unwrap()
+                .starts_with("blake3:")
+        );
+        assert_eq!(artifact["staleState"]["state"], "current");
+        assert_eq!(artifact["warningCodes"][0], "tone_mapped_preview_only");
         assert_eq!(artifact["sourceImageRefs"].as_array().unwrap().len(), 2);
+        assert_eq!(artifact["sourceState"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            artifact["sourceState"][0]["graphRevision"],
+            "hdr_legacy_runtime_v1"
+        );
+        assert_eq!(
+            artifact["sourceState"][0]["contentHash"],
+            format!("path:{}", source_refs[0].image_path)
+        );
     }
 }
