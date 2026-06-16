@@ -1,6 +1,9 @@
 #!/usr/bin/env bun
 
-import { buildPanoramaUiDryRunCommandV1 } from '../packages/rawengine-schema/src/panoramaUiControls.ts';
+import {
+  buildPanoramaUiApplyCommandV1,
+  buildPanoramaUiDryRunCommandV1,
+} from '../packages/rawengine-schema/src/panoramaUiControls.ts';
 
 const command = buildPanoramaUiDryRunCommandV1(
   {
@@ -41,6 +44,67 @@ if (command.parameters.blendMode !== 'multi_band') {
 }
 if (command.parameters.exposureNormalization !== 'auto') {
   failures.push('Panorama UI mapper must map gain compensation to API exposure normalization.');
+}
+
+const applyCommand = buildPanoramaUiApplyCommandV1(
+  {
+    blendMode: 'feather',
+    boundaryMode: 'transparent',
+    exposureMode: 'none',
+    outputName: 'Ridge Overlook Panorama',
+    projection: 'spherical',
+    sources: [
+      { exposureEv: 0, imagePath: '/photos/pano/PANO_0001.CR3', sourceIndex: 0 },
+      { exposureEv: 0, imagePath: '/photos/pano/PANO_0002.CR3', sourceIndex: 1 },
+    ],
+  },
+  {
+    acceptedDryRunPlanHash: 'sha256:panorama-ui-plan-001',
+    acceptedDryRunPlanId: 'panorama_ui_plan_001',
+    commandId: 'command_panorama_ui_apply_001',
+    correlationId: 'corr_panorama_ui_apply_001',
+    expectedGraphRevision: 'graph_rev_panorama_ui_001',
+    idempotencyKey: 'idem_panorama_ui_apply_001',
+    targetId: 'project_panorama_ui_001',
+  },
+);
+
+if (applyCommand.dryRun || applyCommand.approval.approvalClass !== 'edit_apply') {
+  failures.push('Panorama UI apply mapper must produce approved edit-apply commands.');
+}
+if (applyCommand.parameters.acceptedDryRunPlanId !== 'panorama_ui_plan_001') {
+  failures.push('Panorama UI apply mapper must require and preserve accepted dry-run plan IDs.');
+}
+if (applyCommand.parameters.exposureNormalization !== 'none' || applyCommand.parameters.blendMode !== 'feather') {
+  failures.push('Panorama UI apply mapper must preserve UI control overrides.');
+}
+
+let blockedMissingPlan = false;
+try {
+  buildPanoramaUiApplyCommandV1(
+    {
+      boundaryMode: 'auto_crop',
+      outputName: 'Invalid Panorama Apply',
+      projection: 'cylindrical',
+      sources: [
+        { imagePath: '/photos/pano/PANO_0001.CR3', sourceIndex: 0 },
+        { imagePath: '/photos/pano/PANO_0002.CR3', sourceIndex: 1 },
+      ],
+    },
+    {
+      acceptedDryRunPlanId: 'panorama_ui_plan_001',
+      commandId: 'command_panorama_ui_apply_invalid',
+      correlationId: 'corr_panorama_ui_apply_invalid',
+      expectedGraphRevision: 'graph_rev_panorama_ui_001',
+      targetId: 'project_panorama_ui_001',
+    },
+  );
+} catch {
+  blockedMissingPlan = true;
+}
+
+if (!blockedMissingPlan) {
+  failures.push('Panorama UI apply mapper accepted a missing acceptedDryRunPlanHash.');
 }
 
 let blockedSingleSource = false;
