@@ -138,6 +138,7 @@
     "check:hdr-merge-weighting-smoke": "bun scripts/check-hdr-merge-weighting-smoke.mjs",
     "check:hdr-merge-ui": "bun scripts/check-hdr-merge-ui.mjs",
     "check:hdr-ui-api": "bun scripts/check-hdr-ui-api.mjs",
+    "check:hdr-ui-runtime-bridge": "bun scripts/check-hdr-ui-runtime-bridge.mjs",
     "check:hdr-performance-smoke": "bun scripts/check-hdr-performance-smoke.mjs",
     "check:hdr-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario hdr-ui",
     "check:focus-fixtures": "bun scripts/check-focus-synthetic-fixtures.mjs",
