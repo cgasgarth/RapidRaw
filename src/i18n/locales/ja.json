@@ -1313,13 +1313,20 @@
       "workflowCustomPresetDetail": "カスタムミックス",
       "workflowExport": "書き出し",
       "workflowExportConverting": "変換中",
-      "workflowExportReady": "プレビュー準備完了",
       "workflowPreset": "プリセット",
       "workflowPrintDetail": "EV {{exposure}}  C {{contrast}}",
       "workflowPrintGrade": "グレード",
       "workflowSetup": "セットアップ",
       "workflowSetupDetailSingle": "1 件のスキャン",
-      "workflowSetupDetailMultiple": "{{scanCount}} 件のスキャン"
+      "workflowSetupDetailMultiple": "{{scanCount}} 件のスキャン",
+      "exportOptions": "書き出しオプション",
+      "outputSuffix": "出力サフィックス",
+      "outputFormats": {
+        "jpeg_proof": "JPEGプルーフ",
+        "tiff16": "16-bit TIFF"
+      },
+      "workflowExportReadyJpeg": "JPEGプルーフ準備完了",
+      "workflowExportReadyTiff": "16-bit TIFF準備完了"
     },
     "panorama": {
       "cancel": "キャンセル",

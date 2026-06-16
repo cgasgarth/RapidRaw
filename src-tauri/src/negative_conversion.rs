@@ -28,12 +28,49 @@ pub struct NegativeConversionParams {
     pub contrast: f32,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum NegativeConversionOutputFormat {
+    JpegProof,
+    #[default]
+    Tiff16,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeConversionSaveOptions {
+    pub output_format: NegativeConversionOutputFormat,
+    pub suffix: String,
+}
+
 const MIN_CHANNEL_WEIGHT: f32 = 0.5;
 const MAX_CHANNEL_WEIGHT: f32 = 2.0;
 const MIN_EXPOSURE: f32 = -2.0;
 const MAX_EXPOSURE: f32 = 2.0;
 const MIN_CONTRAST: f32 = 0.5;
 const MAX_CONTRAST: f32 = 2.5;
+const DEFAULT_OUTPUT_SUFFIX: &str = "Positive";
+const JPEG_PROOF_QUALITY: u8 = 92;
+
+impl Default for NegativeConversionSaveOptions {
+    fn default() -> Self {
+        Self {
+            output_format: NegativeConversionOutputFormat::Tiff16,
+            suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
+        }
+    }
+}
+
+impl NegativeConversionSaveOptions {
+    fn sanitized(self) -> Self {
+        let suffix = sanitize_output_suffix(&self.suffix);
+
+        Self {
+            output_format: self.output_format,
+            suffix,
+        }
+    }
+}
 
 impl Default for NegativeConversionParams {
     fn default() -> Self {
@@ -44,6 +81,28 @@ impl Default for NegativeConversionParams {
             exposure: 0.0,
             contrast: 1.0,
         }
+    }
+}
+
+fn sanitize_output_suffix(suffix: &str) -> String {
+    let sanitized: String = suffix
+        .chars()
+        .filter_map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_') {
+                Some(c)
+            } else if c.is_whitespace() {
+                Some('_')
+            } else {
+                None
+            }
+        })
+        .take(40)
+        .collect();
+
+    if sanitized.is_empty() {
+        DEFAULT_OUTPUT_SUFFIX.to_string()
+    } else {
+        sanitized
     }
 }
 
@@ -315,10 +374,12 @@ pub async fn preview_negative_conversion(
 pub async fn convert_negatives(
     paths: Vec<String>,
     params: NegativeConversionParams,
+    options: Option<NegativeConversionSaveOptions>,
     app_handle: AppHandle,
 ) -> Result<Vec<String>, String> {
     tokio::task::spawn_blocking(move || {
         let mut results = Vec::new();
+        let save_options = options.unwrap_or_default().sanitized();
 
         for (i, path_str) in paths.iter().enumerate() {
             let _ = app_handle.emit(
@@ -359,13 +420,33 @@ pub async fn convert_negatives(
             let p = Path::new(&real_path);
             let parent = p.parent().unwrap_or(Path::new(""));
             let stem = p.file_stem().unwrap_or_default().to_string_lossy();
-            let filename = format!("{}_Positive.tiff", stem);
+            let extension = match save_options.output_format {
+                NegativeConversionOutputFormat::JpegProof => "jpg",
+                NegativeConversionOutputFormat::Tiff16 => "tiff",
+            };
+            let filename = format!("{}_{}.{}", stem, save_options.suffix, extension);
             let out_path = parent.join(&filename);
 
-            processed
-                .to_rgb16()
-                .save(&out_path)
-                .map_err(|e| format!("Failed to save {}: {}", filename, e))?;
+            match save_options.output_format {
+                NegativeConversionOutputFormat::JpegProof => {
+                    let mut buf = Cursor::new(Vec::new());
+                    processed
+                        .to_rgb8()
+                        .write_with_encoder(JpegEncoder::new_with_quality(
+                            &mut buf,
+                            JPEG_PROOF_QUALITY,
+                        ))
+                        .map_err(|e| format!("Failed to encode {}: {}", filename, e))?;
+                    fs::write(&out_path, buf.into_inner())
+                        .map_err(|e| format!("Failed to save {}: {}", filename, e))?;
+                }
+                NegativeConversionOutputFormat::Tiff16 => {
+                    processed
+                        .to_rgb16()
+                        .save(&out_path)
+                        .map_err(|e| format!("Failed to save {}: {}", filename, e))?;
+                }
+            }
 
             let _ = crate::exif_processing::write_rrexif_sidecar(&real_path, &out_path);
             results.push(out_path.to_string_lossy().to_string());
@@ -421,6 +502,32 @@ mod tests {
             sanitized.contrast,
             NegativeConversionParams::default().contrast
         );
+    }
+
+    #[test]
+    fn negative_conversion_save_options_sanitize_output_suffix() {
+        let sanitized = NegativeConversionSaveOptions {
+            output_format: NegativeConversionOutputFormat::JpegProof,
+            suffix: " Proof / Final:01 ".to_string(),
+        }
+        .sanitized();
+
+        assert!(matches!(
+            sanitized.output_format,
+            NegativeConversionOutputFormat::JpegProof
+        ));
+        assert_eq!(sanitized.suffix, "_Proof__Final01_");
+    }
+
+    #[test]
+    fn negative_conversion_save_options_default_empty_suffix() {
+        let sanitized = NegativeConversionSaveOptions {
+            output_format: NegativeConversionOutputFormat::Tiff16,
+            suffix: "///".to_string(),
+        }
+        .sanitized();
+
+        assert_eq!(sanitized.suffix, DEFAULT_OUTPUT_SUFFIX);
     }
 
     #[test]

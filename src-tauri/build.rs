@@ -122,6 +122,16 @@ fn main() {
 
     fs::create_dir_all(&dest_dir).unwrap();
     let dest_path = dest_dir.join(lib_name);
+    let required_ci_feature_enabled = env::var_os("CARGO_FEATURE_REQUIRED_CI").is_some();
+
+    if required_ci_feature_enabled && target_os != "android" {
+        println!(
+            "cargo:warning=required-ci feature enabled; skipping ONNX Runtime download for compile-only checks."
+        );
+        println!("cargo:rerun-if-changed=build.rs");
+        tauri_build::build();
+        return;
+    }
 
     let mut is_valid = false;
     if dest_path.exists() {

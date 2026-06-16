@@ -37,14 +37,24 @@ const workflowStageKeys = [
   'workflowPrintGrade',
   'workflowPrintDetail',
   'workflowExport',
-  'workflowExportReady',
+  'workflowExportReadyJpeg',
+  'workflowExportReadyTiff',
   'workflowExportConverting',
+  'exportOptions',
+  'outputSuffix',
 ];
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
+const backendSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8');
 
-for (const marker of ['NegativeLabWorkflowStage', 'workflowStages', 'renderWorkflowRail']) {
+for (const marker of ['NegativeLabWorkflowStage', 'workflowStages', 'renderWorkflowRail', 'outputFormat', 'suffix']) {
   if (!modalSource.includes(marker)) {
     failures.push(`negative conversion modal is missing workflow marker: ${marker}`);
+  }
+}
+
+for (const marker of ['NegativeConversionSaveOptions', 'NegativeConversionOutputFormat', 'sanitize_output_suffix']) {
+  if (!backendSource.includes(marker)) {
+    failures.push(`negative conversion backend is missing export marker: ${marker}`);
   }
 }
 
@@ -56,6 +66,15 @@ for (const fileName of readdirSync('src/i18n/locales')) {
   for (const key of workflowStageKeys) {
     if (typeof negativeConversion?.[key] !== 'string' || negativeConversion[key].trim().length === 0) {
       failures.push(`${fileName}: missing modals.negativeConversion.${key}`);
+    }
+  }
+
+  for (const key of ['jpeg_proof', 'tiff16']) {
+    if (
+      typeof negativeConversion?.outputFormats?.[key] !== 'string' ||
+      negativeConversion.outputFormats[key].trim().length === 0
+    ) {
+      failures.push(`${fileName}: missing modals.negativeConversion.outputFormats.${key}`);
     }
   }
 }
