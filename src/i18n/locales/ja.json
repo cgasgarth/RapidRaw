@@ -1344,6 +1344,8 @@
       "batchReadiness": "Batch readiness",
       "batchPlanApplyCount": "Apply {{applyCount}}",
       "batchPlanSkippedCount": "Skip {{skippedCount}}",
+      "batchPlanCopied": "Copied plan",
+      "copyBatchPlan": "Copy batch plan JSON",
       "convertAndSaveActive": "Convert & Save Active",
       "previewPending": "Preview pending",
       "previewReady": "Preview ready",
