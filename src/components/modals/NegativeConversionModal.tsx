@@ -875,12 +875,36 @@ export default function NegativeConversionModal({
                   {selectedPresetRuntimeLabel}
                 </span>
               </div>
+              <div
+                className="mb-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-[11px] text-text-tertiary"
+                data-testid="negative-lab-preset-metadata"
+              >
+                <span>{t('modals.negativeConversion.presetSpeedClass')}</span>
+                <span className="text-right text-text-secondary" data-testid="negative-lab-preset-speed-class">
+                  {selectedPreset.nominalSpeedClass}
+                </span>
+                <span>{t('modals.negativeConversion.presetContrastCurve')}</span>
+                <span className="text-right text-text-secondary" data-testid="negative-lab-preset-contrast-curve">
+                  {selectedPreset.contrastCurveDescriptor}
+                </span>
+                <span>{t('modals.negativeConversion.presetGrainModel')}</span>
+                <span className="text-right text-text-secondary" data-testid="negative-lab-preset-grain-model">
+                  {selectedPreset.grainModelDescriptor}
+                </span>
+              </div>
               <UiText
                 data-testid="negative-lab-preset-intent"
                 variant={TextVariants.small}
                 className="text-text-secondary"
               >
                 {selectedPreset.intent}
+              </UiText>
+              <UiText
+                data-testid="negative-lab-preset-color-response"
+                variant={TextVariants.small}
+                className="mt-1 text-text-tertiary"
+              >
+                {t('modals.negativeConversion.presetColorResponse')}: {selectedPreset.colorResponseNotes}
               </UiText>
               <UiText
                 data-testid="negative-lab-preset-claim-policy"
