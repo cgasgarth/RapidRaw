@@ -675,6 +675,21 @@ mod tests {
         0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
     }
 
+    fn assert_images_near(left: &Rgb32FImage, right: &Rgb32FImage) {
+        assert_eq!(left.dimensions(), right.dimensions());
+
+        for (left_pixel, right_pixel) in left.pixels().zip(right.pixels()) {
+            for (left_channel, right_channel) in
+                left_pixel.channels().iter().zip(right_pixel.channels())
+            {
+                assert!(
+                    (left_channel - right_channel).abs() <= 0.000_001,
+                    "expected matching preview/export channel values, got {left_channel} and {right_channel}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn negative_conversion_params_clamp_to_supported_api_range() {
         let sanitized = NegativeConversionParams {
@@ -957,6 +972,57 @@ mod tests {
         assert_ne!(
             corrected.get_pixel(0, 0).channels(),
             uncorrected.get_pixel(0, 0).channels()
+        );
+    }
+
+    #[test]
+    fn negative_preview_and_export_fixture_share_density_pipeline() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                4,
+                2,
+                vec![
+                    0.92, 0.75, 0.42, 0.80, 0.58, 0.32, 0.44, 0.30, 0.18, 0.18, 0.12, 0.08, //
+                    0.88, 0.70, 0.38, 0.68, 0.48, 0.26, 0.36, 0.24, 0.14, 0.12, 0.08, 0.05,
+                ],
+            )
+            .unwrap(),
+        );
+        let params = NegativeConversionParams {
+            red_weight: 1.07,
+            green_weight: 0.96,
+            blue_weight: 1.18,
+            base_fog_strength: 1.0,
+            base_fog_sample: Some(NegativeBaseFogSampleRect {
+                x: 0.0,
+                y: 0.0,
+                width: 0.5,
+                height: 1.0,
+            }),
+            exposure: 0.05,
+            contrast: 1.1,
+        };
+        let rgb = input.to_rgb32f();
+        let (width, height) = rgb.dimensions();
+        let log_pixels: Vec<f32> = rgb
+            .as_raw()
+            .iter()
+            .map(|&v| -v.clamp(1e-6, 1.0).log10())
+            .collect();
+        let export_bounds = analyze_bounds(
+            &log_pixels,
+            width as usize,
+            height as usize,
+            params.base_fog_sample,
+        );
+
+        let preview_render = run_pipeline(&input, &params, None).to_rgb32f();
+        let export_render = run_pipeline(&input, &params, Some(export_bounds)).to_rgb32f();
+
+        assert_images_near(&preview_render, &export_render);
+        assert_ne!(
+            preview_render.get_pixel(0, 0).channels(),
+            preview_render.get_pixel(3, 1).channels()
         );
     }
 
