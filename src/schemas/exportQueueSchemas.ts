@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const exportQueueJobStatusSchema = z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']);
 export const exportQueuePrioritySchema = z.enum(['normal', 'high']);
+export type ExportQueuePriority = z.infer<typeof exportQueuePrioritySchema>;
 
 export const exportQueueRecipeRefSchema = z
   .object({
@@ -97,8 +98,46 @@ export const exportQueueSchema = z
     }
   });
 
+export const exportQueueExecutionPlanSchema = z
+  .object({
+    activeJobIds: z.array(z.string().trim().min(1)),
+    availableSlots: z.number().int().min(0),
+    nextJobIds: z.array(z.string().trim().min(1)),
+    queuedJobIds: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
 export type ExportQueue = z.infer<typeof exportQueueSchema>;
+export type ExportQueueExecutionPlan = z.infer<typeof exportQueueExecutionPlanSchema>;
 export type ExportQueueJob = z.infer<typeof exportQueueJobSchema>;
 
 export const parseExportQueue = (value: unknown): ExportQueue => exportQueueSchema.parse(value);
 export const parseExportQueueJob = (value: unknown): ExportQueueJob => exportQueueJobSchema.parse(value);
+
+const EXPORT_QUEUE_PRIORITY_WEIGHT: Record<ExportQueuePriority, number> = {
+  high: 0,
+  normal: 1,
+};
+
+const compareExportQueueJobs = (left: ExportQueueJob, right: ExportQueueJob) =>
+  EXPORT_QUEUE_PRIORITY_WEIGHT[left.priority] - EXPORT_QUEUE_PRIORITY_WEIGHT[right.priority] ||
+  left.createdAt.localeCompare(right.createdAt) ||
+  left.id.localeCompare(right.id);
+
+export const buildExportQueueExecutionPlan = (value: unknown): ExportQueueExecutionPlan => {
+  const queue = parseExportQueue(value);
+  const runningJobs = queue.jobs
+    .filter((job) => job.status === 'running')
+    .toSorted(
+      (left, right) => (left.startedAt ?? '').localeCompare(right.startedAt ?? '') || left.id.localeCompare(right.id),
+    );
+  const queuedJobs = queue.jobs.filter((job) => job.status === 'queued').toSorted(compareExportQueueJobs);
+  const availableSlots = Math.max(0, queue.maxConcurrentJobs - runningJobs.length);
+
+  return exportQueueExecutionPlanSchema.parse({
+    activeJobIds: runningJobs.map((job) => job.id),
+    availableSlots,
+    nextJobIds: queuedJobs.slice(0, availableSlots).map((job) => job.id),
+    queuedJobIds: queuedJobs.map((job) => job.id),
+  });
+};
