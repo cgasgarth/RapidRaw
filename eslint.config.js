@@ -1,3 +1,4 @@
+const { fixupPluginRules } = require('@eslint/compat');
 const js = require('@eslint/js');
 const tseslint = require('typescript-eslint');
 const react = require('eslint-plugin-react');
@@ -15,6 +16,13 @@ const publicApiSignatureFiles = [
   'src/schemas/**/*.ts',
   'src/utils/tauriSchemaInvoke.ts',
 ];
+const reactPlugin = fixupPluginRules(react);
+const reactHooksPlugin = fixupPluginRules(reactHooks);
+const reactRefreshPlugin = fixupPluginRules(reactRefresh.plugin);
+const jsxA11yPlugin = fixupPluginRules(jsxA11y);
+const importXPlugin = fixupPluginRules(importX);
+const boundariesPlugin = fixupPluginRules(boundaries);
+const i18nextPlugin = fixupPluginRules(i18next);
 
 const jsRecommendedForTs = {
   ...js.configs.recommended,
@@ -28,31 +36,55 @@ const tsStrictTypeChecked = tseslint.configs.strictTypeChecked.map((config) =>
 const reactRecommended = {
   ...react.configs.flat.recommended,
   files: tsFiles,
+  plugins: {
+    ...react.configs.flat.recommended.plugins,
+    react: reactPlugin,
+  },
 };
 
 const reactJsxRuntime = {
   ...react.configs.flat['jsx-runtime'],
   files: tsFiles,
+  plugins: {
+    ...react.configs.flat['jsx-runtime'].plugins,
+    react: reactPlugin,
+  },
 };
 
 const reactHooksRecommended = {
   ...reactHooks.configs.flat.recommended,
   files: tsFiles,
+  plugins: {
+    ...reactHooks.configs.flat.recommended.plugins,
+    'react-hooks': reactHooksPlugin,
+  },
 };
 
 const jsxA11yRecommended = {
   ...jsxA11y.flatConfigs.recommended,
   files: tsFiles,
+  plugins: {
+    ...jsxA11y.flatConfigs.recommended.plugins,
+    'jsx-a11y': jsxA11yPlugin,
+  },
 };
 
 const importXRecommended = {
   ...importX.flatConfigs.recommended,
   files: tsFiles,
+  plugins: {
+    ...importX.flatConfigs.recommended.plugins,
+    'import-x': importXPlugin,
+  },
 };
 
 const importXTypeScript = {
   ...importX.flatConfigs.typescript,
   files: tsFiles,
+  plugins: {
+    ...importX.flatConfigs.typescript.plugins,
+    'import-x': importXPlugin,
+  },
 };
 
 module.exports = [
@@ -81,7 +113,7 @@ module.exports = [
     files: reactRefreshFiles,
     ignores: ['src/utils/CollageVariants.tsx'],
     plugins: {
-      'react-refresh': reactRefresh.plugin,
+      'react-refresh': reactRefreshPlugin,
     },
     rules: {
       'react-refresh/only-export-components': [
@@ -97,10 +129,10 @@ module.exports = [
   {
     files: tsFiles,
     plugins: {
-      react,
-      'react-hooks': reactHooks,
-      boundaries,
-      i18next,
+      react: reactPlugin,
+      'react-hooks': reactHooksPlugin,
+      boundaries: boundariesPlugin,
+      i18next: i18nextPlugin,
     },
     languageOptions: {
       ecmaVersion: 'latest',
