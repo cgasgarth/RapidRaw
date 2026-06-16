@@ -277,16 +277,29 @@ const buildSyntheticManifestEntry = (fixture) => {
   };
 };
 
-const buildPlannedCameraRawEntry = () => ({
+const buildPlannedRealScanEntry = ({
+  bitDepth,
+  captureProfile,
+  developmentNotes,
+  expectedNegativeWarningCodes,
+  fileFormat,
+  fixtureId,
+  fixtureRole,
+  frameFormat,
+  lightSource,
+  processFamily,
+  rollOrSheetIdentifier,
+  scanInputMode,
+}) => ({
   allowedDistribution: 'none',
   allowedValidationUses: ['schema_roundtrip'],
   autoCorrectionBakedIn: 'unknown',
   baseFogSampleRegions: [],
-  bitDepth: 14,
-  captureProfile: 'raw_decoder_camera_profile_pending',
-  colorProfile: 'camera_raw_native_pending',
+  bitDepth,
+  captureProfile,
+  colorProfile: `${captureProfile}_pending`,
   derivativeDistributionAllowed: false,
-  developmentNotes: 'Placeholder for a camera-scanned RAW negative once licensing and ownership review permits use.',
+  developmentNotes,
   developmentProcessKnown: false,
   disallowedValidationUses: buildDisallowedUses(['schema_roundtrip']),
   expectedFixtureWarningCodes: [
@@ -297,25 +310,25 @@ const buildPlannedCameraRawEntry = () => ({
     'fixture_auto_correction_unknown',
     'fixture_profile_claim_disallowed',
   ],
-  expectedNegativeWarningCodes: ['unknown_input_profile', 'low_acquisition_confidence'],
-  fileFormat: 'raw',
-  filmStockDisplayName: 'Private Camera-Scanned RAW Negative Candidate',
+  expectedNegativeWarningCodes,
+  fileFormat,
+  filmStockDisplayName: 'Private Real Negative Candidate',
   filmStockKnown: false,
   filmStockSource: 'Local/private candidate; no stock claim in repository metadata.',
-  fixtureId: 'negative_lab.local.camera_raw_negative_candidate_001',
-  fixtureRole: 'profile_measurement',
-  frameFormat: '35mm_negative_frame_pending_review',
+  fixtureId,
+  fixtureRole,
+  frameFormat,
   lens: 'private_camera_scan_lens_pending_review',
-  lightSource: 'private_camera_scan_light_source_pending_review',
-  lossyCompression: false,
+  lightSource,
+  lossyCompression: fileFormat === 'jpeg',
   measurementClaimAllowed: false,
   negativeFixtureTier: 'local_private_scan',
   payloadAccess: 'metadata_only',
-  processFamily: 'c41_color_negative',
+  processFamily,
   profileClaimAllowed: false,
   rejectedSampleRegions: [],
-  rollOrSheetIdentifier: 'private_roll_pending_review',
-  scanInputMode: 'camera_raw',
+  rollOrSheetIdentifier,
+  scanInputMode,
   scannerOrCamera: 'private_camera_scan_pending_review',
   scannerSoftware: 'raw_decoder_pending_review',
   scannerSoftwareSettingsKnown: false,
@@ -327,12 +340,74 @@ const buildPlannedCameraRawEntry = () => ({
   targetOrStepWedgePresent: false,
 });
 
+const buildPlannedRealScanEntries = () => [
+  buildPlannedRealScanEntry({
+    bitDepth: 14,
+    captureProfile: 'raw_decoder_camera_profile',
+    developmentNotes:
+      'Placeholder for a camera-scanned color negative RAW once licensing and ownership review permits use.',
+    expectedNegativeWarningCodes: ['unknown_input_profile', 'low_acquisition_confidence'],
+    fileFormat: 'raw',
+    fixtureId: 'negative_lab.local.camera_raw_color_negative_candidate_001',
+    fixtureRole: 'profile_measurement',
+    frameFormat: '35mm_color_negative_frame_pending_review',
+    lightSource: 'private_even_backlight_pending_review',
+    processFamily: 'c41_color_negative',
+    rollOrSheetIdentifier: 'private_color_roll_pending_review',
+    scanInputMode: 'camera_raw',
+  }),
+  buildPlannedRealScanEntry({
+    bitDepth: 14,
+    captureProfile: 'raw_decoder_camera_profile',
+    developmentNotes: 'Placeholder for black-and-white silver negative RAW conversion proof and grain/tonality review.',
+    expectedNegativeWarningCodes: ['unknown_input_profile', 'low_acquisition_confidence'],
+    fileFormat: 'raw',
+    fixtureId: 'negative_lab.local.camera_raw_bw_negative_candidate_001',
+    fixtureRole: 'profile_measurement',
+    frameFormat: '35mm_bw_negative_frame_pending_review',
+    lightSource: 'private_even_backlight_pending_review',
+    processFamily: 'black_and_white_silver_negative',
+    rollOrSheetIdentifier: 'private_bw_roll_pending_review',
+    scanInputMode: 'camera_raw',
+  }),
+  buildPlannedRealScanEntry({
+    bitDepth: 16,
+    captureProfile: 'camera_tiff_profile',
+    developmentNotes:
+      'Placeholder for dense/thin exposure range proof where conversion must modify pixels and emit confidence warnings.',
+    expectedNegativeWarningCodes: ['unknown_input_profile', 'low_acquisition_confidence'],
+    fileFormat: 'tiff',
+    fixtureId: 'negative_lab.local.tiff_dense_thin_candidate_001',
+    fixtureRole: 'warning_stability',
+    frameFormat: 'mixed_density_negative_strip_pending_review',
+    lightSource: 'private_even_backlight_pending_review',
+    processFamily: 'c41_color_negative',
+    rollOrSheetIdentifier: 'private_dense_thin_roll_pending_review',
+    scanInputMode: 'camera_tiff',
+  }),
+  buildPlannedRealScanEntry({
+    bitDepth: 16,
+    captureProfile: 'camera_tiff_profile',
+    developmentNotes:
+      'Placeholder for mixed-lighting color negative scan proof where base/fog and color balance warnings remain visible.',
+    expectedNegativeWarningCodes: ['unknown_input_profile', 'low_acquisition_confidence'],
+    fileFormat: 'tiff',
+    fixtureId: 'negative_lab.local.tiff_mixed_lighting_candidate_001',
+    fixtureRole: 'roll_consistency',
+    frameFormat: 'mixed_lighting_negative_strip_pending_review',
+    lightSource: 'mixed_lighting_pending_review',
+    processFamily: 'c41_color_negative',
+    rollOrSheetIdentifier: 'private_mixed_lighting_roll_pending_review',
+    scanInputMode: 'camera_tiff',
+  }),
+];
+
 const buildSyntheticProof = () =>
   syntheticProofSchema.parse({ cases: buildSyntheticCases(), generator, issue: 1377, schemaVersion: 1 });
 
 const buildManifest = (proof) =>
   negativeLabFixtureManifestV1Schema.parse({
-    entries: [...proof.cases.map(buildSyntheticManifestEntry), buildPlannedCameraRawEntry()],
+    entries: [...proof.cases.map(buildSyntheticManifestEntry), ...buildPlannedRealScanEntries()],
     manifestId: 'negative_lab_fixture_manifest',
     manifestVersion: '2026-06-16',
     schemaVersion: 1,
@@ -373,14 +448,15 @@ const assertCoverage = (proof, manifest) => {
     }
   }
 
-  const rawCameraCandidates = manifest.entries.filter(
-    (entry) =>
-      entry.fileFormat === 'raw' &&
-      entry.scanInputMode === 'camera_raw' &&
-      entry.negativeFixtureTier === 'local_private_scan',
-  );
-  if (rawCameraCandidates.length < 1) {
-    throw new Error('Negative-lab fixture manifest must track at least one camera-scanned RAW negative candidate.');
+  for (const fixtureId of [
+    'negative_lab.local.camera_raw_color_negative_candidate_001',
+    'negative_lab.local.camera_raw_bw_negative_candidate_001',
+    'negative_lab.local.tiff_dense_thin_candidate_001',
+    'negative_lab.local.tiff_mixed_lighting_candidate_001',
+  ]) {
+    if (!manifest.entries.some((entry) => entry.fixtureId === fixtureId && entry.payloadAccess === 'metadata_only')) {
+      throw new Error(`Negative-lab fixture manifest missing real-scan placeholder: ${fixtureId}.`);
+    }
   }
 };
 
