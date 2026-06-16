@@ -92,6 +92,10 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:negative-lab-fixtures', new Set(['bun scripts/check-negative-lab-fixtures.mjs'])],
   ['check:negative-lab-fixtures:update', new Set(['bun scripts/check-negative-lab-fixtures.mjs --update'])],
   ['check:negative-lab-ui-presets', new Set(['bun scripts/check-negative-lab-ui-presets.mjs'])],
+  [
+    'check:negative-lab-workspace-smoke',
+    new Set(['bun scripts/capture-visual-smoke.mjs --scenario negative-lab-workspace']),
+  ],
   ['check:performance-smoke', new Set(['bun scripts/check-performance-smoke.mjs'])],
   [
     'check:pure-ts-tests',
@@ -455,6 +459,17 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -125,6 +125,7 @@\n+    "check:negative-lab-ui-presets": "bun scripts/check-negative-lab-ui-presets.mjs",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'negative lab workspace smoke package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -125,6 +125,7 @@\n+    "check:negative-lab-workspace-smoke": "bun scripts/capture-visual-smoke.mjs --scenario negative-lab-workspace",',
       },
     ],
     SMOKE_MODES.NONE,

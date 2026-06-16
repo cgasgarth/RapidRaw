@@ -5,6 +5,73 @@ import VisualSmokeApp from './VisualSmokeApp';
 import '../../i18n';
 import '../../styles.css';
 
+type VisualSmokeInvoke = (command: string, args?: Record<string, unknown>, options?: unknown) => Promise<unknown>;
+
+interface VisualSmokeTauriInternals {
+  convertFileSrc: (filePath: string, protocol?: string) => string;
+  invoke: VisualSmokeInvoke;
+  transformCallback: (callback: unknown, once?: boolean) => number;
+  unregisterCallback: (id: number) => void;
+}
+
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: VisualSmokeTauriInternals;
+    isTauri?: boolean;
+  }
+}
+
+const negativeLabPreviewUrl = `data:image/svg+xml,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640">
+  <defs>
+    <linearGradient id="negativeLabSmoke" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffd0a8"/>
+      <stop offset="0.45" stop-color="#8fc7ff"/>
+      <stop offset="1" stop-color="#f6f0cf"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="640" fill="#151515"/>
+  <rect x="96" y="58" width="768" height="524" rx="20" fill="url(#negativeLabSmoke)"/>
+  <rect x="136" y="96" width="110" height="448" fill="#291c1a" opacity="0.28"/>
+  <rect x="706" y="96" width="118" height="448" fill="#f1ceb0" opacity="0.3"/>
+  <circle cx="486" cy="322" r="128" fill="#fff6dc" opacity="0.42"/>
+  <path d="M142 468c130-82 229-38 344-88 113-49 188-111 333-58v222H142z" fill="#263a41" opacity="0.74"/>
+</svg>`)}`;
+
+const generatedPreviewBytes = [
+  255, 216, 255, 224, 0, 16, 74, 70, 73, 70, 0, 1, 1, 1, 0, 72, 0, 72, 0, 0, 255, 219, 0, 67, 0, 3, 2, 2, 3, 2, 2, 3, 3,
+  3, 3, 4, 3, 3, 4, 5, 8, 5, 5, 4, 4, 5, 10, 7, 7, 6, 8, 12, 10, 12, 12, 11, 10, 11, 11, 13, 14, 18, 16, 13, 14, 17, 14,
+  11, 11, 16, 22, 16, 17, 19, 20, 21, 21, 21, 12, 15, 23, 24, 22, 20, 24, 18, 20, 21, 20, 255, 192, 0, 17, 8, 0, 1, 0,
+  1, 3, 1, 34, 0, 2, 17, 1, 3, 17, 1, 255, 196, 0, 20, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 255,
+  196, 0, 20, 16, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 218, 0, 12, 3, 1, 0, 2, 17, 3, 17, 0, 63, 0,
+  191, 255, 217,
+];
+
+let callbackId = 0;
+window.isTauri = true;
+window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+  unregisterListener: () => {},
+};
+window.__TAURI_INTERNALS__ = {
+  convertFileSrc: (filePath) => filePath,
+  invoke: (command) => {
+    if (command === 'preview_negative_conversion') return Promise.resolve(negativeLabPreviewUrl);
+    if (command === 'generate_preview_for_path') return Promise.resolve(generatedPreviewBytes);
+    if (command === 'estimate_negative_base_fog') {
+      return Promise.resolve({ blueWeight: 1.18, confidence: 0.91, greenWeight: 0.96, redWeight: 1.07 });
+    }
+    if (command === 'convert_negatives') return Promise.resolve(['/tmp/rawengine-negative-smoke-positive.tif']);
+    if (command === 'plugin:event|listen') return Promise.resolve(1);
+    if (command === 'plugin:event|unlisten') return Promise.resolve(null);
+    return Promise.reject(new Error(`Unhandled visual smoke Tauri command: ${command}`));
+  },
+  transformCallback: () => {
+    callbackId += 1;
+    return callbackId;
+  },
+  unregisterCallback: () => {},
+};
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error('Root element not found');
