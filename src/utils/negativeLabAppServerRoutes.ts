@@ -1,7 +1,11 @@
 import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitometer';
 import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
+import {
+  NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
+  type NegativeLabRuntimeProfileCatalog,
+  resolveNegativeLabRuntimeProfile,
+} from './negativeLabMeasuredProfileRuntime';
 import { buildNegativeLabAcceptedPlanIdentity } from './negativeLabPlanIdentity';
-import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCatalog';
 import {
   negativeLabAppServerCommandSchema,
   negativeLabAppServerRouteManifestSchema,
@@ -81,28 +85,24 @@ export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteM
 
 export const buildNegativeLabConversionPlanResult = (
   command: NegativeLabAppServerCommand,
+  runtimeCatalog: NegativeLabRuntimeProfileCatalog = NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
 ): NegativeLabConversionPlanResult => {
   const parsedCommand = negativeLabAppServerCommandSchema.parse(command);
-  const preset = NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.find(
-    (candidate) => candidate.presetId === parsedCommand.presetId,
-  );
-
-  if (preset === undefined) {
-    throw new Error(`Unknown Negative Lab preset id: ${parsedCommand.presetId}`);
-  }
+  const profile = resolveNegativeLabRuntimeProfile(parsedCommand.presetId, runtimeCatalog);
 
   return negativeLabConversionPlanResultSchema.parse({
     commandName: 'negative.lab.build_conversion_plan',
     outputFormat: parsedCommand.outputFormat,
     params: {
-      ...preset.params,
+      ...profile.params,
       base_fog_sample: parsedCommand.sampleRect,
     },
     paths: parsedCommand.paths,
-    presetId: preset.presetId,
+    presetId: profile.presetId,
+    profile,
     proof: {
       deterministic: true,
-      generatedFrom: 'src/utils/negativeLabPresetCatalog.ts',
+      generatedFrom: 'src/utils/negativeLabMeasuredProfileRuntime.ts',
     },
     sampleRect: parsedCommand.sampleRect,
     scope: parsedCommand.scope,
@@ -156,6 +156,7 @@ export const buildNegativeLabAcceptedBatchPlanRouteResult = (
 
 export const buildNegativeLabAcceptedBatchApplyRouteResult = (
   command: NegativeLabAcceptedBatchApplyAppServerCommand,
+  runtimeCatalog: NegativeLabRuntimeProfileCatalog = NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
 ): NegativeLabAcceptedBatchApplyAppServerResult => {
   const parsedCommand = negativeLabAcceptedBatchApplyAppServerCommandSchema.parse(command);
   const expectedAcceptedPlan = buildNegativeLabAcceptedBatchPlanRouteResult(parsedCommand.dryRun);
@@ -173,10 +174,13 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
   const plannedPaths = expectedAcceptedPlan.dryRunSummary.frameHealthReport.frames
     .filter((frame) => expectedAcceptedPlan.dryRunSummary.affectedFrameIds.includes(frame.frameId))
     .map((frame) => frame.sourcePath);
-  const conversionPlan = buildNegativeLabConversionPlanResult({
-    ...parsedCommand.conversion,
-    paths: plannedPaths,
-  });
+  const conversionPlan = buildNegativeLabConversionPlanResult(
+    {
+      ...parsedCommand.conversion,
+      paths: plannedPaths,
+    },
+    runtimeCatalog,
+  );
 
   return negativeLabAcceptedBatchApplyAppServerResultSchema.parse({
     acceptedDryRunPlanHash: expectedAcceptedPlan.acceptedDryRunPlanHash,
