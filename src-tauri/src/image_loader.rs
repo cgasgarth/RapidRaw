@@ -366,6 +366,7 @@ pub async fn load_image(
 
         *state.denoise_result.lock().unwrap() = None;
         *state.hdr_result.lock().unwrap() = None;
+        *state.hdr_runtime_plan.lock().unwrap() = None;
         state.hdr_source_refs.lock().unwrap().clear();
         *state.panorama_result.lock().unwrap() = None;
     }
