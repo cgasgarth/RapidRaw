@@ -47,7 +47,7 @@ tokenizers = "0.23.1"
 once_cell = "1.21"
 futures = "0.3.32"
 sha2 = "0.11"
-nalgebra = "0.34.2"
+nalgebra = "0.35"
 hex = "0.4"
 rand = "0.10"
 tauri-plugin-shell = "2.3.5"
@@ -57,7 +57,7 @@ image_hasher = "3.1.1"
 regex = "1.12.3"
 memmap2 = "0.9.10"
 half = { version = "2.7.1", features = ["bytemuck"] }
-glam = "0.32.1"
+glam = "0.33"
 quick-xml = { version = "0.40", features = ["serialize"] }
 fuzzy-matcher = "0.3.7"
 image-hdr = { version = "0.6.0", default-features = false }
