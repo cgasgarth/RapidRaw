@@ -144,6 +144,7 @@ export default function NegativeConversionModal({
   const [baseFogConfidence, setBaseFogConfidence] = useState<number | null>(null);
   const [baseFogEstimate, setBaseFogEstimate] = useState<NegativeBaseFogEstimate | null>(null);
   const [baseFogReadoutCopied, setBaseFogReadoutCopied] = useState(false);
+  const [copiedBatchPlanJson, setCopiedBatchPlanJson] = useState<string | null>(null);
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
@@ -213,6 +214,8 @@ export default function NegativeConversionModal({
     [baseFogConfidence, effectiveActivePathIndex, includedPathSet, previewUrl, targetPaths],
   );
   const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
+  const batchDryRunPlanJson = useMemo(() => JSON.stringify(batchDryRunSummary, null, 2), [batchDryRunSummary]);
+  const isBatchPlanCopied = copiedBatchPlanJson === batchDryRunPlanJson;
 
   const workflowStages = useMemo<NegativeLabWorkflowStage[]>(
     () => [
@@ -520,6 +523,16 @@ export default function NegativeConversionModal({
     }
   };
 
+  const handleCopyBatchPlan = async () => {
+    try {
+      await navigator.clipboard.writeText(batchDryRunPlanJson);
+      setCopiedBatchPlanJson(batchDryRunPlanJson);
+    } catch (error) {
+      console.error('Negative Lab batch plan copy failed', error);
+      setCopiedBatchPlanJson(null);
+    }
+  };
+
   const handleSave = async () => {
     if (pathsToConvert.length === 0) return;
     setIsSaving(true);
@@ -627,6 +640,19 @@ export default function NegativeConversionModal({
                 skippedCount: batchDryRunSummary.skippedFrameIds.length,
               })}
             </span>
+            <button
+              type="button"
+              className="col-span-2 inline-flex items-center justify-center gap-1 rounded bg-bg-secondary px-1.5 py-0.5 text-text-secondary transition-colors hover:bg-surface"
+              data-testid="negative-lab-copy-batch-plan"
+              onClick={() => {
+                void handleCopyBatchPlan();
+              }}
+            >
+              <Copy size={11} />
+              {isBatchPlanCopied
+                ? t('modals.negativeConversion.batchPlanCopied')
+                : t('modals.negativeConversion.copyBatchPlan')}
+            </button>
           </div>
           <div className="grid gap-1">
             {frameHealthReport.frames.map((row, index) => (

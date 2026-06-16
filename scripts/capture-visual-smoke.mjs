@@ -611,6 +611,14 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-skipped-frame-count').getByText('Skip 1', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-copy-batch-plan').click();
+  await page.getByTestId('negative-lab-copy-batch-plan').getByText('Copied plan', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  const copiedBatchPlan = await page.evaluate(() => window.__RAWENGINE_NEGATIVE_LAB_CLIPBOARD_WRITES__?.at(-1) ?? '');
+  if (!copiedBatchPlan.includes('"plannedApplyCount"') || !copiedBatchPlan.includes('"skippedFrameIds"')) {
+    throw new Error('Negative Lab batch plan copy did not include apply/skip JSON.');
+  }
   await page
     .getByTestId('negative-lab-queued-count')
     .getByText('1 queued', { exact: true })
