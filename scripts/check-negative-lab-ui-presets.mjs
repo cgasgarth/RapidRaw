@@ -148,6 +148,8 @@ for (const marker of [
   'negative-lab-scope-all',
   'negative-lab-frame-health-grid',
   'negative-lab-frame-health-row-',
+  'negative-lab-frame-warning-chip-',
+  'negative-lab-frame-warning-row-',
   'negative-lab-queued-count',
   'negative-lab-include-toggle-',
   'negative-lab-included-status',
