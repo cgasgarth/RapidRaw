@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// @ts-check
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
