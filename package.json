@@ -140,6 +140,7 @@
     "check:hdr-ui-smoke": "bun scripts/capture-visual-smoke.mjs --scenario hdr-ui",
     "check:focus-fixtures": "bun scripts/check-focus-synthetic-fixtures.mjs",
     "check:focus-fixtures:update": "bun scripts/check-focus-synthetic-fixtures.mjs --update",
+    "check:focus-app-server-runtime": "bun scripts/check-focus-app-server-runtime.mjs",
     "check:focus-runtime-plan-smoke": "bun scripts/check-focus-runtime-plan-smoke.mjs",
     "check:focus-alignment-smoke": "bun scripts/check-focus-translation-alignment-smoke.mjs",
     "check:focus-sharpness-map-smoke": "bun scripts/check-focus-sharpness-map-smoke.mjs",
