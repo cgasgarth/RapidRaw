@@ -564,6 +564,14 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-base-density-readout')
     .getByText('0.145 / 0.238 / 0.356', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-copy-readout').click();
+  await page.getByTestId('negative-lab-copy-readout').getByText('Copied readout', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  const copiedReadout = await page.evaluate(() => window.__RAWENGINE_NEGATIVE_LAB_CLIPBOARD_WRITES__?.at(-1) ?? '');
+  if (!copiedReadout.includes('"baseDensity"') || !copiedReadout.includes('"sampleLabel"')) {
+    throw new Error('Negative Lab readout copy did not include density/sample JSON.');
+  }
   await page.getByTestId('negative-lab-include-toggle-1').click();
   await page
     .getByTestId('negative-lab-queued-count')
@@ -612,6 +620,17 @@ async function main() {
     await waitForDevServer();
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ deviceScaleFactor: 1, viewport });
+    await page.addInitScript(() => {
+      window.__RAWENGINE_NEGATIVE_LAB_CLIPBOARD_WRITES__ = [];
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          writeText: async (text) => {
+            window.__RAWENGINE_NEGATIVE_LAB_CLIPBOARD_WRITES__.push(text);
+          },
+        },
+      });
+    });
 
     page.on('pageerror', (error) => {
       throw error;
