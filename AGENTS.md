@@ -16,6 +16,13 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Pull Requests And GitHub Flow
 
 - Use pull requests for all repo changes. Do not commit directly to `main`.
+- Keep GitHub CLI repo resolution pointed at the fork:
+  `cgasgarth/RapidRaw`. If `gh repo view --json nameWithOwner --jq
+.nameWithOwner` returns anything else, run `bun run repo:fix-gh-resolution`
+  instead of working around it with repeated `-R` flags.
+- The intended local remotes are `origin=https://github.com/cgasgarth/RapidRaw.git`
+  and `upstream=https://github.com/CyberTimon/RapidRAW.git`; `origin` should be
+  the gh-resolved base remote and `upstream` should not be gh-resolved.
 - Keep at most 2 active open PRs at a time. This is a hard cap.
 - Use the two-PR cap as an A/B pattern when useful: one PR can build in CI while
   another independent PR is prepared or validated. Do not use the cap as
