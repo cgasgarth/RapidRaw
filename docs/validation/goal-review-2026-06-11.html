@@ -236,8 +236,8 @@
     <main class="page">
       <header>
         <div class="meta">
-          <span class="pill">Snapshot: 2026-06-11</span>
-          <span class="pill">Issue: #452</span>
+          <span class="pill">Snapshot: 2026-06-16</span>
+          <span class="pill">Issue: #1259</span>
           <span class="pill">Local review artifact</span>
           <span class="pill">Offline-first</span>
         </div>
@@ -261,8 +261,8 @@
             <span>Architecture, sidecar, GPU, release, API, agent, fixture, privacy docs.</span>
           </div>
           <div class="metric">
-            <strong>Validation queue</strong>
-            <span>Sidecar roundtrip and this review page are the next validation artifacts queued.</span>
+            <strong>Feature proofs</strong>
+            <span>HDR, panorama, focus stack, super-resolution, film, color, Negative Lab, and layer smoke paths.</span>
           </div>
         </div>
       </section>
@@ -324,15 +324,78 @@
             </tr>
             <tr>
               <td>User-visible UI features</td>
-              <td><span class="status gap">Pending</span></td>
-              <td>Current visible work is mostly infrastructure and documentation.</td>
-              <td>Feature screenshots must be added when UI feature PRs land.</td>
+              <td><span class="status partial">In progress</span></td>
+              <td>
+                Visual-smoke scenarios now cover HDR, panorama, focus stack, super-resolution, film look browser,
+                Negative Lab workspace, color workflow, and library/editor shells.
+              </td>
+              <td>
+                Most computational-photo paths remain UI/API/dry-run or synthetic-smoke only, not final E2E apply.
+              </td>
             </tr>
             <tr>
               <td>Image-processing proof</td>
-              <td><span class="status gap">Pending</span></td>
-              <td>Existing Vite empty-root render artifact only.</td>
-              <td>Golden render, CPU/GPU parity, and feature-specific visual artifacts remain future work.</td>
+              <td><span class="status partial">Synthetic proof</span></td>
+              <td>
+                CPU/synthetic checks exist for HDR, focus stack, panorama planning, super-resolution budgets, and detail
+                tools.
+              </td>
+              <td>Real RAW before/after proof and export parity remain required before feature completion.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>User-Visible Feature Proofs</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Status</th>
+              <th>Evidence</th>
+              <th>Remaining proof</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>HDR merge workspace</td>
+              <td><span class="status partial">UI/API proof</span></td>
+              <td>PR #1428, <code>bun run check:hdr-ui-smoke</code>, <code>bun run check:hdr-ui-api</code>.</td>
+              <td>Real bracket merge, preview/export parity, and deghost quality gates.</td>
+            </tr>
+            <tr>
+              <td>Panorama workspace</td>
+              <td><span class="status partial">UI proof</span></td>
+              <td>PR #1429, <code>bun run check:panorama-ui-smoke</code>, fixture and parity checks.</td>
+              <td>Rendered seam/exposure output, tiling path, and real photo validation.</td>
+            </tr>
+            <tr>
+              <td>Focus stack workspace</td>
+              <td><span class="status partial">UI proof</span></td>
+              <td>PR #1430, <code>bun run check:focus-ui-smoke</code>, synthetic focus fixture checks.</td>
+              <td>Final stack render, depth/halo controls, retouch artifact, and RAW fixture proof.</td>
+            </tr>
+            <tr>
+              <td>Super-resolution workspace</td>
+              <td><span class="status partial">UI proof</span></td>
+              <td>PR #1431, <code>bun run check:sr-ui-smoke</code>, performance fixture budgets.</td>
+              <td>Conservative final output, multi-frame alignment proof, and artifact quality validation.</td>
+            </tr>
+            <tr>
+              <td>Color workflow</td>
+              <td><span class="status partial">UI proof</span></td>
+              <td><code>bun run check:color-workflow-smoke</code>, color style preset and fixture checks.</td>
+              <td>Capture One-class color parity, skin-tone runtime, profile/input transform proof.</td>
+            </tr>
+            <tr>
+              <td>Film and Negative Lab</td>
+              <td><span class="status partial">UI/fixture proof</span></td>
+              <td>
+                <code>bun run check:film-look-browser-smoke</code>,
+                <code>bun run check:negative-lab-workspace-smoke</code>, Negative Lab fixture checks.
+              </td>
+              <td>Major stock preset expansion, real scan processing, QC overlays, and export parity.</td>
             </tr>
           </tbody>
         </table>
@@ -353,14 +416,12 @@
             </p>
           </div>
           <div class="artifact">
-            <h3>Future Feature Screenshots</h3>
-            <div class="note">
-              Add feature screenshots, before/after renders, tool-call logs, and dry-run/apply audit captures here as
-              product-facing work lands.
-            </div>
+            <h3>Visual Smoke Screenshots</h3>
+            <img src="../../artifacts/visual-smoke/hdr-ui.png" alt="HDR merge visual smoke screenshot" />
             <p>
-              Do not fabricate screenshots. Missing artifacts should remain visible and be linked to follow-up issues or
-              PRs.
+              Run <code>bun run check:visual-smoke</code> to refresh local screenshots under
+              <code>artifacts/visual-smoke/</code>. Expected files include HDR, panorama, focus, super-resolution, film,
+              Negative Lab, color workflow, and editor/library smoke images.
             </p>
           </div>
         </div>
@@ -473,8 +534,8 @@
           <li>Before/after renders for editing features.</li>
           <li>Golden image outputs and perceptual comparison reports.</li>
           <li>OpenAI app-server dry-run/apply/audit screenshots or rendered logs.</li>
-          <li>Negative Lab workflow screenshots and QC overlays.</li>
-          <li>Panorama, HDR, focus stack, and super-resolution validation artifacts.</li>
+          <li>Negative Lab real-scan workflow screenshots and QC overlays.</li>
+          <li>Panorama, HDR, focus stack, and super-resolution real-image validation artifacts.</li>
           <li>Accessibility and high-DPI UI screenshots.</li>
         </ul>
       </section>
