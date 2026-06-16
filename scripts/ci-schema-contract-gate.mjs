@@ -20,6 +20,7 @@ const CONTRACT_CHECKS = [
   'schema:focus-app-server',
   'schema:hdr-app-server',
   'schema:hdr-api-tools',
+  'schema:sr-app-server',
   'check:tauri-schema-validation',
 ];
 
@@ -46,6 +47,7 @@ const PACKAGE_SCRIPT_NAMES = new Set([
   'schema:focus-app-server',
   'schema:hdr-api-tools',
   'schema:hdr-app-server',
+  'schema:sr-app-server',
   'schema:samples',
   'schema:types',
 ]);
