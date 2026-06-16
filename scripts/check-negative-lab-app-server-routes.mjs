@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import {
   buildNegativeLabBatchSummaryRouteResult,
+  buildNegativeLabAcceptedBatchPlanRouteResult,
   buildNegativeLabConversionPlanResult,
   buildNegativeLabDensitometerRouteResult,
   buildNegativeLabFrameHealthRouteResult,
@@ -13,10 +14,14 @@ import {
 } from '../src/utils/negativeLabAppServerRoutes.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
 
+const expectedAcceptBatchPlanCommandName = 'negative.lab.accept_batch_dry_run_plan';
 const expectedBatchSummaryCommandName = 'negative.lab.build_batch_dry_run_summary';
 const expectedCommandName = 'negative.lab.build_conversion_plan';
 const expectedDensitometerCommandName = 'negative.lab.build_densitometer_readout';
 const expectedFrameHealthCommandName = 'negative.lab.build_frame_health_report';
+const acceptBatchPlanRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
+  (candidate) => candidate.commandName === expectedAcceptBatchPlanCommandName,
+);
 const batchSummaryRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedBatchSummaryCommandName,
 );
@@ -30,6 +35,9 @@ const frameHealthRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedFrameHealthCommandName,
 );
 
+if (acceptBatchPlanRoute === undefined) {
+  throw new Error(`Missing Negative Lab app-server route for ${expectedAcceptBatchPlanCommandName}.`);
+}
 if (batchSummaryRoute === undefined) {
   throw new Error(`Missing Negative Lab app-server route for ${expectedBatchSummaryCommandName}.`);
 }
@@ -104,6 +112,13 @@ const batchSummaryResult = buildNegativeLabBatchSummaryRouteResult({
   previewReady: false,
   targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
 });
+const acceptedBatchPlanResult = buildNegativeLabAcceptedBatchPlanRouteResult({
+  activePathIndex: 1,
+  baseFogConfidence: 0.82,
+  includedPaths: ['/roll/001.CR3', '/roll/002.CR3'],
+  previewReady: false,
+  targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
+});
 const densitometerResult = densitometerReadoutSchema.parse(
   buildNegativeLabDensitometerRouteResult({
     baseFogEstimate: {
@@ -133,11 +148,34 @@ if (!batchSummaryResult.rollWarningCodes.includes('excluded_from_batch')) {
   throw new Error('Negative Lab app-server batch summary route did not roll up warnings.');
 }
 if (
+  acceptedBatchPlanResult.commandName !== expectedAcceptBatchPlanCommandName ||
+  !acceptedBatchPlanResult.acceptedDryRunPlanId.startsWith('negative_lab_batch_plan_') ||
+  !acceptedBatchPlanResult.acceptedDryRunPlanHash.startsWith('fnv1a32:') ||
+  acceptedBatchPlanResult.dryRunSummary.plannedApplyCount !== 2
+) {
+  throw new Error('Negative Lab app-server accepted batch plan route did not preserve dry-run plan identity.');
+}
+if (
   densitometerResult.dominantChannel !== 'blue' ||
   densitometerResult.status !== 'strong_cast' ||
   Math.abs(densitometerResult.densityRange - 0.211) > 0.000001
 ) {
   throw new Error('Negative Lab app-server densitometer route did not match UI density math.');
+}
+
+try {
+  buildNegativeLabAcceptedBatchPlanRouteResult({
+    activePathIndex: 0,
+    baseFogConfidence: null,
+    includedPaths: ['/roll/not-in-target.CR3'],
+    previewReady: true,
+    targetPaths: ['/roll/blocked.CR3'],
+  });
+  throw new Error('Blocked Negative Lab accepted batch plan route was accepted.');
+} catch (error) {
+  if (error instanceof Error && error.message === 'Blocked Negative Lab accepted batch plan route was accepted.') {
+    throw error;
+  }
 }
 
 for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
@@ -187,8 +225,10 @@ try {
 
 for (const [filePath, marker] of [
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabBatchSummaryAppServerCommandSchema'],
+  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabAcceptBatchPlanAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabDensitometerAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabFrameHealthAppServerCommandSchema'],
+  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabAcceptedBatchPlanRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabBatchSummaryRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabDensitometerRouteResult'],
   ['src/utils/negativeLabDensitometer.ts', 'buildNegativeBaseFogDensitometerReadout'],
