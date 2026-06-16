@@ -45,8 +45,17 @@ export const focusStackDryRunContextV1Schema = z
   })
   .strict();
 
+export const focusStackApplyContextV1Schema = focusStackDryRunContextV1Schema
+  .extend({
+    acceptedDryRunPlanHash: z.string().trim().min(1),
+    acceptedDryRunPlanId: z.string().trim().min(1),
+    idempotencyKey: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
 export type FocusStackUiControlsV1 = z.infer<typeof focusStackUiControlsV1Schema>;
 export type FocusStackDryRunContextV1 = z.infer<typeof focusStackDryRunContextV1Schema>;
+export type FocusStackApplyContextV1 = z.infer<typeof focusStackApplyContextV1Schema>;
 
 export const buildFocusStackUiDryRunCommandV1 = (
   controlsValue: unknown,
@@ -68,6 +77,52 @@ export const buildFocusStackUiDryRunCommandV1 = (
     dryRun: true,
     expectedGraphRevision: context.expectedGraphRevision,
     parameters: {
+      alignmentMode: controls.alignmentMode,
+      blendMethod: controls.blendMethod,
+      maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
+      memoryBudgetBytes: controls.memoryBudgetBytes,
+      outputName: controls.outputName,
+      qualityPreference: controls.qualityPreference,
+      retouchLayerPolicy: controls.retouchLayerPolicy,
+      sources: controls.sources.map((source) => ({
+        colorSpaceHint: source.colorSpaceHint,
+        focusDistanceMm: source.focusDistanceMm,
+        imageId: source.imageId,
+        imagePath: source.imagePath,
+        rawDefaultsApplied: source.rawDefaultsApplied,
+        role: 'focus_slice',
+        sourceIndex: source.sourceIndex,
+        virtualCopyId: source.virtualCopyId,
+      })),
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    target: { id: context.targetId, kind: context.targetKind },
+  });
+};
+
+export const buildFocusStackUiApplyCommandV1 = (
+  controlsValue: unknown,
+  contextValue: unknown,
+): ComputationalMergeCommandEnvelopeV1 => {
+  const controls = focusStackUiControlsV1Schema.parse(controlsValue);
+  const context = focusStackApplyContextV1Schema.parse(contextValue);
+
+  return computationalMergeCommandEnvelopeV1Schema.parse({
+    actor: { id: context.actorId, kind: 'agent' },
+    approval: {
+      approvalClass: ApprovalClass.EditApply,
+      reason: 'Focus stack UI apply uses an accepted stack dry-run plan before mutating the edit graph.',
+      state: 'approved',
+    },
+    commandId: context.commandId,
+    commandType: 'computationalMerge.createFocusStack',
+    correlationId: context.correlationId,
+    dryRun: false,
+    expectedGraphRevision: context.expectedGraphRevision,
+    idempotencyKey: context.idempotencyKey,
+    parameters: {
+      acceptedDryRunPlanHash: context.acceptedDryRunPlanHash,
+      acceptedDryRunPlanId: context.acceptedDryRunPlanId,
       alignmentMode: controls.alignmentMode,
       blendMethod: controls.blendMethod,
       maxPreviewDimensionPx: controls.maxPreviewDimensionPx,
