@@ -106,8 +106,14 @@ for (const row of runtimeProfileRows) {
 }
 
 const measuredProfileBase = {
+  calibrationMethod: 'density_matrix_process_family_v1',
   claimLevel: 'measured_profile',
   displayName: 'Measured C-41 Process Family',
+  evidenceDigest: {
+    fixtureLegalStatus: 'project_owned_private_ci',
+    renderProofStatus: 'metadata_only',
+    sourceFixtureContentHashes: ['sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'],
+  },
   evidenceFixtureIds: ['negative_lab.project_owned.c41_profile_measurement_001'],
   filmClass: 'color_negative',
   measurementProfileId: 'negative_lab.measured.c41.process_family.v1',
@@ -136,6 +142,10 @@ const measuredBrowserRows = buildNegativeLabRuntimeProfileBrowserRows({
         ...measuredProfileBase,
         claimPolicy: 'process_family_profile_no_stock_claim',
         doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],
+        evidenceDigest: {
+          ...measuredProfileBase.evidenceDigest,
+          renderProofStatus: 'runtime_route_verified',
+        },
         runtimeLimitations: ['Runtime applies measured process-family parameters; no stock-emulation claim is made.'],
         runtimeStatus: 'runtime_parameter_applied',
       },
