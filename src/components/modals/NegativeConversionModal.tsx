@@ -719,6 +719,7 @@ export default function NegativeConversionModal({
                     <button
                       aria-current={isActiveScan ? 'true' : undefined}
                       className="flex min-w-0 items-center justify-between gap-2 rounded px-1.5 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid={`negative-lab-active-scan-${index}`}
                       disabled={isSaving || isEstimatingBaseFog}
                       onClick={() => {
                         setActivePathIndex(index);

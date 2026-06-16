@@ -164,6 +164,7 @@ for (const marker of [
   'negative-lab-frame-warning-chip-',
   'negative-lab-frame-warning-row-',
   'negative-lab-queued-count',
+  'negative-lab-active-scan-',
   'negative-lab-include-toggle-',
   'negative-lab-included-status',
   'negative-lab-preview-status',
