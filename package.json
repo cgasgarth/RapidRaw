@@ -69,6 +69,7 @@
     "check:mask-copy-paste": "bun scripts/check-mask-copy-paste.mjs",
     "check:ai-mask-capabilities": "bun scripts/check-ai-mask-capabilities.mjs",
     "check:ai-people-masks": "bun scripts/check-ai-people-mask-contract.mjs",
+    "check:ai-app-server-routes": "bun scripts/check-ai-app-server-tool-routes.mjs",
     "check:noise-separation": "bun scripts/check-noise-separation-fixtures.mjs",
     "check:ai-people-picker": "bun scripts/check-ai-people-picker-model.mjs",
     "check:ai-people-fake-provider": "bun scripts/check-ai-people-fake-provider.mjs",
