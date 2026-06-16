@@ -1,0 +1,75 @@
+import { z } from 'zod';
+
+export const computationalMergeAppServerRouteFamilySchema = z.enum([
+  'hdr',
+  'panorama',
+  'focus_stack',
+  'super_resolution',
+]);
+export const computationalMergeAppServerRouteExecutionModeSchema = z.enum(['dry_run_command', 'apply_dry_run_plan']);
+export const computationalMergeAppServerRouteStatusSchema = z.enum(['mapped']);
+
+export const computationalMergeAppServerRouteSchema = z
+  .object({
+    commandType: z.enum([
+      'computationalMerge.createFocusStack',
+      'computationalMerge.createHdr',
+      'computationalMerge.createPanorama',
+      'computationalMerge.createSuperResolution',
+    ]),
+    executionMode: computationalMergeAppServerRouteExecutionModeSchema,
+    family: computationalMergeAppServerRouteFamilySchema,
+    inputSchemaName: z.literal('ComputationalMergeCommandEnvelopeV1'),
+    outputSchemaName: z.enum(['ComputationalMergeDryRunResultV1', 'ComputationalMergeMutationResultV1']),
+    reason: z.string().trim().min(1),
+    runtimeCheckScript: z.string().trim().min(1),
+    status: computationalMergeAppServerRouteStatusSchema,
+    toolName: z
+      .string()
+      .trim()
+      .regex(/^computationalmerge\.(?:focus_stack|hdr|panorama|super_resolution)\.(?:dry_run_command|apply_command)$/u),
+  })
+  .strict()
+  .superRefine((route, context) => {
+    if (route.executionMode === 'dry_run_command' && route.outputSchemaName !== 'ComputationalMergeDryRunResultV1') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Dry-run computational merge routes must return dry-run results.',
+        path: ['outputSchemaName'],
+      });
+    }
+
+    if (
+      route.executionMode === 'apply_dry_run_plan' &&
+      route.outputSchemaName !== 'ComputationalMergeMutationResultV1'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Apply computational merge routes must return mutation results.',
+        path: ['outputSchemaName'],
+      });
+    }
+  });
+
+export const computationalMergeAppServerRouteManifestSchema = z
+  .object({
+    routes: z.array(computationalMergeAppServerRouteSchema).min(1),
+    schemaVersion: z.literal(1),
+  })
+  .strict()
+  .superRefine((manifest, context) => {
+    const toolNames = new Set<string>();
+    for (const [index, route] of manifest.routes.entries()) {
+      if (toolNames.has(route.toolName)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Duplicate computational route tool name.',
+          path: ['routes', index],
+        });
+      }
+      toolNames.add(route.toolName);
+    }
+  });
+
+export type ComputationalMergeAppServerRoute = z.infer<typeof computationalMergeAppServerRouteSchema>;
+export type ComputationalMergeAppServerRouteManifest = z.infer<typeof computationalMergeAppServerRouteManifestSchema>;
