@@ -12,6 +12,7 @@ import {
   negativeBaseFogEstimateSchema,
   negativeBaseFogSampleReadoutSchema,
   negativeConversionSavedPathsSchema,
+  type NegativeBaseFogEstimate,
   type NegativeLabBaseFogSampleRect,
   type NegativeLabBuiltInUiPreset,
   type NegativeLabPresetParams,
@@ -40,6 +41,8 @@ const DEFAULT_SAVE_OPTIONS = {
 };
 const getInitialIncludedPaths = (paths: string[]) => new Set(paths);
 const formatPercentValue = (value: number) => `${Math.round(value)}%`;
+const formatDensityValue = (value: number) => value.toFixed(3);
+const formatRgbValue = (value: number) => `${Math.round(value * 255)}`;
 const BASE_FOG_SAMPLE_PRESETS = [
   {
     labelKey: 'modals.negativeConversion.sampleLeftEdge',
@@ -81,6 +84,7 @@ export default function NegativeConversionModal({
   const [isSaving, setIsSaving] = useState(false);
   const [isEstimatingBaseFog, setIsEstimatingBaseFog] = useState(false);
   const [baseFogConfidence, setBaseFogConfidence] = useState<number | null>(null);
+  const [baseFogEstimate, setBaseFogEstimate] = useState<NegativeBaseFogEstimate | null>(null);
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
@@ -109,7 +113,7 @@ export default function NegativeConversionModal({
 
     const sampleRect = params.base_fog_sample;
     return negativeBaseFogSampleReadoutSchema.parse({
-      areaPercent: sampleRect.width * sampleRect.height * 10_000,
+      areaPercent: sampleRect.width * sampleRect.height * 100,
       confidencePercent: baseFogConfidence === null ? null : Math.round(baseFogConfidence * 100),
       heightPercent: sampleRect.height * 100,
       label: activeBaseFogSampleLabel,
@@ -327,6 +331,7 @@ export default function NegativeConversionModal({
       setZoom(1);
       setPan({ x: 0, y: 0 });
       setBaseFogConfidence(null);
+      setBaseFogEstimate(null);
       setActiveBaseFogSampleLabel(null);
       setActivePathIndex(0);
       setIsLoading(true);
@@ -354,6 +359,7 @@ export default function NegativeConversionModal({
   const handlePresetSelect = (preset: NegativeLabBuiltInUiPreset) => {
     setSelectedPresetId(preset.presetId);
     setBaseFogConfidence(null);
+    setBaseFogEstimate(null);
     setActiveBaseFogSampleLabel(null);
     setParams(preset.params);
     void updatePreview(preset.params);
@@ -380,6 +386,7 @@ export default function NegativeConversionModal({
         red_weight: estimate.redWeight,
       };
       setBaseFogConfidence(estimate.confidence);
+      setBaseFogEstimate(estimate);
       setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
       setSelectedPresetId('');
       setParams(nextParams);
@@ -412,6 +419,7 @@ export default function NegativeConversionModal({
         red_weight: estimate.redWeight,
       };
       setBaseFogConfidence(estimate.confidence);
+      setBaseFogEstimate(estimate);
       setActiveBaseFogSampleLabel(t(labelKey));
       setSelectedPresetId('');
       setParams(nextParams);
@@ -863,6 +871,21 @@ export default function NegativeConversionModal({
                     height: formatPercentValue(baseFogSampleReadout.heightPercent),
                     width: formatPercentValue(baseFogSampleReadout.widthPercent),
                   })}
+                </span>
+              </div>
+            )}
+            {baseFogEstimate !== null && (
+              <div
+                className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-primary p-2 text-xs text-text-tertiary"
+                data-testid="negative-lab-density-readout"
+              >
+                <span className="text-text-secondary">{t('modals.negativeConversion.baseRgb')}</span>
+                <span className="text-right tabular-nums" data-testid="negative-lab-base-rgb-readout">
+                  {baseFogEstimate.baseRgb.map(formatRgbValue).join(' / ')}
+                </span>
+                <span className="text-text-secondary">{t('modals.negativeConversion.baseDensity')}</span>
+                <span className="text-right tabular-nums" data-testid="negative-lab-base-density-readout">
+                  {baseFogEstimate.baseDensity.map(formatDensityValue).join(' / ')}
                 </span>
               </div>
             )}

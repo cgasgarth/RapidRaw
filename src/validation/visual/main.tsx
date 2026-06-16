@@ -67,7 +67,14 @@ window.__TAURI_INTERNALS__ = {
     if (command === 'preview_negative_conversion') return Promise.resolve(negativeLabPreviewUrl);
     if (command === 'generate_preview_for_path') return Promise.resolve(generatedPreviewBytes);
     if (command === 'estimate_negative_base_fog') {
-      return Promise.resolve({ blueWeight: 1.18, confidence: 0.91, greenWeight: 0.96, redWeight: 1.07 });
+      return Promise.resolve({
+        baseDensity: [0.145, 0.238, 0.356],
+        baseRgb: [0.716, 0.578, 0.441],
+        blueWeight: 1.18,
+        confidence: 0.91,
+        greenWeight: 0.96,
+        redWeight: 1.07,
+      });
     }
     if (command === 'convert_negatives') return Promise.resolve(['/tmp/rawengine-negative-smoke-positive.tif']);
     if (command === 'save_community_preset') return Promise.resolve(null);

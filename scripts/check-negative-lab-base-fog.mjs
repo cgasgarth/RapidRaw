@@ -46,6 +46,10 @@ for (const marker of [
   'base_fog_strength',
   'base_fog_sample',
   'baseFogConfidence',
+  'baseFogEstimate',
+  'negative-lab-density-readout',
+  'negative-lab-base-rgb-readout',
+  'negative-lab-base-density-readout',
 ]) {
   requireMarker(files.modal, marker, 'modal');
 }

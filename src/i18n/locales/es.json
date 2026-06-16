@@ -1363,7 +1363,9 @@
       "presetClaimGeneric": "Generic starting point",
       "presetClaimMeasured": "Measured profile",
       "presetRuntimeApplied": "Runtime applied",
-      "presetRuntimeCatalogOnly": "Catalog only"
+      "presetRuntimeCatalogOnly": "Catalog only",
+      "baseRgb": "Base RGB",
+      "baseDensity": "Base density"
     },
     "panorama": {
       "cancel": "Cancelar",
