@@ -2,6 +2,7 @@ import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitomet
 import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
 import {
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
+  buildNegativeLabRuntimeProfileProvenanceHash,
   type NegativeLabRuntimeProfileCatalog,
   resolveNegativeLabRuntimeProfile,
 } from './negativeLabMeasuredProfileRuntime';
@@ -89,6 +90,7 @@ export const buildNegativeLabConversionPlanResult = (
 ): NegativeLabConversionPlanResult => {
   const parsedCommand = negativeLabAppServerCommandSchema.parse(command);
   const profile = resolveNegativeLabRuntimeProfile(parsedCommand.presetId, runtimeCatalog);
+  const profileProvenanceHash = buildNegativeLabRuntimeProfileProvenanceHash(profile);
 
   return negativeLabConversionPlanResultSchema.parse({
     commandName: 'negative.lab.build_conversion_plan',
@@ -100,6 +102,7 @@ export const buildNegativeLabConversionPlanResult = (
     paths: parsedCommand.paths,
     presetId: profile.presetId,
     profile,
+    profileProvenanceHash,
     proof: {
       deterministic: true,
       generatedFrom: 'src/utils/negativeLabMeasuredProfileRuntime.ts',
@@ -190,6 +193,7 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
         acceptedDryRunPlanHash: expectedAcceptedPlan.acceptedDryRunPlanHash,
         acceptedDryRunPlanId: expectedAcceptedPlan.acceptedDryRunPlanId,
         outputFormat: parsedCommand.conversion.outputFormat,
+        profileProvenanceHash: conversionPlan.profileProvenanceHash,
         suffix: parsedCommand.conversion.suffix,
       },
       params: conversionPlan.params,

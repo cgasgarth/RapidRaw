@@ -31,6 +31,7 @@ export const negativeLabAppServerCommandNameSchema = z.union([
 ]);
 export const negativeLabAppServerOutputFormatSchema = z.enum(['jpeg_proof', 'tiff16']);
 export const negativeLabAppServerScopeSchema = z.enum(['active', 'all']);
+export const negativeLabProfileProvenanceHashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
 
 export const negativeLabAppServerCommandSchema = z
   .object({
@@ -155,6 +156,7 @@ export const negativeLabConversionPlanResultSchema = z
     paths: z.array(z.string().trim().min(1)).min(1),
     presetId: negativeLabRuntimePresetIdSchema,
     profile: negativeLabResolvedRuntimeProfileSchema,
+    profileProvenanceHash: negativeLabProfileProvenanceHashSchema,
     proof: z
       .object({
         deterministic: z.literal(true),
@@ -198,6 +200,7 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
             acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
             acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
             outputFormat: negativeLabAppServerOutputFormatSchema,
+            profileProvenanceHash: negativeLabProfileProvenanceHashSchema,
             suffix: z.string().trim().min(1).max(40),
           })
           .strict(),
@@ -251,3 +254,4 @@ export type NegativeLabDensitometerAppServerCommand = z.infer<typeof negativeLab
 export type NegativeLabDensitometerAppServerResult = z.infer<typeof negativeLabDensitometerAppServerResultSchema>;
 export type NegativeLabFrameHealthAppServerCommand = z.infer<typeof negativeLabFrameHealthAppServerCommandSchema>;
 export type NegativeLabFrameHealthAppServerResult = z.infer<typeof negativeLabFrameHealthAppServerResultSchema>;
+export type NegativeLabProfileProvenanceHash = z.infer<typeof negativeLabProfileProvenanceHashSchema>;

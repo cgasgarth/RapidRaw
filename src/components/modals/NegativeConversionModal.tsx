@@ -38,7 +38,7 @@ import {
   buildNegativeLabFrameHealthReport,
   getNegativeLabScanLabel,
 } from '../../utils/negativeLabFrameHealth';
-import { buildNegativeLabAcceptedPlanIdentity } from '../../utils/negativeLabPlanIdentity';
+import { buildNegativeLabAcceptedPlanIdentity, buildNegativeLabPlanHash } from '../../utils/negativeLabPlanIdentity';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
@@ -257,6 +257,25 @@ export default function NegativeConversionModal({
       NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.find((preset) => preset.presetId === selectedPresetId) ?? null,
     [selectedPresetId],
   );
+  const selectedProfileProvenanceHash = useMemo(() => {
+    if (selectedPreset === null) return null;
+
+    return `fnv1a32:${buildNegativeLabPlanHash(
+      JSON.stringify({
+        claimLevel: selectedPreset.claimLevel,
+        claimPolicy: selectedPreset.claimPolicy,
+        displayName: selectedPreset.displayName,
+        doesNotProve: ['no_stock_emulation_claim', 'no_colorimetric_match_claim'],
+        evidenceFixtureIds: [],
+        measurementProfileId: selectedPreset.measurementProfileId,
+        params: selectedPreset.params,
+        presetId: selectedPreset.presetId,
+        profileStatus: selectedPreset.profileStatus,
+        runtimeStatus: selectedPreset.runtimeStatus,
+        sourceGenericPresetId: null,
+      }),
+    )}`;
+  }, [selectedPreset]);
   const selectedPresetFilmClass =
     selectedPreset?.filmClass === 'black_and_white_silver' ? 'Black and white silver' : 'Color negative';
   const selectedPresetClaimLabel =
@@ -705,6 +724,7 @@ export default function NegativeConversionModal({
           options: {
             ...saveOptions,
             ...(requiresAcceptedBatchPlan ? acceptedBatchPlanIdentity : {}),
+            ...(selectedProfileProvenanceHash === null ? {} : { profileProvenanceHash: selectedProfileProvenanceHash }),
           },
         },
         negativeConversionSavedPathsSchema,
