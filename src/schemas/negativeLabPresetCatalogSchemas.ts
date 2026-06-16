@@ -2,6 +2,15 @@ import { z } from 'zod';
 
 export const negativeLabPresetIdSchema = z.string().regex(/^negative_lab\.generic\.(?:c41|bw)\.[a-z0-9_]+\.v[0-9]+$/u);
 
+export const negativeLabUiPresetFilmClassSchema = z.enum(['color_negative', 'black_and_white_silver']);
+export const negativeLabUiPresetProcessFamilySchema = z.enum(['c41_color_negative', 'black_and_white_silver_negative']);
+export const negativeLabUiPresetProfileStatusSchema = z.enum(['generic_unmeasured', 'fixture_measured']);
+export const negativeLabUiPresetRuntimeStatusSchema = z.enum(['ui_catalog_only', 'runtime_parameter_applied']);
+export const negativeLabUiPresetClaimPolicySchema = z.enum([
+  'generic_starting_point_no_stock_claim',
+  'measured_profile_required_before_stock_claim',
+]);
+
 export const negativeLabBaseFogSampleRectSchema = z
   .object({
     height: z.number().min(0.02).max(1),
@@ -28,13 +37,38 @@ export const negativeLabPresetParamsSchema = z
 
 export const negativeLabBuiltInUiPresetSchema = z
   .object({
+    claimPolicy: negativeLabUiPresetClaimPolicySchema,
     displayName: z.string().trim().min(1).max(80),
+    filmClass: negativeLabUiPresetFilmClassSchema,
     intent: z.string().trim().min(1).max(160),
+    legalNote: z.string().trim().min(1).max(180),
+    measurementProfileId: z.string().trim().min(1).nullable(),
     params: negativeLabPresetParamsSchema,
     presetId: negativeLabPresetIdSchema,
+    profileStatus: negativeLabUiPresetProfileStatusSchema,
+    processFamily: negativeLabUiPresetProcessFamilySchema,
     processHint: z.string().trim().min(1).max(80),
+    runtimeStatus: negativeLabUiPresetRuntimeStatusSchema,
+    stockFamilyDescriptor: z.string().trim().min(1).max(80),
   })
-  .strict();
+  .strict()
+  .superRefine((preset, context) => {
+    if (preset.profileStatus === 'generic_unmeasured' && preset.measurementProfileId !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Generic unmeasured Negative Lab presets must not reference a measurement profile.',
+        path: ['measurementProfileId'],
+      });
+    }
+
+    if (preset.profileStatus === 'fixture_measured' && preset.measurementProfileId === null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Fixture-measured Negative Lab presets must reference a measurement profile.',
+        path: ['measurementProfileId'],
+      });
+    }
+  });
 
 export const negativeLabBuiltInUiPresetCatalogSchema = z
   .object({
@@ -63,13 +97,41 @@ export const negativeLabBuiltInUiPresetCatalogSchema = z
       }
       displayNames.add(displayName);
 
-      const isBlackAndWhitePreset = preset.displayName.toLocaleLowerCase('en-US').includes('black and white');
+      const isBlackAndWhitePreset = preset.filmClass === 'black_and_white_silver';
       const hasBlackAndWhiteId = preset.presetId.includes('.bw.');
       if (isBlackAndWhitePreset !== hasBlackAndWhiteId) {
         context.addIssue({
           code: 'custom',
-          message: 'Black-and-white preset names and ids must align.',
+          message: 'Black-and-white preset film classes and ids must align.',
           path: ['presets', index],
+        });
+      }
+
+      if (preset.filmClass === 'color_negative' && preset.processFamily !== 'c41_color_negative') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Color-negative UI presets must declare the C-41 process family.',
+          path: ['presets', index, 'processFamily'],
+        });
+      }
+
+      if (preset.filmClass === 'black_and_white_silver' && preset.processFamily !== 'black_and_white_silver_negative') {
+        context.addIssue({
+          code: 'custom',
+          message: 'Black-and-white UI presets must declare the silver-negative process family.',
+          path: ['presets', index, 'processFamily'],
+        });
+      }
+
+      if (
+        preset.claimPolicy === 'generic_starting_point_no_stock_claim' &&
+        preset.profileStatus !== 'generic_unmeasured'
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message:
+            'Generic no-stock-claim presets must stay unmeasured until a measured profile policy is implemented.',
+          path: ['presets', index, 'profileStatus'],
         });
       }
     }
@@ -87,6 +149,10 @@ export type NegativeLabBuiltInUiPreset = z.infer<typeof negativeLabBuiltInUiPres
 export type NegativeLabBaseFogSampleRect = z.infer<typeof negativeLabBaseFogSampleRectSchema>;
 export type NegativeLabPresetParams = z.infer<typeof negativeLabPresetParamsSchema>;
 export type NegativeLabBuiltInUiPresetCatalog = z.infer<typeof negativeLabBuiltInUiPresetCatalogSchema>;
+export type NegativeLabUiPresetFilmClass = z.infer<typeof negativeLabUiPresetFilmClassSchema>;
+export type NegativeLabUiPresetProcessFamily = z.infer<typeof negativeLabUiPresetProcessFamilySchema>;
+export type NegativeLabUiPresetProfileStatus = z.infer<typeof negativeLabUiPresetProfileStatusSchema>;
+export type NegativeLabUiPresetRuntimeStatus = z.infer<typeof negativeLabUiPresetRuntimeStatusSchema>;
 
 export const parseNegativeLabBuiltInUiPresetCatalog = (value: unknown): NegativeLabBuiltInUiPresetCatalog =>
   negativeLabBuiltInUiPresetCatalogSchema.parse(value);

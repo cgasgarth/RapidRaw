@@ -528,7 +528,7 @@ async function prepareScenario(page, mode) {
   await page.getByRole('button', { name: 'Black and White Ortho' }).click();
   await page
     .getByTestId('negative-lab-preset-process')
-    .getByText('Silver gelatin family', { exact: true })
+    .getByText('Silver gelatin family / Ortho-style silver negative', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
     .getByTestId('negative-lab-preset-film-class')
@@ -537,6 +537,10 @@ async function prepareScenario(page, mode) {
   await page
     .getByTestId('negative-lab-preset-intent')
     .getByText('Orthochromatic-style tonal separation with reduced red response.', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-preset-claim-policy')
+    .getByText('Generic family descriptor only; no manufacturer, stock, or emulation claim.', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-include-toggle-1').click();
   await page

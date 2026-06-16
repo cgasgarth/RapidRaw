@@ -112,7 +112,7 @@ export default function NegativeConversionModal({
     [selectedPresetId],
   );
   const selectedPresetFilmClass =
-    selectedPreset?.presetId.includes('.bw.') === true ? 'Black and white silver' : 'Color negative';
+    selectedPreset?.filmClass === 'black_and_white_silver' ? 'Black and white silver' : 'Color negative';
 
   const workflowStages = useMemo<NegativeLabWorkflowStage[]>(
     () => [
@@ -631,7 +631,7 @@ export default function NegativeConversionModal({
                     variant={TextVariants.small}
                     className="text-text-tertiary"
                   >
-                    {selectedPreset.processHint}
+                    {selectedPreset.processHint} / {selectedPreset.stockFamilyDescriptor}
                   </UiText>
                 </div>
                 <span
@@ -647,6 +647,13 @@ export default function NegativeConversionModal({
                 className="text-text-secondary"
               >
                 {selectedPreset.intent}
+              </UiText>
+              <UiText
+                data-testid="negative-lab-preset-claim-policy"
+                variant={TextVariants.small}
+                className="mt-2 text-text-tertiary"
+              >
+                {selectedPreset.legalNote}
               </UiText>
             </div>
           )}
