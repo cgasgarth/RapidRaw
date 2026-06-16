@@ -22,8 +22,12 @@ for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
     preset.intent,
     preset.claimLevel,
     preset.claimPolicy,
+    preset.colorResponseNotes,
+    preset.contrastCurveDescriptor,
     preset.legalNote,
+    preset.grainModelDescriptor,
     preset.measurementSource,
+    preset.nominalSpeedClass,
     preset.profileStatus,
     preset.processFamily,
     preset.processHint,
@@ -66,6 +70,17 @@ for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
 
   if (preset.stockFamilyDescriptor.length < 8) {
     failures.push(`${preset.presetId}: stock family descriptor is too vague`);
+  }
+
+  for (const [key, value] of [
+    ['colorResponseNotes', preset.colorResponseNotes],
+    ['contrastCurveDescriptor', preset.contrastCurveDescriptor],
+    ['grainModelDescriptor', preset.grainModelDescriptor],
+    ['nominalSpeedClass', preset.nominalSpeedClass],
+  ]) {
+    if (typeof value !== 'string' || value.trim().length < 8) {
+      failures.push(`${preset.presetId}: ${key} is missing useful generic metadata`);
+    }
   }
 }
 
@@ -121,8 +136,12 @@ const workflowStageKeys = [
   'outputSuffix',
   'presetClaimGeneric',
   'presetClaimMeasured',
+  'presetColorResponse',
+  'presetContrastCurve',
+  'presetGrainModel',
   'presetRuntimeApplied',
   'presetRuntimeCatalogOnly',
+  'presetSpeedClass',
   'previewPending',
   'previewReady',
   'queuedScans',
@@ -188,11 +207,16 @@ for (const marker of [
   'negative-lab-export-jpeg-proof',
   'negative-lab-preset-claim-policy',
   'negative-lab-preset-claim-level',
+  'negative-lab-preset-color-response',
+  'negative-lab-preset-contrast-curve',
   'negative-lab-preset-film-class',
+  'negative-lab-preset-grain-model',
   'negative-lab-preset-intent',
+  'negative-lab-preset-metadata',
   'negative-lab-preset-process',
   'negative-lab-preset-provenance',
   'negative-lab-preset-runtime-status',
+  'negative-lab-preset-speed-class',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`negative conversion modal is missing workflow marker: ${marker}`);

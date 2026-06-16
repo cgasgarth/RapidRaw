@@ -571,6 +571,21 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-preset-intent')
     .getByText('Orthochromatic-style tonal separation with reduced red response.', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-preset-metadata').waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-preset-speed-class')
+    .getByText('Low to medium speed family', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-preset-contrast-curve')
+    .getByText('Medium separation curve', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-preset-color-response')
+    .getByText('Color response: Reduced red response and stronger blue weighting for ortho-style separation.', {
+      exact: true,
+    })
+    .waitFor({ timeout: 10_000 });
   await page
     .getByTestId('negative-lab-preset-claim-policy')
     .getByText('Generic family descriptor only; no manufacturer, stock, or emulation claim.', { exact: true })
