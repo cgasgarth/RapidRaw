@@ -288,28 +288,20 @@ fn apply_output_sharpening(
     DynamicImage::ImageRgb32F(output)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn process_image_for_export_pipeline(
-    path: &str,
-    base_image: &DynamicImage,
+fn prepare_export_masks<'a>(
+    base_image: &'a DynamicImage,
     js_adjustments: &Value,
-    context: &GpuContext,
     state: &tauri::State<AppState>,
-    is_raw: bool,
-    debug_tag: &str,
-    app_handle: &tauri::AppHandle,
-) -> Result<DynamicImage, String> {
+) -> (Cow<'a, DynamicImage>, Vec<GrayImage>) {
     let (transformed_image, unscaled_crop_offset) =
         apply_all_transformations(Cow::Borrowed(base_image), js_adjustments);
     let (img_w, img_h) = transformed_image.dimensions();
-
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
         .and_then(|m| serde_json::from_value(m.clone()).ok())
         .unwrap_or_default();
-
     let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
-    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
+    let mask_bitmaps = mask_definitions
         .iter()
         .filter_map(|def| {
             generate_mask_bitmap(
@@ -323,6 +315,21 @@ fn process_image_for_export_pipeline(
         })
         .collect();
 
+    (transformed_image, mask_bitmaps)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn process_image_for_export_pipeline(
+    path: &str,
+    base_image: &DynamicImage,
+    js_adjustments: &Value,
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+    is_raw: bool,
+    debug_tag: &str,
+    app_handle: &tauri::AppHandle,
+) -> Result<DynamicImage, String> {
+    let (transformed_image, mask_bitmaps) = prepare_export_masks(base_image, js_adjustments, state);
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
     let mut all_adjustments = get_all_adjustments_from_json(js_adjustments, is_raw, tm_override);
     all_adjustments.global.show_clipping = 0;
@@ -561,28 +568,8 @@ fn export_masks_for_image(
     is_raw: bool,
     app_handle: &tauri::AppHandle,
 ) -> Result<(), String> {
-    let (transformed_image, unscaled_crop_offset) =
-        apply_all_transformations(Cow::Borrowed(base_image), js_adjustments);
+    let (transformed_image, mask_bitmaps) = prepare_export_masks(base_image, js_adjustments, state);
     let (img_w, img_h) = transformed_image.dimensions();
-    let mask_definitions: Vec<MaskDefinition> = js_adjustments
-        .get("masks")
-        .and_then(|m| serde_json::from_value(m.clone()).ok())
-        .unwrap_or_default();
-
-    let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
-    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-        .iter()
-        .filter_map(|def| {
-            generate_mask_bitmap(
-                def,
-                img_w,
-                img_h,
-                1.0,
-                unscaled_crop_offset,
-                warped_image.as_deref(),
-            )
-        })
-        .collect();
 
     if !mask_bitmaps.is_empty() {
         let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
