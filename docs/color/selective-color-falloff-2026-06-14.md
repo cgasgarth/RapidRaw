@@ -27,8 +27,8 @@ wraparound, wide-range, and edge falloff cases.
 
 - `bun run check:selective-color-falloff`
 - `bun run check:types`
-- `bunx eslint src/utils/selectiveColorFalloff.ts scripts/check-selective-color-falloff.mjs --max-warnings 0`
+- `bunx eslint src/utils/selectiveColorFalloff.ts scripts/check-selective-color-falloff.ts --max-warnings 0`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check src/utils/selectiveColorFalloff.ts scripts/check-selective-color-falloff.mjs fixtures/color/selective-color-falloff-fixtures.json docs/color/selective-color-falloff-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
-- `bun scripts/check-markdown-links.mjs`
+- `bunx prettier --check src/utils/selectiveColorFalloff.ts scripts/check-selective-color-falloff.ts fixtures/color/selective-color-falloff-fixtures.json docs/color/selective-color-falloff-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
+- `bun scripts/check-markdown-links.ts`
 - `git diff --check`

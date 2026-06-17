@@ -22,7 +22,7 @@ bun run check:bundle
 ```
 
 This command builds the frontend and then runs
-`scripts/check-vite-bundle-budget.mjs` against `dist/assets`.
+`scripts/check-vite-bundle-budget.ts` against `dist/assets`.
 
 ## Policy
 

@@ -23,7 +23,7 @@ by themselves:
 
 - `eslint.config.js`
 - `i18next.config.ts`
-- `scripts/*.mjs`
+- `scripts/*.ts`
 
 Build, package manager, workflow, action, Rust, Tauri, unknown, and mixed
 safe/required path changes still record a fail-closed smoke decision in PRs.

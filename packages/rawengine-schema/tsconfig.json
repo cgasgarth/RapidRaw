@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "types": [],
+    "types": ["bun"],
+    "allowImportingTsExtensions": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "exactOptionalPropertyTypes": true,

@@ -23,7 +23,7 @@ push, and go-to-index actions.
 
 ## Validation
 
-`scripts/check-edit-history-replay.mjs` replays representative adjustment
+`scripts/check-edit-history-replay.ts` replays representative adjustment
 snapshots and verifies:
 
 - undo restores the previous exposure/contrast snapshot;

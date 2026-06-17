@@ -20,7 +20,7 @@ masks.
 
 ## Validation
 
-`scripts/check-mask-refinement-controls.mjs` verifies that the controls remain
+`scripts/check-mask-refinement-controls.ts` verifies that the controls remain
 wired to the masks panel and that all runtime-backed refinement keys are present.
 
 This is UI-to-runtime plumbing. Pixel-quality tuning remains iterative and must

@@ -78,7 +78,7 @@ The schema is validated by:
 - `packages/rawengine-schema/src/rawEngineSchemas.ts`
 - `packages/rawengine-schema/src/samplePayloads.ts`
 - `packages/rawengine-schema/scripts/check-samples.ts`
-- `packages/rawengine-schema/scripts/check-sample-artifacts.mjs`
+- `packages/rawengine-schema/scripts/check-sample-artifacts.ts`
 - `packages/rawengine-schema/samples/panorama-artifact-v1.json`
 
 Required local checks:

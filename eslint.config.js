@@ -10,6 +10,7 @@ const boundaries = require('eslint-plugin-boundaries');
 const i18next = require('eslint-plugin-i18next');
 
 const tsFiles = ['**/*.{ts,tsx,mts}'];
+const scriptLikeTsFiles = ['scripts/**/*.ts', 'tests/**/*.ts', 'packages/*/scripts/**/*.ts'];
 const reactRefreshFiles = ['**/*.{tsx,jsx}'];
 const publicApiSignatureFiles = [
   'packages/rawengine-schema/src/**/*.ts',
@@ -328,6 +329,36 @@ module.exports = [
           variableDeclaration: false,
         },
       ],
+    },
+  },
+  {
+    ...tseslint.configs.disableTypeChecked,
+    files: scriptLikeTsFiles,
+    rules: {
+      ...tseslint.configs.disableTypeChecked.rules,
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        {
+          minimumDescriptionLength: 12,
+          'ts-check': false,
+          'ts-expect-error': 'allow-with-description',
+          'ts-ignore': true,
+          'ts-nocheck': true,
+        },
+      ],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+      'boundaries/dependencies': 'off',
+      'boundaries/element-types': 'off',
+      'boundaries/entry-point': 'off',
+      'i18next/no-literal-string': 'off',
+      'import-x/no-cycle': 'off',
+      'import-x/no-named-as-default-member': 'off',
+      'import-x/no-unresolved': 'off',
+      'import-x/order': 'off',
+      'preserve-caught-error': 'off',
     },
   },
 ];
