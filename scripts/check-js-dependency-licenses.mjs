@@ -1,8 +1,9 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+
+import { runText } from './lib/process.mjs';
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const policyPath = resolve(repoRoot, 'docs/ci/dependency-license-policy.json');
@@ -32,10 +33,10 @@ const reviewedPackagePatterns = policy.reviewedPackagePatterns.map((review) => (
   regex: new RegExp(review.pattern, 'u'),
 }));
 
-const scanOutput = execFileSync(
+const scanOutput = runText(
   resolve(repoRoot, 'node_modules/.bin/license-checker-rseidelsohn'),
   ['--json', '--excludePrivatePackages'],
-  { cwd: repoRoot, encoding: 'utf8' },
+  { cwd: repoRoot },
 );
 
 const dependencyLicenses = z
