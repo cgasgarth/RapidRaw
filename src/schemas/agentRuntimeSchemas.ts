@@ -57,12 +57,29 @@ export const rawEngineAppServerHealthRequestSchema = z
   })
   .strict();
 
+export const rawEngineAppServerCapabilitiesRequestSchema = z
+  .object({
+    requestId: z.string().trim().min(1),
+    toolName: z.literal('rawengine.host.capabilities'),
+  })
+  .strict();
+
 export const rawEngineAppServerHealthResponseSchema = z
   .object({
     manifestToolCount: z.number().int().positive(),
     requestId: z.string().trim().min(1),
     runtime: z.literal(AgentRuntimeId.AppServer),
     status: z.literal('ok'),
+    transport: rawEngineAppServerTransportSchema,
+  })
+  .strict();
+
+export const rawEngineAppServerCapabilitiesResponseSchema = z
+  .object({
+    requestId: z.string().trim().min(1),
+    runtime: z.literal(AgentRuntimeId.AppServer),
+    status: z.literal('ok'),
+    tools: z.array(rawEngineAppServerToolDefinitionSchema).min(1),
     transport: rawEngineAppServerTransportSchema,
   })
   .strict();
@@ -91,7 +108,21 @@ export const rawEngineAppServerHealthReplaySchema = z
   })
   .strict();
 
+export const rawEngineAppServerCapabilitiesReplaySchema = z
+  .object({
+    auditLog: z.array(rawEngineAppServerAuditEntrySchema).min(1),
+    manifest: rawEngineAppServerHostManifestSchema,
+    request: rawEngineAppServerCapabilitiesRequestSchema,
+    response: rawEngineAppServerCapabilitiesResponseSchema,
+    replayId: z.string().trim().min(1),
+    schemaVersion: z.literal(1),
+  })
+  .strict();
+
 export type RawEngineAppServerAuditEntry = z.infer<typeof rawEngineAppServerAuditEntrySchema>;
+export type RawEngineAppServerCapabilitiesReplay = z.infer<typeof rawEngineAppServerCapabilitiesReplaySchema>;
+export type RawEngineAppServerCapabilitiesRequest = z.infer<typeof rawEngineAppServerCapabilitiesRequestSchema>;
+export type RawEngineAppServerCapabilitiesResponse = z.infer<typeof rawEngineAppServerCapabilitiesResponseSchema>;
 export type RawEngineAppServerHealthReplay = z.infer<typeof rawEngineAppServerHealthReplaySchema>;
 export type RawEngineAppServerHealthRequest = z.infer<typeof rawEngineAppServerHealthRequestSchema>;
 export type RawEngineAppServerHealthResponse = z.infer<typeof rawEngineAppServerHealthResponseSchema>;
