@@ -14,6 +14,8 @@ import {
   rawEngineAppServerRouteCatalogEntrySchema,
   rawEngineAppServerRouteCatalogReplaySchema,
   rawEngineAppServerRouteCatalogResponseSchema,
+  rawEngineAppServerHostRequestSchema,
+  rawEngineAppServerHostResponseSchema,
   type RawEngineAppServerAuditEntry,
   type RawEngineAppServerCapabilitiesReplay,
   type RawEngineAppServerCapabilitiesRequest,
@@ -22,6 +24,8 @@ import {
   type RawEngineAppServerHealthRequest,
   type RawEngineAppServerHealthResponse,
   type RawEngineAppServerHostManifest,
+  type RawEngineAppServerHostRequest,
+  type RawEngineAppServerHostResponse,
   type RawEngineAppServerRouteCatalogEntry,
   type RawEngineAppServerRouteCatalogReplay,
   type RawEngineAppServerRouteCatalogRequest,
@@ -200,6 +204,19 @@ export const buildRawEngineAppServerRouteCatalogResponse = ({
     status: 'ok',
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });
+
+export const handleRawEngineAppServerHostRequest = (request: unknown): RawEngineAppServerHostResponse => {
+  const parsedRequest: RawEngineAppServerHostRequest = rawEngineAppServerHostRequestSchema.parse(request);
+
+  switch (parsedRequest.toolName) {
+    case 'rawengine.host.capabilities':
+      return rawEngineAppServerHostResponseSchema.parse(buildRawEngineAppServerCapabilitiesResponse(parsedRequest));
+    case 'rawengine.host.health':
+      return rawEngineAppServerHostResponseSchema.parse(buildRawEngineAppServerHealthResponse(parsedRequest));
+    case 'rawengine.host.route_catalog':
+      return rawEngineAppServerHostResponseSchema.parse(buildRawEngineAppServerRouteCatalogResponse(parsedRequest));
+  }
+};
 
 export const buildRawEngineAppServerAuditEntry = ({
   requestId,

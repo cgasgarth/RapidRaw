@@ -8,6 +8,7 @@ Official reference checked: https://developers.openai.com/codex/app-server.
 
 - Start the official sidecar with `codex app-server` when testing Codex app-server process behavior.
 - Run RawEngine contract proof with `bun run check:rawengine-app-server-host`.
+- Route local host requests through `handleRawEngineAppServerHostRequest` so each read tool shares one Zod-validated dispatcher path.
 
 ## Boundary
 
