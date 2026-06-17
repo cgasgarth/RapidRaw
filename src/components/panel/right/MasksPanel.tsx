@@ -78,6 +78,12 @@ import {
   MaskContainer,
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
+import {
+  cloneMaskContainerForPaste,
+  cloneSubMaskForPaste,
+  insertMaskContainerAt,
+  insertSubMaskAt,
+} from '../../../utils/maskClipboard';
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
 import { createMaskRefinementCommand, dispatchMaskRefinementCommand } from '../../../utils/maskRefinementCommandBus';
 import { createSubMask } from '../../../utils/maskUtils';
@@ -1286,36 +1292,19 @@ export default function MasksPanel() {
   const cloneMaskContainerData = (
     container: MaskContainer,
     options: { invert?: boolean; rename?: boolean; resetAdjustments?: boolean } = {},
-  ): MaskContainer => {
-    const clonedContainer = structuredClone(container);
+  ): MaskContainer =>
+    cloneMaskContainerForPaste(container, uuidv4, {
+      invert: options.invert,
+      renameTo: options.rename === false ? undefined : t('editor.masks.patches.copyName', { name: container.name }),
+      resetAdjustments: options.resetAdjustments,
+    });
 
-    clonedContainer.id = uuidv4();
-    clonedContainer.invert = options.invert ? !clonedContainer.invert : clonedContainer.invert;
-    clonedContainer.name =
-      options.rename === false ? clonedContainer.name : t('editor.masks.patches.copyName', { name: container.name });
-    clonedContainer.subMasks = clonedContainer.subMasks.map((subMask: SubMask) => ({
-      ...subMask,
-      id: uuidv4(),
-    }));
-
-    if (options.resetAdjustments) {
-      clonedContainer.adjustments = structuredClone(INITIAL_MASK_ADJUSTMENTS);
-    }
-
-    return clonedContainer;
-  };
-
-  const cloneSubMaskData = (subMask: SubMask, options: { invert?: boolean; rename?: boolean } = {}): SubMask => {
-    const clonedSubMask = structuredClone(subMask);
-
-    clonedSubMask.id = uuidv4();
-    clonedSubMask.invert = options.invert ? !clonedSubMask.invert : clonedSubMask.invert;
-    if (options.rename !== false) {
-      clonedSubMask.name = t('editor.masks.patches.copyName', { name: getSubMaskName(subMask) });
-    }
-
-    return clonedSubMask;
-  };
+  const cloneSubMaskData = (subMask: SubMask, options: { invert?: boolean; rename?: boolean } = {}): SubMask =>
+    cloneSubMaskForPaste(subMask, uuidv4, {
+      invert: options.invert,
+      renameTo:
+        options.rename === false ? undefined : t('editor.masks.patches.copyName', { name: getSubMaskName(subMask) }),
+    });
 
   const copyMaskToClipboard = (container: MaskContainer) => {
     setCopiedMask(structuredClone(container));
@@ -1327,12 +1316,7 @@ export default function MasksPanel() {
 
   const insertMaskContainer = (container: MaskContainer, insertIndex?: number) => {
     setAdjustments((prev: Adjustments) => {
-      const newMasks = [...prev.masks];
-      const targetIndex = Math.max(0, Math.min(insertIndex ?? newMasks.length, newMasks.length));
-
-      newMasks.splice(targetIndex, 0, container);
-
-      return { ...prev, masks: newMasks };
+      return { ...prev, masks: insertMaskContainerAt(prev.masks, container, insertIndex) };
     });
 
     onSelectContainer(container.id);
@@ -1348,12 +1332,7 @@ export default function MasksPanel() {
           return container;
         }
 
-        const newSubMasks = [...container.subMasks];
-        const targetIndex = Math.max(0, Math.min(insertIndex ?? newSubMasks.length, newSubMasks.length));
-
-        newSubMasks.splice(targetIndex, 0, subMask);
-
-        return { ...container, subMasks: newSubMasks };
+        return { ...container, subMasks: insertSubMaskAt(container.subMasks, subMask, insertIndex) };
       }),
     }));
 

@@ -74,6 +74,12 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { Adjustments, AiPatch } from '../../../utils/adjustments';
+import {
+  cloneMaskLikeContainerForPaste,
+  cloneSubMaskForPaste,
+  insertMaskLikeContainerAt,
+  insertSubMaskAt,
+} from '../../../utils/maskClipboard';
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
 import { createSubMask } from '../../../utils/maskUtils';
 import { BrushSettings, OPTION_SEPARATOR, type Option } from '../../ui/AppProperties';
@@ -730,33 +736,21 @@ export default function AIPanel() {
     }));
   };
 
-  const clonePatchData = (container: AiPatch, options: { invert?: boolean; rename?: boolean } = {}): AiPatch => {
-    const clonedContainer = structuredClone(container);
+  const clonePatchData = (container: AiPatch, options: { invert?: boolean; rename?: boolean } = {}): AiPatch =>
+    cloneMaskLikeContainerForPaste(container, uuidv4, {
+      invert: options.invert,
+      renameTo: options.rename === false ? undefined : `${container.name} Copy`,
+      resetContainer: (clonedContainer) => {
+        clonedContainer.isLoading = false;
+        clonedContainer.patchData = null;
+      },
+    });
 
-    clonedContainer.id = uuidv4();
-    clonedContainer.invert = options.invert ? !clonedContainer.invert : clonedContainer.invert;
-    clonedContainer.isLoading = false;
-    clonedContainer.name = options.rename === false ? clonedContainer.name : `${container.name} Copy`;
-    clonedContainer.patchData = null;
-    clonedContainer.subMasks = clonedContainer.subMasks.map((subMask: SubMask) => ({
-      ...subMask,
-      id: uuidv4(),
-    }));
-
-    return clonedContainer;
-  };
-
-  const cloneSubMaskData = (subMask: SubMask, options: { invert?: boolean; rename?: boolean } = {}): SubMask => {
-    const clonedSubMask = structuredClone(subMask);
-
-    clonedSubMask.id = uuidv4();
-    clonedSubMask.invert = options.invert ? !clonedSubMask.invert : clonedSubMask.invert;
-    if (options.rename !== false) {
-      clonedSubMask.name = `${getSubMaskName(subMask)} Copy`;
-    }
-
-    return clonedSubMask;
-  };
+  const cloneSubMaskData = (subMask: SubMask, options: { invert?: boolean; rename?: boolean } = {}): SubMask =>
+    cloneSubMaskForPaste(subMask, uuidv4, {
+      invert: options.invert,
+      renameTo: options.rename === false ? undefined : `${getSubMaskName(subMask)} Copy`,
+    });
 
   const copyPatchToClipboard = (container: AiPatch) => {
     setCopiedPatch(structuredClone(container));
@@ -768,11 +762,7 @@ export default function AIPanel() {
 
   const insertPatchContainer = (container: AiPatch, insertIndex?: number) => {
     setAdjustments((prev: Adjustments) => {
-      const newPatches = [...prev.aiPatches];
-      const targetIndex = Math.max(0, Math.min(insertIndex ?? newPatches.length, newPatches.length));
-
-      newPatches.splice(targetIndex, 0, container);
-      return { ...prev, aiPatches: newPatches };
+      return { ...prev, aiPatches: insertMaskLikeContainerAt(prev.aiPatches, container, insertIndex) };
     });
 
     onSelectPatchContainer(container.id);
@@ -788,11 +778,7 @@ export default function AIPanel() {
           return container;
         }
 
-        const newSubMasks = [...container.subMasks];
-        const targetIndex = Math.max(0, Math.min(insertIndex ?? newSubMasks.length, newSubMasks.length));
-
-        newSubMasks.splice(targetIndex, 0, subMask);
-        return { ...container, subMasks: newSubMasks };
+        return { ...container, subMasks: insertSubMaskAt(container.subMasks, subMask, insertIndex) };
       }),
     }));
 

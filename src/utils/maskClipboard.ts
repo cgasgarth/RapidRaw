@@ -5,21 +5,34 @@ import type { SubMask } from '../components/panel/right/Masks';
 export type MaskClipboardIdFactory = () => string;
 
 export interface CloneMaskContainerOptions {
-  invert?: boolean;
-  renameTo?: string;
-  resetAdjustments?: boolean;
+  invert?: boolean | undefined;
+  renameTo?: string | undefined;
+  resetAdjustments?: boolean | undefined;
+}
+
+export interface CloneMaskLikeContainerOptions<TContainer> {
+  invert?: boolean | undefined;
+  renameTo?: string | undefined;
+  resetContainer?: ((container: TContainer) => void) | undefined;
 }
 
 export interface CloneSubMaskOptions {
-  invert?: boolean;
-  renameTo?: string;
+  invert?: boolean | undefined;
+  renameTo?: string | undefined;
 }
 
-export function cloneMaskContainerForPaste(
-  container: MaskContainer,
+export interface MaskLikeContainer {
+  id: string;
+  invert: boolean;
+  name: string;
+  subMasks: Array<SubMask>;
+}
+
+export function cloneMaskLikeContainerForPaste<TContainer extends MaskLikeContainer>(
+  container: TContainer,
   createId: MaskClipboardIdFactory,
-  options: CloneMaskContainerOptions = {},
-): MaskContainer {
+  options: CloneMaskLikeContainerOptions<TContainer> = {},
+): TContainer {
   const clonedContainer = structuredClone(container);
   clonedContainer.id = createId();
   clonedContainer.invert = options.invert ? !clonedContainer.invert : clonedContainer.invert;
@@ -28,12 +41,24 @@ export function cloneMaskContainerForPaste(
     ...subMask,
     id: createId(),
   }));
-
-  if (options.resetAdjustments) {
-    clonedContainer.adjustments = structuredClone(INITIAL_MASK_ADJUSTMENTS);
-  }
-
+  options.resetContainer?.(clonedContainer);
   return clonedContainer;
+}
+
+export function cloneMaskContainerForPaste(
+  container: MaskContainer,
+  createId: MaskClipboardIdFactory,
+  options: CloneMaskContainerOptions = {},
+): MaskContainer {
+  return cloneMaskLikeContainerForPaste(container, createId, {
+    invert: options.invert,
+    renameTo: options.renameTo,
+    resetContainer: options.resetAdjustments
+      ? (clonedContainer) => {
+          clonedContainer.adjustments = structuredClone(INITIAL_MASK_ADJUSTMENTS);
+        }
+      : undefined,
+  });
 }
 
 export function cloneSubMaskForPaste(
@@ -61,11 +86,22 @@ export function insertMaskContainerAt(
   return nextContainers;
 }
 
-export function insertSubMaskAt(
-  subMasks: Array<SubMask>,
-  subMask: SubMask,
+export function insertMaskLikeContainerAt<TContainer>(
+  containers: Array<TContainer>,
+  container: TContainer,
+  insertIndex = containers.length,
+): Array<TContainer> {
+  const nextContainers = [...containers];
+  const targetIndex = Math.max(0, Math.min(insertIndex, nextContainers.length));
+  nextContainers.splice(targetIndex, 0, container);
+  return nextContainers;
+}
+
+export function insertSubMaskAt<TSubMask extends SubMask>(
+  subMasks: Array<TSubMask>,
+  subMask: TSubMask,
   insertIndex = subMasks.length,
-): Array<SubMask> {
+): Array<TSubMask> {
   const nextSubMasks = [...subMasks];
   const targetIndex = Math.max(0, Math.min(insertIndex, nextSubMasks.length));
   nextSubMasks.splice(targetIndex, 0, subMask);
