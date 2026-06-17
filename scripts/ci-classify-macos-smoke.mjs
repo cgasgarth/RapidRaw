@@ -67,6 +67,10 @@ const SAFE_FRONTEND_EXTENSIONS = new Set([
 
 const SAFE_SCHEMA_PACKAGE_EXTENSIONS = new Set(['.json', '.md', '.mjs', '.ts']);
 const SAFE_PURE_TEST_EXTENSIONS = new Set(['.js', '.mjs', '.ts']);
+const SAFE_VALIDATION_SCRIPT_FILES = new Set([
+  'scripts/legacy-script-extension-allowlist.json',
+  'scripts/tsconfig.json',
+]);
 
 const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   [
@@ -88,6 +92,8 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     ]),
   ],
   ['check:ai-fallbacks', new Set(['bun scripts/check-ai-provider-fallbacks.mjs'])],
+  ['check:script-extension-policy', new Set(['bun scripts/check-script-extension-policy.ts'])],
+  ['check:script-extension-policy:self-test', new Set(['bun scripts/check-script-extension-policy.ts --self-test'])],
   [
     'check:command-palette-workflows',
     new Set(['bun scripts/capture-visual-smoke.mjs --scenario command-palette-workflows']),
@@ -180,7 +186,10 @@ function isSafeFixturePath(path) {
 }
 
 function isSafeValidationScript(path) {
-  return path.startsWith('scripts/') && (path.endsWith('.mjs') || path.endsWith('.ts'));
+  return (
+    path.startsWith('scripts/') &&
+    (path.endsWith('.mjs') || path.endsWith('.ts') || SAFE_VALIDATION_SCRIPT_FILES.has(path))
+  );
 }
 
 function isSafePackageJsonScriptPatch(patch) {
@@ -709,6 +718,11 @@ function runSelfTest() {
   assertClassification(
     'typed validation script helpers can skip smoke',
     ['scripts/lib/computational-ui-api-smoke.ts'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'script policy metadata can skip smoke',
+    ['scripts/legacy-script-extension-allowlist.json', 'scripts/tsconfig.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], SMOKE_MODES.NONE);

@@ -75,6 +75,15 @@
       "prRequired": true
     },
     {
+      "id": "frontend-script-extension-policy",
+      "packageScript": "check:script-extension-policy",
+      "ciJobId": "frontend-unsafe-casts",
+      "ciJobName": "frontend: unsafe cast ban",
+      "cadence": "pr-main-manual",
+      "proofType": "lint",
+      "prRequired": true
+    },
+    {
       "id": "generated-type-drift",
       "packageScript": "check:generated-types",
       "ciJobId": "generated-type-drift",

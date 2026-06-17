@@ -2,13 +2,16 @@
 // @ts-check
 
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 const SCRIPT_DIR = 'scripts';
-const MAX_SCRIPTS_WITHOUT_TS_CHECK = 157;
+const MAX_SCRIPTS_WITHOUT_TS_CHECK = 160;
 
 export const collectScriptTypeCoverage = (files) => {
-  const missingTsCheck = files.filter(({ source }) => {
+  const missingTsCheck = files.filter(({ path, source }) => {
+    if (path.endsWith('.ts')) {
+      return false;
+    }
+
     const firstLines = source.split(/\r?\n/u).slice(0, 3).join('\n');
     return !firstLines.includes('@ts-check');
   });
@@ -24,9 +27,10 @@ const runSelfTest = () => {
   const result = collectScriptTypeCoverage([
     { path: 'scripts/typed.mjs', source: '#!/usr/bin/env bun\n// @ts-check\n' },
     { path: 'scripts/untyped.mjs', source: '#!/usr/bin/env bun\nconsole.log(1);\n' },
+    { path: 'scripts/typed.ts', source: '#!/usr/bin/env bun\nconsole.log(1);\n' },
   ]);
 
-  if (result.typedCount !== 1 || result.totalCount !== 2 || result.missingTsCheck[0]?.path !== 'scripts/untyped.mjs') {
+  if (result.typedCount !== 2 || result.totalCount !== 3 || result.missingTsCheck[0]?.path !== 'scripts/untyped.mjs') {
     throw new Error('script type coverage self-test failed');
   }
 
@@ -38,10 +42,16 @@ if (process.argv.includes('--self-test')) {
   process.exit(0);
 }
 
-const scriptFiles = readdirSync(SCRIPT_DIR)
-  .filter((fileName) => fileName.endsWith('.js') || fileName.endsWith('.mjs'))
-  .map((fileName) => join(SCRIPT_DIR, fileName))
-  .sort()
+const collectFiles = (directory) =>
+  readdirSync(directory, { withFileTypes: true })
+    .flatMap((entry) => {
+      const path = `${directory}/${entry.name}`;
+      return entry.isDirectory() ? collectFiles(path) : [path];
+    })
+    .sort();
+
+const scriptFiles = collectFiles(SCRIPT_DIR)
+  .filter((path) => path.endsWith('.js') || path.endsWith('.mjs') || path.endsWith('.ts'))
   .map((path) => ({ path, source: readFileSync(path, 'utf8') }));
 
 const coverage = collectScriptTypeCoverage(scriptFiles);
