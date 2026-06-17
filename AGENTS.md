@@ -13,7 +13,7 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - If one part blocks, continue other useful implementation, validation, issue
   cleanup, or PR maintenance instead of stopping.
 
-## Pull Requests And GitHub Flow
+## Pull Requests
 
 - Keep at most 3 open PRs at a time.
 
