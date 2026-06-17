@@ -1,0 +1,67 @@
+#!/usr/bin/env bun
+
+import { readFileSync } from 'node:fs';
+
+import {
+  RAW_ENGINE_APP_SERVER_HOST_MANIFEST,
+  buildRawEngineAppServerHealthReplay,
+} from '../src/utils/rawEngineAppServerHost.ts';
+import {
+  rawEngineAppServerHealthReplaySchema,
+  rawEngineAppServerHostManifestSchema,
+} from '../src/schemas/agentRuntimeSchemas.ts';
+
+const failures = [];
+const manifest = rawEngineAppServerHostManifestSchema.parse(RAW_ENGINE_APP_SERVER_HOST_MANIFEST);
+const healthTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.health');
+
+if (healthTool === undefined) {
+  failures.push('Missing rawengine.host.health tool.');
+} else {
+  if (healthTool.mutates) failures.push('Health tool must be read-only.');
+  if (healthTool.toolKind !== 'read') failures.push('Health tool must use read kind.');
+}
+
+const replay = rawEngineAppServerHealthReplaySchema.parse(
+  buildRawEngineAppServerHealthReplay({
+    requestId: 'health_replay_001',
+    toolName: 'rawengine.host.health',
+  }),
+);
+
+if (replay.response.status !== 'ok') failures.push('Health replay did not return ok.');
+if (replay.response.manifestToolCount !== manifest.tools.length) {
+  failures.push('Health replay manifest count mismatch.');
+}
+if (replay.auditLog.length !== 1 || replay.auditLog[0]?.mutates) {
+  failures.push('Health replay audit log must be read-only.');
+}
+if (replay.auditLog[0]?.toolName !== 'rawengine.host.health') {
+  failures.push('Health replay audit tool mismatch.');
+}
+
+const source = [
+  'src/utils/rawEngineAppServerHost.ts',
+  'src/schemas/agentRuntimeSchemas.ts',
+  'docs/agent/app-server-host-skeleton-2026-06-17.md',
+]
+  .map((file) => readFileSync(file, 'utf8'))
+  .join('\n');
+
+for (const marker of [
+  'RAW_ENGINE_APP_SERVER_HOST_MANIFEST',
+  'rawengine.host.health',
+  'No UI automation',
+  'codex app-server',
+  'stdio JSONL',
+]) {
+  if (!source.includes(marker)) failures.push(`Missing marker ${marker}.`);
+}
+
+if (failures.length > 0) {
+  console.error(`rawengine app-server host skeleton failed (${failures.length})`);
+  for (const failure of failures) console.error(`- ${failure}`);
+  process.exit(1);
+}
+
+console.log(`rawengine app-server host skeleton ok (${manifest.tools.length} tool)`);

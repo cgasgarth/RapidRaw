@@ -31,6 +31,7 @@ const CHECK_GROUPS = {
     'check:edit-history-replay',
     'check:basic-tone-command-bridge',
     'check:tone-color-app-server-routes',
+    'check:rawengine-app-server-host',
     'check:tauri-schema-validation',
     'check:tauri-invoke-boundaries',
     'check:tauri-invoke-boundaries:self-test',
