@@ -1,6 +1,36 @@
 {
   "version": 1,
   "defaultPresetId": "color_style.portrait.clean_skin.v1",
+  "runtimeExpectations": [
+    {
+      "presetId": "color_style.landscape.clean_chrome.v1",
+      "inputRgb": {
+        "red": 0.28,
+        "green": 0.54,
+        "blue": 0.22
+      },
+      "expectedRgb": {
+        "red": 0.31262551137890626,
+        "green": 0.6009845044005879,
+        "blue": 0.19787736769285402
+      },
+      "tolerance": 0.000001
+    },
+    {
+      "presetId": "color_style.product.neutral_catalog.v1",
+      "inputRgb": {
+        "red": 0.5,
+        "green": 0.46,
+        "blue": 0.42
+      },
+      "expectedRgb": {
+        "red": 0.4992,
+        "green": 0.45999999999999996,
+        "blue": 0.42079999999999995
+      },
+      "tolerance": 0.000001
+    }
+  ],
   "presets": [
     {
       "version": 1,
