@@ -5,12 +5,12 @@ export const toneColorAppServerRouteStatusSchema = z.enum(['mapped']);
 
 export const toneColorAppServerRouteSchema = z
   .object({
-    commandType: z.literal('toneColor.setBasicTone'),
+    commandType: z.enum(['toneColor.setBasicTone', 'toneColor.setLevels']),
     executionMode: toneColorAppServerRouteExecutionModeSchema,
     inputSchemaName: z.literal('ToneColorCommandEnvelopeV1'),
     outputSchemaName: z.enum(['ToneColorDryRunResultV1', 'ToneColorMutationResultV1']),
     reason: z.string().trim().min(1),
-    runtimeCheckScript: z.literal('check:basic-tone-command-bridge'),
+    runtimeCheckScript: z.enum(['check:basic-tone-command-bridge', 'check:levels-runtime']),
     status: toneColorAppServerRouteStatusSchema,
     toolName: z
       .string()
@@ -38,21 +38,22 @@ export const toneColorAppServerRouteSchema = z
 
 export const toneColorAppServerRouteManifestSchema = z
   .object({
-    routes: z.array(toneColorAppServerRouteSchema).length(2),
+    routes: z.array(toneColorAppServerRouteSchema).min(2),
     schemaVersion: z.literal(1),
   })
   .strict()
   .superRefine((manifest, context) => {
-    const toolNames = new Set<string>();
+    const routeKeys = new Set<string>();
     for (const [index, route] of manifest.routes.entries()) {
-      if (toolNames.has(route.toolName)) {
+      const routeKey = `${route.commandType}:${route.executionMode}`;
+      if (routeKeys.has(routeKey)) {
         context.addIssue({
           code: 'custom',
-          message: 'Duplicate tone-color route tool name.',
+          message: 'Duplicate tone-color command execution route.',
           path: ['routes', index],
         });
       }
-      toolNames.add(route.toolName);
+      routeKeys.add(routeKey);
     }
   });
 

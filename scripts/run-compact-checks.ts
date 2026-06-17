@@ -73,6 +73,7 @@ const CHECK_GROUPS = {
     'check:black-white-mixer',
     'check:color-balance-rgb',
     'check:channel-mixer',
+    'check:levels-runtime',
     'check:color-grading-presets',
     'check:profile-tone',
     'check:camera-profile-lookup',
