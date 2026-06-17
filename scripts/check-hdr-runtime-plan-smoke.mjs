@@ -71,6 +71,26 @@ const dryRun = buildHdrRuntimeDryRunV1({
   searchRadiusPx: SEARCH_RADIUS_PX,
   sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
 });
+const unalignedDryRunCommand = {
+  ...dryRunCommand,
+  commandId: 'command_hdr_runtime_plan_unaligned_smoke',
+  correlationId: 'corr_hdr_runtime_plan_unaligned_smoke',
+  parameters: {
+    ...dryRunCommand.parameters,
+    alignmentMode: 'none',
+    deghosting: 'off',
+  },
+};
+const unalignedDryRun = buildHdrRuntimeDryRunV1({
+  clipThreshold: CLIP_THRESHOLD,
+  command: unalignedDryRunCommand,
+  frames,
+  motionThreshold: MOTION_THRESHOLD,
+  outputArtifactId: 'artifact_hdr_runtime_unaligned_output',
+  previewArtifactId: 'artifact_hdr_runtime_unaligned_preview',
+  searchRadiusPx: SEARCH_RADIUS_PX,
+  sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
+});
 
 const applyCommand = {
   ...dryRunCommand,
@@ -109,6 +129,16 @@ if (dryRun.provenance.alignmentConfidence < 0.99) {
   throw new Error(`Expected alignment confidence >= 0.99, got ${dryRun.provenance.alignmentConfidence}.`);
 }
 
+const expectedTransforms = new Map(
+  BRACKETS.map((bracket) => [bracket.sourceIndex, { x: -bracket.shiftX, y: -bracket.shiftY }]),
+);
+for (const transform of dryRun.provenance.alignmentTransforms) {
+  const expected = expectedTransforms.get(transform.sourceIndex);
+  if (expected === undefined) throw new Error(`Missing expected transform for source ${transform.sourceIndex}.`);
+  assertEqual(transform.translationPx.x, expected.x, `source ${transform.sourceIndex} translation x`);
+  assertEqual(transform.translationPx.y, expected.y, `source ${transform.sourceIndex} translation y`);
+}
+
 if (dryRun.provenance.motionCoverageRatio <= 0) {
   throw new Error('Expected moving-subject fixture to produce a non-empty deghost mask.');
 }
@@ -117,14 +147,22 @@ if (applied.mergedPixels.length !== WIDTH * HEIGHT) {
   throw new Error('Expected applied HDR runtime output dimensions to match fixture.');
 }
 
+const alignedMae = measureCentralRegionMae(scene, applied.mergedPixels, WIDTH, HEIGHT, 6);
+const unalignedMae = measureCentralRegionMae(scene, unalignedDryRun.mergedPixels, WIDTH, HEIGHT, 6);
+if (alignedMae >= unalignedMae * 0.6) {
+  throw new Error(`Expected aligned HDR MAE ${alignedMae} to improve over unaligned ${unalignedMae}.`);
+}
+
 console.log(
   JSON.stringify(
     {
       acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
       alignmentConfidence: dryRun.provenance.alignmentConfidence,
+      alignedMae,
       fixture: 'synthetic_hdr_runtime_plan_v1',
       motionCoverageRatio: dryRun.provenance.motionCoverageRatio,
       outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.mergedPixels.buffer)).digest('hex'),
+      unalignedMae,
     },
     null,
     2,
@@ -173,6 +211,19 @@ function isInsideRectangle(x, y, left, top, width, height) {
 
 function getPixelIndex(x, y, width) {
   return y * width + x;
+}
+
+function measureCentralRegionMae(expected, actual, width, height, insetPx) {
+  let absoluteError = 0;
+  let count = 0;
+  for (let y = insetPx; y < height - insetPx; y += 1) {
+    for (let x = insetPx; x < width - insetPx; x += 1) {
+      const index = getPixelIndex(x, y, width);
+      absoluteError += Math.abs((expected[index] ?? 0) - (actual[index] ?? 0));
+      count += 1;
+    }
+  }
+  return Math.round((absoluteError / count) * 1_000_000) / 1_000_000;
 }
 
 function assertEqual(actual, expected, label) {

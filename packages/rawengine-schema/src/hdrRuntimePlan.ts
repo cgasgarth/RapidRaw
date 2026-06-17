@@ -49,6 +49,25 @@ export const hdrRuntimeProvenanceV1Schema = z
     acceptedDryRunPlanId: z.string().trim().min(1).optional(),
     alignmentConfidence: z.number().min(0).max(1),
     alignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
+    alignmentTransforms: z
+      .array(
+        z
+          .object({
+            confidence: z.number().min(0).max(1),
+            overlapRatio: z.number().min(0).max(1),
+            rmsError: z.number().nonnegative(),
+            sourceIndex: z.number().int().nonnegative(),
+            transformType: z.enum(['identity', 'translation']),
+            translationPx: z
+              .object({
+                x: z.number().int(),
+                y: z.number().int(),
+              })
+              .strict(),
+          })
+          .strict(),
+      )
+      .min(2),
     deghosting: z.enum(['off', 'low', 'medium', 'high']),
     engineId: z.literal(HDR_RUNTIME_ENGINE_ID),
     engineVersion: z.literal(HDR_RUNTIME_ENGINE_VERSION),
@@ -239,7 +258,18 @@ const parseHdrRuntimePlanRequest = (requestValue: unknown, dryRun: boolean): Par
 
 const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
   const referenceSourceIndex = findReferenceSourceIndex(request.command);
-  const captures = request.frames.map((frame) => ({
+  const alignment = estimateHdrAlignmentTransformsV1({
+    frames: request.frames.map((frame) => ({
+      height: frame.height,
+      pixels: normalizeFrameForAlignment(frame),
+      sourceIndex: frame.sourceIndex,
+      width: frame.width,
+    })),
+    referenceSourceIndex,
+    searchRadiusPx: request.command.parameters.alignmentMode === 'none' ? 0 : request.searchRadiusPx,
+  });
+  const alignedFrames = alignHdrRuntimeFrames(request.frames, alignment.transforms);
+  const captures = alignedFrames.map((frame) => ({
     exposureEv: frame.exposureEv,
     pixels: frame.pixels,
     sourceIndex: frame.sourceIndex,
@@ -252,7 +282,7 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
     width: request.frames[0]?.width,
   });
   const motionMask = detectHdrMotionMaskV1({
-    frames: request.frames.map((frame) => ({
+    frames: alignedFrames.map((frame) => ({
       height: frame.height,
       pixels: normalizeFrameForAlignment(frame),
       sourceIndex: frame.sourceIndex,
@@ -262,18 +292,7 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
     referenceSourceIndex,
   });
   const motionCoverageRatio = countHdrMotionPixelsV1(motionMask) / motionMask.length;
-  applyReferencePixelsInMotionRegions(mergedPixels, request.frames, motionMask, referenceSourceIndex);
-
-  const alignment = estimateHdrAlignmentTransformsV1({
-    frames: request.frames.map((frame) => ({
-      height: frame.height,
-      pixels: normalizeFrameForAlignment(frame),
-      sourceIndex: frame.sourceIndex,
-      width: frame.width,
-    })),
-    referenceSourceIndex,
-    searchRadiusPx: request.command.parameters.alignmentMode === 'none' ? 0 : request.searchRadiusPx,
-  });
+  applyReferencePixelsInMotionRegions(mergedPixels, alignedFrames, motionMask, referenceSourceIndex);
   const warnings = deriveRuntimeWarnings(
     alignment.alignmentConfidence,
     motionCoverageRatio,
@@ -291,6 +310,7 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
     provenance: hdrRuntimeProvenanceV1Schema.parse({
       alignmentConfidence: alignment.alignmentConfidence,
       alignmentMode: request.command.parameters.alignmentMode,
+      alignmentTransforms: alignment.transforms,
       deghosting: request.command.parameters.deghosting,
       engineId: HDR_RUNTIME_ENGINE_ID,
       engineVersion: HDR_RUNTIME_ENGINE_VERSION,
@@ -309,6 +329,40 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
     warnings,
     width: firstFrame.width,
   };
+};
+
+const alignHdrRuntimeFrames = (
+  frames: HdrRuntimeFrameV1[],
+  transforms: HdrRuntimeProvenanceV1['alignmentTransforms'],
+): HdrRuntimeFrameV1[] =>
+  frames.map((frame) => {
+    const transform = transforms.find((candidate) => candidate.sourceIndex === frame.sourceIndex);
+    if (transform === undefined) {
+      throw new Error(`HDR runtime alignment missing transform for source ${frame.sourceIndex}.`);
+    }
+
+    return {
+      ...frame,
+      pixels: translateHdrRuntimePixels(frame.pixels, frame.width, frame.height, transform.translationPx),
+    };
+  });
+
+const translateHdrRuntimePixels = (
+  pixels: Float64Array,
+  width: number,
+  height: number,
+  translationPx: HdrRuntimeProvenanceV1['alignmentTransforms'][number]['translationPx'],
+): Float64Array => {
+  const translated = new Float64Array(pixels.length);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = x - translationPx.x;
+      const sourceY = y - translationPx.y;
+      if (!isInsideRuntimeImage(sourceX, sourceY, width, height)) continue;
+      translated[getRuntimePixelIndex(x, y, width)] = pixels[getRuntimePixelIndex(sourceX, sourceY, width)] ?? 0;
+    }
+  }
+  return translated;
 };
 
 const applyReferencePixelsInMotionRegions = (
@@ -335,6 +389,11 @@ const normalizeFrameForAlignment = (frame: HdrRuntimeFrameV1): Float64Array => {
   }
   return pixels;
 };
+
+const isInsideRuntimeImage = (x: number, y: number, width: number, height: number): boolean =>
+  Number.isInteger(x) && Number.isInteger(y) && x >= 0 && x < width && y >= 0 && y < height;
+
+const getRuntimePixelIndex = (x: number, y: number, width: number): number => y * width + x;
 
 const findReferenceSourceIndex = (command: HdrRuntimeCommandV1): number => {
   const referenceSource = command.parameters.sources.find((source) => source.exposureEv === 0);
