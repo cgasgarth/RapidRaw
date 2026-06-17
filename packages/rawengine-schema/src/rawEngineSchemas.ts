@@ -1486,6 +1486,7 @@ export const toneColorCommandTypeV1Schema = z.enum([
   'toneColor.setWhiteBalance',
   'toneColor.adjustHsl',
   'toneColor.setColorGrading',
+  'toneColor.setLevels',
 ]);
 
 export const toneColorChannelV1Schema = z.enum(['luma', 'red', 'green', 'blue', 'rgb']);
@@ -1630,6 +1631,38 @@ export const toneColorCommandEnvelopeV1Schema = z
             shadows: toneColorWheelV1Schema,
           })
           .strict(),
+      })
+      .strict(),
+    toneColorCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('toneColor.setLevels'),
+        parameters: z
+          .object({
+            channel: z.literal('luma'),
+            enabled: z.boolean(),
+            gamma: z.number().min(0.1).max(5),
+            inputBlack: z.number().min(0).max(1),
+            inputWhite: z.number().min(0).max(1),
+            outputBlack: z.number().min(0).max(1),
+            outputWhite: z.number().min(0).max(1),
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            if (parameters.inputBlack >= parameters.inputWhite) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Levels input black must be below input white.',
+                path: ['inputBlack'],
+              });
+            }
+            if (parameters.outputBlack >= parameters.outputWhite) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Levels output black must be below output white.',
+                path: ['outputBlack'],
+              });
+            }
+          }),
       })
       .strict(),
   ])

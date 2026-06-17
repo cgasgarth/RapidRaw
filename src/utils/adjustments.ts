@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { toMaskParameterRecord } from './maskParameterAccess';
 import { Mask, SubMask, SubMaskMode } from '../components/panel/right/Masks';
 
+import type { LevelsSettings } from '../schemas/levelsSchemas';
+
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | Array<JsonValue>;
 
@@ -51,6 +53,7 @@ export enum ColorAdjustment {
   ColorGrading = 'colorGrading',
   Hsl = 'hsl',
   Hue = 'hue',
+  Levels = 'levels',
   Luminance = 'luminance',
   Saturation = 'saturation',
   Temperature = 'temperature',
@@ -200,6 +203,7 @@ export interface Adjustments {
   halationAmount: number;
   highlights: number;
   hsl: Hsl;
+  levels: LevelsSettings;
   lensCorrectionMode: 'auto' | 'manual';
   lensDistortionAmount: number;
   lensVignetteAmount: number;
@@ -485,6 +489,15 @@ const INITIAL_CHANNEL_MIXER: ChannelMixerSettings = {
   red: { red: 100, green: 0, blue: 0, constant: 0 },
 };
 
+const INITIAL_LEVELS: LevelsSettings = {
+  enabled: false,
+  gamma: 1,
+  inputBlack: 0,
+  inputWhite: 1,
+  outputBlack: 0,
+  outputWhite: 1,
+};
+
 export const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
   darks: 0,
   shadows: 0,
@@ -627,6 +640,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
     reds: { hue: 0, saturation: 0, luminance: 0 },
     yellows: { hue: 0, saturation: 0, luminance: 0 },
   },
+  levels: structuredClone(INITIAL_LEVELS),
   lensCorrectionMode: 'manual',
   lensDistortionAmount: 100,
   lensVignetteAmount: 100,
@@ -833,6 +847,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
+    levels: { ...INITIAL_ADJUSTMENTS.levels, ...(loadedAdjustments.levels || {}) },
     curves: loadedAdjustments.curves ? deepCloneCurves(loadedAdjustments.curves) : getDefaultCurves(),
     pointCurves: loadedAdjustments.pointCurves ? deepCloneCurves(loadedAdjustments.pointCurves) : getDefaultCurves(),
     parametricCurve: loadedAdjustments.parametricCurve
@@ -1001,6 +1016,7 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     ColorAdjustment.BlackWhiteMixer,
     ColorAdjustment.ColorBalanceRgb,
     ColorAdjustment.ChannelMixer,
+    ColorAdjustment.Levels,
     ColorAdjustment.Hsl,
     ColorAdjustment.ColorGrading,
     'colorCalibration',

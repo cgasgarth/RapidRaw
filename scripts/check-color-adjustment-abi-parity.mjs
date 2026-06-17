@@ -15,6 +15,7 @@ const STRUCTS = [
   'ColorCalibrationSettings',
   'ChannelMixerRow',
   'ChannelMixerSettings',
+  'LevelsSettings',
   'GlobalAdjustments',
   'MaskAdjustments',
   'AllAdjustments',
