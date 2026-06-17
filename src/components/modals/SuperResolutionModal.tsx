@@ -241,6 +241,7 @@ export default function SuperResolutionModal({
         title={t('modals.superResolution.review.title')}
         proofStatus={t('modals.superResolution.review.proofStatus')}
         limitation={t('modals.superResolution.review.limitation')}
+        testId="sr-review-diagnostics"
         items={[
           {
             label: t('modals.superResolution.review.registration'),
@@ -256,6 +257,42 @@ export default function SuperResolutionModal({
             label: t('modals.superResolution.review.ringing'),
             status: 'pending',
             value: t('modals.superResolution.review.uiE2ePending'),
+          },
+        ]}
+        sections={[
+          {
+            title: t('modals.superResolution.preflightTitle'),
+            rows: [
+              {
+                label: t('modals.superResolution.preflight.sources'),
+                value: String(sourceCount),
+              },
+              {
+                label: t('modals.superResolution.preflight.scale'),
+                value: t('modals.superResolution.scaleValue', { scale: settings.outputScale }),
+              },
+              {
+                label: t('modals.superResolution.preflight.alignment'),
+                value: t(`modals.superResolution.alignment.${settings.alignmentMode}`),
+              },
+              {
+                label: t('modals.superResolution.qualityLabel'),
+                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '',
+              },
+            ],
+          },
+          {
+            title: t('modals.superResolution.review.title'),
+            rows: [
+              {
+                label: t('modals.superResolution.preflight.detail'),
+                value: t(`modals.superResolution.detailPolicy.${settings.detailPolicy}.label`),
+              },
+              {
+                label: t('modals.superResolution.review.detailGain'),
+                value: t('modals.superResolution.review.privateRawPending'),
+              },
+            ],
           },
         ]}
       />
