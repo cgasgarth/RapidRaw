@@ -98,101 +98,116 @@ export const negativeLabStockFamilyConversionAppServerCommandSchema = negativeLa
   })
   .strict();
 
-export const negativeLabBatchSummaryRouteSchema = z
-  .object({
-    commandName: negativeLabBatchSummaryCommandNameSchema,
-    inputSchemaName: z.literal('NegativeLabBatchSummaryAppServerCommandV1'),
-    outputSchemaName: z.literal('NegativeLabBatchDryRunSummaryV1'),
-    reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
-  })
-  .strict();
+interface NegativeLabRouteDescriptor {
+  commandName: z.infer<typeof negativeLabAppServerCommandNameSchema>;
+  inputSchemaName: string;
+  outputSchemaName: string;
+  reason: string;
+}
 
-export const negativeLabAcceptBatchPlanRouteSchema = z
-  .object({
-    commandName: negativeLabAcceptBatchPlanCommandNameSchema,
-    inputSchemaName: z.literal('NegativeLabAcceptBatchPlanAppServerCommandV1'),
-    outputSchemaName: z.literal('NegativeLabAcceptedBatchPlanV1'),
-    reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
-  })
-  .strict();
+export const negativeLabAcceptedBatchApplyRouteDescriptor = {
+  commandName: 'negative.lab.build_accepted_batch_apply',
+  inputSchemaName: 'NegativeLabAcceptedBatchApplyAppServerCommandV1',
+  outputSchemaName: 'NegativeLabAcceptedBatchApplyPlanV1',
+  reason: 'Negative Lab app-server apply calls must replay an accepted dry-run plan identity.',
+} as const satisfies NegativeLabRouteDescriptor;
+export const negativeLabAcceptBatchPlanRouteDescriptor = {
+  commandName: 'negative.lab.accept_batch_dry_run_plan',
+  inputSchemaName: 'NegativeLabAcceptBatchPlanAppServerCommandV1',
+  outputSchemaName: 'NegativeLabAcceptedBatchPlanV1',
+  reason: 'Negative Lab app-server calls require an accepted non-destructive batch plan before apply.',
+} as const satisfies NegativeLabRouteDescriptor;
+export const negativeLabBatchSummaryRouteDescriptor = {
+  commandName: 'negative.lab.build_batch_dry_run_summary',
+  inputSchemaName: 'NegativeLabBatchSummaryAppServerCommandV1',
+  outputSchemaName: 'NegativeLabBatchDryRunSummaryV1',
+  reason: 'Negative Lab app-server calls expose the same non-destructive batch apply/skip plan used by UI.',
+} as const satisfies NegativeLabRouteDescriptor;
+export const negativeLabConversionPlanRouteDescriptor = {
+  commandName: 'negative.lab.build_conversion_plan',
+  inputSchemaName: 'NegativeLabAppServerCommandV1',
+  outputSchemaName: 'NegativeLabConversionPlanResultV1',
+  reason: 'Negative Lab app-server calls share the UI built-in preset catalog and deterministic conversion plan shape.',
+} as const satisfies NegativeLabRouteDescriptor;
+export const negativeLabDensitometerRouteDescriptor = {
+  commandName: 'negative.lab.build_densitometer_readout',
+  inputSchemaName: 'NegativeLabDensitometerAppServerCommandV1',
+  outputSchemaName: 'NegativeBaseFogDensitometerReadoutV1',
+  reason: 'Negative Lab app-server calls expose the same base/fog densitometer math used by UI.',
+} as const satisfies NegativeLabRouteDescriptor;
+export const negativeLabFrameHealthRouteDescriptor = {
+  commandName: 'negative.lab.build_frame_health_report',
+  inputSchemaName: 'NegativeLabFrameHealthAppServerCommandV1',
+  outputSchemaName: 'NegativeLabFrameHealthReportV1',
+  reason: 'Negative Lab app-server calls expose the same roll frame health report used by the workspace UI.',
+} as const satisfies NegativeLabRouteDescriptor;
+export const negativeLabQcProofRouteDescriptor = {
+  commandName: 'negative.lab.build_qc_proof_report',
+  inputSchemaName: 'NegativeLabQcProofAppServerCommandV1',
+  outputSchemaName: 'NegativeLabQcProofReportV1',
+  reason: 'Negative Lab app-server calls expose the same contact-sheet QC proof summary used by the workspace UI.',
+} as const satisfies NegativeLabRouteDescriptor;
+export const negativeLabStockFamilyConversionRouteDescriptor = {
+  commandName: 'negative.lab.build_stock_family_conversion_plan',
+  inputSchemaName: 'NegativeLabStockFamilyConversionAppServerCommandV1',
+  outputSchemaName: 'NegativeLabStockFamilyConversionResultV1',
+  reason: 'Negative Lab app-server calls can build conversion plans from governed stock-family registry ids.',
+} as const satisfies NegativeLabRouteDescriptor;
+export const negativeLabStockMetadataRouteDescriptor = {
+  commandName: 'negative.lab.list_stock_metadata',
+  inputSchemaName: 'NegativeLabStockMetadataAppServerCommandV1',
+  outputSchemaName: 'NegativeLabStockMetadataAppServerResultV1',
+  reason: 'Negative Lab app-server calls expose named stock metadata without routing it through apply/export.',
+} as const satisfies NegativeLabRouteDescriptor;
+export const negativeLabStockRegistryRouteDescriptor = {
+  commandName: 'negative.lab.list_stock_registry',
+  inputSchemaName: 'NegativeLabStockRegistryAppServerCommandV1',
+  outputSchemaName: 'NegativeLabStockRegistryAppServerResultV1',
+  reason: 'Negative Lab app-server calls expose the governed stock-family registry used by preset workflows.',
+} as const satisfies NegativeLabRouteDescriptor;
 
-export const negativeLabAcceptedBatchApplyRouteSchema = z
-  .object({
-    commandName: negativeLabAcceptedBatchApplyCommandNameSchema,
-    inputSchemaName: z.literal('NegativeLabAcceptedBatchApplyAppServerCommandV1'),
-    outputSchemaName: z.literal('NegativeLabAcceptedBatchApplyPlanV1'),
-    reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
-  })
-  .strict();
+export const negativeLabRouteDescriptors = [
+  negativeLabAcceptedBatchApplyRouteDescriptor,
+  negativeLabAcceptBatchPlanRouteDescriptor,
+  negativeLabBatchSummaryRouteDescriptor,
+  negativeLabConversionPlanRouteDescriptor,
+  negativeLabDensitometerRouteDescriptor,
+  negativeLabFrameHealthRouteDescriptor,
+  negativeLabQcProofRouteDescriptor,
+  negativeLabStockFamilyConversionRouteDescriptor,
+  negativeLabStockMetadataRouteDescriptor,
+  negativeLabStockRegistryRouteDescriptor,
+] as const;
 
-export const negativeLabConversionPlanRouteSchema = z
-  .object({
-    commandName: negativeLabConversionPlanCommandNameSchema,
-    inputSchemaName: z.literal('NegativeLabAppServerCommandV1'),
-    outputSchemaName: z.literal('NegativeLabConversionPlanResultV1'),
-    reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
-  })
-  .strict();
+const buildNegativeLabRouteSchema = (descriptor: (typeof negativeLabRouteDescriptors)[number]) =>
+  z
+    .object({
+      commandName: z.literal(descriptor.commandName),
+      inputSchemaName: z.literal(descriptor.inputSchemaName),
+      outputSchemaName: z.literal(descriptor.outputSchemaName),
+      reason: z.string().trim().min(1),
+      status: z.literal('mapped'),
+    })
+    .strict();
 
-export const negativeLabDensitometerRouteSchema = z
-  .object({
-    commandName: negativeLabDensitometerCommandNameSchema,
-    inputSchemaName: z.literal('NegativeLabDensitometerAppServerCommandV1'),
-    outputSchemaName: z.literal('NegativeBaseFogDensitometerReadoutV1'),
-    reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
-  })
-  .strict();
-
-export const negativeLabFrameHealthRouteSchema = z
-  .object({
-    commandName: negativeLabFrameHealthCommandNameSchema,
-    inputSchemaName: z.literal('NegativeLabFrameHealthAppServerCommandV1'),
-    outputSchemaName: z.literal('NegativeLabFrameHealthReportV1'),
-    reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
-  })
-  .strict();
-export const negativeLabQcProofRouteSchema = z
-  .object({
-    commandName: negativeLabQcProofCommandNameSchema,
-    inputSchemaName: z.literal('NegativeLabQcProofAppServerCommandV1'),
-    outputSchemaName: z.literal('NegativeLabQcProofReportV1'),
-    reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
-  })
-  .strict();
-export const negativeLabStockRegistryRouteSchema = z
-  .object({
-    commandName: negativeLabStockRegistryCommandNameSchema,
-    inputSchemaName: z.literal('NegativeLabStockRegistryAppServerCommandV1'),
-    outputSchemaName: z.literal('NegativeLabStockRegistryAppServerResultV1'),
-    reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
-  })
-  .strict();
-export const negativeLabStockMetadataRouteSchema = z
-  .object({
-    commandName: negativeLabStockMetadataCommandNameSchema,
-    inputSchemaName: z.literal('NegativeLabStockMetadataAppServerCommandV1'),
-    outputSchemaName: z.literal('NegativeLabStockMetadataAppServerResultV1'),
-    reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
-  })
-  .strict();
-export const negativeLabStockFamilyConversionRouteSchema = z
-  .object({
-    commandName: negativeLabStockFamilyConversionCommandNameSchema,
-    inputSchemaName: z.literal('NegativeLabStockFamilyConversionAppServerCommandV1'),
-    outputSchemaName: z.literal('NegativeLabStockFamilyConversionResultV1'),
-    reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
-  })
-  .strict();
+export const negativeLabBatchSummaryRouteSchema = buildNegativeLabRouteSchema(negativeLabBatchSummaryRouteDescriptor);
+export const negativeLabAcceptBatchPlanRouteSchema = buildNegativeLabRouteSchema(
+  negativeLabAcceptBatchPlanRouteDescriptor,
+);
+export const negativeLabAcceptedBatchApplyRouteSchema = buildNegativeLabRouteSchema(
+  negativeLabAcceptedBatchApplyRouteDescriptor,
+);
+export const negativeLabConversionPlanRouteSchema = buildNegativeLabRouteSchema(
+  negativeLabConversionPlanRouteDescriptor,
+);
+export const negativeLabDensitometerRouteSchema = buildNegativeLabRouteSchema(negativeLabDensitometerRouteDescriptor);
+export const negativeLabFrameHealthRouteSchema = buildNegativeLabRouteSchema(negativeLabFrameHealthRouteDescriptor);
+export const negativeLabQcProofRouteSchema = buildNegativeLabRouteSchema(negativeLabQcProofRouteDescriptor);
+export const negativeLabStockRegistryRouteSchema = buildNegativeLabRouteSchema(negativeLabStockRegistryRouteDescriptor);
+export const negativeLabStockMetadataRouteSchema = buildNegativeLabRouteSchema(negativeLabStockMetadataRouteDescriptor);
+export const negativeLabStockFamilyConversionRouteSchema = buildNegativeLabRouteSchema(
+  negativeLabStockFamilyConversionRouteDescriptor,
+);
 
 export const negativeLabAppServerRouteSchema = z.union([
   negativeLabAcceptBatchPlanRouteSchema,
