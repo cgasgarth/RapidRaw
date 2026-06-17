@@ -88,6 +88,27 @@ export const TONE_COLOR_APP_SERVER_ROUTE_MANIFEST = toneColorAppServerRouteManif
       toolName: 'tonecolor.apply_command',
     },
     {
+      commandType: 'toneColor.setColorGrading',
+      executionMode: 'dry_run_command',
+      inputSchemaName,
+      outputSchemaName: 'ToneColorDryRunResultV1',
+      reason: 'Color grading dry-runs use the generic tone/color command tool with color grading preset validation.',
+      runtimeCheckScript: 'check:color-grading-presets',
+      status: 'mapped',
+      toolName: 'tonecolor.dry_run_command',
+    },
+    {
+      commandType: 'toneColor.setColorGrading',
+      executionMode: 'apply_dry_run_plan',
+      inputSchemaName,
+      outputSchemaName: 'ToneColorMutationResultV1',
+      reason:
+        'Color grading applies reuse the approved tone/color apply tool and persist an undoable edit graph update.',
+      runtimeCheckScript: 'check:color-grading-presets',
+      status: 'mapped',
+      toolName: 'tonecolor.apply_command',
+    },
+    {
       commandType: 'toneColor.setLevels',
       executionMode: 'dry_run_command',
       inputSchemaName,
