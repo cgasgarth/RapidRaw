@@ -496,11 +496,11 @@ async function prepareScenario(page, mode) {
   }
 
   if (mode === 'color-workflow') {
-    const colorSliders = page.locator('[data-visual-smoke-mode="color-workflow"] input[type="range"]');
-    await colorSliders.nth(0).fill('12');
-    await colorSliders.nth(3).fill('18');
-    await page.getByRole('button', { name: 'Off' }).nth(1).click();
-    await page.getByRole('button', { name: 'Off' }).nth(1).click();
+    const colorPanel = page.locator('[data-visual-smoke-section="color-workflow-panel"]');
+    await colorPanel.getByLabel('Temperature').fill('12');
+    await colorPanel.getByLabel('Saturation').first().fill('18');
+    await colorPanel.getByTestId('color-balance-toggle').click();
+    await colorPanel.getByTestId('channel-mixer-toggle').click();
     await page.getByTestId('color-workflow-adjustment-proof').getByText('Temp 12', { exact: true }).waitFor({
       timeout: 10_000,
     });

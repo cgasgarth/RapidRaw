@@ -62,7 +62,22 @@
       "vibrance": "Красочность",
       "wbPickerTooltip": "Пипетка баланса белого",
       "wbPickerWgpuDisabled": "Пипетка ББ: отключите WGPU в настройках.",
-      "whiteBalance": "Баланс белого"
+      "whiteBalance": "Баланс белого",
+      "levels": {
+        "disabled": "Off",
+        "enabled": "On",
+        "gamma": "Gamma",
+        "inputBlack": "Input Black",
+        "inputWhite": "Input White",
+        "outputBlack": "Output Black",
+        "outputWhite": "Output White",
+        "title": "Levels",
+        "warnings": {
+          "highlightClipping": "Highlight clipping active",
+          "outputCompression": "Output range compressed",
+          "shadowClipping": "Shadow clipping active"
+        }
+      }
     },
     "curves": {
       "channels": {
