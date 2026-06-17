@@ -406,86 +406,83 @@ impl Default for ParametricMaskParameters {
     }
 }
 
-fn grayscale_dilate(image: &GrayImage, k: u8) -> GrayImage {
+#[derive(Clone, Copy)]
+enum GrayscaleMorphology {
+    Dilate,
+    Erode,
+}
+
+impl GrayscaleMorphology {
+    fn seed(self) -> u8 {
+        match self {
+            Self::Dilate => 0,
+            Self::Erode => 255,
+        }
+    }
+
+    fn fold(self, left: u8, right: u8) -> u8 {
+        match self {
+            Self::Dilate => left.max(right),
+            Self::Erode => left.min(right),
+        }
+    }
+}
+
+fn morphology_bounds(index: usize, radius: usize, limit: usize) -> (usize, usize) {
+    (
+        index.saturating_sub(radius),
+        index.saturating_add(radius).min(limit.saturating_sub(1)),
+    )
+}
+
+fn grayscale_morphology(image: &GrayImage, k: u8, operation: GrayscaleMorphology) -> GrayImage {
     let (width, height) = image.dimensions();
     if width == 0 || height == 0 {
         return image.clone();
     }
     let w = width as usize;
     let h = height as usize;
-    let r = k as i32;
+    let Some(pixel_count) = w.checked_mul(h) else {
+        return image.clone();
+    };
+    let r = k as usize;
     let src = image.as_raw();
 
-    let mut temp = vec![0u8; w * h];
-    let mut out = vec![0u8; w * h];
+    let mut temp = vec![0u8; pixel_count];
+    let mut out = vec![0u8; pixel_count];
 
     for y in 0..h {
         let row_offset = y * w;
         for x in 0..w {
-            let mut max_val = 0;
-            let start = (x as i32 - r).max(0) as usize;
-            let end = (x as i32 + r).min((w - 1) as i32) as usize;
+            let mut value = operation.seed();
+            let (start, end) = morphology_bounds(x, r, w);
             for xi in start..=end {
-                max_val = max_val.max(src[row_offset + xi]);
+                value = operation.fold(value, src[row_offset + xi]);
             }
-            temp[row_offset + x] = max_val;
+            temp[row_offset + x] = value;
         }
     }
 
     for x in 0..w {
         for y in 0..h {
-            let mut max_val = 0;
-            let start = (y as i32 - r).max(0) as usize;
-            let end = (y as i32 + r).min((h - 1) as i32) as usize;
+            let mut value = operation.seed();
+            let (start, end) = morphology_bounds(y, r, h);
             for yi in start..=end {
-                max_val = max_val.max(temp[yi * w + x]);
+                value = operation.fold(value, temp[yi * w + x]);
             }
-            out[y * w + x] = max_val;
+            out[y * w + x] = value;
         }
     }
 
-    GrayImage::from_raw(width, height, out).unwrap()
+    GrayImage::from_raw(width, height, out).unwrap_or_else(|| image.clone())
+}
+
+fn grayscale_dilate(image: &GrayImage, k: u8) -> GrayImage {
+    grayscale_morphology(image, k, GrayscaleMorphology::Dilate)
 }
 
 fn grayscale_erode(image: &GrayImage, k: u8) -> GrayImage {
-    let (width, height) = image.dimensions();
-    if width == 0 || height == 0 {
-        return image.clone();
-    }
-    let w = width as usize;
-    let h = height as usize;
-    let r = k as i32;
-    let src = image.as_raw();
-
-    let mut temp = vec![0u8; w * h];
-    let mut out = vec![0u8; w * h];
-
-    for y in 0..h {
-        let row_offset = y * w;
-        for x in 0..w {
-            let mut min_val = 255;
-            let start = (x as i32 - r).max(0) as usize;
-            let end = (x as i32 + r).min((w - 1) as i32) as usize;
-            for xi in start..=end {
-                min_val = min_val.min(src[row_offset + xi]);
-            }
-            temp[row_offset + x] = min_val;
-        }
-    }
-
-    for x in 0..w {
-        for y in 0..h {
-            let mut min_val = 255;
-            let start = (y as i32 - r).max(0) as usize;
-            let end = (y as i32 + r).min((h - 1) as i32) as usize;
-            for yi in start..=end {
-                min_val = min_val.min(temp[yi * w + x]);
-            }
-            out[y * w + x] = min_val;
-        }
-    }
-
-    GrayImage::from_raw(width, height, out).unwrap()
+    grayscale_morphology(image, k, GrayscaleMorphology::Erode)
 }
 
 fn apply_grow_and_feather(mask: &mut GrayImage, grow: f32, feather: f32, width: u32, height: u32) {
@@ -1790,5 +1787,24 @@ mod tests {
         assert_eq!(mask.get_pixel(0, 0)[0], 255);
         assert_eq!(mask.get_pixel(1, 0)[0], 255);
         assert_eq!(mask.get_pixel(2, 0)[0], 255);
+    }
+
+    #[test]
+    fn grayscale_morphology_handles_edge_dimensions() {
+        let mut mask = GrayImage::new(1, 3);
+        mask.put_pixel(0, 1, Luma([255]));
+
+        let dilated = grayscale_dilate(&mask, 1);
+        assert_eq!(dilated.get_pixel(0, 0)[0], 255);
+        assert_eq!(dilated.get_pixel(0, 1)[0], 255);
+        assert_eq!(dilated.get_pixel(0, 2)[0], 255);
+
+        let eroded = grayscale_erode(&dilated, 1);
+        assert_eq!(eroded.get_pixel(0, 0)[0], 255);
+        assert_eq!(eroded.get_pixel(0, 1)[0], 255);
+        assert_eq!(eroded.get_pixel(0, 2)[0], 255);
+
+        let empty = GrayImage::new(0, 0);
+        assert_eq!(grayscale_dilate(&empty, 1).dimensions(), (0, 0));
     }
 }
