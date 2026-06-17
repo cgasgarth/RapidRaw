@@ -7,6 +7,10 @@ import {
   resolveNegativeLabRuntimeProfile,
 } from './negativeLabMeasuredProfileRuntime';
 import { buildNegativeLabAcceptedPlanIdentity } from './negativeLabPlanIdentity';
+import {
+  NEGATIVE_LAB_STOCK_METADATA_CATALOG,
+  buildNegativeLabStockMetadataCounts,
+} from './negativeLabStockMetadataCatalog';
 import { NEGATIVE_LAB_STOCK_REGISTRY, buildNegativeLabStockRegistryCounts } from './negativeLabStockRegistry';
 import {
   negativeLabAppServerCommandSchema,
@@ -22,6 +26,8 @@ import {
   negativeLabDensitometerAppServerResultSchema,
   negativeLabFrameHealthAppServerCommandSchema,
   negativeLabFrameHealthAppServerResultSchema,
+  negativeLabStockMetadataAppServerCommandSchema,
+  negativeLabStockMetadataAppServerResultSchema,
   negativeLabStockFamilyConversionAppServerCommandSchema,
   negativeLabStockFamilyConversionResultSchema,
   negativeLabStockRegistryAppServerCommandSchema,
@@ -38,6 +44,8 @@ import {
   type NegativeLabDensitometerAppServerResult,
   type NegativeLabFrameHealthAppServerCommand,
   type NegativeLabFrameHealthAppServerResult,
+  type NegativeLabStockMetadataAppServerCommand,
+  type NegativeLabStockMetadataAppServerResult,
   type NegativeLabStockFamilyConversionAppServerCommand,
   type NegativeLabStockFamilyConversionResult,
   type NegativeLabStockRegistryAppServerCommand,
@@ -101,6 +109,13 @@ export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteM
       inputSchemaName: 'NegativeLabStockRegistryAppServerCommandV1',
       outputSchemaName: 'NegativeLabStockRegistryAppServerResultV1',
       reason: 'Negative Lab app-server calls expose the governed stock-family registry used by preset workflows.',
+      status: 'mapped',
+    },
+    {
+      commandName: 'negative.lab.list_stock_metadata',
+      inputSchemaName: 'NegativeLabStockMetadataAppServerCommandV1',
+      outputSchemaName: 'NegativeLabStockMetadataAppServerResultV1',
+      reason: 'Negative Lab app-server calls expose named stock metadata without routing it through apply/export.',
       status: 'mapped',
     },
   ],
@@ -257,6 +272,24 @@ export const buildNegativeLabStockRegistryRouteResult = (
       namedStockClaimsRuntimeGated: true,
     },
     registry: NEGATIVE_LAB_STOCK_REGISTRY,
+  });
+};
+
+export const buildNegativeLabStockMetadataRouteResult = (
+  command: NegativeLabStockMetadataAppServerCommand,
+): NegativeLabStockMetadataAppServerResult => {
+  negativeLabStockMetadataAppServerCommandSchema.parse(command);
+
+  return negativeLabStockMetadataAppServerResultSchema.parse({
+    catalog: NEGATIVE_LAB_STOCK_METADATA_CATALOG,
+    commandName: 'negative.lab.list_stock_metadata',
+    counts: buildNegativeLabStockMetadataCounts(NEGATIVE_LAB_STOCK_METADATA_CATALOG),
+    proof: {
+      deterministic: true,
+      generatedFrom: 'src/utils/negativeLabStockMetadataCatalog.ts',
+      metadataOnlyNotRuntimeApplied: true,
+      namedStockClaimsRuntimeGated: true,
+    },
   });
 };
 
