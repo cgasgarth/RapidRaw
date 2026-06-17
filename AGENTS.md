@@ -15,7 +15,7 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Pull Requests
 
-- Keep at most 3 open PRs at a time.
+- Up to 3 open PRs at a time.
 
 ## GitHub Repo Resolution
 
