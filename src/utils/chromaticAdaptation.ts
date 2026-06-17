@@ -24,6 +24,12 @@ export type XyWhitePoint = z.infer<typeof xyWhitePointSchema>;
 export type XyzColor = z.infer<typeof xyzColorSchema>;
 export type ChromaticAdaptationInput = z.infer<typeof chromaticAdaptationInputSchema>;
 
+export interface LinearRgbColor {
+  blue: number;
+  green: number;
+  red: number;
+}
+
 type Matrix3 = readonly [XyzColor, XyzColor, XyzColor];
 
 const bradfordMatrix: Matrix3 = [
@@ -36,6 +42,18 @@ const inverseBradfordMatrix: Matrix3 = [
   [0.9869929, -0.1470543, 0.1599627],
   [0.4323053, 0.5183603, 0.0492912],
   [-0.0085287, 0.0400428, 0.9684867],
+];
+
+const srgbToXyzD65Matrix: Matrix3 = [
+  [0.4124564, 0.3575761, 0.1804375],
+  [0.2126729, 0.7151522, 0.072175],
+  [0.0193339, 0.119192, 0.9503041],
+];
+
+const xyzD65ToSrgbMatrix: Matrix3 = [
+  [3.2404542, -1.5371385, -0.4985314],
+  [-0.969266, 1.8760108, 0.041556],
+  [0.0556434, -0.2040259, 1.0572252],
 ];
 
 const multiplyMatrixVector = (matrix: Matrix3, vector: XyzColor): XyzColor => [
@@ -68,3 +86,18 @@ export const adaptXyzBradford = (input: ChromaticAdaptationInput): XyzColor => {
 
   return multiplyMatrixVector(inverseBradfordMatrix, adaptedCone);
 };
+
+export const linearSrgbToXyzD65 = (rgb: LinearRgbColor): XyzColor =>
+  multiplyMatrixVector(srgbToXyzD65Matrix, [rgb.red, rgb.green, rgb.blue]);
+
+export const xyzD65ToLinearSrgb = (xyz: XyzColor): LinearRgbColor => {
+  const [red, green, blue] = multiplyMatrixVector(xyzD65ToSrgbMatrix, xyz);
+  return { blue, green, red };
+};
+
+export const adaptLinearSrgbBradford = (
+  rgb: LinearRgbColor,
+  sourceWhitePoint: XyWhitePoint,
+  targetWhitePoint: XyWhitePoint,
+): LinearRgbColor =>
+  xyzD65ToLinearSrgb(adaptXyzBradford({ sourceWhitePoint, targetWhitePoint, xyz: linearSrgbToXyzD65(rgb) }));
