@@ -46,6 +46,27 @@ export const TONE_COLOR_APP_SERVER_ROUTE_MANIFEST = toneColorAppServerRouteManif
       toolName: 'tonecolor.apply_command',
     },
     {
+      commandType: 'toneColor.setWhiteBalance',
+      executionMode: 'dry_run_command',
+      inputSchemaName,
+      outputSchemaName: 'ToneColorDryRunResultV1',
+      reason: 'White balance dry-runs use the generic tone/color command tool with picker/runtime validation.',
+      runtimeCheckScript: 'check:white-balance-picker',
+      status: 'mapped',
+      toolName: 'tonecolor.dry_run_command',
+    },
+    {
+      commandType: 'toneColor.setWhiteBalance',
+      executionMode: 'apply_dry_run_plan',
+      inputSchemaName,
+      outputSchemaName: 'ToneColorMutationResultV1',
+      reason:
+        'White balance applies reuse the approved tone/color apply tool and persist an undoable edit graph update.',
+      runtimeCheckScript: 'check:white-balance-picker',
+      status: 'mapped',
+      toolName: 'tonecolor.apply_command',
+    },
+    {
       commandType: 'toneColor.setLevels',
       executionMode: 'dry_run_command',
       inputSchemaName,
