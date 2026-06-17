@@ -43,7 +43,23 @@ export const superResolutionRuntimeProvenanceV1Schema = z
     acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
     acceptedDryRunPlanId: z.string().trim().min(1).optional(),
     changedPixelRatioAgainstNearest: z.number().min(0).max(1),
+    confidenceMap: z
+      .object({
+        completeSampleRatio: z.number().min(0).max(1),
+        maxSampleCount: z.number().int().positive(),
+        meanSampleCount: z.number().positive(),
+        minSampleCount: z.number().int().positive(),
+      })
+      .strict(),
     detailPolicy: z.enum(['conservative', 'balanced', 'aggressive_preview_only']),
+    detailQuality: z
+      .object({
+        nearestBaselineChangedPixelRatio: z.number().min(0).max(1),
+        outputPixelCount: z.number().int().positive(),
+        sourcePixelCount: z.number().int().positive(),
+        sourceToOutputPixelRatio: z.number().positive(),
+      })
+      .strict(),
     effectiveOutputScale: z.number().min(1).max(4),
     engineId: z.literal(SR_RUNTIME_ENGINE_ID),
     engineVersion: z.literal(SR_RUNTIME_ENGINE_VERSION),
@@ -275,7 +291,14 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
     outputPixels: result.outputPixels,
     provenance: superResolutionRuntimeProvenanceV1Schema.parse({
       changedPixelRatioAgainstNearest: roundSrMetric(result.changedPixelRatioAgainstNearest),
+      confidenceMap: buildSrConfidenceMap(request.frames, result.outputWidth, result.outputHeight, result.outputScale),
       detailPolicy: request.command.parameters.detailPolicy,
+      detailQuality: buildSrDetailQuality(
+        request.frames,
+        result.outputWidth,
+        result.outputHeight,
+        result.changedPixelRatioAgainstNearest,
+      ),
       effectiveOutputScale: result.outputScale,
       engineId: SR_RUNTIME_ENGINE_ID,
       engineVersion: SR_RUNTIME_ENGINE_VERSION,
@@ -359,6 +382,62 @@ const deriveSrWarnings = (
   if (changedPixelRatioAgainstNearest < 0.2) warnings.add('texture_risk');
   if (detailPolicy === 'aggressive_preview_only') warnings.add('aggressive_preview_only');
   return [...warnings].sort();
+};
+
+const buildSrConfidenceMap = (
+  frames: SuperResolutionRuntimeFrameV1[],
+  outputWidth: number,
+  outputHeight: number,
+  outputScale: number,
+): SuperResolutionRuntimeProvenanceV1['confidenceMap'] => {
+  const sampleCounts = new Uint16Array(outputWidth * outputHeight);
+  for (const frame of frames) {
+    for (let y = 0; y < frame.height; y += 1) {
+      for (let x = 0; x < frame.width; x += 1) {
+        const outputX = Math.trunc(x * outputScale + frame.shiftX);
+        const outputY = Math.trunc(y * outputScale + frame.shiftY);
+        const outputIndex = outputY * outputWidth + outputX;
+        if (outputIndex >= 0 && outputIndex < sampleCounts.length) {
+          sampleCounts[outputIndex] = (sampleCounts[outputIndex] ?? 0) + 1;
+        }
+      }
+    }
+  }
+
+  let coveredPixelCount = 0;
+  let maxSampleCount = 0;
+  let minSampleCount = Number.POSITIVE_INFINITY;
+  let sampleCountTotal = 0;
+  for (const sampleCount of sampleCounts) {
+    if (sampleCount === 0) continue;
+    coveredPixelCount += 1;
+    maxSampleCount = Math.max(maxSampleCount, sampleCount);
+    minSampleCount = Math.min(minSampleCount, sampleCount);
+    sampleCountTotal += sampleCount;
+  }
+
+  return {
+    completeSampleRatio: roundSrMetric(coveredPixelCount / Math.max(1, sampleCounts.length)),
+    maxSampleCount: Math.max(1, maxSampleCount),
+    meanSampleCount: roundSrMetric(sampleCountTotal / Math.max(1, coveredPixelCount)),
+    minSampleCount: Number.isFinite(minSampleCount) ? minSampleCount : 1,
+  };
+};
+
+const buildSrDetailQuality = (
+  frames: SuperResolutionRuntimeFrameV1[],
+  outputWidth: number,
+  outputHeight: number,
+  changedPixelRatioAgainstNearest: number,
+): SuperResolutionRuntimeProvenanceV1['detailQuality'] => {
+  const sourcePixelCount = frames.reduce((total, frame) => total + frame.width * frame.height, 0);
+  const outputPixelCount = outputWidth * outputHeight;
+  return {
+    nearestBaselineChangedPixelRatio: roundSrMetric(changedPixelRatioAgainstNearest),
+    outputPixelCount,
+    sourcePixelCount,
+    sourceToOutputPixelRatio: roundSrMetric(sourcePixelCount / outputPixelCount),
+  };
 };
 
 const stableSrRuntimeHash = (input: string): string => {
