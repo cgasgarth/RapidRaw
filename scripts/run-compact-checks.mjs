@@ -96,6 +96,7 @@ const CHECK_GROUPS = {
     'check:ai-people-apply-plan',
     'check:negative-lab-ui-presets',
     'check:negative-lab-frame-health',
+    'check:negative-lab-measured-render-proof',
   ],
 };
 
