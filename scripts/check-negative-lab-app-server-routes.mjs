@@ -11,6 +11,7 @@ import {
   buildNegativeLabConversionPlanResult,
   buildNegativeLabDensitometerRouteResult,
   buildNegativeLabFrameHealthRouteResult,
+  buildNegativeLabStockFamilyConversionRouteResult,
   buildNegativeLabStockRegistryRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../src/utils/negativeLabAppServerRoutes.ts';
@@ -22,6 +23,7 @@ const expectedBatchSummaryCommandName = 'negative.lab.build_batch_dry_run_summar
 const expectedCommandName = 'negative.lab.build_conversion_plan';
 const expectedDensitometerCommandName = 'negative.lab.build_densitometer_readout';
 const expectedFrameHealthCommandName = 'negative.lab.build_frame_health_report';
+const expectedStockFamilyConversionCommandName = 'negative.lab.build_stock_family_conversion_plan';
 const expectedStockRegistryCommandName = 'negative.lab.list_stock_registry';
 const acceptBatchPlanRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedAcceptBatchPlanCommandName,
@@ -44,6 +46,9 @@ const frameHealthRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
 const stockRegistryRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedStockRegistryCommandName,
 );
+const stockFamilyConversionRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
+  (candidate) => candidate.commandName === expectedStockFamilyConversionCommandName,
+);
 
 if (acceptBatchPlanRoute === undefined) {
   throw new Error(`Missing Negative Lab app-server route for ${expectedAcceptBatchPlanCommandName}.`);
@@ -65,6 +70,9 @@ if (frameHealthRoute === undefined) {
 }
 if (stockRegistryRoute === undefined) {
   throw new Error(`Missing Negative Lab app-server route for ${expectedStockRegistryCommandName}.`);
+}
+if (stockFamilyConversionRoute === undefined) {
+  throw new Error(`Missing Negative Lab app-server route for ${expectedStockFamilyConversionCommandName}.`);
 }
 
 const sampleRect = { height: 0.6, width: 0.12, x: 0.02, y: 0.2 };
@@ -173,6 +181,14 @@ const densitometerResult = densitometerReadoutSchema.parse(
   }),
 );
 const stockRegistryResult = buildNegativeLabStockRegistryRouteResult({});
+const stockFamilyConversionResult = buildNegativeLabStockFamilyConversionRouteResult({
+  outputFormat: 'jpeg_proof',
+  paths: ['/fixtures/negative-lab/synthetic-color-negative-001.tif'],
+  sampleRect,
+  scope: 'active',
+  stockFamilyRegistryId: 'negative_lab.stock_family.c41_portrait_color_negative.v1',
+  suffix: 'Positive',
+});
 
 if (frameHealthResult.activeFrameId !== 'negative-lab-frame-2') {
   throw new Error('Negative Lab app-server frame health route did not report the active frame.');
@@ -222,6 +238,15 @@ if (
   !stockRegistryResult.proof.namedStockClaimsRuntimeGated
 ) {
   throw new Error('Negative Lab app-server stock registry route did not expose governed registry proof.');
+}
+if (
+  stockFamilyConversionResult.commandName !== expectedStockFamilyConversionCommandName ||
+  stockFamilyConversionResult.stockFamily.genericPresetId !== 'negative_lab.generic.c41.portrait.v1' ||
+  stockFamilyConversionResult.conversionPlan.presetId !== 'negative_lab.generic.c41.portrait.v1' ||
+  stockFamilyConversionResult.conversionPlan.params.base_fog_sample?.x !== sampleRect.x ||
+  !stockFamilyConversionResult.proof.registryMappedPreset
+) {
+  throw new Error('Negative Lab app-server stock-family conversion route did not map registry id to preset plan.');
 }
 
 try {
@@ -313,12 +338,32 @@ try {
   }
 }
 
+try {
+  buildNegativeLabStockFamilyConversionRouteResult({
+    outputFormat: 'jpeg_proof',
+    paths: ['/fixtures/negative-lab/synthetic-color-negative-001.tif'],
+    sampleRect,
+    scope: 'active',
+    stockFamilyRegistryId: 'negative_lab.stock_family.ecn2_cinema_negative.v1',
+    suffix: 'Positive',
+  });
+  throw new Error('Reference-only Negative Lab stock family was accepted for conversion.');
+} catch (error) {
+  if (
+    error instanceof Error &&
+    error.message === 'Reference-only Negative Lab stock family was accepted for conversion.'
+  ) {
+    throw error;
+  }
+}
+
 for (const [filePath, marker] of [
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabBatchSummaryAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabAcceptBatchPlanAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabAcceptedBatchApplyAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabDensitometerAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabFrameHealthAppServerCommandSchema'],
+  ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabStockFamilyConversionAppServerCommandSchema'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabStockRegistryAppServerCommandSchema'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabAcceptedBatchPlanRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabAcceptedBatchApplyRouteResult'],
@@ -328,6 +373,7 @@ for (const [filePath, marker] of [
   ['src/utils/negativeLabDensitometer.ts', 'buildNegativeBaseFogDensitometerReadout'],
   ['src/schemas/negativeLabAppServerSchemas.ts', 'negativeLabConversionPlanResultSchema'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabFrameHealthRouteResult'],
+  ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabStockFamilyConversionRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabStockRegistryRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabConversionPlanResult'],
   ['src/utils/negativeLabMeasuredProfileRuntime.ts', 'resolveNegativeLabRuntimeProfile'],
