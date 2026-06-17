@@ -15,10 +15,7 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Pull Requests And GitHub Flow
 
-- Use pull requests for all repo changes. Do not commit directly to `main`.
-- Keep at most 3 open PRs at a time.
-- Keep PRs small enough to review and merge steadily.
-- Keep PR descriptions concise with validation evidence.
+- Use pull requests for repo changes; keep at most 3 open PRs at a time.
 
 ## GitHub Repo Resolution
 
