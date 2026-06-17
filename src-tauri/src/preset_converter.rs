@@ -3,7 +3,7 @@ use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::file_management::Preset;
+use crate::presets::Preset;
 
 #[derive(Copy, Clone, Debug)]
 enum Num {

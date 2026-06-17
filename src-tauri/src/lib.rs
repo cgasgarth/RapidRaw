@@ -37,6 +37,7 @@ mod panorama_opencv_spike;
 mod panorama_stitching;
 mod panorama_utils;
 mod preset_converter;
+mod presets;
 mod raw_processing;
 mod tagging;
 mod tagging_utils;
@@ -2639,15 +2640,15 @@ pub fn run() {
             file_management::save_metadata_and_update_thumbnail,
             file_management::apply_adjustments_to_paths,
             file_management::load_metadata,
-            file_management::load_presets,
-            file_management::save_presets,
+            presets::load_presets,
+            presets::save_presets,
             file_management::get_or_create_internal_library_root,
             file_management::reset_adjustments_for_paths,
             file_management::apply_auto_adjustments_to_paths,
-            file_management::handle_import_presets_from_file,
-            file_management::handle_import_legacy_presets_from_file,
-            file_management::handle_export_presets_to_file,
-            file_management::save_community_preset,
+            presets::handle_import_presets_from_file,
+            presets::handle_import_legacy_presets_from_file,
+            presets::handle_export_presets_to_file,
+            presets::save_community_preset,
             file_management::clear_all_sidecars,
             file_management::clear_thumbnail_cache,
             file_management::set_color_label_for_paths,
