@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Pipette, Sliders } from 'lucide-react';
-import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import AdjustmentSlider from './AdjustmentSlider';
 import { type BlackWhiteMixerChannel } from '../../schemas/blackWhiteMixerSchemas';
 import { type ChannelMixerOutput, type ChannelMixerSource } from '../../schemas/channelMixerSchemas';
 import { type ColorBalanceRgbChannel, type ColorBalanceRgbRange } from '../../schemas/colorBalanceRgbSchemas';
@@ -22,7 +23,6 @@ import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
 import { AppSettings } from '../ui/AppProperties';
 import ColorWheel from '../ui/ColorWheel';
-import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
 
 interface ColorProps {
@@ -43,14 +43,6 @@ interface ColorPanelProps {
 
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 type LevelsNumericKey = Exclude<keyof Adjustments['levels'], 'enabled'>;
-
-type SliderChangeEvent =
-  | ChangeEvent<HTMLInputElement>
-  | {
-      target: {
-        value: number | string;
-      };
-    };
 
 const formatPercent = (value: number) => `${String(value)}%`;
 const CAMERA_PROFILE_IDS = [
@@ -184,12 +176,12 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
     }));
   };
 
-  const handleGlobalChange = (grading: ColorGrading, value: number | string) => {
+  const handleGlobalChange = (grading: ColorGrading, value: number) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       colorGrading: {
         ...prev.colorGrading,
-        [grading]: parseFloat(String(value)),
+        [grading]: value,
       },
     }));
   };
@@ -352,25 +344,25 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
       </div>
 
       <div>
-        <Slider
+        <AdjustmentSlider
           defaultValue={50}
           label={t('adjustments.color.grading.blending')}
           max={100}
           min={0}
-          onChange={(e: SliderChangeEvent) => {
-            handleGlobalChange(ColorGrading.Blending, e.target.value);
+          onValueChange={(value) => {
+            handleGlobalChange(ColorGrading.Blending, value);
           }}
           step={1}
           value={colorGrading.blending}
           onDragStateChange={onDragStateChange}
         />
-        <Slider
+        <AdjustmentSlider
           defaultValue={0}
           label={t('adjustments.color.grading.balance')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => {
-            handleGlobalChange(ColorGrading.Balance, e.target.value);
+          onValueChange={(value) => {
+            handleGlobalChange(ColorGrading.Balance, value);
           }}
           step={1}
           value={colorGrading.balance}
@@ -395,23 +387,23 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
     [t],
   );
 
-  const handleShadowsChange = (value: number | string) => {
+  const handleShadowsChange = (value: number) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       colorCalibration: {
         ...prev.colorCalibration,
-        shadowsTint: parseFloat(String(value)),
+        shadowsTint: value,
       },
     }));
   };
 
-  const handlePrimaryChange = (key: 'Hue' | 'Saturation', value: number | string) => {
+  const handlePrimaryChange = (key: 'Hue' | 'Saturation', value: number) => {
     const fullKey = `${activePrimary}${key}` as keyof ColorCalibration;
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       colorCalibration: {
         ...prev.colorCalibration,
-        [fullKey]: parseFloat(String(value)),
+        [fullKey]: value,
       },
     }));
   };
@@ -432,15 +424,15 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
         <UiText color={TextColors.primary} weight={TextWeights.medium} className="mb-1">
           {t('adjustments.color.calibration.shadows')}
         </UiText>
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.color.calibration.tint')}
           min={-100}
           max={100}
           step={1}
           defaultValue={0}
           value={colorCalibration.shadowsTint}
-          onChange={(e: SliderChangeEvent) => {
-            handleShadowsChange(e.target.value);
+          onValueChange={(value) => {
+            handleShadowsChange(value);
           }}
           onDragStateChange={onDragStateChange}
           trackClassName="tint-gradient-track"
@@ -462,28 +454,28 @@ const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange 
             />
           ))}
         </div>
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.color.calibration.hue')}
           min={-100}
           max={100}
           step={1}
           defaultValue={0}
           value={currentValues.hue}
-          onChange={(e: SliderChangeEvent) => {
-            handlePrimaryChange('Hue', e.target.value);
+          onValueChange={(value) => {
+            handlePrimaryChange('Hue', value);
           }}
           onDragStateChange={onDragStateChange}
           trackClassName={`hue-slider-${trackSuffix}`}
         />
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.color.calibration.saturation')}
           min={-100}
           max={100}
           step={1}
           defaultValue={0}
           value={currentValues.saturation}
-          onChange={(e: SliderChangeEvent) => {
-            handlePrimaryChange('Saturation', e.target.value);
+          onValueChange={(value) => {
+            handlePrimaryChange('Saturation', value);
           }}
           onDragStateChange={onDragStateChange}
           trackClassName={`sat-slider-${trackSuffix}`}
@@ -606,18 +598,18 @@ export default function ColorPanel({
     document.documentElement.style.setProperty(`--hsl-mixer-sat-${activeColor}`, formatPercent(effectiveSaturation));
   }, [effectiveHue, currentHsl.saturation, activeColor]);
 
-  const handleGlobalChange = (key: ColorAdjustment, value: number | string) => {
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: parseFloat(String(value)) }));
+  const handleGlobalChange = (key: ColorAdjustment, value: number) => {
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
   };
 
-  const handleHslChange = (key: ColorAdjustment, value: number | string) => {
+  const handleHslChange = (key: ColorAdjustment, value: number) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       hsl: {
         ...prev.hsl,
         [activeColor]: {
           ...prev.hsl[activeColor],
-          [key]: parseFloat(String(value)),
+          [key]: value,
         },
       },
     }));
@@ -637,7 +629,7 @@ export default function ColorPanel({
     });
   };
 
-  const handleBlackWhiteWeightChange = (value: number | string) => {
+  const handleBlackWhiteWeightChange = (value: number) => {
     setAdjustments((prev: Adjustments) => {
       const current = prev.blackWhiteMixer;
 
@@ -647,7 +639,7 @@ export default function ColorPanel({
           ...current,
           weights: {
             ...current.weights,
-            [activeColor]: parseFloat(String(value)),
+            [activeColor]: value,
           },
         },
       };
@@ -682,7 +674,7 @@ export default function ColorPanel({
     });
   };
 
-  const handleColorBalanceChange = (channel: ColorBalanceRgbChannel, value: number | string) => {
+  const handleColorBalanceChange = (channel: ColorBalanceRgbChannel, value: number) => {
     setAdjustments((prev: Adjustments) => {
       const current = prev.colorBalanceRgb;
 
@@ -692,7 +684,7 @@ export default function ColorPanel({
           ...current,
           [activeColorBalanceRange]: {
             ...current[activeColorBalanceRange],
-            [channel]: parseFloat(String(value)),
+            [channel]: value,
           },
         },
       };
@@ -727,7 +719,7 @@ export default function ColorPanel({
     });
   };
 
-  const handleChannelMixerChange = (source: ChannelMixerSource, value: number | string) => {
+  const handleChannelMixerChange = (source: ChannelMixerSource, value: number) => {
     setAdjustments((prev: Adjustments) => {
       const current = prev.channelMixer;
 
@@ -737,7 +729,7 @@ export default function ColorPanel({
           ...current,
           [activeChannelMixerOutput]: {
             ...current[activeChannelMixerOutput],
-            [source]: parseFloat(String(value)),
+            [source]: value,
           },
         },
       };
@@ -778,13 +770,12 @@ export default function ColorPanel({
     }));
   };
 
-  const handleLevelsChange = (key: LevelsNumericKey, value: number | string) => {
-    const numericValue = parseFloat(String(value));
+  const handleLevelsChange = (key: LevelsNumericKey, value: number) => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       levels: {
         ...prev.levels,
-        [key]: numericValue,
+        [key]: value,
       },
     }));
   };
@@ -859,56 +850,56 @@ export default function ColorPanel({
               {levels.enabled ? t('adjustments.color.levels.enabled') : t('adjustments.color.levels.disabled')}
             </button>
           </div>
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.color.levels.inputBlack')}
             max={inputBlackMax}
             min={0}
-            onChange={(e: SliderChangeEvent) => {
-              handleLevelsChange('inputBlack', Number(e.target.value) / 100);
+            onValueChange={(value) => {
+              handleLevelsChange('inputBlack', value / 100);
             }}
             step={1}
             value={Math.round(levels.inputBlack * 100)}
             onDragStateChange={onDragStateChange}
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.color.levels.inputWhite')}
             max={100}
             min={inputWhiteMin}
-            onChange={(e: SliderChangeEvent) => {
-              handleLevelsChange('inputWhite', Number(e.target.value) / 100);
+            onValueChange={(value) => {
+              handleLevelsChange('inputWhite', value / 100);
             }}
             step={1}
             value={Math.round(levels.inputWhite * 100)}
             onDragStateChange={onDragStateChange}
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.color.levels.gamma')}
             max={300}
             min={25}
-            onChange={(e: SliderChangeEvent) => {
-              handleLevelsChange('gamma', Number(e.target.value) / 100);
+            onValueChange={(value) => {
+              handleLevelsChange('gamma', value / 100);
             }}
             step={1}
             value={Math.round(levels.gamma * 100)}
             onDragStateChange={onDragStateChange}
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.color.levels.outputBlack')}
             max={outputBlackMax}
             min={0}
-            onChange={(e: SliderChangeEvent) => {
-              handleLevelsChange('outputBlack', Number(e.target.value) / 100);
+            onValueChange={(value) => {
+              handleLevelsChange('outputBlack', value / 100);
             }}
             step={1}
             value={Math.round(levels.outputBlack * 100)}
             onDragStateChange={onDragStateChange}
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.color.levels.outputWhite')}
             max={100}
             min={outputWhiteMin}
-            onChange={(e: SliderChangeEvent) => {
-              handleLevelsChange('outputWhite', Number(e.target.value) / 100);
+            onValueChange={(value) => {
+              handleLevelsChange('outputWhite', value / 100);
             }}
             step={1}
             value={Math.round(levels.outputWhite * 100)}
@@ -948,24 +939,24 @@ export default function ColorPanel({
             </button>
           )}
         </div>
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.color.temperature')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => {
-            handleGlobalChange(ColorAdjustment.Temperature, e.target.value);
+          onValueChange={(value) => {
+            handleGlobalChange(ColorAdjustment.Temperature, value);
           }}
           step={1}
           value={adjustments.temperature || 0}
           trackClassName="temperature-gradient-track"
           onDragStateChange={onDragStateChange}
         />
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.color.tint')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => {
-            handleGlobalChange(ColorAdjustment.Tint, e.target.value);
+          onValueChange={(value) => {
+            handleGlobalChange(ColorAdjustment.Tint, value);
           }}
           step={1}
           value={adjustments.tint || 0}
@@ -978,23 +969,23 @@ export default function ColorPanel({
         <UiText variant={TextVariants.heading} className="mb-2">
           {t('adjustments.color.presence')}
         </UiText>
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.color.vibrance')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => {
-            handleGlobalChange(ColorAdjustment.Vibrance, e.target.value);
+          onValueChange={(value) => {
+            handleGlobalChange(ColorAdjustment.Vibrance, value);
           }}
           step={1}
           value={adjustments.vibrance || 0}
           onDragStateChange={onDragStateChange}
         />
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.color.saturation')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => {
-            handleGlobalChange(ColorAdjustment.Saturation, e.target.value);
+          onValueChange={(value) => {
+            handleGlobalChange(ColorAdjustment.Saturation, value);
           }}
           step={1}
           value={adjustments.saturation || 0}
@@ -1031,14 +1022,14 @@ export default function ColorPanel({
               />
             ))}
           </div>
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.color.blackWhiteMixer.contribution', {
               name: t(getSelectiveColorRange(activeColor).labelKey),
             })}
             max={100}
             min={-100}
-            onChange={(e: SliderChangeEvent) => {
-              handleBlackWhiteWeightChange(e.target.value);
+            onValueChange={(value) => {
+              handleBlackWhiteWeightChange(value);
             }}
             step={1}
             value={currentBlackWhiteWeight}
@@ -1099,13 +1090,13 @@ export default function ColorPanel({
             ))}
           </div>
           {colorBalanceChannels.map((channel) => (
-            <Slider
+            <AdjustmentSlider
               key={channel.key}
               label={channel.label}
               max={100}
               min={-100}
-              onChange={(e: SliderChangeEvent) => {
-                handleColorBalanceChange(channel.key, e.target.value);
+              onValueChange={(value) => {
+                handleColorBalanceChange(channel.key, value);
               }}
               step={1}
               value={activeColorBalance[channel.key]}
@@ -1167,13 +1158,13 @@ export default function ColorPanel({
             ))}
           </div>
           {channelMixerSources.map((source) => (
-            <Slider
+            <AdjustmentSlider
               key={source.key}
               label={source.label}
               max={source.key === 'constant' ? 100 : 200}
               min={source.key === 'constant' ? -100 : -200}
-              onChange={(e: SliderChangeEvent) => {
-                handleChannelMixerChange(source.key, e.target.value);
+              onValueChange={(value) => {
+                handleChannelMixerChange(source.key, value);
               }}
               step={1}
               value={activeChannelMixerRow[source.key]}
@@ -1211,36 +1202,36 @@ export default function ColorPanel({
             />
           ))}
         </div>
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.color.hue')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => {
-            handleHslChange(ColorAdjustment.Hue, e.target.value);
+          onValueChange={(value) => {
+            handleHslChange(ColorAdjustment.Hue, value);
           }}
           step={1}
           value={currentHsl.hue}
           trackClassName={hue_slider}
           onDragStateChange={onDragStateChange}
         />
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.color.saturation')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => {
-            handleHslChange(ColorAdjustment.Saturation, e.target.value);
+          onValueChange={(value) => {
+            handleHslChange(ColorAdjustment.Saturation, value);
           }}
           step={1}
           value={currentHsl.saturation}
           trackClassName={saturation_slider}
           onDragStateChange={onDragStateChange}
         />
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.color.luminance')}
           max={100}
           min={-100}
-          onChange={(e: SliderChangeEvent) => {
-            handleHslChange(ColorAdjustment.Luminance, e.target.value);
+          onValueChange={(value) => {
+            handleHslChange(ColorAdjustment.Luminance, value);
           }}
           step={1}
           value={currentHsl.luminance}
