@@ -872,6 +872,12 @@ export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorD
       previousValue: 0,
       value: 12,
     },
+    {
+      module: 'black_white_mixer',
+      path: '/parameters/weights/reds',
+      previousValue: 0,
+      value: 18,
+    },
   ],
   predictedGraphRevision: 'graph_rev_46_preview',
   previewArtifacts: [

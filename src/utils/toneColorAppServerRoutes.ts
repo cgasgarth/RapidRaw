@@ -88,6 +88,28 @@ export const TONE_COLOR_APP_SERVER_ROUTE_MANIFEST = toneColorAppServerRouteManif
       status: 'mapped',
       toolName: 'tonecolor.apply_command',
     },
+    {
+      commandType: 'toneColor.setBlackWhiteMixer',
+      executionMode: 'dry_run_command',
+      inputSchemaName,
+      outputSchemaName: 'ToneColorDryRunResultV1',
+      reason:
+        'Black and white mixer dry-runs use the generic tone/color command tool with hue-weighted runtime validation.',
+      runtimeCheckScript: 'check:black-white-mixer',
+      status: 'mapped',
+      toolName: 'tonecolor.dry_run_command',
+    },
+    {
+      commandType: 'toneColor.setBlackWhiteMixer',
+      executionMode: 'apply_dry_run_plan',
+      inputSchemaName,
+      outputSchemaName: 'ToneColorMutationResultV1',
+      reason:
+        'Black and white mixer applies reuse the approved tone/color apply tool and persist an undoable edit graph update.',
+      runtimeCheckScript: 'check:black-white-mixer',
+      status: 'mapped',
+      toolName: 'tonecolor.apply_command',
+    },
   ],
   schemaVersion: 1,
 });

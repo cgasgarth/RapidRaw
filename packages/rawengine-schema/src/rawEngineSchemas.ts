@@ -1478,6 +1478,7 @@ export const toneColorCommandTypeV1Schema = z.enum([
   'toneColor.setLevels',
   'toneColor.setChannelMixer',
   'toneColor.setColorBalanceRgb',
+  'toneColor.setBlackWhiteMixer',
 ]);
 
 export const toneColorChannelV1Schema = z.enum(['luma', 'red', 'green', 'blue', 'rgb']);
@@ -1522,6 +1523,19 @@ export const toneColorBalanceRgbRangeV1Schema = z
     blue: z.number().min(-100).max(100),
     green: z.number().min(-100).max(100),
     red: z.number().min(-100).max(100),
+  })
+  .strict();
+
+export const toneColorBlackWhiteMixerWeightsV1Schema = z
+  .object({
+    aquas: z.number().min(-100).max(100),
+    blues: z.number().min(-100).max(100),
+    greens: z.number().min(-100).max(100),
+    magentas: z.number().min(-100).max(100),
+    oranges: z.number().min(-100).max(100),
+    purples: z.number().min(-100).max(100),
+    reds: z.number().min(-100).max(100),
+    yellows: z.number().min(-100).max(100),
   })
   .strict();
 
@@ -1730,6 +1744,27 @@ export const toneColorCommandEnvelopeV1Schema = z
           }),
       })
       .strict(),
+    toneColorCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('toneColor.setBlackWhiteMixer'),
+        parameters: z
+          .object({
+            enabled: z.boolean(),
+            weights: toneColorBlackWhiteMixerWeightsV1Schema,
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            const hasAdjustment = Object.values(parameters.weights).some((value) => value !== 0);
+            if (parameters.enabled && !hasAdjustment) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Enabled black and white mixer requires at least one non-zero channel weight.',
+                path: ['weights'],
+              });
+            }
+          }),
+      })
+      .strict(),
   ])
   .superRefine((command, context) => {
     if (command.dryRun) {
@@ -1772,6 +1807,7 @@ export const toneColorParameterDiffV1Schema = z
       'levels',
       'channel_mixer',
       'color_balance_rgb',
+      'black_white_mixer',
     ]),
     path: z.string().trim().min(1),
     previousValue: z.unknown().optional(),
