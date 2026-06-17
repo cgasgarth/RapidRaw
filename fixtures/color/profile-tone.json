@@ -6,7 +6,20 @@
       "toneCurve": "high_contrast"
     },
     "expectedProfile": "camera_landscape",
-    "expectedToneCurve": "high_contrast"
+    "expectedToneCurve": "high_contrast",
+    "runtimeExpectation": {
+      "inputRgb": {
+        "red": 0.42,
+        "green": 0.51,
+        "blue": 0.38
+      },
+      "expectedRgb": {
+        "red": 0.4180755854758524,
+        "green": 0.5126895793600623,
+        "blue": 0.3894942748233307
+      },
+      "tolerance": 1e-12
+    }
   },
   {
     "case": "linear raw with linear tone",
@@ -15,6 +28,19 @@
       "toneCurve": "linear"
     },
     "expectedProfile": "linear_raw",
-    "expectedToneCurve": "linear"
+    "expectedToneCurve": "linear",
+    "runtimeExpectation": {
+      "inputRgb": {
+        "red": 0.31,
+        "green": 0.31,
+        "blue": 0.31
+      },
+      "expectedRgb": {
+        "red": 0.31,
+        "green": 0.31,
+        "blue": 0.31
+      },
+      "tolerance": 1e-12
+    }
   }
 ]

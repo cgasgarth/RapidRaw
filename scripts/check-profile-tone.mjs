@@ -2,6 +2,8 @@
 
 import { readFile } from 'node:fs/promises';
 
+import { z } from 'zod';
+
 import { parseProfileToneSettings } from '../src/schemas/profileToneSchemas.ts';
 import {
   ADJUSTMENT_GROUPS,
@@ -9,10 +11,34 @@ import {
   ColorAdjustment,
   INITIAL_ADJUSTMENTS,
 } from '../src/utils/adjustments.ts';
+import { applyProfileToneToRgbPixel } from '../src/utils/profileToneRuntime.ts';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../src/utils/profileTonePresets.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
-const fixtures = await readJson('fixtures/color/profile-tone.json');
+const rgbPixelSchema = z
+  .object({
+    blue: z.number().min(0).max(1),
+    green: z.number().min(0).max(1),
+    red: z.number().min(0).max(1),
+  })
+  .strict();
+const runtimeExpectationSchema = z
+  .object({
+    expectedRgb: rgbPixelSchema,
+    inputRgb: rgbPixelSchema,
+    tolerance: z.number().min(0).max(0.01),
+  })
+  .strict();
+const fixtureSchema = z
+  .object({
+    case: z.string().min(1),
+    expectedProfile: z.string().min(1),
+    expectedToneCurve: z.string().min(1),
+    input: z.unknown(),
+    runtimeExpectation: runtimeExpectationSchema.optional(),
+  })
+  .strict();
+const fixtures = z.array(fixtureSchema).parse(await readJson('fixtures/color/profile-tone.json'));
 const invalidCases = await readJson('fixtures/color/invalid-profile-tone.json');
 const failures = [];
 
@@ -23,6 +49,16 @@ for (const fixture of fixtures) {
   }
   if (settings.toneCurve !== fixture.expectedToneCurve) {
     failures.push(`${fixture.case}: expected tone curve ${fixture.expectedToneCurve}.`);
+  }
+  if (fixture.runtimeExpectation) {
+    const result = applyProfileToneToRgbPixel(fixture.runtimeExpectation.inputRgb, settings);
+    for (const channel of ['red', 'green', 'blue']) {
+      const actual = result.outputRgb[channel];
+      const expected = fixture.runtimeExpectation.expectedRgb[channel];
+      if (Math.abs(actual - expected) > fixture.runtimeExpectation.tolerance) {
+        failures.push(`${fixture.case}: expected ${channel}=${expected}, got ${actual}.`);
+      }
+    }
   }
 }
 
