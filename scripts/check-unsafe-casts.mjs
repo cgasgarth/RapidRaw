@@ -1,24 +1,13 @@
 #!/usr/bin/env bun
 // @ts-check
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 import ts from 'typescript';
 
-const ROOT = process.cwd();
+import { getExtension, walkRepoFiles } from './lib/repo-files.mjs';
+
 const CHECKED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
-const IGNORED_DIRS = new Set(['.git', 'dist', 'node_modules', 'src-tauri/target', 'target']);
-
-const getExtension = (path) => {
-  const index = path.lastIndexOf('.');
-  return index >= 0 ? path.slice(index) : '';
-};
-
-const isIgnored = (path) => {
-  const normalized = path.split('/').join('/');
-  return [...IGNORED_DIRS].some((ignored) => normalized === ignored || normalized.startsWith(`${ignored}/`));
-};
 
 const hasCheckedExtension = (path) => CHECKED_EXTENSIONS.has(getExtension(path));
 
@@ -77,25 +66,6 @@ export const findUnsafeCastViolations = (filePath, contents) => {
   return violations;
 };
 
-const files = [];
-const walk = (dir) => {
-  for (const entry of readdirSync(dir)) {
-    const absolutePath = join(dir, entry);
-    const repoPath = relative(ROOT, absolutePath);
-    if (isIgnored(repoPath)) continue;
-
-    const stat = statSync(absolutePath);
-    if (stat.isDirectory()) {
-      walk(absolutePath);
-      continue;
-    }
-
-    if (stat.isFile() && hasCheckedExtension(repoPath)) {
-      files.push(absolutePath);
-    }
-  }
-};
-
 const runSelfTest = () => {
   const cases = [
     {
@@ -150,7 +120,7 @@ if (process.argv.includes('--self-test')) {
   process.exit(0);
 }
 
-walk(ROOT);
+const files = walkRepoFiles({ include: ({ repoPath }) => hasCheckedExtension(repoPath) });
 
 const violations = [];
 for (const file of files) {
