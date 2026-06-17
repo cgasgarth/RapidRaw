@@ -94,6 +94,15 @@ export const panoramaRuntimeProvenanceV1Schema = z
         support: z.enum(['implemented_current_engine', 'schema_only_deferred']),
       })
       .strict(),
+    qualityMetrics: z
+      .object({
+        cropCoverageRatio: z.number().min(0).max(1),
+        meanOverlapAreaPx: z.number().nonnegative(),
+        outputPixelCount: z.number().int().positive(),
+        sourcePixelCount: z.number().int().positive(),
+        stitchedSourceRatio: z.number().min(0).max(1),
+      })
+      .strict(),
     resolvedProjection: z.enum(['rectilinear', 'planar']),
     runtimeStatus: z.enum(['dry_run_rendered', 'apply_rendered']),
     seamBlend: z
@@ -309,6 +318,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
       },
       projection: request.command.parameters.projection,
       projectionSettings: buildPanoramaRuntimeProjectionSettings(request.command.parameters.projection),
+      qualityMetrics: buildPanoramaRuntimeQualityMetrics(request, stitched.output.width, stitched.output.height),
       resolvedProjection: resolvePanoramaRuntimeProjection(request.command.parameters.projection),
       runtimeStatus: 'dry_run_rendered',
       seamBlend: {
@@ -455,6 +465,27 @@ const buildPanoramaRuntimeAlignment = (
   };
 };
 
+const buildPanoramaRuntimeQualityMetrics = (
+  request: ParsedPanoramaRuntimePlanRequestV1,
+  outputWidth: number,
+  outputHeight: number,
+): PanoramaRuntimeProvenanceV1['qualityMetrics'] => {
+  const alignment = buildPanoramaRuntimeAlignment(request.sourceFrames, request.connectedSourceIndices);
+  const sourcePixelCount = request.sourceFrames.reduce((total, frame) => total + frame.width * frame.height, 0);
+  const overlapAreaTotal = alignment.pairwiseMatches.reduce((total, match) => total + match.overlapAreaPx, 0);
+  const crop = buildPanoramaRuntimeCrop(request.command.parameters.boundaryMode, outputWidth, outputHeight);
+  const outputPixelCount = outputWidth * outputHeight;
+  return {
+    cropCoverageRatio: roundPanoramaRuntimeMetric((crop.width * crop.height) / Math.max(1, outputPixelCount)),
+    meanOverlapAreaPx: roundPanoramaRuntimeMetric(overlapAreaTotal / Math.max(1, alignment.pairwiseMatches.length)),
+    outputPixelCount,
+    sourcePixelCount,
+    stitchedSourceRatio: roundPanoramaRuntimeMetric(
+      request.connectedSourceIndices.length / request.sourceFrames.length,
+    ),
+  };
+};
+
 const toSyntheticSourceFrame = (frame: PanoramaRuntimeSourceFrameV1): PanoramaSyntheticSourceFrameV1 => ({
   expectedOffsetX: frame.expectedOffsetX,
   expectedOffsetY: frame.expectedOffsetY,
@@ -480,6 +511,8 @@ const hashPanoramaRuntimePixels = (pixels: Uint8Array): string => {
   }
   return value.toString(16).padStart(8, '0');
 };
+
+const roundPanoramaRuntimeMetric = (value: number): number => Math.round(value * 1_000_000) / 1_000_000;
 
 const isPanoramaRuntimeCommand = (command: ComputationalMergeCommandEnvelopeV1): command is PanoramaRuntimeCommandV1 =>
   command.commandType === 'computationalMerge.createPanorama';

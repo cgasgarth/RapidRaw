@@ -119,6 +119,10 @@ assertEqual(dryRun.provenance.alignment.pairwiseMatches[0]?.translationPx.x, 48,
 assertEqual(dryRun.provenance.alignment.pairwiseMatches[0]?.translationPx.y, 2, 'first match y');
 assertEqual(dryRun.provenance.crop.mode, 'auto', 'crop mode');
 assertEqual(dryRun.provenance.crop.width, dryRun.dryRunResult.mergePlan.outputDimensions.width, 'crop width');
+assertEqual(dryRun.provenance.qualityMetrics.cropCoverageRatio, 1, 'crop coverage');
+assertEqual(dryRun.provenance.qualityMetrics.outputPixelCount, 168 * 51, 'output pixels');
+assertEqual(dryRun.provenance.qualityMetrics.sourcePixelCount, 72 * 48 * 3, 'source pixels');
+assertEqual(dryRun.provenance.qualityMetrics.stitchedSourceRatio, 1, 'stitched source ratio');
 assertEqual(dryRun.provenance.seamBlend.blendMode, 'feather', 'blend mode');
 assertEqual(dryRun.provenance.seamBlend.seamMethod, 'adaptive_feather', 'seam method');
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
@@ -146,6 +150,7 @@ console.log(
       provenance: {
         exposureNormalization: applied.provenance.exposureNormalization,
         lensCorrectionPolicy: applied.provenance.lensCorrectionPolicy,
+        qualityMetrics: applied.provenance.qualityMetrics,
         seamBlend: applied.provenance.seamBlend,
       },
       warnings: dryRun.dryRunResult.warnings,
