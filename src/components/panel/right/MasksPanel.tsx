@@ -96,6 +96,7 @@ import {
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
 import { createMaskRefinementCommand, dispatchMaskRefinementCommand } from '../../../utils/maskRefinementCommandBus';
 import { createSubMask } from '../../../utils/maskUtils';
+import AdjustmentSlider from '../../adjustments/AdjustmentSlider';
 import BasicAdjustments from '../../adjustments/Basic';
 import ColorPanel from '../../adjustments/Color';
 import CurveGraph, { type ChannelConfig } from '../../adjustments/Curves';
@@ -111,7 +112,6 @@ import {
 } from '../../ui/AppProperties';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Resizer from '../../ui/Resizer';
-import Slider, { type SliderChangeEvent } from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import UiText from '../../ui/Text';
 import Waveform from '../editor/Waveform';
@@ -369,15 +369,15 @@ const BrushTools = ({
 
   return (
     <div>
-      <Slider
+      <AdjustmentSlider
         defaultValue={100}
         label={t('editor.masks.brush.size')}
         max={200}
         min={1}
-        onChange={(e: SliderChangeEvent) => {
+        onValueChange={(value) => {
           onSettingsChange((settings) => ({
             ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-            size: Number(e.target.value),
+            size: value,
           }));
         }}
         step={1}
@@ -385,15 +385,15 @@ const BrushTools = ({
         fillOrigin="min"
         onDragStateChange={onDragStateChange}
       />
-      <Slider
+      <AdjustmentSlider
         defaultValue={50}
         label={t('editor.masks.brush.feather')}
         max={100}
         min={0}
-        onChange={(e: SliderChangeEvent) => {
+        onValueChange={(value) => {
           onSettingsChange((settings) => ({
             ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-            feather: Number(e.target.value),
+            feather: value,
           }));
         }}
         step={1}
@@ -446,13 +446,13 @@ const FlowBrushTool = ({
 
   return (
     <div className="space-y-4 border-t border-surface">
-      <Slider
+      <AdjustmentSlider
         defaultValue={10}
         label={t('editor.masks.brush.flow')}
         max={100}
         min={0}
-        onChange={(e: SliderChangeEvent) => {
-          onFlowChange(Number(e.target.value));
+        onValueChange={(value) => {
+          onFlowChange(value);
         }}
         step={1}
         value={flow}
@@ -831,7 +831,7 @@ function MaskRefinementControls({
       {MASK_REFINEMENT_PARAMETERS.map((param) => {
         const multiplier = param.multiplier ?? 1;
         return (
-          <Slider
+          <AdjustmentSlider
             key={param.key}
             label={t(param.labelKey)}
             min={param.min}
@@ -839,8 +839,8 @@ function MaskRefinementControls({
             step={param.step}
             defaultValue={param.defaultValue}
             value={getMaskParameterNumber(parameters, param.key, param.defaultValue / multiplier) * multiplier}
-            onChange={(e: SliderChangeEvent) => {
-              onChange({ [param.key]: Number(e.target.value) / multiplier });
+            onValueChange={(value) => {
+              onChange({ [param.key]: value / multiplier });
             }}
             {...(param.min >= 0 && { fillOrigin: 'min' })}
             onDragStateChange={onDragStateChange}
@@ -2894,17 +2894,17 @@ function SettingsPanel({
             </div>
           )}
 
-          <Slider
+          <AdjustmentSlider
             defaultValue={100}
             label={t('editor.masks.settings.opacity')}
             max={100}
             min={0}
             value={isComponentMode ? activeSubMask.opacity : displayContainer.opacity}
-            onChange={(e: SliderChangeEvent) => {
+            onValueChange={(value) => {
               if (isComponentMode) {
-                updateSubMask(activeSubMask.id, { opacity: Number(e.target.value) });
+                updateSubMask(activeSubMask.id, { opacity: value });
               } else {
-                handleMaskPropertyChange('opacity', Number(e.target.value));
+                handleMaskPropertyChange('opacity', value);
               }
             }}
             step={1}
@@ -2942,7 +2942,7 @@ function SettingsPanel({
               )}
 
               {subMaskConfig.parameters?.map((param) => (
-                <Slider
+                <AdjustmentSlider
                   key={param.key}
                   label={
                     param.key === 'feather' && activeSubMask.type === Mask.AiDepth
@@ -2954,9 +2954,9 @@ function SettingsPanel({
                   step={param.step}
                   defaultValue={param.defaultValue}
                   value={getMaskParameterNumber(activeSubMask.parameters, param.key) * (param.multiplier || 1)}
-                  onChange={(e: SliderChangeEvent) => {
+                  onValueChange={(value) => {
                     handleSubMaskParametersChange({
-                      [param.key]: parseFloat(String(e.target.value)) / (param.multiplier || 1),
+                      [param.key]: value / (param.multiplier || 1),
                     });
                   }}
                   {...(param.key !== 'grow' && { fillOrigin: 'min' })}
