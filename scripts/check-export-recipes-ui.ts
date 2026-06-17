@@ -2,9 +2,12 @@
 
 import { readFile } from 'node:fs/promises';
 
+import { z } from 'zod';
+
 import { buildExportRecipeUiRows, exportRecipeUiRowSchema } from '../src/schemas/exportRecipeUiSchemas.ts';
 
-const recipes = JSON.parse(await readFile('fixtures/export/export-recipes.json', 'utf8'));
+const recipesJson: unknown = JSON.parse(await readFile('fixtures/export/export-recipes.json', 'utf8'));
+const recipes = z.array(z.unknown()).parse(recipesJson);
 const rows = buildExportRecipeUiRows(recipes);
 const failures = [];
 
