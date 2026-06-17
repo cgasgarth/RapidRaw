@@ -14,6 +14,7 @@ import {
   negativeLabBaseFogSampleRectSchema,
   negativeLabPresetParamsSchema,
 } from './negativeLabPresetCatalogSchemas';
+import { negativeLabStockMetadataCatalogSchema } from './negativeLabStockMetadataCatalogSchemas';
 import {
   negativeLabStockRegistryEntrySchema,
   negativeLabStockRegistryIdSchema,
@@ -26,6 +27,7 @@ export const negativeLabAcceptBatchPlanCommandNameSchema = z.literal('negative.l
 export const negativeLabBatchSummaryCommandNameSchema = z.literal('negative.lab.build_batch_dry_run_summary');
 export const negativeLabDensitometerCommandNameSchema = z.literal('negative.lab.build_densitometer_readout');
 export const negativeLabFrameHealthCommandNameSchema = z.literal('negative.lab.build_frame_health_report');
+export const negativeLabStockMetadataCommandNameSchema = z.literal('negative.lab.list_stock_metadata');
 export const negativeLabStockRegistryCommandNameSchema = z.literal('negative.lab.list_stock_registry');
 export const negativeLabStockFamilyConversionCommandNameSchema = z.literal(
   'negative.lab.build_stock_family_conversion_plan',
@@ -37,6 +39,7 @@ export const negativeLabAppServerCommandNameSchema = z.union([
   negativeLabConversionPlanCommandNameSchema,
   negativeLabDensitometerCommandNameSchema,
   negativeLabFrameHealthCommandNameSchema,
+  negativeLabStockMetadataCommandNameSchema,
   negativeLabStockFamilyConversionCommandNameSchema,
   negativeLabStockRegistryCommandNameSchema,
 ]);
@@ -83,6 +86,7 @@ export const negativeLabDensitometerAppServerCommandSchema = z
   })
   .strict();
 export const negativeLabStockRegistryAppServerCommandSchema = z.object({}).strict();
+export const negativeLabStockMetadataAppServerCommandSchema = z.object({}).strict();
 export const negativeLabStockFamilyConversionAppServerCommandSchema = negativeLabAppServerCommandSchema
   .omit({ presetId: true })
   .extend({
@@ -158,6 +162,15 @@ export const negativeLabStockRegistryRouteSchema = z
     status: z.literal('mapped'),
   })
   .strict();
+export const negativeLabStockMetadataRouteSchema = z
+  .object({
+    commandName: negativeLabStockMetadataCommandNameSchema,
+    inputSchemaName: z.literal('NegativeLabStockMetadataAppServerCommandV1'),
+    outputSchemaName: z.literal('NegativeLabStockMetadataAppServerResultV1'),
+    reason: z.string().trim().min(1),
+    status: z.literal('mapped'),
+  })
+  .strict();
 export const negativeLabStockFamilyConversionRouteSchema = z
   .object({
     commandName: negativeLabStockFamilyConversionCommandNameSchema,
@@ -176,6 +189,7 @@ export const negativeLabAppServerRouteSchema = z.union([
   negativeLabDensitometerRouteSchema,
   negativeLabFrameHealthRouteSchema,
   negativeLabStockFamilyConversionRouteSchema,
+  negativeLabStockMetadataRouteSchema,
   negativeLabStockRegistryRouteSchema,
 ]);
 
@@ -298,6 +312,34 @@ export const negativeLabStockRegistryAppServerResultSchema = z
       context.addIssue({ code: 'custom', message: 'Stock registry count must match registry entries.' });
     }
   });
+export const negativeLabStockMetadataAppServerResultSchema = z
+  .object({
+    catalog: negativeLabStockMetadataCatalogSchema,
+    commandName: negativeLabStockMetadataCommandNameSchema,
+    counts: z
+      .object({
+        blackAndWhiteNegativeCount: z.number().int().nonnegative(),
+        cinemaNegativeCount: z.number().int().nonnegative(),
+        colorNegativeCount: z.number().int().nonnegative(),
+        slideReversalCount: z.number().int().nonnegative(),
+        totalCount: z.number().int().positive(),
+      })
+      .strict(),
+    proof: z
+      .object({
+        deterministic: z.literal(true),
+        generatedFrom: z.literal('src/utils/negativeLabStockMetadataCatalog.ts'),
+        metadataOnlyNotRuntimeApplied: z.literal(true),
+        namedStockClaimsRuntimeGated: z.literal(true),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((result, context) => {
+    if (result.counts.totalCount !== result.catalog.entries.length) {
+      context.addIssue({ code: 'custom', message: 'Stock metadata count must match catalog entries.' });
+    }
+  });
 export const negativeLabStockFamilyConversionResultSchema = z
   .object({
     commandName: negativeLabStockFamilyConversionCommandNameSchema,
@@ -345,6 +387,8 @@ export type NegativeLabDensitometerAppServerResult = z.infer<typeof negativeLabD
 export type NegativeLabFrameHealthAppServerCommand = z.infer<typeof negativeLabFrameHealthAppServerCommandSchema>;
 export type NegativeLabFrameHealthAppServerResult = z.infer<typeof negativeLabFrameHealthAppServerResultSchema>;
 export type NegativeLabProfileProvenanceHash = z.infer<typeof negativeLabProfileProvenanceHashSchema>;
+export type NegativeLabStockMetadataAppServerCommand = z.infer<typeof negativeLabStockMetadataAppServerCommandSchema>;
+export type NegativeLabStockMetadataAppServerResult = z.infer<typeof negativeLabStockMetadataAppServerResultSchema>;
 export type NegativeLabStockRegistryAppServerCommand = z.infer<typeof negativeLabStockRegistryAppServerCommandSchema>;
 export type NegativeLabStockRegistryAppServerResult = z.infer<typeof negativeLabStockRegistryAppServerResultSchema>;
 export type NegativeLabStockFamilyConversionAppServerCommand = z.infer<
