@@ -90,6 +90,7 @@ export enum Invokes {
   RenameFiles = 'rename_files',
   RenameFolder = 'rename_folder',
   ResetAdjustmentsForPaths = 'reset_adjustments_for_paths',
+  RunRawOpenEditExportProof = 'run_raw_open_edit_export_proof',
   SaveMetadataAndUpdateThumbnail = 'save_metadata_and_update_thumbnail',
   SaveCollage = 'save_collage',
   SaveDenoisedImage = 'save_denoised_image',

@@ -319,7 +319,7 @@ fn prepare_export_masks<'a>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn process_image_for_export_pipeline(
+pub(crate) fn process_image_for_export_pipeline(
     path: &str,
     base_image: &DynamicImage,
     js_adjustments: &Value,
