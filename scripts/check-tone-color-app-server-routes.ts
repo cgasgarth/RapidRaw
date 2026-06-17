@@ -44,6 +44,27 @@ if (!parsedCommand.success || parsedCommand.data.commandType !== 'toneColor.setB
   failures.push('Sample tone-color command does not validate the basic tone command route type.');
 }
 
+const parsedToneCurveCommand = toneColorCommandEnvelopeV1Schema.safeParse({
+  ...sampleToneColorCommandEnvelopeV1,
+  commandId: 'command_tone_color_tone_curve_preview_sample',
+  commandType: 'toneColor.setToneCurve',
+  correlationId: 'corr_tone_color_tone_curve_preview_sample',
+  idempotencyKey: 'idem_tone_color_tone_curve_preview_sample',
+  parameters: {
+    channel: 'luma',
+    interpolation: 'monotone_cubic',
+    points: [
+      { input: 0, output: 0 },
+      { input: 0.25, output: 0.22 },
+      { input: 0.75, output: 0.8 },
+      { input: 1, output: 1 },
+    ],
+  },
+});
+if (!parsedToneCurveCommand.success || parsedToneCurveCommand.data.commandType !== 'toneColor.setToneCurve') {
+  failures.push('Tone-color tone curve command does not validate the ordered curve route type.');
+}
+
 const parsedLevelsCommand = toneColorCommandEnvelopeV1Schema.safeParse({
   ...sampleToneColorCommandEnvelopeV1,
   commandId: 'command_tone_color_levels_preview_sample',
@@ -131,6 +152,7 @@ if (
 }
 
 for (const commandType of [
+  'toneColor.setToneCurve',
   'toneColor.setLevels',
   'toneColor.setChannelMixer',
   'toneColor.setColorBalanceRgb',
