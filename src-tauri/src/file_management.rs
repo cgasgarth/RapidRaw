@@ -182,6 +182,62 @@ fn virtual_path_for_copy(source_path: &Path, copy_id: Option<&str>) -> (String, 
     }
 }
 
+fn expand_image_file_rows(
+    path_buf: PathBuf,
+    sidecars: Vec<Option<String>>,
+    settings: &AppSettings,
+    enable_xmp_sync: bool,
+) -> Vec<ImageFile> {
+    let path_str = path_buf.to_string_lossy().into_owned();
+    let modified = fs::metadata(&path_buf)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let mut file_results = Vec::with_capacity(sidecars.len());
+
+    for copy_id_opt in sidecars {
+        let (virtual_path, is_virtual_copy) =
+            virtual_path_for_copy(&path_buf, copy_id_opt.as_deref());
+        let sidecar_path = rrdata_sidecar_path(&path_buf, copy_id_opt.as_deref());
+
+        let (is_edited, tags, rating) = {
+            let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+
+            if enable_xmp_sync
+                && sync_metadata_from_xmp(&path_buf, &mut metadata)
+                && let Ok(json) = serde_json::to_string_pretty(&metadata)
+            {
+                let _ = fs::write(&sidecar_path, json);
+            }
+
+            let is_raw = crate::formats::is_raw_file(&path_str);
+            let tm_override =
+                crate::image_processing::resolve_tonemapper_override(settings, is_raw);
+            let edited = crate::image_processing::is_image_edited(
+                &metadata.adjustments,
+                is_raw,
+                tm_override,
+            );
+            (edited, metadata.tags, metadata.rating)
+        };
+
+        file_results.push(ImageFile {
+            path: virtual_path,
+            modified,
+            is_edited,
+            tags,
+            exif: None,
+            is_virtual_copy,
+            rating,
+        });
+    }
+
+    file_results
+}
+
 pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     let (source_path_str, copy_id) = if let Some((base, id)) = virtual_path.rsplit_once("?vc=") {
         (base.to_string(), Some(id.to_string()))
@@ -308,61 +364,14 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
             let sidecars = sidecars_by_filename
                 .remove(&file_name)
                 .unwrap_or_else(|| vec![None]);
-            let path_str = path_buf.to_string_lossy().into_owned();
-            (path_str, path_buf, sidecars)
+            (path_buf, sidecars)
         })
         .collect();
 
     let result_list: Vec<ImageFile> = tasks
         .into_par_iter()
-        .flat_map(|(path_str, path_buf, sidecars)| {
-            let modified = fs::metadata(&path_buf)
-                .ok()
-                .and_then(|m| m.modified().ok())
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-
-            let mut file_results = Vec::with_capacity(sidecars.len());
-
-            for copy_id_opt in sidecars {
-                let (virtual_path, is_virtual_copy) =
-                    virtual_path_for_copy(&path_buf, copy_id_opt.as_deref());
-                let sidecar_path = rrdata_sidecar_path(&path_buf, copy_id_opt.as_deref());
-
-                let (is_edited, tags, rating) = {
-                    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-
-                    if enable_xmp_sync
-                        && sync_metadata_from_xmp(&path_buf, &mut metadata)
-                        && let Ok(json) = serde_json::to_string_pretty(&metadata)
-                    {
-                        let _ = fs::write(&sidecar_path, json);
-                    }
-
-                    let is_raw = crate::formats::is_raw_file(&path_str);
-                    let tm_override =
-                        crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
-                    let edited = crate::image_processing::is_image_edited(
-                        &metadata.adjustments,
-                        is_raw,
-                        tm_override,
-                    );
-                    (edited, metadata.tags, metadata.rating)
-                };
-
-                file_results.push(ImageFile {
-                    path: virtual_path,
-                    modified,
-                    is_edited,
-                    tags,
-                    exif: None,
-                    is_virtual_copy,
-                    rating,
-                });
-            }
-
-            file_results
+        .flat_map(|(path_buf, sidecars)| {
+            expand_image_file_rows(path_buf, sidecars, &settings, enable_xmp_sync)
         })
         .collect();
 
@@ -407,61 +416,14 @@ pub fn list_images_recursive(
             let sidecars = sidecars_by_path
                 .remove(&path_buf)
                 .unwrap_or_else(|| vec![None]);
-            let path_str = path_buf.to_string_lossy().into_owned();
-            (path_str, path_buf, sidecars)
+            (path_buf, sidecars)
         })
         .collect();
 
     let result_list: Vec<ImageFile> = tasks
         .into_par_iter()
-        .flat_map(|(path_str, path_buf, sidecars)| {
-            let modified = fs::metadata(&path_buf)
-                .ok()
-                .and_then(|m| m.modified().ok())
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-
-            let mut file_results = Vec::with_capacity(sidecars.len());
-
-            for copy_id_opt in sidecars {
-                let (virtual_path, is_virtual_copy) =
-                    virtual_path_for_copy(&path_buf, copy_id_opt.as_deref());
-                let sidecar_path = rrdata_sidecar_path(&path_buf, copy_id_opt.as_deref());
-
-                let (is_edited, tags, rating) = {
-                    let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-
-                    if enable_xmp_sync
-                        && sync_metadata_from_xmp(&path_buf, &mut metadata)
-                        && let Ok(json) = serde_json::to_string_pretty(&metadata)
-                    {
-                        let _ = fs::write(&sidecar_path, json);
-                    }
-
-                    let is_raw = crate::formats::is_raw_file(&path_str);
-                    let tm_override =
-                        crate::image_processing::resolve_tonemapper_override(&settings, is_raw);
-                    let edited = crate::image_processing::is_image_edited(
-                        &metadata.adjustments,
-                        is_raw,
-                        tm_override,
-                    );
-                    (edited, metadata.tags, metadata.rating)
-                };
-
-                file_results.push(ImageFile {
-                    path: virtual_path,
-                    modified,
-                    is_edited,
-                    tags,
-                    exif: None,
-                    is_virtual_copy,
-                    rating,
-                });
-            }
-
-            file_results
+        .flat_map(|(path_buf, sidecars)| {
+            expand_image_file_rows(path_buf, sidecars, &settings, enable_xmp_sync)
         })
         .collect();
 
