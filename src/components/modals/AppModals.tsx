@@ -20,7 +20,15 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { useUIStore } from '../../store/useUIStore';
+import {
+  createDefaultCollageModalState,
+  createDefaultCullingModalState,
+  createDefaultFocusStackModalState,
+  createDefaultHdrModalState,
+  createDefaultPanoramaModalState,
+  createDefaultSuperResolutionModalState,
+  useUIStore,
+} from '../../store/useUIStore';
 import { CopyPasteSettings } from '../../utils/adjustments';
 import { AppSettings, AlbumItem } from '../ui/AppProperties';
 
@@ -192,15 +200,7 @@ export default function AppModals(props: AppModalsProps) {
         }
         onClose={() => {
           setUI({
-            panoramaModalState: {
-              isOpen: false,
-              isProcessing: false,
-              progressMessage: '',
-              settings: panoramaModalState.settings,
-              finalImageBase64: null,
-              error: null,
-              stitchingSourcePaths: [],
-            },
+            panoramaModalState: createDefaultPanoramaModalState(panoramaModalState.settings),
           });
         }}
         onOpenFile={(path: string) => {
@@ -231,15 +231,7 @@ export default function AppModals(props: AppModalsProps) {
         }
         onClose={() => {
           setUI({
-            hdrModalState: {
-              isOpen: false,
-              isProcessing: false,
-              progressMessage: '',
-              settings: hdrModalState.settings,
-              finalImageBase64: null,
-              error: null,
-              stitchingSourcePaths: [],
-            },
+            hdrModalState: createDefaultHdrModalState(hdrModalState.settings),
           });
         }}
         onOpenFile={(path: string) => {
@@ -269,11 +261,7 @@ export default function AppModals(props: AppModalsProps) {
         }
         onClose={() => {
           setUI((state) => ({
-            superResolutionModalState: {
-              ...state.superResolutionModalState,
-              isOpen: false,
-              sourcePaths: [],
-            },
+            superResolutionModalState: createDefaultSuperResolutionModalState(state.superResolutionModalState.settings),
           }));
         }}
         onSettingsChange={(settings) => {
@@ -300,11 +288,7 @@ export default function AppModals(props: AppModalsProps) {
         }
         onClose={() => {
           setUI((state) => ({
-            focusStackModalState: {
-              ...state.focusStackModalState,
-              isOpen: false,
-              sourcePaths: [],
-            },
+            focusStackModalState: createDefaultFocusStackModalState(state.focusStackModalState.settings),
           }));
         }}
         onSettingsChange={(settings) => {
@@ -447,9 +431,7 @@ export default function AppModals(props: AppModalsProps) {
       <CullingModal
         isOpen={cullingModalState.isOpen}
         onClose={() => {
-          setUI({
-            cullingModalState: { isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] },
-          });
+          setUI({ cullingModalState: createDefaultCullingModalState() });
         }}
         progress={cullingModalState.progress}
         suggestions={cullingModalState.suggestions}
@@ -464,9 +446,7 @@ export default function AppModals(props: AppModalsProps) {
           } else {
             void props.executeDelete(paths, { includeAssociated: false });
           }
-          setUI({
-            cullingModalState: { isOpen: false, progress: null, suggestions: null, error: null, pathsToCull: [] },
-          });
+          setUI({ cullingModalState: createDefaultCullingModalState() });
         }}
         onError={(err) => {
           setUI((state) => ({ cullingModalState: { ...state.cullingModalState, error: err, progress: null } }));
@@ -475,7 +455,7 @@ export default function AppModals(props: AppModalsProps) {
       <CollageModal
         isOpen={collageModalState.isOpen}
         onClose={() => {
-          setUI({ collageModalState: { isOpen: false, sourceImages: [] } });
+          setUI({ collageModalState: createDefaultCollageModalState() });
         }}
         onSave={props.handleSaveCollage}
         sourceImages={collageModalState.sourceImages}
