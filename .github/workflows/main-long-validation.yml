@@ -12,11 +12,25 @@ permissions:
 
 jobs:
   rust-check:
-    name: 'rust: cargo check macOS'
-    runs-on: macos-14
+    name: 'rust: cargo check Linux'
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
 
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         with:
@@ -27,43 +41,33 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-check-macos-host-desktop
+          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-check-main-long
           cache-on-failure: true
-
-      - name: Cache ONNX Runtime library
-        id: rust-check-onnx-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: src-tauri/resources/libonnxruntime.dylib
-          key: v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-${{ hashFiles('src-tauri/build.rs') }}
-          restore-keys: |
-            v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-
-
-      - name: Record Rust check cache status
-        run: |
-          set -euo pipefail
-
-          onnx_cache_hit="${{ steps.rust-check-onnx-cache.outputs.cache-hit }}"
-          if [[ -z "$onnx_cache_hit" ]]; then
-            onnx_cache_hit="miss"
-          fi
-
-          {
-            echo "### Rust check cache status"
-            echo "- Rust cache key suffix: \`v1-${{ runner.os }}-${{ runner.arch }}-rust-check-macos-host-desktop\`"
-            echo "- ONNX exact hit: \`$onnx_cache_hit\`"
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Cargo check
         working-directory: src-tauri
         run: cargo check --locked --no-default-features --features required-ci
 
   rust-clippy:
-    name: 'rust: clippy baseline macOS'
-    runs-on: macos-14
+    name: 'rust: clippy baseline Linux'
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
 
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         with:
@@ -75,43 +79,33 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-clippy-macos-host-desktop
+          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-clippy-main-long
           cache-on-failure: true
-
-      - name: Cache ONNX Runtime library
-        id: rust-clippy-onnx-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: src-tauri/resources/libonnxruntime.dylib
-          key: v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-${{ hashFiles('src-tauri/build.rs') }}
-          restore-keys: |
-            v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-
-
-      - name: Record Rust clippy cache status
-        run: |
-          set -euo pipefail
-
-          onnx_cache_hit="${{ steps.rust-clippy-onnx-cache.outputs.cache-hit }}"
-          if [[ -z "$onnx_cache_hit" ]]; then
-            onnx_cache_hit="miss"
-          fi
-
-          {
-            echo "### Rust clippy cache status"
-            echo "- Rust cache key suffix: \`v1-${{ runner.os }}-${{ runner.arch }}-rust-clippy-macos-host-desktop\`"
-            echo "- ONNX exact hit: \`$onnx_cache_hit\`"
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Clippy
         working-directory: src-tauri
         run: cargo clippy --locked --all-targets --no-default-features --features required-ci -- -D warnings
 
   rust-test:
-    name: 'rust: tests macOS'
-    runs-on: macos-14
+    name: 'rust: tests Linux'
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
 
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         with:
@@ -122,32 +116,8 @@ jobs:
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-test-macos-host-desktop
+          key: v1-${{ runner.os }}-${{ runner.arch }}-rust-test-main-long
           cache-on-failure: true
-
-      - name: Cache ONNX Runtime library
-        id: rust-test-onnx-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: src-tauri/resources/libonnxruntime.dylib
-          key: v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-${{ hashFiles('src-tauri/build.rs') }}
-          restore-keys: |
-            v1-${{ runner.os }}-${{ runner.arch }}-onnxruntime-macos-host-desktop-
-
-      - name: Record Rust test cache status
-        run: |
-          set -euo pipefail
-
-          onnx_cache_hit="${{ steps.rust-test-onnx-cache.outputs.cache-hit }}"
-          if [[ -z "$onnx_cache_hit" ]]; then
-            onnx_cache_hit="miss"
-          fi
-
-          {
-            echo "### Rust test cache status"
-            echo "- Rust cache key suffix: \`v1-${{ runner.os }}-${{ runner.arch }}-rust-test-macos-host-desktop\`"
-            echo "- ONNX exact hit: \`$onnx_cache_hit\`"
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Cargo test
         working-directory: src-tauri
