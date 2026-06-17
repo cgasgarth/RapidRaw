@@ -7,6 +7,7 @@ import {
   buildNegativeLabConversionPlanResult,
   buildNegativeLabDensitometerRouteResult,
   buildNegativeLabFrameHealthRouteResult,
+  buildNegativeLabStockFamilyConversionRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../src/utils/negativeLabAppServerRoutes.ts';
 import {
@@ -57,6 +58,7 @@ const requiredRouteNames = [
   'negative.lab.build_batch_dry_run_summary',
   'negative.lab.accept_batch_dry_run_plan',
   'negative.lab.build_accepted_batch_apply',
+  'negative.lab.build_stock_family_conversion_plan',
 ];
 
 for (const routeName of requiredRouteNames) {
@@ -96,6 +98,14 @@ const acceptedApplyPlan = buildNegativeLabAcceptedBatchApplyRouteResult({
   dryRun: dryRunCommand,
 });
 const conversionPlan = buildNegativeLabConversionPlanResult(conversionCommand);
+const stockFamilyConversionPlan = buildNegativeLabStockFamilyConversionRouteResult({
+  outputFormat: 'jpeg_proof',
+  paths: dryRunCommand.targetPaths,
+  sampleRect,
+  scope: 'all',
+  stockFamilyRegistryId: 'negative_lab.stock_family.c41_portrait_color_negative.v1',
+  suffix: 'Positive',
+});
 
 if (densitometerReadout.status !== 'strong_cast') {
   throw new Error('Negative Lab agent densitometer route did not flag the color cast.');
@@ -115,6 +125,14 @@ if (
 
 if (conversionPlan.params.base_fog_sample?.x !== sampleRect.x) {
   throw new Error('Negative Lab agent conversion route did not preserve the sampled base/fog rectangle.');
+}
+
+if (
+  stockFamilyConversionPlan.stockFamily.genericPresetId !== 'negative_lab.generic.c41.portrait.v1' ||
+  stockFamilyConversionPlan.conversionPlan.presetId !== 'negative_lab.generic.c41.portrait.v1' ||
+  stockFamilyConversionPlan.conversionPlan.params.base_fog_sample?.x !== sampleRect.x
+) {
+  throw new Error('Negative Lab agent stock-family route did not map registry id to a conversion plan.');
 }
 
 const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
