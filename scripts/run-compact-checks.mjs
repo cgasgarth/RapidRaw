@@ -13,6 +13,8 @@ const CHECK_GROUPS = {
     'check:i18n',
     'check:unsafe-casts',
     'check:film-fixtures',
+    'check:film-look-preview-export-parity',
+    'check:film-look-measured-fixtures',
     'check:release-notes',
     'check:release-benchmark-report',
     'check:export-recipes',
