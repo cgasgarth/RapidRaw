@@ -83,6 +83,8 @@ import { Adjustments, AiPatch } from '../../../utils/adjustments';
 import {
   cloneMaskLikeContainerForPaste,
   cloneSubMaskForPaste,
+  createInvertedSubMaskContainer,
+  getMaskLikeInsertAfterIndex,
   insertMaskLikeContainerAt,
   insertSubMaskAt,
   moveSubMaskBetweenContainers,
@@ -797,18 +799,16 @@ export default function AIPanel() {
   };
 
   const handleDuplicatePatchContainer = (container: AiPatch) => {
-    const patchIndex = adjustments.aiPatches.findIndex((patch) => patch.id === container.id);
     const duplicatedContainer = clonePatchData(container, { rename: true });
 
-    insertPatchContainer(duplicatedContainer, patchIndex >= 0 ? patchIndex + 1 : undefined);
+    insertPatchContainer(duplicatedContainer, getMaskLikeInsertAfterIndex(adjustments.aiPatches, container.id));
   };
 
   const handleDuplicateAndInvertPatchContainer = (container: AiPatch) => {
-    const patchIndex = adjustments.aiPatches.findIndex((patch) => patch.id === container.id);
     const duplicatedContainer = clonePatchData(container, { invert: true, rename: false });
     duplicatedContainer.name = t('editor.ai.patches.invertedName', { name: container.name });
 
-    insertPatchContainer(duplicatedContainer, patchIndex >= 0 ? patchIndex + 1 : undefined);
+    insertPatchContainer(duplicatedContainer, getMaskLikeInsertAfterIndex(adjustments.aiPatches, container.id));
   };
 
   const handlePastePatch = (insertAfterContainerId?: string) => {
@@ -833,15 +833,15 @@ export default function AIPanel() {
     const parentContainer = adjustments.aiPatches.find((p) => p.id === containerId);
     if (!parentContainer) return;
 
-    const duplicatedSubMask = cloneSubMaskData(subMask, { invert: true, rename: false });
-    const newContainer = clonePatchData(parentContainer, { rename: false });
+    const newContainer = createInvertedSubMaskContainer({
+      cloneContainer: (container) => clonePatchData(container, { rename: false }),
+      cloneSubMask: (sourceSubMask) => cloneSubMaskData(sourceSubMask, { invert: true, rename: false }),
+      invertedName: t('editor.ai.patches.invertedName', { name: getSubMaskName(subMask) }),
+      parentContainer,
+      subMask,
+    });
 
-    newContainer.name = t('editor.ai.patches.invertedName', { name: getSubMaskName(subMask) });
-    newContainer.subMasks = [duplicatedSubMask];
-    newContainer.invert = false;
-
-    const parentIndex = adjustments.aiPatches.findIndex((p) => p.id === containerId);
-    insertPatchContainer(newContainer, parentIndex >= 0 ? parentIndex + 1 : undefined);
+    insertPatchContainer(newContainer, getMaskLikeInsertAfterIndex(adjustments.aiPatches, containerId));
   };
 
   const handlePasteSubMask = (containerId: string, insertIndex?: number) => {
