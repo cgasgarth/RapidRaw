@@ -18,13 +18,12 @@ Tauri build behavior changes.
 
 ## Package Manager State
 
-| Item                    | Current value                   | Notes                                                          |
-| ----------------------- | ------------------------------- | -------------------------------------------------------------- |
-| `packageManager` field  | `bun@1.3.13`                    | Bun is the declared frontend package manager.                  |
-| Primary lockfile        | `bun.lock`                      | Bun text lockfile is the frontend CI source of truth.          |
-| Transitional lockfile   | `package-lock.json`             | Preserved temporarily as npm fallback until removal is proven. |
-| CI frontend install     | `bun install --frozen-lockfile` | Used by validation and reusable app-build paths.               |
-| GitHub Actions Node use | None in project-authored steps  | Workflow helpers run through Bun instead of installing Node.   |
+| Item                    | Current value                   | Notes                                                        |
+| ----------------------- | ------------------------------- | ------------------------------------------------------------ |
+| `packageManager` field  | `bun@1.3.13`                    | Bun is the declared frontend package manager.                |
+| Primary lockfile        | `bun.lock`                      | Bun text lockfile is the frontend CI source of truth.        |
+| CI frontend install     | `bun install --frozen-lockfile` | Used by validation and reusable app-build paths.             |
+| GitHub Actions Node use | None in project-authored steps  | Workflow helpers run through Bun instead of installing Node. |
 
 ## `package.json` Scripts
 
@@ -150,8 +149,8 @@ Future PRs should add named scripts so local and CI behavior can converge:
 
 - `packageManager` points at Bun.
 - `bun.lock` exists and is verified by CI.
-- `package-lock.json` remains only as a transition fallback until a dedicated
-  removal PR proves all required paths are Bun-clean.
+- `package-lock.json` has been removed; `bun.lock` is the only frontend
+  dependency lockfile.
 
 #22 migrates compatible frontend CI install and script execution:
 
