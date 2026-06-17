@@ -41,14 +41,60 @@ export const panoramaRuntimeProvenanceV1Schema = z
   .object({
     acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
     acceptedDryRunPlanId: z.string().trim().min(1).optional(),
+    alignment: z
+      .object({
+        algorithmId: z.literal('synthetic_offset_translation_v1'),
+        pairwiseMatches: z.array(
+          z
+            .object({
+              fromSourceIndex: z.number().int().nonnegative(),
+              overlapAreaPx: z.number().int().nonnegative(),
+              reprojectionErrorPx: z.number().nonnegative(),
+              toSourceIndex: z.number().int().nonnegative(),
+              translationPx: z
+                .object({
+                  x: z.number().int(),
+                  y: z.number().int(),
+                })
+                .strict(),
+            })
+            .strict(),
+        ),
+      })
+      .strict(),
     boundaryMode: z.enum(['auto_crop', 'transparent', 'manual_crop', 'deferred_fill']),
+    crop: z
+      .object({
+        height: z.number().int().positive(),
+        mode: z.enum(['none', 'auto', 'manual']),
+        width: z.number().int().positive(),
+        x: z.number().int().nonnegative(),
+        y: z.number().int().nonnegative(),
+      })
+      .strict(),
     engineId: z.literal(PANORAMA_RUNTIME_ENGINE_ID),
     engineVersion: z.literal(PANORAMA_RUNTIME_ENGINE_VERSION),
     exposureNormalization: z.enum(['none', 'auto', 'gain_compensation']),
     excludedSourceCount: z.number().int().nonnegative(),
     lensCorrectionPolicy: z.enum(['unchanged', 'required_before_stitch', 'applied_before_stitch']),
+    projectedBounds: z
+      .object({
+        height: z.number().int().positive(),
+        width: z.number().int().positive(),
+        x: z.number().int(),
+        y: z.number().int(),
+      })
+      .strict(),
     projection: z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']),
-    resolvedProjection: z.literal('rectilinear'),
+    projectionSettings: z
+      .object({
+        deferredReason: z.string().trim().min(1).optional(),
+        effectiveProjection: z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']),
+        requestedProjection: z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']),
+        support: z.enum(['implemented_current_engine', 'schema_only_deferred']),
+      })
+      .strict(),
+    resolvedProjection: z.enum(['rectilinear', 'planar']),
     runtimeStatus: z.enum(['dry_run_rendered', 'apply_rendered']),
     seamBlend: z
       .object({
@@ -243,14 +289,27 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
     height: stitched.output.height,
     outputPixels: stitched.outputPixels,
     provenance: panoramaRuntimeProvenanceV1Schema.parse({
+      alignment: buildPanoramaRuntimeAlignment(request.sourceFrames, request.connectedSourceIndices),
       boundaryMode: request.command.parameters.boundaryMode,
+      crop: buildPanoramaRuntimeCrop(
+        request.command.parameters.boundaryMode,
+        stitched.output.width,
+        stitched.output.height,
+      ),
       engineId: PANORAMA_RUNTIME_ENGINE_ID,
       engineVersion: PANORAMA_RUNTIME_ENGINE_VERSION,
       exposureNormalization: request.command.parameters.exposureNormalization,
       excludedSourceCount: stitched.excludedSourceCount,
       lensCorrectionPolicy: request.command.parameters.lensCorrectionPolicy,
+      projectedBounds: {
+        height: stitched.output.height,
+        width: stitched.output.width,
+        x: 0,
+        y: Math.min(...request.sourceFrames.map((frame) => frame.expectedOffsetY ?? 0)),
+      },
       projection: request.command.parameters.projection,
-      resolvedProjection: 'rectilinear',
+      projectionSettings: buildPanoramaRuntimeProjectionSettings(request.command.parameters.projection),
+      resolvedProjection: resolvePanoramaRuntimeProjection(request.command.parameters.projection),
       runtimeStatus: 'dry_run_rendered',
       seamBlend: {
         blendMode: request.command.parameters.blendMode ?? 'feather',
@@ -316,9 +375,84 @@ const buildPanoramaPreflightEstimate = (request: ParsedPanoramaRuntimePlanReques
 
 const expectedWarningsForCommand = (command: PanoramaRuntimeCommandV1): string[] => {
   const warnings = new Set<string>(['legacy_full_frame_render']);
-  if (command.parameters.projection !== 'rectilinear') warnings.add('projection_runtime_deferred');
+  if (['cylindrical', 'spherical'].includes(command.parameters.projection)) warnings.add('projection_runtime_deferred');
   if (command.parameters.boundaryMode === 'deferred_fill') warnings.add('boundary_runtime_deferred');
   return [...warnings].sort();
+};
+
+const buildPanoramaRuntimeProjectionSettings = (
+  requestedProjection: PanoramaRuntimeCommandV1['parameters']['projection'],
+) => {
+  const effectiveProjection = resolvePanoramaRuntimeProjection(requestedProjection);
+  const support = requestedProjection === effectiveProjection ? 'implemented_current_engine' : 'schema_only_deferred';
+  return {
+    ...(support === 'schema_only_deferred'
+      ? {
+          deferredReason: 'Synthetic runtime currently renders non-planar panorama previews with rectilinear sampling.',
+        }
+      : {}),
+    effectiveProjection,
+    requestedProjection,
+    support,
+  };
+};
+
+const resolvePanoramaRuntimeProjection = (
+  requestedProjection: PanoramaRuntimeCommandV1['parameters']['projection'],
+): 'rectilinear' | 'planar' => (requestedProjection === 'planar' ? 'planar' : 'rectilinear');
+
+const buildPanoramaRuntimeCrop = (
+  boundaryMode: PanoramaRuntimeCommandV1['parameters']['boundaryMode'],
+  width: number,
+  height: number,
+) => ({
+  height,
+  mode:
+    boundaryMode === 'transparent' || boundaryMode === 'deferred_fill'
+      ? 'none'
+      : boundaryMode === 'manual_crop'
+        ? 'manual'
+        : 'auto',
+  width,
+  x: 0,
+  y: 0,
+});
+
+const buildPanoramaRuntimeAlignment = (
+  sourceFrames: PanoramaRuntimeSourceFrameV1[],
+  connectedSourceIndices: number[],
+) => {
+  const framesByIndex = new Map(sourceFrames.map((frame) => [frame.sourceIndex, frame]));
+  const connectedFrames = connectedSourceIndices.map((sourceIndex) => {
+    const frame = framesByIndex.get(sourceIndex);
+    if (frame === undefined) throw new Error(`Panorama runtime alignment missing source ${sourceIndex}.`);
+    return frame;
+  });
+
+  return {
+    algorithmId: 'synthetic_offset_translation_v1' as const,
+    pairwiseMatches: connectedFrames.slice(1).map((frame, index) => {
+      const previousFrame = connectedFrames[index];
+      if (previousFrame === undefined) throw new Error('Panorama runtime alignment missing previous source frame.');
+      const previousX = previousFrame.expectedOffsetX ?? 0;
+      const previousY = previousFrame.expectedOffsetY ?? 0;
+      const frameX = frame.expectedOffsetX ?? previousX + previousFrame.width;
+      const frameY = frame.expectedOffsetY ?? previousY;
+      const overlapWidth = Math.max(0, previousX + previousFrame.width - frameX);
+      const overlapTop = Math.max(previousY, frameY);
+      const overlapBottom = Math.min(previousY + previousFrame.height, frameY + frame.height);
+      return {
+        fromSourceIndex: previousFrame.sourceIndex,
+        overlapAreaPx: overlapWidth * Math.max(0, overlapBottom - overlapTop),
+        reprojectionErrorPx: Math.abs(frameY - previousY) / Math.max(1, frame.height),
+        toSourceIndex: frame.sourceIndex,
+        translationPx: {
+          x: frameX - previousX,
+          y: frameY - previousY,
+        },
+      };
+    }),
+  };
 };
 
 const toSyntheticSourceFrame = (frame: PanoramaRuntimeSourceFrameV1): PanoramaSyntheticSourceFrameV1 => ({

@@ -108,8 +108,17 @@ const applied = applyPanoramaRuntimePlanV1({
 
 assertEqual(dryRun.provenance.projection, 'cylindrical', 'requested projection');
 assertEqual(dryRun.provenance.resolvedProjection, 'rectilinear', 'resolved projection');
+assertEqual(dryRun.provenance.projectionSettings.support, 'schema_only_deferred', 'projection support');
+assertEqual(dryRun.provenance.projectionSettings.requestedProjection, 'cylindrical', 'requested projection setting');
+assertEqual(dryRun.provenance.projectionSettings.effectiveProjection, 'rectilinear', 'effective projection setting');
 assertEqual(dryRun.provenance.exposureNormalization, 'auto', 'exposure normalization');
 assertEqual(dryRun.provenance.lensCorrectionPolicy, 'required_before_stitch', 'lens correction policy');
+assertEqual(dryRun.provenance.alignment.algorithmId, 'synthetic_offset_translation_v1', 'alignment algorithm');
+assertEqual(dryRun.provenance.alignment.pairwiseMatches.length, 2, 'pairwise match count');
+assertEqual(dryRun.provenance.alignment.pairwiseMatches[0]?.translationPx.x, 48, 'first match x');
+assertEqual(dryRun.provenance.alignment.pairwiseMatches[0]?.translationPx.y, 2, 'first match y');
+assertEqual(dryRun.provenance.crop.mode, 'auto', 'crop mode');
+assertEqual(dryRun.provenance.crop.width, dryRun.dryRunResult.mergePlan.outputDimensions.width, 'crop width');
 assertEqual(dryRun.provenance.seamBlend.blendMode, 'feather', 'blend mode');
 assertEqual(dryRun.provenance.seamBlend.seamMethod, 'adaptive_feather', 'seam method');
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
