@@ -35,6 +35,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 
 import { useOsPlatform } from '../../hooks/useOsPlatform';
 import {
@@ -52,6 +53,7 @@ import {
   KEYBIND_SECTIONS,
   normalizeCombo,
 } from '../../utils/keyboardUtils';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { ThemeProps, THEMES } from '../../utils/themes';
 import ConfirmModal from '../modals/ConfirmModal';
 import { AppSettings, Invokes, Theme } from '../ui/AppProperties';
@@ -177,6 +179,10 @@ const buildProcessingSettings = (appSettings: AppSettings, osPlatform: string): 
 });
 
 const EXECUTE_TIMEOUT = 3000;
+const stringArraySchema = z.array(z.string());
+const pathSchema = z.string().min(1);
+const countSchema = z.number().int().nonnegative();
+const emptyResponseSchema = z.unknown();
 const translateDynamicKey = (translate: TFunction, key: string): string => translate(key, { defaultValue: key });
 const KEYBIND_ACTIONS = new Set(KEYBIND_DEFINITIONS.map((definition) => definition.action));
 
@@ -770,7 +776,7 @@ export default function SettingsPanel({
   useEffect(() => {
     const fetchLogPath = async () => {
       try {
-        const path: string = await invoke(Invokes.GetLogFilePath);
+        const path = await invokeWithSchema(Invokes.GetLogFilePath, {}, pathSchema);
         setLogPath(path);
       } catch (error) {
         console.error('Failed to get log file path:', error);
@@ -783,7 +789,7 @@ export default function SettingsPanel({
   }, []);
 
   useEffect(() => {
-    invoke<string[]>('get_lensfun_makers').then(setLensMakers).catch(console.error);
+    invokeWithSchema('get_lensfun_makers', {}, stringArraySchema).then(setLensMakers).catch(console.error);
   }, []);
 
   const handleProcessingSettingChange = async <K extends ProcessingSettingKey>(
@@ -807,7 +813,7 @@ export default function SettingsPanel({
         key === 'rawPreprocessingSharpening' ||
         key === 'applyPreprocessingToNonRaws'
       ) {
-        await invoke('clear_image_caches');
+        await invokeWithSchema('clear_image_caches', {}, emptyResponseSchema);
       }
     }
   };
@@ -839,7 +845,9 @@ export default function SettingsPanel({
     setTempLensModel('');
     setLensModels([]);
     if (maker) {
-      invoke<string[]>('get_lensfun_lenses_for_maker', { maker }).then(setLensModels).catch(console.error);
+      invokeWithSchema('get_lensfun_lenses_for_maker', { maker }, stringArraySchema)
+        .then(setLensModels)
+        .catch(console.error);
     }
   };
 
@@ -881,7 +889,7 @@ export default function SettingsPanel({
     try {
       let totalCount = 0;
       for (const root of effectiveRootPaths) {
-        const count: number = await invoke(Invokes.ClearAllSidecars, { rootPath: root });
+        const count = await invokeWithSchema(Invokes.ClearAllSidecars, { rootPath: root }, countSchema);
         totalCount += count;
       }
       setClearMessage(t('settings.data.statuses.sidecarSuccess', { count: totalCount }));
@@ -916,7 +924,7 @@ export default function SettingsPanel({
     try {
       let totalCount = 0;
       for (const root of effectiveRootPaths) {
-        const count: number = await invoke(Invokes.ClearAiTags, { rootPath: root });
+        const count = await invokeWithSchema(Invokes.ClearAiTags, { rootPath: root }, countSchema);
         totalCount += count;
       }
       setAiTagsClearMessage(t('settings.data.statuses.aiSuccess', { count: totalCount }));
@@ -951,7 +959,7 @@ export default function SettingsPanel({
     try {
       let totalCount = 0;
       for (const root of effectiveRootPaths) {
-        const count: number = await invoke(Invokes.ClearAllTags, { rootPath: root });
+        const count = await invokeWithSchema(Invokes.ClearAllTags, { rootPath: root }, countSchema);
         totalCount += count;
       }
       setTagsClearMessage(t('settings.data.statuses.allSuccess', { count: totalCount }));
@@ -989,7 +997,7 @@ export default function SettingsPanel({
     setIsClearingCache(true);
     setCacheClearMessage(t('settings.data.statuses.clearingCache'));
     try {
-      await invoke(Invokes.ClearThumbnailCache);
+      await invokeWithSchema(Invokes.ClearThumbnailCache, {}, emptyResponseSchema);
       setCacheClearMessage(t('settings.data.statuses.cacheSuccess'));
       onLibraryRefresh();
     } catch (err: unknown) {
@@ -1022,7 +1030,7 @@ export default function SettingsPanel({
     }
     setTestStatus({ testing: true, message: t('settings.processing.ai.connector.testing'), success: null });
     try {
-      await invoke(Invokes.TestAIConnectorConnection, { address: aiConnectorAddress });
+      await invokeWithSchema(Invokes.TestAIConnectorConnection, { address: aiConnectorAddress }, emptyResponseSchema);
       setTestStatus({ testing: false, message: t('settings.processing.ai.connector.success'), success: true });
     } catch (err) {
       setTestStatus({ testing: false, message: t('settings.processing.ai.connector.failed'), success: false });

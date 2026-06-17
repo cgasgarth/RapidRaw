@@ -4,12 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FileInput, CheckCircle, XCircle, Loader, Ban, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../utils/timing';
 import { Invokes, SelectedImage, AppSettings } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
@@ -56,6 +58,9 @@ interface ImageDimensions {
   height: number;
   width: number;
 }
+
+const imageDimensionsSchema = z.object({ height: z.number(), width: z.number() }).strict();
+const exportSizeEstimateSchema = z.number().nonnegative();
 
 function Section({ title, children }: SectionProps) {
   return (
@@ -319,7 +324,11 @@ export default function ExportPanel({
         return;
       }
       try {
-        const dims: ImageDimensions = await invoke('get_image_dimensions', { path: pathsToExport[0] });
+        const dims: ImageDimensions = await invokeWithSchema(
+          'get_image_dimensions',
+          { path: pathsToExport[0] },
+          imageDimensionsSchema,
+        );
         if (dims.width > 0 && dims.height > 0) setImageAspectRatio(dims.width / dims.height);
       } catch {
         setImageAspectRatio(3 / 2);
@@ -335,9 +344,11 @@ export default function ExportPanel({
         return;
       }
       try {
-        const dimensions: { width: number; height: number } = await invoke('get_image_dimensions', {
-          path: watermarkPath,
-        });
+        const dimensions = await invokeWithSchema(
+          'get_image_dimensions',
+          { path: watermarkPath },
+          imageDimensionsSchema,
+        );
         setWatermarkImageAspectRatio(dimensions.height > 0 ? dimensions.width / dimensions.height : 1);
       } catch {
         setWatermarkImageAspectRatio(1);
@@ -388,13 +399,17 @@ export default function ExportPanel({
           }
           setIsEstimating(true);
           try {
-            const size: number = await invoke(Invokes.EstimateExportSizes, {
-              paths,
-              exportSettings,
-              outputFormat: format,
-              currentEditPath: currentPath || null,
-              currentEditAdjustments: currentAdj || null,
-            });
+            const size = await invokeWithSchema(
+              Invokes.EstimateExportSizes,
+              {
+                paths,
+                exportSettings,
+                outputFormat: format,
+                currentEditPath: currentPath || null,
+                currentEditAdjustments: currentAdj || null,
+              },
+              exportSizeEstimateSchema,
+            );
             setEstimatedSize(size);
           } catch {
             setEstimatedSize(null);
