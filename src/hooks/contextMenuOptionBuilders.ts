@@ -1,4 +1,4 @@
-import { Palette, Star, Tag } from 'lucide-react';
+import { Check, Palette, Star, Tag, X } from 'lucide-react';
 
 import { type Option, type AppSettings } from '../components/ui/AppProperties';
 import TaggingSubMenu from '../context/TaggingSubMenu';
@@ -12,6 +12,11 @@ export interface CommonTag {
 }
 
 type Translate = TFunction;
+
+interface DestructiveConfirmAction {
+  label: string;
+  onClick: () => Promise<void> | void;
+}
 
 const colorLabelFallback = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
@@ -84,4 +89,24 @@ export function buildTaggingMenu({
       },
     ],
   };
+}
+
+export function buildDestructiveConfirmSubmenu({
+  actions,
+  cancelLabel,
+}: {
+  actions: DestructiveConfirmAction[];
+  cancelLabel: string;
+}): Option[] {
+  return [
+    { label: cancelLabel, icon: X, onClick: () => {} },
+    ...actions.map((action) => ({
+      icon: Check,
+      isDestructive: true,
+      label: action.label,
+      onClick: () => {
+        void action.onClick();
+      },
+    })),
+  ];
 }

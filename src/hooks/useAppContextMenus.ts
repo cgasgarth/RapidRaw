@@ -22,7 +22,6 @@ import {
   Palette,
   Trash2,
   Undo,
-  X,
   Pin,
   PinOff,
   Users,
@@ -45,7 +44,13 @@ import { useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 
-import { buildColorLabelMenu, buildRatingMenu, buildTaggingMenu, type CommonTag } from './contextMenuOptionBuilders';
+import {
+  buildColorLabelMenu,
+  buildDestructiveConfirmSubmenu,
+  buildRatingMenu,
+  buildTaggingMenu,
+  type CommonTag,
+} from './contextMenuOptionBuilders';
 import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
 import {
@@ -321,24 +326,26 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           label: t('contextMenus.editor.resetAdjustments'),
           icon: RotateCcw,
-          submenu: [
-            { label: t('contextMenus.editor.cancel'), icon: X, onClick: () => {} },
-            {
-              label: t('contextMenus.editor.confirmReset'),
-              icon: Check,
-              isDestructive: true,
-              onClick: () => {
-                const originalAspectRatio =
-                  selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
-                resetHistory({
-                  ...INITIAL_ADJUSTMENTS,
-                  aspectRatio: originalAspectRatio,
-                  aiPatches: [],
-                });
-                setEditor({ adjustments: { ...INITIAL_ADJUSTMENTS, aspectRatio: originalAspectRatio, aiPatches: [] } });
+          submenu: buildDestructiveConfirmSubmenu({
+            cancelLabel: t('contextMenus.editor.cancel'),
+            actions: [
+              {
+                label: t('contextMenus.editor.confirmReset'),
+                onClick: () => {
+                  const originalAspectRatio =
+                    selectedImage.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
+                  resetHistory({
+                    ...INITIAL_ADJUSTMENTS,
+                    aspectRatio: originalAspectRatio,
+                    aiPatches: [],
+                  });
+                  setEditor({
+                    adjustments: { ...INITIAL_ADJUSTMENTS, aspectRatio: originalAspectRatio, aiPatches: [] },
+                  });
+                },
               },
-            },
-          ],
+            ],
+          }),
         },
       ];
       showContextMenu(event.clientX, event.clientY, options);
@@ -405,41 +412,39 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
       let deleteSubmenu;
       if (selectionHasVirtualCopies) {
-        deleteSubmenu = [
-          { label: t('contextMenus.editor.cancel'), icon: X, onClick: () => {} },
-          {
-            label: t('contextMenus.thumbnail.confirmDeleteVc'),
-            icon: Check,
-            isDestructive: true,
-            onClick: () => props.executeDelete(finalSelection, { includeAssociated: false }),
-          },
-        ];
+        deleteSubmenu = buildDestructiveConfirmSubmenu({
+          cancelLabel: t('contextMenus.editor.cancel'),
+          actions: [
+            {
+              label: t('contextMenus.thumbnail.confirmDeleteVc'),
+              onClick: () => props.executeDelete(finalSelection, { includeAssociated: false }),
+            },
+          ],
+        });
       } else if (hasAssociatedFiles) {
-        deleteSubmenu = [
-          { label: t('contextMenus.editor.cancel'), icon: X, onClick: () => {} },
-          {
-            label: t('contextMenus.thumbnail.deleteSelected'),
-            icon: Check,
-            isDestructive: true,
-            onClick: () => props.executeDelete(finalSelection, { includeAssociated: false }),
-          },
-          {
-            label: t('contextMenus.thumbnail.deleteAssociated'),
-            icon: Check,
-            isDestructive: true,
-            onClick: () => props.executeDelete(finalSelection, { includeAssociated: true }),
-          },
-        ];
+        deleteSubmenu = buildDestructiveConfirmSubmenu({
+          cancelLabel: t('contextMenus.editor.cancel'),
+          actions: [
+            {
+              label: t('contextMenus.thumbnail.deleteSelected'),
+              onClick: () => props.executeDelete(finalSelection, { includeAssociated: false }),
+            },
+            {
+              label: t('contextMenus.thumbnail.deleteAssociated'),
+              onClick: () => props.executeDelete(finalSelection, { includeAssociated: true }),
+            },
+          ],
+        });
       } else {
-        deleteSubmenu = [
-          { label: t('contextMenus.editor.cancel'), icon: X, onClick: () => {} },
-          {
-            label: t('contextMenus.thumbnail.confirmDelete'),
-            icon: Check,
-            isDestructive: true,
-            onClick: () => props.executeDelete(finalSelection, { includeAssociated: false }),
-          },
-        ];
+        deleteSubmenu = buildDestructiveConfirmSubmenu({
+          cancelLabel: t('contextMenus.editor.cancel'),
+          actions: [
+            {
+              label: t('contextMenus.thumbnail.confirmDelete'),
+              onClick: () => props.executeDelete(finalSelection, { includeAssociated: false }),
+            },
+          ],
+        });
       }
 
       const pasteLabel = t('contextMenus.thumbnail.pasteAdjustments', { count: selectionCount });
@@ -798,17 +803,17 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         {
           label: resetLabel,
           icon: RotateCcw,
-          submenu: [
-            { label: t('contextMenus.editor.cancel'), icon: X, onClick: () => {} },
-            {
-              label: t('contextMenus.editor.confirmReset'),
-              icon: Check,
-              isDestructive: true,
-              onClick: () => {
-                handleResetAdjustments(finalSelection);
+          submenu: buildDestructiveConfirmSubmenu({
+            cancelLabel: t('contextMenus.editor.cancel'),
+            actions: [
+              {
+                label: t('contextMenus.editor.confirmReset'),
+                onClick: () => {
+                  handleResetAdjustments(finalSelection);
+                },
               },
-            },
-          ],
+            ],
+          }),
         },
         {
           label: deleteLabel,
@@ -1025,44 +1030,44 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           icon: Trash2,
           isDestructive: true,
           label: t('contextMenus.folders.deleteFolder'),
-          submenu: [
-            { label: t('contextMenus.editor.cancel'), icon: X, onClick: () => {} },
-            {
-              label: t('contextMenus.folders.confirm'),
-              icon: Check,
-              isDestructive: true,
-              onClick: async () => {
-                try {
-                  await invoke(Invokes.DeleteFolder, { path: targetPath });
+          submenu: buildDestructiveConfirmSubmenu({
+            cancelLabel: t('contextMenus.editor.cancel'),
+            actions: [
+              {
+                label: t('contextMenus.folders.confirm'),
+                onClick: async () => {
+                  try {
+                    await invoke(Invokes.DeleteFolder, { path: targetPath });
 
-                  const isCurrentInTarget =
-                    currentFolderPath === targetPath ||
-                    currentFolderPath?.startsWith(targetPath + '/') ||
-                    currentFolderPath?.startsWith(targetPath + '\\');
+                    const isCurrentInTarget =
+                      currentFolderPath === targetPath ||
+                      currentFolderPath?.startsWith(targetPath + '/') ||
+                      currentFolderPath?.startsWith(targetPath + '\\');
 
-                  if (isCurrentInTarget) {
-                    props.handleBackToLibrary();
-                    setLibrary({
-                      currentFolderPath: null,
-                      imageList: [],
-                      libraryActivePath: null,
-                      multiSelectedPaths: [],
-                      selectionAnchorPath: null,
-                    });
+                    if (isCurrentInTarget) {
+                      props.handleBackToLibrary();
+                      setLibrary({
+                        currentFolderPath: null,
+                        imageList: [],
+                        libraryActivePath: null,
+                        multiSelectedPaths: [],
+                        selectionAnchorPath: null,
+                      });
 
-                    const { appSettings, handleSettingsChange } = useSettingsStore.getState();
-                    if (appSettings) {
-                      await handleSettingsChange({ ...appSettings, lastFolderState: null });
+                      const { appSettings, handleSettingsChange } = useSettingsStore.getState();
+                      if (appSettings) {
+                        await handleSettingsChange({ ...appSettings, lastFolderState: null });
+                      }
                     }
-                  }
 
-                  await props.refreshAllFolderTrees();
-                } catch (err) {
-                  toast.error(t('contextMenus.toasts.failedDeleteFolder', { err }));
-                }
+                    await props.refreshAllFolderTrees();
+                  } catch (err) {
+                    toast.error(t('contextMenus.toasts.failedDeleteFolder', { err }));
+                  }
+                },
               },
-            },
-          ],
+            ],
+          }),
         },
       ];
       showContextMenu(event.clientX, event.clientY, options);
@@ -1281,37 +1286,37 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   item.type === 'group' ? t('contextMenus.albums.deleteGroup') : t('contextMenus.albums.deleteAlbum'),
                 icon: Trash2,
                 isDestructive: true,
-                submenu: [
-                  { label: t('contextMenus.editor.cancel'), icon: X, onClick: () => {} },
-                  {
-                    label:
-                      item.type === 'album'
-                        ? t('contextMenus.albums.confirmDeleteAlbum')
-                        : item.children.length > 0
-                          ? t('contextMenus.albums.confirmDeleteGroupNested')
-                          : t('contextMenus.albums.confirmDeleteGroupEmpty'),
-                    icon: Check,
-                    isDestructive: true,
-                    onClick: () => {
-                      const newTree = structuredClone(albumTree);
-                      const del = (nodes: AlbumItem[]) => {
-                        const idx = nodes.findIndex((n) => n.id === item.id);
-                        if (idx !== -1) nodes.splice(idx, 1);
-                        else
-                          nodes.forEach((n) => {
-                            if (n.type === 'group') del(n.children);
-                          });
-                      };
-                      del(newTree);
-                      invoke(Invokes.SaveAlbums, { tree: newTree })
-                        .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
-                        .then((sorted) => {
-                          setLibrary({ albumTree: sorted });
-                        })
-                        .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedDelete', { err })));
+                submenu: buildDestructiveConfirmSubmenu({
+                  cancelLabel: t('contextMenus.editor.cancel'),
+                  actions: [
+                    {
+                      label:
+                        item.type === 'album'
+                          ? t('contextMenus.albums.confirmDeleteAlbum')
+                          : item.children.length > 0
+                            ? t('contextMenus.albums.confirmDeleteGroupNested')
+                            : t('contextMenus.albums.confirmDeleteGroupEmpty'),
+                      onClick: () => {
+                        const newTree = structuredClone(albumTree);
+                        const del = (nodes: AlbumItem[]) => {
+                          const idx = nodes.findIndex((n) => n.id === item.id);
+                          if (idx !== -1) nodes.splice(idx, 1);
+                          else
+                            nodes.forEach((n) => {
+                              if (n.type === 'group') del(n.children);
+                            });
+                        };
+                        del(newTree);
+                        invoke(Invokes.SaveAlbums, { tree: newTree })
+                          .then(() => invoke<AlbumItem[]>(Invokes.GetAlbums))
+                          .then((sorted) => {
+                            setLibrary({ albumTree: sorted });
+                          })
+                          .catch((err: unknown) => toast.error(t('contextMenus.toasts.failedDelete', { err })));
+                      },
                     },
-                  },
-                ],
+                  ],
+                }),
               },
             ]
           : []),
