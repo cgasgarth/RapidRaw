@@ -9,11 +9,17 @@ import {
   buildRawEngineAppServerHostResponseEnvelope,
   buildRawEngineAppServerLifecycleReplay,
   buildRawEngineAppServerRouteCatalogReplay,
+  cancelRawEngineAppServerSupervisor,
   createRawEngineAppServerLifecycleState,
+  createRawEngineAppServerSupervisorState,
+  failRawEngineAppServerSupervisor,
   handleRawEngineAppServerHostRequest,
   initializeRawEngineAppServerLifecycle,
   assertRawEngineAppServerLifecycleReady,
+  markRawEngineAppServerSupervisorReady,
+  startRawEngineAppServerSupervisor,
   stopRawEngineAppServerLifecycle,
+  stopRawEngineAppServerSupervisor,
 } from '../src/utils/rawEngineAppServerHost.ts';
 import {
   rawEngineAppServerCapabilitiesReplaySchema,
@@ -22,6 +28,7 @@ import {
   rawEngineAppServerHostManifestSchema,
   rawEngineAppServerLifecycleReplaySchema,
   rawEngineAppServerRouteCatalogReplaySchema,
+  rawEngineAppServerSupervisorStateSchema,
 } from '../src/schemas/agentRuntimeSchemas.ts';
 
 const failures = [];
@@ -90,6 +97,68 @@ const lifecycleReplay = rawEngineAppServerLifecycleReplaySchema.parse(
 if (lifecycleReplay.finalState.phase !== 'stopped') failures.push('Lifecycle replay must finish stopped.');
 if (lifecycleReplay.events.map((event) => event.phase).join(',') !== 'created,initialized,stopped') {
   failures.push('Lifecycle replay phase order mismatch.');
+}
+
+const supervisorCreated = createRawEngineAppServerSupervisorState({
+  command: ['codex', 'app-server', '--stdio'],
+  supervisorId: 'supervisor_stdio_001',
+  timestampIso: '2026-06-17T12:00:00.000Z',
+});
+const supervisorStarting = startRawEngineAppServerSupervisor({
+  processId: 4242,
+  state: supervisorCreated,
+  timestampIso: '2026-06-17T12:00:01.000Z',
+});
+const supervisorRunning = markRawEngineAppServerSupervisorReady({
+  state: supervisorStarting,
+  timestampIso: '2026-06-17T12:00:02.000Z',
+});
+const supervisorCancelling = cancelRawEngineAppServerSupervisor({
+  state: supervisorRunning,
+  timestampIso: '2026-06-17T12:00:03.000Z',
+});
+const supervisorStopped = rawEngineAppServerSupervisorStateSchema.parse(
+  stopRawEngineAppServerSupervisor({
+    state: supervisorCancelling,
+    timestampIso: '2026-06-17T12:00:04.000Z',
+  }),
+);
+
+if (supervisorStopped.phase !== 'stopped') failures.push('Supervisor stop should finish stopped.');
+if (supervisorStopped.processId !== null) failures.push('Supervisor stop must clear processId.');
+if (supervisorStopped.cancellationRequestedAtIso === null) {
+  failures.push('Supervisor cancellation should remain audit-visible after stop.');
+}
+if (supervisorStopped.auditEvents.map((event) => event.kind).join(',') !== 'created,start,ready,cancel,stop') {
+  failures.push('Supervisor audit event order mismatch.');
+}
+
+const supervisorFailed = failRawEngineAppServerSupervisor({
+  error: {
+    code: 'health_timeout',
+    message: 'App-server health check did not report initialized before timeout.',
+    recoverable: true,
+  },
+  state: supervisorStarting,
+  timestampIso: '2026-06-17T12:00:05.000Z',
+});
+if (supervisorFailed.error?.code !== 'health_timeout')
+  failures.push('Supervisor failure should keep structured error.');
+if (!supervisorFailed.auditEvents.some((event) => event.kind === 'fail')) {
+  failures.push('Supervisor failure should append fail event.');
+}
+
+try {
+  startRawEngineAppServerSupervisor({
+    processId: 4343,
+    state: supervisorRunning,
+    timestampIso: '2026-06-17T12:00:06.000Z',
+  });
+  failures.push('Supervisor must reject start while running.');
+} catch (error) {
+  if (!(error instanceof Error) || !error.message.includes('running')) {
+    failures.push('Supervisor start rejection should include current phase.');
+  }
 }
 
 if (healthTool === undefined) {
@@ -232,6 +301,9 @@ for (const marker of [
   'buildRawEngineAppServerHostResponseEnvelope',
   'buildRawEngineAppServerLifecycleReplay',
   'assertRawEngineAppServerLifecycleReady',
+  'createRawEngineAppServerSupervisorState',
+  'cancelRawEngineAppServerSupervisor',
+  'rawEngineAppServerSupervisorStateSchema',
   'No UI automation',
   'codex app-server',
   'stdio JSONL',
