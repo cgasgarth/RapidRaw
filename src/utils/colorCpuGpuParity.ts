@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const colorParityOperationSchema = z.enum([
   'channel_mixer',
+  'luma_levels',
   'linear_exposure',
   'white_balance',
   'legacy_tonemap',
@@ -23,7 +24,13 @@ export const colorParityCaseSchema = z
 
 export const colorParityShaderFunctionSchema = z
   .object({
-    name: z.enum(['apply_channel_mixer', 'apply_linear_exposure', 'apply_white_balance', 'legacy_tonemap']),
+    name: z.enum([
+      'apply_channel_mixer',
+      'apply_linear_exposure',
+      'apply_luma_levels',
+      'apply_white_balance',
+      'legacy_tonemap',
+    ]),
     sha256: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   })
   .strict();
@@ -141,11 +148,37 @@ export const applyColorParityChannelMixer = (
   return makeVec3(clamp(mixed[0] * scale, 0, 1), clamp(mixed[1] * scale, 0, 1), clamp(mixed[2] * scale, 0, 1));
 };
 
+export const applyColorParityLumaLevels = (
+  inputValue: ColorParityVec3,
+  parameters: Record<string, number>,
+): ColorParityVec3 => {
+  const input = colorParityVec3Schema.parse(inputValue);
+  if ((parameters['enabled'] ?? 1) === 0) return makeVec3(input[0], input[1], input[2]);
+
+  const sourceLuma = Math.max(input[0] * 0.2126 + input[1] * 0.7152 + input[2] * 0.0722, 0);
+  const inputBlack = parameters['inputBlack'] ?? 0;
+  const inputWhite = parameters['inputWhite'] ?? 1;
+  const gamma = parameters['gamma'] ?? 1;
+  const outputBlack = parameters['outputBlack'] ?? 0;
+  const outputWhite = parameters['outputWhite'] ?? 1;
+  const inputRange = Math.max(inputWhite - inputBlack, 0.0001);
+  const normalizedLuma = clamp((sourceLuma - inputBlack) / inputRange, 0, 1);
+  const gammaLuma = normalizedLuma ** (1 / Math.max(gamma, 0.0001));
+  const outputLuma = outputBlack + (outputWhite - outputBlack) * gammaLuma;
+
+  if (sourceLuma <= 0.0001) return makeVec3(outputLuma, outputLuma, outputLuma);
+
+  const scale = outputLuma / sourceLuma;
+  return makeVec3(clamp(input[0] * scale, 0, 1), clamp(input[1] * scale, 0, 1), clamp(input[2] * scale, 0, 1));
+};
+
 export const evaluateColorParityCase = (testCaseValue: ColorParityCase): ColorParityVec3 => {
   const testCase = colorParityCaseSchema.parse(testCaseValue);
   switch (testCase.operation) {
     case 'channel_mixer':
       return applyColorParityChannelMixer(testCase.input, testCase.parameters);
+    case 'luma_levels':
+      return applyColorParityLumaLevels(testCase.input, testCase.parameters);
     case 'linear_exposure':
       return applyColorParityLinearExposure(testCase.input, testCase.parameters);
     case 'white_balance':

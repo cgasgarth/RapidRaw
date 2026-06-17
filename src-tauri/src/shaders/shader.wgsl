@@ -47,6 +47,17 @@ struct ChannelMixerSettings {
     _pad2: u32,
 }
 
+struct LevelsSettings {
+    input_black: f32,
+    input_white: f32,
+    gamma: f32,
+    output_black: f32,
+    output_white: f32,
+    enabled: u32,
+    _pad1: u32,
+    _pad2: u32,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     brightness: f32,
@@ -110,6 +121,7 @@ struct GlobalAdjustments {
 
     color_calibration: ColorCalibrationSettings,
     channel_mixer: ChannelMixerSettings,
+    levels: LevelsSettings,
 
     hsl: array<HslColor, 8>,
     luma_curve: array<Point, 16>,
@@ -645,6 +657,24 @@ fn apply_channel_mixer(color: vec3<f32>, settings: ChannelMixerSettings) -> vec3
 
     mixed = clamp(mixed * (source_luma / mixed_luma), vec3<f32>(0.0), vec3<f32>(1.0));
     return mixed;
+}
+
+fn apply_luma_levels(color: vec3<f32>, settings: LevelsSettings) -> vec3<f32> {
+    if (settings.enabled == 0u) {
+        return color;
+    }
+
+    let source_luma = max(get_luma(color), 0.0);
+    let input_range = max(settings.input_white - settings.input_black, 0.0001);
+    let normalized_luma = clamp((source_luma - settings.input_black) / input_range, 0.0, 1.0);
+    let gamma_luma = pow(normalized_luma, 1.0 / max(settings.gamma, 0.0001));
+    let output_luma = mix(settings.output_black, settings.output_white, gamma_luma);
+
+    if (source_luma <= 0.0001) {
+        return vec3<f32>(output_luma);
+    }
+
+    return clamp(color * (output_luma / source_luma), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
 fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords_i: vec2<i32>) -> vec3<f32> {
@@ -1639,6 +1669,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
     composite_rgb_linear = apply_creative_color(composite_rgb_linear, t_saturation, t_vibrance);
     composite_rgb_linear = apply_channel_mixer(composite_rgb_linear, adjustments.global.channel_mixer);
+    composite_rgb_linear = apply_luma_levels(composite_rgb_linear, adjustments.global.levels);
 
     composite_rgb_linear = apply_color_grading(
         composite_rgb_linear,

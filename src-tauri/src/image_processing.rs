@@ -1278,6 +1278,34 @@ pub struct ChannelMixerSettings {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
+pub struct LevelsSettings {
+    input_black: f32,
+    input_white: f32,
+    gamma: f32,
+    output_black: f32,
+    output_white: f32,
+    enabled: u32,
+    _pad1: u32,
+    _pad2: u32,
+}
+
+impl Default for LevelsSettings {
+    fn default() -> Self {
+        Self {
+            input_black: 0.0,
+            input_white: 1.0,
+            gamma: 1.0,
+            output_black: 0.0,
+            output_white: 1.0,
+            enabled: 0,
+            _pad1: 0,
+            _pad2: 0,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct GpuMat3 {
     col0: [f32; 4],
     col1: [f32; 4],
@@ -1359,6 +1387,7 @@ pub struct GlobalAdjustments {
 
     pub color_calibration: ColorCalibrationSettings,
     pub channel_mixer: ChannelMixerSettings,
+    pub levels: LevelsSettings,
 
     pub hsl: [HslColor; 8],
     pub luma_curve: [Point; 16],
@@ -1617,6 +1646,28 @@ fn parse_channel_mixer_settings(js_channel_mixer: &serde_json::Value) -> Channel
             .as_bool()
             .unwrap_or(false)
         {
+            1
+        } else {
+            0
+        },
+        _pad1: 0,
+        _pad2: 0,
+    }
+}
+
+fn parse_levels_settings(js_levels: &serde_json::Value) -> LevelsSettings {
+    let input_black = js_levels["inputBlack"].as_f64().unwrap_or(0.0) as f32;
+    let input_white = js_levels["inputWhite"].as_f64().unwrap_or(1.0) as f32;
+    let output_black = js_levels["outputBlack"].as_f64().unwrap_or(0.0) as f32;
+    let output_white = js_levels["outputWhite"].as_f64().unwrap_or(1.0) as f32;
+
+    LevelsSettings {
+        input_black: input_black.clamp(0.0, 0.99),
+        input_white: input_white.clamp(0.01, 1.0),
+        gamma: (js_levels["gamma"].as_f64().unwrap_or(1.0) as f32).clamp(0.1, 5.0),
+        output_black: output_black.clamp(0.0, 0.99),
+        output_white: output_white.clamp(0.01, 1.0),
+        enabled: if js_levels["enabled"].as_bool().unwrap_or(false) {
             1
         } else {
             0
@@ -2029,6 +2080,7 @@ fn get_global_adjustments_from_json(
         .get("channelMixer")
         .cloned()
         .unwrap_or_default();
+    let levels_obj = js_adjustments.get("levels").cloned().unwrap_or_default();
 
     let color_cal_settings = if is_visible("color") {
         ColorCalibrationSettings {
@@ -2206,6 +2258,11 @@ fn get_global_adjustments_from_json(
             parse_channel_mixer_settings(&channel_mixer_obj)
         } else {
             ChannelMixerSettings::default()
+        },
+        levels: if is_visible("color") {
+            parse_levels_settings(&levels_obj)
+        } else {
+            LevelsSettings::default()
         },
 
         hsl: if is_visible("color") {
