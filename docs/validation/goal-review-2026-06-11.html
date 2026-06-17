@@ -346,6 +346,18 @@
               </td>
               <td>Real RAW before/after proof and export parity remain required before feature completion.</td>
             </tr>
+            <tr>
+              <td>RAW open/edit/export proof</td>
+              <td><span class="status partial">Private RAW report gate</span></td>
+              <td>
+                <code>bun run check:raw-open-edit-export-proof</code> and
+                <code>bun run check:raw-open-edit-export-run-reports</code> validate manifest-only public schema and
+                fail closed before a proof can be marked accepted without private artifact hashes and run reports.
+              </td>
+              <td>
+                Actual private RAW open, typed edit command, preview/export, sidecar reload, and pixel-delta proof.
+              </td>
+            </tr>
           </tbody>
         </table>
       </section>
@@ -581,6 +593,18 @@
               <td>
                 Pixel-shift render, frame registrations, confidence artifact hash, confidence-map coverage, detail
                 quality, and improvement-ratio proof.
+              </td>
+            </tr>
+            <tr>
+              <td>RAW open/edit/export manifest</td>
+              <td><code>bun run check:raw-open-edit-export-proof</code></td>
+              <td>Private RAW ledger linkage, immutable source intent, workflow steps, and artifact slots.</td>
+            </tr>
+            <tr>
+              <td>RAW open/edit/export reports</td>
+              <td><code>bun run check:raw-open-edit-export-run-reports</code></td>
+              <td>
+                Public-schema run-report gate; accepted private proof requires non-null hashes and private run reports.
               </td>
             </tr>
             <tr>
