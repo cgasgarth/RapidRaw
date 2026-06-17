@@ -83,6 +83,21 @@
         "shadows": "Shadows"
       },
       "hue": "Hue",
+      "levels": {
+        "disabled": "Off",
+        "enabled": "On",
+        "gamma": "Gamma",
+        "inputBlack": "Input Black",
+        "inputWhite": "Input White",
+        "outputBlack": "Output Black",
+        "outputWhite": "Output White",
+        "title": "Levels",
+        "warnings": {
+          "highlightClipping": "Highlight clipping active",
+          "outputCompression": "Output range compressed",
+          "shadowClipping": "Shadow clipping active"
+        }
+      },
       "luminance": "Luminance",
       "mixerColors": {
         "aquas": "Aquas",

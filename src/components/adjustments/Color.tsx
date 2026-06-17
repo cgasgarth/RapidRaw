@@ -42,6 +42,7 @@ interface ColorPanelProps {
 }
 
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
+type LevelsNumericKey = Exclude<keyof Adjustments['levels'], 'enabled'>;
 
 type SliderChangeEvent =
   | ChangeEvent<HTMLInputElement>
@@ -586,6 +587,16 @@ export default function ColorPanel({
   const activeChannelMixerRow = channelMixer[activeChannelMixerOutput];
   const baseHue = getSelectiveColorRange(activeColor).centerHueDegrees;
   const effectiveHue = baseHue + (currentHsl.hue || 0);
+  const levels = adjustments.levels;
+  const inputBlackMax = Math.max(0, Math.min(99, Math.round(levels.inputWhite * 100) - 1));
+  const inputWhiteMin = Math.min(100, Math.max(1, Math.round(levels.inputBlack * 100) + 1));
+  const outputBlackMax = Math.max(0, Math.min(99, Math.round(levels.outputWhite * 100) - 1));
+  const outputWhiteMin = Math.min(100, Math.max(1, Math.round(levels.outputBlack * 100) + 1));
+  const levelsClippingWarnings = [
+    levels.inputBlack > 0 ? t('adjustments.color.levels.warnings.shadowClipping') : null,
+    levels.inputWhite < 1 ? t('adjustments.color.levels.warnings.highlightClipping') : null,
+    levels.outputBlack > 0 || levels.outputWhite < 1 ? t('adjustments.color.levels.warnings.outputCompression') : null,
+  ].filter((warning): warning is string => warning !== null);
 
   useEffect(() => {
     const normalizedHue = ((effectiveHue % 360) + 360) % 360;
@@ -757,6 +768,27 @@ export default function ColorPanel({
     });
   };
 
+  const handleLevelsToggle = () => {
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      levels: {
+        ...prev.levels,
+        enabled: !prev.levels.enabled,
+      },
+    }));
+  };
+
+  const handleLevelsChange = (key: LevelsNumericKey, value: number | string) => {
+    const numericValue = parseFloat(String(value));
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      levels: {
+        ...prev.levels,
+        [key]: numericValue,
+      },
+    }));
+  };
+
   const hue_slider = `hue-slider-${activeColor}`;
   const saturation_slider = `sat-slider-${activeColor}`;
   const luminance_slider = `lum-slider-${activeColor}`;
@@ -812,6 +844,87 @@ export default function ColorPanel({
             )}
           </div>
         )}
+
+      {!isForMask && adjustmentVisibility[ColorAdjustment.Levels] !== false && (
+        <div className="p-2 bg-bg-tertiary rounded-md">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <UiText variant={TextVariants.heading}>{t('adjustments.color.levels.title')}</UiText>
+            <button
+              className={`px-2 py-1 rounded text-xs transition-colors ${
+                levels.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary hover:bg-surface'
+              }`}
+              onClick={handleLevelsToggle}
+              type="button"
+            >
+              {levels.enabled ? t('adjustments.color.levels.enabled') : t('adjustments.color.levels.disabled')}
+            </button>
+          </div>
+          <Slider
+            label={t('adjustments.color.levels.inputBlack')}
+            max={inputBlackMax}
+            min={0}
+            onChange={(e: SliderChangeEvent) => {
+              handleLevelsChange('inputBlack', Number(e.target.value) / 100);
+            }}
+            step={1}
+            value={Math.round(levels.inputBlack * 100)}
+            onDragStateChange={onDragStateChange}
+          />
+          <Slider
+            label={t('adjustments.color.levels.inputWhite')}
+            max={100}
+            min={inputWhiteMin}
+            onChange={(e: SliderChangeEvent) => {
+              handleLevelsChange('inputWhite', Number(e.target.value) / 100);
+            }}
+            step={1}
+            value={Math.round(levels.inputWhite * 100)}
+            onDragStateChange={onDragStateChange}
+          />
+          <Slider
+            label={t('adjustments.color.levels.gamma')}
+            max={300}
+            min={25}
+            onChange={(e: SliderChangeEvent) => {
+              handleLevelsChange('gamma', Number(e.target.value) / 100);
+            }}
+            step={1}
+            value={Math.round(levels.gamma * 100)}
+            onDragStateChange={onDragStateChange}
+          />
+          <Slider
+            label={t('adjustments.color.levels.outputBlack')}
+            max={outputBlackMax}
+            min={0}
+            onChange={(e: SliderChangeEvent) => {
+              handleLevelsChange('outputBlack', Number(e.target.value) / 100);
+            }}
+            step={1}
+            value={Math.round(levels.outputBlack * 100)}
+            onDragStateChange={onDragStateChange}
+          />
+          <Slider
+            label={t('adjustments.color.levels.outputWhite')}
+            max={100}
+            min={outputWhiteMin}
+            onChange={(e: SliderChangeEvent) => {
+              handleLevelsChange('outputWhite', Number(e.target.value) / 100);
+            }}
+            step={1}
+            value={Math.round(levels.outputWhite * 100)}
+            onDragStateChange={onDragStateChange}
+          />
+          {levelsClippingWarnings.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {levelsClippingWarnings.map((warning) => (
+                <UiText key={warning} variant={TextVariants.small} color={TextColors.secondary} className="block">
+                  {warning}
+                </UiText>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="p-2 bg-bg-tertiary rounded-md">
         <div className="flex justify-between items-center mb-2">
@@ -953,6 +1066,7 @@ export default function ColorPanel({
               </button>
               <button
                 aria-pressed={colorBalanceRgb.enabled}
+                data-testid="color-balance-toggle"
                 className={`rounded px-2 py-1 text-xs font-medium ${
                   colorBalanceRgb.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary'
                 }`}
@@ -1020,6 +1134,7 @@ export default function ColorPanel({
               </button>
               <button
                 aria-pressed={channelMixer.enabled}
+                data-testid="channel-mixer-toggle"
                 className={`rounded px-2 py-1 text-xs font-medium ${
                   channelMixer.enabled ? 'bg-accent text-button-text' : 'bg-bg-secondary text-text-secondary'
                 }`}

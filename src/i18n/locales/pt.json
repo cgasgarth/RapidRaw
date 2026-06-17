@@ -62,7 +62,22 @@
       "vibrance": "Vibração",
       "wbPickerTooltip": "Seletor de Balanço de Branco",
       "wbPickerWgpuDisabled": "Seletor de BB: Desative o WGPU nas Configurações.",
-      "whiteBalance": "Balanço de Branco"
+      "whiteBalance": "Balanço de Branco",
+      "levels": {
+        "disabled": "Off",
+        "enabled": "On",
+        "gamma": "Gamma",
+        "inputBlack": "Input Black",
+        "inputWhite": "Input White",
+        "outputBlack": "Output Black",
+        "outputWhite": "Output White",
+        "title": "Levels",
+        "warnings": {
+          "highlightClipping": "Highlight clipping active",
+          "outputCompression": "Output range compressed",
+          "shadowClipping": "Shadow clipping active"
+        }
+      }
     },
     "curves": {
       "channels": {
