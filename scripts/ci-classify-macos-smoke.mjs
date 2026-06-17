@@ -109,6 +109,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:focus-ui-api', new Set(['bun scripts/check-focus-ui-api.mjs'])],
   ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario focus-ui'])],
   ['check:hdr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario hdr-ui'])],
+  ['check:keyboard-shortcuts', new Set(['bun scripts/check-keyboard-shortcuts.ts'])],
   ['check:panorama-ui-api', new Set(['bun scripts/check-panorama-ui-api.mjs'])],
   ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario panorama-ui'])],
   ['check:sr-ui-api', new Set(['bun scripts/check-sr-ui-api.mjs'])],
@@ -117,6 +118,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:negative-lab-fixtures:update', new Set(['bun scripts/check-negative-lab-fixtures.mjs --update'])],
   ['check:negative-lab-frame-health', new Set(['bun scripts/check-negative-lab-frame-health-report.mjs'])],
   ['check:negative-lab-ui-presets', new Set(['bun scripts/check-negative-lab-ui-presets.mjs'])],
+  ['check:mask-refine-command-ui', new Set(['bun scripts/check-mask-refinement-command-ui.ts'])],
   ['check:mask-refine-controls', new Set(['bun scripts/check-mask-refinement-controls.ts'])],
   ['check:private-raw-evidence', new Set(['bun scripts/check-private-raw-evidence-ledger.mjs'])],
   ['check:public-fixture-manifest', new Set(['bun scripts/check-public-fixture-manifest.ts'])],
@@ -159,6 +161,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set(['bun packages/rawengine-schema/scripts/check-panorama-app-server-command-bus.ts']),
   ],
   ['check:sr-synthetic-smoke', new Set(['bun scripts/check-super-resolution-synthetic-smoke.mjs'])],
+  ['check:tauri-schema-validation', new Set(['bun scripts/check-tauri-schema-validation.ts'])],
 ]);
 
 function hasExtension(path, extensions) {

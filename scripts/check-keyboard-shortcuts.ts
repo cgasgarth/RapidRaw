@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
-import { KEYBIND_DEFINITIONS, KEYBIND_SECTIONS } from '../src/utils/keyboardUtils.ts';
 import { keyboardShortcutComboSchema } from '../src/schemas/keyboardShortcutSchemas.ts';
+import { KEYBIND_DEFINITIONS, KEYBIND_SECTIONS } from '../src/utils/keyboardUtils.ts';
 
-const failures = [];
-const actions = new Set();
+const failures: string[] = [];
+const actions = new Set<string>();
 const sections = new Set(KEYBIND_SECTIONS.map((section) => section.id));
 
 for (const definition of KEYBIND_DEFINITIONS) {
