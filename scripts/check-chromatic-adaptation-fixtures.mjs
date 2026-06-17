@@ -4,15 +4,30 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { adaptXyzBradford, chromaticAdaptationInputSchema, xyzColorSchema } from '../src/utils/chromaticAdaptation.ts';
+import {
+  adaptLinearSrgbBradford,
+  adaptXyzBradford,
+  chromaticAdaptationInputSchema,
+  xyzColorSchema,
+} from '../src/utils/chromaticAdaptation.ts';
+
+const linearRgbSchema = z
+  .object({
+    blue: z.number(),
+    green: z.number(),
+    red: z.number(),
+  })
+  .strict();
 
 const fixtureSchema = z
   .array(
     z
       .object({
         case: z.string().min(1),
+        expectedLinearRgb: linearRgbSchema.optional(),
         expectedXyz: xyzColorSchema,
         input: chromaticAdaptationInputSchema,
+        inputLinearRgb: linearRgbSchema.optional(),
         tolerance: z.number().positive(),
       })
       .strict(),
@@ -30,6 +45,22 @@ for (const fixture of fixtures) {
     const delta = Math.abs((actual[index] ?? Number.NaN) - expected);
     if (delta > fixture.tolerance) {
       failures.push(`${fixture.case} channel ${index}: expected ${expected}, got ${actual[index]}.`);
+    }
+  }
+
+  if (fixture.inputLinearRgb && fixture.expectedLinearRgb) {
+    const rgbActual = adaptLinearSrgbBradford(
+      fixture.inputLinearRgb,
+      fixture.input.sourceWhitePoint,
+      fixture.input.targetWhitePoint,
+    );
+    for (const channel of ['red', 'green', 'blue']) {
+      const delta = Math.abs(rgbActual[channel] - fixture.expectedLinearRgb[channel]);
+      if (delta > fixture.tolerance) {
+        failures.push(
+          `${fixture.case} RGB ${channel}: expected ${fixture.expectedLinearRgb[channel]}, got ${rgbActual[channel]}.`,
+        );
+      }
     }
   }
 }
