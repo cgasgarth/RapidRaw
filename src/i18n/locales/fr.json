@@ -1414,7 +1414,9 @@
       },
       "stockRegistry": "Stock families",
       "stockRegistrySummary": "{{runtimeSafeCount}} runtime-safe / {{referenceOnlyCount}} reference-only",
-      "stockRegistryVersion": "v{{version}}"
+      "stockRegistryVersion": "v{{version}}",
+      "stockMetadata": "",
+      "stockMetadataSummary": ""
     },
     "panorama": {
       "cancel": "Annuler",

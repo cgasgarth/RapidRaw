@@ -95,6 +95,12 @@ const NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID = new Map(
   NEGATIVE_LAB_PROFILE_BROWSER_ROWS.map((row) => [row.presetId, row]),
 );
 const NEGATIVE_LAB_STOCK_REGISTRY_COUNTS = buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY);
+const NEGATIVE_LAB_STOCK_METADATA_COUNTS = {
+  blackAndWhiteNegativeCount: 4,
+  cinemaNegativeCount: 3,
+  colorNegativeCount: 6,
+  slideReversalCount: 3,
+};
 const formatStockRegistryToken = (value: string) => value.split('_').join(' ');
 const DENSITOMETER_CHANNEL_LABEL_KEYS: Record<
   NegativeBaseFogDensitometerReadout['dominantChannel'],
@@ -1193,6 +1199,26 @@ export default function NegativeConversionModal({
                   </button>
                 );
               })}
+            </div>
+          </div>
+          <div
+            className="mb-3 rounded-md border border-surface bg-bg-primary p-3"
+            data-testid="negative-lab-stock-metadata"
+          >
+            <div className="mb-2">
+              <div>
+                <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
+                  {t('modals.negativeConversion.stockMetadata')}
+                </UiText>
+                <UiText variant={TextVariants.small} className="text-text-tertiary">
+                  {t('modals.negativeConversion.stockMetadataSummary', {
+                    blackAndWhiteCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.blackAndWhiteNegativeCount,
+                    cinemaCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.cinemaNegativeCount,
+                    colorCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.colorNegativeCount,
+                    slideCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.slideReversalCount,
+                  })}
+                </UiText>
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-2">
