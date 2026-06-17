@@ -338,8 +338,8 @@
               <td><span class="status partial">Synthetic proof</span></td>
               <td>
                 Runtime apply checks now render synthetic HDR, panorama, focus stack, and super-resolution outputs with
-                app-server/UI bridge coverage, output-derived artifact hashes, and quality provenance for HDR/SR plus
-                focus quality metrics queued in PR #1599.
+                app-server/UI bridge coverage, output-derived artifact hashes, and quality provenance for HDR/SR/focus
+                plus panorama quality metrics queued in PR #1601.
               </td>
               <td>Real RAW before/after proof and export parity remain required before feature completion.</td>
             </tr>
@@ -373,9 +373,11 @@
               <td>Panorama workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PRs #1588 and #1590, <code>bun run check:panorama-runtime-plan-smoke</code>,
+                PRs #1588 and #1590, with PR #1601 queued,
+                <code>bun run check:panorama-runtime-plan-smoke</code>,
                 <code>bun run check:panorama-app-server-runtime</code>,
-                <code>bun run check:panorama-ui-runtime-bridge</code>.
+                <code>bun run check:panorama-ui-runtime-bridge</code>. Runtime smoke records crop coverage, overlap
+                area, output/source pixels, and stitched-source ratio.
               </td>
               <td>Production seam search, projection engines, tiling path, and real photo validation.</td>
             </tr>
@@ -383,7 +385,7 @@
               <td>Focus stack workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PRs #1587 and #1591, with PR #1599 queued, <code>bun run check:focus-runtime-plan-smoke</code>,
+                PRs #1587, #1591, and #1599, <code>bun run check:focus-runtime-plan-smoke</code>,
                 <code>bun run check:focus-app-server-runtime</code>, <code>bun run check:focus-ui-runtime-bridge</code>.
                 Runtime smoke records alignment, source coverage, winning confidence, low-confidence area, and retouch
                 recommendation.
@@ -548,7 +550,10 @@
             <tr>
               <td>Panorama runtime apply</td>
               <td><code>bun run check:panorama-runtime-plan-smoke</code></td>
-              <td>Synthetic stitch output, durable artifact hash, and stitch setting provenance proof.</td>
+              <td>
+                Synthetic stitch output, durable artifact hash, stitch setting provenance, crop/overlap quality metrics,
+                and app-server bridge proof.
+              </td>
             </tr>
             <tr>
               <td>Focus runtime apply</td>
