@@ -6,10 +6,16 @@ import { join, relative } from 'node:path';
 import { z } from 'zod';
 import {
   aiSidecarProvenanceEntryV1Schema,
+  focusStackArtifactV1Schema,
   hdrMergeArtifactV1Schema,
   negativeLabRollSessionArtifactV1Schema,
   panoramaArtifactV1Schema,
+  superResolutionArtifactV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  sampleFocusStackArtifactV1,
+  sampleSuperResolutionArtifactV1,
+} from '../packages/rawengine-schema/src/samplePayloads.ts';
 
 const ROOT = process.cwd();
 const FIXTURE_DIR = 'fixtures/sidecar-roundtrip';
@@ -40,11 +46,13 @@ const JsonValueSchema = z.lazy(() =>
 const RawEngineArtifactsSchema = z
   .object({
     aiProvenanceEntries: z.array(aiSidecarProvenanceEntryV1Schema).default([]),
+    focusStackArtifacts: z.array(focusStackArtifactV1Schema).default([]),
     hdrMergeArtifacts: z.array(hdrMergeArtifactV1Schema).default([]),
     negativeLabRollSessions: z.array(negativeLabRollSessionArtifactV1Schema).default([]),
     panoramaArtifacts: z.array(panoramaArtifactV1Schema).default([]),
     schemaVersion: z.literal(1),
     staleArtifactIds: z.array(z.string().trim().min(1)).default([]),
+    superResolutionArtifacts: z.array(superResolutionArtifactV1Schema).default([]),
   })
   .strict();
 
@@ -227,9 +235,11 @@ assertEqual(primary.metadata.exif.Model, 'Deterministic 1', 'primary EXIF Model'
 const primaryArtifacts = RawEngineArtifactsSchema.parse(primary.metadata.rawEngineArtifacts);
 assertEqual(primaryArtifacts.schemaVersion, 1, 'primary rawEngineArtifacts schema version');
 assertEqual(primaryArtifacts.aiProvenanceEntries.length, 2, 'primary AI provenance entry count');
+assertEqual(primaryArtifacts.focusStackArtifacts.length, 0, 'primary focus stack artifact count');
 assertEqual(primaryArtifacts.hdrMergeArtifacts.length, 0, 'primary HDR artifact count');
 assertEqual(primaryArtifacts.negativeLabRollSessions.length, 1, 'primary Negative Lab roll session count');
 assertEqual(primaryArtifacts.panoramaArtifacts.length, 0, 'primary panorama artifact count');
+assertEqual(primaryArtifacts.superResolutionArtifacts.length, 0, 'primary super-resolution artifact count');
 
 const [maskProvenance, enhancementProvenance] = primaryArtifacts.aiProvenanceEntries;
 assertEqual(maskProvenance.providerId, 'rawengine-local-ai', 'AI mask provider id');
@@ -337,6 +347,70 @@ const roundtrippedPanoramaArtifacts = SidecarSchema.parse(
 ).rawEngineArtifacts;
 assertJsonEqual(roundtrippedPanoramaArtifacts, panoramaArtifacts, 'panorama artifact sidecar roundtrip');
 
+const computationalMergeSyntheticSidecar = SidecarSchema.parse({
+  version: 1,
+  rating: 0,
+  adjustments: {
+    rawEngineFutureControl: {
+      kind: 'fixture-computational-merge-artifact-sidecar',
+      preservesDerivedArtifacts: true,
+    },
+  },
+  tags: ['color:blue', 'computational merge', 'user:derived-artifact'],
+  rawEngineArtifacts: {
+    schemaVersion: 1,
+    focusStackArtifacts: [sampleFocusStackArtifactV1],
+    superResolutionArtifacts: [sampleSuperResolutionArtifactV1],
+  },
+});
+const computationalMergeArtifacts = RawEngineArtifactsSchema.parse(
+  computationalMergeSyntheticSidecar.rawEngineArtifacts,
+);
+assertEqual(computationalMergeArtifacts.focusStackArtifacts.length, 1, 'focus stack artifact count');
+assertEqual(computationalMergeArtifacts.superResolutionArtifacts.length, 1, 'super-resolution artifact count');
+
+const [focusStackArtifact] = computationalMergeArtifacts.focusStackArtifacts;
+assertEqual(focusStackArtifact.family, 'focus_stack', 'focus stack artifact family');
+assertEqual(focusStackArtifact.outputArtifact.storage, 'sidecar_artifact', 'focus stack output storage');
+assertEqual(focusStackArtifact.sharpnessMapArtifact?.storage, 'sidecar_artifact', 'focus stack sharpness map storage');
+assertEqual(
+  focusStackArtifact.depthConfidenceMapArtifact?.storage,
+  'sidecar_artifact',
+  'focus stack depth map storage',
+);
+assertEqual(focusStackArtifact.retouchLayerArtifact?.storage, 'sidecar_artifact', 'focus stack retouch layer storage');
+assertEqual(focusStackArtifact.staleState.state, 'current', 'focus stack stale state');
+assertEqual(
+  focusStackArtifact.dryRun.acceptedDryRunPlanId,
+  'merge_plan_focus_stack_001',
+  'focus stack accepted dry-run plan id',
+);
+
+const [superResolutionArtifact] = computationalMergeArtifacts.superResolutionArtifacts;
+assertEqual(superResolutionArtifact.family, 'super_resolution', 'super-resolution artifact family');
+assertEqual(superResolutionArtifact.outputArtifact.storage, 'sidecar_artifact', 'super-resolution output storage');
+assertEqual(superResolutionArtifact.detailPolicy, 'conservative', 'super-resolution detail policy');
+assertEqual(superResolutionArtifact.staleState.state, 'current', 'super-resolution stale state');
+assertEqual(
+  superResolutionArtifact.dryRun.acceptedDryRunPlanId,
+  'merge_plan_super_resolution_001',
+  'super-resolution accepted dry-run plan id',
+);
+assertEqual(
+  superResolutionArtifact.validationSummary.humanReviewStatus,
+  'passed',
+  'super-resolution human review status',
+);
+
+const roundtrippedComputationalMergeArtifacts = SidecarSchema.parse(
+  JSON.parse(JSON.stringify(computationalMergeSyntheticSidecar, null, 2)),
+).rawEngineArtifacts;
+assertJsonEqual(
+  roundtrippedComputationalMergeArtifacts,
+  computationalMergeArtifacts,
+  'focus stack and super-resolution artifact sidecar roundtrip',
+);
+
 const missing = loadSidecarFixture(undefined);
 if (!missing.usedDefault) {
   fail('missing sidecar should use default metadata');
@@ -362,6 +436,6 @@ console.log(
     `Checked ${toRepoPath(toAbsolutePath(hdrFixturePath))}`,
     `Checked ${toRepoPath(toAbsolutePath(panoramaFixturePath))}`,
     `Checked ${toRepoPath(toAbsolutePath(virtualFixturePath))}`,
-    'Coverage: schema shape, virtual-copy naming, adjustment preservation, tag conventions, HDR/panorama/Negative Lab artifacts, missing/invalid defaults.',
+    'Coverage: schema shape, virtual-copy naming, adjustment preservation, tag conventions, HDR/panorama/focus-stack/super-resolution/Negative Lab artifacts, missing/invalid defaults.',
   ].join('\n'),
 );
