@@ -1476,6 +1476,7 @@ export const toneColorCommandTypeV1Schema = z.enum([
   'toneColor.adjustHsl',
   'toneColor.setColorGrading',
   'toneColor.setLevels',
+  'toneColor.setChannelMixer',
 ]);
 
 export const toneColorChannelV1Schema = z.enum(['luma', 'red', 'green', 'blue', 'rgb']);
@@ -1503,6 +1504,15 @@ export const toneColorWheelV1Schema = z
     hueDegrees: z.number().min(0).lt(360),
     luminance: z.number().min(-100).max(100),
     saturation: z.number().min(0).max(100),
+  })
+  .strict();
+
+export const toneColorChannelMixerRowV1Schema = z
+  .object({
+    blue: z.number().min(-200).max(200),
+    constant: z.number().min(-100).max(100),
+    green: z.number().min(-200).max(200),
+    red: z.number().min(-200).max(200),
   })
   .strict();
 
@@ -1654,6 +1664,37 @@ export const toneColorCommandEnvelopeV1Schema = z
           }),
       })
       .strict(),
+    toneColorCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('toneColor.setChannelMixer'),
+        parameters: z
+          .object({
+            blue: toneColorChannelMixerRowV1Schema,
+            enabled: z.boolean(),
+            green: toneColorChannelMixerRowV1Schema,
+            preserveLuminance: z.boolean(),
+            red: toneColorChannelMixerRowV1Schema,
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            const rows = [parameters.red, parameters.green, parameters.blue];
+            const changed = rows.some(
+              (row, index) =>
+                row.red !== (index === 0 ? 100 : 0) ||
+                row.green !== (index === 1 ? 100 : 0) ||
+                row.blue !== (index === 2 ? 100 : 0) ||
+                row.constant !== 0,
+            );
+            if (parameters.enabled && !changed) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Enabled channel mixer requires at least one non-identity output row.',
+                path: ['enabled'],
+              });
+            }
+          }),
+      })
+      .strict(),
   ])
   .superRefine((command, context) => {
     if (command.dryRun) {
@@ -1687,7 +1728,7 @@ export const toneColorCommandEnvelopeV1Schema = z
 
 export const toneColorParameterDiffV1Schema = z
   .object({
-    module: z.enum(['basic_tone', 'tone_curve', 'white_balance', 'hsl', 'color_grading', 'levels']),
+    module: z.enum(['basic_tone', 'tone_curve', 'white_balance', 'hsl', 'color_grading', 'levels', 'channel_mixer']),
     path: z.string().trim().min(1),
     previousValue: z.unknown().optional(),
     value: z.unknown().optional(),
