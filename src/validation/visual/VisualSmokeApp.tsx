@@ -1,5 +1,5 @@
 import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactElement, useState } from 'react';
 
 import ColorPanel from '../../components/adjustments/Color';
 import EffectsPanel from '../../components/adjustments/Effects';
@@ -19,9 +19,25 @@ import {
 import { useUIStore } from '../../store/useUIStore';
 import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../utils/adjustments';
 
+import type { VisualSmokeMode } from './visualSmokeScenarios';
+
 interface VisualSmokeAppProps {
   mode: string;
 }
+
+const visualSmokeComponents = {
+  'color-workflow': ColorWorkflowVisualSmoke,
+  'command-palette-workflows': CommandPaletteWorkflowSmoke,
+  'film-look-browser': FilmLookVisualSmoke,
+  'focus-ui': FocusStackVisualSmoke,
+  'hdr-ui': HdrVisualSmoke,
+  'negative-lab-workspace': NegativeLabVisualSmoke,
+  'panorama-ui': PanoramaVisualSmoke,
+  'sr-ui': SuperResolutionVisualSmoke,
+} satisfies Partial<Record<VisualSmokeMode, () => ReactElement>>;
+type VisualSmokeComponentMode = keyof typeof visualSmokeComponents;
+
+const isVisualSmokeComponentMode = (mode: string): mode is VisualSmokeComponentMode => mode in visualSmokeComponents;
 
 const filmstripFrames = [
   { name: 'DSC_1042.ARW', tone: 'from-emerald-400 to-cyan-500', rating: '5' },
@@ -476,36 +492,9 @@ function ColorWorkflowVisualSmoke() {
 }
 
 function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
-  if (mode === 'command-palette-workflows') {
-    return <CommandPaletteWorkflowSmoke />;
-  }
-
-  if (mode === 'focus-ui') {
-    return <FocusStackVisualSmoke />;
-  }
-
-  if (mode === 'sr-ui') {
-    return <SuperResolutionVisualSmoke />;
-  }
-
-  if (mode === 'panorama-ui') {
-    return <PanoramaVisualSmoke />;
-  }
-
-  if (mode === 'hdr-ui') {
-    return <HdrVisualSmoke />;
-  }
-
-  if (mode === 'negative-lab-workspace') {
-    return <NegativeLabVisualSmoke />;
-  }
-
-  if (mode === 'film-look-browser') {
-    return <FilmLookVisualSmoke />;
-  }
-
-  if (mode === 'color-workflow') {
-    return <ColorWorkflowVisualSmoke />;
+  if (isVisualSmokeComponentMode(mode)) {
+    const ScenarioComponent = visualSmokeComponents[mode];
+    return <ScenarioComponent />;
   }
 
   const scenario = mode === 'empty-library' ? 'Empty Library Startup' : 'Editor Shell Smoke';
