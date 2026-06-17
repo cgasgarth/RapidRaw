@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Negative Lab Agent Workflow Proof</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f8fb;
+        --ink: #111827;
+        --muted: #5b6472;
+        --panel: #ffffff;
+        --line: #d8dee8;
+        --accent: #0f766e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 24px 56px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      header,
+      section {
+        margin-bottom: 28px;
+      }
+
+      header {
+        display: grid;
+        gap: 10px;
+      }
+
+      h1 {
+        font-size: 32px;
+        line-height: 1.15;
+      }
+
+      h2 {
+        font-size: 21px;
+        margin-bottom: 12px;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .tile {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .tile strong {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px;
+        text-align: left;
+        vertical-align: top;
+        font-size: 13px;
+      }
+
+      th {
+        background: #edf2f7;
+        color: var(--muted);
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      @media (max-width: 820px) {
+        .summary {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Negative Lab Agent Workflow Proof</h1>
+        <p>Route-proof artifact for preview, QC, accepted dry-run apply, and governed stock-family planning.</p>
+      </header>
+
+      <section class="summary">
+        <div class="tile"><strong>Replay</strong><code>replay_negative_lab_agent_route_tool_e2e_001</code></div>
+        <div class="tile"><strong>Routes</strong>8</div>
+        <div class="tile"><strong>QC frames</strong>3</div>
+        <div class="tile"><strong>Apply paths</strong>2</div>
+      </section>
+
+      <section>
+        <h2>Mapped Routes</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Command</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>negative.lab.build_conversion_plan</code></td>
+              <td>mapped</td>
+            </tr>
+            <tr>
+              <td><code>negative.lab.build_densitometer_readout</code></td>
+              <td>mapped</td>
+            </tr>
+            <tr>
+              <td><code>negative.lab.build_frame_health_report</code></td>
+              <td>mapped</td>
+            </tr>
+            <tr>
+              <td><code>negative.lab.build_qc_proof_report</code></td>
+              <td>mapped</td>
+            </tr>
+            <tr>
+              <td><code>negative.lab.build_batch_dry_run_summary</code></td>
+              <td>mapped</td>
+            </tr>
+            <tr>
+              <td><code>negative.lab.accept_batch_dry_run_plan</code></td>
+              <td>mapped</td>
+            </tr>
+            <tr>
+              <td><code>negative.lab.build_accepted_batch_apply</code></td>
+              <td>mapped</td>
+            </tr>
+            <tr>
+              <td><code>negative.lab.build_stock_family_conversion_plan</code></td>
+              <td>mapped</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Replay Steps</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th>Tool</th>
+              <th>Mode</th>
+              <th>Mutates</th>
+              <th>Approval</th>
+              <th>Artifacts</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>negative_lab_agent_preview</code></td>
+              <td>negativelab.preview_conversion</td>
+              <td>dry-run</td>
+              <td>no</td>
+              <td>not_required</td>
+              <td><code>artifact_preview_sample</code></td>
+            </tr>
+            <tr>
+              <td><code>negative_lab_agent_apply</code></td>
+              <td>negativelab.apply_planned_command</td>
+              <td>apply</td>
+              <td>yes</td>
+              <td>approved</td>
+              <td><code>artifact_preview_sample</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>QC Proof Rows</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Frame</th>
+              <th>Scan</th>
+              <th>Batch</th>
+              <th>QC</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>negative-lab-frame-1</code></td>
+              <td>001.CR3</td>
+              <td>included</td>
+              <td>review</td>
+              <td>Confirm this frame after per-frame base sampling before final retouch.</td>
+            </tr>
+            <tr>
+              <td><code>negative-lab-frame-2</code></td>
+              <td>002.CR3</td>
+              <td>included</td>
+              <td>ready</td>
+              <td>Preview ready for visual dust and scratch pass.</td>
+            </tr>
+            <tr>
+              <td><code>negative-lab-frame-3</code></td>
+              <td>003.CR3</td>
+              <td>excluded</td>
+              <td>review</td>
+              <td>Frame excluded from batch.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>
