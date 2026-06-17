@@ -26,12 +26,6 @@
       "reason": "Cargo 0.x minor changes can carry semver-breaking API changes."
     },
     {
-      "title": "deps(major): migrate cargo/ndarray to 0.17",
-      "issue": 962,
-      "status": "open",
-      "reason": "Cargo 0.x minor changes can carry semver-breaking API changes."
-    },
-    {
       "title": "deps(major): migrate cargo/nalgebra to 0.35",
       "issue": 963,
       "status": "open",

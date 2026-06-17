@@ -15,7 +15,7 @@ const args = new Set(process.argv.slice(2));
 const ecosystemArg = process.argv.find((arg) => arg.startsWith('--ecosystem='));
 const ecosystem = ecosystemArg?.split('=')[1] ?? defaultEcosystem;
 const formatArg = process.argv.find((arg) => arg.startsWith('--format='));
-const format = formatArg?.split('=')[1] ?? 'markdown';
+const format = formatArg?.split('=')[1] ?? 'summary';
 const failOnMajor = args.has('--fail-on-major');
 const failOnMissingMajorIssues = args.has('--fail-on-missing-major-issues');
 
@@ -423,13 +423,38 @@ const renderTable = (title, rows) => {
   return lines.join('\n');
 };
 
+const renderSummary = (report) => {
+  const rows = [...report.js, ...report.rust];
+  const majorRows = rows.filter((row) => row.majorIssueTitle);
+  const missingIssueRows = majorRows.filter((row) => row.majorIssueTracking === 'missing issue');
+  const skippedRows = rows.filter((row) => row.skipReason);
+  const parts = [
+    `js=${report.js.length}`,
+    `rust=${report.rust.length}`,
+    `major=${majorRows.length}`,
+    `missing=${missingIssueRows.length}`,
+    `skipped=${skippedRows.length}`,
+  ];
+
+  if (missingIssueRows.length > 0) {
+    parts.push(
+      `missingIssues=${missingIssueRows
+        .map((row) => row.majorIssueTitle)
+        .slice(0, 5)
+        .join('; ')}`,
+    );
+  }
+
+  return `dependency audit ok (${parts.join(', ')})`;
+};
+
 const run = async () => {
   if (!['all', 'js', 'rust'].includes(ecosystem)) {
     throw new Error(`Unsupported --ecosystem=${ecosystem}; expected all, js, or rust.`);
   }
 
-  if (!['json', 'markdown'].includes(format)) {
-    throw new Error(`Unsupported --format=${format}; expected json or markdown.`);
+  if (!['json', 'markdown', 'summary'].includes(format)) {
+    throw new Error(`Unsupported --format=${format}; expected json, markdown, or summary.`);
   }
 
   const report = {
@@ -441,11 +466,13 @@ const run = async () => {
 
   if (format === 'json') {
     console.log(JSON.stringify(report, null, 2));
-  } else {
+  } else if (format === 'markdown') {
     const sections = ['# RawEngine Dependency Version Audit', '', `Generated at: ${report.generatedAt}`];
     if (report.js.length > 0) sections.push('', renderTable('JavaScript/Bun Package Versions', report.js));
     if (report.rust.length > 0) sections.push('', renderTable('Rust/Cargo Crate Versions', report.rust));
     console.log(sections.join('\n'));
+  } else {
+    console.log(renderSummary(report));
   }
 
   const majorCount = [...report.js, ...report.rust].filter((row) => row.majorIssueTitle).length;
