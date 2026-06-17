@@ -1,11 +1,15 @@
 #!/usr/bin/env bun
 
-import { defringeFixtureSchema, parseDefringeFixtures } from '../src/schemas/defringeSchemas.ts';
+import { z } from 'zod';
+
 import { addDuplicateFieldFailures, expectInvalidCases, finishFixtureCheck, readJson } from './lib/fixture-checks.ts';
+import { defringeFixtureSchema, parseDefringeFixtures } from '../src/schemas/defringeSchemas.ts';
 
 const fixtures = parseDefringeFixtures(await readJson('fixtures/detail/defringe-fixtures.json'));
-const invalidCases = await readJson('fixtures/detail/invalid-defringe-fixtures.json');
-const failures = [];
+const invalidCases = z
+  .array(z.object({ case: z.string().min(1), fixture: z.unknown() }).strict())
+  .parse(await readJson('fixtures/detail/invalid-defringe-fixtures.json'));
+const failures: string[] = [];
 
 addDuplicateFieldFailures({
   failures,
