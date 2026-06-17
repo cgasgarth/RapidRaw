@@ -53,6 +53,8 @@ const manifestSchema = z
   })
   .strict();
 
+const rawOrTiffFixturePath = /\.(?:arw|cr2|cr3|dng|nef|raf|rw2|tif|tiff)$/iu;
+
 const outputCaseSchema = z
   .object({
     baselinePreviewMaxDelta: z.number().nonnegative(),
@@ -177,6 +179,18 @@ const unsafeClaims =
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const manifest = manifestSchema.parse(await readJson(manifestPath));
 
+for (const fixture of manifest.fixtures) {
+  for (const requiredUse of ['preview_export_parity', 'render_bounds']) {
+    if (!fixture.allowedValidationUses.includes(requiredUse)) {
+      throw new Error(`${fixture.fixtureId}: measured fixture must allow ${requiredUse}.`);
+    }
+  }
+
+  if (!rawOrTiffFixturePath.test(fixture.localRelativePath)) {
+    throw new Error(`${fixture.fixtureId}: measured fixture must point at a RAW/TIFF payload path.`);
+  }
+}
+
 const buildCase = (fixture, look) => {
   const sourcePixels = makeMeasuredScene();
   const patch = buildFilmLookAppliedAdjustmentPatch(look, 100);
@@ -232,6 +246,20 @@ if (updateFixture) {
 }
 
 const currentOutput = outputSchema.parse(await readJson(outputPath));
+const expectedCaseCount = manifest.fixtures.length * FILM_LOOK_BROWSER_ITEMS.length;
+if (currentOutput.cases.length !== expectedCaseCount) {
+  throw new Error(`Measured film look fixture output must cover ${expectedCaseCount} fixture/look cases.`);
+}
+
+for (const fixture of manifest.fixtures) {
+  for (const look of FILM_LOOK_BROWSER_ITEMS) {
+    const caseId = `film.look.measured.${fixture.fixtureId}.${look.id}`;
+    if (!currentOutput.cases.some((fixtureCase) => fixtureCase.caseId === caseId)) {
+      throw new Error(`Measured film look fixture output is missing case: ${caseId}`);
+    }
+  }
+}
+
 if (JSON.stringify(currentOutput) !== JSON.stringify(expectedOutput)) {
   throw new Error(
     'Measured film look fixture outputs are stale. Run bun run check:film-look-measured-fixtures:update.',
