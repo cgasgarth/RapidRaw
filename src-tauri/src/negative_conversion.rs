@@ -286,14 +286,7 @@ fn write_negative_lab_output_sidecar(
 
     let artifacts = sidecar
         .raw_engine_artifacts
-        .get_or_insert_with(|| RawEngineArtifacts {
-            schema_version: 1,
-            ai_provenance_entries: Vec::new(),
-            hdr_merge_artifacts: Vec::new(),
-            negative_lab_artifacts: Vec::new(),
-            panorama_artifacts: Vec::new(),
-            stale_artifact_ids: Vec::new(),
-        });
+        .get_or_insert_with(RawEngineArtifacts::new_v1);
     artifacts.schema_version = 1;
     artifacts.negative_lab_artifacts.push(artifact);
     artifacts.stale_artifact_ids.retain(|id| !id.is_empty());

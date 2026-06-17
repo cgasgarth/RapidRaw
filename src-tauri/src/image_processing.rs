@@ -48,7 +48,7 @@ impl<'a> IntoCowImage<'a> for &'a std::sync::Arc<DynamicImage> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RawEngineArtifacts {
     pub schema_version: u32,
@@ -62,6 +62,25 @@ pub struct RawEngineArtifacts {
     pub panorama_artifacts: Vec<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub stale_artifact_ids: Vec<String>,
+}
+
+impl RawEngineArtifacts {
+    pub fn new_v1() -> Self {
+        Self {
+            schema_version: 1,
+            ai_provenance_entries: Vec::new(),
+            hdr_merge_artifacts: Vec::new(),
+            negative_lab_artifacts: Vec::new(),
+            panorama_artifacts: Vec::new(),
+            stale_artifact_ids: Vec::new(),
+        }
+    }
+}
+
+impl Default for RawEngineArtifacts {
+    fn default() -> Self {
+        Self::new_v1()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -3653,20 +3672,17 @@ mod tests {
             tags: Some(vec!["color:green".to_string(), "user:panorama".to_string()]),
             exif: None,
             raw_engine_artifacts: Some(RawEngineArtifacts {
-                schema_version: 1,
                 ai_provenance_entries: vec![json!({
                     "provenanceEntryId": "prov_ai_subject_mask_001",
                     "providerId": "rawengine-local-ai",
                     "modelId": "local_sam2_subject_mask",
                     "settingsHash": "sha256:sample-ai-subject-mask-settings"
                 })],
-                hdr_merge_artifacts: Vec::new(),
-                negative_lab_artifacts: Vec::new(),
                 panorama_artifacts: vec![json!({
                     "artifactId": "artifact_panorama_session_0001",
                     "provenance": { "runtimeStatus": "rendered" }
                 })],
-                stale_artifact_ids: Vec::new(),
+                ..RawEngineArtifacts::new_v1()
             }),
         };
 
