@@ -436,6 +436,10 @@
           "path": "docs/validation/render-artifact-comparison-2026-06-15.md"
         },
         {
+          "title": "Runtime proof completion states",
+          "path": "docs/validation/runtime-proof-completion-states-2026-06-17.md"
+        },
+        {
           "title": "Unused vars severity",
           "path": "docs/validation/unused-vars-error-2026-06-15.md"
         },
