@@ -1,5 +1,9 @@
 #!/usr/bin/env bun
 
+import { readFileSync, writeFileSync } from 'node:fs';
+
+import { format, resolveConfig } from 'prettier';
+
 import {
   buildNegativeLabAcceptedBatchApplyRouteResult,
   buildNegativeLabAcceptedBatchPlanRouteResult,
@@ -23,6 +27,12 @@ import {
   sampleNegativeLabDryRunResultV1,
   sampleToolRegistryV1,
 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+
+const OUTPUT_PATH = 'docs/validation/negative-lab-agent-workflow-proof-2026-06-16.html';
+const args = new Set(process.argv.slice(2));
+const shouldUpdate = args.has('--update');
+const escapeHtml = (value) =>
+  String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
 const actor = {
   id: 'codex-app-server',
@@ -253,6 +263,211 @@ if (fixture.steps.length !== 2 || fixture.finalGraphRevision !== sampleNegativeL
 
 if (sampleNegativeLabApplyResultV1.changeSet.artifactHandles.length === 0) {
   throw new Error('Negative Lab agent apply fixture did not include an edited artifact handle.');
+}
+
+const routeRows = requiredRouteNames
+  .map(
+    (routeName) => `<tr>
+      <td><code>${escapeHtml(routeName)}</code></td>
+      <td>${routeNames.has(routeName) ? 'mapped' : 'missing'}</td>
+    </tr>`,
+  )
+  .join('\n');
+
+const replayRows = fixture.steps
+  .map(
+    (step) => `<tr>
+      <td><code>${escapeHtml(step.stepId)}</code></td>
+      <td>${escapeHtml(step.toolName)}</td>
+      <td>${step.dryRun ? 'dry-run' : 'apply'}</td>
+      <td>${step.mutates ? 'yes' : 'no'}</td>
+      <td>${escapeHtml(step.approval.state)}</td>
+      <td>${step.auditLog.affectedArtifactIds.map((artifactId) => `<code>${escapeHtml(artifactId)}</code>`).join(', ')}</td>
+    </tr>`,
+  )
+  .join('\n');
+
+const qcRows = qcProofReport.frames
+  .map(
+    (frame) => `<tr>
+      <td><code>${escapeHtml(frame.frameId)}</code></td>
+      <td>${escapeHtml(frame.scanLabel)}</td>
+      <td>${frame.included ? 'included' : 'excluded'}</td>
+      <td>${frame.needsReview ? 'review' : 'ready'}</td>
+      <td>${escapeHtml(frame.exportBlockedReason ?? frame.recommendedAction)}</td>
+    </tr>`,
+  )
+  .join('\n');
+
+const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Negative Lab Agent Workflow Proof</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f8fb;
+        --ink: #111827;
+        --muted: #5b6472;
+        --panel: #ffffff;
+        --line: #d8dee8;
+        --accent: #0f766e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 24px 56px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      header,
+      section {
+        margin-bottom: 28px;
+      }
+
+      header {
+        display: grid;
+        gap: 10px;
+      }
+
+      h1 {
+        font-size: 32px;
+        line-height: 1.15;
+      }
+
+      h2 {
+        font-size: 21px;
+        margin-bottom: 12px;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .tile {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .tile strong {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px;
+        text-align: left;
+        vertical-align: top;
+        font-size: 13px;
+      }
+
+      th {
+        background: #edf2f7;
+        color: var(--muted);
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      @media (max-width: 820px) {
+        .summary {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Negative Lab Agent Workflow Proof</h1>
+        <p>Route-proof artifact for preview, QC, accepted dry-run apply, and governed stock-family planning.</p>
+      </header>
+
+      <section class="summary">
+        <div class="tile"><strong>Replay</strong><code>${escapeHtml(fixture.replayId)}</code></div>
+        <div class="tile"><strong>Routes</strong>${requiredRouteNames.length}</div>
+        <div class="tile"><strong>QC frames</strong>${qcProofReport.totalFrameCount}</div>
+        <div class="tile"><strong>Apply paths</strong>${acceptedApplyPlan.apply.paths.length}</div>
+      </section>
+
+      <section>
+        <h2>Mapped Routes</h2>
+        <table>
+          <thead><tr><th>Command</th><th>Status</th></tr></thead>
+          <tbody>${routeRows}</tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Replay Steps</h2>
+        <table>
+          <thead><tr><th>Step</th><th>Tool</th><th>Mode</th><th>Mutates</th><th>Approval</th><th>Artifacts</th></tr></thead>
+          <tbody>${replayRows}</tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>QC Proof Rows</h2>
+        <table>
+          <thead><tr><th>Frame</th><th>Scan</th><th>Batch</th><th>QC</th><th>Action</th></tr></thead>
+          <tbody>${qcRows}</tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>
+`;
+
+const prettierConfig = (await resolveConfig(OUTPUT_PATH)) ?? {};
+const formattedHtml = await format(html, { ...prettierConfig, filepath: OUTPUT_PATH, parser: 'html' });
+
+if (shouldUpdate) {
+  writeFileSync(OUTPUT_PATH, formattedHtml);
+  console.log('negative lab agent workflow proof updated');
+  process.exit(0);
+}
+
+const current = readFileSync(OUTPUT_PATH, 'utf8');
+if (current !== formattedHtml) {
+  throw new Error(`${OUTPUT_PATH} is stale. Run bun scripts/check-negative-lab-agent-workflow.mjs --update`);
 }
 
 console.log(

@@ -649,6 +649,10 @@
           "path": "docs/validation/agent-replay-proof-gallery-2026-06-16.html"
         },
         {
+          "title": "Negative Lab agent workflow proof",
+          "path": "docs/validation/negative-lab-agent-workflow-proof-2026-06-16.html"
+        },
+        {
           "title": "Performance smoke",
           "path": "docs/validation/performance-smoke-2026-06-13.md"
         },
