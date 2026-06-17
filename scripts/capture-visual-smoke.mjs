@@ -683,6 +683,19 @@ async function prepareScenario(page, mode) {
     timeout: 10_000,
   });
   await page.getByTestId('negative-lab-active-scan-0').click();
+  await page.getByTestId('negative-lab-stock-registry').waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-stock-registry')
+    .getByText('5 runtime-safe / 2 reference-only', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-stock-family-negative_lab.stock_family.c41_portrait_color_negative.v1')
+    .getByText('descriptive generic only', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-stock-family-negative_lab.stock_family.ecn2_cinema_negative.v1')
+    .getByText('legal review required', { exact: true })
+    .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-preset-inspector').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-preset-film-class').getByText('Color negative', { exact: true }).waitFor({
     timeout: 10_000,
