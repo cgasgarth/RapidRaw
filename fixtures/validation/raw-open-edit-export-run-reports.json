@@ -1,0 +1,8 @@
+{
+  "$schema": "https://rawengine.dev/schemas/raw-open-edit-export-run-reports-v1.json",
+  "issue": 1829,
+  "reports": [],
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-17",
+  "validationMode": "public_schema_private_reports"
+}

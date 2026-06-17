@@ -77,6 +77,18 @@ const proofCaseSchema = z
         });
       }
     }
+
+    if (proofCase.status === 'accepted_private_asset') {
+      for (const [artifactIndex, artifact] of proofCase.artifacts.entries()) {
+        if (artifact.hash === null) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Accepted private RAW proof artifacts require non-null hashes.',
+            path: ['artifacts', artifactIndex, 'hash'],
+          });
+        }
+      }
+    }
   });
 
 export const rawOpenEditExportProofManifestSchema = z
