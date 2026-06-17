@@ -17,7 +17,7 @@ if (invokesEnum === undefined) {
 }
 
 const routeInvokes = new Set(AI_APP_SERVER_TOOL_ROUTES.map((route) => route.tauriInvoke));
-const registeredTools = new Set(sampleToolRegistryV1.tools.map((tool) => tool.toolName));
+const registeredToolByName = new Map(sampleToolRegistryV1.tools.map((tool) => [tool.toolName, tool]));
 const aiToolCapabilities = new Map(
   sampleAiAppServerToolManifestV1.tools.map((tool) => [tool.toolName, new Set(tool.allowedCapabilities)]),
 );
@@ -45,12 +45,24 @@ if (!routeInvokes.has('precompute_ai_subject_mask')) {
 }
 
 for (const route of AI_APP_SERVER_TOOL_ROUTES) {
+  const registeredTool =
+    route.status === 'mapped' && route.appServerToolName !== undefined
+      ? registeredToolByName.get(route.appServerToolName)
+      : undefined;
+
+  if (route.status === 'mapped' && route.appServerToolName !== undefined && registeredTool === undefined) {
+    failures.push(`${route.tauriInvoke} maps to unregistered tool ${route.appServerToolName}.`);
+  }
+
   if (
     route.status === 'mapped' &&
-    route.appServerToolName !== undefined &&
-    !registeredTools.has(route.appServerToolName)
+    route.commandSchemaName !== undefined &&
+    registeredTool !== undefined &&
+    route.commandSchemaName !== registeredTool.inputSchemaName
   ) {
-    failures.push(`${route.tauriInvoke} maps to unregistered tool ${route.appServerToolName}.`);
+    failures.push(
+      `${route.tauriInvoke} declares ${route.commandSchemaName} but ${route.appServerToolName} expects ${registeredTool.inputSchemaName}.`,
+    );
   }
 
   if (route.status === 'mapped' && route.appServerToolName !== undefined && route.toolCapability !== undefined) {
