@@ -2,7 +2,6 @@ import cx from 'clsx';
 import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, Layers3, Plus, Trash2 } from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { v4 as uuidv4 } from 'uuid';
 
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { deleteLayer, duplicateLayer, moveLayer, setLayerOpacity, setLayerVisibility } from '../../../utils/layerStack';
@@ -110,7 +109,7 @@ export default function LayerStackPanel({
   };
   const duplicateActiveLayer = () => {
     if (!activeRow || activeRow.isBase) return;
-    const newLayerId = uuidv4();
+    const newLayerId = crypto.randomUUID();
     applyLayerStack(
       duplicateLayer(masks, activeRow.id, newLayerId, t('editor.layers.copyName', { name: activeRow.name })),
       newLayerId,

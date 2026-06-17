@@ -42,7 +42,6 @@ import {
   useCallback,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { v4 as uuidv4 } from 'uuid';
 
 import {
   Mask,
@@ -606,7 +605,7 @@ export default function AIPanel() {
     }
 
     const newContainer: AiPatch = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       invert: false,
       isLoading: false,
       name: name,
@@ -737,7 +736,7 @@ export default function AIPanel() {
   };
 
   const clonePatchData = (container: AiPatch, options: { invert?: boolean; rename?: boolean } = {}): AiPatch =>
-    cloneMaskLikeContainerForPaste(container, uuidv4, {
+    cloneMaskLikeContainerForPaste(container, () => crypto.randomUUID(), {
       invert: options.invert,
       renameTo: options.rename === false ? undefined : `${container.name} Copy`,
       resetContainer: (clonedContainer) => {
@@ -747,7 +746,7 @@ export default function AIPanel() {
     });
 
   const cloneSubMaskData = (subMask: SubMask, options: { invert?: boolean; rename?: boolean } = {}): SubMask =>
-    cloneSubMaskForPaste(subMask, uuidv4, {
+    cloneSubMaskForPaste(subMask, () => crypto.randomUUID(), {
       invert: options.invert,
       renameTo: options.rename === false ? undefined : `${getSubMaskName(subMask)} Copy`,
     });
@@ -957,7 +956,7 @@ export default function AIPanel() {
           if (!movedSubMask) return prev;
 
           const newContainer: AiPatch = {
-            id: uuidv4(),
+            id: crypto.randomUUID(),
             invert: false,
             isLoading: false,
             name: t('editor.ai.patches.aiEdit', { count: newPatches.length + 1 }),

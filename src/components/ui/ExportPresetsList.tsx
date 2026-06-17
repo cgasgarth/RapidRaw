@@ -1,7 +1,6 @@
 import { Check, CheckCircle, Plus, Save, Trash2, TriangleAlert, X } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { v4 as uuidv4 } from 'uuid';
 
 import { AppSettings } from './AppProperties';
 import Dropdown from './Dropdown';
@@ -47,7 +46,7 @@ export default function ExportPresetsList({
     if (!newPresetName.trim() || !appSettings) return;
 
     const newPreset: ExportPreset = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       name: newPresetName.trim(),
       ...currentSettings,
     };
