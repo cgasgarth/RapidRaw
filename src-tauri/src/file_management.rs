@@ -120,6 +120,68 @@ pub struct ImportSettings {
     pub delete_after_import: bool,
 }
 
+fn split_rrdata_sidecar_filename(file_name: &str) -> Option<(String, Option<String>)> {
+    let base = file_name.strip_suffix(".rrdata")?;
+    if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
+        let id = &base[base.len() - 6..];
+        if id.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')) {
+            return Some((base[..base.len() - 7].to_string(), Some(id.to_string())));
+        }
+    }
+
+    Some((base.to_string(), None))
+}
+
+fn rrdata_sidecar_filename(source_path: &Path, copy_id: Option<&str>) -> String {
+    let source_filename = source_path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy();
+    match copy_id {
+        Some(id) => format!("{}.{}.rrdata", source_filename, id),
+        None => format!("{}.rrdata", source_filename),
+    }
+}
+
+fn rrdata_sidecar_path(source_path: &Path, copy_id: Option<&str>) -> PathBuf {
+    source_path.with_file_name(rrdata_sidecar_filename(source_path, copy_id))
+}
+
+fn rrexif_sidecar_path(source_path: &Path) -> PathBuf {
+    let mut rrexif_name = source_path.file_name().unwrap_or_default().to_os_string();
+    rrexif_name.push(".rrexif");
+    source_path.with_file_name(rrexif_name)
+}
+
+fn copy_existing_file(source_path: &Path, destination_path: &Path) -> Result<(), String> {
+    if source_path.exists() {
+        fs::copy(source_path, destination_path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+fn copy_primary_sidecars(
+    source_path: &Path,
+    source_sidecar_path: &Path,
+    destination_path: &Path,
+) -> Result<(), String> {
+    copy_existing_file(
+        source_sidecar_path,
+        &rrdata_sidecar_path(destination_path, None),
+    )?;
+    copy_existing_file(
+        &rrexif_sidecar_path(source_path),
+        &rrexif_sidecar_path(destination_path),
+    )
+}
+
+fn virtual_path_for_copy(source_path: &Path, copy_id: Option<&str>) -> (String, bool) {
+    match copy_id {
+        Some(id) => (format!("{}?vc={}", source_path.to_string_lossy(), id), true),
+        None => (source_path.to_string_lossy().into_owned(), false),
+    }
+}
+
 pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     let (source_path_str, copy_id) = if let Some((base, id)) = virtual_path.rsplit_once("?vc=") {
         (base.to_string(), Some(id.to_string()))
@@ -128,27 +190,7 @@ pub fn parse_virtual_path(virtual_path: &str) -> (PathBuf, PathBuf) {
     };
 
     let source_path = PathBuf::from(source_path_str);
-
-    let sidecar_filename = if let Some(id) = copy_id {
-        format!(
-            "{}.{}.rrdata",
-            source_path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy(),
-            &id
-        )
-    } else {
-        format!(
-            "{}.rrdata",
-            source_path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-        )
-    };
-
-    let sidecar_path = source_path.with_file_name(sidecar_filename);
+    let sidecar_path = rrdata_sidecar_path(&source_path, copy_id.as_deref());
     (source_path, sidecar_path)
 }
 
@@ -250,23 +292,9 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
             .into_string()
             .unwrap_or_else(|os| os.to_string_lossy().into_owned());
 
-        if file_name.ends_with(".rrdata") {
-            let base = &file_name[..file_name.len() - 7];
-
-            let (source_filename, copy_id) =
-                if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
-                    let id = &base[base.len() - 6..];
-                    if id.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')) {
-                        (&base[..base.len() - 7], Some(id.to_string()))
-                    } else {
-                        (base, None)
-                    }
-                } else {
-                    (base, None)
-                };
-
+        if let Some((source_filename, copy_id)) = split_rrdata_sidecar_filename(&file_name) {
             sidecars_by_filename
-                .entry(source_filename.to_string())
+                .entry(source_filename)
                 .or_default()
                 .push(copy_id);
         } else if is_supported_image_file(&file_name) {
@@ -281,13 +309,13 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
                 .remove(&file_name)
                 .unwrap_or_else(|| vec![None]);
             let path_str = path_buf.to_string_lossy().into_owned();
-            (path_str, file_name, path_buf, sidecars)
+            (path_str, path_buf, sidecars)
         })
         .collect();
 
     let result_list: Vec<ImageFile> = tasks
         .into_par_iter()
-        .flat_map(|(path_str, file_name, path_buf, sidecars)| {
+        .flat_map(|(path_str, path_buf, sidecars)| {
             let modified = fs::metadata(&path_buf)
                 .ok()
                 .and_then(|m| m.modified().ok())
@@ -298,16 +326,9 @@ pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<Ima
             let mut file_results = Vec::with_capacity(sidecars.len());
 
             for copy_id_opt in sidecars {
-                let (virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
-                    Some(id) => (
-                        format!("{}?vc={}", path_str, id),
-                        true,
-                        format!("{}.{}.rrdata", file_name, id),
-                    ),
-                    None => (path_str.clone(), false, format!("{}.rrdata", file_name)),
-                };
-
-                let sidecar_path = path_buf.with_file_name(sidecar_filename);
+                let (virtual_path, is_virtual_copy) =
+                    virtual_path_for_copy(&path_buf, copy_id_opt.as_deref());
+                let sidecar_path = rrdata_sidecar_path(&path_buf, copy_id_opt.as_deref());
 
                 let (is_edited, tags, rating) = {
                     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
@@ -368,19 +389,7 @@ pub fn list_images_recursive(
         }
 
         let file_name = entry_path.file_name().unwrap_or_default().to_string_lossy();
-        if let Some(base) = file_name.strip_suffix(".rrdata") {
-            let (source_filename, copy_id) =
-                if base.len() >= 7 && base.as_bytes()[base.len() - 7] == b'.' {
-                    let id = &base[base.len() - 6..];
-                    if id.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')) {
-                        (&base[..base.len() - 7], Some(id.to_string()))
-                    } else {
-                        (base, None)
-                    }
-                } else {
-                    (base, None)
-                };
-
+        if let Some((source_filename, copy_id)) = split_rrdata_sidecar_filename(&file_name) {
             if let Some(parent) = entry_path.parent() {
                 sidecars_by_path
                     .entry(parent.join(source_filename))
@@ -399,18 +408,13 @@ pub fn list_images_recursive(
                 .remove(&path_buf)
                 .unwrap_or_else(|| vec![None]);
             let path_str = path_buf.to_string_lossy().into_owned();
-            let file_name = path_buf
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .into_owned();
-            (path_str, file_name, path_buf, sidecars)
+            (path_str, path_buf, sidecars)
         })
         .collect();
 
     let result_list: Vec<ImageFile> = tasks
         .into_par_iter()
-        .flat_map(|(path_str, file_name, path_buf, sidecars)| {
+        .flat_map(|(path_str, path_buf, sidecars)| {
             let modified = fs::metadata(&path_buf)
                 .ok()
                 .and_then(|m| m.modified().ok())
@@ -421,16 +425,9 @@ pub fn list_images_recursive(
             let mut file_results = Vec::with_capacity(sidecars.len());
 
             for copy_id_opt in sidecars {
-                let (virtual_path, is_virtual_copy, sidecar_filename) = match copy_id_opt {
-                    Some(id) => (
-                        format!("{}?vc={}", path_str, id),
-                        true,
-                        format!("{}.{}.rrdata", file_name, id),
-                    ),
-                    None => (path_str.clone(), false, format!("{}.rrdata", file_name)),
-                };
-
-                let sidecar_path = path_buf.with_file_name(sidecar_filename);
+                let (virtual_path, is_virtual_copy) =
+                    virtual_path_for_copy(&path_buf, copy_id_opt.as_deref());
+                let sidecar_path = rrdata_sidecar_path(&path_buf, copy_id_opt.as_deref());
 
                 let (is_edited, tags, rating) = {
                     let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
@@ -1742,23 +1739,7 @@ pub fn duplicate_file(
 
     fs::copy(&source_path, &dest_path).map_err(|e| e.to_string())?;
 
-    if source_sidecar_path.exists()
-        && let Some(dest_str) = dest_path.to_str()
-    {
-        let (_, dest_sidecar_path) = parse_virtual_path(dest_str);
-        fs::copy(&source_sidecar_path, &dest_sidecar_path).map_err(|e| e.to_string())?;
-    }
-
-    let mut source_rrexif_name = source_path.file_name().unwrap().to_os_string();
-    source_rrexif_name.push(".rrexif");
-    let source_rrexif = source_path.with_file_name(source_rrexif_name);
-
-    if source_rrexif.exists() {
-        let mut dest_rrexif_name = dest_path.file_name().unwrap().to_os_string();
-        dest_rrexif_name.push(".rrexif");
-        let dest_rrexif = dest_path.with_file_name(dest_rrexif_name);
-        let _ = fs::copy(&source_rrexif, &dest_rrexif);
-    }
+    copy_primary_sidecars(&source_path, &source_sidecar_path, &dest_path)?;
 
     let dest_path_str = dest_path.to_string_lossy().into_owned();
 
@@ -1772,12 +1753,7 @@ pub fn duplicate_file(
 fn find_all_associated_files(source_image_path: &Path) -> Result<Vec<PathBuf>, String> {
     let mut associated_files = vec![source_image_path.to_path_buf()];
 
-    let mut rrexif_name = source_image_path
-        .file_name()
-        .unwrap_or_default()
-        .to_os_string();
-    rrexif_name.push(".rrexif");
-    let rrexif_path = source_image_path.with_file_name(rrexif_name);
+    let rrexif_path = rrexif_sidecar_path(source_image_path);
 
     if rrexif_path.exists() {
         associated_files.push(rrexif_path);
@@ -1791,7 +1767,7 @@ fn find_all_associated_files(source_image_path: &Path) -> Result<Vec<PathBuf>, S
         .ok_or("Could not get source filename")?
         .to_string_lossy();
 
-    let primary_sidecar_name = format!("{}.rrdata", source_filename);
+    let primary_sidecar_name = rrdata_sidecar_filename(source_image_path, None);
     let virtual_copy_prefix = format!("{}.", source_filename);
 
     if let Ok(entries) = fs::read_dir(parent_dir) {
@@ -2899,23 +2875,7 @@ pub async fn import_files(
                 }
 
                 fs::copy(&source_path, &dest_file_path).map_err(|e| e.to_string())?;
-                if source_sidecar.exists()
-                    && let Some(dest_str) = dest_file_path.to_str()
-                {
-                    let (_, dest_sidecar) = parse_virtual_path(dest_str);
-                    fs::copy(&source_sidecar, &dest_sidecar).map_err(|e| e.to_string())?;
-                }
-
-                let mut source_rrexif_name = source_path.file_name().unwrap().to_os_string();
-                source_rrexif_name.push(".rrexif");
-                let source_rrexif = source_path.with_file_name(source_rrexif_name);
-
-                if source_rrexif.exists() {
-                    let mut dest_rrexif_name = dest_file_path.file_name().unwrap().to_os_string();
-                    dest_rrexif_name.push(".rrexif");
-                    let dest_rrexif = dest_file_path.with_file_name(dest_rrexif_name);
-                    let _ = fs::copy(&source_rrexif, &dest_rrexif);
-                }
+                copy_primary_sidecars(&source_path, &source_sidecar, &dest_file_path)?;
 
                 if settings.delete_after_import {
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
@@ -2950,9 +2910,7 @@ pub async fn import_files(
                         if source_sidecar.exists() {
                             fs::remove_file(&source_sidecar).map_err(|e| e.to_string())?;
                         }
-                        if source_rrexif.exists() {
-                            let _ = fs::remove_file(&source_rrexif);
-                        }
+                        let _ = fs::remove_file(rrexif_sidecar_path(&source_path));
                     }
                 }
 
@@ -3062,7 +3020,6 @@ pub fn rename_files(
             .parent()
             .ok_or("Could not get parent directory")?;
         let original_filename_str = original_path.file_name().unwrap().to_string_lossy();
-        let new_filename_str = new_path.file_name().unwrap().to_string_lossy();
 
         if let Ok(entries) = fs::read_dir(parent) {
             for entry in entries.filter_map(Result::ok) {
@@ -3070,32 +3027,22 @@ pub fn rename_files(
                 let entry_os_filename = entry.file_name();
                 let entry_filename = entry_os_filename.to_string_lossy();
 
-                if entry_filename.starts_with(&format!("{}.", original_filename_str))
-                    && entry_filename.ends_with(".rrdata")
+                if let Some((source_filename, copy_id)) =
+                    split_rrdata_sidecar_filename(&entry_filename)
+                    && source_filename == original_filename_str
                 {
-                    let new_sidecar_filename =
-                        entry_filename.replacen(&*original_filename_str, &new_filename_str, 1);
-                    let new_sidecar_path = parent.join(new_sidecar_filename);
-                    sidecar_operations.insert(entry_path, new_sidecar_path);
-                } else if entry_filename == format!("{}.rrdata", original_filename_str) {
-                    let mut new_sidecar_name = new_path.file_name().unwrap().to_os_string();
-                    new_sidecar_name.push(".rrdata");
-                    let new_sidecar_path = new_path.with_file_name(new_sidecar_name);
-
-                    sidecar_operations.insert(entry_path, new_sidecar_path);
+                    sidecar_operations.insert(
+                        entry_path,
+                        rrdata_sidecar_path(new_path, copy_id.as_deref()),
+                    );
                 }
             }
         }
 
-        let mut old_rrexif_name = original_path.file_name().unwrap().to_os_string();
-        old_rrexif_name.push(".rrexif");
-        let old_rrexif = original_path.with_file_name(old_rrexif_name);
+        let old_rrexif = rrexif_sidecar_path(original_path);
 
         if old_rrexif.exists() {
-            let mut new_rrexif_name = new_path.file_name().unwrap().to_os_string();
-            new_rrexif_name.push(".rrexif");
-            let new_rrexif = new_path.with_file_name(new_rrexif_name);
-            sidecar_operations.insert(old_rrexif, new_rrexif);
+            sidecar_operations.insert(old_rrexif, rrexif_sidecar_path(new_path));
         }
     }
     operations.extend(sidecar_operations);
