@@ -36,7 +36,6 @@ const ALWAYS_REQUIRE_FILES = new Set([
   'Cargo.toml',
   'index.html',
   'package.json',
-  'package-lock.json',
   'pnpm-lock.yaml',
   'tsconfig.json',
   'tsconfig.app.json',
@@ -204,6 +203,14 @@ function isSafePackageJsonScriptPatch(patch) {
 function classifyPathChange(change) {
   const path = change.filename;
 
+  if (path === 'package-lock.json' && change.status === 'removed') {
+    return {
+      decision: SMOKE_DECISIONS.NONE,
+      mode: SMOKE_MODES.NONE,
+      reason: 'removed stale npm lockfile after Bun migration',
+    };
+  }
+
   if (path === 'package.json' && isSafePackageJsonScriptPatch(change.patch)) {
     return {
       decision: SMOKE_DECISIONS.NONE,
@@ -262,6 +269,7 @@ export function classifyFileChanges(changes) {
     .map((change) => ({
       filename: (change.filename ?? change.path ?? '').trim(),
       patch: change.patch,
+      status: change.status,
     }))
     .filter((change) => change.filename);
 
@@ -356,6 +364,7 @@ function readPullFilesFromArg(path) {
   return entries.map((entry) => ({
     filename: typeof entry.filename === 'string' ? entry.filename : typeof entry.path === 'string' ? entry.path : '',
     patch: typeof entry.patch === 'string' ? entry.patch : undefined,
+    status: typeof entry.status === 'string' ? entry.status : undefined,
   }));
 }
 
@@ -369,6 +378,7 @@ function readPullFilesNdjsonFromArg(path) {
       return {
         filename: typeof entry.filename === 'string' ? entry.filename : '',
         patch: typeof entry.patch === 'string' ? entry.patch : undefined,
+        status: typeof entry.status === 'string' ? entry.status : undefined,
       };
     });
 }
@@ -418,6 +428,16 @@ function runSelfTest() {
   assertDecision('empty file list fails closed decision', [], SMOKE_DECISIONS.FAIL_CLOSED);
   assertClassification('tauri changes require release smoke', ['src-tauri/src/main.rs'], SMOKE_MODES.RELEASE);
   assertClassification('package changes require release smoke', ['package.json'], SMOKE_MODES.RELEASE);
+  assertClassification(
+    'package-lock file lists fail closed without removal status',
+    ['package-lock.json'],
+    SMOKE_MODES.RELEASE,
+  );
+  assertChangeClassification(
+    'removed npm lockfile skips smoke',
+    [{ filename: 'package-lock.json', status: 'removed' }],
+    SMOKE_MODES.NONE,
+  );
   assertChangeClassification(
     'schema package changes skip smoke',
     [

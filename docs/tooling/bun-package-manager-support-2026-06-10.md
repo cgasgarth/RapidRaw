@@ -15,8 +15,8 @@ Tauri commands yet. Full CI/script migration remains #22.
 
 - Added `packageManager: "bun@1.3.13"` to `package.json`.
 - Generated the text lockfile `bun.lock` from the existing `package-lock.json`.
-- Kept `package-lock.json` in place so npm-based CI and Tauri commands keep
-  working during the transition.
+- `package-lock.json` was later removed after Bun became the repository source
+  of truth for frontend installs.
 - Added a blocking CI job, `frontend: bun install baseline`, that runs
   `bun install --frozen-lockfile`.
 - Added Bun setup to the reusable app-build workflow because Tauri's GitHub
@@ -58,5 +58,5 @@ Observed local results:
 - Replace compatible `npm run ...` workflow commands with `bun run ...`.
 - Update Tauri `beforeDevCommand` and `beforeBuildCommand` if Bun becomes the
   authoritative frontend runner.
-- Decide when `package-lock.json` can be removed. It should remain until Bun CI
-  is green and npm fallback is intentionally retired.
+- `package-lock.json` removal is complete; frontend dependency state is
+  Bun-only.

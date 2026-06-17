@@ -28,8 +28,6 @@ Bun while keeping inherited non-macOS packaging behavior tracked separately.
 
 ## Documented Exceptions
 
-- `package-lock.json` remains as a transition fallback until a dedicated removal
-  PR proves all required paths are Bun-clean.
 - Android matrix review remains deferred to #52, but project-authored Android
   workflow helper commands now run through Bun.
 
