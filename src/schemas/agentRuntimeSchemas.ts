@@ -185,6 +185,17 @@ export const rawEngineAppServerHostResponseSchema = z.union([
   rawEngineAppServerRouteCatalogResponseSchema,
 ]);
 
+export const rawEngineAppServerHostResponseEnvelopeSchema = z
+  .object({
+    handledAtIso: z.iso.datetime(),
+    request: rawEngineAppServerHostRequestSchema,
+    response: rawEngineAppServerHostResponseSchema,
+    schemaVersion: z.literal(1),
+    status: z.literal('ok'),
+    transport: rawEngineAppServerTransportSchema,
+  })
+  .strict();
+
 export type RawEngineAppServerAuditEntry = z.infer<typeof rawEngineAppServerAuditEntrySchema>;
 export type RawEngineAppServerCapabilitiesReplay = z.infer<typeof rawEngineAppServerCapabilitiesReplaySchema>;
 export type RawEngineAppServerCapabilitiesRequest = z.infer<typeof rawEngineAppServerCapabilitiesRequestSchema>;
@@ -195,6 +206,7 @@ export type RawEngineAppServerHealthResponse = z.infer<typeof rawEngineAppServer
 export type RawEngineAppServerHostManifest = z.infer<typeof rawEngineAppServerHostManifestSchema>;
 export type RawEngineAppServerHostRequest = z.infer<typeof rawEngineAppServerHostRequestSchema>;
 export type RawEngineAppServerHostResponse = z.infer<typeof rawEngineAppServerHostResponseSchema>;
+export type RawEngineAppServerHostResponseEnvelope = z.infer<typeof rawEngineAppServerHostResponseEnvelopeSchema>;
 export type RawEngineAppServerRouteCatalogEntry = z.infer<typeof rawEngineAppServerRouteCatalogEntrySchema>;
 export type RawEngineAppServerRouteCatalogReplay = z.infer<typeof rawEngineAppServerRouteCatalogReplaySchema>;
 export type RawEngineAppServerRouteCatalogRequest = z.infer<typeof rawEngineAppServerRouteCatalogRequestSchema>;

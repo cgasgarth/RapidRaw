@@ -9,6 +9,7 @@ Official reference checked: https://developers.openai.com/codex/app-server.
 - Start the official sidecar with `codex app-server` when testing Codex app-server process behavior.
 - Run RawEngine contract proof with `bun run check:rawengine-app-server-host`.
 - Route local host requests through `handleRawEngineAppServerHostRequest` so each read tool shares one Zod-validated dispatcher path.
+- Wrap stdio JSONL responses with `buildRawEngineAppServerHostResponseEnvelope` so request, response, transport, timestamp, status, and schema version are validated together.
 
 ## Boundary
 
@@ -25,3 +26,5 @@ No UI automation: host tools must call the typed RawEngine command/query layer o
 ## Replay Evidence
 
 `buildRawEngineAppServerHealthReplay`, `buildRawEngineAppServerCapabilitiesReplay`, and `buildRawEngineAppServerRouteCatalogReplay` record typed requests, responses, manifests, and audit log entries. The replay proof keeps host discovery read-only and auditable before mutation-capable feature tools are added.
+
+`buildRawEngineAppServerHostResponseEnvelope` proves the dispatch path can produce one concrete stdio JSONL response envelope for health, capabilities, and route catalog tools. This is runtime apply-capable for read-only host discovery; image mutation tools remain deferred.
