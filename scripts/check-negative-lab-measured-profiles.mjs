@@ -1,7 +1,5 @@
 #!/usr/bin/env bun
 
-import { readFile } from 'node:fs/promises';
-
 import {
   negativeLabFixtureManifestEntryV1Schema,
   negativeLabFixtureManifestV1Schema,
@@ -21,6 +19,12 @@ import {
   resolveNegativeLabRuntimeProfile,
 } from '../src/utils/negativeLabMeasuredProfileRuntime.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
+import {
+  assertGenericNegativeLabCatalogIsNotPromoted,
+  genericNegativeLabPresetById,
+  isNegativeLabProfileEligibleFixture,
+  readJson,
+} from './lib/negative-lab-validation.mjs';
 
 const manifestUrl = new URL('../fixtures/negative-lab/negative-lab-fixture-manifest.json', import.meta.url);
 const measuredCatalogUrl = new URL(
@@ -28,41 +32,12 @@ const measuredCatalogUrl = new URL(
   import.meta.url,
 );
 
-const readJson = async (url) => JSON.parse(await readFile(url, 'utf8'));
-const genericPresetById = new Map(
-  NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.map((preset) => [preset.presetId, preset]),
-);
-
-const assertGenericCatalogIsNotPromoted = () => {
-  for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
-    if (
-      preset.profileStatus !== 'generic_unmeasured' ||
-      preset.measurementProfileId !== null ||
-      preset.claimLevel !== 'generic_starting_point_only' ||
-      preset.measurementSource !== 'generic_engineered_starting_point'
-    ) {
-      throw new Error(`Generic Negative Lab preset was promoted without measured profile evidence: ${preset.presetId}`);
-    }
-  }
-};
-
-const isProfileEligibleFixture = (fixture) =>
-  fixture.allowedValidationUses.includes('profile_measurement') &&
-  !fixture.disallowedValidationUses.includes('profile_measurement') &&
-  fixture.state === 'approved_profile_measurement' &&
-  ['project_owned_scan', 'licensed_scan'].includes(fixture.negativeFixtureTier) &&
-  fixture.targetOrStepWedgePresent &&
-  fixture.measurementClaimAllowed &&
-  fixture.profileClaimAllowed &&
-  fixture.measuredProfileEvidence !== undefined &&
-  fixture.autoCorrectionBakedIn === 'known_absent';
-
 const validateMeasuredProfileCatalog = (catalog, fixtureEntries) => {
   const fixtureById = new Map(fixtureEntries.map((fixture) => [fixture.fixtureId, fixture]));
 
   for (const profile of catalog.profiles) {
     const parsedProfile = negativeLabMeasuredProfileSchema.parse(profile);
-    const sourcePreset = genericPresetById.get(parsedProfile.sourceGenericPresetId);
+    const sourcePreset = genericNegativeLabPresetById.get(parsedProfile.sourceGenericPresetId);
     if (sourcePreset === undefined) {
       throw new Error(`Measured Negative Lab profile references unknown generic preset: ${parsedProfile.profileId}`);
     }
@@ -85,7 +60,7 @@ const validateMeasuredProfileCatalog = (catalog, fixtureEntries) => {
         throw new Error(`Measured Negative Lab profile references unknown fixture: ${fixtureId}`);
       }
 
-      if (!isProfileEligibleFixture(fixture)) {
+      if (!isNegativeLabProfileEligibleFixture(fixture)) {
         throw new Error(`Measured Negative Lab profile references ineligible fixture: ${fixtureId}`);
       }
     }
@@ -270,7 +245,7 @@ const shippedMeasuredProfile = measuredCatalog.profiles.find(
   (profile) => profile.profileId === 'negative_lab.measured.c41.process_family.v1',
 );
 
-assertGenericCatalogIsNotPromoted();
+assertGenericNegativeLabCatalogIsNotPromoted();
 validateMeasuredProfileCatalog(measuredCatalog, manifest.entries);
 if (shippedMeasuredProfile === undefined) {
   throw new Error('Shipped measured Negative Lab catalog is missing the C-41 process-family profile.');
