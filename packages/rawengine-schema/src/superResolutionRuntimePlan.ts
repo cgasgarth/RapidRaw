@@ -5,6 +5,7 @@ import {
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
+  type ArtifactHandleV1,
   type ComputationalMergeCommandEnvelopeV1,
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMutationResultV1,
@@ -46,6 +47,18 @@ export const superResolutionRuntimeProvenanceV1Schema = z
     effectiveOutputScale: z.number().min(1).max(4),
     engineId: z.literal(SR_RUNTIME_ENGINE_ID),
     engineVersion: z.literal(SR_RUNTIME_ENGINE_VERSION),
+    frameRegistrations: z
+      .array(
+        z
+          .object({
+            confidence: z.number().min(0).max(1),
+            shiftX: z.number().int().nonnegative(),
+            shiftY: z.number().int().nonnegative(),
+            sourceIndex: z.number().int().nonnegative(),
+          })
+          .strict(),
+      )
+      .min(2),
     mode: z.enum(['single_image', 'multi_image']),
     requestedAlignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
     requestedOutputScale: z.number().min(1.1).max(4),
@@ -91,10 +104,11 @@ export const buildSuperResolutionRuntimeDryRunV1 = (requestValue: unknown): Supe
   const runtime = renderSuperResolutionRuntime(request);
   const planId = `sr_plan_${request.command.commandId}`;
   const planHash = `sha256:${stableSrRuntimeHash(`${planId}:${runtime.provenance.effectiveOutputScale}`)}`;
+  const renderedContentHash = hashSrRuntimePixels(runtime.outputPixels);
   const previewArtifacts = [
     {
       artifactId: request.previewArtifactId,
-      contentHash: `sha256:${stableSrRuntimeHash(`${planHash}:preview`)}`,
+      contentHash: `sha256:${stableSrRuntimeHash(`${planHash}:${request.previewArtifactId}:${renderedContentHash}`)}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
@@ -154,15 +168,30 @@ export const applySuperResolutionRuntimePlanV1 = (requestValue: unknown): SuperR
     throw new Error('Super-resolution runtime apply requires an accepted dry-run plan id and hash.');
   }
 
-  const outputArtifacts = [
+  const renderedContentHash = hashSrRuntimePixels(runtime.outputPixels);
+  const outputArtifacts: ArtifactHandleV1[] = [
     {
       artifactId: request.outputArtifactId,
-      contentHash: `sha256:${stableSrRuntimeHash(`${acceptedDryRunPlanHash}:${request.outputArtifactId}`)}`,
+      contentHash: `sha256:${stableSrRuntimeHash(
+        `${acceptedDryRunPlanHash}:${request.outputArtifactId}:${renderedContentHash}`,
+      )}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
       },
       kind: 'merge_output' as const,
+      storage: 'sidecar_artifact' as const,
+    },
+    {
+      artifactId: request.confidenceMapArtifactId,
+      contentHash: `sha256:${stableSrRuntimeHash(
+        `${acceptedDryRunPlanHash}:${request.confidenceMapArtifactId}:${renderedContentHash}`,
+      )}`,
+      dimensions: {
+        height: runtime.height,
+        width: runtime.width,
+      },
+      kind: 'mask' as const,
       storage: 'sidecar_artifact' as const,
     },
   ];
@@ -250,6 +279,12 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
       effectiveOutputScale: result.outputScale,
       engineId: SR_RUNTIME_ENGINE_ID,
       engineVersion: SR_RUNTIME_ENGINE_VERSION,
+      frameRegistrations: request.frames.map((frame) => ({
+        confidence: 1,
+        shiftX: frame.shiftX,
+        shiftY: frame.shiftY,
+        sourceIndex: frame.sourceIndex,
+      })),
       mode: request.command.parameters.mode,
       requestedAlignmentMode: request.command.parameters.alignmentMode,
       requestedOutputScale: request.command.parameters.outputScale,
@@ -330,6 +365,15 @@ const stableSrRuntimeHash = (input: string): string => {
   let value = 2166136261;
   for (let index = 0; index < input.length; index += 1) {
     value ^= input.charCodeAt(index);
+    value = Math.imul(value, 16777619) >>> 0;
+  }
+  return value.toString(16).padStart(8, '0');
+};
+
+const hashSrRuntimePixels = (pixels: Float32Array): string => {
+  let value = 2166136261;
+  for (const pixel of pixels) {
+    value ^= Math.round(pixel * 1_000_000);
     value = Math.imul(value, 16777619) >>> 0;
   }
   return value.toString(16).padStart(8, '0');
