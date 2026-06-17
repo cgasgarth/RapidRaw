@@ -1,0 +1,95 @@
+#!/usr/bin/env bun
+
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, normalize } from 'node:path';
+import { z } from 'zod';
+
+const REVIEW_PAGE_PATH = 'docs/validation/goal-review-2026-06-11.html';
+const ROOT = process.cwd();
+
+const requirementSchema = z
+  .object({
+    label: z.string().min(1),
+    needles: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
+
+const requirements = z.array(requirementSchema).parse([
+  {
+    label: 'required sections',
+    needles: [
+      '<h2>Current Snapshot</h2>',
+      '<h2>Review Checklist</h2>',
+      '<h2>User-Visible Feature Proofs</h2>',
+      '<h2>Artifacts</h2>',
+      '<h2>Design Decisions To Track</h2>',
+      '<h2>Validation Evidence Ledger</h2>',
+      '<h2>Missing Artifacts</h2>',
+    ],
+  },
+  {
+    label: 'validation commands',
+    needles: [
+      'bun run check:visual-smoke',
+      'bun run check:hdr-runtime-plan-smoke',
+      'bun run check:panorama-runtime-plan-smoke',
+      'bun run check:focus-runtime-plan-smoke',
+      'bun run check:sr-runtime-plan-smoke',
+      'bun run check:sidecar-roundtrip',
+    ],
+  },
+  {
+    label: 'capability honesty',
+    needles: ['Runtime apply proof', 'Synthetic proof', 'Real RAW before/after proof', 'Missing Artifacts'],
+  },
+]);
+
+const fail = (messages: string[]): never => {
+  console.error(`goal review page failed (${messages.length})`);
+  console.error(
+    messages
+      .slice(0, 20)
+      .map((message) => `- ${message}`)
+      .join('\n'),
+  );
+  process.exit(1);
+};
+
+const reviewPage = join(ROOT, REVIEW_PAGE_PATH);
+if (!existsSync(reviewPage)) {
+  fail([`missing ${REVIEW_PAGE_PATH}`]);
+}
+
+const html = readFileSync(reviewPage, 'utf8');
+const failures: string[] = [];
+
+for (const requirement of requirements) {
+  for (const needle of requirement.needles) {
+    if (!html.includes(needle)) {
+      failures.push(`${requirement.label}: missing ${needle}`);
+    }
+  }
+}
+
+const stalePhrases = ['queued in PR', 'Queued local branch'];
+for (const stalePhrase of stalePhrases) {
+  if (html.includes(stalePhrase)) {
+    failures.push(`stale phrase: ${stalePhrase}`);
+  }
+}
+
+for (const match of html.matchAll(/<img\b[^>]*\bsrc="([^"]+)"/gu)) {
+  const src = match[1];
+  if (src === undefined || src.startsWith('http')) continue;
+
+  const resolvedPath = normalize(join(ROOT, dirname(REVIEW_PAGE_PATH), src));
+  if (!resolvedPath.startsWith(ROOT) || !existsSync(resolvedPath)) {
+    failures.push(`missing image artifact: ${src}`);
+  }
+}
+
+if (failures.length > 0) {
+  fail(failures);
+}
+
+console.log('goal review page ok');
