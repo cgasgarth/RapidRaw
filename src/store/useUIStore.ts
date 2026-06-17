@@ -97,6 +97,59 @@ export interface CullingModalState {
   pathsToCull: Array<string>;
 }
 
+export const createDefaultPanoramaModalState = (
+  settings: PanoramaUiSettings = DEFAULT_PANORAMA_UI_SETTINGS,
+): PanoramaModalState => ({
+  error: null,
+  finalImageBase64: null,
+  isOpen: false,
+  isProcessing: false,
+  progressMessage: '',
+  settings,
+  stitchingSourcePaths: [],
+});
+
+export const createDefaultHdrModalState = (
+  settings: HdrMergeUiSettings = DEFAULT_HDR_MERGE_UI_SETTINGS,
+): HdrModalState => ({
+  error: null,
+  finalImageBase64: null,
+  isOpen: false,
+  isProcessing: false,
+  progressMessage: '',
+  settings,
+  stitchingSourcePaths: [],
+});
+
+export const createDefaultSuperResolutionModalState = (
+  settings: SuperResolutionUiSettings = DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
+): SuperResolutionModalState => ({
+  isOpen: false,
+  settings,
+  sourcePaths: [],
+});
+
+export const createDefaultFocusStackModalState = (
+  settings: FocusStackUiSettings = DEFAULT_FOCUS_STACK_UI_SETTINGS,
+): FocusStackModalState => ({
+  isOpen: false,
+  settings,
+  sourcePaths: [],
+});
+
+export const createDefaultCullingModalState = (): CullingModalState => ({
+  error: null,
+  isOpen: false,
+  pathsToCull: [],
+  progress: null,
+  suggestions: null,
+});
+
+export const createDefaultCollageModalState = (): CollageModalState => ({
+  isOpen: false,
+  sourceImages: [],
+});
+
 interface UIState {
   // View & Layout
   activeView: string;
@@ -191,34 +244,10 @@ export const useUIStore = create<UIState>((set, get) => ({
   albumActionTarget: null,
 
   confirmModalState: { isOpen: false },
-  panoramaModalState: {
-    error: null,
-    finalImageBase64: null,
-    isOpen: false,
-    isProcessing: false,
-    progressMessage: '',
-    settings: DEFAULT_PANORAMA_UI_SETTINGS,
-    stitchingSourcePaths: [],
-  },
-  hdrModalState: {
-    error: null,
-    finalImageBase64: null,
-    isOpen: false,
-    isProcessing: false,
-    progressMessage: '',
-    settings: DEFAULT_HDR_MERGE_UI_SETTINGS,
-    stitchingSourcePaths: [],
-  },
-  superResolutionModalState: {
-    isOpen: false,
-    settings: DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
-    sourcePaths: [],
-  },
-  focusStackModalState: {
-    isOpen: false,
-    settings: DEFAULT_FOCUS_STACK_UI_SETTINGS,
-    sourcePaths: [],
-  },
+  panoramaModalState: createDefaultPanoramaModalState(),
+  hdrModalState: createDefaultHdrModalState(),
+  superResolutionModalState: createDefaultSuperResolutionModalState(),
+  focusStackModalState: createDefaultFocusStackModalState(),
   negativeModalState: { isOpen: false, targetPaths: [] },
   denoiseModalState: {
     isOpen: false,
@@ -229,8 +258,8 @@ export const useUIStore = create<UIState>((set, get) => ({
     progressMessage: null,
     isRaw: false,
   },
-  cullingModalState: { isOpen: false, suggestions: null, progress: null, error: null, pathsToCull: [] },
-  collageModalState: { isOpen: false, sourceImages: [] },
+  cullingModalState: createDefaultCullingModalState(),
+  collageModalState: createDefaultCollageModalState(),
 
   setUI: (updater) => {
     set((state) => (typeof updater === 'function' ? updater(state) : updater));
