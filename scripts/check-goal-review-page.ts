@@ -48,6 +48,7 @@ const requirements = z.array(requirementSchema).parse([
       'Private RAW report gate',
       'manifest-only public schema',
       'Real RAW before/after proof',
+      'negative-lab-qc-contact-sheet-proof-2026-06-16.svg',
       'Missing Artifacts',
     ],
   },
