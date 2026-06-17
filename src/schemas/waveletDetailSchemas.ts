@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const normalizedScalarSchema = z.number().min(0).max(1);
+const artifactHashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
 
 export const waveletDetailScaleSchema = z
   .object({
@@ -61,6 +62,16 @@ export const waveletDetailPreviewPassSchema = z
   })
   .strict();
 
+export const waveletDetailPreviewArtifactSchema = z
+  .object({
+    artifactId: z.string().regex(/^wavelet_detail\.preview\.[a-z0-9._-]+$/u),
+    colorSpace: waveletDetailRecipeSchema.shape.colorSpace,
+    contentHash: artifactHashSchema,
+    kind: z.literal('luma_detail_preview'),
+    passCount: z.number().int().positive(),
+  })
+  .strict();
+
 export const waveletDetailPreviewPlanSchema = z
   .object({
     colorSpace: waveletDetailRecipeSchema.shape.colorSpace,
@@ -69,6 +80,7 @@ export const waveletDetailPreviewPlanSchema = z
     id: z.string().trim().min(1),
     passCount: z.number().int().nonnegative(),
     passes: z.array(waveletDetailPreviewPassSchema),
+    previewArtifact: waveletDetailPreviewArtifactSchema.nullable(),
     previewEnabled: z.boolean(),
     previewMode: waveletDetailRecipeSchema.shape.previewMode,
     schemaVersion: z.literal(1),
@@ -90,9 +102,34 @@ export const waveletDetailPreviewPlanSchema = z
         path: ['previewMode'],
       });
     }
+
+    if (plan.previewEnabled && plan.previewArtifact === null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Enabled wavelet preview plans must include a preview artifact.',
+        path: ['previewArtifact'],
+      });
+    }
+
+    if (!plan.previewEnabled && plan.previewArtifact !== null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Disabled wavelet preview plans must not include a preview artifact.',
+        path: ['previewArtifact'],
+      });
+    }
+
+    if (plan.previewArtifact !== null && plan.previewArtifact.passCount !== plan.passCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Wavelet preview artifact pass count must match plan pass count.',
+        path: ['previewArtifact', 'passCount'],
+      });
+    }
   });
 
 export type WaveletDetailRecipe = z.infer<typeof waveletDetailRecipeSchema>;
+export type WaveletDetailPreviewArtifact = z.infer<typeof waveletDetailPreviewArtifactSchema>;
 export type WaveletDetailPreviewPass = z.infer<typeof waveletDetailPreviewPassSchema>;
 export type WaveletDetailPreviewPlan = z.infer<typeof waveletDetailPreviewPlanSchema>;
 export type WaveletDetailScale = z.infer<typeof waveletDetailScaleSchema>;
@@ -106,6 +143,41 @@ export function estimateWaveletDetailPasses(recipe: WaveletDetailRecipe): number
 
 export function parseWaveletDetailRecipe(value: unknown): WaveletDetailRecipe {
   return waveletDetailRecipeSchema.parse(value);
+}
+
+function fnv1a32(value: string): string {
+  let hash = 0x811c9dc5;
+  for (const character of value) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+function buildWaveletDetailPreviewArtifact(
+  recipe: WaveletDetailRecipe,
+  passes: readonly WaveletDetailPreviewPass[],
+): WaveletDetailPreviewArtifact | null {
+  if (passes.length === 0 || recipe.previewMode === 'off') {
+    return null;
+  }
+
+  const signature = JSON.stringify({
+    colorSpace: recipe.colorSpace,
+    edgeThreshold: recipe.edgeThreshold,
+    haloSuppression: recipe.haloSuppression,
+    id: recipe.id,
+    passes,
+    previewMode: recipe.previewMode,
+  });
+
+  return waveletDetailPreviewArtifactSchema.parse({
+    artifactId: `wavelet_detail.preview.${recipe.id}`,
+    colorSpace: recipe.colorSpace,
+    contentHash: `fnv1a32:${fnv1a32(signature)}`,
+    kind: 'luma_detail_preview',
+    passCount: passes.length,
+  });
 }
 
 export function buildWaveletDetailPreviewPlan(recipe: WaveletDetailRecipe): WaveletDetailPreviewPlan {
@@ -130,6 +202,7 @@ export function buildWaveletDetailPreviewPlan(recipe: WaveletDetailRecipe): Wave
     id: `${recipe.id}.preview_plan`,
     passCount: passes.length,
     passes,
+    previewArtifact: buildWaveletDetailPreviewArtifact(recipe, passes),
     previewEnabled,
     previewMode: previewEnabled ? recipe.previewMode : 'off',
     schemaVersion: 1,
