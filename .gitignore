@@ -16,6 +16,7 @@ artifacts/performance-smoke/
 artifacts/focus-sharpness-map/
 artifacts/focus-preview-blend/
 artifacts/super-resolution-synthetic-smoke/
+artifacts/layers/preview-export-parity/
 artifacts/release-benchmarks/
 *.local
 

@@ -84,6 +84,7 @@ const CHECK_GROUPS = {
     'check:layer-stack',
     'check:layer-mask-audit',
     'check:layer-adjustments',
+    'check:layer-preview-export-parity',
     'check:brush-mask',
     'check:gradient-mask',
     'check:luminance-range-mask',

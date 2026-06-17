@@ -61,6 +61,7 @@
     "check:layer-stack": "bun scripts/check-layer-stack-operations.mjs",
     "check:layer-mask-audit": "bun scripts/check-layer-mask-model-audit.mjs",
     "check:layer-adjustments": "bun scripts/check-layer-adjustment-operations.mjs",
+    "check:layer-preview-export-parity": "bun scripts/check-layer-preview-export-parity.mjs",
     "check:brush-mask": "bun scripts/check-brush-mask-parameters.mjs",
     "check:gradient-mask": "bun scripts/check-gradient-mask-parameters.mjs",
     "check:luminance-range-mask": "bun scripts/check-luminance-range-mask-parameters.mjs",

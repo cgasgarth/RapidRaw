@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "layers.synthetic.preview-export-parity.v1",
+      "width": 3,
+      "height": 2,
+      "expectedPreviewExportHash": "sha256:5068e8c209d65ab45519266cc864c247f85ca30d28b224d96d185fd73e66538d",
+      "expectedCoverageByLayer": [
+        { "id": "tone-normal", "opacity": 0.25, "touchedPixels": 6 },
+        { "id": "shadow-multiply", "opacity": 0.55, "touchedPixels": 5 },
+        { "id": "highlight-screen", "opacity": 0.35, "touchedPixels": 5 },
+        { "id": "contrast-overlay", "opacity": 0.4, "touchedPixels": 6 }
+      ],
+      "basePixels": [
+        { "r": 64, "g": 72, "b": 80 },
+        { "r": 96, "g": 104, "b": 112 },
+        { "r": 128, "g": 136, "b": 144 },
+        { "r": 160, "g": 152, "b": 144 },
+        { "r": 192, "g": 184, "b": 176 },
+        { "r": 224, "g": 216, "b": 208 }
+      ],
+      "layers": [
+        {
+          "id": "tone-normal",
+          "name": "Tone lift",
+          "blendMode": "normal",
+          "opacity": 0.25,
+          "visible": true,
+          "pixels": [
+            { "r": 80, "g": 88, "b": 96 },
+            { "r": 112, "g": 120, "b": 128 },
+            { "r": 144, "g": 152, "b": 160 },
+            { "r": 176, "g": 168, "b": 160 },
+            { "r": 208, "g": 200, "b": 192 },
+            { "r": 240, "g": 232, "b": 224 }
+          ]
+        },
+        {
+          "id": "shadow-multiply",
+          "name": "Shadow shape",
+          "blendMode": "multiply",
+          "opacity": 0.55,
+          "visible": true,
+          "maskAlpha": [1, 0.7, 0.25, 0, 0.4, 1],
+          "pixels": [
+            { "r": 126, "g": 135, "b": 144 },
+            { "r": 120, "g": 128, "b": 136 },
+            { "r": 112, "g": 120, "b": 128 },
+            { "r": 104, "g": 112, "b": 120 },
+            { "r": 96, "g": 104, "b": 112 },
+            { "r": 88, "g": 96, "b": 104 }
+          ]
+        },
+        {
+          "id": "highlight-screen",
+          "name": "Highlight bloom",
+          "blendMode": "screen",
+          "opacity": 0.35,
+          "visible": true,
+          "maskAlpha": [0, 0.25, 0.8, 1, 0.5, 0.15],
+          "pixels": [
+            { "r": 210, "g": 220, "b": 230 },
+            { "r": 205, "g": 215, "b": 225 },
+            { "r": 200, "g": 210, "b": 220 },
+            { "r": 195, "g": 205, "b": 215 },
+            { "r": 190, "g": 200, "b": 210 },
+            { "r": 185, "g": 195, "b": 205 }
+          ]
+        },
+        {
+          "id": "contrast-overlay",
+          "name": "Contrast finish",
+          "blendMode": "overlay",
+          "opacity": 0.4,
+          "visible": true,
+          "pixels": [
+            { "r": 96, "g": 104, "b": 112 },
+            { "r": 120, "g": 128, "b": 136 },
+            { "r": 144, "g": 152, "b": 160 },
+            { "r": 168, "g": 160, "b": 152 },
+            { "r": 192, "g": 184, "b": 176 },
+            { "r": 216, "g": 208, "b": 200 }
+          ]
+        }
+      ],
+      "sidecarLayerStack": {
+        "artifactId": "layer_stack_preview_export_parity_v1",
+        "schemaVersion": 1,
+        "storage": "sidecar_artifact",
+        "sourceImagePath": "/fixture-roll/IMG_LAYER_0001.CR3",
+        "layers": [
+          { "id": "tone-normal", "blendMode": "normal", "opacity": 0.25, "visible": true, "maskPersisted": false },
+          { "id": "shadow-multiply", "blendMode": "multiply", "opacity": 0.55, "visible": true, "maskPersisted": true },
+          { "id": "highlight-screen", "blendMode": "screen", "opacity": 0.35, "visible": true, "maskPersisted": true },
+          { "id": "contrast-overlay", "blendMode": "overlay", "opacity": 0.4, "visible": true, "maskPersisted": false }
+        ]
+      }
+    }
+  ]
+}

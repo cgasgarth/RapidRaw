@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 
 import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
