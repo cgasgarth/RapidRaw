@@ -64,13 +64,33 @@ if (!parsedLevelsCommand.success || parsedLevelsCommand.data.commandType !== 'to
   failures.push('Tone-color levels command does not validate the luma levels command route type.');
 }
 
-const levelsRouteModes = new Set(
-  TONE_COLOR_APP_SERVER_ROUTES.filter((route) => route.commandType === 'toneColor.setLevels').map(
-    (route) => route.executionMode,
-  ),
-);
-for (const mode of ['dry_run_command', 'apply_dry_run_plan']) {
-  if (!levelsRouteModes.has(mode)) failures.push(`toneColor.setLevels missing ${mode} route.`);
+const parsedChannelMixerCommand = toneColorCommandEnvelopeV1Schema.safeParse({
+  ...sampleToneColorCommandEnvelopeV1,
+  commandId: 'command_tone_color_channel_mixer_preview_sample',
+  commandType: 'toneColor.setChannelMixer',
+  correlationId: 'corr_tone_color_channel_mixer_preview_sample',
+  idempotencyKey: 'idem_tone_color_channel_mixer_preview_sample',
+  parameters: {
+    blue: { blue: 100, constant: 0, green: 0, red: 0 },
+    enabled: true,
+    green: { blue: 0, constant: 0, green: 100, red: 0 },
+    preserveLuminance: true,
+    red: { blue: -5, constant: 0, green: 10, red: 95 },
+  },
+});
+if (!parsedChannelMixerCommand.success || parsedChannelMixerCommand.data.commandType !== 'toneColor.setChannelMixer') {
+  failures.push('Tone-color channel mixer command does not validate the RGB mixer route type.');
+}
+
+for (const commandType of ['toneColor.setLevels', 'toneColor.setChannelMixer']) {
+  const routeModes = new Set(
+    TONE_COLOR_APP_SERVER_ROUTES.filter((route) => route.commandType === commandType).map(
+      (route) => route.executionMode,
+    ),
+  );
+  for (const mode of ['dry_run_command', 'apply_dry_run_plan']) {
+    if (!routeModes.has(mode)) failures.push(`${commandType} missing ${mode} route.`);
+  }
 }
 
 if (failures.length > 0) {

@@ -45,6 +45,27 @@ export const TONE_COLOR_APP_SERVER_ROUTE_MANIFEST = toneColorAppServerRouteManif
       status: 'mapped',
       toolName: 'tonecolor.apply_command',
     },
+    {
+      commandType: 'toneColor.setChannelMixer',
+      executionMode: 'dry_run_command',
+      inputSchemaName,
+      outputSchemaName: 'ToneColorDryRunResultV1',
+      reason: 'Channel mixer dry-runs use the generic tone/color command tool with RGB mixer runtime validation.',
+      runtimeCheckScript: 'check:channel-mixer',
+      status: 'mapped',
+      toolName: 'tonecolor.dry_run_command',
+    },
+    {
+      commandType: 'toneColor.setChannelMixer',
+      executionMode: 'apply_dry_run_plan',
+      inputSchemaName,
+      outputSchemaName: 'ToneColorMutationResultV1',
+      reason:
+        'Channel mixer applies reuse the approved tone/color apply tool and persist an undoable edit graph update.',
+      runtimeCheckScript: 'check:channel-mixer',
+      status: 'mapped',
+      toolName: 'tonecolor.apply_command',
+    },
   ],
   schemaVersion: 1,
 });

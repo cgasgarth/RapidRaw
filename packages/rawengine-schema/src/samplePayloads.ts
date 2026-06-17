@@ -860,6 +860,12 @@ export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorD
       previousValue: 1,
       value: 1.1,
     },
+    {
+      module: 'channel_mixer',
+      path: '/parameters/red/green',
+      previousValue: 0,
+      value: 10,
+    },
   ],
   predictedGraphRevision: 'graph_rev_46_preview',
   previewArtifacts: [
