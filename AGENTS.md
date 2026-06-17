@@ -16,6 +16,14 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Pull Requests And GitHub Flow
 
 - Use pull requests for all repo changes. Do not commit directly to `main`.
+- Keep at most 3 active open PRs at a time.
+- Keep PRs moving: merge passing work, fix blocked work, and close obsolete
+  work.
+- Keep PR descriptions concise and include validation evidence.
+- Update linked GitHub issues and milestones with evidence as work lands.
+
+## GitHub Repo Resolution
+
 - Keep GitHub CLI repo resolution pointed at the fork:
   `cgasgarth/RapidRaw`. If `gh repo view --json nameWithOwner --jq
 .nameWithOwner` returns anything else, run `bun run repo:fix-gh-resolution`
@@ -23,20 +31,6 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - The intended local remotes are `origin=https://github.com/cgasgarth/RapidRaw.git`
   and `upstream=https://github.com/CyberTimon/RapidRAW.git`; `origin` should be
   the gh-resolved base remote and `upstream` should not be gh-resolved.
-- Keep at most 2 active open PRs at a time. This is a hard cap.
-- Use the two-PR cap as an A/B pattern when useful: one PR can build in CI while
-  another independent PR is prepared or validated. Do not use the cap as
-  permission to leave work sitting open.
-- Do not leave PRs forgotten. Any PR open for more than 1 hour must be acted on:
-  merge it if passing or clearly safe, refresh/rebase it if behind, fix it if
-  failing, or close it if obsolete. If neither merge nor close is possible, add
-  a clear status comment and keep checking until it resolves.
-- Enable auto-merge on PRs when appropriate and keep branch state fresh enough
-  for the required aggregate gate.
-- PRs should stay small to medium sized where possible, ideally one issue and
-  one validation story.
-- PR bodies should include `How`, `Why`, and validation evidence.
-- Update linked GitHub issues and milestones with evidence as work lands.
 
 ## Concise Output Discipline
 
@@ -65,7 +59,7 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Do not delete that automation unless the user explicitly asks to remove that
   exact reminder.
 - It should run every 15 minutes and check for stale open PRs, especially PRs
-  open for more than 1 hour, while enforcing the two-open-PR cap.
+  open for more than 1 hour, while enforcing the three-open-PR cap.
 - It should also remind the agent to use the consult skill for hard decisions.
 - If a temporary reminder is needed to check consult output, update the existing
   `check-rapidraw-consult-and-prs` automation instead of creating or deleting a
