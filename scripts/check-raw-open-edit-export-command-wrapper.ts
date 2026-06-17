@@ -2,15 +2,17 @@
 
 import { readFile } from 'node:fs/promises';
 
+import { toneColorCommandEnvelopeV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   rawOpenEditExportProofReportSchema,
   rawOpenEditExportProofRequestSchema,
 } from '../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
-const [wrapperSource, appPropertiesSource, rustSource] = await Promise.all([
+const [wrapperSource, appPropertiesSource, rustSource, proofRequestFixtureSource] = await Promise.all([
   readFile('src/utils/rawOpenEditExportProofCommand.ts', 'utf8'),
   readFile('src/components/ui/AppProperties.tsx', 'utf8'),
   readFile('src-tauri/src/raw_open_edit_export_proof.rs', 'utf8'),
+  readFile('fixtures/validation/raw-open-edit-export-proof-request.json', 'utf8'),
 ]);
 
 const failures: string[] = [];
@@ -32,15 +34,12 @@ if (!rustSource.includes('pub async fn run_raw_open_edit_export_proof(')) {
 }
 
 const validHash = `sha256:${'0'.repeat(64)}`;
-const sampleRequest = rawOpenEditExportProofRequestSchema.parse({
-  adjustments: { exposure: 0.35 },
-  artifactDirRelative: 'private-artifacts/validation/open-edit-export',
-  editCommandId: 'command.raw-open-edit-export.basic-tone.v1',
-  editGraphRevision: 'graph-rev.raw-open-edit-export.sample.v1',
-  fixtureId: 'validation.raw-open-edit-export.sample.v1',
-  privateRootPath: '/tmp/rawengine-private-root',
-  sourceRelativePath: 'private-fixtures/detail/sample.cr3',
-});
+const fixtureValue = JSON.parse(proofRequestFixtureSource) as unknown;
+const sampleRequest = rawOpenEditExportProofRequestSchema.parse(fixtureValue);
+
+if (!toneColorCommandEnvelopeV1Schema.safeParse(sampleRequest.editCommand).success) {
+  failures.push('RAW proof editCommand must stay compatible with ToneColorCommandEnvelopeV1.');
+}
 
 const sampleAsset = {
   hash: validHash,
@@ -57,8 +56,8 @@ rawOpenEditExportProofReportSchema.parse({
     { ...sampleAsset, kind: 'sidecar_after_private' },
     { ...sampleAsset, kind: 'workflow_report_private' },
   ],
-  editCommandId: sampleRequest.editCommandId,
-  editGraphRevision: sampleRequest.editGraphRevision,
+  editCommandId: sampleRequest.editCommand.commandId,
+  editGraphRevision: sampleRequest.editCommand.expectedGraphRevision,
   fixtureId: sampleRequest.fixtureId,
   generatedAt: '2026-06-17T00:00:00Z',
   metrics: [
