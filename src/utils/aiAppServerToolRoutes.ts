@@ -43,9 +43,10 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
       toolCapability: 'sky_mask',
     },
     {
-      deferredIssue: '#1276',
-      reason: 'Generative inpaint currently uses the legacy connector request and needs dry-run/apply plan wiring.',
-      status: 'deferred',
+      appServerToolName: 'ai.enhancement.dry_run_command',
+      commandSchemaName: 'AiEnhancementCommandEnvelopeV1',
+      reason: 'Generative inpaint preview maps to the typed AI enhancement dry-run tool before apply approval.',
+      status: 'mapped',
       tauriInvoke: 'invoke_generative_replace',
       toolCapability: 'inpaint',
     },
