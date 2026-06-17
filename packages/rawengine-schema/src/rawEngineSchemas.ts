@@ -1284,7 +1284,7 @@ export const detailDeblurRuntimeStateV1Schema = z
 
 export const detailDeblurCommandTypeV1Schema = z.enum(['detailDeblur.dryRunControls', 'detailDeblur.applyControls']);
 
-const detailDeblurCommandBaseV1Schema = z.object({
+const detailImageCommandBaseV1Schema = z.object({
   actor: rawEngineActorSchema,
   approval: approvalRequirementSchema,
   commandId: z.string().trim().min(1),
@@ -1296,16 +1296,50 @@ const detailDeblurCommandBaseV1Schema = z.object({
   target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'virtual_copy']) }).strict(),
 });
 
+const refinePreviewApplyApproval = (
+  command: { approval: z.infer<typeof approvalRequirementSchema>; dryRun: boolean },
+  context: z.RefinementCtx,
+  featureLabel: string,
+) => {
+  if (command.dryRun) {
+    if (command.approval.approvalClass !== ApprovalClass.PreviewOnly) {
+      context.addIssue({
+        code: 'custom',
+        message: `Dry-run ${featureLabel} commands require preview-only approval classification.`,
+        path: ['approval', 'approvalClass'],
+      });
+    }
+
+    return;
+  }
+
+  if (command.approval.approvalClass !== ApprovalClass.EditApply) {
+    context.addIssue({
+      code: 'custom',
+      message: `Applied ${featureLabel} commands require edit-apply approval classification.`,
+      path: ['approval', 'approvalClass'],
+    });
+  }
+
+  if (command.approval.state !== 'approved') {
+    context.addIssue({
+      code: 'custom',
+      message: `Applied ${featureLabel} commands require approved user approval before execution.`,
+      path: ['approval', 'state'],
+    });
+  }
+};
+
 export const detailDeblurCommandEnvelopeV1Schema = z
   .discriminatedUnion('commandType', [
-    detailDeblurCommandBaseV1Schema
+    detailImageCommandBaseV1Schema
       .extend({
         commandType: z.literal('detailDeblur.dryRunControls'),
         dryRun: z.literal(true),
         parameters: detailDeblurControlsV1Schema,
       })
       .strict(),
-    detailDeblurCommandBaseV1Schema
+    detailImageCommandBaseV1Schema
       .extend({
         commandType: z.literal('detailDeblur.applyControls'),
         dryRun: z.literal(false),
@@ -1314,33 +1348,7 @@ export const detailDeblurCommandEnvelopeV1Schema = z
       .strict(),
   ])
   .superRefine((command, context) => {
-    if (command.dryRun) {
-      if (command.approval.approvalClass !== ApprovalClass.PreviewOnly) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Dry-run deblur commands require preview-only approval classification.',
-          path: ['approval', 'approvalClass'],
-        });
-      }
-
-      return;
-    }
-
-    if (command.approval.approvalClass !== ApprovalClass.EditApply) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Applied deblur commands require edit-apply approval classification.',
-        path: ['approval', 'approvalClass'],
-      });
-    }
-
-    if (command.approval.state !== 'approved') {
-      context.addIssue({
-        code: 'custom',
-        message: 'Applied deblur commands require approved user approval before execution.',
-        path: ['approval', 'state'],
-      });
-    }
+    refinePreviewApplyApproval(command, context, 'deblur');
   });
 
 export const detailDeblurDryRunResultV1Schema = z
@@ -1438,28 +1446,16 @@ export const detailDenoiseRuntimeStateV1Schema = z
 
 export const detailDenoiseCommandTypeV1Schema = z.enum(['detailDenoise.dryRunControls', 'detailDenoise.applyControls']);
 
-const detailDenoiseCommandBaseV1Schema = z.object({
-  actor: rawEngineActorSchema,
-  approval: approvalRequirementSchema,
-  commandId: z.string().trim().min(1),
-  correlationId: z.string().trim().min(1),
-  dryRun: z.boolean(),
-  expectedGraphRevision: z.string().trim().min(1),
-  idempotencyKey: z.string().trim().min(1).optional(),
-  schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
-  target: rawEngineTargetSchema.safeExtend({ kind: z.enum(['image', 'virtual_copy']) }).strict(),
-});
-
 export const detailDenoiseCommandEnvelopeV1Schema = z
   .discriminatedUnion('commandType', [
-    detailDenoiseCommandBaseV1Schema
+    detailImageCommandBaseV1Schema
       .extend({
         commandType: z.literal('detailDenoise.dryRunControls'),
         dryRun: z.literal(true),
         parameters: detailDenoiseControlsV1Schema,
       })
       .strict(),
-    detailDenoiseCommandBaseV1Schema
+    detailImageCommandBaseV1Schema
       .extend({
         commandType: z.literal('detailDenoise.applyControls'),
         dryRun: z.literal(false),
@@ -1468,33 +1464,7 @@ export const detailDenoiseCommandEnvelopeV1Schema = z
       .strict(),
   ])
   .superRefine((command, context) => {
-    if (
-      command.commandType === 'detailDenoise.dryRunControls' &&
-      command.approval.approvalClass !== ApprovalClass.PreviewOnly
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Dry-run denoise commands require preview-only approval classification.',
-        path: ['approval', 'approvalClass'],
-      });
-    }
-
-    if (command.commandType === 'detailDenoise.applyControls') {
-      if (command.approval.approvalClass !== ApprovalClass.EditApply) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Applied denoise commands require edit-apply approval classification.',
-          path: ['approval', 'approvalClass'],
-        });
-      }
-      if (command.approval.state !== 'approved') {
-        context.addIssue({
-          code: 'custom',
-          message: 'Applied denoise commands require approved user approval before execution.',
-          path: ['approval', 'state'],
-        });
-      }
-    }
+    refinePreviewApplyApproval(command, context, 'denoise');
   });
 
 export const detailDenoiseDryRunResultV1Schema = z
