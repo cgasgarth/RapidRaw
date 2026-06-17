@@ -15,7 +15,6 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Pull Requests And GitHub Flow
 
-- Use pull requests for repo changes.
 - Keep at most 3 open PRs at a time.
 
 ## GitHub Repo Resolution
@@ -40,9 +39,6 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   or explains a blocker.
 - Use concise conventional commit subjects. Add commit bodies only when the
   reasoning is not obvious from the diff or linked issue.
-- Keep PR descriptions short: scope, validation commands, non-obvious risks or
-  limits, and linked issue. Do not paste broad background, repeated plans, or
-  large command output.
 - Preserve hard evidence. Exact validation commands, runtime proof, blockers,
   safety decisions, and accepted or rejected consult advice must remain visible
   even when other prose is compressed.
