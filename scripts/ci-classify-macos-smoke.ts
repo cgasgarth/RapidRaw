@@ -138,6 +138,10 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:raw-open-edit-export-private-report-collector',
     new Set(['bun scripts/collect-raw-open-edit-export-private-run-reports.ts --self-test']),
   ],
+  [
+    'check:raw-open-edit-export-private-proof-acceptance',
+    new Set(['bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test']),
+  ],
   ['check:raw-open-edit-export-run-reports', new Set(['bun scripts/check-raw-open-edit-export-run-reports.ts'])],
   ['check:reference-images', new Set(['bun scripts/check-reference-image-fixtures.ts'])],
   [
@@ -679,6 +683,17 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-private-report-collector": "bun scripts/collect-raw-open-edit-export-private-run-reports.ts --self-test",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'raw open edit export private proof acceptance package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-private-proof-acceptance": "bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test",',
       },
     ],
     SMOKE_MODES.NONE,

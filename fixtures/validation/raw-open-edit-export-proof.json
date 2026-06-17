@@ -52,12 +52,12 @@
         {
           "name": "sidecarReloadRevisionMatch",
           "required": true,
-          "threshold": 0
+          "threshold": 1
         },
         {
           "name": "sourceHashUnchanged",
           "required": true,
-          "threshold": 0
+          "threshold": 1
         }
       ],
       "fixtureId": "validation.raw-open-edit-export.edge-ringing.v1",
