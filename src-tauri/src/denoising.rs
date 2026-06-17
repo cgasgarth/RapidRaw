@@ -1,4 +1,4 @@
-use crate::app_settings::load_settings;
+use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
 use crate::file_management::parse_virtual_path;
 use crate::formats::is_raw_file;
@@ -307,7 +307,7 @@ fn denoise_image(
     }
 
     let is_raw = is_raw_file(&path_str);
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
 
     let _ = app_handle.emit("denoise-progress", "Loading image...");
 

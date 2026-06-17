@@ -167,7 +167,7 @@ pub fn get_or_init_gpu_context(
 
     #[cfg(not(any(target_os = "android", target_os = "linux")))]
     let surface_opt = {
-        let settings = crate::app_settings::load_settings(app_handle.clone()).unwrap_or_default();
+        let settings = crate::app_settings::load_settings_or_default(app_handle);
         let use_wgpu_renderer = settings.use_wgpu_renderer.unwrap_or(true);
 
         if use_wgpu_renderer {

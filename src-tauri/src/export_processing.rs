@@ -36,7 +36,7 @@ use crate::deblur_render::apply_deblur_stage;
 use crate::denoise_render::apply_denoise_stage;
 use crate::{
     apply_all_transformations, generate_transformed_preview, get_cached_or_generate_mask,
-    get_full_image_for_processing, get_or_load_lut, hydrate_adjustments, load_settings,
+    get_full_image_for_processing, get_or_load_lut, hydrate_adjustments, load_settings_or_default,
     resolve_warped_image_for_masks,
 };
 
@@ -766,7 +766,7 @@ pub async fn export_images(
     let task = tokio::spawn(async move {
         let output_folder_path = std::path::Path::new(&output_folder_or_file);
         let total_paths = paths.len();
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+        let settings = load_settings_or_default(&app_handle);
 
         let mut base_path_counts: HashMap<String, usize> = HashMap::new();
         let mut export_items = Vec::with_capacity(total_paths);
@@ -1123,7 +1123,7 @@ pub async fn estimate_export_sizes(
     let context = get_or_init_gpu_context(&state, &app_handle)?;
     let is_current_edit = Some(&source_path_str) == current_edit_path.as_ref();
     let is_raw = is_raw_file(&source_path_str);
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
 
     let single_image_extrapolated_size: usize = if is_current_edit
         && current_edit_adjustments.is_some()
