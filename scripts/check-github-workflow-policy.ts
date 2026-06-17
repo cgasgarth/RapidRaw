@@ -7,6 +7,7 @@ import yaml from 'js-yaml';
 
 const ROOT = process.cwd();
 const WORKFLOW_DIR = join(ROOT, '.github/workflows');
+const MAIN_LONG_WORKFLOW_PATH = '.github/workflows/main-long-validation.yml';
 const REQUIRED_PR_WORKFLOW_PATH = '.github/workflows/lint.yml';
 const REQUIRED_AGGREGATE_JOB_ID = 'pr-ci-required';
 const REQUIRED_AGGREGATE_JOB_NAME = 'PR CI / required';
@@ -50,6 +51,10 @@ const normalizeEventName = (eventName) => (eventName === true ? 'on' : eventName
 const getWorkflowEvents = (workflow) => workflow.on ?? workflow.true;
 const hasWritePermission = (value) =>
   value === 'write' || (value && typeof value === 'object' && Object.values(value).some((child) => child === 'write'));
+const isMacosRunner = (runsOn) =>
+  Array.isArray(runsOn)
+    ? runsOn.some(isMacosRunner)
+    : typeof runsOn === 'string' && runsOn.toLowerCase().startsWith('macos-');
 
 function getTopLevelSection(lines, key) {
   const startIndex = lines.findIndex((line) => new RegExp(`^${key}:`, 'u').test(stripComment(line)));
@@ -153,6 +158,26 @@ function checkWorkflowFiles(files) {
 
     if (hasWritePermission(parsed.permissions) && !WRITE_PERMISSION_ALLOWLIST.has(path)) {
       violations.push(`${path}: write permissions require an allowlist reason`);
+    }
+
+    if (path === MAIN_LONG_WORKFLOW_PATH) {
+      const jobs = parsed.jobs;
+      if (!jobs || typeof jobs !== 'object' || Array.isArray(jobs)) {
+        violations.push(`${path}: main long validation must define jobs`);
+      } else {
+        for (const [jobId, job] of Object.entries(jobs)) {
+          if (!job || typeof job !== 'object' || Array.isArray(job) || !isMacosRunner(job['runs-on'])) {
+            continue;
+          }
+
+          const jobIf = job.if;
+          if (typeof jobIf !== 'string' || !jobIf.includes('workflow_dispatch') || jobIf.includes('push')) {
+            violations.push(
+              `${path}: macOS job ${jobId} must not run on main push; use manual or scheduled validation to avoid runner backlogs`,
+            );
+          }
+        }
+      }
     }
 
     if (path !== REQUIRED_PR_WORKFLOW_PATH) continue;
@@ -332,6 +357,42 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'rejects main long macOS push job',
+      expectedViolations: 1,
+      path: MAIN_LONG_WORKFLOW_PATH,
+      source: `name: Main Long Validation
+on:
+  push:
+    branches:
+      - main
+jobs:
+  main-macos-app-build:
+    runs-on: macos-14
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'allows manual main long macOS job',
+      expectedViolations: 0,
+      path: MAIN_LONG_WORKFLOW_PATH,
+      source: `name: Main Long Validation
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '37 8 * * *'
+  workflow_dispatch:
+jobs:
+  main-macos-app-build:
+    if: \${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    runs-on: macos-14
     steps:
       - run: true
 `,
