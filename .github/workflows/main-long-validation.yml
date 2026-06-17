@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '37 8 * * *'
   workflow_dispatch:
 
 permissions:
@@ -125,6 +127,7 @@ jobs:
 
   main-macos-app-build:
     name: macOS app no-bundle smoke
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: macos-14
     timeout-minutes: 90
     steps:
