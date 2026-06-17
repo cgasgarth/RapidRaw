@@ -35,6 +35,14 @@ pub struct RawOpenEditExportProofArtifact {
     pub public_repo_allowed: bool,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportProofHashedPath {
+    pub hash: String,
+    pub path: String,
+    pub public_repo_allowed: bool,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportProofMetric {
@@ -54,8 +62,11 @@ pub struct RawOpenEditExportProofReport {
     pub fixture_id: String,
     pub generated_at: String,
     pub metrics: Vec<RawOpenEditExportProofMetric>,
+    pub preview_after: RawOpenEditExportProofHashedPath,
+    pub preview_before: RawOpenEditExportProofHashedPath,
     pub report_id: String,
-    pub source_hash_unchanged: bool,
+    pub sidecar_after: RawOpenEditExportProofHashedPath,
+    pub source_raw: RawOpenEditExportProofHashedPath,
     pub tracking_issue: u32,
 }
 
@@ -174,32 +185,20 @@ pub async fn run_raw_open_edit_export_proof(
     let source_hash_after = sha256_file(&source_path)?;
     let source_hash_unchanged = source_hash_before == source_hash_after;
 
+    let source_raw = hashed_path(request.source_relative_path.clone(), source_hash_before);
+    let preview_before_path = hash_relative_path(&private_root, &preview_before_relative)?;
+    let preview_after_path = hash_relative_path(&private_root, &preview_after_relative)?;
+    let sidecar_after_path = hash_relative_path(&private_root, &sidecar_after_relative)?;
     let mut artifacts = vec![
-        artifact(
-            "source_raw_private",
-            request.source_relative_path.clone(),
-            source_hash_before,
-        ),
-        hashed_artifact(
-            &private_root,
-            "preview_before_private",
-            &preview_before_relative,
-        )?,
-        hashed_artifact(
-            &private_root,
-            "preview_after_private",
-            &preview_after_relative,
-        )?,
+        artifact("source_raw_private", &source_raw),
+        artifact("preview_before_private", &preview_before_path),
+        artifact("preview_after_private", &preview_after_path),
         hashed_artifact(
             &private_root,
             "export_after_private",
             &export_after_relative,
         )?,
-        hashed_artifact(
-            &private_root,
-            "sidecar_after_private",
-            &sidecar_after_relative,
-        )?,
+        artifact("sidecar_after_private", &sidecar_after_path),
     ];
 
     let mut report = RawOpenEditExportProofReport {
@@ -238,8 +237,11 @@ pub async fn run_raw_open_edit_export_proof(
                 source_hash_unchanged,
             ),
         ],
+        preview_after: preview_after_path,
+        preview_before: preview_before_path,
         report_id: format!("raw-open-edit-export-run.{}", slug),
-        source_hash_unchanged,
+        sidecar_after: sidecar_after_path,
+        source_raw,
         tracking_issue: 1376,
     };
 
@@ -314,20 +316,37 @@ fn hashed_artifact(
     kind: &str,
     relative_path: &str,
 ) -> Result<RawOpenEditExportProofArtifact, String> {
-    let path = resolve_private_relative(private_root, relative_path)?;
     Ok(artifact(
         kind,
-        relative_path.to_string(),
-        sha256_file(&path)?,
+        &hash_relative_path(private_root, relative_path)?,
     ))
 }
 
-fn artifact(kind: &str, path: String, hash: String) -> RawOpenEditExportProofArtifact {
-    RawOpenEditExportProofArtifact {
+fn hash_relative_path(
+    private_root: &Path,
+    relative_path: &str,
+) -> Result<RawOpenEditExportProofHashedPath, String> {
+    let path = resolve_private_relative(private_root, relative_path)?;
+    Ok(hashed_path(relative_path.to_string(), sha256_file(&path)?))
+}
+
+fn hashed_path(path: String, hash: String) -> RawOpenEditExportProofHashedPath {
+    RawOpenEditExportProofHashedPath {
         hash,
-        kind: kind.to_string(),
         path,
         public_repo_allowed: false,
+    }
+}
+
+fn artifact(
+    kind: &str,
+    hashed_path: &RawOpenEditExportProofHashedPath,
+) -> RawOpenEditExportProofArtifact {
+    RawOpenEditExportProofArtifact {
+        hash: hashed_path.hash.clone(),
+        kind: kind.to_string(),
+        path: hashed_path.path.clone(),
+        public_repo_allowed: hashed_path.public_repo_allowed,
     }
 }
 
