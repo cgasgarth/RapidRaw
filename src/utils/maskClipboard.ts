@@ -34,6 +34,21 @@ export interface SplitSubMaskResult<TContainer extends MaskListContainer> {
   subMask: SubMask;
 }
 
+export interface MaskLikeClipboardActionsOptions<TContainer extends MaskLikeContainer> {
+  cloneContainerForDuplicate: (container: TContainer, options: { invert?: boolean; rename?: boolean }) => TContainer;
+  cloneContainerForInvertedSubMask: (container: TContainer) => TContainer;
+  cloneContainerForPaste: (container: TContainer) => TContainer;
+  cloneSubMaskForDuplicate: (subMask: SubMask, options: { invert?: boolean; rename?: boolean }) => SubMask;
+  cloneSubMaskForPaste: (subMask: SubMask) => SubMask;
+  containers: Array<TContainer>;
+  copiedContainer: TContainer | null | undefined;
+  copiedSubMask: SubMask | null | undefined;
+  insertContainer: (container: TContainer, insertIndex?: number) => void;
+  insertSubMask: (containerId: string, subMask: SubMask, insertIndex?: number) => void;
+  invertedContainerName: (container: TContainer) => string;
+  invertedSubMaskContainerName: (subMask: SubMask) => string;
+}
+
 export interface MaskListContainer {
   id: string;
   subMasks: Array<SubMask>;
@@ -214,4 +229,76 @@ export function getMaskLikeInsertAfterIndex(
 ): number | undefined {
   const containerIndex = containers.findIndex((container) => container.id === containerId);
   return containerIndex >= 0 ? containerIndex + 1 : undefined;
+}
+
+export function createMaskLikeClipboardActions<TContainer extends MaskLikeContainer>({
+  cloneContainerForDuplicate,
+  cloneContainerForInvertedSubMask,
+  cloneContainerForPaste,
+  cloneSubMaskForDuplicate,
+  cloneSubMaskForPaste,
+  containers,
+  copiedContainer,
+  copiedSubMask,
+  insertContainer,
+  insertSubMask,
+  invertedContainerName,
+  invertedSubMaskContainerName,
+}: MaskLikeClipboardActionsOptions<TContainer>) {
+  const duplicateContainer = (container: TContainer) => {
+    insertContainer(
+      cloneContainerForDuplicate(container, { rename: true }),
+      getMaskLikeInsertAfterIndex(containers, container.id),
+    );
+  };
+
+  const duplicateAndInvertContainer = (container: TContainer) => {
+    const duplicatedContainer = cloneContainerForDuplicate(container, { invert: true, rename: false });
+    duplicatedContainer.name = invertedContainerName(container);
+
+    insertContainer(duplicatedContainer, getMaskLikeInsertAfterIndex(containers, container.id));
+  };
+
+  const pasteContainer = (insertAfterContainerId?: string) => {
+    if (!copiedContainer) return;
+
+    const containerIndex = insertAfterContainerId
+      ? containers.findIndex((container) => container.id === insertAfterContainerId)
+      : -1;
+    insertContainer(cloneContainerForPaste(copiedContainer), containerIndex >= 0 ? containerIndex + 1 : undefined);
+  };
+
+  const duplicateSubMask = (containerId: string, subMask: SubMask, insertIndex?: number) => {
+    insertSubMask(containerId, cloneSubMaskForDuplicate(subMask, { rename: true }), insertIndex);
+  };
+
+  const duplicateAndInvertSubMask = (containerId: string, subMask: SubMask) => {
+    const parentContainer = containers.find((container) => container.id === containerId);
+    if (!parentContainer) return;
+
+    const newContainer = createInvertedSubMaskContainer({
+      cloneContainer: cloneContainerForInvertedSubMask,
+      cloneSubMask: (sourceSubMask) => cloneSubMaskForDuplicate(sourceSubMask, { invert: true, rename: false }),
+      invertedName: invertedSubMaskContainerName(subMask),
+      parentContainer,
+      subMask,
+    });
+
+    insertContainer(newContainer, getMaskLikeInsertAfterIndex(containers, containerId));
+  };
+
+  const pasteSubMask = (containerId: string, insertIndex?: number) => {
+    if (!copiedSubMask) return;
+
+    insertSubMask(containerId, cloneSubMaskForPaste(copiedSubMask), insertIndex);
+  };
+
+  return {
+    duplicateAndInvertContainer,
+    duplicateAndInvertSubMask,
+    duplicateContainer,
+    duplicateSubMask,
+    pasteContainer,
+    pasteSubMask,
+  };
 }
