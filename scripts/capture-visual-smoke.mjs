@@ -709,6 +709,11 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-stock-family-negative_lab.stock_family.ecn2_cinema_negative.v1')
     .getByText('legal review required', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-stock-metadata').waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-stock-metadata')
+    .getByText('6 color / 4 B&W / 3 slide / 3 cinema', { exact: true })
+    .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-preset-inspector').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-preset-film-class').getByText('Color negative', { exact: true }).waitFor({
     timeout: 10_000,
