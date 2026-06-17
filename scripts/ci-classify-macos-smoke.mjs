@@ -180,7 +180,7 @@ function isSafeFixturePath(path) {
 }
 
 function isSafeValidationScript(path) {
-  return path.startsWith('scripts/') && path.endsWith('.mjs');
+  return path.startsWith('scripts/') && (path.endsWith('.mjs') || path.endsWith('.ts'));
 }
 
 function isSafePackageJsonScriptPatch(patch) {
@@ -704,6 +704,11 @@ function runSelfTest() {
   assertClassification(
     'validation scripts can skip smoke',
     ['scripts/check-eslint-escape-hatches.mjs'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'typed validation script helpers can skip smoke',
+    ['scripts/lib/computational-ui-api-smoke.ts'],
     SMOKE_MODES.NONE,
   );
   assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], SMOKE_MODES.NONE);
