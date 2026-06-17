@@ -1,14 +1,12 @@
-import { z } from 'zod';
-
+import {
+  ComputationalMergeAppServerCommandBusHarness,
+  type ComputationalMergeAppServerCommandBusHarnessOptions,
+  expectThrows,
+} from './appServerCommandBusHarness.js';
 import { createFocusStackPlanOnlyDryRunResultV1 } from '../src/focusStackPreflight.js';
 import {
-  computationalMergeAppServerToolManifestV1Schema,
   computationalMergeCommandEnvelopeV1Schema,
-  computationalMergeMutationResultV1Schema,
-  type ComputationalMergeAppServerToolDefinitionV1,
   type ComputationalMergeCommandEnvelopeV1,
-  type ComputationalMergeDryRunResultV1,
-  type ComputationalMergeMutationResultV1,
 } from '../src/rawEngineSchemas.js';
 import {
   sampleComputationalMergeAppServerToolManifestV1,
@@ -18,65 +16,14 @@ import {
   sampleFocusStackArtifactV1,
 } from '../src/samplePayloads.js';
 
-const FocusAppServerCommandBusResultSchema = z.discriminatedUnion('kind', [
-  z
-    .object({
-      dryRunResult: z.custom<ComputationalMergeDryRunResultV1>(),
-      kind: z.literal('dry_run'),
-      toolName: z.string().min(1),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('apply'),
-      mutationResult: z.custom<ComputationalMergeMutationResultV1>(),
-      toolName: z.string().min(1),
-    })
-    .strict(),
-]);
-
 const sampleFocusStackPreflightSourceStates = sampleFocusStackArtifactV1.sourceState.map((sourceState) => ({
   contentHash: sourceState.contentHash,
   graphRevision: sourceState.graphRevision,
   sourceIndex: sourceState.sourceIndex,
 }));
 
-class FocusAppServerCommandBus {
-  readonly #acceptedDryRunPlanHashesById = new Map<string, string>();
-  readonly #toolsByName = new Map<string, ComputationalMergeAppServerToolDefinitionV1>();
-
-  constructor(manifestValue: unknown) {
-    const manifest = computationalMergeAppServerToolManifestV1Schema.parse(manifestValue);
-    for (const tool of manifest.tools.filter((candidateTool) =>
-      candidateTool.allowedCommandTypes.includes('computationalMerge.createFocusStack'),
-    )) {
-      this.#toolsByName.set(tool.toolName, tool);
-    }
-  }
-
-  execute(toolName: string, commandValue: unknown) {
-    const tool = this.#toolsByName.get(toolName);
-    if (tool === undefined) {
-      throw new Error(`Focus app-server command bus has no registered tool named ${toolName}.`);
-    }
-
-    const command = computationalMergeCommandEnvelopeV1Schema.parse(commandValue);
-    if (!tool.allowedCommandTypes.includes(command.commandType)) {
-      throw new Error(`${tool.toolName} does not allow command type ${command.commandType}.`);
-    }
-
-    if (tool.executionMode === 'dry_run_command') {
-      return this.#executeDryRun(tool, command);
-    }
-
-    return this.#executeApply(tool, command);
-  }
-
-  #executeDryRun(tool: ComputationalMergeAppServerToolDefinitionV1, command: ComputationalMergeCommandEnvelopeV1) {
-    if (!command.dryRun) {
-      throw new Error(`${tool.toolName} requires a dry-run command envelope.`);
-    }
-
+const focusCommandBusConfig: ComputationalMergeAppServerCommandBusHarnessOptions = {
+  buildDryRun: (tool, command: ComputationalMergeCommandEnvelopeV1) => {
     const dryRunResult = createFocusStackPlanOnlyDryRunResultV1(command, {
       planId: 'merge_plan_focus_stack_app_server_bus_001',
       predictedGraphRevision: 'graph_rev_48_focus_stack_app_server_preview',
@@ -87,81 +34,44 @@ class FocusAppServerCommandBus {
       throw new Error(`${tool.toolName} expected an accepted dry-run plan.`);
     }
 
-    this.#acceptedDryRunPlanHashesById.set(
-      dryRunResult.mergePlan.planId,
-      sampleFocusStackArtifactV1.dryRun.acceptedDryRunPlanHash,
-    );
-    return FocusAppServerCommandBusResultSchema.parse({
+    return {
+      acceptedDryRunPlanHash: sampleFocusStackArtifactV1.dryRun.acceptedDryRunPlanHash,
       dryRunResult,
-      kind: 'dry_run',
-      toolName: tool.toolName,
-    });
-  }
-
-  #executeApply(tool: ComputationalMergeAppServerToolDefinitionV1, command: ComputationalMergeCommandEnvelopeV1) {
-    if (command.dryRun) {
-      throw new Error(`${tool.toolName} requires an apply command envelope.`);
-    }
-
-    if (command.commandType !== 'computationalMerge.createFocusStack') {
-      throw new Error(`${tool.toolName} only applies focus-stack commands.`);
-    }
-
-    const acceptedPlanId = command.parameters.acceptedDryRunPlanId;
-    const acceptedPlanHash = command.parameters.acceptedDryRunPlanHash;
-    if (acceptedPlanId === undefined || !this.#acceptedDryRunPlanHashesById.has(acceptedPlanId)) {
-      throw new Error(`${tool.toolName} rejected unaccepted dry-run plan ${String(acceptedPlanId)}.`);
-    }
-
-    if (acceptedPlanHash !== this.#acceptedDryRunPlanHashesById.get(acceptedPlanId)) {
-      throw new Error(`${tool.toolName} rejected mismatched dry-run plan hash ${String(acceptedPlanHash)}.`);
-    }
-
-    const mutationResult = computationalMergeMutationResultV1Schema.parse({
-      appliedGraphRevision: 'graph_rev_48_focus_stack_app_server_apply',
-      changedNodeIds: ['node_merge_focus_stack_app_server_001'],
-      commandId: command.commandId,
-      commandType: command.commandType,
-      correlationId: command.correlationId,
-      derivedAssetId: 'derived_focus_stack_app_server_001',
-      dryRun: false,
-      mutates: true,
-      outputArtifacts: [
-        {
-          artifactId: 'artifact_focus_stack_app_server_output',
-          contentHash: 'sha256:sample-focus-stack-app-server-output',
-          dimensions: {
-            height: 1600,
-            width: 2400,
-          },
-          kind: 'merge_output',
-          storage: 'sidecar_artifact',
+    };
+  },
+  buildApply: (_tool, command: ComputationalMergeCommandEnvelopeV1) => ({
+    appliedGraphRevision: 'graph_rev_48_focus_stack_app_server_apply',
+    changedNodeIds: ['node_merge_focus_stack_app_server_001'],
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    derivedAssetId: 'derived_focus_stack_app_server_001',
+    dryRun: false,
+    mutates: true,
+    outputArtifacts: [
+      {
+        artifactId: 'artifact_focus_stack_app_server_output',
+        contentHash: 'sha256:sample-focus-stack-app-server-output',
+        dimensions: {
+          height: 1600,
+          width: 2400,
         },
-      ],
-      schemaVersion: command.schemaVersion,
-      sourceGraphRevision: command.expectedGraphRevision,
-      undoRevision: command.expectedGraphRevision,
-      warnings: [],
-    });
-
-    return FocusAppServerCommandBusResultSchema.parse({
-      kind: 'apply',
-      mutationResult,
-      toolName: tool.toolName,
-    });
-  }
-}
-
-const expectThrows = (label: string, callback: () => unknown) => {
-  try {
-    callback();
-  } catch {
-    return;
-  }
-  throw new Error(`Expected ${label} to throw.`);
+        kind: 'merge_output',
+        storage: 'sidecar_artifact',
+      },
+    ],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: [],
+  }),
+  commandType: 'computationalMerge.createFocusStack',
+  familyLabel: 'focus-stack',
+  manifestValue: sampleComputationalMergeAppServerToolManifestV1,
 };
 
-const commandBus = new FocusAppServerCommandBus(sampleComputationalMergeAppServerToolManifestV1);
+const commandBus = new ComputationalMergeAppServerCommandBusHarness(focusCommandBusConfig);
+
 const dryRun = commandBus.execute(
   'computationalmerge.focus_stack.dry_run_command',
   sampleComputationalMergeFocusStackCommandEnvelopeV1,
@@ -195,7 +105,7 @@ expectThrows('focus dry-run tool with apply command', () =>
 );
 
 expectThrows('focus apply tool without accepted dry-run plan', () =>
-  commandBus.execute(
+  new ComputationalMergeAppServerCommandBusHarness(focusCommandBusConfig).execute(
     'computationalmerge.focus_stack.apply_command',
     sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
   ),

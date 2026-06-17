@@ -1,14 +1,12 @@
-import { z } from 'zod';
-
 import {
-  computationalMergeAppServerToolManifestV1Schema,
+  ComputationalMergeAppServerCommandBusHarness,
+  type ComputationalMergeAppServerCommandBusHarnessOptions,
+  expectThrows,
+} from './appServerCommandBusHarness.js';
+import {
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
-  computationalMergeMutationResultV1Schema,
-  type ComputationalMergeAppServerToolDefinitionV1,
   type ComputationalMergeCommandEnvelopeV1,
-  type ComputationalMergeDryRunResultV1,
-  type ComputationalMergeMutationResultV1,
 } from '../src/rawEngineSchemas.js';
 import {
   sampleComputationalMergeAppServerToolManifestV1,
@@ -17,59 +15,8 @@ import {
   sampleHdrMergeArtifactV1,
 } from '../src/samplePayloads.js';
 
-const HdrAppServerCommandBusResultSchema = z.discriminatedUnion('kind', [
-  z
-    .object({
-      dryRunResult: z.custom<ComputationalMergeDryRunResultV1>(),
-      kind: z.literal('dry_run'),
-      toolName: z.string().min(1),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('apply'),
-      mutationResult: z.custom<ComputationalMergeMutationResultV1>(),
-      toolName: z.string().min(1),
-    })
-    .strict(),
-]);
-
-class HdrAppServerCommandBus {
-  readonly #acceptedDryRunPlanHashesById = new Map<string, string>();
-  readonly #toolsByName = new Map<string, ComputationalMergeAppServerToolDefinitionV1>();
-
-  constructor(manifestValue: unknown) {
-    const manifest = computationalMergeAppServerToolManifestV1Schema.parse(manifestValue);
-    for (const tool of manifest.tools.filter((candidateTool) =>
-      candidateTool.allowedCommandTypes.includes('computationalMerge.createHdr'),
-    )) {
-      this.#toolsByName.set(tool.toolName, tool);
-    }
-  }
-
-  execute(toolName: string, commandValue: unknown) {
-    const tool = this.#toolsByName.get(toolName);
-    if (tool === undefined) {
-      throw new Error(`HDR app-server command bus has no registered tool named ${toolName}.`);
-    }
-
-    const command = computationalMergeCommandEnvelopeV1Schema.parse(commandValue);
-    if (!tool.allowedCommandTypes.includes(command.commandType)) {
-      throw new Error(`${tool.toolName} does not allow command type ${command.commandType}.`);
-    }
-
-    if (tool.executionMode === 'dry_run_command') {
-      return this.#executeDryRun(tool, command);
-    }
-
-    return this.#executeApply(tool, command);
-  }
-
-  #executeDryRun(tool: ComputationalMergeAppServerToolDefinitionV1, command: ComputationalMergeCommandEnvelopeV1) {
-    if (!command.dryRun) {
-      throw new Error(`${tool.toolName} requires a dry-run command envelope.`);
-    }
-
+const hdrCommandBusConfig: ComputationalMergeAppServerCommandBusHarnessOptions = {
+  buildDryRun: (_tool, command: ComputationalMergeCommandEnvelopeV1) => {
     const outputDimensions = sampleHdrMergeArtifactV1.outputArtifact.dimensions;
     if (outputDimensions === undefined) {
       throw new Error('Sample HDR artifact requires output dimensions for app-server dry-run planning.');
@@ -145,69 +92,32 @@ class HdrAppServerCommandBus {
       warnings: ['HDR preview is tone mapped; final scene-linear output remains an apply step.'],
     });
 
-    this.#acceptedDryRunPlanHashesById.set(
-      dryRunResult.mergePlan.planId,
-      sampleHdrMergeArtifactV1.dryRun.acceptedDryRunPlanHash,
-    );
-    return HdrAppServerCommandBusResultSchema.parse({
+    return {
+      acceptedDryRunPlanHash: sampleHdrMergeArtifactV1.dryRun.acceptedDryRunPlanHash,
       dryRunResult,
-      kind: 'dry_run',
-      toolName: tool.toolName,
-    });
-  }
-
-  #executeApply(tool: ComputationalMergeAppServerToolDefinitionV1, command: ComputationalMergeCommandEnvelopeV1) {
-    if (command.dryRun) {
-      throw new Error(`${tool.toolName} requires an apply command envelope.`);
-    }
-
-    if (command.commandType !== 'computationalMerge.createHdr') {
-      throw new Error(`${tool.toolName} only applies HDR commands.`);
-    }
-
-    const acceptedPlanId = command.parameters.acceptedDryRunPlanId;
-    const acceptedPlanHash = command.parameters.acceptedDryRunPlanHash;
-    if (acceptedPlanId === undefined || !this.#acceptedDryRunPlanHashesById.has(acceptedPlanId)) {
-      throw new Error(`${tool.toolName} rejected unaccepted dry-run plan ${String(acceptedPlanId)}.`);
-    }
-    if (acceptedPlanHash !== this.#acceptedDryRunPlanHashesById.get(acceptedPlanId)) {
-      throw new Error(`${tool.toolName} rejected mismatched dry-run plan hash ${String(acceptedPlanHash)}.`);
-    }
-
-    const mutationResult = computationalMergeMutationResultV1Schema.parse({
-      appliedGraphRevision: 'graph_rev_48_hdr_apply',
-      changedNodeIds: ['node_merge_hdr_app_server_001'],
-      commandId: command.commandId,
-      commandType: command.commandType,
-      correlationId: command.correlationId,
-      derivedAssetId: sampleHdrMergeArtifactV1.editableDerivedAssetId,
-      dryRun: false,
-      mutates: true,
-      outputArtifacts: [sampleHdrMergeArtifactV1.outputArtifact],
-      schemaVersion: command.schemaVersion,
-      sourceGraphRevision: command.expectedGraphRevision,
-      undoRevision: command.expectedGraphRevision,
-      warnings: sampleHdrMergeArtifactV1.warningCodes,
-    });
-
-    return HdrAppServerCommandBusResultSchema.parse({
-      kind: 'apply',
-      mutationResult,
-      toolName: tool.toolName,
-    });
-  }
-}
-
-const expectThrows = (label: string, callback: () => unknown) => {
-  try {
-    callback();
-  } catch {
-    return;
-  }
-  throw new Error(`Expected ${label} to throw.`);
+    };
+  },
+  buildApply: (_tool, command: ComputationalMergeCommandEnvelopeV1) => ({
+    appliedGraphRevision: 'graph_rev_48_hdr_apply',
+    changedNodeIds: ['node_merge_hdr_app_server_001'],
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    derivedAssetId: sampleHdrMergeArtifactV1.editableDerivedAssetId ?? 'derived_hdr_app_server_001',
+    dryRun: false,
+    mutates: true,
+    outputArtifacts: [sampleHdrMergeArtifactV1.outputArtifact],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: sampleHdrMergeArtifactV1.warningCodes,
+  }),
+  commandType: 'computationalMerge.createHdr',
+  familyLabel: 'HDR',
+  manifestValue: sampleComputationalMergeAppServerToolManifestV1,
 };
 
-const commandBus = new HdrAppServerCommandBus(sampleComputationalMergeAppServerToolManifestV1);
+const commandBus = new ComputationalMergeAppServerCommandBusHarness(hdrCommandBusConfig);
 const dryRun = commandBus.execute(
   'computationalmerge.hdr.dry_run_command',
   sampleComputationalMergeHdrCommandEnvelopeV1,
@@ -246,7 +156,7 @@ expectThrows('HDR dry-run tool with apply command', () =>
 );
 
 expectThrows('HDR apply tool before accepted dry-run', () =>
-  new HdrAppServerCommandBus(sampleComputationalMergeAppServerToolManifestV1).execute(
+  new ComputationalMergeAppServerCommandBusHarness(hdrCommandBusConfig).execute(
     'computationalmerge.hdr.apply_command',
     acceptedApplyCommand,
   ),
