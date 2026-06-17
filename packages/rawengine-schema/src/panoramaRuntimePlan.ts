@@ -6,9 +6,11 @@ import {
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
+  panoramaArtifactV1Schema,
   type ComputationalMergeCommandEnvelopeV1,
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMutationResultV1,
+  type PanoramaArtifactV1,
 } from './rawEngineSchemas.js';
 
 const PANORAMA_RUNTIME_ENGINE_ID = 'rawengine_panorama_synthetic_v1';
@@ -147,6 +149,13 @@ export interface PanoramaRuntimeApplyResultV1 {
   provenance: PanoramaRuntimeProvenanceV1;
 }
 
+export interface PanoramaRuntimeArtifactInputV1 {
+  applyResult: PanoramaRuntimeApplyResultV1;
+  command: PanoramaRuntimeCommandV1;
+  createdAt: string;
+  previewArtifacts?: ComputationalMergeDryRunResultV1['previewArtifacts'];
+}
+
 export const buildPanoramaRuntimeDryRunV1 = (requestValue: unknown): PanoramaRuntimeDryRunResultV1 => {
   const request = parsePanoramaRuntimePlanRequest(requestValue, true);
   const runtime = renderPanoramaRuntime(request);
@@ -257,6 +266,82 @@ export const applyPanoramaRuntimePlanV1 = (requestValue: unknown): PanoramaRunti
       runtimeStatus: 'apply_rendered',
     }),
   };
+};
+
+export const buildPanoramaRuntimeArtifactV1 = ({
+  applyResult,
+  command,
+  createdAt,
+  previewArtifacts = [],
+}: PanoramaRuntimeArtifactInputV1): PanoramaArtifactV1 => {
+  const { mutationResult, provenance } = applyResult;
+  const sourceImageRefs = sourceImageRefsForPanoramaRuntimeArtifact(command, provenance);
+  const excludedSources = sourceImageRefs
+    .filter((source) => !provenance.sourceState.some((sourceState) => sourceState.sourceIndex === source.sourceIndex))
+    .map((source) => ({
+      reason: 'source_excluded' as const,
+      sourceIndex: source.sourceIndex,
+    }));
+
+  return panoramaArtifactV1Schema.parse({
+    alignment: alignmentForPanoramaRuntimeArtifact(provenance),
+    artifactId: `artifact_${mutationResult.derivedAssetId}`,
+    boundaryMode: provenance.boundaryMode,
+    boundarySettings: boundarySettingsForPanoramaRuntimeArtifact(provenance),
+    createdAt,
+    crop: provenance.crop,
+    excludedSources,
+    engine: {
+      capabilities: {
+        adaptiveSeamFeather: true,
+        autoCrop: true,
+        bundleAdjustment: false,
+        cylindricalProjection: false,
+        exposureNormalization: false,
+        planarHomography: true,
+        tiledRender: false,
+      },
+      engineId: 'rapidraw_homography_seam_v0',
+      qualityTier: 'validated_planar_v1',
+    },
+    exposureNormalization: exposureNormalizationForPanoramaRuntimeArtifact(provenance),
+    lensCorrectionPolicy: provenance.lensCorrectionPolicy,
+    operationId: 'merge.panorama.create',
+    operationVersion: 1,
+    outputArtifacts: mutationResult.outputArtifacts,
+    outputColorSpace: 'linear_rec2020_d65_v1',
+    previewArtifacts,
+    projection: provenance.resolvedProjection,
+    projectionSettings: projectionSettingsForPanoramaRuntimeArtifact(provenance),
+    provenance: {
+      commandId: mutationResult.commandId,
+      graphRevision: mutationResult.appliedGraphRevision,
+      runtimeStatus: 'rendered',
+    },
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    seamPolicy: {
+      featherWidthPx: 100,
+      lowDetailFeatherMultiplier: 5,
+      mode: 'adaptive_dp_feather_v1',
+    },
+    sourceImageRefs,
+    sourceState: provenance.sourceState,
+    staleState: {
+      checkedAt: createdAt,
+      invalidationReasons: [],
+      state: 'current',
+    },
+    validationMetrics: {
+      excludedSourceCount: excludedSources.length,
+      overlapCoverageRatio: provenance.qualityMetrics.stitchedSourceRatio,
+      outputHeight: provenance.crop.height,
+      outputWidth: provenance.crop.width,
+      reprojectionRmsPx: meanPanoramaRuntimeReprojectionError(provenance),
+      sourceCount: sourceImageRefs.length,
+      stitchedSourceCount: provenance.stitchedSourceCount,
+    },
+    warnings: mutationResult.warnings.filter(isPanoramaArtifactWarning),
+  });
 };
 
 const parsePanoramaRuntimePlanRequest = (
@@ -516,3 +601,115 @@ const roundPanoramaRuntimeMetric = (value: number): number => Math.round(value *
 
 const isPanoramaRuntimeCommand = (command: ComputationalMergeCommandEnvelopeV1): command is PanoramaRuntimeCommandV1 =>
   command.commandType === 'computationalMerge.createPanorama';
+
+const sourceImageRefsForPanoramaRuntimeArtifact = (
+  command: PanoramaRuntimeCommandV1,
+  provenance: PanoramaRuntimeProvenanceV1,
+): PanoramaArtifactV1['sourceImageRefs'] =>
+  command.parameters.sources.map((source) => ({
+    colorSpaceHint: source.colorSpaceHint,
+    imageId: source.imageId,
+    imagePath: source.imagePath,
+    lensCorrectionState: lensCorrectionStateForPanoramaRuntimeArtifact(provenance.lensCorrectionPolicy),
+    rawDefaultsApplied: source.rawDefaultsApplied,
+    sourceIndex: source.sourceIndex,
+    virtualCopyId: source.virtualCopyId ?? null,
+  }));
+
+const lensCorrectionStateForPanoramaRuntimeArtifact = (
+  policy: PanoramaRuntimeProvenanceV1['lensCorrectionPolicy'],
+): PanoramaArtifactV1['sourceImageRefs'][number]['lensCorrectionState'] => {
+  if (policy === 'applied_before_stitch') {
+    return 'applied';
+  }
+  if (policy === 'required_before_stitch') {
+    return 'required_before_stitch';
+  }
+  return 'unknown';
+};
+
+const alignmentForPanoramaRuntimeArtifact = (
+  provenance: PanoramaRuntimeProvenanceV1,
+): PanoramaArtifactV1['alignment'] => ({
+  algorithmId: 'rapidraw_fast9_brief_ransac_v1',
+  downscaleMaxDimensionPx: 1600,
+  globalHomographyCount: provenance.alignment.pairwiseMatches.length,
+  minimumInliersForConnection: 15,
+  pairwiseMatches: provenance.alignment.pairwiseMatches.map((match) => ({
+    fromSourceIndex: match.fromSourceIndex,
+    homography3x3: [1, 0, match.translationPx.x, 0, 1, match.translationPx.y, 0, 0, 1],
+    inliers: Math.max(15, match.overlapAreaPx),
+    matchQuality: 'accepted',
+    reprojectionErrorPx: match.reprojectionErrorPx,
+    toSourceIndex: match.toSourceIndex,
+  })),
+  ransacInlierThresholdPx: 5,
+  ransacIterations: 2500,
+  ransacSeed: 0,
+});
+
+const boundarySettingsForPanoramaRuntimeArtifact = (
+  provenance: PanoramaRuntimeProvenanceV1,
+): PanoramaArtifactV1['boundarySettings'] => ({
+  crop: provenance.crop,
+  ...(provenance.boundaryMode === 'deferred_fill'
+    ? { deferredReason: 'Synthetic runtime records deferred fill but renders transparent bounds.' }
+    : {}),
+  effectiveMode: provenance.boundaryMode,
+  requestedMode: provenance.boundaryMode,
+  support: provenance.boundaryMode === 'deferred_fill' ? 'schema_only_deferred' : 'implemented_current_engine',
+});
+
+const projectionSettingsForPanoramaRuntimeArtifact = (
+  provenance: PanoramaRuntimeProvenanceV1,
+): PanoramaArtifactV1['projectionSettings'] => ({
+  ...(provenance.projectionSettings.support === 'schema_only_deferred'
+    ? { deferredReason: provenance.projectionSettings.deferredReason ?? 'Projection was resolved by runtime fallback.' }
+    : {}),
+  effectiveProjection: provenance.resolvedProjection,
+  requestedProjection: provenance.projection,
+  support: provenance.projectionSettings.support,
+});
+
+const exposureNormalizationForPanoramaRuntimeArtifact = (
+  provenance: PanoramaRuntimeProvenanceV1,
+): PanoramaArtifactV1['exposureNormalization'] => {
+  if (provenance.exposureNormalization === 'none') {
+    return {
+      mode: 'none',
+      skippedReason: 'not_requested',
+      support: 'implemented_current_engine',
+    };
+  }
+
+  return {
+    deferredReason: 'Synthetic runtime records requested exposure normalization but does not alter pixels yet.',
+    mode: 'planned',
+    overlapMetrics: {
+      medianLogLuminanceDeltaBefore: roundPanoramaRuntimeMetric(provenance.qualityMetrics.meanOverlapAreaPx / 10_000),
+    },
+    support: 'schema_only_deferred',
+  };
+};
+
+const meanPanoramaRuntimeReprojectionError = (provenance: PanoramaRuntimeProvenanceV1): number | undefined => {
+  if (provenance.alignment.pairwiseMatches.length === 0) return undefined;
+  const total = provenance.alignment.pairwiseMatches.reduce((sum, match) => sum + match.reprojectionErrorPx, 0);
+  return roundPanoramaRuntimeMetric(total / provenance.alignment.pairwiseMatches.length);
+};
+
+const isPanoramaArtifactWarning = (warning: string): warning is PanoramaArtifactV1['warnings'][number] =>
+  [
+    'source_excluded',
+    'insufficient_features',
+    'ambiguous_matches',
+    'weak_alignment',
+    'low_inlier_count',
+    'high_memory_estimate',
+    'memory_budget_exceeded',
+    'missing_lens_correction',
+    'exposure_mismatch',
+    'projection_runtime_deferred',
+    'boundary_runtime_deferred',
+    'cancellation_not_supported',
+  ].includes(warning);
