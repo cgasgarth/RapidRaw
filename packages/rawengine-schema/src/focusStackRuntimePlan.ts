@@ -1,14 +1,16 @@
 import { z } from 'zod';
 
 import {
+  buildComputationalMergeArtifactHandleV1,
+  buildComputationalMergeDryRunResultV1,
+  buildComputationalMergeMutationResultV1,
+} from './computationalMergeRuntimeResultBuilders.js';
+import {
   applyWeightedSharpnessFocusStackV1,
   focusStackRuntimeSharpnessCellV1Schema,
 } from './focusStackWeightedBlend.js';
 import {
-  RAW_ENGINE_SCHEMA_VERSION,
   computationalMergeCommandEnvelopeV1Schema,
-  computationalMergeDryRunResultV1Schema,
-  computationalMergeMutationResultV1Schema,
   type ArtifactHandleV1,
   type ComputationalMergeCommandEnvelopeV1,
   type ComputationalMergeDryRunResultV1,
@@ -138,23 +140,18 @@ export const buildFocusStackRuntimeDryRunV1 = (requestValue: unknown): FocusStac
   const planHash = `sha256:${stableFocusRuntimeHash(`${planId}:${runtime.provenance.blendMethod}`)}`;
   const renderedContentHash = hashFocusRuntimePixels(runtime.outputPixels);
   const previewArtifacts = [
-    {
+    buildComputationalMergeArtifactHandleV1({
       artifactId: request.previewArtifactId,
       contentHash: `sha256:${stableFocusRuntimeHash(`${planHash}:${request.previewArtifactId}:${renderedContentHash}`)}`,
-      dimensions: {
-        height: runtime.height,
-        width: runtime.width,
-      },
-      kind: 'preview' as const,
-      storage: 'temp_cache' as const,
-    },
+      height: runtime.height,
+      kind: 'preview',
+      storage: 'temp_cache',
+      width: runtime.width,
+    }),
   ];
 
-  const dryRunResult = computationalMergeDryRunResultV1Schema.parse({
-    commandId: request.command.commandId,
-    commandType: request.command.commandType,
-    correlationId: request.command.correlationId,
-    dryRun: true,
+  const dryRunResult = buildComputationalMergeDryRunResultV1({
+    command: request.command,
     mergePlan: {
       family: 'focus_stack',
       outputDimensions: {
@@ -176,11 +173,8 @@ export const buildFocusStackRuntimeDryRunV1 = (requestValue: unknown): FocusStac
       sourceImageRefs: request.command.parameters.sources,
       warnings: runtime.warnings,
     },
-    mutates: false,
     predictedGraphRevision: `${request.command.expectedGraphRevision}:focus-preview`,
     previewArtifacts,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-    sourceGraphRevision: request.command.expectedGraphRevision,
     warnings: runtime.warnings,
   });
 
@@ -202,73 +196,61 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
 
   const renderedContentHash = hashFocusRuntimePixels(runtime.outputPixels);
   const outputArtifacts: ArtifactHandleV1[] = [
-    {
+    buildComputationalMergeArtifactHandleV1({
       artifactId: request.outputArtifactId,
       contentHash: `sha256:${stableFocusRuntimeHash(
         `${acceptedDryRunPlanHash}:${request.outputArtifactId}:${renderedContentHash}`,
       )}`,
-      dimensions: {
-        height: runtime.height,
-        width: runtime.width,
-      },
-      kind: 'merge_output' as const,
-      storage: 'sidecar_artifact' as const,
-    },
-    {
+      height: runtime.height,
+      kind: 'merge_output',
+      storage: 'sidecar_artifact',
+      width: runtime.width,
+    }),
+    buildComputationalMergeArtifactHandleV1({
       artifactId: request.sharpnessMapArtifactId,
       contentHash: `sha256:${stableFocusRuntimeHash(
         `${acceptedDryRunPlanHash}:${request.sharpnessMapArtifactId}:${renderedContentHash}`,
       )}`,
-      dimensions: {
-        height: runtime.height,
-        width: runtime.width,
-      },
-      kind: 'mask' as const,
-      storage: 'sidecar_artifact' as const,
-    },
-    {
+      height: runtime.height,
+      kind: 'mask',
+      storage: 'sidecar_artifact',
+      width: runtime.width,
+    }),
+    buildComputationalMergeArtifactHandleV1({
       artifactId: request.depthConfidenceArtifactId,
       contentHash: `sha256:${stableFocusRuntimeHash(
         `${acceptedDryRunPlanHash}:${request.depthConfidenceArtifactId}:${renderedContentHash}`,
       )}`,
-      dimensions: {
-        height: runtime.height,
-        width: runtime.width,
-      },
-      kind: 'mask' as const,
-      storage: 'sidecar_artifact' as const,
-    },
+      height: runtime.height,
+      kind: 'mask',
+      storage: 'sidecar_artifact',
+      width: runtime.width,
+    }),
   ];
   if (request.command.parameters.retouchLayerPolicy === 'generate_retouch_layer') {
     if (request.retouchLayerArtifactId === undefined) {
       throw new Error('Focus stack runtime retouch layer policy requires retouchLayerArtifactId.');
     }
-    outputArtifacts.push({
-      artifactId: request.retouchLayerArtifactId,
-      contentHash: `sha256:${stableFocusRuntimeHash(
-        `${acceptedDryRunPlanHash}:${request.retouchLayerArtifactId}:${renderedContentHash}`,
-      )}`,
-      dimensions: {
+    outputArtifacts.push(
+      buildComputationalMergeArtifactHandleV1({
+        artifactId: request.retouchLayerArtifactId,
+        contentHash: `sha256:${stableFocusRuntimeHash(
+          `${acceptedDryRunPlanHash}:${request.retouchLayerArtifactId}:${renderedContentHash}`,
+        )}`,
         height: runtime.height,
+        kind: 'generated_patch',
+        storage: 'sidecar_artifact',
         width: runtime.width,
-      },
-      kind: 'generated_patch' as const,
-      storage: 'sidecar_artifact' as const,
-    });
+      }),
+    );
   }
 
-  const mutationResult = computationalMergeMutationResultV1Schema.parse({
+  const mutationResult = buildComputationalMergeMutationResultV1({
     appliedGraphRevision: `${request.command.expectedGraphRevision}:focus-apply`,
     changedNodeIds: [`node_${request.command.commandId}`],
-    commandId: request.command.commandId,
-    commandType: request.command.commandType,
-    correlationId: request.command.correlationId,
+    command: request.command,
     derivedAssetId: `derived_${request.command.commandId}`,
-    dryRun: false,
-    mutates: true,
     outputArtifacts,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-    sourceGraphRevision: request.command.expectedGraphRevision,
     undoRevision: `${request.command.expectedGraphRevision}:undo-focus-apply`,
     warnings: runtime.warnings,
   });
