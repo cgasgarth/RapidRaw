@@ -1,7 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2 } from 'lucide-react';
 import {
-  type ChangeEvent,
   type MouseEvent as ReactMouseEvent,
   type TouchEvent as ReactTouchEvent,
   useState,
@@ -12,11 +11,11 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import AdjustmentSlider from './AdjustmentSlider';
 import { useContextMenu } from '../../context/ContextMenuContext';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { ActiveChannel, Adjustments, Coord, ParametricCurveSettings } from '../../utils/adjustments';
 import { Theme, OPTION_SEPARATOR } from '../ui/AppProperties';
-import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
 
 let curveClipboard: Array<Coord> | null = null;
@@ -24,7 +23,6 @@ let parametricClipboard: ParametricCurveSettings | null = null;
 
 type CurveAdjustmentUpdater = (prev: Adjustments) => Adjustments;
 type PointerInputEvent = globalThis.MouseEvent | TouchEvent | ReactMouseEvent | ReactTouchEvent;
-type SliderChangeEvent = ChangeEvent<HTMLInputElement> | { target: { value: number | string } };
 
 const CURVE_CHANNELS = [ActiveChannel.Luma, ActiveChannel.Red, ActiveChannel.Green, ActiveChannel.Blue] as const;
 const CURVE_CHANNEL_LABEL_FALLBACKS: Record<ActiveChannel, string> = {
@@ -1111,75 +1109,75 @@ export default function CurveGraph({
               </div>
 
               <div className="flex flex-col gap-2">
-                <Slider
+                <AdjustmentSlider
                   label={t('adjustments.curves.params.whiteLevel')}
                   min={-100}
                   max={0}
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.whiteLevel}
-                  onChange={(e: SliderChangeEvent) => {
-                    updateParametricValue('whiteLevel', parseFloat(String(e.target.value)));
+                  onValueChange={(value) => {
+                    updateParametricValue('whiteLevel', value);
                   }}
                   onDragStateChange={onDragStateChange}
                 />
-                <Slider
+                <AdjustmentSlider
                   label={t('adjustments.curves.params.highlights')}
                   min={-100}
                   max={100}
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.highlights}
-                  onChange={(e: SliderChangeEvent) => {
-                    updateParametricValue('highlights', parseFloat(String(e.target.value)));
+                  onValueChange={(value) => {
+                    updateParametricValue('highlights', value);
                   }}
                   onDragStateChange={onDragStateChange}
                 />
-                <Slider
+                <AdjustmentSlider
                   label={t('adjustments.curves.params.lights')}
                   min={-100}
                   max={100}
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.lights}
-                  onChange={(e: SliderChangeEvent) => {
-                    updateParametricValue('lights', parseFloat(String(e.target.value)));
+                  onValueChange={(value) => {
+                    updateParametricValue('lights', value);
                   }}
                   onDragStateChange={onDragStateChange}
                 />
-                <Slider
+                <AdjustmentSlider
                   label={t('adjustments.curves.params.darks')}
                   min={-100}
                   max={100}
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.darks}
-                  onChange={(e: SliderChangeEvent) => {
-                    updateParametricValue('darks', parseFloat(String(e.target.value)));
+                  onValueChange={(value) => {
+                    updateParametricValue('darks', value);
                   }}
                   onDragStateChange={onDragStateChange}
                 />
-                <Slider
+                <AdjustmentSlider
                   label={t('adjustments.curves.params.shadows')}
                   min={-100}
                   max={100}
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.shadows}
-                  onChange={(e: SliderChangeEvent) => {
-                    updateParametricValue('shadows', parseFloat(String(e.target.value)));
+                  onValueChange={(value) => {
+                    updateParametricValue('shadows', value);
                   }}
                   onDragStateChange={onDragStateChange}
                 />
-                <Slider
+                <AdjustmentSlider
                   label={t('adjustments.curves.params.blackLevel')}
                   min={0}
                   max={100}
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.blackLevel}
-                  onChange={(e: SliderChangeEvent) => {
-                    updateParametricValue('blackLevel', parseFloat(String(e.target.value)));
+                  onValueChange={(value) => {
+                    updateParametricValue('blackLevel', value);
                   }}
                   onDragStateChange={onDragStateChange}
                 />
