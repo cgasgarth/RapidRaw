@@ -1,0 +1,504 @@
+{
+  "catalogId": "negative_lab_stock_metadata_catalog",
+  "entries": [
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a medium-speed C-41 stock family; generic neutral preset is only a starting point.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Fujifilm 400",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.fujifilm_400.v1",
+      "grainModelDescriptor": "Nominal moderate C-41 grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 400
+      },
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "color_negative",
+      "stockFamilyDescriptor": "Everyday still color negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.neutral.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a daylight color reversal stock family; no negative-lab applied profile is implied.",
+      "contrastCurveDescriptor": "Reference metadata only; positive reversal workflow pending",
+      "displayName": "Fujifilm Provia 100F",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.fujifilm_provia_100f.v1",
+      "grainModelDescriptor": "Nominal fine slide-film grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 100
+      },
+      "processFamily": "e6_slide_reversal",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "slide_reversal",
+      "stockFamilyDescriptor": "Daylight color reversal",
+      "suggestedGenericPresetId": null
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a saturated daylight color reversal stock family; no negative-lab applied profile is implied.",
+      "contrastCurveDescriptor": "Reference metadata only; positive reversal workflow pending",
+      "displayName": "Fujifilm Velvia 50",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.fujifilm_velvia_50.v1",
+      "grainModelDescriptor": "Nominal fine slide-film grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 50
+      },
+      "processFamily": "e6_slide_reversal",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "slide_reversal",
+      "stockFamilyDescriptor": "Saturated color reversal",
+      "suggestedGenericPresetId": null
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a fine-grain black-and-white panchromatic stock family; generic fine-grain preset is only a starting point.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Ilford FP4 Plus 125",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.ilford_fp4_plus_125.v1",
+      "grainModelDescriptor": "Nominal fine silver-grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 125
+      },
+      "processFamily": "black_and_white_silver_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "black_and_white_negative",
+      "stockFamilyDescriptor": "Fine-grain silver negative",
+      "suggestedGenericPresetId": "negative_lab.generic.bw.fine_grain.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a high-speed black-and-white panchromatic stock family; generic push preset is only a starting point.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Ilford HP5 Plus 400",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.ilford_hp5_plus_400.v1",
+      "grainModelDescriptor": "Nominal higher-speed silver-grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 400
+      },
+      "processFamily": "black_and_white_silver_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "black_and_white_negative",
+      "stockFamilyDescriptor": "High-speed silver negative",
+      "suggestedGenericPresetId": "negative_lab.generic.bw.push_contrast.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a daylight color reversal stock family; no negative-lab applied profile is implied.",
+      "contrastCurveDescriptor": "Reference metadata only; positive reversal workflow pending",
+      "displayName": "Kodak Ektachrome E100",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_ektachrome_e100.v1",
+      "grainModelDescriptor": "Nominal fine slide-film grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 100
+      },
+      "processFamily": "e6_slide_reversal",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "slide_reversal",
+      "stockFamilyDescriptor": "Daylight color reversal",
+      "suggestedGenericPresetId": null
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a fine-grain saturated C-41 still-photo stock family; generic saturated preset is only a starting point.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Kodak Ektar 100",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_ektar_100.v1",
+      "grainModelDescriptor": "Nominal fine C-41 grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 100
+      },
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "color_negative",
+      "stockFamilyDescriptor": "Saturated still color negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.saturated.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a consumer warm C-41 stock family; generic warm preset is only a starting point.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Kodak Gold 200",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_gold_200.v1",
+      "grainModelDescriptor": "Nominal moderate C-41 grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 200
+      },
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "color_negative",
+      "stockFamilyDescriptor": "Consumer still color negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.warm_consumer.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a fine-grain portrait C-41 stock family; generic portrait preset is only a starting point.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Kodak Portra 160",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_portra_160.v1",
+      "grainModelDescriptor": "Nominal fine C-41 grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 160
+      },
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "color_negative",
+      "stockFamilyDescriptor": "Portrait still color negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.portrait.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a medium-speed portrait C-41 stock family; generic portrait preset is only a starting point.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Kodak Portra 400",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_portra_400.v1",
+      "grainModelDescriptor": "Nominal moderate C-41 grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 400
+      },
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "color_negative",
+      "stockFamilyDescriptor": "Portrait still color negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.portrait.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a high-speed portrait C-41 stock family; generic high-speed preset is only a starting point.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Kodak Portra 800",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_portra_800.v1",
+      "grainModelDescriptor": "Nominal higher-speed C-41 grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 800
+      },
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "color_negative",
+      "stockFamilyDescriptor": "High-speed portrait still color negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.high_speed.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a fine-grain tabular black-and-white stock family; generic fine-grain preset is only a starting point.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Kodak T-Max 100",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_t_max_100.v1",
+      "grainModelDescriptor": "Nominal fine tabular silver-grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 100
+      },
+      "processFamily": "black_and_white_silver_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "black_and_white_negative",
+      "stockFamilyDescriptor": "Fine-grain silver negative",
+      "suggestedGenericPresetId": "negative_lab.generic.bw.fine_grain.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a classic high-speed black-and-white panchromatic stock family; generic classic preset is only a starting point.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Kodak Tri-X 400",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_tri_x_400.v1",
+      "grainModelDescriptor": "Nominal classic silver-grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "ISO",
+        "value": 400
+      },
+      "processFamily": "black_and_white_silver_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "black_and_white_negative",
+      "stockFamilyDescriptor": "Classic silver negative",
+      "suggestedGenericPresetId": "negative_lab.generic.bw.classic.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a daylight-balanced medium-speed cinema negative stock family; applied behavior is not provided.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Kodak Vision3 250D 5207",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_vision3_250d_5207.v1",
+      "grainModelDescriptor": "Nominal moderate cinema-negative grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "EI",
+        "value": 250
+      },
+      "processFamily": "ecn2_cinema_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "cinema_negative",
+      "stockFamilyDescriptor": "Daylight cinema color negative",
+      "suggestedGenericPresetId": null
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a tungsten-balanced high-speed cinema negative stock family; applied behavior is not provided.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Kodak Vision3 500T 5219",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_vision3_500t_5219.v1",
+      "grainModelDescriptor": "Nominal higher-speed cinema-negative grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "EI",
+        "value": 500
+      },
+      "processFamily": "ecn2_cinema_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "cinema_negative",
+      "stockFamilyDescriptor": "Tungsten cinema color negative",
+      "suggestedGenericPresetId": null
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "colorResponseNotes": "Reference metadata for a daylight-balanced fine-grain cinema negative stock family; applied behavior is not provided.",
+      "contrastCurveDescriptor": "Reference metadata only; runtime curve not provided",
+      "displayName": "Kodak Vision3 50D 5203",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_vision3_50d_5203.v1",
+      "grainModelDescriptor": "Nominal fine cinema-negative grain metadata",
+      "measurementSource": "public_or_project_metadata_only",
+      "namingTier": "named_stock_reference",
+      "nominalIso": {
+        "sourceStatus": "nominal_public_metadata",
+        "unit": "EI",
+        "value": 50
+      },
+      "processFamily": "ecn2_cinema_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "sourceReferences": [
+        "public manufacturer/reference metadata; no endorsement"
+      ],
+      "stockClass": "cinema_negative",
+      "stockFamilyDescriptor": "Daylight cinema color negative",
+      "suggestedGenericPresetId": null
+    }
+  ],
+  "generatedFrom": "src/data/negativeLabStockMetadataCatalog.json",
+  "schemaVersion": 1,
+  "version": "2026-06-17"
+}

@@ -169,6 +169,7 @@
     "check:negative-lab-real-fixtures": "bun scripts/check-negative-lab-real-fixtures.mjs",
     "check:negative-lab-frame-health": "bun scripts/check-negative-lab-frame-health-report.mjs",
     "check:negative-lab-stock-registry": "bun scripts/check-negative-lab-stock-registry.mjs",
+    "check:negative-lab-stock-metadata-catalog": "bun scripts/check-negative-lab-stock-metadata-catalog.mjs",
     "check:negative-lab-workspace": "bun scripts/check-negative-lab-workspace.mjs",
     "check:negative-lab-roll-cockpit": "bun scripts/check-negative-lab-roll-cockpit.mjs",
     "check:negative-lab-measured-profiles": "bun scripts/check-negative-lab-measured-profiles.mjs",
