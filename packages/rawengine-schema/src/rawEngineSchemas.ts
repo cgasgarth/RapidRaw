@@ -2188,6 +2188,59 @@ export const panoramaInvalidationReasonV1Schema = z.enum([
 
 export const panoramaStaleStateV1Schema = z.enum(['current', 'stale', 'unknown']);
 
+type SourceIndexRef = { sourceIndex: number };
+
+interface SourceStateCoverageOptions<TSourceRef extends SourceIndexRef, TSourceState extends SourceIndexRef> {
+  context: z.RefinementCtx;
+  coverageMessage: string;
+  path: Array<string | number>;
+  referenceMessage: string;
+  sourceImageRefs: Array<TSourceRef>;
+  sourceStates: Array<TSourceState>;
+  uniqueMessage: string;
+}
+
+const validateSourceStateCoverage = <TSourceRef extends SourceIndexRef, TSourceState extends SourceIndexRef>({
+  context,
+  coverageMessage,
+  path,
+  referenceMessage,
+  sourceImageRefs,
+  sourceStates,
+  uniqueMessage,
+}: SourceStateCoverageOptions<TSourceRef, TSourceState>) => {
+  const sourceIndexes = new Set(sourceImageRefs.map((source) => source.sourceIndex));
+  const stateIndexes = new Set<number>();
+
+  for (const [index, sourceState] of sourceStates.entries()) {
+    if (stateIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: uniqueMessage,
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+
+    stateIndexes.add(sourceState.sourceIndex);
+
+    if (!sourceIndexes.has(sourceState.sourceIndex)) {
+      context.addIssue({
+        code: 'custom',
+        message: referenceMessage,
+        path: [...path, index, 'sourceIndex'],
+      });
+    }
+  }
+
+  if (stateIndexes.size !== sourceIndexes.size) {
+    context.addIssue({
+      code: 'custom',
+      message: coverageMessage,
+      path,
+    });
+  }
+};
+
 const panoramaSourceStateV1Schema = z
   .object({
     contentHash: z.string().trim().min(1),
@@ -2202,36 +2255,15 @@ const validatePanoramaSourceState = (
   context: z.RefinementCtx,
   path: Array<string | number>,
 ) => {
-  const sourceIndexes = new Set(sourceImageRefs.map((source) => source.sourceIndex));
-  const stateIndexes = new Set<number>();
-
-  for (const [index, sourceState] of sourceStates.entries()) {
-    if (stateIndexes.has(sourceState.sourceIndex)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Panorama source state entries require unique source indexes.',
-        path: [...path, index, 'sourceIndex'],
-      });
-    }
-
-    stateIndexes.add(sourceState.sourceIndex);
-
-    if (!sourceIndexes.has(sourceState.sourceIndex)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Panorama source state entries must reference sourceImageRefs.',
-        path: [...path, index, 'sourceIndex'],
-      });
-    }
-  }
-
-  if (stateIndexes.size !== sourceIndexes.size) {
-    context.addIssue({
-      code: 'custom',
-      message: 'Panorama source state entries must cover every source image.',
-      path,
-    });
-  }
+  validateSourceStateCoverage({
+    context,
+    coverageMessage: 'Panorama source state entries must cover every source image.',
+    path,
+    referenceMessage: 'Panorama source state entries must reference sourceImageRefs.',
+    sourceImageRefs,
+    sourceStates,
+    uniqueMessage: 'Panorama source state entries require unique source indexes.',
+  });
 };
 
 export const panoramaBackendCapabilityReportV1Schema = z
@@ -3573,36 +3605,15 @@ const validateHdrSourceState = (
   context: z.RefinementCtx,
   path: Array<string | number>,
 ) => {
-  const sourceIndexes = new Set(sourceImageRefs.map((source) => source.sourceIndex));
-  const stateIndexes = new Set<number>();
-
-  for (const [index, sourceState] of sourceStates.entries()) {
-    if (stateIndexes.has(sourceState.sourceIndex)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'HDR source state entries require unique source indexes.',
-        path: [...path, index, 'sourceIndex'],
-      });
-    }
-
-    stateIndexes.add(sourceState.sourceIndex);
-
-    if (!sourceIndexes.has(sourceState.sourceIndex)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'HDR source state entries must reference sourceImageRefs.',
-        path: [...path, index, 'sourceIndex'],
-      });
-    }
-  }
-
-  if (stateIndexes.size !== sourceIndexes.size) {
-    context.addIssue({
-      code: 'custom',
-      message: 'HDR source state entries must cover every source image.',
-      path,
-    });
-  }
+  validateSourceStateCoverage({
+    context,
+    coverageMessage: 'HDR source state entries must cover every source image.',
+    path,
+    referenceMessage: 'HDR source state entries must reference sourceImageRefs.',
+    sourceImageRefs,
+    sourceStates,
+    uniqueMessage: 'HDR source state entries require unique source indexes.',
+  });
 };
 
 export const hdrMergeArtifactV1Schema = z
@@ -3749,36 +3760,15 @@ const validateFocusStackSourceState = (
   context: z.RefinementCtx,
   path: Array<string | number>,
 ) => {
-  const sourceIndexes = new Set(sourceImageRefs.map((source) => source.sourceIndex));
-  const stateIndexes = new Set<number>();
-
-  for (const [index, sourceState] of sourceStates.entries()) {
-    if (stateIndexes.has(sourceState.sourceIndex)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Focus stack source state entries require unique source indexes.',
-        path: [...path, index, 'sourceIndex'],
-      });
-    }
-
-    stateIndexes.add(sourceState.sourceIndex);
-
-    if (!sourceIndexes.has(sourceState.sourceIndex)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Focus stack source state entry must reference a source image index.',
-        path: [...path, index, 'sourceIndex'],
-      });
-    }
-  }
-
-  if (stateIndexes.size !== sourceIndexes.size) {
-    context.addIssue({
-      code: 'custom',
-      message: 'Focus stack source state entries must cover every source image.',
-      path,
-    });
-  }
+  validateSourceStateCoverage({
+    context,
+    coverageMessage: 'Focus stack source state entries must cover every source image.',
+    path,
+    referenceMessage: 'Focus stack source state entry must reference a source image index.',
+    sourceImageRefs,
+    sourceStates,
+    uniqueMessage: 'Focus stack source state entries require unique source indexes.',
+  });
 };
 
 export const focusStackArtifactV1Schema = z
@@ -3922,36 +3912,15 @@ const validateSuperResolutionSourceState = (
   context: z.RefinementCtx,
   path: Array<string | number>,
 ) => {
-  const sourceIndexes = new Set(sourceImageRefs.map((source) => source.sourceIndex));
-  const stateIndexes = new Set<number>();
-
-  for (const [index, sourceState] of sourceStates.entries()) {
-    if (stateIndexes.has(sourceState.sourceIndex)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Super-resolution source state entries require unique source indexes.',
-        path: [...path, index, 'sourceIndex'],
-      });
-    }
-
-    stateIndexes.add(sourceState.sourceIndex);
-
-    if (!sourceIndexes.has(sourceState.sourceIndex)) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Super-resolution source state entries must reference sourceImageRefs.',
-        path: [...path, index, 'sourceIndex'],
-      });
-    }
-  }
-
-  if (stateIndexes.size !== sourceIndexes.size) {
-    context.addIssue({
-      code: 'custom',
-      message: 'Super-resolution source state entries must cover every source image.',
-      path,
-    });
-  }
+  validateSourceStateCoverage({
+    context,
+    coverageMessage: 'Super-resolution source state entries must cover every source image.',
+    path,
+    referenceMessage: 'Super-resolution source state entries must reference sourceImageRefs.',
+    sourceImageRefs,
+    sourceStates,
+    uniqueMessage: 'Super-resolution source state entries require unique source indexes.',
+  });
 };
 
 const validateUniqueSuperResolutionSourceState = (
