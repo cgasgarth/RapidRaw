@@ -97,6 +97,7 @@ const CHECK_GROUPS = {
     'check:negative-lab-ui-presets',
     'check:negative-lab-frame-health',
     'check:negative-lab-measured-render-proof',
+    'check:negative-lab-real-fixtures',
   ],
 };
 
