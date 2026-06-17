@@ -51,6 +51,7 @@ const CHECK_GROUPS = {
     'check:private-raw-evidence',
     'check:raw-open-edit-export-proof',
     'check:raw-open-edit-export-command-wrapper',
+    'check:raw-open-edit-export-private-report-collector',
     'check:raw-open-edit-export-run-reports',
     'check:color-pipeline-audit',
     'check:denoise-fixtures',
