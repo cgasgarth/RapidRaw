@@ -1,12 +1,17 @@
 #!/usr/bin/env bun
-// @ts-check
 
 import { readdirSync, readFileSync } from 'node:fs';
+import process from 'node:process';
 
 const SCRIPT_DIR = 'scripts';
 const MAX_SCRIPTS_WITHOUT_TS_CHECK = 160;
 
-export const collectScriptTypeCoverage = (files) => {
+type ScriptSource = {
+  path: string;
+  source: string;
+};
+
+export const collectScriptTypeCoverage = (files: readonly ScriptSource[]) => {
   const missingTsCheck = files.filter(({ path, source }) => {
     if (path.endsWith('.ts')) {
       return false;
@@ -23,7 +28,7 @@ export const collectScriptTypeCoverage = (files) => {
   };
 };
 
-const runSelfTest = () => {
+const runSelfTest = (): void => {
   const result = collectScriptTypeCoverage([
     { path: 'scripts/typed.mjs', source: '#!/usr/bin/env bun\n// @ts-check\n' },
     { path: 'scripts/untyped.mjs', source: '#!/usr/bin/env bun\nconsole.log(1);\n' },
@@ -42,7 +47,7 @@ if (process.argv.includes('--self-test')) {
   process.exit(0);
 }
 
-const collectFiles = (directory) =>
+const collectFiles = (directory: string): string[] =>
   readdirSync(directory, { withFileTypes: true })
     .flatMap((entry) => {
       const path = `${directory}/${entry.name}`;

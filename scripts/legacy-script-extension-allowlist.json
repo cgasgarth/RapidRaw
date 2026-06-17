@@ -138,7 +138,6 @@
   "scripts/check-render-artifact-comparison.mjs",
   "scripts/check-rust-advisory-waivers.mjs",
   "scripts/check-rust-feature-policy.mjs",
-  "scripts/check-script-type-coverage.mjs",
   "scripts/check-selective-color-falloff.mjs",
   "scripts/check-selective-color-mask-fixtures.mjs",
   "scripts/check-selective-color-ranges.mjs",
