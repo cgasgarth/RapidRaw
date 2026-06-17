@@ -91,6 +91,9 @@ const formatPercentValue = (value: number) => `${Math.round(value)}%`;
 const formatDensityValue = (value: number) => value.toFixed(3);
 const formatRgbValue = (value: number) => `${Math.round(value * 255)}`;
 const NEGATIVE_LAB_PROFILE_BROWSER_ROWS = buildNegativeLabProfileBrowserRows();
+const NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID = new Map(
+  NEGATIVE_LAB_PROFILE_BROWSER_ROWS.map((row) => [row.presetId, row]),
+);
 const NEGATIVE_LAB_STOCK_REGISTRY_COUNTS = buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY);
 const formatStockRegistryToken = (value: string) => value.split('_').join(' ');
 const DENSITOMETER_CHANNEL_LABEL_KEYS: Record<
@@ -1149,17 +1152,32 @@ export default function NegativeConversionModal({
             <div className="grid grid-cols-1 gap-2">
               {NEGATIVE_LAB_STOCK_REGISTRY.entries.map((entry) => {
                 const isActiveFamily = entry.genericPresetId !== null && entry.genericPresetId === selectedPresetId;
+                const mappedProfile =
+                  entry.genericPresetId === null
+                    ? null
+                    : NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID.get(entry.genericPresetId);
+                const isSelectableFamily =
+                  mappedProfile !== null && mappedProfile !== undefined && mappedProfile.isSelectable;
 
                 return (
-                  <div
+                  <button
+                    aria-current={isActiveFamily ? 'true' : undefined}
                     className={cx(
-                      'rounded-md border p-2 text-xs',
+                      'rounded-md border p-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                       isActiveFamily
                         ? 'border-accent bg-accent/10 text-text-primary'
                         : 'border-surface bg-bg-secondary text-text-secondary',
+                      isSelectableFamily && !isActiveFamily && 'hover:bg-surface',
                     )}
                     data-testid={`negative-lab-stock-family-${entry.registryId}`}
+                    disabled={!isSelectableFamily}
                     key={entry.registryId}
+                    onClick={() => {
+                      if (mappedProfile !== null && mappedProfile !== undefined) {
+                        handlePresetSelect(mappedProfile);
+                      }
+                    }}
+                    type="button"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="font-medium text-text-primary">{entry.stockFamilyDescriptor}</span>
@@ -1172,7 +1190,7 @@ export default function NegativeConversionModal({
                       <span>{formatStockRegistryToken(entry.legalNamingStatus)}</span>
                       <span>{formatStockRegistryToken(entry.fixtureStatus)}</span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
