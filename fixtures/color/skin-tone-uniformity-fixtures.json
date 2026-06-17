@@ -13,6 +13,16 @@
         "luminance": 0.46,
         "saturation": 0.5
       },
+      "inputRgb": {
+        "red": 0.72,
+        "green": 0.45,
+        "blue": 0.34
+      },
+      "expectedRgb": {
+        "red": 0.724991914893617,
+        "green": 0.5005205935050392,
+        "blue": 0.3990080851063831
+      },
       "settings": {
         "hueUniformity": 0.5,
         "luminanceUniformity": 0.4,
@@ -56,6 +66,16 @@
         "hueDegrees": 45,
         "luminance": 0.82,
         "saturation": 0.72
+      },
+      "inputRgb": {
+        "red": 0.82,
+        "green": 0.42,
+        "blue": 0.25
+      },
+      "expectedRgb": {
+        "red": 0.7425999999999999,
+        "green": 0.5658000000000003,
+        "blue": 0.47740000000000005
       },
       "settings": {
         "hueUniformity": 1,
