@@ -52,8 +52,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 - The standing reminder automation is `check-rapidraw-consult-and-prs`.
 - Keep it active unless the user explicitly asks to remove it.
-- It should remind the agent to check PRs, respect the 3-open-PR cap, and use
-  consult for hard decisions.
+- Keep its instructions simple: respect the 3-open-PR cap and use consult for
+  hard decisions.
 
 ## Consult And Research
 
