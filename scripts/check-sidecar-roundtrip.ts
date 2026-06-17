@@ -373,6 +373,8 @@ const [focusStackArtifact] = computationalMergeArtifacts.focusStackArtifacts;
 assertEqual(focusStackArtifact.family, 'focus_stack', 'focus stack artifact family');
 assertEqual(focusStackArtifact.outputArtifact.storage, 'sidecar_artifact', 'focus stack output storage');
 assertEqual(focusStackArtifact.sharpnessMapArtifact?.storage, 'sidecar_artifact', 'focus stack sharpness map storage');
+assertEqual(focusStackArtifact.sharpnessSettings.cellCount, 3, 'focus stack sharpness cell count');
+assertEqual(focusStackArtifact.sharpnessSettings.weightPower, 5, 'focus stack sharpness weight power');
 assertEqual(
   focusStackArtifact.depthConfidenceMapArtifact?.storage,
   'sidecar_artifact',

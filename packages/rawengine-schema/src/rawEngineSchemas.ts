@@ -4088,6 +4088,15 @@ const validateFocusStackSourceState = (
   });
 };
 
+const focusStackSharpnessSettingsV1Schema = z
+  .object({
+    cellCount: z.number().int().positive(),
+    lowConfidenceCellCount: z.number().int().nonnegative(),
+    lowConfidenceWeightFloor: z.number().min(0).max(1),
+    weightPower: z.number().positive(),
+  })
+  .strict();
+
 export const focusStackArtifactV1Schema = z
   .object({
     artifactId: z.string().trim().min(1),
@@ -4118,6 +4127,7 @@ export const focusStackArtifactV1Schema = z
     retouchLayerPolicy: focusStackRetouchLayerPolicyV1Schema,
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
     sharpnessMapArtifact: artifactHandleV1Schema.optional(),
+    sharpnessSettings: focusStackSharpnessSettingsV1Schema,
     sourceImageRefs: z.array(computationalMergeSourceImageRefV1Schema).min(2),
     sourceState: z.array(focusStackSourceStateV1Schema).min(2),
     staleState: z
