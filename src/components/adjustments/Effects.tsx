@@ -1,8 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { type ChangeEvent, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import AdjustmentSlider from './AdjustmentSlider';
 import FilmLookBrowser from './FilmLookBrowser';
 import { TextVariants } from '../../types/typography';
 import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
@@ -14,7 +15,6 @@ import {
 } from '../../utils/filmLookBrowser';
 import { AppSettings, Invokes, type Preset } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
-import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
 
 interface EffectsPanelProps {
@@ -29,14 +29,6 @@ interface EffectsPanelProps {
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 
 type PresetExportItem = { preset: Preset };
-
-type SliderChangeEvent =
-  | ChangeEvent<HTMLInputElement>
-  | {
-      target: {
-        value: number | string;
-      };
-    };
 
 const FILM_LOOK_PRESET_FILE_EXTENSION = 'rrpreset';
 const FILM_LOOK_PRESET_FILE_TYPE = 'RapidRaw Preset';
@@ -64,9 +56,8 @@ export default function EffectsPanel({
   const { t } = useTranslation();
   const [filmLookPresetStatus, setFilmLookPresetStatus] = useState<string | null>(null);
 
-  const handleAdjustmentChange = (key: string, value: number | string) => {
-    const numericValue = parseInt(String(value), 10);
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: numericValue }));
+  const handleAdjustmentChange = (key: string, value: number) => {
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: Math.trunc(value) }));
   };
 
   const handleLutIntensityChange = (intensity: number) => {
@@ -141,24 +132,24 @@ export default function EffectsPanel({
           {t('adjustments.effects.creative')}
         </UiText>
 
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.effects.glow')}
           max={100}
           min={0}
-          onChange={(e: SliderChangeEvent) => {
-            handleAdjustmentChange(CreativeAdjustment.GlowAmount, e.target.value);
+          onValueChange={(value) => {
+            handleAdjustmentChange(CreativeAdjustment.GlowAmount, value);
           }}
           step={1}
           value={adjustments.glowAmount}
           onDragStateChange={onDragStateChange}
         />
 
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.effects.halation')}
           max={100}
           min={0}
-          onChange={(e: SliderChangeEvent) => {
-            handleAdjustmentChange(CreativeAdjustment.HalationAmount, e.target.value);
+          onValueChange={(value) => {
+            handleAdjustmentChange(CreativeAdjustment.HalationAmount, value);
           }}
           step={1}
           value={adjustments.halationAmount}
@@ -166,12 +157,12 @@ export default function EffectsPanel({
         />
 
         {!isForMask && (
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.effects.lightFlares')}
             max={100}
             min={0}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(CreativeAdjustment.FlareAmount, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(CreativeAdjustment.FlareAmount, value);
             }}
             step={1}
             value={adjustments.flareAmount}
@@ -219,48 +210,48 @@ export default function EffectsPanel({
               <UiText variant={TextVariants.heading} className="mb-2">
                 {t('adjustments.effects.vignette')}
               </UiText>
-              <Slider
+              <AdjustmentSlider
                 label={t('adjustments.effects.amount')}
                 max={100}
                 min={-100}
-                onChange={(e: SliderChangeEvent) => {
-                  handleAdjustmentChange(Effect.VignetteAmount, e.target.value);
+                onValueChange={(value) => {
+                  handleAdjustmentChange(Effect.VignetteAmount, value);
                 }}
                 step={1}
                 value={adjustments.vignetteAmount}
                 onDragStateChange={onDragStateChange}
               />
-              <Slider
+              <AdjustmentSlider
                 defaultValue={50}
                 label={t('adjustments.effects.midpoint')}
                 max={100}
                 min={0}
-                onChange={(e: SliderChangeEvent) => {
-                  handleAdjustmentChange(Effect.VignetteMidpoint, e.target.value);
+                onValueChange={(value) => {
+                  handleAdjustmentChange(Effect.VignetteMidpoint, value);
                 }}
                 step={1}
                 value={adjustments.vignetteMidpoint}
                 onDragStateChange={onDragStateChange}
                 fillOrigin="min"
               />
-              <Slider
+              <AdjustmentSlider
                 label={t('adjustments.effects.roundness')}
                 max={100}
                 min={-100}
-                onChange={(e: SliderChangeEvent) => {
-                  handleAdjustmentChange(Effect.VignetteRoundness, e.target.value);
+                onValueChange={(value) => {
+                  handleAdjustmentChange(Effect.VignetteRoundness, value);
                 }}
                 step={1}
                 value={adjustments.vignetteRoundness}
                 onDragStateChange={onDragStateChange}
               />
-              <Slider
+              <AdjustmentSlider
                 defaultValue={50}
                 label={t('adjustments.effects.feather')}
                 max={100}
                 min={0}
-                onChange={(e: SliderChangeEvent) => {
-                  handleAdjustmentChange(Effect.VignetteFeather, e.target.value);
+                onValueChange={(value) => {
+                  handleAdjustmentChange(Effect.VignetteFeather, value);
                 }}
                 step={1}
                 value={adjustments.vignetteFeather}
@@ -275,37 +266,37 @@ export default function EffectsPanel({
               <UiText variant={TextVariants.heading} className="mb-2">
                 {t('adjustments.effects.grain')}
               </UiText>
-              <Slider
+              <AdjustmentSlider
                 label={t('adjustments.effects.amount')}
                 max={100}
                 min={0}
-                onChange={(e: SliderChangeEvent) => {
-                  handleAdjustmentChange(Effect.GrainAmount, e.target.value);
+                onValueChange={(value) => {
+                  handleAdjustmentChange(Effect.GrainAmount, value);
                 }}
                 step={1}
                 value={adjustments.grainAmount}
                 onDragStateChange={onDragStateChange}
               />
-              <Slider
+              <AdjustmentSlider
                 defaultValue={25}
                 label={t('adjustments.effects.size')}
                 max={100}
                 min={0}
-                onChange={(e: SliderChangeEvent) => {
-                  handleAdjustmentChange(Effect.GrainSize, e.target.value);
+                onValueChange={(value) => {
+                  handleAdjustmentChange(Effect.GrainSize, value);
                 }}
                 step={1}
                 value={adjustments.grainSize}
                 onDragStateChange={onDragStateChange}
                 fillOrigin="min"
               />
-              <Slider
+              <AdjustmentSlider
                 defaultValue={50}
                 label={t('adjustments.effects.roughness')}
                 max={100}
                 min={0}
-                onChange={(e: SliderChangeEvent) => {
-                  handleAdjustmentChange(Effect.GrainRoughness, e.target.value);
+                onValueChange={(value) => {
+                  handleAdjustmentChange(Effect.GrainRoughness, value);
                 }}
                 step={1}
                 value={adjustments.grainRoughness}
