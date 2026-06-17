@@ -6,17 +6,20 @@ import {
   RAW_ENGINE_APP_SERVER_HOST_MANIFEST,
   buildRawEngineAppServerCapabilitiesReplay,
   buildRawEngineAppServerHealthReplay,
+  buildRawEngineAppServerRouteCatalogReplay,
 } from '../src/utils/rawEngineAppServerHost.ts';
 import {
   rawEngineAppServerCapabilitiesReplaySchema,
   rawEngineAppServerHealthReplaySchema,
   rawEngineAppServerHostManifestSchema,
+  rawEngineAppServerRouteCatalogReplaySchema,
 } from '../src/schemas/agentRuntimeSchemas.ts';
 
 const failures = [];
 const manifest = rawEngineAppServerHostManifestSchema.parse(RAW_ENGINE_APP_SERVER_HOST_MANIFEST);
 const healthTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.health');
 const capabilitiesTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.capabilities');
+const routeCatalogTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.route_catalog');
 
 if (healthTool === undefined) {
   failures.push('Missing rawengine.host.health tool.');
@@ -30,6 +33,13 @@ if (capabilitiesTool === undefined) {
 } else {
   if (capabilitiesTool.mutates) failures.push('Capabilities tool must be read-only.');
   if (capabilitiesTool.toolKind !== 'read') failures.push('Capabilities tool must use read kind.');
+}
+
+if (routeCatalogTool === undefined) {
+  failures.push('Missing rawengine.host.route_catalog tool.');
+} else {
+  if (routeCatalogTool.mutates) failures.push('Route catalog tool must be read-only.');
+  if (routeCatalogTool.toolKind !== 'read') failures.push('Route catalog tool must use read kind.');
 }
 
 const replay = rawEngineAppServerHealthReplaySchema.parse(
@@ -67,6 +77,28 @@ if (capabilitiesReplay.auditLog[0]?.toolName !== 'rawengine.host.capabilities') 
   failures.push('Capabilities replay audit tool mismatch.');
 }
 
+const routeCatalogReplay = rawEngineAppServerRouteCatalogReplaySchema.parse(
+  buildRawEngineAppServerRouteCatalogReplay({
+    requestId: 'route_catalog_replay_001',
+    toolName: 'rawengine.host.route_catalog',
+  }),
+);
+
+if (routeCatalogReplay.response.routes.length < 20) {
+  failures.push('Route catalog replay must expose mapped editing routes.');
+}
+for (const expectedFamily of ['ai', 'computational_merge', 'film_look', 'negative_lab', 'tone_color']) {
+  if (!routeCatalogReplay.response.routes.some((route) => route.family === expectedFamily)) {
+    failures.push(`Route catalog missing ${expectedFamily}.`);
+  }
+}
+if (routeCatalogReplay.auditLog.length !== 1 || routeCatalogReplay.auditLog[0]?.mutates) {
+  failures.push('Route catalog replay audit log must be read-only.');
+}
+if (routeCatalogReplay.auditLog[0]?.toolName !== 'rawengine.host.route_catalog') {
+  failures.push('Route catalog replay audit tool mismatch.');
+}
+
 const source = [
   'src/utils/rawEngineAppServerHost.ts',
   'src/schemas/agentRuntimeSchemas.ts',
@@ -79,6 +111,7 @@ for (const marker of [
   'RAW_ENGINE_APP_SERVER_HOST_MANIFEST',
   'rawengine.host.health',
   'rawengine.host.capabilities',
+  'rawengine.host.route_catalog',
   'No UI automation',
   'codex app-server',
   'stdio JSONL',

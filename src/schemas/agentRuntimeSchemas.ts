@@ -64,6 +64,13 @@ export const rawEngineAppServerCapabilitiesRequestSchema = z
   })
   .strict();
 
+export const rawEngineAppServerRouteCatalogRequestSchema = z
+  .object({
+    requestId: z.string().trim().min(1),
+    toolName: z.literal('rawengine.host.route_catalog'),
+  })
+  .strict();
+
 export const rawEngineAppServerHealthResponseSchema = z
   .object({
     manifestToolCount: z.number().int().positive(),
@@ -80,6 +87,42 @@ export const rawEngineAppServerCapabilitiesResponseSchema = z
     runtime: z.literal(AgentRuntimeId.AppServer),
     status: z.literal('ok'),
     tools: z.array(rawEngineAppServerToolDefinitionSchema).min(1),
+    transport: rawEngineAppServerTransportSchema,
+  })
+  .strict();
+
+export const rawEngineAppServerRouteFamilySchema = z.enum([
+  'ai',
+  'computational_merge',
+  'film_look',
+  'negative_lab',
+  'tone_color',
+]);
+export const rawEngineAppServerRouteModeSchema = z.enum([
+  'apply_dry_run_plan',
+  'dry_run_command',
+  'host_command',
+  'mapped_invoke',
+]);
+
+export const rawEngineAppServerRouteCatalogEntrySchema = z
+  .object({
+    commandName: z.string().trim().min(1),
+    family: rawEngineAppServerRouteFamilySchema,
+    inputSchemaNames: z.array(z.string().trim().min(1)).min(1),
+    modes: z.array(rawEngineAppServerRouteModeSchema).min(1),
+    outputSchemaNames: z.array(z.string().trim().min(1)).min(1),
+    runtimeCheckScripts: z.array(z.string().trim().min(1)),
+    toolNames: z.array(z.string().trim().min(1)).min(1),
+  })
+  .strict();
+
+export const rawEngineAppServerRouteCatalogResponseSchema = z
+  .object({
+    requestId: z.string().trim().min(1),
+    routes: z.array(rawEngineAppServerRouteCatalogEntrySchema).min(1),
+    runtime: z.literal(AgentRuntimeId.AppServer),
+    status: z.literal('ok'),
     transport: rawEngineAppServerTransportSchema,
   })
   .strict();
@@ -119,6 +162,17 @@ export const rawEngineAppServerCapabilitiesReplaySchema = z
   })
   .strict();
 
+export const rawEngineAppServerRouteCatalogReplaySchema = z
+  .object({
+    auditLog: z.array(rawEngineAppServerAuditEntrySchema).min(1),
+    manifest: rawEngineAppServerHostManifestSchema,
+    request: rawEngineAppServerRouteCatalogRequestSchema,
+    response: rawEngineAppServerRouteCatalogResponseSchema,
+    replayId: z.string().trim().min(1),
+    schemaVersion: z.literal(1),
+  })
+  .strict();
+
 export type RawEngineAppServerAuditEntry = z.infer<typeof rawEngineAppServerAuditEntrySchema>;
 export type RawEngineAppServerCapabilitiesReplay = z.infer<typeof rawEngineAppServerCapabilitiesReplaySchema>;
 export type RawEngineAppServerCapabilitiesRequest = z.infer<typeof rawEngineAppServerCapabilitiesRequestSchema>;
@@ -127,3 +181,9 @@ export type RawEngineAppServerHealthReplay = z.infer<typeof rawEngineAppServerHe
 export type RawEngineAppServerHealthRequest = z.infer<typeof rawEngineAppServerHealthRequestSchema>;
 export type RawEngineAppServerHealthResponse = z.infer<typeof rawEngineAppServerHealthResponseSchema>;
 export type RawEngineAppServerHostManifest = z.infer<typeof rawEngineAppServerHostManifestSchema>;
+export type RawEngineAppServerRouteCatalogEntry = z.infer<typeof rawEngineAppServerRouteCatalogEntrySchema>;
+export type RawEngineAppServerRouteCatalogReplay = z.infer<typeof rawEngineAppServerRouteCatalogReplaySchema>;
+export type RawEngineAppServerRouteCatalogRequest = z.infer<typeof rawEngineAppServerRouteCatalogRequestSchema>;
+export type RawEngineAppServerRouteCatalogResponse = z.infer<typeof rawEngineAppServerRouteCatalogResponseSchema>;
+export type RawEngineAppServerRouteFamily = z.infer<typeof rawEngineAppServerRouteFamilySchema>;
+export type RawEngineAppServerRouteMode = z.infer<typeof rawEngineAppServerRouteModeSchema>;
