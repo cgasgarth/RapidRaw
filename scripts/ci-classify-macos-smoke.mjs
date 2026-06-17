@@ -100,6 +100,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:command-palette-workflows',
     new Set(['bun scripts/capture-visual-smoke.mjs --scenario command-palette-workflows']),
   ],
+  ['check:colorchecker-fixtures', new Set(['bun scripts/check-colorchecker-fixtures.ts'])],
   ['check:film-look-browser-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario film-look-browser'])],
   ['check:focus-ui-api', new Set(['bun scripts/check-focus-ui-api.mjs'])],
   ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario focus-ui'])],
