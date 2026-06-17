@@ -2,9 +2,13 @@ import {
   ActorKind,
   ApprovalClass,
   RAW_ENGINE_SCHEMA_VERSION,
+  rawEngineAppServerToolCallValidationV1Schema,
   type ApprovalRequirementV1,
+  type RawEngineAppServerToolCallV1,
+  type RawEngineAppServerToolCallValidationV1,
   type RawEngineActor,
   type RawEngineTarget,
+  type RawEngineToolRegistryV1,
 } from './rawEngineSchemas.js';
 
 export const sampleAgentActor = (sessionId = 'session_sample'): RawEngineActor => ({
@@ -58,3 +62,23 @@ export const withSampleSchemaVersion = <TValue extends object>(value: TValue): T
   ...value,
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
 });
+
+type SampleAppServerToolCallInput = Omit<RawEngineAppServerToolCallV1, 'protocol' | 'schemaVersion' | 'transport'>;
+
+export const sampleAppServerToolCallValidation = ({
+  registry,
+  toolCall,
+}: {
+  registry: RawEngineToolRegistryV1;
+  toolCall: SampleAppServerToolCallInput;
+}): RawEngineAppServerToolCallValidationV1 =>
+  rawEngineAppServerToolCallValidationV1Schema.parse(
+    withSampleSchemaVersion({
+      registry,
+      toolCall: withSampleSchemaVersion({
+        ...toolCall,
+        protocol: 'codex_app_server_json_rpc',
+        transport: 'stdio',
+      }),
+    }),
+  );

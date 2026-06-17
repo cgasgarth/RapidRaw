@@ -65,7 +65,6 @@ import {
   projectLibrarySnapshotV1Schema,
   queryEnvelopeV1Schema,
   rawEngineAgentReplayFixtureV1Schema,
-  rawEngineAppServerToolCallValidationV1Schema,
   rawEngineToolRegistryV1Schema,
   superResolutionArtifactV1Schema,
   superResolutionDryRunSummaryV1Schema,
@@ -147,6 +146,7 @@ import {
 } from './rawEngineSchemas.js';
 import {
   sampleAgentActor,
+  sampleAppServerToolCallValidation,
   sampleEditApplyApproval,
   sampleExternalModelApproval,
   sampleFileMutationApproval,
@@ -513,9 +513,8 @@ export const sampleToolRegistryV1: RawEngineToolRegistryV1 = rawEngineToolRegist
 });
 
 export const sampleRawEngineAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: {
         approvalClass: ApprovalClass.PreviewOnly,
@@ -527,12 +526,9 @@ export const sampleRawEngineAppServerToolCallValidationV1: RawEngineAppServerToo
       inputSchemaName: 'CommandEnvelopeV1',
       itemId: 'item_tool_call_tone_preview',
       jsonRpcRequestId: 42,
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
       toolKind: 'dry_run',
       toolName: 'edit.dry_run_tone',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_sample',
     },
   });
@@ -1182,9 +1178,8 @@ export const sampleAiToolAgentReplayFixtureV1: RawEngineAgentReplayFixtureV1 =
   });
 
 export const sampleAiMaskDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleAiToolCommandEnvelopeV1.approval,
       arguments: sampleAiToolCommandEnvelopeV1,
@@ -1192,20 +1187,16 @@ export const sampleAiMaskDryRunAppServerToolCallValidationV1: RawEngineAppServer
       inputSchemaName: 'AiToolCommandEnvelopeV1',
       itemId: 'item_tool_call_ai_subject_mask_dry_run',
       jsonRpcRequestId: 'jsonrpc_ai_subject_mask_dry_run',
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_ai_mask_sample',
       toolKind: 'dry_run',
       toolName: 'ai.mask.dry_run_subject',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_ai_mask_sample',
     },
   });
 
 export const sampleAiMaskApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleAiToolApplyCommandEnvelopeV1.approval,
       arguments: sampleAiToolApplyCommandEnvelopeV1,
@@ -1213,12 +1204,9 @@ export const sampleAiMaskApplyAppServerToolCallValidationV1: RawEngineAppServerT
       inputSchemaName: 'AiToolCommandEnvelopeV1',
       itemId: 'item_tool_call_ai_subject_mask_apply',
       jsonRpcRequestId: 'jsonrpc_ai_subject_mask_apply',
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_ai_mask_sample',
       toolKind: 'apply',
       toolName: 'ai.mask.apply_subject',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_ai_mask_sample',
     },
   });
@@ -1422,9 +1410,8 @@ export const sampleAiEnhancementAgentReplayFixtureV1: RawEngineAgentReplayFixtur
   });
 
 export const sampleAiEnhancementDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleAiEnhancementCommandEnvelopeV1.approval,
       arguments: sampleAiEnhancementCommandEnvelopeV1,
@@ -1432,20 +1419,16 @@ export const sampleAiEnhancementDryRunAppServerToolCallValidationV1: RawEngineAp
       inputSchemaName: 'AiEnhancementCommandEnvelopeV1',
       itemId: 'item_tool_call_ai_denoise_dry_run',
       jsonRpcRequestId: 'jsonrpc_ai_denoise_dry_run',
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_ai_enhancement_sample',
       toolKind: 'dry_run',
       toolName: 'ai.enhancement.dry_run_command',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_ai_enhancement_sample',
     },
   });
 
 export const sampleAiEnhancementApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleAiEnhancementApplyCommandEnvelopeV1.approval,
       arguments: sampleAiEnhancementApplyCommandEnvelopeV1,
@@ -1453,12 +1436,9 @@ export const sampleAiEnhancementApplyAppServerToolCallValidationV1: RawEngineApp
       inputSchemaName: 'AiEnhancementCommandEnvelopeV1',
       itemId: 'item_tool_call_ai_denoise_apply',
       jsonRpcRequestId: 'jsonrpc_ai_denoise_apply',
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_ai_enhancement_sample',
       toolKind: 'apply',
       toolName: 'ai.enhancement.apply_command',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_ai_enhancement_sample',
     },
   });
@@ -1565,9 +1545,8 @@ export const sampleExportApplyResultV1: ExportApplyResultV1 = exportApplyResultV
 });
 
 export const sampleExportDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleExportCommandEnvelopeV1.approval,
       arguments: sampleExportCommandEnvelopeV1,
@@ -1575,20 +1554,16 @@ export const sampleExportDryRunAppServerToolCallValidationV1: RawEngineAppServer
       inputSchemaName: 'ExportCommandEnvelopeV1',
       itemId: 'item_tool_call_export_dry_run',
       jsonRpcRequestId: 'jsonrpc_export_dry_run',
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_export_sample',
       toolKind: 'dry_run',
       toolName: 'export.dry_run_command',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_export_sample',
     },
   });
 
 export const sampleExportApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleExportApplyCommandEnvelopeV1.approval,
       arguments: sampleExportApplyCommandEnvelopeV1,
@@ -1596,12 +1571,9 @@ export const sampleExportApplyAppServerToolCallValidationV1: RawEngineAppServerT
       inputSchemaName: 'ExportCommandEnvelopeV1',
       itemId: 'item_tool_call_export_apply',
       jsonRpcRequestId: 'jsonrpc_export_apply',
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_export_sample',
       toolKind: 'export',
       toolName: 'export.write_files',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_export_sample',
     },
   });
@@ -2497,9 +2469,8 @@ export const sampleComputationalMergeMutationResultV1: ComputationalMergeMutatio
   });
 
 export const sampleComputationalMergePanoramaDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleComputationalMergeCommandEnvelopeV1.approval,
       arguments: sampleComputationalMergeCommandEnvelopeV1,
@@ -2507,20 +2478,16 @@ export const sampleComputationalMergePanoramaDryRunAppServerToolCallValidationV1
       inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
       itemId: 'item_tool_call_panorama_dry_run',
       jsonRpcRequestId: 44,
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
       toolKind: 'dry_run',
       toolName: 'computationalmerge.panorama.dry_run_command',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_sample',
     },
   });
 
 export const sampleComputationalMergePanoramaApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleComputationalMergeApplyCommandEnvelopeV1.approval,
       arguments: sampleComputationalMergeApplyCommandEnvelopeV1,
@@ -2528,20 +2495,16 @@ export const sampleComputationalMergePanoramaApplyAppServerToolCallValidationV1:
       inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
       itemId: 'item_tool_call_panorama_apply',
       jsonRpcRequestId: 45,
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
       toolKind: 'apply',
       toolName: 'computationalmerge.panorama.apply_command',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_sample',
     },
   });
 
 export const sampleComputationalMergeFocusStackDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleComputationalMergeFocusStackCommandEnvelopeV1.approval,
       arguments: sampleComputationalMergeFocusStackCommandEnvelopeV1,
@@ -2549,20 +2512,16 @@ export const sampleComputationalMergeFocusStackDryRunAppServerToolCallValidation
       inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
       itemId: 'item_tool_call_focus_stack_dry_run',
       jsonRpcRequestId: 46,
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
       toolKind: 'dry_run',
       toolName: 'computationalmerge.focus_stack.dry_run_command',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_sample',
     },
   });
 
 export const sampleComputationalMergeFocusStackApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleComputationalMergeFocusStackApplyCommandEnvelopeV1.approval,
       arguments: sampleComputationalMergeFocusStackApplyCommandEnvelopeV1,
@@ -2570,20 +2529,16 @@ export const sampleComputationalMergeFocusStackApplyAppServerToolCallValidationV
       inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
       itemId: 'item_tool_call_focus_stack_apply',
       jsonRpcRequestId: 47,
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
       toolKind: 'apply',
       toolName: 'computationalmerge.focus_stack.apply_command',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_sample',
     },
   });
 
 export const sampleComputationalMergeSuperResolutionDryRunAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleComputationalMergeSuperResolutionCommandEnvelopeV1.approval,
       arguments: sampleComputationalMergeSuperResolutionCommandEnvelopeV1,
@@ -2591,20 +2546,16 @@ export const sampleComputationalMergeSuperResolutionDryRunAppServerToolCallValid
       inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
       itemId: 'item_tool_call_sr_dry_run',
       jsonRpcRequestId: 48,
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
       toolKind: 'dry_run',
       toolName: 'computationalmerge.super_resolution.dry_run_command',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_sample',
     },
   });
 
 export const sampleComputationalMergeSuperResolutionApplyAppServerToolCallValidationV1: RawEngineAppServerToolCallValidationV1 =
-  rawEngineAppServerToolCallValidationV1Schema.parse({
+  sampleAppServerToolCallValidation({
     registry: sampleToolRegistryV1,
-    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
     toolCall: {
       approval: sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1.approval,
       arguments: sampleComputationalMergeSuperResolutionApplyCommandEnvelopeV1,
@@ -2612,12 +2563,9 @@ export const sampleComputationalMergeSuperResolutionApplyAppServerToolCallValida
       inputSchemaName: 'ComputationalMergeCommandEnvelopeV1',
       itemId: 'item_tool_call_sr_apply',
       jsonRpcRequestId: 49,
-      protocol: 'codex_app_server_json_rpc',
-      schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       threadId: 'thread_rawengine_agent_sample',
       toolKind: 'apply',
       toolName: 'computationalmerge.super_resolution.apply_command',
-      transport: 'stdio',
       turnId: 'turn_rawengine_agent_sample',
     },
   });
