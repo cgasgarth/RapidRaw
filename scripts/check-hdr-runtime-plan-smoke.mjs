@@ -124,6 +124,10 @@ assertEqual(dryRun.provenance.alignmentMode, 'translation', 'dry-run alignment m
 assertEqual(dryRun.provenance.deghosting, 'medium', 'dry-run deghosting');
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted dry-run plan id');
+const [outputArtifact] = applied.mutationResult.outputArtifacts;
+if (outputArtifact?.contentHash === undefined) {
+  throw new Error('Expected HDR output artifact to include rendered content hash.');
+}
 
 if (dryRun.provenance.alignmentConfidence < 0.99) {
   throw new Error(`Expected alignment confidence >= 0.99, got ${dryRun.provenance.alignmentConfidence}.`);
@@ -161,6 +165,7 @@ console.log(
       alignedMae,
       fixture: 'synthetic_hdr_runtime_plan_v1',
       motionCoverageRatio: dryRun.provenance.motionCoverageRatio,
+      outputArtifactContentHash: outputArtifact.contentHash,
       outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.mergedPixels.buffer)).digest('hex'),
       unalignedMae,
     },
