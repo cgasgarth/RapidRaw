@@ -1477,6 +1477,7 @@ export const toneColorCommandTypeV1Schema = z.enum([
   'toneColor.setColorGrading',
   'toneColor.setLevels',
   'toneColor.setChannelMixer',
+  'toneColor.setColorBalanceRgb',
 ]);
 
 export const toneColorChannelV1Schema = z.enum(['luma', 'red', 'green', 'blue', 'rgb']);
@@ -1513,6 +1514,14 @@ export const toneColorChannelMixerRowV1Schema = z
     constant: z.number().min(-100).max(100),
     green: z.number().min(-200).max(200),
     red: z.number().min(-200).max(200),
+  })
+  .strict();
+
+export const toneColorBalanceRgbRangeV1Schema = z
+  .object({
+    blue: z.number().min(-100).max(100),
+    green: z.number().min(-100).max(100),
+    red: z.number().min(-100).max(100),
   })
   .strict();
 
@@ -1695,6 +1704,32 @@ export const toneColorCommandEnvelopeV1Schema = z
           }),
       })
       .strict(),
+    toneColorCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('toneColor.setColorBalanceRgb'),
+        parameters: z
+          .object({
+            enabled: z.boolean(),
+            highlights: toneColorBalanceRgbRangeV1Schema,
+            midtones: toneColorBalanceRgbRangeV1Schema,
+            preserveLuminance: z.boolean(),
+            shadows: toneColorBalanceRgbRangeV1Schema,
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            const values = [parameters.shadows, parameters.midtones, parameters.highlights].flatMap((range) =>
+              Object.values(range),
+            );
+            if (parameters.enabled && values.every((value) => value === 0)) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Enabled RGB color balance requires at least one non-zero channel.',
+                path: ['enabled'],
+              });
+            }
+          }),
+      })
+      .strict(),
   ])
   .superRefine((command, context) => {
     if (command.dryRun) {
@@ -1728,7 +1763,16 @@ export const toneColorCommandEnvelopeV1Schema = z
 
 export const toneColorParameterDiffV1Schema = z
   .object({
-    module: z.enum(['basic_tone', 'tone_curve', 'white_balance', 'hsl', 'color_grading', 'levels', 'channel_mixer']),
+    module: z.enum([
+      'basic_tone',
+      'tone_curve',
+      'white_balance',
+      'hsl',
+      'color_grading',
+      'levels',
+      'channel_mixer',
+      'color_balance_rgb',
+    ]),
     path: z.string().trim().min(1),
     previousValue: z.unknown().optional(),
     value: z.unknown().optional(),

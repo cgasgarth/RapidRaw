@@ -5,12 +5,22 @@ export const toneColorAppServerRouteStatusSchema = z.enum(['mapped']);
 
 export const toneColorAppServerRouteSchema = z
   .object({
-    commandType: z.enum(['toneColor.setBasicTone', 'toneColor.setLevels', 'toneColor.setChannelMixer']),
+    commandType: z.enum([
+      'toneColor.setBasicTone',
+      'toneColor.setLevels',
+      'toneColor.setChannelMixer',
+      'toneColor.setColorBalanceRgb',
+    ]),
     executionMode: toneColorAppServerRouteExecutionModeSchema,
     inputSchemaName: z.literal('ToneColorCommandEnvelopeV1'),
     outputSchemaName: z.enum(['ToneColorDryRunResultV1', 'ToneColorMutationResultV1']),
     reason: z.string().trim().min(1),
-    runtimeCheckScript: z.enum(['check:basic-tone-command-bridge', 'check:levels-runtime', 'check:channel-mixer']),
+    runtimeCheckScript: z.enum([
+      'check:basic-tone-command-bridge',
+      'check:levels-runtime',
+      'check:channel-mixer',
+      'check:color-balance-rgb',
+    ]),
     status: toneColorAppServerRouteStatusSchema,
     toolName: z
       .string()
