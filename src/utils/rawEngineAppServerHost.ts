@@ -16,6 +16,8 @@ import {
   rawEngineAppServerRouteCatalogResponseSchema,
   rawEngineAppServerLifecycleReplaySchema,
   rawEngineAppServerLifecycleStateSchema,
+  rawEngineAppServerStructuredErrorSchema,
+  rawEngineAppServerSupervisorStateSchema,
   rawEngineAppServerHostRequestSchema,
   rawEngineAppServerHostResponseEnvelopeSchema,
   rawEngineAppServerHostResponseSchema,
@@ -33,6 +35,8 @@ import {
   type RawEngineAppServerHostResponseEnvelope,
   type RawEngineAppServerLifecycleReplay,
   type RawEngineAppServerLifecycleState,
+  type RawEngineAppServerStructuredError,
+  type RawEngineAppServerSupervisorState,
   type RawEngineAppServerRouteCatalogEntry,
   type RawEngineAppServerRouteCatalogReplay,
   type RawEngineAppServerRouteCatalogRequest,
@@ -128,6 +132,152 @@ export const assertRawEngineAppServerLifecycleReady = (state: RawEngineAppServer
   if (state.phase !== 'initialized') {
     throw new Error(`RawEngine app-server request rejected while lifecycle is ${state.phase}.`);
   }
+};
+
+const appendRawEngineAppServerSupervisorEvent = ({
+  kind,
+  phase,
+  state,
+  timestampIso,
+}: {
+  kind: RawEngineAppServerSupervisorState['auditEvents'][number]['kind'];
+  phase: RawEngineAppServerSupervisorState['phase'];
+  state: RawEngineAppServerSupervisorState;
+  timestampIso: string;
+}): RawEngineAppServerSupervisorState['auditEvents'] => [...state.auditEvents, { kind, phase, timestampIso }];
+
+export const createRawEngineAppServerSupervisorState = ({
+  command,
+  supervisorId,
+  timestampIso,
+}: {
+  command: string[];
+  supervisorId: string;
+  timestampIso: string;
+}): RawEngineAppServerSupervisorState =>
+  rawEngineAppServerSupervisorStateSchema.parse({
+    auditEvents: [{ kind: 'created', phase: 'idle', timestampIso }],
+    cancellationRequestedAtIso: null,
+    command,
+    error: null,
+    lastTransitionAtIso: timestampIso,
+    phase: 'idle',
+    processId: null,
+    schemaVersion: 1,
+    startedAtIso: null,
+    stoppedAtIso: null,
+    supervisorId,
+    transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+  });
+
+export const startRawEngineAppServerSupervisor = ({
+  processId,
+  state,
+  timestampIso,
+}: {
+  processId: number;
+  state: RawEngineAppServerSupervisorState;
+  timestampIso: string;
+}): RawEngineAppServerSupervisorState => {
+  if (state.phase !== 'idle' && state.phase !== 'stopped') {
+    throw new Error(`RawEngine app-server supervisor cannot start from ${state.phase}.`);
+  }
+
+  return rawEngineAppServerSupervisorStateSchema.parse({
+    ...state,
+    auditEvents: appendRawEngineAppServerSupervisorEvent({ kind: 'start', phase: 'starting', state, timestampIso }),
+    error: null,
+    lastTransitionAtIso: timestampIso,
+    phase: 'starting',
+    processId,
+    startedAtIso: timestampIso,
+    stoppedAtIso: null,
+  });
+};
+
+export const markRawEngineAppServerSupervisorReady = ({
+  state,
+  timestampIso,
+}: {
+  state: RawEngineAppServerSupervisorState;
+  timestampIso: string;
+}): RawEngineAppServerSupervisorState => {
+  if (state.phase !== 'starting') {
+    throw new Error(`RawEngine app-server supervisor cannot become ready from ${state.phase}.`);
+  }
+
+  return rawEngineAppServerSupervisorStateSchema.parse({
+    ...state,
+    auditEvents: appendRawEngineAppServerSupervisorEvent({ kind: 'ready', phase: 'running', state, timestampIso }),
+    lastTransitionAtIso: timestampIso,
+    phase: 'running',
+  });
+};
+
+export const cancelRawEngineAppServerSupervisor = ({
+  state,
+  timestampIso,
+}: {
+  state: RawEngineAppServerSupervisorState;
+  timestampIso: string;
+}): RawEngineAppServerSupervisorState => {
+  if (state.phase !== 'running' && state.phase !== 'starting') {
+    throw new Error(`RawEngine app-server supervisor cannot cancel from ${state.phase}.`);
+  }
+
+  return rawEngineAppServerSupervisorStateSchema.parse({
+    ...state,
+    auditEvents: appendRawEngineAppServerSupervisorEvent({ kind: 'cancel', phase: 'stopping', state, timestampIso }),
+    cancellationRequestedAtIso: timestampIso,
+    lastTransitionAtIso: timestampIso,
+    phase: 'stopping',
+  });
+};
+
+export const stopRawEngineAppServerSupervisor = ({
+  state,
+  timestampIso,
+}: {
+  state: RawEngineAppServerSupervisorState;
+  timestampIso: string;
+}): RawEngineAppServerSupervisorState => {
+  if (state.phase !== 'running' && state.phase !== 'starting' && state.phase !== 'stopping') {
+    throw new Error(`RawEngine app-server supervisor cannot stop from ${state.phase}.`);
+  }
+
+  return rawEngineAppServerSupervisorStateSchema.parse({
+    ...state,
+    auditEvents: appendRawEngineAppServerSupervisorEvent({ kind: 'stop', phase: 'stopped', state, timestampIso }),
+    lastTransitionAtIso: timestampIso,
+    phase: 'stopped',
+    processId: null,
+    stoppedAtIso: timestampIso,
+  });
+};
+
+export const failRawEngineAppServerSupervisor = ({
+  error,
+  state,
+  timestampIso,
+}: {
+  error: RawEngineAppServerStructuredError;
+  state: RawEngineAppServerSupervisorState;
+  timestampIso: string;
+}): RawEngineAppServerSupervisorState => {
+  const parsedError = rawEngineAppServerStructuredErrorSchema.parse(error);
+  if (state.phase !== 'starting' && state.phase !== 'running' && state.phase !== 'stopping') {
+    throw new Error(`RawEngine app-server supervisor cannot fail from ${state.phase}.`);
+  }
+
+  return rawEngineAppServerSupervisorStateSchema.parse({
+    ...state,
+    auditEvents: appendRawEngineAppServerSupervisorEvent({ kind: 'fail', phase: 'stopped', state, timestampIso }),
+    error: parsedError,
+    lastTransitionAtIso: timestampIso,
+    phase: 'stopped',
+    processId: null,
+    stoppedAtIso: timestampIso,
+  });
 };
 
 export const buildRawEngineAppServerLifecycleReplay = ({

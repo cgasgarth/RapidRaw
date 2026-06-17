@@ -1,6 +1,7 @@
 # RawEngine App-Server Host Skeleton
 
-Runtime status: skeleton/route proof only. This does not claim a live expert image-editing agent, background process manager, or mutation-capable tool set.
+Runtime status: supervised lifecycle proof for host discovery. This does not
+claim a live expert image-editing agent or mutation-capable tool set.
 
 Official reference checked: https://developers.openai.com/codex/app-server.
 
@@ -26,8 +27,14 @@ requests in `created` and `stopped` phases so app-server tools cannot run before
 the connection handshake or after shutdown.
 
 `buildRawEngineAppServerLifecycleReplay` records the `created -> initialized ->
-stopped` sequence for stdio JSONL. This is lifecycle-state proof only; it does
-not start the official Codex sidecar process or prove image mutation tools.
+stopped` sequence for stdio JSONL.
+
+The desktop-owned supervisor state records command, process id, phase,
+structured errors, cancellation request time, stop time, and audit events. The
+local proof exercises `idle -> starting -> running -> stopping -> stopped`,
+rejects invalid restarts, and preserves failure details such as
+`health_timeout`. This is process-supervision state proof; wiring it to the
+official Codex sidecar process remains the next runtime integration step.
 
 ## Tool Manifest
 
