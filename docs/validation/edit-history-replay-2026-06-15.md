@@ -32,8 +32,17 @@ snapshots and verifies:
 - pushing after undo truncates redo history;
 - the 50-entry cap remains stable.
 
+`scripts/check-command-replay-render-proof.ts` adds the first synthetic
+headless render bridge for #1257. It builds a typed `toneColor.setBasicTone`
+command from UI-style adjustments, replays it into history, renders a small
+synthetic image through the same replayed adjustment state for preview and
+export, and fails if the before/after hash is unchanged or preview/export output
+diverges.
+
 ## Remaining Work
 
+- Promote the synthetic headless render proof to real RAW fixtures once the
+  private/public RAW corpus is available.
 - Add graph-native command replay once edit graph commands own mutations.
 - Add browser evidence for history context-menu selection.
 - Add sidecar restart replay after command persistence lands.
