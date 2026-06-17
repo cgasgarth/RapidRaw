@@ -1,15 +1,21 @@
 #!/usr/bin/env bun
 
+import { z } from 'zod';
+
+import { expectInvalidCases, finishFixtureCheck, readJson } from './lib/fixture-checks.ts';
 import {
   estimateWaveletDetailPasses,
   parseWaveletDetailRecipe,
   waveletDetailRecipeSchema,
 } from '../src/schemas/waveletDetailSchemas.ts';
-import { expectInvalidCases, finishFixtureCheck, readJson } from './lib/fixture-checks.mjs';
 
-const recipes = await readJson('fixtures/detail/wavelet-detail-recipes.json');
-const invalidCases = await readJson('fixtures/detail/invalid-wavelet-detail-recipes.json');
-const failures = [];
+const invalidCaseSchema = z.object({ case: z.string().min(1), recipe: z.unknown() }).strict();
+
+const recipes = z.array(z.unknown()).parse(await readJson('fixtures/detail/wavelet-detail-recipes.json'));
+const invalidCases = z
+  .array(invalidCaseSchema)
+  .parse(await readJson('fixtures/detail/invalid-wavelet-detail-recipes.json'));
+const failures: string[] = [];
 
 let totalPasses = 0;
 for (const recipeValue of recipes) {

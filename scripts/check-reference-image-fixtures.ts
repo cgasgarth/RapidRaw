@@ -2,17 +2,21 @@
 
 import { readFile } from 'node:fs/promises';
 
+import { z } from 'zod';
+
 import {
   parseReferenceImageWorkspace,
   referenceImageWorkspaceSchema,
   referenceWorkspaceSummary,
 } from '../src/schemas/referenceImageSchemas.ts';
 
-const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
+const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, 'utf8'));
 
 const workspace = parseReferenceImageWorkspace(await readJson('fixtures/ui/reference-image-workspace.json'));
-const invalidCases = await readJson('fixtures/ui/invalid-reference-image-cases.json');
-const failures = [];
+const invalidCases = z
+  .array(z.object({ case: z.string().min(1), workspace: z.unknown() }).strict())
+  .parse(await readJson('fixtures/ui/invalid-reference-image-cases.json'));
+const failures: string[] = [];
 
 const summary = referenceWorkspaceSummary(workspace);
 if (summary !== 'side_by_side:right:reference-client-grade:2') {
