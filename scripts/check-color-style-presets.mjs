@@ -1,16 +1,48 @@
 #!/usr/bin/env bun
 
 import { readFile } from 'node:fs/promises';
+import { z } from 'zod';
+
 import {
   applyColorStylePresetPatch,
   listColorStylePresetAdjustmentKeys,
   parseColorStylePresetCatalog,
 } from '../src/schemas/colorStylePresetSchemas.ts';
 import { COLOR_STYLE_PRESET_CATALOG } from '../src/utils/colorStylePresetCatalog.ts';
+import { applyColorStylePresetToRgbPixel } from '../src/utils/colorStyleRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
-const catalog = parseColorStylePresetCatalog(await readJson('fixtures/color/color-style-presets.json'));
+const rgbPixelSchema = z
+  .object({
+    blue: z.number().min(0).max(1),
+    green: z.number().min(0).max(1),
+    red: z.number().min(0).max(1),
+  })
+  .strict();
+const runtimeExpectationSchema = z
+  .object({
+    expectedRgb: rgbPixelSchema,
+    inputRgb: rgbPixelSchema,
+    presetId: z.string().min(1),
+    tolerance: z.number().positive().max(0.001),
+  })
+  .strict();
+const fixtureSchema = z
+  .object({
+    defaultPresetId: z.string().nullable(),
+    presets: z.array(z.unknown()).min(1),
+    runtimeExpectations: z.array(runtimeExpectationSchema).optional(),
+    version: z.literal(1),
+  })
+  .strict();
+
+const fixture = fixtureSchema.parse(await readJson('fixtures/color/color-style-presets.json'));
+const catalog = parseColorStylePresetCatalog({
+  defaultPresetId: fixture.defaultPresetId,
+  presets: fixture.presets,
+  version: fixture.version,
+});
 const invalidCases = await readJson('fixtures/color/invalid-color-style-presets.json');
 const failures = [];
 
@@ -30,6 +62,24 @@ for (const preset of catalog.presets) {
   const applied = applyColorStylePresetPatch({ exposure: 0, saturation: 0, temperature: 0 }, preset);
   if (applied['exposure'] !== 0) {
     failures.push(`${preset.id}: color style patch changed non-color exposure baseline.`);
+  }
+}
+
+for (const expectation of fixture.runtimeExpectations ?? []) {
+  const preset = catalog.presets.find((candidate) => candidate.id === expectation.presetId);
+  if (!preset) {
+    failures.push(`${expectation.presetId}: runtime expectation references missing preset.`);
+    continue;
+  }
+
+  const actual = applyColorStylePresetToRgbPixel(expectation.inputRgb, preset).outputRgb;
+  for (const channel of ['red', 'green', 'blue']) {
+    const delta = Math.abs(actual[channel] - expectation.expectedRgb[channel]);
+    if (delta > expectation.tolerance) {
+      failures.push(
+        `${expectation.presetId}: expected ${channel}=${expectation.expectedRgb[channel]}, got ${actual[channel]}.`,
+      );
+    }
   }
 }
 
