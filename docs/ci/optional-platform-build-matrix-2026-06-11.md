@@ -3,7 +3,7 @@
 Issue: #52 `ci(matrix): add optional inherited platform build matrix`
 
 RawEngine is macOS-first. Required PR validation uses the stable
-`PR CI / required` aggregate gate, and full macOS package builds run on `main`.
+`PR CI / required` aggregate gate, and full macOS package builds run on demand.
 Inherited RapidRAW platform rows for Windows, Linux, and Android are preserved as
 manual, non-required signal through `.github/workflows/optional-platform-builds.yml`.
 
@@ -12,7 +12,7 @@ manual, non-required signal through `.github/workflows/optional-platform-builds.
 - PRs: `Baseline Validation` with `PR CI / required`.
 - App-impacting PRs: `macOS app no-bundle smoke` is included in the aggregate
   gate by changed-path routing.
-- `main`: `CI Build` runs macOS Apple Silicon and Intel package builds.
+- Manual: `CI Build` runs macOS Apple Silicon and Intel package builds.
 
 ## Optional Rows
 

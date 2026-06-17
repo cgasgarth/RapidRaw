@@ -107,7 +107,7 @@ Workflow files at snapshot:
 Current workflow shape:
 
 - `pr-ci.yml` runs the reusable build workflow on pull requests across Windows, macOS, Linux, and Android matrix entries.
-- `ci.yml` runs the same build matrix on pushes to `main`.
+- `ci.yml` runs the macOS build matrix on manual dispatch.
 - `release.yml` builds release assets on GitHub release creation.
 - `lint.yml` runs frontend format, frontend lint, i18n check, cargo fmt, and cargo clippy.
 - Follow-up hardening removed the temporary `continue-on-error` wrappers from frontend typecheck, format, and i18n lint after their baseline issues were closed.
