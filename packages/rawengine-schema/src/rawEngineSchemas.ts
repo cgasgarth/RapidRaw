@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import { artifactHandleV1Schema } from './artifactSchemas.js';
+
+export { artifactHandleV1Schema } from './artifactSchemas.js';
+export type { ArtifactHandleV1 } from './artifactSchemas.js';
+
 export const RAW_ENGINE_SCHEMA_VERSION = 1;
 
 export const ActorKind = {
@@ -117,22 +122,6 @@ export const queryEnvelopeV1Schema = z
     queryType: z.string().trim().min(1),
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
     target: rawEngineTargetSchema,
-  })
-  .strict();
-
-export const artifactHandleV1Schema = z
-  .object({
-    artifactId: z.string().trim().min(1),
-    contentHash: z.string().trim().min(1).optional(),
-    dimensions: z
-      .object({
-        height: z.number().int().positive(),
-        width: z.number().int().positive(),
-      })
-      .strict()
-      .optional(),
-    kind: z.enum(['mask', 'preview', 'generated_patch', 'denoise_output', 'merge_output', 'export']),
-    storage: z.enum(['temp_cache', 'sidecar_artifact', 'export_path']),
   })
   .strict();
 
@@ -9209,7 +9198,6 @@ export type AiToolProviderClassV1 = z.infer<typeof aiToolProviderClassV1Schema>;
 export type AiToolSourcePixelDisclosureV1 = z.infer<typeof aiToolSourcePixelDisclosureV1Schema>;
 export type ApprovalClass = z.infer<typeof approvalClassSchema>;
 export type ApprovalRequirementV1 = z.infer<typeof approvalRequirementSchema>;
-export type ArtifactHandleV1 = z.infer<typeof artifactHandleV1Schema>;
 export type CommandEnvelopeV1 = z.infer<typeof commandEnvelopeV1Schema>;
 export type RawEngineColorDomainV1 = z.infer<typeof rawEngineColorDomainV1Schema>;
 export type RawEngineColorPipelineContextV1 = z.infer<typeof rawEngineColorPipelineContextV1Schema>;
