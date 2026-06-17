@@ -38,6 +38,7 @@ mod panorama_stitching;
 mod panorama_utils;
 mod preset_converter;
 mod presets;
+mod raw_open_edit_export_proof;
 mod raw_processing;
 mod tagging;
 mod tagging_utils;
@@ -2628,6 +2629,7 @@ pub fn run() {
             presets::handle_export_presets_to_file,
             presets::save_community_preset,
             file_management::clear_all_sidecars,
+            raw_open_edit_export_proof::run_raw_open_edit_export_proof,
             file_management::clear_thumbnail_cache,
             file_management::set_color_label_for_paths,
             file_management::set_rating_for_paths,
