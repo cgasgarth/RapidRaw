@@ -21,8 +21,8 @@ const frames = [0, 1, 2].map((sourceIndex) => ({
   height: HEIGHT,
   pixels: createFocusFrame(sourceIndex),
   sourceIndex,
-  translationX: 0,
-  translationY: 0,
+  translationX: sourceIndex === 0 ? 0 : sourceIndex,
+  translationY: sourceIndex === 2 ? -1 : 0,
   width: WIDTH,
 }));
 
@@ -112,6 +112,11 @@ const applied = applyFocusStackRuntimePlanV1({
 });
 
 assertEqual(dryRun.provenance.focusCoverageRatio, 1, 'focus coverage');
+assertEqual(dryRun.provenance.alignmentTransforms.length, frames.length, 'alignment transform count');
+assertEqual(dryRun.provenance.alignmentTransforms[0]?.role, 'reference', 'reference transform role');
+assertEqual(dryRun.provenance.alignmentTransforms[2]?.translationY, -1, 'third transform y');
+assertEqual(dryRun.provenance.blendSourceCoverage.length, frames.length, 'blend source coverage count');
+assertEqual(dryRun.provenance.blendSourceCoverage[1]?.coveredAreaPx, (WIDTH / 3) * HEIGHT, 'middle coverage area');
 assertEqual(dryRun.provenance.sharpnessSettings.cellCount, cells.length, 'sharpness cell count');
 assertEqual(dryRun.provenance.sharpnessSettings.weightPower, 5, 'sharpness weight power');
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');

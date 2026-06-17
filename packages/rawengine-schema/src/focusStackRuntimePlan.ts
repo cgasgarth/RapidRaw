@@ -51,7 +51,26 @@ export const focusStackRuntimeProvenanceV1Schema = z
   .object({
     acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
     acceptedDryRunPlanId: z.string().trim().min(1).optional(),
+    alignmentTransforms: z.array(
+      z
+        .object({
+          role: z.enum(['reference', 'aligned']),
+          sourceIndex: z.number().int().nonnegative(),
+          translationX: z.number().int(),
+          translationY: z.number().int(),
+        })
+        .strict(),
+    ),
     blendMethod: z.enum(['depth_map', 'laplacian_pyramid', 'weighted_sharpness']),
+    blendSourceCoverage: z.array(
+      z
+        .object({
+          cellCount: z.number().int().nonnegative(),
+          coveredAreaPx: z.number().int().nonnegative(),
+          sourceIndex: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
     engineId: z.literal(FOCUS_RUNTIME_ENGINE_ID),
     engineVersion: z.literal(FOCUS_RUNTIME_ENGINE_VERSION),
     focusCoverageRatio: z.number().min(0).max(1),
@@ -307,7 +326,9 @@ const renderFocusStackRuntime = (request: ParsedFocusStackRuntimePlanRequestV1) 
     height: blend.outputHeight,
     outputPixels: blend.outputPixels,
     provenance: focusStackRuntimeProvenanceV1Schema.parse({
+      alignmentTransforms: buildFocusAlignmentTransforms(request),
       blendMethod: request.command.parameters.blendMethod,
+      blendSourceCoverage: buildFocusBlendSourceCoverage(request),
       engineId: FOCUS_RUNTIME_ENGINE_ID,
       engineVersion: FOCUS_RUNTIME_ENGINE_VERSION,
       focusCoverageRatio,
@@ -398,6 +419,42 @@ const deriveFocusWarnings = (
   if (focusCoverageRatio < 0.9) warnings.add('focus_coverage_low');
   if (retouchLayerPolicy === 'generate_retouch_layer') warnings.add('retouch_layer_required');
   return [...warnings].sort();
+};
+
+const buildFocusAlignmentTransforms = (request: ParsedFocusStackRuntimePlanRequestV1) => {
+  const referenceSourceIndex = request.frames[0]?.sourceIndex;
+  if (referenceSourceIndex === undefined) throw new Error('Focus stack runtime alignment requires a reference frame.');
+
+  return request.frames.map((frame) => ({
+    role: frame.sourceIndex === referenceSourceIndex ? ('reference' as const) : ('aligned' as const),
+    sourceIndex: frame.sourceIndex,
+    translationX: frame.translationX,
+    translationY: frame.translationY,
+  }));
+};
+
+const buildFocusBlendSourceCoverage = (request: ParsedFocusStackRuntimePlanRequestV1) =>
+  request.frames.map((frame) => {
+    const winningCells = request.cells.filter((cell) => {
+      return findWinningFocusSourceIndex(cell.sourceScores) === frame.sourceIndex;
+    });
+    return {
+      cellCount: winningCells.length,
+      coveredAreaPx: winningCells.reduce((total, cell) => total + cell.width * cell.height, 0),
+      sourceIndex: frame.sourceIndex,
+    };
+  });
+
+const findWinningFocusSourceIndex = (sourceScores: FocusStackRuntimePlanRequestV1['cells'][number]['sourceScores']) => {
+  let winningSourceIndex: number | undefined;
+  let winningConfidence = -Infinity;
+  for (const score of sourceScores) {
+    if (score.relativeConfidence > winningConfidence) {
+      winningConfidence = score.relativeConfidence;
+      winningSourceIndex = score.sourceIndex;
+    }
+  }
+  return winningSourceIndex;
 };
 
 const stableFocusRuntimeHash = (input: string): string => {
