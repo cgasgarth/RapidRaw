@@ -20,7 +20,6 @@ import {
   Star,
   SquaresUnite,
   Palette,
-  Tag,
   Trash2,
   Undo,
   X,
@@ -46,6 +45,7 @@ import { useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 
+import { buildColorLabelMenu, buildRatingMenu, buildTaggingMenu, type CommonTag } from './contextMenuOptionBuilders';
 import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
 import {
@@ -59,7 +59,6 @@ import {
   AppSettings,
 } from '../components/ui/AppProperties';
 import { useContextMenu } from '../context/ContextMenuContext';
-import TaggingSubMenu from '../context/TaggingSubMenu';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS } from '../schemas/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS } from '../schemas/panoramaUiSchemas';
@@ -69,13 +68,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
-import {
-  type Adjustments,
-  type Color,
-  COLOR_LABELS,
-  INITIAL_ADJUSTMENTS,
-  normalizeLoadedAdjustments,
-} from '../utils/adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
 
 export interface UseAppContextMenusProps {
@@ -103,8 +96,6 @@ interface FolderTreeRoot {
 }
 
 type ContextMenuEvent = MouseEvent<HTMLElement>;
-
-const colorLabelFallback = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
 const findAlbumById = (items: AlbumItem[], albumId: string): Album | null => {
   for (const item of items) {
@@ -147,7 +138,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
     [t],
   );
 
-  const getCommonTags = useCallback((paths: string[]): { tag: string; isUser: boolean }[] => {
+  const getCommonTags = useCallback((paths: string[]): CommonTag[] => {
     const { imageList } = useLibraryStore.getState();
     if (paths.length === 0) return [];
     const imageFiles = imageList.filter((img) => paths.includes(img.path));
@@ -323,53 +314,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           ],
         },
         { type: OPTION_SEPARATOR },
-        {
-          label: t('contextMenus.editor.rating'),
-          icon: Star,
-          submenu: [0, 1, 2, 3, 4, 5].map((rating: number) => ({
-            label:
-              rating === 0
-                ? t('contextMenus.editor.noRating')
-                : t('contextMenus.editor.ratingLabel', { count: rating }),
-            onClick: () => {
-              handleRate(rating);
-            },
-          })),
-        },
-        {
-          label: t('contextMenus.editor.colorLabel'),
-          icon: Palette,
-          submenu: [
-            {
-              label: t('contextMenus.editor.noLabel'),
-              onClick: () => {
-                void handleSetColorLabel(null);
-              },
-            },
-            ...COLOR_LABELS.map((label: Color) => ({
-              label: t(`contextMenus.colors.${label.name}`, { defaultValue: colorLabelFallback(label.name) }),
-              color: label.color,
-              onClick: () => {
-                void handleSetColorLabel(label.name);
-              },
-            })),
-          ],
-        },
-        {
-          label: t('contextMenus.editor.tagging'),
-          icon: Tag,
-          submenu: [
-            {
-              customComponent: TaggingSubMenu,
-              customProps: {
-                paths: [selectedImage.path],
-                initialTags: commonTags,
-                onTagsChanged: handleTagsChanged,
-                appSettings,
-              },
-            },
-          ],
-        },
+        buildRatingMenu({ onRate: handleRate, t }),
+        buildColorLabelMenu({ onSetColorLabel: handleSetColorLabel, t }),
+        buildTaggingMenu({ appSettings, commonTags, onTagsChanged: handleTagsChanged, paths: [selectedImage.path], t }),
         { type: OPTION_SEPARATOR },
         {
           label: t('contextMenus.editor.resetAdjustments'),
@@ -805,46 +752,19 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           },
         },
         { type: OPTION_SEPARATOR },
-        {
-          icon: Star,
-          label: t('contextMenus.editor.rating'),
-          submenu: [0, 1, 2, 3, 4, 5].map((rating: number) => ({
-            label:
-              rating === 0
-                ? t('contextMenus.editor.noRating')
-                : t('contextMenus.editor.ratingLabel', { count: rating }),
-            onClick: () => {
-              handleRate(rating, finalSelection);
-            },
-          })),
-        },
-        {
-          label: t('contextMenus.editor.colorLabel'),
-          icon: Palette,
-          submenu: [
-            { label: t('contextMenus.editor.noLabel'), onClick: () => handleSetColorLabel(null, finalSelection) },
-            ...COLOR_LABELS.map((label: Color) => ({
-              label: t(`contextMenus.colors.${label.name}`, { defaultValue: colorLabelFallback(label.name) }),
-              color: label.color,
-              onClick: () => handleSetColorLabel(label.name, finalSelection),
-            })),
-          ],
-        },
-        {
-          label: t('contextMenus.editor.tagging'),
-          icon: Tag,
-          submenu: [
-            {
-              customComponent: TaggingSubMenu,
-              customProps: {
-                paths: finalSelection,
-                initialTags: commonTags,
-                onTagsChanged: handleTagsChanged,
-                appSettings,
-              },
-            },
-          ],
-        },
+        buildRatingMenu({
+          onRate: (rating) => {
+            handleRate(rating, finalSelection);
+          },
+          t,
+        }),
+        buildColorLabelMenu({
+          onSetColorLabel: (color) => {
+            void handleSetColorLabel(color, finalSelection);
+          },
+          t,
+        }),
+        buildTaggingMenu({ appSettings, commonTags, onTagsChanged: handleTagsChanged, paths: finalSelection, t }),
         { type: OPTION_SEPARATOR },
         {
           label: t('contextMenus.thumbnail.addToAlbum'),
