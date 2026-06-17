@@ -6,12 +6,17 @@ import {
   sampleToolRegistryV1,
   sampleToneColorCommandEnvelopeV1,
 } from '../packages/rawengine-schema/src/samplePayloads.ts';
-import { toneColorCommandEnvelopeV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  toneColorCommandEnvelopeV1Schema,
+  toneColorCommandTypeV1Schema,
+} from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { TONE_COLOR_APP_SERVER_ROUTES } from '../src/utils/toneColorAppServerRoutes.ts';
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 const packageScripts = new Set(Object.keys(packageJson.scripts ?? {}));
 const routeToolNames = new Set(TONE_COLOR_APP_SERVER_ROUTES.map((route) => route.toolName));
+const expectedCommandTypes = toneColorCommandTypeV1Schema.options;
+const expectedCommandTypeSet = new Set<string>(expectedCommandTypes);
 const failures = [];
 
 for (const expectedToolName of ['tonecolor.dry_run_command', 'tonecolor.apply_command']) {
@@ -19,6 +24,10 @@ for (const expectedToolName of ['tonecolor.dry_run_command', 'tonecolor.apply_co
 }
 
 for (const route of TONE_COLOR_APP_SERVER_ROUTES) {
+  if (!expectedCommandTypeSet.has(route.commandType)) {
+    failures.push(`${route.commandType} is not defined in the tone-color command schema.`);
+  }
+
   const tool = sampleToolRegistryV1.tools.find((candidate) => candidate.toolName === route.toolName);
   if (tool === undefined) {
     failures.push(`${route.toolName} does not exist in the RawEngine tool registry.`);
@@ -203,16 +212,7 @@ if (
   failures.push('Tone-color black and white mixer command does not validate the hue-weighted route type.');
 }
 
-for (const commandType of [
-  'toneColor.setToneCurve',
-  'toneColor.setWhiteBalance',
-  'toneColor.adjustHsl',
-  'toneColor.setColorGrading',
-  'toneColor.setLevels',
-  'toneColor.setChannelMixer',
-  'toneColor.setColorBalanceRgb',
-  'toneColor.setBlackWhiteMixer',
-]) {
+for (const commandType of expectedCommandTypes) {
   const routeModes = new Set(
     TONE_COLOR_APP_SERVER_ROUTES.filter((route) => route.commandType === commandType).map(
       (route) => route.executionMode,
