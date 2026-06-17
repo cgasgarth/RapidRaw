@@ -29,6 +29,7 @@ const CHECK_GROUPS = {
     'check:keyboard-shortcut-conflicts',
     'check:edit-graph-history',
     'check:edit-history-replay',
+    'check:basic-tone-command-bridge',
     'check:tauri-schema-validation',
     'check:tauri-invoke-boundaries',
     'check:tauri-invoke-boundaries:self-test',

@@ -36,6 +36,7 @@
     "check:keyboard-shortcut-conflicts": "bun scripts/check-keyboard-shortcut-conflicts.mjs",
     "check:edit-graph-history": "bun scripts/check-edit-graph-history-commands.mjs",
     "check:edit-history-replay": "bun scripts/check-edit-history-replay.mjs",
+    "check:basic-tone-command-bridge": "bun scripts/check-basic-tone-command-bridge.mjs",
     "check:derived-artifact-invalidation": "bun scripts/check-derived-artifact-invalidation.mjs",
     "check:tauri-schema-validation": "bun scripts/check-tauri-schema-validation.mjs",
     "check:tauri-invoke-boundaries": "bun scripts/check-tauri-invoke-boundaries.mjs",
