@@ -16,8 +16,18 @@ if (invokesEnum === undefined) {
   throw new Error('Unable to locate Invokes enum.');
 }
 
-const routeInvokes = new Set(AI_APP_SERVER_TOOL_ROUTES.map((route) => route.tauriInvoke));
+const routeInvokes = new Set(
+  AI_APP_SERVER_TOOL_ROUTES.filter((route) => route.sourceKind === 'tauri_invoke').map(
+    (route) => route.sourceOperation,
+  ),
+);
+const mappedToolNames = new Set(
+  AI_APP_SERVER_TOOL_ROUTES.filter((route) => route.status === 'mapped' && route.appServerToolName !== undefined).map(
+    (route) => route.appServerToolName,
+  ),
+);
 const registeredToolByName = new Map(sampleToolRegistryV1.tools.map((tool) => [tool.toolName, tool]));
+const aiToolByName = new Map(sampleAiAppServerToolManifestV1.tools.map((tool) => [tool.toolName, tool]));
 const aiToolCapabilities = new Map(
   sampleAiAppServerToolManifestV1.tools.map((tool) => [tool.toolName, new Set(tool.allowedCapabilities)]),
 );
@@ -51,7 +61,7 @@ for (const route of AI_APP_SERVER_TOOL_ROUTES) {
       : undefined;
 
   if (route.status === 'mapped' && route.appServerToolName !== undefined && registeredTool === undefined) {
-    failures.push(`${route.tauriInvoke} maps to unregistered tool ${route.appServerToolName}.`);
+    failures.push(`${route.sourceOperation} maps to unregistered tool ${route.appServerToolName}.`);
   }
 
   if (
@@ -61,24 +71,52 @@ for (const route of AI_APP_SERVER_TOOL_ROUTES) {
     route.commandSchemaName !== registeredTool.inputSchemaName
   ) {
     failures.push(
-      `${route.tauriInvoke} declares ${route.commandSchemaName} but ${route.appServerToolName} expects ${registeredTool.inputSchemaName}.`,
+      `${route.sourceOperation} declares ${route.commandSchemaName} but ${route.appServerToolName} expects ${registeredTool.inputSchemaName}.`,
     );
+  }
+
+  if (
+    route.status === 'mapped' &&
+    route.outputSchemaName !== undefined &&
+    registeredTool !== undefined &&
+    route.outputSchemaName !== registeredTool.outputSchemaName
+  ) {
+    failures.push(
+      `${route.sourceOperation} declares ${route.outputSchemaName} but ${route.appServerToolName} returns ${registeredTool.outputSchemaName}.`,
+    );
+  }
+
+  if (route.status === 'mapped' && route.appServerToolName !== undefined && route.executionMode !== undefined) {
+    const aiTool = aiToolByName.get(route.appServerToolName);
+    if (aiTool !== undefined && route.executionMode !== aiTool.executionMode) {
+      failures.push(
+        `${route.sourceOperation} declares ${route.executionMode} but ${route.appServerToolName} uses ${aiTool.executionMode}.`,
+      );
+    }
   }
 
   if (route.status === 'mapped' && route.appServerToolName !== undefined && route.toolCapability !== undefined) {
     const capabilities = aiToolCapabilities.get(route.appServerToolName);
     if (capabilities === undefined) {
-      failures.push(`${route.tauriInvoke} maps to AI tool ${route.appServerToolName} with no AI manifest entry.`);
+      failures.push(`${route.sourceOperation} maps to AI tool ${route.appServerToolName} with no AI manifest entry.`);
     } else if (!capabilities.has(route.toolCapability)) {
-      failures.push(`${route.tauriInvoke} maps to ${route.appServerToolName} without ${route.toolCapability} support.`);
+      failures.push(
+        `${route.sourceOperation} maps to ${route.appServerToolName} without ${route.toolCapability} support.`,
+      );
     }
+  }
+}
+
+for (const toolName of aiToolCapabilities.keys()) {
+  if (!mappedToolNames.has(toolName)) {
+    failures.push(`${toolName} is missing from AI app-server route manifest.`);
   }
 }
 
 for (const capability of AI_MASK_CAPABILITY_AUDIT) {
   if (capability.status !== 'native' || capability.invokeCommand === null) continue;
 
-  const route = AI_APP_SERVER_TOOL_ROUTES.find((candidate) => candidate.tauriInvoke === capability.invokeCommand);
+  const route = AI_APP_SERVER_TOOL_ROUTES.find((candidate) => candidate.sourceOperation === capability.invokeCommand);
   if (route === undefined) {
     failures.push(`${capability.invokeCommand}: native AI mask capability has no app-server route.`);
     continue;

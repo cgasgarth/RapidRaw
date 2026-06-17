@@ -159,12 +159,12 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
   for (const route of AI_APP_SERVER_TOOL_ROUTES.filter((candidate) => candidate.status === 'mapped')) {
     catalog.push(
       buildRouteCatalogEntry({
-        commandName: route.tauriInvoke,
+        commandName: route.sourceOperation,
         family: 'ai',
         inputSchemaNames: route.commandSchemaName === undefined ? ['AiToolRouteCommandV1'] : [route.commandSchemaName],
-        modes: ['mapped_invoke'],
-        outputSchemaNames: ['AiToolRouteResultV1'],
-        toolNames: route.appServerToolName === undefined ? [route.tauriInvoke] : [route.appServerToolName],
+        modes: route.executionMode === undefined ? ['mapped_invoke'] : [route.executionMode],
+        outputSchemaNames: route.outputSchemaName === undefined ? ['AiToolRouteResultV1'] : [route.outputSchemaName],
+        toolNames: route.appServerToolName === undefined ? [route.sourceOperation] : [route.appServerToolName],
       }),
     );
   }
