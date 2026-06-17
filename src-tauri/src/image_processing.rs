@@ -1255,6 +1255,27 @@ pub struct ColorCalibrationSettings {
     _pad1: f32,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
+#[repr(C)]
+pub struct ChannelMixerRow {
+    red: f32,
+    green: f32,
+    blue: f32,
+    constant: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable, Default)]
+#[repr(C)]
+pub struct ChannelMixerSettings {
+    red: ChannelMixerRow,
+    green: ChannelMixerRow,
+    blue: ChannelMixerRow,
+    enabled: u32,
+    preserve_luminance: u32,
+    _pad1: u32,
+    _pad2: u32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct GpuMat3 {
@@ -1337,6 +1358,7 @@ pub struct GlobalAdjustments {
     _pad3: f32,
 
     pub color_calibration: ColorCalibrationSettings,
+    pub channel_mixer: ChannelMixerSettings,
 
     pub hsl: [HslColor; 8],
     pub luma_curve: [Point; 16],
@@ -1564,6 +1586,43 @@ fn parse_color_grade_settings(js_cg: &serde_json::Value) -> ColorGradeSettings {
         luminance: js_cg["luminance"].as_f64().unwrap_or(0.0) as f32
             / SCALES.color_grading_luminance,
         _pad: 0.0,
+    }
+}
+
+fn parse_channel_mixer_row(
+    row: &serde_json::Value,
+    red: f32,
+    green: f32,
+    blue: f32,
+) -> ChannelMixerRow {
+    ChannelMixerRow {
+        red: row["red"].as_f64().unwrap_or(red as f64) as f32 / 100.0,
+        green: row["green"].as_f64().unwrap_or(green as f64) as f32 / 100.0,
+        blue: row["blue"].as_f64().unwrap_or(blue as f64) as f32 / 100.0,
+        constant: row["constant"].as_f64().unwrap_or(0.0) as f32 / 100.0,
+    }
+}
+
+fn parse_channel_mixer_settings(js_channel_mixer: &serde_json::Value) -> ChannelMixerSettings {
+    ChannelMixerSettings {
+        red: parse_channel_mixer_row(&js_channel_mixer["red"], 100.0, 0.0, 0.0),
+        green: parse_channel_mixer_row(&js_channel_mixer["green"], 0.0, 100.0, 0.0),
+        blue: parse_channel_mixer_row(&js_channel_mixer["blue"], 0.0, 0.0, 100.0),
+        enabled: if js_channel_mixer["enabled"].as_bool().unwrap_or(false) {
+            1
+        } else {
+            0
+        },
+        preserve_luminance: if js_channel_mixer["preserveLuminance"]
+            .as_bool()
+            .unwrap_or(false)
+        {
+            1
+        } else {
+            0
+        },
+        _pad1: 0,
+        _pad2: 0,
     }
 }
 
@@ -1966,6 +2025,10 @@ fn get_global_adjustments_from_json(
         .get("colorCalibration")
         .cloned()
         .unwrap_or_default();
+    let channel_mixer_obj = js_adjustments
+        .get("channelMixer")
+        .cloned()
+        .unwrap_or_default();
 
     let color_cal_settings = if is_visible("color") {
         ColorCalibrationSettings {
@@ -2139,6 +2202,11 @@ fn get_global_adjustments_from_json(
         _pad3: 0.0,
 
         color_calibration: color_cal_settings,
+        channel_mixer: if is_visible("color") {
+            parse_channel_mixer_settings(&channel_mixer_obj)
+        } else {
+            ChannelMixerSettings::default()
+        },
 
         hsl: if is_visible("color") {
             parse_hsl_adjustments(&js_adjustments.get("hsl").cloned().unwrap_or_default())
