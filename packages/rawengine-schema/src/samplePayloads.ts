@@ -145,53 +145,46 @@ import {
   type ToneColorDryRunResultV1,
   type ToneColorMutationResultV1,
 } from './rawEngineSchemas.js';
+import {
+  sampleAgentActor,
+  sampleEditApplyApproval,
+  sampleExternalModelApproval,
+  sampleFileMutationApproval,
+  sampleGenerativeEditApproval,
+  sampleImageTarget,
+  samplePreviewApproval,
+  withSampleSchemaVersion,
+} from './samplePayloadFactories.js';
 
-export const sampleQueryEnvelopeV1: QueryEnvelopeV1 = queryEnvelopeV1Schema.parse({
-  actor: {
-    id: 'codex-app-server',
-    kind: ActorKind.Agent,
-    sessionId: 'session_sample',
-  },
-  correlationId: 'corr_metadata_sample',
-  parameters: {
-    includeExif: true,
-  },
-  queryId: 'query_metadata_sample',
-  queryType: 'image.getMetadata',
-  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-  target: {
-    imagePath: '/photos/session/IMG_0001.CR3',
-    kind: 'image',
-  },
-});
+export const sampleQueryEnvelopeV1: QueryEnvelopeV1 = queryEnvelopeV1Schema.parse(
+  withSampleSchemaVersion({
+    actor: sampleAgentActor(),
+    correlationId: 'corr_metadata_sample',
+    parameters: {
+      includeExif: true,
+    },
+    queryId: 'query_metadata_sample',
+    queryType: 'image.getMetadata',
+    target: sampleImageTarget(),
+  }),
+);
 
-export const sampleCommandEnvelopeV1: CommandEnvelopeV1 = commandEnvelopeV1Schema.parse({
-  actor: {
-    id: 'codex-app-server',
-    kind: ActorKind.Agent,
-    sessionId: 'session_sample',
-  },
-  approval: {
-    approvalClass: ApprovalClass.PreviewOnly,
-    reason: 'Tone dry-run does not persist sidecars or exported files.',
-    state: 'not_required',
-  },
-  commandId: 'command_tone_dry_run_sample',
-  commandType: 'edit.tone.dryRun',
-  correlationId: 'corr_tone_dry_run_sample',
-  dryRun: true,
-  expectedGraphRevision: 'graph_rev_42',
-  parameters: {
-    exposureEv: 0.25,
-    highlights: -12,
-  },
-  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-  target: {
-    imagePath: '/photos/session/IMG_0001.CR3',
-    kind: 'image',
-    virtualCopyId: null,
-  },
-});
+export const sampleCommandEnvelopeV1: CommandEnvelopeV1 = commandEnvelopeV1Schema.parse(
+  withSampleSchemaVersion({
+    actor: sampleAgentActor(),
+    approval: samplePreviewApproval('Tone dry-run does not persist sidecars or exported files.'),
+    commandId: 'command_tone_dry_run_sample',
+    commandType: 'edit.tone.dryRun',
+    correlationId: 'corr_tone_dry_run_sample',
+    dryRun: true,
+    expectedGraphRevision: 'graph_rev_42',
+    parameters: {
+      exposureEv: 0.25,
+      highlights: -12,
+    },
+    target: sampleImageTarget('/photos/session/IMG_0001.CR3', null),
+  }),
+);
 
 export const sampleArtifactHandleV1: ArtifactHandleV1 = artifactHandleV1Schema.parse({
   artifactId: 'artifact_preview_sample',
@@ -642,16 +635,10 @@ export const sampleEditGraphSnapshotV1: EditGraphSnapshotV1 = editGraphSnapshotV
 });
 
 export const sampleEditGraphCommandEnvelopeV1: EditGraphCommandEnvelopeV1 = editGraphCommandEnvelopeV1Schema.parse({
-  actor: {
-    id: 'codex-app-server',
-    kind: ActorKind.Agent,
-    sessionId: 'session_edit_graph_sample',
-  },
-  approval: {
-    approvalClass: ApprovalClass.PreviewOnly,
-    reason: 'Previewing an edit graph patch computes a non-mutating graph diff and preview artifact.',
-    state: 'not_required',
-  },
+  actor: sampleAgentActor('session_edit_graph_sample'),
+  approval: samplePreviewApproval(
+    'Previewing an edit graph patch computes a non-mutating graph diff and preview artifact.',
+  ),
   commandId: 'command_edit_graph_patch_preview_sample',
   commandType: 'editGraph.applyParameterPatch',
   correlationId: 'corr_edit_graph_patch_preview_sample',
@@ -678,20 +665,15 @@ export const sampleEditGraphCommandEnvelopeV1: EditGraphCommandEnvelopeV1 = edit
     ],
   },
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-  target: {
-    imagePath: '/photos/session/IMG_0001.CR3',
-    kind: 'image',
-  },
+  target: sampleImageTarget(),
 });
 
 export const sampleEditGraphApplyCommandEnvelopeV1: EditGraphCommandEnvelopeV1 = editGraphCommandEnvelopeV1Schema.parse(
   {
     ...sampleEditGraphCommandEnvelopeV1,
-    approval: {
-      approvalClass: ApprovalClass.EditApply,
-      reason: 'Applying the accepted edit graph patch persists the graph revision to the image sidecar.',
-      state: 'approved',
-    },
+    approval: sampleEditApplyApproval(
+      'Applying the accepted edit graph patch persists the graph revision to the image sidecar.',
+    ),
     commandId: 'command_edit_graph_patch_apply_sample',
     correlationId: 'corr_edit_graph_patch_apply_sample',
     dryRun: false,
@@ -823,16 +805,8 @@ const createSampleReplayAuditLog = ({
 });
 
 export const sampleToneColorCommandEnvelopeV1: ToneColorCommandEnvelopeV1 = toneColorCommandEnvelopeV1Schema.parse({
-  actor: {
-    id: 'codex-app-server',
-    kind: ActorKind.Agent,
-    sessionId: 'session_tone_color_sample',
-  },
-  approval: {
-    approvalClass: ApprovalClass.PreviewOnly,
-    reason: 'Previewing tone and color changes renders a non-mutating graph diff before apply.',
-    state: 'not_required',
-  },
+  actor: sampleAgentActor('session_tone_color_sample'),
+  approval: samplePreviewApproval('Previewing tone and color changes renders a non-mutating graph diff before apply.'),
   commandId: 'command_tone_color_basic_preview_sample',
   commandType: 'toneColor.setBasicTone',
   correlationId: 'corr_tone_color_basic_preview_sample',
@@ -851,20 +825,13 @@ export const sampleToneColorCommandEnvelopeV1: ToneColorCommandEnvelopeV1 = tone
     whitePoint: 6,
   },
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-  target: {
-    imagePath: '/photos/session/IMG_0001.CR3',
-    kind: 'image',
-  },
+  target: sampleImageTarget(),
 });
 
 export const sampleToneColorApplyCommandEnvelopeV1: ToneColorCommandEnvelopeV1 = toneColorCommandEnvelopeV1Schema.parse(
   {
     ...sampleToneColorCommandEnvelopeV1,
-    approval: {
-      approvalClass: ApprovalClass.EditApply,
-      reason: 'Applying the accepted tone and color command persists the edit graph revision.',
-      state: 'approved',
-    },
+    approval: sampleEditApplyApproval('Applying the accepted tone and color command persists the edit graph revision.'),
     commandId: 'command_tone_color_basic_apply_sample',
     correlationId: 'corr_tone_color_basic_apply_sample',
     dryRun: false,
@@ -1024,16 +991,10 @@ export const sampleRawEngineAgentReplayFixtureV1: RawEngineAgentReplayFixtureV1 
   });
 
 export const sampleAiToolCommandEnvelopeV1: AiToolCommandEnvelopeV1 = aiToolCommandEnvelopeV1Schema.parse({
-  actor: {
-    id: 'codex-app-server',
-    kind: ActorKind.Agent,
-    sessionId: 'session_sample',
-  },
-  approval: {
-    approvalClass: ApprovalClass.ExternalModel,
-    reason: 'Local subject-mask model reads pixels and returns a non-mutating dry-run mask artifact.',
-    state: 'approved',
-  },
+  actor: sampleAgentActor(),
+  approval: sampleExternalModelApproval(
+    'Local subject-mask model reads pixels and returns a non-mutating dry-run mask artifact.',
+  ),
   commandId: 'command_ai_subject_mask_dry_run_sample',
   commandType: 'ai.mask.generateSubject',
   correlationId: 'corr_ai_subject_mask_sample',
@@ -1054,21 +1015,15 @@ export const sampleAiToolCommandEnvelopeV1: AiToolCommandEnvelopeV1 = aiToolComm
     sourcePixelDisclosure: 'local_only',
   },
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-  target: {
-    imagePath: '/photos/session/IMG_0001.CR3',
-    kind: 'image',
-    virtualCopyId: null,
-  },
+  target: sampleImageTarget('/photos/session/IMG_0001.CR3', null),
 });
 
 export const sampleAiToolApplyCommandEnvelopeV1: AiToolCommandEnvelopeV1 = aiToolCommandEnvelopeV1Schema.parse({
   ...sampleAiToolCommandEnvelopeV1,
-  approval: {
-    approvalClass: ApprovalClass.GenerativeEdit,
-    reason: 'Apply the accepted AI-generated subject mask into the non-destructive edit graph.',
-    recordId: 'approval_ai_subject_mask_apply_001',
-    state: 'approved',
-  },
+  approval: sampleGenerativeEditApproval(
+    'Apply the accepted AI-generated subject mask into the non-destructive edit graph.',
+    'approval_ai_subject_mask_apply_001',
+  ),
   commandId: 'command_ai_subject_mask_apply_sample',
   commandType: 'ai.mask.applySubject',
   dryRun: false,
@@ -1270,16 +1225,10 @@ export const sampleAiMaskApplyAppServerToolCallValidationV1: RawEngineAppServerT
 
 export const sampleAiEnhancementCommandEnvelopeV1: AiEnhancementCommandEnvelopeV1 =
   aiEnhancementCommandEnvelopeV1Schema.parse({
-    actor: {
-      id: 'codex-app-server',
-      kind: ActorKind.Agent,
-      sessionId: 'session_sample',
-    },
-    approval: {
-      approvalClass: ApprovalClass.ExternalModel,
-      reason: 'Local AI inpaint model reads pixels and returns a non-mutating dry-run generated patch.',
-      state: 'approved',
-    },
+    actor: sampleAgentActor(),
+    approval: sampleExternalModelApproval(
+      'Local AI inpaint model reads pixels and returns a non-mutating dry-run generated patch.',
+    ),
     commandId: 'command_ai_inpaint_dry_run_sample',
     commandType: 'ai.enhancement.dryRun',
     correlationId: 'corr_ai_inpaint_sample',
@@ -1302,22 +1251,16 @@ export const sampleAiEnhancementCommandEnvelopeV1: AiEnhancementCommandEnvelopeV
       strength: 0.42,
     },
     schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-    target: {
-      imagePath: '/photos/session/IMG_0001.CR3',
-      kind: 'image',
-      virtualCopyId: null,
-    },
+    target: sampleImageTarget('/photos/session/IMG_0001.CR3', null),
   });
 
 export const sampleAiEnhancementApplyCommandEnvelopeV1: AiEnhancementCommandEnvelopeV1 =
   aiEnhancementCommandEnvelopeV1Schema.parse({
     ...sampleAiEnhancementCommandEnvelopeV1,
-    approval: {
-      approvalClass: ApprovalClass.GenerativeEdit,
-      reason: 'Apply the accepted AI inpaint dry-run plan into the non-destructive edit graph.',
-      recordId: 'approval_ai_inpaint_apply_001',
-      state: 'approved',
-    },
+    approval: sampleGenerativeEditApproval(
+      'Apply the accepted AI inpaint dry-run plan into the non-destructive edit graph.',
+      'approval_ai_inpaint_apply_001',
+    ),
     commandId: 'command_ai_inpaint_apply_sample',
     commandType: 'ai.enhancement.apply',
     dryRun: false,
@@ -1521,16 +1464,10 @@ export const sampleAiEnhancementApplyAppServerToolCallValidationV1: RawEngineApp
   });
 
 export const sampleExportCommandEnvelopeV1: ExportCommandEnvelopeV1 = exportCommandEnvelopeV1Schema.parse({
-  actor: {
-    id: 'codex-app-server',
-    kind: ActorKind.Agent,
-    sessionId: 'session_export_sample',
-  },
-  approval: {
-    approvalClass: ApprovalClass.PreviewOnly,
-    reason: 'Plan export files, names, dimensions, and preview artifacts before writing anything to disk.',
-    state: 'not_required',
-  },
+  actor: sampleAgentActor('session_export_sample'),
+  approval: samplePreviewApproval(
+    'Plan export files, names, dimensions, and preview artifacts before writing anything to disk.',
+  ),
   commandId: 'command_export_plan_sample',
   commandType: 'export.planFiles',
   correlationId: 'corr_export_sample',
@@ -1550,21 +1487,15 @@ export const sampleExportCommandEnvelopeV1: ExportCommandEnvelopeV1 = exportComm
     resizeMode: 'fit_long_edge',
   },
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-  target: {
-    imagePath: '/photos/session/IMG_0001.CR3',
-    kind: 'image',
-    virtualCopyId: 'vc_final_color_grade',
-  },
+  target: sampleImageTarget('/photos/session/IMG_0001.CR3', 'vc_final_color_grade'),
 });
 
 export const sampleExportApplyCommandEnvelopeV1: ExportCommandEnvelopeV1 = exportCommandEnvelopeV1Schema.parse({
   ...sampleExportCommandEnvelopeV1,
-  approval: {
-    approvalClass: ApprovalClass.FileMutation,
-    reason: 'Write the accepted export plan to the selected output folder.',
-    recordId: 'approval_export_write_001',
-    state: 'approved',
-  },
+  approval: sampleFileMutationApproval(
+    'Write the accepted export plan to the selected output folder.',
+    'approval_export_write_001',
+  ),
   commandId: 'command_export_write_sample',
   commandType: 'export.writeFiles',
   dryRun: false,

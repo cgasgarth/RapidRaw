@@ -1,0 +1,60 @@
+import {
+  ActorKind,
+  ApprovalClass,
+  RAW_ENGINE_SCHEMA_VERSION,
+  type ApprovalRequirementV1,
+  type RawEngineActor,
+  type RawEngineTarget,
+} from './rawEngineSchemas.js';
+
+export const sampleAgentActor = (sessionId = 'session_sample'): RawEngineActor => ({
+  id: 'codex-app-server',
+  kind: ActorKind.Agent,
+  sessionId,
+});
+
+export const sampleImageTarget = (
+  imagePath = '/photos/session/IMG_0001.CR3',
+  virtualCopyId?: string | null,
+): RawEngineTarget => ({
+  imagePath,
+  kind: 'image',
+  ...(virtualCopyId !== undefined ? { virtualCopyId } : {}),
+});
+
+export const samplePreviewApproval = (reason: string): ApprovalRequirementV1 => ({
+  approvalClass: ApprovalClass.PreviewOnly,
+  reason,
+  state: 'not_required',
+});
+
+export const sampleExternalModelApproval = (reason: string): ApprovalRequirementV1 => ({
+  approvalClass: ApprovalClass.ExternalModel,
+  reason,
+  state: 'approved',
+});
+
+export const sampleGenerativeEditApproval = (reason: string, recordId: string): ApprovalRequirementV1 => ({
+  approvalClass: ApprovalClass.GenerativeEdit,
+  reason,
+  recordId,
+  state: 'approved',
+});
+
+export const sampleEditApplyApproval = (reason: string): ApprovalRequirementV1 => ({
+  approvalClass: ApprovalClass.EditApply,
+  reason,
+  state: 'approved',
+});
+
+export const sampleFileMutationApproval = (reason: string, recordId: string): ApprovalRequirementV1 => ({
+  approvalClass: ApprovalClass.FileMutation,
+  reason,
+  recordId,
+  state: 'approved',
+});
+
+export const withSampleSchemaVersion = <TValue extends object>(value: TValue): TValue & { schemaVersion: 1 } => ({
+  ...value,
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+});
