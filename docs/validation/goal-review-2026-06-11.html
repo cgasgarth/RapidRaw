@@ -338,7 +338,8 @@
               <td><span class="status partial">Synthetic proof</span></td>
               <td>
                 Runtime apply checks now render synthetic HDR, panorama, focus stack, and super-resolution outputs with
-                app-server/UI bridge coverage and output-derived artifact hashes.
+                app-server/UI bridge coverage, output-derived artifact hashes, and quality provenance for HDR/SR plus
+                focus quality metrics queued in PR #1599.
               </td>
               <td>Real RAW before/after proof and export parity remain required before feature completion.</td>
             </tr>
@@ -362,8 +363,9 @@
               <td>HDR merge workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PRs #1586 and #1592, <code>bun run check:hdr-runtime-plan-smoke</code>,
+                PRs #1586, #1592, and #1598, <code>bun run check:hdr-runtime-plan-smoke</code>,
                 <code>bun run check:hdr-app-server-runtime</code>, <code>bun run check:hdr-ui-runtime-bridge</code>.
+                Runtime smoke records clipping, motion pixels, and synthetic reconstruction MAE.
               </td>
               <td>Real bracket merge, preview/export parity, tone mapping, and deghost quality gates.</td>
             </tr>
@@ -381,8 +383,10 @@
               <td>Focus stack workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PRs #1587 and #1591, <code>bun run check:focus-runtime-plan-smoke</code>,
+                PRs #1587 and #1591, with PR #1599 queued, <code>bun run check:focus-runtime-plan-smoke</code>,
                 <code>bun run check:focus-app-server-runtime</code>, <code>bun run check:focus-ui-runtime-bridge</code>.
+                Runtime smoke records alignment, source coverage, winning confidence, low-confidence area, and retouch
+                recommendation.
               </td>
               <td>Depth-map/laplacian production blending, halo controls, and RAW fixture proof.</td>
             </tr>
@@ -390,8 +394,10 @@
               <td>Super-resolution workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PR #1589, <code>bun run check:sr-runtime-plan-smoke</code>,
+                PRs #1589 and #1597, <code>bun run check:sr-runtime-plan-smoke</code>,
                 <code>bun run check:sr-app-server-runtime</code>, <code>bun run check:sr-ui-runtime-bridge</code>.
+                Runtime smoke records confidence-map coverage, detail quality, frame registrations, and improvement
+                ratio.
               </td>
               <td>Model/optical-flow SR, artifact quality review, and real burst RAW validation.</td>
             </tr>
@@ -534,7 +540,10 @@
             <tr>
               <td>HDR runtime apply</td>
               <td><code>bun run check:hdr-runtime-plan-smoke</code></td>
-              <td>Synthetic aligned HDR render, deghost mask, app-server bridge, and output artifact hash proof.</td>
+              <td>
+                Synthetic aligned HDR render, deghost mask, app-server bridge, output artifact hash, clipping ratio,
+                motion-pixel count, and reconstruction-MAE proof.
+              </td>
             </tr>
             <tr>
               <td>Panorama runtime apply</td>
@@ -544,12 +553,18 @@
             <tr>
               <td>Focus runtime apply</td>
               <td><code>bun run check:focus-runtime-plan-smoke</code></td>
-              <td>Weighted-sharpness output, depth/sharpness/retouch artifact hashes, and app-server bridge proof.</td>
+              <td>
+                Weighted-sharpness output, depth/sharpness/retouch artifact hashes, alignment/source coverage, quality
+                metrics, and app-server bridge proof.
+              </td>
             </tr>
             <tr>
               <td>Super-resolution runtime apply</td>
               <td><code>bun run check:sr-runtime-plan-smoke</code></td>
-              <td>Pixel-shift render, frame registrations, confidence artifact hash, and improvement-ratio proof.</td>
+              <td>
+                Pixel-shift render, frame registrations, confidence artifact hash, confidence-map coverage, detail
+                quality, and improvement-ratio proof.
+              </td>
             </tr>
             <tr>
               <td>Sidecar fixture</td>
