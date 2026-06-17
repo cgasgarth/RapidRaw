@@ -376,6 +376,90 @@
       "targetOrStepWedgePresent": false
     },
     {
+      "allowedDistribution": "private_ci_only",
+      "allowedValidationUses": ["schema_roundtrip", "profile_measurement"],
+      "autoCorrectionBakedIn": "known_absent",
+      "baseFogSampleRegions": [
+        {
+          "coordinateSpace": "source_asset_pixels",
+          "height": 32,
+          "kind": "rect",
+          "width": 160,
+          "x": 16,
+          "y": 16
+        }
+      ],
+      "bitDepth": 16,
+      "captureProfile": "camera_tiff_profile",
+      "colorProfile": "rawengine_camera_tiff_profile_v1",
+      "derivativeDistributionAllowed": false,
+      "developmentNotes": "Project-owned measured process-family profile fixture; no named-stock emulation claim.",
+      "developmentProcessKnown": true,
+      "disallowedValidationUses": [
+        "ui_overlay_smoke",
+        "density_math_reference",
+        "warning_stability",
+        "roll_consistency",
+        "stock_reference_mapping",
+        "marketing_screenshot"
+      ],
+      "expectedFixtureWarningCodes": [],
+      "expectedNegativeWarningCodes": [],
+      "fileFormat": "tiff",
+      "filmStockDisplayName": "Measured C-41 Process-Family Fixture",
+      "filmStockKnown": false,
+      "filmStockSource": "Project-owned measured process-family fixture; no manufacturer or stock claim.",
+      "fixtureId": "negative_lab.project_owned.c41_profile_measurement_001",
+      "fixtureRole": "profile_measurement",
+      "frameFormat": "35mm_color_negative_frame_project_owned",
+      "lens": "private_camera_scan_lens_pending_review",
+      "lightSource": "calibrated_even_backlight_d65",
+      "lossyCompression": false,
+      "measurementClaimAllowed": true,
+      "measuredProfileEvidence": {
+        "baseFogSampleCount": 4,
+        "claimPolicy": "process_family_profile_no_stock_claim",
+        "deltaE": {
+          "max": 5.4,
+          "mean": 1.2,
+          "percentile95": 3.1
+        },
+        "measurementDate": "2026-06-16",
+        "measurementReportHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "measurementSoftware": "rawengine_negative_lab_measurement_harness.v1",
+        "operator": "RawEngine fixture validator",
+        "profileId": "negative_lab.measured.c41.process_family.v1",
+        "sourceFixtureIds": ["negative_lab.project_owned.c41_profile_measurement_001"],
+        "targetReference": {
+          "id": "project_target_transparency_001",
+          "patchCount": 24,
+          "referenceHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "type": "it8_transparency"
+        }
+      },
+      "negativeFixtureTier": "project_owned_scan",
+      "payloadAccess": "private_ci_payload",
+      "processFamily": "c41_color_negative",
+      "profileClaimAllowed": true,
+      "rejectedSampleRegions": [],
+      "reviewIssue": "https://github.com/cgasgarth/RapidRaw/issues/1470",
+      "reviewedAt": "2026-06-16",
+      "reviewer": "RawEngine fixture validator",
+      "rollOrSheetIdentifier": "project_owned_c41_profile_measurement_roll_001",
+      "scanInputMode": "camera_tiff",
+      "scannerOrCamera": "project_owned_camera_scan_station_v1",
+      "scannerSoftware": "rawengine_fixture_measurement_harness.v1",
+      "scannerSoftwareSettingsKnown": true,
+      "source": {
+        "copyrightOwner": "RawEngine project",
+        "licenseName": "Project-owned private CI fixture",
+        "redistributionEvidence": "Private CI payload; public repository stores metadata only.",
+        "sourceKind": "project_owned"
+      },
+      "state": "approved_profile_measurement",
+      "targetOrStepWedgePresent": true
+    },
+    {
       "allowedDistribution": "none",
       "allowedValidationUses": ["schema_roundtrip"],
       "autoCorrectionBakedIn": "unknown",
@@ -605,6 +689,6 @@
     }
   ],
   "manifestId": "negative_lab_fixture_manifest",
-  "manifestVersion": "2026-06-16",
+  "manifestVersion": "2026-06-17",
   "schemaVersion": 1
 }
