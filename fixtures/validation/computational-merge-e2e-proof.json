@@ -1,0 +1,246 @@
+{
+  "$schema": "https://rawengine.dev/schemas/computational-merge-e2e-proof-v1.json",
+  "issue": 1809,
+  "proofCases": [
+    {
+      "artifacts": [
+        {
+          "hash": null,
+          "kind": "source_raw_sequence_private",
+          "path": "private-fixtures/panorama/overlap-stitch-v1",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "alignment_report_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-alignment.json",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "merge_output_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-merge.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_after_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-preview.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "export_after_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-export.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "quality_report_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-quality.json",
+          "publicRepoAllowed": false
+        }
+      ],
+      "evidenceId": "raw-evidence.panorama.overlap-stitch.v1",
+      "expectedMetrics": [
+        {
+          "name": "alignmentInlierRatio",
+          "required": true,
+          "threshold": 0.55
+        },
+        {
+          "name": "edgeContinuityScore",
+          "required": true,
+          "threshold": 0.85
+        },
+        {
+          "name": "previewExportMeanAbsDelta",
+          "required": true,
+          "threshold": 0.015
+        }
+      ],
+      "featureFamily": "panorama_stitch",
+      "fixtureId": "validation.computational-merge.panorama-overlap.v1",
+      "implementationIssue": 1508,
+      "localSourceRelativePaths": [
+        "private-fixtures/panorama/overlap-stitch-v1/frame-01.raf",
+        "private-fixtures/panorama/overlap-stitch-v1/frame-02.raf",
+        "private-fixtures/panorama/overlap-stitch-v1/frame-03.raf"
+      ],
+      "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
+      "notes": "Private RAW panorama E2E proof slot for decode, feature alignment, stitch/blend output, preview/export parity, and quality metrics. This manifest is planning evidence only until the private assets and runtime run reports exist.",
+      "proofStatus": "manifest_only",
+      "uiIssue": 1333,
+      "workflowSteps": [
+        "open_raw_sequence",
+        "decode_raw_sources",
+        "align_sources",
+        "merge_sources",
+        "render_preview",
+        "export_artifact",
+        "record_quality_metrics"
+      ]
+    },
+    {
+      "artifacts": [
+        {
+          "hash": null,
+          "kind": "source_raw_sequence_private",
+          "path": "private-fixtures/focus-stack/plane-transition-v1",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "alignment_report_private",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-alignment.json",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "merge_output_private",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-merge.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_after_private",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-preview.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "export_after_private",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-export.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "quality_report_private",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-quality.json",
+          "publicRepoAllowed": false
+        }
+      ],
+      "evidenceId": "raw-evidence.focus-stack.plane-transition.v1",
+      "expectedMetrics": [
+        {
+          "name": "sharpnessGainRatio",
+          "required": true,
+          "threshold": 1.15
+        },
+        {
+          "name": "focusTransitionArtifactScore",
+          "required": true,
+          "threshold": 0.9
+        },
+        {
+          "name": "previewExportMeanAbsDelta",
+          "required": true,
+          "threshold": 0.015
+        }
+      ],
+      "featureFamily": "focus_stack",
+      "fixtureId": "validation.computational-merge.focus-plane-transition.v1",
+      "implementationIssue": 1507,
+      "localSourceRelativePaths": [
+        "private-fixtures/focus-stack/plane-transition-v1/frame-01.cr3",
+        "private-fixtures/focus-stack/plane-transition-v1/frame-02.cr3",
+        "private-fixtures/focus-stack/plane-transition-v1/frame-03.cr3"
+      ],
+      "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
+      "notes": "Private RAW focus-stack E2E proof slot for decode, source alignment, sharpness-map merge, preview/export parity, and transition-artifact quality metrics. This manifest is planning evidence only until the private assets and runtime run reports exist.",
+      "proofStatus": "manifest_only",
+      "uiIssue": 1334,
+      "workflowSteps": [
+        "open_raw_sequence",
+        "decode_raw_sources",
+        "align_sources",
+        "merge_sources",
+        "render_preview",
+        "export_artifact",
+        "record_quality_metrics"
+      ]
+    },
+    {
+      "artifacts": [
+        {
+          "hash": null,
+          "kind": "source_raw_sequence_private",
+          "path": "private-fixtures/super-resolution/subpixel-detail-v1",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "alignment_report_private",
+          "path": "private-artifacts/validation/computational-merge/sr-subpixel-alignment.json",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "merge_output_private",
+          "path": "private-artifacts/validation/computational-merge/sr-subpixel-merge.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_after_private",
+          "path": "private-artifacts/validation/computational-merge/sr-subpixel-preview.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "export_after_private",
+          "path": "private-artifacts/validation/computational-merge/sr-subpixel-export.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "quality_report_private",
+          "path": "private-artifacts/validation/computational-merge/sr-subpixel-quality.json",
+          "publicRepoAllowed": false
+        }
+      ],
+      "evidenceId": "raw-evidence.super-resolution.subpixel-detail.v1",
+      "expectedMetrics": [
+        {
+          "name": "alignmentInlierRatio",
+          "required": true,
+          "threshold": 0.65
+        },
+        {
+          "name": "superResolutionDetailGainRatio",
+          "required": true,
+          "threshold": 1.2
+        },
+        {
+          "name": "previewExportMeanAbsDelta",
+          "required": true,
+          "threshold": 0.015
+        }
+      ],
+      "featureFamily": "super_resolution",
+      "fixtureId": "validation.computational-merge.super-resolution-subpixel.v1",
+      "implementationIssue": 1506,
+      "localSourceRelativePaths": [
+        "private-fixtures/super-resolution/subpixel-detail-v1/frame-01.nef",
+        "private-fixtures/super-resolution/subpixel-detail-v1/frame-02.nef",
+        "private-fixtures/super-resolution/subpixel-detail-v1/frame-03.nef"
+      ],
+      "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
+      "notes": "Private RAW super-resolution E2E proof slot for decode, subpixel alignment, detail reconstruction, preview/export parity, and artifact quality metrics. This manifest is planning evidence only until the private assets and runtime run reports exist.",
+      "proofStatus": "manifest_only",
+      "uiIssue": 1335,
+      "workflowSteps": [
+        "open_raw_sequence",
+        "decode_raw_sources",
+        "align_sources",
+        "merge_sources",
+        "render_preview",
+        "export_artifact",
+        "record_quality_metrics"
+      ]
+    }
+  ],
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-17",
+  "validationMode": "schema_public_assets_private"
+}
