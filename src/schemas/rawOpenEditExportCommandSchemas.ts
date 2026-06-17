@@ -1,0 +1,81 @@
+import { z } from 'zod';
+
+import { jsonValueSchema } from './aiMaskingSchemas';
+
+const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
+const privatePathSchema = z
+  .string()
+  .trim()
+  .regex(/^(private-fixtures|private-artifacts)\//u);
+
+const hashedPathSchema = z
+  .object({
+    hash: sha256Schema,
+    path: privatePathSchema,
+    publicRepoAllowed: z.literal(false),
+  })
+  .strict();
+
+const artifactKindSchema = z.enum([
+  'source_raw_private',
+  'preview_before_private',
+  'preview_after_private',
+  'export_after_private',
+  'sidecar_after_private',
+  'workflow_report_private',
+]);
+
+export const rawOpenEditExportProofRequestSchema = z
+  .object({
+    adjustments: jsonValueSchema,
+    artifactDirRelative: privatePathSchema,
+    editCommandId: z.string().trim().min(1),
+    editGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
+    fixtureId: z.string().regex(/^validation\.raw-open-edit-export\.[a-z0-9.-]+\.v[0-9]+$/u),
+    privateRootPath: z.string().trim().min(1),
+    sourceRelativePath: privatePathSchema,
+  })
+  .strict();
+
+export const rawOpenEditExportProofReportSchema = z
+  .object({
+    artifacts: z
+      .array(
+        hashedPathSchema
+          .extend({
+            kind: artifactKindSchema,
+          })
+          .strict(),
+      )
+      .min(6),
+    editCommandId: z.string().trim().min(1),
+    editGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
+    fixtureId: z.string().regex(/^validation\.raw-open-edit-export\.[a-z0-9.-]+\.v[0-9]+$/u),
+    generatedAt: z.iso.datetime(),
+    metrics: z.array(
+      z
+        .object({
+          name: z.enum([
+            'changedPixelRatio',
+            'previewExportMeanAbsDelta',
+            'sidecarReloadRevisionMatch',
+            'sourceHashUnchanged',
+          ]),
+          passed: z.boolean(),
+          source: z.literal('private_raw_report'),
+          threshold: z.number().min(0),
+          value: z.number().min(0),
+        })
+        .strict(),
+    ),
+    previewAfter: hashedPathSchema,
+    previewBefore: hashedPathSchema,
+    reportId: z.string().regex(/^raw-open-edit-export-run\.[a-z0-9.-]+\.v[0-9]+$/u),
+    sidecarAfter: hashedPathSchema,
+    sourceRaw: hashedPathSchema,
+    trackingIssue: z.literal(1376),
+  })
+  .strict();
+
+export type RawOpenEditExportProofRequest = z.infer<typeof rawOpenEditExportProofRequestSchema>;
+export type RawOpenEditExportProofReport = z.infer<typeof rawOpenEditExportProofReportSchema>;
