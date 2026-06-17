@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { rawEngineGamutMappingFixtureManifestV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { applyRelativeColorimetricClipFallback, classifyLinearRgbGamut } from '../src/utils/gamutMappingRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/color/gamut-mapping-fixtures.json';
 
@@ -16,20 +17,6 @@ const REQUIRED_CASE_IDS = new Set([
   'gamut.srgb.perceptual-intent-blocked.v1',
   'gamut.scene-referred.no-output-map.v1',
 ]);
-
-const classify = (rgb) => {
-  const minComponent = Math.min(...rgb);
-  const maxComponent = Math.max(...rgb);
-  const hasNegative = minComponent < 0;
-  const hasHigh = maxComponent > 1;
-
-  if (hasNegative && hasHigh) return 'mixed_out_of_gamut';
-  if (hasNegative) return 'negative_component';
-  if (hasHigh) return 'high_component';
-  return 'in_gamut';
-};
-
-const countOutOfGamutChannels = (rgb) => rgb.filter((component) => component < 0 || component > 1).length;
 
 const hasWarning = (testCase, warning) => testCase.policy.warnings.includes(warning);
 
@@ -45,15 +32,24 @@ for (const requiredId of REQUIRED_CASE_IDS) {
 
 for (const testCase of manifest.cases) {
   const rgb = testCase.destinationLinearRgbBeforeMap;
-  const actualClassification = classify(rgb);
+  const runtime = applyRelativeColorimetricClipFallback(rgb);
+  const actualClassification = classifyLinearRgbGamut(rgb);
   const minComponent = Math.min(...rgb);
   const maxComponent = Math.max(...rgb);
   const maxOvershoot = Math.max(0, maxComponent - 1);
   const maxUndershoot = Math.max(0, -minComponent);
-  const outOfGamutChannelCount = countOutOfGamutChannels(rgb);
+  const outOfGamutChannelCount = runtime.outOfGamutChannelCount;
 
   if (actualClassification !== testCase.expectedClassification) {
     failures.push(`${testCase.id}: expected ${testCase.expectedClassification}, got ${actualClassification}`);
+  }
+
+  if (runtime.classification !== testCase.expectedClassification) {
+    failures.push(`${testCase.id}: runtime expected ${testCase.expectedClassification}, got ${runtime.classification}`);
+  }
+
+  if (runtime.clippedLinearRgb.some((component) => component < 0 || component > 1)) {
+    failures.push(`${testCase.id}: clipped runtime RGB left output cube.`);
   }
 
   if (actualClassification === 'in_gamut' && outOfGamutChannelCount !== 0) {
@@ -97,6 +93,12 @@ for (const testCase of manifest.cases) {
     !hasWarning(testCase, 'output_gamut_mapping_not_runtime_applied_v1')
   ) {
     failures.push(`${testCase.id}: schema-only case must include output_gamut_mapping_not_runtime_applied_v1`);
+  }
+
+  if (testCase.policy.method === 'relative_colorimetric_clip_fallback_v1') {
+    for (const warning of runtime.warnings) {
+      if (!hasWarning(testCase, warning)) failures.push(`${testCase.id}: missing runtime warning ${warning}`);
+    }
   }
 
   if (testCase.policy.destination === 'scene_referred' && testCase.policy.method !== 'none_scene_referred_v1') {
