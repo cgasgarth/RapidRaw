@@ -44,6 +44,7 @@ const CHECK_GROUPS = {
     'check:capture-sharpening',
     'check:wavelet-detail',
     'check:private-raw-evidence',
+    'check:raw-open-edit-export-proof',
     'check:color-pipeline-audit',
     'check:denoise-fixtures',
     'check:denoise-ui-api',

@@ -1,0 +1,81 @@
+{
+  "$schema": "https://rawengine.dev/schemas/raw-open-edit-export-proof-v1.json",
+  "issue": 1376,
+  "proofCases": [
+    {
+      "artifacts": [
+        {
+          "hash": null,
+          "kind": "source_raw_private",
+          "path": "private-fixtures/detail/edge-ringing-v1.cr3",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_before_private",
+          "path": "private-artifacts/validation/open-edit-export/edge-ringing-preview-before.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_after_private",
+          "path": "private-artifacts/validation/open-edit-export/edge-ringing-preview-after.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "export_after_private",
+          "path": "private-artifacts/validation/open-edit-export/edge-ringing-export-after.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "sidecar_after_private",
+          "path": "private-artifacts/validation/open-edit-export/edge-ringing-after.rrdata",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "workflow_report_private",
+          "path": "private-artifacts/validation/open-edit-export/edge-ringing-workflow-report.json",
+          "publicRepoAllowed": false
+        }
+      ],
+      "editGraphRevision": "graph-rev.open-edit-export.edge-ringing.v1",
+      "evidenceId": "raw-evidence.detail.edge-ringing.v1",
+      "expectedMetrics": [
+        {
+          "name": "previewExportMeanAbsDelta",
+          "required": true,
+          "threshold": 0.015
+        },
+        {
+          "name": "sidecarReloadRevisionMatch",
+          "required": true,
+          "threshold": 0
+        },
+        {
+          "name": "sourceHashUnchanged",
+          "required": true,
+          "threshold": 0
+        }
+      ],
+      "fixtureId": "validation.raw-open-edit-export.edge-ringing.v1",
+      "localRelativePath": "private-fixtures/detail/edge-ringing-v1.cr3",
+      "notes": "Private RAW workflow proof slot for opening a RAW, applying a representative edit graph, rendering preview, exporting, writing sidecar state, and reloading it. Public repo stores metadata only until private assets are available.",
+      "status": "pending_private_asset",
+      "trackingIssue": 1376,
+      "workflowSteps": [
+        "open_raw",
+        "apply_edit_graph",
+        "render_preview",
+        "export_image",
+        "write_sidecar",
+        "reload_sidecar"
+      ]
+    }
+  ],
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-17",
+  "validationMode": "schema_public_assets_private"
+}
