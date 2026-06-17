@@ -1,23 +1,10 @@
 import { z } from 'zod';
 
+import { uniqueStringArraySchema } from './zodUniqueHelpers';
+
 export const importPresetSourcePolicySchema = z.enum(['copy', 'move', 'reference']);
 export const importPresetDuplicatePolicySchema = z.enum(['skip', 'rename', 'overwrite_after_approval']);
 export const importPresetSidecarPolicySchema = z.enum(['copy_existing', 'create_empty', 'ignore']);
-
-const uniqueStringArraySchema = (fieldName: string) =>
-  z.array(z.string().trim().min(1)).superRefine((values, context) => {
-    const seen = new Set<string>();
-    for (const [index, value] of values.entries()) {
-      if (seen.has(value)) {
-        context.addIssue({
-          code: 'custom',
-          message: `${fieldName} must not contain duplicate entries.`,
-          path: [index],
-        });
-      }
-      seen.add(value);
-    }
-  });
 
 export const importPresetBackupPolicySchema = z
   .object({

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { uniqueStringArraySchema } from './zodUniqueHelpers';
+
 export const metadataTemplateMergeModeSchema = z.enum(['append_tags', 'replace_fields']);
 export const metadataTemplateFieldSchema = z.enum([
   'Artist',
@@ -10,21 +12,6 @@ export const metadataTemplateFieldSchema = z.enum([
   'rating',
   'tags',
 ]);
-
-const uniqueStringArraySchema = (fieldName: string) =>
-  z.array(z.string().trim().min(1)).superRefine((values, context) => {
-    const seen = new Set<string>();
-    for (const [index, value] of values.entries()) {
-      if (seen.has(value)) {
-        context.addIssue({
-          code: 'custom',
-          message: `${fieldName} must not contain duplicate entries.`,
-          path: [index],
-        });
-      }
-      seen.add(value);
-    }
-  });
 
 export const metadataTemplateValuesSchema = z
   .object({

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { uniqueStringArraySchema } from './zodUniqueHelpers';
+
 export const librarySessionKindSchema = z.enum([
   'folder_browse',
   'shoot_session',
@@ -14,21 +16,6 @@ export const librarySessionViewModeSchema = z.enum(['grid', 'list', 'compare', '
 export const librarySessionSortKeySchema = z.enum(['name', 'modified_at', 'rating', 'color_label', 'file_type']);
 export const librarySessionSortOrderSchema = z.enum(['asc', 'desc']);
 export const librarySessionRawStatusSchema = z.enum(['all', 'raw_only', 'rendered_only', 'missing_sidecar']);
-
-const uniqueStringArraySchema = (fieldName: string) =>
-  z.array(z.string().trim().min(1)).superRefine((values, context) => {
-    const seen = new Set<string>();
-    for (const [index, value] of values.entries()) {
-      if (seen.has(value)) {
-        context.addIssue({
-          code: 'custom',
-          message: `${fieldName} must not contain duplicate entries.`,
-          path: [index],
-        });
-      }
-      seen.add(value);
-    }
-  });
 
 export const librarySessionSortSchema = z
   .object({

@@ -1,19 +1,10 @@
 import { z } from 'zod';
 
+import { uniqueStringArraySchema } from './zodUniqueHelpers';
+
 export const compareSurveyModeSchema = z.enum(['compare', 'survey']);
 export const compareSurveySortKeySchema = z.enum(['selection_order', 'rating', 'capture_time', 'file_name']);
 export const compareSurveySortOrderSchema = z.enum(['asc', 'desc']);
-
-const uniquePathArraySchema = (fieldName: string) =>
-  z.array(z.string().trim().min(1)).superRefine((values, context) => {
-    const seen = new Set<string>();
-    for (const [index, value] of values.entries()) {
-      if (seen.has(value)) {
-        context.addIssue({ code: 'custom', message: `${fieldName} must not contain duplicate paths.`, path: [index] });
-      }
-      seen.add(value);
-    }
-  });
 
 export const compareSurveyCandidateSchema = z
   .object({
@@ -33,7 +24,7 @@ export const compareSurveyCandidateSchema = z
 export const compareSurveySessionSchema = z
   .object({
     activePath: z.string().trim().min(1),
-    candidatePaths: uniquePathArraySchema('candidatePaths').min(2).max(32),
+    candidatePaths: uniqueStringArraySchema('candidatePaths', { duplicateLabel: 'paths' }).min(2).max(32),
     candidates: z.array(compareSurveyCandidateSchema).min(2).max(32),
     compareReferencePath: z.string().trim().min(1).nullable(),
     createdAt: z.iso.datetime(),

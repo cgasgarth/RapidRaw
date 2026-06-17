@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { uniqueStringArraySchema } from './zodUniqueHelpers';
+
 export const workspaceSurfaceSchema = z.enum(['library', 'editor', 'negative_lab', 'merge', 'export']);
 export const workspaceDensitySchema = z.enum(['compact', 'comfortable', 'dense']);
 export const workspacePanelIdSchema = z.enum([
@@ -13,21 +15,6 @@ export const workspacePanelIdSchema = z.enum([
   'presets',
 ]);
 export const workspacePanelDockSchema = z.enum(['left', 'right', 'bottom', 'hidden']);
-
-const uniqueStringArraySchema = (fieldName: string) =>
-  z.array(z.string().trim().min(1)).superRefine((values, context) => {
-    const seen = new Set<string>();
-    for (const [index, value] of values.entries()) {
-      if (seen.has(value)) {
-        context.addIssue({
-          code: 'custom',
-          message: `${fieldName} must not contain duplicate entries.`,
-          path: [index],
-        });
-      }
-      seen.add(value);
-    }
-  });
 
 export const workspacePanelLayoutSchema = z
   .object({
