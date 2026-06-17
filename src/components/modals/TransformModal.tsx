@@ -1,7 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import throttle from 'lodash.throttle';
 import { Check, RotateCcw, Grid3X3, Eye, EyeOff, Info, LineChart, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextColors, TextVariants } from '../../types/typography';
 import { Adjustments } from '../../utils/adjustments';
+import { throttle } from '../../utils/timing';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
@@ -255,7 +255,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         setParams(initParams);
         setShowLines(false);
         handleResetZoom();
-        void updatePreview(initParams, false);
+        updatePreview(initParams, false);
       }, 0);
       return () => {
         window.clearTimeout(timer);
@@ -274,7 +274,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
   const handleChange = (key: keyof typeof DEFAULT_PARAMS, value: number) => {
     const newParams = { ...params, [key]: value };
     setParams(newParams);
-    void updatePreview(newParams, showLines);
+    updatePreview(newParams, showLines);
   };
 
   const handleApply = () => {
@@ -290,13 +290,13 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
 
   const handleReset = () => {
     setParams(DEFAULT_PARAMS);
-    void updatePreview(DEFAULT_PARAMS, showLines);
+    updatePreview(DEFAULT_PARAMS, showLines);
   };
 
   const handleShowLinesToggle = () => {
     const newShowLines = !showLines;
     setShowLines(newShowLines);
-    void updatePreview(params, newShowLines);
+    updatePreview(params, newShowLines);
   };
 
   const toggleCompare = async (active: boolean) => {
@@ -327,7 +327,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
       });
       setPreviewUrl(result);
     } else {
-      void updatePreview(params, showLines);
+      updatePreview(params, showLines);
     }
   };
 

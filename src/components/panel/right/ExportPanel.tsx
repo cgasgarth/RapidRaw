@@ -1,7 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
-import debounce from 'lodash.debounce';
 import { FileInput, CheckCircle, XCircle, Loader, Ban, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +10,7 @@ import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { debounce } from '../../../utils/timing';
 import { Invokes, SelectedImage, AppSettings } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import Dropdown from '../../ui/Dropdown';
@@ -431,7 +431,7 @@ export default function ExportPanel({
           : null,
     };
     const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
-    void debouncedEstimateSize(pathsToExport, adjustments, selectedImage?.path, exportSettings, format);
+    debouncedEstimateSize(pathsToExport, adjustments, selectedImage?.path, exportSettings, format);
     return () => {
       debouncedEstimateSize.cancel();
     };

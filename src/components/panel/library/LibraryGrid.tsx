@@ -1,4 +1,3 @@
-import debounce from 'lodash.debounce';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import React, {
   useState,
@@ -17,6 +16,7 @@ import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
+import { debounce } from '../../../utils/timing';
 import {
   ExifOverlay,
   LibraryViewMode,
@@ -704,7 +704,9 @@ export default function LibraryGrid(props: LibraryGridProps) {
             listRef={setListHandle}
             rowCount={gridData.rows.length}
             rowHeight={getItemSize}
-            onScroll={(e: React.UIEvent<HTMLElement>) => handleScroll(e.currentTarget.scrollTop)}
+            onScroll={(e: React.UIEvent<HTMLElement>) => {
+              handleScroll(e.currentTarget.scrollTop);
+            }}
             className="custom-scrollbar"
             rowComponent={VirtualizedRow}
             rowProps={memoizedRowProps}

@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
-import debounce from 'lodash.debounce';
 import { Loader2 } from 'lucide-react';
 import {
   useState,
@@ -28,6 +27,7 @@ import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
 import { normalizeMaskOverlaySettings } from '../../utils/maskOverlayModes';
 import { toMaskParameterRecord } from '../../utils/maskParameterAccess';
+import { debounce } from '../../utils/timing';
 import { Panel, TransformState, Invokes } from '../ui/AppProperties';
 
 const parseRgb = (rgbStr: string): [number, number, number, number] => {

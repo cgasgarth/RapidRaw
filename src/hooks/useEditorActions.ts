@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import debounce from 'lodash.debounce';
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 
@@ -24,6 +23,7 @@ import {
 import { calculateCenteredCrop } from '../utils/cropUtils';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { debounce } from '../utils/timing';
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
   useEditorStore.getState().pushHistory(newAdj);

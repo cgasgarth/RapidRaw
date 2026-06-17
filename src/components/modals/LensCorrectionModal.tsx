@@ -1,7 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import throttle from 'lodash.throttle';
 import {
   RotateCcw,
   Check,
@@ -22,6 +21,7 @@ import { useTranslation, Trans } from 'react-i18next';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextColors, TextVariants } from '../../types/typography';
 import { Adjustments } from '../../utils/adjustments';
+import { throttle } from '../../utils/timing';
 import { SelectedImage } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
@@ -336,7 +336,7 @@ export default function LensCorrectionModal({
         setParams(initParams);
         setDetectionStatus('idle');
         handleResetZoom();
-        void updatePreview(initParams);
+        updatePreview(initParams);
       }, 0);
 
       void invoke<Array<string>>('get_lensfun_makers')
@@ -384,7 +384,7 @@ export default function LensCorrectionModal({
       })
       .catch(console.error);
 
-    void updatePreview(newParams);
+    updatePreview(newParams);
   };
 
   const handleModelChange = async (model: string) => {
@@ -396,7 +396,7 @@ export default function LensCorrectionModal({
       const distortionParams = await fetchDistortionParams(params.lensMaker, model);
       const finalParams = { ...tempParams, lensDistortionParams: distortionParams };
       setParams(finalParams);
-      void updatePreview(finalParams);
+      updatePreview(finalParams);
     }
   };
 
@@ -419,19 +419,19 @@ export default function LensCorrectionModal({
     const distortionParams = await fetchDistortionParams(selected.maker, selected.model);
     const finalParams = { ...tempParams, lensDistortionParams: distortionParams };
     setParams(finalParams);
-    void updatePreview(finalParams);
+    updatePreview(finalParams);
   };
 
   const handleAmountChange = (key: keyof LensParams, amount: number) => {
     const newParams = { ...params, [key]: amount };
     setParams(newParams);
-    void updatePreview(newParams);
+    updatePreview(newParams);
   };
 
   const handleToggleChange = (key: keyof LensParams, val: boolean) => {
     const newParams = { ...params, [key]: val };
     setParams(newParams);
-    void updatePreview(newParams);
+    updatePreview(newParams);
   };
 
   const handleAutoDetect = async () => {
@@ -470,7 +470,7 @@ export default function LensCorrectionModal({
             lensModel: detectedModel,
             lensDistortionParams: distortionParams,
           };
-          void updatePreview(newParams);
+          updatePreview(newParams);
           return newParams;
         });
 
@@ -487,7 +487,7 @@ export default function LensCorrectionModal({
             lensModel: null,
             lensDistortionParams: null,
           };
-          void updatePreview(clearedParams);
+          updatePreview(clearedParams);
           return clearedParams;
         });
         setDetectionStatus('not_found');
@@ -514,7 +514,7 @@ export default function LensCorrectionModal({
     setParams(resetParams);
     setLenses([]);
     setDetectionStatus('idle');
-    void updatePreview(resetParams);
+    updatePreview(resetParams);
   };
 
   const toggleCompare = (active: boolean) => {
@@ -559,7 +559,7 @@ export default function LensCorrectionModal({
         })
         .catch(console.error);
     } else {
-      void updatePreview(params);
+      updatePreview(params);
     }
   };
 
@@ -589,7 +589,7 @@ export default function LensCorrectionModal({
     if (mode === 'auto') {
       void handleAutoDetect();
     } else {
-      void updatePreview(newParams);
+      updatePreview(newParams);
     }
   };
 
