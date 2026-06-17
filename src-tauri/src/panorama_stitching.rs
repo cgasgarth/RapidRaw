@@ -986,14 +986,7 @@ fn upsert_panorama_artifact_metadata(
 
     let artifacts = sidecar
         .raw_engine_artifacts
-        .get_or_insert_with(|| RawEngineArtifacts {
-            schema_version: 1,
-            ai_provenance_entries: Vec::new(),
-            hdr_merge_artifacts: Vec::new(),
-            negative_lab_artifacts: Vec::new(),
-            panorama_artifacts: Vec::new(),
-            stale_artifact_ids: Vec::new(),
-        });
+        .get_or_insert_with(RawEngineArtifacts::new_v1);
     artifacts.schema_version = 1;
     artifacts.panorama_artifacts.push(artifact);
     artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
@@ -1747,16 +1740,12 @@ mod tests {
             tags: None,
             exif: None,
             raw_engine_artifacts: Some(RawEngineArtifacts {
-                schema_version: 1,
-                ai_provenance_entries: Vec::new(),
-                hdr_merge_artifacts: Vec::new(),
-                negative_lab_artifacts: Vec::new(),
                 panorama_artifacts: vec![json!({
                     "artifactId": "artifact_panorama_test",
                     "createdAt": "2023-11-14T22:13:21Z",
                     "sourceImageRefs": sources,
                 })],
-                stale_artifact_ids: Vec::new(),
+                ..RawEngineArtifacts::new_v1()
             }),
         }
     }
