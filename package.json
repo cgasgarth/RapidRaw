@@ -167,6 +167,7 @@
     "check:focus-preview-blend-smoke": "bun scripts/check-focus-preview-blend-smoke.ts",
     "check:focus-ui-api": "bun scripts/check-focus-ui-api.ts",
     "check:focus-ui-runtime-bridge": "bun scripts/check-focus-ui-runtime-bridge.ts",
+    "check:focus-review-diagnostics": "bun scripts/check-focus-review-diagnostics.ts",
     "check:focus-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario focus-ui",
     "check:sr-performance-fixtures": "bun scripts/check-super-resolution-performance-fixtures.ts",
     "check:sr-app-server-runtime": "bun scripts/check-super-resolution-app-server-runtime.ts",

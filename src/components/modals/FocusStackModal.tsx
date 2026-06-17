@@ -240,6 +240,7 @@ export default function FocusStackModal({
         title={t('modals.focusStack.review.title')}
         proofStatus={t('modals.focusStack.review.proofStatus')}
         limitation={t('modals.focusStack.review.limitation')}
+        testId="focus-review-diagnostics"
         items={[
           {
             label: t('modals.focusStack.review.sharpnessMap'),
@@ -255,6 +256,42 @@ export default function FocusStackModal({
             label: t('modals.focusStack.review.retouchLayer'),
             status: 'pending',
             value: t('modals.focusStack.review.uiE2ePending'),
+          },
+        ]}
+        sections={[
+          {
+            title: t('modals.focusStack.preflightTitle'),
+            rows: [
+              {
+                label: t('modals.focusStack.preflight.sources'),
+                value: String(sourceCount),
+              },
+              {
+                label: t('modals.focusStack.preflight.alignment'),
+                value: t(`modals.focusStack.alignment.${settings.alignmentMode}`),
+              },
+              {
+                label: t('modals.focusStack.qualityLabel'),
+                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '',
+              },
+              {
+                label: t('modals.focusStack.preflight.blend'),
+                value: t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`),
+              },
+            ],
+          },
+          {
+            title: t('modals.focusStack.review.title'),
+            rows: [
+              {
+                label: t('modals.focusStack.preflight.retouch'),
+                value: t(`modals.focusStack.retouchPolicy.${settings.retouchLayerPolicy}.label`),
+              },
+              {
+                label: t('modals.focusStack.review.transitions'),
+                value: t('modals.focusStack.review.privateRawPending'),
+              },
+            ],
           },
         ]}
       />
