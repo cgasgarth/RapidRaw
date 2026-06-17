@@ -100,6 +100,7 @@ const CHECK_GROUPS = {
     'check:negative-lab-frame-health',
     'check:negative-lab-measured-render-proof',
     'check:negative-lab-real-fixtures',
+    'check:negative-lab-stock-metadata-catalog',
   ],
 };
 
