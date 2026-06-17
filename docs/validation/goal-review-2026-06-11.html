@@ -318,8 +318,11 @@
             </tr>
             <tr>
               <td>Sidecar validation</td>
-              <td><span class="status partial">Queued</span></td>
-              <td>Sidecar format baseline and local sidecar roundtrip fixture branch.</td>
+              <td><span class="status partial">Artifact proof</span></td>
+              <td>
+                <code>bun run check:sidecar-roundtrip</code> validates sidecar fixture semantics for AI provenance, HDR,
+                panorama, focus-stack, super-resolution, and Negative Lab artifacts.
+              </td>
               <td>Rust-side sidecar integration and migration tests are not complete.</td>
             </tr>
             <tr>
@@ -339,7 +342,7 @@
               <td>
                 Runtime apply checks now render synthetic HDR, panorama, focus stack, and super-resolution outputs with
                 app-server/UI bridge coverage, output-derived artifact hashes, and quality provenance for HDR/SR/focus
-                plus panorama quality metrics queued in PR #1601.
+                plus panorama quality metrics.
               </td>
               <td>Real RAW before/after proof and export parity remain required before feature completion.</td>
             </tr>
@@ -373,8 +376,7 @@
               <td>Panorama workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PRs #1588 and #1590, with PR #1601 queued,
-                <code>bun run check:panorama-runtime-plan-smoke</code>,
+                PRs #1588, #1590, and #1805, <code>bun run check:panorama-runtime-plan-smoke</code>,
                 <code>bun run check:panorama-app-server-runtime</code>,
                 <code>bun run check:panorama-ui-runtime-bridge</code>. Runtime smoke records crop coverage, overlap
                 area, output/source pixels, and stitched-source ratio.
@@ -385,10 +387,11 @@
               <td>Focus stack workspace</td>
               <td><span class="status partial">Runtime apply proof</span></td>
               <td>
-                PRs #1587, #1591, and #1599, <code>bun run check:focus-runtime-plan-smoke</code>,
-                <code>bun run check:focus-app-server-runtime</code>, <code>bun run check:focus-ui-runtime-bridge</code>.
-                Runtime smoke records alignment, source coverage, winning confidence, low-confidence area, and retouch
-                recommendation.
+                PRs #1587, #1591, #1599, #1805, and #1806,
+                <code>bun run check:focus-runtime-plan-smoke</code>,
+                <code>bun run check:focus-app-server-runtime</code>, <code>bun run check:focus-ui-runtime-bridge</code>,
+                and <code>bun run check:sidecar-roundtrip</code>. Runtime smoke records alignment, source coverage,
+                winning confidence, low-confidence area, retouch recommendation, and persisted sharpness settings.
               </td>
               <td>Depth-map/laplacian production blending, halo controls, and RAW fixture proof.</td>
             </tr>
@@ -444,7 +447,10 @@
           </div>
           <div class="artifact">
             <h3>Visual Smoke Screenshots</h3>
-            <img src="../../artifacts/visual-smoke/hdr-ui.png" alt="HDR merge visual smoke screenshot" />
+            <img
+              src="../../artifacts/visual-smoke/negative-lab-workspace.png"
+              alt="Negative Lab visual smoke screenshot"
+            />
             <p>
               Run <code>bun run check:visual-smoke</code> to refresh local screenshots under
               <code>artifacts/visual-smoke/</code>. Expected files include HDR, panorama, focus, super-resolution, film,
@@ -580,7 +586,7 @@
             <tr>
               <td>Sidecar fixture</td>
               <td><code>bun run check:sidecar-roundtrip</code></td>
-              <td>Queued local branch validating `.rrdata` fixture semantics.</td>
+              <td>Validates `.rrdata` fixture semantics for current derived artifact and AI provenance families.</td>
             </tr>
           </tbody>
         </table>
