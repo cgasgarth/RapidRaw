@@ -1,0 +1,338 @@
+import { z } from 'zod';
+
+const filmLookPresetBaseSchema = z
+  .object({
+    includeCropTransform: z.literal(false),
+    includeMasks: z.literal(false),
+    presetType: z.literal('style'),
+  })
+  .passthrough();
+const warmPrintPresetSchema = filmLookPresetBaseSchema.extend({
+  adjustments: z.object({
+    contrast: z.literal(8),
+    highlights: z.literal(-10),
+    temperature: z.literal(8),
+  }),
+  name: z.literal('Warm Print 100%'),
+});
+const monoSilverPresetSchema = filmLookPresetBaseSchema.extend({
+  adjustments: z.object({
+    contrast: z.literal(12),
+    grainAmount: z.literal(22),
+    grainSize: z.literal(42),
+    saturation: z.literal(-100),
+  }),
+  name: z.literal('Mono Silver 100%'),
+});
+const exportedFilmLookPresetSchema = z.union([
+  warmPrintPresetSchema.extend({ id: z.string().uuid() }),
+  monoSilverPresetSchema.extend({ id: z.string().uuid() }),
+]);
+const filmLookExportArgsSchema = z.object({
+  filePath: z.literal('/tmp/rawengine-film-look-smoke.rrpreset'),
+  presetsToExport: z
+    .array(
+      z.object({
+        preset: exportedFilmLookPresetSchema,
+      }),
+    )
+    .length(1),
+});
+const filmLookSaveCommandSchema = z.union([
+  z.object({
+    args: warmPrintPresetSchema,
+    command: z.literal('save_community_preset'),
+    options: z.unknown().optional(),
+  }),
+  z.object({
+    args: monoSilverPresetSchema,
+    command: z.literal('save_community_preset'),
+    options: z.unknown().optional(),
+  }),
+]);
+const filmLookExportCommandSchema = z.object({
+  args: filmLookExportArgsSchema,
+  command: z.literal('handle_export_presets_to_file'),
+  options: z.unknown().optional(),
+});
+const filmLookInvokeLogSchema = z.array(z.union([filmLookSaveCommandSchema, filmLookExportCommandSchema]));
+const filmLookExportProofSchema = z.object({
+  exportedNames: z.array(z.string()).superRefine((names, context) => {
+    for (const expectedName of ['Warm Print 100%', 'Mono Silver 100%']) {
+      if (!names.includes(expectedName)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Missing exported film look preset ${expectedName}.`,
+        });
+      }
+    }
+  }),
+  savedNames: z.array(z.string()).superRefine((names, context) => {
+    for (const expectedName of ['Warm Print 100%', 'Mono Silver 100%']) {
+      if (!names.includes(expectedName)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Missing saved film look preset ${expectedName}.`,
+        });
+      }
+    }
+  }),
+});
+const visualSmokeInvokeLogSchema = z.array(
+  z.object({
+    args: z.unknown().optional(),
+    command: z.string(),
+    options: z.unknown().optional(),
+  }),
+);
+const negativeLabLeftEdgeSampleSchema = z.object({
+  height: z.literal(0.6),
+  width: z.literal(0.12),
+  x: z.literal(0.02),
+  y: z.literal(0.2),
+});
+const negativeLabCustomBaseSampleSchema = z.object({
+  height: z.literal(0.18),
+  width: z.literal(0.18),
+  x: z.literal(0.25),
+  y: z.literal(0.25),
+});
+const negativeLabShadowPatchSampleSchema = z.object({
+  height: z.literal(0.18),
+  width: z.literal(0.18),
+  x: z.literal(0.18),
+  y: z.literal(0.62),
+});
+const negativeLabOrthoPresetParamsSchema = z
+  .object({
+    base_fog_sample: z.union([negativeLabLeftEdgeSampleSchema, negativeLabCustomBaseSampleSchema]),
+    base_fog_strength: z.literal(1),
+    blue_weight: z.literal(1.18),
+    contrast: z.literal(1.2),
+    exposure: z.literal(-0.05),
+    green_weight: z.literal(0.96),
+    red_weight: z.literal(1.07),
+  })
+  .passthrough();
+const negativeLabPreviewParamsSchema = z
+  .object({
+    base_fog_sample: z.union([z.null(), negativeLabLeftEdgeSampleSchema, negativeLabCustomBaseSampleSchema]),
+    base_fog_strength: z.literal(1),
+    blue_weight: z.number(),
+    contrast: z.number(),
+    exposure: z.number(),
+    green_weight: z.number(),
+    red_weight: z.number(),
+  })
+  .passthrough();
+const negativeLabFixturePathSchema = z.union([
+  z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
+  z.literal('/fixtures/negative-lab/synthetic-gray-ramp-negative-002.tif'),
+]);
+const negativeLabPreviewInvokeSchema = z.object({
+  args: z.object({
+    params: negativeLabPreviewParamsSchema,
+    path: negativeLabFixturePathSchema,
+  }),
+  command: z.literal('preview_negative_conversion'),
+  options: z.unknown().optional(),
+});
+const negativeLabBaseFogEstimateInvokeSchema = z.object({
+  args: z.object({
+    path: z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
+    sampleRect: z.union([
+      z.null(),
+      negativeLabLeftEdgeSampleSchema,
+      negativeLabCustomBaseSampleSchema,
+      negativeLabShadowPatchSampleSchema,
+    ]),
+  }),
+  command: z.literal('estimate_negative_base_fog'),
+  options: z.unknown().optional(),
+});
+const negativeLabConvertArgsSchema = z.object({
+  options: z.object({
+    outputFormat: z.literal('jpeg_proof'),
+    suffix: z.literal('Positive'),
+  }),
+  params: negativeLabOrthoPresetParamsSchema,
+  paths: z.array(z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif')).length(1),
+});
+const negativeLabBatchColorParamsSchema = z
+  .object({
+    base_fog_sample: z.null(),
+    base_fog_strength: z.literal(1),
+    blue_weight: z.literal(1.14),
+    contrast: z.literal(1),
+    exposure: z.literal(0),
+    green_weight: z.literal(0.91),
+    red_weight: z.literal(1.23),
+  })
+  .passthrough();
+const negativeLabBatchConvertArgsSchema = z.object({
+  options: z
+    .object({
+      acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
+      outputFormat: z.literal('jpeg_proof'),
+      suffix: z.literal('Positive'),
+    })
+    .refine(
+      (options) =>
+        options.acceptedDryRunPlanId ===
+        `negative_lab_batch_plan_${options.acceptedDryRunPlanHash.replace('fnv1a32:', '')}`,
+      'accepted batch plan id must match hash',
+    ),
+  params: negativeLabBatchColorParamsSchema,
+  paths: z
+    .array(
+      z.union([
+        z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
+        z.literal('/fixtures/negative-lab/synthetic-gray-ramp-negative-002.tif'),
+      ]),
+    )
+    .length(2),
+});
+const negativeLabPreviewReturnProofSchema = z.array(z.string().startsWith('data:image/svg+xml,')).min(3);
+
+export const hdrUiSettingsProofSchema = z.object({
+  deghosting: z.literal('high'),
+  maxPreviewDimensionPx: z.literal('8192'),
+  toneMapPreview: z.literal('false'),
+});
+export const panoramaUiSettingsProofSchema = z.object({
+  blendMode: z.literal('feather'),
+  boundaryMode: z.literal('transparent'),
+  exposureMode: z.literal('none'),
+  maxPreviewDimensionPx: z.literal('8192'),
+  projection: z.literal('spherical'),
+  qualityPreference: z.literal('preview'),
+});
+export const focusUiSettingsProofSchema = z.object({
+  alignmentMode: z.literal('homography'),
+  blendMethod: z.literal('depth_map'),
+  maxPreviewDimensionPx: z.literal('8192'),
+  qualityPreference: z.literal('preview'),
+  retouchLayerPolicy: z.literal('none'),
+});
+export const superResolutionUiSettingsProofSchema = z.object({
+  alignmentMode: z.literal('optical_flow'),
+  detailPolicy: z.literal('aggressive_preview_only'),
+  maxPreviewDimensionPx: z.literal('8192'),
+  outputScale: z.literal('4'),
+  qualityPreference: z.literal('preview'),
+});
+export const commandPaletteWorkflowProofSchema = z.object({
+  focusOpen: z.literal('true'),
+  hdrOpen: z.literal('true'),
+  negativeOpen: z.literal('true'),
+  panoramaOpen: z.literal('true'),
+  srOpen: z.literal('true'),
+});
+export const negativeLabWorkspaceProofDatasetSchema = z.object({
+  activeStage: z.enum(['colorInversion', 'export', 'inspection']),
+  exportReady: z.enum(['false', 'true']),
+  previewReady: z.literal('true'),
+  queuedCount: z.string().regex(/^[1-9][0-9]*$/u),
+  reviewCount: z.string().regex(/^[0-9]+$/u),
+  retouchCount: z.literal('0'),
+  schemaVersion: z.literal('1'),
+  targetCount: z.string().regex(/^[1-9][0-9]*$/u),
+});
+
+export async function assertFilmLookExportProof(page) {
+  const rawInvokeLog = visualSmokeInvokeLogSchema.parse(
+    await page.evaluate(() => window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []),
+  );
+  const invokeLog = filmLookInvokeLogSchema.parse(
+    rawInvokeLog.filter((call) => ['handle_export_presets_to_file', 'save_community_preset'].includes(call.command)),
+  );
+  const savedNames = invokeLog.filter((call) => call.command === 'save_community_preset').map((call) => call.args.name);
+  const exportedNames = invokeLog
+    .filter((call) => call.command === 'handle_export_presets_to_file')
+    .map((call) => call.args.presetsToExport[0]?.preset.name ?? '<missing>');
+
+  filmLookExportProofSchema.parse({ exportedNames, savedNames });
+}
+
+export async function assertNegativeLabInvokeProof(page) {
+  const invokeLog = visualSmokeInvokeLogSchema.parse(
+    await page.evaluate(() => window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []),
+  );
+  const convertCall = invokeLog.find((call) => call.command === 'convert_negatives');
+
+  if (convertCall === undefined) {
+    throw new Error('Negative Lab convert invoke was not recorded.');
+  }
+
+  negativeLabConvertArgsSchema.parse(convertCall.args);
+}
+
+export async function assertNegativeLabBaseFogPreviewExportProof(page) {
+  const rawInvokeLog = visualSmokeInvokeLogSchema.parse(
+    await page.evaluate(() => window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []),
+  );
+  const previewCalls = z
+    .array(negativeLabPreviewInvokeSchema)
+    .parse(rawInvokeLog.filter((call) => call.command === 'preview_negative_conversion'));
+  const estimateCalls = z
+    .array(negativeLabBaseFogEstimateInvokeSchema)
+    .parse(rawInvokeLog.filter((call) => call.command === 'estimate_negative_base_fog'));
+  const previewReturns = negativeLabPreviewReturnProofSchema.parse(
+    await page.evaluate(() => window.__RAWENGINE_NEGATIVE_LAB_PREVIEW_RETURNS__ ?? []),
+  );
+  const hasAutoEstimate = estimateCalls.some((call) => call.args.sampleRect === null);
+  const hasManualEstimate = estimateCalls.some((call) => call.args.sampleRect !== null);
+  const hasCustomBaseEstimate = estimateCalls.some(
+    (call) => negativeLabCustomBaseSampleSchema.safeParse(call.args.sampleRect).success,
+  );
+  const hasPatchProbeEstimate = estimateCalls.some(
+    (call) => negativeLabShadowPatchSampleSchema.safeParse(call.args.sampleRect).success,
+  );
+  const hasAutoPreview = previewCalls.some((call) => call.args.params.base_fog_sample === null);
+  const hasManualPreview = previewCalls.some(
+    (call) => call.args.params.base_fog_sample !== null && call.args.params.blue_weight === 1.18,
+  );
+  const hasCustomBasePreview = previewCalls.some(
+    (call) => negativeLabCustomBaseSampleSchema.safeParse(call.args.params.base_fog_sample).success,
+  );
+
+  if (
+    !hasAutoEstimate ||
+    !hasManualEstimate ||
+    !hasCustomBaseEstimate ||
+    !hasPatchProbeEstimate ||
+    !hasAutoPreview ||
+    !hasManualPreview ||
+    !hasCustomBasePreview
+  ) {
+    throw new Error(
+      `Negative Lab base/fog proof did not exercise auto and sampled preview paths: ${JSON.stringify({
+        hasAutoEstimate,
+        hasAutoPreview,
+        hasCustomBaseEstimate,
+        hasCustomBasePreview,
+        hasManualEstimate,
+        hasManualPreview,
+        hasPatchProbeEstimate,
+      })}`,
+    );
+  }
+
+  if (new Set(previewReturns).size < 2) {
+    throw new Error('Negative Lab sampled preview proof did not produce distinct preview render payloads.');
+  }
+}
+
+export async function assertNegativeLabBatchColorInvokeProof(page) {
+  const invokeLog = visualSmokeInvokeLogSchema.parse(
+    await page.evaluate(() => window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []),
+  );
+  const convertCall = invokeLog.find((call) => call.command === 'convert_negatives');
+
+  if (convertCall === undefined) {
+    throw new Error('Negative Lab batch convert invoke was not recorded.');
+  }
+
+  negativeLabBatchConvertArgsSchema.parse(convertCall.args);
+}
