@@ -854,6 +854,12 @@ export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorD
       previousValue: -12,
       value: -24,
     },
+    {
+      module: 'levels',
+      path: '/parameters/gamma',
+      previousValue: 1,
+      value: 1.1,
+    },
   ],
   predictedGraphRevision: 'graph_rev_46_preview',
   previewArtifacts: [

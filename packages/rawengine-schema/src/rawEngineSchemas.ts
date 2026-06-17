@@ -1687,7 +1687,7 @@ export const toneColorCommandEnvelopeV1Schema = z
 
 export const toneColorParameterDiffV1Schema = z
   .object({
-    module: z.enum(['basic_tone', 'tone_curve', 'white_balance', 'hsl', 'color_grading']),
+    module: z.enum(['basic_tone', 'tone_curve', 'white_balance', 'hsl', 'color_grading', 'levels']),
     path: z.string().trim().min(1),
     previousValue: z.unknown().optional(),
     value: z.unknown().optional(),
