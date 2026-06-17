@@ -461,7 +461,7 @@ const buildMeasuredProfilePromotionFixture = (overrides = {}) => {
     negativeFixtureTier: 'project_owned_scan',
     payloadAccess: 'private_ci_payload',
     profileClaimAllowed: true,
-    reviewIssue: 'https://github.com/cgasgarth/RapidRaw/issues/1539',
+    reviewIssue: 'https://github.com/cgasgarth/RapidRaw/issues/1470',
     reviewedAt: '2026-06-16',
     reviewer: 'RawEngine fixture validator',
     scannerOrCamera: 'project_owned_camera_scan_station_v1',
@@ -514,9 +514,13 @@ const buildSyntheticProof = () =>
 
 const buildManifest = (proof) =>
   negativeLabFixtureManifestV1Schema.parse({
-    entries: [...proof.cases.map(buildSyntheticManifestEntry), ...buildPlannedRealScanEntries()],
+    entries: [
+      ...proof.cases.map(buildSyntheticManifestEntry),
+      buildMeasuredProfilePromotionFixture(),
+      ...buildPlannedRealScanEntries(),
+    ],
     manifestId: 'negative_lab_fixture_manifest',
-    manifestVersion: '2026-06-16',
+    manifestVersion: '2026-06-17',
     schemaVersion: 1,
   });
 
@@ -556,12 +560,13 @@ const assertCoverage = (proof, manifest) => {
   }
 
   for (const fixtureId of [
+    'negative_lab.project_owned.c41_profile_measurement_001',
     'negative_lab.local.camera_raw_color_negative_candidate_001',
     'negative_lab.local.camera_raw_bw_negative_candidate_001',
     'negative_lab.local.tiff_dense_thin_candidate_001',
     'negative_lab.local.tiff_mixed_lighting_candidate_001',
   ]) {
-    if (!manifest.entries.some((entry) => entry.fixtureId === fixtureId && entry.payloadAccess === 'metadata_only')) {
+    if (!manifest.entries.some((entry) => entry.fixtureId === fixtureId)) {
       throw new Error(`Negative-lab fixture manifest missing real-scan placeholder: ${fixtureId}.`);
     }
   }

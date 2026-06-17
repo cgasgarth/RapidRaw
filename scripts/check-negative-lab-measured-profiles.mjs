@@ -16,7 +16,10 @@ import {
   buildNegativeLabAcceptedBatchPlanRouteResult,
   buildNegativeLabConversionPlanResult,
 } from '../src/utils/negativeLabAppServerRoutes.ts';
-import { resolveNegativeLabRuntimeProfile } from '../src/utils/negativeLabMeasuredProfileRuntime.ts';
+import {
+  NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
+  resolveNegativeLabRuntimeProfile,
+} from '../src/utils/negativeLabMeasuredProfileRuntime.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
 
 const manifestUrl = new URL('../fixtures/negative-lab/negative-lab-fixture-manifest.json', import.meta.url);
@@ -263,9 +266,21 @@ const expectMeasurementReportReject = (label, report) => {
 
 const manifest = negativeLabFixtureManifestV1Schema.parse(await readJson(manifestUrl));
 const measuredCatalog = negativeLabMeasuredProfileCatalogSchema.parse(await readJson(measuredCatalogUrl));
+const shippedMeasuredProfile = measuredCatalog.profiles.find(
+  (profile) => profile.profileId === 'negative_lab.measured.c41.process_family.v1',
+);
 
 assertGenericCatalogIsNotPromoted();
 validateMeasuredProfileCatalog(measuredCatalog, manifest.entries);
+if (shippedMeasuredProfile === undefined) {
+  throw new Error('Shipped measured Negative Lab catalog is missing the C-41 process-family profile.');
+}
+if (
+  NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG.measuredCatalog.profiles.length !== measuredCatalog.profiles.length ||
+  NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG.measuredCatalog.profiles[0]?.profileId !== shippedMeasuredProfile.profileId
+) {
+  throw new Error('Runtime measured Negative Lab catalog is not sourced from the shipped measured-profile catalog.');
+}
 validateMeasuredProfileCatalog(
   negativeLabMeasuredProfileCatalogSchema.parse({
     catalogId: 'negative_lab_measured_profile_catalog',

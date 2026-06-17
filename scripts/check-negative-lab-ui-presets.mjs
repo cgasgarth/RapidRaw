@@ -95,13 +95,27 @@ if (NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length < 12) {
   failures.push('Negative Lab UI preset catalog must include at least 12 generic family starters');
 }
 
-if (runtimeProfileRows.length !== NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length) {
+const genericRuntimeRows = runtimeProfileRows.filter((row) => row.profileStatus === 'generic_unmeasured');
+const measuredRuntimeRows = runtimeProfileRows.filter((row) => row.profileStatus === 'fixture_measured');
+
+if (genericRuntimeRows.length !== NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length) {
   failures.push('Negative Lab profile browser rows must expose every public generic preset');
 }
 
-for (const row of runtimeProfileRows) {
-  if (row.profileStatus !== 'generic_unmeasured' || !row.isSelectable || row.disabledReason !== null) {
-    failures.push(`${row.presetId}: public profile browser row must remain a selectable generic starter`);
+for (const row of genericRuntimeRows) {
+  if (!row.isSelectable || row.disabledReason !== null) {
+    failures.push(`${row.presetId}: public generic profile browser row must remain selectable`);
+  }
+}
+
+for (const row of measuredRuntimeRows) {
+  if (
+    row.claimPolicy !== 'process_family_profile_no_stock_claim' ||
+    !row.doesNotProve.includes('no_stock_emulation_claim') ||
+    !row.doesNotProve.includes('no_colorimetric_match_claim') ||
+    row.evidenceFixtureCount < 1
+  ) {
+    failures.push(`${row.presetId}: public measured profile row must stay evidence-backed and claim-limited`);
   }
 }
 

@@ -1,11 +1,13 @@
 import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCatalog';
+import negativeLabMeasuredProfileCatalogJson from '../data/negativeLabMeasuredProfileCatalog.json';
 import {
   type NegativeLabMeasuredProfile,
   type NegativeLabMeasuredProfileCatalog,
   type NegativeLabRuntimeProfileBrowserRow,
   type NegativeLabResolvedRuntimeProfile,
   type NegativeLabRuntimePresetId,
+  parseNegativeLabMeasuredProfileCatalog,
   negativeLabRuntimeProfileBrowserRowSchema,
   negativeLabResolvedRuntimeProfileSchema,
 } from '../schemas/negativeLabMeasuredProfileSchemas';
@@ -26,9 +28,13 @@ export const NEGATIVE_LAB_EMPTY_MEASURED_PROFILE_CATALOG = {
   schemaVersion: 1,
 } satisfies NegativeLabMeasuredProfileCatalog;
 
+export const NEGATIVE_LAB_MEASURED_PROFILE_CATALOG = parseNegativeLabMeasuredProfileCatalog(
+  negativeLabMeasuredProfileCatalogJson,
+);
+
 export const NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG = {
   genericCatalog: parseNegativeLabBuiltInUiPresetCatalog(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG),
-  measuredCatalog: NEGATIVE_LAB_EMPTY_MEASURED_PROFILE_CATALOG,
+  measuredCatalog: NEGATIVE_LAB_MEASURED_PROFILE_CATALOG,
 } satisfies NegativeLabRuntimeProfileCatalog;
 
 const getMeasuredProfileDisabledReason = (profile: NegativeLabMeasuredProfile) => {
