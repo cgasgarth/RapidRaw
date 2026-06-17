@@ -49,13 +49,6 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Prefer updating existing issues, docs, plan entries, and PR descriptions over
   adding new duplicated summaries.
 
-## Recurring Reminder Automation
-
-- The standing reminder automation is `check-rapidraw-consult-and-prs`.
-- Keep it active unless the user explicitly asks to remove it.
-- Keep it simple: check active PRs, respect the 3-open-PR cap, and use consult
-  for hard decisions.
-
 ## Consult And Research
 
 - Use the consult skill heavily for design decisions, color science, negative
