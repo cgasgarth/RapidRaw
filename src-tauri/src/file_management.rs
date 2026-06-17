@@ -334,7 +334,7 @@ pub async fn update_exif_fields(
 
 #[tauri::command]
 pub fn list_images_in_dir(path: String, app_handle: AppHandle) -> Result<Vec<ImageFile>, String> {
-    let settings = load_settings(app_handle).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
     let entries = fs::read_dir(&path).map_err(|e| e.to_string())?;
@@ -383,7 +383,7 @@ pub fn list_images_recursive(
     path: String,
     app_handle: AppHandle,
 ) -> Result<Vec<ImageFile>, String> {
-    let settings = load_settings(app_handle).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
     let root_path = Path::new(&path);
@@ -635,7 +635,7 @@ pub fn get_album_images(
     paths: Vec<String>,
     app_handle: AppHandle,
 ) -> Result<Vec<ImageFile>, String> {
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
     let result_list: Vec<ImageFile> = paths
@@ -966,7 +966,7 @@ pub fn generate_thumbnail_data(
         && !meta.adjustments.is_null()
     {
         let state = app_handle.state::<AppState>();
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+        let settings = load_settings_or_default(app_handle);
         let target_res = settings.thumbnail_resolution.unwrap_or(720);
 
         let geometry_hash = calculate_geometry_hash(&meta.adjustments);
@@ -1001,7 +1001,7 @@ pub fn generate_thumbnail_data(
         let (processing_base, total_scale) = if let Some(hit) = cached_base {
             hit
         } else {
-            let settings = load_settings(app_handle.clone()).unwrap_or_default();
+            let settings = load_settings_or_default(app_handle);
             let mut raw_scale_factor = 1.0f32;
 
             let composite_image = if let Some(img) = preloaded_image {
@@ -1191,7 +1191,7 @@ pub fn generate_thumbnail_data(
         }
     }
 
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(app_handle);
 
     let mut final_image = if let Some(img) = preloaded_image {
         image_loader::composite_patches_on_image(img, &adjustments)?
@@ -1317,7 +1317,7 @@ fn generate_single_thumbnail_and_cache(
 pub fn start_thumbnail_workers(app_handle: tauri::AppHandle) {
     let state = app_handle.state::<crate::AppState>();
     let manager = state.thumbnail_manager.clone();
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
     let thread_count = settings.thumbnail_worker_threads.unwrap_or(4).clamp(1, 16);
 
     for _ in 0..thread_count {
@@ -1960,7 +1960,7 @@ pub fn save_metadata_and_update_thumbnail(
 
     thread::spawn(move || {
         let state = app_handle_clone.state::<AppState>();
-        let settings = load_settings(app_handle_clone.clone()).unwrap_or_default();
+        let settings = load_settings_or_default(&app_handle_clone);
 
         let thumb_cache_dir = match resolve_thumbnail_cache_dir(&app_handle_clone) {
             Ok(dir) => dir,
@@ -2009,7 +2009,7 @@ pub async fn apply_adjustments_to_paths(
     add_to_thumbnail_queue(&state, paths.len(), &app_handle);
 
     tauri::async_runtime::spawn_blocking(move || {
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+        let settings = load_settings_or_default(&app_handle);
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
@@ -2107,7 +2107,7 @@ pub async fn reset_adjustments_for_paths(
     add_to_thumbnail_queue(&state, paths.len(), &app_handle);
 
     tauri::async_runtime::spawn_blocking(move || {
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+        let settings = load_settings_or_default(&app_handle);
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
@@ -2179,7 +2179,7 @@ pub async fn apply_auto_adjustments_to_paths(
     add_to_thumbnail_queue(&state, paths.len(), &app_handle);
 
     tauri::async_runtime::spawn_blocking(move || {
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+        let settings = load_settings_or_default(&app_handle);
         let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
         let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
@@ -2289,7 +2289,7 @@ pub fn set_color_label_for_paths(
     color: Option<String>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
     let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
@@ -2332,7 +2332,7 @@ pub fn set_rating_for_paths(
     rating: u8,
     app_handle: AppHandle,
 ) -> Result<(), String> {
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
     let create_xmp_if_missing = settings.create_xmp_if_missing.unwrap_or(false);
 
@@ -2358,7 +2358,7 @@ pub fn set_rating_for_paths(
 
 #[tauri::command]
 pub fn load_metadata(path: String, app_handle: AppHandle) -> Result<ImageMetadata, String> {
-    let settings = load_settings(app_handle).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
     let enable_xmp_sync = settings.enable_xmp_sync.unwrap_or(false);
 
     let (source_path, sidecar_path) = parse_virtual_path(&path);
@@ -2692,7 +2692,7 @@ pub fn get_cached_or_generate_thumbnail_image(
     gpu_context: Option<&GpuContext>,
 ) -> Result<DynamicImage> {
     let thumb_cache_dir = get_thumb_cache_dir(app_handle).map_err(|e| anyhow::anyhow!(e))?;
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(app_handle);
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
 
     if let Some(cache_hash) = get_cache_key_hash(path_str) {

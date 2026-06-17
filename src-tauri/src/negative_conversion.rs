@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 use crate::AppState;
 use crate::image_processing::downscale_f32_image;
-use crate::load_settings;
+use crate::load_settings_or_default;
 use tauri::Emitter;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -596,7 +596,7 @@ pub async fn preview_negative_conversion(
                         loaded.image.clone().as_ref().clone()
                     } else {
                         drop(original_lock);
-                        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+                        let settings = load_settings_or_default(&app_handle);
 
                         match read_file_mapped(Path::new(&source_path_str)) {
                             Ok(mmap) => load_base_image_from_bytes(
@@ -623,7 +623,7 @@ pub async fn preview_negative_conversion(
                     }
                 } else {
                     drop(original_lock);
-                    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+                    let settings = load_settings_or_default(&app_handle);
 
                     match read_file_mapped(Path::new(&source_path_str)) {
                         Ok(mmap) => load_base_image_from_bytes(
@@ -686,7 +686,7 @@ pub async fn estimate_negative_base_fog(
                 loaded.image.clone().as_ref().clone()
             } else {
                 drop(original_lock);
-                let settings = load_settings(app_handle.clone()).unwrap_or_default();
+                let settings = load_settings_or_default(&app_handle);
                 match read_file_mapped(Path::new(&source_path_str)) {
                     Ok(mmap) => {
                         load_base_image_from_bytes(&mmap, &source_path_str, false, &settings, None)
@@ -701,7 +701,7 @@ pub async fn estimate_negative_base_fog(
             }
         } else {
             drop(original_lock);
-            let settings = load_settings(app_handle.clone()).unwrap_or_default();
+            let settings = load_settings_or_default(&app_handle);
             match read_file_mapped(Path::new(&source_path_str)) {
                 Ok(mmap) => {
                     load_base_image_from_bytes(&mmap, &source_path_str, false, &settings, None)
@@ -745,7 +745,7 @@ pub async fn convert_negatives(
             let real_path = source_path.to_string_lossy().to_string();
             let sanitized_params = params.sanitized();
 
-            let settings = load_settings(app_handle.clone()).unwrap_or_default();
+            let settings = load_settings_or_default(&app_handle);
 
             let img = match read_file_mapped(Path::new(&real_path)) {
                 Ok(mmap) => load_base_image_from_bytes(&mmap, &real_path, false, &settings, None),

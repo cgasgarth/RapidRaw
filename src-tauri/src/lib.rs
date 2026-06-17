@@ -385,7 +385,7 @@ fn process_preview_job(
     drop(loaded_image_guard);
 
     let new_transform_hash = calculate_transform_hash(&adjustments_clone);
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(app_handle);
     let live_quality = settings.live_preview_quality.as_deref().unwrap_or("high");
 
     let default_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
@@ -817,7 +817,7 @@ fn generate_uncropped_preview(
         let flipped_image =
             apply_flip(coarse_rotated_image, flip_horizontal, flip_vertical).into_owned();
 
-        let settings = load_settings(app_handle.clone()).unwrap_or_default();
+        let settings = load_settings_or_default(&app_handle);
         let preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
 
         let (rotated_w, rotated_h) = flipped_image.dimensions();
@@ -915,7 +915,7 @@ fn generate_original_transformed_preview(
     let (transformed_full_res, _unscaled_crop_offset) =
         apply_all_transformations(Cow::Borrowed(&image_for_preview), &adjustments_clone);
 
-    let settings = load_settings(app_handle).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
     let default_dim = settings.editor_preview_resolution.unwrap_or(1920);
     let preview_dim = target_resolution.unwrap_or(default_dim);
 
@@ -964,7 +964,7 @@ async fn preview_geometry_transform(
                 loaded.image.clone()
             };
 
-            let settings = load_settings(app_handle.clone()).unwrap_or_default();
+            let settings = load_settings_or_default(&app_handle);
             let interactive_divisor = 1.5;
             let final_preview_dim = settings.editor_preview_resolution.unwrap_or(1920);
             let target_dim = (final_preview_dim as f32 / interactive_divisor) as u32;
@@ -1239,7 +1239,7 @@ async fn generate_all_community_previews(
     const TILE_DIM: u32 = 360;
     const PROCESSING_DIM: u32 = TILE_DIM * 2;
 
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
 
     let mut base_thumbnails: Vec<(DynamicImage, bool, f32)> = Vec::new();
     for image_path in image_paths.iter() {
@@ -1453,7 +1453,7 @@ async fn merge_hdr(
     let hdr_result_handle = state.hdr_result.clone();
     let hdr_runtime_plan_handle = state.hdr_runtime_plan.clone();
     let hdr_source_refs_handle = state.hdr_source_refs.clone();
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
 
     let loaded_items: Vec<(String, DynamicImage, Duration, f32)> = paths
         .iter()
@@ -1920,7 +1920,7 @@ fn generate_preview_for_path(
     let (source_path, _) = parse_virtual_path(&path);
     let source_path_str = source_path.to_string_lossy().to_string();
     let is_raw = is_raw_file(&source_path_str);
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
 
     let base_image = match read_file_mapped(&source_path) {
         Ok(mmap) => load_and_composite(
@@ -2283,7 +2283,7 @@ pub fn run() {
                 *state.gpu_crash_flag_path.lock().unwrap() = Some(crash_flag_path.clone());
             }
 
-            let mut settings: AppSettings = load_settings(app_handle.clone()).unwrap_or_default();
+            let mut settings: AppSettings = load_settings_or_default(&app_handle);
 
             {
                 let state = app.state::<AppState>();

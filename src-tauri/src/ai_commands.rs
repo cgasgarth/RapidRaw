@@ -15,7 +15,7 @@ use crate::ai_processing::{
     AiSubjectMaskParameters, CachedDepthMap, generate_image_embeddings, get_or_init_ai_models,
     run_depth_anything_model, run_sam_decoder, run_sky_seg_model, run_u2netp_model,
 };
-use crate::app_settings::load_settings;
+use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
 use crate::cache_utils::GEOMETRY_KEYS;
 use crate::image_loader::composite_patches_on_image;
@@ -383,7 +383,7 @@ pub async fn precompute_ai_subject_mask(
 
 #[tauri::command]
 pub async fn check_ai_connector_status(app_handle: tauri::AppHandle) {
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
     let is_connected = if let Some(address) = settings.ai_connector_address {
         ai_connector::check_status(&address).await.unwrap_or(false)
     } else {
@@ -415,7 +415,7 @@ pub async fn invoke_generative_replace_with_mask_def(
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
 
     let mut source_image_adjustments = current_adjustments.clone();
     if let Some(patches) = source_image_adjustments

@@ -1,5 +1,5 @@
 use crate::Cursor;
-use crate::app_settings::{AppSettings, load_settings};
+use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::{AppState, LoadedImage};
 use crate::exif_processing;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
@@ -381,7 +381,7 @@ pub async fn load_image(
         let _ = fs::write(&sidecar_path, json);
     }
 
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
 
     let path_clone = source_path_str.clone();
 

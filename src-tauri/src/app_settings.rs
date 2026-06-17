@@ -610,6 +610,10 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
     Ok(settings)
 }
 
+pub fn load_settings_or_default(app_handle: &AppHandle) -> AppSettings {
+    load_settings(app_handle.clone()).unwrap_or_default()
+}
+
 #[tauri::command]
 pub fn save_settings(settings: AppSettings, app_handle: AppHandle) -> Result<(), String> {
     let path = get_settings_path(&app_handle)?;

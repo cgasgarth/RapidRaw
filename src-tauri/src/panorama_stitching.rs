@@ -1,4 +1,4 @@
-use crate::app_settings::load_settings;
+use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
 use crate::file_management::parse_virtual_path;
 use base64::{Engine as _, engine::general_purpose};
@@ -354,7 +354,7 @@ fn load_panorama_source_metadata_for_plan(
     image_paths: &[String],
     app_handle: &AppHandle,
 ) -> Result<Vec<PanoramaSourceMetadata>, String> {
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(app_handle);
 
     image_paths
         .iter()
@@ -471,7 +471,7 @@ fn render_with_legacy_homography_engine(
         image_paths.len()
     );
 
-    let settings = load_settings(app_handle.clone()).unwrap_or_default();
+    let settings = load_settings_or_default(&app_handle);
 
     let start_time = Instant::now();
     let _ = app_handle.emit("panorama-progress", "Loading and preparing images...");
