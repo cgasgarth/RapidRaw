@@ -98,6 +98,25 @@ if (!parsedHslCommand.success || parsedHslCommand.data.commandType !== 'toneColo
   failures.push('Tone-color HSL command does not validate the color-mixer route type.');
 }
 
+const parsedColorGradingCommand = toneColorCommandEnvelopeV1Schema.safeParse({
+  ...sampleToneColorCommandEnvelopeV1,
+  commandId: 'command_tone_color_color_grading_preview_sample',
+  commandType: 'toneColor.setColorGrading',
+  correlationId: 'corr_tone_color_color_grading_preview_sample',
+  idempotencyKey: 'idem_tone_color_color_grading_preview_sample',
+  parameters: {
+    balance: -8,
+    blend: 45,
+    global: { hueDegrees: 28, luminance: 0, saturation: 6 },
+    highlights: { hueDegrees: 38, luminance: 4, saturation: 12 },
+    midtones: { hueDegrees: 30, luminance: 0, saturation: 8 },
+    shadows: { hueDegrees: 220, luminance: -3, saturation: 10 },
+  },
+});
+if (!parsedColorGradingCommand.success || parsedColorGradingCommand.data.commandType !== 'toneColor.setColorGrading') {
+  failures.push('Tone-color color grading command does not validate the wheel/blend route type.');
+}
+
 const parsedLevelsCommand = toneColorCommandEnvelopeV1Schema.safeParse({
   ...sampleToneColorCommandEnvelopeV1,
   commandId: 'command_tone_color_levels_preview_sample',
@@ -188,6 +207,7 @@ for (const commandType of [
   'toneColor.setToneCurve',
   'toneColor.setWhiteBalance',
   'toneColor.adjustHsl',
+  'toneColor.setColorGrading',
   'toneColor.setLevels',
   'toneColor.setChannelMixer',
   'toneColor.setColorBalanceRgb',

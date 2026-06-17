@@ -873,6 +873,12 @@ export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorD
       value: 10,
     },
     {
+      module: 'color_grading',
+      path: '/parameters/shadows/hueDegrees',
+      previousValue: 210,
+      value: 220,
+    },
+    {
       module: 'levels',
       path: '/parameters/gamma',
       previousValue: 1,
