@@ -44,6 +44,13 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import {
+  getMaskLikeContainerDropClass,
+  getMaskLikeSubMaskDropClass,
+  isMaskLikeContainerDrag,
+  type MaskLikeDragData,
+  useDelayedHover,
+} from './maskPanelRowHelpers';
+import {
   Mask,
   MaskType,
   SubMask,
@@ -92,7 +99,7 @@ import Slider from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import UiText from '../../ui/Text';
 
-interface DragData {
+interface DragData extends MaskLikeDragData {
   type: 'Container' | 'SubMask' | 'Creation';
   item?: AiPatch | SubMask;
   maskType?: Mask;
@@ -1486,19 +1493,7 @@ function ContainerRow({
     ]);
   };
 
-  const isDraggingContainer = activeDragItem?.type === 'Container';
-  let borderClass = '';
-
-  if (isOver) {
-    if (isDraggingContainer) {
-      borderClass = 'border-t-2 border-accent';
-    } else if (
-      (activeDragItem?.type === 'SubMask' && activeDragItem.parentId !== container.id) ||
-      activeDragItem?.type === 'Creation'
-    ) {
-      borderClass = 'bg-card-active border border-accent/50';
-    }
-  }
+  const borderClass = getMaskLikeContainerDropClass({ activeDragItem, containerId: container.id, isOver });
   const handleContainerKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
@@ -1744,31 +1739,13 @@ function SubMaskRow({
   const maskType = subMask.type;
   const MaskIcon = MASK_ICON_MAP[maskType];
   const { showContextMenu } = useContextMenu();
-  const [isHovered, setIsHovered] = useState(false);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
-  const isDraggingContainer = activeDragItem?.type === 'Container';
+  const { handleMouseEnter, handleMouseLeave, isHovered } = useDelayedHover();
+  const isDraggingContainer = isMaskLikeContainerDrag(activeDragItem);
+  const dropClass = getMaskLikeSubMaskDropClass(activeDragItem, isOver);
   const isAnalyzing = subMask.id === analyzingSubMaskId || (isParentLoading && subMask.type === Mask.QuickEraser);
 
   useManagedFocus(renameInputRef, renamingId === subMask.id);
-
-  const handleMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setIsHovered(true);
-  };
-  const handleMouseLeave = () => {
-    hoverTimeoutRef.current = setTimeout(() => {
-      setIsHovered(false);
-    }, 1000);
-  };
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    };
-  }, []);
 
   const handleRenameSubmit = () => {
     if (tempName.trim()) {
@@ -1818,7 +1795,7 @@ function SubMaskRow({
       onMouseLeave={handleMouseLeave}
       className={`flex items-center gap-2 p-2 rounded-md transition-colors group cursor-pointer
             ${isActive ? 'bg-surface' : 'hover:bg-card-active'}
-            ${isOver && !isDraggingContainer ? 'border-t-2 border-accent' : ''}
+            ${dropClass}
             ${isDragging ? 'opacity-40 z-50' : ''}
             ${!parentVisible ? 'opacity-50' : ''}
             ${isDraggingContainer ? 'opacity-30 pointer-events-none' : ''}
