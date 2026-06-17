@@ -855,6 +855,12 @@ export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorD
       value: -24,
     },
     {
+      module: 'tone_curve',
+      path: '/parameters/points/2/output',
+      previousValue: 0.75,
+      value: 0.8,
+    },
+    {
       module: 'levels',
       path: '/parameters/gamma',
       previousValue: 1,
