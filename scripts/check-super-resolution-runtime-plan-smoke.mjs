@@ -105,6 +105,13 @@ const applied = applySuperResolutionRuntimePlanV1({
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted plan id');
 assertEqual(applied.provenance.effectiveOutputScale, SCALE, 'effective output scale');
+assertEqual(applied.provenance.frameRegistrations.length, sourceFrameDefs.length, 'frame registration count');
+const artifactIds = applied.mutationResult.outputArtifacts.map((artifact) => artifact.artifactId).sort();
+assertDeepEqual(artifactIds, ['artifact_sr_runtime_confidence', 'artifact_sr_runtime_output'], 'SR output artifacts');
+const [outputArtifact] = applied.mutationResult.outputArtifacts;
+if (outputArtifact?.contentHash === undefined) {
+  throw new Error('Expected SR output artifact to include a rendered content hash.');
+}
 
 const nearestBaseline = createNearestNeighborBaselineV1(frames[0].pixels, LOW_WIDTH, LOW_HEIGHT, SCALE);
 const baselineMae = calculateMeanAbsoluteErrorV1(nearestBaseline, truth);
@@ -118,8 +125,11 @@ console.log(
   JSON.stringify(
     {
       acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
+      artifactCount: applied.mutationResult.outputArtifacts.length,
       fixture: 'synthetic_sr_runtime_plan_v1',
+      frameRegistrations: applied.provenance.frameRegistrations,
       improvementRatio,
+      outputArtifactContentHash: outputArtifact.contentHash,
       outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex'),
       outputSize: dryRun.dryRunResult.mergePlan.outputDimensions,
     },
@@ -158,5 +168,11 @@ function downsamplePixelShiftFrame(truthPixels, shiftX, shiftY) {
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
     throw new Error(`${label}: expected ${expected}, got ${actual}.`);
+  }
+}
+
+function assertDeepEqual(actual, expected, label) {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}.`);
   }
 }
