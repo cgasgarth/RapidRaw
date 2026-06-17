@@ -130,6 +130,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:private-raw-evidence', new Set(['bun scripts/check-private-raw-evidence-ledger.ts'])],
   ['check:public-fixture-manifest', new Set(['bun scripts/check-public-fixture-manifest.ts'])],
   ['check:raw-open-edit-export-proof', new Set(['bun scripts/check-raw-open-edit-export-proof.ts'])],
+  ['check:raw-open-edit-export-run-reports', new Set(['bun scripts/check-raw-open-edit-export-run-reports.ts'])],
   ['check:reference-images', new Set(['bun scripts/check-reference-image-fixtures.ts'])],
   [
     'check:negative-lab-workspace-smoke',
@@ -653,6 +654,17 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(
+    'raw open edit export run report package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-run-reports": "bun scripts/check-raw-open-edit-export-run-reports.ts",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
     'pure TS test package script changes skip smoke',
     [
       {
@@ -711,6 +723,11 @@ function runSelfTest() {
   assertClassification(
     'validation fixture contracts can skip smoke',
     ['fixtures/validation/raw-open-edit-export-proof.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'validation run-report fixtures can skip smoke',
+    ['fixtures/validation/raw-open-edit-export-run-reports.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(
