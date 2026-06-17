@@ -7,12 +7,13 @@ import yaml from 'js-yaml';
 
 const ROOT = process.cwd();
 const WORKFLOW_DIR = join(ROOT, '.github/workflows');
+const MAIN_BUILD_WORKFLOW_PATH = '.github/workflows/ci.yml';
 const MAIN_LONG_WORKFLOW_PATH = '.github/workflows/main-long-validation.yml';
 const REQUIRED_PR_WORKFLOW_PATH = '.github/workflows/lint.yml';
 const REQUIRED_AGGREGATE_JOB_ID = 'pr-ci-required';
 const REQUIRED_AGGREGATE_JOB_NAME = 'PR CI / required';
 const WRITE_PERMISSION_ALLOWLIST = new Map([
-  ['.github/workflows/ci.yml', 'main build workflow publishes release artifacts'],
+  ['.github/workflows/ci.yml', 'manual build workflow publishes release artifacts'],
   [
     '.github/workflows/optional-platform-builds.yml',
     'manual optional build workflow publishes artifacts when requested',
@@ -158,6 +159,10 @@ function checkWorkflowFiles(files) {
 
     if (hasWritePermission(parsed.permissions) && !WRITE_PERMISSION_ALLOWLIST.has(path)) {
       violations.push(`${path}: write permissions require an allowlist reason`);
+    }
+
+    if (path === MAIN_BUILD_WORKFLOW_PATH && eventKeys.includes('push')) {
+      violations.push(`${path}: full package build must stay manual to avoid main push macOS runner backlogs`);
     }
 
     if (path === MAIN_LONG_WORKFLOW_PATH) {
@@ -357,6 +362,37 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'rejects main package build push',
+      expectedViolations: 1,
+      path: MAIN_BUILD_WORKFLOW_PATH,
+      source: `name: CI Build
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - run: true
+`,
+    },
+    {
+      name: 'allows manual package build',
+      expectedViolations: 0,
+      path: MAIN_BUILD_WORKFLOW_PATH,
+      source: `name: CI Build
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-14
     steps:
       - run: true
 `,
