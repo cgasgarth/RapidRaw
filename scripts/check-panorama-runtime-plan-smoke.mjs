@@ -110,6 +110,13 @@ assertEqual(dryRun.provenance.projection, 'cylindrical', 'requested projection')
 assertEqual(dryRun.provenance.resolvedProjection, 'rectilinear', 'resolved projection');
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted plan id');
+const [outputArtifact] = applied.mutationResult.outputArtifacts;
+if (outputArtifact === undefined) {
+  throw new Error('Expected panorama apply to emit a durable output artifact.');
+}
+assertEqual(outputArtifact.artifactId, 'artifact_panorama_runtime_output', 'output artifact id');
+assertEqual(outputArtifact.kind, 'merge_output', 'output artifact kind');
+assertEqual(outputArtifact.storage, 'sidecar_artifact', 'output artifact storage');
 
 if (applied.outputPixels.length <= sourceFrames[0].width * sourceFrames[0].height * 3) {
   throw new Error('Expected panorama output to be wider than one source frame.');
@@ -120,6 +127,7 @@ console.log(
     {
       acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
       fixture: 'synthetic_panorama_runtime_plan_v1',
+      outputArtifactContentHash: outputArtifact.contentHash,
       output: dryRun.dryRunResult.mergePlan.outputDimensions,
       outputSha256: new Bun.CryptoHasher('sha256').update(applied.outputPixels).digest('hex'),
       warnings: dryRun.dryRunResult.warnings,
