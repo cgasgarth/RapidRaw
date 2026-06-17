@@ -95,18 +95,7 @@ jobs:
 
       - name: Install additional system dependencies (Linux)
         if: runner.os == 'Linux' && inputs.mobile == ''
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf
+        uses: ./.github/actions/install-tauri-linux-deps
 
       # ------------- Android Setup -------------
       - name: Set up JDK
