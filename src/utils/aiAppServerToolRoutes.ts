@@ -92,6 +92,24 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
       toolCapability: 'inpaint',
     },
     {
+      deferredIssue: '#1276',
+      reason:
+        'The inherited denoise invoke multiplexes classic and AI NIND paths; app-server migration needs a separate denoise dry-run plan with model provenance before mapping.',
+      sourceKind: 'tauri_invoke',
+      sourceOperation: 'apply_denoising',
+      status: 'deferred',
+      toolCapability: 'denoise',
+    },
+    {
+      deferredIssue: '#1276',
+      reason:
+        'Saving denoised output is an artifact-writing apply step and must wait for an accepted AI denoise dry-run plan and audit metadata.',
+      sourceKind: 'tauri_invoke',
+      sourceOperation: 'save_denoised_image',
+      status: 'deferred',
+      toolCapability: 'denoise',
+    },
+    {
       reason: 'Connector health is a capability/status probe, not an image edit tool call.',
       sourceKind: 'tauri_invoke',
       sourceOperation: 'check_ai_connector_status',
