@@ -35,14 +35,15 @@ const fixtureSchema = z
   })
   .strict()
   .superRefine((fixture, context) => {
-    if (fixture.disallowedValidationUses.includes('stock_reference_mapping')) {
-      return;
+    for (const requiredDisallowedUse of ['stock_reference_mapping', 'marketing_screenshot']) {
+      if (!fixture.disallowedValidationUses.includes(requiredDisallowedUse)) {
+        context.addIssue({
+          code: 'custom',
+          message: `Measured film-look fixtures must explicitly block ${requiredDisallowedUse}.`,
+          path: ['disallowedValidationUses'],
+        });
+      }
     }
-    context.addIssue({
-      code: 'custom',
-      message: 'Measured film-look fixtures must explicitly block stock-reference mapping.',
-      path: ['disallowedValidationUses'],
-    });
   });
 
 const manifestSchema = z
@@ -75,7 +76,18 @@ const outputCaseSchema = z
 const outputSchema = z
   .object({
     cases: z.array(outputCaseSchema).min(FILM_LOOK_BROWSER_ITEMS.length),
-    doesNotProve: z.array(z.string()).min(1),
+    doesNotProve: z
+      .array(
+        z.enum([
+          'colorimetric_film_match',
+          'manufacturer_endorsement',
+          'measured_film_stock_emulation',
+          'photochemical_density_domain',
+          'public_raw_payload_render',
+          'stock_reference_mapping',
+        ]),
+      )
+      .min(6),
     fixtureManifest: manifestSchema,
     generatedFrom: z.literal('scripts/check-film-look-measured-fixtures.mjs'),
     version: z.literal(1),
@@ -175,6 +187,14 @@ const applySyntheticFilmLook = (sourcePixels, lookId, patch) =>
 
 const unsafeClaims =
   /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|identical|ilford|kodak|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;
+const requiredOutputNonClaims = [
+  'colorimetric_film_match',
+  'manufacturer_endorsement',
+  'measured_film_stock_emulation',
+  'photochemical_density_domain',
+  'public_raw_payload_render',
+  'stock_reference_mapping',
+];
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const manifest = manifestSchema.parse(await readJson(manifestPath));
@@ -232,7 +252,7 @@ for (const look of FILM_LOOK_BROWSER_ITEMS) {
 
 const expectedOutput = outputSchema.parse({
   cases: manifest.fixtures.flatMap((fixture) => FILM_LOOK_BROWSER_ITEMS.map((look) => buildCase(fixture, look))),
-  doesNotProve: ['public_raw_payload_render', 'measured_film_stock_emulation', 'photochemical_density_domain'],
+  doesNotProve: requiredOutputNonClaims,
   fixtureManifest: manifest,
   generatedFrom: 'scripts/check-film-look-measured-fixtures.mjs',
   version: 1,
@@ -246,6 +266,11 @@ if (updateFixture) {
 }
 
 const currentOutput = outputSchema.parse(await readJson(outputPath));
+for (const requiredNonClaim of requiredOutputNonClaims) {
+  if (!currentOutput.doesNotProve.includes(requiredNonClaim)) {
+    throw new Error(`Measured film look fixture output missing non-claim: ${requiredNonClaim}`);
+  }
+}
 const expectedCaseCount = manifest.fixtures.length * FILM_LOOK_BROWSER_ITEMS.length;
 if (currentOutput.cases.length !== expectedCaseCount) {
   throw new Error(`Measured film look fixture output must cover ${expectedCaseCount} fixture/look cases.`);

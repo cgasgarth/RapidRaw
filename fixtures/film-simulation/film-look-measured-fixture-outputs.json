@@ -85,7 +85,14 @@
       "renderBoundsStatus": "within_bounds"
     }
   ],
-  "doesNotProve": ["public_raw_payload_render", "measured_film_stock_emulation", "photochemical_density_domain"],
+  "doesNotProve": [
+    "colorimetric_film_match",
+    "manufacturer_endorsement",
+    "measured_film_stock_emulation",
+    "photochemical_density_domain",
+    "public_raw_payload_render",
+    "stock_reference_mapping"
+  ],
   "fixtureManifest": {
     "fixtures": [
       {
