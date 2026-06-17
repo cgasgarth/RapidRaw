@@ -28,6 +28,15 @@ export const rawEngineAppServerTransportSchema = z.enum(['stdio_jsonl']);
 export const rawEngineAppServerToolKindSchema = z.enum(['read']);
 export const rawEngineAppServerAuditOutcomeSchema = z.enum(['success', 'rejected']);
 export const rawEngineAppServerLifecyclePhaseSchema = z.enum(['created', 'initialized', 'stopped']);
+export const rawEngineAppServerSupervisorPhaseSchema = z.enum(['idle', 'starting', 'running', 'stopping', 'stopped']);
+export const rawEngineAppServerSupervisorEventKindSchema = z.enum([
+  'created',
+  'start',
+  'ready',
+  'cancel',
+  'stop',
+  'fail',
+]);
 
 export const rawEngineAppServerClientInfoSchema = z
   .object({
@@ -77,6 +86,53 @@ export const rawEngineAppServerLifecycleReplaySchema = z
     schemaVersion: z.literal(1),
   })
   .strict();
+
+export const rawEngineAppServerStructuredErrorSchema = z
+  .object({
+    code: z.enum(['spawn_failed', 'health_timeout', 'cancelled', 'unexpected_exit']),
+    message: z.string().trim().min(1),
+    recoverable: z.boolean(),
+  })
+  .strict();
+
+export const rawEngineAppServerSupervisorEventSchema = z
+  .object({
+    kind: rawEngineAppServerSupervisorEventKindSchema,
+    phase: rawEngineAppServerSupervisorPhaseSchema,
+    timestampIso: z.iso.datetime(),
+  })
+  .strict();
+
+export const rawEngineAppServerSupervisorStateSchema = z
+  .object({
+    auditEvents: z.array(rawEngineAppServerSupervisorEventSchema).min(1),
+    cancellationRequestedAtIso: z.iso.datetime().nullable(),
+    command: z.array(z.string().trim().min(1)).min(1),
+    error: rawEngineAppServerStructuredErrorSchema.nullable(),
+    lastTransitionAtIso: z.iso.datetime(),
+    phase: rawEngineAppServerSupervisorPhaseSchema,
+    processId: z.number().int().positive().nullable(),
+    schemaVersion: z.literal(1),
+    startedAtIso: z.iso.datetime().nullable(),
+    stoppedAtIso: z.iso.datetime().nullable(),
+    supervisorId: z.string().trim().min(1),
+    transport: rawEngineAppServerTransportSchema,
+  })
+  .strict()
+  .superRefine((state, context) => {
+    if ((state.phase === 'running' || state.phase === 'stopping') && state.processId === null) {
+      context.addIssue({ code: 'custom', message: 'Running supervisor state requires processId.' });
+    }
+    if ((state.phase === 'running' || state.phase === 'stopping') && state.startedAtIso === null) {
+      context.addIssue({ code: 'custom', message: 'Running supervisor state requires startedAtIso.' });
+    }
+    if ((state.phase === 'stopped' || state.phase === 'idle') && state.processId !== null) {
+      context.addIssue({ code: 'custom', message: 'Stopped supervisor state must not retain processId.' });
+    }
+    if (state.phase === 'stopped' && state.stoppedAtIso === null) {
+      context.addIssue({ code: 'custom', message: 'Stopped supervisor state requires stoppedAtIso.' });
+    }
+  });
 
 export const rawEngineAppServerToolDefinitionSchema = z
   .object({
@@ -260,6 +316,8 @@ export type RawEngineAppServerHostResponse = z.infer<typeof rawEngineAppServerHo
 export type RawEngineAppServerHostResponseEnvelope = z.infer<typeof rawEngineAppServerHostResponseEnvelopeSchema>;
 export type RawEngineAppServerLifecycleReplay = z.infer<typeof rawEngineAppServerLifecycleReplaySchema>;
 export type RawEngineAppServerLifecycleState = z.infer<typeof rawEngineAppServerLifecycleStateSchema>;
+export type RawEngineAppServerStructuredError = z.infer<typeof rawEngineAppServerStructuredErrorSchema>;
+export type RawEngineAppServerSupervisorState = z.infer<typeof rawEngineAppServerSupervisorStateSchema>;
 export type RawEngineAppServerRouteCatalogEntry = z.infer<typeof rawEngineAppServerRouteCatalogEntrySchema>;
 export type RawEngineAppServerRouteCatalogReplay = z.infer<typeof rawEngineAppServerRouteCatalogReplaySchema>;
 export type RawEngineAppServerRouteCatalogRequest = z.infer<typeof rawEngineAppServerRouteCatalogRequestSchema>;
