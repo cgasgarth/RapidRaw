@@ -67,10 +67,7 @@ const SAFE_FRONTEND_EXTENSIONS = new Set([
 
 const SAFE_SCHEMA_PACKAGE_EXTENSIONS = new Set(['.json', '.md', '.ts', '.ts']);
 const SAFE_PURE_TEST_EXTENSIONS = new Set(['.js', '.ts', '.ts']);
-const SAFE_VALIDATION_SCRIPT_FILES = new Set([
-  'scripts/legacy-script-extension-allowlist.json',
-  'scripts/tsconfig.json',
-]);
+const SAFE_VALIDATION_SCRIPT_FILES = new Set(['scripts/tsconfig.json']);
 
 const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   [
@@ -744,11 +741,7 @@ function runSelfTest() {
     ['scripts/lib/computational-ui-api-smoke.ts'],
     SMOKE_MODES.NONE,
   );
-  assertClassification(
-    'script policy metadata can skip smoke',
-    ['scripts/legacy-script-extension-allowlist.json', 'scripts/tsconfig.json'],
-    SMOKE_MODES.NONE,
-  );
+  assertClassification('script policy metadata can skip smoke', ['scripts/tsconfig.json'], SMOKE_MODES.NONE);
   assertClassification('docs can skip smoke', ['RAW_EDITOR_PLAN.md', 'docs/validation.md'], SMOKE_MODES.NONE);
   assertClassification(
     'mixed safe and workflow paths require main smoke decision',
