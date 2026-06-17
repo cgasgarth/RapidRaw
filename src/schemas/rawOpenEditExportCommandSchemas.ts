@@ -64,6 +64,7 @@ export const rawOpenEditExportBasicToneCommandSchema = z
 
 export const rawOpenEditExportProofRequestSchema = z
   .object({
+    $schema: z.url().optional(),
     artifactDirRelative: privatePathSchema,
     editCommand: rawOpenEditExportBasicToneCommandSchema,
     fixtureId: z.string().regex(/^validation\.raw-open-edit-export\.[a-z0-9.-]+\.v[0-9]+$/u),

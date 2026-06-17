@@ -741,6 +741,11 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification(
+    'validation proof request fixtures can skip smoke',
+    ['fixtures/validation/raw-open-edit-export-proof-request.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
     'validation run-report fixtures can skip smoke',
     ['fixtures/validation/raw-open-edit-export-run-reports.json'],
     SMOKE_MODES.NONE,

@@ -3,17 +3,16 @@
 import { readFile } from 'node:fs/promises';
 
 import { toneColorCommandEnvelopeV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { sampleRawEngineSceneColorPipelineV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
-import { sampleAgentActor, sampleImageTarget } from '../packages/rawengine-schema/src/samplePayloadFactories.ts';
 import {
   rawOpenEditExportProofReportSchema,
   rawOpenEditExportProofRequestSchema,
 } from '../src/schemas/rawOpenEditExportCommandSchemas.ts';
 
-const [wrapperSource, appPropertiesSource, rustSource] = await Promise.all([
+const [wrapperSource, appPropertiesSource, rustSource, proofRequestFixtureSource] = await Promise.all([
   readFile('src/utils/rawOpenEditExportProofCommand.ts', 'utf8'),
   readFile('src/components/ui/AppProperties.tsx', 'utf8'),
   readFile('src-tauri/src/raw_open_edit_export_proof.rs', 'utf8'),
+  readFile('fixtures/validation/raw-open-edit-export-proof-request.json', 'utf8'),
 ]);
 
 const failures: string[] = [];
@@ -35,40 +34,8 @@ if (!rustSource.includes('pub async fn run_raw_open_edit_export_proof(')) {
 }
 
 const validHash = `sha256:${'0'.repeat(64)}`;
-const editCommand = {
-  actor: sampleAgentActor('raw-proof-command-wrapper'),
-  approval: {
-    approvalClass: 'edit_apply',
-    reason: 'Apply accepted basic tone command for RAW open/edit/export runtime proof.',
-    state: 'approved',
-  },
-  colorPipeline: sampleRawEngineSceneColorPipelineV1,
-  commandId: 'command.raw-open-edit-export.basic-tone.v1',
-  commandType: 'toneColor.setBasicTone',
-  correlationId: 'corr.raw-open-edit-export.basic-tone.v1',
-  dryRun: false,
-  expectedGraphRevision: 'graph-rev.raw-open-edit-export.sample.v1',
-  idempotencyKey: 'idem.raw-open-edit-export.basic-tone.v1',
-  parameters: {
-    blackPoint: -2,
-    clarity: 4,
-    contrast: 8,
-    exposureEv: 0.35,
-    highlights: -12,
-    saturation: 5,
-    shadows: 9,
-    whitePoint: 3,
-  },
-  schemaVersion: 1,
-  target: sampleImageTarget('private-fixtures/detail/sample.cr3'),
-};
-const sampleRequest = rawOpenEditExportProofRequestSchema.parse({
-  artifactDirRelative: 'private-artifacts/validation/open-edit-export',
-  editCommand,
-  fixtureId: 'validation.raw-open-edit-export.sample.v1',
-  privateRootPath: '/tmp/rawengine-private-root',
-  sourceRelativePath: 'private-fixtures/detail/sample.cr3',
-});
+const fixtureValue = JSON.parse(proofRequestFixtureSource) as unknown;
+const sampleRequest = rawOpenEditExportProofRequestSchema.parse(fixtureValue);
 
 if (!toneColorCommandEnvelopeV1Schema.safeParse(sampleRequest.editCommand).success) {
   failures.push('RAW proof editCommand must stay compatible with ToneColorCommandEnvelopeV1.');
