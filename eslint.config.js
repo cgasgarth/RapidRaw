@@ -142,7 +142,7 @@ module.exports = [
           jsx: true,
         },
         projectService: {
-          allowDefaultProject: ['*.ts', 'scripts/lib/*.ts'],
+          allowDefaultProject: ['*.ts'],
         },
         tsconfigRootDir: __dirname,
       },
