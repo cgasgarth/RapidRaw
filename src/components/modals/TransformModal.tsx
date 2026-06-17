@@ -2,10 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, RotateCcw, Grid3X3, Eye, EyeOff, Info, LineChart, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
+import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import { TextColors, TextVariants } from '../../types/typography';
 import { Adjustments } from '../../utils/adjustments';
 import { throttle } from '../../utils/timing';
@@ -126,32 +127,10 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
   const [isCompareActive, setIsCompareActive] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
 
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const lastMousePos = useRef({ x: 0, y: 0 });
+  const { containerRef, handleMouseDown, handleResetZoom, handleWheel, imageTransformStyle, zoom, zoomIn, zoomOut } =
+    usePreviewViewport({ maxZoom: 8, minZoom: 0.1, zoomStep: 0.25 });
 
   const { isMounted, show } = useModalTransition(isOpen);
-
-  useEffect(() => {
-    if (!isDragging) return;
-    const handleWindowMouseMove = (e: MouseEvent) => {
-      const dx = e.clientX - lastMousePos.current.x;
-      const dy = e.clientY - lastMousePos.current.y;
-      setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    };
-    const handleWindowMouseUp = () => {
-      setIsDragging(false);
-    };
-    window.addEventListener('mousemove', handleWindowMouseMove);
-    window.addEventListener('mouseup', handleWindowMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleWindowMouseMove);
-      window.removeEventListener('mouseup', handleWindowMouseUp);
-    };
-  }, [isDragging]);
 
   useEffect(() => {
     const handleDragEndGlobal = () => {
@@ -171,36 +150,6 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
 
   const handleInteractionStart = useCallback(() => {
     setIsInteracting(true);
-  }, []);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    setIsDragging(true);
-    lastMousePos.current = { x: e.clientX, y: e.clientY };
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.stopPropagation();
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left - rect.width / 2;
-    const mouseY = e.clientY - rect.top - rect.height / 2;
-    const delta = -e.deltaY * 0.001;
-    const newZoom = Math.min(Math.max(0.1, zoom + delta), 8);
-    const scaleRatio = newZoom / zoom;
-    const mouseFromCenterX = mouseX - pan.x;
-    const mouseFromCenterY = mouseY - pan.y;
-    const newPanX = mouseX - mouseFromCenterX * scaleRatio;
-    const newPanY = mouseY - mouseFromCenterY * scaleRatio;
-    setZoom(newZoom);
-    setPan({ x: newPanX, y: newPanY });
-  };
-
-  const handleResetZoom = useCallback((e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
   }, []);
 
   const updatePreview = useMemo(
@@ -481,12 +430,6 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
     </div>
   );
 
-  const imageTransformStyle = {
-    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-    transition: isDragging ? 'none' : 'transform 0.1s ease-out',
-    transformOrigin: 'center center',
-  };
-
   const renderContent = () => (
     <div className="modal-preview-adjustments flex flex-row h-full w-full overflow-hidden">
       <div className="modal-preview-pane grow flex flex-col relative min-h-0 bg-[#0f0f0f] overflow-hidden">
@@ -574,9 +517,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             <div className="w-px h-5 bg-white/20 mx-1"></div>
 
             <button
-              onClick={() => {
-                setZoom((z) => Math.max(0.1, z - 0.25));
-              }}
+              onClick={zoomOut}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.transform.zoomOutTooltip')}
             >
@@ -588,9 +529,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             </span>
 
             <button
-              onClick={() => {
-                setZoom((z) => Math.min(8, z + 0.25));
-              }}
+              onClick={zoomIn}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.transform.zoomInTooltip')}
             >
