@@ -35,12 +35,21 @@ const requirements = z.array(requirementSchema).parse([
       'bun run check:panorama-runtime-plan-smoke',
       'bun run check:focus-runtime-plan-smoke',
       'bun run check:sr-runtime-plan-smoke',
+      'bun run check:raw-open-edit-export-proof',
+      'bun run check:raw-open-edit-export-run-reports',
       'bun run check:sidecar-roundtrip',
     ],
   },
   {
     label: 'capability honesty',
-    needles: ['Runtime apply proof', 'Synthetic proof', 'Real RAW before/after proof', 'Missing Artifacts'],
+    needles: [
+      'Runtime apply proof',
+      'Synthetic proof',
+      'Private RAW report gate',
+      'manifest-only public schema',
+      'Real RAW before/after proof',
+      'Missing Artifacts',
+    ],
   },
 ]);
 
