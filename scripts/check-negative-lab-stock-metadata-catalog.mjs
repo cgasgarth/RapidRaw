@@ -15,7 +15,23 @@ const genericPresetIds = new Set(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets
 const filmLookIds = new Set(FILM_LOOK_BROWSER_ITEMS.map((look) => look.id));
 const measuredProfileIds = new Set(NEGATIVE_LAB_MEASURED_PROFILE_CATALOG.profiles.map((profile) => profile.profileId));
 const unsafeClaimText =
-  /\b(?:colorimetric match|emulat(?:e|es|ion)|exact(?:ly)?|identical|manufacturer[ -]?approved|official|runtime profile|runtime preset)\b/iu;
+  /\b(?:adobe|capture one|colorimetric match|dehancer|emulat(?:e|es|ion)|exact(?:ly)?|fuji simulation|identical|lightroom|manufacturer[ -]?approved|mastin|negative lab pro|official|rni|runtime profile|runtime preset|vsco)\b/iu;
+const runtimeOnlyKeys = new Set([
+  'exportHash',
+  'measuredProfileId',
+  'params',
+  'profileId',
+  'renderHash',
+  'runtimeProfileId',
+]);
+const requiredNonClaims = new Set([
+  'colorimetric_match',
+  'licensed_profile',
+  'manufacturer_endorsement',
+  'measured_profile',
+  'runtime_application',
+  'stock_emulation',
+]);
 
 if (JSON.stringify(sourceCatalog) !== JSON.stringify(fixtureCatalog)) {
   throw new Error('Negative Lab stock metadata fixture must match source-owned catalog.');
@@ -29,8 +45,24 @@ if (JSON.stringify(sourceCatalog.entries.map((entry) => entry.entryId)) !== JSON
 }
 
 for (const entry of sourceCatalog.entries) {
+  for (const key of Object.keys(entry)) {
+    if (runtimeOnlyKeys.has(key)) {
+      throw new Error(`Stock metadata entry contains runtime-only key ${key}: ${entry.entryId}`);
+    }
+  }
+
+  for (const requiredNonClaim of requiredNonClaims) {
+    if (!entry.doesNotProve.includes(requiredNonClaim)) {
+      throw new Error(`Stock metadata entry missing required non-claim ${requiredNonClaim}: ${entry.entryId}`);
+    }
+  }
+
   if (entry.suggestedGenericPresetId !== null && !genericPresetIds.has(entry.suggestedGenericPresetId)) {
     throw new Error(`Stock metadata entry references unknown generic preset: ${entry.entryId}`);
+  }
+
+  if (['cinema_negative', 'slide_reversal'].includes(entry.stockClass) && entry.suggestedGenericPresetId !== null) {
+    throw new Error(`Non-Negative-Lab process metadata must not suggest an applyable preset: ${entry.entryId}`);
   }
 
   if (filmLookIds.has(entry.entryId) || genericPresetIds.has(entry.entryId) || measuredProfileIds.has(entry.entryId)) {
@@ -42,6 +74,7 @@ for (const entry of sourceCatalog.entries) {
     entry.contrastCurveDescriptor,
     entry.displayName,
     entry.grainModelDescriptor,
+    entry.sourceReferences.join(' '),
     entry.stockFamilyDescriptor,
   ].join(' ');
   if (unsafeClaimText.test(claimText)) {
