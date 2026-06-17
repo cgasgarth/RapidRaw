@@ -127,6 +127,11 @@ assertDeepEqual(
   ],
   'focus output artifacts',
 );
+for (const artifact of applied.mutationResult.outputArtifacts) {
+  if (artifact.contentHash === undefined) {
+    throw new Error(`Expected ${artifact.artifactId} to include rendered content hash.`);
+  }
+}
 
 const outputHash = new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex');
 const sourceHashes = frames.map((frame) =>
@@ -141,6 +146,7 @@ console.log(
     {
       acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
       artifactCount: applied.mutationResult.outputArtifacts.length,
+      artifactContentHashes: applied.mutationResult.outputArtifacts.map((artifact) => artifact.contentHash),
       fixture: 'synthetic_focus_runtime_plan_v1',
       focusCoverageRatio: dryRun.provenance.focusCoverageRatio,
       outputSha256: outputHash,
