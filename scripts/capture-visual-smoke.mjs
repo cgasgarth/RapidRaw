@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
+import { VISUAL_SMOKE_SCENARIOS } from '../src/validation/visual/visualSmokeScenarios.ts';
+
 const host = '127.0.0.1';
 const port = 1420;
 const baseUrl = `http://${host}:${port}`;
@@ -12,69 +14,10 @@ const outputDir = resolve('artifacts/visual-smoke');
 const viewport = { width: 1440, height: 960 };
 const scenarioArgIndex = process.argv.indexOf('--scenario');
 const requestedScenario = scenarioArgIndex >= 0 ? process.argv[scenarioArgIndex + 1] : null;
-const scenarios = [
-  {
-    marker: 'Editor Preview',
-    mode: 'empty-library',
-    outputPath: resolve(outputDir, 'empty-library.png'),
-    sectionMinimum: 4,
-  },
-  {
-    marker: 'Command Palette Workflows',
-    mode: 'command-palette-workflows',
-    outputPath: resolve(outputDir, 'command-palette-workflows.png'),
-    sectionMinimum: 1,
-  },
-  {
-    marker: 'Panorama setup',
-    mode: 'panorama-ui',
-    outputPath: resolve(outputDir, 'panorama-ui.png'),
-    sectionMinimum: 1,
-  },
-  {
-    marker: 'Focus-stack plan',
-    mode: 'focus-ui',
-    outputPath: resolve(outputDir, 'focus-ui.png'),
-    sectionMinimum: 1,
-  },
-  {
-    marker: 'HDR merge setup',
-    mode: 'hdr-ui',
-    outputPath: resolve(outputDir, 'hdr-ui.png'),
-    sectionMinimum: 1,
-  },
-  {
-    marker: 'Super-resolution plan',
-    mode: 'sr-ui',
-    outputPath: resolve(outputDir, 'sr-ui.png'),
-    sectionMinimum: 1,
-  },
-  {
-    marker: 'Negative Conversion',
-    mode: 'negative-lab-workspace',
-    outputPath: resolve(outputDir, 'negative-lab-workspace.png'),
-    sectionMinimum: 1,
-  },
-  {
-    appMode: 'negative-lab-workspace',
-    marker: 'Negative Conversion',
-    mode: 'negative-lab-batch-color-workspace',
-    outputPath: resolve(outputDir, 'negative-lab-batch-color-workspace.png'),
-    sectionMinimum: 1,
-  },
-  {
-    marker: 'Film Looks',
-    mode: 'film-look-browser',
-    outputPath: resolve(outputDir, 'film-look-browser.png'),
-    sectionMinimum: 2,
-  },
-  {
-    marker: 'Color Workflow',
-    mode: 'color-workflow',
-    outputPath: resolve(outputDir, 'color-workflow.png'),
-    sectionMinimum: 2,
-  },
-];
+const scenarios = VISUAL_SMOKE_SCENARIOS.map((scenario) => ({
+  ...scenario,
+  outputPath: resolve(outputDir, scenario.outputFile),
+}));
 const highDpiTargets = [
   { deviceScaleFactor: 1, name: 'empty-library-1x.png' },
   { deviceScaleFactor: 2, name: 'empty-library-2x.png' },
