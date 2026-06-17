@@ -122,6 +122,7 @@ generator before the release workflow needs one.
 - [Failure artifacts](ci/failure-artifacts-2026-06-11.md)
 - [Optional platform build matrix](ci/optional-platform-build-matrix-2026-06-11.md)
 - [Render artifact comparison](validation/render-artifact-comparison-2026-06-15.md)
+- [Runtime proof completion states](validation/runtime-proof-completion-states-2026-06-17.md)
 - [Unused vars severity](validation/unused-vars-error-2026-06-15.md)
 - [Local check command contract](tooling/local-check-command-contract-2026-06-10.md)
 - [Script type coverage](tooling/script-type-coverage-2026-06-15.md)
