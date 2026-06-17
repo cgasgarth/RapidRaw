@@ -39,6 +39,48 @@
     }
   ],
   "issue": 97,
+  "runtimeCases": [
+    {
+      "adjustment": {
+        "hue": 8,
+        "luminance": 3,
+        "saturation": 16
+      },
+      "expectedRgb": {
+        "red": 0.8082412412284817,
+        "green": 0.5202233177019245,
+        "blue": 0.1915812441082957
+      },
+      "id": "color.selective.runtime.orange-warmth.v1",
+      "inputRgb": {
+        "red": 0.72,
+        "green": 0.42,
+        "blue": 0.22
+      },
+      "rangeKey": "oranges",
+      "tolerance": 0.000001
+    },
+    {
+      "adjustment": {
+        "hue": -6,
+        "luminance": -4,
+        "saturation": 10
+      },
+      "expectedRgb": {
+        "red": 0.18016522535478308,
+        "green": 0.36578990614019014,
+        "blue": 0.6412400549701786
+      },
+      "id": "color.selective.runtime.blue-depth.v1",
+      "inputRgb": {
+        "red": 0.22,
+        "green": 0.36,
+        "blue": 0.68
+      },
+      "rangeKey": "blues",
+      "tolerance": 0.000001
+    }
+  ],
   "schemaVersion": 1,
   "shaderDefaultSmoothness": 1.5,
   "snapshotDate": "2026-06-14"
