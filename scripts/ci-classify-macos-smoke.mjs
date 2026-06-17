@@ -109,7 +109,9 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:focus-ui-api', new Set(['bun scripts/check-focus-ui-api.mjs'])],
   ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario focus-ui'])],
   ['check:hdr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario hdr-ui'])],
+  ['check:keyboard-shortcut-conflicts', new Set(['bun scripts/check-keyboard-shortcut-conflicts.ts'])],
   ['check:keyboard-shortcuts', new Set(['bun scripts/check-keyboard-shortcuts.ts'])],
+  ['check:library-session-ui', new Set(['bun scripts/check-library-session-ui.ts'])],
   ['check:panorama-ui-api', new Set(['bun scripts/check-panorama-ui-api.mjs'])],
   ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario panorama-ui'])],
   ['check:sr-ui-api', new Set(['bun scripts/check-sr-ui-api.mjs'])],
@@ -162,6 +164,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['check:sr-synthetic-smoke', new Set(['bun scripts/check-super-resolution-synthetic-smoke.mjs'])],
   ['check:tauri-schema-validation', new Set(['bun scripts/check-tauri-schema-validation.ts'])],
+  ['check:workspace-layouts', new Set(['bun scripts/check-workspace-layout-fixtures.ts'])],
 ]);
 
 function hasExtension(path, extensions) {
