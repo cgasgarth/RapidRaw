@@ -2,6 +2,7 @@
 
 import {
   applyPanoramaRuntimePlanV1,
+  buildPanoramaRuntimeArtifactV1,
   buildPanoramaRuntimeDryRunV1,
 } from '../packages/rawengine-schema/src/panoramaRuntimePlan.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
@@ -105,6 +106,12 @@ const applied = applyPanoramaRuntimePlanV1({
   seed: 'rawengine-panorama-runtime-smoke-v1',
   sourceFrames,
 });
+const derivedArtifact = buildPanoramaRuntimeArtifactV1({
+  applyResult: applied,
+  command: applyCommand,
+  createdAt: '2026-06-17T19:25:00.000Z',
+  previewArtifacts: dryRun.dryRunResult.previewArtifacts,
+});
 
 assertEqual(dryRun.provenance.projection, 'cylindrical', 'requested projection');
 assertEqual(dryRun.provenance.resolvedProjection, 'rectilinear', 'resolved projection');
@@ -134,6 +141,18 @@ if (outputArtifact === undefined) {
 assertEqual(outputArtifact.artifactId, 'artifact_panorama_runtime_output', 'output artifact id');
 assertEqual(outputArtifact.kind, 'merge_output', 'output artifact kind');
 assertEqual(outputArtifact.storage, 'sidecar_artifact', 'output artifact storage');
+assertEqual(derivedArtifact.provenance.runtimeStatus, 'rendered', 'derived artifact runtime status');
+assertEqual(
+  derivedArtifact.provenance.graphRevision,
+  applied.mutationResult.appliedGraphRevision,
+  'derived graph revision',
+);
+assertEqual(derivedArtifact.outputArtifacts[0]?.artifactId, outputArtifact.artifactId, 'derived output artifact id');
+assertEqual(derivedArtifact.sourceImageRefs.length, sourceFrames.length, 'derived source refs');
+assertEqual(derivedArtifact.sourceState.length, sourceFrames.length, 'derived source state');
+assertEqual(derivedArtifact.projection, 'rectilinear', 'derived effective projection');
+assertEqual(derivedArtifact.projectionSettings.requestedProjection, 'cylindrical', 'derived requested projection');
+assertEqual(derivedArtifact.staleState.state, 'current', 'derived stale state');
 
 if (applied.outputPixels.length <= sourceFrames[0].width * sourceFrames[0].height * 3) {
   throw new Error('Expected panorama output to be wider than one source frame.');
@@ -145,6 +164,7 @@ console.log(
       acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
       fixture: 'synthetic_panorama_runtime_plan_v1',
       outputArtifactContentHash: outputArtifact.contentHash,
+      panoramaArtifactId: derivedArtifact.artifactId,
       output: dryRun.dryRunResult.mergePlan.outputDimensions,
       outputSha256: new Bun.CryptoHasher('sha256').update(applied.outputPixels).digest('hex'),
       provenance: {
