@@ -7,6 +7,7 @@ import {
   buildNegativeLabConversionPlanResult,
   buildNegativeLabDensitometerRouteResult,
   buildNegativeLabFrameHealthRouteResult,
+  buildNegativeLabQcProofRouteResult,
   buildNegativeLabStockFamilyConversionRouteResult,
   NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST,
 } from '../src/utils/negativeLabAppServerRoutes.ts';
@@ -55,6 +56,7 @@ const requiredRouteNames = [
   'negative.lab.build_conversion_plan',
   'negative.lab.build_densitometer_readout',
   'negative.lab.build_frame_health_report',
+  'negative.lab.build_qc_proof_report',
   'negative.lab.build_batch_dry_run_summary',
   'negative.lab.accept_batch_dry_run_plan',
   'negative.lab.build_accepted_batch_apply',
@@ -90,6 +92,7 @@ const densitometerReadout = buildNegativeLabDensitometerRouteResult({
   },
 });
 const frameHealthReport = buildNegativeLabFrameHealthRouteResult(dryRunCommand);
+const qcProofReport = buildNegativeLabQcProofRouteResult(dryRunCommand);
 const batchSummary = buildNegativeLabBatchSummaryRouteResult(dryRunCommand);
 const acceptedPlan = buildNegativeLabAcceptedBatchPlanRouteResult(dryRunCommand);
 const acceptedApplyPlan = buildNegativeLabAcceptedBatchApplyRouteResult({
@@ -113,6 +116,14 @@ if (densitometerReadout.status !== 'strong_cast') {
 
 if (frameHealthReport.activeFrameId !== 'negative-lab-frame-2' || batchSummary.plannedApplyCount !== 2) {
   throw new Error('Negative Lab agent dry-run routes did not produce expected frame/roll evidence.');
+}
+
+if (
+  qcProofReport.totalFrameCount !== dryRunCommand.targetPaths.length ||
+  qcProofReport.includedFrameCount !== dryRunCommand.includedPaths.length ||
+  qcProofReport.frames[2]?.exportBlockedReason !== 'Frame excluded from batch.'
+) {
+  throw new Error('Negative Lab agent QC route did not expose proof/report evidence.');
 }
 
 if (
