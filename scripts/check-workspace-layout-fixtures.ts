@@ -2,17 +2,21 @@
 
 import { readFile } from 'node:fs/promises';
 
+import { z } from 'zod';
+
 import {
   parseWorkspaceLayoutCatalog,
   visiblePanelsForLayout,
   workspaceLayoutCatalogSchema,
 } from '../src/schemas/workspaceLayoutSchemas.ts';
 
-const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
+const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, 'utf8'));
 
 const catalog = parseWorkspaceLayoutCatalog(await readJson('fixtures/ui/workspace-layouts.json'));
-const invalidCases = await readJson('fixtures/ui/invalid-workspace-layout-cases.json');
-const failures = [];
+const invalidCases = z
+  .array(z.object({ case: z.string().min(1), catalog: z.unknown() }).strict())
+  .parse(await readJson('fixtures/ui/invalid-workspace-layout-cases.json'));
+const failures: string[] = [];
 
 const denseLayout = catalog.layouts.find((layout) => layout.id === 'capture-cull-dense');
 if (denseLayout === undefined) {

@@ -10,7 +10,8 @@ import {
   librarySessionUiCardSchema,
 } from '../src/schemas/librarySessionUiSchemas.ts';
 
-const sessionSet = parseLibrarySessionSet(JSON.parse(await readFile('fixtures/library/library-sessions.json', 'utf8')));
+const sessionSetJson: unknown = JSON.parse(await readFile('fixtures/library/library-sessions.json', 'utf8'));
+const sessionSet = parseLibrarySessionSet(sessionSetJson);
 const activeSession = sessionSet.sessions.find((session) => session.id === sessionSet.activeSessionId);
 
 if (activeSession === undefined) {

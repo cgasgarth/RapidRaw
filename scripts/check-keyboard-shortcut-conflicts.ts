@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import { z } from 'zod';
 
 import { keyboardShortcutComboSchema, keyboardShortcutMapSchema } from '../src/schemas/keyboardShortcutSchemas.ts';
@@ -23,10 +24,10 @@ const fixtureSchema = z
   })
   .strict();
 
-const fixtures = z
-  .array(fixtureSchema)
-  .min(1)
-  .parse(JSON.parse(readFileSync(resolve('fixtures/keyboard-shortcuts/conflict-fixtures.json'), 'utf8')));
+const fixturesJson: unknown = JSON.parse(
+  readFileSync(resolve('fixtures/keyboard-shortcuts/conflict-fixtures.json'), 'utf8'),
+);
+const fixtures = z.array(fixtureSchema).min(1).parse(fixturesJson);
 
 for (const fixture of fixtures) {
   const actualConflicts = findKeyboardShortcutConflicts(fixture.shortcuts);
