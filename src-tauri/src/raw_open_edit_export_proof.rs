@@ -465,6 +465,36 @@ mod tests {
     }
 
     #[test]
+    fn proof_report_serializes_run_report_schema_fields() {
+        let asset = hashed_path(
+            "private-artifacts/validation/open-edit-export/sample.png".to_string(),
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        );
+        let report = RawOpenEditExportProofReport {
+            artifacts: vec![artifact("preview_before_private", &asset)],
+            edit_command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
+            edit_graph_revision: "graph-rev.raw-open-edit-export.sample.v1".to_string(),
+            fixture_id: "validation.raw-open-edit-export.sample.v1".to_string(),
+            generated_at: "2026-06-17T00:00:00Z".to_string(),
+            metrics: Vec::new(),
+            preview_after: asset.clone(),
+            preview_before: asset.clone(),
+            report_id: "raw-open-edit-export-run.sample.v1".to_string(),
+            sidecar_after: asset.clone(),
+            source_raw: asset,
+            tracking_issue: 1376,
+        };
+
+        let value = serde_json::to_value(report).expect("report serializes");
+
+        assert!(value.get("previewAfter").is_some());
+        assert!(value.get("previewBefore").is_some());
+        assert!(value.get("sidecarAfter").is_some());
+        assert!(value.get("sourceRaw").is_some());
+        assert!(value.get("sourceHashUnchanged").is_none());
+    }
+
+    #[test]
     fn fixture_ids_create_stable_run_report_slugs() {
         assert_eq!(
             slug_from_fixture_id("validation.raw-open-edit-export.edge-ringing.v1"),
