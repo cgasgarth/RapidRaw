@@ -4,8 +4,10 @@ import { z } from 'zod';
 
 import { expectInvalidCases, finishFixtureCheck, readJson } from './lib/fixture-checks.ts';
 import {
+  buildWaveletDetailPreviewPlan,
   estimateWaveletDetailPasses,
   parseWaveletDetailRecipe,
+  waveletDetailPreviewPlanSchema,
   waveletDetailRecipeSchema,
 } from '../src/schemas/waveletDetailSchemas.ts';
 
@@ -18,9 +20,20 @@ const invalidCases = z
 const failures: string[] = [];
 
 let totalPasses = 0;
+let previewEnabledCount = 0;
 for (const recipeValue of recipes) {
   const recipe = parseWaveletDetailRecipe(recipeValue);
-  totalPasses += estimateWaveletDetailPasses(recipe);
+  const plan = waveletDetailPreviewPlanSchema.parse(buildWaveletDetailPreviewPlan(recipe));
+  totalPasses += plan.passCount;
+  if (plan.previewEnabled) previewEnabledCount += 1;
+
+  if (plan.passCount > 0 && estimateWaveletDetailPasses(recipe) !== plan.passCount + 1) {
+    failures.push(`${recipe.id}: preview plan pass count does not match runtime estimate.`);
+  }
+
+  if (plan.passCount === 0 && plan.previewMode !== 'off') {
+    failures.push(`${recipe.id}: disabled preview plan must use off mode.`);
+  }
 }
 
 expectInvalidCases({
@@ -31,8 +44,12 @@ expectInvalidCases({
   schema: waveletDetailRecipeSchema,
 });
 
-if (totalPasses !== 7) {
-  failures.push(`Expected 7 wavelet detail passes across fixtures, got ${totalPasses}.`);
+if (totalPasses !== 5) {
+  failures.push(`Expected 5 active wavelet detail preview passes across fixtures, got ${totalPasses}.`);
+}
+
+if (previewEnabledCount !== 2) {
+  failures.push(`Expected 2 enabled wavelet detail preview plans, got ${previewEnabledCount}.`);
 }
 
 finishFixtureCheck({
