@@ -16,6 +16,10 @@
       "localRelativePath": "private-fixtures/film-simulation/color-checker-001.tiff",
       "measurementStatus": "approved_private_payload_metadata",
       "payloadAccess": "private_ci_payload",
+      "payloadSha256": "sha256:4d967b9df2a23fb67d9ff26fdfc20b0690dcf483e0b7f9d1c5c633d2a990eec7",
+      "reviewDate": "2026-06-17",
+      "reviewIssue": 1556,
+      "reviewer": "RawEngine validation",
       "sourceKind": "project_owned",
       "state": "approved_render_measurement",
       "targetOrStepWedgePresent": true
