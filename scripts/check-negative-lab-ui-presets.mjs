@@ -292,6 +292,7 @@ const workflowStageKeys = [
   'stockRegistryVersion',
   'workflowExportReadyCount',
 ];
+const stockMetadataLocaleKeys = ['stockMetadata', 'stockMetadataSummary'];
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
 const backendSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8');
 
@@ -369,7 +370,9 @@ for (const marker of [
   'negative-lab-profile-row-',
   'negative-lab-profile-runtime-status',
   'negative-lab-stock-family-',
+  'negative-lab-stock-metadata',
   'negative-lab-stock-registry',
+  'NEGATIVE_LAB_STOCK_METADATA_COUNTS',
   'NEGATIVE_LAB_STOCK_REGISTRY',
 ]) {
   if (!modalSource.includes(marker)) {
@@ -416,6 +419,14 @@ for (const fileName of readdirSync('src/i18n/locales')) {
     ) {
       failures.push(`${fileName}: missing modals.negativeConversion.outputFormats.${key}`);
     }
+  }
+}
+
+const englishNegativeConversion = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'))?.modals
+  ?.negativeConversion;
+for (const key of stockMetadataLocaleKeys) {
+  if (typeof englishNegativeConversion?.[key] !== 'string' || englishNegativeConversion[key].trim().length === 0) {
+    failures.push(`en.json: missing modals.negativeConversion.${key}`);
   }
 }
 

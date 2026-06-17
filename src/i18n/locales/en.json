@@ -1631,6 +1631,8 @@
       "sampleShadowPatch": "Shadow patch",
       "scopeActive": "Active scan",
       "scopeAll": "All scans",
+      "stockMetadata": "Named stock references",
+      "stockMetadataSummary": "{{colorCount}} color / {{blackAndWhiteCount}} B&W / {{slideCount}} slide / {{cinemaCount}} cinema",
       "stockRegistry": "Stock families",
       "stockRegistrySummary": "{{runtimeSafeCount}} runtime-safe / {{referenceOnlyCount}} reference-only",
       "stockRegistryVersion": "v{{version}}",
