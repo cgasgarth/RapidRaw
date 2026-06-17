@@ -389,3 +389,67 @@ fn slug_from_fixture_id(fixture_id: &str) -> String {
         .unwrap_or(fixture_id)
         .replace('.', "-")
 }
+
+#[cfg(test)]
+mod tests {
+    use image::{DynamicImage, Rgba, RgbaImage};
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn private_paths_reject_absolute_and_traversal() {
+        let root = Path::new("/tmp/rawengine-private-root");
+
+        assert!(resolve_private_relative(root, "private-fixtures/sample.cr3").is_ok());
+        assert!(resolve_private_relative(root, "/tmp/private-fixtures/sample.cr3").is_err());
+        assert!(resolve_private_relative(root, "../private-fixtures/sample.cr3").is_err());
+        assert!(resolve_private_relative(root, "private-fixtures/../sample.cr3").is_err());
+    }
+
+    #[test]
+    fn pixel_metrics_detect_changed_pixels_and_mean_delta() {
+        let before = RgbaImage::from_pixel(2, 1, Rgba([0, 0, 0, 255]));
+        let mut after = before.clone();
+        after.put_pixel(1, 0, Rgba([255, 0, 0, 255]));
+
+        let before = DynamicImage::ImageRgba8(before);
+        let after = DynamicImage::ImageRgba8(after);
+
+        assert_eq!(changed_pixel_ratio(&before, &after), 0.5);
+        assert_eq!(mean_abs_delta(&before, &after), 0.125);
+    }
+
+    #[test]
+    fn sidecar_json_preserves_edit_graph_revision() {
+        let request = RawOpenEditExportProofRequest {
+            adjustments: json!({ "exposure": 0.35 }),
+            artifact_dir_relative: "private-artifacts/validation/open-edit-export".to_string(),
+            edit_command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
+            edit_graph_revision: "graph-rev.open-edit-export.edge-ringing.v1".to_string(),
+            fixture_id: "validation.raw-open-edit-export.edge-ringing.v1".to_string(),
+            private_root_path: "/tmp/rawengine-private-root".to_string(),
+            source_relative_path: "private-fixtures/detail/edge-ringing-v1.cr3".to_string(),
+        };
+
+        let sidecar = build_sidecar_json(&request);
+
+        assert_eq!(sidecar["adjustments"], json!({ "exposure": 0.35 }));
+        assert_eq!(
+            sidecar["rawOpenEditExportProof"]["editGraphRevision"],
+            json!("graph-rev.open-edit-export.edge-ringing.v1")
+        );
+        assert_eq!(
+            sidecar["rawOpenEditExportProof"]["trackingIssue"],
+            json!(1376)
+        );
+    }
+
+    #[test]
+    fn fixture_ids_create_stable_run_report_slugs() {
+        assert_eq!(
+            slug_from_fixture_id("validation.raw-open-edit-export.edge-ringing.v1"),
+            "edge-ringing-v1"
+        );
+    }
+}
