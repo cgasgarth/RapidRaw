@@ -87,14 +87,17 @@ expectThrows('mismatched accepted panorama UI runtime plan', () =>
   }),
 );
 
-console.log(
-  JSON.stringify({
-    fixture: 'synthetic_panorama_ui_runtime_bridge_v1',
-    output: dryRun.dryRun.dryRunResult.mergePlan.outputDimensions,
-    outputSha256: new Bun.CryptoHasher('sha256').update(applied.apply.outputPixels).digest('hex'),
-    planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
-  }),
-);
+const result = {
+  fixture: 'synthetic_panorama_ui_runtime_bridge_v1',
+  output: dryRun.dryRun.dryRunResult.mergePlan.outputDimensions,
+  outputSha256: new Bun.CryptoHasher('sha256').update(applied.apply.outputPixels).digest('hex'),
+  planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+};
+if (process.argv.includes('--verbose')) {
+  console.log(JSON.stringify(result, null, 2));
+} else {
+  console.log(`panorama UI runtime bridge ok (${result.output.width}x${result.output.height})`);
+}
 
 function buildRequest(command) {
   return {

@@ -108,16 +108,17 @@ const improvementRatio =
   calculateMeanAbsoluteErrorV1(nearestBaseline, truth);
 if (improvementRatio < 0.65) throw new Error(`Expected SR improvement ratio >= 0.65, got ${improvementRatio}.`);
 
-console.log(
-  JSON.stringify({
-    fixture: 'synthetic_sr_app_server_runtime_v1',
-    improvementRatio,
-    outputSha256: new Bun.CryptoHasher('sha256')
-      .update(new Uint8Array(applied.apply.outputPixels.buffer))
-      .digest('hex'),
-    planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
-  }),
-);
+const result = {
+  fixture: 'synthetic_sr_app_server_runtime_v1',
+  improvementRatio,
+  outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.apply.outputPixels.buffer)).digest('hex'),
+  planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+};
+if (process.argv.includes('--verbose')) {
+  console.log(JSON.stringify(result, null, 2));
+} else {
+  console.log(`SR app-server runtime ok (improvement=${result.improvementRatio.toFixed(3)})`);
+}
 
 function buildRequest(command) {
   return {

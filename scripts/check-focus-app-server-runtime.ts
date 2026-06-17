@@ -112,14 +112,17 @@ expectThrows('unaccepted focus apply plan', () =>
   }),
 );
 
-console.log(
-  JSON.stringify({
-    fixture: 'synthetic_focus_app_server_runtime_v1',
-    focusCoverageRatio: applied.apply.provenance.focusCoverageRatio,
-    outputSha256: outputHash,
-    planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
-  }),
-);
+const result = {
+  fixture: 'synthetic_focus_app_server_runtime_v1',
+  focusCoverageRatio: applied.apply.provenance.focusCoverageRatio,
+  outputSha256: outputHash,
+  planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+};
+if (process.argv.includes('--verbose')) {
+  console.log(JSON.stringify(result, null, 2));
+} else {
+  console.log(`focus app-server runtime ok (coverage=${result.focusCoverageRatio})`);
+}
 
 function buildRequest(command) {
   return {
