@@ -1,20 +1,15 @@
 #!/usr/bin/env bun
 
-import { execFileSync } from 'node:child_process';
+import { runQuiet, runText } from './lib/process.mjs';
 
 const EXPECTED_REPOSITORY = 'cgasgarth/RapidRaw';
 const EXPECTED_ORIGIN = 'https://github.com/cgasgarth/RapidRaw.git';
 const EXPECTED_UPSTREAM = 'https://github.com/CyberTimon/RapidRAW.git';
 const fixMode = process.argv.includes('--fix');
 
-const run = (command, args) =>
-  execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-const runQuiet = (command, args) => {
-  execFileSync(command, args, { stdio: 'ignore' });
-};
 const readGitConfig = (key) => {
   try {
-    return run('git', ['config', '--get', key]);
+    return runText('git', ['config', '--get', key]);
   } catch {
     return '';
   }
@@ -45,7 +40,7 @@ const pushDefault = readGitConfig('remote.pushDefault');
 let resolvedRepository = '';
 
 try {
-  resolvedRepository = run('gh', ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner']);
+  resolvedRepository = runText('gh', ['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner']);
 } catch (error) {
   console.error('gh repo resolution failed. Run `bun run repo:fix-gh-resolution` after `gh auth login`.');
   console.error(error instanceof Error ? error.message : String(error));
