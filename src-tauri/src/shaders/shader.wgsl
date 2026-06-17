@@ -58,6 +58,16 @@ struct LevelsSettings {
     _pad2: u32,
 }
 
+struct ColorBalanceRgbSettings {
+    shadows: vec4<f32>,
+    midtones: vec4<f32>,
+    highlights: vec4<f32>,
+    enabled: u32,
+    preserve_luminance: u32,
+    _pad1: u32,
+    _pad2: u32,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     brightness: f32,
@@ -120,6 +130,7 @@ struct GlobalAdjustments {
     _pad3: f32,
 
     color_calibration: ColorCalibrationSettings,
+    color_balance_rgb: ColorBalanceRgbSettings,
     channel_mixer: ChannelMixerSettings,
     levels: LevelsSettings,
 
@@ -657,6 +668,44 @@ fn apply_channel_mixer(color: vec3<f32>, settings: ChannelMixerSettings) -> vec3
 
     mixed = clamp(mixed * (source_luma / mixed_luma), vec3<f32>(0.0), vec3<f32>(1.0));
     return mixed;
+}
+
+fn color_balance_rgb_weights(luma: f32) -> vec3<f32> {
+    let shadows = clamp((0.55 - luma) / 0.55, 0.0, 1.0);
+    let highlights = clamp((luma - 0.45) / 0.55, 0.0, 1.0);
+    let midtones = clamp(1.0 - abs(luma - 0.5) / 0.5, 0.0, 1.0);
+    let total = shadows + midtones + highlights;
+    if (total <= 0.0) {
+        return vec3<f32>(0.0, 1.0, 0.0);
+    }
+    return vec3<f32>(shadows, midtones, highlights) / total;
+}
+
+fn apply_color_balance_rgb(color: vec3<f32>, settings: ColorBalanceRgbSettings) -> vec3<f32> {
+    if (settings.enabled == 0u) {
+        return color;
+    }
+
+    let source_luma = get_luma(color);
+    let weights = color_balance_rgb_weights(source_luma);
+    let offset = (
+        settings.shadows.rgb * weights.x +
+        settings.midtones.rgb * weights.y +
+        settings.highlights.rgb * weights.z
+    ) / 400.0;
+    var balanced = clamp(color + offset, vec3<f32>(0.0), vec3<f32>(1.0));
+
+    if (settings.preserve_luminance == 0u) {
+        return balanced;
+    }
+
+    let balanced_luma = get_luma(balanced);
+    if (balanced_luma <= 0.0) {
+        return balanced;
+    }
+
+    balanced = clamp(balanced * (source_luma / balanced_luma), vec3<f32>(0.0), vec3<f32>(1.0));
+    return balanced;
 }
 
 fn apply_luma_levels(color: vec3<f32>, settings: LevelsSettings) -> vec3<f32> {
@@ -1668,6 +1717,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     composite_rgb_linear = apply_color_calibration(composite_rgb_linear, adjustments.global.color_calibration);
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
     composite_rgb_linear = apply_creative_color(composite_rgb_linear, t_saturation, t_vibrance);
+    composite_rgb_linear = apply_color_balance_rgb(composite_rgb_linear, adjustments.global.color_balance_rgb);
     composite_rgb_linear = apply_channel_mixer(composite_rgb_linear, adjustments.global.channel_mixer);
     composite_rgb_linear = apply_luma_levels(composite_rgb_linear, adjustments.global.levels);
 
