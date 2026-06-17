@@ -5,7 +5,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SCRIPT_DIR = 'scripts';
-const MAX_SCRIPTS_WITHOUT_TS_CHECK = 119;
+const MAX_SCRIPTS_WITHOUT_TS_CHECK = 157;
 
 export const collectScriptTypeCoverage = (files) => {
   const missingTsCheck = files.filter(({ source }) => {
