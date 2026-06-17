@@ -18,12 +18,41 @@ use crate::image_processing::{ImageMetadata, get_or_init_gpu_context};
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportProofRequest {
     pub artifact_dir_relative: String,
-    pub edit_command_id: String,
-    pub edit_graph_revision: String,
+    pub edit_command: RawOpenEditExportBasicToneCommand,
     pub fixture_id: String,
     pub private_root_path: String,
     pub source_relative_path: String,
-    pub adjustments: Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportBasicToneCommand {
+    pub approval: RawOpenEditExportBasicToneApproval,
+    pub command_id: String,
+    pub command_type: String,
+    pub dry_run: bool,
+    pub expected_graph_revision: String,
+    pub parameters: RawOpenEditExportBasicToneParameters,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportBasicToneApproval {
+    pub approval_class: String,
+    pub state: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportBasicToneParameters {
+    pub black_point: f64,
+    pub clarity: f64,
+    pub contrast: f64,
+    pub exposure_ev: f64,
+    pub highlights: f64,
+    pub saturation: f64,
+    pub shadows: f64,
+    pub white_point: f64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -84,6 +113,7 @@ pub async fn run_raw_open_edit_export_proof(
     let source_path = resolve_private_relative(&private_root, &request.source_relative_path)?;
     let artifact_dir = resolve_private_relative(&private_root, &request.artifact_dir_relative)?;
     fs::create_dir_all(&artifact_dir).map_err(|error| error.to_string())?;
+    let adjustments = basic_tone_adjustments(&request.edit_command)?;
 
     let source_hash_before = sha256_file(&source_path)?;
     let source_bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
@@ -109,7 +139,7 @@ pub async fn run_raw_open_edit_export_proof(
     let preview_after = process_image_for_export_pipeline(
         &source_path_string,
         &base_image,
-        &request.adjustments,
+        &adjustments,
         &context,
         &state,
         is_raw,
@@ -119,7 +149,7 @@ pub async fn run_raw_open_edit_export_proof(
     let export_after = process_image_for_export_pipeline(
         &source_path_string,
         &base_image,
-        &request.adjustments,
+        &adjustments,
         &context,
         &state,
         is_raw,
@@ -166,7 +196,7 @@ pub async fn run_raw_open_edit_export_proof(
     )?;
 
     let sidecar_path = resolve_private_relative(&private_root, &sidecar_after_relative)?;
-    let sidecar_json = build_sidecar_json(&request);
+    let sidecar_json = build_sidecar_json(&request, &adjustments);
     fs::write(
         &sidecar_path,
         serde_json::to_vec_pretty(&sidecar_json).map_err(|error| error.to_string())?,
@@ -181,7 +211,7 @@ pub async fn run_raw_open_edit_export_proof(
     let sidecar_reload_revision_match = reloaded_sidecar_json
         .pointer("/rawOpenEditExportProof/editGraphRevision")
         .and_then(Value::as_str)
-        == Some(request.edit_graph_revision.as_str());
+        == Some(request.edit_command.expected_graph_revision.as_str());
     let source_hash_after = sha256_file(&source_path)?;
     let source_hash_unchanged = source_hash_before == source_hash_after;
 
@@ -203,8 +233,8 @@ pub async fn run_raw_open_edit_export_proof(
 
     let mut report = RawOpenEditExportProofReport {
         artifacts: Vec::new(),
-        edit_command_id: request.edit_command_id,
-        edit_graph_revision: request.edit_graph_revision,
+        edit_command_id: request.edit_command.command_id,
+        edit_graph_revision: request.edit_command.expected_graph_revision,
         fixture_id: request.fixture_id.clone(),
         generated_at: Utc::now().to_rfc3339(),
         metrics: vec![
@@ -262,15 +292,38 @@ pub async fn run_raw_open_edit_export_proof(
     Ok(report)
 }
 
-fn build_sidecar_json(request: &RawOpenEditExportProofRequest) -> Value {
+fn basic_tone_adjustments(command: &RawOpenEditExportBasicToneCommand) -> Result<Value, String> {
+    if command.command_type != "toneColor.setBasicTone" {
+        return Err("editCommand.commandType must be toneColor.setBasicTone.".to_string());
+    }
+    if command.dry_run {
+        return Err("editCommand must be an apply command, not a dry-run command.".to_string());
+    }
+    if command.approval.approval_class != "edit_apply" || command.approval.state != "approved" {
+        return Err("editCommand requires approved edit_apply approval.".to_string());
+    }
+
+    Ok(json!({
+        "blacks": command.parameters.black_point,
+        "clarity": command.parameters.clarity,
+        "contrast": command.parameters.contrast,
+        "exposure": command.parameters.exposure_ev,
+        "highlights": command.parameters.highlights,
+        "saturation": command.parameters.saturation,
+        "shadows": command.parameters.shadows,
+        "whites": command.parameters.white_point,
+    }))
+}
+
+fn build_sidecar_json(request: &RawOpenEditExportProofRequest, adjustments: &Value) -> Value {
     let metadata = ImageMetadata {
-        adjustments: request.adjustments.clone(),
+        adjustments: adjustments.clone(),
         ..Default::default()
     };
     let mut value = serde_json::to_value(metadata).unwrap_or_else(|_| json!({}));
     value["rawOpenEditExportProof"] = json!({
-        "editCommandId": request.edit_command_id,
-        "editGraphRevision": request.edit_graph_revision,
+        "editCommandId": request.edit_command.command_id,
+        "editGraphRevision": request.edit_command.expected_graph_revision,
         "fixtureId": request.fixture_id,
         "trackingIssue": 1376
     });
@@ -416,6 +469,29 @@ mod tests {
 
     use super::*;
 
+    fn sample_basic_tone_command() -> RawOpenEditExportBasicToneCommand {
+        RawOpenEditExportBasicToneCommand {
+            approval: RawOpenEditExportBasicToneApproval {
+                approval_class: "edit_apply".to_string(),
+                state: "approved".to_string(),
+            },
+            command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
+            command_type: "toneColor.setBasicTone".to_string(),
+            dry_run: false,
+            expected_graph_revision: "graph-rev.open-edit-export.edge-ringing.v1".to_string(),
+            parameters: RawOpenEditExportBasicToneParameters {
+                black_point: -2.0,
+                clarity: 4.0,
+                contrast: 8.0,
+                exposure_ev: 0.35,
+                highlights: -12.0,
+                saturation: 5.0,
+                shadows: 9.0,
+                white_point: 3.0,
+            },
+        }
+    }
+
     #[test]
     fn private_paths_reject_absolute_and_traversal() {
         let root = Path::new("/tmp/rawengine-private-root");
@@ -442,18 +518,18 @@ mod tests {
     #[test]
     fn sidecar_json_preserves_edit_graph_revision() {
         let request = RawOpenEditExportProofRequest {
-            adjustments: json!({ "exposure": 0.35 }),
             artifact_dir_relative: "private-artifacts/validation/open-edit-export".to_string(),
-            edit_command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
-            edit_graph_revision: "graph-rev.open-edit-export.edge-ringing.v1".to_string(),
+            edit_command: sample_basic_tone_command(),
             fixture_id: "validation.raw-open-edit-export.edge-ringing.v1".to_string(),
             private_root_path: "/tmp/rawengine-private-root".to_string(),
             source_relative_path: "private-fixtures/detail/edge-ringing-v1.cr3".to_string(),
         };
+        let adjustments = basic_tone_adjustments(&request.edit_command).expect("basic tone maps");
 
-        let sidecar = build_sidecar_json(&request);
+        let sidecar = build_sidecar_json(&request, &adjustments);
 
-        assert_eq!(sidecar["adjustments"], json!({ "exposure": 0.35 }));
+        assert_eq!(sidecar["adjustments"]["exposure"], json!(0.35));
+        assert_eq!(sidecar["adjustments"]["contrast"], json!(8.0));
         assert_eq!(
             sidecar["rawOpenEditExportProof"]["editGraphRevision"],
             json!("graph-rev.open-edit-export.edge-ringing.v1")
@@ -462,6 +538,23 @@ mod tests {
             sidecar["rawOpenEditExportProof"]["trackingIssue"],
             json!(1376)
         );
+    }
+
+    #[test]
+    fn basic_tone_adjustments_require_approved_apply_command() {
+        let valid = sample_basic_tone_command();
+        assert_eq!(
+            basic_tone_adjustments(&valid).expect("valid command maps")["whites"],
+            json!(3.0)
+        );
+
+        let mut dry_run = sample_basic_tone_command();
+        dry_run.dry_run = true;
+        assert!(basic_tone_adjustments(&dry_run).is_err());
+
+        let mut pending = sample_basic_tone_command();
+        pending.approval.state = "pending".to_string();
+        assert!(basic_tone_adjustments(&pending).is_err());
     }
 
     #[test]
