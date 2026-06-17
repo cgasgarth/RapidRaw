@@ -14,7 +14,20 @@
         "magentas": 8
       }
     },
-    "expectedActiveChannels": ["reds", "oranges", "magentas"]
+    "expectedActiveChannels": ["reds", "oranges", "magentas"],
+    "runtimeExpectation": {
+      "inputRgb": {
+        "red": 0.62,
+        "green": 0.42,
+        "blue": 0.34
+      },
+      "expectedRgb": {
+        "red": 0.48871608000000005,
+        "green": 0.48871608000000005,
+        "blue": 0.48871608000000005
+      },
+      "tolerance": 1e-12
+    }
   },
   {
     "case": "landscape sky control",
@@ -31,6 +44,19 @@
         "magentas": 0
       }
     },
-    "expectedActiveChannels": ["oranges", "yellows", "greens"]
+    "expectedActiveChannels": ["oranges", "yellows", "greens"],
+    "runtimeExpectation": {
+      "inputRgb": {
+        "red": 0.24,
+        "green": 0.38,
+        "blue": 0.66
+      },
+      "expectedRgb": {
+        "red": 0.31858872,
+        "green": 0.31858872,
+        "blue": 0.31858872
+      },
+      "tolerance": 1e-12
+    }
   }
 ]
