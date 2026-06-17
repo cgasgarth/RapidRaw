@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-export const colorParityOperationSchema = z.enum(['linear_exposure', 'white_balance', 'legacy_tonemap']);
+export const colorParityOperationSchema = z.enum([
+  'channel_mixer',
+  'linear_exposure',
+  'white_balance',
+  'legacy_tonemap',
+]);
 
 export const colorParityVec3Schema = z.tuple([z.number(), z.number(), z.number()]);
 
@@ -18,7 +23,7 @@ export const colorParityCaseSchema = z
 
 export const colorParityShaderFunctionSchema = z
   .object({
-    name: z.enum(['apply_linear_exposure', 'apply_white_balance', 'legacy_tonemap']),
+    name: z.enum(['apply_channel_mixer', 'apply_linear_exposure', 'apply_white_balance', 'legacy_tonemap']),
     sha256: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   })
   .strict();
@@ -109,9 +114,38 @@ export const applyColorParityLegacyTonemap = (inputValue: ColorParityVec3): Colo
   return makeVec3(tonemap(input[0]), tonemap(input[1]), tonemap(input[2]));
 };
 
+export const applyColorParityChannelMixer = (
+  inputValue: ColorParityVec3,
+  parameters: Record<string, number>,
+): ColorParityVec3 => {
+  const input = colorParityVec3Schema.parse(inputValue);
+  const mixRow = (prefix: string) =>
+    clamp(
+      input[0] * (parameters[`${prefix}Red`] ?? (prefix === 'red' ? 1 : 0)) +
+        input[1] * (parameters[`${prefix}Green`] ?? (prefix === 'green' ? 1 : 0)) +
+        input[2] * (parameters[`${prefix}Blue`] ?? (prefix === 'blue' ? 1 : 0)) +
+        (parameters[`${prefix}Constant`] ?? 0),
+      0,
+      1,
+    );
+
+  const mixed = makeVec3(mixRow('red'), mixRow('green'), mixRow('blue'));
+  if ((parameters['preserveLuminance'] ?? 0) === 0) return mixed;
+
+  const luma = (color: ColorParityVec3) => color[0] * 0.2126 + color[1] * 0.7152 + color[2] * 0.0722;
+  const sourceLuma = luma(input);
+  const mixedLuma = luma(mixed);
+  if (sourceLuma <= 0 || mixedLuma <= 0) return mixed;
+
+  const scale = sourceLuma / mixedLuma;
+  return makeVec3(clamp(mixed[0] * scale, 0, 1), clamp(mixed[1] * scale, 0, 1), clamp(mixed[2] * scale, 0, 1));
+};
+
 export const evaluateColorParityCase = (testCaseValue: ColorParityCase): ColorParityVec3 => {
   const testCase = colorParityCaseSchema.parse(testCaseValue);
   switch (testCase.operation) {
+    case 'channel_mixer':
+      return applyColorParityChannelMixer(testCase.input, testCase.parameters);
     case 'linear_exposure':
       return applyColorParityLinearExposure(testCase.input, testCase.parameters);
     case 'white_balance':

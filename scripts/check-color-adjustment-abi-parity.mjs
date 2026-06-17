@@ -13,6 +13,8 @@ const STRUCTS = [
   'HslColor',
   'ColorGradeSettings',
   'ColorCalibrationSettings',
+  'ChannelMixerRow',
+  'ChannelMixerSettings',
   'GlobalAdjustments',
   'MaskAdjustments',
   'AllAdjustments',

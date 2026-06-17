@@ -30,6 +30,23 @@ struct ColorCalibrationSettings {
     _pad1: f32,
 }
 
+struct ChannelMixerRow {
+    red: f32,
+    green: f32,
+    blue: f32,
+    constant: f32,
+}
+
+struct ChannelMixerSettings {
+    red: ChannelMixerRow,
+    green: ChannelMixerRow,
+    blue: ChannelMixerRow,
+    enabled: u32,
+    preserve_luminance: u32,
+    _pad1: u32,
+    _pad2: u32,
+}
+
 struct GlobalAdjustments {
     exposure: f32,
     brightness: f32,
@@ -92,6 +109,7 @@ struct GlobalAdjustments {
     _pad3: f32,
 
     color_calibration: ColorCalibrationSettings,
+    channel_mixer: ChannelMixerSettings,
 
     hsl: array<HslColor, 8>,
     luma_curve: array<Point, 16>,
@@ -598,6 +616,35 @@ fn apply_creative_color(color: vec3<f32>, sat: f32, vib: f32) -> vec3<f32> {
         processed = mix(vec3<f32>(luma), processed, 1.0 + amount);
     }
     return processed;
+}
+
+fn apply_channel_mixer_row(color: vec3<f32>, row: ChannelMixerRow) -> f32 {
+    return clamp(dot(color, vec3<f32>(row.red, row.green, row.blue)) + row.constant, 0.0, 1.0);
+}
+
+fn apply_channel_mixer(color: vec3<f32>, settings: ChannelMixerSettings) -> vec3<f32> {
+    if (settings.enabled == 0u) {
+        return color;
+    }
+
+    var mixed = vec3<f32>(
+        apply_channel_mixer_row(color, settings.red),
+        apply_channel_mixer_row(color, settings.green),
+        apply_channel_mixer_row(color, settings.blue),
+    );
+
+    if (settings.preserve_luminance == 0u) {
+        return mixed;
+    }
+
+    let source_luma = get_luma(color);
+    let mixed_luma = get_luma(mixed);
+    if (source_luma <= 0.0 || mixed_luma <= 0.0) {
+        return mixed;
+    }
+
+    mixed = clamp(mixed * (source_luma / mixed_luma), vec3<f32>(0.0), vec3<f32>(1.0));
+    return mixed;
 }
 
 fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords_i: vec2<i32>) -> vec3<f32> {
@@ -1591,6 +1638,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     composite_rgb_linear = apply_color_calibration(composite_rgb_linear, adjustments.global.color_calibration);
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
     composite_rgb_linear = apply_creative_color(composite_rgb_linear, t_saturation, t_vibrance);
+    composite_rgb_linear = apply_channel_mixer(composite_rgb_linear, adjustments.global.channel_mixer);
 
     composite_rgb_linear = apply_color_grading(
         composite_rgb_linear,

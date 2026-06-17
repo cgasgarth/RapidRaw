@@ -2,6 +2,52 @@
   "$schema": "https://rawengine.dev/schemas/color-cpu-gpu-parity-fixtures-v1.json",
   "cases": [
     {
+      "expectedOutput": [0.374, 0.444, 0.713],
+      "id": "color.parity.channel-mixer-crossfeed.v1",
+      "input": [0.18, 0.42, 0.75],
+      "notes": "CPU mirror for the WGPU channel mixer cross-channel row math without luminance preservation.",
+      "operation": "channel_mixer",
+      "parameters": {
+        "blueBlue": 0.8,
+        "blueConstant": 0.05,
+        "blueGreen": 0.15,
+        "blueRed": 0,
+        "greenBlue": 0,
+        "greenConstant": 0,
+        "greenGreen": 1.1,
+        "greenRed": -0.1,
+        "preserveLuminance": 0,
+        "redBlue": 0.2,
+        "redConstant": 0.02,
+        "redGreen": 0.1,
+        "redRed": 0.9
+      },
+      "tolerance": 0.000001
+    },
+    {
+      "expectedOutput": [0.36005849, 0.27826535, 0.14756496],
+      "id": "color.parity.channel-mixer-preserve-luma.v1",
+      "input": [0.35, 0.28, 0.16],
+      "notes": "CPU mirror for the WGPU channel mixer luminance preservation scale.",
+      "operation": "channel_mixer",
+      "parameters": {
+        "blueBlue": 0.7,
+        "blueConstant": 0,
+        "blueGreen": 0.1,
+        "blueRed": 0.1,
+        "greenBlue": 0.05,
+        "greenConstant": 0,
+        "greenGreen": 0.9,
+        "greenRed": 0.2,
+        "preserveLuminance": 1,
+        "redBlue": 0,
+        "redConstant": 0,
+        "redGreen": 0.15,
+        "redRed": 1.1
+      },
+      "tolerance": 0.000001
+    },
+    {
       "expectedOutput": [0.42811456, 0.59460356, 1.18920712],
       "id": "color.parity.linear-exposure-midgray.v1",
       "input": [0.18, 0.25, 0.5],
@@ -37,6 +83,10 @@
   "issue": 95,
   "schemaVersion": 1,
   "shaderFunctions": [
+    {
+      "name": "apply_channel_mixer",
+      "sha256": "sha256:090dd60afc3ee05de093a13a706dd3e33fb1f3f87c7940c5fd14bfa88bd51752"
+    },
     {
       "name": "apply_linear_exposure",
       "sha256": "sha256:221bbd78cee52da68538c489c33b324cd2c24a6ddf59b727d89407f6f83ebb4e"
