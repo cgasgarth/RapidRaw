@@ -184,6 +184,28 @@
             "virtualCopyId": null
           }
         ],
+        "sourceState": [
+          {
+            "sourceIndex": 0,
+            "contentHash": "sha256:sample-panorama-source-0001",
+            "graphRevision": "graph_rev_43"
+          },
+          {
+            "sourceIndex": 1,
+            "contentHash": "sha256:sample-panorama-source-0002",
+            "graphRevision": "graph_rev_43"
+          },
+          {
+            "sourceIndex": 2,
+            "contentHash": "sha256:sample-panorama-source-0003",
+            "graphRevision": "graph_rev_43"
+          }
+        ],
+        "staleState": {
+          "checkedAt": "2026-06-13T07:30:00.000Z",
+          "invalidationReasons": [],
+          "state": "current"
+        },
         "validationMetrics": {
           "estimatedPeakMemoryBytes": 2200000000,
           "excludedSourceCount": 0,

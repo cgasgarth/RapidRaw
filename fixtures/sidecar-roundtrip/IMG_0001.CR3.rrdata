@@ -74,6 +74,95 @@
         "outputArtifactIds": ["artifact_ai_denoise_sidecar"]
       }
     ],
+    "negativeLabRollSessions": [
+      {
+        "schemaVersion": 1,
+        "family": "negative_lab_roll_session",
+        "rollId": "negative_lab_roll_fixture_roll_001",
+        "sessionId": "negative_lab_session_fixture_roll_001",
+        "createdAt": "2026-06-17T12:00:00Z",
+        "sourceImagePaths": ["/fixture-roll/IMG_0001.CR3", "/fixture-roll/IMG_0002.CR3"],
+        "sharedBaseFogSamples": [
+          {
+            "sampleId": "base_fog_fixture_roll_001",
+            "frameId": null,
+            "rect": {
+              "x": 42,
+              "y": 38,
+              "width": 96,
+              "height": 64
+            },
+            "densityRgb": {
+              "r": 0.78,
+              "g": 0.82,
+              "b": 0.91
+            },
+            "confidence": 0.92
+          }
+        ],
+        "anchorFrames": [
+          {
+            "frameId": "negative_lab_frame_fixture_001",
+            "path": "/fixture-roll/IMG_0001.CR3",
+            "role": "base_fog_anchor"
+          },
+          {
+            "frameId": "negative_lab_frame_fixture_002",
+            "path": "/fixture-roll/IMG_0002.CR3",
+            "role": "color_balance_anchor"
+          }
+        ],
+        "perFrameOverrides": [
+          {
+            "frameId": "negative_lab_frame_fixture_001",
+            "path": "/fixture-roll/IMG_0001.CR3",
+            "presetId": "negative_lab.generic.c41.neutral.v1",
+            "baseFogSampleId": "base_fog_fixture_roll_001",
+            "exposureOffsetStops": 0.1
+          },
+          {
+            "frameId": "negative_lab_frame_fixture_002",
+            "path": "/fixture-roll/IMG_0002.CR3",
+            "presetId": "negative_lab.generic.c41.portrait.v1",
+            "baseFogSampleId": "base_fog_fixture_roll_001",
+            "exposureOffsetStops": -0.15
+          }
+        ],
+        "positiveVariantProvenance": [
+          {
+            "variantId": "positive_variant_fixture_001",
+            "sourceFrameId": "negative_lab_frame_fixture_001",
+            "outputArtifactId": "artifact_negative_lab_positive_fixture_001",
+            "commandId": "command_negative_lab_apply_fixture_001",
+            "acceptedDryRunPlanId": "negative_lab_batch_plan_1a2b3c4d",
+            "acceptedDryRunPlanHash": "fnv1a32:1a2b3c4d"
+          }
+        ],
+        "migrationPolicy": {
+          "currentShape": "negative_lab_roll_session_v1",
+          "forwardCompatibleRead": true,
+          "preserveUnknownFields": true,
+          "migrationNotes": ["preserve unknown frame-level fields", "only mutate through accepted dry-run apply"]
+        },
+        "appServerCommandVisibility": {
+          "previewToolName": "negativelab.preview_conversion",
+          "applyToolName": "negativelab.apply_planned_command",
+          "commandNames": [
+            "negative.lab.build_conversion_plan",
+            "negative.lab.build_batch_dry_run_summary",
+            "negative.lab.accept_batch_dry_run_plan",
+            "negative.lab.build_accepted_batch_apply",
+            "negative.lab.build_frame_health_report",
+            "negative.lab.build_qc_proof_report"
+          ]
+        },
+        "mutationSafety": {
+          "requiresAcceptedDryRunPlan": true,
+          "acceptedDryRunPlanId": "negative_lab_batch_plan_1a2b3c4d",
+          "acceptedDryRunPlanHash": "fnv1a32:1a2b3c4d"
+        }
+      }
+    ],
     "panoramaArtifacts": [],
     "staleArtifactIds": []
   }

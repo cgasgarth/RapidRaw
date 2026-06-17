@@ -19,8 +19,9 @@ const routeToolNames = new Set(COMPUTATIONAL_MERGE_APP_SERVER_ROUTES.map((route)
 for (const { family, file } of modalCoverage) {
   const source = readFileSync(file, 'utf8');
   if (!routeFamilies.has(family)) failures.push(`${family} has no app-server route manifest entry.`);
-  const badgeRegex = new RegExp(`<ComputationalMergeAppServerBadge[\\s\\S]*?family="${family}"`, 'u');
-  if (!badgeRegex.test(source)) {
+  const directBadgeRegex = new RegExp(`<ComputationalMergeAppServerBadge[\\s\\S]*?family="${family}"`, 'u');
+  const setupShellBadgeRegex = new RegExp(`<ComputationalSetupModalShell[\\s\\S]*?appServerFamily="${family}"`, 'u');
+  if (!directBadgeRegex.test(source) && !setupShellBadgeRegex.test(source)) {
     failures.push(`${file} does not render the ${family} app-server route badge.`);
   }
   if (source.includes('apiPending')) failures.push(`${file} still renders a pending API badge.`);

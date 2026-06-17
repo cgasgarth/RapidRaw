@@ -7,6 +7,7 @@ import { z } from 'zod';
 import {
   aiSidecarProvenanceEntryV1Schema,
   hdrMergeArtifactV1Schema,
+  negativeLabRollSessionArtifactV1Schema,
   panoramaArtifactV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
@@ -40,6 +41,7 @@ const RawEngineArtifactsSchema = z
   .object({
     aiProvenanceEntries: z.array(aiSidecarProvenanceEntryV1Schema).default([]),
     hdrMergeArtifacts: z.array(hdrMergeArtifactV1Schema).default([]),
+    negativeLabRollSessions: z.array(negativeLabRollSessionArtifactV1Schema).default([]),
     panoramaArtifacts: z.array(panoramaArtifactV1Schema).default([]),
     schemaVersion: z.literal(1),
     staleArtifactIds: z.array(z.string().trim().min(1)).default([]),
@@ -226,6 +228,7 @@ const primaryArtifacts = RawEngineArtifactsSchema.parse(primary.metadata.rawEngi
 assertEqual(primaryArtifacts.schemaVersion, 1, 'primary rawEngineArtifacts schema version');
 assertEqual(primaryArtifacts.aiProvenanceEntries.length, 2, 'primary AI provenance entry count');
 assertEqual(primaryArtifacts.hdrMergeArtifacts.length, 0, 'primary HDR artifact count');
+assertEqual(primaryArtifacts.negativeLabRollSessions.length, 1, 'primary Negative Lab roll session count');
 assertEqual(primaryArtifacts.panoramaArtifacts.length, 0, 'primary panorama artifact count');
 
 const [maskProvenance, enhancementProvenance] = primaryArtifacts.aiProvenanceEntries;
@@ -239,6 +242,34 @@ const roundtrippedPrimaryArtifacts = SidecarSchema.parse(
   JSON.parse(JSON.stringify(primary.metadata, null, 2)),
 ).rawEngineArtifacts;
 assertJsonEqual(roundtrippedPrimaryArtifacts, primaryArtifacts, 'AI provenance sidecar roundtrip');
+
+const [negativeLabRollSession] = primaryArtifacts.negativeLabRollSessions;
+assertEqual(negativeLabRollSession.rollId, 'negative_lab_roll_fixture_roll_001', 'Negative Lab roll id');
+assertEqual(negativeLabRollSession.sharedBaseFogSamples.length, 1, 'Negative Lab shared base/fog sample count');
+assertEqual(negativeLabRollSession.anchorFrames.length, 2, 'Negative Lab anchor frame count');
+assertEqual(negativeLabRollSession.perFrameOverrides.length, 2, 'Negative Lab per-frame override count');
+assertEqual(
+  negativeLabRollSession.appServerCommandVisibility.applyToolName,
+  'negativelab.apply_planned_command',
+  'Negative Lab app-server apply visibility',
+);
+assertEqual(
+  negativeLabRollSession.mutationSafety.requiresAcceptedDryRunPlan,
+  true,
+  'Negative Lab mutation dry-run requirement',
+);
+for (const variant of negativeLabRollSession.positiveVariantProvenance) {
+  assertEqual(
+    variant.acceptedDryRunPlanId,
+    negativeLabRollSession.mutationSafety.acceptedDryRunPlanId,
+    'Negative Lab positive variant accepted plan id',
+  );
+  assertEqual(
+    variant.acceptedDryRunPlanHash,
+    negativeLabRollSession.mutationSafety.acceptedDryRunPlanHash,
+    'Negative Lab positive variant accepted plan hash',
+  );
+}
 
 assertEqual(deriveSidecarPath(PRIMARY_IMAGE_PATH), '/fixture-roll/IMG_0001.CR3.rrdata', 'primary sidecar path');
 assertEqual(
@@ -331,6 +362,6 @@ console.log(
     `Checked ${toRepoPath(toAbsolutePath(hdrFixturePath))}`,
     `Checked ${toRepoPath(toAbsolutePath(panoramaFixturePath))}`,
     `Checked ${toRepoPath(toAbsolutePath(virtualFixturePath))}`,
-    'Coverage: schema shape, virtual-copy naming, adjustment preservation, tag conventions, HDR/panorama artifacts, missing/invalid defaults.',
+    'Coverage: schema shape, virtual-copy naming, adjustment preservation, tag conventions, HDR/panorama/Negative Lab artifacts, missing/invalid defaults.',
   ].join('\n'),
 );
