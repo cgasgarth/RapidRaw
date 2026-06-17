@@ -53,7 +53,7 @@
     "check:color-grading-presets": "bun scripts/check-color-grading-presets.mjs",
     "check:profile-tone": "bun scripts/check-profile-tone.mjs",
     "check:camera-profile-lookup": "bun scripts/check-camera-profile-lookup-fixtures.mjs",
-    "check:colorchecker-fixtures": "bun scripts/check-colorchecker-fixtures.mjs",
+    "check:colorchecker-fixtures": "bun scripts/check-colorchecker-fixtures.ts",
     "check:color-style-presets": "bun scripts/check-color-style-presets.mjs",
     "check:selective-color-ranges": "bun scripts/check-selective-color-ranges.mjs",
     "check:selective-color-falloff": "bun scripts/check-selective-color-falloff.mjs",

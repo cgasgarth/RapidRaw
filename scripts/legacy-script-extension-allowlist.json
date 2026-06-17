@@ -26,7 +26,6 @@
   "scripts/check-color-pipeline-audit.mjs",
   "scripts/check-color-range-mask-parameters.mjs",
   "scripts/check-color-style-presets.mjs",
-  "scripts/check-colorchecker-fixtures.mjs",
   "scripts/check-compact-quality-commands.mjs",
   "scripts/check-compare-survey-fixtures.mjs",
   "scripts/check-computational-merge-app-server-routes.mjs",
