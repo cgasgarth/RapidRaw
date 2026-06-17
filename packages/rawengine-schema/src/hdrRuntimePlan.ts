@@ -118,10 +118,11 @@ export const buildHdrRuntimeDryRunV1 = (requestValue: unknown): HdrRuntimeDryRun
   const runtime = renderHdrRuntimePixels(request);
   const planId = `hdr_plan_${request.command.commandId}`;
   const planHash = `sha256:${stableHdrRuntimeHash(`${planId}:${runtime.provenance.alignmentMode}:${runtime.provenance.deghosting}`)}`;
+  const renderedContentHash = hashHdrRuntimePixels(runtime.mergedPixels);
   const previewArtifacts = [
     {
       artifactId: request.previewArtifactId,
-      contentHash: `sha256:${stableHdrRuntimeHash(`${planHash}:preview`)}`,
+      contentHash: `sha256:${stableHdrRuntimeHash(`${planHash}:${request.previewArtifactId}:${renderedContentHash}`)}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
@@ -182,10 +183,13 @@ export const applyHdrRuntimePlanV1 = (requestValue: unknown): HdrRuntimeApplyRes
   if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
     throw new Error('HDR runtime apply requires an accepted dry-run plan id and hash.');
   }
+  const renderedContentHash = hashHdrRuntimePixels(runtime.mergedPixels);
   const outputArtifacts = [
     {
       artifactId: request.outputArtifactId,
-      contentHash: `sha256:${stableHdrRuntimeHash(`${acceptedDryRunPlanHash}:${request.outputArtifactId}`)}`,
+      contentHash: `sha256:${stableHdrRuntimeHash(
+        `${acceptedDryRunPlanHash}:${request.outputArtifactId}:${renderedContentHash}`,
+      )}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
@@ -469,6 +473,15 @@ const stableHdrRuntimeHash = (input: string): string => {
   let value = 2166136261;
   for (let index = 0; index < input.length; index += 1) {
     value ^= input.charCodeAt(index);
+    value = Math.imul(value, 16777619) >>> 0;
+  }
+  return value.toString(16).padStart(8, '0');
+};
+
+const hashHdrRuntimePixels = (pixels: Float64Array): string => {
+  let value = 2166136261;
+  for (const pixel of pixels) {
+    value ^= Math.round(pixel * 1_000_000);
     value = Math.imul(value, 16777619) >>> 0;
   }
   return value.toString(16).padStart(8, '0');
