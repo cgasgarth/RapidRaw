@@ -70,6 +70,7 @@ const dryRun = buildHdrRuntimeDryRunV1({
   previewArtifactId: 'artifact_hdr_runtime_preview',
   searchRadiusPx: SEARCH_RADIUS_PX,
   sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
+  syntheticScenePixels: scene,
 });
 const unalignedDryRunCommand = {
   ...dryRunCommand,
@@ -90,6 +91,7 @@ const unalignedDryRun = buildHdrRuntimeDryRunV1({
   previewArtifactId: 'artifact_hdr_runtime_unaligned_preview',
   searchRadiusPx: SEARCH_RADIUS_PX,
   sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
+  syntheticScenePixels: scene,
 });
 
 const applyCommand = {
@@ -118,10 +120,12 @@ const applied = applyHdrRuntimePlanV1({
   previewArtifactId: 'artifact_hdr_runtime_preview',
   searchRadiusPx: SEARCH_RADIUS_PX,
   sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
+  syntheticScenePixels: scene,
 });
 
 assertEqual(dryRun.provenance.alignmentMode, 'translation', 'dry-run alignment mode');
 assertEqual(dryRun.provenance.deghosting, 'medium', 'dry-run deghosting');
+assertEqual(dryRun.provenance.qualityMetrics.maxReconstructionMae, 0.015, 'max reconstruction mae');
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted dry-run plan id');
 const [outputArtifact] = applied.mutationResult.outputArtifacts;
@@ -146,6 +150,12 @@ for (const transform of dryRun.provenance.alignmentTransforms) {
 if (dryRun.provenance.motionCoverageRatio <= 0) {
   throw new Error('Expected moving-subject fixture to produce a non-empty deghost mask.');
 }
+if (dryRun.provenance.qualityMetrics.motionPixelCount <= 0) {
+  throw new Error('Expected HDR quality metrics to record motion pixels.');
+}
+if (dryRun.provenance.qualityMetrics.reconstructionMae === undefined) {
+  throw new Error('Expected HDR synthetic quality metrics to include reconstruction MAE.');
+}
 
 if (applied.mergedPixels.length !== WIDTH * HEIGHT) {
   throw new Error('Expected applied HDR runtime output dimensions to match fixture.');
@@ -167,6 +177,7 @@ console.log(
       motionCoverageRatio: dryRun.provenance.motionCoverageRatio,
       outputArtifactContentHash: outputArtifact.contentHash,
       outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.mergedPixels.buffer)).digest('hex'),
+      qualityMetrics: dryRun.provenance.qualityMetrics,
       unalignedMae,
     },
     null,

@@ -73,6 +73,14 @@ export const hdrRuntimeProvenanceV1Schema = z
     engineVersion: z.literal(HDR_RUNTIME_ENGINE_VERSION),
     mergeStrategy: z.enum(['scene_linear_radiance', 'exposure_fusion_preview']),
     motionCoverageRatio: z.number().min(0).max(1),
+    qualityMetrics: z
+      .object({
+        clippedInputPixelRatio: z.number().min(0).max(1),
+        maxReconstructionMae: z.number().positive(),
+        motionPixelCount: z.number().int().nonnegative(),
+        reconstructionMae: z.number().nonnegative().optional(),
+      })
+      .strict(),
     referenceSourceIndex: z.number().int().nonnegative(),
     runtimeStatus: z.enum(['dry_run_rendered', 'apply_rendered']),
     sourceState: z.array(
@@ -320,6 +328,7 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
       engineVersion: HDR_RUNTIME_ENGINE_VERSION,
       mergeStrategy: request.command.parameters.mergeStrategy,
       motionCoverageRatio: roundHdrRuntimeMetric(motionCoverageRatio),
+      qualityMetrics: buildHdrRuntimeQualityMetrics(request, mergedPixels, motionMask),
       referenceSourceIndex,
       runtimeStatus: 'dry_run_rendered',
       sourceState: request.frames.map((frame) => ({
@@ -460,6 +469,38 @@ const deriveRuntimeWarnings = (
   if (motionCoverageRatio > 0) warnings.add('motion_detected');
   if (motionCoverageRatio > 0 && deghosting !== 'off') warnings.add('deghost_mask_generated');
   return [...warnings].sort();
+};
+
+const buildHdrRuntimeQualityMetrics = (
+  request: ParsedHdrRuntimePlanRequestV1,
+  mergedPixels: Float64Array,
+  motionMask: Uint8Array,
+): HdrRuntimeProvenanceV1['qualityMetrics'] => {
+  const inputPixelCount = request.frames.reduce((total, frame) => total + frame.pixels.length, 0);
+  const clippedPixelCount = request.frames.reduce(
+    (total, frame) =>
+      total + frame.pixels.reduce((count, pixel) => count + (pixel >= request.clipThreshold ? 1 : 0), 0),
+    0,
+  );
+  return {
+    clippedInputPixelRatio: roundHdrRuntimeMetric(clippedPixelCount / Math.max(1, inputPixelCount)),
+    maxReconstructionMae: request.maxReconstructionMae,
+    motionPixelCount: countHdrMotionPixelsV1(motionMask),
+    ...buildHdrReconstructionMae(request.syntheticScenePixels, mergedPixels),
+  };
+};
+
+const buildHdrReconstructionMae = (syntheticScenePixels: Float64Array | undefined, mergedPixels: Float64Array) => {
+  if (syntheticScenePixels === undefined) return {};
+  if (syntheticScenePixels.length !== mergedPixels.length) {
+    throw new Error('HDR runtime synthetic scene pixel length must match merged output length.');
+  }
+
+  let absoluteError = 0;
+  for (let index = 0; index < mergedPixels.length; index += 1) {
+    absoluteError += Math.abs((syntheticScenePixels[index] ?? 0) - (mergedPixels[index] ?? 0));
+  }
+  return { reconstructionMae: roundHdrRuntimeMetric(absoluteError / Math.max(1, mergedPixels.length)) };
 };
 
 const motionRiskForCoverage = (coverage: number): 'none' | 'low' | 'medium' | 'high' => {
