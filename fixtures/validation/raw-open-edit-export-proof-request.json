@@ -1,0 +1,66 @@
+{
+  "$schema": "https://rawengine.dev/schemas/raw-open-edit-export-proof-request-v1.json",
+  "artifactDirRelative": "private-artifacts/validation/open-edit-export",
+  "editCommand": {
+    "actor": {
+      "id": "agent.raw-proof-command-wrapper",
+      "kind": "agent",
+      "sessionId": "raw-proof-command-wrapper"
+    },
+    "approval": {
+      "approvalClass": "edit_apply",
+      "reason": "Apply accepted basic tone command for RAW open/edit/export runtime proof.",
+      "state": "approved"
+    },
+    "colorPipeline": {
+      "chromaticAdaptation": {
+        "method": "bradford_v1",
+        "sourceWhitePoint": {
+          "x": 0.3457,
+          "y": 0.3585
+        },
+        "status": "math_validated",
+        "targetWhitePoint": {
+          "x": 0.32168,
+          "y": 0.33767
+        },
+        "warnings": []
+      },
+      "inputDomain": "camera_linear_rgb",
+      "operationDomain": "acescg_linear_v1",
+      "renderTarget": {
+        "bitDepth": 16,
+        "embedIcc": true,
+        "intent": "relative_colorimetric",
+        "outputProfile": "display_p3",
+        "viewTransform": "rawengine_agx_v1"
+      },
+      "sceneToDisplayTransform": "rawengine_agx_v1",
+      "workingSpace": "acescg_linear_v1"
+    },
+    "commandId": "command.raw-open-edit-export.basic-tone.v1",
+    "commandType": "toneColor.setBasicTone",
+    "correlationId": "corr.raw-open-edit-export.basic-tone.v1",
+    "dryRun": false,
+    "expectedGraphRevision": "graph-rev.raw-open-edit-export.sample.v1",
+    "idempotencyKey": "idem.raw-open-edit-export.basic-tone.v1",
+    "parameters": {
+      "blackPoint": -2,
+      "clarity": 4,
+      "contrast": 8,
+      "exposureEv": 0.35,
+      "highlights": -12,
+      "saturation": 5,
+      "shadows": 9,
+      "whitePoint": 3
+    },
+    "schemaVersion": 1,
+    "target": {
+      "imagePath": "private-fixtures/detail/sample.cr3",
+      "kind": "image"
+    }
+  },
+  "fixtureId": "validation.raw-open-edit-export.sample.v1",
+  "privateRootPath": "/tmp/rawengine-private-root",
+  "sourceRelativePath": "private-fixtures/detail/sample.cr3"
+}
