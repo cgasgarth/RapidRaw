@@ -2231,6 +2231,12 @@ export const sampleFocusStackArtifactV1: FocusStackArtifactV1 = focusStackArtifa
     kind: 'mask',
     storage: 'sidecar_artifact',
   },
+  sharpnessSettings: {
+    cellCount: 3,
+    lowConfidenceCellCount: 0,
+    lowConfidenceWeightFloor: 0.12,
+    weightPower: 5,
+  },
   sourceImageRefs: sampleComputationalMergeFocusStackCommandEnvelopeV1.parameters.sources,
   sourceState: [
     {
