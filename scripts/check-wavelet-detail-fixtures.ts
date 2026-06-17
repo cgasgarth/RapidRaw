@@ -20,12 +20,14 @@ const invalidCases = z
 const failures: string[] = [];
 
 let totalPasses = 0;
+let previewArtifactCount = 0;
 let previewEnabledCount = 0;
 for (const recipeValue of recipes) {
   const recipe = parseWaveletDetailRecipe(recipeValue);
   const plan = waveletDetailPreviewPlanSchema.parse(buildWaveletDetailPreviewPlan(recipe));
   totalPasses += plan.passCount;
   if (plan.previewEnabled) previewEnabledCount += 1;
+  if (plan.previewArtifact !== null) previewArtifactCount += 1;
 
   if (plan.passCount > 0 && estimateWaveletDetailPasses(recipe) !== plan.passCount + 1) {
     failures.push(`${recipe.id}: preview plan pass count does not match runtime estimate.`);
@@ -33,6 +35,14 @@ for (const recipeValue of recipes) {
 
   if (plan.passCount === 0 && plan.previewMode !== 'off') {
     failures.push(`${recipe.id}: disabled preview plan must use off mode.`);
+  }
+
+  if (plan.previewEnabled && plan.previewArtifact?.artifactId !== `wavelet_detail.preview.${recipe.id}`) {
+    failures.push(`${recipe.id}: preview artifact id is unstable.`);
+  }
+
+  if (plan.previewArtifact !== null && !plan.previewArtifact.contentHash.startsWith('fnv1a32:')) {
+    failures.push(`${recipe.id}: preview artifact content hash missing deterministic hash prefix.`);
   }
 }
 
@@ -50,6 +60,10 @@ if (totalPasses !== 5) {
 
 if (previewEnabledCount !== 2) {
   failures.push(`Expected 2 enabled wavelet detail preview plans, got ${previewEnabledCount}.`);
+}
+
+if (previewArtifactCount !== previewEnabledCount) {
+  failures.push(`Expected preview artifacts to match enabled previews, got ${previewArtifactCount}.`);
 }
 
 finishFixtureCheck({
