@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 
-const files = {
+const files: Record<'app' | 'folderTreeSchema' | 'packageJson' | 'tauriInvoke', string> = {
   app: readFileSync('src/App.tsx', 'utf8'),
   folderTreeSchema: readFileSync('src/schemas/folderTreeSchemas.ts', 'utf8'),
   packageJson: readFileSync('package.json', 'utf8'),
   tauriInvoke: readFileSync('src/utils/tauriSchemaInvoke.ts', 'utf8'),
 };
 
-const required = [
+const required: Array<[label: string, passed: boolean]> = [
   ['tauri invoke helper uses invoke<unknown>', files.tauriInvoke.includes('invoke<unknown>')],
   ['tauri parse helper uses Zod safeParse', files.tauriInvoke.includes('schema.safeParse(payload)')],
   ['tauri parse helper formats bounded issues', files.tauriInvoke.includes('.slice(0, 5)')],

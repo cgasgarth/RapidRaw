@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 const busSource = readFileSync('src/utils/maskRefinementCommandBus.ts', 'utf8');
 const panelSource = readFileSync('src/components/panel/right/MasksPanel.tsx', 'utf8');
 
-const requiredBusFragments = [
+const requiredBusFragments: string[] = [
   'maskRefinementUiCommandSchema',
   "commandType: z.literal('layerMask.refineMask')",
   'createMaskRefinementCommand',
@@ -12,7 +12,7 @@ const requiredBusFragments = [
   'featherPx: z.number().min(0).max(4096)',
 ];
 
-const requiredPanelFragments = [
+const requiredPanelFragments: string[] = [
   'createMaskRefinementCommand',
   'dispatchMaskRefinementCommand',
   'handleMaskRefinementParametersChange',
