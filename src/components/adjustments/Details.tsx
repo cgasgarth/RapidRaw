@@ -1,10 +1,9 @@
-import { type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import AdjustmentSlider from './AdjustmentSlider';
 import { TextVariants } from '../../types/typography';
 import { Adjustments, DetailsAdjustment } from '../../utils/adjustments';
 import { AppSettings } from '../ui/AppProperties';
-import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
 
@@ -18,14 +17,6 @@ interface DetailsPanelProps {
 
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 
-type SliderChangeEvent =
-  | ChangeEvent<HTMLInputElement>
-  | {
-      target: {
-        value: number | string;
-      };
-    };
-
 export default function DetailsPanel({
   adjustments,
   setAdjustments,
@@ -35,14 +26,12 @@ export default function DetailsPanel({
 }: DetailsPanelProps) {
   const { t } = useTranslation();
 
-  const handleAdjustmentChange = (key: string, value: number | string) => {
-    const numericValue = parseInt(String(value), 10);
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: numericValue }));
+  const handleAdjustmentChange = (key: string, value: number) => {
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: Math.trunc(value) }));
   };
 
-  const handleFloatAdjustmentChange = (key: string, value: number | string) => {
-    const numericValue = parseFloat(String(value));
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: numericValue }));
+  const handleFloatAdjustmentChange = (key: string, value: number) => {
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
   };
 
   const handleBooleanAdjustmentChange = (key: string, value: boolean) => {
@@ -65,12 +54,12 @@ export default function DetailsPanel({
               handleBooleanAdjustmentChange(DetailsAdjustment.DeblurEnabled, checked);
             }}
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.amount')}
             max={100}
             min={0}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.DeblurStrength, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.DeblurStrength, value);
             }}
             step={1}
             value={adjustments.deblurStrength}
@@ -78,12 +67,12 @@ export default function DetailsPanel({
             disabled={!adjustments.deblurEnabled}
             fillOrigin="min"
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.blurRadius')}
             max={1.35}
             min={0.45}
-            onChange={(e: SliderChangeEvent) => {
-              handleFloatAdjustmentChange(DetailsAdjustment.DeblurSigmaPx, e.target.value);
+            onValueChange={(value) => {
+              handleFloatAdjustmentChange(DetailsAdjustment.DeblurSigmaPx, value);
             }}
             step={0.05}
             value={adjustments.deblurSigmaPx}
@@ -103,23 +92,23 @@ export default function DetailsPanel({
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.sharpening')}
           </UiText>
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.sharpness')}
             max={100}
             min={-100}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.Sharpness, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.Sharpness, value);
             }}
             step={1}
             value={adjustments.sharpness}
             onDragStateChange={onDragStateChange}
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.threshold')}
             max={80}
             min={0}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.SharpnessThreshold, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.SharpnessThreshold, value);
             }}
             step={1}
             value={adjustments.sharpnessThreshold}
@@ -135,34 +124,34 @@ export default function DetailsPanel({
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.presence')}
           </UiText>
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.clarity')}
             max={100}
             min={-100}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.Clarity, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.Clarity, value);
             }}
             step={1}
             value={adjustments.clarity}
             onDragStateChange={onDragStateChange}
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.dehaze')}
             max={100}
             min={-100}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.Dehaze, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.Dehaze, value);
             }}
             step={1}
             value={adjustments.dehaze}
             onDragStateChange={onDragStateChange}
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.structure')}
             max={100}
             min={-100}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.Structure, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.Structure, value);
             }}
             step={1}
             value={adjustments.structure}
@@ -170,12 +159,12 @@ export default function DetailsPanel({
           />
           {!isForMask && (
             <>
-              <Slider
+              <AdjustmentSlider
                 label={t('adjustments.details.localContrastRadius')}
                 max={96}
                 min={4}
-                onChange={(e: SliderChangeEvent) => {
-                  handleAdjustmentChange(DetailsAdjustment.LocalContrastRadiusPx, e.target.value);
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.LocalContrastRadiusPx, value);
                 }}
                 step={1}
                 value={adjustments.localContrastRadiusPx}
@@ -183,12 +172,12 @@ export default function DetailsPanel({
                 defaultValue={24}
                 suffix=" px"
               />
-              <Slider
+              <AdjustmentSlider
                 label={t('adjustments.details.haloGuard')}
                 max={100}
                 min={0}
-                onChange={(e: SliderChangeEvent) => {
-                  handleAdjustmentChange(DetailsAdjustment.LocalContrastHaloGuard, e.target.value);
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.LocalContrastHaloGuard, value);
                 }}
                 step={1}
                 value={adjustments.localContrastHaloGuard}
@@ -196,12 +185,12 @@ export default function DetailsPanel({
                 defaultValue={50}
                 fillOrigin="min"
               />
-              <Slider
+              <AdjustmentSlider
                 label={t('adjustments.details.midtoneMask')}
                 max={100}
                 min={0}
-                onChange={(e: SliderChangeEvent) => {
-                  handleAdjustmentChange(DetailsAdjustment.LocalContrastMidtoneMask, e.target.value);
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.LocalContrastMidtoneMask, value);
                 }}
                 step={1}
                 value={adjustments.localContrastMidtoneMask}
@@ -215,12 +204,12 @@ export default function DetailsPanel({
             </>
           )}
           {!isForMask && (
-            <Slider
+            <AdjustmentSlider
               label={t('adjustments.details.centre')}
               max={100}
               min={-100}
-              onChange={(e: SliderChangeEvent) => {
-                handleAdjustmentChange(DetailsAdjustment.Centré, e.target.value);
+              onValueChange={(value) => {
+                handleAdjustmentChange(DetailsAdjustment.Centré, value);
               }}
               step={1}
               value={adjustments.centré}
@@ -235,23 +224,23 @@ export default function DetailsPanel({
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.noiseReduction')}
           </UiText>
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.luminance')}
             max={100}
             min={isForMask ? -100 : 0}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.LumaNoiseReduction, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.LumaNoiseReduction, value);
             }}
             step={1}
             value={adjustments.lumaNoiseReduction}
             onDragStateChange={onDragStateChange}
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.color')}
             max={100}
             min={isForMask ? -100 : 0}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.ColorNoiseReduction, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.ColorNoiseReduction, value);
             }}
             step={1}
             value={adjustments.colorNoiseReduction}
@@ -265,23 +254,23 @@ export default function DetailsPanel({
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('adjustments.details.chromaticAberration')}
           </UiText>
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.redCyan')}
             max={100}
             min={-100}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationRedCyan, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationRedCyan, value);
             }}
             step={1}
             value={adjustments.chromaticAberrationRedCyan}
             onDragStateChange={onDragStateChange}
           />
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.details.blueYellow')}
             max={100}
             min={-100}
-            onChange={(e: SliderChangeEvent) => {
-              handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationBlueYellow, e.target.value);
+            onValueChange={(value) => {
+              handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationBlueYellow, value);
             }}
             step={1}
             value={adjustments.chromaticAberrationBlueYellow}
