@@ -82,6 +82,9 @@ import {
   cloneSubMaskForPaste,
   insertMaskContainerAt,
   insertSubMaskAt,
+  moveSubMaskBetweenContainers,
+  reorderMaskListContainers,
+  splitSubMaskToContainer,
 } from '../../../utils/maskClipboard';
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
 import { createMaskRefinementCommand, dispatchMaskRefinementCommand } from '../../../utils/maskRefinementCommandBus';
@@ -1455,7 +1458,6 @@ export default function MasksPanel() {
         const draggedItem = dragData.item;
         if (!draggedItem) return prev;
 
-        const oldIndex = prev.masks.findIndex((m) => m.id === draggedItem.id);
         let newIndex = -1;
 
         if (overId === 'mask-list-root') {
@@ -1466,14 +1468,8 @@ export default function MasksPanel() {
           newIndex = prev.masks.findIndex((m) => m.id === overData.parentId);
         }
 
-        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-          const newMasks = [...prev.masks];
-          const [movedItem] = newMasks.splice(oldIndex, 1);
-          if (!movedItem) return prev;
-          newMasks.splice(newIndex, 0, movedItem);
-          return { ...prev, masks: newMasks };
-        }
-        return prev;
+        const reorderedMasks = reorderMaskListContainers(prev.masks, draggedItem.id, prev.masks[newIndex]?.id ?? '');
+        return reorderedMasks ? { ...prev, masks: reorderedMasks } : prev;
       });
       return;
     }
@@ -1487,21 +1483,20 @@ export default function MasksPanel() {
           const draggedItem = dragData.item;
           if (!draggedItem) return prev;
 
-          const newMasks = structuredClone(prev.masks);
-          const sourceContainer = newMasks.find((m: MaskContainer) => m.id === sourceContainerId);
-          if (!sourceContainer) return prev;
-          const subMaskIndex = sourceContainer.subMasks.findIndex((sm: SubMask) => sm.id === draggedItem.id);
-          if (subMaskIndex === -1) return prev;
-          const [movedSubMask] = sourceContainer.subMasks.splice(subMaskIndex, 1);
-          if (!movedSubMask) return prev;
+          const result = splitSubMaskToContainer(
+            prev.masks,
+            sourceContainerId,
+            draggedItem.id,
+            (movedSubMask, count) => ({
+              ...INITIAL_MASK_CONTAINER,
+              id: crypto.randomUUID(),
+              name: `Mask ${count + 1}`,
+              subMasks: [movedSubMask],
+            }),
+          );
+          if (!result) return prev;
 
-          const newContainer = {
-            ...INITIAL_MASK_CONTAINER,
-            id: crypto.randomUUID(),
-            name: `Mask ${newMasks.length + 1}`,
-            subMasks: [movedSubMask],
-          };
-          newMasks.push(newContainer);
+          const { container: newContainer, containers: newMasks, subMask: movedSubMask } = result;
           setTimeout(() => {
             onSelectContainer(newContainer.id);
             onSelectMask(movedSubMask.id);
@@ -1522,33 +1517,16 @@ export default function MasksPanel() {
           const draggedItem = dragData.item;
           if (!draggedItem) return prev;
 
-          const newMasks = prev.masks.map((m) => ({ ...m, subMasks: [...m.subMasks] }));
-          const sourceContainer = newMasks.find((m) => m.id === sourceContainerId);
-          const targetContainer = newMasks.find((m) => m.id === expandedTargetContainerId);
-          if (!sourceContainer || !targetContainer) return prev;
+          const newMasks = moveSubMaskBetweenContainers(
+            prev.masks,
+            sourceContainerId,
+            expandedTargetContainerId,
+            draggedItem.id,
+            overData?.type === 'SubMask' ? String(over.id) : undefined,
+          );
+          if (!newMasks) return prev;
 
-          const sourceSubMaskIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === draggedItem.id);
-          if (sourceSubMaskIndex === -1) return prev;
-
-          const [movedSubMask] = sourceContainer.subMasks.splice(sourceSubMaskIndex, 1);
-          if (!movedSubMask) return prev;
-
-          if (sourceContainerId === targetContainerId) {
-            if (overData?.type === 'SubMask') {
-              const overSubMaskIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === over.id);
-              const insertIndex = overSubMaskIndex >= 0 ? overSubMaskIndex : sourceContainer.subMasks.length;
-              sourceContainer.subMasks.splice(insertIndex, 0, movedSubMask);
-            } else {
-              sourceContainer.subMasks.push(movedSubMask);
-            }
-          } else {
-            if (overData?.type === 'SubMask') {
-              const overSubMaskIndex = targetContainer.subMasks.findIndex((sm) => sm.id === over.id);
-              const insertIndex = overSubMaskIndex >= 0 ? overSubMaskIndex : targetContainer.subMasks.length;
-              targetContainer.subMasks.splice(insertIndex, 0, movedSubMask);
-            } else {
-              targetContainer.subMasks.push(movedSubMask);
-            }
+          if (sourceContainerId !== targetContainerId) {
             setExpandedContainers((p) => new Set(p).add(expandedTargetContainerId));
           }
           return { ...prev, masks: newMasks };

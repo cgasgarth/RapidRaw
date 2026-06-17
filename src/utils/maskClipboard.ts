@@ -28,6 +28,86 @@ export interface MaskLikeContainer {
   subMasks: Array<SubMask>;
 }
 
+export interface SplitSubMaskResult<TContainer extends MaskListContainer> {
+  container: TContainer;
+  containers: Array<TContainer>;
+  subMask: SubMask;
+}
+
+export interface MaskListContainer {
+  id: string;
+  subMasks: Array<SubMask>;
+}
+
+const cloneMaskListContainers = <TContainer extends MaskListContainer>(
+  containers: Array<TContainer>,
+): Array<TContainer> => containers.map((container) => ({ ...container, subMasks: [...container.subMasks] }));
+
+export function reorderMaskListContainers<TContainer extends MaskListContainer>(
+  containers: Array<TContainer>,
+  activeContainerId: string,
+  targetContainerId: string,
+): Array<TContainer> | null {
+  const oldIndex = containers.findIndex((container) => container.id === activeContainerId);
+  const newIndex = containers.findIndex((container) => container.id === targetContainerId);
+  if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return null;
+
+  const nextContainers = [...containers];
+  const [movedContainer] = nextContainers.splice(oldIndex, 1);
+  if (!movedContainer) return null;
+  nextContainers.splice(newIndex, 0, movedContainer);
+  return nextContainers;
+}
+
+export function splitSubMaskToContainer<TContainer extends MaskListContainer>(
+  containers: Array<TContainer>,
+  sourceContainerId: string,
+  subMaskId: string,
+  createContainer: (subMask: SubMask, containerCount: number) => TContainer,
+): SplitSubMaskResult<TContainer> | null {
+  const nextContainers = cloneMaskListContainers(containers);
+  const sourceContainer = nextContainers.find((container) => container.id === sourceContainerId);
+  if (!sourceContainer) return null;
+
+  const subMaskIndex = sourceContainer.subMasks.findIndex((subMask) => subMask.id === subMaskId);
+  if (subMaskIndex === -1) return null;
+
+  const [movedSubMask] = sourceContainer.subMasks.splice(subMaskIndex, 1);
+  if (!movedSubMask) return null;
+
+  const newContainer = createContainer(movedSubMask, nextContainers.length);
+  nextContainers.push(newContainer);
+  return { container: newContainer, containers: nextContainers, subMask: movedSubMask };
+}
+
+export function moveSubMaskBetweenContainers<TContainer extends MaskListContainer>(
+  containers: Array<TContainer>,
+  sourceContainerId: string,
+  targetContainerId: string,
+  subMaskId: string,
+  targetSubMaskId?: string,
+): Array<TContainer> | null {
+  const nextContainers = cloneMaskListContainers(containers);
+  const sourceContainer = nextContainers.find((container) => container.id === sourceContainerId);
+  const targetContainer = nextContainers.find((container) => container.id === targetContainerId);
+  if (!sourceContainer || !targetContainer) return null;
+
+  const sourceSubMaskIndex = sourceContainer.subMasks.findIndex((subMask) => subMask.id === subMaskId);
+  if (sourceSubMaskIndex === -1) return null;
+
+  const [movedSubMask] = sourceContainer.subMasks.splice(sourceSubMaskIndex, 1);
+  if (!movedSubMask) return null;
+
+  const insertContainer = sourceContainerId === targetContainerId ? sourceContainer : targetContainer;
+  const targetSubMaskIndex =
+    targetSubMaskId === undefined
+      ? -1
+      : insertContainer.subMasks.findIndex((subMask) => subMask.id === targetSubMaskId);
+  const insertIndex = targetSubMaskIndex >= 0 ? targetSubMaskIndex : insertContainer.subMasks.length;
+  insertContainer.subMasks.splice(insertIndex, 0, movedSubMask);
+  return nextContainers;
+}
+
 export function cloneMaskLikeContainerForPaste<TContainer extends MaskLikeContainer>(
   container: TContainer,
   createId: MaskClipboardIdFactory,
