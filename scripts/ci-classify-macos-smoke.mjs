@@ -168,6 +168,7 @@ function isSafePureTestPath(path) {
 
 function isSafeFixturePath(path) {
   return (
+    (path.startsWith('fixtures/color/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/detail/') && path.endsWith('.json')) ||
     path.startsWith('fixtures/docs/') ||
     (path.startsWith('fixtures/film-simulation/') && path.endsWith('.json')) ||
@@ -627,6 +628,7 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification('public styles can skip smoke', ['public/theme.css'], SMOKE_MODES.NONE);
+  assertClassification('color fixture outputs can skip smoke', ['fixtures/color/channel-mixer.json'], SMOKE_MODES.NONE);
   assertClassification(
     'film fixture outputs can skip smoke',
     ['fixtures/film-simulation/film-look-fixture-outputs.json'],

@@ -8,7 +8,10 @@
       "green": { "red": -5, "green": 105, "blue": 0, "constant": 0 },
       "blue": { "red": -6, "green": 4, "blue": 102, "constant": 0 }
     },
-    "expectedChangedOutputs": ["red", "green", "blue"]
+    "inputRgb": { "red": 0.62, "green": 0.48, "blue": 0.36 },
+    "expectedChangedOutputs": ["red", "green", "blue"],
+    "expectedRgb": { "red": 0.6431324288966327, "green": 0.4741297363904414, "blue": 0.35003404640072333 },
+    "tolerance": 0.000001
   },
   {
     "case": "cyan shadow bias",
@@ -19,6 +22,9 @@
       "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
       "blue": { "red": 8, "green": 0, "blue": 108, "constant": 2 }
     },
-    "expectedChangedOutputs": ["red", "blue"]
+    "inputRgb": { "red": 0.22, "green": 0.31, "blue": 0.44 },
+    "expectedChangedOutputs": ["red", "blue"],
+    "expectedRgb": { "red": 0.1622, "green": 0.31, "blue": 0.5128 },
+    "tolerance": 0.000001
   }
 ]

@@ -2,6 +2,8 @@
 
 import { readFile } from 'node:fs/promises';
 
+import { z } from 'zod';
+
 import { parseChannelMixerSettings } from '../src/schemas/channelMixerSchemas.ts';
 import {
   ADJUSTMENT_GROUPS,
@@ -9,6 +11,7 @@ import {
   ColorAdjustment,
   INITIAL_ADJUSTMENTS,
 } from '../src/utils/adjustments.ts';
+import { applyChannelMixerToRgbPixel } from '../src/utils/channelMixerRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const identityRows = {
@@ -17,7 +20,27 @@ const identityRows = {
   red: { red: 100, green: 0, blue: 0, constant: 0 },
 };
 const outputKeys = ['red', 'green', 'blue'];
-const fixtures = await readJson('fixtures/color/channel-mixer.json');
+const rgbPixelSchema = z
+  .object({
+    blue: z.number().min(0).max(1),
+    green: z.number().min(0).max(1),
+    red: z.number().min(0).max(1),
+  })
+  .strict();
+const fixtureSchema = z
+  .object({
+    case: z.string().trim().min(1),
+    expectedChangedOutputs: z.array(z.enum(['red', 'green', 'blue'])),
+    expectedRgb: rgbPixelSchema,
+    input: z.unknown(),
+    inputRgb: rgbPixelSchema,
+    tolerance: z.number().positive().max(0.000001),
+  })
+  .strict();
+const fixtures = z
+  .array(fixtureSchema)
+  .min(1)
+  .parse(await readJson('fixtures/color/channel-mixer.json'));
 const invalidCases = await readJson('fixtures/color/invalid-channel-mixer.json');
 const failures = [];
 
@@ -29,6 +52,14 @@ for (const fixture of fixtures) {
   for (const expectedOutput of fixture.expectedChangedOutputs) {
     if (!changedOutputs.includes(expectedOutput)) {
       failures.push(`${fixture.case}: expected changed ${expectedOutput} output.`);
+    }
+  }
+
+  const actualRgb = applyChannelMixerToRgbPixel(fixture.inputRgb, settings);
+  for (const output of outputKeys) {
+    const delta = Math.abs(actualRgb[output] - fixture.expectedRgb[output]);
+    if (delta > fixture.tolerance) {
+      failures.push(`${fixture.case}: ${output} expected ${fixture.expectedRgb[output]}, got ${actualRgb[output]}.`);
     }
   }
 }
