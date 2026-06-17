@@ -8,7 +8,20 @@
       "midtones": { "red": 2, "green": 0, "blue": -2 },
       "highlights": { "red": 10, "green": 2, "blue": -8 }
     },
-    "expectedNonZeroRanges": ["shadows", "midtones", "highlights"]
+    "expectedNonZeroRanges": ["shadows", "midtones", "highlights"],
+    "runtimeExpectation": {
+      "inputRgb": {
+        "red": 0.22,
+        "green": 0.27,
+        "blue": 0.34
+      },
+      "expectedRgb": {
+        "red": 0.2131622549955504,
+        "green": 0.27069531498530197,
+        "blue": 0.3532467494523268
+      },
+      "tolerance": 1e-12
+    }
   },
   {
     "case": "portrait midtone warmth",
@@ -19,6 +32,19 @@
       "midtones": { "red": 8, "green": 1, "blue": -6 },
       "highlights": { "red": 3, "green": 0, "blue": -2 }
     },
-    "expectedNonZeroRanges": ["midtones", "highlights"]
+    "expectedNonZeroRanges": ["midtones", "highlights"],
+    "runtimeExpectation": {
+      "inputRgb": {
+        "red": 0.58,
+        "green": 0.49,
+        "blue": 0.41
+      },
+      "expectedRgb": {
+        "red": 0.5924729822912871,
+        "green": 0.4879526774547909,
+        "blue": 0.3935524799058996
+      },
+      "tolerance": 1e-12
+    }
   }
 ]
