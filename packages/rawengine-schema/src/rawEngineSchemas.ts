@@ -2179,6 +2179,45 @@ export const panoramaStaleStateV1Schema = z.enum(['current', 'stale', 'unknown']
 
 type SourceIndexRef = { sourceIndex: number };
 
+type DuplicateKeyValue = number | string;
+
+interface DuplicateFieldIssueOptions<TItem, TValue extends DuplicateKeyValue> {
+  context: z.RefinementCtx;
+  getPath: (index: number, item: TItem) => Array<number | string>;
+  getValue: (item: TItem) => TValue;
+  items: ReadonlyArray<TItem>;
+  message: string;
+  normalize?: (value: TValue) => DuplicateKeyValue;
+}
+
+const normalizeEnglishKey = (value: string): string => value.toLocaleLowerCase('en-US');
+
+const addDuplicateFieldIssues = <TItem, TValue extends DuplicateKeyValue>({
+  context,
+  getPath,
+  getValue,
+  items,
+  message,
+  normalize,
+}: DuplicateFieldIssueOptions<TItem, TValue>) => {
+  const seen = new Set<DuplicateKeyValue>();
+
+  for (const [index, item] of items.entries()) {
+    const value = getValue(item);
+    const key = normalize?.(value) ?? value;
+
+    if (seen.has(key)) {
+      context.addIssue({
+        code: 'custom',
+        message,
+        path: getPath(index, item),
+      });
+    }
+
+    seen.add(key);
+  }
+};
+
 interface SourceStateCoverageOptions<TSourceRef extends SourceIndexRef, TSourceState extends SourceIndexRef> {
   context: z.RefinementCtx;
   coverageMessage: string;
@@ -5751,8 +5790,22 @@ export const negativeLabBuiltInPresetCatalogV1Schema = z
   })
   .strict()
   .superRefine((catalog, context) => {
-    const presetIds = new Set<string>();
-    const displayNames = new Set<string>();
+    addDuplicateFieldIssues({
+      context,
+      getPath: (index) => ['presets', index, 'presetId'],
+      getValue: (preset) => preset.presetId,
+      items: catalog.presets,
+      message: 'Built-in preset catalog must not contain duplicate preset IDs.',
+    });
+    addDuplicateFieldIssues({
+      context,
+      getPath: (index) => ['presets', index, 'displayName'],
+      getValue: (preset) => preset.displayName,
+      items: catalog.presets,
+      message: 'Built-in preset catalog must not contain duplicate display names.',
+      normalize: normalizeEnglishKey,
+    });
+
     const profileRefs = new Map<string, z.infer<typeof negativeLabPresetProfileRefV1Schema>>();
 
     for (const profileRef of catalog.processProfileRefs) {
@@ -5760,26 +5813,6 @@ export const negativeLabBuiltInPresetCatalogV1Schema = z
     }
 
     for (const [index, preset] of catalog.presets.entries()) {
-      const displayNameKey = preset.displayName.toLocaleLowerCase('en-US');
-
-      if (presetIds.has(preset.presetId)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Built-in preset catalog must not contain duplicate preset IDs.',
-          path: ['presets', index, 'presetId'],
-        });
-      }
-      presetIds.add(preset.presetId);
-
-      if (displayNames.has(displayNameKey)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Built-in preset catalog must not contain duplicate display names.',
-          path: ['presets', index, 'displayName'],
-        });
-      }
-      displayNames.add(displayNameKey);
-
       const profileRef = profileRefs.get(`${preset.processProfileId}@${preset.processProfileVersion}`);
       if (profileRef === undefined) {
         context.addIssue({
@@ -6053,30 +6086,21 @@ export const negativeLabPresetMetadataPolicyCatalogV1Schema = z
   })
   .strict()
   .superRefine((catalog, context) => {
-    const policyIds = new Set<string>();
-    const displayLabels = new Set<string>();
-
-    for (const [index, policy] of catalog.policies.entries()) {
-      const displayLabelKey = policy.displayCopy.label.toLocaleLowerCase('en-US');
-
-      if (policyIds.has(policy.policyId)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Preset metadata policy catalog must not contain duplicate policy IDs.',
-          path: ['policies', index, 'policyId'],
-        });
-      }
-      policyIds.add(policy.policyId);
-
-      if (displayLabels.has(displayLabelKey)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Preset metadata policy catalog must not contain duplicate display labels.',
-          path: ['policies', index, 'displayCopy', 'label'],
-        });
-      }
-      displayLabels.add(displayLabelKey);
-    }
+    addDuplicateFieldIssues({
+      context,
+      getPath: (index) => ['policies', index, 'policyId'],
+      getValue: (policy) => policy.policyId,
+      items: catalog.policies,
+      message: 'Preset metadata policy catalog must not contain duplicate policy IDs.',
+    });
+    addDuplicateFieldIssues({
+      context,
+      getPath: (index) => ['policies', index, 'displayCopy', 'label'],
+      getValue: (policy) => policy.displayCopy.label,
+      items: catalog.policies,
+      message: 'Preset metadata policy catalog must not contain duplicate display labels.',
+      normalize: normalizeEnglishKey,
+    });
   });
 
 const filmLookRecipeIdSchema = z
@@ -6211,17 +6235,15 @@ export const filmLookRecipeV1Schema = z
       }
     }
 
-    const nodeIds = new Set<string>();
-    for (const [index, node] of look.nodes.entries()) {
-      if (nodeIds.has(node.nodeId)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Film look recipes must not contain duplicate node IDs.',
-          path: ['nodes', index, 'nodeId'],
-        });
-      }
-      nodeIds.add(node.nodeId);
+    addDuplicateFieldIssues({
+      context,
+      getPath: (index) => ['nodes', index, 'nodeId'],
+      getValue: (node) => node.nodeId,
+      items: look.nodes,
+      message: 'Film look recipes must not contain duplicate node IDs.',
+    });
 
+    for (const [index, node] of look.nodes.entries()) {
       if (node.nodeKind === 'lut_reference' && node.parameters['assetId'] === undefined) {
         context.addIssue({
           code: 'custom',
@@ -6241,29 +6263,21 @@ export const filmLookCatalogV1Schema = z
   })
   .strict()
   .superRefine((catalog, context) => {
-    const lookIds = new Set<string>();
-    const displayNames = new Set<string>();
-
-    for (const [index, look] of catalog.looks.entries()) {
-      if (lookIds.has(look.lookId)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Film look catalog must not contain duplicate look IDs.',
-          path: ['looks', index, 'lookId'],
-        });
-      }
-      lookIds.add(look.lookId);
-
-      const displayNameKey = look.displayName.toLocaleLowerCase('en-US');
-      if (displayNames.has(displayNameKey)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Film look catalog must not contain duplicate display names.',
-          path: ['looks', index, 'displayName'],
-        });
-      }
-      displayNames.add(displayNameKey);
-    }
+    addDuplicateFieldIssues({
+      context,
+      getPath: (index) => ['looks', index, 'lookId'],
+      getValue: (look) => look.lookId,
+      items: catalog.looks,
+      message: 'Film look catalog must not contain duplicate look IDs.',
+    });
+    addDuplicateFieldIssues({
+      context,
+      getPath: (index) => ['looks', index, 'displayName'],
+      getValue: (look) => look.displayName,
+      items: catalog.looks,
+      message: 'Film look catalog must not contain duplicate display names.',
+      normalize: normalizeEnglishKey,
+    });
   });
 
 const contentHashSchema = z
@@ -6626,17 +6640,13 @@ export const negativeLabFixtureManifestV1Schema = z
   })
   .strict()
   .superRefine((manifest, context) => {
-    const fixtureIds = new Set<string>();
-    for (const [index, fixture] of manifest.entries.entries()) {
-      if (fixtureIds.has(fixture.fixtureId)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Negative-lab fixture manifests must not contain duplicate fixture IDs.',
-          path: ['entries', index, 'fixtureId'],
-        });
-      }
-      fixtureIds.add(fixture.fixtureId);
-    }
+    addDuplicateFieldIssues({
+      context,
+      getPath: (index) => ['entries', index, 'fixtureId'],
+      getValue: (fixture) => fixture.fixtureId,
+      items: manifest.entries,
+      message: 'Negative-lab fixture manifests must not contain duplicate fixture IDs.',
+    });
   });
 
 const normalizedScoreSchema = z.number().min(0).max(1);
@@ -6811,28 +6821,21 @@ export const negativeLabInputProfileCatalogV1Schema = z
   })
   .strict()
   .superRefine((catalog, context) => {
-    const profileIds = new Set<string>();
-    const displayNames = new Set<string>();
-    for (const [index, profile] of catalog.profiles.entries()) {
-      if (profileIds.has(profile.profileId)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Input profile catalog must not contain duplicate profile IDs.',
-          path: ['profiles', index, 'profileId'],
-        });
-      }
-      profileIds.add(profile.profileId);
-
-      const displayNameKey = profile.displayName.toLocaleLowerCase('en-US');
-      if (displayNames.has(displayNameKey)) {
-        context.addIssue({
-          code: 'custom',
-          message: 'Input profile catalog must not contain duplicate display names.',
-          path: ['profiles', index, 'displayName'],
-        });
-      }
-      displayNames.add(displayNameKey);
-    }
+    addDuplicateFieldIssues({
+      context,
+      getPath: (index) => ['profiles', index, 'profileId'],
+      getValue: (profile) => profile.profileId,
+      items: catalog.profiles,
+      message: 'Input profile catalog must not contain duplicate profile IDs.',
+    });
+    addDuplicateFieldIssues({
+      context,
+      getPath: (index) => ['profiles', index, 'displayName'],
+      getValue: (profile) => profile.displayName,
+      items: catalog.profiles,
+      message: 'Input profile catalog must not contain duplicate display names.',
+      normalize: normalizeEnglishKey,
+    });
   });
 
 export const negativeFrameRecordV1Schema = z
