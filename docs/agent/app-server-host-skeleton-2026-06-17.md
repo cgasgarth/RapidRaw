@@ -18,7 +18,8 @@ No UI automation: host tools must call the typed RawEngine command/query layer o
 ## Tool Manifest
 
 - `rawengine.host.health`: read-only health check returning runtime, transport, request id, and manifest tool count.
+- `rawengine.host.capabilities`: read-only capability discovery returning the typed host tool list before an agent selects image-editing tools.
 
 ## Replay Evidence
 
-`buildRawEngineAppServerHealthReplay` records the typed request, response, manifest, and audit log entry. The replay fixture proves the first host route is read-only and auditable before feature tools are added.
+`buildRawEngineAppServerHealthReplay` and `buildRawEngineAppServerCapabilitiesReplay` record typed requests, responses, manifests, and audit log entries. The replay proof keeps host discovery read-only and auditable before mutation-capable feature tools are added.

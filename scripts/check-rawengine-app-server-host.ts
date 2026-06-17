@@ -4,9 +4,11 @@ import { readFileSync } from 'node:fs';
 
 import {
   RAW_ENGINE_APP_SERVER_HOST_MANIFEST,
+  buildRawEngineAppServerCapabilitiesReplay,
   buildRawEngineAppServerHealthReplay,
 } from '../src/utils/rawEngineAppServerHost.ts';
 import {
+  rawEngineAppServerCapabilitiesReplaySchema,
   rawEngineAppServerHealthReplaySchema,
   rawEngineAppServerHostManifestSchema,
 } from '../src/schemas/agentRuntimeSchemas.ts';
@@ -14,12 +16,20 @@ import {
 const failures = [];
 const manifest = rawEngineAppServerHostManifestSchema.parse(RAW_ENGINE_APP_SERVER_HOST_MANIFEST);
 const healthTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.health');
+const capabilitiesTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.capabilities');
 
 if (healthTool === undefined) {
   failures.push('Missing rawengine.host.health tool.');
 } else {
   if (healthTool.mutates) failures.push('Health tool must be read-only.');
   if (healthTool.toolKind !== 'read') failures.push('Health tool must use read kind.');
+}
+
+if (capabilitiesTool === undefined) {
+  failures.push('Missing rawengine.host.capabilities tool.');
+} else {
+  if (capabilitiesTool.mutates) failures.push('Capabilities tool must be read-only.');
+  if (capabilitiesTool.toolKind !== 'read') failures.push('Capabilities tool must use read kind.');
 }
 
 const replay = rawEngineAppServerHealthReplaySchema.parse(
@@ -40,6 +50,23 @@ if (replay.auditLog[0]?.toolName !== 'rawengine.host.health') {
   failures.push('Health replay audit tool mismatch.');
 }
 
+const capabilitiesReplay = rawEngineAppServerCapabilitiesReplaySchema.parse(
+  buildRawEngineAppServerCapabilitiesReplay({
+    requestId: 'capabilities_replay_001',
+    toolName: 'rawengine.host.capabilities',
+  }),
+);
+
+if (capabilitiesReplay.response.tools.length !== manifest.tools.length) {
+  failures.push('Capabilities replay tool count mismatch.');
+}
+if (capabilitiesReplay.auditLog.length !== 1 || capabilitiesReplay.auditLog[0]?.mutates) {
+  failures.push('Capabilities replay audit log must be read-only.');
+}
+if (capabilitiesReplay.auditLog[0]?.toolName !== 'rawengine.host.capabilities') {
+  failures.push('Capabilities replay audit tool mismatch.');
+}
+
 const source = [
   'src/utils/rawEngineAppServerHost.ts',
   'src/schemas/agentRuntimeSchemas.ts',
@@ -51,6 +78,7 @@ const source = [
 for (const marker of [
   'RAW_ENGINE_APP_SERVER_HOST_MANIFEST',
   'rawengine.host.health',
+  'rawengine.host.capabilities',
   'No UI automation',
   'codex app-server',
   'stdio JSONL',
@@ -64,4 +92,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`rawengine app-server host skeleton ok (${manifest.tools.length} tool)`);
+console.log(`rawengine app-server host skeleton ok (${manifest.tools.length} tools)`);
