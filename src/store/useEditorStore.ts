@@ -8,6 +8,8 @@ import { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
 import { Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, MaskContainer } from '../utils/adjustments';
 import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
 
+import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
+
 export interface InteractivePatch {
   url: string;
   normX: number;
@@ -25,6 +27,7 @@ interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
   adjustments: Adjustments;
+  lastBasicToneCommand: BasicToneCommandEnvelope | null;
 
   // History State
   history: Adjustments[];
@@ -90,6 +93,7 @@ interface EditorState {
 export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
   adjustments: INITIAL_ADJUSTMENTS,
+  lastBasicToneCommand: null,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,
 

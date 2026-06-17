@@ -16,6 +16,11 @@ import {
   LensAdjustment,
   normalizeLoadedAdjustments,
 } from '../utils/adjustments';
+import {
+  buildBasicToneCommandEnvelope,
+  buildBasicToneImageCommandContext,
+  hasBasicToneAdjustmentChange,
+} from '../utils/basicToneCommandBridge';
 import { calculateCenteredCrop } from '../utils/cropUtils';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { globalImageCache } from '../utils/ImageLRUCache';
@@ -39,6 +44,9 @@ interface MetadataResponse {
 }
 
 const cloneAdjustmentValue = (value: unknown): unknown => structuredClone(value);
+const BASIC_TONE_SESSION_ID = 'rapidraw-editor-basic-tone';
+
+const createOperationId = (): string => crypto.randomUUID();
 
 export function useEditorActions() {
   const setEditor = useEditorStore((s) => s.setEditor);
@@ -48,8 +56,22 @@ export function useEditorActions() {
       setEditor((state) => {
         const prev = state.adjustments;
         const newAdjustments = typeof value === 'function' ? value(prev) : { ...prev, ...value };
+        const lastBasicToneCommand =
+          state.selectedImage?.path && hasBasicToneAdjustmentChange(prev, newAdjustments)
+            ? buildBasicToneCommandEnvelope(
+                newAdjustments,
+                buildBasicToneImageCommandContext({
+                  expectedGraphRevision: `history_${state.historyIndex}`,
+                  imagePath: state.selectedImage.path,
+                  operationId: createOperationId(),
+                  sessionId: BASIC_TONE_SESSION_ID,
+                }),
+                { dryRun: true },
+              )
+            : state.lastBasicToneCommand;
+
         debouncedSetHistory(newAdjustments);
-        return { adjustments: newAdjustments };
+        return { adjustments: newAdjustments, lastBasicToneCommand };
       });
     },
     [setEditor],
