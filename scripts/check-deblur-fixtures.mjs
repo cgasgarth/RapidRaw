@@ -1,13 +1,10 @@
 #!/usr/bin/env bun
 
-import { readFile } from 'node:fs/promises';
-
 import { deblurFixtureManifestSchema, parseDeblurFixtureManifest } from '../src/schemas/deblurFixtureSchemas.ts';
+import { expectInvalidCases, finishFixtureCheck, readJson } from './lib/fixture-checks.mjs';
 
 const MANIFEST_PATH = 'fixtures/detail/deblur-fixtures.json';
 const INVALID_PATH = 'fixtures/detail/invalid-deblur-fixtures.json';
-
-const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 
 const manifest = parseDeblurFixtureManifest(await readJson(MANIFEST_PATH));
 const invalidCases = await readJson(INVALID_PATH);
@@ -83,17 +80,17 @@ for (const fixture of rejectedFixtures) {
   }
 }
 
-for (const invalidCase of invalidCases) {
-  const result = deblurFixtureManifestSchema.safeParse(invalidCase.payload);
-  if (result.success) {
-    failures.push(`${invalidCase.case}: expected deblur fixture manifest rejection.`);
-  }
-}
+expectInvalidCases({
+  failures,
+  getPayload: (invalidCase) => invalidCase.payload,
+  invalidCases,
+  label: 'deblur fixture manifest',
+  schema: deblurFixtureManifestSchema,
+});
 
-if (failures.length > 0) {
-  console.error('Deblur fixture validation failed.');
-  console.error(failures.join('\n'));
-  process.exit(1);
-}
-
-console.log(`Validated ${manifest.fixtures.length} deblur fixtures and ${invalidCases.length} invalid cases.`);
+finishFixtureCheck({
+  failures,
+  invalidCount: invalidCases.length,
+  label: 'deblur fixtures',
+  validCount: manifest.fixtures.length,
+});
