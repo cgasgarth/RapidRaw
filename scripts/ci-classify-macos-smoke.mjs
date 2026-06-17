@@ -174,6 +174,7 @@ function isSafeFixturePath(path) {
     (path.startsWith('fixtures/film-simulation/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/layers/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/negative-lab/') && path.endsWith('.json')) ||
+    path.startsWith('fixtures/sidecar-roundtrip/') ||
     (path.startsWith('fixtures/validation/') && path.endsWith('.json'))
   );
 }
@@ -685,6 +686,11 @@ function runSelfTest() {
   assertClassification(
     'layer fixture outputs can skip smoke',
     ['fixtures/layers/layer-stack-operations.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'sidecar roundtrip fixture outputs can skip smoke',
+    ['fixtures/sidecar-roundtrip/IMG_0001.CR3.rrdata'],
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(

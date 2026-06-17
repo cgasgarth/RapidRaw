@@ -3705,6 +3705,174 @@ export const hdrMergeArtifactV1Schema = z
     validateHdrSourceState(artifact.sourceImageRefs, artifact.sourceState, context, ['sourceState']);
   });
 
+export const negativeLabSampleRectV1Schema = z
+  .object({
+    height: z.number().positive(),
+    width: z.number().positive(),
+    x: z.number().nonnegative(),
+    y: z.number().nonnegative(),
+  })
+  .strict();
+
+export const negativeLabDensityRgbV1Schema = z
+  .object({
+    b: z.number().min(0).max(4),
+    g: z.number().min(0).max(4),
+    r: z.number().min(0).max(4),
+  })
+  .strict();
+
+export const negativeLabRollFrameRoleV1Schema = z.enum(['base_fog_anchor', 'color_balance_anchor', 'density_anchor']);
+
+export const negativeLabRollSessionArtifactV1Schema = z
+  .object({
+    anchorFrames: z
+      .array(
+        z
+          .object({
+            frameId: z.string().trim().min(1),
+            path: z.string().trim().min(1),
+            role: negativeLabRollFrameRoleV1Schema,
+          })
+          .strict(),
+      )
+      .min(1),
+    appServerCommandVisibility: z
+      .object({
+        applyToolName: z.literal('negativelab.apply_planned_command'),
+        commandNames: z
+          .array(
+            z.enum([
+              'negative.lab.accept_batch_dry_run_plan',
+              'negative.lab.build_accepted_batch_apply',
+              'negative.lab.build_batch_dry_run_summary',
+              'negative.lab.build_conversion_plan',
+              'negative.lab.build_frame_health_report',
+              'negative.lab.build_qc_proof_report',
+            ]),
+          )
+          .min(1),
+        previewToolName: z.literal('negativelab.preview_conversion'),
+      })
+      .strict(),
+    createdAt: z.iso.datetime({ offset: true }),
+    family: z.literal('negative_lab_roll_session'),
+    migrationPolicy: z
+      .object({
+        currentShape: z.literal('negative_lab_roll_session_v1'),
+        forwardCompatibleRead: z.literal(true),
+        migrationNotes: z.array(z.string().trim().min(1)),
+        preserveUnknownFields: z.literal(true),
+      })
+      .strict(),
+    mutationSafety: z
+      .object({
+        acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+        acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
+        requiresAcceptedDryRunPlan: z.literal(true),
+      })
+      .strict(),
+    perFrameOverrides: z
+      .array(
+        z
+          .object({
+            baseFogSampleId: z.string().trim().min(1).nullable(),
+            exposureOffsetStops: z.number().min(-5).max(5),
+            frameId: z.string().trim().min(1),
+            path: z.string().trim().min(1),
+            presetId: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    positiveVariantProvenance: z
+      .array(
+        z
+          .object({
+            acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+            acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
+            commandId: z.string().trim().min(1),
+            outputArtifactId: z.string().trim().min(1),
+            sourceFrameId: z.string().trim().min(1),
+            variantId: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    rollId: z.string().regex(/^negative_lab_roll_[a-z0-9_]+$/u),
+    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    sessionId: z.string().regex(/^negative_lab_session_[a-z0-9_]+$/u),
+    sharedBaseFogSamples: z
+      .array(
+        z
+          .object({
+            confidence: z.number().min(0).max(1),
+            densityRgb: negativeLabDensityRgbV1Schema,
+            frameId: z.string().trim().min(1).nullable(),
+            rect: negativeLabSampleRectV1Schema,
+            sampleId: z.string().trim().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    sourceImagePaths: z.array(z.string().trim().min(1)).min(1),
+  })
+  .strict()
+  .superRefine((session, context) => {
+    const sourcePaths = new Set(session.sourceImagePaths);
+    const sampleIds = new Set(session.sharedBaseFogSamples.map((sample) => sample.sampleId));
+    const frameIds = new Set(session.perFrameOverrides.map((frame) => frame.frameId));
+
+    for (const [index, frame] of session.perFrameOverrides.entries()) {
+      if (!sourcePaths.has(frame.path)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab frame overrides must reference a source image path.',
+          path: ['perFrameOverrides', index, 'path'],
+        });
+      }
+
+      if (frame.baseFogSampleId !== null && !sampleIds.has(frame.baseFogSampleId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab frame overrides must reference a shared base/fog sample.',
+          path: ['perFrameOverrides', index, 'baseFogSampleId'],
+        });
+      }
+    }
+
+    for (const [index, anchor] of session.anchorFrames.entries()) {
+      if (!frameIds.has(anchor.frameId) || !sourcePaths.has(anchor.path)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab anchor frames must reference persisted roll frames.',
+          path: ['anchorFrames', index],
+        });
+      }
+    }
+
+    for (const [index, variant] of session.positiveVariantProvenance.entries()) {
+      if (!frameIds.has(variant.sourceFrameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab positive variants must reference persisted roll frames.',
+          path: ['positiveVariantProvenance', index, 'sourceFrameId'],
+        });
+      }
+
+      if (
+        variant.acceptedDryRunPlanId !== session.mutationSafety.acceptedDryRunPlanId ||
+        variant.acceptedDryRunPlanHash !== session.mutationSafety.acceptedDryRunPlanHash
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Negative Lab positive variants require the accepted dry-run identity.',
+          path: ['positiveVariantProvenance', index],
+        });
+      }
+    }
+  });
+
 export const focusStackBlendMethodV1Schema = z.enum(['depth_map', 'laplacian_pyramid', 'weighted_sharpness']);
 
 export const focusStackRetouchLayerPolicyV1Schema = z.enum(['none', 'generate_retouch_layer']);
@@ -9258,6 +9426,10 @@ export type HdrMergeInvalidationReasonV1 = z.infer<typeof hdrMergeInvalidationRe
 export type HdrMergeStaleStateV1 = z.infer<typeof hdrMergeStaleStateV1Schema>;
 export type HdrMergeWarningCodeV1 = z.infer<typeof hdrMergeWarningCodeV1Schema>;
 export type HdrMotionRiskV1 = z.infer<typeof hdrMotionRiskV1Schema>;
+export type NegativeLabDensityRgbV1 = z.infer<typeof negativeLabDensityRgbV1Schema>;
+export type NegativeLabRollFrameRoleV1 = z.infer<typeof negativeLabRollFrameRoleV1Schema>;
+export type NegativeLabRollSessionArtifactV1 = z.infer<typeof negativeLabRollSessionArtifactV1Schema>;
+export type NegativeLabSampleRectV1 = z.infer<typeof negativeLabSampleRectV1Schema>;
 export type FocusStackArtifactV1 = z.infer<typeof focusStackArtifactV1Schema>;
 export type FocusStackBlendMethodV1 = z.infer<typeof focusStackBlendMethodV1Schema>;
 export type FocusStackInvalidationReasonV1 = z.infer<typeof focusStackInvalidationReasonV1Schema>;
