@@ -117,6 +117,10 @@ assertEqual(dryRun.provenance.alignmentTransforms[0]?.role, 'reference', 'refere
 assertEqual(dryRun.provenance.alignmentTransforms[2]?.translationY, -1, 'third transform y');
 assertEqual(dryRun.provenance.blendSourceCoverage.length, frames.length, 'blend source coverage count');
 assertEqual(dryRun.provenance.blendSourceCoverage[1]?.coveredAreaPx, (WIDTH / 3) * HEIGHT, 'middle coverage area');
+assertEqual(dryRun.provenance.qualityMetrics.averageWinningConfidence, 1, 'average winning confidence');
+assertEqual(dryRun.provenance.qualityMetrics.lowConfidenceAreaRatio, 0, 'low confidence area ratio');
+assertEqual(dryRun.provenance.qualityMetrics.outputPixelCount, WIDTH * HEIGHT, 'quality output pixels');
+assertEqual(dryRun.provenance.qualityMetrics.retouchLayerRecommended, true, 'retouch recommended');
 assertEqual(dryRun.provenance.sharpnessSettings.cellCount, cells.length, 'sharpness cell count');
 assertEqual(dryRun.provenance.sharpnessSettings.weightPower, 5, 'sharpness weight power');
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
@@ -155,6 +159,7 @@ console.log(
       fixture: 'synthetic_focus_runtime_plan_v1',
       focusCoverageRatio: dryRun.provenance.focusCoverageRatio,
       outputSha256: outputHash,
+      qualityMetrics: dryRun.provenance.qualityMetrics,
       sharpnessSettings: dryRun.provenance.sharpnessSettings,
       warnings: dryRun.dryRunResult.warnings,
     },
