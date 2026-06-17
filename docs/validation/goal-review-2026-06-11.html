@@ -236,7 +236,7 @@
     <main class="page">
       <header>
         <div class="meta">
-          <span class="pill">Snapshot: 2026-06-16</span>
+          <span class="pill">Snapshot: 2026-06-17</span>
           <span class="pill">Issue: #1259</span>
           <span class="pill">Local review artifact</span>
           <span class="pill">Offline-first</span>
@@ -337,8 +337,8 @@
               <td>Image-processing proof</td>
               <td><span class="status partial">Synthetic proof</span></td>
               <td>
-                CPU/synthetic checks exist for HDR, focus stack, panorama planning, super-resolution budgets, and detail
-                tools.
+                Runtime apply checks now render synthetic HDR, panorama, focus stack, and super-resolution outputs with
+                app-server/UI bridge coverage and output-derived artifact hashes.
               </td>
               <td>Real RAW before/after proof and export parity remain required before feature completion.</td>
             </tr>
@@ -360,27 +360,40 @@
           <tbody>
             <tr>
               <td>HDR merge workspace</td>
-              <td><span class="status partial">UI/API proof</span></td>
-              <td>PR #1428, <code>bun run check:hdr-ui-smoke</code>, <code>bun run check:hdr-ui-api</code>.</td>
-              <td>Real bracket merge, preview/export parity, and deghost quality gates.</td>
+              <td><span class="status partial">Runtime apply proof</span></td>
+              <td>
+                PRs #1586 and #1592, <code>bun run check:hdr-runtime-plan-smoke</code>,
+                <code>bun run check:hdr-app-server-runtime</code>, <code>bun run check:hdr-ui-runtime-bridge</code>.
+              </td>
+              <td>Real bracket merge, preview/export parity, tone mapping, and deghost quality gates.</td>
             </tr>
             <tr>
               <td>Panorama workspace</td>
-              <td><span class="status partial">UI proof</span></td>
-              <td>PR #1429, <code>bun run check:panorama-ui-smoke</code>, fixture and parity checks.</td>
-              <td>Rendered seam/exposure output, tiling path, and real photo validation.</td>
+              <td><span class="status partial">Runtime apply proof</span></td>
+              <td>
+                PRs #1588 and #1590, <code>bun run check:panorama-runtime-plan-smoke</code>,
+                <code>bun run check:panorama-app-server-runtime</code>,
+                <code>bun run check:panorama-ui-runtime-bridge</code>.
+              </td>
+              <td>Production seam search, projection engines, tiling path, and real photo validation.</td>
             </tr>
             <tr>
               <td>Focus stack workspace</td>
-              <td><span class="status partial">UI proof</span></td>
-              <td>PR #1430, <code>bun run check:focus-ui-smoke</code>, synthetic focus fixture checks.</td>
-              <td>Final stack render, depth/halo controls, retouch artifact, and RAW fixture proof.</td>
+              <td><span class="status partial">Runtime apply proof</span></td>
+              <td>
+                PRs #1587 and #1591, <code>bun run check:focus-runtime-plan-smoke</code>,
+                <code>bun run check:focus-app-server-runtime</code>, <code>bun run check:focus-ui-runtime-bridge</code>.
+              </td>
+              <td>Depth-map/laplacian production blending, halo controls, and RAW fixture proof.</td>
             </tr>
             <tr>
               <td>Super-resolution workspace</td>
-              <td><span class="status partial">UI proof</span></td>
-              <td>PR #1431, <code>bun run check:sr-ui-smoke</code>, performance fixture budgets.</td>
-              <td>Conservative final output, multi-frame alignment proof, and artifact quality validation.</td>
+              <td><span class="status partial">Runtime apply proof</span></td>
+              <td>
+                PR #1589, <code>bun run check:sr-runtime-plan-smoke</code>,
+                <code>bun run check:sr-app-server-runtime</code>, <code>bun run check:sr-ui-runtime-bridge</code>.
+              </td>
+              <td>Model/optical-flow SR, artifact quality review, and real burst RAW validation.</td>
             </tr>
             <tr>
               <td>Color workflow</td>
@@ -517,6 +530,26 @@
               <td>Unsafe casts</td>
               <td><code>bun run check:unsafe-casts</code></td>
               <td>Bans unsafe TypeScript cast escape hatches such as <code>as unknown as</code>.</td>
+            </tr>
+            <tr>
+              <td>HDR runtime apply</td>
+              <td><code>bun run check:hdr-runtime-plan-smoke</code></td>
+              <td>Synthetic aligned HDR render, deghost mask, app-server bridge, and output artifact hash proof.</td>
+            </tr>
+            <tr>
+              <td>Panorama runtime apply</td>
+              <td><code>bun run check:panorama-runtime-plan-smoke</code></td>
+              <td>Synthetic stitch output, durable artifact hash, and stitch setting provenance proof.</td>
+            </tr>
+            <tr>
+              <td>Focus runtime apply</td>
+              <td><code>bun run check:focus-runtime-plan-smoke</code></td>
+              <td>Weighted-sharpness output, depth/sharpness/retouch artifact hashes, and app-server bridge proof.</td>
+            </tr>
+            <tr>
+              <td>Super-resolution runtime apply</td>
+              <td><code>bun run check:sr-runtime-plan-smoke</code></td>
+              <td>Pixel-shift render, frame registrations, confidence artifact hash, and improvement-ratio proof.</td>
             </tr>
             <tr>
               <td>Sidecar fixture</td>
