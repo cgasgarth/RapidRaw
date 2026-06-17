@@ -155,6 +155,26 @@ export function cloneSubMaskForPaste(
   return clonedSubMask;
 }
 
+export function createInvertedSubMaskContainer<TContainer extends MaskLikeContainer>({
+  cloneContainer,
+  cloneSubMask,
+  invertedName,
+  parentContainer,
+  subMask,
+}: {
+  cloneContainer: (container: TContainer) => TContainer;
+  cloneSubMask: (subMask: SubMask) => SubMask;
+  invertedName: string;
+  parentContainer: TContainer;
+  subMask: SubMask;
+}): TContainer {
+  const newContainer = cloneContainer(parentContainer);
+  newContainer.name = invertedName;
+  newContainer.subMasks = [cloneSubMask(subMask)];
+  newContainer.invert = false;
+  return newContainer;
+}
+
 export function insertMaskContainerAt(
   containers: Array<MaskContainer>,
   container: MaskContainer,
@@ -186,4 +206,12 @@ export function insertSubMaskAt<TSubMask extends SubMask>(
   const targetIndex = Math.max(0, Math.min(insertIndex, nextSubMasks.length));
   nextSubMasks.splice(targetIndex, 0, subMask);
   return nextSubMasks;
+}
+
+export function getMaskLikeInsertAfterIndex(
+  containers: Array<MaskListContainer>,
+  containerId: string,
+): number | undefined {
+  const containerIndex = containers.findIndex((container) => container.id === containerId);
+  return containerIndex >= 0 ? containerIndex + 1 : undefined;
 }
