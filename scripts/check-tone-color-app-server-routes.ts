@@ -81,6 +81,23 @@ if (!parsedWhiteBalanceCommand.success || parsedWhiteBalanceCommand.data.command
   failures.push('Tone-color white balance command does not validate the custom Kelvin/tint route type.');
 }
 
+const parsedHslCommand = toneColorCommandEnvelopeV1Schema.safeParse({
+  ...sampleToneColorCommandEnvelopeV1,
+  commandId: 'command_tone_color_hsl_preview_sample',
+  commandType: 'toneColor.adjustHsl',
+  correlationId: 'corr_tone_color_hsl_preview_sample',
+  idempotencyKey: 'idem_tone_color_hsl_preview_sample',
+  parameters: {
+    band: 'orange',
+    hueShiftDegrees: -4,
+    luminance: 6,
+    saturation: 10,
+  },
+});
+if (!parsedHslCommand.success || parsedHslCommand.data.commandType !== 'toneColor.adjustHsl') {
+  failures.push('Tone-color HSL command does not validate the color-mixer route type.');
+}
+
 const parsedLevelsCommand = toneColorCommandEnvelopeV1Schema.safeParse({
   ...sampleToneColorCommandEnvelopeV1,
   commandId: 'command_tone_color_levels_preview_sample',
@@ -170,6 +187,7 @@ if (
 for (const commandType of [
   'toneColor.setToneCurve',
   'toneColor.setWhiteBalance',
+  'toneColor.adjustHsl',
   'toneColor.setLevels',
   'toneColor.setChannelMixer',
   'toneColor.setColorBalanceRgb',

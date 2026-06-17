@@ -867,6 +867,12 @@ export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorD
       value: 8,
     },
     {
+      module: 'hsl',
+      path: '/parameters/orange/saturation',
+      previousValue: 0,
+      value: 10,
+    },
+    {
       module: 'levels',
       path: '/parameters/gamma',
       previousValue: 1,

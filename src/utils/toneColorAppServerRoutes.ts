@@ -67,6 +67,27 @@ export const TONE_COLOR_APP_SERVER_ROUTE_MANIFEST = toneColorAppServerRouteManif
       toolName: 'tonecolor.apply_command',
     },
     {
+      commandType: 'toneColor.adjustHsl',
+      executionMode: 'dry_run_command',
+      inputSchemaName,
+      outputSchemaName: 'ToneColorDryRunResultV1',
+      reason: 'HSL color mixer dry-runs use the generic tone/color command tool with selective color range validation.',
+      runtimeCheckScript: 'check:selective-color-ranges',
+      status: 'mapped',
+      toolName: 'tonecolor.dry_run_command',
+    },
+    {
+      commandType: 'toneColor.adjustHsl',
+      executionMode: 'apply_dry_run_plan',
+      inputSchemaName,
+      outputSchemaName: 'ToneColorMutationResultV1',
+      reason:
+        'HSL color mixer applies reuse the approved tone/color apply tool and persist an undoable edit graph update.',
+      runtimeCheckScript: 'check:selective-color-ranges',
+      status: 'mapped',
+      toolName: 'tonecolor.apply_command',
+    },
+    {
       commandType: 'toneColor.setLevels',
       executionMode: 'dry_run_command',
       inputSchemaName,
