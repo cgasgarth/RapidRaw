@@ -109,10 +109,11 @@ export const buildFocusStackRuntimeDryRunV1 = (requestValue: unknown): FocusStac
   const runtime = renderFocusStackRuntime(request);
   const planId = `focus_stack_plan_${request.command.commandId}`;
   const planHash = `sha256:${stableFocusRuntimeHash(`${planId}:${runtime.provenance.blendMethod}`)}`;
+  const renderedContentHash = hashFocusRuntimePixels(runtime.outputPixels);
   const previewArtifacts = [
     {
       artifactId: request.previewArtifactId,
-      contentHash: `sha256:${stableFocusRuntimeHash(`${planHash}:preview`)}`,
+      contentHash: `sha256:${stableFocusRuntimeHash(`${planHash}:${request.previewArtifactId}:${renderedContentHash}`)}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
@@ -172,10 +173,13 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
     throw new Error('Focus stack runtime apply requires an accepted dry-run plan id and hash.');
   }
 
+  const renderedContentHash = hashFocusRuntimePixels(runtime.outputPixels);
   const outputArtifacts: ArtifactHandleV1[] = [
     {
       artifactId: request.outputArtifactId,
-      contentHash: `sha256:${stableFocusRuntimeHash(`${acceptedDryRunPlanHash}:${request.outputArtifactId}`)}`,
+      contentHash: `sha256:${stableFocusRuntimeHash(
+        `${acceptedDryRunPlanHash}:${request.outputArtifactId}:${renderedContentHash}`,
+      )}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
@@ -185,7 +189,9 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
     },
     {
       artifactId: request.sharpnessMapArtifactId,
-      contentHash: `sha256:${stableFocusRuntimeHash(`${acceptedDryRunPlanHash}:${request.sharpnessMapArtifactId}`)}`,
+      contentHash: `sha256:${stableFocusRuntimeHash(
+        `${acceptedDryRunPlanHash}:${request.sharpnessMapArtifactId}:${renderedContentHash}`,
+      )}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
@@ -195,7 +201,9 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
     },
     {
       artifactId: request.depthConfidenceArtifactId,
-      contentHash: `sha256:${stableFocusRuntimeHash(`${acceptedDryRunPlanHash}:${request.depthConfidenceArtifactId}`)}`,
+      contentHash: `sha256:${stableFocusRuntimeHash(
+        `${acceptedDryRunPlanHash}:${request.depthConfidenceArtifactId}:${renderedContentHash}`,
+      )}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
@@ -210,7 +218,9 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
     }
     outputArtifacts.push({
       artifactId: request.retouchLayerArtifactId,
-      contentHash: `sha256:${stableFocusRuntimeHash(`${acceptedDryRunPlanHash}:${request.retouchLayerArtifactId}`)}`,
+      contentHash: `sha256:${stableFocusRuntimeHash(
+        `${acceptedDryRunPlanHash}:${request.retouchLayerArtifactId}:${renderedContentHash}`,
+      )}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
@@ -394,6 +404,15 @@ const stableFocusRuntimeHash = (input: string): string => {
   let value = 2166136261;
   for (let index = 0; index < input.length; index += 1) {
     value ^= input.charCodeAt(index);
+    value = Math.imul(value, 16777619) >>> 0;
+  }
+  return value.toString(16).padStart(8, '0');
+};
+
+const hashFocusRuntimePixels = (pixels: Float32Array): string => {
+  let value = 2166136261;
+  for (const pixel of pixels) {
+    value ^= Math.round(pixel * 1_000_000);
     value = Math.imul(value, 16777619) >>> 0;
   }
   return value.toString(16).padStart(8, '0');
