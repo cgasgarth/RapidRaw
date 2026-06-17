@@ -84,7 +84,7 @@ bun run deps:audit:check
 bun run deps:audit:js
 bun run deps:audit:rust
 bun run check:unsafe-casts
-bun run check:lint -- scripts/audit-dependency-versions.mjs
+bun run check:lint -- scripts/audit-dependency-versions.ts
 bun run docs:check
 git diff --check
 ```

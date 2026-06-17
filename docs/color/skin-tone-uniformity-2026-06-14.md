@@ -27,8 +27,8 @@ partial-uniformity, and full-target behavior.
 
 - `bun run check:skin-tone-uniformity`
 - `bun run check:types`
-- `bunx eslint src/utils/skinToneUniformity.ts scripts/check-skin-tone-uniformity.mjs --max-warnings 0`
+- `bunx eslint src/utils/skinToneUniformity.ts scripts/check-skin-tone-uniformity.ts --max-warnings 0`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check src/utils/skinToneUniformity.ts scripts/check-skin-tone-uniformity.mjs fixtures/color/skin-tone-uniformity-fixtures.json docs/color/skin-tone-uniformity-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
-- `bun scripts/check-markdown-links.mjs`
+- `bunx prettier --check src/utils/skinToneUniformity.ts scripts/check-skin-tone-uniformity.ts fixtures/color/skin-tone-uniformity-fixtures.json docs/color/skin-tone-uniformity-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
+- `bun scripts/check-markdown-links.ts`
 - `git diff --check`

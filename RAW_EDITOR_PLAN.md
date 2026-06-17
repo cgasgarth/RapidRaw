@@ -3815,7 +3815,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `tooling(casts): make unsafe-cast ban AST-backed`
   - Issue: #1299
   - Docs: `docs/tooling/unsafe-cast-ast-guard-2026-06-15.md`
-  - Validation: `bun scripts/check-unsafe-casts.mjs --self-test`, `bun run check:unsafe-casts`
+  - Validation: `bun scripts/check-unsafe-casts.ts --self-test`, `bun run check:unsafe-casts`
   - Status: guard hardening only; no runtime product behavior change.
 - `tooling(eslint): define allowed escape hatches`
 - `tooling(check): add local check scripts mirroring CI`
@@ -3853,13 +3853,13 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `audit(gpu): document current GPU and shader pipeline`
 - `audit(layers): document current layer and mask model`
   - Docs: `docs/baseline/rapidraw-layer-mask-model-audit-2026-06-15.md`
-  - Validation: `scripts/check-layer-mask-model-audit.mjs`
+  - Validation: `scripts/check-layer-mask-model-audit.ts`
   - Runtime status: audit only; current mask-container layer model and graph-native gaps are documented.
 - `audit(ai): document current AI and generative hooks`
 - `validation(sidecar): add sidecar roundtrip tests`
 - `validation(history): add edit history replay tests`
   - Docs: `docs/validation/edit-history-replay-2026-06-15.md`
-  - Validation: `scripts/check-edit-history-replay.mjs`
+  - Validation: `scripts/check-edit-history-replay.ts`
   - Runtime status: current in-memory editor history push, undo, redo, jump, branch truncation, and 50-entry bound are helper-backed and fixture-validated; graph-native command replay remains future work.
 - `validation(render): add baseline render smoke tests`
 - `validation(fixtures): add fixture download policy`
@@ -3868,7 +3868,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `validation(render): add image artifact comparison script`
   - Issue: #69
   - Docs: `docs/validation/render-artifact-comparison-2026-06-15.md`
-  - Validation: `scripts/check-render-artifact-comparison.mjs`
+  - Validation: `scripts/check-render-artifact-comparison.ts`
   - Runtime status: synthetic PPM artifact comparison foundation; renderer-produced RAW artifacts remain follow-up work.
 - `validation(performance): add performance smoke script`
 
@@ -3937,7 +3937,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `api(commands): add edit command bus`
 - `api(commands): route representative UI operations through command bus`
 - `api(history): add undo redo command tests`
-  - Validation: `scripts/check-edit-graph-history-commands.mjs`
+  - Validation: `scripts/check-edit-graph-history-commands.ts`
 - `api(cli): add headless render command`
 - `docs(api): document edit command API`
 
@@ -3945,7 +3945,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 
 - `color(audit): audit current RapidRAW color pipeline`
   - Audit: `docs/color/current-color-pipeline-audit-2026-06-15.md`
-  - Validation: `scripts/check-color-pipeline-audit.mjs`
+  - Validation: `scripts/check-color-pipeline-audit.ts`
   - Runtime status: audit/doc guard only; no pixel-path changes.
 - `color(adr): decide working color space`
   - ADR: `docs/color/working-color-space-adr-2026-06-14.md`
@@ -3973,7 +3973,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `color(gamut): add gamut mapping plan`
   - Design: `docs/color/gamut-mapping-plan-2026-06-15.md`
   - Fixtures: `fixtures/color/gamut-mapping-fixtures.json`
-  - Validation: `scripts/check-gamut-mapping-fixtures.mjs`
+  - Validation: `scripts/check-gamut-mapping-fixtures.ts`
   - Runtime status: schema/fixture contract only; preview/export pixel mapping remains future work.
 
 #### Milestone 6: Capture One-Class Color Editing
@@ -4030,11 +4030,11 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Runtime status: add/subtract/intersect weight composition is typed, clamped, and fixture-validated; renderer integration remains future work.
 - `masks(refine): add feather density and edge refine`
   - Docs: `docs/layers/mask-refinement-runtime-2026-06-15.md`
-  - Validation: `scripts/check-mask-refinement-parameters.mjs`
+  - Validation: `scripts/check-mask-refinement-parameters.ts`
 - 2026-06-15: Added runtime-backed mask refinement controls to the masks panel.
   - Issue: #1245
   - Docs: `docs/layers/mask-refinement-controls-2026-06-15.md`
-  - Validation: `scripts/check-mask-refinement-controls.mjs`
+  - Validation: `scripts/check-mask-refinement-controls.ts`
   - Status: UI-to-runtime plumbing; real-image quality tuning remains a follow-up.
 - 2026-06-15: Added typed mask refinement command schema and sample payload.
   - Issue: #1258
@@ -4044,15 +4044,15 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
   - Runtime status: feather, density, edge shift, smoothness, and edge contrast schemas plus refined weight evaluation are fixture-validated and wired into the Rust mask renderer; user-facing controls remain future work.
 - `masks(overlay): add mask overlay modes`
   - Docs: `docs/layers/mask-overlay-runtime-2026-06-15.md`
-  - Validation: `scripts/check-mask-overlay-modes.mjs`
+  - Validation: `scripts/check-mask-overlay-modes.ts`
   - Runtime status: rubylith, green, blue, white, black, grayscale, inverse, edge, and hidden overlay modes are schema-backed, fixture-validated for preview color evaluation, and wired into the live `generate_mask_overlay` command; user-facing UI controls remain future work.
 - `masks(copy): add mask copy paste`
   - Docs: `docs/layers/mask-copy-paste-runtime-2026-06-15.md`
-  - Validation: `scripts/check-mask-copy-paste.mjs`
+  - Validation: `scripts/check-mask-copy-paste.ts`
   - Runtime status: masks panel context menus expose copy/paste/paste-adjustments and helper fixtures validate clone, insert, invert, rename, and reset-adjustment behavior; typed command/API routing remains future work.
 - `masks(ai): audit subject sky background masks`
   - Docs: `docs/layers/ai-mask-capability-audit-2026-06-15.md`
-  - Validation: `scripts/check-ai-mask-capabilities.mjs`
+  - Validation: `scripts/check-ai-mask-capabilities.ts`
   - Runtime status: subject, sky, foreground, depth, and derived background capability coverage is schema-backed, fixture-validated, and checked against frontend invoke commands plus Rust command/render branches; runtime quality benchmarking remains future work.
 - `masks(ai): research people and parts masks`
   - Consult: 2026-06-14 RapidRaw Pro Extended consultation recommended a staged path: schema contract, deterministic fake provider, render/apply plumbing, dry-run UI, then macOS whole-person runtime before fine portrait parts.
@@ -4267,7 +4267,7 @@ This index is the seed list for future GitHub issue creation. Detailed issue bod
 - `api(sr): add super-resolution API tools`
 - `validation(sr): add performance tests`
   - Doc: `docs/super-resolution/performance-validation-contract-2026-06-14.md`
-  - Script: `scripts/check-super-resolution-performance-fixtures.mjs`
+  - Script: `scripts/check-super-resolution-performance-fixtures.ts`
   - Fixture manifest: `docs/validation/super-resolution-performance-fixtures.json`
 - `validation(sr): add visual artifact review checklist`
   - Doc: `docs/super-resolution/visual-artifact-review-checklist-2026-06-14.md`

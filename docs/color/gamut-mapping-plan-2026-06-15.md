@@ -81,6 +81,6 @@ Fixture classification is computed from `destinationLinearRgbBeforeMap`:
 - `bun run check:deltae-fixtures`
 - `bun run check:color-cpu-gpu-parity`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check docs/color/gamut-mapping-plan-2026-06-15.md fixtures/color/gamut-mapping-fixtures.json scripts/check-gamut-mapping-fixtures.mjs packages/rawengine-schema/src/rawEngineSchemas.ts docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json scripts/run-compact-checks.mjs`
-- `bun scripts/check-markdown-links.mjs`
+- `bunx prettier --check docs/color/gamut-mapping-plan-2026-06-15.md fixtures/color/gamut-mapping-fixtures.json scripts/check-gamut-mapping-fixtures.ts packages/rawengine-schema/src/rawEngineSchemas.ts docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json scripts/run-compact-checks.ts`
+- `bun scripts/check-markdown-links.ts`
 - `git diff --check`

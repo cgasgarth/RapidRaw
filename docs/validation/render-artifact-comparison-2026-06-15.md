@@ -1,7 +1,7 @@
 # Render Artifact Comparison
 
 - Issue: #69 `validation(render): add image artifact comparison script`
-- Script: `scripts/check-render-artifact-comparison.mjs`
+- Script: `scripts/check-render-artifact-comparison.ts`
 - Fixture manifest: `fixtures/render/artifact-comparison-cases.json`
 
 ## Scope

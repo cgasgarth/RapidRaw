@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import process from 'node:process';
 
 const SCRIPT_DIR = 'scripts';
-const MAX_SCRIPTS_WITHOUT_TS_CHECK = 160;
+const MAX_SCRIPTS_WITHOUT_TS_CHECK = 0;
 
 type ScriptSource = {
   path: string;
@@ -30,12 +30,12 @@ export const collectScriptTypeCoverage = (files: readonly ScriptSource[]) => {
 
 const runSelfTest = (): void => {
   const result = collectScriptTypeCoverage([
-    { path: 'scripts/typed.mjs', source: '#!/usr/bin/env bun\n// @ts-check\n' },
-    { path: 'scripts/untyped.mjs', source: '#!/usr/bin/env bun\nconsole.log(1);\n' },
+    { path: 'scripts/typed.js', source: '#!/usr/bin/env bun\n// @ts-check\n' },
+    { path: 'scripts/untyped.js', source: '#!/usr/bin/env bun\nconsole.log(1);\n' },
     { path: 'scripts/typed.ts', source: '#!/usr/bin/env bun\nconsole.log(1);\n' },
   ]);
 
-  if (result.typedCount !== 2 || result.totalCount !== 3 || result.missingTsCheck[0]?.path !== 'scripts/untyped.mjs') {
+  if (result.typedCount !== 2 || result.totalCount !== 3 || result.missingTsCheck[0]?.path !== 'scripts/untyped.js') {
     throw new Error('script type coverage self-test failed');
   }
 
@@ -56,7 +56,7 @@ const collectFiles = (directory: string): string[] =>
     .sort();
 
 const scriptFiles = collectFiles(SCRIPT_DIR)
-  .filter((path) => path.endsWith('.js') || path.endsWith('.mjs') || path.endsWith('.ts'))
+  .filter((path) => path.endsWith('.js') || path.endsWith('.ts'))
   .map((path) => ({ path, source: readFileSync(path, 'utf8') }));
 
 const coverage = collectScriptTypeCoverage(scriptFiles);

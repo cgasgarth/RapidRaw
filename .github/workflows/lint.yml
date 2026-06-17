@@ -208,7 +208,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          bun scripts/ci-classify-macos-smoke.mjs ${{ steps.macos-smoke-files.outputs.args }} > .macos-smoke.outputs
+          bun scripts/ci-classify-macos-smoke.ts ${{ steps.macos-smoke-files.outputs.args }} > .macos-smoke.outputs
           cat .macos-smoke.outputs >> "$GITHUB_OUTPUT"
           cat .macos-smoke.outputs
 
@@ -285,7 +285,7 @@ jobs:
 
       - name: Classify Rust requirement
         id: rust-pr-decision
-        run: bun scripts/ci-classify-rust-pr.mjs ${{ steps.rust-pr-files.outputs.args }}
+        run: bun scripts/ci-classify-rust-pr.ts ${{ steps.rust-pr-files.outputs.args }}
 
       - name: Install Tauri Linux dependencies
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
@@ -351,7 +351,7 @@ jobs:
 
       - name: Classify Rust requirement
         id: rust-pr-decision
-        run: bun scripts/ci-classify-rust-pr.mjs ${{ steps.rust-pr-files.outputs.args }}
+        run: bun scripts/ci-classify-rust-pr.ts ${{ steps.rust-pr-files.outputs.args }}
 
       - name: Install Tauri Linux dependencies
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'

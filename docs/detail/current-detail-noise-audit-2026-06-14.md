@@ -41,5 +41,5 @@ This audit records the current RapidRAW detail, sharpening, noise, dehaze, and c
 ## Validation
 
 - `bunx prettier --check docs/detail/current-detail-noise-audit-2026-06-14.md docs/index.md docs/site-navigation.json`
-- `bun scripts/check-markdown-links.mjs`
+- `bun scripts/check-markdown-links.ts`
 - `git diff --check`

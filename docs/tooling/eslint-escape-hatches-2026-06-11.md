@@ -18,7 +18,7 @@ strings and ordinary code text cannot satisfy or trip the policy.
 ## Validation
 
 ```sh
-bun scripts/check-eslint-escape-hatches.mjs --self-test
+bun scripts/check-eslint-escape-hatches.ts --self-test
 bun run check:lint-escapes
 ```
 

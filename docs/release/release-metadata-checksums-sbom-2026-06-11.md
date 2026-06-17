@@ -15,11 +15,11 @@ and a source dependency SBOM before signing/notarization is enforced.
 Each reusable build job writes release metadata under
 `$RUNNER_TEMP/release-metadata`.
 
-| File                      | Producer                                | Scope                                                                   |
-| ------------------------- | --------------------------------------- | ----------------------------------------------------------------------- |
-| `*_checksums.sha256`      | `scripts/generate-release-metadata.mjs` | SHA-256 hashes for matched release artifact files in that platform row. |
-| `*_release-metadata.json` | `scripts/generate-release-metadata.mjs` | Machine-readable list of matched files and their SHA-256 hashes.        |
-| `source_sbom.spdx.json`   | GitHub dependency graph SBOM API        | Source dependency SBOM generated once from the Apple Silicon macOS row. |
+| File                      | Producer                               | Scope                                                                   |
+| ------------------------- | -------------------------------------- | ----------------------------------------------------------------------- |
+| `*_checksums.sha256`      | `scripts/generate-release-metadata.ts` | SHA-256 hashes for matched release artifact files in that platform row. |
+| `*_release-metadata.json` | `scripts/generate-release-metadata.ts` | Machine-readable list of matched files and their SHA-256 hashes.        |
+| `source_sbom.spdx.json`   | GitHub dependency graph SBOM API       | Source dependency SBOM generated once from the Apple Silicon macOS row. |
 
 ## Upload Behavior
 

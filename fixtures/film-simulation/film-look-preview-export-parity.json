@@ -40,6 +40,6 @@
     "kind": "synthetic-film-look-preview-export-parity",
     "scene": "ramp-color-chips-highlight-edge"
   },
-  "generatedFrom": "scripts/check-film-look-preview-export-parity.mjs",
+  "generatedFrom": "scripts/check-film-look-preview-export-parity.ts",
   "version": 1
 }

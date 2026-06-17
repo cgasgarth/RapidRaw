@@ -22,7 +22,7 @@ const recentLogMap = new Map<string, number>();
 let isInstalled = false;
 
 function installViteErrorForwarding(): void {
-  void import('./viteHotContext.mjs')
+  void import('./viteHotContext.mts')
     .then(({ onViteError }) => {
       onViteError((payload: unknown) => {
         const err = isPlainRecord(payload) ? (getRecordField(payload, 'err') ?? payload) : payload;

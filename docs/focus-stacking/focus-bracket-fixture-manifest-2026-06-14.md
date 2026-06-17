@@ -139,7 +139,7 @@ Every fixture set must include:
 The first deterministic synthetic fixture manifest and generator live at:
 
 - `fixtures/focus-stacking/focus-synthetic-bracket-fixtures.json`
-- `scripts/check-focus-synthetic-fixtures.mjs`
+- `scripts/check-focus-synthetic-fixtures.ts`
 
 They generate tiny temporary PPM sources during validation and verify stable
 fixture hashes. They do not commit raster assets or claim runtime focus-stack

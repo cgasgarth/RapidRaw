@@ -82,5 +82,5 @@ or color-science math.
 - `bun run check:color-pipeline-audit`
 - `bun run docs:check`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check docs/color/current-color-pipeline-audit-2026-06-15.md scripts/check-color-pipeline-audit.mjs docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json scripts/run-compact-checks.mjs`
+- `bunx prettier --check docs/color/current-color-pipeline-audit-2026-06-15.md scripts/check-color-pipeline-audit.ts docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json scripts/run-compact-checks.ts`
 - `git diff --check`
