@@ -1,5 +1,35 @@
 {
   "version": 1,
+  "runtimeExpectations": [
+    {
+      "presetId": "color_grading.cinematic.teal_warm.v1",
+      "inputRgb": {
+        "red": 0.31,
+        "green": 0.42,
+        "blue": 0.52
+      },
+      "expectedRgb": {
+        "red": 0.30836835182035216,
+        "green": 0.5203978221796479,
+        "blue": 0.49866573076269893
+      },
+      "tolerance": 1e-12
+    },
+    {
+      "presetId": "color_grading.portrait.clean_warmth.v1",
+      "inputRgb": {
+        "red": 0.66,
+        "green": 0.51,
+        "blue": 0.44
+      },
+      "expectedRgb": {
+        "red": 0.6626978081592627,
+        "green": 0.4403970086407374,
+        "blue": 0.5379156337492643
+      },
+      "tolerance": 1e-12
+    }
+  ],
   "presets": [
     {
       "version": 1,
