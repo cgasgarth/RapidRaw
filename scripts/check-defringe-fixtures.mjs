@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { defringeFixtureSchema, parseDefringeFixtures } from '../src/schemas/defringeSchemas.ts';
-import { addDuplicateFieldFailures, expectInvalidCases, finishFixtureCheck, readJson } from './lib/fixture-checks.mjs';
+import { addDuplicateFieldFailures, expectInvalidCases, finishFixtureCheck, readJson } from './lib/fixture-checks.ts';
 
 const fixtures = parseDefringeFixtures(await readJson('fixtures/detail/defringe-fixtures.json'));
 const invalidCases = await readJson('fixtures/detail/invalid-defringe-fixtures.json');

@@ -104,6 +104,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set(['bun scripts/capture-visual-smoke.mjs --scenario command-palette-workflows']),
   ],
   ['check:colorchecker-fixtures', new Set(['bun scripts/check-colorchecker-fixtures.ts'])],
+  ['check:capture-sharpening', new Set(['bun scripts/check-capture-sharpening-fixtures.ts'])],
   ['check:export-recipes-ui', new Set(['bun scripts/check-export-recipes-ui.ts'])],
   ['check:film-look-browser-smoke', new Set(['bun scripts/capture-visual-smoke.mjs --scenario film-look-browser'])],
   ['check:focus-ui-api', new Set(['bun scripts/check-focus-ui-api.mjs'])],
@@ -120,11 +121,13 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:negative-lab-fixtures:update', new Set(['bun scripts/check-negative-lab-fixtures.mjs --update'])],
   ['check:negative-lab-frame-health', new Set(['bun scripts/check-negative-lab-frame-health-report.mjs'])],
   ['check:negative-lab-ui-presets', new Set(['bun scripts/check-negative-lab-ui-presets.mjs'])],
+  ['check:output-sharpening', new Set(['bun scripts/check-output-sharpening-fixtures.ts'])],
   ['check:mask-refine-command-ui', new Set(['bun scripts/check-mask-refinement-command-ui.ts'])],
   ['check:mask-refine-controls', new Set(['bun scripts/check-mask-refinement-controls.ts'])],
   ['check:private-raw-evidence', new Set(['bun scripts/check-private-raw-evidence-ledger.mjs'])],
   ['check:public-fixture-manifest', new Set(['bun scripts/check-public-fixture-manifest.ts'])],
   ['check:raw-open-edit-export-proof', new Set(['bun scripts/check-raw-open-edit-export-proof.mjs'])],
+  ['check:reference-images', new Set(['bun scripts/check-reference-image-fixtures.ts'])],
   [
     'check:negative-lab-workspace-smoke',
     new Set(['bun scripts/capture-visual-smoke.mjs --scenario negative-lab-workspace']),
@@ -164,6 +167,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['check:sr-synthetic-smoke', new Set(['bun scripts/check-super-resolution-synthetic-smoke.mjs'])],
   ['check:tauri-schema-validation', new Set(['bun scripts/check-tauri-schema-validation.ts'])],
+  ['check:wavelet-detail', new Set(['bun scripts/check-wavelet-detail-fixtures.ts'])],
   ['check:workspace-layouts', new Set(['bun scripts/check-workspace-layout-fixtures.ts'])],
 ]);
 

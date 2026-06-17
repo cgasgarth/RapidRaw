@@ -1,15 +1,21 @@
 #!/usr/bin/env bun
 
+import { z } from 'zod';
+
+import { expectInvalidCases, finishFixtureCheck, readJson } from './lib/fixture-checks.ts';
 import {
   captureSharpeningPresetSchema,
   estimateCaptureSharpeningKernelDiameter,
   parseCaptureSharpeningPreset,
 } from '../src/schemas/captureSharpeningSchemas.ts';
-import { expectInvalidCases, finishFixtureCheck, readJson } from './lib/fixture-checks.mjs';
 
-const presets = await readJson('fixtures/detail/capture-sharpening-presets.json');
-const invalidCases = await readJson('fixtures/detail/invalid-capture-sharpening-presets.json');
-const failures = [];
+const invalidCaseSchema = z.object({ case: z.string().min(1), preset: z.unknown() }).strict();
+
+const presets = z.array(z.unknown()).parse(await readJson('fixtures/detail/capture-sharpening-presets.json'));
+const invalidCases = z
+  .array(invalidCaseSchema)
+  .parse(await readJson('fixtures/detail/invalid-capture-sharpening-presets.json'));
+const failures: string[] = [];
 
 let totalKernelDiameter = 0;
 
