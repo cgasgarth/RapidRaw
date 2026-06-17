@@ -11,10 +11,16 @@ issue tracking for package ecosystems that can be queried deterministically.
 
 ## Commands
 
-Run the full report:
+Run the compact local summary:
 
 ```sh
 bun run deps:audit
+```
+
+Render the full Markdown report:
+
+```sh
+bun scripts/audit-dependency-versions.ts --format=markdown
 ```
 
 Run ecosystem-specific reports:
@@ -49,7 +55,6 @@ Known tracked major issues when this audit landed:
 - #946 `deps(major): migrate npm/@eslint/js to 10`
 - #959 `deps(major): migrate cargo/glam to 0.33`
 - #960 `deps(major): migrate cargo/imageproc to 0.27`
-- #962 `deps(major): migrate cargo/ndarray to 0.17`
 - #963 `deps(major): migrate cargo/nalgebra to 0.35`
 
 When a new major candidate appears, create the issue first, then add it to the
@@ -68,8 +73,8 @@ Related freshness checks:
 
 - GitHub Action current pins and latest upstream tags are checked by
   `bun run check:action-pins:latest`.
-- The scheduled dependency-version workflow runs JavaScript and Rust reports and
-  writes them to GitHub step summaries.
+- The scheduled dependency-version workflow requests Markdown explicitly and
+  writes full JavaScript and Rust reports to GitHub step summaries.
 - Node, Bun, Tauri, Rust toolchain, and validation CLI freshness should remain
   visible through package rows where they are represented in `package.json` or
   through dedicated follow-up issues when they are not package-resolvable.
