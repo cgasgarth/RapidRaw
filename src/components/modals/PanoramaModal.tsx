@@ -314,6 +314,7 @@ export default function PanoramaModal({
               title={t('modals.panorama.review.title')}
               proofStatus={t('modals.panorama.review.proofStatus')}
               limitation={t('modals.panorama.review.limitation')}
+              testId="panorama-review-diagnostics"
               items={[
                 {
                   label: t('modals.panorama.review.alignment'),
@@ -329,6 +330,42 @@ export default function PanoramaModal({
                   label: t('modals.panorama.review.projectionCrop'),
                   status: 'pending',
                   value: t('modals.panorama.review.uiE2ePending'),
+                },
+              ]}
+              sections={[
+                {
+                  title: t('modals.panorama.workflowTitle'),
+                  rows: [
+                    {
+                      label: t('modals.panorama.projectionLabel'),
+                      value: t(`modals.panorama.projection.${settings.projection}`),
+                    },
+                    {
+                      label: t('modals.panorama.boundaryLabel'),
+                      value: boundaryOptions.find((option) => option.value === settings.boundaryMode)?.label ?? '',
+                    },
+                    {
+                      label: t('modals.panorama.exposureLabel'),
+                      value: exposureOptions.find((option) => option.value === settings.exposureMode)?.label ?? '',
+                    },
+                    {
+                      label: t('modals.panorama.previewBudgetLabel'),
+                      value: t('modals.panorama.previewPixels', { value: settings.maxPreviewDimensionPx }),
+                    },
+                  ],
+                },
+                {
+                  title: t('modals.panorama.review.title'),
+                  rows: [
+                    {
+                      label: t('modals.panorama.review.seams'),
+                      value: t('modals.panorama.review.privateRawPending'),
+                    },
+                    {
+                      label: t('modals.panorama.review.projectionCrop'),
+                      value: t('modals.panorama.review.uiE2ePending'),
+                    },
+                  ],
                 },
               ]}
             />

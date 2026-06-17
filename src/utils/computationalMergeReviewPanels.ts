@@ -69,58 +69,57 @@ export function buildComputationalMergeReviewPanelDiagnostics(
 }
 
 function syntheticMetricsFor(featureFamily: ComputationalMergePrivateSourceSet['featureFamily']) {
-  if (featureFamily === 'focus_stack') {
-    return [
-      {
-        name: 'sharpnessGainRatio',
-        passed: true,
-        source: 'synthetic_runtime',
-        threshold: 1.15,
-        value: 1.16,
-      },
-      {
-        name: 'focusTransitionArtifactScore',
-        passed: true,
-        source: 'synthetic_runtime',
-        threshold: 0.9,
-        value: 0.91,
-      },
-    ];
+  switch (featureFamily) {
+    case 'focus_stack':
+      return [
+        {
+          name: 'sharpnessGainRatio',
+          passed: true,
+          source: 'synthetic_runtime',
+          threshold: 1.15,
+          value: 1.16,
+        },
+        {
+          name: 'focusTransitionArtifactScore',
+          passed: true,
+          source: 'synthetic_runtime',
+          threshold: 0.9,
+          value: 0.91,
+        },
+      ];
+    case 'super_resolution':
+      return [
+        {
+          name: 'alignmentInlierRatio',
+          passed: true,
+          source: 'synthetic_runtime',
+          threshold: 0.65,
+          value: 0.66,
+        },
+        {
+          name: 'superResolutionDetailGainRatio',
+          passed: true,
+          source: 'synthetic_runtime',
+          threshold: 1.2,
+          value: 1.21,
+        },
+      ];
+    case 'panorama_stitch':
+      return [
+        {
+          name: 'alignmentInlierRatio',
+          passed: true,
+          source: 'synthetic_runtime',
+          threshold: 0.55,
+          value: 0.56,
+        },
+        {
+          name: 'edgeContinuityScore',
+          passed: true,
+          source: 'synthetic_runtime',
+          threshold: 0.85,
+          value: 0.86,
+        },
+      ];
   }
-
-  if (featureFamily === 'super_resolution') {
-    return [
-      {
-        name: 'alignmentInlierRatio',
-        passed: true,
-        source: 'synthetic_runtime',
-        threshold: 0.65,
-        value: 0.66,
-      },
-      {
-        name: 'superResolutionDetailGainRatio',
-        passed: true,
-        source: 'synthetic_runtime',
-        threshold: 1.2,
-        value: 1.21,
-      },
-    ];
-  }
-
-  return [
-    {
-      name: 'alignmentInlierRatio',
-      passed: true,
-      source: 'synthetic_runtime',
-      threshold: 0.55,
-      value: 0.56,
-    },
-    {
-      name: 'edgeContinuityScore',
-      passed: true,
-      source: 'synthetic_runtime',
-      threshold: 0.85,
-      value: 0.86,
-    },
-  ];
 }
