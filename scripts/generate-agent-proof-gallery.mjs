@@ -16,6 +16,18 @@ const fixture = rawEngineAgentReplayFixtureV1Schema.parse(sampleRawEngineAgentRe
 const escapeHtml = (value) =>
   String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
+const collectStepOutputArtifacts = (step) =>
+  ['previewArtifacts', 'outputArtifacts', 'maskArtifacts']
+    .flatMap((key) => {
+      const value = step.output[key];
+      return Array.isArray(value) ? value.map((artifact) => ({ ...artifact, source: `output.${key}` })) : [];
+    })
+    .filter((artifact) => typeof artifact.artifactId === 'string');
+
+const outputArtifactsById = new Map(
+  fixture.steps.flatMap((step) => collectStepOutputArtifacts(step).map((artifact) => [artifact.artifactId, artifact])),
+);
+
 const stepRows = fixture.steps
   .map(
     (step) => `<tr>
@@ -29,6 +41,36 @@ const stepRows = fixture.steps
     </tr>`,
   )
   .join('\n');
+
+const artifactRows = fixture.steps
+  .flatMap((step) =>
+    step.auditLog.affectedArtifactIds.map((artifactId) => {
+      const outputArtifact = outputArtifactsById.get(artifactId);
+      return {
+        artifactId,
+        contentHash: outputArtifact?.contentHash ?? 'audit-only',
+        source: outputArtifact?.source ?? 'auditLog.affectedArtifactIds',
+        stepId: step.stepId,
+      };
+    }),
+  )
+  .map(
+    (artifact) => `<tr>
+      <td><code>${escapeHtml(artifact.stepId)}</code></td>
+      <td><code>${escapeHtml(artifact.artifactId)}</code></td>
+      <td>${escapeHtml(artifact.source)}</td>
+      <td><code>${escapeHtml(artifact.contentHash)}</code></td>
+    </tr>`,
+  )
+  .join('\n');
+
+if (artifactRows.length === 0) {
+  throw new Error('Agent proof gallery requires at least one affected artifact row.');
+}
+
+if (![...outputArtifactsById.values()].some((artifact) => typeof artifact.contentHash === 'string')) {
+  throw new Error('Agent proof gallery requires at least one output artifact content hash.');
+}
 
 const html = `<!doctype html>
 <html lang="en">
@@ -226,6 +268,23 @@ const html = `<!doctype html>
           </thead>
           <tbody>
             ${stepRows}
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Artifact Hash Proof</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th>Artifact</th>
+              <th>Source</th>
+              <th>Content hash</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${artifactRows}
           </tbody>
         </table>
       </section>
