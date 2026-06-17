@@ -9,6 +9,7 @@ import {
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   computationalMergeMutationResultV1Schema,
+  type ArtifactHandleV1,
   type ComputationalMergeCommandEnvelopeV1,
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMutationResultV1,
@@ -59,6 +60,14 @@ export const focusStackRuntimeProvenanceV1Schema = z
     resolvedAlignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
     retouchLayerPolicy: z.enum(['none', 'generate_retouch_layer']),
     runtimeStatus: z.enum(['dry_run_rendered', 'apply_rendered']),
+    sharpnessSettings: z
+      .object({
+        cellCount: z.number().int().positive(),
+        lowConfidenceWeightFloor: z.number().min(0).max(1),
+        lowConfidenceCellCount: z.number().int().nonnegative(),
+        weightPower: z.number().positive(),
+      })
+      .strict(),
     sourceState: z.array(
       z
         .object({
@@ -163,7 +172,7 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
     throw new Error('Focus stack runtime apply requires an accepted dry-run plan id and hash.');
   }
 
-  const outputArtifacts = [
+  const outputArtifacts: ArtifactHandleV1[] = [
     {
       artifactId: request.outputArtifactId,
       contentHash: `sha256:${stableFocusRuntimeHash(`${acceptedDryRunPlanHash}:${request.outputArtifactId}`)}`,
@@ -174,7 +183,42 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
       kind: 'merge_output' as const,
       storage: 'sidecar_artifact' as const,
     },
+    {
+      artifactId: request.sharpnessMapArtifactId,
+      contentHash: `sha256:${stableFocusRuntimeHash(`${acceptedDryRunPlanHash}:${request.sharpnessMapArtifactId}`)}`,
+      dimensions: {
+        height: runtime.height,
+        width: runtime.width,
+      },
+      kind: 'mask' as const,
+      storage: 'sidecar_artifact' as const,
+    },
+    {
+      artifactId: request.depthConfidenceArtifactId,
+      contentHash: `sha256:${stableFocusRuntimeHash(`${acceptedDryRunPlanHash}:${request.depthConfidenceArtifactId}`)}`,
+      dimensions: {
+        height: runtime.height,
+        width: runtime.width,
+      },
+      kind: 'mask' as const,
+      storage: 'sidecar_artifact' as const,
+    },
   ];
+  if (request.command.parameters.retouchLayerPolicy === 'generate_retouch_layer') {
+    if (request.retouchLayerArtifactId === undefined) {
+      throw new Error('Focus stack runtime retouch layer policy requires retouchLayerArtifactId.');
+    }
+    outputArtifacts.push({
+      artifactId: request.retouchLayerArtifactId,
+      contentHash: `sha256:${stableFocusRuntimeHash(`${acceptedDryRunPlanHash}:${request.retouchLayerArtifactId}`)}`,
+      dimensions: {
+        height: runtime.height,
+        width: runtime.width,
+      },
+      kind: 'generated_patch' as const,
+      storage: 'sidecar_artifact' as const,
+    });
+  }
 
   const mutationResult = computationalMergeMutationResultV1Schema.parse({
     appliedGraphRevision: `${request.command.expectedGraphRevision}:focus-apply`,
@@ -263,6 +307,12 @@ const renderFocusStackRuntime = (request: ParsedFocusStackRuntimePlanRequestV1) 
         request.command.parameters.alignmentMode === 'auto' ? 'translation' : request.command.parameters.alignmentMode,
       retouchLayerPolicy: request.command.parameters.retouchLayerPolicy,
       runtimeStatus: 'dry_run_rendered',
+      sharpnessSettings: {
+        cellCount: request.cells.length,
+        lowConfidenceCellCount: request.cells.filter((cell) => cell.lowConfidence).length,
+        lowConfidenceWeightFloor: request.lowConfidenceWeightFloor,
+        weightPower: request.weightPower,
+      },
       sourceState: request.frames.map((frame) => ({
         contentHash: frame.contentHash,
         focusDistanceMm: frame.focusDistanceMm,
