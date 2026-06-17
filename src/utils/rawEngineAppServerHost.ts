@@ -14,9 +14,12 @@ import {
   rawEngineAppServerRouteCatalogEntrySchema,
   rawEngineAppServerRouteCatalogReplaySchema,
   rawEngineAppServerRouteCatalogResponseSchema,
+  rawEngineAppServerLifecycleReplaySchema,
+  rawEngineAppServerLifecycleStateSchema,
   rawEngineAppServerHostRequestSchema,
   rawEngineAppServerHostResponseEnvelopeSchema,
   rawEngineAppServerHostResponseSchema,
+  type RawEngineAppServerClientInfo,
   type RawEngineAppServerAuditEntry,
   type RawEngineAppServerCapabilitiesReplay,
   type RawEngineAppServerCapabilitiesRequest,
@@ -28,6 +31,8 @@ import {
   type RawEngineAppServerHostRequest,
   type RawEngineAppServerHostResponse,
   type RawEngineAppServerHostResponseEnvelope,
+  type RawEngineAppServerLifecycleReplay,
+  type RawEngineAppServerLifecycleState,
   type RawEngineAppServerRouteCatalogEntry,
   type RawEngineAppServerRouteCatalogReplay,
   type RawEngineAppServerRouteCatalogRequest,
@@ -64,6 +69,100 @@ export const RAW_ENGINE_APP_SERVER_HOST_MANIFEST = rawEngineAppServerHostManifes
   ],
   transport: 'stdio_jsonl',
 });
+
+export const createRawEngineAppServerLifecycleState = ({
+  connectionId,
+}: {
+  connectionId: string;
+}): RawEngineAppServerLifecycleState =>
+  rawEngineAppServerLifecycleStateSchema.parse({
+    clientInfo: null,
+    connectionId,
+    initializedAtIso: null,
+    phase: 'created',
+    schemaVersion: 1,
+    stoppedAtIso: null,
+    transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+  });
+
+export const initializeRawEngineAppServerLifecycle = ({
+  clientInfo,
+  state,
+  timestampIso,
+}: {
+  clientInfo: RawEngineAppServerClientInfo;
+  state: RawEngineAppServerLifecycleState;
+  timestampIso: string;
+}): RawEngineAppServerLifecycleState => {
+  if (state.phase !== 'created') {
+    throw new Error(`RawEngine app-server lifecycle cannot initialize from ${state.phase}.`);
+  }
+
+  return rawEngineAppServerLifecycleStateSchema.parse({
+    ...state,
+    clientInfo,
+    initializedAtIso: timestampIso,
+    phase: 'initialized',
+  });
+};
+
+export const stopRawEngineAppServerLifecycle = ({
+  state,
+  timestampIso,
+}: {
+  state: RawEngineAppServerLifecycleState;
+  timestampIso: string;
+}): RawEngineAppServerLifecycleState => {
+  if (state.phase === 'created') {
+    throw new Error('RawEngine app-server lifecycle cannot stop before initialize.');
+  }
+
+  return rawEngineAppServerLifecycleStateSchema.parse({
+    ...state,
+    phase: 'stopped',
+    stoppedAtIso: timestampIso,
+  });
+};
+
+export const assertRawEngineAppServerLifecycleReady = (state: RawEngineAppServerLifecycleState): void => {
+  if (state.phase !== 'initialized') {
+    throw new Error(`RawEngine app-server request rejected while lifecycle is ${state.phase}.`);
+  }
+};
+
+export const buildRawEngineAppServerLifecycleReplay = ({
+  clientInfo,
+  connectionId,
+  createdAtIso,
+  initializedAtIso,
+  stoppedAtIso,
+}: {
+  clientInfo: RawEngineAppServerClientInfo;
+  connectionId: string;
+  createdAtIso: string;
+  initializedAtIso: string;
+  stoppedAtIso: string;
+}): RawEngineAppServerLifecycleReplay => {
+  const created = createRawEngineAppServerLifecycleState({ connectionId });
+  const initialized = initializeRawEngineAppServerLifecycle({
+    clientInfo,
+    state: created,
+    timestampIso: initializedAtIso,
+  });
+  assertRawEngineAppServerLifecycleReady(initialized);
+  const stopped = stopRawEngineAppServerLifecycle({ state: initialized, timestampIso: stoppedAtIso });
+
+  return rawEngineAppServerLifecycleReplaySchema.parse({
+    connectionId,
+    events: [
+      { phase: created.phase, timestampIso: createdAtIso },
+      { phase: initialized.phase, timestampIso: initializedAtIso },
+      { phase: stopped.phase, timestampIso: stoppedAtIso },
+    ],
+    finalState: stopped,
+    schemaVersion: 1,
+  });
+};
 
 const uniqueSorted = (values: Iterable<string>): string[] => [...new Set(values)].sort((a, b) => a.localeCompare(b));
 

@@ -7,14 +7,20 @@ import {
   buildRawEngineAppServerCapabilitiesReplay,
   buildRawEngineAppServerHealthReplay,
   buildRawEngineAppServerHostResponseEnvelope,
+  buildRawEngineAppServerLifecycleReplay,
   buildRawEngineAppServerRouteCatalogReplay,
+  createRawEngineAppServerLifecycleState,
   handleRawEngineAppServerHostRequest,
+  initializeRawEngineAppServerLifecycle,
+  assertRawEngineAppServerLifecycleReady,
+  stopRawEngineAppServerLifecycle,
 } from '../src/utils/rawEngineAppServerHost.ts';
 import {
   rawEngineAppServerCapabilitiesReplaySchema,
   rawEngineAppServerHealthReplaySchema,
   rawEngineAppServerHostResponseEnvelopeSchema,
   rawEngineAppServerHostManifestSchema,
+  rawEngineAppServerLifecycleReplaySchema,
   rawEngineAppServerRouteCatalogReplaySchema,
 } from '../src/schemas/agentRuntimeSchemas.ts';
 
@@ -23,6 +29,68 @@ const manifest = rawEngineAppServerHostManifestSchema.parse(RAW_ENGINE_APP_SERVE
 const healthTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.health');
 const capabilitiesTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.capabilities');
 const routeCatalogTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.route_catalog');
+const clientInfo = {
+  name: 'rawengine_desktop',
+  title: 'RawEngine Desktop',
+  version: '0.1.0',
+};
+
+const lifecycleCreated = createRawEngineAppServerLifecycleState({ connectionId: 'conn_stdio_001' });
+try {
+  assertRawEngineAppServerLifecycleReady(lifecycleCreated);
+  failures.push('Created lifecycle state must reject host requests before initialize.');
+} catch (error) {
+  if (!(error instanceof Error) || !error.message.includes('created')) {
+    failures.push('Created lifecycle rejection should include phase.');
+  }
+}
+
+const lifecycleInitialized = initializeRawEngineAppServerLifecycle({
+  clientInfo,
+  state: lifecycleCreated,
+  timestampIso: '2026-06-17T12:00:00.000Z',
+});
+assertRawEngineAppServerLifecycleReady(lifecycleInitialized);
+try {
+  initializeRawEngineAppServerLifecycle({
+    clientInfo,
+    state: lifecycleInitialized,
+    timestampIso: '2026-06-17T12:01:00.000Z',
+  });
+  failures.push('Lifecycle must reject repeated initialize.');
+} catch (error) {
+  if (!(error instanceof Error) || !error.message.includes('initialized')) {
+    failures.push('Repeated initialize rejection should include phase.');
+  }
+}
+
+const lifecycleStopped = stopRawEngineAppServerLifecycle({
+  state: lifecycleInitialized,
+  timestampIso: '2026-06-17T12:02:00.000Z',
+});
+try {
+  assertRawEngineAppServerLifecycleReady(lifecycleStopped);
+  failures.push('Stopped lifecycle state must reject host requests.');
+} catch (error) {
+  if (!(error instanceof Error) || !error.message.includes('stopped')) {
+    failures.push('Stopped lifecycle rejection should include phase.');
+  }
+}
+
+const lifecycleReplay = rawEngineAppServerLifecycleReplaySchema.parse(
+  buildRawEngineAppServerLifecycleReplay({
+    clientInfo,
+    connectionId: 'conn_stdio_replay_001',
+    createdAtIso: '2026-06-17T11:59:59.000Z',
+    initializedAtIso: '2026-06-17T12:00:00.000Z',
+    stoppedAtIso: '2026-06-17T12:02:00.000Z',
+  }),
+);
+
+if (lifecycleReplay.finalState.phase !== 'stopped') failures.push('Lifecycle replay must finish stopped.');
+if (lifecycleReplay.events.map((event) => event.phase).join(',') !== 'created,initialized,stopped') {
+  failures.push('Lifecycle replay phase order mismatch.');
+}
 
 if (healthTool === undefined) {
   failures.push('Missing rawengine.host.health tool.');
@@ -162,6 +230,8 @@ for (const marker of [
   'rawengine.host.capabilities',
   'rawengine.host.route_catalog',
   'buildRawEngineAppServerHostResponseEnvelope',
+  'buildRawEngineAppServerLifecycleReplay',
+  'assertRawEngineAppServerLifecycleReady',
   'No UI automation',
   'codex app-server',
   'stdio JSONL',
@@ -175,4 +245,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`rawengine app-server host skeleton ok (${manifest.tools.length} tools)`);
+console.log(`rawengine app-server host skeleton ok (${manifest.tools.length} tools, lifecycle replay)`);

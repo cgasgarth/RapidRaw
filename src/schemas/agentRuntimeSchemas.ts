@@ -27,6 +27,56 @@ export const normalizeAgentRuntimeId = (value: unknown): AgentRuntimeId => {
 export const rawEngineAppServerTransportSchema = z.enum(['stdio_jsonl']);
 export const rawEngineAppServerToolKindSchema = z.enum(['read']);
 export const rawEngineAppServerAuditOutcomeSchema = z.enum(['success', 'rejected']);
+export const rawEngineAppServerLifecyclePhaseSchema = z.enum(['created', 'initialized', 'stopped']);
+
+export const rawEngineAppServerClientInfoSchema = z
+  .object({
+    name: z.string().trim().min(1),
+    title: z.string().trim().min(1),
+    version: z.string().trim().min(1),
+  })
+  .strict();
+
+export const rawEngineAppServerLifecycleStateSchema = z
+  .object({
+    clientInfo: rawEngineAppServerClientInfoSchema.nullable(),
+    connectionId: z.string().trim().min(1),
+    initializedAtIso: z.iso.datetime().nullable(),
+    phase: rawEngineAppServerLifecyclePhaseSchema,
+    schemaVersion: z.literal(1),
+    stoppedAtIso: z.iso.datetime().nullable(),
+    transport: rawEngineAppServerTransportSchema,
+  })
+  .strict()
+  .superRefine((state, context) => {
+    if (state.phase === 'created' && (state.clientInfo !== null || state.initializedAtIso !== null)) {
+      context.addIssue({ code: 'custom', message: 'Created lifecycle state must not include initialized metadata.' });
+    }
+    if (state.phase === 'initialized' && (state.clientInfo === null || state.initializedAtIso === null)) {
+      context.addIssue({ code: 'custom', message: 'Initialized lifecycle state requires client metadata.' });
+    }
+    if (state.phase === 'stopped' && state.stoppedAtIso === null) {
+      context.addIssue({ code: 'custom', message: 'Stopped lifecycle state requires stoppedAtIso.' });
+    }
+  });
+
+export const rawEngineAppServerLifecycleReplaySchema = z
+  .object({
+    connectionId: z.string().trim().min(1),
+    events: z
+      .array(
+        z
+          .object({
+            phase: rawEngineAppServerLifecyclePhaseSchema,
+            timestampIso: z.iso.datetime(),
+          })
+          .strict(),
+      )
+      .min(3),
+    finalState: rawEngineAppServerLifecycleStateSchema,
+    schemaVersion: z.literal(1),
+  })
+  .strict();
 
 export const rawEngineAppServerToolDefinitionSchema = z
   .object({
@@ -200,6 +250,7 @@ export type RawEngineAppServerAuditEntry = z.infer<typeof rawEngineAppServerAudi
 export type RawEngineAppServerCapabilitiesReplay = z.infer<typeof rawEngineAppServerCapabilitiesReplaySchema>;
 export type RawEngineAppServerCapabilitiesRequest = z.infer<typeof rawEngineAppServerCapabilitiesRequestSchema>;
 export type RawEngineAppServerCapabilitiesResponse = z.infer<typeof rawEngineAppServerCapabilitiesResponseSchema>;
+export type RawEngineAppServerClientInfo = z.infer<typeof rawEngineAppServerClientInfoSchema>;
 export type RawEngineAppServerHealthReplay = z.infer<typeof rawEngineAppServerHealthReplaySchema>;
 export type RawEngineAppServerHealthRequest = z.infer<typeof rawEngineAppServerHealthRequestSchema>;
 export type RawEngineAppServerHealthResponse = z.infer<typeof rawEngineAppServerHealthResponseSchema>;
@@ -207,6 +258,8 @@ export type RawEngineAppServerHostManifest = z.infer<typeof rawEngineAppServerHo
 export type RawEngineAppServerHostRequest = z.infer<typeof rawEngineAppServerHostRequestSchema>;
 export type RawEngineAppServerHostResponse = z.infer<typeof rawEngineAppServerHostResponseSchema>;
 export type RawEngineAppServerHostResponseEnvelope = z.infer<typeof rawEngineAppServerHostResponseEnvelopeSchema>;
+export type RawEngineAppServerLifecycleReplay = z.infer<typeof rawEngineAppServerLifecycleReplaySchema>;
+export type RawEngineAppServerLifecycleState = z.infer<typeof rawEngineAppServerLifecycleStateSchema>;
 export type RawEngineAppServerRouteCatalogEntry = z.infer<typeof rawEngineAppServerRouteCatalogEntrySchema>;
 export type RawEngineAppServerRouteCatalogReplay = z.infer<typeof rawEngineAppServerRouteCatalogReplaySchema>;
 export type RawEngineAppServerRouteCatalogRequest = z.infer<typeof rawEngineAppServerRouteCatalogRequestSchema>;

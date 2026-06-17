@@ -17,6 +17,18 @@ Transport v1 is stdio JSONL. Socket, WebSocket, and long-running worker transpor
 
 No UI automation: host tools must call the typed RawEngine command/query layer only. They must not drive GUI actions, use raw Tauri invokes, or bypass command schemas.
 
+## Lifecycle
+
+The current lifecycle proof follows the official Codex app-server ordering:
+connect, initialize once with client metadata, allow requests only after
+initialization, then stop. `assertRawEngineAppServerLifecycleReady` rejects host
+requests in `created` and `stopped` phases so app-server tools cannot run before
+the connection handshake or after shutdown.
+
+`buildRawEngineAppServerLifecycleReplay` records the `created -> initialized ->
+stopped` sequence for stdio JSONL. This is lifecycle-state proof only; it does
+not start the official Codex sidecar process or prove image mutation tools.
+
 ## Tool Manifest
 
 - `rawengine.host.health`: read-only health check returning runtime, transport, request id, and manifest tool count.
