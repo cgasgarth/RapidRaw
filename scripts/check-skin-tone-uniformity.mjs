@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
-import { applySkinToneUniformity } from '../src/utils/skinToneUniformity.ts';
+import { applySkinToneUniformity, applySkinToneUniformityToRgbPixel } from '../src/utils/skinToneUniformity.ts';
 
 const FIXTURE_PATH = 'fixtures/color/skin-tone-uniformity-fixtures.json';
 
@@ -13,6 +13,14 @@ const skinPatchSchema = z
     hueDegrees: z.number().min(0).lt(360),
     luminance: z.number().min(0).max(1),
     saturation: z.number().min(0).max(1),
+  })
+  .strict();
+
+const rgbPixelSchema = z
+  .object({
+    blue: z.number().min(0).max(1),
+    green: z.number().min(0).max(1),
+    red: z.number().min(0).max(1),
   })
   .strict();
 
@@ -30,8 +38,10 @@ const settingsSchema = z
 const caseSchema = z
   .object({
     expected: skinPatchSchema,
+    expectedRgb: rgbPixelSchema.optional(),
     id: z.string().regex(/^color\.skin\.[a-z0-9.-]+\.v[0-9]+$/u),
     input: skinPatchSchema,
+    inputRgb: rgbPixelSchema.optional(),
     settings: settingsSchema,
     tolerance: z.number().positive().max(0.001),
   })
@@ -63,6 +73,18 @@ for (const testCase of manifest.cases) {
     const delta = Math.abs(actual[field] - testCase.expected[field]);
     if (delta > testCase.tolerance) {
       failures.push(`${testCase.id}.${field}: expected ${testCase.expected[field]}, got ${actual[field]}.`);
+    }
+  }
+
+  if (testCase.inputRgb && testCase.expectedRgb) {
+    const rgbActual = applySkinToneUniformityToRgbPixel(testCase.inputRgb, testCase.settings);
+    for (const channel of ['red', 'green', 'blue']) {
+      const delta = Math.abs(rgbActual.outputRgb[channel] - testCase.expectedRgb[channel]);
+      if (delta > testCase.tolerance) {
+        failures.push(
+          `${testCase.id}.rgb.${channel}: expected ${testCase.expectedRgb[channel]}, got ${rgbActual.outputRgb[channel]}.`,
+        );
+      }
     }
   }
 }
