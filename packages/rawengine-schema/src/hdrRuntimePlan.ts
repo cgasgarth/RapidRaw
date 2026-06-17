@@ -352,8 +352,8 @@ const translateHdrRuntimePixels = (
   width: number,
   height: number,
   translationPx: HdrRuntimeProvenanceV1['alignmentTransforms'][number]['translationPx'],
-): Float64Array => {
-  const translated = new Float64Array(pixels.length);
+): HdrRuntimeFrameV1['pixels'] => {
+  const translated = new Float64Array(new ArrayBuffer(pixels.length * Float64Array.BYTES_PER_ELEMENT));
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const sourceX = x - translationPx.x;
