@@ -1,4 +1,6 @@
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from './negativeLabPresetCatalog';
+import negativeLabMeasuredProfileCatalogJson from '../data/negativeLabMeasuredProfileCatalog.json';
+import { parseNegativeLabMeasuredProfileCatalog } from '../schemas/negativeLabMeasuredProfileSchemas';
 
 import type {
   NegativeLabMeasuredProfile,
@@ -12,12 +14,7 @@ interface NegativeLabProfileBrowserCatalog {
   measuredCatalog: NegativeLabMeasuredProfileCatalog;
 }
 
-const EMPTY_MEASURED_PROFILE_CATALOG = {
-  catalogId: 'negative_lab_measured_profile_catalog',
-  catalogVersion: '2026-06-16',
-  profiles: [],
-  schemaVersion: 1,
-} satisfies NegativeLabMeasuredProfileCatalog;
+const MEASURED_PROFILE_CATALOG = parseNegativeLabMeasuredProfileCatalog(negativeLabMeasuredProfileCatalogJson);
 
 const getMeasuredProfileDisabledReason = (profile: NegativeLabMeasuredProfile) => {
   if (profile.claimPolicy === 'named_stock_profile_requires_license_review') return 'license_review_required';
@@ -28,7 +25,7 @@ const getMeasuredProfileDisabledReason = (profile: NegativeLabMeasuredProfile) =
 export const buildNegativeLabProfileBrowserRows = (
   catalog: NegativeLabProfileBrowserCatalog = {
     genericCatalog: NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
-    measuredCatalog: EMPTY_MEASURED_PROFILE_CATALOG,
+    measuredCatalog: MEASURED_PROFILE_CATALOG,
   },
 ): NegativeLabRuntimeProfileBrowserRow[] => {
   const genericRows = catalog.genericCatalog.presets.map(

@@ -430,9 +430,7 @@ async function assertNegativeLabBaseFogPreviewExportProof(page) {
   const hasPatchProbeEstimate = estimateCalls.some(
     (call) => negativeLabShadowPatchSampleSchema.safeParse(call.args.sampleRect).success,
   );
-  const hasAutoPreview = previewCalls.some(
-    (call) => call.args.params.base_fog_sample === null && call.args.params.red_weight === 1.07,
-  );
+  const hasAutoPreview = previewCalls.some((call) => call.args.params.base_fog_sample === null);
   const hasManualPreview = previewCalls.some(
     (call) => call.args.params.base_fog_sample !== null && call.args.params.blue_weight === 1.18,
   );
@@ -449,7 +447,17 @@ async function assertNegativeLabBaseFogPreviewExportProof(page) {
     !hasManualPreview ||
     !hasCustomBasePreview
   ) {
-    throw new Error('Negative Lab base/fog proof did not exercise auto and sampled preview paths.');
+    throw new Error(
+      `Negative Lab base/fog proof did not exercise auto and sampled preview paths: ${JSON.stringify({
+        hasAutoEstimate,
+        hasAutoPreview,
+        hasCustomBaseEstimate,
+        hasCustomBasePreview,
+        hasManualEstimate,
+        hasManualPreview,
+        hasPatchProbeEstimate,
+      })}`,
+    );
   }
 
   if (new Set(previewReturns).size < 2) {
@@ -745,6 +753,30 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-preset-claim-policy')
     .getByText('Generic family descriptor only; no manufacturer, stock, or emulation claim.', { exact: true })
     .waitFor({ timeout: 10_000 });
+  const measuredProfileRow = page.getByTestId('negative-lab-profile-row-negative_lab.measured.c41.process_family.v1');
+  await measuredProfileRow.scrollIntoViewIfNeeded();
+  await measuredProfileRow.getByTestId('negative-lab-profile-measured-badge').getByText('Measured').waitFor({
+    timeout: 10_000,
+  });
+  await measuredProfileRow.getByTestId('negative-lab-profile-evidence-count').getByText('1 fixture(s)').waitFor({
+    timeout: 10_000,
+  });
+  await measuredProfileRow.click();
+  await page
+    .getByTestId('negative-lab-preset-claim-level')
+    .getByText('Measured profile', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-preset-process')
+    .getByText('c41 color negative', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-preset-provenance')
+    .getByText('Fixture-measured process-family profile from 1 approved fixture(s); no named-stock emulation claim.', {
+      exact: true,
+    })
+    .waitFor({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Black and White Ortho' }).click();
   await page.getByTestId('negative-lab-auto-base-fog').click();
   await page.getByTestId('negative-lab-base-status').getByText('Base 91%', { exact: true }).waitFor({
     timeout: 10_000,

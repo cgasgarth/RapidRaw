@@ -1263,7 +1263,7 @@ export default function NegativeConversionModal({
                     className="text-text-tertiary"
                   >
                     {selectedPreset === null
-                      ? selectedProfile.processFamily
+                      ? formatStockRegistryToken(selectedProfile.processFamily)
                       : `${selectedPreset.processHint} / ${selectedPreset.stockFamilyDescriptor}`}
                   </UiText>
                 </div>
