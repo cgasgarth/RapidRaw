@@ -12,7 +12,12 @@ import { type CopiedSectionAdjustments, useEditorStore } from '../../../store/us
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { type CollapsibleSectionsState, useUIStore } from '../../../store/useUIStore';
 import { TextVariants } from '../../../types/typography';
-import { Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_SECTIONS } from '../../../utils/adjustments';
+import {
+  Adjustments,
+  INITIAL_ADJUSTMENTS,
+  ADJUSTMENT_SECTIONS,
+  pickAdjustmentValues,
+} from '../../../utils/adjustments';
 import BasicAdjustments from '../../adjustments/Basic';
 import ColorPanel from '../../adjustments/Color';
 import CurveGraph from '../../adjustments/Curves';
@@ -36,32 +41,6 @@ const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> 
   curves: 'Curves',
   details: 'Details',
   effects: 'Effects',
-};
-
-const cloneAdjustmentValue = (value: unknown): unknown => {
-  if (typeof structuredClone === 'function') {
-    return structuredClone(value);
-  }
-
-  return JSON.parse(JSON.stringify(value)) as unknown;
-};
-
-const pickAdjustmentValues = (
-  keys: Array<string>,
-  source: Adjustments,
-  requireExistingKey = false,
-): Partial<Adjustments> => {
-  const values: Record<string, unknown> = {};
-
-  for (const key of keys) {
-    if (requireExistingKey && !Object.prototype.hasOwnProperty.call(source, key)) {
-      continue;
-    }
-
-    values[key] = cloneAdjustmentValue(source[key]);
-  }
-
-  return values;
 };
 
 export default function Controls() {
@@ -186,7 +165,7 @@ export default function Controls() {
     const sectionKeys = ADJUSTMENT_SECTIONS[sectionName];
 
     const handleCopy = () => {
-      const adjustmentsToCopy = pickAdjustmentValues(sectionKeys, adjustments, true);
+      const adjustmentsToCopy = pickAdjustmentValues(sectionKeys, adjustments, { requireExistingKey: true });
       setCopiedSectionAdjustments({ section: sectionName, values: adjustmentsToCopy });
     };
 
