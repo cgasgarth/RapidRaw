@@ -15,7 +15,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Pull Requests And GitHub Flow
 
-- Use pull requests for repo changes; keep at most 3 open PRs at a time.
+- Use pull requests for repo changes.
+- Keep at most 3 open PRs at a time.
 
 ## GitHub Repo Resolution
 
@@ -52,8 +53,8 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 - The standing reminder automation is `check-rapidraw-consult-and-prs`.
 - Keep it active unless the user explicitly asks to remove it.
-- Keep its instructions simple: respect the 3-open-PR cap and use consult for
-  hard decisions.
+- Keep it simple: check active PRs, respect the 3-open-PR cap, and use consult
+  for hard decisions.
 
 ## Consult And Research
 
