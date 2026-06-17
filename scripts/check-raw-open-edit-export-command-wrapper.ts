@@ -2,6 +2,9 @@
 
 import { readFile } from 'node:fs/promises';
 
+import { toneColorCommandEnvelopeV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { sampleRawEngineSceneColorPipelineV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { sampleAgentActor, sampleImageTarget } from '../packages/rawengine-schema/src/samplePayloadFactories.ts';
 import {
   rawOpenEditExportProofReportSchema,
   rawOpenEditExportProofRequestSchema,
@@ -32,15 +35,44 @@ if (!rustSource.includes('pub async fn run_raw_open_edit_export_proof(')) {
 }
 
 const validHash = `sha256:${'0'.repeat(64)}`;
+const editCommand = {
+  actor: sampleAgentActor('raw-proof-command-wrapper'),
+  approval: {
+    approvalClass: 'edit_apply',
+    reason: 'Apply accepted basic tone command for RAW open/edit/export runtime proof.',
+    state: 'approved',
+  },
+  colorPipeline: sampleRawEngineSceneColorPipelineV1,
+  commandId: 'command.raw-open-edit-export.basic-tone.v1',
+  commandType: 'toneColor.setBasicTone',
+  correlationId: 'corr.raw-open-edit-export.basic-tone.v1',
+  dryRun: false,
+  expectedGraphRevision: 'graph-rev.raw-open-edit-export.sample.v1',
+  idempotencyKey: 'idem.raw-open-edit-export.basic-tone.v1',
+  parameters: {
+    blackPoint: -2,
+    clarity: 4,
+    contrast: 8,
+    exposureEv: 0.35,
+    highlights: -12,
+    saturation: 5,
+    shadows: 9,
+    whitePoint: 3,
+  },
+  schemaVersion: 1,
+  target: sampleImageTarget('private-fixtures/detail/sample.cr3'),
+};
 const sampleRequest = rawOpenEditExportProofRequestSchema.parse({
-  adjustments: { exposure: 0.35 },
   artifactDirRelative: 'private-artifacts/validation/open-edit-export',
-  editCommandId: 'command.raw-open-edit-export.basic-tone.v1',
-  editGraphRevision: 'graph-rev.raw-open-edit-export.sample.v1',
+  editCommand,
   fixtureId: 'validation.raw-open-edit-export.sample.v1',
   privateRootPath: '/tmp/rawengine-private-root',
   sourceRelativePath: 'private-fixtures/detail/sample.cr3',
 });
+
+if (!toneColorCommandEnvelopeV1Schema.safeParse(sampleRequest.editCommand).success) {
+  failures.push('RAW proof editCommand must stay compatible with ToneColorCommandEnvelopeV1.');
+}
 
 const sampleAsset = {
   hash: validHash,
@@ -57,8 +89,8 @@ rawOpenEditExportProofReportSchema.parse({
     { ...sampleAsset, kind: 'sidecar_after_private' },
     { ...sampleAsset, kind: 'workflow_report_private' },
   ],
-  editCommandId: sampleRequest.editCommandId,
-  editGraphRevision: sampleRequest.editGraphRevision,
+  editCommandId: sampleRequest.editCommand.commandId,
+  editGraphRevision: sampleRequest.editCommand.expectedGraphRevision,
   fixtureId: sampleRequest.fixtureId,
   generatedAt: '2026-06-17T00:00:00Z',
   metrics: [

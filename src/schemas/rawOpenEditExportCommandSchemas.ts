@@ -25,12 +25,47 @@ const artifactKindSchema = z.enum([
   'workflow_report_private',
 ]);
 
+const jsonObjectSchema = z.record(z.string(), jsonValueSchema);
+const targetJsonObjectSchema = z.object({ kind: z.enum(['image', 'virtual_copy']) }).catchall(jsonValueSchema);
+
+export const rawOpenEditExportBasicToneCommandSchema = z
+  .object({
+    actor: jsonObjectSchema,
+    approval: z
+      .object({
+        approvalClass: z.literal('edit_apply'),
+        reason: z.string().trim().min(1),
+        state: z.literal('approved'),
+      })
+      .strict(),
+    colorPipeline: jsonObjectSchema,
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('toneColor.setBasicTone'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    expectedGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    parameters: z
+      .object({
+        blackPoint: z.number().min(-100).max(100),
+        clarity: z.number().min(-100).max(100),
+        contrast: z.number().min(-100).max(100),
+        exposureEv: z.number().min(-10).max(10),
+        highlights: z.number().min(-100).max(100),
+        saturation: z.number().min(-100).max(100),
+        shadows: z.number().min(-100).max(100),
+        whitePoint: z.number().min(-100).max(100),
+      })
+      .strict(),
+    schemaVersion: z.literal(1),
+    target: targetJsonObjectSchema,
+  })
+  .strict();
+
 export const rawOpenEditExportProofRequestSchema = z
   .object({
-    adjustments: jsonValueSchema,
     artifactDirRelative: privatePathSchema,
-    editCommandId: z.string().trim().min(1),
-    editGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
+    editCommand: rawOpenEditExportBasicToneCommandSchema,
     fixtureId: z.string().regex(/^validation\.raw-open-edit-export\.[a-z0-9.-]+\.v[0-9]+$/u),
     privateRootPath: z.string().trim().min(1),
     sourceRelativePath: privatePathSchema,
