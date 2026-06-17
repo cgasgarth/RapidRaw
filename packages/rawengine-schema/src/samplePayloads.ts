@@ -861,6 +861,12 @@ export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorD
       value: 0.8,
     },
     {
+      module: 'white_balance',
+      path: '/parameters/tint',
+      previousValue: 2,
+      value: 8,
+    },
+    {
       module: 'levels',
       path: '/parameters/gamma',
       previousValue: 1,

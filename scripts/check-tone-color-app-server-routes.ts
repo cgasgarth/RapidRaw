@@ -65,6 +65,22 @@ if (!parsedToneCurveCommand.success || parsedToneCurveCommand.data.commandType !
   failures.push('Tone-color tone curve command does not validate the ordered curve route type.');
 }
 
+const parsedWhiteBalanceCommand = toneColorCommandEnvelopeV1Schema.safeParse({
+  ...sampleToneColorCommandEnvelopeV1,
+  commandId: 'command_tone_color_white_balance_preview_sample',
+  commandType: 'toneColor.setWhiteBalance',
+  correlationId: 'corr_tone_color_white_balance_preview_sample',
+  idempotencyKey: 'idem_tone_color_white_balance_preview_sample',
+  parameters: {
+    mode: 'custom_kelvin_tint',
+    temperatureKelvin: 5500,
+    tint: 8,
+  },
+});
+if (!parsedWhiteBalanceCommand.success || parsedWhiteBalanceCommand.data.commandType !== 'toneColor.setWhiteBalance') {
+  failures.push('Tone-color white balance command does not validate the custom Kelvin/tint route type.');
+}
+
 const parsedLevelsCommand = toneColorCommandEnvelopeV1Schema.safeParse({
   ...sampleToneColorCommandEnvelopeV1,
   commandId: 'command_tone_color_levels_preview_sample',
@@ -153,6 +169,7 @@ if (
 
 for (const commandType of [
   'toneColor.setToneCurve',
+  'toneColor.setWhiteBalance',
   'toneColor.setLevels',
   'toneColor.setChannelMixer',
   'toneColor.setColorBalanceRgb',

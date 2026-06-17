@@ -8,6 +8,7 @@ export const toneColorAppServerRouteSchema = z
     commandType: z.enum([
       'toneColor.setBasicTone',
       'toneColor.setToneCurve',
+      'toneColor.setWhiteBalance',
       'toneColor.setLevels',
       'toneColor.setChannelMixer',
       'toneColor.setColorBalanceRgb',
@@ -20,6 +21,7 @@ export const toneColorAppServerRouteSchema = z
     runtimeCheckScript: z.enum([
       'check:basic-tone-command-bridge',
       'check:profile-tone',
+      'check:white-balance-picker',
       'check:levels-runtime',
       'check:channel-mixer',
       'check:color-balance-rgb',
