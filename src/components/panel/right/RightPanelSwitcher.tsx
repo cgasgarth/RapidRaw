@@ -1,23 +1,8 @@
 import { motion } from 'framer-motion';
-import {
-  SlidersHorizontal,
-  Info,
-  Crop,
-  Layers,
-  Paintbrush,
-  SwatchBook,
-  FileInput,
-  type LucideIcon,
-} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { RIGHT_PANEL_GROUPS } from './rightPanelRegistry';
 import { Panel } from '../../ui/AppProperties';
-
-interface PanelOptions {
-  icon: LucideIcon;
-  id: Panel;
-  title: string;
-}
 
 interface RightPanelSwitcherProps {
   activePanel: Panel | null;
@@ -25,30 +10,6 @@ interface RightPanelSwitcherProps {
   isInstantTransition: boolean;
   layout?: 'horizontal' | 'vertical';
 }
-
-const panelGroups: Array<Array<PanelOptions>> = [
-  [{ id: Panel.Metadata, icon: Info, title: 'editor.switcher.tooltips.info' }],
-  [
-    { id: Panel.Adjustments, icon: SlidersHorizontal, title: 'editor.switcher.tooltips.adjust' },
-    { id: Panel.Crop, icon: Crop, title: 'editor.switcher.tooltips.crop' },
-    { id: Panel.Masks, icon: Layers, title: 'editor.switcher.tooltips.masks' },
-    { id: Panel.Ai, icon: Paintbrush, title: 'editor.switcher.tooltips.inpaint' },
-  ],
-  [
-    { id: Panel.Presets, icon: SwatchBook, title: 'editor.switcher.tooltips.presets' },
-    { id: Panel.Export, icon: FileInput, title: 'editor.switcher.tooltips.export' },
-  ],
-];
-
-const PANEL_TOOLTIP_FALLBACKS: Record<Panel, string> = {
-  [Panel.Adjustments]: 'Adjust',
-  [Panel.Ai]: 'Inpaint',
-  [Panel.Crop]: 'Crop',
-  [Panel.Export]: 'Export',
-  [Panel.Masks]: 'Masks',
-  [Panel.Metadata]: 'Info',
-  [Panel.Presets]: 'Presets',
-};
 
 export default function RightPanelSwitcher({
   activePanel,
@@ -61,14 +22,14 @@ export default function RightPanelSwitcher({
 
   return (
     <div className={isHorizontal ? 'flex items-center overflow-x-auto p-1 gap-1' : 'flex flex-col p-1 gap-1 h-full'}>
-      {panelGroups.map((group, groupIndex) => (
+      {RIGHT_PANEL_GROUPS.map((group, groupIndex) => (
         <div key={groupIndex} className={isHorizontal ? 'flex items-center gap-1' : 'flex flex-col gap-1'}>
           {groupIndex > 0 && (
             <div
               className={isHorizontal ? 'w-px h-6 bg-surface self-stretch my-auto' : 'w-6 h-px bg-surface self-center'}
             />
           )}
-          {group.map(({ id, icon: Icon, title }) => (
+          {group.map(({ fallbackLabel, icon: Icon, id, tooltipKey }) => (
             <button
               className={`relative rounded-md transition-colors duration-200 ${isHorizontal ? 'p-2 shrink-0' : 'p-2'} ${
                 activePanel === id
@@ -79,7 +40,7 @@ export default function RightPanelSwitcher({
               onClick={() => {
                 onPanelSelect(id);
               }}
-              data-tooltip={t(title, { defaultValue: PANEL_TOOLTIP_FALLBACKS[id] })}
+              data-tooltip={t(tooltipKey, { defaultValue: fallbackLabel })}
             >
               {activePanel === id && (
                 <motion.div

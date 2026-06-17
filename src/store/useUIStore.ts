@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import { RIGHT_PANEL_ORDER } from '../components/panel/right/rightPanelRegistry';
 import { ImageFile, Panel, UiVisibility, CullingSuggestions } from '../components/ui/AppProperties';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../schemas/hdrMergeUiSchemas';
@@ -8,16 +9,6 @@ import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
 } from '../schemas/superResolutionUiSchemas';
-
-const RIGHT_PANEL_ORDER = [
-  Panel.Metadata,
-  Panel.Adjustments,
-  Panel.Crop,
-  Panel.Masks,
-  Panel.Ai,
-  Panel.Presets,
-  Panel.Export,
-];
 
 export interface CollapsibleSectionsState {
   basic: boolean;

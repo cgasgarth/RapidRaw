@@ -227,32 +227,35 @@ export default function EditorView({
           key={renderedRightPanel}
           variants={panelVariants}
         >
-          {renderedRightPanel === Panel.Adjustments && <Controls />}
-          {renderedRightPanel === Panel.Metadata && <MetadataPanel />}
-          {renderedRightPanel === Panel.Crop && <CropPanel />}
-          {renderedRightPanel === Panel.Masks && <MasksPanel />}
-          {renderedRightPanel === Panel.Presets && (
-            <PresetsPanel
-              onNavigateToCommunity={() => {
-                handleBackToLibrary();
-                setUI({ activeView: 'community' });
-              }}
-            />
-          )}
-          {renderedRightPanel === Panel.Export && (
-            <ExportPanel
-              exportState={exportState}
-              multiSelectedPaths={multiSelectedPaths}
-              selectedImage={selectedImage}
-              setExportState={setExportState}
-              appSettings={appSettings}
-              onSettingsChange={(settings) => {
-                void handleSettingsChange(settings);
-              }}
-              rootPaths={rootPaths}
-            />
-          )}
-          {renderedRightPanel === Panel.Ai && <AIPanel />}
+          {renderedRightPanel &&
+            {
+              [Panel.Adjustments]: <Controls />,
+              [Panel.Ai]: <AIPanel />,
+              [Panel.Crop]: <CropPanel />,
+              [Panel.Export]: (
+                <ExportPanel
+                  exportState={exportState}
+                  multiSelectedPaths={multiSelectedPaths}
+                  selectedImage={selectedImage}
+                  setExportState={setExportState}
+                  appSettings={appSettings}
+                  onSettingsChange={(settings) => {
+                    void handleSettingsChange(settings);
+                  }}
+                  rootPaths={rootPaths}
+                />
+              ),
+              [Panel.Masks]: <MasksPanel />,
+              [Panel.Metadata]: <MetadataPanel />,
+              [Panel.Presets]: (
+                <PresetsPanel
+                  onNavigateToCommunity={() => {
+                    handleBackToLibrary();
+                    setUI({ activeView: 'community' });
+                  }}
+                />
+              ),
+            }[renderedRightPanel]}
         </motion.div>
       )}
     </AnimatePresence>
