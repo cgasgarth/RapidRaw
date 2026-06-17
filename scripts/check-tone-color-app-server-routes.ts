@@ -103,7 +103,39 @@ if (
   failures.push('Tone-color RGB color balance command does not validate the range-weighted route type.');
 }
 
-for (const commandType of ['toneColor.setLevels', 'toneColor.setChannelMixer', 'toneColor.setColorBalanceRgb']) {
+const parsedBlackWhiteMixerCommand = toneColorCommandEnvelopeV1Schema.safeParse({
+  ...sampleToneColorCommandEnvelopeV1,
+  commandId: 'command_tone_color_black_white_mixer_preview_sample',
+  commandType: 'toneColor.setBlackWhiteMixer',
+  correlationId: 'corr_tone_color_black_white_mixer_preview_sample',
+  idempotencyKey: 'idem_tone_color_black_white_mixer_preview_sample',
+  parameters: {
+    enabled: true,
+    weights: {
+      aquas: -4,
+      blues: -10,
+      greens: 8,
+      magentas: 0,
+      oranges: 12,
+      purples: 0,
+      reds: 18,
+      yellows: 10,
+    },
+  },
+});
+if (
+  !parsedBlackWhiteMixerCommand.success ||
+  parsedBlackWhiteMixerCommand.data.commandType !== 'toneColor.setBlackWhiteMixer'
+) {
+  failures.push('Tone-color black and white mixer command does not validate the hue-weighted route type.');
+}
+
+for (const commandType of [
+  'toneColor.setLevels',
+  'toneColor.setChannelMixer',
+  'toneColor.setColorBalanceRgb',
+  'toneColor.setBlackWhiteMixer',
+]) {
   const routeModes = new Set(
     TONE_COLOR_APP_SERVER_ROUTES.filter((route) => route.commandType === commandType).map(
       (route) => route.executionMode,

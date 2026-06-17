@@ -10,6 +10,7 @@ export const toneColorAppServerRouteSchema = z
       'toneColor.setLevels',
       'toneColor.setChannelMixer',
       'toneColor.setColorBalanceRgb',
+      'toneColor.setBlackWhiteMixer',
     ]),
     executionMode: toneColorAppServerRouteExecutionModeSchema,
     inputSchemaName: z.literal('ToneColorCommandEnvelopeV1'),
@@ -20,6 +21,7 @@ export const toneColorAppServerRouteSchema = z
       'check:levels-runtime',
       'check:channel-mixer',
       'check:color-balance-rgb',
+      'check:black-white-mixer',
     ]),
     status: toneColorAppServerRouteStatusSchema,
     toolName: z
