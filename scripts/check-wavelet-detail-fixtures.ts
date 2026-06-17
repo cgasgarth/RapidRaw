@@ -4,9 +4,11 @@ import { z } from 'zod';
 
 import { expectInvalidCases, finishFixtureCheck, readJson } from './lib/fixture-checks.ts';
 import {
+  buildWaveletDetailPreviewManifest,
   buildWaveletDetailPreviewPlan,
   estimateWaveletDetailPasses,
   parseWaveletDetailRecipe,
+  waveletDetailPreviewManifestSchema,
   waveletDetailPreviewPlanSchema,
   waveletDetailRecipeSchema,
 } from '../src/schemas/waveletDetailSchemas.ts';
@@ -22,12 +24,20 @@ const failures: string[] = [];
 let totalPasses = 0;
 let previewArtifactCount = 0;
 let previewEnabledCount = 0;
+let readyManifestCount = 0;
 for (const recipeValue of recipes) {
   const recipe = parseWaveletDetailRecipe(recipeValue);
   const plan = waveletDetailPreviewPlanSchema.parse(buildWaveletDetailPreviewPlan(recipe));
+  const manifest = waveletDetailPreviewManifestSchema.parse(
+    buildWaveletDetailPreviewManifest({
+      recipe,
+      sourceImageId: `fixture.raw.${recipe.id}`,
+    }),
+  );
   totalPasses += plan.passCount;
   if (plan.previewEnabled) previewEnabledCount += 1;
   if (plan.previewArtifact !== null) previewArtifactCount += 1;
+  if (manifest.status === 'ready') readyManifestCount += 1;
 
   if (plan.passCount > 0 && estimateWaveletDetailPasses(recipe) !== plan.passCount + 1) {
     failures.push(`${recipe.id}: preview plan pass count does not match runtime estimate.`);
@@ -43,6 +53,17 @@ for (const recipeValue of recipes) {
 
   if (plan.previewArtifact !== null && !plan.previewArtifact.contentHash.startsWith('fnv1a32:')) {
     failures.push(`${recipe.id}: preview artifact content hash missing deterministic hash prefix.`);
+  }
+
+  if (manifest.plan.id !== plan.id) failures.push(`${recipe.id}: preview manifest plan mismatch.`);
+  if (manifest.status === 'ready' && manifest.selectedArtifactId !== plan.previewArtifact?.artifactId) {
+    failures.push(`${recipe.id}: ready preview manifest selected artifact mismatch.`);
+  }
+  if (manifest.status === 'disabled' && manifest.selectedArtifactId !== null) {
+    failures.push(`${recipe.id}: disabled preview manifest should not select an artifact.`);
+  }
+  if (!manifest.limitations.includes('no_pixel_wavelet_render')) {
+    failures.push(`${recipe.id}: preview manifest must disclose deferred pixel rendering.`);
   }
 }
 
@@ -64,6 +85,10 @@ if (previewEnabledCount !== 2) {
 
 if (previewArtifactCount !== previewEnabledCount) {
   failures.push(`Expected preview artifacts to match enabled previews, got ${previewArtifactCount}.`);
+}
+
+if (readyManifestCount !== previewEnabledCount) {
+  failures.push(`Expected ready preview manifests to match enabled previews, got ${readyManifestCount}.`);
 }
 
 finishFixtureCheck({
