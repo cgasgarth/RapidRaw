@@ -7,9 +7,7 @@ import { parseNegativeLabBuiltInUiPresetCatalog } from '../src/schemas/negativeL
 import { buildNegativeLabRuntimeProfileBrowserRows } from '../src/utils/negativeLabMeasuredProfileRuntime.ts';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-
-const unsafeClaims =
-  /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|ilford|kodak|lightroom|mastin|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;
+import { unsafeNegativeLabClaimPattern } from './lib/negative-lab-validation.mjs';
 
 const failures = [];
 const ids = new Set();
@@ -38,7 +36,7 @@ for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
     preset.runtimeStatus,
     preset.stockFamilyDescriptor,
   ].join(' ');
-  if (unsafeClaims.test(text)) {
+  if (unsafeNegativeLabClaimPattern.test(text)) {
     failures.push(`${preset.presetId}: generic preset contains unsafe stock or brand claim`);
   }
 
