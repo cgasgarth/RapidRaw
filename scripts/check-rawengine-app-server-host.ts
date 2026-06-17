@@ -6,12 +6,14 @@ import {
   RAW_ENGINE_APP_SERVER_HOST_MANIFEST,
   buildRawEngineAppServerCapabilitiesReplay,
   buildRawEngineAppServerHealthReplay,
+  buildRawEngineAppServerHostResponseEnvelope,
   buildRawEngineAppServerRouteCatalogReplay,
   handleRawEngineAppServerHostRequest,
 } from '../src/utils/rawEngineAppServerHost.ts';
 import {
   rawEngineAppServerCapabilitiesReplaySchema,
   rawEngineAppServerHealthReplaySchema,
+  rawEngineAppServerHostResponseEnvelopeSchema,
   rawEngineAppServerHostManifestSchema,
   rawEngineAppServerRouteCatalogReplaySchema,
 } from '../src/schemas/agentRuntimeSchemas.ts';
@@ -118,6 +120,34 @@ const dispatchedRouteCatalog = handleRawEngineAppServerHostRequest({
 });
 if (dispatchedRouteCatalog.status !== 'ok') failures.push('Dispatched route catalog request failed.');
 
+const envelopeRequests = [
+  {
+    requestId: 'envelope_health_001',
+    toolName: 'rawengine.host.health',
+  },
+  {
+    requestId: 'envelope_capabilities_001',
+    toolName: 'rawengine.host.capabilities',
+  },
+  {
+    requestId: 'envelope_route_catalog_001',
+    toolName: 'rawengine.host.route_catalog',
+  },
+];
+
+for (const request of envelopeRequests) {
+  const envelope = rawEngineAppServerHostResponseEnvelopeSchema.parse(
+    buildRawEngineAppServerHostResponseEnvelope(request, '2026-06-17T12:00:00.000Z'),
+  );
+
+  if (envelope.status !== 'ok') failures.push(`${request.toolName} envelope did not return ok.`);
+  if (envelope.request.requestId !== request.requestId) failures.push(`${request.toolName} envelope request mismatch.`);
+  if (envelope.response.requestId !== request.requestId) {
+    failures.push(`${request.toolName} envelope response mismatch.`);
+  }
+  if (envelope.transport !== manifest.transport) failures.push(`${request.toolName} envelope transport mismatch.`);
+}
+
 const source = [
   'src/utils/rawEngineAppServerHost.ts',
   'src/schemas/agentRuntimeSchemas.ts',
@@ -131,6 +161,7 @@ for (const marker of [
   'rawengine.host.health',
   'rawengine.host.capabilities',
   'rawengine.host.route_catalog',
+  'buildRawEngineAppServerHostResponseEnvelope',
   'No UI automation',
   'codex app-server',
   'stdio JSONL',

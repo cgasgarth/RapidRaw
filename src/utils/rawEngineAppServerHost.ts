@@ -15,6 +15,7 @@ import {
   rawEngineAppServerRouteCatalogReplaySchema,
   rawEngineAppServerRouteCatalogResponseSchema,
   rawEngineAppServerHostRequestSchema,
+  rawEngineAppServerHostResponseEnvelopeSchema,
   rawEngineAppServerHostResponseSchema,
   type RawEngineAppServerAuditEntry,
   type RawEngineAppServerCapabilitiesReplay,
@@ -26,6 +27,7 @@ import {
   type RawEngineAppServerHostManifest,
   type RawEngineAppServerHostRequest,
   type RawEngineAppServerHostResponse,
+  type RawEngineAppServerHostResponseEnvelope,
   type RawEngineAppServerRouteCatalogEntry,
   type RawEngineAppServerRouteCatalogReplay,
   type RawEngineAppServerRouteCatalogRequest,
@@ -216,6 +218,22 @@ export const handleRawEngineAppServerHostRequest = (request: unknown): RawEngine
     case 'rawengine.host.route_catalog':
       return rawEngineAppServerHostResponseSchema.parse(buildRawEngineAppServerRouteCatalogResponse(parsedRequest));
   }
+};
+
+export const buildRawEngineAppServerHostResponseEnvelope = (
+  request: unknown,
+  handledAtIso = '2026-06-17T00:00:00.000Z',
+): RawEngineAppServerHostResponseEnvelope => {
+  const parsedRequest = rawEngineAppServerHostRequestSchema.parse(request);
+
+  return rawEngineAppServerHostResponseEnvelopeSchema.parse({
+    handledAtIso,
+    request: parsedRequest,
+    response: handleRawEngineAppServerHostRequest(parsedRequest),
+    schemaVersion: 1,
+    status: 'ok',
+    transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
+  });
 };
 
 export const buildRawEngineAppServerAuditEntry = ({
