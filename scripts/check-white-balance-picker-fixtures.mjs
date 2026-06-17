@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import {
+  applyWhiteBalanceToRgbPixel,
   calculateWhiteBalancePickerAdjustment,
   whiteBalancePickerInputSchema,
 } from '../src/utils/whiteBalancePicker.ts';
@@ -14,7 +15,23 @@ const fixtureSchema = z
     z
       .object({
         case: z.string().min(1),
+        expectedRgb: z
+          .object({
+            blue: z.number().min(0).max(1),
+            green: z.number().min(0).max(1),
+            red: z.number().min(0).max(1),
+          })
+          .strict()
+          .optional(),
         input: whiteBalancePickerInputSchema,
+        inputRgb: z
+          .object({
+            blue: z.number().min(0).max(1),
+            green: z.number().min(0).max(1),
+            red: z.number().min(0).max(1),
+          })
+          .strict()
+          .optional(),
         expected: z
           .object({
             deltaTemperature: z.number(),
@@ -51,6 +68,13 @@ for (const fixture of fixtures) {
   assertClose(`${fixture.case} deltaTint`, result.deltaTint, fixture.expected.deltaTint, fixture.tolerance);
   assertClose(`${fixture.case} temperature`, result.temperature, fixture.expected.temperature, fixture.tolerance);
   assertClose(`${fixture.case} tint`, result.tint, fixture.expected.tint, fixture.tolerance);
+
+  if (fixture.inputRgb && fixture.expectedRgb) {
+    const actualRgb = applyWhiteBalanceToRgbPixel(fixture.inputRgb, result.temperature, result.tint).outputRgb;
+    assertClose(`${fixture.case} red`, actualRgb.red, fixture.expectedRgb.red, fixture.tolerance);
+    assertClose(`${fixture.case} green`, actualRgb.green, fixture.expectedRgb.green, fixture.tolerance);
+    assertClose(`${fixture.case} blue`, actualRgb.blue, fixture.expectedRgb.blue, fixture.tolerance);
+  }
 }
 
 if (failures.length > 0) {
