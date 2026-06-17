@@ -67,6 +67,76 @@ export const negativeLabDustScratchReviewReportSchema = z
     }
   });
 
+export const negativeLabQcProofRowSchema = z
+  .object({
+    contactSheetSlot: z.number().int().positive(),
+    exportBlockedReason: z.string().trim().min(1).max(120).nullable(),
+    findingCodes: z.array(negativeLabDustScratchFindingCodeSchema).min(1),
+    frameId: z.string().trim().min(1),
+    included: z.boolean(),
+    needsReview: z.boolean(),
+    previewReady: z.boolean(),
+    recommendedAction: z.string().trim().min(1).max(160),
+    scanLabel: z.string().trim().min(1),
+  })
+  .strict()
+  .superRefine((row, context) => {
+    if (!row.included && row.exportBlockedReason === null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Excluded Negative Lab QC rows must include an export block reason.',
+        path: ['exportBlockedReason'],
+      });
+    }
+
+    if (!row.previewReady && row.exportBlockedReason === null) {
+      context.addIssue({
+        code: 'custom',
+        message: 'QC rows without preview must include an export block reason.',
+        path: ['exportBlockedReason'],
+      });
+    }
+  });
+
+export const negativeLabQcProofReportSchema = z
+  .object({
+    contactSheetColumnCount: z.number().int().min(1).max(8),
+    exportReady: z.boolean(),
+    frames: z.array(negativeLabQcProofRowSchema).min(1),
+    includedFrameCount: z.number().int().nonnegative(),
+    reviewFrameCount: z.number().int().nonnegative(),
+    schemaVersion: z.literal(NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION),
+    totalFrameCount: z.number().int().positive(),
+  })
+  .strict()
+  .superRefine((report, context) => {
+    if (report.frames.length !== report.totalFrameCount) {
+      context.addIssue({ code: 'custom', message: 'QC proof total frame count is stale.', path: ['totalFrameCount'] });
+    }
+
+    const includedFrameCount = report.frames.filter((frame) => frame.included).length;
+    if (includedFrameCount !== report.includedFrameCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'QC proof included frame count is stale.',
+        path: ['includedFrameCount'],
+      });
+    }
+
+    const reviewFrameCount = report.frames.filter((frame) => frame.needsReview).length;
+    if (reviewFrameCount !== report.reviewFrameCount) {
+      context.addIssue({
+        code: 'custom',
+        message: 'QC proof review frame count is stale.',
+        path: ['reviewFrameCount'],
+      });
+    }
+
+    if (report.exportReady && report.frames.some((frame) => frame.exportBlockedReason !== null)) {
+      context.addIssue({ code: 'custom', message: 'Export-ready QC proof cannot include blocked rows.' });
+    }
+  });
+
 export const negativeLabWorkspaceProofSchema = z
   .object({
     activeStage: negativeLabWorkspaceStageIdSchema,
@@ -93,11 +163,15 @@ export const negativeLabWorkspaceProofSchema = z
   });
 
 export type NegativeLabDustScratchReviewReport = z.infer<typeof negativeLabDustScratchReviewReportSchema>;
+export type NegativeLabQcProofReport = z.infer<typeof negativeLabQcProofReportSchema>;
 export type NegativeLabWorkspaceProof = z.infer<typeof negativeLabWorkspaceProofSchema>;
 export type NegativeLabWorkspaceStageId = z.infer<typeof negativeLabWorkspaceStageIdSchema>;
 
 export const parseNegativeLabDustScratchReviewReport = (value: unknown): NegativeLabDustScratchReviewReport =>
   negativeLabDustScratchReviewReportSchema.parse(value);
+
+export const parseNegativeLabQcProofReport = (value: unknown): NegativeLabQcProofReport =>
+  negativeLabQcProofReportSchema.parse(value);
 
 export const parseNegativeLabWorkspaceProof = (value: unknown): NegativeLabWorkspaceProof =>
   negativeLabWorkspaceProofSchema.parse(value);

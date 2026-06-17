@@ -32,7 +32,10 @@ import {
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import { buildNegativeBaseFogDensitometerReadout } from '../../utils/negativeLabDensitometer';
-import { buildNegativeLabDustScratchReviewReport } from '../../utils/negativeLabDustScratchReview';
+import {
+  buildNegativeLabDustScratchReviewReport,
+  buildNegativeLabQcProofReport,
+} from '../../utils/negativeLabDustScratchReview';
 import {
   buildNegativeLabBatchDryRunSummary,
   buildNegativeLabFrameHealthReport,
@@ -343,6 +346,15 @@ export default function NegativeConversionModal({
     previewUrl !== null &&
     pathsToConvert.length > 0 &&
     (!requiresAcceptedBatchPlan || isBatchPlanAccepted);
+  const qcProofReport = useMemo(
+    () =>
+      buildNegativeLabQcProofReport(
+        dustScratchReviewReport,
+        previewUrl !== null,
+        canSave && pathsToConvert.length === targetPaths.length,
+      ),
+    [canSave, dustScratchReviewReport, pathsToConvert.length, previewUrl, targetPaths.length],
+  );
   const workspaceProof = useMemo(
     (): NegativeLabWorkspaceProof => ({
       activeStage: canSave ? 'export' : previewUrl === null ? 'colorInversion' : 'inspection',
@@ -1012,6 +1024,59 @@ export default function NegativeConversionModal({
     </div>
   );
 
+  const renderQcProofReport = () => (
+    <div className="space-y-2 rounded-md border border-surface bg-bg-primary p-2" data-testid="negative-lab-qc-proof">
+      <div className="flex items-center justify-between gap-2">
+        <UiText variant={TextVariants.small} className="font-medium text-text-primary">
+          {t('modals.negativeConversion.qcProofReport')}
+        </UiText>
+        <div className="flex gap-1 text-[11px] text-text-tertiary">
+          <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-qc-proof-frame-count">
+            {t('modals.negativeConversion.frameHealthFrameCount', { frameCount: qcProofReport.totalFrameCount })}
+          </span>
+          <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-qc-proof-review-count">
+            {t('modals.negativeConversion.dustReviewCount', { reviewCount: qcProofReport.reviewFrameCount })}
+          </span>
+        </div>
+      </div>
+      <UiText variant={TextVariants.small} className="text-text-tertiary">
+        {t('modals.negativeConversion.qcProofHint')}
+      </UiText>
+      <div
+        className="grid gap-1"
+        data-contact-sheet-columns={qcProofReport.contactSheetColumnCount}
+        data-export-ready={qcProofReport.exportReady ? 'true' : 'false'}
+      >
+        {qcProofReport.frames.map((frame) => (
+          <div
+            className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+            data-blocked={frame.exportBlockedReason === null ? 'false' : 'true'}
+            data-testid={`negative-lab-qc-proof-row-${frame.contactSheetSlot - 1}`}
+            key={frame.frameId}
+          >
+            <span className="rounded bg-bg-primary px-1.5 py-0.5 text-[11px] text-text-tertiary">
+              {frame.contactSheetSlot}
+            </span>
+            <span className="min-w-0 truncate text-text-secondary">{frame.scanLabel}</span>
+            <span
+              className={cx(
+                'rounded px-1.5 py-0.5',
+                frame.needsReview ? 'bg-surface text-text-secondary' : 'bg-accent/15 text-text-primary',
+              )}
+            >
+              {frame.needsReview
+                ? t(DUST_SCRATCH_SEVERITY_LABEL_KEYS.review)
+                : t('modals.negativeConversion.previewReady')}
+            </span>
+            <span className="col-span-3 text-[11px] text-text-tertiary">
+              {frame.exportBlockedReason ?? frame.recommendedAction}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const renderControls = () => (
     <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary flex flex-col border-l border-surface h-full z-10">
       <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
@@ -1660,6 +1725,7 @@ export default function NegativeConversionModal({
                 )}
             </div>
             {renderDustScratchReview()}
+            {renderQcProofReport()}
             <Slider
               label={t('modals.negativeConversion.redWeight')}
               value={params.red_weight}
