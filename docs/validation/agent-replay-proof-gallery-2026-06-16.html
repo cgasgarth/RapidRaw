@@ -99,6 +99,28 @@
         gap: 12px;
       }
 
+      .fixture-card {
+        display: grid;
+        gap: 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .fixture-card + .fixture-card {
+        margin-top: 14px;
+      }
+
+      .fixture-card h3 {
+        margin: 8px 0 4px;
+        font-size: 18px;
+      }
+
+      .frames.compact {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
+
       .preview {
         aspect-ratio: 4 / 3;
         border: 1px solid var(--line);
@@ -163,36 +185,99 @@
     <main>
       <header>
         <h1>Agent Replay Proof Gallery</h1>
-        <p class="muted">Generated from <code>packages/rawengine-schema/samples/agent-replay-fixture-v1.json</code>.</p>
+        <p class="muted">Generated from all committed agent replay fixtures.</p>
       </header>
 
       <section class="summary">
-        <div class="tile"><strong>Replay</strong><code>replay_agent_edit_rollback_001</code></div>
-        <div class="tile"><strong>Initial revision</strong><code>graph_rev_44</code></div>
-        <div class="tile"><strong>Final revision</strong><code>graph_rev_44</code></div>
-        <div class="tile"><strong>Validation</strong>golden_replay</div>
+        <div class="tile"><strong>Fixtures</strong>3</div>
+        <div class="tile"><strong>Replay steps</strong>7</div>
+        <div class="tile"><strong>Dry-run/apply</strong>3 / 4</div>
+        <div class="tile"><strong>Validation</strong>golden_replay, schema_contract</div>
       </section>
 
       <section>
         <h2>Rendered Fixture Evidence</h2>
-        <div class="frames">
-          <div class="frame">
-            <div class="preview"><span class="badge">before</span></div>
-            <code>graph_rev_44</code>
+        <article class="fixture-card">
+          <div>
+            <span class="badge">Edit graph rollback</span>
+            <h3>replay_agent_edit_rollback_001</h3>
+            <p class="muted"><code>packages/rawengine-schema/samples/agent-replay-fixture-v1.json</code></p>
           </div>
-          <div class="frame">
-            <div class="preview"><span class="badge">dry-run</span></div>
-            <code>graph_rev_45_preview</code>
+          <div class="frames compact">
+            <div class="frame">
+              <div class="preview"><span class="badge">before</span></div>
+              <code>graph_rev_44</code>
+            </div>
+            <div class="frame">
+              <div class="preview"><span class="badge">dry-run</span></div>
+              <code>graph_rev_45_preview</code>
+            </div>
+            <div class="frame">
+              <div class="preview"><span class="badge">apply</span></div>
+              <code>graph_rev_45</code>
+            </div>
+            <div class="frame">
+              <div class="preview"><span class="badge">apply</span></div>
+              <code>graph_rev_44</code>
+            </div>
+            <div class="frame">
+              <div class="preview"><span class="badge">final</span></div>
+              <code>graph_rev_44</code>
+            </div>
           </div>
-          <div class="frame">
-            <div class="preview"><span class="badge">applied</span></div>
-            <code>graph_rev_45</code>
+        </article>
+        <article class="fixture-card">
+          <div>
+            <span class="badge">AI subject mask</span>
+            <h3>replay_ai_subject_mask_001</h3>
+            <p class="muted"><code>packages/rawengine-schema/samples/ai-tool-agent-replay-fixture-v1.json</code></p>
           </div>
-          <div class="frame">
-            <div class="preview"><span class="badge">rolled back</span></div>
-            <code>graph_rev_44</code>
+          <div class="frames compact">
+            <div class="frame">
+              <div class="preview"><span class="badge">before</span></div>
+              <code>graph_rev_44</code>
+            </div>
+            <div class="frame">
+              <div class="preview"><span class="badge">dry-run</span></div>
+              <code>n/a</code>
+            </div>
+            <div class="frame">
+              <div class="preview"><span class="badge">apply</span></div>
+              <code>graph_rev_47</code>
+            </div>
+            <div class="frame">
+              <div class="preview"><span class="badge">final</span></div>
+              <code>graph_rev_47</code>
+            </div>
           </div>
-        </div>
+        </article>
+        <article class="fixture-card">
+          <div>
+            <span class="badge">AI enhancement</span>
+            <h3>replay_ai_inpaint_001</h3>
+            <p class="muted">
+              <code>packages/rawengine-schema/samples/ai-enhancement-agent-replay-fixture-v1.json</code>
+            </p>
+          </div>
+          <div class="frames compact">
+            <div class="frame">
+              <div class="preview"><span class="badge">before</span></div>
+              <code>graph_rev_44</code>
+            </div>
+            <div class="frame">
+              <div class="preview"><span class="badge">dry-run</span></div>
+              <code>n/a</code>
+            </div>
+            <div class="frame">
+              <div class="preview"><span class="badge">apply</span></div>
+              <code>graph_rev_48</code>
+            </div>
+            <div class="frame">
+              <div class="preview"><span class="badge">final</span></div>
+              <code>graph_rev_48</code>
+            </div>
+          </div>
+        </article>
       </section>
 
       <section>
@@ -200,6 +285,7 @@
         <table>
           <thead>
             <tr>
+              <th>Fixture</th>
               <th>Step</th>
               <th>Tool</th>
               <th>Mode</th>
@@ -211,6 +297,7 @@
           </thead>
           <tbody>
             <tr>
+              <td>Edit graph rollback</td>
               <td><code>step_edit_graph_dry_run</code></td>
               <td>editgraph.dry_run_command</td>
               <td>dry-run</td>
@@ -220,6 +307,7 @@
               <td>n/a</td>
             </tr>
             <tr>
+              <td>Edit graph rollback</td>
               <td><code>step_edit_graph_apply</code></td>
               <td>editgraph.apply_command</td>
               <td>apply</td>
@@ -229,6 +317,7 @@
               <td>graph_rev_44</td>
             </tr>
             <tr>
+              <td>Edit graph rollback</td>
               <td><code>step_edit_graph_rollback</code></td>
               <td>editgraph.apply_command</td>
               <td>apply</td>
@@ -236,6 +325,46 @@
               <td>never_overwrite_original</td>
               <td><code>/parameters/exposure</code>, <code>/parameters/contrast</code></td>
               <td>graph_rev_45</td>
+            </tr>
+            <tr>
+              <td>AI subject mask</td>
+              <td><code>step_ai_subject_mask_dry_run</code></td>
+              <td>ai.mask.dry_run_subject</td>
+              <td>dry-run</td>
+              <td>no</td>
+              <td>never_overwrite_original</td>
+              <td><code>/parameters/maskName</code></td>
+              <td>n/a</td>
+            </tr>
+            <tr>
+              <td>AI subject mask</td>
+              <td><code>step_ai_subject_mask_apply</code></td>
+              <td>ai.mask.apply_subject</td>
+              <td>apply</td>
+              <td>yes</td>
+              <td>never_overwrite_original</td>
+              <td><code>/parameters/acceptedDryRunPlanId</code></td>
+              <td>graph_rev_44</td>
+            </tr>
+            <tr>
+              <td>AI enhancement</td>
+              <td><code>step_ai_inpaint_dry_run</code></td>
+              <td>ai.enhancement.dry_run_command</td>
+              <td>dry-run</td>
+              <td>no</td>
+              <td>never_overwrite_original</td>
+              <td><code>/parameters/strength</code></td>
+              <td>n/a</td>
+            </tr>
+            <tr>
+              <td>AI enhancement</td>
+              <td><code>step_ai_inpaint_apply</code></td>
+              <td>ai.enhancement.apply_command</td>
+              <td>apply</td>
+              <td>yes</td>
+              <td>never_overwrite_original</td>
+              <td><code>/parameters/acceptedDryRunPlanId</code></td>
+              <td>graph_rev_44</td>
             </tr>
           </tbody>
         </table>
@@ -246,6 +375,7 @@
         <table>
           <thead>
             <tr>
+              <th>Fixture</th>
               <th>Step</th>
               <th>Artifact</th>
               <th>Source</th>
@@ -254,10 +384,32 @@
           </thead>
           <tbody>
             <tr>
+              <td>Edit graph rollback</td>
               <td><code>step_edit_graph_dry_run</code></td>
               <td><code>artifact_edit_graph_patch_preview</code></td>
               <td>output.previewArtifacts</td>
               <td><code>sha256:sample-edit-graph-preview</code></td>
+            </tr>
+            <tr>
+              <td>AI subject mask</td>
+              <td><code>step_ai_subject_mask_dry_run</code></td>
+              <td><code>artifact_ai_subject_mask_alpha</code></td>
+              <td>output.maskArtifacts</td>
+              <td><code>sha256:sample-ai-subject-mask-alpha</code></td>
+            </tr>
+            <tr>
+              <td>AI enhancement</td>
+              <td><code>step_ai_inpaint_dry_run</code></td>
+              <td><code>artifact_ai_inpaint_preview_patch</code></td>
+              <td>auditLog.affectedArtifactIds</td>
+              <td><code>audit-only</code></td>
+            </tr>
+            <tr>
+              <td>AI enhancement</td>
+              <td><code>step_ai_inpaint_dry_run</code></td>
+              <td><code>artifact_ai_inpaint_preview</code></td>
+              <td>output.previewArtifacts</td>
+              <td><code>sha256:sample-ai-inpaint-preview</code></td>
             </tr>
           </tbody>
         </table>

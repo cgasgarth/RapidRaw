@@ -4,14 +4,42 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 import { format, resolveConfig } from 'prettier';
 
-import { sampleRawEngineAgentReplayFixtureV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
-import { rawEngineAgentReplayFixtureV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  sampleAiEnhancementAgentReplayFixtureV1,
+  sampleAiToolAgentReplayFixtureV1,
+  sampleRawEngineAgentReplayFixtureV1,
+} from '../packages/rawengine-schema/src/samplePayloads.ts';
+import {
+  rawEngineAgentReplayFixtureV1Schema,
+  type RawEngineAgentReplayFixtureV1,
+} from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const OUTPUT_PATH = 'docs/validation/agent-replay-proof-gallery-2026-06-16.html';
 const args = new Set(process.argv.slice(2));
 const shouldUpdate = args.has('--update');
 
-const fixture = rawEngineAgentReplayFixtureV1Schema.parse(sampleRawEngineAgentReplayFixtureV1);
+const replayFixtureInputs: Array<{ fixture: RawEngineAgentReplayFixtureV1; name: string; sourcePath: string }> = [
+  {
+    fixture: sampleRawEngineAgentReplayFixtureV1,
+    name: 'Edit graph rollback',
+    sourcePath: 'packages/rawengine-schema/samples/agent-replay-fixture-v1.json',
+  },
+  {
+    fixture: sampleAiToolAgentReplayFixtureV1,
+    name: 'AI subject mask',
+    sourcePath: 'packages/rawengine-schema/samples/ai-tool-agent-replay-fixture-v1.json',
+  },
+  {
+    fixture: sampleAiEnhancementAgentReplayFixtureV1,
+    name: 'AI enhancement',
+    sourcePath: 'packages/rawengine-schema/samples/ai-enhancement-agent-replay-fixture-v1.json',
+  },
+];
+
+const replayFixtures = replayFixtureInputs.map(({ fixture, ...metadata }) => ({
+  ...metadata,
+  fixture: rawEngineAgentReplayFixtureV1Schema.parse(fixture),
+}));
 
 const escapeHtml = (value) =>
   String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -24,13 +52,49 @@ const collectStepOutputArtifacts = (step) =>
     })
     .filter((artifact) => typeof artifact.artifactId === 'string');
 
-const outputArtifactsById = new Map(
-  fixture.steps.flatMap((step) => collectStepOutputArtifacts(step).map((artifact) => [artifact.artifactId, artifact])),
-);
+const getStepGraphRevision = (step) => {
+  if ('predictedGraphRevision' in step.output && typeof step.output.predictedGraphRevision === 'string') {
+    return step.output.predictedGraphRevision;
+  }
 
-const stepRows = fixture.steps
+  if ('appliedGraphRevision' in step.output && typeof step.output.appliedGraphRevision === 'string') {
+    return step.output.appliedGraphRevision;
+  }
+
+  if ('sourceGraphRevision' in step.output && typeof step.output.sourceGraphRevision === 'string') {
+    return step.output.sourceGraphRevision;
+  }
+
+  return 'n/a';
+};
+
+const fixtureCards = replayFixtures
   .map(
-    (step) => `<tr>
+    ({ fixture, name, sourcePath }) => `<article class="fixture-card">
+      <div>
+        <span class="badge">${escapeHtml(name)}</span>
+        <h3>${escapeHtml(fixture.replayId)}</h3>
+        <p class="muted"><code>${escapeHtml(sourcePath)}</code></p>
+      </div>
+      <div class="frames compact">
+        <div class="frame"><div class="preview"><span class="badge">before</span></div><code>${escapeHtml(fixture.initialGraphRevision)}</code></div>
+        ${fixture.steps
+          .map(
+            (step) =>
+              `<div class="frame"><div class="preview"><span class="badge">${escapeHtml(step.dryRun ? 'dry-run' : step.toolKind)}</span></div><code>${escapeHtml(getStepGraphRevision(step))}</code></div>`,
+          )
+          .join('\n')}
+        <div class="frame"><div class="preview"><span class="badge">final</span></div><code>${escapeHtml(fixture.finalGraphRevision)}</code></div>
+      </div>
+    </article>`,
+  )
+  .join('\n');
+
+const stepRows = replayFixtures
+  .flatMap(({ fixture, name }) =>
+    fixture.steps.map(
+      (step) => `<tr>
+      <td>${escapeHtml(name)}</td>
       <td><code>${escapeHtml(step.stepId)}</code></td>
       <td>${escapeHtml(step.toolName)}</td>
       <td>${step.dryRun ? 'dry-run' : 'apply'}</td>
@@ -39,23 +103,35 @@ const stepRows = fixture.steps
       <td>${step.auditLog.parameterDiff.map((diff) => `<code>${escapeHtml(diff.path)}</code>`).join(', ')}</td>
       <td>${escapeHtml(step.auditLog.rollbackPoint?.graphRevision ?? 'n/a')}</td>
     </tr>`,
+    ),
   )
   .join('\n');
 
-const artifactRows = fixture.steps
-  .flatMap((step) =>
+const artifactRowData = replayFixtures.flatMap(({ fixture, name }) => {
+  const outputArtifactsById = new Map(
+    fixture.steps.flatMap((step) =>
+      collectStepOutputArtifacts(step).map((artifact) => [artifact.artifactId, artifact]),
+    ),
+  );
+
+  return fixture.steps.flatMap((step) =>
     step.auditLog.affectedArtifactIds.map((artifactId) => {
       const outputArtifact = outputArtifactsById.get(artifactId);
       return {
         artifactId,
         contentHash: outputArtifact?.contentHash ?? 'audit-only',
+        fixtureName: name,
         source: outputArtifact?.source ?? 'auditLog.affectedArtifactIds',
         stepId: step.stepId,
       };
     }),
-  )
+  );
+});
+
+const artifactRows = artifactRowData
   .map(
     (artifact) => `<tr>
+      <td>${escapeHtml(artifact.fixtureName)}</td>
       <td><code>${escapeHtml(artifact.stepId)}</code></td>
       <td><code>${escapeHtml(artifact.artifactId)}</code></td>
       <td>${escapeHtml(artifact.source)}</td>
@@ -64,13 +140,32 @@ const artifactRows = fixture.steps
   )
   .join('\n');
 
-if (artifactRows.length === 0) {
+const missingDryRunOrApplyFixture = replayFixtures.find(
+  ({ fixture }) => !fixture.steps.some((step) => step.dryRun) || !fixture.steps.some((step) => step.mutates),
+);
+
+if (missingDryRunOrApplyFixture !== undefined) {
+  throw new Error(`${missingDryRunOrApplyFixture.name} replay fixture must contain dry-run and apply steps.`);
+}
+
+if (artifactRowData.length === 0) {
   throw new Error('Agent proof gallery requires at least one affected artifact row.');
 }
 
-if (![...outputArtifactsById.values()].some((artifact) => typeof artifact.contentHash === 'string')) {
+if (!artifactRowData.some((artifact) => artifact.contentHash.startsWith('sha256:'))) {
   throw new Error('Agent proof gallery requires at least one output artifact content hash.');
 }
+
+const totalSteps = replayFixtures.reduce((count, { fixture }) => count + fixture.steps.length, 0);
+const totalDryRuns = replayFixtures.reduce(
+  (count, { fixture }) => count + fixture.steps.filter((step) => step.dryRun).length,
+  0,
+);
+const totalApplySteps = replayFixtures.reduce(
+  (count, { fixture }) => count + fixture.steps.filter((step) => step.mutates).length,
+  0,
+);
+const validationProfiles = [...new Set(replayFixtures.map(({ fixture }) => fixture.validationProfile))].join(', ');
 
 const html = `<!doctype html>
 <html lang="en">
@@ -167,6 +262,28 @@ const html = `<!doctype html>
         gap: 12px;
       }
 
+      .fixture-card {
+        display: grid;
+        gap: 14px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .fixture-card + .fixture-card {
+        margin-top: 14px;
+      }
+
+      .fixture-card h3 {
+        margin: 8px 0 4px;
+        font-size: 18px;
+      }
+
+      .frames.compact {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      }
+
       .preview {
         aspect-ratio: 4 / 3;
         border: 1px solid var(--line);
@@ -232,24 +349,19 @@ const html = `<!doctype html>
     <main>
       <header>
         <h1>Agent Replay Proof Gallery</h1>
-        <p class="muted">Generated from <code>packages/rawengine-schema/samples/agent-replay-fixture-v1.json</code>.</p>
+        <p class="muted">Generated from all committed agent replay fixtures.</p>
       </header>
 
       <section class="summary">
-        <div class="tile"><strong>Replay</strong><code>${escapeHtml(fixture.replayId)}</code></div>
-        <div class="tile"><strong>Initial revision</strong><code>${escapeHtml(fixture.initialGraphRevision)}</code></div>
-        <div class="tile"><strong>Final revision</strong><code>${escapeHtml(fixture.finalGraphRevision)}</code></div>
-        <div class="tile"><strong>Validation</strong>${escapeHtml(fixture.validationProfile)}</div>
+        <div class="tile"><strong>Fixtures</strong>${replayFixtures.length}</div>
+        <div class="tile"><strong>Replay steps</strong>${totalSteps}</div>
+        <div class="tile"><strong>Dry-run/apply</strong>${totalDryRuns} / ${totalApplySteps}</div>
+        <div class="tile"><strong>Validation</strong>${escapeHtml(validationProfiles)}</div>
       </section>
 
       <section>
         <h2>Rendered Fixture Evidence</h2>
-        <div class="frames">
-          <div class="frame"><div class="preview"><span class="badge">before</span></div><code>${escapeHtml(fixture.initialGraphRevision)}</code></div>
-          <div class="frame"><div class="preview"><span class="badge">dry-run</span></div><code>${escapeHtml(fixture.steps[0].output.predictedGraphRevision)}</code></div>
-          <div class="frame"><div class="preview"><span class="badge">applied</span></div><code>${escapeHtml(fixture.steps[1].output.appliedGraphRevision)}</code></div>
-          <div class="frame"><div class="preview"><span class="badge">rolled back</span></div><code>${escapeHtml(fixture.steps[2].output.appliedGraphRevision)}</code></div>
-        </div>
+        ${fixtureCards}
       </section>
 
       <section>
@@ -257,6 +369,7 @@ const html = `<!doctype html>
         <table>
           <thead>
             <tr>
+              <th>Fixture</th>
               <th>Step</th>
               <th>Tool</th>
               <th>Mode</th>
@@ -277,6 +390,7 @@ const html = `<!doctype html>
         <table>
           <thead>
             <tr>
+              <th>Fixture</th>
               <th>Step</th>
               <th>Artifact</th>
               <th>Source</th>
