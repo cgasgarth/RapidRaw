@@ -146,6 +146,7 @@
     "check:panorama-ui-api": "bun scripts/check-panorama-ui-api.ts",
     "check:panorama-ui-runtime-bridge": "bun scripts/check-panorama-ui-runtime-bridge.ts",
     "check:panorama-ui": "bun scripts/check-panorama-ui.ts",
+    "check:panorama-review-diagnostics": "bun scripts/check-panorama-review-diagnostics.ts",
     "check:panorama-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario panorama-ui",
     "check:hdr-alignment-smoke": "bun scripts/check-hdr-alignment-smoke.ts",
     "check:hdr-deghosting-smoke": "bun scripts/check-hdr-deghosting-smoke.ts",
