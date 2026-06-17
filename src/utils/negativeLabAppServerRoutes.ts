@@ -35,6 +35,7 @@ import {
   negativeLabStockFamilyConversionResultSchema,
   negativeLabStockRegistryAppServerCommandSchema,
   negativeLabStockRegistryAppServerResultSchema,
+  negativeLabRouteDescriptors,
   type NegativeLabAppServerCommand,
   type NegativeLabAcceptedBatchApplyAppServerCommand,
   type NegativeLabAcceptedBatchApplyAppServerResult,
@@ -58,79 +59,7 @@ import {
 } from '../schemas/negativeLabAppServerSchemas';
 
 export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteManifestSchema.parse({
-  routes: [
-    {
-      commandName: 'negative.lab.build_accepted_batch_apply',
-      inputSchemaName: 'NegativeLabAcceptedBatchApplyAppServerCommandV1',
-      outputSchemaName: 'NegativeLabAcceptedBatchApplyPlanV1',
-      reason: 'Negative Lab app-server apply calls must replay an accepted dry-run plan identity.',
-      status: 'mapped',
-    },
-    {
-      commandName: 'negative.lab.accept_batch_dry_run_plan',
-      inputSchemaName: 'NegativeLabAcceptBatchPlanAppServerCommandV1',
-      outputSchemaName: 'NegativeLabAcceptedBatchPlanV1',
-      reason: 'Negative Lab app-server calls require an accepted non-destructive batch plan before apply.',
-      status: 'mapped',
-    },
-    {
-      commandName: 'negative.lab.build_batch_dry_run_summary',
-      inputSchemaName: 'NegativeLabBatchSummaryAppServerCommandV1',
-      outputSchemaName: 'NegativeLabBatchDryRunSummaryV1',
-      reason: 'Negative Lab app-server calls expose the same non-destructive batch apply/skip plan used by UI.',
-      status: 'mapped',
-    },
-    {
-      commandName: 'negative.lab.build_conversion_plan',
-      inputSchemaName: 'NegativeLabAppServerCommandV1',
-      outputSchemaName: 'NegativeLabConversionPlanResultV1',
-      reason:
-        'Negative Lab app-server calls share the UI built-in preset catalog and deterministic conversion plan shape.',
-      status: 'mapped',
-    },
-    {
-      commandName: 'negative.lab.build_densitometer_readout',
-      inputSchemaName: 'NegativeLabDensitometerAppServerCommandV1',
-      outputSchemaName: 'NegativeBaseFogDensitometerReadoutV1',
-      reason: 'Negative Lab app-server calls expose the same base/fog densitometer math used by UI.',
-      status: 'mapped',
-    },
-    {
-      commandName: 'negative.lab.build_frame_health_report',
-      inputSchemaName: 'NegativeLabFrameHealthAppServerCommandV1',
-      outputSchemaName: 'NegativeLabFrameHealthReportV1',
-      reason: 'Negative Lab app-server calls expose the same roll frame health report used by the workspace UI.',
-      status: 'mapped',
-    },
-    {
-      commandName: 'negative.lab.build_qc_proof_report',
-      inputSchemaName: 'NegativeLabQcProofAppServerCommandV1',
-      outputSchemaName: 'NegativeLabQcProofReportV1',
-      reason: 'Negative Lab app-server calls expose the same contact-sheet QC proof summary used by the workspace UI.',
-      status: 'mapped',
-    },
-    {
-      commandName: 'negative.lab.build_stock_family_conversion_plan',
-      inputSchemaName: 'NegativeLabStockFamilyConversionAppServerCommandV1',
-      outputSchemaName: 'NegativeLabStockFamilyConversionResultV1',
-      reason: 'Negative Lab app-server calls can build conversion plans from governed stock-family registry ids.',
-      status: 'mapped',
-    },
-    {
-      commandName: 'negative.lab.list_stock_registry',
-      inputSchemaName: 'NegativeLabStockRegistryAppServerCommandV1',
-      outputSchemaName: 'NegativeLabStockRegistryAppServerResultV1',
-      reason: 'Negative Lab app-server calls expose the governed stock-family registry used by preset workflows.',
-      status: 'mapped',
-    },
-    {
-      commandName: 'negative.lab.list_stock_metadata',
-      inputSchemaName: 'NegativeLabStockMetadataAppServerCommandV1',
-      outputSchemaName: 'NegativeLabStockMetadataAppServerResultV1',
-      reason: 'Negative Lab app-server calls expose named stock metadata without routing it through apply/export.',
-      status: 'mapped',
-    },
-  ],
+  routes: negativeLabRouteDescriptors.map((descriptor) => ({ ...descriptor, status: 'mapped' as const })),
   schemaVersion: 1,
 });
 
