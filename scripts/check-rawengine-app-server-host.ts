@@ -7,6 +7,7 @@ import {
   buildRawEngineAppServerCapabilitiesReplay,
   buildRawEngineAppServerHealthReplay,
   buildRawEngineAppServerRouteCatalogReplay,
+  handleRawEngineAppServerHostRequest,
 } from '../src/utils/rawEngineAppServerHost.ts';
 import {
   rawEngineAppServerCapabilitiesReplaySchema,
@@ -98,6 +99,24 @@ if (routeCatalogReplay.auditLog.length !== 1 || routeCatalogReplay.auditLog[0]?.
 if (routeCatalogReplay.auditLog[0]?.toolName !== 'rawengine.host.route_catalog') {
   failures.push('Route catalog replay audit tool mismatch.');
 }
+
+const dispatchedHealth = handleRawEngineAppServerHostRequest({
+  requestId: 'dispatch_health_001',
+  toolName: 'rawengine.host.health',
+});
+if (dispatchedHealth.status !== 'ok') failures.push('Dispatched health request failed.');
+
+const dispatchedCapabilities = handleRawEngineAppServerHostRequest({
+  requestId: 'dispatch_capabilities_001',
+  toolName: 'rawengine.host.capabilities',
+});
+if (dispatchedCapabilities.status !== 'ok') failures.push('Dispatched capabilities request failed.');
+
+const dispatchedRouteCatalog = handleRawEngineAppServerHostRequest({
+  requestId: 'dispatch_route_catalog_001',
+  toolName: 'rawengine.host.route_catalog',
+});
+if (dispatchedRouteCatalog.status !== 'ok') failures.push('Dispatched route catalog request failed.');
 
 const source = [
   'src/utils/rawEngineAppServerHost.ts',
