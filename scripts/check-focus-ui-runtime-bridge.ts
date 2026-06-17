@@ -109,14 +109,17 @@ expectThrows('mismatched accepted focus UI runtime plan', () =>
   }),
 );
 
-console.log(
-  JSON.stringify({
-    fixture: 'synthetic_focus_ui_runtime_bridge_v1',
-    focusCoverageRatio: applied.apply.provenance.focusCoverageRatio,
-    outputSha256: outputHash,
-    planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
-  }),
-);
+const result = {
+  fixture: 'synthetic_focus_ui_runtime_bridge_v1',
+  focusCoverageRatio: applied.apply.provenance.focusCoverageRatio,
+  outputSha256: outputHash,
+  planId: dryRun.dryRun.dryRunResult.mergePlan.planId,
+};
+if (process.argv.includes('--verbose')) {
+  console.log(JSON.stringify(result, null, 2));
+} else {
+  console.log(`focus UI runtime bridge ok (coverage=${result.focusCoverageRatio})`);
+}
 
 function buildRequest(command) {
   return {

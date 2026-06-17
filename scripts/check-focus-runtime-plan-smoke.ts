@@ -150,23 +150,22 @@ if (sourceHashes.includes(outputHash)) {
   throw new Error('Expected focus stack output to differ from every source frame.');
 }
 
-console.log(
-  JSON.stringify(
-    {
-      acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
-      artifactCount: applied.mutationResult.outputArtifacts.length,
-      artifactContentHashes: applied.mutationResult.outputArtifacts.map((artifact) => artifact.contentHash),
-      fixture: 'synthetic_focus_runtime_plan_v1',
-      focusCoverageRatio: dryRun.provenance.focusCoverageRatio,
-      outputSha256: outputHash,
-      qualityMetrics: dryRun.provenance.qualityMetrics,
-      sharpnessSettings: dryRun.provenance.sharpnessSettings,
-      warnings: dryRun.dryRunResult.warnings,
-    },
-    null,
-    2,
-  ),
-);
+const result = {
+  acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
+  artifactCount: applied.mutationResult.outputArtifacts.length,
+  artifactContentHashes: applied.mutationResult.outputArtifacts.map((artifact) => artifact.contentHash),
+  fixture: 'synthetic_focus_runtime_plan_v1',
+  focusCoverageRatio: dryRun.provenance.focusCoverageRatio,
+  outputSha256: outputHash,
+  qualityMetrics: dryRun.provenance.qualityMetrics,
+  sharpnessSettings: dryRun.provenance.sharpnessSettings,
+  warnings: dryRun.dryRunResult.warnings,
+};
+if (process.argv.includes('--verbose')) {
+  console.log(JSON.stringify(result, null, 2));
+} else {
+  console.log(`focus runtime plan ok (${result.artifactCount} artifacts, coverage=${result.focusCoverageRatio})`);
+}
 
 function createFocusFrame(sourceIndex) {
   const pixels = new Float32Array(WIDTH * HEIGHT);

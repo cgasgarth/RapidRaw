@@ -130,26 +130,27 @@ if (improvementRatio < MIN_IMPROVEMENT_RATIO) {
   throw new Error(`Expected SR improvement ratio >= ${MIN_IMPROVEMENT_RATIO}, got ${improvementRatio}.`);
 }
 
-console.log(
-  JSON.stringify(
-    {
-      acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
-      artifactCount: applied.mutationResult.outputArtifacts.length,
-      fixture: 'synthetic_sr_runtime_plan_v1',
-      frameRegistrations: applied.provenance.frameRegistrations,
-      quality: {
-        confidenceMap: applied.provenance.confidenceMap,
-        detailQuality: applied.provenance.detailQuality,
-      },
-      improvementRatio,
-      outputArtifactContentHash: outputArtifact.contentHash,
-      outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex'),
-      outputSize: dryRun.dryRunResult.mergePlan.outputDimensions,
-    },
-    null,
-    2,
-  ),
-);
+const result = {
+  acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
+  artifactCount: applied.mutationResult.outputArtifacts.length,
+  fixture: 'synthetic_sr_runtime_plan_v1',
+  frameRegistrations: applied.provenance.frameRegistrations,
+  quality: {
+    confidenceMap: applied.provenance.confidenceMap,
+    detailQuality: applied.provenance.detailQuality,
+  },
+  improvementRatio,
+  outputArtifactContentHash: outputArtifact.contentHash,
+  outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex'),
+  outputSize: dryRun.dryRunResult.mergePlan.outputDimensions,
+};
+if (process.argv.includes('--verbose')) {
+  console.log(JSON.stringify(result, null, 2));
+} else {
+  console.log(
+    `SR runtime plan ok (${result.outputSize.width}x${result.outputSize.height}, improvement=${result.improvementRatio.toFixed(3)})`,
+  );
+}
 
 function createHighResolutionTruth() {
   const pixels = new Float32Array(HIGH_WIDTH * HIGH_HEIGHT);
