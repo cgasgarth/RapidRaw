@@ -16,11 +16,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Pull Requests And GitHub Flow
 
 - Use pull requests for all repo changes. Do not commit directly to `main`.
-- Keep at most 3 active open PRs at a time.
-- Keep PRs moving: merge passing work, fix blocked work, and close obsolete
-  work.
-- Keep PR descriptions concise and include validation evidence.
-- Update linked GitHub issues and milestones with evidence as work lands.
+- Keep at most 3 open PRs at a time.
+- Keep PRs small enough to review and merge steadily.
+- Keep PR descriptions concise with validation evidence.
 
 ## GitHub Repo Resolution
 
@@ -56,17 +54,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Recurring Reminder Automation
 
 - The standing reminder automation is `check-rapidraw-consult-and-prs`.
-- Do not delete that automation unless the user explicitly asks to remove that
-  exact reminder.
-- It should run every 15 minutes and check for stale open PRs, especially PRs
-  open for more than 1 hour, while enforcing the three-open-PR cap.
-- It should also remind the agent to use the consult skill for hard decisions.
-- If a temporary reminder is needed to check consult output, update the existing
-  `check-rapidraw-consult-and-prs` automation instead of creating or deleting a
-  separate reminder, then restore it to the standing PR-stale/consult reminder
-  afterward.
-- `check-rapidraw-consult` is an inactive older reminder and must not be
-  reactivated unless the user explicitly asks.
+- Keep it active unless the user explicitly asks to remove it.
+- It should remind the agent to check PRs, respect the 3-open-PR cap, and use
+  consult for hard decisions.
 
 ## Consult And Research
 
