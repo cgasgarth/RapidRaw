@@ -2,7 +2,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import cx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import throttle from 'lodash.throttle';
 import {
   RotateCcw,
   ZoomIn,
@@ -49,6 +48,7 @@ import {
 import { buildNegativeLabProfileBrowserRows } from '../../utils/negativeLabProfileBrowserRows';
 import { NEGATIVE_LAB_STOCK_REGISTRY, buildNegativeLabStockRegistryCounts } from '../../utils/negativeLabStockRegistry';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
+import { throttle } from '../../utils/timing';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
@@ -533,7 +533,7 @@ export default function NegativeConversionModal({
     if (isOpen) {
       const timer = window.setTimeout(() => {
         setIsLoading(true);
-        void updatePreview(DEFAULT_PARAMS, true);
+        updatePreview(DEFAULT_PARAMS, true);
       }, 0);
 
       if (selectedImagePath) {
@@ -586,7 +586,7 @@ export default function NegativeConversionModal({
     }
     setParams(newParams);
     setAcceptedBatchPlanJson(null);
-    void updatePreview(newParams);
+    updatePreview(newParams);
   };
 
   const handlePresetSelect = (preset: NegativeLabRuntimeProfileBrowserRow) => {
@@ -598,7 +598,7 @@ export default function NegativeConversionModal({
     setBaseFogReadoutCopied(false);
     setActiveBaseFogSampleLabel(null);
     setParams(preset.params);
-    void updatePreview(preset.params);
+    updatePreview(preset.params);
   };
 
   const handleAutoBaseFog = async () => {
@@ -628,7 +628,7 @@ export default function NegativeConversionModal({
       setSelectedPresetId('');
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
-      void updatePreview(nextParams);
+      updatePreview(nextParams);
     } catch (e) {
       console.error('Negative base/fog estimate failed', e);
     } finally {
@@ -663,7 +663,7 @@ export default function NegativeConversionModal({
       setSelectedPresetId('');
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
-      void updatePreview(nextParams);
+      updatePreview(nextParams);
     } catch (e) {
       console.error('Negative base/fog sample failed', e);
     } finally {
@@ -715,7 +715,7 @@ export default function NegativeConversionModal({
     setSelectedPresetId('');
     setParams(nextParams);
     setAcceptedBatchPlanJson(null);
-    void updatePreview(nextParams);
+    updatePreview(nextParams);
   };
 
   const handleSamplePatchProbe = async (
@@ -1087,7 +1087,7 @@ export default function NegativeConversionModal({
             setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
             setBaseFogConfidence(null);
             setActiveBaseFogSampleLabel(null);
-            void updatePreview(DEFAULT_PARAMS);
+            updatePreview(DEFAULT_PARAMS);
           }}
           disabled={isSaving || isEstimatingBaseFog}
           data-tooltip={t('modals.negativeConversion.resetTooltip')}

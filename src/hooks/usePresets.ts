@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import debounce from 'lodash.debounce';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { type Folder, Invokes, type Preset } from '../components/ui/AppProperties';
@@ -9,6 +8,7 @@ import {
   ADJUSTMENT_GROUPS,
   INITIAL_ADJUSTMENTS,
 } from '../utils/adjustments';
+import { debounce } from '../utils/timing';
 
 export enum PresetListType {
   Folder = 'folder',

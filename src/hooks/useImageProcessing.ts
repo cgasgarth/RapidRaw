@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import debounce from 'lodash.debounce';
 import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 
 import { debouncedSave } from './useEditorActions';
@@ -11,6 +10,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
+import { debounce } from '../utils/timing';
 
 interface PreviousAdjustments {
   adjustments: Adjustments;
@@ -469,7 +469,7 @@ export function useImageProcessing(
     if (showOriginal && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
       const targetRes = calculateTargetRes();
       if (targetRes > currentOriginalResRef.current) {
-        void requestHiFiOriginalZoom(adjustments, targetRes);
+        requestHiFiOriginalZoom(adjustments, targetRes);
       }
     }
     return () => {
