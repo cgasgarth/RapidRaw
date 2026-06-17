@@ -128,8 +128,69 @@ export const waveletDetailPreviewPlanSchema = z
     }
   });
 
+export const waveletDetailPreviewManifestSchema = z
+  .object({
+    artifacts: z.array(waveletDetailPreviewArtifactSchema),
+    id: z.string().regex(/^wavelet_detail\.preview_manifest\.[a-z0-9._-]+$/u),
+    limitations: z.array(z.enum(['metadata_manifest_only', 'no_pixel_wavelet_render'])).min(2),
+    plan: waveletDetailPreviewPlanSchema,
+    schemaVersion: z.literal(1),
+    selectedArtifactId: waveletDetailPreviewArtifactSchema.shape.artifactId.nullable(),
+    sourceImageId: z.string().trim().min(1),
+    status: z.enum(['ready', 'disabled']),
+  })
+  .strict()
+  .superRefine((manifest, context) => {
+    const artifactIds = manifest.artifacts.map((artifact) => artifact.artifactId);
+
+    if (new Set(artifactIds).size !== artifactIds.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Wavelet preview manifest artifact ids must be unique.',
+        path: ['artifacts'],
+      });
+    }
+
+    if (manifest.status === 'ready') {
+      if (!manifest.plan.previewEnabled) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Ready wavelet preview manifests must reference an enabled preview plan.',
+          path: ['plan', 'previewEnabled'],
+        });
+      }
+
+      if (manifest.selectedArtifactId === null || !artifactIds.includes(manifest.selectedArtifactId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Ready wavelet preview manifests must select a listed artifact.',
+          path: ['selectedArtifactId'],
+        });
+      }
+    }
+
+    if (manifest.status === 'disabled') {
+      if (manifest.plan.previewEnabled) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Disabled wavelet preview manifests must reference a disabled preview plan.',
+          path: ['plan', 'previewEnabled'],
+        });
+      }
+
+      if (manifest.selectedArtifactId !== null || manifest.artifacts.length !== 0) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Disabled wavelet preview manifests must not include artifacts.',
+          path: ['artifacts'],
+        });
+      }
+    }
+  });
+
 export type WaveletDetailRecipe = z.infer<typeof waveletDetailRecipeSchema>;
 export type WaveletDetailPreviewArtifact = z.infer<typeof waveletDetailPreviewArtifactSchema>;
+export type WaveletDetailPreviewManifest = z.infer<typeof waveletDetailPreviewManifestSchema>;
 export type WaveletDetailPreviewPass = z.infer<typeof waveletDetailPreviewPassSchema>;
 export type WaveletDetailPreviewPlan = z.infer<typeof waveletDetailPreviewPlanSchema>;
 export type WaveletDetailScale = z.infer<typeof waveletDetailScaleSchema>;
@@ -206,5 +267,27 @@ export function buildWaveletDetailPreviewPlan(recipe: WaveletDetailRecipe): Wave
     previewEnabled,
     previewMode: previewEnabled ? recipe.previewMode : 'off',
     schemaVersion: 1,
+  });
+}
+
+export function buildWaveletDetailPreviewManifest({
+  recipe,
+  sourceImageId,
+}: {
+  recipe: WaveletDetailRecipe;
+  sourceImageId: string;
+}): WaveletDetailPreviewManifest {
+  const plan = buildWaveletDetailPreviewPlan(recipe);
+  const artifacts = plan.previewArtifact === null ? [] : [plan.previewArtifact];
+
+  return waveletDetailPreviewManifestSchema.parse({
+    artifacts,
+    id: `wavelet_detail.preview_manifest.${recipe.id}`,
+    limitations: ['metadata_manifest_only', 'no_pixel_wavelet_render'],
+    plan,
+    schemaVersion: 1,
+    selectedArtifactId: plan.previewArtifact?.artifactId ?? null,
+    sourceImageId,
+    status: plan.previewEnabled ? 'ready' : 'disabled',
   });
 }
