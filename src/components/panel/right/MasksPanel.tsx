@@ -41,7 +41,6 @@ import {
   useCallback,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { v4 as uuidv4 } from 'uuid';
 import { useShallow } from 'zustand/react/shallow';
 
 import LayerStackPanel from './LayerStackPanel';
@@ -1110,7 +1109,7 @@ export default function MasksPanel() {
     const count = adjustments.masks.length + 1;
     const newContainer = {
       ...INITIAL_MASK_CONTAINER,
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       name: t('editor.masks.patches.maskName', { count }),
       subMasks: [subMask],
     };
@@ -1293,14 +1292,14 @@ export default function MasksPanel() {
     container: MaskContainer,
     options: { invert?: boolean; rename?: boolean; resetAdjustments?: boolean } = {},
   ): MaskContainer =>
-    cloneMaskContainerForPaste(container, uuidv4, {
+    cloneMaskContainerForPaste(container, () => crypto.randomUUID(), {
       invert: options.invert,
       renameTo: options.rename === false ? undefined : t('editor.masks.patches.copyName', { name: container.name }),
       resetAdjustments: options.resetAdjustments,
     });
 
   const cloneSubMaskData = (subMask: SubMask, options: { invert?: boolean; rename?: boolean } = {}): SubMask =>
-    cloneSubMaskForPaste(subMask, uuidv4, {
+    cloneSubMaskForPaste(subMask, () => crypto.randomUUID(), {
       invert: options.invert,
       renameTo:
         options.rename === false ? undefined : t('editor.masks.patches.copyName', { name: getSubMaskName(subMask) }),
@@ -1498,7 +1497,7 @@ export default function MasksPanel() {
 
           const newContainer = {
             ...INITIAL_MASK_CONTAINER,
-            id: uuidv4(),
+            id: crypto.randomUUID(),
             name: `Mask ${newMasks.length + 1}`,
             subMasks: [movedSubMask],
           };

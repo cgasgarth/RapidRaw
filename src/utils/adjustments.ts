@@ -1,5 +1,4 @@
 import { Crop } from 'react-image-crop';
-import { v4 as uuidv4 } from 'uuid';
 
 import { toMaskParameterRecord } from './maskParameterAccess';
 import { Mask, SubMask, SubMaskMode } from '../components/panel/right/Masks';
@@ -729,7 +728,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
 
   const normalizeSubMasks = (subMasks?: Array<Partial<SubMask>>): Array<SubMask> => {
     return (subMasks || []).map((subMask: Partial<SubMask>) => ({
-      id: subMask.id || uuidv4(),
+      id: subMask.id || crypto.randomUUID(),
       invert: subMask.invert ?? false,
       mode: subMask.mode ?? SubMaskMode.Additive,
       opacity: subMask.opacity ?? 100,
@@ -747,7 +746,7 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     return {
       ...INITIAL_MASK_CONTAINER,
       ...maskContainer,
-      id: maskContainer.id || uuidv4(),
+      id: maskContainer.id || crypto.randomUUID(),
       adjustments: {
         ...INITIAL_MASK_ADJUSTMENTS,
         ...containerAdjustments,
