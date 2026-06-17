@@ -112,8 +112,21 @@ const applied = applyFocusStackRuntimePlanV1({
 });
 
 assertEqual(dryRun.provenance.focusCoverageRatio, 1, 'focus coverage');
+assertEqual(dryRun.provenance.sharpnessSettings.cellCount, cells.length, 'sharpness cell count');
+assertEqual(dryRun.provenance.sharpnessSettings.weightPower, 5, 'sharpness weight power');
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted plan id');
+const artifactIds = applied.mutationResult.outputArtifacts.map((artifact) => artifact.artifactId).sort();
+assertDeepEqual(
+  artifactIds,
+  [
+    'artifact_focus_runtime_depth_confidence',
+    'artifact_focus_runtime_output',
+    'artifact_focus_runtime_retouch',
+    'artifact_focus_runtime_sharpness',
+  ],
+  'focus output artifacts',
+);
 
 const outputHash = new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex');
 const sourceHashes = frames.map((frame) =>
@@ -127,9 +140,11 @@ console.log(
   JSON.stringify(
     {
       acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
+      artifactCount: applied.mutationResult.outputArtifacts.length,
       fixture: 'synthetic_focus_runtime_plan_v1',
       focusCoverageRatio: dryRun.provenance.focusCoverageRatio,
       outputSha256: outputHash,
+      sharpnessSettings: dryRun.provenance.sharpnessSettings,
       warnings: dryRun.dryRunResult.warnings,
     },
     null,
@@ -153,5 +168,11 @@ function createFocusFrame(sourceIndex) {
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
     throw new Error(`${label}: expected ${expected}, got ${actual}.`);
+  }
+}
+
+function assertDeepEqual(actual, expected, label) {
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}.`);
   }
 }
