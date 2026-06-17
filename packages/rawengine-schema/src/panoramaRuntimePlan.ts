@@ -89,10 +89,11 @@ export const buildPanoramaRuntimeDryRunV1 = (requestValue: unknown): PanoramaRun
   const runtime = renderPanoramaRuntime(request);
   const planId = `panorama_plan_${request.command.commandId}`;
   const planHash = `sha256:${stablePanoramaRuntimeHash(`${planId}:${runtime.provenance.resolvedProjection}`)}`;
+  const renderedContentHash = hashPanoramaRuntimePixels(runtime.outputPixels);
   const previewArtifacts = [
     {
       artifactId: request.previewArtifactId,
-      contentHash: `sha256:${stablePanoramaRuntimeHash(`${planHash}:preview`)}`,
+      contentHash: `sha256:${stablePanoramaRuntimeHash(`${planHash}:${request.previewArtifactId}:${renderedContentHash}`)}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
@@ -155,7 +156,9 @@ export const applyPanoramaRuntimePlanV1 = (requestValue: unknown): PanoramaRunti
   const outputArtifacts = [
     {
       artifactId: request.outputArtifactId,
-      contentHash: `sha256:${stablePanoramaRuntimeHash(`${acceptedDryRunPlanHash}:${request.outputArtifactId}`)}`,
+      contentHash: `sha256:${stablePanoramaRuntimeHash(
+        `${acceptedDryRunPlanHash}:${request.outputArtifactId}:${hashPanoramaRuntimePixels(runtime.outputPixels)}`,
+      )}`,
       dimensions: {
         height: runtime.height,
         width: runtime.width,
@@ -316,6 +319,15 @@ const stablePanoramaRuntimeHash = (input: string): string => {
   let value = 2166136261;
   for (let index = 0; index < input.length; index += 1) {
     value ^= input.charCodeAt(index);
+    value = Math.imul(value, 16777619) >>> 0;
+  }
+  return value.toString(16).padStart(8, '0');
+};
+
+const hashPanoramaRuntimePixels = (pixels: Uint8Array): string => {
+  let value = 2166136261;
+  for (const pixel of pixels) {
+    value ^= pixel;
     value = Math.imul(value, 16777619) >>> 0;
   }
   return value.toString(16).padStart(8, '0');
