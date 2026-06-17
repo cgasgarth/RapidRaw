@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Layers3, ScanSearch, ShieldCheck } from 'l
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
 import {
   ComputationalSetupModalShell,
   ComputationalSetupOptionSection,
@@ -235,6 +236,29 @@ export default function SuperResolutionModal({
           />
         </div>
       </motion.section>
+
+      <ComputationalMergeReviewPanel
+        title={t('modals.superResolution.review.title')}
+        proofStatus={t('modals.superResolution.review.proofStatus')}
+        limitation={t('modals.superResolution.review.limitation')}
+        items={[
+          {
+            label: t('modals.superResolution.review.registration'),
+            status: 'ready',
+            value: t('modals.superResolution.review.runtimeBridge'),
+          },
+          {
+            label: t('modals.superResolution.review.detailGain'),
+            status: 'review',
+            value: t('modals.superResolution.review.privateRawPending'),
+          },
+          {
+            label: t('modals.superResolution.review.ringing'),
+            status: 'pending',
+            value: t('modals.superResolution.review.uiE2ePending'),
+          },
+        ]}
+      />
 
       {isAggressivePreviewOnly && (
         <div className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 flex gap-3">

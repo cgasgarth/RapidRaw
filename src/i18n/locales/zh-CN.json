@@ -1412,6 +1412,17 @@
           "status": "Flattened preview"
         }
       },
+      "review": {
+        "limitation": "Runtime bridge proof only; private RAW decode, visual QA, and UI E2E remain open.",
+        "privateRawPending": "Private RAW review pending",
+        "proofStatus": "App-server bridge ready",
+        "retouchLayer": "Retouch layer",
+        "runtimeBridge": "Dry-run/apply bridge",
+        "sharpnessMap": "Sharpness map",
+        "title": "Quality review",
+        "transitions": "Focus transitions",
+        "uiE2ePending": "UI E2E pending"
+      },
       "sourceCountBlocked": "Focus stacking needs at least two focus-bracketed source frames.",
       "sourceSummary": "{{count}} focus frames selected",
       "sourceSummary_one": "{{count}} focus frame selected",
@@ -1720,6 +1731,17 @@
       },
       "qualityLabel": "Quality",
       "retry": "重试",
+      "review": {
+        "alignment": "Alignment",
+        "limitation": "Runtime bridge proof only; private RAW decode, visual seam QA, and UI E2E remain open.",
+        "privateRawPending": "Private RAW review pending",
+        "projectionCrop": "Projection/crop",
+        "proofStatus": "App-server bridge ready",
+        "runtimeBridge": "Dry-run/apply bridge",
+        "seams": "Seams",
+        "title": "Quality review",
+        "uiE2ePending": "UI E2E pending"
+      },
       "save": "保存",
       "savedSuccess": "全景图保存成功！",
       "sourceCountBlocked": "Select at least two overlapping source images before stitching.",
@@ -1803,6 +1825,17 @@
       "qualityBest": "Best",
       "qualityLabel": "Quality",
       "qualityPreview": "Preview",
+      "review": {
+        "detailGain": "Detail gain",
+        "limitation": "Runtime bridge proof only; private RAW decode, detail QA, and UI E2E remain open.",
+        "privateRawPending": "Private RAW review pending",
+        "proofStatus": "App-server bridge ready",
+        "registration": "Registration",
+        "ringing": "Ringing/zipper artifacts",
+        "runtimeBridge": "Dry-run/apply bridge",
+        "title": "Quality review",
+        "uiE2ePending": "UI E2E pending"
+      },
       "scaleLabel": "Scale",
       "scaleValue": "{{scale}}x",
       "sourceCountBlocked": "Super-resolution needs at least two source frames in the current API contract.",

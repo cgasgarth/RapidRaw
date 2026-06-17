@@ -2,6 +2,7 @@ import { Layers, ShieldCheck, XCircle } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import {
@@ -307,6 +308,31 @@ export default function PanoramaModal({
               ))}
             </div>
           </section>
+
+          <div className="mt-5">
+            <ComputationalMergeReviewPanel
+              title={t('modals.panorama.review.title')}
+              proofStatus={t('modals.panorama.review.proofStatus')}
+              limitation={t('modals.panorama.review.limitation')}
+              items={[
+                {
+                  label: t('modals.panorama.review.alignment'),
+                  status: 'ready',
+                  value: t('modals.panorama.review.runtimeBridge'),
+                },
+                {
+                  label: t('modals.panorama.review.seams'),
+                  status: 'review',
+                  value: t('modals.panorama.review.privateRawPending'),
+                },
+                {
+                  label: t('modals.panorama.review.projectionCrop'),
+                  status: 'pending',
+                  value: t('modals.panorama.review.uiE2ePending'),
+                },
+              ]}
+            />
+          </div>
 
           <div className="mt-5 flex items-start gap-3 rounded-md border border-border-color bg-surface px-4 py-3">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
