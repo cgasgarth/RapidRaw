@@ -36,6 +36,7 @@ export const negativeLabStockRegistryFixtureStatusSchema = z.enum([
   'fixture_needed',
   'measured_fixture_available',
 ]);
+export const negativeLabStockRegistryIdSchema = z.string().regex(/^negative_lab\.stock_family\.[a-z0-9_]+\.v[0-9]+$/u);
 
 export const negativeLabStockRegistryEntrySchema = z
   .object({
@@ -50,7 +51,7 @@ export const negativeLabStockRegistryEntrySchema = z
     isoClass: z.string().trim().min(1).max(80),
     legalNamingStatus: negativeLabStockRegistryLegalNamingStatusSchema,
     processFamily: negativeLabStockRegistryProcessFamilySchema,
-    registryId: z.string().regex(/^negative_lab\.stock_family\.[a-z0-9_]+\.v[0-9]+$/u),
+    registryId: negativeLabStockRegistryIdSchema,
     sourceReferences: z.array(z.string().trim().min(1)).min(1),
     stockFamilyDescriptor: z.string().trim().min(1).max(120),
   })
@@ -125,6 +126,7 @@ export const negativeLabStockRegistrySchema = z
 
 export type NegativeLabStockRegistry = z.infer<typeof negativeLabStockRegistrySchema>;
 export type NegativeLabStockRegistryEntry = z.infer<typeof negativeLabStockRegistryEntrySchema>;
+export type NegativeLabStockRegistryId = z.infer<typeof negativeLabStockRegistryIdSchema>;
 
 export const parseNegativeLabStockRegistry = (value: unknown): NegativeLabStockRegistry =>
   negativeLabStockRegistrySchema.parse(value);

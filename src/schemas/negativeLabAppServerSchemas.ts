@@ -14,7 +14,11 @@ import {
   negativeLabBaseFogSampleRectSchema,
   negativeLabPresetParamsSchema,
 } from './negativeLabPresetCatalogSchemas';
-import { negativeLabStockRegistrySchema } from './negativeLabStockRegistrySchemas';
+import {
+  negativeLabStockRegistryEntrySchema,
+  negativeLabStockRegistryIdSchema,
+  negativeLabStockRegistrySchema,
+} from './negativeLabStockRegistrySchemas';
 
 export const negativeLabConversionPlanCommandNameSchema = z.literal('negative.lab.build_conversion_plan');
 export const negativeLabAcceptedBatchApplyCommandNameSchema = z.literal('negative.lab.build_accepted_batch_apply');
@@ -23,6 +27,9 @@ export const negativeLabBatchSummaryCommandNameSchema = z.literal('negative.lab.
 export const negativeLabDensitometerCommandNameSchema = z.literal('negative.lab.build_densitometer_readout');
 export const negativeLabFrameHealthCommandNameSchema = z.literal('negative.lab.build_frame_health_report');
 export const negativeLabStockRegistryCommandNameSchema = z.literal('negative.lab.list_stock_registry');
+export const negativeLabStockFamilyConversionCommandNameSchema = z.literal(
+  'negative.lab.build_stock_family_conversion_plan',
+);
 export const negativeLabAppServerCommandNameSchema = z.union([
   negativeLabAcceptBatchPlanCommandNameSchema,
   negativeLabAcceptedBatchApplyCommandNameSchema,
@@ -30,6 +37,7 @@ export const negativeLabAppServerCommandNameSchema = z.union([
   negativeLabConversionPlanCommandNameSchema,
   negativeLabDensitometerCommandNameSchema,
   negativeLabFrameHealthCommandNameSchema,
+  negativeLabStockFamilyConversionCommandNameSchema,
   negativeLabStockRegistryCommandNameSchema,
 ]);
 export const negativeLabAppServerOutputFormatSchema = z.enum(['jpeg_proof', 'tiff16']);
@@ -75,6 +83,12 @@ export const negativeLabDensitometerAppServerCommandSchema = z
   })
   .strict();
 export const negativeLabStockRegistryAppServerCommandSchema = z.object({}).strict();
+export const negativeLabStockFamilyConversionAppServerCommandSchema = negativeLabAppServerCommandSchema
+  .omit({ presetId: true })
+  .extend({
+    stockFamilyRegistryId: negativeLabStockRegistryIdSchema,
+  })
+  .strict();
 
 export const negativeLabBatchSummaryRouteSchema = z
   .object({
@@ -144,6 +158,15 @@ export const negativeLabStockRegistryRouteSchema = z
     status: z.literal('mapped'),
   })
   .strict();
+export const negativeLabStockFamilyConversionRouteSchema = z
+  .object({
+    commandName: negativeLabStockFamilyConversionCommandNameSchema,
+    inputSchemaName: z.literal('NegativeLabStockFamilyConversionAppServerCommandV1'),
+    outputSchemaName: z.literal('NegativeLabStockFamilyConversionResultV1'),
+    reason: z.string().trim().min(1),
+    status: z.literal('mapped'),
+  })
+  .strict();
 
 export const negativeLabAppServerRouteSchema = z.union([
   negativeLabAcceptBatchPlanRouteSchema,
@@ -152,6 +175,7 @@ export const negativeLabAppServerRouteSchema = z.union([
   negativeLabConversionPlanRouteSchema,
   negativeLabDensitometerRouteSchema,
   negativeLabFrameHealthRouteSchema,
+  negativeLabStockFamilyConversionRouteSchema,
   negativeLabStockRegistryRouteSchema,
 ]);
 
@@ -274,6 +298,33 @@ export const negativeLabStockRegistryAppServerResultSchema = z
       context.addIssue({ code: 'custom', message: 'Stock registry count must match registry entries.' });
     }
   });
+export const negativeLabStockFamilyConversionResultSchema = z
+  .object({
+    commandName: negativeLabStockFamilyConversionCommandNameSchema,
+    conversionPlan: negativeLabConversionPlanResultSchema,
+    proof: z
+      .object({
+        deterministic: z.literal(true),
+        generatedFrom: z.literal('src/utils/negativeLabAppServerRoutes.ts'),
+        registryMappedPreset: z.literal(true),
+      })
+      .strict(),
+    stockFamily: negativeLabStockRegistryEntrySchema,
+  })
+  .strict()
+  .superRefine((result, context) => {
+    if (result.stockFamily.genericPresetId === null) {
+      context.addIssue({ code: 'custom', message: 'Stock-family conversion requires a runtime-safe generic preset.' });
+      return;
+    }
+
+    if (result.conversionPlan.presetId !== result.stockFamily.genericPresetId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Stock-family conversion plan must use the registry mapped generic preset.',
+      });
+    }
+  });
 
 export type NegativeLabAppServerCommand = z.infer<typeof negativeLabAppServerCommandSchema>;
 export type NegativeLabAcceptBatchPlanAppServerCommand = z.infer<
@@ -296,3 +347,7 @@ export type NegativeLabFrameHealthAppServerResult = z.infer<typeof negativeLabFr
 export type NegativeLabProfileProvenanceHash = z.infer<typeof negativeLabProfileProvenanceHashSchema>;
 export type NegativeLabStockRegistryAppServerCommand = z.infer<typeof negativeLabStockRegistryAppServerCommandSchema>;
 export type NegativeLabStockRegistryAppServerResult = z.infer<typeof negativeLabStockRegistryAppServerResultSchema>;
+export type NegativeLabStockFamilyConversionAppServerCommand = z.infer<
+  typeof negativeLabStockFamilyConversionAppServerCommandSchema
+>;
+export type NegativeLabStockFamilyConversionResult = z.infer<typeof negativeLabStockFamilyConversionResultSchema>;

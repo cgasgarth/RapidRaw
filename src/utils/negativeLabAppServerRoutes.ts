@@ -22,6 +22,8 @@ import {
   negativeLabDensitometerAppServerResultSchema,
   negativeLabFrameHealthAppServerCommandSchema,
   negativeLabFrameHealthAppServerResultSchema,
+  negativeLabStockFamilyConversionAppServerCommandSchema,
+  negativeLabStockFamilyConversionResultSchema,
   negativeLabStockRegistryAppServerCommandSchema,
   negativeLabStockRegistryAppServerResultSchema,
   type NegativeLabAppServerCommand,
@@ -36,6 +38,8 @@ import {
   type NegativeLabDensitometerAppServerResult,
   type NegativeLabFrameHealthAppServerCommand,
   type NegativeLabFrameHealthAppServerResult,
+  type NegativeLabStockFamilyConversionAppServerCommand,
+  type NegativeLabStockFamilyConversionResult,
   type NegativeLabStockRegistryAppServerCommand,
   type NegativeLabStockRegistryAppServerResult,
 } from '../schemas/negativeLabAppServerSchemas';
@@ -83,6 +87,13 @@ export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteM
       inputSchemaName: 'NegativeLabFrameHealthAppServerCommandV1',
       outputSchemaName: 'NegativeLabFrameHealthReportV1',
       reason: 'Negative Lab app-server calls expose the same roll frame health report used by the workspace UI.',
+      status: 'mapped',
+    },
+    {
+      commandName: 'negative.lab.build_stock_family_conversion_plan',
+      inputSchemaName: 'NegativeLabStockFamilyConversionAppServerCommandV1',
+      outputSchemaName: 'NegativeLabStockFamilyConversionResultV1',
+      reason: 'Negative Lab app-server calls can build conversion plans from governed stock-family registry ids.',
       status: 'mapped',
     },
     {
@@ -246,5 +257,46 @@ export const buildNegativeLabStockRegistryRouteResult = (
       namedStockClaimsRuntimeGated: true,
     },
     registry: NEGATIVE_LAB_STOCK_REGISTRY,
+  });
+};
+
+export const buildNegativeLabStockFamilyConversionRouteResult = (
+  command: NegativeLabStockFamilyConversionAppServerCommand,
+  runtimeCatalog: NegativeLabRuntimeProfileCatalog = NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
+): NegativeLabStockFamilyConversionResult => {
+  const parsedCommand = negativeLabStockFamilyConversionAppServerCommandSchema.parse(command);
+  const stockFamily = NEGATIVE_LAB_STOCK_REGISTRY.entries.find(
+    (entry) => entry.registryId === parsedCommand.stockFamilyRegistryId,
+  );
+
+  if (stockFamily === undefined) {
+    throw new Error(`Unknown Negative Lab stock-family registry id: ${parsedCommand.stockFamilyRegistryId}`);
+  }
+
+  if (stockFamily.genericPresetId === null) {
+    throw new Error(`Negative Lab stock-family registry id is not runtime-safe: ${stockFamily.registryId}`);
+  }
+
+  const conversionPlan = buildNegativeLabConversionPlanResult(
+    {
+      outputFormat: parsedCommand.outputFormat,
+      paths: parsedCommand.paths,
+      presetId: stockFamily.genericPresetId,
+      sampleRect: parsedCommand.sampleRect,
+      scope: parsedCommand.scope,
+      suffix: parsedCommand.suffix,
+    },
+    runtimeCatalog,
+  );
+
+  return negativeLabStockFamilyConversionResultSchema.parse({
+    commandName: 'negative.lab.build_stock_family_conversion_plan',
+    conversionPlan,
+    proof: {
+      deterministic: true,
+      generatedFrom: 'src/utils/negativeLabAppServerRoutes.ts',
+      registryMappedPreset: true,
+    },
+    stockFamily,
   });
 };
