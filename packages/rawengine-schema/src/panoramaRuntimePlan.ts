@@ -44,10 +44,18 @@ export const panoramaRuntimeProvenanceV1Schema = z
     boundaryMode: z.enum(['auto_crop', 'transparent', 'manual_crop', 'deferred_fill']),
     engineId: z.literal(PANORAMA_RUNTIME_ENGINE_ID),
     engineVersion: z.literal(PANORAMA_RUNTIME_ENGINE_VERSION),
+    exposureNormalization: z.enum(['none', 'auto', 'gain_compensation']),
     excludedSourceCount: z.number().int().nonnegative(),
+    lensCorrectionPolicy: z.enum(['unchanged', 'required_before_stitch', 'applied_before_stitch']),
     projection: z.enum(['rectilinear', 'cylindrical', 'spherical', 'planar']),
     resolvedProjection: z.literal('rectilinear'),
     runtimeStatus: z.enum(['dry_run_rendered', 'apply_rendered']),
+    seamBlend: z
+      .object({
+        blendMode: z.enum(['feather', 'multi_band']),
+        seamMethod: z.enum(['adaptive_feather']),
+      })
+      .strict(),
     sourceState: z.array(
       z
         .object({
@@ -238,10 +246,16 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
       boundaryMode: request.command.parameters.boundaryMode,
       engineId: PANORAMA_RUNTIME_ENGINE_ID,
       engineVersion: PANORAMA_RUNTIME_ENGINE_VERSION,
+      exposureNormalization: request.command.parameters.exposureNormalization,
       excludedSourceCount: stitched.excludedSourceCount,
+      lensCorrectionPolicy: request.command.parameters.lensCorrectionPolicy,
       projection: request.command.parameters.projection,
       resolvedProjection: 'rectilinear',
       runtimeStatus: 'dry_run_rendered',
+      seamBlend: {
+        blendMode: request.command.parameters.blendMode ?? 'feather',
+        seamMethod: 'adaptive_feather',
+      },
       sourceState: request.sourceFrames.map((frame) => ({
         contentHash: frame.contentHash,
         graphRevision: frame.graphRevision,

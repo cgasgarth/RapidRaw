@@ -108,6 +108,10 @@ const applied = applyPanoramaRuntimePlanV1({
 
 assertEqual(dryRun.provenance.projection, 'cylindrical', 'requested projection');
 assertEqual(dryRun.provenance.resolvedProjection, 'rectilinear', 'resolved projection');
+assertEqual(dryRun.provenance.exposureNormalization, 'auto', 'exposure normalization');
+assertEqual(dryRun.provenance.lensCorrectionPolicy, 'required_before_stitch', 'lens correction policy');
+assertEqual(dryRun.provenance.seamBlend.blendMode, 'feather', 'blend mode');
+assertEqual(dryRun.provenance.seamBlend.seamMethod, 'adaptive_feather', 'seam method');
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted plan id');
 const [outputArtifact] = applied.mutationResult.outputArtifacts;
@@ -130,6 +134,11 @@ console.log(
       outputArtifactContentHash: outputArtifact.contentHash,
       output: dryRun.dryRunResult.mergePlan.outputDimensions,
       outputSha256: new Bun.CryptoHasher('sha256').update(applied.outputPixels).digest('hex'),
+      provenance: {
+        exposureNormalization: applied.provenance.exposureNormalization,
+        lensCorrectionPolicy: applied.provenance.lensCorrectionPolicy,
+        seamBlend: applied.provenance.seamBlend,
+      },
       warnings: dryRun.dryRunResult.warnings,
     },
     null,
