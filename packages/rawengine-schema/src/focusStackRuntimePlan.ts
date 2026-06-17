@@ -74,6 +74,14 @@ export const focusStackRuntimeProvenanceV1Schema = z
     engineId: z.literal(FOCUS_RUNTIME_ENGINE_ID),
     engineVersion: z.literal(FOCUS_RUNTIME_ENGINE_VERSION),
     focusCoverageRatio: z.number().min(0).max(1),
+    qualityMetrics: z
+      .object({
+        averageWinningConfidence: z.number().min(0).max(1),
+        lowConfidenceAreaRatio: z.number().min(0).max(1),
+        outputPixelCount: z.number().int().positive(),
+        retouchLayerRecommended: z.boolean(),
+      })
+      .strict(),
     referenceSourceIndex: z.number().int().nonnegative(),
     requestedAlignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
     resolvedAlignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
@@ -332,6 +340,7 @@ const renderFocusStackRuntime = (request: ParsedFocusStackRuntimePlanRequestV1) 
       engineId: FOCUS_RUNTIME_ENGINE_ID,
       engineVersion: FOCUS_RUNTIME_ENGINE_VERSION,
       focusCoverageRatio,
+      qualityMetrics: buildFocusQualityMetrics(request, blend.outputWidth, blend.outputHeight),
       referenceSourceIndex,
       requestedAlignmentMode: request.command.parameters.alignmentMode,
       resolvedAlignmentMode:
@@ -445,6 +454,31 @@ const buildFocusBlendSourceCoverage = (request: ParsedFocusStackRuntimePlanReque
     };
   });
 
+const buildFocusQualityMetrics = (
+  request: ParsedFocusStackRuntimePlanRequestV1,
+  outputWidth: number,
+  outputHeight: number,
+): FocusStackRuntimeProvenanceV1['qualityMetrics'] => {
+  let coveredAreaPx = 0;
+  let lowConfidenceAreaPx = 0;
+  let winningConfidenceTotal = 0;
+  for (const cell of request.cells) {
+    const cellAreaPx = cell.width * cell.height;
+    const winningConfidence = findWinningFocusConfidence(cell.sourceScores);
+    coveredAreaPx += cellAreaPx;
+    winningConfidenceTotal += winningConfidence;
+    if (cell.lowConfidence) lowConfidenceAreaPx += cellAreaPx;
+  }
+
+  return {
+    averageWinningConfidence: roundFocusMetric(winningConfidenceTotal / Math.max(1, request.cells.length)),
+    lowConfidenceAreaRatio: roundFocusMetric(lowConfidenceAreaPx / Math.max(1, coveredAreaPx)),
+    outputPixelCount: outputWidth * outputHeight,
+    retouchLayerRecommended:
+      request.command.parameters.retouchLayerPolicy === 'generate_retouch_layer' || lowConfidenceAreaPx > 0,
+  };
+};
+
 const findWinningFocusSourceIndex = (sourceScores: FocusStackRuntimePlanRequestV1['cells'][number]['sourceScores']) => {
   let winningSourceIndex: number | undefined;
   let winningConfidence = -Infinity;
@@ -455,6 +489,14 @@ const findWinningFocusSourceIndex = (sourceScores: FocusStackRuntimePlanRequestV
     }
   }
   return winningSourceIndex;
+};
+
+const findWinningFocusConfidence = (sourceScores: FocusStackRuntimePlanRequestV1['cells'][number]['sourceScores']) => {
+  let winningConfidence = 0;
+  for (const score of sourceScores) {
+    winningConfidence = Math.max(winningConfidence, score.relativeConfidence);
+  }
+  return winningConfidence;
 };
 
 const stableFocusRuntimeHash = (input: string): string => {
