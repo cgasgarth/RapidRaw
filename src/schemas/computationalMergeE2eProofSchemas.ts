@@ -143,6 +143,18 @@ const proofCaseSchema = z
         }
       }
     }
+
+    if (proofCase.proofStatus !== 'manifest_only') {
+      proofCase.artifacts.forEach((artifact, artifactIndex) => {
+        if (artifact.hash === null) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Non-manifest proof status requires non-null private artifact hashes.',
+            path: ['artifacts', artifactIndex, 'hash'],
+          });
+        }
+      });
+    }
   });
 
 export const computationalMergeE2eProofManifestSchema = z
