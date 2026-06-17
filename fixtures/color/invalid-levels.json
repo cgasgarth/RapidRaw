@@ -1,0 +1,35 @@
+[
+  {
+    "case": "input black above input white",
+    "input": {
+      "enabled": true,
+      "gamma": 1,
+      "inputBlack": 0.8,
+      "inputWhite": 0.2,
+      "outputBlack": 0,
+      "outputWhite": 1
+    }
+  },
+  {
+    "case": "output black above output white",
+    "input": {
+      "enabled": true,
+      "gamma": 1,
+      "inputBlack": 0,
+      "inputWhite": 1,
+      "outputBlack": 0.8,
+      "outputWhite": 0.2
+    }
+  },
+  {
+    "case": "gamma outside range",
+    "input": {
+      "enabled": true,
+      "gamma": 0,
+      "inputBlack": 0,
+      "inputWhite": 1,
+      "outputBlack": 0,
+      "outputWhite": 1
+    }
+  }
+]

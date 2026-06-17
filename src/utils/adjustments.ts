@@ -902,6 +902,7 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     { label: 'modals.copyPaste.groups.presence', keys: [ColorAdjustment.Saturation, ColorAdjustment.Vibrance] },
     { label: 'modals.copyPaste.groups.colorBalanceRgb', keys: [ColorAdjustment.ColorBalanceRgb] },
     { label: 'modals.copyPaste.groups.colorGrading', keys: [ColorAdjustment.ColorGrading] },
+    { label: 'modals.copyPaste.groups.levels', keys: [ColorAdjustment.Levels] },
     { label: 'modals.copyPaste.groups.colorMixer', keys: [ColorAdjustment.Hsl] },
     { label: 'modals.copyPaste.groups.blackWhiteMixer', keys: [ColorAdjustment.BlackWhiteMixer] },
     { label: 'modals.copyPaste.groups.channelMixer', keys: [ColorAdjustment.ChannelMixer] },

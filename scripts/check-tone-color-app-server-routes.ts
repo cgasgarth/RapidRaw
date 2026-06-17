@@ -44,6 +44,35 @@ if (!parsedCommand.success || parsedCommand.data.commandType !== 'toneColor.setB
   failures.push('Sample tone-color command does not validate the basic tone command route type.');
 }
 
+const parsedLevelsCommand = toneColorCommandEnvelopeV1Schema.safeParse({
+  ...sampleToneColorCommandEnvelopeV1,
+  commandId: 'command_tone_color_levels_preview_sample',
+  commandType: 'toneColor.setLevels',
+  correlationId: 'corr_tone_color_levels_preview_sample',
+  idempotencyKey: 'idem_tone_color_levels_preview_sample',
+  parameters: {
+    channel: 'luma',
+    enabled: true,
+    gamma: 1.1,
+    inputBlack: 0.03,
+    inputWhite: 0.98,
+    outputBlack: 0,
+    outputWhite: 1,
+  },
+});
+if (!parsedLevelsCommand.success || parsedLevelsCommand.data.commandType !== 'toneColor.setLevels') {
+  failures.push('Tone-color levels command does not validate the luma levels command route type.');
+}
+
+const levelsRouteModes = new Set(
+  TONE_COLOR_APP_SERVER_ROUTES.filter((route) => route.commandType === 'toneColor.setLevels').map(
+    (route) => route.executionMode,
+  ),
+);
+for (const mode of ['dry_run_command', 'apply_dry_run_plan']) {
+  if (!levelsRouteModes.has(mode)) failures.push(`toneColor.setLevels missing ${mode} route.`);
+}
+
 if (failures.length > 0) {
   console.error('Tone-color app-server route validation failed:');
   for (const failure of failures) console.error(`- ${failure}`);
