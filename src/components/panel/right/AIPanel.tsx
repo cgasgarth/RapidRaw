@@ -78,6 +78,9 @@ import {
   cloneSubMaskForPaste,
   insertMaskLikeContainerAt,
   insertSubMaskAt,
+  moveSubMaskBetweenContainers,
+  reorderMaskListContainers,
+  splitSubMaskToContainer,
 } from '../../../utils/maskClipboard';
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
 import { createSubMask } from '../../../utils/maskUtils';
@@ -918,21 +921,18 @@ export default function AIPanel() {
         const draggedItem = dragData.item;
         if (!draggedItem) return prev;
 
-        const oldIndex = prev.aiPatches.findIndex((p) => p.id === draggedItem.id);
         let newIndex = -1;
 
         if (overId === 'ai-list-root') newIndex = prev.aiPatches.length - 1;
         else if (overData?.type === 'Container') newIndex = prev.aiPatches.findIndex((p) => p.id === overId);
         else if (overData?.type === 'SubMask') newIndex = prev.aiPatches.findIndex((p) => p.id === overData.parentId);
 
-        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-          const newPatches = [...prev.aiPatches];
-          const [movedItem] = newPatches.splice(oldIndex, 1);
-          if (!movedItem) return prev;
-          newPatches.splice(newIndex, 0, movedItem);
-          return { ...prev, aiPatches: newPatches };
-        }
-        return prev;
+        const reorderedPatches = reorderMaskListContainers(
+          prev.aiPatches,
+          draggedItem.id,
+          prev.aiPatches[newIndex]?.id ?? '',
+        );
+        return reorderedPatches ? { ...prev, aiPatches: reorderedPatches } : prev;
       });
       return;
     }
@@ -946,26 +946,24 @@ export default function AIPanel() {
           const draggedItem = dragData.item;
           if (!draggedItem) return prev;
 
-          const newPatches = structuredClone(prev.aiPatches);
-          const sourceContainer = newPatches.find((p: AiPatch) => p.id === sourceContainerId);
-          if (!sourceContainer) return prev;
-          const subMaskIndex = sourceContainer.subMasks.findIndex((sm: SubMask) => sm.id === draggedItem.id);
-          if (subMaskIndex === -1) return prev;
+          const result = splitSubMaskToContainer(
+            prev.aiPatches,
+            sourceContainerId,
+            draggedItem.id,
+            (movedSubMask, count) => ({
+              id: crypto.randomUUID(),
+              invert: false,
+              isLoading: false,
+              name: t('editor.ai.patches.aiEdit', { count: count + 1 }),
+              patchData: null,
+              prompt: '',
+              subMasks: [movedSubMask],
+              visible: true,
+            }),
+          );
+          if (!result) return prev;
 
-          const [movedSubMask] = sourceContainer.subMasks.splice(subMaskIndex, 1);
-          if (!movedSubMask) return prev;
-
-          const newContainer: AiPatch = {
-            id: crypto.randomUUID(),
-            invert: false,
-            isLoading: false,
-            name: t('editor.ai.patches.aiEdit', { count: newPatches.length + 1 }),
-            patchData: null,
-            prompt: '',
-            subMasks: [movedSubMask],
-            visible: true,
-          };
-          newPatches.push(newContainer);
+          const { container: newContainer, containers: newPatches, subMask: movedSubMask } = result;
 
           setTimeout(() => {
             onSelectPatchContainer(newContainer.id);
@@ -987,32 +985,16 @@ export default function AIPanel() {
           const draggedItem = dragData.item;
           if (!draggedItem) return prev;
 
-          const newPatches = prev.aiPatches.map((p) => ({ ...p, subMasks: [...p.subMasks] }));
-          const sourceContainer = newPatches.find((p) => p.id === sourceContainerId);
-          const targetContainer = newPatches.find((p) => p.id === expandedTargetContainerId);
-          if (!sourceContainer || !targetContainer) return prev;
+          const newPatches = moveSubMaskBetweenContainers(
+            prev.aiPatches,
+            sourceContainerId,
+            expandedTargetContainerId,
+            draggedItem.id,
+            overData?.type === 'SubMask' ? String(over.id) : undefined,
+          );
+          if (!newPatches) return prev;
 
-          const sourceIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === draggedItem.id);
-          if (sourceIndex === -1) return prev;
-          const [movedSubMask] = sourceContainer.subMasks.splice(sourceIndex, 1);
-          if (!movedSubMask) return prev;
-
-          if (sourceContainerId === targetContainerId) {
-            if (overData?.type === 'SubMask') {
-              const overIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === over.id);
-              const insertIndex = overIndex >= 0 ? overIndex : sourceContainer.subMasks.length;
-              sourceContainer.subMasks.splice(insertIndex, 0, movedSubMask);
-            } else {
-              sourceContainer.subMasks.push(movedSubMask);
-            }
-          } else {
-            if (overData?.type === 'SubMask') {
-              const overIndex = targetContainer.subMasks.findIndex((sm) => sm.id === over.id);
-              const insertIndex = overIndex >= 0 ? overIndex : targetContainer.subMasks.length;
-              targetContainer.subMasks.splice(insertIndex, 0, movedSubMask);
-            } else {
-              targetContainer.subMasks.push(movedSubMask);
-            }
+          if (sourceContainerId !== targetContainerId) {
             setExpandedContainers((p) => new Set(p).add(expandedTargetContainerId));
           }
           return { ...prev, aiPatches: newPatches };
