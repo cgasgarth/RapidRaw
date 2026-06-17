@@ -16,6 +16,7 @@ const STRUCTS = [
   'ChannelMixerRow',
   'ChannelMixerSettings',
   'LevelsSettings',
+  'ColorBalanceRgbSettings',
   'GlobalAdjustments',
   'MaskAdjustments',
   'AllAdjustments',
@@ -51,7 +52,10 @@ const normalizeRustType = (type) => {
   if (trimmed === `[MaskAdjustments; MAX_MASKS]`) return `array<MaskAdjustments, ${MAX_MASKS}>`;
 
   const fixedArray = trimmed.match(/^\[([A-Za-z0-9_]+);\s*(\d+)\]$/u);
-  if (fixedArray) return `array<${fixedArray[1]}, ${fixedArray[2]}>`;
+  if (fixedArray) {
+    if (fixedArray[1] === 'f32' && fixedArray[2] === '4') return 'vec4<f32>';
+    return `array<${fixedArray[1]}, ${fixedArray[2]}>`;
+  }
 
   return trimmed;
 };

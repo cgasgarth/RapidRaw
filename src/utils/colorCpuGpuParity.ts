@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const colorParityOperationSchema = z.enum([
   'channel_mixer',
+  'color_balance_rgb',
   'luma_levels',
   'linear_exposure',
   'white_balance',
@@ -26,6 +27,7 @@ export const colorParityShaderFunctionSchema = z
   .object({
     name: z.enum([
       'apply_channel_mixer',
+      'apply_color_balance_rgb',
       'apply_linear_exposure',
       'apply_luma_levels',
       'apply_white_balance',
@@ -148,6 +150,42 @@ export const applyColorParityChannelMixer = (
   return makeVec3(clamp(mixed[0] * scale, 0, 1), clamp(mixed[1] * scale, 0, 1), clamp(mixed[2] * scale, 0, 1));
 };
 
+export const applyColorParityColorBalanceRgb = (
+  inputValue: ColorParityVec3,
+  parameters: Record<string, number>,
+): ColorParityVec3 => {
+  const input = colorParityVec3Schema.parse(inputValue);
+  if ((parameters['enabled'] ?? 1) === 0) return makeVec3(input[0], input[1], input[2]);
+
+  const luma = input[0] * 0.2126 + input[1] * 0.7152 + input[2] * 0.0722;
+  const shadows = clamp((0.55 - luma) / 0.55, 0, 1);
+  const highlights = clamp((luma - 0.45) / 0.55, 0, 1);
+  const midtones = clamp(1 - Math.abs(luma - 0.5) / 0.5, 0, 1);
+  const total = shadows + midtones + highlights;
+  const rangeWeights =
+    total <= 0
+      ? { highlights: 0, midtones: 1, shadows: 0 }
+      : { highlights: highlights / total, midtones: midtones / total, shadows: shadows / total };
+  const offset = (channel: 'Blue' | 'Green' | 'Red') =>
+    ((parameters[`shadows${channel}`] ?? 0) * rangeWeights.shadows +
+      (parameters[`midtones${channel}`] ?? 0) * rangeWeights.midtones +
+      (parameters[`highlights${channel}`] ?? 0) * rangeWeights.highlights) /
+    400;
+  const balanced = makeVec3(
+    clamp(input[0] + offset('Red'), 0, 1),
+    clamp(input[1] + offset('Green'), 0, 1),
+    clamp(input[2] + offset('Blue'), 0, 1),
+  );
+
+  if ((parameters['preserveLuminance'] ?? 1) === 0) return balanced;
+
+  const balancedLuma = balanced[0] * 0.2126 + balanced[1] * 0.7152 + balanced[2] * 0.0722;
+  if (balancedLuma <= 0) return balanced;
+
+  const scale = luma / balancedLuma;
+  return makeVec3(clamp(balanced[0] * scale, 0, 1), clamp(balanced[1] * scale, 0, 1), clamp(balanced[2] * scale, 0, 1));
+};
+
 export const applyColorParityLumaLevels = (
   inputValue: ColorParityVec3,
   parameters: Record<string, number>,
@@ -177,6 +215,8 @@ export const evaluateColorParityCase = (testCaseValue: ColorParityCase): ColorPa
   switch (testCase.operation) {
     case 'channel_mixer':
       return applyColorParityChannelMixer(testCase.input, testCase.parameters);
+    case 'color_balance_rgb':
+      return applyColorParityColorBalanceRgb(testCase.input, testCase.parameters);
     case 'luma_levels':
       return applyColorParityLumaLevels(testCase.input, testCase.parameters);
     case 'linear_exposure':

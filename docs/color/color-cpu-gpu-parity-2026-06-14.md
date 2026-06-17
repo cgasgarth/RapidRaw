@@ -18,6 +18,9 @@ The fixture set covers:
 
 - linear exposure;
 - white-balance temperature and tint multipliers;
+- channel mixer;
+- RGB color balance;
+- luma levels;
 - legacy display tonemap.
 
 The checker hashes the WGSL function bodies for these helpers and compares CPU

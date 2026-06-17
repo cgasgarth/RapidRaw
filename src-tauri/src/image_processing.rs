@@ -1325,6 +1325,32 @@ impl Default for LevelsSettings {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
+pub struct ColorBalanceRgbSettings {
+    shadows: [f32; 4],
+    midtones: [f32; 4],
+    highlights: [f32; 4],
+    enabled: u32,
+    preserve_luminance: u32,
+    _pad1: u32,
+    _pad2: u32,
+}
+
+impl Default for ColorBalanceRgbSettings {
+    fn default() -> Self {
+        Self {
+            shadows: [0.0; 4],
+            midtones: [0.0; 4],
+            highlights: [0.0; 4],
+            enabled: 0,
+            preserve_luminance: 1,
+            _pad1: 0,
+            _pad2: 0,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
 pub struct GpuMat3 {
     col0: [f32; 4],
     col1: [f32; 4],
@@ -1405,6 +1431,7 @@ pub struct GlobalAdjustments {
     _pad3: f32,
 
     pub color_calibration: ColorCalibrationSettings,
+    pub color_balance_rgb: ColorBalanceRgbSettings,
     pub channel_mixer: ChannelMixerSettings,
     pub levels: LevelsSettings,
 
@@ -1687,6 +1714,40 @@ fn parse_levels_settings(js_levels: &serde_json::Value) -> LevelsSettings {
         output_black: output_black.clamp(0.0, 0.99),
         output_white: output_white.clamp(0.01, 1.0),
         enabled: if js_levels["enabled"].as_bool().unwrap_or(false) {
+            1
+        } else {
+            0
+        },
+        _pad1: 0,
+        _pad2: 0,
+    }
+}
+
+fn parse_color_balance_rgb_range(js_range: &serde_json::Value) -> [f32; 4] {
+    [
+        js_range["red"].as_f64().unwrap_or(0.0) as f32,
+        js_range["green"].as_f64().unwrap_or(0.0) as f32,
+        js_range["blue"].as_f64().unwrap_or(0.0) as f32,
+        0.0,
+    ]
+}
+
+fn parse_color_balance_rgb_settings(
+    js_color_balance: &serde_json::Value,
+) -> ColorBalanceRgbSettings {
+    ColorBalanceRgbSettings {
+        shadows: parse_color_balance_rgb_range(&js_color_balance["shadows"]),
+        midtones: parse_color_balance_rgb_range(&js_color_balance["midtones"]),
+        highlights: parse_color_balance_rgb_range(&js_color_balance["highlights"]),
+        enabled: if js_color_balance["enabled"].as_bool().unwrap_or(false) {
+            1
+        } else {
+            0
+        },
+        preserve_luminance: if js_color_balance["preserveLuminance"]
+            .as_bool()
+            .unwrap_or(true)
+        {
             1
         } else {
             0
@@ -2099,6 +2160,10 @@ fn get_global_adjustments_from_json(
         .get("channelMixer")
         .cloned()
         .unwrap_or_default();
+    let color_balance_obj = js_adjustments
+        .get("colorBalanceRgb")
+        .cloned()
+        .unwrap_or_default();
     let levels_obj = js_adjustments.get("levels").cloned().unwrap_or_default();
 
     let color_cal_settings = if is_visible("color") {
@@ -2273,6 +2338,11 @@ fn get_global_adjustments_from_json(
         _pad3: 0.0,
 
         color_calibration: color_cal_settings,
+        color_balance_rgb: if is_visible("color") {
+            parse_color_balance_rgb_settings(&color_balance_obj)
+        } else {
+            ColorBalanceRgbSettings::default()
+        },
         channel_mixer: if is_visible("color") {
             parse_channel_mixer_settings(&channel_mixer_obj)
         } else {
