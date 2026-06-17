@@ -1,0 +1,156 @@
+import { z } from 'zod';
+
+const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
+
+const featureFamilySchema = z.enum(['panorama_stitch', 'focus_stack', 'super_resolution']);
+
+const artifactKindSchema = z.enum([
+  'source_raw_sequence_private',
+  'alignment_report_private',
+  'merge_output_private',
+  'preview_after_private',
+  'export_after_private',
+  'quality_report_private',
+]);
+
+const metricNameSchema = z.enum([
+  'alignmentInlierRatio',
+  'edgeContinuityScore',
+  'focusTransitionArtifactScore',
+  'sharpnessGainRatio',
+  'superResolutionDetailGainRatio',
+  'previewExportMeanAbsDelta',
+]);
+
+const nonEmptyIdSchema = z.string().trim().min(1);
+const privatePathSchema = z
+  .string()
+  .trim()
+  .regex(/^(private-fixtures|private-artifacts)\//u);
+
+const hashedPathSchema = z
+  .object({
+    hash: sha256Schema,
+    path: privatePathSchema,
+    publicRepoAllowed: z.literal(false),
+  })
+  .strict();
+
+const sourceHashSchema = hashedPathSchema.extend({
+  localRelativePath: privatePathSchema,
+  path: privatePathSchema.optional(),
+});
+
+const runArtifactSchema = hashedPathSchema.extend({
+  kind: artifactKindSchema,
+});
+
+const screenshotArtifactSchema = hashedPathSchema.extend({
+  label: z.enum(['modal_before_apply', 'modal_after_apply', 'result_review', 'export_review']),
+});
+
+const qualityMetricSchema = z
+  .object({
+    name: metricNameSchema,
+    passed: z.literal(true),
+    source: z.literal('private_raw_report'),
+    threshold: z.number().min(0),
+    value: z.number().min(0),
+  })
+  .strict();
+
+const commandIdsSchema = z
+  .object({
+    apply: nonEmptyIdSchema,
+    dryRun: nonEmptyIdSchema,
+  })
+  .strict();
+
+const runtimeResultIdsSchema = z
+  .object({
+    apply: nonEmptyIdSchema,
+    dryRun: nonEmptyIdSchema,
+  })
+  .strict();
+
+const privateRunReportSchema = z
+  .object({
+    acceptanceStatus: z.enum(['runtime_apply_capable', 'passed_private_raw_e2e']),
+    artifacts: z.array(runArtifactSchema).min(6),
+    commandIds: commandIdsSchema,
+    featureFamily: featureFamilySchema,
+    fixtureId: z.string().regex(/^validation\.computational-merge\.[a-z0-9.-]+\.v[0-9]+$/u),
+    generatedAt: z.iso.datetime(),
+    graphRevisionHash: sha256Schema,
+    implementationIssue: z.number().int().positive(),
+    notes: z.string().trim().min(1),
+    previewExportParity: qualityMetricSchema.extend({
+      name: z.literal('previewExportMeanAbsDelta'),
+    }),
+    qualityMetrics: z.array(qualityMetricSchema).min(2),
+    reportId: z.string().regex(/^computational-merge-run\.[a-z0-9.-]+\.v[0-9]+$/u),
+    runtimeResultIds: runtimeResultIdsSchema,
+    screenshotArtifacts: z.array(screenshotArtifactSchema).min(2),
+    sourceHashes: z.array(sourceHashSchema).min(2),
+    uiIssue: z.number().int().positive(),
+  })
+  .strict()
+  .superRefine((report, context) => {
+    const artifactKinds = report.artifacts.map((artifact) => artifact.kind);
+    if (new Set(artifactKinds).size !== artifactKinds.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Run report artifact kinds must be unique.',
+        path: ['artifacts'],
+      });
+    }
+
+    const sourcePaths = report.sourceHashes.map((source) => source.localRelativePath);
+    if (new Set(sourcePaths).size !== sourcePaths.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Run report source hashes must use unique source paths.',
+        path: ['sourceHashes'],
+      });
+    }
+  });
+
+export const computationalMergePrivateRunReportCollectionSchema = z
+  .object({
+    $schema: z.url(),
+    issue: z.literal(1817),
+    reports: z.array(privateRunReportSchema),
+    schemaVersion: z.literal(1),
+    snapshotDate: z.iso.date(),
+    validationMode: z.literal('public_schema_private_reports'),
+  })
+  .strict()
+  .superRefine((collection, context) => {
+    const reportIds = collection.reports.map((report) => report.reportId);
+    if (new Set(reportIds).size !== reportIds.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Private run report IDs must be unique.',
+        path: ['reports'],
+      });
+    }
+
+    const fixtureIds = collection.reports.map((report) => report.fixtureId);
+    if (new Set(fixtureIds).size !== fixtureIds.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only one private run report is allowed per fixture.',
+        path: ['reports'],
+      });
+    }
+  });
+
+export type ComputationalMergePrivateRunReportCollection = z.infer<
+  typeof computationalMergePrivateRunReportCollectionSchema
+>;
+
+export function parseComputationalMergePrivateRunReportCollection(
+  value: unknown,
+): ComputationalMergePrivateRunReportCollection {
+  return computationalMergePrivateRunReportCollectionSchema.parse(value);
+}

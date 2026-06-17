@@ -1,0 +1,8 @@
+{
+  "$schema": "https://rawengine.dev/schemas/computational-merge-private-run-reports-v1.json",
+  "issue": 1817,
+  "reports": [],
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-17",
+  "validationMode": "public_schema_private_reports"
+}
