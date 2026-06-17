@@ -1,4 +1,5 @@
 import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitometer';
+import { buildNegativeLabDustScratchReviewReport, buildNegativeLabQcProofReport } from './negativeLabDustScratchReview';
 import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
 import {
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
@@ -26,6 +27,8 @@ import {
   negativeLabDensitometerAppServerResultSchema,
   negativeLabFrameHealthAppServerCommandSchema,
   negativeLabFrameHealthAppServerResultSchema,
+  negativeLabQcProofAppServerCommandSchema,
+  negativeLabQcProofAppServerResultSchema,
   negativeLabStockMetadataAppServerCommandSchema,
   negativeLabStockMetadataAppServerResultSchema,
   negativeLabStockFamilyConversionAppServerCommandSchema,
@@ -44,6 +47,8 @@ import {
   type NegativeLabDensitometerAppServerResult,
   type NegativeLabFrameHealthAppServerCommand,
   type NegativeLabFrameHealthAppServerResult,
+  type NegativeLabQcProofAppServerCommand,
+  type NegativeLabQcProofAppServerResult,
   type NegativeLabStockMetadataAppServerCommand,
   type NegativeLabStockMetadataAppServerResult,
   type NegativeLabStockFamilyConversionAppServerCommand,
@@ -95,6 +100,13 @@ export const NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST = negativeLabAppServerRouteM
       inputSchemaName: 'NegativeLabFrameHealthAppServerCommandV1',
       outputSchemaName: 'NegativeLabFrameHealthReportV1',
       reason: 'Negative Lab app-server calls expose the same roll frame health report used by the workspace UI.',
+      status: 'mapped',
+    },
+    {
+      commandName: 'negative.lab.build_qc_proof_report',
+      inputSchemaName: 'NegativeLabQcProofAppServerCommandV1',
+      outputSchemaName: 'NegativeLabQcProofReportV1',
+      reason: 'Negative Lab app-server calls expose the same contact-sheet QC proof summary used by the workspace UI.',
       status: 'mapped',
     },
     {
@@ -175,6 +187,23 @@ export const buildNegativeLabBatchSummaryRouteResult = (
   const frameHealthReport = buildNegativeLabFrameHealthRouteResult(parsedCommand);
 
   return negativeLabBatchSummaryAppServerResultSchema.parse(buildNegativeLabBatchDryRunSummary(frameHealthReport));
+};
+
+export const buildNegativeLabQcProofRouteResult = (
+  command: NegativeLabQcProofAppServerCommand,
+): NegativeLabQcProofAppServerResult => {
+  const parsedCommand = negativeLabQcProofAppServerCommandSchema.parse(command);
+  const frameHealthReport = buildNegativeLabFrameHealthRouteResult(parsedCommand);
+  const reviewReport = buildNegativeLabDustScratchReviewReport(frameHealthReport, parsedCommand.previewReady);
+  const exportReady =
+    parsedCommand.previewReady &&
+    frameHealthReport.queuedCount > 0 &&
+    frameHealthReport.includedCount === frameHealthReport.frames.length &&
+    !reviewReport.frames.some((frame) => frame.severity === 'retouch');
+
+  return negativeLabQcProofAppServerResultSchema.parse(
+    buildNegativeLabQcProofReport(reviewReport, parsedCommand.previewReady, exportReady),
+  );
 };
 
 export const buildNegativeLabAcceptedBatchPlanRouteResult = (

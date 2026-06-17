@@ -1,7 +1,9 @@
 import {
   NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
   parseNegativeLabDustScratchReviewReport,
+  parseNegativeLabQcProofReport,
   type NegativeLabDustScratchReviewReport,
+  type NegativeLabQcProofReport,
 } from '../schemas/negativeLabWorkspaceSchemas';
 
 import type { NegativeLabFrameHealthReport } from '../schemas/negativeLabFrameHealthSchemas';
@@ -59,5 +61,43 @@ export const buildNegativeLabDustScratchReviewReport = (
     reviewCount: frames.filter((frame) => frame.severity === 'review').length,
     retouchCount: frames.filter((frame) => frame.severity === 'retouch').length,
     schemaVersion: NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
+  });
+};
+
+export const buildNegativeLabQcProofReport = (
+  reviewReport: NegativeLabDustScratchReviewReport,
+  previewReady: boolean,
+  exportReady: boolean,
+): NegativeLabQcProofReport => {
+  const frames = reviewReport.frames.map((frame, index) => {
+    const exportBlockedReason = !frame.included
+      ? 'Frame excluded from batch.'
+      : !previewReady
+        ? 'Conversion preview required before QC proof export.'
+        : frame.severity === 'retouch'
+          ? 'Manual retouch review required before export.'
+          : null;
+
+    return {
+      contactSheetSlot: index + 1,
+      exportBlockedReason,
+      findingCodes: frame.findingCodes,
+      frameId: frame.frameId,
+      included: frame.included,
+      needsReview: frame.severity !== 'clear',
+      previewReady,
+      recommendedAction: frame.recommendation,
+      scanLabel: frame.scanLabel,
+    };
+  });
+
+  return parseNegativeLabQcProofReport({
+    contactSheetColumnCount: Math.min(4, Math.max(1, frames.length)),
+    exportReady,
+    frames,
+    includedFrameCount: frames.filter((frame) => frame.included).length,
+    reviewFrameCount: frames.filter((frame) => frame.needsReview).length,
+    schemaVersion: NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
+    totalFrameCount: frames.length,
   });
 };
