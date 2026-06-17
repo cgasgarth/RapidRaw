@@ -3,13 +3,20 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { aiPeopleMaskLayerApplyPlanFixtureSchema } from '../src/schemas/aiMaskingSchemas.ts';
+import {
+  aiPeopleMaskFakeProviderFixtureSchema,
+  aiPeopleMaskLayerApplyPlanFixtureSchema,
+} from '../src/schemas/aiMaskingSchemas.ts';
 import { createAiPeopleMaskLayerApplyPlan } from '../src/utils/aiPeopleMaskLayerPlan.ts';
 
-const fakeProviderFixture = JSON.parse(readFileSync(resolve('fixtures/masks/ai-people-fake-provider.json'), 'utf8'));
-const fixture = aiPeopleMaskLayerApplyPlanFixtureSchema.parse(
-  JSON.parse(readFileSync(resolve('fixtures/masks/ai-people-layer-apply-plan.json'), 'utf8')),
+const fakeProviderFixtureJson: unknown = JSON.parse(
+  readFileSync(resolve('fixtures/masks/ai-people-fake-provider.json'), 'utf8'),
 );
+const fakeProviderFixture = aiPeopleMaskFakeProviderFixtureSchema.parse(fakeProviderFixtureJson);
+const fixtureJson: unknown = JSON.parse(
+  readFileSync(resolve('fixtures/masks/ai-people-layer-apply-plan.json'), 'utf8'),
+);
+const fixture = aiPeopleMaskLayerApplyPlanFixtureSchema.parse(fixtureJson);
 
 const actualPlan = createAiPeopleMaskLayerApplyPlan(fakeProviderFixture.analysis, fakeProviderFixture.expectedMasks);
 

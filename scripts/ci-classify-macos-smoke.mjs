@@ -92,6 +92,8 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     ]),
   ],
   ['check:ai-fallbacks', new Set(['bun scripts/check-ai-provider-fallbacks.mjs'])],
+  ['check:ai-people-apply-plan', new Set(['bun scripts/check-ai-people-layer-apply-plan.ts'])],
+  ['check:ai-people-picker', new Set(['bun scripts/check-ai-people-picker-model.ts'])],
   ['check:script-type-coverage', new Set(['bun scripts/check-script-type-coverage.ts'])],
   ['check:script-type-coverage:self-test', new Set(['bun scripts/check-script-type-coverage.ts --self-test'])],
   ['check:script-extension-policy', new Set(['bun scripts/check-script-extension-policy.ts'])],
