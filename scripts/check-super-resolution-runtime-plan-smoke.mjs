@@ -105,6 +105,15 @@ const applied = applySuperResolutionRuntimePlanV1({
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted plan id');
 assertEqual(applied.provenance.effectiveOutputScale, SCALE, 'effective output scale');
+assertEqual(applied.provenance.confidenceMap.completeSampleRatio, 1, 'complete sample ratio');
+assertEqual(applied.provenance.confidenceMap.minSampleCount, 1, 'minimum sample count');
+assertEqual(applied.provenance.confidenceMap.maxSampleCount, 1, 'maximum sample count');
+assertEqual(applied.provenance.detailQuality.outputPixelCount, HIGH_WIDTH * HIGH_HEIGHT, 'detail output pixels');
+assertEqual(
+  applied.provenance.detailQuality.sourcePixelCount,
+  LOW_WIDTH * LOW_HEIGHT * frames.length,
+  'detail source pixels',
+);
 assertEqual(applied.provenance.frameRegistrations.length, sourceFrameDefs.length, 'frame registration count');
 const artifactIds = applied.mutationResult.outputArtifacts.map((artifact) => artifact.artifactId).sort();
 assertDeepEqual(artifactIds, ['artifact_sr_runtime_confidence', 'artifact_sr_runtime_output'], 'SR output artifacts');
@@ -128,6 +137,10 @@ console.log(
       artifactCount: applied.mutationResult.outputArtifacts.length,
       fixture: 'synthetic_sr_runtime_plan_v1',
       frameRegistrations: applied.provenance.frameRegistrations,
+      quality: {
+        confidenceMap: applied.provenance.confidenceMap,
+        detailQuality: applied.provenance.detailQuality,
+      },
       improvementRatio,
       outputArtifactContentHash: outputArtifact.contentHash,
       outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex'),
