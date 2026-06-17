@@ -28,7 +28,20 @@ export interface WhiteBalancePickerResult {
   tint: number;
 }
 
+export interface RgbPixel {
+  blue: number;
+  green: number;
+  red: number;
+}
+
+export interface WhiteBalanceRgbResult {
+  outputRgb: RgbPixel;
+  temperatureMultiplier: RgbPixel;
+  tintMultiplier: RgbPixel;
+}
+
 const clampSlider = (value: number): number => Math.max(sliderMinimum, Math.min(sliderMaximum, value));
+const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 
 const srgbToLinear = (value: number): number => Math.pow(value / 255.0, 2.2);
 
@@ -50,5 +63,34 @@ export const calculateWhiteBalancePickerAdjustment = (input: WhiteBalancePickerI
     deltaTint,
     temperature: clampSlider(parsed.currentTemperature + deltaTemperature),
     tint: clampSlider(parsed.currentTint + deltaTint),
+  };
+};
+
+export const applyWhiteBalanceToRgbPixel = (
+  pixel: RgbPixel,
+  temperature: number,
+  tint: number,
+): WhiteBalanceRgbResult => {
+  const normalizedTemperature = clampSlider(temperature) / 100;
+  const normalizedTint = clampSlider(tint) / 100;
+  const temperatureMultiplier = {
+    blue: 1 - normalizedTemperature * 0.2,
+    green: 1 + normalizedTemperature * 0.05,
+    red: 1 + normalizedTemperature * 0.2,
+  };
+  const tintMultiplier = {
+    blue: 1 + normalizedTint * 0.25,
+    green: 1 - normalizedTint * 0.25,
+    red: 1 + normalizedTint * 0.25,
+  };
+
+  return {
+    outputRgb: {
+      blue: clamp01(pixel.blue * temperatureMultiplier.blue * tintMultiplier.blue),
+      green: clamp01(pixel.green * temperatureMultiplier.green * tintMultiplier.green),
+      red: clamp01(pixel.red * temperatureMultiplier.red * tintMultiplier.red),
+    },
+    temperatureMultiplier,
+    tintMultiplier,
   };
 };
