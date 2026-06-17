@@ -7,6 +7,7 @@ import {
   COPYABLE_ADJUSTMENT_KEYS,
   ADJUSTMENT_GROUPS,
   INITIAL_ADJUSTMENTS,
+  pickAdjustmentValues,
 } from '../utils/adjustments';
 import { debounce } from '../utils/timing';
 
@@ -101,25 +102,11 @@ export function usePresets(currentAdjustments: Adjustments) {
     const GEOMETRY_KEYS = (ADJUSTMENT_GROUPS['geometry'] ?? []).flatMap((group) => group.keys);
     const MASK_KEYS = (ADJUSTMENT_GROUPS['masks'] ?? []).flatMap((group) => group.keys);
 
-    const presetAdjustments: PresetAdjustments = {};
-
-    for (const key of COPYABLE_ADJUSTMENT_KEYS) {
-      if (!includeMasks && MASK_KEYS.includes(key)) continue;
-      if (!includeCropTransform && GEOMETRY_KEYS.includes(key)) continue;
-
-      if (Object.prototype.hasOwnProperty.call(currentAdjustments, key)) {
-        const currentValue: unknown = currentAdjustments[key];
-        const defaultValue: unknown = INITIAL_ADJUSTMENTS[key];
-
-        if (presetType === 'tool') {
-          if (JSON.stringify(currentValue) !== JSON.stringify(defaultValue)) {
-            presetAdjustments[key] = currentValue;
-          }
-        } else {
-          presetAdjustments[key] = currentValue;
-        }
-      }
-    }
+    const presetAdjustments = pickAdjustmentValues(COPYABLE_ADJUSTMENT_KEYS, currentAdjustments, {
+      excludedKeys: [...(!includeMasks ? MASK_KEYS : []), ...(!includeCropTransform ? GEOMETRY_KEYS : [])],
+      requireExistingKey: true,
+      skipDefaultValues: presetType === 'tool',
+    });
 
     const newPresetData: Preset = {
       adjustments: presetAdjustments,
@@ -341,25 +328,11 @@ export function usePresets(currentAdjustments: Adjustments) {
       existingPreset.includeCropTransform ?? GEOMETRY_KEYS.some((key) => existingPreset.adjustments[key] !== undefined);
     const presetType = existingPreset.presetType || 'style';
 
-    const presetAdjustments: PresetAdjustments = {};
-
-    for (const key of COPYABLE_ADJUSTMENT_KEYS) {
-      if (!includeMasks && MASK_KEYS.includes(key)) continue;
-      if (!includeCropTransform && GEOMETRY_KEYS.includes(key)) continue;
-
-      if (Object.prototype.hasOwnProperty.call(currentAdjustments, key)) {
-        const currentValue: unknown = currentAdjustments[key];
-
-        if (presetType === 'tool') {
-          const defaultValue: unknown = INITIAL_ADJUSTMENTS[key];
-          if (JSON.stringify(currentValue) !== JSON.stringify(defaultValue)) {
-            presetAdjustments[key] = currentValue;
-          }
-        } else {
-          presetAdjustments[key] = currentValue;
-        }
-      }
-    }
+    const presetAdjustments = pickAdjustmentValues(COPYABLE_ADJUSTMENT_KEYS, currentAdjustments, {
+      excludedKeys: [...(!includeMasks ? MASK_KEYS : []), ...(!includeCropTransform ? GEOMETRY_KEYS : [])],
+      requireExistingKey: true,
+      skipDefaultValues: presetType === 'tool',
+    });
 
     let updatedPreset: Preset | null = null;
     const updatedPresets = presets.map((item: UserPreset) => {

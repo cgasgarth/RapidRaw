@@ -13,6 +13,7 @@ import {
   COPYABLE_ADJUSTMENT_KEYS,
   PasteMode,
   LensAdjustment,
+  pickAdjustmentValues,
   normalizeLoadedAdjustments,
 } from '../utils/adjustments';
 import {
@@ -37,13 +38,11 @@ export const debouncedSave = debounce((path: string, adjustmentsToSave: Adjustme
 }, 300);
 
 type LoadedMetadataAdjustments = Adjustments & { is_null?: boolean };
-type AdjustmentRecord = Record<string, unknown>;
 
 interface MetadataResponse {
   adjustments?: LoadedMetadataAdjustments | null;
 }
 
-const cloneAdjustmentValue = (value: unknown): unknown => structuredClone(value);
 const BASIC_TONE_SESSION_ID = 'rapidraw-editor-basic-tone';
 
 const createOperationId = (): string => crypto.randomUUID();
@@ -194,14 +193,9 @@ export function useEditorActions() {
 
     if (!sourceAdjustments) return;
 
-    const adjustmentsToCopy: AdjustmentRecord = {};
-
-    for (const key of COPYABLE_ADJUSTMENT_KEYS) {
-      if (Object.prototype.hasOwnProperty.call(sourceAdjustments, key)) {
-        const value: unknown = sourceAdjustments[key];
-        adjustmentsToCopy[key] = cloneAdjustmentValue(value);
-      }
-    }
+    const adjustmentsToCopy = pickAdjustmentValues(COPYABLE_ADJUSTMENT_KEYS, sourceAdjustments, {
+      requireExistingKey: true,
+    });
     useEditorStore.getState().setEditor({ copiedAdjustments: adjustmentsToCopy });
     useProcessStore.getState().setProcess({ isCopied: true });
   }, []);
@@ -219,24 +213,14 @@ export function useEditorActions() {
         mode: PasteMode.Merge,
         includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
       };
-      const copiedAdjustmentRecord: AdjustmentRecord = copiedAdjustments;
-      const adjustmentsToApply: AdjustmentRecord = {};
-
-      for (const key of includedAdjustments) {
-        if (Object.prototype.hasOwnProperty.call(copiedAdjustmentRecord, key)) {
-          const value = copiedAdjustmentRecord[key];
-          if (mode === PasteMode.Merge) {
-            const defaultValue: unknown = INITIAL_ADJUSTMENTS[key];
-            if (JSON.stringify(value) !== JSON.stringify(defaultValue)) adjustmentsToApply[key] = value;
-          } else {
-            adjustmentsToApply[key] = value;
-          }
-        }
-      }
+      const adjustmentsToApply = pickAdjustmentValues(includedAdjustments, copiedAdjustments, {
+        requireExistingKey: true,
+        skipDefaultValues: mode === PasteMode.Merge,
+      });
 
       if (includedAdjustments.includes(LensAdjustment.LensMaker)) {
-        if (!adjustmentsToApply['lensMaker']) {
-          adjustmentsToApply['lensDistortionParams'] = null;
+        if (!adjustmentsToApply[LensAdjustment.LensMaker]) {
+          adjustmentsToApply[LensAdjustment.LensDistortionParams] = null;
         }
       }
 

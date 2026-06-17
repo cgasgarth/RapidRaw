@@ -993,6 +993,37 @@ export const COPYABLE_ADJUSTMENT_KEYS: string[] = Object.values(ADJUSTMENT_GROUP
   .flat()
   .flatMap((group) => group.keys);
 
+export interface PickAdjustmentValuesOptions {
+  excludedKeys?: ReadonlySet<string> | readonly string[];
+  requireExistingKey?: boolean;
+  skipDefaultValues?: boolean;
+}
+
+export const cloneAdjustmentValue = <Value>(value: Value): Value => structuredClone(value);
+
+export const hasAdjustmentKey = (source: Partial<Adjustments>, key: string): boolean => Object.hasOwn(source, key);
+
+export const pickAdjustmentValues = (
+  keys: readonly string[],
+  source: Partial<Adjustments>,
+  options: PickAdjustmentValuesOptions = {},
+): Partial<Adjustments> => {
+  const values: Partial<Adjustments> = {};
+  const excludedKeys =
+    options.excludedKeys instanceof Set ? options.excludedKeys : new Set<string>(options.excludedKeys ?? []);
+
+  for (const key of keys) {
+    if (excludedKeys.has(key)) continue;
+    if (options.requireExistingKey && !hasAdjustmentKey(source, key)) continue;
+
+    const value = cloneAdjustmentValue(source[key]);
+    if (options.skipDefaultValues && JSON.stringify(value) === JSON.stringify(INITIAL_ADJUSTMENTS[key])) continue;
+    values[key] = value;
+  }
+
+  return values;
+};
+
 export const ADJUSTMENT_SECTIONS: Sections = {
   basic: [
     BasicAdjustment.Brightness,
