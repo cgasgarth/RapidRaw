@@ -106,6 +106,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:negative-lab-frame-health', new Set(['bun scripts/check-negative-lab-frame-health-report.mjs'])],
   ['check:negative-lab-ui-presets', new Set(['bun scripts/check-negative-lab-ui-presets.mjs'])],
   ['check:private-raw-evidence', new Set(['bun scripts/check-private-raw-evidence-ledger.mjs'])],
+  ['check:raw-open-edit-export-proof', new Set(['bun scripts/check-raw-open-edit-export-proof.mjs'])],
   [
     'check:negative-lab-workspace-smoke',
     new Set(['bun scripts/capture-visual-smoke.mjs --scenario negative-lab-workspace']),
@@ -173,7 +174,8 @@ function isSafeFixturePath(path) {
     path.startsWith('fixtures/docs/') ||
     (path.startsWith('fixtures/film-simulation/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/layers/') && path.endsWith('.json')) ||
-    (path.startsWith('fixtures/negative-lab/') && path.endsWith('.json'))
+    (path.startsWith('fixtures/negative-lab/') && path.endsWith('.json')) ||
+    (path.startsWith('fixtures/validation/') && path.endsWith('.json'))
   );
 }
 
@@ -589,6 +591,17 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertChangeClassification(
+    'raw open edit export proof package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -110,6 +110,7 @@\n+    "check:raw-open-edit-export-proof": "bun scripts/check-raw-open-edit-export-proof.mjs",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
     'pure TS test package script changes skip smoke',
     [
       {
@@ -642,6 +655,11 @@ function runSelfTest() {
   assertClassification(
     'private RAW evidence fixture ledger can skip smoke',
     ['fixtures/detail/private-raw-evidence-ledger.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'validation fixture contracts can skip smoke',
+    ['fixtures/validation/raw-open-edit-export-proof.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(
