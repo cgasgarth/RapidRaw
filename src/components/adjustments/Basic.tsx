@@ -1,11 +1,11 @@
 import cx from 'clsx';
 import { motion } from 'framer-motion';
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import AdjustmentSlider from './AdjustmentSlider';
 import { Adjustments, BasicAdjustment } from '../../utils/adjustments';
 import { type AppSettings } from '../ui/AppProperties';
-import Slider from '../ui/Slider';
 
 interface BasicAdjustmentsProps {
   adjustments: Adjustments;
@@ -24,14 +24,6 @@ interface ToneMapperSwitchProps {
 }
 
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
-
-type SliderChangeEvent =
-  | ChangeEvent<HTMLInputElement>
-  | {
-      target: {
-        value: number | string;
-      };
-    };
 
 const formatPercent = (value: number) => `${String(value)}%`;
 
@@ -159,13 +151,11 @@ const ToneMapperSwitch = ({
           ))}
         </div>
         <div className="mt-2.5 px-1">
-          <Slider
+          <AdjustmentSlider
             label={t('adjustments.basic.evShift')}
             max={5}
             min={-5}
-            onChange={(e: SliderChangeEvent) => {
-              onEvShiftChange(parseFloat(String(e.target.value)));
-            }}
+            onValueChange={onEvShiftChange}
             step={0.01}
             value={evShiftValue}
             trackClassName="bg-surface"
@@ -186,9 +176,8 @@ export default function BasicAdjustments({
 }: BasicAdjustmentsProps) {
   const { t } = useTranslation();
 
-  const handleAdjustmentChange = (key: BasicAdjustment, value: number | string) => {
-    const numericValue = parseFloat(String(value));
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: numericValue }));
+  const handleAdjustmentChange = (key: BasicAdjustment, value: number) => {
+    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
   };
 
   const handleToneMapperChange = (mapper: string) => {
@@ -203,12 +192,12 @@ export default function BasicAdjustments({
   return (
     <div>
       {hideTonemapper ? (
-        <Slider
+        <AdjustmentSlider
           label={t('adjustments.basic.evShift')}
           max={5}
           min={-5}
-          onChange={(e: SliderChangeEvent) => {
-            handleAdjustmentChange(BasicAdjustment.Exposure, e.target.value);
+          onValueChange={(value) => {
+            handleAdjustmentChange(BasicAdjustment.Exposure, value);
           }}
           step={0.01}
           value={adjustments.exposure}
@@ -225,67 +214,67 @@ export default function BasicAdjustments({
           onDragStateChange={onDragStateChange}
         />
       )}
-      <Slider
+      <AdjustmentSlider
         label={t('adjustments.basic.exposure')}
         max={5}
         min={-5}
-        onChange={(e: SliderChangeEvent) => {
-          handleAdjustmentChange(BasicAdjustment.Brightness, e.target.value);
+        onValueChange={(value) => {
+          handleAdjustmentChange(BasicAdjustment.Brightness, value);
         }}
         step={0.01}
         value={adjustments.brightness}
         onDragStateChange={onDragStateChange}
       />
-      <Slider
+      <AdjustmentSlider
         label={t('adjustments.basic.contrast')}
         max={100}
         min={-100}
-        onChange={(e: SliderChangeEvent) => {
-          handleAdjustmentChange(BasicAdjustment.Contrast, e.target.value);
+        onValueChange={(value) => {
+          handleAdjustmentChange(BasicAdjustment.Contrast, value);
         }}
         step={1}
         value={adjustments.contrast}
         onDragStateChange={onDragStateChange}
       />
-      <Slider
+      <AdjustmentSlider
         label={t('adjustments.basic.highlights')}
         max={100}
         min={-100}
-        onChange={(e: SliderChangeEvent) => {
-          handleAdjustmentChange(BasicAdjustment.Highlights, e.target.value);
+        onValueChange={(value) => {
+          handleAdjustmentChange(BasicAdjustment.Highlights, value);
         }}
         step={1}
         value={adjustments.highlights}
         onDragStateChange={onDragStateChange}
       />
-      <Slider
+      <AdjustmentSlider
         label={t('adjustments.basic.shadows')}
         max={100}
         min={-100}
-        onChange={(e: SliderChangeEvent) => {
-          handleAdjustmentChange(BasicAdjustment.Shadows, e.target.value);
+        onValueChange={(value) => {
+          handleAdjustmentChange(BasicAdjustment.Shadows, value);
         }}
         step={1}
         value={adjustments.shadows}
         onDragStateChange={onDragStateChange}
       />
-      <Slider
+      <AdjustmentSlider
         label={t('adjustments.basic.whites')}
         max={100}
         min={-100}
-        onChange={(e: SliderChangeEvent) => {
-          handleAdjustmentChange(BasicAdjustment.Whites, e.target.value);
+        onValueChange={(value) => {
+          handleAdjustmentChange(BasicAdjustment.Whites, value);
         }}
         step={1}
         value={adjustments.whites}
         onDragStateChange={onDragStateChange}
       />
-      <Slider
+      <AdjustmentSlider
         label={t('adjustments.basic.blacks')}
         max={100}
         min={-100}
-        onChange={(e: SliderChangeEvent) => {
-          handleAdjustmentChange(BasicAdjustment.Blacks, e.target.value);
+        onValueChange={(value) => {
+          handleAdjustmentChange(BasicAdjustment.Blacks, value);
         }}
         step={1}
         value={adjustments.blacks}
