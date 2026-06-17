@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
+import { applySelectiveColorToRgbPixel } from '../src/utils/selectiveColorRuntime.ts';
 import { calculateSelectiveColorInfluence } from '../src/utils/selectiveColorFalloff.ts';
 
 const FIXTURE_PATH = 'fixtures/color/selective-color-falloff-fixtures.json';
@@ -21,11 +22,37 @@ const falloffCaseSchema = z
   })
   .strict();
 
+const rgbPixelSchema = z
+  .object({
+    blue: z.number().min(0).max(1),
+    green: z.number().min(0).max(1),
+    red: z.number().min(0).max(1),
+  })
+  .strict();
+
+const runtimeCaseSchema = z
+  .object({
+    adjustment: z
+      .object({
+        hue: z.number().min(-180).max(180),
+        luminance: z.number().min(-100).max(100),
+        saturation: z.number().min(-100).max(100),
+      })
+      .strict(),
+    expectedRgb: rgbPixelSchema,
+    id: z.string().regex(/^color\.selective\.runtime\.[a-z0-9.-]+\.v[0-9]+$/u),
+    inputRgb: rgbPixelSchema,
+    rangeKey: z.enum(['reds', 'oranges', 'yellows', 'greens', 'aquas', 'blues', 'purples', 'magentas']),
+    tolerance: z.number().positive().max(0.001),
+  })
+  .strict();
+
 const manifestSchema = z
   .object({
     $schema: z.string().url(),
     cases: z.array(falloffCaseSchema).min(1),
     issue: z.literal(97),
+    runtimeCases: z.array(runtimeCaseSchema).optional(),
     schemaVersion: z.literal(1),
     shaderDefaultSmoothness: z.number().positive(),
     snapshotDate: z.string().date(),
@@ -74,10 +101,23 @@ for (const testCase of manifest.cases) {
   }
 }
 
+for (const testCase of manifest.runtimeCases ?? []) {
+  const result = applySelectiveColorToRgbPixel(testCase.inputRgb, testCase.rangeKey, testCase.adjustment);
+  for (const channel of ['red', 'green', 'blue']) {
+    const actual = result.outputRgb[channel];
+    const expected = testCase.expectedRgb[channel];
+    if (Math.abs(actual - expected) > testCase.tolerance) {
+      failures.push(`${testCase.id}: expected ${channel}=${expected}, got ${actual}.`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error('Selective color falloff validation failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log(`Validated ${manifest.cases.length} selective color falloff cases.`);
+console.log(
+  `Validated ${manifest.cases.length} selective color falloff cases and ${manifest.runtimeCases?.length ?? 0} runtime cases.`,
+);
