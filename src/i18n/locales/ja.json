@@ -1489,7 +1489,18 @@
       "sourceCountBlocked": "Select at least two overlapping source images before stitching.",
       "uiOnlyNotice": "These controls define the requested panorama artifact. Runtime projection and boundary support will be applied as engine capability checks land.",
       "workflowStatus": "Projection, blend, boundary, and preview controls are recorded for the panorama request.",
-      "workflowTitle": "Panorama setup"
+      "workflowTitle": "Panorama setup",
+      "review": {
+        "title": "Quality review",
+        "proofStatus": "App-server bridge ready",
+        "limitation": "Runtime bridge proof only; private RAW decode, visual seam QA, and UI E2E remain open.",
+        "runtimeBridge": "Dry-run/apply bridge",
+        "privateRawPending": "Private RAW review pending",
+        "uiE2ePending": "UI E2E pending",
+        "alignment": "Alignment",
+        "seams": "Seams",
+        "projectionCrop": "Projection/crop"
+      }
     },
     "renameAlbum": {
       "placeholder": "新しいアルバム名を入力..."
@@ -1595,7 +1606,18 @@
       "sourceSummary_other": "{{count}} source frames selected",
       "title": "Super Resolution",
       "workflowStatus": "Plan-only surface until API wiring lands.",
-      "workflowTitle": "Super-resolution plan"
+      "workflowTitle": "Super-resolution plan",
+      "review": {
+        "title": "Quality review",
+        "proofStatus": "App-server bridge ready",
+        "limitation": "Runtime bridge proof only; private RAW decode, detail QA, and UI E2E remain open.",
+        "runtimeBridge": "Dry-run/apply bridge",
+        "privateRawPending": "Private RAW review pending",
+        "uiE2ePending": "UI E2E pending",
+        "registration": "Registration",
+        "detailGain": "Detail gain",
+        "ringing": "Ringing/zipper artifacts"
+      }
     },
     "focusStack": {
       "apiPending": "API pending",
@@ -1663,7 +1685,18 @@
       "sourceSummary_other": "{{count}} focus frames selected",
       "title": "Focus Stack",
       "workflowStatus": "Plan-only surface until API wiring lands.",
-      "workflowTitle": "Focus-stack plan"
+      "workflowTitle": "Focus-stack plan",
+      "review": {
+        "title": "Quality review",
+        "proofStatus": "App-server bridge ready",
+        "limitation": "Runtime bridge proof only; private RAW decode, visual QA, and UI E2E remain open.",
+        "runtimeBridge": "Dry-run/apply bridge",
+        "privateRawPending": "Private RAW review pending",
+        "uiE2ePending": "UI E2E pending",
+        "sharpnessMap": "Sharpness map",
+        "transitions": "Focus transitions",
+        "retouchLayer": "Retouch layer"
+      }
     }
   },
   "settings": {

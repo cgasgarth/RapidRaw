@@ -3,6 +3,7 @@ import { AlertTriangle, Aperture, CheckCircle2, Layers3, ShieldCheck } from 'luc
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
 import {
   ComputationalSetupModalShell,
   ComputationalSetupOptionSection,
@@ -234,6 +235,29 @@ export default function FocusStackModal({
           />
         </div>
       </motion.section>
+
+      <ComputationalMergeReviewPanel
+        title={t('modals.focusStack.review.title')}
+        proofStatus={t('modals.focusStack.review.proofStatus')}
+        limitation={t('modals.focusStack.review.limitation')}
+        items={[
+          {
+            label: t('modals.focusStack.review.sharpnessMap'),
+            status: 'ready',
+            value: t('modals.focusStack.review.runtimeBridge'),
+          },
+          {
+            label: t('modals.focusStack.review.transitions'),
+            status: 'review',
+            value: t('modals.focusStack.review.privateRawPending'),
+          },
+          {
+            label: t('modals.focusStack.review.retouchLayer'),
+            status: 'pending',
+            value: t('modals.focusStack.review.uiE2ePending'),
+          },
+        ]}
+      />
 
       {isDepthMapPreviewOnly && (
         <div className="rounded-md border border-yellow-500/40 bg-yellow-500/10 px-4 py-3 flex gap-3">

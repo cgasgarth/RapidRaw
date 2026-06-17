@@ -120,6 +120,7 @@
     "check:computational-merge-e2e-proof-manifest": "bun scripts/check-computational-merge-e2e-proof-manifest.ts",
     "check:computational-merge-source-sets": "bun scripts/check-computational-merge-source-sets.ts",
     "check:computational-merge-source-runtime-bridge": "bun scripts/check-computational-merge-source-runtime-bridge.ts",
+    "check:computational-merge-review-panels": "bun scripts/check-computational-merge-review-panels.ts",
     "check:chromatic-adaptation": "bun scripts/check-chromatic-adaptation-fixtures.ts",
     "check:gamut-mapping": "bun scripts/check-gamut-mapping-fixtures.ts",
     "check:generated-types": "bun scripts/check-generated-type-drift.ts",
