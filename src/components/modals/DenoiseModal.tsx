@@ -1,10 +1,11 @@
 import { listen } from '@tauri-apps/api/event';
 import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, Loader2, Save, RefreshCw, ZoomIn, ZoomOut, Move, Grip } from 'lucide-react';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
+import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import Button from '../ui/Button';
@@ -33,36 +34,30 @@ interface DenoiseModalProps {
 const ImageCompare = ({ original, denoised }: { original: string; denoised: string }) => {
   const { t } = useTranslation();
   const [sliderPosition, setSliderPosition] = useState(50);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-
-  const [isDragging, setIsDragging] = useState(false);
   const [isResizingSlider, setIsResizingSlider] = useState(false);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const lastMousePos = useRef({ x: 0, y: 0 });
+  const {
+    containerRef,
+    handleMouseDown: handleViewportMouseDown,
+    handleWheel,
+    imageTransformStyle,
+    resetViewport,
+    zoom,
+    zoomIn,
+    zoomOut,
+  } = usePreviewViewport({ maxZoom: 4, minZoom: 0.5, transitionLocked: isResizingSlider, zoomStep: 0.5 });
 
   useEffect(() => {
-    if (!isDragging && !isResizingSlider) return;
+    if (!isResizingSlider) return;
 
     const handleWindowMouseMove = (e: MouseEvent) => {
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
 
-      if (isResizingSlider) {
-        const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-        const percent = (x / rect.width) * 100;
-        setSliderPosition(percent);
-      } else if (isDragging) {
-        const dx = e.clientX - lastMousePos.current.x;
-        const dy = e.clientY - lastMousePos.current.y;
-        setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
-        lastMousePos.current = { x: e.clientX, y: e.clientY };
-      }
+      const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+      setSliderPosition((x / rect.width) * 100);
     };
 
     const handleWindowMouseUp = () => {
-      setIsDragging(false);
       setIsResizingSlider(false);
     };
 
@@ -73,41 +68,17 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
-  }, [isDragging, isResizingSlider]);
+  }, [containerRef, isResizingSlider]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isResizingSlider) return;
-    e.preventDefault();
-    setIsDragging(true);
-    lastMousePos.current = { x: e.clientX, y: e.clientY };
+    handleViewportMouseDown(e);
   };
 
   const handleSliderMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     setIsResizingSlider(true);
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.stopPropagation();
-    if (!containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left - rect.width / 2;
-    const mouseY = e.clientY - rect.top - rect.height / 2;
-
-    const delta = -e.deltaY * 0.001;
-    const newZoom = Math.min(Math.max(0.5, zoom + delta), 4);
-
-    const scaleRatio = newZoom / zoom;
-    const mouseFromCenterX = mouseX - pan.x;
-    const mouseFromCenterY = mouseY - pan.y;
-
-    const newPanX = mouseX - mouseFromCenterX * scaleRatio;
-    const newPanY = mouseY - mouseFromCenterY * scaleRatio;
-
-    setZoom(newZoom);
-    setPan({ x: newPanX, y: newPanY });
   };
 
   const handleSliderKeyDown = (e: React.KeyboardEvent) => {
@@ -135,12 +106,6 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
     }
   };
 
-  const imageTransformStyle = {
-    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-    transition: isDragging || isResizingSlider ? 'none' : 'transform 0.1s ease-out',
-    transformOrigin: 'center center',
-  };
-
   return (
     <div className="flex flex-col h-full bg-[#111] rounded-lg overflow-hidden border border-surface">
       <div className="h-9 bg-bg-primary border-b border-surface flex items-center justify-between px-3">
@@ -148,27 +113,16 @@ const ImageCompare = ({ original, denoised }: { original: string; denoised: stri
           <Move size={14} /> <span>{t('modals.denoise.panZoomEnabled')}</span>
         </UiText>
         <UiText as="div" variant={TextVariants.small} className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              setZoom((z) => Math.max(0.5, z - 0.5));
-            }}
-            className="hover:text-text-primary"
-          >
+          <button onClick={zoomOut} className="hover:text-text-primary">
             <ZoomOut size={16} />
           </button>
           <span className="w-10 text-center">{(zoom * 100).toFixed(0)}%</span>
-          <button
-            onClick={() => {
-              setZoom((z) => Math.min(4, z + 0.5));
-            }}
-            className="hover:text-text-primary"
-          >
+          <button onClick={zoomIn} className="hover:text-text-primary">
             <ZoomIn size={16} />
           </button>
           <button
             onClick={() => {
-              setZoom(1);
-              setPan({ x: 0, y: 0 });
+              resetViewport();
               setSliderPosition(50);
             }}
             className="ml-2 text-accent hover:underline"

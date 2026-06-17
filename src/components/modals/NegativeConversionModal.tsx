@@ -15,10 +15,11 @@ import {
   WandSparkles,
   Copy,
 } from 'lucide-react';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
+import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import {
   negativeBaseFogEstimateSchema,
   negativeBaseFogSampleReadoutSchema,
@@ -213,13 +214,18 @@ export default function NegativeConversionModal({
   const [activePathIndex, setActivePathIndex] = useState(0);
 
   const { isMounted, show } = useModalTransition(isOpen);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
   const [isCompareActive, setIsCompareActive] = useState(false);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const lastMousePos = useRef({ x: 0, y: 0 });
+  const {
+    containerRef,
+    handleMouseDown,
+    handleResetZoom,
+    handleWheel,
+    imageTransformStyle,
+    resetViewport,
+    zoom,
+    zoomIn,
+    zoomOut,
+  } = usePreviewViewport({ maxZoom: 8, minZoom: 0.1, zoomStep: 0.25 });
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const effectiveActivePathIndex = targetPaths[activePathIndex] === undefined ? 0 : activePathIndex;
   const selectedImagePath = targetPaths[effectiveActivePathIndex] ?? null;
@@ -461,51 +467,6 @@ export default function NegativeConversionModal({
     };
   }, []);
 
-  useEffect(() => {
-    if (!isDragging) return;
-    const handleWindowMouseMove = (e: MouseEvent) => {
-      const dx = e.clientX - lastMousePos.current.x;
-      const dy = e.clientY - lastMousePos.current.y;
-      setPan((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    };
-    const handleWindowMouseUp = () => {
-      setIsDragging(false);
-    };
-    window.addEventListener('mousemove', handleWindowMouseMove);
-    window.addEventListener('mouseup', handleWindowMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleWindowMouseMove);
-      window.removeEventListener('mouseup', handleWindowMouseUp);
-    };
-  }, [isDragging]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    setIsDragging(true);
-    lastMousePos.current = { x: e.clientX, y: e.clientY };
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
-    e.stopPropagation();
-    if (!containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left - rect.width / 2;
-    const mouseY = e.clientY - rect.top - rect.height / 2;
-    const delta = -e.deltaY * 0.001;
-    const newZoom = Math.min(Math.max(0.1, zoom + delta), 8);
-    const scaleRatio = newZoom / zoom;
-    const mouseFromCenterX = mouseX - pan.x;
-    const mouseFromCenterY = mouseY - pan.y;
-    const newPanX = mouseX - mouseFromCenterX * scaleRatio;
-    const newPanY = mouseY - mouseFromCenterY * scaleRatio;
-
-    setZoom(newZoom);
-    setPan({ x: newPanX, y: newPanY });
-  };
-
   const updatePreview = useMemo(
     () =>
       throttle(async (currentParams: NegativeParams, isInitialLoad: boolean = false) => {
@@ -557,8 +518,7 @@ export default function NegativeConversionModal({
       setOriginalUrl(null);
       setParams(DEFAULT_PARAMS);
       setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
+      resetViewport();
       setBaseFogConfidence(null);
       setBaseFogEstimate(null);
       setBaseFogReadoutCopied(false);
@@ -575,7 +535,7 @@ export default function NegativeConversionModal({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [isOpen, selectedImagePath, targetPaths, updatePreview]);
+  }, [isOpen, resetViewport, selectedImagePath, targetPaths, updatePreview]);
 
   const handleParamChange = (key: keyof NegativeParams, value: number) => {
     const newParams = { ...params, [key]: value };
@@ -817,12 +777,6 @@ export default function NegativeConversionModal({
       }
       return nextIncludedPaths;
     });
-  };
-
-  const imageTransformStyle = {
-    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-    transition: isDragging ? 'none' : 'transform 0.1s ease-out',
-    transformOrigin: 'center center',
   };
 
   const renderBatchReadiness = () => (
@@ -1131,8 +1085,7 @@ export default function NegativeConversionModal({
                       disabled={isSaving || isEstimatingBaseFog}
                       onClick={() => {
                         setActivePathIndex(index);
-                        setZoom(1);
-                        setPan({ x: 0, y: 0 });
+                        resetViewport();
                       }}
                       title={path}
                       type="button"
@@ -2037,9 +1990,7 @@ export default function NegativeConversionModal({
             }}
           >
             <button
-              onClick={() => {
-                setZoom((z) => Math.max(0.1, z - 0.25));
-              }}
+              onClick={zoomOut}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.negativeConversion.zoomOutTooltip')}
             >
@@ -2049,19 +2000,14 @@ export default function NegativeConversionModal({
               {Math.round(zoom * 100)}%
             </span>
             <button
-              onClick={() => {
-                setZoom((z) => Math.min(8, z + 0.25));
-              }}
+              onClick={zoomIn}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.negativeConversion.zoomInTooltip')}
             >
               <ZoomIn size={18} />
             </button>
             <button
-              onClick={() => {
-                setZoom(1);
-                setPan({ x: 0, y: 0 });
-              }}
+              onClick={handleResetZoom}
               className="p-2 text-white/60 hover:bg-white/10 hover:text-white rounded-full transition-colors"
               data-tooltip={t('modals.negativeConversion.resetViewTooltip')}
             >
