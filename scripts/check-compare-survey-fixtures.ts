@@ -2,17 +2,21 @@
 
 import { readFile } from 'node:fs/promises';
 
+import { z } from 'zod';
+
 import {
   compareSurveySessionSchema,
   parseCompareSurveySession,
   visibleCompareSurveyCandidates,
 } from '../src/schemas/compareSurveySchemas.ts';
 
-const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
+const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, 'utf8'));
 
 const session = parseCompareSurveySession(await readJson('fixtures/ui/compare-survey-session.json'));
-const invalidCases = await readJson('fixtures/ui/invalid-compare-survey-cases.json');
-const failures = [];
+const invalidCases = z
+  .array(z.object({ case: z.string().min(1), session: z.unknown() }).strict())
+  .parse(await readJson('fixtures/ui/invalid-compare-survey-cases.json'));
+const failures: string[] = [];
 
 const visiblePaths = visibleCompareSurveyCandidates(session).map((candidate) => candidate.path);
 const expectedVisiblePaths = [
