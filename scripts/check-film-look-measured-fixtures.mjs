@@ -29,6 +29,10 @@ const fixtureSchema = z
     localRelativePath: z.string().startsWith('private-fixtures/film-simulation/'),
     measurementStatus: z.literal('approved_private_payload_metadata'),
     payloadAccess: z.literal('private_ci_payload'),
+    payloadSha256: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    reviewDate: z.string().date(),
+    reviewIssue: z.literal(1556),
+    reviewer: z.string().min(1),
     sourceKind: z.enum(['project_owned', 'licensed']),
     state: z.literal('approved_render_measurement'),
     targetOrStepWedgePresent: z.literal(true),
@@ -70,6 +74,7 @@ const outputCaseSchema = z
     previewHash: z.string().length(16),
     proofLevel: z.literal('private_payload_metadata_and_adjustment_domain'),
     renderBoundsStatus: z.literal('within_bounds'),
+    reviewIssue: z.literal(1556),
   })
   .strict();
 
@@ -240,6 +245,7 @@ const buildCase = (fixture, look) => {
     previewHash: hashPixels(preview),
     proofLevel: 'private_payload_metadata_and_adjustment_domain',
     renderBoundsStatus: 'within_bounds',
+    reviewIssue: fixture.reviewIssue,
   };
 };
 
