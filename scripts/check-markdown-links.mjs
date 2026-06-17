@@ -1,37 +1,13 @@
 #!/usr/bin/env bun
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, extname, join, relative, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+
+import { getExtension, walkRepoFiles } from './lib/repo-files.mjs';
 
 const ROOT = process.cwd();
-const IGNORED_DIRS = new Set(['.git', 'dist', 'node_modules', 'src-tauri/target', 'target']);
 const MARKDOWN_EXTENSION = '.md';
 const EXTERNAL_TARGET_PATTERN = /^[a-z][a-z0-9+.-]*:/iu;
-
-const isIgnored = (repoPath) => {
-  const normalized = repoPath.split('/').join('/');
-  return [...IGNORED_DIRS].some((ignored) => normalized === ignored || normalized.startsWith(`${ignored}/`));
-};
-
-const walk = (dir, files = []) => {
-  for (const entry of readdirSync(dir)) {
-    const absolutePath = join(dir, entry);
-    const repoPath = relative(ROOT, absolutePath);
-    if (isIgnored(repoPath)) continue;
-
-    const stat = statSync(absolutePath);
-    if (stat.isDirectory()) {
-      walk(absolutePath, files);
-      continue;
-    }
-
-    if (stat.isFile() && extname(entry) === MARKDOWN_EXTENSION) {
-      files.push(absolutePath);
-    }
-  }
-
-  return files;
-};
 
 const slugifyHeading = (heading) =>
   heading
@@ -121,7 +97,7 @@ const resolveTargetPath = (sourceFile, linkPath) => {
   return resolve(dirname(sourceFile), decodedPath);
 };
 
-const markdownFiles = walk(ROOT);
+const markdownFiles = walkRepoFiles({ include: ({ entry }) => getExtension(entry) === MARKDOWN_EXTENSION });
 const failures = [];
 
 for (const filePath of markdownFiles) {
@@ -146,7 +122,7 @@ for (const filePath of markdownFiles) {
       continue;
     }
 
-    if (rawAnchor && extname(targetPath) === MARKDOWN_EXTENSION) {
+    if (rawAnchor && getExtension(targetPath) === MARKDOWN_EXTENSION) {
       const anchor = safeDecode(rawAnchor).toLowerCase();
       if (!getAnchorsForFile(targetPath).has(anchor)) {
         failures.push(`${sourceRepoPath}: missing heading anchor "${anchor}" in ${targetRepoPath}`);

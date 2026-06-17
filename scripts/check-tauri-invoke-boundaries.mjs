@@ -1,14 +1,13 @@
 #!/usr/bin/env bun
 // @ts-check
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { extname, join, relative } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 import ts from 'typescript';
 
-const ROOT = process.cwd();
+import { getExtension, toRepoPath, walkRepoFiles } from './lib/repo-files.mjs';
+
 const CHECKED_EXTENSIONS = new Set(['.ts', '.tsx']);
-const IGNORED_DIRS = new Set(['.git', 'dist', 'node_modules', 'src-tauri/target', 'target']);
 const SCHEMA_WRAPPER_PATH = 'src/utils/tauriSchemaInvoke.ts';
 
 const APPROVED_RAW_INVOKE_BUDGET = {
@@ -43,14 +42,7 @@ const APPROVED_RAW_INVOKE_BUDGET = {
   'src/utils/frontendLogBridge.ts': { raw: 1, typed: 0 },
 };
 
-const getExtension = (path) => extname(path);
-
 const getScriptKind = (path) => (getExtension(path) === '.tsx' ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-
-const isIgnored = (path) => {
-  const normalized = path.split('/').join('/');
-  return [...IGNORED_DIRS].some((ignored) => normalized === ignored || normalized.startsWith(`${ignored}/`));
-};
 
 const getLine = (sourceFile, position) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
 
@@ -132,25 +124,6 @@ const collectBoundaryFailures = (inventory, approvedBudget = APPROVED_RAW_INVOKE
   return failures;
 };
 
-const files = [];
-const walk = (dir) => {
-  for (const entry of readdirSync(dir)) {
-    const absolutePath = join(dir, entry);
-    const repoPath = relative(ROOT, absolutePath);
-    if (isIgnored(repoPath)) continue;
-
-    const stat = statSync(absolutePath);
-    if (stat.isDirectory()) {
-      walk(absolutePath);
-      continue;
-    }
-
-    if (stat.isFile() && CHECKED_EXTENSIONS.has(getExtension(entry))) {
-      files.push(absolutePath);
-    }
-  }
-};
-
 const runSelfTest = () => {
   const blocked = inspectTauriInvokeSource(
     'src/App.tsx',
@@ -223,11 +196,11 @@ if (process.argv.includes('--self-test')) {
   process.exit(0);
 }
 
-walk(ROOT);
-
+const root = process.cwd();
+const files = walkRepoFiles({ include: ({ entry }) => CHECKED_EXTENSIONS.has(getExtension(entry)) });
 const inventory = [];
 for (const file of files) {
-  const repoPath = relative(ROOT, file);
+  const repoPath = toRepoPath(root, file);
   const result = inspectTauriInvokeSource(repoPath, readFileSync(file, 'utf8'));
   if (result.importedNames.length > 0 || result.rawCalls.length > 0) {
     inventory.push({ path: repoPath, ...result });
