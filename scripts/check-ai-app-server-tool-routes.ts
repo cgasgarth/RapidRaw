@@ -54,6 +54,26 @@ if (!routeInvokes.has('precompute_ai_subject_mask')) {
   failures.push('precompute_ai_subject_mask string invoke is missing from AI app-server route manifest.');
 }
 
+for (const invoke of ['apply_denoising', 'save_denoised_image']) {
+  const route = AI_APP_SERVER_TOOL_ROUTES.find((candidate) => candidate.sourceOperation === invoke);
+  if (route === undefined) {
+    failures.push(`${invoke} is missing from AI app-server route manifest.`);
+    continue;
+  }
+
+  if (route.toolCapability !== 'denoise') {
+    failures.push(`${invoke} must declare denoise capability.`);
+  }
+
+  if (route.status === 'mapped') {
+    failures.push(`${invoke} must not be mapped until AI denoise dry-run/apply provenance is implemented.`);
+  }
+
+  if (route.status === 'deferred' && route.deferredIssue !== '#1276') {
+    failures.push(`${invoke} deferred route must track #1276.`);
+  }
+}
+
 for (const route of AI_APP_SERVER_TOOL_ROUTES) {
   const registeredTool =
     route.status === 'mapped' && route.appServerToolName !== undefined

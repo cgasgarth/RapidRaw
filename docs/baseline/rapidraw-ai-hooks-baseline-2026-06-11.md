@@ -40,6 +40,18 @@ server design.
 | AI denoise              | `apply_denoising`/`batch_denoise_images` with method `ai` and NIND ONNX           | Denoise UI paths outside this doc's primary panel | Shares `AiState` model cache and emits denoise progress/completion events.                                                             |
 | AI tagging/indexing     | `start_background_indexing` with CLIP ONNX/tokenizer                              | Library/settings tagging flows                    | Disabled by default; writes tags into `.rrdata` sidecars and can clear AI tags later.                                                  |
 
+## App-Server Migration Coverage
+
+`AI_APP_SERVER_TOOL_ROUTE_MANIFEST` tracks which inherited AI operations are
+mapped, deferred, or intentionally outside image-editing tool calls.
+
+| Feature                            | Route status                    | Reason                                                                                                                                                        |
+| ---------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Subject/foreground/sky/depth masks | mapped                          | Typed dry-run/apply mask tools cover local model mask generation.                                                                                             |
+| Generative replace/inpaint         | mapped                          | Typed enhancement dry-run/apply tools cover approved inpaint edits.                                                                                           |
+| AI denoise                         | deferred to #1276               | The current Tauri invokes multiplex classic and AI denoise and need a denoise dry-run plan, model provenance, and artifact-writing apply path before mapping. |
+| AI tagging/indexing                | outside image-edit tool surface | Tagging mutates library metadata, not image pixels; `clear_ai_tags` remains metadata cleanup.                                                                 |
+
 ## Local Model Capabilities
 
 All local ONNX assets are downloaded into `app_data_dir()/models` and loaded
