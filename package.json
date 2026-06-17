@@ -175,6 +175,7 @@
     "check:sr-synthetic-smoke": "bun scripts/check-super-resolution-synthetic-smoke.ts",
     "check:sr-ui-api": "bun scripts/check-sr-ui-api.ts",
     "check:sr-ui-runtime-bridge": "bun scripts/check-sr-ui-runtime-bridge.ts",
+    "check:sr-review-diagnostics": "bun scripts/check-sr-review-diagnostics.ts",
     "check:sr-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario sr-ui",
     "check:negative-lab-base-fog": "bun scripts/check-negative-lab-base-fog.ts",
     "check:negative-lab-fixtures": "bun scripts/check-negative-lab-fixtures.ts",
