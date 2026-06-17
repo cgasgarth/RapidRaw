@@ -213,13 +213,15 @@ if (
 }
 
 for (const commandType of expectedCommandTypes) {
-  const routeModes = new Set(
-    TONE_COLOR_APP_SERVER_ROUTES.filter((route) => route.commandType === commandType).map(
-      (route) => route.executionMode,
-    ),
-  );
+  const routeModeCounts = new Map<string, number>();
+  for (const route of TONE_COLOR_APP_SERVER_ROUTES.filter((candidate) => candidate.commandType === commandType)) {
+    routeModeCounts.set(route.executionMode, (routeModeCounts.get(route.executionMode) ?? 0) + 1);
+  }
+
   for (const mode of ['dry_run_command', 'apply_dry_run_plan']) {
-    if (!routeModes.has(mode)) failures.push(`${commandType} missing ${mode} route.`);
+    const count = routeModeCounts.get(mode) ?? 0;
+    if (count === 0) failures.push(`${commandType} missing ${mode} route.`);
+    if (count > 1) failures.push(`${commandType} has duplicate ${mode} routes.`);
   }
 }
 
