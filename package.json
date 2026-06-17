@@ -172,6 +172,7 @@
     "check:negative-lab-stock-metadata-catalog": "bun scripts/check-negative-lab-stock-metadata-catalog.mjs",
     "check:negative-lab-workspace": "bun scripts/check-negative-lab-workspace.mjs",
     "check:negative-lab-roll-cockpit": "bun scripts/check-negative-lab-roll-cockpit.mjs",
+    "check:negative-lab-qc-contact-sheet": "bun scripts/generate-negative-lab-qc-contact-sheet.mjs",
     "check:negative-lab-measured-profiles": "bun scripts/check-negative-lab-measured-profiles.mjs",
     "check:negative-lab-measured-render-proof": "bun scripts/check-negative-lab-measured-render-proof.mjs",
     "check:negative-lab-workspace-smoke": "bun scripts/capture-visual-smoke.mjs --scenario negative-lab-workspace",
