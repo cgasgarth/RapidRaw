@@ -100,6 +100,24 @@ interface SettingItemProps {
   label: string;
 }
 
+interface DropdownSettingProps<T extends string | number> {
+  description: string;
+  label: string;
+  onChange: (value: T) => void;
+  options: OptionItem<T>[];
+  value: T;
+}
+
+interface SwitchSettingProps {
+  checked: boolean;
+  description: string;
+  disabled?: boolean;
+  id: string;
+  label: string;
+  onChange: (checked: boolean) => void;
+  switchLabel: string;
+}
+
 interface SettingsPanelProps {
   appSettings: AppSettings;
   onBack: () => void;
@@ -141,6 +159,22 @@ type NumericChangeEvent = ChangeEvent<HTMLInputElement> | { target: { value: num
 const getNumericEventValue = (event: NumericChangeEvent): number => Number(event.target.value);
 const getIntegerEventValue = (event: NumericChangeEvent): number => parseInt(String(event.target.value), 10);
 const formatUnknownError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+const shouldDefaultWgpuRenderer = (osPlatform: string): boolean => osPlatform !== 'linux' && osPlatform !== 'android';
+const buildProcessingSettings = (appSettings: AppSettings, osPlatform: string): ProcessingSettings => ({
+  applyPreprocessingToNonRaws: appSettings.applyPreprocessingToNonRaws ?? false,
+  editorPreviewResolution: appSettings.editorPreviewResolution || 1920,
+  highResZoomMultiplier: appSettings.highResZoomMultiplier || 1.0,
+  imageCacheSize: appSettings.imageCacheSize ?? 5,
+  linuxGpuOptimization: appSettings.linuxGpuOptimization ?? false,
+  processingBackend: appSettings.processingBackend || 'auto',
+  rawHighlightCompression: appSettings.rawHighlightCompression ?? 2.5,
+  rawPreprocessingColorNr: appSettings.rawPreprocessingColorNr ?? 0.5,
+  rawPreprocessingSharpening: appSettings.rawPreprocessingSharpening ?? 0.35,
+  thumbnailResolution: appSettings.thumbnailResolution || 720,
+  thumbnailWorkerThreads: appSettings.thumbnailWorkerThreads ?? 4,
+  useFullDpiRendering: appSettings.useFullDpiRendering ?? false,
+  useWgpuRenderer: appSettings.useWgpuRenderer ?? shouldDefaultWgpuRenderer(osPlatform),
+});
 
 const EXECUTE_TIMEOUT = 3000;
 const translateDynamicKey = (translate: TFunction, key: string): string => translate(key, { defaultValue: key });
@@ -268,6 +302,32 @@ const SettingItem = ({ children, description, label }: SettingItemProps) => (
       </UiText>
     )}
   </div>
+);
+
+const DropdownSetting = <T extends string | number>({
+  description,
+  label,
+  onChange,
+  options,
+  value,
+}: DropdownSettingProps<T>) => (
+  <SettingItem description={description} label={label}>
+    <Dropdown onChange={onChange} options={options} value={value} triggerClassName="bg-bg-primary" />
+  </SettingItem>
+);
+
+const SwitchSetting = ({
+  checked,
+  description,
+  disabled = false,
+  id,
+  label,
+  onChange,
+  switchLabel,
+}: SwitchSettingProps) => (
+  <SettingItem description={description} label={label}>
+    <Switch checked={checked} disabled={disabled} id={id} label={switchLabel} onChange={onChange} />
+  </SettingItem>
 );
 
 const DataActionItem = ({
@@ -593,21 +653,9 @@ export default function SettingsPanel({
   const [tempLensModel, setTempLensModel] = useState<string>('');
 
   const osPlatform = useOsPlatform();
-  const [processingSettings, setProcessingSettings] = useState<ProcessingSettings>({
-    editorPreviewResolution: appSettings.editorPreviewResolution || 1920,
-    thumbnailResolution: appSettings.thumbnailResolution || 720,
-    rawHighlightCompression: appSettings.rawHighlightCompression ?? 2.5,
-    processingBackend: appSettings.processingBackend || 'auto',
-    linuxGpuOptimization: appSettings.linuxGpuOptimization ?? false,
-    highResZoomMultiplier: appSettings.highResZoomMultiplier || 1.0,
-    useFullDpiRendering: appSettings.useFullDpiRendering ?? false,
-    useWgpuRenderer: appSettings.useWgpuRenderer ?? (osPlatform === 'linux' || osPlatform === 'android' ? false : true),
-    thumbnailWorkerThreads: appSettings.thumbnailWorkerThreads ?? 4,
-    imageCacheSize: appSettings.imageCacheSize ?? 5,
-    rawPreprocessingColorNr: appSettings.rawPreprocessingColorNr ?? 0.5,
-    rawPreprocessingSharpening: appSettings.rawPreprocessingSharpening ?? 0.35,
-    applyPreprocessingToNonRaws: appSettings.applyPreprocessingToNonRaws ?? false,
-  });
+  const [processingSettings, setProcessingSettings] = useState<ProcessingSettings>(() =>
+    buildProcessingSettings(appSettings, osPlatform),
+  );
   const [restartRequired, setRestartRequired] = useState(false);
   const [activeCategory, setActiveCategory] = useState('general');
   const [logPath, setLogPath] = useState<string | null>(null);
@@ -710,28 +758,14 @@ export default function SettingsPanel({
         const nextProvider = normalizeAiProviderId(appSettings.aiProvider);
         return nextProvider !== current ? nextProvider : current;
       });
-      setProcessingSettings({
-        editorPreviewResolution: appSettings.editorPreviewResolution || 1920,
-        thumbnailResolution: appSettings.thumbnailResolution || 720,
-        rawHighlightCompression: appSettings.rawHighlightCompression ?? 2.5,
-        processingBackend: appSettings.processingBackend || 'auto',
-        linuxGpuOptimization: appSettings.linuxGpuOptimization ?? false,
-        highResZoomMultiplier: appSettings.highResZoomMultiplier || 1.0,
-        useFullDpiRendering: appSettings.useFullDpiRendering ?? false,
-        useWgpuRenderer: appSettings.useWgpuRenderer ?? true,
-        thumbnailWorkerThreads: appSettings.thumbnailWorkerThreads ?? 4,
-        imageCacheSize: appSettings.imageCacheSize ?? 5,
-        rawPreprocessingColorNr: appSettings.rawPreprocessingColorNr ?? 0.5,
-        rawPreprocessingSharpening: appSettings.rawPreprocessingSharpening ?? 0.35,
-        applyPreprocessingToNonRaws: appSettings.applyPreprocessingToNonRaws ?? false,
-      });
+      setProcessingSettings(buildProcessingSettings(appSettings, osPlatform));
       setRestartRequired(false);
     }, 0);
 
     return () => {
       clearTimeout(syncTimer);
     };
-  }, [appSettings]);
+  }, [appSettings, osPlatform]);
 
   useEffect(() => {
     const fetchLogPath = async () => {
@@ -1829,19 +1863,15 @@ export default function SettingsPanel({
                                 {t('settings.processing.staticDesc')}
                               </UiText>
                               <div className="pl-4 border-l-2 border-border-color ml-1">
-                                <SettingItem
+                                <DropdownSetting
                                   description={t('settings.processing.previewResDesc')}
                                   label={t('settings.processing.previewRes')}
-                                >
-                                  <Dropdown
-                                    onChange={(value: number) => {
-                                      handleProcessingSettingChangeVoid('editorPreviewResolution', value);
-                                    }}
-                                    options={resolutions}
-                                    value={processingSettings.editorPreviewResolution}
-                                    triggerClassName="bg-bg-primary"
-                                  />
-                                </SettingItem>
+                                  onChange={(value) => {
+                                    handleProcessingSettingChangeVoid('editorPreviewResolution', value);
+                                  }}
+                                  options={resolutions}
+                                  value={processingSettings.editorPreviewResolution}
+                                />
                               </div>
                             </motion.div>
                           ) : (
@@ -1856,52 +1886,41 @@ export default function SettingsPanel({
                                 {t('settings.processing.dynamicDesc')}
                               </UiText>
                               <div className="pl-4 border-l-2 border-border-color ml-1 space-y-3">
-                                <SettingItem
+                                <DropdownSetting
                                   description={t('settings.processing.staticPreviewResDesc')}
                                   label={t('settings.processing.staticPreviewRes')}
-                                >
-                                  <Dropdown
-                                    onChange={(value: number) => {
-                                      handleProcessingSettingChangeVoid('editorPreviewResolution', value);
-                                    }}
-                                    options={resolutions}
-                                    value={processingSettings.editorPreviewResolution}
-                                    triggerClassName="bg-bg-primary"
-                                  />
-                                </SettingItem>
+                                  onChange={(value) => {
+                                    handleProcessingSettingChangeVoid('editorPreviewResolution', value);
+                                  }}
+                                  options={resolutions}
+                                  value={processingSettings.editorPreviewResolution}
+                                />
 
-                                <SettingItem
+                                <DropdownSetting
                                   label={t('settings.processing.renderScale')}
                                   description={t('settings.processing.renderScaleDesc')}
-                                >
-                                  <Dropdown
-                                    onChange={(value: number) => {
-                                      handleProcessingSettingChangeVoid('highResZoomMultiplier', value);
-                                    }}
-                                    options={zoomMultiplierOptions}
-                                    value={processingSettings.highResZoomMultiplier}
-                                    triggerClassName="bg-bg-primary"
-                                  />
-                                </SettingItem>
+                                  onChange={(value) => {
+                                    handleProcessingSettingChangeVoid('highResZoomMultiplier', value);
+                                  }}
+                                  options={zoomMultiplierOptions}
+                                  value={processingSettings.highResZoomMultiplier}
+                                />
 
-                                <SettingItem
+                                <SwitchSetting
                                   label={t('settings.processing.highDpi')}
                                   description={
                                     dpr > 1
                                       ? t('settings.processing.highDpiDesc', { dpr })
                                       : t('settings.processing.highDpiDescStandard')
                                   }
-                                >
-                                  <Switch
-                                    checked={processingSettings.useFullDpiRendering}
-                                    disabled={dpr <= 1}
-                                    id="full-dpi-rendering-toggle"
-                                    label={t('settings.processing.nativeDpi')}
-                                    onChange={(checked) => {
-                                      handleProcessingSettingChangeVoid('useFullDpiRendering', checked);
-                                    }}
-                                  />
-                                </SettingItem>
+                                  checked={processingSettings.useFullDpiRendering}
+                                  disabled={dpr <= 1}
+                                  id="full-dpi-rendering-toggle"
+                                  switchLabel={t('settings.processing.nativeDpi')}
+                                  onChange={(checked) => {
+                                    handleProcessingSettingChangeVoid('useFullDpiRendering', checked);
+                                  }}
+                                />
                               </div>
                             </motion.div>
                           )}
@@ -1953,19 +1972,15 @@ export default function SettingsPanel({
                       </AnimatePresence>
                     </div>
 
-                    <SettingItem
+                    <DropdownSetting
                       description={t('settings.processing.thumbnailResDesc')}
                       label={t('settings.processing.thumbnailRes')}
-                    >
-                      <Dropdown
-                        onChange={(value: number) => {
-                          handleProcessingSettingChangeVoid('thumbnailResolution', value);
-                        }}
-                        options={thumbnailResolutions}
-                        value={processingSettings.thumbnailResolution}
-                        triggerClassName="bg-bg-primary"
-                      />
-                    </SettingItem>
+                      onChange={(value) => {
+                        handleProcessingSettingChangeVoid('thumbnailResolution', value);
+                      }}
+                      options={thumbnailResolutions}
+                      value={processingSettings.thumbnailResolution}
+                    />
 
                     <SettingItem
                       label={t('settings.processing.workerThreads')}
@@ -2003,7 +2018,7 @@ export default function SettingsPanel({
                       />
                     </SettingItem>
 
-                    <SettingItem
+                    <SwitchSetting
                       label={t('settings.processing.wgpu')}
                       description={
                         osPlatform === 'linux'
@@ -2012,50 +2027,40 @@ export default function SettingsPanel({
                             ? t('settings.processing.wgpuDescAndroid')
                             : t('settings.processing.wgpuDescRecommended')
                       }
-                    >
-                      <Switch
-                        checked={processingSettings.useWgpuRenderer}
-                        disabled={osPlatform === 'linux' || osPlatform === 'android'}
-                        id="wgpu-renderer-toggle"
-                        label={t('settings.processing.wgpuLabel')}
-                        onChange={(checked) => {
-                          handleProcessingSettingChangeVoid('useWgpuRenderer', checked);
-                        }}
-                      />
-                    </SettingItem>
+                      checked={processingSettings.useWgpuRenderer}
+                      disabled={osPlatform === 'linux' || osPlatform === 'android'}
+                      id="wgpu-renderer-toggle"
+                      switchLabel={t('settings.processing.wgpuLabel')}
+                      onChange={(checked) => {
+                        handleProcessingSettingChangeVoid('useWgpuRenderer', checked);
+                      }}
+                    />
 
-                    <SettingItem
+                    <DropdownSetting
                       label={t('settings.processing.backend')}
                       description={t('settings.processing.backendDesc')}
-                    >
-                      <Dropdown
-                        onChange={(value: string) => {
-                          handleProcessingSettingChangeVoid('processingBackend', value);
-                        }}
-                        options={filteredBackendOptions}
-                        value={
-                          filteredBackendOptions.some((option) => option.value === processingSettings.processingBackend)
-                            ? processingSettings.processingBackend
-                            : 'auto'
-                        }
-                        triggerClassName="bg-bg-primary"
-                      />
-                    </SettingItem>
+                      onChange={(value) => {
+                        handleProcessingSettingChangeVoid('processingBackend', value);
+                      }}
+                      options={filteredBackendOptions}
+                      value={
+                        filteredBackendOptions.some((option) => option.value === processingSettings.processingBackend)
+                          ? processingSettings.processingBackend
+                          : 'auto'
+                      }
+                    />
 
                     {osPlatform !== 'macos' && osPlatform !== 'windows' && (
-                      <SettingItem
+                      <SwitchSetting
                         label={t('settings.processing.linuxCompat')}
                         description={t('settings.processing.linuxCompatDesc')}
-                      >
-                        <Switch
-                          checked={processingSettings.linuxGpuOptimization}
-                          id="gpu-compat-toggle"
-                          label={t('settings.processing.linuxCompatLabel')}
-                          onChange={(checked) => {
-                            handleProcessingSettingChangeVoid('linuxGpuOptimization', checked);
-                          }}
-                        />
-                      </SettingItem>
+                        checked={processingSettings.linuxGpuOptimization}
+                        id="gpu-compat-toggle"
+                        switchLabel={t('settings.processing.linuxCompatLabel')}
+                        onChange={(checked) => {
+                          handleProcessingSettingChangeVoid('linuxGpuOptimization', checked);
+                        }}
+                      />
                     )}
 
                     {restartRequired && (
@@ -2141,33 +2146,26 @@ export default function SettingsPanel({
                       />
                     </SettingItem>
 
-                    <SettingItem
+                    <SwitchSetting
                       label={t('settings.processing.preprocessing.applyPreprocessing')}
                       description={t('settings.processing.preprocessing.applyPreprocessingDesc')}
-                    >
-                      <Switch
-                        checked={processingSettings.applyPreprocessingToNonRaws}
-                        id="preprocessing-non-raws-toggle"
-                        label={t('settings.processing.preprocessing.enablePreprocessingNonRaws')}
-                        onChange={(checked) => {
-                          handleProcessingSettingChangeVoid('applyPreprocessingToNonRaws', checked);
-                        }}
-                      />
-                    </SettingItem>
+                      checked={processingSettings.applyPreprocessingToNonRaws}
+                      id="preprocessing-non-raws-toggle"
+                      switchLabel={t('settings.processing.preprocessing.enablePreprocessingNonRaws')}
+                      onChange={(checked) => {
+                        handleProcessingSettingChangeVoid('applyPreprocessingToNonRaws', checked);
+                      }}
+                    />
 
-                    <SettingItem
+                    <DropdownSetting
                       label={t('settings.processing.preprocessing.linearRaw')}
                       description={t('settings.processing.preprocessing.linearRawDesc')}
-                    >
-                      <Dropdown
-                        onChange={(value: string) => {
-                          saveSettings({ ...appSettings, linearRawMode: value });
-                        }}
-                        options={linearRawOptions}
-                        value={appSettings.linearRawMode || 'auto'}
-                        triggerClassName="bg-bg-primary"
-                      />
-                    </SettingItem>
+                      onChange={(value) => {
+                        saveSettings({ ...appSettings, linearRawMode: value });
+                      }}
+                      options={linearRawOptions}
+                      value={appSettings.linearRawMode || 'auto'}
+                    />
 
                     <div className="space-y-4">
                       <SettingItem
