@@ -83,8 +83,7 @@ import { Adjustments, AiPatch } from '../../../utils/adjustments';
 import {
   cloneMaskLikeContainerForPaste,
   cloneSubMaskForPaste,
-  createInvertedSubMaskContainer,
-  getMaskLikeInsertAfterIndex,
+  createMaskLikeClipboardActions,
   insertMaskLikeContainerAt,
   insertSubMaskAt,
   moveSubMaskBetweenContainers,
@@ -798,60 +797,27 @@ export default function AIPanel() {
     setExpandedContainers((prev) => new Set(prev).add(containerId));
   };
 
-  const handleDuplicatePatchContainer = (container: AiPatch) => {
-    const duplicatedContainer = clonePatchData(container, { rename: true });
+  const clipboardActions = createMaskLikeClipboardActions({
+    cloneContainerForDuplicate: (container, options) => clonePatchData(container, options),
+    cloneContainerForInvertedSubMask: (container) => clonePatchData(container, { rename: false }),
+    cloneContainerForPaste: (container) => clonePatchData(container, { rename: false }),
+    cloneSubMaskForDuplicate: (subMask, options) => cloneSubMaskData(subMask, options),
+    cloneSubMaskForPaste: (subMask) => cloneSubMaskData(subMask, { rename: false }),
+    containers: adjustments.aiPatches,
+    copiedContainer: copiedPatch,
+    copiedSubMask,
+    insertContainer: insertPatchContainer,
+    insertSubMask: insertSubMaskIntoContainer,
+    invertedContainerName: (container) => t('editor.ai.patches.invertedName', { name: container.name }),
+    invertedSubMaskContainerName: (subMask) => t('editor.ai.patches.invertedName', { name: getSubMaskName(subMask) }),
+  });
 
-    insertPatchContainer(duplicatedContainer, getMaskLikeInsertAfterIndex(adjustments.aiPatches, container.id));
-  };
-
-  const handleDuplicateAndInvertPatchContainer = (container: AiPatch) => {
-    const duplicatedContainer = clonePatchData(container, { invert: true, rename: false });
-    duplicatedContainer.name = t('editor.ai.patches.invertedName', { name: container.name });
-
-    insertPatchContainer(duplicatedContainer, getMaskLikeInsertAfterIndex(adjustments.aiPatches, container.id));
-  };
-
-  const handlePastePatch = (insertAfterContainerId?: string) => {
-    if (!copiedPatch) {
-      return;
-    }
-
-    const pastedContainer = clonePatchData(copiedPatch, { rename: false });
-    const patchIndex = insertAfterContainerId
-      ? adjustments.aiPatches.findIndex((patch) => patch.id === insertAfterContainerId)
-      : -1;
-
-    insertPatchContainer(pastedContainer, patchIndex >= 0 ? patchIndex + 1 : undefined);
-  };
-
-  const handleDuplicateSubMask = (containerId: string, subMask: SubMask, insertIndex?: number) => {
-    const duplicatedSubMask = cloneSubMaskData(subMask, { rename: true });
-    insertSubMaskIntoContainer(containerId, duplicatedSubMask, insertIndex);
-  };
-
-  const handleDuplicateAndInvertSubMask = (containerId: string, subMask: SubMask) => {
-    const parentContainer = adjustments.aiPatches.find((p) => p.id === containerId);
-    if (!parentContainer) return;
-
-    const newContainer = createInvertedSubMaskContainer({
-      cloneContainer: (container) => clonePatchData(container, { rename: false }),
-      cloneSubMask: (sourceSubMask) => cloneSubMaskData(sourceSubMask, { invert: true, rename: false }),
-      invertedName: t('editor.ai.patches.invertedName', { name: getSubMaskName(subMask) }),
-      parentContainer,
-      subMask,
-    });
-
-    insertPatchContainer(newContainer, getMaskLikeInsertAfterIndex(adjustments.aiPatches, containerId));
-  };
-
-  const handlePasteSubMask = (containerId: string, insertIndex?: number) => {
-    if (!copiedSubMask) {
-      return;
-    }
-
-    const pastedSubMask = cloneSubMaskData(copiedSubMask, { rename: false });
-    insertSubMaskIntoContainer(containerId, pastedSubMask, insertIndex);
-  };
+  const handleDuplicatePatchContainer = clipboardActions.duplicateContainer;
+  const handleDuplicateAndInvertPatchContainer = clipboardActions.duplicateAndInvertContainer;
+  const handlePastePatch = clipboardActions.pasteContainer;
+  const handleDuplicateSubMask = clipboardActions.duplicateSubMask;
+  const handleDuplicateAndInvertSubMask = clipboardActions.duplicateAndInvertSubMask;
+  const handlePasteSubMask = clipboardActions.pasteSubMask;
 
   const handlePanelContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
