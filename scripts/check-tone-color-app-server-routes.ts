@@ -82,7 +82,28 @@ if (!parsedChannelMixerCommand.success || parsedChannelMixerCommand.data.command
   failures.push('Tone-color channel mixer command does not validate the RGB mixer route type.');
 }
 
-for (const commandType of ['toneColor.setLevels', 'toneColor.setChannelMixer']) {
+const parsedColorBalanceCommand = toneColorCommandEnvelopeV1Schema.safeParse({
+  ...sampleToneColorCommandEnvelopeV1,
+  commandId: 'command_tone_color_color_balance_rgb_preview_sample',
+  commandType: 'toneColor.setColorBalanceRgb',
+  correlationId: 'corr_tone_color_color_balance_rgb_preview_sample',
+  idempotencyKey: 'idem_tone_color_color_balance_rgb_preview_sample',
+  parameters: {
+    enabled: true,
+    highlights: { blue: -8, green: 2, red: 10 },
+    midtones: { blue: -2, green: 0, red: 2 },
+    preserveLuminance: true,
+    shadows: { blue: 12, green: 0, red: -8 },
+  },
+});
+if (
+  !parsedColorBalanceCommand.success ||
+  parsedColorBalanceCommand.data.commandType !== 'toneColor.setColorBalanceRgb'
+) {
+  failures.push('Tone-color RGB color balance command does not validate the range-weighted route type.');
+}
+
+for (const commandType of ['toneColor.setLevels', 'toneColor.setChannelMixer', 'toneColor.setColorBalanceRgb']) {
   const routeModes = new Set(
     TONE_COLOR_APP_SERVER_ROUTES.filter((route) => route.commandType === commandType).map(
       (route) => route.executionMode,

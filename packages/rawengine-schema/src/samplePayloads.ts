@@ -866,6 +866,12 @@ export const sampleToneColorDryRunResultV1: ToneColorDryRunResultV1 = toneColorD
       previousValue: 0,
       value: 10,
     },
+    {
+      module: 'color_balance_rgb',
+      path: '/parameters/shadows/blue',
+      previousValue: 0,
+      value: 12,
+    },
   ],
   predictedGraphRevision: 'graph_rev_46_preview',
   previewArtifacts: [
