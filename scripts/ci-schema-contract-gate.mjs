@@ -20,6 +20,7 @@ const CONTRACT_CHECKS = [
   'check:agent-proof-gallery',
   'check:ui-api-coverage',
   'check:ai-app-server-routes',
+  'check:tone-color-app-server-routes',
   'check:computational-merge-app-server-routes',
   'check:computational-merge-ui-route-badges',
   'check:focus-ui-api',
@@ -42,6 +43,7 @@ const CONTRACT_CHECKS = [
   'check:panorama-app-server-runtime',
   'schema:panorama-app-server',
   'check:tauri-schema-validation',
+  'check:tone-color-app-server-routes',
 ];
 
 const RELEVANT_PREFIXES = ['packages/rawengine-schema/', 'src/schemas/', 'src-tauri/gen/schemas/'];
