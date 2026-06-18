@@ -22,7 +22,13 @@ bun run check:hue-memory-color
 ```
 
 The checker validates fixture shape with Zod and proves hue wraparound,
-partial-uniformity, and full-target behavior.
+partial-uniformity, full-target behavior, target-distance improvement, and the
+runtime/UI proof artifact:
+
+`docs/validation/skin-tone-uniformity-runtime-ui-proof-2026-06-18.json`
+
+The UI proof is covered by `bun run check:color-workflow-smoke`, which renders a
+skin-tone uniformity output marker inside the color workflow validation surface.
 
 ## Hue And Memory-Color Gate
 
