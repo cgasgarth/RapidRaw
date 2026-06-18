@@ -1,0 +1,22 @@
+{
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1930,
+  "performance": {
+    "fixtureCount": 3,
+    "maxRequiredPrMemoryBudgetBytes": 64000000,
+    "maxRequiredPrRuntimeBudgetMs": 5000,
+    "performanceManifestHash": "80b0c68a265019f33de6be615101c8b5f1f809e7e8d753abb60515db18b30bea",
+    "projectionProxyMemoryBytes": 48000
+  },
+  "projection": {
+    "cropPixelCount": 1104,
+    "effectiveProjection": "rectilinear",
+    "fullCanvasPixelCount": 6000,
+    "requestedProjection": "cylindrical",
+    "support": "metadata_serialized_runtime_deferred"
+  },
+  "proofHash": "36de4a614ea4392b8ead5a364940dcf5bda4a0df71998fb4ec0e3f4c7a4fc00a",
+  "schemaVersion": 1,
+  "sourceReportHash": "33a2e07bc54e6e33e528a48fdd02234d6ad2459e13d1eb02f1d53453863ade5b",
+  "validationStatus": "synthetic_artifact_gate"
+}
