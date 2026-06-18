@@ -597,14 +597,16 @@
               <td>HDR private RAW asset prep</td>
               <td>
                 <code>bun run prepare:hdr-real-raw-private-root</code><br />
+                <code>bun run check:hdr-real-raw-private-proof</code><br />
                 <code>bun run prepare:focus-real-raw-private-root</code><br />
                 <code>bun run prepare:sr-real-raw-private-root</code><br />
                 <code>bun run prepare:panorama-real-raw-private-root</code>
               </td>
               <td>
                 Creates and validates private root layouts for HDR ARW brackets, focus CR3 stacks, SR NEF bursts, and
-                panorama RAF overlap sets without committing private pixels. <code>--require-assets</code> intentionally
-                fails until each source set exists.
+                panorama RAF overlap sets without committing private pixels. The HDR runner orchestrates the env-gated
+                Rust decode-to-apply proof plus private report collection, and skips explicitly until a private root is
+                configured. <code>--require-assets</code> intentionally fails until each source set exists.
               </td>
             </tr>
             <tr>
@@ -720,7 +722,10 @@
           <li>Golden image outputs and perceptual comparison reports.</li>
           <li>OpenAI app-server dry-run/apply/audit screenshots or rendered logs.</li>
           <li>Negative Lab real-scan workflow screenshots and QC overlays.</li>
-          <li>HDR private ARW bracket files for <code>private-fixtures/hdr/bracket-alignment-v1/</code>.</li>
+          <li>
+            HDR private ARW bracket files for <code>private-fixtures/hdr/bracket-alignment-v1/</code>; the proof runner
+            is wired, but no private run report exists yet.
+          </li>
           <li>
             Focus CR3, super-resolution NEF, and panorama RAF private source files for the computational E2E proof
             slots.

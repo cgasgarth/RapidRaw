@@ -39,7 +39,8 @@
   ],
   "checks": [
     "bun run check:computational-merge-e2e-proof-manifest",
-    "bun run check:computational-merge-private-run-reports"
+    "bun run check:computational-merge-private-run-reports",
+    "bun run check:hdr-real-raw-private-proof"
   ],
   "generatedAt": "2026-06-18T00:00:00.000Z",
   "issue": 1809,
