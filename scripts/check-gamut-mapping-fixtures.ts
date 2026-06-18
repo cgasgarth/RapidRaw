@@ -1,12 +1,20 @@
 #!/usr/bin/env bun
 
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { rawEngineGamutMappingFixtureManifestV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { applyRelativeColorimetricClipFallback, classifyLinearRgbGamut } from '../src/utils/gamutMappingRuntime.ts';
+import {
+  applyRelativeColorimetricClipFallback,
+  classifyLinearRgbGamut,
+  type GamutClassification,
+} from '../src/utils/gamutMappingRuntime.ts';
 
 const FIXTURE_PATH = 'fixtures/color/gamut-mapping-fixtures.json';
+const REPORT_PATH = 'docs/validation/color-gamut-clipping-gate-2026-06-18.json';
+const UPDATE_REPORT = process.argv.includes('--update');
+const COMPONENT_BOUNDARY_EPSILON = 1e-12;
+const MIN_OUT_OF_GAMUT_MAGNITUDE = 1e-6;
 
 const REQUIRED_CASE_IDS = new Set([
   'gamut.srgb.neutral-in-gamut.v1',
@@ -18,12 +26,26 @@ const REQUIRED_CASE_IDS = new Set([
   'gamut.scene-referred.no-output-map.v1',
 ]);
 
-const hasWarning = (testCase, warning) => testCase.policy.warnings.includes(warning);
+const hasWarning = (testCase: { policy: { warnings: ReadonlyArray<string> } }, warning: string) =>
+  testCase.policy.warnings.includes(warning);
+interface GamutClipReportCase {
+  clipDeltaL1: number;
+  clipDeltaMax: number;
+  clippedLinearRgb: Array<number>;
+  id: string;
+  inputMax: number;
+  inputMin: number;
+  outOfGamutChannelCount: number;
+  outOfGamutMagnitude: number;
+  runtimeClassification: GamutClassification;
+  warnings: Array<string>;
+}
 
 const fixturePath = resolve(FIXTURE_PATH);
 const fixtureText = await readFile(fixturePath, 'utf8');
 const manifest = rawEngineGamutMappingFixtureManifestV1Schema.parse(JSON.parse(fixtureText));
 const failures = [];
+const reportCases: Array<GamutClipReportCase> = [];
 
 const actualIds = new Set(manifest.cases.map((testCase) => testCase.id));
 for (const requiredId of REQUIRED_CASE_IDS) {
@@ -39,6 +61,10 @@ for (const testCase of manifest.cases) {
   const maxOvershoot = Math.max(0, maxComponent - 1);
   const maxUndershoot = Math.max(0, -minComponent);
   const outOfGamutChannelCount = runtime.outOfGamutChannelCount;
+  const clipDeltas = rgb.map((component, index) => Math.abs(component - runtime.clippedLinearRgb[index]));
+  const clipDeltaL1 = clipDeltas.reduce((sum, delta) => sum + delta, 0);
+  const clipDeltaMax = Math.max(...clipDeltas);
+  const outOfGamutMagnitude = Math.max(maxOvershoot, maxUndershoot);
 
   if (actualClassification !== testCase.expectedClassification) {
     failures.push(`${testCase.id}: expected ${testCase.expectedClassification}, got ${actualClassification}`);
@@ -58,7 +84,7 @@ for (const testCase of manifest.cases) {
 
   if (
     (actualClassification === 'high_component' || actualClassification === 'mixed_out_of_gamut') &&
-    maxOvershoot <= 0
+    maxOvershoot <= MIN_OUT_OF_GAMUT_MAGNITUDE
   ) {
     failures.push(`${testCase.id}: high-component case has no positive overshoot`);
   }
@@ -72,9 +98,17 @@ for (const testCase of manifest.cases) {
 
   if (
     (actualClassification === 'negative_component' || actualClassification === 'mixed_out_of_gamut') &&
-    maxUndershoot <= 0
+    maxUndershoot <= MIN_OUT_OF_GAMUT_MAGNITUDE
   ) {
     failures.push(`${testCase.id}: negative-component case has no negative undershoot`);
+  }
+
+  if (actualClassification === 'in_gamut' && clipDeltaMax > COMPONENT_BOUNDARY_EPSILON) {
+    failures.push(`${testCase.id}: in-gamut clip delta ${clipDeltaMax} exceeds boundary epsilon`);
+  }
+
+  if (actualClassification !== 'in_gamut' && clipDeltaMax <= COMPONENT_BOUNDARY_EPSILON) {
+    failures.push(`${testCase.id}: out-of-gamut case did not produce a measurable clip delta`);
   }
 
   if (
@@ -104,6 +138,19 @@ for (const testCase of manifest.cases) {
   if (testCase.policy.destination === 'scene_referred' && testCase.policy.method !== 'none_scene_referred_v1') {
     failures.push(`${testCase.id}: scene-referred policy must not apply an output map`);
   }
+
+  reportCases.push({
+    clipDeltaL1: roundMetric(clipDeltaL1),
+    clipDeltaMax: roundMetric(clipDeltaMax),
+    clippedLinearRgb: runtime.clippedLinearRgb.map(roundMetric),
+    id: testCase.id,
+    inputMax: roundMetric(maxComponent),
+    inputMin: roundMetric(minComponent),
+    outOfGamutChannelCount,
+    outOfGamutMagnitude: roundMetric(outOfGamutMagnitude),
+    runtimeClassification: runtime.classification,
+    warnings: runtime.warnings,
+  });
 }
 
 const invalidRuntimeOverclaim = rawEngineGamutMappingFixtureManifestV1Schema.safeParse({
@@ -135,10 +182,37 @@ if (invalidNonFinite.success) {
   failures.push('Non-finite RGB fixture values must be rejected.');
 }
 
+const report = {
+  cases: reportCases,
+  fixturePath: FIXTURE_PATH,
+  generatedFromSnapshotDate: manifest.snapshotDate,
+  issue: 1931,
+  schemaVersion: 1,
+  thresholds: {
+    componentBoundaryEpsilon: COMPONENT_BOUNDARY_EPSILON,
+    minOutOfGamutMagnitude: MIN_OUT_OF_GAMUT_MAGNITUDE,
+  },
+};
+const reportText = `${JSON.stringify(report, null, 2)}\n`;
+
+if (UPDATE_REPORT) {
+  await writeFile(REPORT_PATH, reportText);
+} else {
+  const expectedReport = JSON.parse(await readFile(REPORT_PATH, 'utf8'));
+  if (JSON.stringify(expectedReport) !== JSON.stringify(report)) {
+    failures.push(`${REPORT_PATH} is stale; run bun scripts/check-gamut-mapping-fixtures.ts --update`);
+  }
+}
+
 if (failures.length > 0) {
   console.error('Gamut mapping fixture check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log(`Validated ${manifest.cases.length} gamut mapping fixture cases.`);
+const maxClipDelta = Math.max(...reportCases.map((testCase) => testCase.clipDeltaMax));
+console.log(`gamut clipping gate ok (${manifest.cases.length} cases, max clip ${roundMetric(maxClipDelta)})`);
+
+function roundMetric(value: number): number {
+  return Number(value.toFixed(12));
+}

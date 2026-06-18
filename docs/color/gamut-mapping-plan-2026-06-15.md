@@ -54,6 +54,20 @@ Fixture classification is computed from `destinationLinearRgbBeforeMap`:
   rejected by schema.
 - Non-finite RGB values are rejected.
 
+## Current Gate Thresholds
+
+The #1931 gate is deterministic and synthetic. It validates classification,
+warning policy, clip fallback bounds, and a committed review report, but it does
+not claim perceptual gamut mapping quality.
+
+- Component boundary epsilon: `1e-12`.
+- Minimum measurable out-of-gamut magnitude: `1e-6`.
+- In-gamut cases must have `clipDeltaMax <= 1e-12`.
+- Out-of-gamut cases must have `clipDeltaMax > 1e-12` and clip back into
+  `[0, 1]`.
+- The review artifact is
+  `docs/validation/color-gamut-clipping-gate-2026-06-18.json`.
+
 ## Science Risks
 
 - RGB clipping can shift hue and saturation, especially for saturated flowers,
