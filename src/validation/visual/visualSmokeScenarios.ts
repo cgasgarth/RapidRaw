@@ -12,6 +12,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     sectionMinimum: 1,
   },
   {
+    marker: 'Agent chat UI smoke',
+    mode: 'agent-chat-ui',
+    outputFile: 'agent-chat-ui.png',
+    sectionMinimum: 1,
+  },
+  {
     marker: 'Panorama setup',
     mode: 'panorama-ui',
     outputFile: 'panorama-ui.png',

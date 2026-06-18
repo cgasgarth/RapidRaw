@@ -43,6 +43,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import AgentChatShell from './AgentChatShell';
 import {
   getMaskLikeContainerDropClass,
   getMaskLikeSubMaskDropClass,
@@ -80,6 +81,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { Adjustments, AiPatch } from '../../../utils/adjustments';
+import { agentChatTranscriptFixture } from '../../../utils/agentChatTranscriptFixture';
 import {
   cloneMaskLikeContainerForPaste,
   cloneSubMaskForPaste,
@@ -2008,6 +2010,8 @@ function SettingsPanel({
         e.stopPropagation();
       }}
     >
+      <AgentChatShell transcript={agentChatTranscriptFixture} />
+
       <CollapsibleSection
         title={t('editor.ai.settings.generativeReplaceTitle')}
         isOpen={collapsibleState.generative}

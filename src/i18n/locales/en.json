@@ -408,6 +408,32 @@
         "switchToSubtract": "Switch to Subtract"
       },
       "addNewEdit": "Add New Edit",
+      "agent": {
+        "actions": {
+          "approveApply": "Approve apply",
+          "exportAudit": "Export audit",
+          "inspectDiff": "Inspect diff",
+          "revert": "Revert"
+        },
+        "approval": {
+          "approved": "Approval approved",
+          "notRequired": "Approval not required",
+          "rejected": "Approval rejected",
+          "required": "Approval required"
+        },
+        "duration": {
+          "pending": "Pending"
+        },
+        "mode": {
+          "apply": "Apply",
+          "dryRun": "Dry-run",
+          "read": "Read"
+        },
+        "noAppliedEdits": "No edits applied",
+        "title": "Expert Agent",
+        "transcript": "Tool-call transcript",
+        "uiOnly": "UI-only"
+      },
       "approval": {
         "cloudMessage": "This will send the selected image area and prompt to the cloud AI provider and apply the returned edit.",
         "confirm": "Approve edit",

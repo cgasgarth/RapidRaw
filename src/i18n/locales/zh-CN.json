@@ -408,6 +408,32 @@
         "switchToSubtract": "切换到减去"
       },
       "addNewEdit": "添加新编辑",
+      "agent": {
+        "actions": {
+          "approveApply": "",
+          "exportAudit": "",
+          "inspectDiff": "",
+          "revert": ""
+        },
+        "approval": {
+          "approved": "",
+          "notRequired": "",
+          "rejected": "",
+          "required": ""
+        },
+        "duration": {
+          "pending": ""
+        },
+        "mode": {
+          "apply": "",
+          "dryRun": "",
+          "read": ""
+        },
+        "noAppliedEdits": "",
+        "title": "",
+        "transcript": "",
+        "uiOnly": ""
+      },
       "approval": {
         "cloudMessage": "This will send the selected image area and prompt to the cloud AI provider and apply the returned edit.",
         "confirm": "Approve edit",

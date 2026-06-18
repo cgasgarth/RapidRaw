@@ -17,6 +17,17 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 - Up to 3 open PRs at a time.
 
+## GitHub Issues
+
+- Every new GitHub issue should be refined enough for one small or medium PR
+  where practical.
+- Use milestones to group larger themes instead of making one issue represent
+  several PRs.
+- Issue bodies should include `Why`, `How`, and `Validation` sections. Keep them
+  concise, but include enough context, links, expected checks, screenshots,
+  artifacts, runtime proof, or explicit plan-only status for the next agent to
+  understand the goal without rediscovering intent.
+
 ## GitHub Repo Resolution
 
 - Keep GitHub CLI repo resolution pointed at the fork:
