@@ -199,6 +199,7 @@ const negativeLabBatchConvertArgsSchema = z.object({
     .length(2),
 });
 const negativeLabPreviewReturnProofSchema = z.array(z.string().startsWith('data:image/svg+xml,')).min(3);
+const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 
 export const hdrUiSettingsProofSchema = z.object({
   deghosting: z.literal('high'),
@@ -222,8 +223,9 @@ export const panoramaUiSettingsProofSchema = z.object({
   qualityPreference: z.literal('preview'),
 });
 export const panoramaReviewWorkspaceProofSchema = z.object({
+  applyCommand: z.literal(panoramaRoutePair.applyToolName),
   artifactPath: z.literal('/tmp/panorama.tif'),
-  command: z.literal('panorama.stitch.dry_run_command'),
+  command: z.literal(panoramaRoutePair.dryRunToolName),
   projection: z.literal('spherical'),
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('5'),
