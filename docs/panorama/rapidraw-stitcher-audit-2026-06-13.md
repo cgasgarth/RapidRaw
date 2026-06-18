@@ -121,6 +121,16 @@ That proof consumes the alignment report, serializes requested/effective
 projection metadata, computes full-canvas and auto-crop rectangles, and records
 that preview/export parity is deferred to #1888.
 
+Issue #1888 adds the first executable blend/exposure pixel artifact proof:
+
+- `docs/validation/panorama-blend-exposure-proof-2026-06-18.json`
+- `bun run check:panorama-blend-exposure`
+
+That proof consumes the projection/crop report, applies a deterministic exposure
+gain to an overlap fixture, feather-blends overlap pixels, records changed-pixel
+counts and output hash, and labels the artifact risk as synthetic
+low-resolution only.
+
 ## Strengths To Preserve
 
 - The implementation is local-first and does not require external stitcher
