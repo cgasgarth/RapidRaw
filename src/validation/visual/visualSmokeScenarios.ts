@@ -18,7 +18,7 @@ export const VISUAL_SMOKE_SCENARIOS = [
     sectionMinimum: 1,
   },
   {
-    marker: 'Panorama setup',
+    marker: 'Panorama review',
     mode: 'panorama-ui',
     outputFile: 'panorama-ui.png',
     sectionMinimum: 1,
