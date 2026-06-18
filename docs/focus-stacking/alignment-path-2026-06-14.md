@@ -137,6 +137,11 @@ Runtime validation:
 - natural texture bracket for false sharpness;
 - parallax/motion stress fixture that requires warnings or apply blocking.
 
+Issue #1938 adds `bun run check:focus-alignment-sharpness-proof`, which combines
+the translation alignment smoke with the sharpness-map artifact report and
+persists hashes at
+`docs/validation/focus-alignment-sharpness-proof-2026-06-18.json`.
+
 Manual QA:
 
 - overlay before/after alignment;
