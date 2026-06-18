@@ -596,6 +596,8 @@
             <tr>
               <td>HDR private RAW asset prep</td>
               <td>
+                <code>bun run prepare:computational-private-root</code><br />
+                <code>bun run check:computational-private-root-assets</code><br />
                 <code>bun run prepare:hdr-real-raw-private-root</code><br />
                 <code>bun run check:hdr-real-raw-private-proof</code><br />
                 <code>bun run prepare:focus-real-raw-private-root</code><br />
@@ -603,10 +605,10 @@
                 <code>bun run prepare:panorama-real-raw-private-root</code>
               </td>
               <td>
-                Creates and validates private root layouts for HDR ARW brackets, focus CR3 stacks, SR NEF bursts, and
-                panorama RAF overlap sets without committing private pixels. The HDR runner orchestrates the env-gated
-                Rust decode-to-apply proof plus private report collection, and skips explicitly until a private root is
-                configured. <code>--require-assets</code> intentionally fails until each source set exists.
+                Aggregate computational private root prep creates all HDR ARW, focus CR3, SR NEF, and panorama RAF
+                source slots without committing private pixels. The aggregate asset gate intentionally fails until each
+                source set exists. The HDR runner orchestrates the env-gated Rust decode proof plus private report
+                collection, and skips explicitly until a private root is configured.
               </td>
             </tr>
             <tr>

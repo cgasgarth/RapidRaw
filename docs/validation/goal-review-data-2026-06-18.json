@@ -56,6 +56,8 @@
     "bun run check:goal-review-page",
     "bun run check:goal-review-screenshot",
     "bun run check:computational-merge-runtime-status",
+    "bun run prepare:computational-private-root",
+    "bun run check:computational-private-root-assets",
     "bun run prepare:hdr-real-raw-private-root",
     "bun run prepare:focus-real-raw-private-root",
     "bun run prepare:sr-real-raw-private-root",
