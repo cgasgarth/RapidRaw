@@ -184,6 +184,11 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set(['bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test']),
   ],
   ['check:raw-open-edit-export-run-reports', new Set(['bun scripts/check-raw-open-edit-export-run-reports.ts'])],
+  ['check:raw-open-edit-export-runtime-status', new Set(['bun scripts/check-raw-open-edit-export-runtime-status.ts'])],
+  [
+    'check:raw-open-edit-export-runtime-status:update',
+    new Set(['bun scripts/check-raw-open-edit-export-runtime-status.ts --update']),
+  ],
   ['check:reference-images', new Set(['bun scripts/check-reference-image-fixtures.ts'])],
   [
     'check:negative-lab-workspace-smoke',
