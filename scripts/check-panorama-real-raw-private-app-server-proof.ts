@@ -96,13 +96,27 @@ async function runProof(rootPath: string): Promise<void> {
   if (applied.apply.provenance.runtimeStatus !== 'apply_rendered') {
     throw new Error(`Expected apply_rendered, got ${applied.apply.provenance.runtimeStatus}.`);
   }
+  if (applied.apply.provenance.acceptedDryRunPlanId !== dryRun.dryRun.dryRunResult.mergePlan.planId) {
+    throw new Error('Panorama private app-server proof did not preserve accepted dry-run plan ID.');
+  }
+  if (applied.apply.provenance.stitchedSourceCount !== sample.connectedSourceIndices.length) {
+    throw new Error(
+      `Expected ${sample.connectedSourceIndices.length} stitched panorama sources, got ${applied.apply.provenance.stitchedSourceCount}.`,
+    );
+  }
+  const outputContentHash = applied.apply.mutationResult.outputArtifacts[0]?.contentHash;
+  if (outputContentHash === undefined) {
+    throw new Error('Panorama private app-server proof did not produce an output content hash.');
+  }
 
   const proof = {
     acceptedDryRunPlanHash: dryRun.acceptedDryRunPlanHash,
     acceptedDryRunPlanId: dryRun.dryRun.dryRunResult.mergePlan.planId,
     appliedGraphRevision: applied.apply.mutationResult.appliedGraphRevision,
+    applyToolName: panoramaRoutePair.applyToolName,
+    dryRunToolName: panoramaRoutePair.dryRunToolName,
     fixtureId: FIXTURE_ID,
-    outputContentHash: applied.apply.mutationResult.outputArtifacts[0]?.contentHash,
+    outputContentHash,
     runtimeStatus: applied.apply.provenance.runtimeStatus,
     stitchedSourceCount: applied.apply.provenance.stitchedSourceCount,
   };
