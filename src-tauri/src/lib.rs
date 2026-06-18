@@ -26,6 +26,8 @@ mod export_processing;
 mod file_management;
 mod formats;
 mod gpu_processing;
+#[cfg(all(test, feature = "tauri-test"))]
+mod hdr_real_raw_proof;
 mod image_loader;
 mod image_processing;
 #[cfg(all(test, feature = "tauri-test"))]
