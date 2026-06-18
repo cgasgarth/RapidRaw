@@ -7,7 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import Filmstrip from './Filmstrip';
 import { useEditorStore } from '../../store/useEditorStore';
-import { GLOBAL_KEYS, ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
+import { GLOBAL_KEYS, type ImageFile, type SelectedImage, type ThumbnailAspectRatio } from '../ui/AppProperties';
 import UiText from '../ui/Text';
 
 interface BottomBarProps {

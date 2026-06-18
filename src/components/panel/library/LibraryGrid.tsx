@@ -1,5 +1,5 @@
 import { ChevronUp, ChevronDown } from 'lucide-react';
-import React, {
+import {
   useState,
   useEffect,
   useRef,
@@ -29,6 +29,7 @@ import {
 import UiText from '../../ui/Text';
 
 import type { ColumnWidths } from '../MainLibrary';
+import type React from 'react';
 
 type ColumnWidthKey = keyof ColumnWidths;
 type HeaderSortKey = SortCriteria['key'];

@@ -4,26 +4,27 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AdjustmentSlider from './AdjustmentSlider';
-import { type BlackWhiteMixerChannel } from '../../schemas/blackWhiteMixerSchemas';
-import { type ChannelMixerOutput, type ChannelMixerSource } from '../../schemas/channelMixerSchemas';
-import { type ColorBalanceRgbChannel, type ColorBalanceRgbRange } from '../../schemas/colorBalanceRgbSchemas';
-import { type CameraProfileId, type ToneCurveId } from '../../schemas/profileToneSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
-  Adjustments,
+  type Adjustments,
   ColorAdjustment,
-  ColorCalibration,
+  type ColorCalibration,
   ColorGrading,
   DEFAULT_PARAMETRIC_CURVE,
-  HueSatLum,
+  type HueSatLum,
   INITIAL_ADJUSTMENTS,
 } from '../../utils/adjustments';
 import { COLOR_GRADING_PRESETS } from '../../utils/colorGradingPresets';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../utils/profileTonePresets';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../utils/selectiveColorRanges';
-import { AppSettings } from '../ui/AppProperties';
 import ColorWheel from '../ui/ColorWheel';
 import UiText from '../ui/Text';
+
+import type { BlackWhiteMixerChannel } from '../../schemas/blackWhiteMixerSchemas';
+import type { ChannelMixerOutput, ChannelMixerSource } from '../../schemas/channelMixerSchemas';
+import type { ColorBalanceRgbChannel, ColorBalanceRgbRange } from '../../schemas/colorBalanceRgbSchemas';
+import type { CameraProfileId, ToneCurveId } from '../../schemas/profileToneSchemas';
+import type { AppSettings } from '../ui/AppProperties';
 
 interface ColorProps {
   color: string;

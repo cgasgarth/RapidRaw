@@ -1,9 +1,9 @@
 import { Check, Palette, Star, Tag, X } from 'lucide-react';
 
-import { type Option, type AppSettings } from '../components/ui/AppProperties';
 import TaggingSubMenu from '../context/TaggingSubMenu';
 import { type Color, COLOR_LABELS } from '../utils/adjustments';
 
+import type { Option, AppSettings } from '../components/ui/AppProperties';
 import type { TFunction } from 'i18next';
 
 export interface CommonTag {

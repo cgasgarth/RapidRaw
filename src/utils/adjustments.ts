@@ -1,9 +1,8 @@
-import { Crop } from 'react-image-crop';
-
 import { toMaskParameterRecord } from './maskParameterAccess';
-import { Mask, SubMask, SubMaskMode } from '../components/panel/right/Masks';
+import { Mask, type SubMask, SubMaskMode } from '../components/panel/right/Masks';
 
 import type { LevelsSettings } from '../schemas/levelsSchemas';
+import type { Crop } from 'react-image-crop';
 
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | Array<JsonValue>;

@@ -19,14 +19,15 @@ import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextVariants } from '../../types/typography';
-import { type Adjustments } from '../../utils/adjustments';
 import { createBlobFromUint8Array } from '../../utils/blobUtils';
 import { LAYOUTS, type Layout, type LayoutDefinition } from '../../utils/CollageVariants';
-import { ImageFile, Invokes } from '../ui/AppProperties';
+import { type ImageFile, Invokes } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
+
+import type { Adjustments } from '../../utils/adjustments';
 
 interface CollageModalProps {
   isOpen: boolean;

@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { platform } from '@tauri-apps/plugin-os';
 import { create } from 'zustand';
 
-import { AppSettings, SupportedTypes, Invokes, Theme } from '../components/ui/AppProperties';
+import { type AppSettings, type SupportedTypes, Invokes, type Theme } from '../components/ui/AppProperties';
 import { DEFAULT_THEME_ID } from '../utils/themes';
 
 interface SettingsState {

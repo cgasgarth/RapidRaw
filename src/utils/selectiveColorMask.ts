@@ -1,4 +1,4 @@
-import { getSelectiveColorRange, SelectiveColorRangeKey } from './selectiveColorRanges';
+import { getSelectiveColorRange, type SelectiveColorRangeKey } from './selectiveColorRanges';
 
 export interface SelectiveColorMaskSelection {
   centerHueDegrees: number;

@@ -1,15 +1,17 @@
 import cx from 'clsx';
 import { Image as ImageIcon, Star, SlidersHorizontal } from 'lucide-react';
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo, useLayoutEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Grid, useGridCallbackRef, type GridImperativeAPI } from 'react-window';
 
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { Color, COLOR_LABELS } from '../../utils/adjustments';
-import { ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
+import { type Color, COLOR_LABELS } from '../../utils/adjustments';
+import { type ImageFile, type SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import UiText from '../ui/Text';
+
+import type React from 'react';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;

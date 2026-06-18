@@ -10,15 +10,16 @@ import {
   ComputationalSetupSourceWarning,
   ComputationalSetupStatusLine,
 } from './ComputationalSetupModalShell';
-import {
-  type FocusStackAlignmentMode,
-  type FocusStackQualityPreference,
-  type FocusStackUiSettings,
-} from '../../schemas/focusStackUiSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
+
+import type {
+  FocusStackAlignmentMode,
+  FocusStackQualityPreference,
+  FocusStackUiSettings,
+} from '../../schemas/focusStackUiSchemas';
 
 interface FocusStackModalProps {
   isOpen: boolean;

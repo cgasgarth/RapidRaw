@@ -8,11 +8,12 @@ import { useTranslation } from 'react-i18next';
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import { TextColors, TextVariants } from '../../types/typography';
-import { Adjustments } from '../../utils/adjustments';
 import { throttle } from '../../utils/timing';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
+
+import type { Adjustments } from '../../utils/adjustments';
 
 interface GeometryParams {
   distortion: number;

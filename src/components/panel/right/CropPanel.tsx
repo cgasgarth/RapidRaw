@@ -19,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import LensCorrectionModal from '../../modals/LensCorrectionModal';
 import TransformModal from '../../modals/TransformModal';
 import { Orientation } from '../../ui/AppProperties';

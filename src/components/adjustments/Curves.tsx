@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import AdjustmentSlider from './AdjustmentSlider';
 import { useContextMenu } from '../../context/ContextMenuContext';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { ActiveChannel, Adjustments, Coord, ParametricCurveSettings } from '../../utils/adjustments';
+import { ActiveChannel, type Adjustments, type Coord, type ParametricCurveSettings } from '../../utils/adjustments';
 import { Theme, OPTION_SEPARATOR } from '../ui/AppProperties';
 import UiText from '../ui/Text';
 

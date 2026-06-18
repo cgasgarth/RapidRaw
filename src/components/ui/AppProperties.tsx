@@ -1,7 +1,6 @@
-import { ExportPreset } from './ExportImportProperties';
-import { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
-import { ToolType } from '../panel/right/Masks';
-
+import type { ExportPreset } from './ExportImportProperties';
+import type { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
+import type { ToolType } from '../panel/right/Masks';
 import type { LucideIcon } from 'lucide-react';
 
 export const GLOBAL_KEYS = [

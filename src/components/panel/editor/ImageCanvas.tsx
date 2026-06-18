@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import CropOverlay, { PercentCrop, Crop } from 'react-image-crop';
+import CropOverlay, { type PercentCrop, type Crop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
 
 import CompositionOverlays from './overlays/CompositionOverlays';
-import { RenderSize } from '../../../hooks/useImageRenderSize';
-import { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
 import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
-import { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
-import { Mask, SubMask, SubMaskMode, ToolType } from '../right/Masks';
+import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/Masks';
 
+import type { RenderSize } from '../../../hooks/useImageRenderSize';
+import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../../utils/adjustments';
+import type { AppSettings, BrushSettings, SelectedImage } from '../../ui/AppProperties';
 import type { OverlayMode } from '../right/CropPanel';
 import type { KonvaEventObject, Node as KonvaNode } from 'konva/lib/Node';
 import type { Ellipse as KonvaEllipse } from 'konva/lib/shapes/Ellipse';

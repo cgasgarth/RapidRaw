@@ -1,17 +1,17 @@
 import { create } from 'zustand';
 
-import { ColumnWidths } from '../components/panel/MainLibrary';
 import {
-  FilterCriteria,
-  ImageFile,
+  type FilterCriteria,
+  type ImageFile,
   RawStatus,
-  SortCriteria,
+  type SortCriteria,
   SortDirection,
-  AlbumItem,
+  type AlbumItem,
 } from '../components/ui/AppProperties';
-import { Adjustments, INITIAL_ADJUSTMENTS } from '../utils/adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../utils/adjustments';
 
 import type { FolderTree } from '../components/panel/FolderTree';
+import type { ColumnWidths } from '../components/panel/MainLibrary';
 
 export interface SearchCriteria {
   tags: string[];

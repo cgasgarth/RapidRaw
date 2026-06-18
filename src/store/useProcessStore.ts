@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 
-import { Progress } from '../components/ui/AppProperties';
-import { ExportState, ImportState, Status } from '../components/ui/ExportImportProperties';
+import { type ExportState, type ImportState, Status } from '../components/ui/ExportImportProperties';
+
+import type { Progress } from '../components/ui/AppProperties';
 
 interface ProcessState {
   exportState: ExportState;
