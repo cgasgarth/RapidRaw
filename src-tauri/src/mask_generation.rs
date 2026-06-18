@@ -13,6 +13,7 @@ use std::io::Cursor;
 use std::sync::Arc; // Required for parallel rasterization
 
 use crate::app_state::AppState;
+use crate::formats::png_data_url;
 use crate::get_cached_full_warped_image;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -1618,7 +1619,7 @@ pub fn generate_mask_overlay(
             .map_err(|e| e.to_string())?;
 
         let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-        let data_url = format!("data:image/png;base64,{}", base64_str);
+        let data_url = png_data_url(base64_str);
 
         Ok(data_url)
     } else {

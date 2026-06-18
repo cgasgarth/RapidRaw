@@ -17,7 +17,7 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter, Runtime};
 use uuid::Uuid;
 
-use crate::formats::is_raw_file;
+use crate::formats::{is_raw_file, png_data_url};
 use crate::image_processing::apply_cpu_default_raw_processing;
 use crate::image_processing::{ImageMetadata, RawEngineArtifacts};
 use crate::panorama_utils::{processing, stitching};
@@ -320,7 +320,7 @@ pub async fn stitch_panorama(
                 }
 
                 let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-                let final_base64 = format!("data:image/png;base64,{}", base64_str);
+                let final_base64 = png_data_url(base64_str);
 
                 *panorama_result_handle.lock().unwrap() = Some(PendingPanoramaResult {
                     image: render_result.image,

@@ -91,7 +91,7 @@ use tauri::{Emitter, Manager, ipc::Response};
 use tempfile::NamedTempFile;
 use uuid::Uuid;
 
-const JPEG_DATA_URL_PREFIX: &str = "data:image/jpeg;base64,";
+use crate::formats::{PNG_DATA_URL_PREFIX, jpeg_data_url, png_data_url};
 
 fn encode_jpeg_bytes(image: &DynamicImage, quality: u8) -> Result<Vec<u8>, String> {
     let (width, height) = image.dimensions();
@@ -104,11 +104,7 @@ fn encode_jpeg_bytes(image: &DynamicImage, quality: u8) -> Result<Vec<u8>, Strin
 
 fn encode_jpeg_data_url(image: &DynamicImage, quality: u8) -> Result<String, String> {
     let bytes = encode_jpeg_bytes(image, quality)?;
-    Ok(format!(
-        "{}{}",
-        JPEG_DATA_URL_PREFIX,
-        general_purpose::STANDARD.encode(&bytes)
-    ))
+    Ok(jpeg_data_url(general_purpose::STANDARD.encode(&bytes)))
 }
 
 fn encode_jpeg_response(image: &DynamicImage, quality: u8) -> Result<Response, String> {
@@ -1550,7 +1546,7 @@ async fn merge_hdr(
     }
 
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-    let final_base64 = format!("data:image/png;base64,{}", base64_str);
+    let final_base64 = png_data_url(base64_str);
     let runtime_plan =
         build_hdr_runtime_plan(&source_refs, hdr_merged.width(), hdr_merged.height());
 
@@ -1902,11 +1898,10 @@ fn hash_hdr_output_file(path: &Path) -> Result<String, String> {
 
 #[tauri::command]
 async fn save_collage(base64_data: String, first_path_str: String) -> Result<String, String> {
-    let data_url_prefix = "data:image/png;base64,";
-    if !base64_data.starts_with(data_url_prefix) {
+    if !base64_data.starts_with(PNG_DATA_URL_PREFIX) {
         return Err("Invalid base64 data format".to_string());
     }
-    let encoded_data = &base64_data[data_url_prefix.len()..];
+    let encoded_data = &base64_data[PNG_DATA_URL_PREFIX.len()..];
 
     let decoded_bytes = general_purpose::STANDARD
         .decode(encoded_data)

@@ -1,7 +1,7 @@
 use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
 use crate::file_management::parse_virtual_path;
-use crate::formats::is_raw_file;
+use crate::formats::{is_raw_file, png_data_url};
 use crate::image_loader::load_base_image_from_bytes;
 use crate::image_processing::apply_cpu_default_raw_processing;
 use base64::{Engine as _, engine::general_purpose};
@@ -366,7 +366,7 @@ fn denoise_image(
         .write_to(&mut buf_denoised, ImageFormat::Png)
         .map_err(|e| format!("Failed to encode preview: {}", e))?;
     let base64_str_denoised = general_purpose::STANDARD.encode(buf_denoised.get_ref());
-    let data_url_denoised = format!("data:image/png;base64,{}", base64_str_denoised);
+    let data_url_denoised = png_data_url(base64_str_denoised);
 
     let original_dynamic = DynamicImage::ImageRgb32F(rgb_img_for_denoiser);
     let original_preview = if new_w != w {
@@ -381,7 +381,7 @@ fn denoise_image(
         .write_to(&mut buf_orig, ImageFormat::Png)
         .map_err(|e| format!("Failed to encode original preview: {}", e))?;
     let base64_str_orig = general_purpose::STANDARD.encode(buf_orig.get_ref());
-    let data_url_orig = format!("data:image/png;base64,{}", base64_str_orig);
+    let data_url_orig = png_data_url(base64_str_orig);
 
     let payload = serde_json::json!({
         "denoised": data_url_denoised,
