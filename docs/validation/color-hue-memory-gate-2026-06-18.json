@@ -1,0 +1,52 @@
+{
+  "cases": [
+    {
+      "hueErrorDegrees": 0,
+      "id": "color.hue.linearity-quarter-step.v1",
+      "kind": "hue_linearity",
+      "luminanceError": 0,
+      "neutralRgbDrift": 0,
+      "saturationError": 0,
+      "targetDistanceAfter": 0.166666666667,
+      "targetDistanceBefore": 0.222222222222
+    },
+    {
+      "hueErrorDegrees": 0,
+      "id": "color.hue.wraparound-shortest-path.v1",
+      "kind": "hue_linearity",
+      "luminanceError": 0,
+      "neutralRgbDrift": 0,
+      "saturationError": 0,
+      "targetDistanceAfter": 0.083333333333,
+      "targetDistanceBefore": 0.166666666667
+    },
+    {
+      "hueErrorDegrees": 0,
+      "id": "color.neutral.no-rgb-drift.v1",
+      "kind": "neutral_drift",
+      "luminanceError": 0,
+      "neutralRgbDrift": 0,
+      "saturationError": 0,
+      "targetDistanceAfter": 0,
+      "targetDistanceBefore": 0.666666666667
+    },
+    {
+      "hueErrorDegrees": 0,
+      "id": "color.memory.skin-warm-patch.v1",
+      "kind": "memory_color",
+      "luminanceError": 0,
+      "neutralRgbDrift": 0,
+      "saturationError": 0,
+      "targetDistanceAfter": 0.211666666667,
+      "targetDistanceBefore": 0.393333333333
+    }
+  ],
+  "fixturePath": "fixtures/color/hue-memory-color-gate.json",
+  "generatedFromSnapshotDate": "2026-06-18",
+  "issue": 1932,
+  "schemaVersion": 1,
+  "thresholds": {
+    "maxNeutralRgbDrift": 1e-12,
+    "perCaseToleranceMax": 0.001
+  }
+}

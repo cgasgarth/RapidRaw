@@ -1,0 +1,110 @@
+{
+  "$schema": "https://rawengine.dev/schemas/hue-memory-color-gate-v1.json",
+  "cases": [
+    {
+      "expected": {
+        "hueDegrees": 20,
+        "luminance": 0.5,
+        "saturation": 0.5
+      },
+      "id": "color.hue.linearity-quarter-step.v1",
+      "input": {
+        "hueDegrees": 10,
+        "luminance": 0.5,
+        "saturation": 0.5
+      },
+      "kind": "hue_linearity",
+      "settings": {
+        "hueUniformity": 0.25,
+        "luminanceUniformity": 0,
+        "saturationUniformity": 0,
+        "targetHueDegrees": 50,
+        "targetLuminance": 0.5,
+        "targetSaturation": 0.5
+      },
+      "tolerance": 0.000001
+    },
+    {
+      "expected": {
+        "hueDegrees": 5,
+        "luminance": 0.48,
+        "saturation": 0.44
+      },
+      "id": "color.hue.wraparound-shortest-path.v1",
+      "input": {
+        "hueDegrees": 350,
+        "luminance": 0.48,
+        "saturation": 0.44
+      },
+      "kind": "hue_linearity",
+      "settings": {
+        "hueUniformity": 0.5,
+        "luminanceUniformity": 0,
+        "saturationUniformity": 0,
+        "targetHueDegrees": 20,
+        "targetLuminance": 0.48,
+        "targetSaturation": 0.44
+      },
+      "tolerance": 0.000001
+    },
+    {
+      "expected": {
+        "hueDegrees": 240,
+        "luminance": 0.42,
+        "saturation": 0
+      },
+      "expectedRgb": {
+        "blue": 0.42,
+        "green": 0.42,
+        "red": 0.42
+      },
+      "id": "color.neutral.no-rgb-drift.v1",
+      "input": {
+        "hueDegrees": 120,
+        "luminance": 0.42,
+        "saturation": 0
+      },
+      "inputRgb": {
+        "blue": 0.42,
+        "green": 0.42,
+        "red": 0.42
+      },
+      "kind": "neutral_drift",
+      "settings": {
+        "hueUniformity": 1,
+        "luminanceUniformity": 0,
+        "saturationUniformity": 0,
+        "targetHueDegrees": 240,
+        "targetLuminance": 0.42,
+        "targetSaturation": 0
+      },
+      "tolerance": 0.000001
+    },
+    {
+      "expected": {
+        "hueDegrees": 27.5,
+        "luminance": 0.52,
+        "saturation": 0.42
+      },
+      "id": "color.memory.skin-warm-patch.v1",
+      "input": {
+        "hueDegrees": 35,
+        "luminance": 0.46,
+        "saturation": 0.5
+      },
+      "kind": "memory_color",
+      "settings": {
+        "hueUniformity": 0.5,
+        "luminanceUniformity": 0.4,
+        "saturationUniformity": 0.5,
+        "targetHueDegrees": 20,
+        "targetLuminance": 0.61,
+        "targetSaturation": 0.34
+      },
+      "tolerance": 0.000001
+    }
+  ],
+  "issue": 1932,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-18"
+}
