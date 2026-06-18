@@ -247,6 +247,41 @@
       "trackingIssue": 1507
     },
     {
+      "artifactClass": "focus_plane_transition",
+      "camera": {
+        "cameraMake": "Canon",
+        "cameraModel": "EOS R5",
+        "lens": "RF 100mm F2.8L Macro IS USM",
+        "rawFormat": "cr3"
+      },
+      "crop": {
+        "height": 1024,
+        "unit": "source_pixels",
+        "width": 1024,
+        "x": 1200,
+        "y": 900
+      },
+      "evidenceId": "raw-evidence.focus-stack.product-depth.v1",
+      "expectedUse": ["focus_stack", "preview_export_parity"],
+      "exposure": {
+        "aperture": 5.6,
+        "exposureBiasEv": 0,
+        "iso": 100,
+        "shutterSeconds": 0.01
+      },
+      "featureFamily": "focus_stack",
+      "notes": "Reserved private product focus bracket for focus-map accuracy, blend transitions, halo review, and preview/export parity proof.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private focus bracket sequence must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1899
+    },
+    {
       "artifactClass": "subpixel_detail_reconstruction",
       "camera": {
         "cameraMake": "Nikon",

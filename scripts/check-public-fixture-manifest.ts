@@ -20,6 +20,8 @@ const requiredHighIsoFixtureIds = new Set([
   'real.hdr.handheld-ghosting-bracket.v0',
   'real.panorama.overlap-urban-row.v0',
   'real.panorama.parallax-foreground.v0',
+  'real.focus.macro-bracket-flower.v0',
+  'real.focus.product-depth-stack.v0',
 ]);
 const presentFixtureIds = new Set(manifest.entries.map((entry) => entry.fixtureId));
 const missingFixtureIds = [...requiredHighIsoFixtureIds].filter((fixtureId) => !presentFixtureIds.has(fixtureId));
