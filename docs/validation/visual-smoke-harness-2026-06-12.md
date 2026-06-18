@@ -25,6 +25,16 @@ http://127.0.0.1:1420/visual-smoke.html?scenario=empty-library
 bun run check:visual-smoke
 ```
 
+Focused PR lane:
+
+```sh
+bun run check:visual-smoke:pr
+```
+
+The PR lane runs only the deterministic `empty-library` browser smoke path.
+Local measurement on 2026-06-18 was 9.4s wall time after dependencies were
+present.
+
 The command:
 
 1. starts Vite through Bun on `127.0.0.1:1420`;
@@ -44,6 +54,11 @@ bunx playwright install chromium
 ```
 
 ## CI Behavior
+
+The required PR baseline includes `frontend: PR visual smoke`. It runs in
+parallel with the other PR jobs, installs Playwright Chromium, executes
+`bun run check:visual-smoke:pr`, and uploads screenshots only on failure to keep
+successful logs compact.
 
 The manual `Image Quality Regression` workflow now includes a macOS
 `visual-smoke` job. It installs Playwright Chromium, runs

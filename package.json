@@ -256,6 +256,7 @@
     "check:unused-deps": "bun scripts/run-compact-command.ts --label unused-deps -- knip --config knip.jsonc --dependencies --reporter compact",
     "check:performance-smoke": "bun scripts/check-performance-smoke.ts",
     "check:visual-smoke": "bun scripts/capture-visual-smoke.ts",
+    "check:visual-smoke:pr": "bun scripts/capture-visual-smoke.ts --scenario empty-library",
     "check:bundle": "bun run build:frontend && bun run check:bundle:budget",
     "check:bundle:budget": "bun scripts/check-vite-bundle-budget.ts",
     "check:ci-paths": "bun scripts/ci-classify-macos-smoke.ts --self-test",
