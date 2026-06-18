@@ -93,6 +93,7 @@ const privateRunReportSchema = z
     }),
     qualityMetrics: z.array(qualityMetricSchema).min(2),
     reportId: z.string().regex(/^computational-merge-run\.[a-z0-9.-]+\.v[0-9]+$/u),
+    runId: z.string().trim().min(1).optional(),
     runtimeResultIds: runtimeResultIdsSchema,
     screenshotArtifacts: z.array(screenshotArtifactSchema).min(2),
     sourceHashes: z.array(sourceHashSchema).min(2),

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -56,6 +57,7 @@ export async function runComputationalPrivateProof(config: ComputationalPrivateP
   }
 
   const privateRoot = resolve(args.privateRoot);
+  const runId = `private-run-${Date.now()}-${randomUUID()}`;
   let tempOutputDir: string | undefined;
   const reportOutputPath =
     args.outputPath ??
@@ -73,13 +75,17 @@ export async function runComputationalPrivateProof(config: ComputationalPrivateP
       command: config.privateStep.command,
       cwd: config.privateStep.cwd,
       env: {
+        RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID: runId,
         RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
         ...config.privateStep.env,
       },
     });
 
     for (const check of config.postPrivateChecks ?? []) {
-      await runCompact(check.join(' '), { command: check, env: { RAWENGINE_PRIVATE_RAW_ROOT: privateRoot } });
+      await runCompact(check.join(' '), {
+        command: check,
+        env: { RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID: runId, RAWENGINE_PRIVATE_RAW_ROOT: privateRoot },
+      });
     }
 
     await runCompact('computational merge private report collection', {
@@ -110,6 +116,7 @@ export async function runComputationalPrivateProof(config: ComputationalPrivateP
         config.fixtureId,
         '--input',
         reportOutputPath,
+        ...(args.requireAssets ? ['--require-run-id', runId] : []),
         ...(args.requireAssets ? ['--require-assets'] : []),
       ],
       env: {
