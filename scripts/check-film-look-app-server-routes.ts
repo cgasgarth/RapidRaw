@@ -14,8 +14,9 @@ import {
   FILM_LOOK_BROWSER_ITEMS,
   getFilmLookControlledAdjustmentKeys,
 } from '../src/utils/filmLookBrowser.ts';
+import { FilmLookAppServerCommandName } from '../src/utils/filmLookAppServerRouteIds.ts';
 
-const expectedCommandName = 'film.look.build_adjustment_patch';
+const expectedCommandName = FilmLookAppServerCommandName.BuildAdjustmentPatch;
 const runtimeCheckScripts = ['check:film-look-render-apply-proof', 'check:film-look-preview-export-parity'];
 const failures = [];
 const route = FILM_LOOK_APP_SERVER_ROUTE_MANIFEST.routes.find(

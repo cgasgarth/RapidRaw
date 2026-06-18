@@ -1,27 +1,38 @@
 import { z } from 'zod';
 
-export const detailAppServerRouteFeatureSchema = z.enum(['deblur']);
-export const detailAppServerRouteExecutionModeSchema = z.enum(['apply_dry_run_plan', 'dry_run_command']);
-export const detailAppServerRouteStatusSchema = z.enum(['mapped_unavailable']);
+import {
+  DETAIL_APP_SERVER_COMMAND_TYPES,
+  DETAIL_APP_SERVER_EXECUTION_MODES,
+  DETAIL_APP_SERVER_FEATURES,
+  DETAIL_APP_SERVER_ROUTE_STATUSES,
+  DetailAppServerCommandType,
+  DetailAppServerExecutionMode,
+  DetailAppServerSchemaName,
+  DetailAppServerToolName,
+} from '../utils/detailAppServerRouteIds';
+
+export const detailAppServerRouteFeatureSchema = z.enum(DETAIL_APP_SERVER_FEATURES);
+export const detailAppServerRouteExecutionModeSchema = z.enum(DETAIL_APP_SERVER_EXECUTION_MODES);
+export const detailAppServerRouteStatusSchema = z.enum(DETAIL_APP_SERVER_ROUTE_STATUSES);
 
 export const detailAppServerRouteSchema = z
   .object({
-    commandType: z.enum(['detailDeblur.applyControls', 'detailDeblur.dryRunControls']),
+    commandType: z.enum(DETAIL_APP_SERVER_COMMAND_TYPES),
     executionMode: detailAppServerRouteExecutionModeSchema,
     feature: detailAppServerRouteFeatureSchema,
-    inputSchemaName: z.literal('DetailDeblurCommandEnvelopeV1'),
-    outputSchemaName: z.literal('DetailDeblurDryRunResultV1'),
+    inputSchemaName: z.literal(DetailAppServerSchemaName.CommandEnvelope),
+    outputSchemaName: z.literal(DetailAppServerSchemaName.DryRunResult),
     reason: z.string().trim().min(1),
     runtimeCheckScript: z.string().trim().min(1),
     status: detailAppServerRouteStatusSchema,
-    toolName: z
-      .string()
-      .trim()
-      .regex(/^detail\.deblur\.(?:dry_run_command|apply_command)$/u),
+    toolName: z.enum([DetailAppServerToolName.DryRunCommand, DetailAppServerToolName.ApplyCommand]),
   })
   .strict()
   .superRefine((route, context) => {
-    if (route.executionMode === 'dry_run_command' && route.commandType !== 'detailDeblur.dryRunControls') {
+    if (
+      route.executionMode === DetailAppServerExecutionMode.DryRunCommand &&
+      route.commandType !== DetailAppServerCommandType.DryRunControls
+    ) {
       context.addIssue({
         code: 'custom',
         message: 'Deblur dry-run routes must use the dry-run command type.',
@@ -29,7 +40,10 @@ export const detailAppServerRouteSchema = z
       });
     }
 
-    if (route.executionMode === 'apply_dry_run_plan' && route.commandType !== 'detailDeblur.applyControls') {
+    if (
+      route.executionMode === DetailAppServerExecutionMode.ApplyDryRunPlan &&
+      route.commandType !== DetailAppServerCommandType.ApplyControls
+    ) {
       context.addIssue({
         code: 'custom',
         message: 'Deblur apply routes must use the apply command type.',
