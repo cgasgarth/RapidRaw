@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { NegativeLabOutputFormatId } from '../../src/utils/negativeLabOutputFormatIds.ts';
+
 const filmLookPresetBaseSchema = z
   .object({
     includeCropTransform: z.literal(false),
@@ -152,7 +154,7 @@ const negativeLabBaseFogEstimateInvokeSchema = z.object({
 });
 const negativeLabConvertArgsSchema = z.object({
   options: z.object({
-    outputFormat: z.literal('jpeg_proof'),
+    outputFormat: z.literal(NegativeLabOutputFormatId.JpegProof),
     suffix: z.literal('Positive'),
   }),
   params: negativeLabOrthoPresetParamsSchema,
@@ -174,7 +176,7 @@ const negativeLabBatchConvertArgsSchema = z.object({
     .object({
       acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
       acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
-      outputFormat: z.literal('jpeg_proof'),
+      outputFormat: z.literal(NegativeLabOutputFormatId.JpegProof),
       suffix: z.literal('Positive'),
     })
     .refine(
