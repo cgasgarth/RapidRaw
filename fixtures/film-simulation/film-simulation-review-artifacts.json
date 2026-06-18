@@ -1,0 +1,62 @@
+{
+  "artifactId": "film-review-artifacts.generic-builtins.v1",
+  "beforeImage": {
+    "hash": "sha256:70857b0aa5c58d9bb637840c3a21839c7eb9c49c5a92a5886eccf943a6129d28",
+    "kind": "synthetic_before_image",
+    "scene": "ramp-color-chips-highlight-edge"
+  },
+  "cases": [
+    {
+      "afterImage": {
+        "exportHash": "ce1b5b9dfc974109",
+        "kind": "synthetic_after_preview_export_pair",
+        "previewHash": "ce1b5b9dfc974109"
+      },
+      "baselinePreviewMaxDelta": 0.04,
+      "category": "color_warm",
+      "displayName": "Warm Print",
+      "lookId": "film_look.generic.warm_print.v1",
+      "previewExportMaxDelta": 0,
+      "provenanceStatus": "generic_engineered_not_measured_stock",
+      "runtimeStatus": "synthetic_preview_export_parity",
+      "runtimeSupport": "adjustment_patch_preview_export",
+      "strength": 100
+    },
+    {
+      "afterImage": {
+        "exportHash": "7e4b525fd7be754b",
+        "kind": "synthetic_after_preview_export_pair",
+        "previewHash": "7e4b525fd7be754b"
+      },
+      "baselinePreviewMaxDelta": 0.248547,
+      "category": "black_and_white",
+      "displayName": "Mono Silver",
+      "lookId": "film_look.generic.mono_silver.v1",
+      "previewExportMaxDelta": 0,
+      "provenanceStatus": "generic_engineered_not_measured_stock",
+      "runtimeStatus": "synthetic_preview_export_parity",
+      "runtimeSupport": "adjustment_patch_preview_export",
+      "strength": 100
+    },
+    {
+      "afterImage": {
+        "exportHash": "942aa1199eb4a1d3",
+        "kind": "synthetic_after_preview_export_pair",
+        "previewHash": "942aa1199eb4a1d3"
+      },
+      "baselinePreviewMaxDelta": 0.096471,
+      "category": "color_contrast",
+      "displayName": "Punch Color",
+      "lookId": "film_look.generic.punch_color.v1",
+      "previewExportMaxDelta": 0,
+      "provenanceStatus": "generic_engineered_not_measured_stock",
+      "runtimeStatus": "synthetic_preview_export_parity",
+      "runtimeSupport": "adjustment_patch_preview_export",
+      "strength": 100
+    }
+  ],
+  "doesNotProve": ["real_raw_quality", "measured_film_stock_emulation", "photochemical_density_domain"],
+  "generatedFrom": "scripts/check-film-simulation-review-artifacts.ts",
+  "proofId": "film.simulation.review-artifacts.synthetic.v1",
+  "schemaVersion": 1
+}
