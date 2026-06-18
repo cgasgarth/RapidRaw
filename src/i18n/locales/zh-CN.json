@@ -1614,6 +1614,7 @@
       "includedScans": "{{includedCount}} included",
       "includeScan": "Include",
       "measureCustomBase": "Measure sample",
+      "nextFrameTooltip": "Next frame",
       "noticeText": "反转逻辑受 <0>NegPy</0>（作者 marcinz606，<1>GPL-3.0</1>）启发。",
       "originalLabel": "原始负片",
       "outputFormats": {
@@ -1635,6 +1636,7 @@
       "previewAlt": "预览",
       "previewPending": "Preview pending",
       "previewReady": "Preview ready",
+      "previousFrameTooltip": "Previous frame",
       "printGrade": "打印分级",
       "profileDisabledReasons": {
         "catalog_only": "Catalog only",
