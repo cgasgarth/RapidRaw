@@ -10,6 +10,12 @@ import {
   toneColorCommandEnvelopeV1Schema,
   toneColorCommandTypeV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  TONE_COLOR_APP_SERVER_COMMAND_TYPES,
+  TONE_COLOR_APP_SERVER_EXECUTION_MODES,
+  TONE_COLOR_APP_SERVER_TOOL_NAMES,
+  ToneColorAppServerExecutionMode,
+} from '../src/utils/toneColorAppServerRouteIds.ts';
 import { TONE_COLOR_APP_SERVER_ROUTES } from '../src/utils/toneColorAppServerRoutes.ts';
 
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -19,7 +25,11 @@ const expectedCommandTypes = toneColorCommandTypeV1Schema.options;
 const expectedCommandTypeSet = new Set<string>(expectedCommandTypes);
 const failures = [];
 
-for (const expectedToolName of ['tonecolor.dry_run_command', 'tonecolor.apply_command']) {
+if (JSON.stringify(TONE_COLOR_APP_SERVER_COMMAND_TYPES) !== JSON.stringify(expectedCommandTypes)) {
+  failures.push('Tone-color route command types do not match the package command schema.');
+}
+
+for (const expectedToolName of TONE_COLOR_APP_SERVER_TOOL_NAMES) {
   if (!routeToolNames.has(expectedToolName)) failures.push(`${expectedToolName} is missing from route manifest.`);
 }
 
@@ -38,7 +48,7 @@ for (const route of TONE_COLOR_APP_SERVER_ROUTES) {
     failures.push(`${route.toolName} route schemas do not match the RawEngine tool registry.`);
   }
 
-  const expectedMutates = route.executionMode === 'apply_dry_run_plan';
+  const expectedMutates = route.executionMode === ToneColorAppServerExecutionMode.ApplyDryRunPlan;
   if (tool.mutates !== expectedMutates) {
     failures.push(`${route.toolName} mutates flag does not match route execution mode.`);
   }
@@ -218,7 +228,7 @@ for (const commandType of expectedCommandTypes) {
     routeModeCounts.set(route.executionMode, (routeModeCounts.get(route.executionMode) ?? 0) + 1);
   }
 
-  for (const mode of ['dry_run_command', 'apply_dry_run_plan']) {
+  for (const mode of TONE_COLOR_APP_SERVER_EXECUTION_MODES) {
     const count = routeModeCounts.get(mode) ?? 0;
     if (count === 0) failures.push(`${commandType} missing ${mode} route.`);
     if (count > 1) failures.push(`${commandType} has duplicate ${mode} routes.`);
