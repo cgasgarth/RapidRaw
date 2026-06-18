@@ -33,3 +33,10 @@ bun run check:hdr-alignment-smoke
 
 The script emits a JSON summary with the reference source, recovered transforms,
 overlap ratio, RMS error, and alignment confidence.
+
+## Bracket Gate Follow-Up
+
+Issue #1927 adds `bun run check:hdr-alignment-bracket-proof`, which combines the
+fixture manifest bracket detector with deterministic alignment recovery and a
+duplicate-exposure rejection proof. The generated report lives at
+`docs/validation/hdr-alignment-bracket-proof-2026-06-18.json`.
