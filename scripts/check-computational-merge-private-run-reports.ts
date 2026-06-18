@@ -80,7 +80,8 @@ for (const report of reportCollection.reports) {
     report.acceptanceStatus === 'private_stitch_artifact_smoke' && report.featureFamily === 'panorama_stitch';
   const previewExportSmoke =
     report.acceptanceStatus === 'private_preview_export_smoke' &&
-    (report.featureFamily === 'panorama_stitch' ||
+    (report.featureFamily === 'hdr_merge' ||
+      report.featureFamily === 'panorama_stitch' ||
       report.featureFamily === 'focus_stack' ||
       report.featureFamily === 'super_resolution');
   const reconstructionArtifactSmoke =
@@ -480,7 +481,9 @@ function verifyPreviewExportSmokeReport(
   report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
   expectedSourceCount: number,
 ): void {
-  if (report.featureFamily === 'panorama_stitch') {
+  if (report.featureFamily === 'hdr_merge') {
+    verifyHdrPreviewExportSmokeReport(report, expectedSourceCount);
+  } else if (report.featureFamily === 'panorama_stitch') {
     verifyStitchArtifactSmokeReport(report, expectedSourceCount, { allowPreviewExport: true });
   } else if (report.featureFamily === 'focus_stack') {
     verifyFocusStackArtifactSmokeReport(report, expectedSourceCount, { allowPreviewExport: true });
@@ -500,6 +503,42 @@ function verifyPreviewExportSmokeReport(
     !metricPassesThreshold(previewExportParity.name, previewExportParity.value, previewExportParity.threshold)
   ) {
     failures.push(`${report.fixtureId}: preview/export smoke must prove previewExportMeanAbsDelta threshold.`);
+  }
+}
+
+function verifyHdrPreviewExportSmokeReport(
+  report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
+  expectedSourceCount: number,
+): void {
+  const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
+  for (const requiredKind of [
+    'source_raw_sequence_private',
+    'decode_report_private',
+    'alignment_report_private',
+    'merge_output_private',
+    'quality_report_private',
+  ]) {
+    if (!artifactKinds.has(requiredKind)) {
+      failures.push(`${report.fixtureId}: HDR preview/export smoke missing ${requiredKind}.`);
+    }
+  }
+
+  const reportMetrics = new Map(report.qualityMetrics.map((metric) => [metric.name, metric]));
+  const requiredMetrics = [
+    reportMetrics.get('exposureBracketCoverageEv'),
+    reportMetrics.get('highlightRecoveryRatio'),
+    reportMetrics.get('ghostSuppressionScore'),
+  ];
+  if (report.sourceHashes.length < expectedSourceCount) {
+    failures.push(`${report.fixtureId}: HDR preview/export smoke must include all source hashes.`);
+  }
+  for (const requiredMetric of requiredMetrics) {
+    if (
+      requiredMetric === undefined ||
+      !metricPassesThreshold(requiredMetric.name, requiredMetric.value, requiredMetric.threshold)
+    ) {
+      failures.push(`${report.fixtureId}: HDR preview/export smoke metric failed threshold.`);
+    }
   }
 }
 
