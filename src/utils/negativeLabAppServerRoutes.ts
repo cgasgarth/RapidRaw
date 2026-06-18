@@ -1,3 +1,4 @@
+import { NegativeLabAppServerCommandName } from './negativeLabAppServerCommandNames';
 import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitometer';
 import { buildNegativeLabDustScratchReviewReport, buildNegativeLabQcProofReport } from './negativeLabDustScratchReview';
 import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
@@ -72,7 +73,7 @@ export const buildNegativeLabConversionPlanResult = (
   const profileProvenanceHash = buildNegativeLabRuntimeProfileProvenanceHash(profile);
 
   return negativeLabConversionPlanResultSchema.parse({
-    commandName: 'negative.lab.build_conversion_plan',
+    commandName: NegativeLabAppServerCommandName.ConversionPlan,
     outputFormat: parsedCommand.outputFormat,
     params: {
       ...profile.params,
@@ -144,7 +145,7 @@ export const buildNegativeLabAcceptedBatchPlanRouteResult = (
 
   return negativeLabAcceptBatchPlanAppServerResultSchema.parse({
     ...planIdentity,
-    commandName: 'negative.lab.accept_batch_dry_run_plan',
+    commandName: NegativeLabAppServerCommandName.AcceptBatchPlan,
     dryRunSummary,
     proof: {
       deterministic: true,
@@ -195,7 +196,7 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
       params: conversionPlan.params,
       paths: plannedPaths,
     },
-    commandName: 'negative.lab.build_accepted_batch_apply',
+    commandName: NegativeLabAppServerCommandName.AcceptedBatchApply,
     conversionPlan,
     dryRunSummary: expectedAcceptedPlan.dryRunSummary,
     proof: {
@@ -222,7 +223,7 @@ export const buildNegativeLabStockRegistryRouteResult = (
   negativeLabStockRegistryAppServerCommandSchema.parse(command);
 
   return negativeLabStockRegistryAppServerResultSchema.parse({
-    commandName: 'negative.lab.list_stock_registry',
+    commandName: NegativeLabAppServerCommandName.StockRegistry,
     counts: buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY),
     proof: {
       deterministic: true,
@@ -240,7 +241,7 @@ export const buildNegativeLabStockMetadataRouteResult = (
 
   return negativeLabStockMetadataAppServerResultSchema.parse({
     catalog: NEGATIVE_LAB_STOCK_METADATA_CATALOG,
-    commandName: 'negative.lab.list_stock_metadata',
+    commandName: NegativeLabAppServerCommandName.StockMetadata,
     counts: buildNegativeLabStockMetadataCounts(NEGATIVE_LAB_STOCK_METADATA_CATALOG),
     proof: {
       deterministic: true,
@@ -281,7 +282,7 @@ export const buildNegativeLabStockFamilyConversionRouteResult = (
   );
 
   return negativeLabStockFamilyConversionResultSchema.parse({
-    commandName: 'negative.lab.build_stock_family_conversion_plan',
+    commandName: NegativeLabAppServerCommandName.StockFamilyConversion,
     conversionPlan,
     proof: {
       deterministic: true,

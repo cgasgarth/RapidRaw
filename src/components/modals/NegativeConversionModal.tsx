@@ -33,6 +33,7 @@ import {
 } from '../../schemas/negativeLabPresetCatalogSchemas';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
+import { NegativeLabAppServerCommandName } from '../../utils/negativeLabAppServerCommandNames';
 import { buildNegativeBaseFogDensitometerReadout } from '../../utils/negativeLabDensitometer';
 import {
   buildNegativeLabDustScratchReviewReport,
@@ -370,8 +371,8 @@ export default function NegativeConversionModal({
       ? 'ready_to_commit'
       : 'not_committed';
   const agentCommandSource = isBatchPlanAccepted
-    ? 'negative.lab.accept_batch_dry_run_plan'
-    : 'negative.lab.build_batch_dry_run_summary';
+    ? NegativeLabAppServerCommandName.AcceptBatchPlan
+    : NegativeLabAppServerCommandName.BatchSummary;
   const requiresAcceptedBatchPlan = hasMultipleScans && conversionScope === 'all';
   const canSave =
     !isSaving &&

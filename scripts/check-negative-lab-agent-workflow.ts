@@ -20,6 +20,7 @@ import {
   negativeLabApplyPlanRequestV1Schema,
   negativeLabAppServerToolManifestV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
 import { NegativeLabAppServerRuntimeToolBusV1 } from '../packages/rawengine-schema/src/negativeLabAppServerRuntime.ts';
 import {
   sampleNegativeLabApplyPlanRequestV1,
@@ -89,14 +90,14 @@ if (runtimeApply.apply.changeSet.artifactHandles.length === 0) {
 }
 const routeNames = new Set(NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.map((route) => route.commandName));
 const requiredRouteNames = [
-  'negative.lab.build_conversion_plan',
-  'negative.lab.build_densitometer_readout',
-  'negative.lab.build_frame_health_report',
-  'negative.lab.build_qc_proof_report',
-  'negative.lab.build_batch_dry_run_summary',
-  'negative.lab.accept_batch_dry_run_plan',
-  'negative.lab.build_accepted_batch_apply',
-  'negative.lab.build_stock_family_conversion_plan',
+  NegativeLabAppServerCommandName.ConversionPlan,
+  NegativeLabAppServerCommandName.Densitometer,
+  NegativeLabAppServerCommandName.FrameHealth,
+  NegativeLabAppServerCommandName.QcProof,
+  NegativeLabAppServerCommandName.BatchSummary,
+  NegativeLabAppServerCommandName.AcceptBatchPlan,
+  NegativeLabAppServerCommandName.AcceptedBatchApply,
+  NegativeLabAppServerCommandName.StockFamilyConversion,
 ];
 
 for (const routeName of requiredRouteNames) {
