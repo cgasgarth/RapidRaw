@@ -420,6 +420,15 @@
               <td>Model/optical-flow SR, artifact quality review, and real burst RAW validation.</td>
             </tr>
             <tr>
+              <td>Layers and masks</td>
+              <td><span class="status partial">Private RAW proof</span></td>
+              <td>
+                <code>bun run check:layer-mask-real-raw-proof</code> records private ARW mask-refinement metrics,
+                committed metadata hashes, and preview/export parity without publishing private artifacts.
+              </td>
+              <td>Full UI-driven mask refinement walkthrough and broader real RAW layer stack coverage.</td>
+            </tr>
+            <tr>
               <td>Color workflow</td>
               <td><span class="status partial">UI proof</span></td>
               <td><code>bun run check:color-workflow-smoke</code>, color style preset and fixture checks.</td>
@@ -633,6 +642,14 @@
               <td><code>bun run check:raw-open-edit-export-run-reports</code></td>
               <td>
                 Public-schema run-report gate; accepted private proof requires non-null hashes and private run reports.
+              </td>
+            </tr>
+            <tr>
+              <td>Computational merge runtime status</td>
+              <td><code>bun run check:computational-merge-runtime-status</code></td>
+              <td>
+                Tracks HDR, panorama, focus stack, and super-resolution proof maturity and keeps manifest-only cases
+                distinct from private runtime reports.
               </td>
             </tr>
             <tr>
