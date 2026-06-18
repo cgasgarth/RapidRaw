@@ -1,0 +1,63 @@
+{
+  "deghost": {
+    "ghostMeanAbsoluteError": 0,
+    "maskHash": "bfdd5d0bbac6e8f34b34cb18eac95e8162beab2b7b236591109279ba5e621916",
+    "metrics": {
+      "falseNegative": 0,
+      "falsePositive": 0,
+      "precision": 1,
+      "recall": 1,
+      "truePositive": 300
+    },
+    "motionCoverageRatio": 0.086806,
+    "outputHash": "f5b5ae92b49de6f711f626acecf5b180e639489c278f87dd2937afa2bb3aea58",
+    "referenceSourceIndex": 1
+  },
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1928,
+  "proofHash": "1255afce9328ffeedcd14e53d60ecb74a6b501504a8a42e18eddace6e4f41fc6",
+  "schemaVersion": 1,
+  "tone": {
+    "brackets": [
+      {
+        "exposureEv": -2,
+        "sourceIndex": 0
+      },
+      {
+        "exposureEv": 0,
+        "sourceIndex": 1
+      },
+      {
+        "exposureEv": 2,
+        "sourceIndex": 2
+      }
+    ],
+    "metrics": {
+      "meanAbsoluteError": 0,
+      "recoveredHighlightPixelRatio": 1,
+      "shadowNoiseAmplificationRisk": "low",
+      "unrecoveredClippedPixelRatio": 0,
+      "clippedInputPixelRatioBySource": [
+        {
+          "clippedHighRatio": 0,
+          "nearClippedHighRatio": 0,
+          "sourceIndex": 0
+        },
+        {
+          "clippedHighRatio": 0.489909,
+          "nearClippedHighRatio": 0.505534,
+          "sourceIndex": 1
+        },
+        {
+          "clippedHighRatio": 0.901042,
+          "nearClippedHighRatio": 0.90625,
+          "sourceIndex": 2
+        }
+      ]
+    },
+    "previewHash": "d9b3f4e9c3e595fb9eff65195709d31a538ece6d7a9eb1ccc4aa19f06e925637",
+    "sceneLinearOutputHash": "c36dc975acf9e424724d54d8dcdcb78ae7624d30f6c80b5702e74c49e35b01b6",
+    "toneMap": "reinhard_gamma_2_2_preview"
+  },
+  "validationStatus": "synthetic_artifact_gate"
+}
