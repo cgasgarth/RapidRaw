@@ -12,7 +12,7 @@ This audit records the current RapidRAW detail, sharpening, noise, dehaze, and c
 | Local contrast            | `clarity`, `structure`, `dehaze`                                  | GPU processing creates separate blur inputs for clarity and structure | No explicit local-contrast stage contract, halo budget, scale policy, or regression fixtures                                   |
 | Noise reduction           | `lumaNoiseReduction`, `colorNoiseReduction` plus AI denoise modal | UI adjustment state and `nind-denoise` ONNX path in Rust              | Chroma/luma controls exist but are not validated against high-ISO fixtures; AI denoise is not yet app-server/replay integrated |
 | Chromatic aberration      | `chromaticAberrationRedCyan`, `chromaticAberrationBlueYellow`     | UI/detail adjustments and settings import mappings                    | No defringe-specific hue/range controls or fixture coverage                                                                    |
-| Wavelet/detail-by-scale   | None                                                              | No wavelet runtime or UI path found                                   | Design and implementation remain open                                                                                          |
+| Wavelet/detail-by-scale   | Schema and fixture contract                                       | `waveletDetailSchemas`, `check:wavelet-detail`, and control model     | Pixel runtime, UI controls, and preview/export parity remain open                                                              |
 | Dust/spot visualization   | None                                                              | No dust visualization runtime or UI path found                        | Needs visible overlay, source preview, and fixture validation                                                                  |
 
 ## Pipeline Observations
@@ -30,8 +30,8 @@ This audit records the current RapidRAW detail, sharpening, noise, dehaze, and c
 | #125 `detail(sharpen): add output sharpening`                 | Add export/output sharpening controls with print/screen target fixtures.            |
 | #126 `detail(deblur): research deconvolution and lens deblur` | Document bounded deconvolution options and reject hallucination-prone paths.        |
 | #127 `detail(local-contrast): refine local contrast`          | Add halo-safe local-contrast validation with edge fixtures.                         |
-| #128 `detail(wavelet): design detail-by-scale controls`       | Define scale bands, UI behavior, and masking interactions.                          |
-| #129 `detail(wavelet): implement detail-by-scale controls`    | Add runtime and fixture proof after #128 lands.                                     |
+| #128 `detail(wavelet): design detail-by-scale controls`       | Control model defines bands, ranges, defaults, UI behavior, and validation limits.  |
+| #129 `detail(wavelet): implement detail-by-scale controls`    | Schema/fixture contract landed; pixel runtime and UI remain follow-up work.         |
 | #130 `detail(noise): separate chroma and luma noise`          | Add high-ISO fixture metrics for chroma/luma separation.                            |
 | #131 `validation(noise): add high ISO fixture set`            | Add licensed or synthetic high-ISO validation assets and metrics.                   |
 | #132 `detail(defringe): improve defringe controls`            | Add hue/range defringe controls and purple/green fringe fixtures.                   |
