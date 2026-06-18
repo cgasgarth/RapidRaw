@@ -5,6 +5,43 @@
       "artifactClass": "high_iso_chroma_noise",
       "camera": {
         "cameraMake": "Sony",
+        "cameraModel": "ILCE-7M3",
+        "lens": "FE 24-105mm F4 G OSS",
+        "rawFormat": "arw"
+      },
+      "crop": {
+        "height": 768,
+        "unit": "source_pixels",
+        "width": 768,
+        "x": 1800,
+        "y": 1200
+      },
+      "evidenceId": "raw-evidence.detail.high-iso-skin-shadow.v1",
+      "expectedUse": ["denoise", "detail", "preview_export_parity"],
+      "exposure": {
+        "aperture": 4,
+        "exposureBiasEv": -0.3,
+        "iso": 25600,
+        "shutterSeconds": 0.00125
+      },
+      "featureFamily": "detail",
+      "fileSha256": "sha256:5b1a62fb37669f3065479e2c7cf9af4ef031a920cf6feac82d1269e9fdf4a136",
+      "localRelativePath": "artifacts/detail/ai-denoise-source/_DSC1373.ARW",
+      "notes": "Local-only Pixls Play Raw high-ISO ARW source for denoise/detail validation. The RAW payload is ignored and not committed; public manifest records source URL, size, hash, and rights review status.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "Pixls Play Raw contributor",
+        "evidence": "Pixls Play Raw thread states the linked _DSC1373.ARW is Creative Commons Attribution-ShareAlike; public repo keeps metadata only until attribution and derivative-output policy are finalized.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "third_party_restricted"
+      },
+      "status": "private_asset_available",
+      "trackingIssue": 2043
+    },
+    {
+      "artifactClass": "high_iso_chroma_noise",
+      "camera": {
+        "cameraMake": "Sony",
         "cameraModel": "ILCE-7M4",
         "lens": "FE 35mm F1.8",
         "rawFormat": "arw"

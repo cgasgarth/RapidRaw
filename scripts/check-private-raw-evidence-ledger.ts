@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { createHash } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -18,21 +19,32 @@ if (requireAssets && root === undefined) {
 }
 
 if (root !== undefined) {
-  const missingPaths: string[] = [];
+  const failures: string[] = [];
   for (const entry of availableEntries) {
     if (entry.localRelativePath === undefined) {
       continue;
     }
 
+    const assetPath = resolve(root, entry.localRelativePath);
     try {
-      await access(resolve(root, entry.localRelativePath));
+      await access(assetPath);
     } catch {
-      missingPaths.push(`${entry.evidenceId}: ${entry.localRelativePath}`);
+      failures.push(`${entry.evidenceId}: missing ${entry.localRelativePath}`);
+      continue;
+    }
+
+    if (entry.fileSha256 !== undefined) {
+      const actualSha256 = `sha256:${createHash('sha256')
+        .update(await readFile(assetPath))
+        .digest('hex')}`;
+      if (actualSha256 !== entry.fileSha256) {
+        failures.push(`${entry.evidenceId}: expected ${entry.fileSha256}, got ${actualSha256}`);
+      }
     }
   }
 
-  if (missingPaths.length > 0) {
-    throw new Error(`Missing private RAW evidence assets:\n${missingPaths.join('\n')}`);
+  if (failures.length > 0) {
+    throw new Error(`Private RAW evidence asset check failed:\n${failures.join('\n')}`);
   }
 }
 
