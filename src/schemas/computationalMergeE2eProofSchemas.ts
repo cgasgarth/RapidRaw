@@ -33,6 +33,7 @@ const proofMetricNameSchema = z.enum([
   'highlightRecoveryRatio',
   'sharpnessGainRatio',
   'superResolutionDetailGainRatio',
+  'superResolutionRegistrationResidualPx',
   'previewExportMeanAbsDelta',
 ]);
 

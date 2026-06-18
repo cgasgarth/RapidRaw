@@ -273,13 +273,13 @@
         {
           "hash": null,
           "kind": "alignment_report_private",
-          "path": "private-artifacts/validation/computational-merge/sr-subpixel-alignment.json",
+          "path": "private-artifacts/validation/computational-merge/sr-subpixel-registration.json",
           "publicRepoAllowed": false
         },
         {
           "hash": null,
           "kind": "merge_output_private",
-          "path": "private-artifacts/validation/computational-merge/sr-subpixel-merge.tiff",
+          "path": "private-artifacts/validation/computational-merge/sr-subpixel-reconstruction.tiff",
           "publicRepoAllowed": false
         },
         {
@@ -299,14 +299,20 @@
           "kind": "quality_report_private",
           "path": "private-artifacts/validation/computational-merge/sr-subpixel-quality.json",
           "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "app_server_runtime_report_private",
+          "path": "private-artifacts/validation/computational-merge/sr-subpixel-app-server-runtime-proof.json",
+          "publicRepoAllowed": false
         }
       ],
       "evidenceId": "raw-evidence.super-resolution.subpixel-detail.v1",
       "expectedMetrics": [
         {
-          "name": "alignmentInlierRatio",
+          "name": "superResolutionRegistrationResidualPx",
           "required": true,
-          "threshold": 0.65
+          "threshold": 0.25
         },
         {
           "name": "superResolutionDetailGainRatio",
@@ -329,7 +335,7 @@
         "private-fixtures/super-resolution/subpixel-detail-v1/frame-04.nef"
       ],
       "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
-      "notes": "Private RAW super-resolution E2E proof slot for decode, subpixel alignment, detail reconstruction, preview/export parity, and artifact quality metrics. This manifest is planning evidence only until the private assets and runtime run reports exist.",
+      "notes": "Private RAW super-resolution E2E proof slot for decode, subpixel registration, detail reconstruction, app-server dry-run/apply replay, preview/export parity, and artifact quality metrics. This manifest is planning evidence only until private assets and full E2E run reports exist.",
       "proofStatus": "manifest_only",
       "uiIssue": 1335,
       "workflowSteps": [

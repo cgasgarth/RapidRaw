@@ -172,6 +172,7 @@
     "check:sr-real-raw-private-root-assets": "bun scripts/prepare-sr-real-raw-private-root.ts --require-assets",
     "run:sr-real-raw-private-proof": "bun scripts/run-sr-real-raw-private-proof.ts",
     "check:sr-real-raw-private-proof": "bun scripts/run-sr-real-raw-private-proof.ts",
+    "check:sr-real-raw-private-app-server-proof": "bun scripts/check-sr-real-raw-private-app-server-proof.ts",
     "prepare:panorama-real-raw-private-root": "bun scripts/prepare-panorama-real-raw-private-root.ts",
     "check:panorama-real-raw-private-root-prep": "bun scripts/prepare-panorama-real-raw-private-root.ts --self-test",
     "check:panorama-real-raw-private-root-assets": "bun scripts/prepare-panorama-real-raw-private-root.ts --require-assets",

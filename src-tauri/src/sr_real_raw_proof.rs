@@ -46,6 +46,13 @@ const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
 };
 
 const RECONSTRUCTION_SCALE: u32 = 2;
+const RUNTIME_SAMPLE_FILE: &str = "sr-subpixel-runtime-sample.json";
+const MODAL_BEFORE_FILE: &str = "sr-subpixel-modal-before.png";
+const MODAL_AFTER_FILE: &str = "sr-subpixel-modal-after.png";
+const RESULT_REVIEW_FILE: &str = "sr-subpixel-result-review.png";
+const EXPORT_REVIEW_FILE: &str = "sr-subpixel-export-review.png";
+const RUNTIME_SAMPLE_WIDTH: u32 = 72;
+const RUNTIME_SAMPLE_HEIGHT: u32 = 48;
 
 #[test]
 fn private_decode_smoke_generates_sr_real_raw_report_when_enabled() {
@@ -150,6 +157,13 @@ fn run_private_sr_reconstruction_artifact_proof(private_root: &Path) -> Result<(
     reconstructed
         .save_with_format(&merge_output_file, ImageFormat::Tiff)
         .map_err(|error| error.to_string())?;
+    write_runtime_sample_and_review_artifacts(
+        &output_dir,
+        &loaded_sources,
+        &source_hashes,
+        &graph_revision_hash,
+        &reconstructed,
+    )?;
     write_json(&quality_file, &quality_metrics)?;
 
     let report = ComputationalMergePrivateRunReport {
@@ -226,6 +240,92 @@ struct SrRegistrationFrame {
     y_shift_px: u32,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SrRuntimeSample {
+    fixture_id: String,
+    frames: Vec<SrRuntimeSampleFrame>,
+    graph_revision_hash: String,
+    height: u32,
+    output_scale: u32,
+    width: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SrRuntimeSampleFrame {
+    content_hash: String,
+    graph_revision: String,
+    pixels: Vec<f64>,
+    shift_x: u32,
+    shift_y: u32,
+    source_index: usize,
+    source_path: String,
+}
+
+fn write_runtime_sample_and_review_artifacts(
+    output_dir: &Path,
+    loaded_sources: &[LoadedSource],
+    source_hashes: &[crate::private_decode_raw_proof::SourceHash],
+    graph_revision_hash: &str,
+    reconstructed: &DynamicImage,
+) -> Result<(), String> {
+    let frames = loaded_sources
+        .iter()
+        .zip(source_hashes.iter())
+        .enumerate()
+        .map(|(source_index, (source, source_hash))| {
+            let thumbnail = source
+                .image
+                .resize_exact(
+                    RUNTIME_SAMPLE_WIDTH,
+                    RUNTIME_SAMPLE_HEIGHT,
+                    imageops::FilterType::Triangle,
+                )
+                .to_rgb8();
+            SrRuntimeSampleFrame {
+                content_hash: source_hash.hash.clone(),
+                graph_revision: graph_revision_hash.to_string(),
+                pixels: luma_plane(&thumbnail, RUNTIME_SAMPLE_WIDTH, RUNTIME_SAMPLE_HEIGHT),
+                shift_x: (source_index % RECONSTRUCTION_SCALE as usize) as u32,
+                shift_y: (source_index / RECONSTRUCTION_SCALE as usize) as u32,
+                source_index,
+                source_path: source.relative_path.clone(),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    write_json(
+        &output_dir.join(RUNTIME_SAMPLE_FILE),
+        &SrRuntimeSample {
+            fixture_id: CONFIG.fixture_id.to_string(),
+            frames,
+            graph_revision_hash: graph_revision_hash.to_string(),
+            height: RUNTIME_SAMPLE_HEIGHT,
+            output_scale: RECONSTRUCTION_SCALE,
+            width: RUNTIME_SAMPLE_WIDTH,
+        },
+    )?;
+
+    let before = loaded_sources
+        .first()
+        .ok_or_else(|| "SR runtime sample requires at least one source".to_string())?
+        .image
+        .thumbnail(960, 640)
+        .to_rgb8();
+    let after = reconstructed.thumbnail(960, 640).to_rgb8();
+    write_png(&output_dir.join(MODAL_BEFORE_FILE), &before)?;
+    write_png(&output_dir.join(MODAL_AFTER_FILE), &after)?;
+    write_png(&output_dir.join(RESULT_REVIEW_FILE), &after)?;
+    write_png(&output_dir.join(EXPORT_REVIEW_FILE), &after)
+}
+
+fn write_png(path: &Path, image: &RgbImage) -> Result<(), String> {
+    DynamicImage::ImageRgb8(image.clone())
+        .save_with_format(path, ImageFormat::Png)
+        .map_err(|error| error.to_string())
+}
+
 fn validate_matching_dimensions(sources: &[LoadedSource]) -> Result<(), String> {
     let first = sources
         .first()
@@ -241,6 +341,18 @@ fn validate_matching_dimensions(sources: &[LoadedSource]) -> Result<(), String> 
         }
     }
     Ok(())
+}
+
+fn luma_plane(frame: &RgbImage, width: u32, height: u32) -> Vec<f64> {
+    let mut luma = vec![0.0; (width * height) as usize];
+    for y in 0..height {
+        for x in 0..width {
+            let Rgb([red, green, blue]) = *frame.get_pixel(x, y);
+            luma[(y * width + x) as usize] =
+                (0.2126 * red as f64 + 0.7152 * green as f64 + 0.0722 * blue as f64) / 255.0;
+        }
+    }
+    luma
 }
 
 fn reconstruct_sr_image(sources: &[LoadedSource], scale: u32) -> Result<DynamicImage, String> {
