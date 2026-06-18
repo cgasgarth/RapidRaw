@@ -140,6 +140,8 @@
     "check:raw-open-edit-export-private-report-collector": "bun scripts/collect-raw-open-edit-export-private-run-reports.ts --self-test",
     "check:raw-open-edit-export-private-proof-acceptance": "bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test",
     "check:raw-open-edit-export-run-reports": "bun scripts/check-raw-open-edit-export-run-reports.ts",
+    "check:raw-open-edit-export-runtime-status": "bun scripts/check-raw-open-edit-export-runtime-status.ts",
+    "check:raw-open-edit-export-runtime-status:update": "bun scripts/check-raw-open-edit-export-runtime-status.ts --update",
     "check:computational-merge-e2e-proof-manifest": "bun scripts/check-computational-merge-e2e-proof-manifest.ts",
     "check:computational-merge-source-sets": "bun scripts/check-computational-merge-source-sets.ts",
     "check:computational-merge-source-runtime-bridge": "bun scripts/check-computational-merge-source-runtime-bridge.ts",

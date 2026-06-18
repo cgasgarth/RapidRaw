@@ -1,0 +1,18 @@
+{
+  "checks": [
+    "bun run check:raw-open-edit-export-proof",
+    "bun run check:raw-open-edit-export-command-wrapper",
+    "bun run check:raw-open-edit-export-run-reports"
+  ],
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1376,
+  "proofHash": "8dc9d7989795f70afe1e9f7fb761b0a451af0139ccbc26e5e77ad91ef4b78ef7",
+  "schemaVersion": 1,
+  "status": "public_contract_private_assets_pending",
+  "summary": {
+    "commandWrapperTyped": true,
+    "manifestProofCases": 1,
+    "privateRunReports": 0,
+    "runtimeStatusForHtmlReview": "Public repo has typed command and manifest checks; private RAW artifacts remain required before #1376 can close."
+  }
+}

@@ -35,6 +35,8 @@ The RAW open/edit/export proof path currently separates:
 - `check:raw-open-edit-export-private-report-collector`: local private report collection.
 - `check:raw-open-edit-export-private-proof-acceptance`: public-safe acceptance helper.
 - `check:raw-open-edit-export-run-reports`: report/manifest consistency.
+- `check:raw-open-edit-export-runtime-status`: compact status report for #1376
+  and the final HTML review page.
 
 These checks are necessary but not individually sufficient to close #1376. That
 issue closes only when private RAW execution reports are accepted and the review
