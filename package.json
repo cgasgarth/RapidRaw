@@ -216,6 +216,8 @@
     "check:sr-synthetic-smoke": "bun scripts/check-super-resolution-synthetic-smoke.ts",
     "check:sr-alignment-detail-proof": "bun scripts/check-super-resolution-alignment-detail-proof.ts",
     "check:sr-alignment-detail-proof:update": "bun scripts/check-super-resolution-alignment-detail-proof.ts --update",
+    "check:sr-artifact-performance-proof": "bun scripts/check-super-resolution-artifact-performance-proof.ts",
+    "check:sr-artifact-performance-proof:update": "bun scripts/check-super-resolution-artifact-performance-proof.ts --update",
     "check:sr-ui-api": "bun scripts/check-sr-ui-api.ts",
     "check:sr-ui-runtime-bridge": "bun scripts/check-sr-ui-runtime-bridge.ts",
     "check:sr-review-diagnostics": "bun scripts/check-sr-review-diagnostics.ts",
