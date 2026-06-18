@@ -359,6 +359,10 @@
           "path": "docs/detail/deblur-implementation-decision-2026-06-18.md"
         },
         {
+          "title": "AI denoise path decision",
+          "path": "docs/detail/ai-denoise-path-decision-2026-06-18.md"
+        },
+        {
           "title": "Wavelet detail control model",
           "path": "docs/detail/wavelet-detail-control-model-2026-06-18.md"
         },
