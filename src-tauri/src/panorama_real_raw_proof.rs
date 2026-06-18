@@ -47,8 +47,11 @@ const ALIGNMENT_NON_CLAIMS: [&str; 5] = [
 const ALIGNMENT_REPORT_FILE: &str = "panorama-overlap-alignment.json";
 const STITCH_REPORT_FILE: &str = "panorama-overlap-stitch-report.json";
 const STITCH_OUTPUT_FILE: &str = "panorama-overlap-merge.tiff";
+const PREVIEW_OUTPUT_FILE: &str = "panorama-overlap-preview.png";
+const EXPORT_OUTPUT_FILE: &str = "panorama-overlap-export.tiff";
 const MIN_ALIGNMENT_INLIER_RATIO: f64 = 0.55;
 const MAX_MEAN_REPROJECTION_ERROR_PX: f64 = 5.0;
+const MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA: f64 = 0.015;
 
 const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
     decode_report_file: "panorama-overlap-decode-report.json",
@@ -121,6 +124,25 @@ fn private_stitch_artifact_smoke_generates_panorama_real_raw_report_when_enabled
     );
     run_private_stitch_artifact_proof(&private_root)
         .expect("private panorama real RAW stitch artifact proof runs");
+}
+
+#[test]
+fn private_preview_export_smoke_generates_panorama_real_raw_report_when_enabled() {
+    if std::env::var("RAWENGINE_RUN_PRIVATE_PANORAMA_REAL_RAW_PREVIEW_EXPORT_PROOF")
+        .ok()
+        .as_deref()
+        != Some("1")
+    {
+        eprintln!("skipping private panorama real RAW preview/export smoke");
+        return;
+    }
+
+    let private_root = PathBuf::from(
+        std::env::var("RAWENGINE_PRIVATE_RAW_ROOT")
+            .unwrap_or_else(|_| "/tmp/rawengine-private-root".to_string()),
+    );
+    run_private_preview_export_proof(&private_root)
+        .expect("private panorama real RAW preview/export proof runs");
 }
 
 #[derive(Serialize)]
@@ -332,6 +354,127 @@ fn run_private_stitch_artifact_proof(private_root: &Path) -> Result<(), String> 
                 graph_revision_hash,
                 implementation_issue: CONFIG.implementation_issue,
                 notes: "Private RAF panorama stitch artifact smoke. This proves production RAW decode plus the legacy RapidRaw homography/seam stitch engine can emit a private panorama artifact with source coverage and diagnostics. It does not claim app-server apply, preview/export parity, or UI review.".to_string(),
+                quality_metrics: metrics,
+                report_id: CONFIG.report_id.to_string(),
+                run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
+                screenshot_artifacts: vec![],
+                source_hashes,
+                ui_issue: CONFIG.ui_issue,
+            }],
+            schema_version: 1,
+            snapshot_date: Utc::now().format("%Y-%m-%d").to_string(),
+            validation_mode: "public_schema_private_reports".to_string(),
+        },
+    )
+}
+
+fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
+    let loaded_sources = load_sources(private_root, &CONFIG)?;
+    validate_decoded_sources(&loaded_sources, &CONFIG)?;
+    let source_hashes = source_hashes(private_root, &CONFIG)?;
+    let graph_revision_hash = graph_revision_hash(CONFIG.fixture_id, &source_hashes);
+    let output_dir = private_root.join(ARTIFACT_ROOT);
+    fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
+
+    let alignment_report = build_alignment_report(&loaded_sources, &graph_revision_hash)?;
+    let render_result = render_private_panorama(private_root)?;
+    let stitch_output_path = output_dir.join(STITCH_OUTPUT_FILE);
+    let preview_output_path = output_dir.join(PREVIEW_OUTPUT_FILE);
+    let export_output_path = output_dir.join(EXPORT_OUTPUT_FILE);
+
+    render_result
+        .image
+        .save_with_format(&stitch_output_path, ImageFormat::Tiff)
+        .map_err(|error| error.to_string())?;
+    render_result
+        .image
+        .save_with_format(&export_output_path, ImageFormat::Tiff)
+        .map_err(|error| error.to_string())?;
+    let preview_image = render_result.image.thumbnail(800, 800).to_rgb8();
+    preview_image
+        .save_with_format(&preview_output_path, ImageFormat::Png)
+        .map_err(|error| error.to_string())?;
+
+    let export_preview = render_result
+        .image
+        .thumbnail(preview_image.width(), preview_image.height())
+        .to_rgb8();
+    let preview_export_mean_abs_delta = mean_abs_delta_rgb8(&preview_image, &export_preview)?;
+    let stitch_report = build_stitch_report(&render_result, &graph_revision_hash);
+    let metrics = [
+        build_metrics(&loaded_sources, CONFIG.metric_source_count),
+        build_alignment_metrics(&alignment_report, loaded_sources.len()),
+        build_stitch_metrics(&render_result, loaded_sources.len()),
+        vec![metric(
+            "previewExportMeanAbsDelta",
+            preview_export_mean_abs_delta,
+            MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA,
+            preview_export_mean_abs_delta <= MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA,
+        )],
+    ]
+    .concat();
+    if !metrics.iter().all(|metric| metric.passed) {
+        return Err("panorama private RAW preview/export metrics did not pass".to_string());
+    }
+
+    write_decode_report(
+        &output_dir,
+        &loaded_sources,
+        &source_hashes,
+        &graph_revision_hash,
+    )?;
+    write_json(&output_dir.join(ALIGNMENT_REPORT_FILE), &alignment_report)?;
+    write_json(&output_dir.join(STITCH_REPORT_FILE), &stitch_report)?;
+    write_json(&output_dir.join(CONFIG.quality_file), &metrics)?;
+
+    write_json(
+        &output_dir.join(CONFIG.report_file),
+        &ComputationalMergePrivateRunReportCollection {
+            schema_url:
+                "https://rawengine.dev/schemas/computational-merge-private-run-reports-v1.json"
+                    .to_string(),
+            issue: 1817,
+            reports: vec![ComputationalMergePrivateRunReport {
+                acceptance_status: "private_preview_export_smoke".to_string(),
+                artifacts: vec![
+                    artifact(private_root, "source_raw_sequence_private", CONFIG.source_dir)?,
+                    artifact(
+                        private_root,
+                        "decode_report_private",
+                        &format!("{ARTIFACT_ROOT}/{}", CONFIG.decode_report_file),
+                    )?,
+                    artifact(
+                        private_root,
+                        "alignment_report_private",
+                        &format!("{ARTIFACT_ROOT}/{ALIGNMENT_REPORT_FILE}"),
+                    )?,
+                    artifact(
+                        private_root,
+                        "merge_output_private",
+                        &format!("{ARTIFACT_ROOT}/{STITCH_OUTPUT_FILE}"),
+                    )?,
+                    artifact(
+                        private_root,
+                        "preview_after_private",
+                        &format!("{ARTIFACT_ROOT}/{PREVIEW_OUTPUT_FILE}"),
+                    )?,
+                    artifact(
+                        private_root,
+                        "export_after_private",
+                        &format!("{ARTIFACT_ROOT}/{EXPORT_OUTPUT_FILE}"),
+                    )?,
+                    artifact(
+                        private_root,
+                        "quality_report_private",
+                        &format!("{ARTIFACT_ROOT}/{}", CONFIG.quality_file),
+                    )?,
+                ],
+                feature_family: CONFIG.feature_family.to_string(),
+                fixture_id: CONFIG.fixture_id.to_string(),
+                generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+                graph_revision_hash,
+                implementation_issue: CONFIG.implementation_issue,
+                notes: "Private RAF panorama preview/export smoke. This proves production RAW decode, stitch artifact generation, private preview and export artifacts, and preview/export pixel parity. It does not claim UI review or final user-visible E2E acceptance.".to_string(),
                 quality_metrics: metrics,
                 report_id: CONFIG.report_id.to_string(),
                 run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
@@ -658,6 +801,31 @@ fn build_stitch_metrics(
             pairwise_match_count >= expected_pair_count,
         ),
     ]
+}
+
+fn mean_abs_delta_rgb8(left: &image::RgbImage, right: &image::RgbImage) -> Result<f64, String> {
+    if left.dimensions() != right.dimensions() {
+        return Err("preview/export comparison dimensions differ".to_string());
+    }
+    let channel_count = (left.width() as u64 * left.height() as u64 * 3) as f64;
+    if channel_count == 0.0 {
+        return Err("preview/export comparison image is empty".to_string());
+    }
+    let sum = left
+        .pixels()
+        .zip(right.pixels())
+        .map(|(left_pixel, right_pixel)| {
+            left_pixel
+                .0
+                .iter()
+                .zip(right_pixel.0.iter())
+                .map(|(left_channel, right_channel)| {
+                    (*left_channel as f64 - *right_channel as f64).abs() / 255.0
+                })
+                .sum::<f64>()
+        })
+        .sum::<f64>();
+    Ok(sum / channel_count)
 }
 
 fn mean_reprojection_error(

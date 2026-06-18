@@ -14,15 +14,15 @@ await runComputationalPrivateProof({
       '--no-default-features',
       '--features',
       'required-ci,tauri-test',
-      'panorama_real_raw_proof::private_stitch_artifact_smoke_generates_panorama_real_raw_report_when_enabled',
+      'panorama_real_raw_proof::private_preview_export_smoke_generates_panorama_real_raw_report_when_enabled',
       '--',
       '--nocapture',
     ],
     cwd: 'src-tauri',
     env: {
-      RAWENGINE_RUN_PRIVATE_PANORAMA_REAL_RAW_STITCH_PROOF: '1',
+      RAWENGINE_RUN_PRIVATE_PANORAMA_REAL_RAW_PREVIEW_EXPORT_PROOF: '1',
     },
-    label: 'panorama real RAW Rust stitch proof',
+    label: 'panorama real RAW Rust preview/export proof',
   },
   proofChecks: [
     ['bun', 'run', 'check:panorama-runtime-plan-smoke'],

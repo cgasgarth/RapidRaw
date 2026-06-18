@@ -78,12 +78,16 @@ for (const report of reportCollection.reports) {
     report.acceptanceStatus === 'private_alignment_smoke' && report.featureFamily === 'panorama_stitch';
   const stitchArtifactSmoke =
     report.acceptanceStatus === 'private_stitch_artifact_smoke' && report.featureFamily === 'panorama_stitch';
+  const previewExportSmoke =
+    report.acceptanceStatus === 'private_preview_export_smoke' && report.featureFamily === 'panorama_stitch';
   if (decodeSmoke) {
     verifyDecodeSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else if (alignmentSmoke) {
     verifyAlignmentSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else if (stitchArtifactSmoke) {
     verifyStitchArtifactSmokeReport(report, proofCase.localSourceRelativePaths.length);
+  } else if (previewExportSmoke) {
+    verifyPreviewExportSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else {
     for (const artifact of report.artifacts) {
       const manifestArtifact = manifestArtifacts.get(artifact.kind);
@@ -311,6 +315,7 @@ function verifyAlignmentSmokeReport(
 function verifyStitchArtifactSmokeReport(
   report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
   expectedSourceCount: number,
+  options: { allowPreviewExport?: boolean } = {},
 ): void {
   const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
   for (const requiredKind of [
@@ -325,6 +330,7 @@ function verifyStitchArtifactSmokeReport(
     }
   }
   for (const forbiddenKind of ['preview_after_private', 'export_after_private']) {
+    if (options.allowPreviewExport === true) continue;
     if (artifactKinds.has(forbiddenKind)) {
       failures.push(`${report.fixtureId}: stitch artifact smoke must not claim ${forbiddenKind}.`);
     }
@@ -358,6 +364,27 @@ function verifyStitchArtifactSmokeReport(
     failures.push(
       `${report.fixtureId}: stitch artifact smoke must prove pairwise match count >= ${expectedPairCount}.`,
     );
+  }
+}
+
+function verifyPreviewExportSmokeReport(
+  report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
+  expectedSourceCount: number,
+): void {
+  verifyStitchArtifactSmokeReport(report, expectedSourceCount, { allowPreviewExport: true });
+  const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
+  for (const requiredKind of ['preview_after_private', 'export_after_private']) {
+    if (!artifactKinds.has(requiredKind)) {
+      failures.push(`${report.fixtureId}: preview/export smoke missing ${requiredKind}.`);
+    }
+  }
+
+  const previewExportParity = report.qualityMetrics.find((metric) => metric.name === 'previewExportMeanAbsDelta');
+  if (
+    previewExportParity === undefined ||
+    !metricPassesThreshold(previewExportParity.name, previewExportParity.value, previewExportParity.threshold)
+  ) {
+    failures.push(`${report.fixtureId}: preview/export smoke must prove previewExportMeanAbsDelta threshold.`);
   }
 }
 

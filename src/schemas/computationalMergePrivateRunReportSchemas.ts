@@ -98,6 +98,7 @@ const privateRunReportSchema = z
       'private_decode_smoke',
       'private_alignment_smoke',
       'private_stitch_artifact_smoke',
+      'private_preview_export_smoke',
       'runtime_apply_capable',
       'passed_private_raw_e2e',
     ]),
@@ -153,6 +154,15 @@ const privateRunReportSchema = z
       'quality_report_private',
     ] as const;
     const forbiddenStitchArtifacts = ['preview_after_private', 'export_after_private'] as const;
+    const requiredPreviewExportArtifacts = [
+      'source_raw_sequence_private',
+      'decode_report_private',
+      'alignment_report_private',
+      'merge_output_private',
+      'preview_after_private',
+      'export_after_private',
+      'quality_report_private',
+    ] as const;
     if (
       report.acceptanceStatus === 'private_decode_smoke' &&
       (report.featureFamily === 'panorama_stitch' ||
@@ -214,6 +224,19 @@ const privateRunReportSchema = z
           context.addIssue({
             code: 'custom',
             message: `Private stitch artifact smoke report must not claim ${artifactKind}.`,
+            path: ['artifacts'],
+          });
+        }
+      }
+    } else if (
+      report.acceptanceStatus === 'private_preview_export_smoke' &&
+      report.featureFamily === 'panorama_stitch'
+    ) {
+      for (const artifactKind of requiredPreviewExportArtifacts) {
+        if (!artifactKinds.includes(artifactKind)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Private preview/export smoke report requires ${artifactKind}.`,
             path: ['artifacts'],
           });
         }
