@@ -2,6 +2,13 @@ import type { MaskContainer } from './adjustments';
 
 export type LayerStackMoveDirection = 'down' | 'up';
 
+export interface LayerGroupSummary {
+  id: string;
+  layerCount: number;
+  layerIds: Array<string>;
+  name: string;
+}
+
 export interface LayerRenderPlanItem {
   adjustmentKeys: Array<string>;
   layerId: string;
@@ -93,6 +100,103 @@ export function moveLayer(
   return nextLayers;
 }
 
+export function canGroupLayerWithNext(layers: Array<MaskContainer>, layerId: string): boolean {
+  const index = layers.findIndex((layer) => layer.id === layerId);
+  if (index < 0 || index >= layers.length - 1) return false;
+
+  const layer = layers[index];
+  const nextLayer = layers[index + 1];
+  if (!layer || !nextLayer) return false;
+
+  return layer.layerGroupId === undefined && nextLayer.layerGroupId === undefined;
+}
+
+export function groupLayerWithNext(
+  layers: Array<MaskContainer>,
+  layerId: string,
+  groupId: string,
+  groupName: string,
+): Array<MaskContainer> {
+  if (!canGroupLayerWithNext(layers, layerId)) {
+    throw new LayerStackOperationError(
+      'Layer groups support one flat adjacent pair; nested and non-adjacent groups are blocked.',
+    );
+  }
+
+  const sourceIndex = findLayerIndex(layers, layerId);
+  const groupedIds = new Set([layers[sourceIndex]?.id, layers[sourceIndex + 1]?.id]);
+  return layers.map((layer) =>
+    groupedIds.has(layer.id) ? { ...layer, layerGroupId: groupId, layerGroupName: groupName } : layer,
+  );
+}
+
+export function ungroupLayerGroup(layers: Array<MaskContainer>, groupId: string): Array<MaskContainer> {
+  if (!layers.some((layer) => layer.layerGroupId === groupId)) {
+    throw new LayerStackOperationError(`Layer group ${groupId} does not exist.`);
+  }
+
+  return layers.map(({ layerGroupId, layerGroupName, ...layer }) =>
+    layerGroupId === groupId ? layer : { ...layer, ...groupFields(layerGroupId, layerGroupName) },
+  );
+}
+
+export function moveLayerGroup(
+  layers: Array<MaskContainer>,
+  groupId: string,
+  direction: LayerStackMoveDirection,
+): Array<MaskContainer> {
+  const groupIndexes = layers
+    .map((layer, index) => (layer.layerGroupId === groupId ? index : -1))
+    .filter((index) => index >= 0);
+  if (groupIndexes.length === 0) {
+    throw new LayerStackOperationError(`Layer group ${groupId} does not exist.`);
+  }
+
+  const startIndex = groupIndexes[0];
+  const endIndex = groupIndexes.at(-1);
+  if (startIndex === undefined || endIndex === undefined) {
+    throw new LayerStackOperationError(`Layer group ${groupId} does not exist.`);
+  }
+
+  if (direction === 'up') {
+    if (startIndex === 0) return layers;
+    const previousGroupId = layers[startIndex - 1]?.layerGroupId;
+    const insertIndex = previousGroupId
+      ? layers.findIndex((layer) => layer.layerGroupId === previousGroupId)
+      : startIndex - 1;
+    return moveLayerBlock(layers, startIndex, endIndex, insertIndex);
+  }
+
+  if (endIndex >= layers.length - 1) return layers;
+  const nextGroupId = layers[endIndex + 1]?.layerGroupId;
+  const insertIndex = nextGroupId
+    ? layers.findLastIndex((layer) => layer.layerGroupId === nextGroupId) + 1
+    : endIndex + 2;
+  return moveLayerBlock(layers, startIndex, endIndex, insertIndex);
+}
+
+export function buildLayerGroupSummaries(layers: Array<MaskContainer>): Array<LayerGroupSummary> {
+  const groups = new Map<string, LayerGroupSummary>();
+  for (const layer of layers) {
+    if (!layer.layerGroupId) continue;
+    const existing = groups.get(layer.layerGroupId);
+    if (existing) {
+      existing.layerCount += 1;
+      existing.layerIds.push(layer.id);
+      continue;
+    }
+
+    groups.set(layer.layerGroupId, {
+      id: layer.layerGroupId,
+      layerCount: 1,
+      layerIds: [layer.id],
+      name: layer.layerGroupName?.trim() || 'Layer Group',
+    });
+  }
+
+  return [...groups.values()];
+}
+
 export function buildLayerRenderPlan(layers: Array<MaskContainer>): Array<LayerRenderPlanItem> {
   return layers
     .filter((layer) => layer.visible && clampLayerOpacity(layer.opacity) > 0)
@@ -112,4 +216,21 @@ export function buildLayerRenderPlan(layers: Array<MaskContainer>): Array<LayerR
         subMaskCount: layer.subMasks.length,
       };
     });
+}
+
+function groupFields(layerGroupId: string | undefined, layerGroupName: string | undefined) {
+  return layerGroupId === undefined ? {} : { layerGroupId, layerGroupName };
+}
+
+function moveLayerBlock(
+  layers: Array<MaskContainer>,
+  startIndex: number,
+  endIndex: number,
+  insertIndex: number,
+): Array<MaskContainer> {
+  const nextLayers = [...layers];
+  const block = nextLayers.splice(startIndex, endIndex - startIndex + 1);
+  const adjustedInsertIndex = insertIndex > startIndex ? insertIndex - block.length : insertIndex;
+  nextLayers.splice(adjustedInsertIndex, 0, ...block);
+  return nextLayers;
 }

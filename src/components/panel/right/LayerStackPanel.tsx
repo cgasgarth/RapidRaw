@@ -1,10 +1,34 @@
 import cx from 'clsx';
-import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, Layers3, Plus, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  Copy,
+  Eye,
+  EyeOff,
+  FolderOpen,
+  FolderPlus,
+  GripVertical,
+  Layers3,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { deleteLayer, duplicateLayer, moveLayer, setLayerOpacity, setLayerVisibility } from '../../../utils/layerStack';
+import {
+  buildLayerGroupSummaries,
+  canGroupLayerWithNext,
+  deleteLayer,
+  duplicateLayer,
+  groupLayerWithNext,
+  moveLayer,
+  moveLayerGroup,
+  setLayerOpacity,
+  setLayerVisibility,
+  ungroupLayerGroup,
+} from '../../../utils/layerStack';
 import Slider, { type SliderChangeEvent } from '../../ui/Slider';
 import UiText from '../../ui/Text';
 
@@ -19,8 +43,12 @@ interface LayerStackPanelProps {
 
 interface LayerRowModel {
   blendMode: string;
+  groupId: string | null;
+  groupLayerCount: number;
   id: string;
   isBase: boolean;
+  isGroupHeader: boolean;
+  isGroupedLayer: boolean;
   maskCount: number;
   name: string;
   opacity: number;
@@ -40,28 +68,65 @@ const blendModes = [
 ] as const;
 
 function getLayerRows(masks: Array<MaskContainer>): Array<LayerRowModel> {
-  const localLayers = masks.map((mask, index) => ({
-    blendMode: 'Normal',
-    id: mask.id,
-    isBase: false,
-    maskCount: mask.subMasks.length,
-    name: mask.name.trim() || `Layer ${String(index + 1)}`,
-    opacity: mask.opacity,
-    visible: mask.visible,
-  }));
+  const groupSummaries = buildLayerGroupSummaries(masks);
+  const rows: Array<LayerRowModel> = [];
+  const emittedGroupIds = new Set<string>();
+
+  masks.forEach((mask, index) => {
+    if (mask.layerGroupId && !emittedGroupIds.has(mask.layerGroupId)) {
+      const groupSummary = groupSummaries.find((group) => group.id === mask.layerGroupId);
+      emittedGroupIds.add(mask.layerGroupId);
+      rows.push({
+        blendMode: 'Folder',
+        groupId: mask.layerGroupId,
+        groupLayerCount: groupSummary?.layerCount ?? 1,
+        id: `group:${mask.layerGroupId}`,
+        isBase: false,
+        isGroupHeader: true,
+        isGroupedLayer: false,
+        maskCount: groupSummary?.layerIds.length ?? 1,
+        name: groupSummary?.name ?? tFallbackLayerGroupName(),
+        opacity: 100,
+        visible:
+          groupSummary?.layerIds.every((layerId) => masks.find((layer) => layer.id === layerId)?.visible) ?? true,
+      });
+    }
+
+    rows.push({
+      blendMode: 'Normal',
+      groupId: mask.layerGroupId ?? null,
+      groupLayerCount: 0,
+      id: mask.id,
+      isBase: false,
+      isGroupHeader: false,
+      isGroupedLayer: mask.layerGroupId !== undefined,
+      maskCount: mask.subMasks.length,
+      name: mask.name.trim() || `Layer ${String(index + 1)}`,
+      opacity: mask.opacity,
+      visible: mask.visible,
+    });
+  });
 
   return [
-    ...localLayers,
+    ...rows,
     {
       blendMode: 'Normal',
+      groupId: null,
+      groupLayerCount: 0,
       id: BASE_LAYER_ID,
       isBase: true,
+      isGroupHeader: false,
+      isGroupedLayer: false,
       maskCount: 0,
       name: 'Base RAW',
       opacity: 100,
       visible: true,
     },
   ];
+}
+
+function tFallbackLayerGroupName(): string {
+  return 'Layer Group';
 }
 
 export default function LayerStackPanel({
@@ -77,13 +142,25 @@ export default function LayerStackPanel({
 
   const activeRow = rows.find((row) => row.id === selectedLayerId) ?? rows[0];
   const isBaseSelected = activeRow?.isBase ?? true;
+  const isGroupHeaderSelected = activeRow?.isGroupHeader ?? false;
   const activeMaskIndex = activeRow && !activeRow.isBase ? masks.findIndex((mask) => mask.id === activeRow.id) : -1;
-  const canMoveActiveLayerUp = activeMaskIndex > 0;
-  const canMoveActiveLayerDown = activeMaskIndex >= 0 && activeMaskIndex < masks.length - 1;
+  const activeGroupId = activeRow?.groupId ?? null;
+  const canMoveActiveLayerUp = isGroupHeaderSelected
+    ? masks.findIndex((mask) => mask.layerGroupId === activeGroupId) > 0
+    : activeMaskIndex > 0 && activeRow?.isGroupedLayer !== true;
+  const canMoveActiveLayerDown = isGroupHeaderSelected
+    ? masks.findLastIndex((mask) => mask.layerGroupId === activeGroupId) < masks.length - 1
+    : activeMaskIndex >= 0 && activeMaskIndex < masks.length - 1 && activeRow?.isGroupedLayer !== true;
+  const canGroupActiveLayer =
+    activeRow !== undefined &&
+    !activeRow.isBase &&
+    !activeRow.isGroupHeader &&
+    canGroupLayerWithNext(masks, activeRow.id);
+  const canUngroupActiveLayer = activeGroupId !== null;
 
   const selectRow = (row: LayerRowModel) => {
     setLocalSelectedLayerId(row.id);
-    onSelectMaskContainer(row.isBase ? null : row.id);
+    onSelectMaskContainer(row.isBase || row.isGroupHeader ? null : row.id);
   };
   const handleRowKeyDown = (event: KeyboardEvent<HTMLDivElement>, row: LayerRowModel) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -100,12 +177,33 @@ export default function LayerStackPanel({
   const updateLayerVisibility = (layerId: string, visible: boolean) => {
     applyLayerStack(setLayerVisibility(masks, layerId, visible), layerId);
   };
+  const updateGroupVisibility = (groupId: string, visible: boolean) => {
+    const nextMasks = masks.map((mask) => (mask.layerGroupId === groupId ? { ...mask, visible } : mask));
+    applyLayerStack(nextMasks, `group:${groupId}`);
+  };
   const updateLayerOpacity = (layerId: string, opacity: number) => {
     applyLayerStack(setLayerOpacity(masks, layerId, opacity), layerId);
   };
   const moveActiveLayer = (direction: 'down' | 'up') => {
     if (!activeRow || activeRow.isBase) return;
+    if (activeRow.isGroupHeader && activeRow.groupId) {
+      applyLayerStack(moveLayerGroup(masks, activeRow.groupId, direction), activeRow.id);
+      return;
+    }
+    if (activeRow.isGroupedLayer) return;
     applyLayerStack(moveLayer(masks, activeRow.id, direction), activeRow.id);
+  };
+  const groupActiveLayer = () => {
+    if (!activeRow || activeRow.isBase || activeRow.isGroupHeader || !canGroupActiveLayer) return;
+    const groupId = crypto.randomUUID();
+    applyLayerStack(
+      groupLayerWithNext(masks, activeRow.id, groupId, t('editor.layers.defaultGroupName')),
+      `group:${groupId}`,
+    );
+  };
+  const ungroupActiveLayer = () => {
+    if (!activeGroupId) return;
+    applyLayerStack(ungroupLayerGroup(masks, activeGroupId), BASE_LAYER_ID);
   };
   const duplicateActiveLayer = () => {
     if (!activeRow || activeRow.isBase) return;
@@ -129,14 +227,25 @@ export default function LayerStackPanel({
             {t('editor.layers.title')}
           </UiText>
         </div>
-        <button
-          className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
-          data-tooltip="Create adjustment layer"
-          disabled
-          type="button"
-        >
-          <Plus size={17} className="mx-auto" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            data-tooltip={t('editor.layers.actions.groupWithNext')}
+            disabled={!canGroupActiveLayer}
+            onClick={groupActiveLayer}
+            type="button"
+          >
+            <FolderPlus size={17} className="mx-auto" />
+          </button>
+          <button
+            className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+            data-tooltip="Create adjustment layer"
+            disabled
+            type="button"
+          >
+            <Plus size={17} className="mx-auto" />
+          </button>
+        </div>
       </div>
 
       <div className="px-3 pb-3 space-y-1">
@@ -151,6 +260,7 @@ export default function LayerStackPanel({
                 isSelected
                   ? 'bg-surface text-text-primary'
                   : 'text-text-secondary hover:bg-surface/70 hover:text-text-primary',
+                row.isGroupedLayer && 'ml-6 w-[calc(100%-1.5rem)] border-l border-surface/80 pl-3',
               )}
               onClick={() => {
                 selectRow(row);
@@ -161,9 +271,12 @@ export default function LayerStackPanel({
               role="button"
               tabIndex={0}
             >
-              <GripVertical size={15} className={row.isBase ? 'text-transparent' : 'text-text-secondary'} />
+              <GripVertical
+                size={15}
+                className={row.isBase || row.isGroupedLayer ? 'text-transparent' : 'text-text-secondary'}
+              />
               <span className="flex h-7 w-7 items-center justify-center rounded bg-bg-primary text-text-secondary ring-1 ring-surface">
-                <Layers3 size={15} />
+                {row.isGroupHeader ? <FolderOpen size={15} /> : <Layers3 size={15} />}
               </span>
               <span className="min-w-0">
                 <UiText as="span" variant={TextVariants.body} weight={TextWeights.medium} className="block truncate">
@@ -172,7 +285,9 @@ export default function LayerStackPanel({
                 <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block truncate">
                   {t('editor.layers.rowSummary', {
                     blendMode: row.blendMode,
-                    maskCount: getMaskCountLabel(row.maskCount),
+                    maskCount: row.isGroupHeader
+                      ? t('editor.layers.groupCount', { count: row.groupLayerCount })
+                      : getMaskCountLabel(row.maskCount),
                     opacity: row.opacity,
                   })}
                 </UiText>
@@ -184,7 +299,11 @@ export default function LayerStackPanel({
                   onClick={(event) => {
                     event.stopPropagation();
                     if (!row.isBase) {
-                      updateLayerVisibility(row.id, !row.visible);
+                      if (row.isGroupHeader && row.groupId) {
+                        updateGroupVisibility(row.groupId, !row.visible);
+                      } else {
+                        updateLayerVisibility(row.id, !row.visible);
+                      }
                     }
                   }}
                   disabled={row.isBase}
@@ -226,13 +345,13 @@ export default function LayerStackPanel({
 
           <Slider
             defaultValue={100}
-            disabled={isBaseSelected}
+            disabled={isBaseSelected || isGroupHeaderSelected}
             fillOrigin="min"
             label={t('editor.masks.settings.opacity')}
             max={100}
             min={0}
             onChange={(event: SliderChangeEvent) => {
-              if (!activeRow.isBase) {
+              if (!activeRow.isBase && !activeRow.isGroupHeader) {
                 updateLayerOpacity(activeRow.id, Number(event.target.value));
               }
             }}
@@ -266,7 +385,7 @@ export default function LayerStackPanel({
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
               data-tooltip={t('editor.layers.actions.duplicate')}
-              disabled={isBaseSelected}
+              disabled={isBaseSelected || isGroupHeaderSelected}
               onClick={duplicateActiveLayer}
               type="button"
             >
@@ -274,8 +393,17 @@ export default function LayerStackPanel({
             </button>
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+              data-tooltip={t('editor.layers.actions.ungroup')}
+              disabled={!canUngroupActiveLayer}
+              onClick={ungroupActiveLayer}
+              type="button"
+            >
+              <FolderOpen size={16} className="mx-auto" />
+            </button>
+            <button
+              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
               data-tooltip={t('editor.layers.actions.delete')}
-              disabled={isBaseSelected}
+              disabled={isBaseSelected || isGroupHeaderSelected}
               onClick={deleteActiveLayer}
               type="button"
             >
