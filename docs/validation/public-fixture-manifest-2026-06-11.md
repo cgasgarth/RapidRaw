@@ -57,8 +57,9 @@ Future PRs that add or activate manifest entries should keep these rules:
 The `real.detail.high-iso-skin-shadow.v0` entry now records a candidate Pixls
 Play Raw high-ISO ARW source for future AI denoise quality review. It stays
 `planned`, private-CI-only, and payload-free because #1267 still needs exact
-asset hash, size, attribution, derivative-output policy, and reviewer sign-off
-before it can become executable proof.
+attribution, derivative-output policy, and reviewer sign-off before it can
+become executable proof. The manifest records the current source URL, byte size,
+and SHA-256 so later activation can fail closed if the upstream bytes change.
 
 ## Known Gaps
 
