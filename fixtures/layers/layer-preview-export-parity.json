@@ -5,12 +5,13 @@
       "id": "layers.synthetic.preview-export-parity.v1",
       "width": 3,
       "height": 2,
-      "expectedPreviewExportHash": "sha256:5068e8c209d65ab45519266cc864c247f85ca30d28b224d96d185fd73e66538d",
+      "expectedPreviewExportHash": "sha256:62b1a1a3b49900f19fe56696a457b5a35cdb1588bf0636af604b36d57745756e",
       "expectedCoverageByLayer": [
         { "id": "tone-normal", "opacity": 0.25, "touchedPixels": 6 },
         { "id": "shadow-multiply", "opacity": 0.55, "touchedPixels": 5 },
         { "id": "highlight-screen", "opacity": 0.35, "touchedPixels": 5 },
-        { "id": "contrast-overlay", "opacity": 0.4, "touchedPixels": 6 }
+        { "id": "contrast-overlay", "opacity": 0.4, "touchedPixels": 6 },
+        { "id": "skin-soft-light", "opacity": 0.3, "touchedPixels": 6 }
       ],
       "basePixels": [
         { "r": 64, "g": 72, "b": 80 },
@@ -82,6 +83,21 @@
             { "r": 192, "g": 184, "b": 176 },
             { "r": 216, "g": 208, "b": 200 }
           ]
+        },
+        {
+          "id": "skin-soft-light",
+          "name": "Skin soft light",
+          "blendMode": "soft_light",
+          "opacity": 0.3,
+          "visible": true,
+          "pixels": [
+            { "r": 132, "g": 118, "b": 104 },
+            { "r": 148, "g": 130, "b": 112 },
+            { "r": 164, "g": 142, "b": 120 },
+            { "r": 180, "g": 154, "b": 128 },
+            { "r": 196, "g": 166, "b": 136 },
+            { "r": 212, "g": 178, "b": 144 }
+          ]
         }
       ],
       "sidecarLayerStack": {
@@ -93,7 +109,14 @@
           { "id": "tone-normal", "blendMode": "normal", "opacity": 0.25, "visible": true, "maskPersisted": false },
           { "id": "shadow-multiply", "blendMode": "multiply", "opacity": 0.55, "visible": true, "maskPersisted": true },
           { "id": "highlight-screen", "blendMode": "screen", "opacity": 0.35, "visible": true, "maskPersisted": true },
-          { "id": "contrast-overlay", "blendMode": "overlay", "opacity": 0.4, "visible": true, "maskPersisted": false }
+          { "id": "contrast-overlay", "blendMode": "overlay", "opacity": 0.4, "visible": true, "maskPersisted": false },
+          {
+            "id": "skin-soft-light",
+            "blendMode": "soft_light",
+            "opacity": 0.3,
+            "visible": true,
+            "maskPersisted": false
+          }
         ]
       }
     }
