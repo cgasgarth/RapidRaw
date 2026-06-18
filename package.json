@@ -292,6 +292,7 @@
     "check:negative-lab-agent-workflow": "bun scripts/check-negative-lab-agent-workflow.ts",
     "check:computational-merge-private-run-reports": "bun scripts/check-computational-merge-private-run-reports.ts",
     "check:computational-private-report-checker-negative-cases": "bun scripts/check-computational-private-report-checker-negative-cases.ts",
+    "check:computational-private-proof-runner-negative-cases": "bun scripts/check-computational-private-proof-runner-negative-cases.ts",
     "check:computational-merge-runtime-status": "bun scripts/check-computational-merge-runtime-status.ts",
     "check:computational-merge-runtime-status:update": "bun scripts/check-computational-merge-runtime-status.ts --update",
     "check:computational-merge-review-panel-contract": "bun scripts/check-computational-merge-review-panel-contract.ts",
