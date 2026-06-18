@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
 import { VISUAL_SMOKE_SCENARIOS } from '../src/validation/visual/visualSmokeScenarios.ts';
 import {
   agentArtifactReviewProofDatasetSchema,
@@ -455,7 +456,7 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-agent-activity').waitFor({ timeout: 10_000 });
   await page
     .getByTestId('negative-lab-agent-command-source')
-    .getByText('negative.lab.build_batch_dry_run_summary', { exact: true })
+    .getByText(NegativeLabAppServerCommandName.BatchSummary, { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
     .getByTestId('negative-lab-agent-dry-run-state')
@@ -501,7 +502,7 @@ async function prepareScenario(page, mode) {
     .waitFor({ timeout: 10_000 });
   await page
     .getByTestId('negative-lab-agent-command-source')
-    .getByText('negative.lab.accept_batch_dry_run_plan', { exact: true })
+    .getByText(NegativeLabAppServerCommandName.AcceptBatchPlan, { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-active-scan-1').click();
   await page.getByTestId('negative-lab-roll-frame-status-1').getByText('Active', { exact: true }).waitFor({

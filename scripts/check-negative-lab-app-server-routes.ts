@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
+import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
 import {
   buildNegativeLabBatchSummaryRouteResult,
   buildNegativeLabAcceptedBatchApplyRouteResult,
@@ -19,16 +20,16 @@ import {
 } from '../src/utils/negativeLabAppServerRoutes.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
 
-const expectedAcceptBatchPlanCommandName = 'negative.lab.accept_batch_dry_run_plan';
-const expectedAcceptedBatchApplyCommandName = 'negative.lab.build_accepted_batch_apply';
-const expectedBatchSummaryCommandName = 'negative.lab.build_batch_dry_run_summary';
-const expectedCommandName = 'negative.lab.build_conversion_plan';
-const expectedDensitometerCommandName = 'negative.lab.build_densitometer_readout';
-const expectedFrameHealthCommandName = 'negative.lab.build_frame_health_report';
-const expectedQcProofCommandName = 'negative.lab.build_qc_proof_report';
-const expectedStockMetadataCommandName = 'negative.lab.list_stock_metadata';
-const expectedStockFamilyConversionCommandName = 'negative.lab.build_stock_family_conversion_plan';
-const expectedStockRegistryCommandName = 'negative.lab.list_stock_registry';
+const expectedAcceptBatchPlanCommandName = NegativeLabAppServerCommandName.AcceptBatchPlan;
+const expectedAcceptedBatchApplyCommandName = NegativeLabAppServerCommandName.AcceptedBatchApply;
+const expectedBatchSummaryCommandName = NegativeLabAppServerCommandName.BatchSummary;
+const expectedCommandName = NegativeLabAppServerCommandName.ConversionPlan;
+const expectedDensitometerCommandName = NegativeLabAppServerCommandName.Densitometer;
+const expectedFrameHealthCommandName = NegativeLabAppServerCommandName.FrameHealth;
+const expectedQcProofCommandName = NegativeLabAppServerCommandName.QcProof;
+const expectedStockMetadataCommandName = NegativeLabAppServerCommandName.StockMetadata;
+const expectedStockFamilyConversionCommandName = NegativeLabAppServerCommandName.StockFamilyConversion;
+const expectedStockRegistryCommandName = NegativeLabAppServerCommandName.StockRegistry;
 const runtimeCheckScripts = ['check:negative-lab-agent-workflow', 'check:negative-lab-measured-render-proof'];
 const failures = [];
 const acceptBatchPlanRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
