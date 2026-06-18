@@ -107,6 +107,8 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:defringe', new Set(['bun scripts/check-defringe-fixtures.ts'])],
   ['check:detail-artifacts', new Set(['bun scripts/check-detail-artifacts.ts'])],
   ['check:delivery-review-manifest', new Set(['bun scripts/check-delivery-review-manifest.ts'])],
+  ['check:export-batch-proof', new Set(['bun scripts/check-export-batch-proof.ts'])],
+  ['check:export-batch-proof:update', new Set(['bun scripts/check-export-batch-proof.ts --update'])],
   ['check:export-recipes-ui', new Set(['bun scripts/check-export-recipes-ui.ts'])],
   ['check:film-look-browser-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario film-look-browser'])],
   ['check:focus-alignment-sharpness-proof', new Set(['bun scripts/check-focus-alignment-sharpness-proof.ts'])],
