@@ -1,0 +1,38 @@
+{
+  "id": "layer-normal-opacity-runtime-v1",
+  "width": 2,
+  "height": 2,
+  "basePixels": [
+    { "r": 40, "g": 60, "b": 80 },
+    { "r": 80, "g": 100, "b": 120 },
+    { "r": 120, "g": 140, "b": 160 },
+    { "r": 160, "g": 180, "b": 200 }
+  ],
+  "layer": {
+    "id": "normal-opacity-lift",
+    "name": "Normal opacity lift",
+    "blendMode": "normal",
+    "opacity": 0.5,
+    "visible": true,
+    "pixels": [
+      { "r": 80, "g": 100, "b": 120 },
+      { "r": 120, "g": 140, "b": 160 },
+      { "r": 160, "g": 180, "b": 200 },
+      { "r": 200, "g": 220, "b": 240 }
+    ]
+  },
+  "sidecarLayerStack": {
+    "artifactId": "layer_normal_opacity_runtime_v1",
+    "schemaVersion": 1,
+    "storage": "sidecar_artifact",
+    "sourceImagePath": "/fixture-roll/IMG_LAYER_NORMAL_0001.CR3",
+    "layers": [{ "id": "normal-opacity-lift", "blendMode": "normal", "opacity": 0.5, "visible": true }]
+  },
+  "expectedPixels": [
+    { "r": 60, "g": 80, "b": 100 },
+    { "r": 100, "g": 120, "b": 140 },
+    { "r": 140, "g": 160, "b": 180 },
+    { "r": 180, "g": 200, "b": 220 }
+  ],
+  "expectedChangedPixels": 4
+}
