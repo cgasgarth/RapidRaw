@@ -1,4 +1,4 @@
-import { ColorResult, HsvaColor, hsvaToHex } from '@uiw/color-convert';
+import { type ColorResult, type HsvaColor, hsvaToHex } from '@uiw/color-convert';
 import Wheel from '@uiw/react-color-wheel';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sun } from 'lucide-react';
@@ -8,7 +8,8 @@ import { useTranslation } from 'react-i18next';
 import Slider, { type SliderChangeEvent } from './Slider';
 import UiText from './Text';
 import { TextColors, TextVariants } from '../../types/typography';
-import { HueSatLum } from '../../utils/adjustments';
+
+import type { HueSatLum } from '../../utils/adjustments';
 
 interface ColorWheelProps {
   defaultValue: HueSatLum;

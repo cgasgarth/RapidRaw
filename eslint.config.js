@@ -130,6 +130,7 @@ module.exports = [
   {
     files: tsFiles,
     plugins: {
+      '@typescript-eslint': tseslint.plugin,
       react: reactPlugin,
       'react-hooks': reactHooksPlugin,
       boundaries: boundariesPlugin,
@@ -177,6 +178,12 @@ module.exports = [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { fixStyle: 'inline-type-imports', prefer: 'type-imports' },
+      ],
+      '@typescript-eslint/consistent-type-exports': 'error',
+      '@typescript-eslint/no-import-type-side-effects': 'error',
       'react-hooks/rules-of-hooks': 'error',
       // Enable after the existing dependency-array warnings are fixed in a focused lint PR.
       'react-hooks/exhaustive-deps': 'error',

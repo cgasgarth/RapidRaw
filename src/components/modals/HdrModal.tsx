@@ -4,17 +4,18 @@ import { useTranslation } from 'react-i18next';
 
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 import { useModalTransition } from '../../hooks/useModalTransition';
-import {
-  type HdrMergeAlignmentMode,
-  type HdrMergeDeghosting,
-  type HdrMergeQualityPreference,
-  type HdrMergeStrategy,
-  type HdrMergeUiSettings,
-} from '../../schemas/hdrMergeUiSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
+
+import type {
+  HdrMergeAlignmentMode,
+  HdrMergeDeghosting,
+  HdrMergeQualityPreference,
+  HdrMergeStrategy,
+  HdrMergeUiSettings,
+} from '../../schemas/hdrMergeUiSchemas';
 
 interface HdrModalProps {
   error: string | null;

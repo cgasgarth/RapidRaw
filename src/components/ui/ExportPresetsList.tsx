@@ -2,13 +2,14 @@ import { Check, CheckCircle, Plus, Save, Trash2, TriangleAlert, X } from 'lucide
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AppSettings } from './AppProperties';
 import Dropdown from './Dropdown';
-import { ExportPreset } from './ExportImportProperties';
 import UiText from './Text';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
 import { buildExportRecipeUiRows } from '../../schemas/exportRecipeUiSchemas';
 import { TextVariants } from '../../types/typography';
+
+import type { AppSettings } from './AppProperties';
+import type { ExportPreset } from './ExportImportProperties';
 
 interface ExportPresetsListProps {
   appSettings: AppSettings | null;

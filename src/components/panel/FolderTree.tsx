@@ -39,7 +39,7 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-import { AlbumItem, Invokes } from '../ui/AppProperties';
+import { type AlbumItem, Invokes } from '../ui/AppProperties';
 import UiText from '../ui/Text';
 
 export interface FolderTree {

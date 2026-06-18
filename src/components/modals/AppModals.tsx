@@ -29,8 +29,9 @@ import {
   createDefaultSuperResolutionModalState,
   useUIStore,
 } from '../../store/useUIStore';
-import { CopyPasteSettings } from '../../utils/adjustments';
-import { AppSettings, AlbumItem } from '../ui/AppProperties';
+
+import type { CopyPasteSettings } from '../../utils/adjustments';
+import type { AppSettings, AlbumItem } from '../ui/AppProperties';
 
 interface DeleteOptions {
   includeAssociated: boolean;

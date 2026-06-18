@@ -15,7 +15,7 @@ import {
   Users,
   SlidersHorizontal,
 } from 'lucide-react';
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import LibraryGrid from './library/LibraryGrid';
@@ -24,21 +24,23 @@ import SettingsPanel from './SettingsPanel';
 import { buildLibrarySessionUiCard } from '../../schemas/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
+import { type ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import {
-  AppSettings,
-  ImageFile,
-  LibraryViewMode,
-  Progress,
+  type AppSettings,
+  type ImageFile,
+  type LibraryViewMode,
+  type Progress,
   ThumbnailSize,
   ThumbnailAspectRatio,
   RawStatus,
   EditedStatus,
-  Theme,
+  type Theme,
 } from '../ui/AppProperties';
 import Button from '../ui/Button';
-import { ImportState, Status } from '../ui/ExportImportProperties';
+import { type ImportState, Status } from '../ui/ExportImportProperties';
 import UiText from '../ui/Text';
+
+import type React from 'react';
 
 interface MainLibraryProps {
   activePath: string | null;

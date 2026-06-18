@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import { RIGHT_PANEL_ORDER } from '../components/panel/right/rightPanelRegistry';
-import { ImageFile, Panel, UiVisibility, CullingSuggestions } from '../components/ui/AppProperties';
+import { type ImageFile, Panel, type UiVisibility, type CullingSuggestions } from '../components/ui/AppProperties';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../schemas/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS, type PanoramaUiSettings } from '../schemas/panoramaUiSchemas';

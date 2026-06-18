@@ -1,4 +1,4 @@
-import { Crop } from 'react-image-crop';
+import type { Crop } from 'react-image-crop';
 
 export function getOrientedDimensions(
   imageWidth: number,

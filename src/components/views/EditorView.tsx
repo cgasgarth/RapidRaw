@@ -1,11 +1,5 @@
 import cx from 'clsx';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
-import {
-  type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent,
-  type RefObject,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useEditorStore } from '../../store/useEditorStore';
@@ -23,8 +17,15 @@ import MasksPanel from '../panel/right/MasksPanel';
 import MetadataPanel from '../panel/right/MetadataPanel';
 import PresetsPanel from '../panel/right/PresetsPanel';
 import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
-import { ImageFile, Orientation, Panel, ThumbnailAspectRatio } from '../ui/AppProperties';
+import { type ImageFile, Orientation, Panel, type ThumbnailAspectRatio } from '../ui/AppProperties';
 import Resizer from '../ui/Resizer';
+
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent,
+  RefObject,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 
 const panelVariants: Variants = {
   animate: (direction: number) => ({

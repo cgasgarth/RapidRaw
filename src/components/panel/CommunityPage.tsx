@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { siGithub } from 'simple-icons';
 
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
-import { Invokes, SupportedTypes, ImageFile } from '../ui/AppProperties';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import { Invokes, type SupportedTypes, type ImageFile } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Input from '../ui/Input';

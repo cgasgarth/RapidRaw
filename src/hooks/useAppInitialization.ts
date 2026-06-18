@@ -5,14 +5,14 @@ import { useShallow } from 'zustand/react/shallow';
 
 import {
   type AppSettings,
-  FilterCriteria,
+  type FilterCriteria,
   type ImageFile,
   Invokes,
   LibraryViewMode,
   EditedStatus,
-  Theme,
+  type Theme,
   ThumbnailSize,
-  ThumbnailAspectRatio,
+  type ThumbnailAspectRatio,
   type SupportedTypes,
 } from '../components/ui/AppProperties';
 import { useEditorStore } from '../store/useEditorStore';
@@ -20,7 +20,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { COPYABLE_ADJUSTMENT_KEYS, DisplayMode, PasteMode } from '../utils/adjustments';
-import { THEMES, DEFAULT_THEME_ID, ThemeProps } from '../utils/themes';
+import { THEMES, DEFAULT_THEME_ID, type ThemeProps } from '../utils/themes';
 
 import type { FolderTree } from '../components/panel/FolderTree';
 import type { i18n as I18n } from 'i18next';

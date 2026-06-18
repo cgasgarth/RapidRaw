@@ -6,14 +6,14 @@ import { useTranslation } from 'react-i18next';
 import AdjustmentSlider from './AdjustmentSlider';
 import FilmLookBrowser from './FilmLookBrowser';
 import { TextVariants } from '../../types/typography';
-import { Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
+import { type Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
   formatFilmLookPresetName,
   type FilmLookBrowserItem,
 } from '../../utils/filmLookBrowser';
-import { AppSettings, Invokes, type Preset } from '../ui/AppProperties';
+import { type AppSettings, Invokes, type Preset } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
 import UiText from '../ui/Text';
 

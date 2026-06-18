@@ -6,8 +6,8 @@ import {
   useDroppable,
   useSensor,
   useSensors,
-  DragEndEvent,
-  DragStartEvent,
+  type DragEndEvent,
+  type DragStartEvent,
   pointerWithin,
 } from '@dnd-kit/core';
 import cx from 'clsx';
@@ -53,8 +53,8 @@ import {
 } from './maskPanelRowHelpers';
 import {
   Mask,
-  MaskType,
-  SubMask,
+  type MaskType,
+  type SubMask,
   MASK_PANEL_CREATION_TYPES,
   OTHERS_MASK_TYPES,
   MASK_ICON_MAP,
@@ -77,11 +77,11 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import {
-  Adjustments,
+  type Adjustments,
   INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
   INITIAL_MASK_CONTAINER,
-  MaskContainer,
+  type MaskContainer,
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import {

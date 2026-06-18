@@ -2,9 +2,9 @@ import cx from 'clsx';
 import { forwardRef, type ElementType, type HTMLAttributes, type ReactNode } from 'react';
 
 import {
-  TextWeight,
-  TextColor,
-  VariantConfig,
+  type TextWeight,
+  type TextColor,
+  type VariantConfig,
   TEXT_WEIGHT_KEYS,
   TEXT_COLOR_KEYS,
   TextVariants,

@@ -4,13 +4,14 @@ import { useCallback, useEffect } from 'react';
 import { toast } from 'react-toastify';
 
 import { useEditorActions } from './useEditorActions';
-import { Mask, SubMask } from '../components/panel/right/Masks';
+import { Mask, type SubMask } from '../components/panel/right/Masks';
 import { Invokes } from '../components/ui/AppProperties';
 import { parseAiPatchDataJson } from '../schemas/aiMaskingSchemas';
 import { useEditorStore } from '../store/useEditorStore';
-import { Adjustments, AiPatch, MaskContainer, Coord } from '../utils/adjustments';
 import { formatUnknownError } from '../utils/errorFormatting';
 import { mergeMaskParameters } from '../utils/maskParameterAccess';
+
+import type { Adjustments, AiPatch, MaskContainer, Coord } from '../utils/adjustments';
 
 type SubMaskParameters = Record<string, unknown>;
 

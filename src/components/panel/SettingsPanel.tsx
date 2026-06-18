@@ -48,17 +48,17 @@ import { normalizeKeyboardShortcutMap, parseKeyboardShortcutCombo } from '../../
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import {
   formatKeyCode,
-  KeybindDefinition,
+  type KeybindDefinition,
   KEYBIND_DEFINITIONS,
   KEYBIND_SECTIONS,
   normalizeCombo,
 } from '../../utils/keyboardUtils';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
-import { ThemeProps, THEMES } from '../../utils/themes';
+import { type ThemeProps, THEMES } from '../../utils/themes';
 import ConfirmModal from '../modals/ConfirmModal';
-import { AppSettings, Invokes, Theme } from '../ui/AppProperties';
+import { type AppSettings, Invokes, type Theme } from '../ui/AppProperties';
 import Button from '../ui/Button';
-import Dropdown, { OptionItem } from '../ui/Dropdown';
+import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import Input from '../ui/Input';
 import Slider from '../ui/Slider';
 import Switch from '../ui/Switch';

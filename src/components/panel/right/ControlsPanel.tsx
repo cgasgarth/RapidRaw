@@ -13,7 +13,7 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { type CollapsibleSectionsState, useUIStore } from '../../../store/useUIStore';
 import { TextVariants } from '../../../types/typography';
 import {
-  Adjustments,
+  type Adjustments,
   INITIAL_ADJUSTMENTS,
   ADJUSTMENT_SECTIONS,
   pickAdjustmentValues,

@@ -12,23 +12,29 @@ import {
   type MouseEvent,
   type RefObject,
 } from 'react';
-import { Crop, PercentCrop } from 'react-image-crop';
 
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
-import { Mask, SubMask } from './right/Masks';
+import { Mask, type SubMask } from './right/Masks';
 import { useAiMasking } from '../../hooks/useAiMasking';
-import { BaseRenderSize, ImageDimensions, RenderSize, useImageRenderSize } from '../../hooks/useImageRenderSize';
+import {
+  type BaseRenderSize,
+  type ImageDimensions,
+  type RenderSize,
+  useImageRenderSize,
+} from '../../hooks/useImageRenderSize';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
-import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import { calculateCenteredCrop } from '../../utils/cropUtils';
 import { normalizeMaskOverlaySettings } from '../../utils/maskOverlayModes';
 import { toMaskParameterRecord } from '../../utils/maskParameterAccess';
 import { debounce } from '../../utils/timing';
-import { Panel, TransformState, Invokes } from '../ui/AppProperties';
+import { Panel, type TransformState, Invokes } from '../ui/AppProperties';
+
+import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
+import type { Crop, PercentCrop } from 'react-image-crop';
 
 const parseRgb = (rgbStr: string): [number, number, number, number] => {
   const match = rgbStr.match(/[\d.]+/g);
