@@ -8,15 +8,20 @@ import {
   buildLayerRenderPlan,
   deleteLayer,
   duplicateLayer,
+  groupLayerWithNext,
   moveLayer,
+  moveLayerGroup,
   setLayerOpacity,
   setLayerVisibility,
+  ungroupLayerGroup,
 } from '../src/utils/layerStack.ts';
 import { INITIAL_MASK_ADJUSTMENTS } from '../src/utils/adjustments.ts';
 
 const layerFixtureSchema = z
   .object({
     id: z.string().trim().min(1),
+    layerGroupId: z.string().trim().min(1).optional(),
+    layerGroupName: z.string().trim().min(1).optional(),
     name: z.string().trim().min(1),
     opacity: z.number(),
     visible: z.boolean(),
@@ -70,10 +75,32 @@ const operationSchema = z.discriminatedUnion('type', [
       type: z.literal('delete'),
     })
     .strict(),
+  z
+    .object({
+      groupId: z.string().trim().min(1),
+      groupName: z.string().trim().min(1),
+      layerId: z.string().trim().min(1),
+      type: z.literal('groupWithNext'),
+    })
+    .strict(),
+  z
+    .object({
+      direction: z.enum(['down', 'up']),
+      groupId: z.string().trim().min(1),
+      type: z.literal('moveGroup'),
+    })
+    .strict(),
+  z
+    .object({
+      groupId: z.string().trim().min(1),
+      type: z.literal('ungroup'),
+    })
+    .strict(),
 ]);
 
 const fixtureSchema = z
   .object({
+    expectedError: z.string().trim().min(1).optional(),
     expectedLayers: z.array(layerFixtureSchema).min(1),
     expectedRenderPlan: z.array(renderPlanItemSchema).optional(),
     id: z.string().trim().min(1),
@@ -92,6 +119,8 @@ function toMaskContainer(layer) {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
     id: layer.id,
     invert: false,
+    ...(layer.layerGroupId ? { layerGroupId: layer.layerGroupId } : {}),
+    ...(layer.layerGroupName ? { layerGroupName: layer.layerGroupName } : {}),
     name: layer.name,
     opacity: layer.opacity,
     subMasks: [],
@@ -102,6 +131,8 @@ function toMaskContainer(layer) {
 function summarize(layers) {
   return layers.map((layer) => ({
     id: layer.id,
+    ...(layer.layerGroupId ? { layerGroupId: layer.layerGroupId } : {}),
+    ...(layer.layerGroupName ? { layerGroupName: layer.layerGroupName } : {}),
     name: layer.name,
     opacity: layer.opacity,
     visible: layer.visible,
@@ -120,14 +151,39 @@ function applyOperation(layers, operation) {
       return duplicateLayer(layers, operation.layerId, operation.newLayerId, operation.name);
     case 'delete':
       return deleteLayer(layers, operation.layerId);
+    case 'groupWithNext':
+      return groupLayerWithNext(layers, operation.layerId, operation.groupId, operation.groupName);
+    case 'moveGroup':
+      return moveLayerGroup(layers, operation.groupId, operation.direction);
+    case 'ungroup':
+      return ungroupLayerGroup(layers, operation.groupId);
   }
 }
 
 for (const fixture of fixtures) {
-  const result = fixture.operations.reduce(
-    (layers, operation) => applyOperation(layers, operation),
-    fixture.initialLayers.map(toMaskContainer),
-  );
+  let result;
+  try {
+    result = fixture.operations.reduce(
+      (layers, operation) => applyOperation(layers, operation),
+      fixture.initialLayers.map(toMaskContainer),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (fixture.expectedError !== undefined && message.includes(fixture.expectedError)) {
+      continue;
+    }
+
+    console.error(`${fixture.id}: unexpected layer stack error`);
+    console.error(message);
+    process.exit(1);
+  }
+
+  if (fixture.expectedError !== undefined) {
+    console.error(`${fixture.id}: expected layer stack error`);
+    console.error(fixture.expectedError);
+    process.exit(1);
+  }
+
   const actual = summarize(result);
   const expected = fixture.expectedLayers;
 

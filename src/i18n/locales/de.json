@@ -634,10 +634,12 @@
       "actions": {
         "delete": "Delete layer",
         "duplicate": "Duplicate layer",
+        "groupWithNext": "Group with next layer",
         "hide": "Hide layer",
         "moveDown": "Move layer down",
         "moveUp": "Move layer up",
-        "show": "Show layer"
+        "show": "Show layer",
+        "ungroup": "Ungroup layers"
       },
       "blend": "Blend",
       "blendModes": {
@@ -650,6 +652,10 @@
         "softLight": "Soft Light"
       },
       "copyName": "{{name}} Copy",
+      "defaultGroupName": "Layer Group",
+      "groupCount": "{{count}} layer",
+      "groupCount_one": "{{count}} layer",
+      "groupCount_other": "{{count}} layers",
       "maskCount": {
         "count": "{{count}} mask",
         "count_one": "{{count}} mask",

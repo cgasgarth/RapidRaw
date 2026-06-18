@@ -60,5 +60,68 @@
       { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": true },
       { "id": "skin-copy", "name": "Skin Uniformity Copy", "opacity": 65, "visible": true }
     ]
+  },
+  {
+    "id": "group-move-and-ungroup",
+    "initialLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true }
+    ],
+    "operations": [
+      { "type": "groupWithNext", "layerId": "skin", "groupId": "portrait-group", "groupName": "Portrait Group" },
+      { "type": "moveGroup", "groupId": "portrait-group", "direction": "up" },
+      { "type": "ungroup", "groupId": "portrait-group" }
+    ],
+    "expectedLayers": [
+      { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true },
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true }
+    ]
+  },
+  {
+    "id": "nested-group-blocked",
+    "initialLayers": [
+      {
+        "id": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 65,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      {
+        "id": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true }
+    ],
+    "operations": [
+      { "type": "groupWithNext", "layerId": "skin", "groupId": "nested-group", "groupName": "Nested Group" }
+    ],
+    "expectedError": "nested and non-adjacent groups are blocked",
+    "expectedLayers": [
+      {
+        "id": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 65,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      {
+        "id": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true }
+    ]
   }
 ]

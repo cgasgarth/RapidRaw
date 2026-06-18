@@ -30,8 +30,9 @@ This command builds the frontend and then runs
 - Growth beyond the raw or gzip budget fails validation.
 - HDR, panorama, color style, advanced color setup UI, Negative Lab frame queue,
   frame health UI, frame health schema wiring, visible frame warning chips, base
-  sample readouts, and the stock-family registry panel increased the temporary
-  JavaScript ceiling; future code-splitting should lower this again.
+  sample readouts, the stock-family registry panel, and layer grouping controls
+  increased the temporary JavaScript ceiling; future code-splitting should lower
+  this again.
 - A future code-splitting PR should lower the JavaScript budget after reducing
   the largest chunk.
 - `vite.config.js` sets `chunkSizeWarningLimit` to the same raw budget range so
