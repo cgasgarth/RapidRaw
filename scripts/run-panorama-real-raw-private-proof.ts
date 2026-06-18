@@ -29,5 +29,6 @@ await runComputationalPrivateProof({
     ['bun', 'run', 'check:panorama-app-server-runtime'],
     ['bun', 'run', 'check:panorama-ui-runtime-bridge'],
   ],
+  postPrivateChecks: [['bun', 'run', 'check:panorama-real-raw-private-app-server-proof']],
   skipLabel: 'panorama real RAW private proof',
 });
