@@ -103,6 +103,7 @@ generator before the release workflow needs one.
 - [Current detail and noise tool audit](detail/current-detail-noise-audit-2026-06-14.md)
 - [Image science iteration consult](detail/image-science-iteration-consult-2026-06-14.md)
 - [Deblur implementation decision](detail/deblur-implementation-decision-2026-06-18.md)
+- [AI denoise path decision](detail/ai-denoise-path-decision-2026-06-18.md)
 - [Wavelet detail control model](detail/wavelet-detail-control-model-2026-06-18.md)
 - [Focus Stack architecture consult summary](focus-stacking/architecture-consult-summary-2026-06-14.md)
 - [Focus Stack RAW normalization and color policy](focus-stacking/raw-normalization-color-policy-2026-06-14.md)
