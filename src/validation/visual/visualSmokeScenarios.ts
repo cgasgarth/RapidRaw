@@ -66,6 +66,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     outputFile: 'color-workflow.png',
     sectionMinimum: 2,
   },
+  {
+    marker: 'Local Adjustment Stack',
+    mode: 'layer-stack-workflow',
+    outputFile: 'layer-stack-workflow.png',
+    sectionMinimum: 3,
+  },
 ] as const;
 
 export type VisualSmokeScenario = (typeof VISUAL_SMOKE_SCENARIOS)[number];

@@ -15,6 +15,8 @@ import {
   commandPaletteWorkflowProofSchema,
   focusUiSettingsProofSchema,
   hdrUiSettingsProofSchema,
+  layerStackExportParityProofSchema,
+  layerStackWorkflowProofSchema,
   negativeLabWorkspaceProofDatasetSchema,
   panoramaUiSettingsProofSchema,
   superResolutionUiSettingsProofSchema,
@@ -209,6 +211,20 @@ async function prepareScenario(page, mode) {
     await page.getByRole('button', { name: '8192 px' }).click();
     superResolutionUiSettingsProofSchema.parse(
       await page.getByTestId('sr-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    return;
+  }
+
+  if (mode === 'layer-stack-workflow') {
+    await page.getByRole('button', { name: /Portrait burn/u }).click();
+    await page.getByRole('button', { name: 'Move down' }).click();
+    await page.getByRole('button', { name: 'Toggle' }).click();
+    layerStackWorkflowProofSchema.parse(
+      await page.getByTestId('layer-stack-workflow-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    await page.getByRole('button', { name: 'Compare preview/export' }).click();
+    layerStackExportParityProofSchema.parse(
+      await page.getByTestId('layer-stack-export-parity-proof').evaluate((element) => ({ ...element.dataset })),
     );
     return;
   }

@@ -34,6 +34,7 @@ const visualSmokeComponents = {
   'film-look-browser': FilmLookVisualSmoke,
   'focus-ui': FocusStackVisualSmoke,
   'hdr-ui': HdrVisualSmoke,
+  'layer-stack-workflow': LayerStackWorkflowVisualSmoke,
   'negative-lab-workspace': NegativeLabVisualSmoke,
   'panorama-ui': PanoramaVisualSmoke,
   'sr-ui': SuperResolutionVisualSmoke,
@@ -100,10 +101,31 @@ const filmLookParityProofCases = [
     previewHash: '942aa1199eb4a1d3',
   },
 ] as const;
+interface LayerWorkflowState {
+  blend: string;
+  mask: string;
+  name: string;
+  opacity: number;
+  visible: boolean;
+}
+
+const layerWorkflowFallbackLayer: LayerWorkflowState = {
+  blend: 'soft_light',
+  mask: 'Sky gradient',
+  name: 'Sky recovery',
+  opacity: 72,
+  visible: true,
+};
+const layerWorkflowInitialStack = [
+  layerWorkflowFallbackLayer,
+  { blend: 'multiply', mask: 'Subject brush', name: 'Portrait burn', opacity: 42, visible: true },
+  { blend: 'screen', mask: 'Window radial', name: 'Window lift', opacity: 36, visible: true },
+] satisfies LayerWorkflowState[];
 const FILM_LOOK_PARITY_TITLE = 'Rendered parity proof';
 const FILM_LOOK_PARITY_FIXTURE_LABEL = 'Synthetic fixture';
 const NEGATIVE_LAB_NO_SAVED_PATHS_LABEL = 'No saved positives yet';
 const formatFilmLookParityDelta = (maxDelta: string) => `Delta ${maxDelta}`;
+const formatLayerBlend = (blend: string) => blend.replace('_', ' ');
 
 const copy = {
   brand: 'RapidRAW',
@@ -124,6 +146,19 @@ const copy = {
   panoramaSmoke: 'Panorama UI Smoke',
   superResolutionSmoke: 'Super Resolution Smoke',
   colorWorkflow: 'Color Workflow',
+  layerWorkflowTitle: 'Local Adjustment Stack',
+  layerMoveDown: 'Move down',
+  layerToggle: 'Toggle',
+  layeredPreview: 'Layered preview',
+  layerWorkflowDescription: 'Mask, blend, opacity, and order state captured in one smoke path.',
+  layerVisibleCount: (count: number) => `${count} visible`,
+  layerRuntimeEvidence: 'Runtime evidence',
+  selectedLayer: 'Selected layer',
+  maskBlendOpacity: 'Mask / blend / opacity',
+  comparePreviewExport: 'Compare preview/export',
+  previewExportParity: 'Preview/export parity',
+  readyForHeadlessReplay: 'Ready for headless replay',
+  pending: 'Pending',
   frameStatus: (rating: string) => `Rating ${rating} / RAW / edited`,
 } as const;
 
@@ -133,6 +168,154 @@ const scopes = [
   ['G', '69'],
   ['B', '73'],
 ] as const;
+
+function LayerStackWorkflowVisualSmoke() {
+  const [layers, setLayers] = useState<LayerWorkflowState[]>(() => [...layerWorkflowInitialStack]);
+  const [selectedLayer, setSelectedLayer] = useState<string>(layerWorkflowFallbackLayer.name);
+  const [exportParity, setExportParity] = useState('pending');
+
+  const moveSelectedLayerDown = () => {
+    setLayers((currentLayers) => {
+      const selectedIndex = currentLayers.findIndex((layer) => layer.name === selectedLayer);
+      if (selectedIndex < 0 || selectedIndex === currentLayers.length - 1) return currentLayers;
+      const nextLayers = [...currentLayers];
+      const selected = nextLayers[selectedIndex];
+      const next = nextLayers[selectedIndex + 1];
+      if (selected === undefined || next === undefined) return currentLayers;
+      nextLayers[selectedIndex] = next;
+      nextLayers[selectedIndex + 1] = selected;
+      return nextLayers;
+    });
+  };
+  const toggleSelectedLayer = () => {
+    setLayers((currentLayers) =>
+      currentLayers.map((layer) => (layer.name === selectedLayer ? { ...layer, visible: !layer.visible } : layer)),
+    );
+  };
+
+  const visibleLayerCount = layers.filter((layer) => layer.visible).length;
+  const selectedLayerState = layers.find((layer) => layer.name === selectedLayer) ?? layerWorkflowFallbackLayer;
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="layer-stack-workflow"
+    >
+      <div className="grid h-screen grid-cols-[280px_1fr_360px] overflow-hidden">
+        <aside className="border-r border-white/10 bg-[#15181c] p-4" data-visual-smoke-section="layer-actions">
+          <div className="mb-4 flex items-center justify-between">
+            <h1 className="text-sm font-semibold">{copy.layerWorkflowTitle}</h1>
+            <Layers3 size={18} className="text-[#f2be4e]" />
+          </div>
+          <div
+            className="space-y-2"
+            data-active-layer={selectedLayerState.name}
+            data-blend-mode={selectedLayerState.blend}
+            data-mask={selectedLayerState.mask}
+            data-opacity={String(selectedLayerState.opacity)}
+            data-testid="layer-stack-workflow-proof"
+            data-visible-count={String(visibleLayerCount)}
+          >
+            {layers.map((layer, index) => (
+              <button
+                className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
+                  selectedLayer === layer.name
+                    ? 'border-[#78d4ff] bg-[#24303a] text-white'
+                    : 'border-white/10 bg-[#1b2026] text-[#cbd5df]'
+                }`}
+                key={layer.name}
+                onClick={() => {
+                  setSelectedLayer(layer.name);
+                }}
+                type="button"
+              >
+                <span className="flex items-center justify-between">
+                  <span>{layer.name}</span>
+                  <span className="text-xs text-[#8d97a3]">#{index + 1}</span>
+                </span>
+                <span className="mt-1 block text-xs text-[#8d97a3]">
+                  {layer.mask} / {formatLayerBlend(layer.blend)} / {layer.opacity}%
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
+              onClick={moveSelectedLayerDown}
+              type="button"
+            >
+              {copy.layerMoveDown}
+            </button>
+            <button
+              className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
+              onClick={toggleSelectedLayer}
+              type="button"
+            >
+              {copy.layerToggle}
+            </button>
+          </div>
+        </aside>
+
+        <section className="relative bg-[#0f1114] p-5" data-visual-smoke-section="layer-preview">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">{copy.layeredPreview}</h2>
+              <p className="text-sm text-[#8d97a3]">{copy.layerWorkflowDescription}</p>
+            </div>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-[#cbd5df]">
+              {copy.layerVisibleCount(visibleLayerCount)}
+            </span>
+          </div>
+          <div className="grid h-[calc(100%-4rem)] place-items-center rounded-md border border-white/10 bg-[#171a1f]">
+            <div className="relative h-[70%] w-[72%] overflow-hidden rounded-md border border-white/10 bg-gradient-to-br from-[#243b4a] via-[#382f3f] to-[#67513a] shadow-2xl">
+              <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[#9ccfff]/50 to-transparent mix-blend-screen" />
+              <div className="absolute bottom-0 left-0 h-40 w-full bg-[#2c201c]/60 mix-blend-multiply" />
+              <div className="absolute right-16 top-20 h-52 w-40 rounded-full bg-[#f6d48a]/45 mix-blend-soft-light blur-xl" />
+              <div className="absolute bottom-14 left-16 right-16 h-20 rounded-md border border-white/10 bg-black/30" />
+            </div>
+          </div>
+        </section>
+
+        <aside className="border-l border-white/10 bg-[#15181c] p-4" data-visual-smoke-section="layer-runtime">
+          <h2 className="mb-3 text-sm font-semibold">{copy.layerRuntimeEvidence}</h2>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border border-white/10 bg-[#1b2026] p-3">
+              <p className="text-xs text-[#8d97a3]">{copy.selectedLayer}</p>
+              <p className="mt-1 font-medium">{selectedLayerState.name}</p>
+            </div>
+            <div className="rounded-md border border-white/10 bg-[#1b2026] p-3">
+              <p className="text-xs text-[#8d97a3]">{copy.maskBlendOpacity}</p>
+              <p className="mt-1 font-medium">
+                {selectedLayerState.mask} / {formatLayerBlend(selectedLayerState.blend)} / {selectedLayerState.opacity}%
+              </p>
+            </div>
+            <button
+              className="w-full rounded-md border border-[#78d4ff]/40 bg-[#1b3442] px-3 py-2 text-left"
+              onClick={() => {
+                setExportParity('ready');
+              }}
+              type="button"
+            >
+              {copy.comparePreviewExport}
+            </button>
+            <div
+              className="rounded-md border border-white/10 bg-[#1b2026] p-3"
+              data-export-parity={exportParity}
+              data-testid="layer-stack-export-parity-proof"
+            >
+              <p className="text-xs text-[#8d97a3]">{copy.previewExportParity}</p>
+              <p className="mt-1 font-medium">
+                {exportParity === 'ready' ? copy.readyForHeadlessReplay : copy.pending}
+              </p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
 
 const panoramaPreviewSvg = encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640">
