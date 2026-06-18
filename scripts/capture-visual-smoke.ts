@@ -13,6 +13,7 @@ import {
   assertNegativeLabBatchColorInvokeProof,
   assertNegativeLabInvokeProof,
   commandPaletteWorkflowProofSchema,
+  detailWorkspaceProofSchema,
   focusUiSettingsProofSchema,
   hdrUiSettingsProofSchema,
   layerStackExportParityProofSchema,
@@ -278,6 +279,19 @@ async function prepareScenario(page, mode) {
       timeout: 10_000,
     });
     await page.getByTestId('skin-tone-uniformity-ui-proof').getByText('Skin 0.725', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    return;
+  }
+
+  if (mode === 'detail-workspace') {
+    await page.getByRole('button', { name: '200%' }).click();
+    await page.getByRole('button', { name: 'Split compare' }).click();
+    await page.getByRole('button', { name: 'Luma detail' }).click();
+    detailWorkspaceProofSchema.parse(
+      await page.getByTestId('detail-workspace-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    await page.getByTestId('detail-warning').getByText('Ringing review', { exact: true }).waitFor({
       timeout: 10_000,
     });
     return;

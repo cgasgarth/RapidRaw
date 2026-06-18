@@ -32,6 +32,7 @@ const visualSmokeComponents = {
   'agent-chat-ui': AgentChatVisualSmoke,
   'color-workflow': ColorWorkflowVisualSmoke,
   'command-palette-workflows': CommandPaletteWorkflowSmoke,
+  'detail-workspace': DetailWorkspaceVisualSmoke,
   'film-look-browser': FilmLookVisualSmoke,
   'focus-ui': FocusStackVisualSmoke,
   'hdr-ui': HdrVisualSmoke,
@@ -127,6 +128,17 @@ const FILM_LOOK_PARITY_FIXTURE_LABEL = 'Synthetic fixture';
 const NEGATIVE_LAB_NO_SAVED_PATHS_LABEL = 'No saved positives yet';
 const formatFilmLookParityDelta = (maxDelta: string) => `Delta ${maxDelta}`;
 const formatLayerBlend = (blend: string) => blend.replace('_', ' ');
+const detailReviewBands = [
+  { label: 'Fine', value: '+18', width: '72%' },
+  { label: 'Medium', value: '+9', width: '54%' },
+  { label: 'Coarse', value: '-4', width: '36%' },
+] as const;
+const detailReviewStages = [
+  'scene_linear_denoise',
+  'scene_linear_deblur',
+  'capture_sharpen',
+  'wavelet_luma_detail',
+] as const;
 
 const copy = {
   brand: 'RapidRAW',
@@ -161,6 +173,22 @@ const copy = {
   readyForHeadlessReplay: 'Ready for headless replay',
   pending: 'Pending',
   frameStatus: (rating: string) => `Rating ${rating} / RAW / edited`,
+  detailReview: 'Detail Review',
+  detailWorkspace: 'Zoom detail workspace',
+  detailRuntimeStatus: 'Fixture runtime paths',
+  detailZoom200: '200%',
+  splitCompare: 'Split compare',
+  lumaDetail: 'Luma detail',
+  detailBefore: 'Before',
+  detailAfter: 'After',
+  detailDenoise: 'Denoise',
+  detailDeblur: 'Deblur',
+  detailWavelet: 'Wavelet',
+  detailWarningTitle: 'Artifact warning',
+  detailRingingReview: 'Ringing review',
+  detailDryRunTool: 'detail.deblur.dry_run_command',
+  detailStageOrder: 'Stage order',
+  detailProofSummary: 'Zoom, split, warning, and existing detail runtime state are captured in one replay.',
 } as const;
 
 const scopes = [
@@ -169,6 +197,135 @@ const scopes = [
   ['G', '69'],
   ['B', '73'],
 ] as const;
+
+function DetailWorkspaceVisualSmoke() {
+  const [zoom, setZoom] = useState('100');
+  const [previewMode, setPreviewMode] = useState<'single' | 'split'>('single');
+  const [waveletMode, setWaveletMode] = useState<'off' | 'luma_detail'>('off');
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="detail-workspace"
+    >
+      <div className="grid h-screen grid-cols-[300px_1fr_360px] overflow-hidden">
+        <aside className="border-r border-white/10 bg-[#15181c] p-4" data-visual-smoke-section="detail-controls">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h1 className="text-sm font-semibold">{copy.detailReview}</h1>
+              <p className="text-xs text-[#9ba6b2]">{copy.detailRuntimeStatus}</p>
+            </div>
+            <SlidersHorizontal size={18} className="text-[#6da7d8]" />
+          </div>
+          <div
+            className="space-y-3"
+            data-artifact-warning="ringing_review"
+            data-deblur-command={copy.detailDryRunTool}
+            data-denoise-stage="scene_linear_denoise"
+            data-preview-mode={previewMode}
+            data-runtime-status="fixture_runtime_paths"
+            data-testid="detail-workspace-proof"
+            data-wavelet-mode={waveletMode}
+            data-zoom={zoom}
+          >
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10"
+              onClick={() => {
+                setZoom('200');
+              }}
+              type="button"
+            >
+              <span>{copy.detailZoom200}</span>
+              <span className="text-xs text-[#aab2bd]">{zoom}%</span>
+            </button>
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10"
+              onClick={() => {
+                setPreviewMode('split');
+              }}
+              type="button"
+            >
+              <span>{copy.splitCompare}</span>
+              <span className="text-xs text-[#aab2bd]">{previewMode}</span>
+            </button>
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-[#6da7d8]/40 bg-[#1d2b35] px-3 py-2 text-left text-sm hover:bg-[#243746]"
+              onClick={() => {
+                setWaveletMode('luma_detail');
+              }}
+              type="button"
+            >
+              <span>{copy.lumaDetail}</span>
+              <Sparkles size={14} className="text-[#9ac5eb]" />
+            </button>
+          </div>
+        </aside>
+        <section className="min-w-0 bg-[#0f1114] p-6" data-visual-smoke-section="detail-preview">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase text-[#9ba6b2]">{copy.detailWorkspace}</p>
+              <h2 className="text-lg font-semibold">{copy.detailReview}</h2>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 px-3 py-1 text-sm">
+              {copy.detailRuntimeStatus}
+            </div>
+          </div>
+          <div className="grid h-[680px] grid-cols-2 gap-3 overflow-hidden rounded-md border border-white/10 bg-[#11161b] p-3">
+            <div className="relative overflow-hidden rounded bg-gradient-to-br from-[#39434a] via-[#6d6f6b] to-[#b8a475]">
+              <div className="absolute left-4 top-4 rounded bg-black/50 px-2 py-1 text-xs text-white">
+                {copy.detailBefore}
+              </div>
+              <div className="absolute inset-x-8 top-28 h-px bg-white/40" />
+              <div className="absolute inset-y-24 left-28 w-px bg-white/30" />
+              <div className="absolute bottom-8 left-8 right-8 h-20 rounded bg-black/20" />
+            </div>
+            <div className="relative overflow-hidden rounded bg-gradient-to-br from-[#33434d] via-[#738176] to-[#cfbe88]">
+              <div className="absolute left-4 top-4 rounded bg-black/50 px-2 py-1 text-xs text-white">
+                {copy.detailAfter}
+              </div>
+              <div className="absolute inset-x-8 top-28 h-px bg-white/70 shadow-[0_0_12px_rgba(255,255,255,0.55)]" />
+              <div className="absolute inset-y-24 left-28 w-px bg-white/50" />
+              <div className="absolute bottom-8 left-8 right-8 h-20 rounded bg-black/15" />
+            </div>
+          </div>
+        </section>
+        <aside className="border-l border-white/10 bg-[#181b20] p-4" data-visual-smoke-section="detail-review">
+          <h2 className="mb-4 text-sm font-semibold">{copy.detailStageOrder}</h2>
+          <div className="space-y-3 text-sm">
+            {detailReviewStages.map((stage) => (
+              <div className="rounded-md border border-white/10 bg-white/5 px-3 py-2" key={stage}>
+                {stage}
+              </div>
+            ))}
+            <div className="rounded-md border border-white/10 bg-white/5 p-3">
+              <p className="mb-2 text-xs text-[#9ba6b2]">{copy.detailWavelet}</p>
+              {detailReviewBands.map((band) => (
+                <div className="mb-2" key={band.label}>
+                  <div className="mb-1 flex justify-between text-xs">
+                    <span>{band.label}</span>
+                    <span>{band.value}</span>
+                  </div>
+                  <div className="h-1.5 rounded bg-white/10">
+                    <div className="h-1.5 rounded bg-[#6da7d8]" style={{ width: band.width }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-md border border-[#d8a24d]/40 bg-[#2c2418] p-3" data-testid="detail-warning">
+              <p className="text-xs text-[#d8b36f]">{copy.detailWarningTitle}</p>
+              <p>{copy.detailRingingReview}</p>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/5 p-3">
+              <p className="text-xs text-[#9ba6b2]">{copy.detailDryRunTool}</p>
+              <p>{copy.detailProofSummary}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
 
 function LayerStackWorkflowVisualSmoke() {
   const [layers, setLayers] = useState<LayerWorkflowState[]>(() => [...layerWorkflowInitialStack]);
