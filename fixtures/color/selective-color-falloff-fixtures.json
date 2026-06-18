@@ -79,6 +79,26 @@
       },
       "rangeKey": "blues",
       "tolerance": 0.000001
+    },
+    {
+      "adjustment": {
+        "hue": 20,
+        "luminance": 10,
+        "saturation": 30
+      },
+      "expectedRgb": {
+        "red": 0.15,
+        "green": 0.25,
+        "blue": 0.7
+      },
+      "id": "color.selective.runtime.red-range-blue-guard.v1",
+      "inputRgb": {
+        "red": 0.15,
+        "green": 0.25,
+        "blue": 0.7
+      },
+      "rangeKey": "reds",
+      "tolerance": 0.000001
     }
   ],
   "schemaVersion": 1,
