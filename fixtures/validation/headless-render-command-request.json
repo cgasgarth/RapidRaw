@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "renderer": "synthetic_basic_tone_v1",
+  "outputArtifactPath": "artifacts/headless-render/basic-tone-artifact.json",
+  "sourcePixels": [
+    [0.08, 0.1, 0.12],
+    [0.25, 0.22, 0.18],
+    [0.52, 0.49, 0.44],
+    [0.82, 0.78, 0.7]
+  ],
+  "command": {
+    "actor": {
+      "id": "agent_rawengine",
+      "kind": "agent"
+    },
+    "approval": {
+      "approvalClass": "edit_apply",
+      "reason": "Synthetic headless render fixture applies approved basic tone edit.",
+      "state": "approved"
+    },
+    "colorPipeline": {
+      "inputColorSpace": "camera_linear_rgb",
+      "outputColorSpace": "display_referred_rgb"
+    },
+    "commandId": "command.headless-render.basic-tone.v1",
+    "commandType": "toneColor.setBasicTone",
+    "correlationId": "corr.headless-render.basic-tone.v1",
+    "dryRun": false,
+    "expectedGraphRevision": "graph-rev.headless-render.basic-tone.v1",
+    "parameters": {
+      "blackPoint": -6,
+      "clarity": 10,
+      "contrast": 18,
+      "exposureEv": 0.45,
+      "highlights": -20,
+      "saturation": 8,
+      "shadows": 12,
+      "whitePoint": 4
+    },
+    "schemaVersion": 1,
+    "target": {
+      "kind": "image"
+    }
+  }
+}
