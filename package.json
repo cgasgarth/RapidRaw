@@ -108,6 +108,7 @@
     "check:export-queue": "bun scripts/check-export-queue-fixtures.ts",
     "check:smart-albums": "bun scripts/check-smart-album-fixtures.ts",
     "check:metadata-templates": "bun scripts/check-metadata-template-fixtures.ts",
+    "check:metadata-sidecar-workflow": "bun scripts/check-metadata-sidecar-workflow-proof.ts",
     "check:workspace-layouts": "bun scripts/check-workspace-layout-fixtures.ts",
     "check:compare-survey": "bun scripts/check-compare-survey-fixtures.ts",
     "check:mask-render": "bun scripts/check-mask-render-fixtures.ts",
