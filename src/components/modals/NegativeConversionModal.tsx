@@ -53,6 +53,7 @@ import { buildNegativeLabProfileBrowserRows } from '../../utils/negativeLabProfi
 import { NEGATIVE_LAB_STOCK_REGISTRY, buildNegativeLabStockRegistryCounts } from '../../utils/negativeLabStockRegistry';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { throttle } from '../../utils/timing';
+import { Invokes } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
@@ -500,7 +501,7 @@ export default function NegativeConversionModal({
       throttle(async (currentParams: NegativeParams, isInitialLoad: boolean = false) => {
         if (!selectedImagePath) return;
         try {
-          const result: string = await invoke('preview_negative_conversion', {
+          const result: string = await invoke(Invokes.PreviewNegativeConversion, {
             path: selectedImagePath,
             params: currentParams,
           });
@@ -526,7 +527,7 @@ export default function NegativeConversionModal({
       }, 0);
 
       if (selectedImagePath) {
-        invoke<number[]>('generate_preview_for_path', {
+        invoke<number[]>(Invokes.GeneratePreviewForPath, {
           path: selectedImagePath,
           jsAdjustments: {},
         })

@@ -272,7 +272,7 @@ export const useAppInitialization = ({
           });
         }
 
-        invoke('frontend_ready').catch((e: unknown) => {
+        invoke(Invokes.FrontendReady).catch((e: unknown) => {
           console.error('Failed to notify backend of readiness:', e);
         });
       })

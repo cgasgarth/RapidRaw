@@ -9,6 +9,7 @@ import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import { TextColors, TextVariants } from '../../types/typography';
 import { throttle } from '../../utils/timing';
+import { Invokes } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
@@ -176,7 +177,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
             lens_vignette_enabled: currentAdjustments.lensVignetteEnabled,
           };
 
-          const result: string = await invoke('preview_geometry_transform', {
+          const result: string = await invoke(Invokes.PreviewGeometryTransform, {
             params: fullParams,
             jsAdjustments: currentAdjustments,
             showLines: linesEnabled,
@@ -270,7 +271,7 @@ export default function TransformModal({ isOpen, onClose, onApply, currentAdjust
         lens_tca_enabled: currentAdjustments.lensTcaEnabled,
         lens_vignette_enabled: currentAdjustments.lensVignetteEnabled,
       };
-      const result: string = await invoke('preview_geometry_transform', {
+      const result: string = await invoke(Invokes.PreviewGeometryTransform, {
         params: fullParams,
         jsAdjustments: currentAdjustments,
         showLines: false,

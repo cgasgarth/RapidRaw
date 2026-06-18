@@ -335,7 +335,7 @@ export function useFileOperations(
             selected.map(async (path) => {
               if (isAndroid) {
                 try {
-                  return await invoke<string>('resolve_android_content_uri_name', { uriStr: path });
+                  return await invoke<string>(Invokes.ResolveAndroidContentUriName, { uriStr: path });
                 } catch (e) {
                   console.error('Failed to resolve URI:', e);
                   return path;
