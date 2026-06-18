@@ -4852,6 +4852,26 @@ export const sampleNegativeLabQcProofArtifactV1: NegativeLabQcProofArtifactV1 =
         warningCodes: [],
       },
     ],
+    positiveVariants: [
+      {
+        frameId: 'frame_0001',
+        operationId: 'negative_lab_positive_variant_0001',
+        outputArtifact: {
+          artifactId: 'artifact_negative_lab_positive_frame_0001',
+          contentHash: 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+          dimensions: {
+            height: 3024,
+            width: 4536,
+          },
+          kind: 'export',
+          storage: 'sidecar_artifact',
+        },
+        outputIntent: 'proof_preview',
+        sourceContentHash: 'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+        sourcePath: '/fixtures/negative-lab/synthetic-color-negative-001.tif',
+        warnings: sampleNegativeLabFrameDetectionResultV1.warnings,
+      },
+    ],
     proofId: 'negative_lab_qc_proof_roll_01',
     rollConsistency: {
       anchorFrameIds: ['frame_0001'],

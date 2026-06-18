@@ -27,11 +27,16 @@ const frameTiles = proof.frameIds
     const x = column * frameWidth;
     const y = row * frameHeight;
     const overlays = proof.overlays.filter((overlay) => overlay.frameId === frameId);
+    const positiveVariant = proof.positiveVariants.find((variant) => variant.frameId === frameId);
+    const outputHash = positiveVariant?.outputArtifact.contentHash ?? 'missing-output-hash';
+    const sourceHash = positiveVariant?.sourceContentHash ?? 'missing-source-hash';
 
     return `<g data-frame-id="${escapeXml(frameId)}">
       <rect x="${x}" y="${y}" width="${frameWidth}" height="${frameHeight}" rx="18" fill="#101820" />
       <rect x="${x + 26}" y="${y + 26}" width="${frameWidth - 52}" height="${frameHeight - 52}" rx="10" fill="#22313d" />
       <text x="${x + 42}" y="${y + 62}" fill="#f8fafc" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="30">${escapeXml(frameId)}</text>
+      <text x="${x + 42}" y="${y + 104}" fill="#93c5fd" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">source ${escapeXml(sourceHash)}</text>
+      <text x="${x + 42}" y="${y + 136}" fill="#86efac" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">positive ${escapeXml(outputHash)}</text>
       ${overlays
         .map((overlay, overlayIndex) => {
           const color = overlayColor(overlay.severity);

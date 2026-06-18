@@ -7416,6 +7416,35 @@ export const negativeLabRollBatchWorkflowV1Schema = z
     }
   });
 
+export const negativeLabQcPositiveVariantV1Schema = z
+  .object({
+    frameId: z.string().trim().min(1),
+    operationId: z.string().trim().min(1),
+    outputArtifact: artifactHandleV1Schema,
+    outputIntent: z.enum(['proof_preview', 'editable_positive', 'export_ready_preview']),
+    sourceContentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    sourcePath: z.string().trim().min(1),
+    warnings: z.array(negativeWarningV1Schema),
+  })
+  .strict()
+  .superRefine((variant, context) => {
+    if (variant.outputArtifact.contentHash === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab QC positive variants must include output artifact content hashes.',
+        path: ['outputArtifact', 'contentHash'],
+      });
+    }
+
+    if (variant.outputArtifact.kind !== 'export' && variant.outputArtifact.kind !== 'preview') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Negative Lab QC positive variants must link preview or export artifacts.',
+        path: ['outputArtifact', 'kind'],
+      });
+    }
+  });
+
 export const negativeLabQcProofArtifactV1Schema = z
   .object({
     contactSheet: z
@@ -7428,6 +7457,7 @@ export const negativeLabQcProofArtifactV1Schema = z
     frameIds: z.array(z.string().trim().min(1)).min(1),
     generatedAt: z.string().trim().min(1),
     overlays: z.array(negativeLabQcOverlayV1Schema),
+    positiveVariants: z.array(negativeLabQcPositiveVariantV1Schema).min(1),
     proofId: z.string().trim().min(1),
     rollConsistency: negativeLabRollConsistencyMetricsV1Schema,
     schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
@@ -7453,6 +7483,26 @@ export const negativeLabQcProofArtifactV1Schema = z
           path: ['overlays', index, 'frameId'],
         });
       }
+    }
+
+    const positiveVariantFrameIds = new Set<string>();
+    for (const [index, variant] of proof.positiveVariants.entries()) {
+      if (!frameIds.has(variant.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'QC positive variant frameId must be included in proof frameIds.',
+          path: ['positiveVariants', index, 'frameId'],
+        });
+      }
+
+      if (positiveVariantFrameIds.has(variant.frameId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'QC positive variants must be unique per frame.',
+          path: ['positiveVariants', index, 'frameId'],
+        });
+      }
+      positiveVariantFrameIds.add(variant.frameId);
     }
 
     for (const [index, metric] of proof.rollConsistency.frameMetrics.entries()) {
