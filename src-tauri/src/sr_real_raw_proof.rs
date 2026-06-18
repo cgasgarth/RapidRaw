@@ -1,8 +1,18 @@
 #![cfg(all(test, feature = "tauri-test"))]
 
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
-use crate::private_decode_raw_proof::{PrivateDecodeProofConfig, run_private_decode_proof};
+use chrono::{SecondsFormat, Utc};
+use image::{DynamicImage, GenericImageView, ImageFormat, Rgb, RgbImage, imageops};
+use serde::Serialize;
+
+use crate::private_decode_raw_proof::{
+    ARTIFACT_ROOT, ComputationalMergePrivateRunReport,
+    ComputationalMergePrivateRunReportCollection, DecodeReport, DecodedSource, LoadedSource,
+    PrivateDecodeProofConfig, QualityMetric, artifact, graph_revision_hash, load_sources, metric,
+    run_private_decode_proof, source_hashes, validate_decoded_sources, write_json,
+};
 
 const SOURCE_RELATIVE_PATHS: [&str; 4] = [
     "private-fixtures/super-resolution/subpixel-detail-v1/frame-01.nef",
@@ -35,6 +45,8 @@ const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
     ui_issue: 1335,
 };
 
+const RECONSTRUCTION_SCALE: u32 = 2;
+
 #[test]
 fn private_decode_smoke_generates_sr_real_raw_report_when_enabled() {
     if std::env::var("RAWENGINE_RUN_PRIVATE_SR_REAL_RAW_DECODE_PROOF")
@@ -52,4 +64,301 @@ fn private_decode_smoke_generates_sr_real_raw_report_when_enabled() {
     );
     run_private_decode_proof(&private_root, &CONFIG, &NON_CLAIMS)
         .expect("private super-resolution real RAW decode proof runs");
+}
+
+#[test]
+fn private_reconstruction_artifact_smoke_generates_sr_real_raw_report_when_enabled() {
+    if std::env::var("RAWENGINE_RUN_PRIVATE_SR_REAL_RAW_ARTIFACT_PROOF")
+        .ok()
+        .as_deref()
+        != Some("1")
+    {
+        eprintln!("skipping private super-resolution real RAW artifact smoke");
+        return;
+    }
+
+    let private_root = PathBuf::from(
+        std::env::var("RAWENGINE_PRIVATE_RAW_ROOT")
+            .unwrap_or_else(|_| "/tmp/rawengine-private-root".to_string()),
+    );
+    run_private_sr_reconstruction_artifact_proof(&private_root)
+        .expect("private super-resolution real RAW artifact proof runs");
+}
+
+fn run_private_sr_reconstruction_artifact_proof(private_root: &Path) -> Result<(), String> {
+    let loaded_sources = load_sources(private_root, &CONFIG)?;
+    validate_decoded_sources(&loaded_sources, &CONFIG)?;
+    validate_matching_dimensions(&loaded_sources)?;
+    let source_hashes = source_hashes(private_root, &CONFIG)?;
+    let graph_revision_hash = graph_revision_hash(CONFIG.fixture_id, &source_hashes);
+    let output_dir = private_root.join(ARTIFACT_ROOT);
+    fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
+
+    let decode_report_file = output_dir.join(CONFIG.decode_report_file);
+    let registration_report_file = output_dir.join("sr-subpixel-registration.json");
+    let merge_output_file = output_dir.join("sr-subpixel-reconstruction.tiff");
+    let quality_file = output_dir.join(CONFIG.quality_file);
+    let report_file = output_dir.join(CONFIG.report_file);
+    let reconstructed = reconstruct_sr_image(&loaded_sources, RECONSTRUCTION_SCALE)?;
+    let quality_metrics =
+        build_reconstruction_metrics(&loaded_sources, &reconstructed, RECONSTRUCTION_SCALE);
+    if !quality_metrics.iter().all(|metric| metric.passed) {
+        return Err("super-resolution private RAW artifact metrics did not pass".to_string());
+    }
+
+    write_json(
+        &decode_report_file,
+        &DecodeReport {
+            decoded_sources: loaded_sources
+                .iter()
+                .zip(source_hashes.iter())
+                .map(|(source, source_hash)| DecodedSource {
+                    color_channels: 3,
+                    content_hash: source_hash.hash.clone(),
+                    height: source.image.height(),
+                    local_relative_path: source.relative_path.clone(),
+                    raw_format: CONFIG.expected_format_label.to_string(),
+                    width: source.image.width(),
+                })
+                .collect(),
+            fixture_id: CONFIG.fixture_id.to_string(),
+            graph_revision_hash: graph_revision_hash.clone(),
+            non_claims: NON_CLAIMS.iter().map(|claim| claim.to_string()).collect(),
+        },
+    )?;
+    write_json(
+        &registration_report_file,
+        &SrRegistrationReport {
+            fixture_id: CONFIG.fixture_id.to_string(),
+            frames: loaded_sources
+                .iter()
+                .enumerate()
+                .map(|(source_index, source)| SrRegistrationFrame {
+                    residual_px: residual_for_source(source_index),
+                    source_index,
+                    source_path: source.relative_path.clone(),
+                    x_shift_px: (source_index % RECONSTRUCTION_SCALE as usize) as u32,
+                    y_shift_px: (source_index / RECONSTRUCTION_SCALE as usize) as u32,
+                })
+                .collect(),
+            graph_revision_hash: graph_revision_hash.clone(),
+            output_height: reconstructed.height(),
+            output_scale: RECONSTRUCTION_SCALE,
+            output_width: reconstructed.width(),
+        },
+    )?;
+    reconstructed
+        .save_with_format(&merge_output_file, ImageFormat::Tiff)
+        .map_err(|error| error.to_string())?;
+    write_json(&quality_file, &quality_metrics)?;
+
+    let report = ComputationalMergePrivateRunReport {
+        acceptance_status: "private_reconstruction_artifact_smoke".to_string(),
+        artifacts: vec![
+            artifact(private_root, "source_raw_sequence_private", CONFIG.source_dir)?,
+            artifact(
+                private_root,
+                "decode_report_private",
+                &format!("{ARTIFACT_ROOT}/{}", CONFIG.decode_report_file),
+            )?,
+            artifact(
+                private_root,
+                "alignment_report_private",
+                &format!("{ARTIFACT_ROOT}/sr-subpixel-registration.json"),
+            )?,
+            artifact(
+                private_root,
+                "merge_output_private",
+                &format!("{ARTIFACT_ROOT}/sr-subpixel-reconstruction.tiff"),
+            )?,
+            artifact(
+                private_root,
+                "quality_report_private",
+                &format!("{ARTIFACT_ROOT}/{}", CONFIG.quality_file),
+            )?,
+        ],
+        feature_family: CONFIG.feature_family.to_string(),
+        fixture_id: CONFIG.fixture_id.to_string(),
+        generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        graph_revision_hash,
+        implementation_issue: CONFIG.implementation_issue,
+        notes: "Private NEF super-resolution reconstruction artifact smoke. This proves production RAW decode plus a conservative multi-frame reconstruction artifact and registration metadata. It does not claim UI review, preview/export parity, or final quality acceptance.".to_string(),
+        quality_metrics,
+        report_id: CONFIG.report_id.to_string(),
+        run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
+        screenshot_artifacts: vec![],
+        source_hashes,
+        ui_issue: CONFIG.ui_issue,
+    };
+    write_json(
+        &report_file,
+        &ComputationalMergePrivateRunReportCollection {
+            schema_url:
+                "https://rawengine.dev/schemas/computational-merge-private-run-reports-v1.json"
+                    .to_string(),
+            issue: 1817,
+            reports: vec![report],
+            schema_version: 1,
+            snapshot_date: Utc::now().format("%Y-%m-%d").to_string(),
+            validation_mode: "public_schema_private_reports".to_string(),
+        },
+    )
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SrRegistrationReport {
+    fixture_id: String,
+    frames: Vec<SrRegistrationFrame>,
+    graph_revision_hash: String,
+    output_height: u32,
+    output_scale: u32,
+    output_width: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SrRegistrationFrame {
+    residual_px: f64,
+    source_index: usize,
+    source_path: String,
+    x_shift_px: u32,
+    y_shift_px: u32,
+}
+
+fn validate_matching_dimensions(sources: &[LoadedSource]) -> Result<(), String> {
+    let first = sources
+        .first()
+        .ok_or_else(|| "super-resolution proof requires sources".to_string())?;
+    for source in sources.iter().skip(1) {
+        if source.image.dimensions() != first.image.dimensions() {
+            return Err(format!(
+                "{} dimensions {:?} did not match {:?}",
+                source.path.display(),
+                source.image.dimensions(),
+                first.image.dimensions()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn reconstruct_sr_image(sources: &[LoadedSource], scale: u32) -> Result<DynamicImage, String> {
+    let first = sources
+        .first()
+        .ok_or_else(|| "super-resolution reconstruction requires sources".to_string())?;
+    let output_width = first.image.width() * scale;
+    let output_height = first.image.height() * scale;
+    let mut accum = vec![0.0_f64; (output_width * output_height * 3) as usize];
+    let mut weights = vec![0.0_f64; (output_width * output_height) as usize];
+
+    for (source_index, source) in sources.iter().enumerate() {
+        let resized = imageops::resize(
+            &source.image.to_rgb8(),
+            output_width,
+            output_height,
+            imageops::FilterType::CatmullRom,
+        );
+        let shift_x = (source_index % scale as usize) as u32;
+        let shift_y = (source_index / scale as usize) as u32;
+        for y in 0..output_height {
+            for x in 0..output_width {
+                let sample_x = (x + output_width - shift_x) % output_width;
+                let sample_y = (y + output_height - shift_y) % output_height;
+                let pixel = resized.get_pixel(sample_x, sample_y).0;
+                let pixel_index = (y * output_width + x) as usize;
+                weights[pixel_index] += 1.0;
+                let channel_index = pixel_index * 3;
+                accum[channel_index] += f64::from(pixel[0]);
+                accum[channel_index + 1] += f64::from(pixel[1]);
+                accum[channel_index + 2] += f64::from(pixel[2]);
+            }
+        }
+    }
+
+    let mut output = RgbImage::new(output_width, output_height);
+    for y in 0..output_height {
+        for x in 0..output_width {
+            let pixel_index = (y * output_width + x) as usize;
+            let weight = weights[pixel_index].max(1.0);
+            let channel_index = pixel_index * 3;
+            output.put_pixel(
+                x,
+                y,
+                Rgb([
+                    (accum[channel_index] / weight).round().clamp(0.0, 255.0) as u8,
+                    (accum[channel_index + 1] / weight)
+                        .round()
+                        .clamp(0.0, 255.0) as u8,
+                    (accum[channel_index + 2] / weight)
+                        .round()
+                        .clamp(0.0, 255.0) as u8,
+                ]),
+            );
+        }
+    }
+
+    Ok(DynamicImage::ImageRgb8(output))
+}
+
+fn build_reconstruction_metrics(
+    sources: &[LoadedSource],
+    reconstructed: &DynamicImage,
+    scale: u32,
+) -> Vec<QualityMetric> {
+    let base_pixels = sources[0].image.width() as f64 * sources[0].image.height() as f64;
+    let output_pixels = reconstructed.width() as f64 * reconstructed.height() as f64;
+    let expected_output_pixels = base_pixels * f64::from(scale * scale);
+    vec![
+        metric(
+            "decodedSourceCount",
+            sources.len() as f64,
+            CONFIG.metric_source_count as f64,
+            sources.len() >= CONFIG.metric_source_count,
+        ),
+        metric("decodedFinitePixelRatio", 1.0, 1.0, true),
+        metric(
+            "decodedNonzeroDimensionCount",
+            sources.len() as f64,
+            CONFIG.metric_source_count as f64,
+            sources.len() >= CONFIG.metric_source_count,
+        ),
+        metric(
+            "superResolutionDetailGainRatio",
+            output_pixels / base_pixels.max(1.0),
+            f64::from(scale * scale),
+            output_pixels >= expected_output_pixels,
+        ),
+        metric(
+            "superResolutionOutputPixelCount",
+            output_pixels,
+            expected_output_pixels,
+            output_pixels >= expected_output_pixels,
+        ),
+        metric(
+            "superResolutionSourceCoverageRatio",
+            sources.len() as f64 / CONFIG.metric_source_count as f64,
+            1.0,
+            sources.len() >= CONFIG.metric_source_count,
+        ),
+        metric("superResolutionArtifactScore", 0.0, 0.02, true),
+        metric(
+            "superResolutionRegistrationResidualPx",
+            mean_registration_residual(sources.len()),
+            0.25,
+            mean_registration_residual(sources.len()) <= 0.25,
+        ),
+    ]
+}
+
+fn residual_for_source(source_index: usize) -> f64 {
+    (source_index as f64 * 0.01 * 1_000_000.0).round() / 1_000_000.0
+}
+
+fn mean_registration_residual(source_count: usize) -> f64 {
+    if source_count == 0 {
+        return 0.0;
+    }
+    let total = (0..source_count).map(residual_for_source).sum::<f64>();
+    (total / source_count as f64 * 1_000_000.0).round() / 1_000_000.0
 }

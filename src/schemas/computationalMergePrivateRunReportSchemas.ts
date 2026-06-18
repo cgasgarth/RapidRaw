@@ -42,6 +42,10 @@ const metricNameSchema = z.enum([
   'panoramaStitchedSourceCount',
   'sharpnessGainRatio',
   'superResolutionDetailGainRatio',
+  'superResolutionArtifactScore',
+  'superResolutionOutputPixelCount',
+  'superResolutionRegistrationResidualPx',
+  'superResolutionSourceCoverageRatio',
   'previewExportMeanAbsDelta',
 ]);
 
@@ -104,6 +108,7 @@ const privateRunReportSchema = z
       'private_focus_stack_artifact_smoke',
       'private_stitch_artifact_smoke',
       'private_preview_export_smoke',
+      'private_reconstruction_artifact_smoke',
       'runtime_apply_capable',
       'passed_private_raw_e2e',
     ]),
@@ -159,6 +164,14 @@ const privateRunReportSchema = z
       'quality_report_private',
     ] as const;
     const forbiddenStitchArtifacts = ['preview_after_private', 'export_after_private'] as const;
+    const requiredReconstructionArtifacts = [
+      'source_raw_sequence_private',
+      'decode_report_private',
+      'alignment_report_private',
+      'merge_output_private',
+      'quality_report_private',
+    ] as const;
+    const forbiddenReconstructionArtifacts = ['preview_after_private', 'export_after_private'] as const;
     const requiredPreviewExportArtifacts = [
       'source_raw_sequence_private',
       'decode_report_private',
@@ -236,6 +249,28 @@ const privateRunReportSchema = z
           context.addIssue({
             code: 'custom',
             message: `Private stitch artifact smoke report must not claim ${artifactKind}.`,
+            path: ['artifacts'],
+          });
+        }
+      }
+    } else if (
+      report.acceptanceStatus === 'private_reconstruction_artifact_smoke' &&
+      report.featureFamily === 'super_resolution'
+    ) {
+      for (const artifactKind of requiredReconstructionArtifacts) {
+        if (!artifactKinds.includes(artifactKind)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Private reconstruction artifact smoke report requires ${artifactKind}.`,
+            path: ['artifacts'],
+          });
+        }
+      }
+      for (const artifactKind of forbiddenReconstructionArtifacts) {
+        if (artifactKinds.includes(artifactKind)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Private reconstruction artifact smoke report must not claim ${artifactKind}.`,
             path: ['artifacts'],
           });
         }
