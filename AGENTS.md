@@ -129,8 +129,11 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   full feature as done until runtime behavior, preview/export behavior, E2E or
   equivalent workflow coverage, screenshots or artifacts, and follow-up gaps are
   all proven or explicitly tracked.
-- For image-editing features, verify with real image processing behavior and
-  artifacts, not only type/lint checks.
+- For image-editing features, completion validation must include actually
+  running the app/software with the new feature on RAW images and validating the
+  output image or generated artifacts. Schemas, dry-runs, synthetic fixtures, or
+  UI-only smoke checks are useful intermediate proof, but they are not enough to
+  close a feature as complete.
 - Do not count planning, schema, API, or UI-only work as a complete feature
   unless end-to-end workflow proof exists in the same PR. If E2E proof is not
   included, state the runtime status explicitly and keep or create a follow-up
