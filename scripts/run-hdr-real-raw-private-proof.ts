@@ -4,6 +4,7 @@ import { runComputationalPrivateProof } from './lib/computational-private-proof-
 
 await runComputationalPrivateProof({
   featureLabel: 'hdr',
+  fixtureId: 'validation.computational-merge.hdr-bracket-alignment.v1',
   privateStep: {
     command: [
       'cargo',
