@@ -176,6 +176,12 @@ const copy = {
   panoramaArtifactPath: '/tmp/panorama.tif',
   panoramaSourceOrder: 'left,center,right,detail,sky',
   superResolutionSmoke: 'Super Resolution Smoke',
+  superResolutionReview: 'Super-resolution review',
+  superResolutionDryRunPreview: 'Dry-run preview',
+  superResolutionArtifactHandoff: 'Artifact handoff',
+  superResolutionDryRunTool: 'super_resolution.merge.dry_run_command',
+  superResolutionArtifactPath: '/tmp/rawengine-super-resolution-smoke.tif',
+  superResolutionSourceSet: 'handheld burst x5',
   colorWorkflow: 'Color Workflow',
   layerWorkflowTitle: 'Local Adjustment Stack',
   layerMoveDown: 'Move down',
@@ -824,6 +830,19 @@ function SuperResolutionVisualSmoke() {
         <div
           className="sr-only"
           data-alignment-mode={settings.alignmentMode}
+          data-artifact-path={copy.superResolutionArtifactPath}
+          data-command={copy.superResolutionDryRunTool}
+          data-detail-policy={settings.detailPolicy}
+          data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
+          data-output-scale={settings.outputScale}
+          data-quality-preference={settings.qualityPreference}
+          data-runtime-status="dry_run_preview"
+          data-source-count="5"
+          data-testid="sr-review-workspace-proof"
+        />
+        <div
+          className="sr-only"
+          data-alignment-mode={settings.alignmentMode}
           data-detail-policy={settings.detailPolicy}
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-output-scale={settings.outputScale}
@@ -844,6 +863,26 @@ function SuperResolutionVisualSmoke() {
           settings={settings}
           sourceCount={5}
         />
+        <aside className="fixed right-4 top-14 z-50 w-80 rounded-md border border-white/10 bg-black/75 p-3 text-sm shadow-lg">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-semibold">{copy.superResolutionReview}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.superResolutionDryRunPreview}</span>
+          </div>
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.superResolutionDryRunTool}</p>
+              <p>{settings.alignmentMode}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.superResolutionSourceSet}</p>
+              <p>{settings.detailPolicy}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="sr-artifact-handoff">
+              <p className="text-xs text-[#aab2bd]">{copy.superResolutionArtifactHandoff}</p>
+              <p>{copy.superResolutionArtifactPath}</p>
+            </div>
+          </div>
+        </aside>
       </div>
     </main>
   );
