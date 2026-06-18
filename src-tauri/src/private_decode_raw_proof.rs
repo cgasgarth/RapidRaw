@@ -12,7 +12,7 @@ use crate::app_settings::AppSettings;
 use crate::formats::is_raw_file;
 use crate::image_loader::load_base_image_from_bytes;
 
-const ARTIFACT_ROOT: &str = "private-artifacts/validation/computational-merge";
+pub(crate) const ARTIFACT_ROOT: &str = "private-artifacts/validation/computational-merge";
 
 pub struct PrivateDecodeProofConfig {
     pub decode_report_file: &'static str,
@@ -32,97 +32,97 @@ pub struct PrivateDecodeProofConfig {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ComputationalMergePrivateRunReportCollection {
+pub(crate) struct ComputationalMergePrivateRunReportCollection {
     #[serde(rename = "$schema")]
-    schema_url: String,
-    issue: u32,
-    reports: Vec<ComputationalMergePrivateRunReport>,
-    schema_version: u32,
-    snapshot_date: String,
-    validation_mode: String,
+    pub(crate) schema_url: String,
+    pub(crate) issue: u32,
+    pub(crate) reports: Vec<ComputationalMergePrivateRunReport>,
+    pub(crate) schema_version: u32,
+    pub(crate) snapshot_date: String,
+    pub(crate) validation_mode: String,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ComputationalMergePrivateRunReport {
-    acceptance_status: String,
-    artifacts: Vec<RunArtifact>,
-    feature_family: String,
-    fixture_id: String,
-    generated_at: String,
-    graph_revision_hash: String,
-    implementation_issue: u32,
-    notes: String,
-    quality_metrics: Vec<QualityMetric>,
-    report_id: String,
+pub(crate) struct ComputationalMergePrivateRunReport {
+    pub(crate) acceptance_status: String,
+    pub(crate) artifacts: Vec<RunArtifact>,
+    pub(crate) feature_family: String,
+    pub(crate) fixture_id: String,
+    pub(crate) generated_at: String,
+    pub(crate) graph_revision_hash: String,
+    pub(crate) implementation_issue: u32,
+    pub(crate) notes: String,
+    pub(crate) quality_metrics: Vec<QualityMetric>,
+    pub(crate) report_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    run_id: Option<String>,
-    screenshot_artifacts: Vec<ScreenshotArtifact>,
-    source_hashes: Vec<SourceHash>,
-    ui_issue: u32,
+    pub(crate) run_id: Option<String>,
+    pub(crate) screenshot_artifacts: Vec<ScreenshotArtifact>,
+    pub(crate) source_hashes: Vec<SourceHash>,
+    pub(crate) ui_issue: u32,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct SourceHash {
-    hash: String,
-    local_relative_path: String,
-    path: String,
-    public_repo_allowed: bool,
+pub(crate) struct SourceHash {
+    pub(crate) hash: String,
+    pub(crate) local_relative_path: String,
+    pub(crate) path: String,
+    pub(crate) public_repo_allowed: bool,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct RunArtifact {
-    hash: String,
-    kind: String,
-    path: String,
-    public_repo_allowed: bool,
+pub(crate) struct RunArtifact {
+    pub(crate) hash: String,
+    pub(crate) kind: String,
+    pub(crate) path: String,
+    pub(crate) public_repo_allowed: bool,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ScreenshotArtifact {
-    hash: String,
-    label: String,
-    path: String,
-    public_repo_allowed: bool,
+pub(crate) struct ScreenshotArtifact {
+    pub(crate) hash: String,
+    pub(crate) label: String,
+    pub(crate) path: String,
+    pub(crate) public_repo_allowed: bool,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct DecodeReport {
-    decoded_sources: Vec<DecodedSource>,
-    fixture_id: String,
-    graph_revision_hash: String,
-    non_claims: Vec<String>,
+pub(crate) struct DecodeReport {
+    pub(crate) decoded_sources: Vec<DecodedSource>,
+    pub(crate) fixture_id: String,
+    pub(crate) graph_revision_hash: String,
+    pub(crate) non_claims: Vec<String>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct DecodedSource {
-    color_channels: u8,
-    content_hash: String,
-    height: u32,
-    local_relative_path: String,
-    raw_format: String,
-    width: u32,
+pub(crate) struct DecodedSource {
+    pub(crate) color_channels: u8,
+    pub(crate) content_hash: String,
+    pub(crate) height: u32,
+    pub(crate) local_relative_path: String,
+    pub(crate) raw_format: String,
+    pub(crate) width: u32,
 }
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct QualityMetric {
-    name: String,
-    passed: bool,
-    source: String,
-    threshold: f64,
-    value: f64,
+pub(crate) struct QualityMetric {
+    pub(crate) name: String,
+    pub(crate) passed: bool,
+    pub(crate) source: String,
+    pub(crate) threshold: f64,
+    pub(crate) value: f64,
 }
 
-struct LoadedSource {
-    image: DynamicImage,
-    path: PathBuf,
-    relative_path: String,
+pub(crate) struct LoadedSource {
+    pub(crate) image: DynamicImage,
+    pub(crate) path: PathBuf,
+    pub(crate) relative_path: String,
 }
 
 pub fn run_private_decode_proof(
@@ -214,7 +214,7 @@ pub fn run_private_decode_proof(
     )
 }
 
-fn load_sources(
+pub(crate) fn load_sources(
     private_root: &Path,
     config: &PrivateDecodeProofConfig,
 ) -> Result<Vec<LoadedSource>, String> {
@@ -243,7 +243,7 @@ fn load_sources(
         .collect()
 }
 
-fn validate_decoded_sources(
+pub(crate) fn validate_decoded_sources(
     sources: &[LoadedSource],
     config: &PrivateDecodeProofConfig,
 ) -> Result<(), String> {
@@ -267,7 +267,10 @@ fn validate_decoded_sources(
     Ok(())
 }
 
-fn build_metrics(sources: &[LoadedSource], expected_source_count: usize) -> Vec<QualityMetric> {
+pub(crate) fn build_metrics(
+    sources: &[LoadedSource],
+    expected_source_count: usize,
+) -> Vec<QualityMetric> {
     let decoded_source_count = sources.len() as f64;
     let decoded_nonzero_dimension_count = sources
         .iter()
@@ -291,7 +294,7 @@ fn build_metrics(sources: &[LoadedSource], expected_source_count: usize) -> Vec<
     ]
 }
 
-fn source_hashes(
+pub(crate) fn source_hashes(
     private_root: &Path,
     config: &PrivateDecodeProofConfig,
 ) -> Result<Vec<SourceHash>, String> {
@@ -310,7 +313,7 @@ fn source_hashes(
         .collect()
 }
 
-fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
+pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
     fs::write(
         path,
         serde_json::to_vec_pretty(value).map_err(|error| error.to_string())?,
@@ -318,7 +321,11 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
     .map_err(|error| error.to_string())
 }
 
-fn artifact(private_root: &Path, kind: &str, relative_path: &str) -> Result<RunArtifact, String> {
+pub(crate) fn artifact(
+    private_root: &Path,
+    kind: &str,
+    relative_path: &str,
+) -> Result<RunArtifact, String> {
     Ok(RunArtifact {
         hash: hash_private_path(&private_root.join(relative_path))?,
         kind: kind.to_string(),
@@ -327,7 +334,7 @@ fn artifact(private_root: &Path, kind: &str, relative_path: &str) -> Result<RunA
     })
 }
 
-fn metric(name: &str, value: f64, threshold: f64, passed: bool) -> QualityMetric {
+pub(crate) fn metric(name: &str, value: f64, threshold: f64, passed: bool) -> QualityMetric {
     QualityMetric {
         name: name.to_string(),
         passed,
@@ -337,7 +344,7 @@ fn metric(name: &str, value: f64, threshold: f64, passed: bool) -> QualityMetric
     }
 }
 
-fn graph_revision_hash(fixture_id: &str, source_hashes: &[SourceHash]) -> String {
+pub(crate) fn graph_revision_hash(fixture_id: &str, source_hashes: &[SourceHash]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(fixture_id.as_bytes());
     for source in source_hashes {

@@ -16,7 +16,13 @@ const artifactKindSchema = z.enum([
 ]);
 
 const metricNameSchema = z.enum([
+  'alignmentAcceptedPairCount',
+  'alignmentFiniteTransformCount',
+  'alignmentInlierCount',
   'alignmentInlierRatio',
+  'alignmentMatchCount',
+  'alignmentMeanReprojectionErrorPx',
+  'alignmentRejectedPairCount',
   'decodedFinitePixelRatio',
   'decodedNonzeroDimensionCount',
   'decodedSourceCount',
@@ -83,7 +89,12 @@ const runtimeResultIdsSchema = z
 
 const privateRunReportSchema = z
   .object({
-    acceptanceStatus: z.enum(['private_decode_smoke', 'runtime_apply_capable', 'passed_private_raw_e2e']),
+    acceptanceStatus: z.enum([
+      'private_decode_smoke',
+      'private_alignment_smoke',
+      'runtime_apply_capable',
+      'passed_private_raw_e2e',
+    ]),
     artifacts: z.array(runArtifactSchema).min(3),
     commandIds: commandIdsSchema.optional(),
     featureFamily: featureFamilySchema,
@@ -121,6 +132,12 @@ const privateRunReportSchema = z
       'decode_report_private',
       'quality_report_private',
     ] as const;
+    const requiredAlignmentArtifacts = [
+      'source_raw_sequence_private',
+      'decode_report_private',
+      'alignment_report_private',
+      'quality_report_private',
+    ] as const;
     const forbiddenDecodeArtifacts = ['merge_output_private', 'preview_after_private', 'export_after_private'] as const;
     if (
       report.acceptanceStatus === 'private_decode_smoke' &&
@@ -142,6 +159,25 @@ const privateRunReportSchema = z
           context.addIssue({
             code: 'custom',
             message: `Private decode smoke report must not claim ${artifactKind}.`,
+            path: ['artifacts'],
+          });
+        }
+      }
+    } else if (report.acceptanceStatus === 'private_alignment_smoke' && report.featureFamily === 'panorama_stitch') {
+      for (const artifactKind of requiredAlignmentArtifacts) {
+        if (!artifactKinds.includes(artifactKind)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Private alignment smoke report requires ${artifactKind}.`,
+            path: ['artifacts'],
+          });
+        }
+      }
+      for (const artifactKind of forbiddenDecodeArtifacts) {
+        if (artifactKinds.includes(artifactKind)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Private alignment smoke report must not claim ${artifactKind}.`,
             path: ['artifacts'],
           });
         }

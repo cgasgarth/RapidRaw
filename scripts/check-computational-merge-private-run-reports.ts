@@ -74,8 +74,12 @@ for (const report of reportCollection.reports) {
     (report.featureFamily === 'panorama_stitch' ||
       report.featureFamily === 'focus_stack' ||
       report.featureFamily === 'super_resolution');
+  const alignmentSmoke =
+    report.acceptanceStatus === 'private_alignment_smoke' && report.featureFamily === 'panorama_stitch';
   if (decodeSmoke) {
     verifyDecodeSmokeReport(report, proofCase.localSourceRelativePaths.length);
+  } else if (alignmentSmoke) {
+    verifyAlignmentSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else {
     for (const artifact of report.artifacts) {
       const manifestArtifact = manifestArtifacts.get(artifact.kind);
@@ -180,7 +184,12 @@ async function verifyPrivateAssets(
 }
 
 function metricPassesThreshold(name: string, value: number, threshold: number): boolean {
-  if (name === 'previewExportMeanAbsDelta' || name === 'focusTransitionArtifactScore') {
+  if (
+    name === 'previewExportMeanAbsDelta' ||
+    name === 'focusTransitionArtifactScore' ||
+    name === 'alignmentMeanReprojectionErrorPx' ||
+    name === 'alignmentRejectedPairCount'
+  ) {
     return value <= threshold;
   }
   return value >= threshold;
@@ -214,6 +223,81 @@ function verifyDecodeSmokeReport(
     failures.push(
       `${report.fixtureId}: decode smoke must prove decodedNonzeroDimensionCount >= ${expectedSourceCount}.`,
     );
+  }
+}
+
+function verifyAlignmentSmokeReport(
+  report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
+  expectedSourceCount: number,
+): void {
+  const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
+  for (const requiredKind of [
+    'source_raw_sequence_private',
+    'decode_report_private',
+    'alignment_report_private',
+    'quality_report_private',
+  ]) {
+    if (!artifactKinds.has(requiredKind))
+      failures.push(`${report.fixtureId}: alignment smoke missing ${requiredKind}.`);
+  }
+  for (const forbiddenKind of ['merge_output_private', 'preview_after_private', 'export_after_private']) {
+    if (artifactKinds.has(forbiddenKind)) {
+      failures.push(`${report.fixtureId}: alignment smoke must not claim ${forbiddenKind}.`);
+    }
+  }
+
+  const expectedPairCount = Math.max(0, expectedSourceCount - 1);
+  const reportMetrics = new Map(report.qualityMetrics.map((metric) => [metric.name, metric]));
+  const decodedSourceCount = reportMetrics.get('decodedSourceCount');
+  const decodedFinitePixelRatio = reportMetrics.get('decodedFinitePixelRatio');
+  const alignmentMatchCount = reportMetrics.get('alignmentMatchCount');
+  const alignmentInlierCount = reportMetrics.get('alignmentInlierCount');
+  const alignmentInlierRatio = reportMetrics.get('alignmentInlierRatio');
+  const alignmentAcceptedPairCount = reportMetrics.get('alignmentAcceptedPairCount');
+  const alignmentRejectedPairCount = reportMetrics.get('alignmentRejectedPairCount');
+  const alignmentFiniteTransformCount = reportMetrics.get('alignmentFiniteTransformCount');
+  const alignmentMeanReprojectionErrorPx = reportMetrics.get('alignmentMeanReprojectionErrorPx');
+
+  if (decodedSourceCount === undefined || decodedSourceCount.value < expectedSourceCount) {
+    failures.push(`${report.fixtureId}: alignment smoke must prove decodedSourceCount >= ${expectedSourceCount}.`);
+  }
+  if (decodedFinitePixelRatio === undefined || decodedFinitePixelRatio.value < 1) {
+    failures.push(`${report.fixtureId}: alignment smoke must prove decodedFinitePixelRatio >= 1.`);
+  }
+  if (alignmentMatchCount === undefined || alignmentMatchCount.value <= 0) {
+    failures.push(`${report.fixtureId}: alignment smoke must prove alignmentMatchCount > 0.`);
+  }
+  if (alignmentInlierCount === undefined || alignmentInlierCount.value <= 0) {
+    failures.push(`${report.fixtureId}: alignment smoke must prove alignmentInlierCount > 0.`);
+  }
+  if (
+    alignmentInlierRatio === undefined ||
+    !metricPassesThreshold(alignmentInlierRatio.name, alignmentInlierRatio.value, alignmentInlierRatio.threshold)
+  ) {
+    failures.push(`${report.fixtureId}: alignment smoke must prove alignmentInlierRatio meets threshold.`);
+  }
+  if (alignmentAcceptedPairCount === undefined || alignmentAcceptedPairCount.value < expectedPairCount) {
+    failures.push(
+      `${report.fixtureId}: alignment smoke must prove alignmentAcceptedPairCount >= ${expectedPairCount}.`,
+    );
+  }
+  if (alignmentRejectedPairCount === undefined || alignmentRejectedPairCount.value > 0) {
+    failures.push(`${report.fixtureId}: alignment smoke must prove alignmentRejectedPairCount <= 0.`);
+  }
+  if (alignmentFiniteTransformCount === undefined || alignmentFiniteTransformCount.value < expectedPairCount) {
+    failures.push(
+      `${report.fixtureId}: alignment smoke must prove alignmentFiniteTransformCount >= ${expectedPairCount}.`,
+    );
+  }
+  if (
+    alignmentMeanReprojectionErrorPx === undefined ||
+    !metricPassesThreshold(
+      alignmentMeanReprojectionErrorPx.name,
+      alignmentMeanReprojectionErrorPx.value,
+      alignmentMeanReprojectionErrorPx.threshold,
+    )
+  ) {
+    failures.push(`${report.fixtureId}: alignment smoke must prove bounded mean reprojection error.`);
   }
 }
 
