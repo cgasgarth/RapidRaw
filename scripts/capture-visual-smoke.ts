@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 import { VISUAL_SMOKE_SCENARIOS } from '../src/validation/visual/visualSmokeScenarios.ts';
 import {
+  agentArtifactReviewProofDatasetSchema,
   agentDryRunReviewProofDatasetSchema,
   agentChatProofDatasetSchema,
   assertFilmLookExportProof,
@@ -121,6 +122,8 @@ async function prepareScenario(page, mode) {
     const shell = page.getByTestId('agent-chat-shell');
     await shell.waitFor({ timeout: 10_000 });
     agentChatProofDatasetSchema.parse(await shell.evaluate((element) => ({ ...element.dataset })));
+    const artifacts = page.getByTestId('agent-artifact-review');
+    agentArtifactReviewProofDatasetSchema.parse(await artifacts.evaluate((element) => ({ ...element.dataset })));
     const review = page.getByTestId('agent-dry-run-review');
     agentDryRunReviewProofDatasetSchema.parse(await review.evaluate((element) => ({ ...element.dataset })));
     await page.getByTestId('agent-chat-messages').getByText('Dry-run only.', { exact: false }).waitFor({
@@ -139,6 +142,25 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('agent-chat-actions').getByText('Inspect diff', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('agent-before-after-preview').getByText('graph_rev_45_preview', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page
+      .getByTestId('agent-preview-artifacts')
+      .getByText('artifact_edit_graph_patch_preview', { exact: true })
+      .waitFor({
+        timeout: 10_000,
+      });
+    await page.getByTestId('agent-preview-artifacts').getByText('review_required', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    const replayLinkCount = await page
+      .getByTestId('agent-audit-entries')
+      .locator('a[href*="agent-replay-proof-gallery-2026-06-16.html"]')
+      .count();
+    if (replayLinkCount !== 3) {
+      throw new Error(`Expected 3 visible agent replay links, found ${replayLinkCount}.`);
+    }
     await page.getByTestId('agent-approval-states').getByText('Approve dry-run', { exact: true }).waitFor({
       timeout: 10_000,
     });

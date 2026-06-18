@@ -1,6 +1,69 @@
 import { agentChatTranscriptSchema, type AgentChatTranscript } from '../schemas/agentChatTranscriptSchemas';
 
 const fixture = {
+  artifactReview: {
+    auditEntries: [
+      {
+        artifactId: 'artifact_edit_graph_patch_preview',
+        id: 'audit-preview-artifact',
+        replayLink: 'docs/validation/agent-replay-proof-gallery-2026-06-16.html#artifact-hash-proof',
+        stage: 'dry_run',
+        summary: 'Dry-run preview is linked to the warning tool call and has not been applied.',
+        toolCallId: 'tool-2',
+      },
+      {
+        artifactId: 'artifact_ai_subject_mask_alpha',
+        id: 'audit-mask-artifact',
+        replayLink: 'docs/validation/agent-replay-proof-gallery-2026-06-16.html#artifact-hash-proof',
+        stage: 'preview',
+        summary: 'Subject mask preview is available for review before apply.',
+        toolCallId: 'tool-2',
+      },
+      {
+        artifactId: 'artifact_ai_inpaint_preview_patch',
+        id: 'audit-apply-blocked',
+        replayLink: 'docs/validation/agent-replay-proof-gallery-2026-06-16.html#artifact-hash-proof',
+        stage: 'apply_blocked',
+        summary: 'Apply remains blocked until replay approval exists.',
+        toolCallId: 'tool-3',
+      },
+    ],
+    beforeAfter: {
+      afterLabel: 'Dry-run preview',
+      afterRevision: 'graph_rev_45_preview',
+      beforeLabel: 'Current edit graph',
+      beforeRevision: 'graph_rev_44',
+    },
+    previewArtifacts: [
+      {
+        contentHash: 'sha256:2f0c9d81a77b4e51',
+        id: 'artifact_edit_graph_patch_preview',
+        kind: 'edit_preview',
+        source: 'output.previewArtifacts',
+        status: 'review_required',
+        title: 'Tone/color preview',
+        toolCallId: 'tool-2',
+      },
+      {
+        contentHash: 'sha256:74d6ae13b5c20e9f',
+        id: 'artifact_ai_subject_mask_alpha',
+        kind: 'mask_preview',
+        source: 'output.maskArtifacts',
+        status: 'ready',
+        title: 'Protected subject mask',
+        toolCallId: 'tool-2',
+      },
+      {
+        contentHash: 'sha256:5a42f8c0e73d912b',
+        id: 'artifact_ai_inpaint_preview_patch',
+        kind: 'clipping_map',
+        source: 'auditLog.affectedArtifactIds',
+        status: 'audit_only',
+        title: 'Highlight warning map',
+        toolCallId: 'tool-3',
+      },
+    ],
+  },
   dryRunReview: {
     actions: [
       {

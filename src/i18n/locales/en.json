@@ -421,6 +421,11 @@
           "rejected": "Approval rejected",
           "required": "Approval required"
         },
+        "artifacts": {
+          "audit": "Audit",
+          "title": "Preview artifacts",
+          "uiOnly": "Before/after previews and audit links are review evidence only."
+        },
         "duration": {
           "pending": "Pending"
         },

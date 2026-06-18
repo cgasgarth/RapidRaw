@@ -232,6 +232,11 @@ export const commandPaletteWorkflowProofSchema = z.object({
 export const agentChatProofDatasetSchema = z.object({
   agentRuntimeStatus: z.literal('ui_only_demo'),
 });
+export const agentArtifactReviewProofDatasetSchema = z.object({
+  artifactCount: z.literal('3'),
+  auditCount: z.literal('3'),
+  beforeRevision: z.literal('graph_rev_44'),
+});
 export const agentDryRunReviewProofDatasetSchema = z.object({
   actionCount: z.literal('3'),
   affectedTargetCount: z.literal('3'),
