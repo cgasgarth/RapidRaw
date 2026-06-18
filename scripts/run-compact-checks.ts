@@ -91,6 +91,7 @@ const CHECK_GROUPS = {
     'check:layer-stack',
     'check:layer-multiply-screen-runtime',
     'check:layer-normal-opacity-runtime',
+    'check:layer-overlay-soft-light-runtime',
     'check:layer-stack-undo-redo',
     'check:layer-mask-audit',
     'check:layer-adjustments',

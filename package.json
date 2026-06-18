@@ -69,6 +69,7 @@
     "check:layer-stack": "bun scripts/check-layer-stack-operations.ts",
     "check:layer-multiply-screen-runtime": "bun scripts/check-layer-multiply-screen-runtime.ts",
     "check:layer-normal-opacity-runtime": "bun scripts/check-layer-normal-opacity-runtime.ts",
+    "check:layer-overlay-soft-light-runtime": "bun scripts/check-layer-overlay-soft-light-runtime.ts",
     "check:layer-stack-undo-redo": "bun scripts/check-layer-stack-undo-redo.ts",
     "check:layer-opacity-order-runtime": "bun scripts/check-layer-opacity-order-runtime.ts",
     "check:layer-mask-audit": "bun scripts/check-layer-mask-model-audit.ts",
