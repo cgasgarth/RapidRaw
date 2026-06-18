@@ -1,0 +1,36 @@
+{
+  "cases": [
+    {
+      "case": "horizontal-overlap-translation",
+      "estimatedTransform": {
+        "model": "translation",
+        "x": 48,
+        "y": 2
+      },
+      "inlierCount": 8,
+      "maxInlierErrorPx": 0,
+      "matchCount": 8,
+      "provenance": {
+        "algorithmId": "synthetic_descriptor_translation_ransac_v1",
+        "boundedFailureMode": "not_applicable",
+        "fixture": "fixtures/panorama/panorama-feature-transform-fixtures.json",
+        "runtimeStatus": "feature_match_transform_estimate_proof"
+      }
+    },
+    {
+      "case": "insufficient-overlap-rejection",
+      "failureCode": "insufficient_inlier_matches",
+      "matchCount": 2,
+      "minimumInliers": 4,
+      "provenance": {
+        "algorithmId": "synthetic_descriptor_translation_ransac_v1",
+        "boundedFailureMode": "actionable_error",
+        "fixture": "fixtures/panorama/panorama-feature-transform-fixtures.json",
+        "runtimeStatus": "feature_match_transform_estimate_proof"
+      }
+    }
+  ],
+  "issue": 1886,
+  "schemaVersion": 1,
+  "validationMode": "panorama_feature_matching_transform_metadata"
+}
