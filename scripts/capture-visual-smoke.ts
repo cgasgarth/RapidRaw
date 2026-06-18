@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 import { VISUAL_SMOKE_SCENARIOS } from '../src/validation/visual/visualSmokeScenarios.ts';
 import {
+  agentDryRunReviewProofDatasetSchema,
   agentChatProofDatasetSchema,
   assertFilmLookExportProof,
   assertNegativeLabBaseFogPreviewExportProof,
@@ -120,6 +121,8 @@ async function prepareScenario(page, mode) {
     const shell = page.getByTestId('agent-chat-shell');
     await shell.waitFor({ timeout: 10_000 });
     agentChatProofDatasetSchema.parse(await shell.evaluate((element) => ({ ...element.dataset })));
+    const review = page.getByTestId('agent-dry-run-review');
+    agentDryRunReviewProofDatasetSchema.parse(await review.evaluate((element) => ({ ...element.dataset })));
     await page.getByTestId('agent-chat-messages').getByText('Dry-run only.', { exact: false }).waitFor({
       timeout: 10_000,
     });
@@ -136,6 +139,27 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('agent-chat-actions').getByText('Inspect diff', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('agent-approval-states').getByText('Approve dry-run', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-approval-states').getByText('rejected', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-approval-states').getByText('unavailable', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-parameter-diffs').getByText('Temperature', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-affected-targets').getByText('DSC_1042.ARW', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-review-warnings').getByText('runtime apply', { exact: false }).waitFor({
+      timeout: 10_000,
+    });
+    if (await page.getByText('Approve apply', { exact: true }).isEnabled()) {
+      throw new Error('Agent apply action must stay disabled in UI-only smoke.');
+    }
     return;
   }
 

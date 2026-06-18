@@ -1,6 +1,69 @@
 import { agentChatTranscriptSchema, type AgentChatTranscript } from '../schemas/agentChatTranscriptSchemas';
 
 const fixture = {
+  dryRunReview: {
+    actions: [
+      {
+        id: 'approve-dry-run',
+        label: 'Approve dry-run',
+        reason: 'Requires runtime replay before apply can be enabled.',
+        state: 'disabled',
+      },
+      {
+        id: 'reject-plan',
+        label: 'Reject plan',
+        reason: 'Rejected state is visible and audit-only in this fixture.',
+        state: 'rejected',
+      },
+      {
+        id: 'apply-unavailable',
+        label: 'Apply unavailable',
+        reason: 'UI-only demo cannot mutate project state.',
+        state: 'unavailable',
+      },
+    ],
+    affectedTargets: [
+      {
+        id: 'current-frame',
+        label: 'Frame',
+        value: 'DSC_1042.ARW',
+      },
+      {
+        id: 'sidecar',
+        label: 'Sidecar',
+        value: 'Pending dry-run artifact',
+      },
+      {
+        id: 'mask',
+        label: 'Mask',
+        value: 'Protected subject mask',
+      },
+    ],
+    parameterDiffs: [
+      {
+        after: '+420 K',
+        before: '+0 K',
+        id: 'temperature',
+        label: 'Temperature',
+      },
+      {
+        after: '-18',
+        before: '0',
+        id: 'highlights',
+        label: 'Highlights',
+      },
+      {
+        after: '+7',
+        before: '0',
+        id: 'subject-saturation',
+        label: 'Subject saturation',
+      },
+    ],
+    warnings: [
+      'Window highlight clipping must be reviewed before apply.',
+      'Runtime apply stays disabled until app-server replay proof exists.',
+    ],
+  },
   id: 'agent-chat-demo-portrait-grade-v1',
   messages: [
     {

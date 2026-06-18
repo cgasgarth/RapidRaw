@@ -4,6 +4,7 @@ export const agentChatMessageRoleSchema = z.enum(['assistant', 'system', 'user']
 export const agentChatToolCallModeSchema = z.enum(['apply', 'dry_run', 'read']);
 export const agentChatToolCallStatusSchema = z.enum(['blocked', 'failed', 'queued', 'running', 'succeeded', 'warning']);
 export const agentChatApprovalStateSchema = z.enum(['approved', 'not_required', 'rejected', 'required']);
+export const agentChatReviewActionStateSchema = z.enum(['available', 'disabled', 'rejected', 'unavailable']);
 
 export const agentChatMessageSchema = z
   .object({
@@ -40,8 +41,50 @@ export const agentChatToolCallSchema = z
   })
   .strict();
 
+export const agentChatDryRunReviewSchema = z
+  .object({
+    actions: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            reason: z.string().min(1),
+            state: agentChatReviewActionStateSchema,
+          })
+          .strict(),
+      )
+      .min(1),
+    affectedTargets: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            label: z.string().min(1),
+            value: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    parameterDiffs: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            after: z.string().min(1),
+            before: z.string().min(1),
+            label: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(1),
+    warnings: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
+
 export const agentChatTranscriptSchema = z
   .object({
+    dryRunReview: agentChatDryRunReviewSchema.optional(),
     id: z.string().min(1),
     messages: z.array(agentChatMessageSchema).min(1),
     runtimeStatus: z.literal('ui_only_demo'),
@@ -52,4 +95,5 @@ export const agentChatTranscriptSchema = z
 
 export type AgentChatMessage = z.infer<typeof agentChatMessageSchema>;
 export type AgentChatToolCall = z.infer<typeof agentChatToolCallSchema>;
+export type AgentChatDryRunReview = z.infer<typeof agentChatDryRunReviewSchema>;
 export type AgentChatTranscript = z.infer<typeof agentChatTranscriptSchema>;

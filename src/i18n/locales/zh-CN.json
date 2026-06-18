@@ -430,6 +430,12 @@
           "read": ""
         },
         "noAppliedEdits": "",
+        "review": {
+          "dryRun": "",
+          "parameterDiffs": "",
+          "title": "",
+          "uiOnly": ""
+        },
         "title": "",
         "transcript": "",
         "uiOnly": ""
