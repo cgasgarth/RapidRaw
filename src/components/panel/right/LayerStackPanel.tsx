@@ -1,18 +1,5 @@
 import cx from 'clsx';
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronDown,
-  Copy,
-  Eye,
-  EyeOff,
-  FolderOpen,
-  FolderPlus,
-  GripVertical,
-  Layers3,
-  Plus,
-  Trash2,
-} from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, Layers3, Plus, Trash2 } from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -235,7 +222,7 @@ export default function LayerStackPanel({
             onClick={groupActiveLayer}
             type="button"
           >
-            <FolderPlus size={17} className="mx-auto" />
+            <Layers3 size={17} className="mx-auto" />
           </button>
           <button
             className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
@@ -276,7 +263,7 @@ export default function LayerStackPanel({
                 className={row.isBase || row.isGroupedLayer ? 'text-transparent' : 'text-text-secondary'}
               />
               <span className="flex h-7 w-7 items-center justify-center rounded bg-bg-primary text-text-secondary ring-1 ring-surface">
-                {row.isGroupHeader ? <FolderOpen size={15} /> : <Layers3 size={15} />}
+                <Layers3 size={15} />
               </span>
               <span className="min-w-0">
                 <UiText as="span" variant={TextVariants.body} weight={TextWeights.medium} className="block truncate">
@@ -398,7 +385,7 @@ export default function LayerStackPanel({
               onClick={ungroupActiveLayer}
               type="button"
             >
-              <FolderOpen size={16} className="mx-auto" />
+              <Layers3 size={16} className="mx-auto" />
             </button>
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
