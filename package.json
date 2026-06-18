@@ -96,6 +96,7 @@
     "check:ai-people-picker": "bun scripts/check-ai-people-picker-model.ts",
     "check:ai-people-fake-provider": "bun scripts/check-ai-people-fake-provider.ts",
     "check:deltae-fixtures": "bun scripts/check-deltae-fixtures.ts",
+    "check:math-invariants": "bun scripts/check-math-invariants.ts",
     "check:color-cpu-gpu-parity": "bun scripts/check-color-cpu-gpu-parity.ts",
     "check:defringe": "bun scripts/check-defringe-fixtures.ts",
     "check:dust-spot-visualization": "bun scripts/check-dust-spot-visualization.ts",
