@@ -1,4 +1,9 @@
 import {
+  FilmLookAppServerCommandName,
+  FilmLookAppServerRouteStatus,
+  FilmLookAppServerSchemaName,
+} from './filmLookAppServerRouteIds';
+import {
   buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
   FILM_LOOK_BROWSER_ITEMS,
@@ -15,12 +20,12 @@ import {
 export const FILM_LOOK_APP_SERVER_ROUTE_MANIFEST = filmLookAppServerRouteManifestSchema.parse({
   routes: [
     {
-      commandName: 'film.look.build_adjustment_patch',
-      inputSchemaName: 'FilmLookAppServerCommandV1',
-      outputSchemaName: 'FilmLookAppServerPatchResultV1',
+      commandName: FilmLookAppServerCommandName.BuildAdjustmentPatch,
+      inputSchemaName: FilmLookAppServerSchemaName.Command,
+      outputSchemaName: FilmLookAppServerSchemaName.PatchResult,
       reason:
         'Film-look app-server calls share the UI catalog, strength clamp, controlled-key reset, and preset draft builder.',
-      status: 'mapped',
+      status: FilmLookAppServerRouteStatus.Mapped,
     },
   ],
   schemaVersion: 1,
@@ -36,7 +41,7 @@ export const buildFilmLookAppServerPatchResult = (command: FilmLookAppServerComm
 
   return filmLookAppServerPatchResultSchema.parse({
     adjustmentPatch: buildFilmLookAppliedAdjustmentPatch(look, parsedCommand.strength),
-    commandName: 'film.look.build_adjustment_patch',
+    commandName: FilmLookAppServerCommandName.BuildAdjustmentPatch,
     controlledAdjustmentKeys: getFilmLookControlledAdjustmentKeys(),
     lookId: look.id,
     presetDraft: buildFilmLookPresetDraft(look, parsedCommand.strength),
