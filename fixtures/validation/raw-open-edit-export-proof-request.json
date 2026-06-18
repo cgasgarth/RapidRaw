@@ -42,8 +42,8 @@
     "commandType": "toneColor.setBasicTone",
     "correlationId": "corr.raw-open-edit-export.basic-tone.v1",
     "dryRun": false,
-    "expectedGraphRevision": "graph-rev.raw-open-edit-export.sample.v1",
-    "idempotencyKey": "idem.raw-open-edit-export.basic-tone.v1",
+    "expectedGraphRevision": "graph-rev.raw-open-edit-export.high-iso-skin-shadow.v1",
+    "idempotencyKey": "idem.raw-open-edit-export.high-iso-skin-shadow.v1",
     "parameters": {
       "blackPoint": -2,
       "clarity": 4,
@@ -56,11 +56,11 @@
     },
     "schemaVersion": 1,
     "target": {
-      "imagePath": "private-fixtures/detail/sample.cr3",
+      "imagePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
       "kind": "image"
     }
   },
-  "fixtureId": "validation.raw-open-edit-export.sample.v1",
+  "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
   "privateRootPath": "/tmp/rawengine-private-root",
-  "sourceRelativePath": "private-fixtures/detail/sample.cr3"
+  "sourceRelativePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw"
 }
