@@ -235,7 +235,7 @@ pub async fn run_raw_open_edit_export_proof(
         artifacts: Vec::new(),
         edit_command_id: request.edit_command.command_id,
         edit_graph_revision: request.edit_command.expected_graph_revision,
-        fixture_id: request.fixture_id.clone(),
+        fixture_id: request.fixture_id,
         generated_at: Utc::now().to_rfc3339(),
         metrics: vec![
             metric(

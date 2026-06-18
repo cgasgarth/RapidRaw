@@ -901,7 +901,7 @@ fn upsert_panorama_artifact_metadata(
         "artifactId": artifact_id,
         "boundaryMode": "auto_crop",
         "boundarySettings": {
-            "crop": crop.clone(),
+            "crop": crop,
             "effectiveMode": "auto_crop",
             "requestedMode": "auto_crop",
             "support": "implemented_current_engine",

@@ -1112,8 +1112,8 @@ pub async fn estimate_export_sizes(
     let is_raw = is_raw_file(&source_path_str);
     let settings = load_settings_or_default(&app_handle);
 
-    let single_image_extrapolated_size: usize = if is_current_edit
-        && current_edit_adjustments.is_some()
+    let single_image_extrapolated_size: usize = if let (true, Some(mut adjustments_clone)) =
+        (is_current_edit, current_edit_adjustments)
     {
         let loaded_image = state
             .original_image
@@ -1121,7 +1121,6 @@ pub async fn estimate_export_sizes(
             .unwrap()
             .clone()
             .ok_or("No original image loaded")?;
-        let mut adjustments_clone = current_edit_adjustments.clone().unwrap();
         hydrate_adjustments(&state, &mut adjustments_clone);
 
         let new_transform_hash = calculate_transform_hash(&adjustments_clone);

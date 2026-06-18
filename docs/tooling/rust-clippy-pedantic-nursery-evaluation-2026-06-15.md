@@ -63,7 +63,8 @@ targeted rule at a time only when all of these are true:
 ## Next Candidates
 
 1. Evaluate a scoped numeric-cast policy for core processing modules.
-2. Evaluate `clippy::redundant_clone` as a low-risk maintainability cleanup.
+2. `clippy::redundant_clone` was promoted into `bun run check:rust:clippy`
+   after removing the focused required-ci findings in #1950.
 3. Evaluate `clippy::must_use_candidate` only for public APIs and command/result
    helpers.
 
