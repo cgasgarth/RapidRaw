@@ -406,6 +406,8 @@ export interface MaskContainer {
   adjustments: MaskAdjustments;
   id: string;
   invert: boolean;
+  layerGroupId?: string;
+  layerGroupName?: string;
   name: string;
   opacity: number;
   subMasks: Array<SubMask>;
