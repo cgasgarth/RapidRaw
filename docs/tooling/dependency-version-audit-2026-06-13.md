@@ -79,6 +79,25 @@ Related freshness checks:
   visible through package rows where they are represented in `package.json` or
   through dedicated follow-up issues when they are not package-resolvable.
 
+## Latest Refresh
+
+Refreshed on June 18, 2026 with:
+
+```sh
+bun run deps:audit:check
+bun scripts/audit-dependency-versions.ts --format=markdown
+```
+
+Result:
+
+- JavaScript/Bun packages checked: 52.
+- Rust/Cargo crates checked: 69.
+- Major or semver-breaking migrations found: 0.
+- Missing major migration issues: 0.
+- Skipped non-registry dependencies: 1 (`rawler`, git dependency).
+
+No new major-version migration issues were required in this refresh.
+
 ## Validation
 
 Before merging changes to the audit command or policy, run:
