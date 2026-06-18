@@ -8,6 +8,13 @@ import {
   sampleAiAppServerToolManifestV1,
   sampleToolRegistryV1,
 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import {
+  AiAppServerToolCapability,
+  AiAppServerToolName,
+  AiAppServerToolRouteExecutionMode,
+  AiAppServerToolRouteSourceKind,
+  AiAppServerToolRouteStatus,
+} from '../src/utils/aiAppServerToolRouteIds.ts';
 
 const APP_PROPERTIES_PATH = 'src/components/ui/AppProperties.tsx';
 const appProperties = readFileSync(APP_PROPERTIES_PATH, 'utf8');
@@ -17,14 +24,14 @@ if (invokesEnum === undefined) {
 }
 
 const routeInvokes = new Set(
-  AI_APP_SERVER_TOOL_ROUTES.filter((route) => route.sourceKind === 'tauri_invoke').map(
+  AI_APP_SERVER_TOOL_ROUTES.filter((route) => route.sourceKind === AiAppServerToolRouteSourceKind.TauriInvoke).map(
     (route) => route.sourceOperation,
   ),
 );
 const mappedToolNames = new Set(
-  AI_APP_SERVER_TOOL_ROUTES.filter((route) => route.status === 'mapped' && route.appServerToolName !== undefined).map(
-    (route) => route.appServerToolName,
-  ),
+  AI_APP_SERVER_TOOL_ROUTES.filter(
+    (route) => route.status === AiAppServerToolRouteStatus.Mapped && route.appServerToolName !== undefined,
+  ).map((route) => route.appServerToolName),
 );
 const registeredToolByName = new Map(sampleToolRegistryV1.tools.map((tool) => [tool.toolName, tool]));
 const aiToolByName = new Map(sampleAiAppServerToolManifestV1.tools.map((tool) => [tool.toolName, tool]));
@@ -41,10 +48,10 @@ const runtimeCheckScripts = [
 ];
 
 const toolCapabilityByAiMaskCapability = new Map([
-  ['depth', 'depth_mask'],
-  ['foreground', 'foreground_mask'],
-  ['sky', 'sky_mask'],
-  ['subject', 'subject_mask'],
+  ['depth', AiAppServerToolCapability.DepthMask],
+  ['foreground', AiAppServerToolCapability.ForegroundMask],
+  ['sky', AiAppServerToolCapability.SkyMask],
+  ['subject', AiAppServerToolCapability.SubjectMask],
 ]);
 
 const aiInvokePattern = /^\s*(?<key>[A-Za-z0-9_]*(?:AI|Ai|Generative)[A-Za-z0-9_]*)\s*=\s*'(?<invoke>[^']+)'/gmu;
@@ -68,28 +75,28 @@ for (const invoke of ['apply_denoising', 'save_denoised_image']) {
     continue;
   }
 
-  if (route.toolCapability !== 'denoise') {
+  if (route.toolCapability !== AiAppServerToolCapability.Denoise) {
     failures.push(`${invoke} must declare denoise capability.`);
   }
 
-  if (route.status === 'mapped') {
+  if (route.status === AiAppServerToolRouteStatus.Mapped) {
     failures.push(`${invoke} must not be mapped until AI denoise dry-run/apply provenance is implemented.`);
   }
 
-  if (route.status === 'deferred' && route.deferredIssue !== '#1963') {
+  if (route.status === AiAppServerToolRouteStatus.Deferred && route.deferredIssue !== '#1963') {
     failures.push(`${invoke} deferred route must track #1963.`);
   }
 }
 
 for (const [toolName, executionMode] of [
-  ['ai.enhancement.dry_run_command', 'dry_run_command'],
-  ['ai.enhancement.apply_command', 'apply_dry_run_plan'],
+  [AiAppServerToolName.EnhancementDryRunCommand, AiAppServerToolRouteExecutionMode.DryRunCommand],
+  [AiAppServerToolName.EnhancementApplyCommand, AiAppServerToolRouteExecutionMode.ApplyDryRunPlan],
 ] as const) {
   const route = AI_APP_SERVER_TOOL_ROUTES.find(
     (candidate) =>
-      candidate.sourceKind === 'app_server_tool' &&
+      candidate.sourceKind === AiAppServerToolRouteSourceKind.AppServerTool &&
       candidate.sourceOperation === toolName &&
-      candidate.toolCapability === 'denoise',
+      candidate.toolCapability === AiAppServerToolCapability.Denoise,
   );
   if (route === undefined) {
     failures.push(`${toolName} is missing a local AI denoise app-server route.`);
@@ -100,23 +107,27 @@ for (const [toolName, executionMode] of [
     failures.push(`${toolName} denoise route must use ${executionMode}.`);
   }
 
-  if (route.status !== 'mapped') {
+  if (route.status !== AiAppServerToolRouteStatus.Mapped) {
     failures.push(`${toolName} denoise route must be mapped.`);
   }
 }
 
 for (const route of AI_APP_SERVER_TOOL_ROUTES) {
   const registeredTool =
-    route.status === 'mapped' && route.appServerToolName !== undefined
+    route.status === AiAppServerToolRouteStatus.Mapped && route.appServerToolName !== undefined
       ? registeredToolByName.get(route.appServerToolName)
       : undefined;
 
-  if (route.status === 'mapped' && route.appServerToolName !== undefined && registeredTool === undefined) {
+  if (
+    route.status === AiAppServerToolRouteStatus.Mapped &&
+    route.appServerToolName !== undefined &&
+    registeredTool === undefined
+  ) {
     failures.push(`${route.sourceOperation} maps to unregistered tool ${route.appServerToolName}.`);
   }
 
   if (
-    route.status === 'mapped' &&
+    route.status === AiAppServerToolRouteStatus.Mapped &&
     route.commandSchemaName !== undefined &&
     registeredTool !== undefined &&
     route.commandSchemaName !== registeredTool.inputSchemaName
@@ -127,7 +138,7 @@ for (const route of AI_APP_SERVER_TOOL_ROUTES) {
   }
 
   if (
-    route.status === 'mapped' &&
+    route.status === AiAppServerToolRouteStatus.Mapped &&
     route.outputSchemaName !== undefined &&
     registeredTool !== undefined &&
     route.outputSchemaName !== registeredTool.outputSchemaName
@@ -137,7 +148,11 @@ for (const route of AI_APP_SERVER_TOOL_ROUTES) {
     );
   }
 
-  if (route.status === 'mapped' && route.appServerToolName !== undefined && route.executionMode !== undefined) {
+  if (
+    route.status === AiAppServerToolRouteStatus.Mapped &&
+    route.appServerToolName !== undefined &&
+    route.executionMode !== undefined
+  ) {
     const aiTool = aiToolByName.get(route.appServerToolName);
     if (aiTool !== undefined && route.executionMode !== aiTool.executionMode) {
       failures.push(
@@ -146,7 +161,11 @@ for (const route of AI_APP_SERVER_TOOL_ROUTES) {
     }
   }
 
-  if (route.status === 'mapped' && route.appServerToolName !== undefined && route.toolCapability !== undefined) {
+  if (
+    route.status === AiAppServerToolRouteStatus.Mapped &&
+    route.appServerToolName !== undefined &&
+    route.toolCapability !== undefined
+  ) {
     const capabilities = aiToolCapabilities.get(route.appServerToolName);
     if (capabilities === undefined) {
       failures.push(`${route.sourceOperation} maps to AI tool ${route.appServerToolName} with no AI manifest entry.`);
@@ -178,7 +197,7 @@ for (const capability of AI_MASK_CAPABILITY_AUDIT) {
     failures.push(`${capability.invokeCommand}: expected route capability ${expectedToolCapability}.`);
   }
 
-  if (route.status === 'deferred') {
+  if (route.status === AiAppServerToolRouteStatus.Deferred) {
     const supportedByMappedTool = [...aiToolCapabilities.values()].some((capabilities) =>
       capabilities.has(route.toolCapability),
     );
