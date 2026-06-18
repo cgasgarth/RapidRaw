@@ -222,6 +222,16 @@ export const superResolutionUiSettingsProofSchema = z.object({
   outputScale: z.literal('4'),
   qualityPreference: z.literal('preview'),
 });
+export const layerStackWorkflowProofSchema = z.object({
+  activeLayer: z.literal('Portrait burn'),
+  blendMode: z.literal('multiply'),
+  mask: z.literal('Subject brush'),
+  opacity: z.literal('42'),
+  visibleCount: z.literal('2'),
+});
+export const layerStackExportParityProofSchema = z.object({
+  exportParity: z.literal('ready'),
+});
 export const commandPaletteWorkflowProofSchema = z.object({
   focusOpen: z.literal('true'),
   hdrOpen: z.literal('true'),
