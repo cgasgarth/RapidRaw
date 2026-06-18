@@ -21,7 +21,14 @@ const artifactSchema = z
   .object({
     exists: z.boolean(),
     path: z.string().trim().min(1),
-    proofKind: z.enum(['runtime_status', 'render_artifact', 'html_review', 'svg_review', 'markdown_policy']),
+    proofKind: z.enum([
+      'runtime_status',
+      'render_artifact',
+      'html_review',
+      'screenshot',
+      'svg_review',
+      'markdown_policy',
+    ]),
   })
   .strict();
 
@@ -91,6 +98,7 @@ const sourceReports = await Promise.all(
 
 const artifacts = [
   artifact('docs/validation/goal-review-2026-06-11.html', 'html_review'),
+  artifact('docs/validation/goal-review-screenshot-2026-06-18.png', 'screenshot'),
   artifact('docs/validation/computational-merge-runtime-status-2026-06-18.json', 'runtime_status'),
   artifact('docs/validation/raw-open-edit-export-runtime-status-2026-06-18.json', 'runtime_status'),
   artifact('docs/validation/professional-workflow-status-2026-06-18.json', 'runtime_status'),
@@ -106,6 +114,7 @@ const report = reportSchema.parse({
   commands: [
     'bun run check:goal-review-data',
     'bun run check:goal-review-page',
+    'bun run check:goal-review-screenshot',
     'bun run check:computational-merge-runtime-status',
     'bun run prepare:hdr-real-raw-private-root',
     'bun run prepare:focus-real-raw-private-root',

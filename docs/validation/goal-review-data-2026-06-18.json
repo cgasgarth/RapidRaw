@@ -7,6 +7,11 @@
     },
     {
       "exists": true,
+      "path": "docs/validation/goal-review-screenshot-2026-06-18.png",
+      "proofKind": "screenshot"
+    },
+    {
+      "exists": true,
       "path": "docs/validation/computational-merge-runtime-status-2026-06-18.json",
       "proofKind": "runtime_status"
     },
@@ -49,6 +54,7 @@
   "commands": [
     "bun run check:goal-review-data",
     "bun run check:goal-review-page",
+    "bun run check:goal-review-screenshot",
     "bun run check:computational-merge-runtime-status",
     "bun run prepare:hdr-real-raw-private-root",
     "bun run prepare:focus-real-raw-private-root",
@@ -65,7 +71,7 @@
     "Private focus-stack CR3, super-resolution NEF, and panorama RAF source files.",
     "Real RAW panorama, focus stack, and super-resolution runtime reports after private source files exist."
   ],
-  "proofHash": "29649e989ea665359b3ec9a82f6970a092499bdc81fd38f7f6e7ca9fd003ce2d",
+  "proofHash": "2f9c8ab63cefd5fc92085be55d5e1671c7588b540e71f2bd63b33d6c6f9055be",
   "schemaVersion": 1,
   "sourceReports": [
     {
