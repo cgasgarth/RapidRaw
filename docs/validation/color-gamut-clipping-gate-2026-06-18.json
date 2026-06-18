@@ -1,0 +1,96 @@
+{
+  "cases": [
+    {
+      "clipDeltaL1": 0,
+      "clipDeltaMax": 0,
+      "clippedLinearRgb": [0.18, 0.18, 0.18],
+      "id": "gamut.srgb.neutral-in-gamut.v1",
+      "inputMax": 0.18,
+      "inputMin": 0.18,
+      "outOfGamutChannelCount": 0,
+      "outOfGamutMagnitude": 0,
+      "runtimeClassification": "in_gamut",
+      "warnings": []
+    },
+    {
+      "clipDeltaL1": 0.28,
+      "clipDeltaMax": 0.28,
+      "clippedLinearRgb": [1, 0.02, 0.04],
+      "id": "gamut.srgb.p3-primary-out-of-gamut.v1",
+      "inputMax": 1.28,
+      "inputMin": 0.02,
+      "outOfGamutChannelCount": 1,
+      "outOfGamutMagnitude": 0.28,
+      "runtimeClassification": "high_component",
+      "warnings": ["output_gamut_high_component_v1"]
+    },
+    {
+      "clipDeltaL1": 0,
+      "clipDeltaMax": 0,
+      "clippedLinearRgb": [0.98, 0.04, 0.03],
+      "id": "gamut.display-p3.p3-primary-in-gamut.v1",
+      "inputMax": 0.98,
+      "inputMin": 0.03,
+      "outOfGamutChannelCount": 0,
+      "outOfGamutMagnitude": 0,
+      "runtimeClassification": "in_gamut",
+      "warnings": []
+    },
+    {
+      "clipDeltaL1": 0.08,
+      "clipDeltaMax": 0.08,
+      "clippedLinearRgb": [0, 0.42, 0.35],
+      "id": "gamut.srgb.negative-component-warning.v1",
+      "inputMax": 0.42,
+      "inputMin": -0.08,
+      "outOfGamutChannelCount": 1,
+      "outOfGamutMagnitude": 0.08,
+      "runtimeClassification": "negative_component",
+      "warnings": ["output_gamut_negative_component_v1"]
+    },
+    {
+      "clipDeltaL1": 1.55,
+      "clipDeltaMax": 1.4,
+      "clippedLinearRgb": [1, 1, 0.72],
+      "id": "gamut.srgb.hdr-component-warning.v1",
+      "inputMax": 2.4,
+      "inputMin": 0.72,
+      "outOfGamutChannelCount": 2,
+      "outOfGamutMagnitude": 1.4,
+      "runtimeClassification": "high_component",
+      "warnings": ["output_gamut_high_component_v1"]
+    },
+    {
+      "clipDeltaL1": 0.45,
+      "clipDeltaMax": 0.31,
+      "clippedLinearRgb": [1, 0.22, 1],
+      "id": "gamut.srgb.perceptual-intent-blocked.v1",
+      "inputMax": 1.31,
+      "inputMin": 0.22,
+      "outOfGamutChannelCount": 2,
+      "outOfGamutMagnitude": 0.31,
+      "runtimeClassification": "high_component",
+      "warnings": ["output_gamut_high_component_v1"]
+    },
+    {
+      "clipDeltaL1": 0.7,
+      "clipDeltaMax": 0.7,
+      "clippedLinearRgb": [1, 0.55, 0.12],
+      "id": "gamut.scene-referred.no-output-map.v1",
+      "inputMax": 1.7,
+      "inputMin": 0.12,
+      "outOfGamutChannelCount": 1,
+      "outOfGamutMagnitude": 0.7,
+      "runtimeClassification": "high_component",
+      "warnings": ["output_gamut_high_component_v1"]
+    }
+  ],
+  "fixturePath": "fixtures/color/gamut-mapping-fixtures.json",
+  "generatedFromSnapshotDate": "2026-06-15",
+  "issue": 1931,
+  "schemaVersion": 1,
+  "thresholds": {
+    "componentBoundaryEpsilon": 1e-12,
+    "minOutOfGamutMagnitude": 0.000001
+  }
+}
