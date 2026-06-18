@@ -222,6 +222,7 @@ function isSafeFixturePath(path) {
     (path.startsWith('fixtures/layers/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/negative-lab/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/negative-lab/public/') && hasExtension(path, new Set(['.jpg', '.jpeg', '.png']))) ||
+    (path.startsWith('fixtures/panorama/') && path.endsWith('.json')) ||
     path.startsWith('fixtures/sidecar-roundtrip/') ||
     (path.startsWith('fixtures/validation/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/workflow/') && path.endsWith('.json'))
@@ -766,6 +767,11 @@ function runSelfTest() {
   assertClassification(
     'negative lab fixture outputs can skip smoke',
     ['fixtures/negative-lab/negative-lab-synthetic-fixture-proof.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'panorama fixture outputs can skip smoke',
+    ['fixtures/panorama/panorama-feature-transform-fixtures.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(
