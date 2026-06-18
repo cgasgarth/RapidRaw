@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
-import { access, readFile, readdir, stat } from 'node:fs/promises';
+import { access, readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 
 import { parseComputationalMergeE2eProofManifest } from '../src/schemas/computationalMergeE2eProofSchemas.ts';
@@ -89,10 +89,18 @@ for (const report of reportCollection.reports) {
     if (reportMetric.threshold !== expectedMetric.threshold) {
       failures.push(`${report.fixtureId}: ${expectedMetric.name} threshold must match manifest.`);
     }
+    if (!metricPassesThreshold(reportMetric.name, reportMetric.value, reportMetric.threshold)) {
+      failures.push(`${report.fixtureId}: ${expectedMetric.name} value must satisfy threshold.`);
+    }
   }
 
   if (!reportMetrics.has('previewExportMeanAbsDelta')) {
     failures.push(`${report.fixtureId}: missing preview/export parity metric.`);
+  }
+
+  const sourceHashes = report.sourceHashes.map((sourceHash) => sourceHash.hash);
+  if (new Set(sourceHashes).size !== sourceHashes.length) {
+    failures.push(`${report.fixtureId}: source hashes must be unique; duplicate bytes are not accepted.`);
   }
 
   if (requireAssets && root !== undefined) {
@@ -137,11 +145,17 @@ async function verifyPrivateAssets(
     if (seenPaths.has(asset.path)) continue;
     seenPaths.add(asset.path);
 
-    const absolutePath = resolve(privateRoot, asset.path);
+    const privateRootPath = await realpath(privateRoot);
+    const absolutePath = resolve(privateRootPath, asset.path);
     try {
       await access(absolutePath);
     } catch {
       failures.push(`${fixtureId}: missing private run artifact ${asset.path}.`);
+      continue;
+    }
+    const resolvedPath = await realpath(absolutePath);
+    if (!isWithinRoot(privateRootPath, resolvedPath)) {
+      failures.push(`${fixtureId}: private run artifact escapes private root: ${asset.path}.`);
       continue;
     }
 
@@ -150,6 +164,18 @@ async function verifyPrivateAssets(
       failures.push(`${fixtureId}: hash mismatch for ${asset.path}.`);
     }
   }
+}
+
+function metricPassesThreshold(name: string, value: number, threshold: number): boolean {
+  if (name === 'previewExportMeanAbsDelta' || name === 'focusTransitionArtifactScore') {
+    return value <= threshold;
+  }
+  return value >= threshold;
+}
+
+function isWithinRoot(rootPath: string, candidatePath: string): boolean {
+  const relativePath = relative(rootPath, candidatePath);
+  return relativePath === '' || (!relativePath.startsWith('..') && !relativePath.startsWith('/'));
 }
 
 async function hashPrivatePath(path: string): Promise<string> {
