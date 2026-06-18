@@ -180,4 +180,30 @@ for (const fixture of manifest.cases) {
   );
 }
 
+const unsupportedBlendModeCase = manifest.cases[0];
+const unsupportedBlendModeLayer = unsupportedBlendModeCase?.layers[0];
+if (unsupportedBlendModeCase === undefined || unsupportedBlendModeLayer === undefined) {
+  fail('layer preview/export parity requires at least one layer fixture');
+}
+
+const unsupportedBlendModeManifest = {
+  cases: [
+    {
+      ...unsupportedBlendModeCase,
+      layers: [
+        {
+          ...unsupportedBlendModeLayer,
+          blendMode: 'soft_light',
+        },
+        ...unsupportedBlendModeCase.layers.slice(1),
+      ],
+    },
+  ],
+  version: 1,
+};
+
+if (manifestSchema.safeParse(unsupportedBlendModeManifest).success) {
+  fail('layer preview/export parity accepted unsupported blend mode');
+}
+
 console.log(`layer preview/export parity ok (${manifest.cases.length})`);
