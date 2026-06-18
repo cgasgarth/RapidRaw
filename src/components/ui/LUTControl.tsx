@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 
+import { Invokes } from './AppProperties';
 import Slider from './Slider';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
 
@@ -51,7 +52,7 @@ export default function LUTControl({
         let fileName = selected;
         if (isAndroid) {
           try {
-            fileName = await invoke<string>('resolve_android_content_uri_name', {
+            fileName = await invoke<string>(Invokes.ResolveAndroidContentUriName, {
               uriStr: selected,
             });
           } catch (e) {

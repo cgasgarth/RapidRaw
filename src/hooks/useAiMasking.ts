@@ -384,7 +384,7 @@ export function useAiMasking() {
 
     if (activeSubMask?.type === Mask.AiSubject && selectedImagePath) {
       const transformAdjustments = getTransformAdjustments(adjustments);
-      invoke('precompute_ai_subject_mask', {
+      invoke(Invokes.PrecomputeAiSubjectMask, {
         jsAdjustments: transformAdjustments,
         path: selectedImagePath,
       }).catch((err: unknown) => {

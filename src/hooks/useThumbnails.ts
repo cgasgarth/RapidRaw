@@ -1,6 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useRef, useCallback, useEffect } from 'react';
 
+import { Invokes } from '../components/ui/AppProperties';
+
 const shuffleThumbnailPaths = (paths: string[]) => {
   for (let i = paths.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -38,7 +40,7 @@ export function useThumbnails() {
 
     shuffleThumbnailPaths(pathsToSend);
 
-    invoke('update_thumbnail_queue', { paths: pathsToSend }).catch((err: unknown) => {
+    invoke(Invokes.UpdateThumbnailQueue, { paths: pathsToSend }).catch((err: unknown) => {
       console.error('Failed to update thumbnail queue:', err);
     });
 
@@ -86,7 +88,7 @@ export function useThumbnails() {
     generatedRef.current.clear();
     pendingQueueRef.current.clear();
     clearScheduledFlush();
-    invoke('update_thumbnail_queue', { paths: [] }).catch(console.error);
+    invoke(Invokes.UpdateThumbnailQueue, { paths: [] }).catch(console.error);
   }, [clearScheduledFlush]);
 
   useEffect(() => {
