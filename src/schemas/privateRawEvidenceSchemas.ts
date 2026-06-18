@@ -67,6 +67,7 @@ export const privateRawEvidenceArtifactClassSchema = z.enum([
 ]);
 
 const privateRawEvidenceFeatureFamilySchema = z.enum([
+  'color_science',
   'detail',
   'focus_stack',
   'hdr_merge',
@@ -107,6 +108,7 @@ export const privateRawEvidenceEntrySchema = z
   .strict()
   .superRefine((entry, context) => {
     const expectedUseByFamily = {
+      color_science: 'color_science',
       detail: 'detail',
       focus_stack: 'focus_stack',
       hdr_merge: 'hdr_merge',
@@ -166,7 +168,14 @@ export const privateRawEvidenceLedgerSchema = z
       });
     }
 
-    const requiredFamilies = ['detail', 'focus_stack', 'hdr_merge', 'panorama_stitch', 'super_resolution'] as const;
+    const requiredFamilies = [
+      'color_science',
+      'detail',
+      'focus_stack',
+      'hdr_merge',
+      'panorama_stitch',
+      'super_resolution',
+    ] as const;
     const featureFamilies = new Set(ledger.entries.map((entry) => entry.featureFamily));
     for (const featureFamily of requiredFamilies) {
       if (!featureFamilies.has(featureFamily)) {
