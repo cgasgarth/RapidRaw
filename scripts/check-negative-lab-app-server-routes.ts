@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
+import { NegativeLabOutputFormatId, NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../src/utils/negativeLabOutputFormatIds.ts';
 import {
   buildNegativeLabBatchSummaryRouteResult,
   buildNegativeLabAcceptedBatchApplyRouteResult,
@@ -102,7 +103,7 @@ const densitometerReadoutSchema = z.object({
 });
 const conversionPlanResultSchema = z.object({
   commandName: z.literal(expectedCommandName),
-  outputFormat: z.enum(['jpeg_proof', 'tiff16']),
+  outputFormat: z.enum(NEGATIVE_LAB_OUTPUT_FORMAT_IDS),
   params: z.object({
     base_fog_sample: z.union([
       z.null(),
@@ -179,7 +180,7 @@ const acceptedBatchPlanResult = buildNegativeLabAcceptedBatchPlanRouteResult({
 const acceptedBatchApplyResult = buildNegativeLabAcceptedBatchApplyRouteResult({
   acceptedPlan: acceptedBatchPlanResult,
   conversion: {
-    outputFormat: 'jpeg_proof',
+    outputFormat: NegativeLabOutputFormatId.JpegProof,
     paths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
     presetId: 'negative_lab.generic.c41.neutral.v1',
     sampleRect,
@@ -209,7 +210,7 @@ const densitometerResult = densitometerReadoutSchema.parse(
 const stockRegistryResult = buildNegativeLabStockRegistryRouteResult({});
 const stockMetadataResult = buildNegativeLabStockMetadataRouteResult({});
 const stockFamilyConversionResult = buildNegativeLabStockFamilyConversionRouteResult({
-  outputFormat: 'jpeg_proof',
+  outputFormat: NegativeLabOutputFormatId.JpegProof,
   paths: ['/fixtures/negative-lab/synthetic-color-negative-001.tif'],
   sampleRect,
   scope: 'active',
@@ -319,7 +320,7 @@ try {
       acceptedDryRunPlanId: 'negative_lab_batch_plan_deadbeef',
     },
     conversion: {
-      outputFormat: 'jpeg_proof',
+      outputFormat: NegativeLabOutputFormatId.JpegProof,
       paths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
       presetId: 'negative_lab.generic.c41.neutral.v1',
       sampleRect,
@@ -344,7 +345,7 @@ try {
 for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
   const activeResult = conversionPlanResultSchema.parse(
     buildNegativeLabConversionPlanResult({
-      outputFormat: 'jpeg_proof',
+      outputFormat: NegativeLabOutputFormatId.JpegProof,
       paths: ['/fixtures/negative-lab/synthetic-color-negative-001.tif'],
       presetId: preset.presetId,
       sampleRect,
@@ -354,7 +355,7 @@ for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
   );
   const batchResult = conversionPlanResultSchema.parse(
     buildNegativeLabConversionPlanResult({
-      outputFormat: 'tiff16',
+      outputFormat: NegativeLabOutputFormatId.Tiff16,
       paths: [
         '/fixtures/negative-lab/synthetic-color-negative-001.tif',
         '/fixtures/negative-lab/synthetic-gray-ramp-negative-002.tif',
@@ -372,7 +373,7 @@ for (const preset of NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets) {
 
 try {
   buildNegativeLabConversionPlanResult({
-    outputFormat: 'tiff16',
+    outputFormat: NegativeLabOutputFormatId.Tiff16,
     paths: ['/fixtures/negative-lab/synthetic-color-negative-001.tif'],
     presetId: 'negative_lab.generic.c41.missing.v1',
     sampleRect: null,
@@ -388,7 +389,7 @@ try {
 
 try {
   buildNegativeLabStockFamilyConversionRouteResult({
-    outputFormat: 'jpeg_proof',
+    outputFormat: NegativeLabOutputFormatId.JpegProof,
     paths: ['/fixtures/negative-lab/synthetic-color-negative-001.tif'],
     sampleRect,
     scope: 'active',

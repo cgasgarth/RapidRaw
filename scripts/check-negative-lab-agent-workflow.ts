@@ -21,6 +21,7 @@ import {
   negativeLabAppServerToolManifestV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
+import { NegativeLabOutputFormatId } from '../src/utils/negativeLabOutputFormatIds.ts';
 import { NegativeLabAppServerRuntimeToolBusV1 } from '../packages/rawengine-schema/src/negativeLabAppServerRuntime.ts';
 import {
   sampleNegativeLabApplyPlanRequestV1,
@@ -53,7 +54,7 @@ const dryRunCommand = {
   targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
 };
 const conversionCommand = {
-  outputFormat: 'jpeg_proof',
+  outputFormat: NegativeLabOutputFormatId.JpegProof,
   paths: dryRunCommand.targetPaths,
   presetId: 'negative_lab.generic.c41.neutral.v1',
   sampleRect,
@@ -139,7 +140,7 @@ const acceptedApplyPlan = buildNegativeLabAcceptedBatchApplyRouteResult({
 });
 const conversionPlan = buildNegativeLabConversionPlanResult(conversionCommand);
 const stockFamilyConversionPlan = buildNegativeLabStockFamilyConversionRouteResult({
-  outputFormat: 'jpeg_proof',
+  outputFormat: NegativeLabOutputFormatId.JpegProof,
   paths: dryRunCommand.targetPaths,
   sampleRect,
   scope: 'all',

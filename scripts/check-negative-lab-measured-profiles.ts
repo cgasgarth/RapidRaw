@@ -18,6 +18,7 @@ import {
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
   resolveNegativeLabRuntimeProfile,
 } from '../src/utils/negativeLabMeasuredProfileRuntime.ts';
+import { NegativeLabOutputFormatId } from '../src/utils/negativeLabOutputFormatIds.ts';
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
 import {
   assertGenericNegativeLabCatalogIsNotPromoted,
@@ -298,7 +299,7 @@ if (
 
 const runtimeConversionPlan = buildNegativeLabConversionPlanResult(
   {
-    outputFormat: 'tiff16',
+    outputFormat: NegativeLabOutputFormatId.Tiff16,
     paths: ['/fixtures/negative-measured.tif'],
     presetId: validRuntimeAppliedMeasuredProfile.profileId,
     sampleRect: validRuntimeAppliedMeasuredProfile.params.base_fog_sample,
@@ -329,7 +330,7 @@ const runtimeAcceptedApply = buildNegativeLabAcceptedBatchApplyRouteResult(
   {
     acceptedPlan: runtimeAcceptedPlan,
     conversion: {
-      outputFormat: 'tiff16',
+      outputFormat: NegativeLabOutputFormatId.Tiff16,
       paths: runtimeDryRun.targetPaths,
       presetId: validRuntimeAppliedMeasuredProfile.profileId,
       sampleRect: validRuntimeAppliedMeasuredProfile.params.base_fog_sample,
