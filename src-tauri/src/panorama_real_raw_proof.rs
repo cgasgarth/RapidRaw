@@ -49,9 +49,17 @@ const STITCH_REPORT_FILE: &str = "panorama-overlap-stitch-report.json";
 const STITCH_OUTPUT_FILE: &str = "panorama-overlap-merge.tiff";
 const PREVIEW_OUTPUT_FILE: &str = "panorama-overlap-preview.png";
 const EXPORT_OUTPUT_FILE: &str = "panorama-overlap-export.tiff";
+const RUNTIME_SAMPLE_FILE: &str = "panorama-overlap-runtime-sample.json";
+const MODAL_BEFORE_FILE: &str = "panorama-overlap-modal-before.png";
+const MODAL_AFTER_FILE: &str = "panorama-overlap-modal-after.png";
+const RESULT_REVIEW_FILE: &str = "panorama-overlap-result-review.png";
+const EXPORT_REVIEW_FILE: &str = "panorama-overlap-export-review.png";
 const MIN_ALIGNMENT_INLIER_RATIO: f64 = 0.55;
 const MAX_MEAN_REPROJECTION_ERROR_PX: f64 = 5.0;
 const MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA: f64 = 0.015;
+const RUNTIME_SAMPLE_WIDTH: u32 = 72;
+const RUNTIME_SAMPLE_HEIGHT: u32 = 48;
+const RUNTIME_SAMPLE_OVERLAP_WIDTH: u32 = 24;
 
 const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
     decode_report_file: "panorama-overlap-decode-report.json",
@@ -171,6 +179,28 @@ struct StitchReport {
     stitch_engine: String,
     warning_count: usize,
     warnings: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PanoramaPrivateRuntimeSample {
+    connected_source_indices: Vec<usize>,
+    fixture_id: String,
+    frames: Vec<PanoramaPrivateRuntimeFrame>,
+    graph_revision_hash: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PanoramaPrivateRuntimeFrame {
+    content_hash: String,
+    expected_offset_x: u32,
+    expected_offset_y: i32,
+    graph_revision: String,
+    height: u32,
+    source_index: usize,
+    source_path: String,
+    width: u32,
 }
 
 #[derive(Serialize)]
@@ -381,6 +411,11 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
     let stitch_output_path = output_dir.join(STITCH_OUTPUT_FILE);
     let preview_output_path = output_dir.join(PREVIEW_OUTPUT_FILE);
     let export_output_path = output_dir.join(EXPORT_OUTPUT_FILE);
+    let runtime_sample_path = output_dir.join(RUNTIME_SAMPLE_FILE);
+    let modal_before_path = output_dir.join(MODAL_BEFORE_FILE);
+    let modal_after_path = output_dir.join(MODAL_AFTER_FILE);
+    let result_review_path = output_dir.join(RESULT_REVIEW_FILE);
+    let export_review_path = output_dir.join(EXPORT_REVIEW_FILE);
 
     render_result
         .image
@@ -394,11 +429,26 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
     preview_image
         .save_with_format(&preview_output_path, ImageFormat::Png)
         .map_err(|error| error.to_string())?;
+    loaded_sources[0]
+        .image
+        .thumbnail(800, 800)
+        .to_rgb8()
+        .save_with_format(&modal_before_path, ImageFormat::Png)
+        .map_err(|error| error.to_string())?;
+    preview_image
+        .save_with_format(&modal_after_path, ImageFormat::Png)
+        .map_err(|error| error.to_string())?;
+    preview_image
+        .save_with_format(&result_review_path, ImageFormat::Png)
+        .map_err(|error| error.to_string())?;
 
     let export_preview = render_result
         .image
         .thumbnail(preview_image.width(), preview_image.height())
         .to_rgb8();
+    export_preview
+        .save_with_format(&export_review_path, ImageFormat::Png)
+        .map_err(|error| error.to_string())?;
     let preview_export_mean_abs_delta = mean_abs_delta_rgb8(&preview_image, &export_preview)?;
     let stitch_report = build_stitch_report(&render_result, &graph_revision_hash);
     let metrics = [
@@ -426,6 +476,10 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
     write_json(&output_dir.join(ALIGNMENT_REPORT_FILE), &alignment_report)?;
     write_json(&output_dir.join(STITCH_REPORT_FILE), &stitch_report)?;
     write_json(&output_dir.join(CONFIG.quality_file), &metrics)?;
+    write_json(
+        &runtime_sample_path,
+        &build_runtime_sample(&loaded_sources, &source_hashes, &graph_revision_hash),
+    )?;
 
     write_json(
         &output_dir.join(CONFIG.report_file),
@@ -509,6 +563,36 @@ fn render_private_panorama(private_root: &Path) -> Result<PanoramaRenderResult, 
         app.handle().clone(),
         AppSettings::default(),
     )
+}
+
+fn build_runtime_sample(
+    loaded_sources: &[LoadedSource],
+    source_hashes: &[crate::private_decode_raw_proof::SourceHash],
+    graph_revision_hash: &str,
+) -> PanoramaPrivateRuntimeSample {
+    PanoramaPrivateRuntimeSample {
+        connected_source_indices: (0..loaded_sources.len()).collect(),
+        fixture_id: CONFIG.fixture_id.to_string(),
+        frames: loaded_sources
+            .iter()
+            .zip(source_hashes.iter())
+            .enumerate()
+            .map(
+                |(source_index, (source, source_hash))| PanoramaPrivateRuntimeFrame {
+                    content_hash: source_hash.hash.clone(),
+                    expected_offset_x: source_index as u32
+                        * (RUNTIME_SAMPLE_WIDTH - RUNTIME_SAMPLE_OVERLAP_WIDTH),
+                    expected_offset_y: if source_index % 2 == 0 { 0 } else { 2 },
+                    graph_revision: graph_revision_hash.to_string(),
+                    height: RUNTIME_SAMPLE_HEIGHT,
+                    source_index,
+                    source_path: source.relative_path.clone(),
+                    width: RUNTIME_SAMPLE_WIDTH,
+                },
+            )
+            .collect(),
+        graph_revision_hash: graph_revision_hash.to_string(),
+    }
 }
 
 fn build_stitch_report(

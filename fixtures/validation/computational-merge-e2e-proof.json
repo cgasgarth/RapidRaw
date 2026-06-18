@@ -129,6 +129,12 @@
           "kind": "quality_report_private",
           "path": "private-artifacts/validation/computational-merge/panorama-overlap-quality.json",
           "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "app_server_runtime_report_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-app-server-runtime-proof.json",
+          "publicRepoAllowed": false
         }
       ],
       "evidenceId": "raw-evidence.panorama.overlap-stitch.v1",
@@ -158,7 +164,7 @@
         "private-fixtures/panorama/overlap-stitch-v1/frame-03.raf"
       ],
       "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
-      "notes": "Private RAW panorama E2E proof slot for decode, feature alignment, stitch/blend output, preview/export parity, and quality metrics. This manifest is planning evidence only until the private assets and runtime run reports exist.",
+      "notes": "Private RAW panorama E2E proof slot for decode, feature alignment, stitch/blend output, preview/export parity, app-server dry-run/apply replay, review artifacts, and quality metrics. This public manifest remains planning evidence until private assets and runtime run reports exist.",
       "proofStatus": "manifest_only",
       "uiIssue": 1333,
       "workflowSteps": [
