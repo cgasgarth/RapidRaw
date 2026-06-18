@@ -4598,6 +4598,7 @@ export const sampleNegativeLabDryRunResultV1: NegativeLabDryRunResultV1 = negati
 export const sampleNegativeLabApplyPlanRequestV1: NegativeLabApplyPlanRequestV1 =
   negativeLabApplyPlanRequestV1Schema.parse({
     acknowledgedWarningCodes: ['lossy_input', 'low_acquisition_confidence'],
+    acceptedDryRunPlanHash: `sha256:${sampleNegativeLabDryRunResultV1.dryRunPlanId}`,
     commandId: sampleNegativeLabCommandEnvelopeV1.commandId,
     dryRunPlanId: sampleNegativeLabDryRunResultV1.dryRunPlanId,
     expectedSessionRevision: 'session_rev_negative_7',
