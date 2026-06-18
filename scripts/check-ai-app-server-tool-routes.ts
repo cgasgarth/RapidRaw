@@ -74,6 +74,30 @@ for (const invoke of ['apply_denoising', 'save_denoised_image']) {
   }
 }
 
+for (const [toolName, executionMode] of [
+  ['ai.enhancement.dry_run_command', 'dry_run_command'],
+  ['ai.enhancement.apply_command', 'apply_dry_run_plan'],
+] as const) {
+  const route = AI_APP_SERVER_TOOL_ROUTES.find(
+    (candidate) =>
+      candidate.sourceKind === 'app_server_tool' &&
+      candidate.sourceOperation === toolName &&
+      candidate.toolCapability === 'denoise',
+  );
+  if (route === undefined) {
+    failures.push(`${toolName} is missing a local AI denoise app-server route.`);
+    continue;
+  }
+
+  if (route.executionMode !== executionMode) {
+    failures.push(`${toolName} denoise route must use ${executionMode}.`);
+  }
+
+  if (route.status !== 'mapped') {
+    failures.push(`${toolName} denoise route must be mapped.`);
+  }
+}
+
 for (const route of AI_APP_SERVER_TOOL_ROUTES) {
   const registeredTool =
     route.status === 'mapped' && route.appServerToolName !== undefined
