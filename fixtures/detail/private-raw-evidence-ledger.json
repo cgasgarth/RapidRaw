@@ -107,6 +107,41 @@
       "trackingIssue": 1509
     },
     {
+      "artifactClass": "bracket_alignment",
+      "camera": {
+        "cameraMake": "Nikon",
+        "cameraModel": "Z 8",
+        "lens": "NIKKOR Z 24-70mm f/4 S",
+        "rawFormat": "nef"
+      },
+      "crop": {
+        "height": 1536,
+        "unit": "source_pixels",
+        "width": 2048,
+        "x": 1100,
+        "y": 760
+      },
+      "evidenceId": "raw-evidence.hdr.interior-window-bracket.v1",
+      "expectedUse": ["hdr_merge", "preview_export_parity"],
+      "exposure": {
+        "aperture": 8,
+        "exposureBiasEv": 0,
+        "iso": 100,
+        "shutterSeconds": 0.0333333333
+      },
+      "featureFamily": "hdr_merge",
+      "notes": "Reserved private interior/window HDR bracket for exposure ordering, highlight recovery review, alignment, and preview/export parity proof.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private HDR bracket must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1897
+    },
+    {
       "artifactClass": "overlap_stitch_alignment",
       "camera": {
         "cameraMake": "Fujifilm",
