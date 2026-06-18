@@ -165,6 +165,8 @@
     "check:sr-real-raw-private-root-prep": "bun scripts/prepare-sr-real-raw-private-root.ts --self-test",
     "prepare:panorama-real-raw-private-root": "bun scripts/prepare-panorama-real-raw-private-root.ts",
     "check:panorama-real-raw-private-root-prep": "bun scripts/prepare-panorama-real-raw-private-root.ts --self-test",
+    "run:panorama-real-raw-private-proof": "bun scripts/run-panorama-real-raw-private-proof.ts",
+    "check:panorama-real-raw-private-proof": "bun scripts/run-panorama-real-raw-private-proof.ts",
     "check:raw-open-edit-export-command-wrapper": "bun scripts/check-raw-open-edit-export-command-wrapper.ts",
     "check:raw-open-edit-export-private-report-collector": "bun scripts/collect-raw-open-edit-export-private-run-reports.ts --self-test",
     "check:raw-open-edit-export-private-proof-acceptance": "bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test",
