@@ -69,37 +69,42 @@ for (const report of reportCollection.reports) {
   }
 
   const manifestArtifacts = new Map(proofCase.artifacts.map((artifact) => [artifact.kind, artifact]));
-  for (const artifact of report.artifacts) {
-    const manifestArtifact = manifestArtifacts.get(artifact.kind);
-    if (manifestArtifact === undefined) {
-      failures.push(`${report.fixtureId}: unexpected artifact kind ${artifact.kind}.`);
-      continue;
+  const decodeSmoke = report.acceptanceStatus === 'private_decode_smoke' && report.featureFamily === 'panorama_stitch';
+  if (decodeSmoke) {
+    verifyDecodeSmokeReport(report, proofCase.localSourceRelativePaths.length);
+  } else {
+    for (const artifact of report.artifacts) {
+      const manifestArtifact = manifestArtifacts.get(artifact.kind);
+      if (manifestArtifact === undefined) {
+        failures.push(`${report.fixtureId}: unexpected artifact kind ${artifact.kind}.`);
+        continue;
+      }
+      if (artifact.path !== manifestArtifact.path) {
+        failures.push(`${report.fixtureId}: ${artifact.kind} path must match manifest artifact path.`);
+      }
     }
-    if (artifact.path !== manifestArtifact.path) {
-      failures.push(`${report.fixtureId}: ${artifact.kind} path must match manifest artifact path.`);
+    if (report.artifacts.length !== proofCase.artifacts.length) {
+      failures.push(`${report.fixtureId}: artifact count must match manifest artifact count.`);
     }
-  }
-  if (report.artifacts.length !== proofCase.artifacts.length) {
-    failures.push(`${report.fixtureId}: artifact count must match manifest artifact count.`);
-  }
 
-  const reportMetrics = new Map(report.qualityMetrics.map((metric) => [metric.name, metric]));
-  for (const expectedMetric of proofCase.expectedMetrics) {
-    const reportMetric = reportMetrics.get(expectedMetric.name);
-    if (reportMetric === undefined) {
-      failures.push(`${report.fixtureId}: missing required quality metric ${expectedMetric.name}.`);
-      continue;
+    const reportMetrics = new Map(report.qualityMetrics.map((metric) => [metric.name, metric]));
+    for (const expectedMetric of proofCase.expectedMetrics) {
+      const reportMetric = reportMetrics.get(expectedMetric.name);
+      if (reportMetric === undefined) {
+        failures.push(`${report.fixtureId}: missing required quality metric ${expectedMetric.name}.`);
+        continue;
+      }
+      if (reportMetric.threshold !== expectedMetric.threshold) {
+        failures.push(`${report.fixtureId}: ${expectedMetric.name} threshold must match manifest.`);
+      }
+      if (!metricPassesThreshold(reportMetric.name, reportMetric.value, reportMetric.threshold)) {
+        failures.push(`${report.fixtureId}: ${expectedMetric.name} value must satisfy threshold.`);
+      }
     }
-    if (reportMetric.threshold !== expectedMetric.threshold) {
-      failures.push(`${report.fixtureId}: ${expectedMetric.name} threshold must match manifest.`);
-    }
-    if (!metricPassesThreshold(reportMetric.name, reportMetric.value, reportMetric.threshold)) {
-      failures.push(`${report.fixtureId}: ${expectedMetric.name} value must satisfy threshold.`);
-    }
-  }
 
-  if (!reportMetrics.has('previewExportMeanAbsDelta')) {
-    failures.push(`${report.fixtureId}: missing preview/export parity metric.`);
+    if (!reportMetrics.has('previewExportMeanAbsDelta')) {
+      failures.push(`${report.fixtureId}: missing preview/export parity metric.`);
+    }
   }
 
   const sourceHashes = report.sourceHashes.map((sourceHash) => sourceHash.hash);
@@ -175,6 +180,37 @@ function metricPassesThreshold(name: string, value: number, threshold: number): 
     return value <= threshold;
   }
   return value >= threshold;
+}
+
+function verifyDecodeSmokeReport(
+  report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
+  expectedSourceCount: number,
+): void {
+  const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
+  for (const requiredKind of ['source_raw_sequence_private', 'decode_report_private', 'quality_report_private']) {
+    if (!artifactKinds.has(requiredKind)) failures.push(`${report.fixtureId}: decode smoke missing ${requiredKind}.`);
+  }
+  for (const forbiddenKind of ['merge_output_private', 'preview_after_private', 'export_after_private']) {
+    if (artifactKinds.has(forbiddenKind)) {
+      failures.push(`${report.fixtureId}: decode smoke must not claim ${forbiddenKind}.`);
+    }
+  }
+
+  const reportMetrics = new Map(report.qualityMetrics.map((metric) => [metric.name, metric]));
+  const decodedSourceCount = reportMetrics.get('decodedSourceCount');
+  const decodedFinitePixelRatio = reportMetrics.get('decodedFinitePixelRatio');
+  const decodedNonzeroDimensionCount = reportMetrics.get('decodedNonzeroDimensionCount');
+  if (decodedSourceCount === undefined || decodedSourceCount.value < expectedSourceCount) {
+    failures.push(`${report.fixtureId}: decode smoke must prove decodedSourceCount >= ${expectedSourceCount}.`);
+  }
+  if (decodedFinitePixelRatio === undefined || decodedFinitePixelRatio.value < 1) {
+    failures.push(`${report.fixtureId}: decode smoke must prove decodedFinitePixelRatio >= 1.`);
+  }
+  if (decodedNonzeroDimensionCount === undefined || decodedNonzeroDimensionCount.value < expectedSourceCount) {
+    failures.push(
+      `${report.fixtureId}: decode smoke must prove decodedNonzeroDimensionCount >= ${expectedSourceCount}.`,
+    );
+  }
 }
 
 function isWithinRoot(rootPath: string, candidatePath: string): boolean {
