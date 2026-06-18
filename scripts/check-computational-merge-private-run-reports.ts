@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
 
-import { access, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { resolve } from 'node:path';
+import { access, readFile, readdir, stat } from 'node:fs/promises';
+import { join, relative, resolve } from 'node:path';
 
 import { parseComputationalMergeE2eProofManifest } from '../src/schemas/computationalMergeE2eProofSchemas.ts';
 import { parseComputationalMergePrivateRunReportCollection } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
 
 const requireAssets = process.argv.includes('--require-assets');
+const inputPath = valueAfter('--input') ?? 'fixtures/validation/computational-merge-private-run-reports.json';
 const root = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 const failures: string[] = [];
 
@@ -19,7 +20,7 @@ const manifest = parseComputationalMergeE2eProofManifest(
   JSON.parse(await readFile('fixtures/validation/computational-merge-e2e-proof.json', 'utf8')),
 );
 const reportCollection = parseComputationalMergePrivateRunReportCollection(
-  JSON.parse(await readFile('fixtures/validation/computational-merge-private-run-reports.json', 'utf8')),
+  JSON.parse(await readFile(inputPath, 'utf8')),
 );
 
 const proofCasesByFixtureId = new Map(manifest.proofCases.map((proofCase) => [proofCase.fixtureId, proofCase]));
@@ -120,7 +121,11 @@ async function verifyPrivateAssets(
   fixtureId: string,
   assets: Array<{ hash: string; path: string }>,
 ): Promise<void> {
+  const seenPaths = new Set<string>();
   for (const asset of assets) {
+    if (seenPaths.has(asset.path)) continue;
+    seenPaths.add(asset.path);
+
     const absolutePath = resolve(privateRoot, asset.path);
     try {
       await access(absolutePath);
@@ -129,13 +134,46 @@ async function verifyPrivateAssets(
       continue;
     }
 
-    const actualHash = createHash('sha256')
-      .update(await readFile(absolutePath))
-      .digest('hex');
+    const actualHash = await hashPrivatePath(absolutePath);
     if (`sha256:${actualHash}` !== asset.hash) {
       failures.push(`${fixtureId}: hash mismatch for ${asset.path}.`);
     }
   }
+}
+
+async function hashPrivatePath(path: string): Promise<string> {
+  const fileStat = await stat(path);
+  if (!fileStat.isDirectory())
+    return createHash('sha256')
+      .update(await readFile(path))
+      .digest('hex');
+
+  const filePaths = await collectDirectoryFiles(path);
+  const hash = createHash('sha256');
+  for (const filePath of filePaths) {
+    hash.update(relative(path, filePath).split('/').join('/'));
+    hash.update(await readFile(filePath));
+  }
+  return hash.digest('hex');
+}
+
+async function collectDirectoryFiles(directory: string): Promise<Array<string>> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files: Array<string> = [];
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectDirectoryFiles(path)));
+    } else if (entry.isFile()) {
+      files.push(path);
+    }
+  }
+  return files.toSorted();
+}
+
+function valueAfter(flag: string): string | undefined {
+  const index = process.argv.indexOf(flag);
+  return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
 if (failures.length > 0) {
