@@ -15,6 +15,7 @@ import {
   commandPaletteWorkflowProofSchema,
   detailWorkspaceProofSchema,
   focusUiSettingsProofSchema,
+  hdrReviewWorkspaceProofSchema,
   hdrUiSettingsProofSchema,
   libraryWorkflowProofSchema,
   layerStackExportParityProofSchema,
@@ -252,6 +253,12 @@ async function prepareScenario(page, mode) {
     hdrUiSettingsProofSchema.parse(
       await page.getByTestId('hdr-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    hdrReviewWorkspaceProofSchema.parse(
+      await page.getByTestId('hdr-review-workspace-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    await page.getByTestId('hdr-artifact-handoff').getByText('/tmp/rawengine-hdr-smoke.tif', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     return;
   }
 

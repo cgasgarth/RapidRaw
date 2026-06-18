@@ -200,6 +200,14 @@ export const hdrUiSettingsProofSchema = z.object({
   maxPreviewDimensionPx: z.literal('8192'),
   toneMapPreview: z.literal('false'),
 });
+export const hdrReviewWorkspaceProofSchema = z.object({
+  artifactPath: z.literal('/tmp/rawengine-hdr-smoke.tif'),
+  bracketValidation: z.literal('required'),
+  command: z.literal('hdr.merge.dry_run_command'),
+  deghosting: z.literal('high'),
+  runtimeStatus: z.literal('dry_run_preview'),
+  sourceCount: z.literal('3'),
+});
 export const panoramaUiSettingsProofSchema = z.object({
   blendMode: z.literal('feather'),
   boundaryMode: z.literal('transparent'),
