@@ -1,24 +1,24 @@
 import { z } from 'zod';
 
-export const toneColorAppServerRouteExecutionModeSchema = z.enum(['dry_run_command', 'apply_dry_run_plan']);
-export const toneColorAppServerRouteStatusSchema = z.enum(['mapped']);
+import {
+  TONE_COLOR_APP_SERVER_COMMAND_TYPES,
+  TONE_COLOR_APP_SERVER_EXECUTION_MODES,
+  TONE_COLOR_APP_SERVER_OUTPUT_SCHEMA_NAMES,
+  TONE_COLOR_APP_SERVER_ROUTE_STATUSES,
+  TONE_COLOR_APP_SERVER_TOOL_NAMES,
+  ToneColorAppServerExecutionMode,
+  ToneColorAppServerSchemaName,
+} from '../utils/toneColorAppServerRouteIds';
+
+export const toneColorAppServerRouteExecutionModeSchema = z.enum(TONE_COLOR_APP_SERVER_EXECUTION_MODES);
+export const toneColorAppServerRouteStatusSchema = z.enum(TONE_COLOR_APP_SERVER_ROUTE_STATUSES);
 
 export const toneColorAppServerRouteSchema = z
   .object({
-    commandType: z.enum([
-      'toneColor.setBasicTone',
-      'toneColor.setToneCurve',
-      'toneColor.setWhiteBalance',
-      'toneColor.adjustHsl',
-      'toneColor.setColorGrading',
-      'toneColor.setLevels',
-      'toneColor.setChannelMixer',
-      'toneColor.setColorBalanceRgb',
-      'toneColor.setBlackWhiteMixer',
-    ]),
+    commandType: z.enum(TONE_COLOR_APP_SERVER_COMMAND_TYPES),
     executionMode: toneColorAppServerRouteExecutionModeSchema,
-    inputSchemaName: z.literal('ToneColorCommandEnvelopeV1'),
-    outputSchemaName: z.enum(['ToneColorDryRunResultV1', 'ToneColorMutationResultV1']),
+    inputSchemaName: z.literal(ToneColorAppServerSchemaName.CommandEnvelope),
+    outputSchemaName: z.enum(TONE_COLOR_APP_SERVER_OUTPUT_SCHEMA_NAMES),
     reason: z.string().trim().min(1),
     runtimeCheckScript: z.enum([
       'check:basic-tone-command-bridge',
@@ -32,14 +32,14 @@ export const toneColorAppServerRouteSchema = z
       'check:black-white-mixer',
     ]),
     status: toneColorAppServerRouteStatusSchema,
-    toolName: z
-      .string()
-      .trim()
-      .regex(/^tonecolor\.(?:dry_run_command|apply_command)$/u),
+    toolName: z.enum(TONE_COLOR_APP_SERVER_TOOL_NAMES),
   })
   .strict()
   .superRefine((route, context) => {
-    if (route.executionMode === 'dry_run_command' && route.outputSchemaName !== 'ToneColorDryRunResultV1') {
+    if (
+      route.executionMode === ToneColorAppServerExecutionMode.DryRunCommand &&
+      route.outputSchemaName !== ToneColorAppServerSchemaName.DryRunResult
+    ) {
       context.addIssue({
         code: 'custom',
         message: 'Dry-run tone-color routes must return dry-run results.',
@@ -47,7 +47,10 @@ export const toneColorAppServerRouteSchema = z
       });
     }
 
-    if (route.executionMode === 'apply_dry_run_plan' && route.outputSchemaName !== 'ToneColorMutationResultV1') {
+    if (
+      route.executionMode === ToneColorAppServerExecutionMode.ApplyDryRunPlan &&
+      route.outputSchemaName !== ToneColorAppServerSchemaName.MutationResult
+    ) {
       context.addIssue({
         code: 'custom',
         message: 'Apply tone-color routes must return mutation results.',
