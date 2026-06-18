@@ -134,6 +134,14 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:panorama-blend-exposure', new Set(['bun scripts/check-panorama-blend-exposure.ts'])],
   ['check:panorama-projection-crop', new Set(['bun scripts/check-panorama-projection-crop.ts'])],
   ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario panorama-ui'])],
+  [
+    'check:sr-artifact-performance-proof',
+    new Set(['bun scripts/check-super-resolution-artifact-performance-proof.ts']),
+  ],
+  [
+    'check:sr-artifact-performance-proof:update',
+    new Set(['bun scripts/check-super-resolution-artifact-performance-proof.ts --update']),
+  ],
   ['check:sr-ui-api', new Set(['bun scripts/check-sr-ui-api.ts'])],
   ['check:sr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario sr-ui'])],
   ['check:negative-lab-fixtures', new Set(['bun scripts/check-negative-lab-fixtures.ts'])],
