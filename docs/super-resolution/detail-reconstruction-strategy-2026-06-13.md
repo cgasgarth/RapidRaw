@@ -144,3 +144,8 @@ Required local checks for this slice:
 - `bun run format:check`
 - `bun run check:unsafe-casts`
 - `git diff --check`
+
+Issue #1940 adds `bun run check:sr-alignment-detail-proof`, which records
+declared pixel-shift alignment, before/after dimensions, MAE/detail deltas, and
+the synthetic report hash at
+`docs/validation/super-resolution-alignment-detail-proof-2026-06-18.json`.

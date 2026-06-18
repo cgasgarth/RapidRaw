@@ -1,0 +1,44 @@
+{
+  "alignment": {
+    "expectedFrameCount": 4,
+    "missingShiftWarningPath": "unsupported_source_set_requires_explicit_warning",
+    "sourceFrames": [
+      {
+        "shiftX": 0,
+        "shiftY": 0
+      },
+      {
+        "shiftX": 1,
+        "shiftY": 0
+      },
+      {
+        "shiftX": 0,
+        "shiftY": 1
+      },
+      {
+        "shiftX": 1,
+        "shiftY": 1
+      }
+    ],
+    "status": "pixel_shift_offsets_declared"
+  },
+  "detail": {
+    "baselineMae": 0.059477884795948434,
+    "changedPixelRatio": 0.7265625,
+    "improvementRatio": 1,
+    "srMae": 0
+  },
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1940,
+  "output": {
+    "dimensions": {
+      "height": 64,
+      "width": 96
+    },
+    "scale": 2,
+    "sourceReportHash": "8d4c76a36b780c9dab7c0e342baca9b1321285f9820e6aedc9132816e355b88d"
+  },
+  "proofHash": "bafd16295d55132a7a43d09e1833fb7b0c2a2d28d38aa65ae64ea09cae366884",
+  "schemaVersion": 1,
+  "validationStatus": "synthetic_artifact_gate"
+}
