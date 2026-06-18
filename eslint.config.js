@@ -320,6 +320,14 @@ module.exports = [
   {
     files: publicApiSignatureFiles,
     rules: {
+      '@typescript-eslint/explicit-function-return-type': [
+        'error',
+        {
+          allowExpressions: true,
+          allowFunctionsWithoutTypeParameters: true,
+          allowTypedFunctionExpressions: true,
+        },
+      ],
       '@typescript-eslint/typedef': [
         'error',
         {
