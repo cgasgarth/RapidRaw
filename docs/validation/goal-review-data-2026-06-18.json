@@ -50,6 +50,10 @@
     "bun run check:goal-review-data",
     "bun run check:goal-review-page",
     "bun run check:computational-merge-runtime-status",
+    "bun run prepare:hdr-real-raw-private-root",
+    "bun run prepare:focus-real-raw-private-root",
+    "bun run prepare:sr-real-raw-private-root",
+    "bun run prepare:panorama-real-raw-private-root",
     "bun run check:raw-open-edit-export-runtime-status",
     "bun run check:professional-workflow-status"
   ],
@@ -58,7 +62,8 @@
   "missingArtifacts": [
     "Full app walkthrough screenshots for every newly added UI surface.",
     "Private HDR ARW bracket runtime report from RAWENGINE_RUN_PRIVATE_HDR_REAL_RAW_PROOF=1.",
-    "Real RAW panorama, focus stack, and super-resolution runtime reports."
+    "Private focus-stack CR3, super-resolution NEF, and panorama RAF source files.",
+    "Real RAW panorama, focus stack, and super-resolution runtime reports after private source files exist."
   ],
   "proofHash": "29649e989ea665359b3ec9a82f6970a092499bdc81fd38f7f6e7ca9fd003ce2d",
   "schemaVersion": 1,
