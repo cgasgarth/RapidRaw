@@ -285,6 +285,12 @@ async function prepareScenario(page, mode) {
   );
   await page.getByTestId('negative-lab-workflow-rail').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-batch-readiness').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-roll-frame-navigator').waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-roll-frame-count')
+    .getByText('Frames 2', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-roll-frame-1').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-dust-review').waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-retouch-count').getByText('Retouch 0', { exact: true }).waitFor({
     timeout: 10_000,
@@ -302,6 +308,12 @@ async function prepareScenario(page, mode) {
     timeout: 10_000,
   });
   await page.getByTestId('negative-lab-active-scan-1').click();
+  await page.getByTestId('negative-lab-roll-frame-status-1').getByText('Active', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-roll-frame-runtime-1').getByText('Preview ready', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId('negative-lab-frame-health-row-1').getByText('Active', { exact: true }).waitFor({
     timeout: 10_000,
   });
@@ -312,7 +324,7 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-stock-registry').waitFor({ timeout: 10_000 });
   await page
     .getByTestId('negative-lab-stock-registry')
-    .getByText('5 runtime-safe / 2 reference-only', { exact: true })
+    .getByText('5 runtime-safe / 12 reference-only', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
     .getByTestId('negative-lab-stock-family-negative_lab.stock_family.c41_portrait_color_negative.v1')

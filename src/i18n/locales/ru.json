@@ -1364,6 +1364,8 @@
       "batchPlanCopied": "Copied plan",
       "copyBatchPlan": "Copy batch plan JSON",
       "convertAndSaveActive": "Convert & Save Active",
+      "nextFrameTooltip": "Next frame",
+      "previousFrameTooltip": "Previous frame",
       "previewPending": "Preview pending",
       "previewReady": "Preview ready",
       "queuedScans": "{{queuedCount}} queued",
