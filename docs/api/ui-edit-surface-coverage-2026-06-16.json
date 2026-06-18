@@ -54,7 +54,7 @@
       "appServerTool": "computationalmerge.hdr.dry_run_command / computationalmerge.hdr.apply_command / computationalmerge.panorama.dry_run_command / computationalmerge.panorama.apply_command / computationalmerge.focus_stack.dry_run_command / computationalmerge.focus_stack.apply_command / computationalmerge.super_resolution.dry_run_command / computationalmerge.super_resolution.apply_command",
       "commandSchema": "ComputationalMergeCommandEnvelopeV1",
       "coverageLevel": "runtime_apply_capable",
-      "e2eIssues": ["#1506", "#1507", "#1508", "#1509"],
+      "e2eIssues": ["#1506", "#1507", "#1508", "#2062"],
       "surface": "HDR, focus stack, panorama, and super-resolution merge commands",
       "uiFiles": [
         "src/components/modals/HdrModal.tsx",

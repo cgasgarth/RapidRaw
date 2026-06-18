@@ -132,7 +132,7 @@ function sampleCollection(): ReturnType<typeof parseComputationalMergePrivateRun
         fixtureId: 'validation.computational-merge.hdr-bracket-alignment.v1',
         generatedAt: '2026-06-18T00:00:00.000Z',
         graphRevisionHash: hash,
-        implementationIssue: 1509,
+        implementationIssue: 2062,
         notes: 'sample private computational merge run report',
         previewExportParity,
         qualityMetrics: [

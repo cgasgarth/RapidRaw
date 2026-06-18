@@ -627,7 +627,7 @@
       "expectedWarnings": ["asset_payload_not_committed"],
       "reviewer": "RawEngine maintainers",
       "reviewDate": "2026-06-18",
-      "notes": "HDR deghosting corpus placeholder for #1897. Full real RAW merge proof remains tracked by #1509."
+      "notes": "HDR deghosting corpus placeholder for #1897. Full real RAW merge proof remains tracked by #2062."
     },
     {
       "fixtureId": "real.panorama.overlap-urban-row.v0",

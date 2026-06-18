@@ -66,7 +66,7 @@
       ],
       "featureFamily": "hdr_merge",
       "fixtureId": "validation.computational-merge.hdr-bracket-alignment.v1",
-      "implementationIssue": 1509,
+      "implementationIssue": 2062,
       "localSourceRelativePaths": [
         "private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw",
         "private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw",
