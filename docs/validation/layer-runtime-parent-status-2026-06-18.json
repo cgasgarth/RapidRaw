@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "parentIssue": 1248,
+  "status": "runtime_children_complete",
+  "runtimeProofs": [
+    {
+      "issue": 1912,
+      "command": "check:layer-normal-opacity-runtime",
+      "fixture": "fixtures/layers/layer-normal-opacity-runtime.json",
+      "proof": "normal opacity sidecar state, changed pixels, and source immutability"
+    },
+    {
+      "issue": 1913,
+      "command": "check:layer-multiply-screen-runtime",
+      "fixture": "fixtures/layers/layer-multiply-screen-runtime.json",
+      "proof": "multiply and screen blend output pixels"
+    },
+    {
+      "issue": 1914,
+      "command": "check:layer-overlay-soft-light-runtime",
+      "fixture": "fixtures/layers/layer-overlay-soft-light-runtime.json",
+      "proof": "overlay and soft-light contrast-local blend output pixels"
+    },
+    {
+      "issue": 1915,
+      "command": "check:layer-opacity-order-runtime",
+      "fixture": "fixtures/layers/layer-opacity-order-runtime.json",
+      "proof": "deterministic layer order, opacity, visibility replay, and export hash parity"
+    },
+    {
+      "issue": 1265,
+      "command": "check:layer-preview-export-parity",
+      "fixture": "fixtures/layers/layer-preview-export-parity.json",
+      "proof": "representative stack preview/export/headless parity across supported blend modes"
+    }
+  ],
+  "explicitFollowUps": [
+    {
+      "issue": 1247,
+      "reason": "real RAW mask refinement preview/export evidence remains separate"
+    }
+  ]
+}
