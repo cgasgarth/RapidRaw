@@ -168,6 +168,7 @@
     "check:hdr-fixtures:update": "bun scripts/check-hdr-synthetic-fixtures.ts --update",
     "check:panorama-fixtures": "bun scripts/check-panorama-fixture-manifest.ts",
     "check:panorama-feature-transform": "bun scripts/check-panorama-feature-transform.ts",
+    "check:panorama-projection-crop": "bun scripts/check-panorama-projection-crop.ts",
     "check:panorama-performance-fixtures": "bun scripts/check-panorama-performance-fixtures.ts",
     "check:panorama-parity": "bun scripts/check-panorama-synthetic-parity.ts",
     "check:panorama-app-server-runtime": "bun scripts/check-panorama-app-server-runtime.ts",
