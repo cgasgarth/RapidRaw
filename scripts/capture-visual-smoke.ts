@@ -258,6 +258,9 @@ async function prepareScenario(page, mode) {
 
   if (mode === 'color-workflow') {
     const colorPanel = page.locator('[data-visual-smoke-section="color-workflow-panel"]');
+    await colorPanel.getByTestId('color-runtime-status-rail').getByText('Preview/export', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     await colorPanel.getByLabel('Temperature').fill('12');
     await colorPanel.getByLabel('Saturation').first().fill('18');
     await colorPanel.getByTestId('color-balance-toggle').click();

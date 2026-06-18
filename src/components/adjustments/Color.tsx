@@ -45,6 +45,29 @@ interface ColorPanelProps {
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 type LevelsNumericKey = Exclude<keyof Adjustments['levels'], 'enabled'>;
 
+const colorRuntimeStatusItems = [
+  { label: 'GPU', state: 'Preview/export' },
+  { label: 'API', state: 'Typed' },
+  { label: 'UI', state: 'Proofed' },
+] as const;
+
+const ColorRuntimeStatusRail = () => (
+  <div
+    aria-label="Color editor runtime status"
+    className="grid grid-cols-3 gap-1 rounded-md border border-border bg-bg-tertiary p-1"
+    data-testid="color-runtime-status-rail"
+  >
+    {colorRuntimeStatusItems.map((item) => (
+      <div className="min-w-0 rounded bg-bg-secondary px-2 py-1" data-runtime-state={item.state} key={item.label}>
+        <div className="truncate text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
+          {item.label}
+        </div>
+        <div className="truncate text-xs font-medium text-text-primary">{item.state}</div>
+      </div>
+    ))}
+  </div>
+);
+
 const formatPercent = (value: number) => `${String(value)}%`;
 const CAMERA_PROFILE_IDS = [
   'camera_standard',
@@ -787,6 +810,7 @@ export default function ColorPanel({
 
   return (
     <div className="space-y-4">
+      {!isForMask && <ColorRuntimeStatusRail />}
       {!isForMask &&
         (adjustmentVisibility[ColorAdjustment.CameraProfile] !== false ||
           adjustmentVisibility[ColorAdjustment.ToneCurve] !== false) && (
