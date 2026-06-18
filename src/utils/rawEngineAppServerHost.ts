@@ -6,7 +6,16 @@ import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negativeLabAppServerRo
 import { TONE_COLOR_APP_SERVER_ROUTES } from './toneColorAppServerRoutes';
 import {
   AgentRuntimeId,
+  RawEngineAppServerAuditOutcome,
   RawEngineAppServerHostToolName,
+  RawEngineAppServerLifecyclePhase,
+  RawEngineAppServerProtocol,
+  RawEngineAppServerResponseStatus,
+  RawEngineAppServerRouteMode,
+  RawEngineAppServerSupervisorEventKind,
+  RawEngineAppServerSupervisorPhase,
+  RawEngineAppServerToolKind,
+  RawEngineAppServerTransport,
   rawEngineAppServerAuditEntrySchema,
   rawEngineAppServerCapabilitiesReplaySchema,
   rawEngineAppServerCapabilitiesResponseSchema,
@@ -44,36 +53,36 @@ import {
   type RawEngineAppServerRouteCatalogRequest,
   type RawEngineAppServerRouteCatalogResponse,
   type RawEngineAppServerRouteFamily,
-  type RawEngineAppServerRouteMode,
+  type RawEngineAppServerRouteMode as RawEngineAppServerRouteModeValue,
 } from '../schemas/agentRuntimeSchemas';
 
 export const RAW_ENGINE_APP_SERVER_HOST_MANIFEST = rawEngineAppServerHostManifestSchema.parse({
-  protocol: 'codex_app_server',
+  protocol: RawEngineAppServerProtocol.CodexAppServer,
   schemaVersion: 1,
   tools: [
     {
       inputSchemaName: 'RawEngineAppServerHealthRequestV1',
       mutates: false,
       outputSchemaName: 'RawEngineAppServerHealthResponseV1',
-      toolKind: 'read',
+      toolKind: RawEngineAppServerToolKind.Read,
       toolName: RawEngineAppServerHostToolName.Health,
     },
     {
       inputSchemaName: 'RawEngineAppServerCapabilitiesRequestV1',
       mutates: false,
       outputSchemaName: 'RawEngineAppServerCapabilitiesResponseV1',
-      toolKind: 'read',
+      toolKind: RawEngineAppServerToolKind.Read,
       toolName: RawEngineAppServerHostToolName.Capabilities,
     },
     {
       inputSchemaName: 'RawEngineAppServerRouteCatalogRequestV1',
       mutates: false,
       outputSchemaName: 'RawEngineAppServerRouteCatalogResponseV1',
-      toolKind: 'read',
+      toolKind: RawEngineAppServerToolKind.Read,
       toolName: RawEngineAppServerHostToolName.RouteCatalog,
     },
   ],
-  transport: 'stdio_jsonl',
+  transport: RawEngineAppServerTransport.StdioJsonl,
 });
 
 export const createRawEngineAppServerLifecycleState = ({
@@ -85,7 +94,7 @@ export const createRawEngineAppServerLifecycleState = ({
     clientInfo: null,
     connectionId,
     initializedAtIso: null,
-    phase: 'created',
+    phase: RawEngineAppServerLifecyclePhase.Created,
     schemaVersion: 1,
     stoppedAtIso: null,
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
@@ -100,7 +109,7 @@ export const initializeRawEngineAppServerLifecycle = ({
   state: RawEngineAppServerLifecycleState;
   timestampIso: string;
 }): RawEngineAppServerLifecycleState => {
-  if (state.phase !== 'created') {
+  if (state.phase !== RawEngineAppServerLifecyclePhase.Created) {
     throw new Error(`RawEngine app-server lifecycle cannot initialize from ${state.phase}.`);
   }
 
@@ -108,7 +117,7 @@ export const initializeRawEngineAppServerLifecycle = ({
     ...state,
     clientInfo,
     initializedAtIso: timestampIso,
-    phase: 'initialized',
+    phase: RawEngineAppServerLifecyclePhase.Initialized,
   });
 };
 
@@ -119,19 +128,19 @@ export const stopRawEngineAppServerLifecycle = ({
   state: RawEngineAppServerLifecycleState;
   timestampIso: string;
 }): RawEngineAppServerLifecycleState => {
-  if (state.phase === 'created') {
+  if (state.phase === RawEngineAppServerLifecyclePhase.Created) {
     throw new Error('RawEngine app-server lifecycle cannot stop before initialize.');
   }
 
   return rawEngineAppServerLifecycleStateSchema.parse({
     ...state,
-    phase: 'stopped',
+    phase: RawEngineAppServerLifecyclePhase.Stopped,
     stoppedAtIso: timestampIso,
   });
 };
 
 export const assertRawEngineAppServerLifecycleReady = (state: RawEngineAppServerLifecycleState): void => {
-  if (state.phase !== 'initialized') {
+  if (state.phase !== RawEngineAppServerLifecyclePhase.Initialized) {
     throw new Error(`RawEngine app-server request rejected while lifecycle is ${state.phase}.`);
   }
 };
@@ -158,12 +167,18 @@ export const createRawEngineAppServerSupervisorState = ({
   timestampIso: string;
 }): RawEngineAppServerSupervisorState =>
   rawEngineAppServerSupervisorStateSchema.parse({
-    auditEvents: [{ kind: 'created', phase: 'idle', timestampIso }],
+    auditEvents: [
+      {
+        kind: RawEngineAppServerSupervisorEventKind.Created,
+        phase: RawEngineAppServerSupervisorPhase.Idle,
+        timestampIso,
+      },
+    ],
     cancellationRequestedAtIso: null,
     command,
     error: null,
     lastTransitionAtIso: timestampIso,
-    phase: 'idle',
+    phase: RawEngineAppServerSupervisorPhase.Idle,
     processId: null,
     schemaVersion: 1,
     startedAtIso: null,
@@ -181,16 +196,24 @@ export const startRawEngineAppServerSupervisor = ({
   state: RawEngineAppServerSupervisorState;
   timestampIso: string;
 }): RawEngineAppServerSupervisorState => {
-  if (state.phase !== 'idle' && state.phase !== 'stopped') {
+  if (
+    state.phase !== RawEngineAppServerSupervisorPhase.Idle &&
+    state.phase !== RawEngineAppServerSupervisorPhase.Stopped
+  ) {
     throw new Error(`RawEngine app-server supervisor cannot start from ${state.phase}.`);
   }
 
   return rawEngineAppServerSupervisorStateSchema.parse({
     ...state,
-    auditEvents: appendRawEngineAppServerSupervisorEvent({ kind: 'start', phase: 'starting', state, timestampIso }),
+    auditEvents: appendRawEngineAppServerSupervisorEvent({
+      kind: RawEngineAppServerSupervisorEventKind.Start,
+      phase: RawEngineAppServerSupervisorPhase.Starting,
+      state,
+      timestampIso,
+    }),
     error: null,
     lastTransitionAtIso: timestampIso,
-    phase: 'starting',
+    phase: RawEngineAppServerSupervisorPhase.Starting,
     processId,
     startedAtIso: timestampIso,
     stoppedAtIso: null,
@@ -204,15 +227,20 @@ export const markRawEngineAppServerSupervisorReady = ({
   state: RawEngineAppServerSupervisorState;
   timestampIso: string;
 }): RawEngineAppServerSupervisorState => {
-  if (state.phase !== 'starting') {
+  if (state.phase !== RawEngineAppServerSupervisorPhase.Starting) {
     throw new Error(`RawEngine app-server supervisor cannot become ready from ${state.phase}.`);
   }
 
   return rawEngineAppServerSupervisorStateSchema.parse({
     ...state,
-    auditEvents: appendRawEngineAppServerSupervisorEvent({ kind: 'ready', phase: 'running', state, timestampIso }),
+    auditEvents: appendRawEngineAppServerSupervisorEvent({
+      kind: RawEngineAppServerSupervisorEventKind.Ready,
+      phase: RawEngineAppServerSupervisorPhase.Running,
+      state,
+      timestampIso,
+    }),
     lastTransitionAtIso: timestampIso,
-    phase: 'running',
+    phase: RawEngineAppServerSupervisorPhase.Running,
   });
 };
 
@@ -223,16 +251,24 @@ export const cancelRawEngineAppServerSupervisor = ({
   state: RawEngineAppServerSupervisorState;
   timestampIso: string;
 }): RawEngineAppServerSupervisorState => {
-  if (state.phase !== 'running' && state.phase !== 'starting') {
+  if (
+    state.phase !== RawEngineAppServerSupervisorPhase.Running &&
+    state.phase !== RawEngineAppServerSupervisorPhase.Starting
+  ) {
     throw new Error(`RawEngine app-server supervisor cannot cancel from ${state.phase}.`);
   }
 
   return rawEngineAppServerSupervisorStateSchema.parse({
     ...state,
-    auditEvents: appendRawEngineAppServerSupervisorEvent({ kind: 'cancel', phase: 'stopping', state, timestampIso }),
+    auditEvents: appendRawEngineAppServerSupervisorEvent({
+      kind: RawEngineAppServerSupervisorEventKind.Cancel,
+      phase: RawEngineAppServerSupervisorPhase.Stopping,
+      state,
+      timestampIso,
+    }),
     cancellationRequestedAtIso: timestampIso,
     lastTransitionAtIso: timestampIso,
-    phase: 'stopping',
+    phase: RawEngineAppServerSupervisorPhase.Stopping,
   });
 };
 
@@ -243,15 +279,24 @@ export const stopRawEngineAppServerSupervisor = ({
   state: RawEngineAppServerSupervisorState;
   timestampIso: string;
 }): RawEngineAppServerSupervisorState => {
-  if (state.phase !== 'running' && state.phase !== 'starting' && state.phase !== 'stopping') {
+  if (
+    state.phase !== RawEngineAppServerSupervisorPhase.Running &&
+    state.phase !== RawEngineAppServerSupervisorPhase.Starting &&
+    state.phase !== RawEngineAppServerSupervisorPhase.Stopping
+  ) {
     throw new Error(`RawEngine app-server supervisor cannot stop from ${state.phase}.`);
   }
 
   return rawEngineAppServerSupervisorStateSchema.parse({
     ...state,
-    auditEvents: appendRawEngineAppServerSupervisorEvent({ kind: 'stop', phase: 'stopped', state, timestampIso }),
+    auditEvents: appendRawEngineAppServerSupervisorEvent({
+      kind: RawEngineAppServerSupervisorEventKind.Stop,
+      phase: RawEngineAppServerSupervisorPhase.Stopped,
+      state,
+      timestampIso,
+    }),
     lastTransitionAtIso: timestampIso,
-    phase: 'stopped',
+    phase: RawEngineAppServerSupervisorPhase.Stopped,
     processId: null,
     stoppedAtIso: timestampIso,
   });
@@ -267,16 +312,25 @@ export const failRawEngineAppServerSupervisor = ({
   timestampIso: string;
 }): RawEngineAppServerSupervisorState => {
   const parsedError = rawEngineAppServerStructuredErrorSchema.parse(error);
-  if (state.phase !== 'starting' && state.phase !== 'running' && state.phase !== 'stopping') {
+  if (
+    state.phase !== RawEngineAppServerSupervisorPhase.Starting &&
+    state.phase !== RawEngineAppServerSupervisorPhase.Running &&
+    state.phase !== RawEngineAppServerSupervisorPhase.Stopping
+  ) {
     throw new Error(`RawEngine app-server supervisor cannot fail from ${state.phase}.`);
   }
 
   return rawEngineAppServerSupervisorStateSchema.parse({
     ...state,
-    auditEvents: appendRawEngineAppServerSupervisorEvent({ kind: 'fail', phase: 'stopped', state, timestampIso }),
+    auditEvents: appendRawEngineAppServerSupervisorEvent({
+      kind: RawEngineAppServerSupervisorEventKind.Fail,
+      phase: RawEngineAppServerSupervisorPhase.Stopped,
+      state,
+      timestampIso,
+    }),
     error: parsedError,
     lastTransitionAtIso: timestampIso,
-    phase: 'stopped',
+    phase: RawEngineAppServerSupervisorPhase.Stopped,
     processId: null,
     stoppedAtIso: timestampIso,
   });
@@ -350,7 +404,7 @@ const buildRouteCatalogEntry = ({
   commandName: string;
   family: RawEngineAppServerRouteFamily;
   inputSchemaNames: Iterable<string>;
-  modes: Iterable<RawEngineAppServerRouteMode>;
+  modes: Iterable<RawEngineAppServerRouteModeValue>;
   outputSchemaNames: Iterable<string>;
   runtimeCheckScripts?: Iterable<string>;
   toolNames: Iterable<string>;
@@ -407,7 +461,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
         commandName: route.commandName,
         family: 'film_look',
         inputSchemaNames: [route.inputSchemaName],
-        modes: ['host_command'],
+        modes: [RawEngineAppServerRouteMode.HostCommand],
         outputSchemaNames: [route.outputSchemaName],
         runtimeCheckScripts: filmLookRuntimeCheckScripts,
         toolNames: [route.commandName],
@@ -421,7 +475,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
         commandName: route.commandName,
         family: 'negative_lab',
         inputSchemaNames: [route.inputSchemaName],
-        modes: ['host_command'],
+        modes: [RawEngineAppServerRouteMode.HostCommand],
         outputSchemaNames: [route.outputSchemaName],
         runtimeCheckScripts: negativeLabRuntimeCheckScripts,
         toolNames: [route.commandName],
@@ -435,7 +489,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
         commandName: route.sourceOperation,
         family: 'ai',
         inputSchemaNames: route.commandSchemaName === undefined ? ['AiToolRouteCommandV1'] : [route.commandSchemaName],
-        modes: route.executionMode === undefined ? ['mapped_invoke'] : [route.executionMode],
+        modes: route.executionMode === undefined ? [RawEngineAppServerRouteMode.MappedInvoke] : [route.executionMode],
         outputSchemaNames: route.outputSchemaName === undefined ? ['AiToolRouteResultV1'] : [route.outputSchemaName],
         runtimeCheckScripts: aiRuntimeCheckScriptsForRoute(route),
         toolNames: route.appServerToolName === undefined ? [route.sourceOperation] : [route.appServerToolName],
@@ -469,7 +523,7 @@ export const buildRawEngineAppServerHealthResponse = ({
     manifestToolCount: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.tools.length,
     requestId,
     runtime: AgentRuntimeId.AppServer,
-    status: 'ok',
+    status: RawEngineAppServerResponseStatus.Ok,
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });
 
@@ -479,7 +533,7 @@ export const buildRawEngineAppServerCapabilitiesResponse = ({
   rawEngineAppServerCapabilitiesResponseSchema.parse({
     requestId,
     runtime: AgentRuntimeId.AppServer,
-    status: 'ok',
+    status: RawEngineAppServerResponseStatus.Ok,
     tools: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.tools,
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });
@@ -491,7 +545,7 @@ export const buildRawEngineAppServerRouteCatalogResponse = ({
     requestId,
     routes: buildRawEngineAppServerRouteCatalog(),
     runtime: AgentRuntimeId.AppServer,
-    status: 'ok',
+    status: RawEngineAppServerResponseStatus.Ok,
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });
 
@@ -519,7 +573,7 @@ export const buildRawEngineAppServerHostResponseEnvelope = (
     request: parsedRequest,
     response: handleRawEngineAppServerHostRequest(parsedRequest),
     schemaVersion: 1,
-    status: 'ok',
+    status: RawEngineAppServerResponseStatus.Ok,
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });
 };
@@ -536,10 +590,10 @@ export const buildRawEngineAppServerAuditEntry = ({
   rawEngineAppServerAuditEntrySchema.parse({
     affectedArtifactIds: [],
     mutates: false,
-    outcome: 'success',
+    outcome: RawEngineAppServerAuditOutcome.Success,
     requestId,
     timestampIso,
-    toolKind: 'read',
+    toolKind: RawEngineAppServerToolKind.Read,
     toolName,
     transport: RAW_ENGINE_APP_SERVER_HOST_MANIFEST.transport,
   });

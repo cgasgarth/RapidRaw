@@ -24,6 +24,14 @@ import {
 } from '../src/utils/rawEngineAppServerHost.ts';
 import {
   RawEngineAppServerHostToolName,
+  RawEngineAppServerLifecyclePhase,
+  RawEngineAppServerProtocol,
+  RawEngineAppServerResponseStatus,
+  RawEngineAppServerStructuredErrorCode,
+  RawEngineAppServerSupervisorEventKind,
+  RawEngineAppServerSupervisorPhase,
+  RawEngineAppServerToolKind,
+  RawEngineAppServerTransport,
   rawEngineAppServerCapabilitiesReplaySchema,
   rawEngineAppServerHealthReplaySchema,
   rawEngineAppServerHostResponseEnvelopeSchema,
@@ -48,9 +56,9 @@ const fixtureResponseSchema = z
     id: z.literal(1),
     result: z
       .object({
-        protocol: z.literal('codex_app_server'),
+        protocol: z.literal(RawEngineAppServerProtocol.CodexAppServer),
         ready: z.literal(true),
-        transport: z.literal('stdio_jsonl'),
+        transport: z.literal(RawEngineAppServerTransport.StdioJsonl),
       })
       .strict(),
   })
@@ -122,8 +130,17 @@ const lifecycleReplay = rawEngineAppServerLifecycleReplaySchema.parse(
   }),
 );
 
-if (lifecycleReplay.finalState.phase !== 'stopped') failures.push('Lifecycle replay must finish stopped.');
-if (lifecycleReplay.events.map((event) => event.phase).join(',') !== 'created,initialized,stopped') {
+if (lifecycleReplay.finalState.phase !== RawEngineAppServerLifecyclePhase.Stopped) {
+  failures.push('Lifecycle replay must finish stopped.');
+}
+if (
+  lifecycleReplay.events.map((event) => event.phase).join(',') !==
+  [
+    RawEngineAppServerLifecyclePhase.Created,
+    RawEngineAppServerLifecyclePhase.Initialized,
+    RawEngineAppServerLifecyclePhase.Stopped,
+  ].join(',')
+) {
   failures.push('Lifecycle replay phase order mismatch.');
 }
 
@@ -152,27 +169,38 @@ const supervisorStopped = rawEngineAppServerSupervisorStateSchema.parse(
   }),
 );
 
-if (supervisorStopped.phase !== 'stopped') failures.push('Supervisor stop should finish stopped.');
+if (supervisorStopped.phase !== RawEngineAppServerSupervisorPhase.Stopped) {
+  failures.push('Supervisor stop should finish stopped.');
+}
 if (supervisorStopped.processId !== null) failures.push('Supervisor stop must clear processId.');
 if (supervisorStopped.cancellationRequestedAtIso === null) {
   failures.push('Supervisor cancellation should remain audit-visible after stop.');
 }
-if (supervisorStopped.auditEvents.map((event) => event.kind).join(',') !== 'created,start,ready,cancel,stop') {
+if (
+  supervisorStopped.auditEvents.map((event) => event.kind).join(',') !==
+  [
+    RawEngineAppServerSupervisorEventKind.Created,
+    RawEngineAppServerSupervisorEventKind.Start,
+    RawEngineAppServerSupervisorEventKind.Ready,
+    RawEngineAppServerSupervisorEventKind.Cancel,
+    RawEngineAppServerSupervisorEventKind.Stop,
+  ].join(',')
+) {
   failures.push('Supervisor audit event order mismatch.');
 }
 
 const supervisorFailed = failRawEngineAppServerSupervisor({
   error: {
-    code: 'health_timeout',
+    code: RawEngineAppServerStructuredErrorCode.HealthTimeout,
     message: 'App-server health check did not report initialized before timeout.',
     recoverable: true,
   },
   state: supervisorStarting,
   timestampIso: '2026-06-17T12:00:05.000Z',
 });
-if (supervisorFailed.error?.code !== 'health_timeout')
+if (supervisorFailed.error?.code !== RawEngineAppServerStructuredErrorCode.HealthTimeout)
   failures.push('Supervisor failure should keep structured error.');
-if (!supervisorFailed.auditEvents.some((event) => event.kind === 'fail')) {
+if (!supervisorFailed.auditEvents.some((event) => event.kind === RawEngineAppServerSupervisorEventKind.Fail)) {
   failures.push('Supervisor failure should append fail event.');
 }
 
@@ -246,7 +274,7 @@ const runStdioLaunchProof = async () => {
   if (initializeResponseLine === undefined || threadStartedLine === undefined) {
     return failRawEngineAppServerSupervisor({
       error: {
-        code: 'health_timeout',
+        code: RawEngineAppServerStructuredErrorCode.HealthTimeout,
         message: 'stdio fixture did not emit initialize response and thread notification.',
         recoverable: true,
       },
@@ -269,7 +297,9 @@ const runStdioLaunchProof = async () => {
 };
 
 const launchProof = rawEngineAppServerSupervisorStateSchema.parse(await runStdioLaunchProof());
-if (launchProof.phase !== 'stopped') failures.push('Executable stdio launch proof must finish stopped.');
+if (launchProof.phase !== RawEngineAppServerSupervisorPhase.Stopped) {
+  failures.push('Executable stdio launch proof must finish stopped.');
+}
 if (launchProof.error !== null) failures.push(`Executable stdio launch proof failed: ${launchProof.error.message}`);
 if (launchProof.auditEvents.map((event) => event.kind).join(',') !== 'created,start,ready,stop') {
   failures.push('Executable stdio launch proof audit event order mismatch.');
@@ -279,21 +309,25 @@ if (healthTool === undefined) {
   failures.push(`Missing ${RawEngineAppServerHostToolName.Health} tool.`);
 } else {
   if (healthTool.mutates) failures.push('Health tool must be read-only.');
-  if (healthTool.toolKind !== 'read') failures.push('Health tool must use read kind.');
+  if (healthTool.toolKind !== RawEngineAppServerToolKind.Read) failures.push('Health tool must use read kind.');
 }
 
 if (capabilitiesTool === undefined) {
   failures.push(`Missing ${RawEngineAppServerHostToolName.Capabilities} tool.`);
 } else {
   if (capabilitiesTool.mutates) failures.push('Capabilities tool must be read-only.');
-  if (capabilitiesTool.toolKind !== 'read') failures.push('Capabilities tool must use read kind.');
+  if (capabilitiesTool.toolKind !== RawEngineAppServerToolKind.Read) {
+    failures.push('Capabilities tool must use read kind.');
+  }
 }
 
 if (routeCatalogTool === undefined) {
   failures.push(`Missing ${RawEngineAppServerHostToolName.RouteCatalog} tool.`);
 } else {
   if (routeCatalogTool.mutates) failures.push('Route catalog tool must be read-only.');
-  if (routeCatalogTool.toolKind !== 'read') failures.push('Route catalog tool must use read kind.');
+  if (routeCatalogTool.toolKind !== RawEngineAppServerToolKind.Read) {
+    failures.push('Route catalog tool must use read kind.');
+  }
 }
 
 const replay = rawEngineAppServerHealthReplaySchema.parse(
@@ -303,7 +337,7 @@ const replay = rawEngineAppServerHealthReplaySchema.parse(
   }),
 );
 
-if (replay.response.status !== 'ok') failures.push('Health replay did not return ok.');
+if (replay.response.status !== RawEngineAppServerResponseStatus.Ok) failures.push('Health replay did not return ok.');
 if (replay.response.manifestToolCount !== manifest.tools.length) {
   failures.push('Health replay manifest count mismatch.');
 }
@@ -386,19 +420,23 @@ const dispatchedHealth = handleRawEngineAppServerHostRequest({
   requestId: 'dispatch_health_001',
   toolName: RawEngineAppServerHostToolName.Health,
 });
-if (dispatchedHealth.status !== 'ok') failures.push('Dispatched health request failed.');
+if (dispatchedHealth.status !== RawEngineAppServerResponseStatus.Ok) failures.push('Dispatched health request failed.');
 
 const dispatchedCapabilities = handleRawEngineAppServerHostRequest({
   requestId: 'dispatch_capabilities_001',
   toolName: RawEngineAppServerHostToolName.Capabilities,
 });
-if (dispatchedCapabilities.status !== 'ok') failures.push('Dispatched capabilities request failed.');
+if (dispatchedCapabilities.status !== RawEngineAppServerResponseStatus.Ok) {
+  failures.push('Dispatched capabilities request failed.');
+}
 
 const dispatchedRouteCatalog = handleRawEngineAppServerHostRequest({
   requestId: 'dispatch_route_catalog_001',
   toolName: RawEngineAppServerHostToolName.RouteCatalog,
 });
-if (dispatchedRouteCatalog.status !== 'ok') failures.push('Dispatched route catalog request failed.');
+if (dispatchedRouteCatalog.status !== RawEngineAppServerResponseStatus.Ok) {
+  failures.push('Dispatched route catalog request failed.');
+}
 
 const envelopeRequests = [
   {
@@ -420,7 +458,9 @@ for (const request of envelopeRequests) {
     buildRawEngineAppServerHostResponseEnvelope(request, '2026-06-17T12:00:00.000Z'),
   );
 
-  if (envelope.status !== 'ok') failures.push(`${request.toolName} envelope did not return ok.`);
+  if (envelope.status !== RawEngineAppServerResponseStatus.Ok) {
+    failures.push(`${request.toolName} envelope did not return ok.`);
+  }
   if (envelope.request.requestId !== request.requestId) failures.push(`${request.toolName} envelope request mismatch.`);
   if (envelope.response.requestId !== request.requestId) {
     failures.push(`${request.toolName} envelope response mismatch.`);
