@@ -41,7 +41,7 @@ const featureIssues = {
     uiIssue: 1334,
   },
   hdr_merge: {
-    implementationIssue: 1509,
+    implementationIssue: 2062,
     uiIssue: 171,
   },
   panorama_stitch: {

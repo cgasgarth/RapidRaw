@@ -7,7 +7,7 @@ await runComputationalPrivateRootPrep({
   featureFamily: 'hdr_merge',
   featureLabel: 'hdr',
   fixtureId: 'validation.computational-merge.hdr-bracket-alignment.v1',
-  issue: 1509,
+  issue: 2062,
   minSources: 3,
   sourceLabel: 'ARW bracket files',
   tempPrefix: 'rawengine-hdr-private-root-',
