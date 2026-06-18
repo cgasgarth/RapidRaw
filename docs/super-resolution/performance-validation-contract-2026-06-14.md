@@ -127,3 +127,8 @@ Use this in PRs that touch SR runtime or validation:
 This contract does not add runtime SR benchmarks because the production SR
 renderer is not implemented yet. It defines the performance gates that runtime
 PRs must satisfy as soon as image-processing code lands.
+
+Issue #1941 adds `bun run check:sr-artifact-performance-proof`, which combines
+the runtime output artifact hash with performance fixture budgets, proxy peak
+memory, measured runtime, and preview/export parity status at
+`docs/validation/super-resolution-artifact-performance-proof-2026-06-18.json`.
