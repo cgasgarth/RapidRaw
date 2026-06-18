@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1929,
+  "proofHash": "f88ca26ecb9db1bf1652f4c8ce33eb2bb8c0ba94595812337d97b1e2dacd8eb6",
+  "schemaVersion": 1,
+  "sourceReportHash": "c877098b34212b92c81d457ce8a998ba6178035781cd95d5849efa05722f2505",
+  "cases": [
+    {
+      "changedPixelCount": 4,
+      "exposureMeanDeltaAfterCompensation": 0,
+      "outputHash": "sha256:2c65a8a4d093bf705e8ea407a8d30e0589973e84b961c880ac0acce2eb51251d",
+      "overlapPixelCount": 4,
+      "seamMaxDeltaFromUnblended": 0.033333,
+      "seamMeanDeltaFromUnblended": 0.008333
+    }
+  ],
+  "validationStatus": "synthetic_artifact_gate"
+}

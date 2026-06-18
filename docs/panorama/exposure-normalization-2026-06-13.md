@@ -39,3 +39,7 @@ Required local checks:
 - `bun run format:check`
 - `bun run check:unsafe-casts`
 - `git diff --check`
+
+Issue #1929 adds `bun run check:panorama-seam-exposure-proof`, which records
+seam delta, overlap size, exposure compensation residual, and output hashes at
+`docs/validation/panorama-seam-exposure-proof-2026-06-18.json`.
