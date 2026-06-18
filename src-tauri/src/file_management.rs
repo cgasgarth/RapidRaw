@@ -1391,7 +1391,7 @@ pub fn update_thumbnail_queue(
         drop(tracker);
 
         let _ = app_handle.emit(
-            "thumbnail-progress",
+            crate::events::THUMBNAIL_PROGRESS,
             serde_json::json!({ "current": 0, "total": 0 }),
         );
         state.thumbnail_manager.cvar.notify_all();
@@ -1427,7 +1427,7 @@ pub fn update_thumbnail_queue(
     drop(tracker);
 
     let _ = app_handle.emit(
-        "thumbnail-progress",
+        crate::events::THUMBNAIL_PROGRESS,
         serde_json::json!({ "current": current, "total": total }),
     );
 
@@ -1443,7 +1443,7 @@ pub fn add_to_thumbnail_queue(state: &AppState, count: usize, app_handle: &AppHa
     drop(tracker);
 
     let _ = app_handle.emit(
-        "thumbnail-progress",
+        crate::events::THUMBNAIL_PROGRESS,
         serde_json::json!({ "current": current, "total": total }),
     );
 }
@@ -1460,14 +1460,14 @@ pub fn increment_thumbnail_progress(state: &AppState, app_handle: &AppHandle) {
         drop(tracker);
 
         let _ = app_handle.emit(
-            "thumbnail-progress",
+            crate::events::THUMBNAIL_PROGRESS,
             serde_json::json!({ "current": 0, "total": 0 }),
         );
-        let _ = app_handle.emit("thumbnail-generation-complete", true);
+        let _ = app_handle.emit(crate::events::THUMBNAIL_GENERATION_COMPLETE, true);
     } else {
         drop(tracker);
         let _ = app_handle.emit(
-            "thumbnail-progress",
+            crate::events::THUMBNAIL_PROGRESS,
             serde_json::json!({ "current": current, "total": total }),
         );
     }
@@ -2719,12 +2719,15 @@ pub async fn import_files(
     app_handle: AppHandle,
 ) -> Result<(), String> {
     let total_files = source_paths.len();
-    let _ = app_handle.emit("import-start", serde_json::json!({ "total": total_files }));
+    let _ = app_handle.emit(
+        crate::events::IMPORT_START,
+        serde_json::json!({ "total": total_files }),
+    );
 
     tauri::async_runtime::spawn_blocking(move || {
         for (i, source_path_str) in source_paths.iter().enumerate() {
             let _ = app_handle.emit(
-                "import-progress",
+                crate::events::IMPORT_PROGRESS,
                 serde_json::json!({ "current": i, "total": total_files, "path": source_path_str }),
             );
 
@@ -2873,16 +2876,16 @@ pub async fn import_files(
 
             if let Err(e) = import_result {
                 eprintln!("Failed to import {}: {}", source_path_str, e);
-                let _ = app_handle.emit("import-error", e);
+                let _ = app_handle.emit(crate::events::IMPORT_ERROR, e);
                 return;
             }
         }
 
         let _ = app_handle.emit(
-            "import-progress",
+            crate::events::IMPORT_PROGRESS,
             serde_json::json!({ "current": total_files, "total": total_files, "path": "" }),
         );
-        let _ = app_handle.emit("import-complete", ());
+        let _ = app_handle.emit(crate::events::IMPORT_COMPLETE, ());
     });
 
     Ok(())
