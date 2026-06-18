@@ -355,6 +355,10 @@
           "path": "docs/detail/image-science-iteration-consult-2026-06-14.md"
         },
         {
+          "title": "Deblur implementation decision",
+          "path": "docs/detail/deblur-implementation-decision-2026-06-18.md"
+        },
+        {
           "title": "Wavelet detail control model",
           "path": "docs/detail/wavelet-detail-control-model-2026-06-18.md"
         },
