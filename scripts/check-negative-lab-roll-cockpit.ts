@@ -21,6 +21,11 @@ for (const marker of [
   'buildNegativeLabBatchDryRunSummary',
   'negative-lab-frame-health-grid',
   'negative-lab-frame-health-row-',
+  'negative-lab-roll-frame-navigator',
+  'negative-lab-roll-frame-navigator-proof',
+  'negative-lab-roll-frame-strip',
+  'negative-lab-roll-frame-status-',
+  'negative-lab-roll-frame-runtime-',
   'negative-lab-frame-warning-chip-',
   'negative-lab-planned-apply-count',
   'negative-lab-skipped-frame-count',
@@ -43,6 +48,10 @@ for (const marker of [
 
 for (const marker of [
   'negative-lab-frame-count',
+  'negative-lab-roll-frame-navigator',
+  'negative-lab-roll-frame-1',
+  'negative-lab-roll-frame-status-1',
+  'negative-lab-roll-frame-runtime-1',
   'negative-lab-roll-warning-count',
   'negative-lab-planned-apply-count',
   'negative-lab-skipped-frame-count',

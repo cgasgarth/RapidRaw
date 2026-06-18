@@ -1615,6 +1615,7 @@
       "includedScans": "{{includedCount}} included",
       "includeScan": "Include",
       "measureCustomBase": "Measure sample",
+      "nextFrameTooltip": "Next frame",
       "noticeText": "Inversion logic inspired by <0>NegPy</0> created by marcinz606 (<1>GPL-3.0</1>).",
       "originalLabel": "Original Negative",
       "outputFormats": {
@@ -1636,6 +1637,7 @@
       "previewAlt": "Preview",
       "previewPending": "Preview pending",
       "previewReady": "Preview ready",
+      "previousFrameTooltip": "Previous frame",
       "printGrade": "Print Grade",
       "profileDisabledReasons": {
         "catalog_only": "Catalog only",
