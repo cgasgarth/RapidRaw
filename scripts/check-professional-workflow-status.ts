@@ -21,14 +21,14 @@ const reportSchema = z
     issue: z.literal(1857),
     proofHash: z.string().regex(/^[a-f0-9]{64}$/),
     schemaVersion: z.literal(1),
-    status: z.literal('partial_workflow_status_not_e2e_complete'),
+    status: z.literal('thin_e2e_workflow_smoke_validated'),
     summary: z.object({
       cullSession: z.literal('fixture_plan_validated'),
       deliveryReview: z.literal('manifest_validated'),
       exportQueue: z.literal('queue_plan_validated'),
       metadataSidecar: z.literal('runtime_temp_sidecar_validated'),
       sessionReload: z.literal('artifact_hash_validated'),
-      uiScreenshots: z.literal('pending'),
+      uiScreenshots: z.literal('library_workflow_visual_smoke_validated'),
     }),
   })
   .strict();
@@ -40,6 +40,7 @@ const commands = [
   'bun scripts/check-metadata-sidecar-workflow-proof.ts',
   'bun scripts/check-export-queue-fixtures.ts',
   'bun scripts/check-delivery-review-manifest.ts',
+  'bun scripts/capture-visual-smoke.ts --scenario library-workflow',
 ];
 for (const command of commands) {
   run(command.split(' '));
@@ -50,7 +51,7 @@ const summary = {
   exportQueue: 'queue_plan_validated',
   metadataSidecar: 'runtime_temp_sidecar_validated',
   sessionReload: 'artifact_hash_validated',
-  uiScreenshots: 'pending',
+  uiScreenshots: 'library_workflow_visual_smoke_validated',
 } as const;
 const report = reportSchema.parse({
   commands: commands.map((command) => ({ command, status: 'passed' })),
@@ -58,7 +59,7 @@ const report = reportSchema.parse({
   issue: 1857,
   proofHash: hashString(JSON.stringify({ commands, summary })),
   schemaVersion: 1,
-  status: 'partial_workflow_status_not_e2e_complete',
+  status: 'thin_e2e_workflow_smoke_validated',
   summary,
 });
 const reportJson = `${JSON.stringify(report, null, 2)}\n`;
@@ -78,7 +79,7 @@ if (JSON.stringify(existingReport) !== JSON.stringify(report)) {
   throw new Error(`${REPORT_PATH} is stale; run bun run check:professional-workflow-status:update.`);
 }
 
-console.log('professional workflow status ok (partial)');
+console.log('professional workflow status ok (thin e2e)');
 
 function run(command: string[]): void {
   const result = Bun.spawnSync(command, { stderr: 'pipe', stdout: 'pipe' });

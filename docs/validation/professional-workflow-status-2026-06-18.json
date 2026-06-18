@@ -19,19 +19,23 @@
     {
       "command": "bun scripts/check-delivery-review-manifest.ts",
       "status": "passed"
+    },
+    {
+      "command": "bun scripts/capture-visual-smoke.ts --scenario library-workflow",
+      "status": "passed"
     }
   ],
   "generatedAt": "2026-06-18T00:00:00.000Z",
   "issue": 1857,
-  "proofHash": "591ccec16c39925185c01b72bc8ef12c7db5d69f6ea23b12958b97d03647e37f",
+  "proofHash": "70a94ffb98f306137fb6bbec555230accd004caf84cb69f305f26d6918b43eaf",
   "schemaVersion": 1,
-  "status": "partial_workflow_status_not_e2e_complete",
+  "status": "thin_e2e_workflow_smoke_validated",
   "summary": {
     "cullSession": "fixture_plan_validated",
     "deliveryReview": "manifest_validated",
     "exportQueue": "queue_plan_validated",
     "metadataSidecar": "runtime_temp_sidecar_validated",
     "sessionReload": "artifact_hash_validated",
-    "uiScreenshots": "pending"
+    "uiScreenshots": "library_workflow_visual_smoke_validated"
   }
 }
