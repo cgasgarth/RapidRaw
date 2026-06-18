@@ -1,0 +1,66 @@
+{
+  "cases": [
+    {
+      "id": "color.selective.runtime.orange-warmth.v1",
+      "influence": 0.99704142228,
+      "inputRgb": {
+        "blue": 0.22,
+        "green": 0.42,
+        "red": 0.72
+      },
+      "maxExpectedDelta": 0,
+      "maxOutputDelta": 0.100223317702,
+      "outputRgb": {
+        "blue": 0.1915812441082957,
+        "green": 0.5202233177019245,
+        "red": 0.8082412412284817
+      },
+      "rangeKey": "oranges",
+      "runtimeStatus": "apply_runtime_proof",
+      "targetStatus": "targeted_changed"
+    },
+    {
+      "id": "color.selective.runtime.blue-depth.v1",
+      "influence": 0.982433995938,
+      "inputRgb": {
+        "blue": 0.68,
+        "green": 0.36,
+        "red": 0.22
+      },
+      "maxExpectedDelta": 0,
+      "maxOutputDelta": 0.039834774645,
+      "outputRgb": {
+        "blue": 0.6412400549701786,
+        "green": 0.36578990614019014,
+        "red": 0.18016522535478308
+      },
+      "rangeKey": "blues",
+      "runtimeStatus": "apply_runtime_proof",
+      "targetStatus": "targeted_changed"
+    },
+    {
+      "id": "color.selective.runtime.red-range-blue-guard.v1",
+      "influence": 0,
+      "inputRgb": {
+        "blue": 0.7,
+        "green": 0.25,
+        "red": 0.15
+      },
+      "maxExpectedDelta": 0,
+      "maxOutputDelta": 0,
+      "outputRgb": {
+        "blue": 0.7,
+        "green": 0.24999999999999956,
+        "red": 0.15000000000000002
+      },
+      "rangeKey": "reds",
+      "runtimeStatus": "apply_runtime_proof",
+      "targetStatus": "targeted_changed"
+    }
+  ],
+  "fixturePath": "fixtures/color/selective-color-falloff-fixtures.json",
+  "issue": 1876,
+  "schemaVersion": 1,
+  "shaderPath": "src-tauri/src/shaders/shader.wgsl",
+  "validationMode": "selective_color_apply_runtime_artifact"
+}
