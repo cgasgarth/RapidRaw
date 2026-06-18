@@ -279,7 +279,7 @@ pub async fn start_background_indexing(
     let app_handle_clone = app_handle.clone();
 
     let task: JoinHandle<()> = tokio::spawn(async move {
-        let _ = app_handle_clone.emit("indexing-started", ());
+        let _ = app_handle_clone.emit(crate::events::INDEXING_STARTED, ());
         println!("Starting background indexing for: {}", folder_path);
         println!(
             "Using {} concurrent threads for AI tagging.",
@@ -300,8 +300,10 @@ pub async fn start_background_indexing(
                 .collect(),
             Err(e) => {
                 eprintln!("Failed to read directory '{}': {}", folder_path, e);
-                let _ = app_handle_clone
-                    .emit("indexing-error", format!("Failed to read directory: {}", e));
+                let _ = app_handle_clone.emit(
+                    crate::events::INDEXING_ERROR,
+                    format!("Failed to read directory: {}", e),
+                );
                 *app_handle_clone
                     .state::<AppState>()
                     .indexing_task_handle
@@ -399,7 +401,7 @@ pub async fn start_background_indexing(
             .await;
 
         println!("Background indexing finished for: {}", folder_path);
-        let _ = app_handle_clone.emit("indexing-finished", ());
+        let _ = app_handle_clone.emit(crate::events::INDEXING_FINISHED, ());
 
         *app_handle_clone
             .state::<AppState>()

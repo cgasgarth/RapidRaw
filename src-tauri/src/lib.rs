@@ -21,6 +21,7 @@ mod denoise_api;
 pub mod denoise_cpu_reference;
 mod denoise_render;
 mod denoising;
+mod events;
 mod exif_processing;
 mod export_processing;
 mod file_management;
@@ -295,7 +296,7 @@ fn cancel_thumbnail_generation(
     drop(tracker);
 
     let _ = app_handle.emit(
-        "thumbnail-progress",
+        crate::events::THUMBNAIL_PROGRESS,
         serde_json::json!({ "current": 0, "total": 0 }),
     );
     Ok(())
@@ -895,7 +896,7 @@ fn generate_uncropped_preview(
         ) {
             match encode_jpeg_data_url(&processed_image, 80) {
                 Ok(data_url) => {
-                    let _ = app_handle.emit("preview-update-uncropped", data_url);
+                    let _ = app_handle.emit(crate::events::PREVIEW_UPDATE_UNCROPPED, data_url);
                 }
                 Err(e) => {
                     log::error!("Failed to encode uncropped preview: {}", e);
@@ -1476,7 +1477,7 @@ async fn merge_hdr(
         .iter()
         .map(|path| {
             let _ = app_handle.emit(
-                "hdr-progress",
+                crate::events::HDR_PROGRESS,
                 format!(
                     "Processing '{}'",
                     Path::new(path)
@@ -1550,14 +1551,14 @@ async fn merge_hdr(
     let runtime_plan =
         build_hdr_runtime_plan(&source_refs, hdr_merged.width(), hdr_merged.height());
 
-    let _ = app_handle.emit("hdr-progress", "Creating preview...");
+    let _ = app_handle.emit(crate::events::HDR_PROGRESS, "Creating preview...");
 
     *hdr_result_handle.lock().unwrap() = Some(hdr_merged);
     *hdr_runtime_plan_handle.lock().unwrap() = Some(runtime_plan);
     *hdr_source_refs_handle.lock().unwrap() = source_refs;
 
     let _ = app_handle.emit(
-        "hdr-complete",
+        crate::events::HDR_COMPLETE,
         serde_json::json!({
             "base64": final_base64,
         }),
@@ -2137,7 +2138,7 @@ fn frontend_log(level: String, message: String) -> Result<(), String> {
 
 fn handle_file_open(app_handle: &tauri::AppHandle, path: PathBuf) {
     if let Some(path_str) = path.to_str()
-        && let Err(e) = app_handle.emit("open-with-file", path_str)
+        && let Err(e) = app_handle.emit(crate::events::OPEN_WITH_FILE, path_str)
     {
         log::error!("Failed to emit open-with-file event: {}", e);
     }
@@ -2254,7 +2255,7 @@ pub fn run() {
 
             if argv.len() > 1 {
                 let path_str = &argv[1];
-                if let Err(e) = app.emit("open-with-file", path_str) {
+                if let Err(e) = app.emit(crate::events::OPEN_WITH_FILE, path_str) {
                     log::error!(
                         "Failed to emit open-with-file from single-instance handler: {}",
                         e

@@ -79,7 +79,7 @@ pub async fn apply_denoising(
                 *denoise_result_handle.lock().unwrap() = Some(image);
             }
             Err(e) => {
-                let _ = app_handle.emit("denoise-error", e);
+                let _ = app_handle.emit(crate::events::DENOISE_ERROR, e);
             }
         }
     })
@@ -154,7 +154,7 @@ pub async fn batch_denoise_images(
                     let output_path = parent_dir.join(output_filename);
                     if let Err(e) = image_to_save.save(&output_path) {
                         let _ = app_handle.emit(
-                            "denoise-error",
+                            crate::events::DENOISE_ERROR,
                             format!("Failed to save {}: {}", real_path, e),
                         );
                         continue;
@@ -176,7 +176,7 @@ pub async fn batch_denoise_images(
                 }
                 Err(e) => {
                     let _ = app_handle.emit(
-                        "denoise-error",
+                        crate::events::DENOISE_ERROR,
                         format!("Failed to denoise {}: {}", real_path, e),
                     );
                 }
@@ -263,7 +263,7 @@ fn run_bm3d(
     let total_work_units = (patches_x * patches_y) * 2;
     let progress_counter = Arc::new(AtomicUsize::new(0));
 
-    let _ = app_handle.emit("denoise-progress", "Processing (Step 1/2)...");
+    let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Processing (Step 1/2)...");
 
     let progress = ProgressReporter {
         counter: &progress_counter,
@@ -274,7 +274,7 @@ fn run_bm3d(
         bm3d_process_joint(&channels, width, height, &params, &dct_tables, &progress);
 
     {
-        let _ = app_handle.emit("denoise-progress", "Blending detail...");
+        let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Blending detail...");
         let blurred_y = gaussian_blur_1ch(&original_y, width as usize, height as usize, 3.0);
         let detail_strength = (intensity * 0.5_f32).clamp(0.0_f32, 0.5_f32);
         let y_ch = &mut denoised_channels[0];
@@ -309,7 +309,7 @@ fn denoise_image(
     let is_raw = is_raw_file(&path_str);
     let settings = load_settings_or_default(&app_handle);
 
-    let _ = app_handle.emit("denoise-progress", "Loading image...");
+    let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Loading image...");
 
     let file_bytes = fs::read(path).map_err(|e| e.to_string())?;
     let mut dynamic_img =
@@ -317,7 +317,7 @@ fn denoise_image(
             .map_err(|e| e.to_string())?;
 
     if is_raw {
-        let _ = app_handle.emit("denoise-progress", "Preparing RAW data...");
+        let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Preparing RAW data...");
         apply_cpu_default_raw_processing(&mut dynamic_img);
     }
 
@@ -336,8 +336,8 @@ fn denoise_image(
         run_bm3d(&rgb_img_for_denoiser, intensity, &app_handle)?
     };
 
-    let _ = app_handle.emit("denoise-progress", "Finalizing data...");
-    let _ = app_handle.emit("denoise-progress", "Generating previews...");
+    let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Finalizing data...");
+    let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, "Generating previews...");
 
     let (w, h) = out_dynamic.dimensions();
     let (new_w, new_h) = if w > h {
@@ -388,7 +388,7 @@ fn denoise_image(
         "original": data_url_orig
     });
 
-    let _ = app_handle.emit("denoise-complete", &payload);
+    let _ = app_handle.emit(crate::events::DENOISE_COMPLETE, &payload);
 
     Ok((out_dynamic, data_url_denoised))
 }
@@ -492,7 +492,9 @@ fn run_bm3d_step_joint(
             let pct = (c as f32 / progress.total_work as f32) * 100.0;
             let step_str = if is_step_1 { "Step 1/2" } else { "Step 2/2" };
             let msg = format!("{} - {:.0}%", step_str, pct);
-            let _ = progress.app_handle.emit("denoise-progress", msg);
+            let _ = progress
+                .app_handle
+                .emit(crate::events::DENOISE_PROGRESS, msg);
         }
 
         let mut group_locs_buf = [(0, 0); MAX_GROUP_SIZE];

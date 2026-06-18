@@ -187,7 +187,7 @@ pub async fn cull_images(
 
     let total_count = paths.len();
     let completed_count = Arc::new(AtomicUsize::new(0));
-    let _ = app_handle.emit("culling-start", total_count);
+    let _ = app_handle.emit(crate::events::CULLING_START, total_count);
 
     let hasher = HasherConfig::new()
         .hash_alg(HashAlg::DoubleGradient)
@@ -307,6 +307,6 @@ pub async fn cull_images(
         });
     }
 
-    let _ = app_handle.emit("culling-complete", &suggestions);
+    let _ = app_handle.emit(crate::events::CULLING_COMPLETE, &suggestions);
     Ok(suggestions)
 }
