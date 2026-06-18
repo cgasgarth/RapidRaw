@@ -109,6 +109,7 @@
     "check:ai-denoise-source-fixture": "bun scripts/check-ai-denoise-source-fixture.ts",
     "check:ai-denoise-quality-proof": "bun scripts/check-ai-denoise-quality-proof.ts",
     "check:ai-denoise-runtime-apply": "bun scripts/check-ai-denoise-runtime-apply.ts",
+    "check:ai-denoise-nind-headless-smoke": "bun scripts/check-ai-denoise-nind-headless-smoke.ts",
     "check:ai-denoise-app-server-tool": "bun scripts/check-ai-denoise-app-server-tool.ts",
     "check:denoise-preview-runtime": "bun scripts/run-compact-command.ts --label denoise-preview-runtime --cwd src-tauri -- cargo test --quiet denoise_render --no-default-features --features required-ci",
     "check:export-recipes-ui": "bun scripts/check-export-recipes-ui.ts",
