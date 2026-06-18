@@ -1,4 +1,5 @@
 use crate::file_management::{parse_virtual_path, read_file_mapped};
+use crate::formats::jpeg_data_url;
 use crate::image_loader::load_base_image_from_bytes;
 use crate::image_processing::RawEngineArtifacts;
 use base64::{Engine as _, engine::general_purpose};
@@ -666,7 +667,7 @@ pub async fn preview_negative_conversion(
         .map_err(|e| e.to_string())?;
 
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-    Ok(format!("data:image/jpeg;base64,{}", base64_str))
+    Ok(jpeg_data_url(base64_str))
 }
 
 #[tauri::command]

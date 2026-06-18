@@ -78,6 +78,38 @@ pub const NON_RAW_EXTENSIONS: &[&str] = &[
     "pnm", "pbm", "pgm", "ppm", "pam", // Netpbm family
 ];
 
+pub const IMAGE_MIME_JPEG: &str = "image/jpeg";
+#[cfg(target_os = "android")]
+pub const IMAGE_MIME_PNG: &str = "image/png";
+#[cfg(target_os = "android")]
+pub const IMAGE_MIME_TIFF: &str = "image/tiff";
+#[cfg(target_os = "android")]
+pub const IMAGE_MIME_WEBP: &str = "image/webp";
+pub const JPEG_DATA_URL_PREFIX: &str = "data:image/jpeg;base64,";
+pub const PNG_DATA_URL_PREFIX: &str = "data:image/png;base64,";
+
+pub fn jpeg_data_url(base64_payload: impl AsRef<str>) -> String {
+    format!("{}{}", JPEG_DATA_URL_PREFIX, base64_payload.as_ref())
+}
+
+pub fn png_data_url(base64_payload: impl AsRef<str>) -> String {
+    format!("{}{}", PNG_DATA_URL_PREFIX, base64_payload.as_ref())
+}
+
+#[cfg(target_os = "android")]
+pub fn export_mime_type_for_extension(extension: &str) -> &'static str {
+    match extension {
+        "jpg" | "jpeg" => IMAGE_MIME_JPEG,
+        "png" => IMAGE_MIME_PNG,
+        "webp" => IMAGE_MIME_WEBP,
+        "bmp" => "image/bmp",
+        "gif" => "image/gif",
+        "tif" | "tiff" => IMAGE_MIME_TIFF,
+        "jxl" => "image/jxl",
+        _ => "application/octet-stream",
+    }
+}
+
 pub fn is_raw_file<P: AsRef<Path>>(path: P) -> bool {
     let ext = match path.as_ref().extension().and_then(|s| s.to_str()) {
         Some(e) => e,
