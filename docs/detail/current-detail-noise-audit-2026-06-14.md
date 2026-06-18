@@ -6,15 +6,15 @@ This audit records the current RapidRAW detail, sharpening, noise, dehaze, and c
 
 ## Current User-Facing Tools
 
-| Area                      | Current surface                                                   | Current implementation evidence                                                     | Gap against RawEngine target                                                                                                       |
-| ------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Capture/detail sharpening | `sharpness`, `sharpnessThreshold` in the Details panel            | UI adjustment state, GPU blur inputs, export reset path                             | Single generic sharpening control; no capture/output sharpening split, radius/detail/masking controls, or fixture proof            |
-| Local contrast            | `clarity`, `structure`, `dehaze`                                  | GPU processing creates separate blur inputs for clarity and structure               | No explicit local-contrast stage contract, halo budget, scale policy, or regression fixtures                                       |
-| Noise reduction           | `lumaNoiseReduction`, `colorNoiseReduction` plus AI denoise modal | UI adjustment state, `nind-denoise` ONNX path in Rust, and AI denoise path decision | Chroma/luma controls exist but are not validated against high-ISO fixtures; AI denoise still needs runtime/app-server/replay proof |
-| Deblur                    | Bounded scene-linear post-denoise deconvolution                   | CPU reference, workflow smoke, and deblur decision doc                              | Real RAW quality and exact lens/motion deblur remain deferred                                                                      |
-| Chromatic aberration      | `chromaticAberrationRedCyan`, `chromaticAberrationBlueYellow`     | UI/detail adjustments and settings import mappings                                  | No defringe-specific hue/range controls or fixture coverage                                                                        |
-| Wavelet/detail-by-scale   | Schema and fixture contract                                       | `waveletDetailSchemas`, `check:wavelet-detail`, and control model                   | Pixel runtime, UI controls, and preview/export parity remain open                                                                  |
-| Dust/spot visualization   | None                                                              | No dust visualization runtime or UI path found                                      | Needs visible overlay, source preview, and fixture validation                                                                      |
+| Area                      | Current surface                                                   | Current implementation evidence                                                                   | Gap against RawEngine target                                                                                                       |
+| ------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Capture/detail sharpening | `sharpness`, `sharpnessThreshold` in the Details panel            | UI adjustment state, GPU blur inputs, export reset path                                           | Single generic sharpening control; no capture/output sharpening split, radius/detail/masking controls, or fixture proof            |
+| Local contrast            | `clarity`, `structure`, `dehaze`                                  | GPU processing creates separate blur inputs for clarity and structure                             | No explicit local-contrast stage contract, halo budget, scale policy, or regression fixtures                                       |
+| Noise reduction           | `lumaNoiseReduction`, `colorNoiseReduction` plus AI denoise modal | UI adjustment state, `nind-denoise` ONNX path in Rust, and AI denoise path decision               | Chroma/luma controls exist but are not validated against high-ISO fixtures; AI denoise still needs runtime/app-server/replay proof |
+| Deblur                    | Bounded scene-linear post-denoise deconvolution                   | CPU reference, workflow smoke, and deblur decision doc                                            | Real RAW quality and exact lens/motion deblur remain deferred                                                                      |
+| Chromatic aberration      | `chromaticAberrationRedCyan`, `chromaticAberrationBlueYellow`     | UI/detail adjustments and settings import mappings                                                | No defringe-specific hue/range controls or fixture coverage                                                                        |
+| Wavelet/detail-by-scale   | Schema, fixture contract, and runtime stage                       | `waveletDetailSchemas`, `check:wavelet-detail`, `check:wavelet-detail-runtime`, and control model | UI controls and real RAW quality proof remain open                                                                                 |
+| Dust/spot visualization   | None                                                              | No dust visualization runtime or UI path found                                                    | Needs visible overlay, source preview, and fixture validation                                                                      |
 
 ## Pipeline Observations
 
@@ -34,7 +34,8 @@ This audit records the current RapidRAW detail, sharpening, noise, dehaze, and c
 | #126 `detail(deblur): research deconvolution and lens deblur` | Decision selects bounded constrained Gaussian luma deconvolution and rejects broad lens/AI claims. |
 | #127 `detail(local-contrast): refine local contrast`          | Add halo-safe local-contrast validation with edge fixtures.                                        |
 | #128 `detail(wavelet): design detail-by-scale controls`       | Control model defines bands, ranges, defaults, UI behavior, and validation limits.                 |
-| #129 `detail(wavelet): implement detail-by-scale controls`    | Schema/fixture contract landed; pixel runtime and UI remain follow-up work.                        |
+| #129 `detail(wavelet): implement detail-by-scale controls`    | Schema/fixture contract landed; UI controls remain follow-up work.                                 |
+| #1266 `detail(runtime): wavelet/detail-by-scale engine`       | Runtime stage mutates pixels deterministically with preview/export parity on synthetic proof.      |
 | #130 `detail(noise): separate chroma and luma noise`          | Add high-ISO fixture metrics for chroma/luma separation.                                           |
 | #131 `validation(noise): add high ISO fixture set`            | Add licensed or synthetic high-ISO validation assets and metrics.                                  |
 | #132 `detail(defringe): improve defringe controls`            | Add hue/range defringe controls and purple/green fringe fixtures.                                  |
@@ -46,5 +47,6 @@ This audit records the current RapidRAW detail, sharpening, noise, dehaze, and c
 
 - `bunx prettier --check docs/detail/current-detail-noise-audit-2026-06-14.md docs/index.md docs/site-navigation.json`
 - `bun run check:ai-denoise-runtime-apply`
+- `bun run check:wavelet-detail-runtime`
 - `bun scripts/check-markdown-links.ts`
 - `git diff --check`

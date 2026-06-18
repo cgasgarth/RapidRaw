@@ -143,6 +143,7 @@
     "check:curves-levels-runtime-proof": "bun scripts/check-curves-levels-runtime-proof.ts",
     "check:capture-sharpening": "bun scripts/check-capture-sharpening-fixtures.ts",
     "check:wavelet-detail": "bun scripts/check-wavelet-detail-fixtures.ts",
+    "check:wavelet-detail-runtime": "bun scripts/check-wavelet-detail-runtime.ts",
     "check:noise-metrics": "bun scripts/check-noise-metric-fixtures.ts",
     "check:private-raw-evidence": "bun scripts/check-private-raw-evidence-ledger.ts",
     "check:raw-open-edit-export-proof": "bun scripts/check-raw-open-edit-export-proof.ts",
