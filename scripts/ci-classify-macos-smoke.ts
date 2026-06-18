@@ -131,6 +131,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:keyboard-shortcuts', new Set(['bun scripts/check-keyboard-shortcuts.ts'])],
   ['check:session-import-reload-proof', new Set(['bun scripts/check-session-import-reload-proof.ts'])],
   ['check:library-session-ui', new Set(['bun scripts/check-library-session-ui.ts'])],
+  ['check:library-workflow-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario library-workflow'])],
   ['check:professional-workflow-status', new Set(['bun scripts/check-professional-workflow-status.ts'])],
   [
     'check:professional-workflow-status:update',

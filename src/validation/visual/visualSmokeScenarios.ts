@@ -72,6 +72,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     outputFile: 'layer-stack-workflow.png',
     sectionMinimum: 3,
   },
+  {
+    marker: 'Cull Session',
+    mode: 'library-workflow',
+    outputFile: 'library-workflow.png',
+    sectionMinimum: 3,
+  },
 ] as const;
 
 export type VisualSmokeScenario = (typeof VISUAL_SMOKE_SCENARIOS)[number];

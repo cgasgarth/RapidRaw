@@ -15,6 +15,7 @@ import {
   commandPaletteWorkflowProofSchema,
   focusUiSettingsProofSchema,
   hdrUiSettingsProofSchema,
+  libraryWorkflowProofSchema,
   layerStackExportParityProofSchema,
   layerStackWorkflowProofSchema,
   negativeLabWorkspaceProofDatasetSchema,
@@ -226,6 +227,19 @@ async function prepareScenario(page, mode) {
     layerStackExportParityProofSchema.parse(
       await page.getByTestId('layer-stack-export-parity-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    return;
+  }
+
+  if (mode === 'library-workflow') {
+    await page.getByRole('button', { name: 'Keepers' }).click();
+    await page.getByRole('button', { name: 'Survey' }).click();
+    await page.getByRole('button', { name: 'Create B&W proof copy' }).click();
+    libraryWorkflowProofSchema.parse(
+      await page.getByTestId('library-workflow-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    await page.getByTestId('library-virtual-copy').getByText('vc-dsc-0002-bw-proof', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     return;
   }
 
