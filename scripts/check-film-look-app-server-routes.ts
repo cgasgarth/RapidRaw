@@ -16,6 +16,8 @@ import {
 } from '../src/utils/filmLookBrowser.ts';
 
 const expectedCommandName = 'film.look.build_adjustment_patch';
+const runtimeCheckScripts = ['check:film-look-render-apply-proof', 'check:film-look-preview-export-parity'];
+const failures = [];
 const route = FILM_LOOK_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedCommandName,
 );
@@ -72,4 +74,31 @@ for (const [filePath, marker] of sourceChecks) {
   }
 }
 
+for (const runtimeCheckScript of runtimeCheckScripts) {
+  runPackageScript(runtimeCheckScript);
+}
+
+if (failures.length > 0) {
+  console.error('Film look app-server route validation failed:');
+  for (const failure of failures) console.error(`- ${failure}`);
+  process.exit(1);
+}
+
 console.log(`film app-server routes ok (${FILM_LOOK_BROWSER_ITEMS.length} looks)`);
+
+function runPackageScript(scriptName: string): void {
+  const result = Bun.spawnSync(['bun', 'run', scriptName], {
+    stderr: 'pipe',
+    stdout: 'pipe',
+  });
+
+  if (result.exitCode === 0) return;
+
+  const output = [new TextDecoder().decode(result.stdout), new TextDecoder().decode(result.stderr)]
+    .join('\n')
+    .split('\n')
+    .filter(Boolean)
+    .slice(-20)
+    .join('\n');
+  failures.push(`${scriptName} failed:\n${output}`);
+}
