@@ -1,4 +1,4 @@
-export type LayerBlendMode = 'multiply' | 'normal' | 'overlay' | 'screen';
+export type LayerBlendMode = 'multiply' | 'normal' | 'overlay' | 'screen' | 'soft_light';
 
 export interface LayerRgbPixel {
   b: number;
@@ -46,6 +46,14 @@ const blendChannel = (base: number, source: number, mode: LayerBlendMode): numbe
   if (mode === 'screen') return (1 - (1 - baseUnit) * (1 - sourceUnit)) * 255;
   if (mode === 'overlay') {
     return (baseUnit < 0.5 ? 2 * baseUnit * sourceUnit : 1 - 2 * (1 - baseUnit) * (1 - sourceUnit)) * 255;
+  }
+  if (mode === 'soft_light') {
+    const dodge = baseUnit <= 0.25 ? ((16 * baseUnit - 12) * baseUnit + 4) * baseUnit : Math.sqrt(baseUnit);
+    const blended =
+      sourceUnit <= 0.5
+        ? baseUnit - (1 - 2 * sourceUnit) * baseUnit * (1 - baseUnit)
+        : baseUnit + (2 * sourceUnit - 1) * (dodge - baseUnit);
+    return blended * 255;
   }
 
   return source;
