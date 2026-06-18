@@ -92,6 +92,29 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
       toolCapability: 'inpaint',
     },
     {
+      appServerToolName: 'ai.enhancement.dry_run_command',
+      commandSchemaName: 'AiEnhancementCommandEnvelopeV1',
+      executionMode: 'dry_run_command',
+      outputSchemaName: 'AiEnhancementDryRunResultV1',
+      reason: 'Local AI denoise exposes a typed dry-run tool before an accepted denoise apply plan can mutate state.',
+      sourceKind: 'app_server_tool',
+      sourceOperation: 'ai.enhancement.dry_run_command',
+      status: 'mapped',
+      toolCapability: 'denoise',
+    },
+    {
+      appServerToolName: 'ai.enhancement.apply_command',
+      commandSchemaName: 'AiEnhancementCommandEnvelopeV1',
+      executionMode: 'apply_dry_run_plan',
+      outputSchemaName: 'AiEnhancementApplyResultV1',
+      reason:
+        'Local AI denoise apply reuses the typed AI enhancement apply tool with an accepted denoise dry-run plan and audit metadata.',
+      sourceKind: 'app_server_tool',
+      sourceOperation: 'ai.enhancement.apply_command',
+      status: 'mapped',
+      toolCapability: 'denoise',
+    },
+    {
       deferredIssue: '#1276',
       reason:
         'The inherited denoise invoke multiplexes classic and AI NIND paths; app-server migration needs a separate denoise dry-run plan with model provenance before mapping.',

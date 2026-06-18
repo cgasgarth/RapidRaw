@@ -20,6 +20,7 @@ const CONTRACT_CHECKS = [
   'check:agent-proof-gallery',
   'check:ui-api-coverage',
   'check:ai-app-server-routes',
+  'check:ai-denoise-app-server-tool',
   'check:tone-color-app-server-routes',
   'check:rawengine-app-server-host',
   'check:computational-merge-app-server-routes',
@@ -61,6 +62,7 @@ const RELEVANT_FILES = new Set([
 const PACKAGE_SCRIPT_NAMES = new Set([
   'check:actions',
   'check:ai-app-server-routes',
+  'check:ai-denoise-app-server-tool',
   'check:agent-approval-boundaries',
   'check:agent-proof-gallery',
   'check:agent-rollback-proof',
