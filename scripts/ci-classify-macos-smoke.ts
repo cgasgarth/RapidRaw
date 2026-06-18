@@ -211,6 +211,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:pure-ts-tests',
     new Set(['bun scripts/run-compact-command.ts --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts']),
   ],
+  ['check:pure-ts-coverage', new Set(['bun scripts/check-pure-ts-coverage.ts'])],
   ['check:release-notes', new Set(['bun scripts/generate-release-notes.ts --self-test'])],
   ['check:workflow-policy:self-test', new Set(['bun scripts/check-github-workflow-policy.ts --self-test'])],
   ['check:validation-gates', new Set(['bun run check:compact-commands && bun run check:compact-commands:self-test'])],

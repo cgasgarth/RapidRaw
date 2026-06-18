@@ -11,6 +11,7 @@ const CHECK_GROUPS = {
     'check:script-extension-policy',
     'check:script-extension-policy:self-test',
     'check:pure-ts-tests',
+    'check:pure-ts-coverage',
     'check:unused-deps',
     'check:i18n',
     'check:unsafe-casts',
