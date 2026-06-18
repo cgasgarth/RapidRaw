@@ -134,6 +134,19 @@ Every fixture set must include:
 - Notes:
 ```
 
+## RAW Corpus Placeholders
+
+Issue #1899 reserves focus-stack RAW corpus slots:
+
+- `real.focus.macro-bracket-flower.v0`
+- `real.focus.product-depth-stack.v0`
+- `raw-evidence.focus-stack.product-depth.v1`
+
+These entries are schema/metadata only. They do not add RAW sequences, focus
+maps, blend outputs, source hashes, or quality claims. A later PR must attach
+approved rights, hashes, ordered-source metadata, render artifacts, and review
+evidence before these entries can count as runtime focus-stack proof.
+
 ## Current Status
 
 The first deterministic synthetic fixture manifest and generator live at:
