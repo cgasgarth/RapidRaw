@@ -39,6 +39,12 @@
           "kind": "quality_report_private",
           "path": "private-artifacts/validation/computational-merge/hdr-bracket-quality.json",
           "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "app_server_runtime_report_private",
+          "path": "private-artifacts/validation/computational-merge/hdr-bracket-app-server-runtime-proof.json",
+          "publicRepoAllowed": false
         }
       ],
       "evidenceId": "raw-evidence.hdr.bracket-alignment.v1",
@@ -73,7 +79,7 @@
         "private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw"
       ],
       "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
-      "notes": "Private RAW HDR bracket E2E proof slot for decode, exposure bracket validation, alignment/deghost review, merge output, preview/export parity, and quality metrics. This manifest is planning evidence only until the private assets and runtime run reports exist.",
+      "notes": "Private RAW HDR bracket E2E proof slot for decode, exposure bracket validation, alignment/deghost review, merge output, preview/export parity, app-server dry-run/apply replay, and quality metrics. This public manifest remains planning evidence until private assets and run reports exist.",
       "proofStatus": "manifest_only",
       "uiIssue": 171,
       "workflowSteps": [
