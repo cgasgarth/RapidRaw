@@ -10,6 +10,8 @@ use std::io::Cursor;
 use std::path::Path;
 use std::time::SystemTime;
 
+use crate::formats::IMAGE_MIME_JPEG;
+
 #[derive(Serialize)]
 struct InpaintRequest {
     source_id: String,
@@ -65,7 +67,7 @@ async fn upload_source_image(
 
     let part = multipart::Part::bytes(jpeg_bytes)
         .file_name("source.jpg")
-        .mime_str("image/jpeg")?;
+        .mime_str(IMAGE_MIME_JPEG)?;
 
     let form = multipart::Form::new()
         .text("source_id", source_id.to_string())

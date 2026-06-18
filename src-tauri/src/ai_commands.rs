@@ -18,6 +18,7 @@ use crate::ai_processing::{
 use crate::app_settings::load_settings_or_default;
 use crate::app_state::AppState;
 use crate::cache_utils::GEOMETRY_KEYS;
+use crate::formats::png_data_url;
 use crate::image_loader::composite_patches_on_image;
 use crate::image_processing::apply_unwarp_geometry;
 use crate::mask_generation::{AiPatchDefinition, MaskDefinition, generate_mask_bitmap};
@@ -31,7 +32,7 @@ fn encode_to_base64_png(image: &GrayImage) -> Result<String, String> {
         .write_to(&mut buf, ImageFormat::Png)
         .map_err(|e| e.to_string())?;
     let base64_str = general_purpose::STANDARD.encode(buf.get_ref());
-    Ok(format!("data:image/png;base64,{}", base64_str))
+    Ok(png_data_url(base64_str))
 }
 
 #[tauri::command]

@@ -425,7 +425,7 @@ fn save_image_with_metadata(
             .ok_or_else(|| "Missing Android export file name".to_string())?;
         crate::android_integration::save_image_bytes_to_android_gallery(
             file_name,
-            mime_type_for_extension(&extension),
+            crate::formats::export_mime_type_for_extension(&extension),
             &image_bytes,
         )?;
     }
@@ -434,20 +434,6 @@ fn save_image_with_metadata(
     fs::write(output_path, image_bytes).map_err(|e| e.to_string())?;
 
     Ok(())
-}
-
-#[cfg(target_os = "android")]
-pub fn mime_type_for_extension(extension: &str) -> &'static str {
-    match extension {
-        "jpg" | "jpeg" => "image/jpeg",
-        "png" => "image/png",
-        "webp" => "image/webp",
-        "bmp" => "image/bmp",
-        "gif" => "image/gif",
-        "tif" | "tiff" => "image/tiff",
-        "jxl" => "image/jxl",
-        _ => "application/octet-stream",
-    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -667,7 +653,7 @@ fn export_masks_for_image(
                     .ok_or_else(|| "Missing Android mask export file name".to_string())?;
                 crate::android_integration::save_image_bytes_to_android_gallery(
                     file_name,
-                    "image/png",
+                    crate::formats::IMAGE_MIME_PNG,
                     &alpha_bytes,
                 )?;
             }

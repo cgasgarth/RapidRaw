@@ -30,7 +30,7 @@ use crate::android_integration::*;
 use crate::app_settings::*;
 use crate::cache_utils::calculate_geometry_hash;
 use crate::exif_processing;
-use crate::formats::{is_raw_file, is_supported_image_file};
+use crate::formats::{is_raw_file, is_supported_image_file, jpeg_data_url};
 use crate::gpu_processing;
 use crate::image_loader;
 use crate::image_processing::GpuContext;
@@ -1290,11 +1290,7 @@ fn generate_single_thumbnail_and_cache(
         && let Ok(data) = fs::read(&cache_path)
     {
         let base64_str = general_purpose::STANDARD.encode(&data);
-        return Some((
-            format!("data:image/jpeg;base64,{}", base64_str),
-            rating,
-            is_edited,
-        ));
+        return Some((jpeg_data_url(base64_str), rating, is_edited));
     }
 
     let target_width = settings.thumbnail_resolution.unwrap_or(720);
@@ -1305,11 +1301,7 @@ fn generate_single_thumbnail_and_cache(
     {
         let _ = fs::write(&cache_path, &thumb_data);
         let base64_str = general_purpose::STANDARD.encode(&thumb_data);
-        return Some((
-            format!("data:image/jpeg;base64,{}", base64_str),
-            rating,
-            is_edited,
-        ));
+        return Some((jpeg_data_url(base64_str), rating, is_edited));
     }
     None
 }
