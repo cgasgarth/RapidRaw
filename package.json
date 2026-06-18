@@ -161,6 +161,8 @@
     "check:hdr-real-raw-private-proof": "bun scripts/run-hdr-real-raw-private-proof.ts",
     "prepare:focus-real-raw-private-root": "bun scripts/prepare-focus-real-raw-private-root.ts",
     "check:focus-real-raw-private-root-prep": "bun scripts/prepare-focus-real-raw-private-root.ts --self-test",
+    "run:focus-real-raw-private-proof": "bun scripts/run-focus-real-raw-private-proof.ts",
+    "check:focus-real-raw-private-proof": "bun scripts/run-focus-real-raw-private-proof.ts",
     "prepare:sr-real-raw-private-root": "bun scripts/prepare-sr-real-raw-private-root.ts",
     "check:sr-real-raw-private-root-prep": "bun scripts/prepare-sr-real-raw-private-root.ts --self-test",
     "prepare:panorama-real-raw-private-root": "bun scripts/prepare-panorama-real-raw-private-root.ts",
