@@ -119,6 +119,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:session-import-reload-proof', new Set(['bun scripts/check-session-import-reload-proof.ts'])],
   ['check:library-session-ui', new Set(['bun scripts/check-library-session-ui.ts'])],
   ['check:panorama-ui-api', new Set(['bun scripts/check-panorama-ui-api.ts'])],
+  ['check:panorama-feature-transform', new Set(['bun scripts/check-panorama-feature-transform.ts'])],
   ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario panorama-ui'])],
   ['check:sr-ui-api', new Set(['bun scripts/check-sr-ui-api.ts'])],
   ['check:sr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario sr-ui'])],
@@ -221,6 +222,7 @@ function isSafeFixturePath(path) {
     (path.startsWith('fixtures/layers/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/negative-lab/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/negative-lab/public/') && hasExtension(path, new Set(['.jpg', '.jpeg', '.png']))) ||
+    (path.startsWith('fixtures/panorama/') && path.endsWith('.json')) ||
     path.startsWith('fixtures/sidecar-roundtrip/') ||
     (path.startsWith('fixtures/validation/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/workflow/') && path.endsWith('.json'))
@@ -765,6 +767,11 @@ function runSelfTest() {
   assertClassification(
     'negative lab fixture outputs can skip smoke',
     ['fixtures/negative-lab/negative-lab-synthetic-fixture-proof.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'panorama fixture outputs can skip smoke',
+    ['fixtures/panorama/panorama-feature-transform-fixtures.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(

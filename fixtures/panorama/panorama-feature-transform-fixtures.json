@@ -1,0 +1,43 @@
+{
+  "$schema": "https://rawengine.dev/schemas/panorama-feature-transform-fixtures.v1.json",
+  "cases": [
+    {
+      "case": "horizontal-overlap-translation",
+      "expected": {
+        "inlierCount": 8,
+        "matchCount": 8,
+        "translationX": 48,
+        "translationY": 2
+      },
+      "features": [
+        { "descriptor": "f00", "left": [8, 8], "right": [56, 10] },
+        { "descriptor": "f01", "left": [18, 12], "right": [66, 14] },
+        { "descriptor": "f02", "left": [28, 18], "right": [76, 20] },
+        { "descriptor": "f03", "left": [38, 22], "right": [86, 24] },
+        { "descriptor": "f04", "left": [14, 32], "right": [62, 34] },
+        { "descriptor": "f05", "left": [26, 38], "right": [74, 40] },
+        { "descriptor": "f06", "left": [42, 36], "right": [90, 38] },
+        { "descriptor": "f07", "left": [50, 16], "right": [98, 18] }
+      ],
+      "imageSize": { "height": 48, "width": 72 },
+      "outliers": [
+        { "descriptor": "ambiguous", "left": [4, 44], "right": [64, 6] },
+        { "descriptor": "ambiguous", "left": [64, 40], "right": [80, 6] }
+      ]
+    },
+    {
+      "case": "insufficient-overlap-rejection",
+      "expectedFailure": "insufficient_inlier_matches",
+      "expectedMinimumInliers": 4,
+      "features": [
+        { "descriptor": "g00", "left": [10, 10], "right": [58, 12] },
+        { "descriptor": "g01", "left": [20, 20], "right": [68, 22] }
+      ],
+      "imageSize": { "height": 48, "width": 72 },
+      "outliers": []
+    }
+  ],
+  "issue": 1886,
+  "schemaVersion": 1,
+  "validationMode": "synthetic_feature_transform_runtime_proof"
+}
