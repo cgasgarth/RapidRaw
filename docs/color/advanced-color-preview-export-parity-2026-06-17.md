@@ -14,7 +14,7 @@ claim the full Capture One-class color workflow complete; that remains #1249.
 | Levels               | GPU preview/export path                               | `check:levels-runtime`, `check:color-cpu-gpu-parity`                                          |
 | Channel Mixer        | GPU preview/export path                               | `check:channel-mixer`, `check:color-cpu-gpu-parity`                                           |
 | RGB Color Balance    | GPU preview/export path                               | `check:color-balance-rgb`, `check:color-cpu-gpu-parity`                                       |
-| Black & White Mixer  | TypeScript runtime proof only                         | `check:black-white-mixer`                                                                     |
+| Black & White Mixer  | TypeScript apply proof with artifact deltas           | `check:black-white-mixer`                                                                     |
 | Selective Color      | Range/falloff/mask proof; not full GPU runtime parity | `check:selective-color-ranges`, `check:selective-color-falloff`, `check:selective-color-mask` |
 | Skin Tone Uniformity | Fixture proof; not full GPU runtime parity            | `check:skin-tone-uniformity`                                                                  |
 
@@ -35,8 +35,9 @@ This slice adds:
 
 ## Remaining Gaps
 
-- Black & White Mixer still needs GPU preview/export integration or an explicit
-  product decision that it remains a command/runtime-only transform.
+- Black & White Mixer now has a runtime apply artifact report, but still needs
+  GPU preview/export integration or an explicit product decision that it remains
+  a command/runtime-only transform.
 - Selective Color needs full pixel-path parity beyond range/falloff fixtures.
 - Skin Tone Uniformity needs runtime image proof against representative portrait
   fixtures.
@@ -45,6 +46,7 @@ This slice adds:
 ## Validation
 
 - `bun run check:color-balance-rgb`
+- `bun run check:black-white-mixer`
 - `bun run check:color-cpu-gpu-parity`
 - `bun run check:color-abi`
 - `bun run check:types`
