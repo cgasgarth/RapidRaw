@@ -229,6 +229,9 @@ export const commandPaletteWorkflowProofSchema = z.object({
   panoramaOpen: z.literal('true'),
   srOpen: z.literal('true'),
 });
+export const agentChatProofDatasetSchema = z.object({
+  agentRuntimeStatus: z.literal('ui_only_demo'),
+});
 export const negativeLabWorkspaceProofDatasetSchema = z.object({
   activeStage: z.enum(['colorInversion', 'export', 'inspection']),
   exportReady: z.enum(['false', 'true']),

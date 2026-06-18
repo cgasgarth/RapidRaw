@@ -9,6 +9,7 @@ import HdrModal from '../../components/modals/HdrModal';
 import NegativeConversionModal from '../../components/modals/NegativeConversionModal';
 import PanoramaModal from '../../components/modals/PanoramaModal';
 import SuperResolutionModal from '../../components/modals/SuperResolutionModal';
+import AgentChatShell from '../../components/panel/right/AgentChatShell';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS, type PanoramaUiSettings } from '../../schemas/panoramaUiSchemas';
@@ -18,6 +19,7 @@ import {
 } from '../../schemas/superResolutionUiSchemas';
 import { useUIStore } from '../../store/useUIStore';
 import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../utils/adjustments';
+import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
 
 import type { VisualSmokeMode } from './visualSmokeScenarios';
 
@@ -26,6 +28,7 @@ interface VisualSmokeAppProps {
 }
 
 const visualSmokeComponents = {
+  'agent-chat-ui': AgentChatVisualSmoke,
   'color-workflow': ColorWorkflowVisualSmoke,
   'command-palette-workflows': CommandPaletteWorkflowSmoke,
   'film-look-browser': FilmLookVisualSmoke,
@@ -38,6 +41,34 @@ const visualSmokeComponents = {
 type VisualSmokeComponentMode = keyof typeof visualSmokeComponents;
 
 const isVisualSmokeComponentMode = (mode: string): mode is VisualSmokeComponentMode => mode in visualSmokeComponents;
+
+const agentChatSmokeTitle = 'Agent chat UI smoke';
+const agentChatSmokeRuntime = 'UI-only';
+
+function AgentChatVisualSmoke() {
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="agent-chat-ui"
+    >
+      <div className="flex h-screen bg-[#0f1114]" data-visual-smoke-section="agent-chat-ui">
+        <div className="flex flex-1 items-center justify-center border-r border-white/10 bg-[#14171a] p-8">
+          <div className="aspect-[4/3] w-full max-w-3xl rounded-md border border-white/10 bg-gradient-to-br from-[#25333a] via-[#5f6c5f] to-[#d5b076] shadow-2xl" />
+        </div>
+        <aside className="w-[420px] overflow-y-auto border-l border-white/10 bg-[#171a1f] p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-semibold">{agentChatSmokeTitle}</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+              {agentChatSmokeRuntime}
+            </span>
+          </div>
+          <AgentChatShell transcript={agentChatTranscriptFixture} />
+        </aside>
+      </div>
+    </main>
+  );
+}
 
 const filmstripFrames = [
   { name: 'DSC_1042.ARW', tone: 'from-emerald-400 to-cyan-500', rating: '5' },

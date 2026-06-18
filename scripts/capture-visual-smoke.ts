@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 
 import { VISUAL_SMOKE_SCENARIOS } from '../src/validation/visual/visualSmokeScenarios.ts';
 import {
+  agentChatProofDatasetSchema,
   assertFilmLookExportProof,
   assertNegativeLabBaseFogPreviewExportProof,
   assertNegativeLabBatchColorInvokeProof,
@@ -112,6 +113,29 @@ async function prepareScenario(page, mode) {
     commandPaletteWorkflowProofSchema.parse(
       await page.getByTestId('command-palette-workflow-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    return;
+  }
+
+  if (mode === 'agent-chat-ui') {
+    const shell = page.getByTestId('agent-chat-shell');
+    await shell.waitFor({ timeout: 10_000 });
+    agentChatProofDatasetSchema.parse(await shell.evaluate((element) => ({ ...element.dataset })));
+    await page.getByTestId('agent-chat-messages').getByText('Dry-run only.', { exact: false }).waitFor({
+      timeout: 10_000,
+    });
+    await page
+      .getByTestId('agent-tool-transcript')
+      .getByText('rawengine.tone_color.dry_run', { exact: true })
+      .waitFor({ timeout: 10_000 });
+    await page.getByTestId('agent-tool-status-tool-2').getByText('warning', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-tool-status-tool-3').getByText('blocked', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-chat-actions').getByText('Inspect diff', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     return;
   }
 
