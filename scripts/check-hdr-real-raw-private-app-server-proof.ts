@@ -14,11 +14,13 @@ import {
   type ComputationalMergeCommandEnvelopeV1,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 import {
   parseComputationalMergePrivateRunReportCollection,
   type ComputationalMergePrivateRunReportCollection,
 } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
 
+const hdrRoutePair = getComputationalMergeAppServerRoutePairSummary('hdr');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
 const FIXTURE_ID = 'validation.computational-merge.hdr-bracket-alignment.v1';
 const SAMPLE_PATH = `${ARTIFACT_ROOT}/hdr-bracket-runtime-sample.json`;
@@ -75,7 +77,7 @@ async function runProof(rootPath: string): Promise<void> {
   const dryRunCommand = buildCommand(sample, true);
   const dryRun = bus.execute({
     request: buildRequest(sample, dryRunCommand),
-    toolName: 'computationalmerge.hdr.dry_run_command',
+    toolName: hdrRoutePair.dryRunToolName,
   });
   if (dryRun.kind !== 'dry_run') throw new Error('Expected HDR private app-server dry-run result.');
 
@@ -85,7 +87,7 @@ async function runProof(rootPath: string): Promise<void> {
   });
   const applied = bus.execute({
     request: buildRequest(sample, applyCommand),
-    toolName: 'computationalmerge.hdr.apply_command',
+    toolName: hdrRoutePair.applyToolName,
   });
   if (applied.kind !== 'apply') throw new Error('Expected HDR private app-server apply result.');
   if (applied.apply.provenance.runtimeStatus !== 'apply_rendered') {

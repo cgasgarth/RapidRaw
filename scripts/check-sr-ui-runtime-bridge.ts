@@ -10,7 +10,9 @@ import {
   buildSuperResolutionUiDryRunCommandV1,
 } from '../packages/rawengine-schema/src/superResolutionUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 
+const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 const SCALE = 2;
 const LOW_WIDTH = 24;
 const LOW_HEIGHT = 18;
@@ -60,7 +62,7 @@ const dryRunCommand = buildSuperResolutionUiDryRunCommandV1(controls, {
 const bus = new SuperResolutionAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1);
 const dryRun = bus.execute({
   request: buildRequest(dryRunCommand),
-  toolName: 'computationalmerge.super_resolution.dry_run_command',
+  toolName: superResolutionRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected SR UI runtime bridge dry-run result.');
 
@@ -76,7 +78,7 @@ const applyCommand = buildSuperResolutionUiApplyCommandV1(controls, {
 
 const applied = bus.execute({
   request: buildRequest(applyCommand),
-  toolName: 'computationalmerge.super_resolution.apply_command',
+  toolName: superResolutionRoutePair.applyToolName,
 });
 if (applied.kind !== 'apply') throw new Error('Expected SR UI runtime bridge apply result.');
 if (applied.apply.provenance.acceptedDryRunPlanId !== dryRun.dryRun.dryRunResult.mergePlan.planId) {
@@ -92,7 +94,7 @@ expectThrows('mismatched accepted SR UI runtime plan', () =>
         acceptedDryRunPlanHash: 'sha256:not-the-accepted-plan',
       },
     }),
-    toolName: 'computationalmerge.super_resolution.apply_command',
+    toolName: superResolutionRoutePair.applyToolName,
   }),
 );
 

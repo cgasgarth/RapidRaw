@@ -25,7 +25,11 @@ import { parseComputationalMergeE2eProofManifest } from '../src/schemas/computat
 import { parsePrivateRawEvidenceLedger } from '../src/schemas/privateRawEvidenceSchemas.ts';
 import type { ComputationalMergePrivateSourceSet } from '../src/schemas/computationalMergeSourceSetSchemas.ts';
 import { buildComputationalMergePrivateSourceSets } from '../src/utils/computationalMergeSourceSets.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 
+const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
+const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
+const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 const manifest = parseComputationalMergeE2eProofManifest(
   JSON.parse(await readFile('fixtures/validation/computational-merge-e2e-proof.json', 'utf8')),
 );
@@ -86,7 +90,7 @@ function runPanoramaBridge(sourceSet: ComputationalMergePrivateSourceSet): void 
       seed: sourceSet.fixtureId,
       sourceFrames,
     } satisfies PanoramaRuntimePlanRequestV1,
-    toolName: 'computationalmerge.panorama.dry_run_command',
+    toolName: panoramaRoutePair.dryRunToolName,
   });
   if (dryRun.kind !== 'dry_run') throw new Error(`${sourceSet.fixtureId}: expected panorama dry-run.`);
 
@@ -105,7 +109,7 @@ function runPanoramaBridge(sourceSet: ComputationalMergePrivateSourceSet): void 
       seed: sourceSet.fixtureId,
       sourceFrames,
     } satisfies PanoramaRuntimePlanRequestV1,
-    toolName: 'computationalmerge.panorama.apply_command',
+    toolName: panoramaRoutePair.applyToolName,
   });
   if (applied.kind !== 'apply') throw new Error(`${sourceSet.fixtureId}: expected panorama apply.`);
 }
@@ -160,7 +164,7 @@ function runFocusBridge(sourceSet: ComputationalMergePrivateSourceSet): void {
       retouchLayerArtifactId: `${sourceSet.fixtureId}.retouch`,
       sharpnessMapArtifactId: `${sourceSet.fixtureId}.sharpness`,
     } satisfies FocusStackRuntimePlanRequestV1,
-    toolName: 'computationalmerge.focus_stack.dry_run_command',
+    toolName: focusRoutePair.dryRunToolName,
   });
   if (dryRun.kind !== 'dry_run') throw new Error(`${sourceSet.fixtureId}: expected focus dry-run.`);
 
@@ -181,7 +185,7 @@ function runFocusBridge(sourceSet: ComputationalMergePrivateSourceSet): void {
       retouchLayerArtifactId: `${sourceSet.fixtureId}.retouch`,
       sharpnessMapArtifactId: `${sourceSet.fixtureId}.sharpness`,
     } satisfies FocusStackRuntimePlanRequestV1,
-    toolName: 'computationalmerge.focus_stack.apply_command',
+    toolName: focusRoutePair.applyToolName,
   });
   if (applied.kind !== 'apply') throw new Error(`${sourceSet.fixtureId}: expected focus apply.`);
 }
@@ -219,7 +223,7 @@ function runSuperResolutionBridge(sourceSet: ComputationalMergePrivateSourceSet)
       outputArtifactId: `${sourceSet.fixtureId}.output`,
       previewArtifactId: `${sourceSet.fixtureId}.preview`,
     } satisfies SuperResolutionRuntimePlanRequestV1,
-    toolName: 'computationalmerge.super_resolution.dry_run_command',
+    toolName: superResolutionRoutePair.dryRunToolName,
   });
   if (dryRun.kind !== 'dry_run') throw new Error(`${sourceSet.fixtureId}: expected SR dry-run.`);
 
@@ -237,7 +241,7 @@ function runSuperResolutionBridge(sourceSet: ComputationalMergePrivateSourceSet)
       outputArtifactId: `${sourceSet.fixtureId}.output`,
       previewArtifactId: `${sourceSet.fixtureId}.preview`,
     } satisfies SuperResolutionRuntimePlanRequestV1,
-    toolName: 'computationalmerge.super_resolution.apply_command',
+    toolName: superResolutionRoutePair.applyToolName,
   });
   if (applied.kind !== 'apply') throw new Error(`${sourceSet.fixtureId}: expected SR apply.`);
 }

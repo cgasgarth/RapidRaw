@@ -7,7 +7,9 @@ import {
 } from '../packages/rawengine-schema/src/superResolutionPixelShift.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 
+const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 const SCALE = 2;
 const LOW_WIDTH = 24;
 const LOW_HEIGHT = 18;
@@ -68,7 +70,7 @@ const dryRunCommand = {
 const bus = new SuperResolutionAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1);
 const dryRun = bus.execute({
   request: buildRequest(dryRunCommand),
-  toolName: 'computationalmerge.super_resolution.dry_run_command',
+  toolName: superResolutionRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected dry-run dispatch result.');
 
@@ -90,14 +92,14 @@ const applyCommand = {
 };
 const applied = bus.execute({
   request: buildRequest(applyCommand),
-  toolName: 'computationalmerge.super_resolution.apply_command',
+  toolName: superResolutionRoutePair.applyToolName,
 });
 if (applied.kind !== 'apply') throw new Error('Expected apply dispatch result.');
 
 expectThrows('unaccepted apply plan', () =>
   new SuperResolutionAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1).execute({
     request: buildRequest(applyCommand),
-    toolName: 'computationalmerge.super_resolution.apply_command',
+    toolName: superResolutionRoutePair.applyToolName,
   }),
 );
 

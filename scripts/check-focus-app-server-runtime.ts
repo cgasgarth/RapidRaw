@@ -3,7 +3,9 @@
 import { FocusStackAppServerRuntimeToolBusV1 } from '../packages/rawengine-schema/src/focusStackAppServerRuntime.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 
+const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 const WIDTH = 72;
 const HEIGHT = 48;
 const sourceRegions = [
@@ -71,7 +73,7 @@ const dryRunCommand = {
 const bus = new FocusStackAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1);
 const dryRun = bus.execute({
   request: buildRequest(dryRunCommand),
-  toolName: 'computationalmerge.focus_stack.dry_run_command',
+  toolName: focusRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected focus dry-run dispatch result.');
 
@@ -93,7 +95,7 @@ const applyCommand = {
 };
 const applied = bus.execute({
   request: buildRequest(applyCommand),
-  toolName: 'computationalmerge.focus_stack.apply_command',
+  toolName: focusRoutePair.applyToolName,
 });
 if (applied.kind !== 'apply') throw new Error('Expected focus apply dispatch result.');
 
@@ -108,7 +110,7 @@ if (sourceHashes.includes(outputHash)) throw new Error('Expected focus stack out
 expectThrows('unaccepted focus apply plan', () =>
   new FocusStackAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1).execute({
     request: buildRequest(applyCommand),
-    toolName: 'computationalmerge.focus_stack.apply_command',
+    toolName: focusRoutePair.applyToolName,
   }),
 );
 

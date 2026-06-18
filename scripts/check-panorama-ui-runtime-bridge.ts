@@ -6,7 +6,9 @@ import {
   buildPanoramaUiDryRunCommandV1,
 } from '../packages/rawengine-schema/src/panoramaUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 
+const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const sourceFrames = [
   { expectedOffsetX: 0, expectedOffsetY: 0, sourceIndex: 0 },
   { expectedOffsetX: 48, expectedOffsetY: 2, sourceIndex: 1 },
@@ -48,7 +50,7 @@ const dryRunCommand = buildPanoramaUiDryRunCommandV1(controls, {
 const bus = new PanoramaAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1);
 const dryRun = bus.execute({
   request: buildRequest(dryRunCommand),
-  toolName: 'computationalmerge.panorama.dry_run_command',
+  toolName: panoramaRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected panorama UI runtime bridge dry-run result.');
 
@@ -64,7 +66,7 @@ const applyCommand = buildPanoramaUiApplyCommandV1(controls, {
 
 const applied = bus.execute({
   request: buildRequest(applyCommand),
-  toolName: 'computationalmerge.panorama.apply_command',
+  toolName: panoramaRoutePair.applyToolName,
 });
 if (applied.kind !== 'apply') throw new Error('Expected panorama UI runtime bridge apply result.');
 if (applied.apply.outputPixels.length <= sourceFrames[0].width * sourceFrames[0].height * 3) {
@@ -83,7 +85,7 @@ expectThrows('mismatched accepted panorama UI runtime plan', () =>
         acceptedDryRunPlanHash: 'sha256:not-the-accepted-plan',
       },
     }),
-    toolName: 'computationalmerge.panorama.apply_command',
+    toolName: panoramaRoutePair.applyToolName,
   }),
 );
 
