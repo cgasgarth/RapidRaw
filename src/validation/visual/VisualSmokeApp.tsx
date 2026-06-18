@@ -174,6 +174,11 @@ const copy = {
   librarySurvey: 'Survey',
   createBwProofCopy: 'Create B&W proof copy',
   virtualCopyShort: 'VC',
+  hdrReview: 'HDR review',
+  hdrDryRunPreview: 'Dry-run preview',
+  hdrArtifactHandoff: 'Artifact handoff',
+  hdrDryRunTool: 'hdr.merge.dry_run_command',
+  hdrArtifactPath: '/tmp/rawengine-hdr-smoke.tif',
   libraryRating: (rating: number) => `Rating ${rating}`,
   libraryStars: (rating: number) => `${rating} stars`,
   libraryColorLabel: (label: string) => `Color label ${label}`,
@@ -694,6 +699,17 @@ function HdrVisualSmoke() {
       <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="hdr-modal" />
       <div
         className="sr-only"
+        data-artifact-path={copy.hdrArtifactPath}
+        data-bracket-validation={hdrSettings.bracketValidation}
+        data-command={copy.hdrDryRunTool}
+        data-deghosting={hdrSettings.deghosting}
+        data-max-preview-dimension-px={hdrSettings.maxPreviewDimensionPx}
+        data-runtime-status="dry_run_preview"
+        data-source-count="3"
+        data-testid="hdr-review-workspace-proof"
+      />
+      <div
+        className="sr-only"
         data-deghosting={hdrSettings.deghosting}
         data-max-preview-dimension-px={hdrSettings.maxPreviewDimensionPx}
         data-testid="hdr-ui-settings-proof"
@@ -714,6 +730,22 @@ function HdrVisualSmoke() {
         progressMessage={null}
         settings={hdrSettings}
       />
+      <aside className="fixed right-4 top-14 z-50 w-72 rounded-md border border-white/10 bg-black/75 p-3 text-sm shadow-lg">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="font-semibold">{copy.hdrReview}</span>
+          <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.hdrDryRunPreview}</span>
+        </div>
+        <div className="space-y-2">
+          <div className="rounded border border-white/10 bg-white/5 p-2">
+            <p className="text-xs text-[#aab2bd]">{copy.hdrDryRunTool}</p>
+            <p>{hdrSettings.deghosting}</p>
+          </div>
+          <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="hdr-artifact-handoff">
+            <p className="text-xs text-[#aab2bd]">{copy.hdrArtifactHandoff}</p>
+            <p>{copy.hdrArtifactPath}</p>
+          </div>
+        </div>
+      </aside>
     </main>
   );
 }
