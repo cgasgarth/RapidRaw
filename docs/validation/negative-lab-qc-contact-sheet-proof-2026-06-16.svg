@@ -29,6 +29,12 @@
       <text x="42" y="62" fill="#f8fafc" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="30">
         frame_0001
       </text>
+      <text x="42" y="104" fill="#93c5fd" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">
+        source sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+      </text>
+      <text x="42" y="136" fill="#86efac" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">
+        positive sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+      </text>
       <rect x="42" y="1055" width="516" height="36" rx="8" fill="#b45309" opacity="0.16" stroke="#b45309" />
       <text x="58" y="1082" fill="#b45309" font-family="ui-sans-serif, system-ui, sans-serif" font-size="24">
         Frame boundary requires review
