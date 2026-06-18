@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "layers.opacity-order.move-after-opacity.v1",
+      "width": 2,
+      "height": 2,
+      "expectedHash": "sha256:d3bbb7d4f3391165ac7d2d59931595beaf3632425dbd2b501e3769e53ce14236",
+      "expectedCoverageByLayer": [
+        { "id": "warm-fill", "opacity": 0.5, "touchedPixels": 4 },
+        { "id": "cool-top", "opacity": 1, "touchedPixels": 4 }
+      ],
+      "basePixels": [
+        { "r": 20, "g": 30, "b": 40 },
+        { "r": 40, "g": 50, "b": 60 },
+        { "r": 80, "g": 90, "b": 100 },
+        { "r": 120, "g": 130, "b": 140 }
+      ],
+      "layers": [
+        {
+          "id": "cool-top",
+          "name": "Cool top",
+          "blendMode": "normal",
+          "opacity": 1,
+          "visible": true,
+          "pixels": [
+            { "r": 20, "g": 60, "b": 180 },
+            { "r": 30, "g": 70, "b": 190 },
+            { "r": 40, "g": 80, "b": 200 },
+            { "r": 50, "g": 90, "b": 210 }
+          ]
+        },
+        {
+          "id": "warm-fill",
+          "name": "Warm fill",
+          "blendMode": "normal",
+          "opacity": 1,
+          "visible": true,
+          "pixels": [
+            { "r": 220, "g": 100, "b": 50 },
+            { "r": 230, "g": 110, "b": 60 },
+            { "r": 240, "g": 120, "b": 70 },
+            { "r": 250, "g": 130, "b": 80 }
+          ]
+        },
+        {
+          "id": "hidden-matte",
+          "name": "Hidden matte",
+          "blendMode": "normal",
+          "opacity": 1,
+          "visible": false,
+          "pixels": [
+            { "r": 255, "g": 255, "b": 255 },
+            { "r": 255, "g": 255, "b": 255 },
+            { "r": 255, "g": 255, "b": 255 },
+            { "r": 255, "g": 255, "b": 255 }
+          ]
+        }
+      ],
+      "operations": [
+        { "type": "setOpacity", "layerId": "warm-fill", "opacity": 0.5 },
+        { "type": "moveToIndex", "layerId": "warm-fill", "toIndex": 0 },
+        { "type": "setVisibility", "layerId": "hidden-matte", "visible": false }
+      ]
+    }
+  ]
+}
