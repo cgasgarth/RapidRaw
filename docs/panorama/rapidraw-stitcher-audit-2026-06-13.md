@@ -81,13 +81,22 @@ Backend entry points:
 11. The strongest pairwise graph edges are used to build a maximum spanning
     tree, then breadth-first traversal creates an ordered connected component.
 12. Full-resolution source images are warped into a global panorama canvas.
-13. Overlapping regions use an adaptive vertical or horizontal seam.
-14. Low-detail regions widen the feather width to reduce visible banding.
-15. A preview is downscaled to 800 px on the long side and emitted as PNG data
-    URL.
-16. The full stitched `DynamicImage` is stored in `AppState.panorama_result`.
-17. `save_panorama` writes a TIFF for `Rgb32FImage` outputs, otherwise PNG, and
-    writes a sidecar using the first source image as the metadata seed.
+
+## Feature Transform Proof
+
+Issue #1886 adds an executable synthetic proof for the first alignment slice:
+
+- `fixtures/panorama/panorama-feature-transform-fixtures.json`
+- `docs/validation/panorama-feature-transform-proof-2026-06-18.json`
+- `bun run check:panorama-feature-transform`
+
+The proof performs deterministic descriptor matching and translation-model
+RANSAC over one overlap fixture, emits transform/provenance metadata, and
+verifies a bounded `insufficient_inlier_matches` failure. It is runtime
+alignment evidence only; projection, warping, seam blending, exposure
+normalization, and real RAW stitch E2E proof remain separate issues. 13. Overlapping regions use an adaptive vertical or horizontal seam. 14. Low-detail regions widen the feather width to reduce visible banding. 15. A preview is downscaled to 800 px on the long side and emitted as PNG data
+URL. 16. The full stitched `DynamicImage` is stored in `AppState.panorama_result`. 17. `save_panorama` writes a TIFF for `Rgb32FImage` outputs, otherwise PNG, and
+writes a sidecar using the first source image as the metadata seed.
 
 ## Feature Transform Proof
 
