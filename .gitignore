@@ -11,9 +11,12 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+
+# Generated local validation/proof artifacts
 artifacts/
 private-artifacts/
 private-fixtures/
+.rawengine-private-root/
 *.local
 
 # Editor directories and files

@@ -332,6 +332,31 @@ pub(crate) fn process_image_for_export_pipeline(
 ) -> Result<DynamicImage, String> {
     let (transformed_image, mask_bitmaps) = prepare_export_masks(base_image, js_adjustments, state);
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
+    process_image_for_export_pipeline_with_tonemapper_override(
+        path,
+        transformed_image.as_ref(),
+        js_adjustments,
+        context,
+        state,
+        is_raw,
+        debug_tag,
+        tm_override,
+        &mask_bitmaps,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn process_image_for_export_pipeline_with_tonemapper_override(
+    path: &str,
+    transformed_image: &DynamicImage,
+    js_adjustments: &Value,
+    context: &GpuContext,
+    state: &tauri::State<AppState>,
+    is_raw: bool,
+    debug_tag: &str,
+    tm_override: Option<u32>,
+    mask_bitmaps: &[GrayImage],
+) -> Result<DynamicImage, String> {
     let mut all_adjustments = get_all_adjustments_from_json(js_adjustments, is_raw, tm_override);
     all_adjustments.global.show_clipping = 0;
 
@@ -340,7 +365,7 @@ pub(crate) fn process_image_for_export_pipeline(
 
     let unique_hash = calculate_full_job_hash(path, js_adjustments);
 
-    let denoised_image = apply_denoise_stage(transformed_image.as_ref(), js_adjustments);
+    let denoised_image = apply_denoise_stage(transformed_image, js_adjustments);
     let deblurred_image = apply_deblur_stage(denoised_image.as_ref(), js_adjustments);
     let wavelet_image = apply_wavelet_detail_stage(deblurred_image.image.as_ref(), js_adjustments);
 
@@ -351,7 +376,7 @@ pub(crate) fn process_image_for_export_pipeline(
         unique_hash,
         RenderRequest {
             adjustments: all_adjustments,
-            mask_bitmaps: &mask_bitmaps,
+            mask_bitmaps,
             lut,
             roi: None,
         },

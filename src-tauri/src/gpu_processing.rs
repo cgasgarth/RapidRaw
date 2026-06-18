@@ -411,6 +411,52 @@ pub fn get_or_init_gpu_context(
     Ok(new_context)
 }
 
+#[cfg(all(test, feature = "tauri-test"))]
+pub fn get_or_init_compute_gpu_context_for_tests(
+    state: &tauri::State<AppState>,
+) -> Result<GpuContext, String> {
+    let mut context_lock = state.gpu_context.lock().unwrap();
+    if let Some(context) = &*context_lock {
+        return Ok(context.clone());
+    }
+
+    let instance =
+        wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
+    let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance,
+        compatible_surface: None,
+        ..Default::default()
+    }))
+    .map_err(|error| format!("Failed to find a wgpu adapter: {}", error))?;
+
+    let mut required_features = wgpu::Features::empty();
+    if adapter
+        .features()
+        .contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES)
+    {
+        required_features |= wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
+    }
+    let limits = adapter.limits();
+    let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        label: Some("Processing Device"),
+        required_features,
+        required_limits: limits.clone(),
+        experimental_features: wgpu::ExperimentalFeatures::default(),
+        memory_hints: wgpu::MemoryHints::Performance,
+        trace: wgpu::Trace::Off,
+    }))
+    .map_err(|error| error.to_string())?;
+
+    let new_context = GpuContext {
+        device: Arc::new(device),
+        queue: Arc::new(queue),
+        limits,
+        display: Arc::new(std::sync::Mutex::new(None)),
+    };
+    *context_lock = Some(new_context.clone());
+    Ok(new_context)
+}
+
 fn read_texture_data_roi(
     device: &wgpu::Device,
     queue: &wgpu::Queue,

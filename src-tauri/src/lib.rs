@@ -52,7 +52,7 @@ use std::io::Cursor;
 use std::io::Write;
 use std::panic;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
@@ -77,7 +77,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{Emitter, Manager, ipc::Response};
 use tempfile::NamedTempFile;
-use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
 
 const JPEG_DATA_URL_PREFIX: &str = "data:image/jpeg;base64,";
@@ -105,8 +104,8 @@ fn encode_jpeg_response(image: &DynamicImage, quality: u8) -> Result<Response, S
 }
 
 use crate::cache_utils::{
-    DecodedImageCache, GEOMETRY_KEYS, calculate_full_job_hash, calculate_geometry_hash,
-    calculate_transform_hash, calculate_visual_hash,
+    GEOMETRY_KEYS, calculate_full_job_hash, calculate_geometry_hash, calculate_transform_hash,
+    calculate_visual_hash,
 };
 use crate::exif_processing::{read_exposure_time_secs, read_iso};
 use crate::file_management::{parse_virtual_path, read_file_mapped};
@@ -2527,40 +2526,7 @@ pub fn run() {
             crate::register_exit_handler();
             Ok(())
         })
-        .manage(AppState {
-            window_setup_complete: AtomicBool::new(false),
-            gpu_crash_flag_path: Mutex::new(None),
-            original_image: Mutex::new(None),
-            cached_preview: Mutex::new(None),
-            gpu_context: Mutex::new(None),
-            gpu_image_cache: Mutex::new(None),
-            gpu_processor: Mutex::new(None),
-            ai_state: Mutex::new(None),
-            ai_init_lock: TokioMutex::new(()),
-            export_task_handle: Mutex::new(None),
-            hdr_result: Arc::new(Mutex::new(None)),
-            hdr_runtime_plan: Arc::new(Mutex::new(None)),
-            hdr_source_refs: Arc::new(Mutex::new(Vec::new())),
-            panorama_result: Arc::new(Mutex::new(None)),
-            denoise_result: Arc::new(Mutex::new(None)),
-            indexing_task_handle: Mutex::new(None),
-            lut_cache: Mutex::new(HashMap::new()),
-            initial_file_path: Mutex::new(None),
-            thumbnail_cancellation_token: Arc::new(AtomicBool::new(false)),
-            thumbnail_progress: Mutex::new(ThumbnailProgressTracker { total: 0, completed: 0 }),
-            preview_worker_tx: Mutex::new(None),
-            analytics_worker_tx: Mutex::new(None),
-            mask_cache: Mutex::new(HashMap::new()),
-            patch_cache: Mutex::new(HashMap::new()),
-            geometry_cache: Mutex::new(HashMap::new()),
-            thumbnail_geometry_cache: Mutex::new(HashMap::new()),
-            lens_db: Mutex::new(None),
-            load_image_generation: Arc::new(AtomicUsize::new(0)),
-            full_warped_cache: Mutex::new(None),
-            full_transformed_cache: Mutex::new(None),
-            decoded_image_cache: Mutex::new(DecodedImageCache::new(5)),
-            thumbnail_manager: ThumbnailManager::new(),
-        })
+        .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             apply_adjustments,
             generate_preview_for_path,
