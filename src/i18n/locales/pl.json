@@ -453,6 +453,11 @@
           "rejected": "",
           "required": ""
         },
+        "artifacts": {
+          "audit": "",
+          "title": "",
+          "uiOnly": ""
+        },
         "duration": {
           "pending": ""
         },

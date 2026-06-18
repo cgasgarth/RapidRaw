@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, CircleDashed, Eye, Sparkles } from 'lucide
 import { useTranslation } from 'react-i18next';
 
 import type {
+  AgentArtifactReview,
   AgentChatDryRunReview,
   AgentChatMessage,
   AgentChatToolCall,
@@ -37,6 +38,12 @@ const reviewActionStyles = {
   unavailable: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
 } satisfies Record<AgentChatDryRunReview['actions'][number]['state'], string>;
 
+const artifactStatusStyles = {
+  audit_only: 'border-white/10 bg-white/5 text-text-secondary',
+  ready: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
+  review_required: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
+} satisfies Record<AgentArtifactReview['previewArtifacts'][number]['status'], string>;
+
 function MessageBubble({ message }: { message: AgentChatMessage }) {
   const isUser = message.role === 'user';
 
@@ -55,6 +62,84 @@ function MessageBubble({ message }: { message: AgentChatMessage }) {
           <span>{message.timestamp}</span>
         </div>
         <p className="text-xs leading-5 text-text-primary">{message.body}</p>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactReviewPanel({ review }: { review: AgentArtifactReview }) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-white/10 bg-black/15 p-3"
+      data-artifact-count={review.previewArtifacts.length}
+      data-audit-count={review.auditEntries.length}
+      data-before-revision={review.beforeAfter.beforeRevision}
+      data-testid="agent-artifact-review"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-text-primary">{t('editor.ai.agent.artifacts.title')}</div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">{t('editor.ai.agent.artifacts.uiOnly')}</p>
+        </div>
+        <span className="shrink-0 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-text-secondary">
+          {t('editor.ai.agent.artifacts.audit')}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2" data-testid="agent-before-after-preview">
+        <div className="rounded border border-white/10 bg-gradient-to-br from-[#283540] via-[#556069] to-[#c19b67] p-2">
+          <span className="rounded bg-black/35 px-1.5 py-0.5 text-[10px] uppercase text-text-primary">
+            {review.beforeAfter.beforeLabel}
+          </span>
+          <div className="mt-14 font-mono text-[10px] text-text-primary">{review.beforeAfter.beforeRevision}</div>
+        </div>
+        <div className="rounded border border-sky-500/25 bg-gradient-to-br from-[#37444a] via-[#776f65] to-[#f2c779] p-2">
+          <span className="rounded bg-black/35 px-1.5 py-0.5 text-[10px] uppercase text-text-primary">
+            {review.beforeAfter.afterLabel}
+          </span>
+          <div className="mt-14 font-mono text-[10px] text-text-primary">{review.beforeAfter.afterRevision}</div>
+        </div>
+      </div>
+
+      <div className="space-y-1" data-testid="agent-preview-artifacts">
+        {review.previewArtifacts.map((artifact) => (
+          <div
+            className="grid grid-cols-[1fr_auto] gap-2 rounded border border-white/10 bg-white/[0.03] p-2 text-[11px]"
+            key={artifact.id}
+          >
+            <div className="min-w-0">
+              <div className="truncate font-semibold text-text-primary">{artifact.title}</div>
+              <div className="mt-1 truncate font-mono text-text-secondary">{artifact.id}</div>
+              <div className="mt-1 truncate font-mono text-text-secondary">{artifact.contentHash}</div>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <span className={`rounded border px-1.5 py-0.5 ${artifactStatusStyles[artifact.status]}`}>
+                {artifact.status}
+              </span>
+              <span className="font-mono text-[10px] text-text-secondary">{artifact.toolCallId}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-1" data-testid="agent-audit-entries">
+        {review.auditEntries.map((entry) => (
+          <a
+            className="block rounded border border-white/10 bg-white/[0.03] p-2 text-[11px] hover:border-primary/50"
+            href={entry.replayLink}
+            key={entry.id}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-text-primary">{entry.stage}</span>
+              <span className="font-mono text-text-secondary">{entry.toolCallId}</span>
+            </div>
+            <div className="mt-1 font-mono text-text-secondary">{entry.artifactId}</div>
+            <div className="mt-1 truncate font-mono text-text-secondary">{entry.replayLink}</div>
+            <p className="mt-1 leading-4 text-text-secondary">{entry.summary}</p>
+          </a>
+        ))}
       </div>
     </div>
   );
@@ -231,6 +316,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
           <ToolCallRow key={toolCall.id} toolCall={toolCall} />
         ))}
       </div>
+
+      {transcript.artifactReview ? <ArtifactReviewPanel review={transcript.artifactReview} /> : null}
 
       {transcript.dryRunReview ? <DryRunReviewPanel review={transcript.dryRunReview} /> : null}
 
