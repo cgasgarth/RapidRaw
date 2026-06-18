@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-export const filmLookAppServerCommandNameSchema = z.literal('film.look.build_adjustment_patch');
+import {
+  FilmLookAppServerCommandName,
+  FilmLookAppServerRouteStatus,
+  FilmLookAppServerSchemaName,
+} from '../utils/filmLookAppServerRouteIds';
+
+export const filmLookAppServerCommandNameSchema = z.literal(FilmLookAppServerCommandName.BuildAdjustmentPatch);
 
 export const filmLookAppServerCommandSchema = z
   .object({
@@ -12,10 +18,10 @@ export const filmLookAppServerCommandSchema = z
 export const filmLookAppServerRouteSchema = z
   .object({
     commandName: filmLookAppServerCommandNameSchema,
-    inputSchemaName: z.literal('FilmLookAppServerCommandV1'),
-    outputSchemaName: z.literal('FilmLookAppServerPatchResultV1'),
+    inputSchemaName: z.literal(FilmLookAppServerSchemaName.Command),
+    outputSchemaName: z.literal(FilmLookAppServerSchemaName.PatchResult),
     reason: z.string().trim().min(1),
-    status: z.literal('mapped'),
+    status: z.literal(FilmLookAppServerRouteStatus.Mapped),
   })
   .strict();
 

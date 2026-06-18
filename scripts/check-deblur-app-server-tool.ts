@@ -7,6 +7,12 @@ import {
   detailDeblurDryRunResultV1Schema,
   detailDeblurRuntimeStateV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  DetailAppServerCommandType,
+  DetailAppServerExecutionMode,
+  DetailAppServerRouteStatus,
+  DetailAppServerToolName,
+} from '../src/utils/detailAppServerRouteIds.ts';
 import { DETAIL_APP_SERVER_ROUTES } from '../src/utils/detailAppServerRoutes.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../src/utils/rawEngineAppServerHost.ts';
 
@@ -15,8 +21,8 @@ const routesByToolName = new Map(DETAIL_APP_SERVER_ROUTES.map((route) => [route.
 const catalogToolNames = new Set(buildRawEngineAppServerRouteCatalog().flatMap((route) => route.toolNames));
 
 for (const [toolName, executionMode] of [
-  ['detail.deblur.dry_run_command', 'dry_run_command'],
-  ['detail.deblur.apply_command', 'apply_dry_run_plan'],
+  [DetailAppServerToolName.DryRunCommand, DetailAppServerExecutionMode.DryRunCommand],
+  [DetailAppServerToolName.ApplyCommand, DetailAppServerExecutionMode.ApplyDryRunPlan],
 ] as const) {
   const route = routesByToolName.get(toolName);
   if (route === undefined) {
@@ -24,7 +30,7 @@ for (const [toolName, executionMode] of [
     continue;
   }
 
-  if (route.executionMode !== executionMode || route.status !== 'mapped_unavailable') {
+  if (route.executionMode !== executionMode || route.status !== DetailAppServerRouteStatus.MappedUnavailable) {
     failures.push(`${toolName} must expose ${executionMode} with explicit unavailable status.`);
   }
 
@@ -51,7 +57,7 @@ const dryRunCommand = detailDeblurCommandEnvelopeV1Schema.parse({
     state: 'not_required',
   },
   commandId: 'command_detail_deblur_app_server_dry_run',
-  commandType: 'detailDeblur.dryRunControls',
+  commandType: DetailAppServerCommandType.DryRunControls,
   correlationId: 'corr_detail_deblur_app_server',
   dryRun: true,
   expectedGraphRevision: 'graph_rev_deblur_app_server_001',
@@ -71,7 +77,7 @@ const applyCommand = detailDeblurCommandEnvelopeV1Schema.parse({
     state: 'approved',
   },
   commandId: 'command_detail_deblur_app_server_apply',
-  commandType: 'detailDeblur.applyControls',
+  commandType: DetailAppServerCommandType.ApplyControls,
   correlationId: 'corr_detail_deblur_app_server_apply',
   dryRun: false,
 });
