@@ -295,7 +295,8 @@
     "check:deblur-cpu-reference": "bun scripts/check-deblur-cpu-reference.ts",
     "check:deblur-real-raw-quality": "bun scripts/check-deblur-real-raw-quality.ts",
     "check:deblur-workflow-smoke": "bun scripts/check-deblur-workflow-smoke.ts",
-    "check:deblur-ui-api": "bun scripts/check-deblur-ui-api.ts"
+    "check:deblur-ui-api": "bun scripts/check-deblur-ui-api.ts",
+    "check:deblur-app-server-tool": "bun scripts/check-deblur-app-server-tool.ts"
   },
   "dependencies": {
     "@clerk/react": "^6.9.1",

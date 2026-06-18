@@ -200,6 +200,7 @@ export const rawEngineAppServerCapabilitiesResponseSchema = z
 export const rawEngineAppServerRouteFamilySchema = z.enum([
   'ai',
   'computational_merge',
+  'detail',
   'film_look',
   'negative_lab',
   'tone_color',

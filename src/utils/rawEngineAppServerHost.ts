@@ -1,5 +1,6 @@
 import { AI_APP_SERVER_TOOL_ROUTES } from './aiAppServerToolRoutes';
 import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computationalMergeAppServerRoutes';
+import { DETAIL_APP_SERVER_ROUTES } from './detailAppServerRoutes';
 import { FILM_LOOK_APP_SERVER_ROUTE_MANIFEST } from './filmLookAppServerRoutes';
 import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negativeLabAppServerRoutes';
 import { TONE_COLOR_APP_SERVER_ROUTES } from './toneColorAppServerRoutes';
@@ -414,6 +415,20 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
         modes: route.executionMode === undefined ? ['mapped_invoke'] : [route.executionMode],
         outputSchemaNames: route.outputSchemaName === undefined ? ['AiToolRouteResultV1'] : [route.outputSchemaName],
         toolNames: route.appServerToolName === undefined ? [route.sourceOperation] : [route.appServerToolName],
+      }),
+    );
+  }
+
+  for (const route of DETAIL_APP_SERVER_ROUTES) {
+    catalog.push(
+      buildRouteCatalogEntry({
+        commandName: route.commandType,
+        family: 'detail',
+        inputSchemaNames: [route.inputSchemaName],
+        modes: [route.executionMode],
+        outputSchemaNames: [route.outputSchemaName],
+        runtimeCheckScripts: [route.runtimeCheckScript],
+        toolNames: [route.toolName],
       }),
     );
   }
