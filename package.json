@@ -112,6 +112,8 @@
     "check:detail-artifacts": "bun scripts/check-detail-artifacts.ts",
     "check:denoise-cpu-reference": "bun scripts/check-denoise-cpu-reference.ts",
     "check:export-recipes": "bun scripts/check-export-recipe-fixtures.ts",
+    "check:export-batch-proof": "bun scripts/check-export-batch-proof.ts",
+    "check:export-batch-proof:update": "bun scripts/check-export-batch-proof.ts --update",
     "check:delivery-review-manifest": "bun scripts/check-delivery-review-manifest.ts",
     "check:import-presets": "bun scripts/check-import-preset-fixtures.ts",
     "check:library-sessions": "bun scripts/check-library-session-fixtures.ts",

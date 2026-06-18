@@ -1,0 +1,60 @@
+{
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1279,
+  "proofHash": "57437a8897b429f451bdc2089cb975aa46024b0c5730b4b7130c12bcd79f314c",
+  "queue": {
+    "activeJobIds": ["export-job-running"],
+    "nextJobIdsAfterDrain": ["export-job-queued"],
+    "queuedJobIds": ["export-job-queued"]
+  },
+  "recipeCoverage": [
+    {
+      "colorProfile": "srgb",
+      "fileFormat": "jpeg",
+      "filenameTemplate": "{original_filename}_client-proof",
+      "id": "client-proof-jpeg",
+      "metadataPolicy": "strip_gps",
+      "resize": "longEdge:3000"
+    },
+    {
+      "colorProfile": "srgb",
+      "fileFormat": "jpeg",
+      "filenameTemplate": "{original_filename}",
+      "id": "default-hq",
+      "metadataPolicy": "keep_metadata",
+      "resize": "original"
+    },
+    {
+      "colorProfile": "displayP3",
+      "fileFormat": "jpeg",
+      "filenameTemplate": "{original_filename}_web",
+      "id": "default-fast",
+      "metadataPolicy": "strip_metadata",
+      "resize": "width:2048"
+    },
+    {
+      "colorProfile": "proPhotoRgb",
+      "fileFormat": "tiff",
+      "filenameTemplate": "{original_filename}_client",
+      "id": "client-proof-tiff",
+      "metadataPolicy": "strip_gps",
+      "resize": "longEdge:4000"
+    }
+  ],
+  "schemaVersion": 1,
+  "simulatedOutputs": [
+    {
+      "outputHash": "1da6406b750e6f15da8d0df6fa3fcaa333ee24d3b2e1d96bc7da50e3c5a5d805",
+      "outputPath": "/Users/example/Pictures/Exports/DSC_0004_client.tiff",
+      "recipeId": "archive-tiff",
+      "sourcePath": "/Users/example/Pictures/Session/DSC_0004.ARW"
+    },
+    {
+      "outputHash": "bb9c37542710ddd244702eb2265007cf09669808f55973077a58ec1b34b192f1",
+      "outputPath": "/Users/example/Pictures/Exports/DSC_0005_client.tiff",
+      "recipeId": "archive-tiff",
+      "sourcePath": "/Users/example/Pictures/Session/DSC_0005.ARW"
+    }
+  ],
+  "status": "synthetic_export_artifact_gate"
+}
