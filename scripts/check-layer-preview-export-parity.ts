@@ -193,7 +193,7 @@ const unsupportedBlendModeManifest = {
       layers: [
         {
           ...unsupportedBlendModeLayer,
-          blendMode: 'soft_light',
+          blendMode: 'hard_light',
         },
         ...unsupportedBlendModeCase.layers.slice(1),
       ],
