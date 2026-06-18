@@ -5,6 +5,7 @@ import { dirname, join, normalize } from 'node:path';
 import { z } from 'zod';
 
 const REVIEW_PAGE_PATH = 'docs/validation/goal-review-2026-06-11.html';
+const REVIEW_DATA_PATH = 'docs/validation/goal-review-data-2026-06-18.json';
 const ROOT = process.cwd();
 
 const requirementSchema = z
@@ -25,6 +26,7 @@ const requirements = z.array(requirementSchema).parse([
       '<h2>Design Decisions To Track</h2>',
       '<h2>Validation Evidence Ledger</h2>',
       '<h2>Missing Artifacts</h2>',
+      'goal-review-data-2026-06-18.json',
     ],
   },
   {
@@ -79,6 +81,9 @@ const fail = (messages: string[]): never => {
 const reviewPage = join(ROOT, REVIEW_PAGE_PATH);
 if (!existsSync(reviewPage)) {
   fail([`missing ${REVIEW_PAGE_PATH}`]);
+}
+if (!existsSync(join(ROOT, REVIEW_DATA_PATH))) {
+  fail([`missing ${REVIEW_DATA_PATH}`]);
 }
 
 const html = readFileSync(reviewPage, 'utf8');

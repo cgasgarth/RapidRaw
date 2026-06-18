@@ -305,6 +305,8 @@
     "check:ci-paths": "bun scripts/ci-classify-macos-smoke.ts --self-test",
     "check:ci-rust-pr-paths": "bun scripts/ci-classify-rust-pr.ts --self-test",
     "check:sidecar-roundtrip": "bun scripts/check-sidecar-roundtrip.ts",
+    "check:goal-review-data": "bun scripts/check-goal-review-data.ts",
+    "check:goal-review-data:update": "bun scripts/check-goal-review-data.ts --update",
     "check:goal-review-page": "bun scripts/check-goal-review-page.ts",
     "check:docs": "bun run docs:check && bun run check:goal-review-page",
     "check:release-metadata": "bun scripts/generate-release-metadata.ts --self-test",
