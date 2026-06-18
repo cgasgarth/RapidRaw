@@ -1,0 +1,99 @@
+#!/usr/bin/env bun
+
+import { z } from 'zod';
+
+import { sampleFilmLookCatalogV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../src/utils/filmLookBrowser.ts';
+
+const genericSafeClaimPattern =
+  /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|identical|ilford|kodak|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;
+
+const filmLookRegistryItemSchema = z
+  .object({
+    adjustmentPatch: z.record(z.string(), z.number()).refine((patch) => Object.keys(patch).length > 0, {
+      message: 'Film look registry entries must apply at least one adjustment.',
+    }),
+    category: z.enum(['black_and_white', 'color_clean', 'color_contrast', 'color_cool', 'color_fade', 'color_warm']),
+    description: z.string().trim().min(1),
+    displayName: z.string().trim().min(1),
+    id: z
+      .string()
+      .trim()
+      .regex(/^film_look\.generic\.[a-z][a-z0-9_]*\.v[0-9]+$/u),
+    provenance: z
+      .object({
+        claimLevel: z.literal('generic_engineered'),
+        legalNamingStatus: z.literal('generic_safe_name'),
+        legalNote: z
+          .string()
+          .trim()
+          .min(1)
+          .regex(/\bnot measured\b/iu),
+        measurementSource: z.literal('generic_engineered_starting_point'),
+      })
+      .strict(),
+    runtimeSupport: z.literal('adjustment_patch_preview_export'),
+    strengthDefault: z.number().int().min(0).max(100),
+  })
+  .strict();
+
+const registrySchema = z.array(filmLookRegistryItemSchema).min(1);
+const registry = registrySchema.parse(FILM_LOOK_BROWSER_ITEMS);
+const catalogLooksById = new Map(sampleFilmLookCatalogV1.looks.map((look) => [look.lookId, look]));
+
+const duplicateValues = (values: Array<string>) => {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return [...counts.entries()].filter(([, count]) => count > 1).map(([value]) => value);
+};
+
+const duplicateIds = duplicateValues(registry.map((look) => look.id));
+if (duplicateIds.length > 0) {
+  throw new Error(`Film look registry has duplicate IDs: ${duplicateIds.join(', ')}`);
+}
+
+const duplicateNames = duplicateValues(registry.map((look) => look.displayName.toLocaleLowerCase('en-US')));
+if (duplicateNames.length > 0) {
+  throw new Error(`Film look registry has duplicate display names: ${duplicateNames.join(', ')}`);
+}
+
+for (const look of registry) {
+  const claimText = [
+    look.id,
+    look.displayName,
+    look.description,
+    look.category,
+    look.provenance.claimLevel,
+    look.provenance.legalNamingStatus,
+    look.provenance.legalNote,
+    look.provenance.measurementSource,
+  ].join(' ');
+
+  if (genericSafeClaimPattern.test(claimText)) {
+    throw new Error(`${look.id}: generic registry entry includes unsafe brand, stock, or exact-emulation claim.`);
+  }
+
+  const catalogLook = catalogLooksById.get(look.id);
+  if (catalogLook === undefined) {
+    throw new Error(`${look.id}: missing matching schema catalog look.`);
+  }
+
+  for (const [field, browserValue, catalogValue] of [
+    ['category', look.category, catalogLook.category],
+    ['description', look.description, catalogLook.description],
+    ['displayName', look.displayName, catalogLook.displayName],
+    ['strengthDefault', String(look.strengthDefault), String(catalogLook.strengthDefault)],
+  ] satisfies Array<[string, string, string]>) {
+    if (browserValue !== catalogValue) {
+      throw new Error(`${look.id}: registry ${field} does not match schema catalog.`);
+    }
+  }
+
+  if (!catalogLook.requiredWarnings.includes('creative_not_exact_emulation')) {
+    throw new Error(`${look.id}: schema catalog must keep creative-not-exact warning.`);
+  }
+}
+
+console.log(`film look registry ok (${registry.length} generic runtime-safe looks)`);
