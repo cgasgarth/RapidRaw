@@ -1954,7 +1954,7 @@ pub fn save_metadata_and_update_thumbnail(
 
     let gpu_context = gpu_processing::get_or_init_gpu_context(&state, &app_handle).ok();
     let app_handle_clone = app_handle.clone();
-    let path_clone = path.clone();
+    let path_clone = path;
 
     add_to_thumbnail_queue(&state, 1, &app_handle);
 
@@ -3176,7 +3176,7 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
     let mut actual_xmp = if xmp_path.exists() {
         Some(xmp_path.clone())
     } else if xmp_path_upper.exists() {
-        Some(xmp_path_upper.clone())
+        Some(xmp_path_upper)
     } else {
         None
     };

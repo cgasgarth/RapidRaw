@@ -140,7 +140,7 @@ pub async fn generate_ai_depth_mask(
                     run_depth_anything_model(warped_image.as_ref(), &models.depth_anything)
                         .map_err(|e| e.to_string())?;
                 let new_cache = CachedDepthMap {
-                    path_hash: path_hash.clone(),
+                    path_hash,
                     depth_image: depth_img,
                     original_size: (warped_image.width(), warped_image.height()),
                 };
@@ -152,7 +152,7 @@ pub async fn generate_ai_depth_mask(
             let depth_img = run_depth_anything_model(warped_image.as_ref(), &models.depth_anything)
                 .map_err(|e| e.to_string())?;
             let new_cache = CachedDepthMap {
-                path_hash: path_hash.clone(),
+                path_hash,
                 depth_image: depth_img,
                 original_size: (warped_image.width(), warped_image.height()),
             };
@@ -228,7 +228,7 @@ pub async fn generate_ai_subject_mask(
                 let mut new_embeddings =
                     generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
                         .map_err(|e| e.to_string())?;
-                new_embeddings.path_hash = path_hash.clone();
+                new_embeddings.path_hash = path_hash;
                 ai_state.embeddings = Some(new_embeddings.clone());
                 new_embeddings
             }
@@ -237,7 +237,7 @@ pub async fn generate_ai_subject_mask(
             let mut new_embeddings =
                 generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
                     .map_err(|e| e.to_string())?;
-            new_embeddings.path_hash = path_hash.clone();
+            new_embeddings.path_hash = path_hash;
             ai_state.embeddings = Some(new_embeddings.clone());
             new_embeddings
         }
@@ -375,7 +375,7 @@ pub async fn precompute_ai_subject_mask(
     let mut new_embeddings = generate_image_embeddings(warped_image.as_ref(), &models.sam_encoder)
         .map_err(|e| e.to_string())?;
 
-    new_embeddings.path_hash = path_hash.clone();
+    new_embeddings.path_hash = path_hash;
     ai_state.embeddings = Some(new_embeddings);
 
     Ok(())

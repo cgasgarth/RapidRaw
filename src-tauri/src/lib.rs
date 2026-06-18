@@ -773,7 +773,7 @@ fn generate_uncropped_preview(
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let context = get_or_init_gpu_context(&state, &app_handle)?;
-    let mut adjustments_clone = js_adjustments.clone();
+    let mut adjustments_clone = js_adjustments;
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let loaded_image = state
@@ -833,7 +833,7 @@ fn generate_uncropped_preview(
             };
             (base, scale)
         } else {
-            (flipped_image.clone(), 1.0)
+            (flipped_image, 1.0)
         };
 
         let (preview_width, preview_height) = processing_base.dimensions();
@@ -905,7 +905,7 @@ fn generate_original_transformed_preview(
         .clone()
         .ok_or("No original image loaded")?;
 
-    let mut adjustments_clone = js_adjustments.clone();
+    let mut adjustments_clone = js_adjustments;
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let mut image_for_preview = loaded_image.image.as_ref().clone();
@@ -2356,7 +2356,7 @@ pub fn run() {
 
             start_preview_worker(app_handle.clone());
             start_analytics_worker(app_handle.clone());
-            file_management::start_thumbnail_workers(app_handle.clone());
+            file_management::start_thumbnail_workers(app_handle);
             jxl_oxide::integration::register_image_decoding_hook();
 
             let window_cfg = app.config().app.windows.first().unwrap().clone();
@@ -2465,7 +2465,7 @@ pub fn run() {
                 });
 
                 let window_for_handler = window.clone();
-                let pending_state_for_handler = pending_window_state.clone();
+                let pending_state_for_handler = pending_window_state;
 
                 window.on_window_event(move |event| match event {
                     tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Moved(_) => {

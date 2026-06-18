@@ -838,7 +838,7 @@ pub fn run_lama_inpainting(
             imageops::resize(&cropped_mask, scaled_w, scaled_h, FilterType::Triangle),
         )
     } else {
-        (crop_w, crop_h, cropped_img.clone(), cropped_mask.clone())
+        (crop_w, crop_h, cropped_img, cropped_mask.clone())
     };
 
     let align = 64u32;
