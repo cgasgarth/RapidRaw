@@ -1,0 +1,68 @@
+{
+  "alignment": {
+    "badBracketWarningPath": "alignment_high_residual",
+    "command": "bun scripts/check-focus-translation-alignment-smoke.ts",
+    "fixtures": [
+      {
+        "fixtureId": "focus.synthetic.three-plane.v1",
+        "maxResidual": 0,
+        "minConfidence": 1
+      },
+      {
+        "fixtureId": "focus.synthetic.translated-three-plane.v1",
+        "maxResidual": 0,
+        "minConfidence": 1
+      }
+    ],
+    "outputHash": "c8a72d53a3557ac07e32340f60bf8cbadcf29d56edbff67b519befb505e43d1d",
+    "skippedScaleVariedFixtures": ["focus.synthetic.breathing-stale-source.v1"]
+  },
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1938,
+  "proofHash": "f700bd95aecd91548ba9a62d57deaecbfd01ff96bb14eb32210cdc1ccd8885e2",
+  "schemaVersion": 1,
+  "sharpness": {
+    "artifactHash": "2c85919f2ea62c139d5cc1a63c06de131546d12cfe39123da7d9002b89aa3cea",
+    "artifactPath": "artifacts/focus-sharpness-map/focus-sharpness-map-report.json",
+    "command": "bun scripts/check-focus-sharpness-map-smoke.ts",
+    "doesNotProve": [
+      "depth_map",
+      "final_blending",
+      "focus_breathing_compensation",
+      "real_raw_quality",
+      "segmentation",
+      "ui_e2e"
+    ],
+    "fixtures": [
+      {
+        "fixtureId": "focus.synthetic.three-plane.v1",
+        "gridHeight": 24,
+        "gridWidth": 32,
+        "minAggregateConfidenceMargin": 0.167223,
+        "minWinnerCellRatio": 0.910714,
+        "transformSourceIndexes": [0, 1, 2],
+        "warningCodes": []
+      },
+      {
+        "fixtureId": "focus.synthetic.translated-three-plane.v1",
+        "gridHeight": 24,
+        "gridWidth": 32,
+        "minAggregateConfidenceMargin": 0.211185,
+        "minWinnerCellRatio": 0.918367,
+        "transformSourceIndexes": [0, 1, 2],
+        "warningCodes": ["alignment_translation_required"]
+      },
+      {
+        "fixtureId": "focus.synthetic.breathing-stale-source.v1",
+        "gridHeight": 26,
+        "gridWidth": 40,
+        "minAggregateConfidenceMargin": 0.203406,
+        "minWinnerCellRatio": 0.904762,
+        "transformSourceIndexes": [0, 1, 2],
+        "warningCodes": ["alignment_translation_required", "focus_breathing_detected"]
+      }
+    ],
+    "mapAlgorithm": "tenengrad-sobel-luma-cell-v1"
+  },
+  "validationStatus": "synthetic_artifact_gate"
+}
