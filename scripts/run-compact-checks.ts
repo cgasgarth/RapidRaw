@@ -69,6 +69,7 @@ const CHECK_GROUPS = {
     'check:noise-separation',
     'check:deltae-fixtures',
     'check:defringe',
+    'check:dust-spot-visualization',
     'check:ai-fallbacks',
     'check:color-abi',
     'check:preview-scopes',

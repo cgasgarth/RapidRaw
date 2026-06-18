@@ -2,6 +2,7 @@ import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles }
 import { type ReactElement, useState } from 'react';
 
 import ColorPanel from '../../components/adjustments/Color';
+import DetailsPanel from '../../components/adjustments/Details';
 import EffectsPanel from '../../components/adjustments/Effects';
 import CommandPaletteModal from '../../components/modals/CommandPaletteModal';
 import FocusStackModal from '../../components/modals/FocusStackModal';
@@ -32,6 +33,7 @@ const visualSmokeComponents = {
   'agent-chat-ui': AgentChatVisualSmoke,
   'color-workflow': ColorWorkflowVisualSmoke,
   'command-palette-workflows': CommandPaletteWorkflowSmoke,
+  'detail-dust-spot': DetailDustSpotVisualSmoke,
   'detail-workspace': DetailWorkspaceVisualSmoke,
   'film-look-browser': FilmLookVisualSmoke,
   'focus-ui': FocusStackVisualSmoke,
@@ -146,6 +148,70 @@ const detailReviewStages = [
   'wavelet_luma_detail',
 ] as const;
 
+function DetailDustSpotVisualSmoke() {
+  const [adjustments, setAdjustments] = useState<Adjustments>(INITIAL_ADJUSTMENTS);
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="detail-dust-spot"
+    >
+      <div className="grid h-screen grid-cols-[420px_1fr] overflow-hidden">
+        <aside
+          className="overflow-y-auto border-r border-white/10 bg-[#15181c] p-4"
+          data-visual-smoke-section="dust-controls"
+        >
+          <DetailsPanel
+            adjustments={adjustments}
+            appSettings={null}
+            setAdjustments={(update) => {
+              setAdjustments((currentAdjustments) =>
+                typeof update === 'function' ? update(currentAdjustments) : { ...currentAdjustments, ...update },
+              );
+            }}
+          />
+        </aside>
+        <section className="bg-[#0f1114] p-8" data-visual-smoke-section="dust-proof">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase text-[#9ba6b2]">{copy.dustSpotVisualization}</p>
+              <h1 className="text-lg font-semibold">{copy.dustOverlayInteractionProof}</h1>
+            </div>
+            <span className="rounded border border-white/10 bg-white/5 px-3 py-1 text-sm">
+              {copy.dustUiOverlayContract}
+            </span>
+          </div>
+          <div
+            className="relative h-[640px] overflow-hidden rounded-md border border-white/10 bg-linear-to-br from-[#39434a] via-[#69675f] to-[#c3a76f]"
+            data-min-radius={String(adjustments.dustSpotMinRadiusPx)}
+            data-overlay-enabled={String(adjustments.dustSpotOverlayEnabled)}
+            data-sensitivity={String(adjustments.dustSpotSensitivity)}
+            data-testid="detail-dust-spot-proof"
+          >
+            {[14, 27, 43, 58, 72, 83].map((left, index) => (
+              <span
+                className={`absolute rounded-full border ${
+                  adjustments.dustSpotOverlayEnabled
+                    ? 'border-red-200 bg-red-500/25 shadow-[0_0_18px_rgba(248,113,113,0.55)]'
+                    : 'border-white/10 bg-white/5'
+                }`}
+                key={left}
+                style={{
+                  height: `${Math.max(8, adjustments.dustSpotMinRadiusPx * 6 + index)}px`,
+                  left: `${left}%`,
+                  top: `${18 + ((index * 11) % 62)}%`,
+                  width: `${Math.max(8, adjustments.dustSpotMinRadiusPx * 6 + index)}px`,
+                }}
+              />
+            ))}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
 const copy = {
   brand: 'RapidRAW',
   harness: 'Visual smoke harness',
@@ -229,6 +295,9 @@ const copy = {
   detailReview: 'Detail Review',
   detailWorkspace: 'Zoom detail workspace',
   detailRuntimeStatus: 'Fixture runtime paths',
+  dustOverlayInteractionProof: 'Overlay interaction proof',
+  dustSpotVisualization: 'Dust Spot Visualization',
+  dustUiOverlayContract: 'UI overlay contract',
   detailZoom200: '200%',
   splitCompare: 'Split compare',
   lumaDetail: 'Luma detail',

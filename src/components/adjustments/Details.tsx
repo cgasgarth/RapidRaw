@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import AdjustmentSlider from './AdjustmentSlider';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, DetailsAdjustment } from '../../utils/adjustments';
+import Slider, { type SliderChangeEvent } from '../ui/Slider';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
 
@@ -85,6 +86,71 @@ export default function DetailsPanel({
           <UiText variant={TextVariants.small} className="mt-2 text-text-secondary">
             {t('adjustments.details.deblurStatus')}
           </UiText>
+        </div>
+      )}
+
+      {!isForMask && (
+        <div className="p-2 bg-bg-tertiary rounded-md">
+          <UiText variant={TextVariants.heading} className="mb-2">
+            {t('adjustments.details.dustSpotVisualization')}
+          </UiText>
+          <Switch
+            checked={adjustments.dustSpotOverlayEnabled}
+            label={t('adjustments.details.showDustOverlay')}
+            onChange={(checked) => {
+              handleBooleanAdjustmentChange(DetailsAdjustment.DustSpotOverlayEnabled, checked);
+            }}
+          />
+          <div className="mt-3 rounded-md border border-border-color bg-bg-primary p-3">
+            <div className="relative h-24 overflow-hidden rounded bg-linear-to-br from-[#20242a] via-[#34313a] to-[#15171b]">
+              {[18, 31, 46, 59, 77].map((left, index) => (
+                <span
+                  aria-hidden="true"
+                  className={`absolute rounded-full border ${
+                    adjustments.dustSpotOverlayEnabled
+                      ? 'border-red-300 bg-red-500/25 shadow-[0_0_12px_rgba(248,113,113,0.45)]'
+                      : 'border-white/10 bg-white/5'
+                  }`}
+                  key={left}
+                  style={{
+                    height: `${Math.max(6, adjustments.dustSpotMinRadiusPx * 4 + index)}px`,
+                    left: `${left}%`,
+                    top: `${16 + ((index * 13) % 58)}%`,
+                    width: `${Math.max(6, adjustments.dustSpotMinRadiusPx * 4 + index)}px`,
+                  }}
+                />
+              ))}
+            </div>
+            <UiText variant={TextVariants.small} className="mt-2 text-text-secondary">
+              {t('adjustments.details.dustOverlayStatus')}
+            </UiText>
+          </div>
+          <Slider
+            label={t('adjustments.details.sensitivity')}
+            max={100}
+            min={0}
+            onChange={(e: SliderChangeEvent) => {
+              handleAdjustmentChange(DetailsAdjustment.DustSpotSensitivity, Number(e.target.value));
+            }}
+            step={1}
+            value={adjustments.dustSpotSensitivity}
+            onDragStateChange={onDragStateChange}
+            disabled={!adjustments.dustSpotOverlayEnabled}
+            fillOrigin="min"
+          />
+          <Slider
+            label={t('adjustments.details.minSpotRadius')}
+            max={12}
+            min={1}
+            onChange={(e: SliderChangeEvent) => {
+              handleAdjustmentChange(DetailsAdjustment.DustSpotMinRadiusPx, Number(e.target.value));
+            }}
+            step={1}
+            value={adjustments.dustSpotMinRadiusPx}
+            onDragStateChange={onDragStateChange}
+            disabled={!adjustments.dustSpotOverlayEnabled}
+            suffix=" px"
+          />
         </div>
       )}
 

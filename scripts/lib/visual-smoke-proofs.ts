@@ -284,6 +284,11 @@ export const detailWorkspaceProofSchema = z.object({
   waveletMode: z.literal('luma_detail'),
   zoom: z.literal('200'),
 });
+export const detailDustSpotProofSchema = z.object({
+  minRadius: z.literal('6'),
+  overlayEnabled: z.literal('true'),
+  sensitivity: z.literal('72'),
+});
 export const commandPaletteWorkflowProofSchema = z.object({
   focusOpen: z.literal('true'),
   hdrOpen: z.literal('true'),
