@@ -239,7 +239,8 @@ const copy = {
   panoramaReview: 'Panorama review',
   panoramaDryRunPreview: 'Dry-run preview',
   panoramaArtifactHandoff: 'Artifact handoff',
-  panoramaDryRunTool: 'panorama.stitch.dry_run_command',
+  panoramaApplyTool: getComputationalMergeAppServerRoutePairSummary('panorama').applyToolName,
+  panoramaDryRunTool: getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName,
   panoramaArtifactPath: '/tmp/panorama.tif',
   panoramaSourceOrder: 'left,center,right,detail,sky',
   superResolutionSmoke: 'Super Resolution Smoke',
@@ -1048,6 +1049,7 @@ function PanoramaVisualSmoke() {
       <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="panorama-modal">
         <div
           className="sr-only"
+          data-apply-command={copy.panoramaApplyTool}
           data-artifact-path={copy.panoramaArtifactPath}
           data-blend-mode={settings.blendMode}
           data-boundary-mode={settings.boundaryMode}
