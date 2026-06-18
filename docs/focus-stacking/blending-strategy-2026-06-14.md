@@ -146,6 +146,10 @@ Visual review:
 - compare winner map to final blend;
 - confirm rejected sources remain visible in provenance.
 
+Issue #1939 adds `bun run check:focus-blend-halo-proof`, which records blend
+output hashes, region MAE, halo risk, and preview/export parity status at
+`docs/validation/focus-blend-halo-proof-2026-06-18.json`.
+
 ## Out Of Scope
 
 This document does not implement blend kernels, GPU execution, UI retouch tools,

@@ -1,0 +1,57 @@
+{
+  "artifactReportHash": "300c6cf481e314024d6f4ee6609237bbc391c0da321bbbe9f51fca7294dc2523",
+  "command": "bun scripts/check-focus-preview-blend-smoke.ts",
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1939,
+  "proofHash": "8471d50bceefbfaef1b3d6e8d81e019089ec38a79eed37c1a69af1b46aca7dee",
+  "schemaVersion": 1,
+  "validationStatus": "synthetic_artifact_gate",
+  "fixtures": [
+    {
+      "blockCodes": [],
+      "fixtureId": "focus.synthetic.three-plane.v1",
+      "haloRiskCellRatio": 0,
+      "maxRegionMeanAbsoluteError": 0.06369,
+      "outputArtifactHash": "16456fd4fdef8d67f5f4a54bd34e171033267c91f2ae308453d2cb6ce5ce727e",
+      "outputDimensions": {
+        "height": 192,
+        "width": 256
+      },
+      "warningCodes": []
+    },
+    {
+      "blockCodes": [],
+      "fixtureId": "focus.synthetic.translated-three-plane.v1",
+      "haloRiskCellRatio": 0,
+      "maxRegionMeanAbsoluteError": 0.068604,
+      "outputArtifactHash": "1071f021c775c5b1f78114f5ce3cb3bacd0899942d2c91bad9bdce02c5fddc14",
+      "outputDimensions": {
+        "height": 192,
+        "width": 256
+      },
+      "warningCodes": ["alignment_translation_required"]
+    },
+    {
+      "blockCodes": ["stale_source_graph_revision"],
+      "fixtureId": "focus.synthetic.breathing-stale-source.v1",
+      "haloRiskCellRatio": 0,
+      "maxRegionMeanAbsoluteError": 0.065128,
+      "outputArtifactHash": "b6cf9905b84e5fc4371577db59109adfa694d19f6339187ab7fac36de59d53f9",
+      "outputDimensions": {
+        "height": 208,
+        "width": 320
+      },
+      "warningCodes": ["alignment_translation_required", "focus_breathing_detected"]
+    }
+  ],
+  "limits": [
+    "depth_map",
+    "final_focus_stack_quality",
+    "focus_breathing_compensation",
+    "gpu_work",
+    "laplacian_pyramid_quality",
+    "real_raw_quality",
+    "ui_e2e"
+  ],
+  "previewExportParity": "same_synthetic_pgm_artifact_for_preview_and_export_gate"
+}
