@@ -20,6 +20,7 @@ type FilmLookAdjustmentKey =
   | 'temperature';
 
 export type FilmLookAdjustmentPatch = Partial<Pick<Adjustments, FilmLookAdjustmentKey>>;
+export type FilmLookRuntimeSupportState = 'adjustment_patch_preview_export';
 
 export interface FilmLookBrowserItem {
   adjustmentPatch: FilmLookAdjustmentPatch;
@@ -28,6 +29,7 @@ export interface FilmLookBrowserItem {
   displayName: string;
   id: string;
   provenance: FilmLookBrowserItemProvenance;
+  runtimeSupport: FilmLookRuntimeSupportState;
   strengthDefault: number;
 }
 
@@ -109,9 +111,14 @@ const GENERIC_FILM_LOOK_PROVENANCE = {
   measurementSource: 'generic_engineered_starting_point',
 } satisfies FilmLookBrowserItemProvenance;
 
-const makeGenericFilmLook = (look: Omit<FilmLookBrowserItem, 'provenance'>): FilmLookBrowserItem => ({
+const GENERIC_FILM_LOOK_RUNTIME_SUPPORT = 'adjustment_patch_preview_export' satisfies FilmLookRuntimeSupportState;
+
+const makeGenericFilmLook = (
+  look: Omit<FilmLookBrowserItem, 'provenance' | 'runtimeSupport'>,
+): FilmLookBrowserItem => ({
   ...look,
   provenance: GENERIC_FILM_LOOK_PROVENANCE,
+  runtimeSupport: GENERIC_FILM_LOOK_RUNTIME_SUPPORT,
 });
 
 export const FILM_LOOK_BROWSER_ITEMS: Array<FilmLookBrowserItem> = [
