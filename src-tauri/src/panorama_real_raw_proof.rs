@@ -4,10 +4,16 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::{SecondsFormat, Utc};
+use image::ImageFormat;
 use nalgebra::Point2;
 use serde::Serialize;
 
-use crate::panorama_stitching::KeyPoint;
+use crate::app_settings::AppSettings;
+use crate::app_state::AppState;
+use crate::panorama_stitching::{
+    KeyPoint, PanoramaRenderRequest, PanoramaRenderResult,
+    render_with_legacy_homography_engine_with_settings,
+};
 use crate::panorama_utils::processing;
 use crate::private_decode_raw_proof::{
     ARTIFACT_ROOT, ComputationalMergePrivateRunReport,
@@ -39,6 +45,8 @@ const ALIGNMENT_NON_CLAIMS: [&str; 5] = [
 ];
 
 const ALIGNMENT_REPORT_FILE: &str = "panorama-overlap-alignment.json";
+const STITCH_REPORT_FILE: &str = "panorama-overlap-stitch-report.json";
+const STITCH_OUTPUT_FILE: &str = "panorama-overlap-merge.tiff";
 const MIN_ALIGNMENT_INLIER_RATIO: f64 = 0.55;
 const MAX_MEAN_REPROJECTION_ERROR_PX: f64 = 5.0;
 
@@ -96,6 +104,25 @@ fn private_alignment_smoke_generates_panorama_real_raw_report_when_enabled() {
         .expect("private panorama real RAW alignment proof runs");
 }
 
+#[test]
+fn private_stitch_artifact_smoke_generates_panorama_real_raw_report_when_enabled() {
+    if std::env::var("RAWENGINE_RUN_PRIVATE_PANORAMA_REAL_RAW_STITCH_PROOF")
+        .ok()
+        .as_deref()
+        != Some("1")
+    {
+        eprintln!("skipping private panorama real RAW stitch artifact smoke");
+        return;
+    }
+
+    let private_root = PathBuf::from(
+        std::env::var("RAWENGINE_PRIVATE_RAW_ROOT")
+            .unwrap_or_else(|_| "/tmp/rawengine-private-root".to_string()),
+    );
+    run_private_stitch_artifact_proof(&private_root)
+        .expect("private panorama real RAW stitch artifact proof runs");
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AlignmentReport {
@@ -103,6 +130,40 @@ struct AlignmentReport {
     graph_revision_hash: String,
     non_claims: Vec<String>,
     pair_reports: Vec<PairAlignmentReport>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StitchReport {
+    boundary_mode: String,
+    connected_source_indices: Vec<usize>,
+    excluded_source_indices: Vec<usize>,
+    exposure_diagnostics: StitchExposureDiagnostics,
+    fixture_id: String,
+    graph_revision_hash: String,
+    non_claims: Vec<String>,
+    output_height: u32,
+    output_width: u32,
+    pairwise_match_count: usize,
+    seam_diagnostics: StitchSeamDiagnostics,
+    stitch_engine: String,
+    warning_count: usize,
+    warnings: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StitchExposureDiagnostics {
+    mode: String,
+    support: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StitchSeamDiagnostics {
+    feather_width_px: u32,
+    mode: String,
+    support: String,
 }
 
 #[derive(Serialize)]
@@ -194,6 +255,149 @@ fn run_private_alignment_proof(private_root: &Path) -> Result<(), String> {
             validation_mode: "public_schema_private_reports".to_string(),
         },
     )
+}
+
+fn run_private_stitch_artifact_proof(private_root: &Path) -> Result<(), String> {
+    let loaded_sources = load_sources(private_root, &CONFIG)?;
+    validate_decoded_sources(&loaded_sources, &CONFIG)?;
+    let source_hashes = source_hashes(private_root, &CONFIG)?;
+    let graph_revision_hash = graph_revision_hash(CONFIG.fixture_id, &source_hashes);
+    let output_dir = private_root.join(ARTIFACT_ROOT);
+    fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
+
+    let alignment_report = build_alignment_report(&loaded_sources, &graph_revision_hash)?;
+    let render_result = render_private_panorama(private_root)?;
+    let stitch_output_path = output_dir.join(STITCH_OUTPUT_FILE);
+    render_result
+        .image
+        .save_with_format(&stitch_output_path, ImageFormat::Tiff)
+        .map_err(|error| error.to_string())?;
+
+    let stitch_report = build_stitch_report(&render_result, &graph_revision_hash);
+    let metrics = [
+        build_metrics(&loaded_sources, CONFIG.metric_source_count),
+        build_alignment_metrics(&alignment_report, loaded_sources.len()),
+        build_stitch_metrics(&render_result, loaded_sources.len()),
+    ]
+    .concat();
+    if !metrics.iter().all(|metric| metric.passed) {
+        return Err("panorama private RAW stitch artifact metrics did not pass".to_string());
+    }
+
+    write_decode_report(
+        &output_dir,
+        &loaded_sources,
+        &source_hashes,
+        &graph_revision_hash,
+    )?;
+    write_json(&output_dir.join(ALIGNMENT_REPORT_FILE), &alignment_report)?;
+    write_json(&output_dir.join(STITCH_REPORT_FILE), &stitch_report)?;
+    write_json(&output_dir.join(CONFIG.quality_file), &metrics)?;
+
+    write_json(
+        &output_dir.join(CONFIG.report_file),
+        &ComputationalMergePrivateRunReportCollection {
+            schema_url:
+                "https://rawengine.dev/schemas/computational-merge-private-run-reports-v1.json"
+                    .to_string(),
+            issue: 1817,
+            reports: vec![ComputationalMergePrivateRunReport {
+                acceptance_status: "private_stitch_artifact_smoke".to_string(),
+                artifacts: vec![
+                    artifact(private_root, "source_raw_sequence_private", CONFIG.source_dir)?,
+                    artifact(
+                        private_root,
+                        "decode_report_private",
+                        &format!("{ARTIFACT_ROOT}/{}", CONFIG.decode_report_file),
+                    )?,
+                    artifact(
+                        private_root,
+                        "alignment_report_private",
+                        &format!("{ARTIFACT_ROOT}/{ALIGNMENT_REPORT_FILE}"),
+                    )?,
+                    artifact(
+                        private_root,
+                        "merge_output_private",
+                        &format!("{ARTIFACT_ROOT}/{STITCH_OUTPUT_FILE}"),
+                    )?,
+                    artifact(
+                        private_root,
+                        "quality_report_private",
+                        &format!("{ARTIFACT_ROOT}/{}", CONFIG.quality_file),
+                    )?,
+                ],
+                feature_family: CONFIG.feature_family.to_string(),
+                fixture_id: CONFIG.fixture_id.to_string(),
+                generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+                graph_revision_hash,
+                implementation_issue: CONFIG.implementation_issue,
+                notes: "Private RAF panorama stitch artifact smoke. This proves production RAW decode plus the legacy RapidRaw homography/seam stitch engine can emit a private panorama artifact with source coverage and diagnostics. It does not claim app-server apply, preview/export parity, or UI review.".to_string(),
+                quality_metrics: metrics,
+                report_id: CONFIG.report_id.to_string(),
+                run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
+                screenshot_artifacts: vec![],
+                source_hashes,
+                ui_issue: CONFIG.ui_issue,
+            }],
+            schema_version: 1,
+            snapshot_date: Utc::now().format("%Y-%m-%d").to_string(),
+            validation_mode: "public_schema_private_reports".to_string(),
+        },
+    )
+}
+
+fn render_private_panorama(private_root: &Path) -> Result<PanoramaRenderResult, String> {
+    let app = tauri::test::mock_builder()
+        .manage(AppState::new())
+        .build(tauri::test::mock_context(tauri::test::noop_assets()))
+        .map_err(|error| error.to_string())?;
+    let image_paths = CONFIG
+        .source_relative_paths
+        .iter()
+        .map(|relative_path| {
+            private_root
+                .join(relative_path)
+                .to_string_lossy()
+                .to_string()
+        })
+        .collect();
+    render_with_legacy_homography_engine_with_settings(
+        PanoramaRenderRequest { image_paths },
+        app.handle().clone(),
+        AppSettings::default(),
+    )
+}
+
+fn build_stitch_report(
+    render_result: &PanoramaRenderResult,
+    graph_revision_hash: &str,
+) -> StitchReport {
+    StitchReport {
+        boundary_mode: "auto_crop".to_string(),
+        connected_source_indices: render_result.metadata.connected_source_indices.clone(),
+        excluded_source_indices: render_result.metadata.excluded_source_indices.clone(),
+        exposure_diagnostics: StitchExposureDiagnostics {
+            mode: "planned_not_applied".to_string(),
+            support: "diagnostic_only_current_engine".to_string(),
+        },
+        fixture_id: CONFIG.fixture_id.to_string(),
+        graph_revision_hash: graph_revision_hash.to_string(),
+        non_claims: ALIGNMENT_NON_CLAIMS
+            .iter()
+            .map(|claim| claim.to_string())
+            .collect(),
+        output_height: render_result.metadata.output_height,
+        output_width: render_result.metadata.output_width,
+        pairwise_match_count: render_result.metadata.pairwise_matches.len(),
+        seam_diagnostics: StitchSeamDiagnostics {
+            feather_width_px: 100,
+            mode: "adaptive_dp_feather_v1".to_string(),
+            support: "implemented_current_engine".to_string(),
+        },
+        stitch_engine: "rapidraw_homography_seam_v0".to_string(),
+        warning_count: render_result.metadata.warnings.len(),
+        warnings: render_result.metadata.warnings.clone(),
+    }
 }
 
 fn write_decode_report(
@@ -402,6 +606,56 @@ fn build_alignment_metrics(report: &AlignmentReport, source_count: usize) -> Vec
             mean_error,
             MAX_MEAN_REPROJECTION_ERROR_PX,
             mean_error <= MAX_MEAN_REPROJECTION_ERROR_PX,
+        ),
+    ]
+}
+
+fn build_stitch_metrics(
+    render_result: &PanoramaRenderResult,
+    source_count: usize,
+) -> Vec<QualityMetric> {
+    let stitched_source_count = render_result.metadata.connected_source_indices.len() as f64;
+    let excluded_source_count = render_result.metadata.excluded_source_indices.len() as f64;
+    let output_pixel_count = (render_result.metadata.output_width as u64
+        * render_result.metadata.output_height as u64) as f64;
+    let pairwise_match_count = render_result.metadata.pairwise_matches.len() as f64;
+    let source_coverage_ratio = if source_count == 0 {
+        0.0
+    } else {
+        stitched_source_count / source_count as f64
+    };
+    let expected_pair_count = source_count.saturating_sub(1) as f64;
+
+    vec![
+        metric(
+            "panoramaStitchedSourceCount",
+            stitched_source_count,
+            source_count as f64,
+            stitched_source_count >= source_count as f64,
+        ),
+        metric(
+            "panoramaExcludedSourceCount",
+            excluded_source_count,
+            0.0,
+            excluded_source_count <= 0.0,
+        ),
+        metric(
+            "panoramaOutputSourceCoverageRatio",
+            source_coverage_ratio,
+            1.0,
+            source_coverage_ratio >= 1.0,
+        ),
+        metric(
+            "panoramaOutputPixelCount",
+            output_pixel_count,
+            1.0,
+            output_pixel_count > 0.0,
+        ),
+        metric(
+            "panoramaPairwiseMatchCount",
+            pairwise_match_count,
+            expected_pair_count,
+            pairwise_match_count >= expected_pair_count,
         ),
     ]
 }

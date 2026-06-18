@@ -76,10 +76,14 @@ for (const report of reportCollection.reports) {
       report.featureFamily === 'super_resolution');
   const alignmentSmoke =
     report.acceptanceStatus === 'private_alignment_smoke' && report.featureFamily === 'panorama_stitch';
+  const stitchArtifactSmoke =
+    report.acceptanceStatus === 'private_stitch_artifact_smoke' && report.featureFamily === 'panorama_stitch';
   if (decodeSmoke) {
     verifyDecodeSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else if (alignmentSmoke) {
     verifyAlignmentSmokeReport(report, proofCase.localSourceRelativePaths.length);
+  } else if (stitchArtifactSmoke) {
+    verifyStitchArtifactSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else {
     for (const artifact of report.artifacts) {
       const manifestArtifact = manifestArtifacts.get(artifact.kind);
@@ -188,7 +192,8 @@ function metricPassesThreshold(name: string, value: number, threshold: number): 
     name === 'previewExportMeanAbsDelta' ||
     name === 'focusTransitionArtifactScore' ||
     name === 'alignmentMeanReprojectionErrorPx' ||
-    name === 'alignmentRejectedPairCount'
+    name === 'alignmentRejectedPairCount' ||
+    name === 'panoramaExcludedSourceCount'
   ) {
     return value <= threshold;
   }
@@ -229,6 +234,7 @@ function verifyDecodeSmokeReport(
 function verifyAlignmentSmokeReport(
   report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
   expectedSourceCount: number,
+  options: { allowMergeOutput?: boolean } = {},
 ): void {
   const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
   for (const requiredKind of [
@@ -241,6 +247,7 @@ function verifyAlignmentSmokeReport(
       failures.push(`${report.fixtureId}: alignment smoke missing ${requiredKind}.`);
   }
   for (const forbiddenKind of ['merge_output_private', 'preview_after_private', 'export_after_private']) {
+    if (forbiddenKind === 'merge_output_private' && options.allowMergeOutput === true) continue;
     if (artifactKinds.has(forbiddenKind)) {
       failures.push(`${report.fixtureId}: alignment smoke must not claim ${forbiddenKind}.`);
     }
@@ -298,6 +305,59 @@ function verifyAlignmentSmokeReport(
     )
   ) {
     failures.push(`${report.fixtureId}: alignment smoke must prove bounded mean reprojection error.`);
+  }
+}
+
+function verifyStitchArtifactSmokeReport(
+  report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
+  expectedSourceCount: number,
+): void {
+  const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
+  for (const requiredKind of [
+    'source_raw_sequence_private',
+    'decode_report_private',
+    'alignment_report_private',
+    'merge_output_private',
+    'quality_report_private',
+  ]) {
+    if (!artifactKinds.has(requiredKind)) {
+      failures.push(`${report.fixtureId}: stitch artifact smoke missing ${requiredKind}.`);
+    }
+  }
+  for (const forbiddenKind of ['preview_after_private', 'export_after_private']) {
+    if (artifactKinds.has(forbiddenKind)) {
+      failures.push(`${report.fixtureId}: stitch artifact smoke must not claim ${forbiddenKind}.`);
+    }
+  }
+
+  verifyAlignmentSmokeReport(report, expectedSourceCount, { allowMergeOutput: true });
+  const expectedPairCount = Math.max(0, expectedSourceCount - 1);
+  const reportMetrics = new Map(report.qualityMetrics.map((metric) => [metric.name, metric]));
+  const stitchedSourceCount = reportMetrics.get('panoramaStitchedSourceCount');
+  const excludedSourceCount = reportMetrics.get('panoramaExcludedSourceCount');
+  const sourceCoverageRatio = reportMetrics.get('panoramaOutputSourceCoverageRatio');
+  const outputPixelCount = reportMetrics.get('panoramaOutputPixelCount');
+  const pairwiseMatchCount = reportMetrics.get('panoramaPairwiseMatchCount');
+
+  if (stitchedSourceCount === undefined || stitchedSourceCount.value < expectedSourceCount) {
+    failures.push(`${report.fixtureId}: stitch artifact smoke must prove all sources stitched.`);
+  }
+  if (excludedSourceCount === undefined || excludedSourceCount.value > 0) {
+    failures.push(`${report.fixtureId}: stitch artifact smoke must prove no excluded sources.`);
+  }
+  if (
+    sourceCoverageRatio === undefined ||
+    !metricPassesThreshold(sourceCoverageRatio.name, sourceCoverageRatio.value, sourceCoverageRatio.threshold)
+  ) {
+    failures.push(`${report.fixtureId}: stitch artifact smoke must prove source coverage ratio meets threshold.`);
+  }
+  if (outputPixelCount === undefined || outputPixelCount.value <= 0) {
+    failures.push(`${report.fixtureId}: stitch artifact smoke must prove nonzero output pixels.`);
+  }
+  if (pairwiseMatchCount === undefined || pairwiseMatchCount.value < expectedPairCount) {
+    failures.push(
+      `${report.fixtureId}: stitch artifact smoke must prove pairwise match count >= ${expectedPairCount}.`,
+    );
   }
 }
 
