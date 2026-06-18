@@ -17,6 +17,7 @@ const publicApiSignatureFiles = [
   'src/schemas/**/*.ts',
   'src/utils/tauriSchemaInvoke.ts',
 ];
+const boundaryElement = (type, pattern) => ({ mode: 'full', pattern, type });
 const reactPlugin = fixupPluginRules(react);
 const reactHooksPlugin = fixupPluginRules(reactHooks);
 const reactRefreshPlugin = fixupPluginRules(reactRefresh.plugin);
@@ -154,22 +155,29 @@ module.exports = [
         version: 'detect',
       },
       'boundaries/elements': [
-        { type: 'entry', pattern: 'src/main.tsx' },
-        { type: 'app', pattern: 'src/App.tsx' },
-        { type: 'views', pattern: 'src/components/views/**' },
-        { type: 'panels', pattern: 'src/components/panel/**' },
-        { type: 'adjustments', pattern: 'src/components/adjustments/**' },
-        { type: 'modals', pattern: 'src/components/modals/**' },
-        { type: 'managers', pattern: 'src/components/managers/**' },
-        { type: 'ui', pattern: 'src/components/ui/**' },
-        { type: 'context', pattern: 'src/context/**' },
-        { type: 'hooks', pattern: 'src/hooks/**' },
-        { type: 'schemas', pattern: 'src/schemas/**' },
-        { type: 'store', pattern: 'src/store/**' },
-        { type: 'types', pattern: 'src/types/**' },
-        { type: 'utils', pattern: 'src/utils/**' },
-        { type: 'i18n', pattern: 'src/i18n/**' },
-        { type: 'window', pattern: 'src/window/**' },
+        boundaryElement('config', '*.config.ts'),
+        boundaryElement('entry', 'src/main.tsx'),
+        boundaryElement('app', 'src/App.tsx'),
+        boundaryElement('validation', 'src/validation/**'),
+        boundaryElement('views', 'src/components/views/**'),
+        boundaryElement('panels', 'src/components/panel/**'),
+        boundaryElement('adjustments', 'src/components/adjustments/**'),
+        boundaryElement('modals', 'src/components/modals/**'),
+        boundaryElement('managers', 'src/components/managers/**'),
+        boundaryElement('ui', 'src/components/ui/**'),
+        boundaryElement('context', 'src/context/**'),
+        boundaryElement('hooks', 'src/hooks/**'),
+        boundaryElement('schemas', 'src/schemas/**'),
+        boundaryElement('store', 'src/store/**'),
+        boundaryElement('types', 'src/types/**'),
+        boundaryElement('declarations', 'src/@types/**'),
+        boundaryElement('utils', 'src/utils/**'),
+        boundaryElement('i18n', 'src/i18n/**'),
+        boundaryElement('window', 'src/window/**'),
+        boundaryElement('scripts', 'scripts/**'),
+        boundaryElement('tests', 'tests/**'),
+        boundaryElement('schema-package-scripts', 'packages/rawengine-schema/scripts/**'),
+        boundaryElement('schema-package', 'packages/rawengine-schema/src/**'),
       ],
     },
     rules: {
@@ -218,7 +226,7 @@ module.exports = [
       'boundaries/entry-point': 'error',
       'boundaries/dependencies': 'error',
       'boundaries/no-unknown': 'off',
-      'boundaries/no-unknown-files': 'off',
+      'boundaries/no-unknown-files': 'error',
       'no-restricted-imports': [
         'error',
         {
