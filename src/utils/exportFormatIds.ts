@@ -27,6 +27,14 @@ export const EXPORT_QUEUE_FILE_FORMAT_IDS = [
   ExportFileFormatId.Cube,
 ] as const;
 
+export const OUTPUT_SHARPENING_FILE_FORMAT_IDS = [
+  ExportFileFormatId.Jpeg,
+  ExportFileFormatId.Png,
+  ExportFileFormatId.Tiff,
+  ExportFileFormatId.Webp,
+  ExportFileFormatId.Jxl,
+] as const;
+
 export const EXPORT_FILE_FORMATS = [
   { extensions: ['jpg', 'jpeg'], id: ExportFileFormatId.Jpeg, name: 'JPEG' },
   { extensions: ['png'], id: ExportFileFormatId.Png, name: 'PNG' },

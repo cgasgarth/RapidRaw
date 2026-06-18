@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { OUTPUT_SHARPENING_FILE_FORMAT_IDS } from '../utils/exportFormatIds';
+
 export const outputSharpeningTargetSchema = z.enum(['screen', 'print', 'custom']);
 
 export const outputSharpeningSettingsSchema = z
@@ -30,7 +32,7 @@ export const outputSharpeningSettingsSchema = z
 
 export const outputSharpeningRecipeSchema = z
   .object({
-    format: z.enum(['jpeg', 'png', 'tiff', 'webp', 'jxl']),
+    format: z.enum(OUTPUT_SHARPENING_FILE_FORMAT_IDS),
     id: z.string().trim().min(1),
     outputSharpening: outputSharpeningSettingsSchema.nullable(),
     resize: z
