@@ -21,6 +21,7 @@ import {
   layerStackExportParityProofSchema,
   layerStackWorkflowProofSchema,
   negativeLabWorkspaceProofDatasetSchema,
+  panoramaReviewWorkspaceProofSchema,
   panoramaUiSettingsProofSchema,
   superResolutionUiSettingsProofSchema,
 } from './lib/visual-smoke-proofs.ts';
@@ -275,6 +276,12 @@ async function prepareScenario(page, mode) {
     panoramaUiSettingsProofSchema.parse(
       await page.getByTestId('panorama-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    panoramaReviewWorkspaceProofSchema.parse(
+      await page.getByTestId('panorama-review-workspace-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    await page.getByTestId('panorama-artifact-handoff').getByText('/tmp/panorama.tif', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     return;
   }
 
