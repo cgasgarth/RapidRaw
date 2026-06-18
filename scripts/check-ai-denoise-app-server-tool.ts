@@ -1,6 +1,12 @@
 #!/usr/bin/env bun
 
 import { AI_APP_SERVER_TOOL_ROUTES } from '../src/utils/aiAppServerToolRoutes.ts';
+import {
+  AiAppServerToolCapability,
+  AiAppServerToolName,
+  AiAppServerToolRouteExecutionMode,
+  AiAppServerToolRouteSourceKind,
+} from '../src/utils/aiAppServerToolRouteIds.ts';
 import { applyLocalAiDenoiseAdapter, buildSyntheticAiDenoiseInput } from '../src/utils/localAiDenoiseAdapter.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../src/utils/rawEngineAppServerHost.ts';
 import {
@@ -16,26 +22,31 @@ import {
 
 const failures: string[] = [];
 const routeByToolName = new Map(
-  AI_APP_SERVER_TOOL_ROUTES.filter((route) => route.sourceKind === 'app_server_tool').map((route) => [
-    route.appServerToolName,
-    route,
-  ]),
+  AI_APP_SERVER_TOOL_ROUTES.filter((route) => route.sourceKind === AiAppServerToolRouteSourceKind.AppServerTool).map(
+    (route) => [route.appServerToolName, route],
+  ),
 );
 const toolByName = new Map(sampleAiAppServerToolManifestV1.tools.map((tool) => [tool.toolName, tool]));
 const routeCatalogToolNames = new Set(buildRawEngineAppServerRouteCatalog().flatMap((route) => route.toolNames));
 
-const dryRunRoute = routeByToolName.get('ai.enhancement.dry_run_command');
-const applyRoute = routeByToolName.get('ai.enhancement.apply_command');
-if (dryRunRoute?.toolCapability !== 'denoise' || dryRunRoute.executionMode !== 'dry_run_command') {
+const dryRunRoute = routeByToolName.get(AiAppServerToolName.EnhancementDryRunCommand);
+const applyRoute = routeByToolName.get(AiAppServerToolName.EnhancementApplyCommand);
+if (
+  dryRunRoute?.toolCapability !== AiAppServerToolCapability.Denoise ||
+  dryRunRoute.executionMode !== AiAppServerToolRouteExecutionMode.DryRunCommand
+) {
   failures.push('Denoise dry-run route must map ai.enhancement.dry_run_command.');
 }
-if (applyRoute?.toolCapability !== 'denoise' || applyRoute.executionMode !== 'apply_dry_run_plan') {
+if (
+  applyRoute?.toolCapability !== AiAppServerToolCapability.Denoise ||
+  applyRoute.executionMode !== AiAppServerToolRouteExecutionMode.ApplyDryRunPlan
+) {
   failures.push('Denoise apply route must map ai.enhancement.apply_command.');
 }
 
-for (const toolName of ['ai.enhancement.dry_run_command', 'ai.enhancement.apply_command']) {
+for (const toolName of [AiAppServerToolName.EnhancementDryRunCommand, AiAppServerToolName.EnhancementApplyCommand]) {
   const tool = toolByName.get(toolName);
-  if (tool === undefined || !tool.allowedCapabilities.includes('denoise')) {
+  if (tool === undefined || !tool.allowedCapabilities.includes(AiAppServerToolCapability.Denoise)) {
     failures.push(`${toolName} must allow denoise capability.`);
   }
 
