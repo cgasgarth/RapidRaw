@@ -129,6 +129,15 @@
           "soft_contrast": "Miękki kontrast"
         }
       },
+      "runtimeStatus": {
+        "apiLabel": "API",
+        "ariaLabel": "Status środowiska edytora kolorów",
+        "gpuLabel": "GPU",
+        "previewExport": "Podgląd/eksport",
+        "proofed": "Zweryfikowane",
+        "typed": "Typowane",
+        "uiLabel": "UI"
+      },
       "saturation": "Nasycenie",
       "temperature": "Temperatura",
       "tint": "Zabarwienie",

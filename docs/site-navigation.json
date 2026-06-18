@@ -127,6 +127,10 @@
           "path": "docs/color/skin-tone-uniformity-2026-06-14.md"
         },
         {
+          "title": "Color editor runtime status UI",
+          "path": "docs/color/color-editor-runtime-status-ui-2026-06-18.md"
+        },
+        {
           "title": "Layer workflow model",
           "path": "docs/layers/layer-workflow-model-2026-06-14.md"
         },
