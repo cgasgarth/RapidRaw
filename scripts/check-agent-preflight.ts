@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { existsSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 
 const EXPECTED_REPO = 'cgasgarth/RapidRaw';
@@ -42,10 +42,6 @@ function pushFailure(failures: Array<string>, message: string): void {
 const failures: Array<string> = [];
 const cwd = resolve('.');
 
-if (basename(cwd) !== 'RapidRaw') {
-  pushFailure(failures, `repo root must be RapidRaw; got ${cwd}`);
-}
-
 if (!existsSync('package.json')) {
   pushFailure(failures, 'package.json missing; run from repo root.');
 } else {
@@ -70,6 +66,13 @@ if (ghRepo.code !== 0) {
   pushFailure(failures, `gh repo view failed: ${ghRepo.stderr || ghRepo.stdout}`);
 } else if (ghRepo.stdout !== EXPECTED_REPO) {
   pushFailure(failures, `gh repo is ${ghRepo.stdout}; run bun run repo:fix-gh-resolution.`);
+}
+
+const topLevel = run(['git', 'rev-parse', '--show-toplevel']);
+if (topLevel.code !== 0) {
+  pushFailure(failures, `git root check failed: ${topLevel.stderr || topLevel.stdout}`);
+} else if (resolve(topLevel.stdout) !== cwd) {
+  pushFailure(failures, `run from repo root; git root is ${topLevel.stdout}, cwd is ${cwd}.`);
 }
 
 for (const [remote, expected] of [
