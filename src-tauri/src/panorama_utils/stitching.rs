@@ -4,7 +4,7 @@ use nalgebra::{Matrix3, Point3};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Runtime};
 
 const FEATHER_WIDTH: f64 = 100.0;
 
@@ -31,10 +31,10 @@ struct SeamInfo {
     dy: f64,
 }
 
-pub fn progressive_seam_stitcher(
+pub fn progressive_seam_stitcher<R: Runtime>(
     images: &[&ImageInfo],
     global_homographies: &HashMap<usize, Matrix3<f64>>,
-    app_handle: AppHandle,
+    app_handle: AppHandle<R>,
 ) -> Rgb32FImage {
     if images.is_empty() {
         return Rgb32FImage::new(0, 0);

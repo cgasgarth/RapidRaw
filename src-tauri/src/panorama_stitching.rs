@@ -1,4 +1,4 @@
-use crate::app_settings::load_settings_or_default;
+use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
 use crate::file_management::parse_virtual_path;
 use base64::{Engine as _, engine::general_purpose};
@@ -14,7 +14,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Runtime};
 use uuid::Uuid;
 
 use crate::formats::is_raw_file;
@@ -460,6 +460,15 @@ fn render_with_legacy_homography_engine(
     request: PanoramaRenderRequest,
     app_handle: AppHandle,
 ) -> Result<PanoramaRenderResult, String> {
+    let settings = load_settings_or_default(&app_handle);
+    render_with_legacy_homography_engine_with_settings(request, app_handle, settings)
+}
+
+pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
+    request: PanoramaRenderRequest,
+    app_handle: AppHandle<R>,
+    settings: AppSettings,
+) -> Result<PanoramaRenderResult, String> {
     let image_paths = request.image_paths;
     if image_paths.len() < 2 {
         return Err("At least two images are required for a panorama.".to_string());
@@ -470,8 +479,6 @@ fn render_with_legacy_homography_engine(
         "Starting panorama stitching process for {} images...",
         image_paths.len()
     );
-
-    let settings = load_settings_or_default(&app_handle);
 
     let start_time = Instant::now();
     let _ = app_handle.emit("panorama-progress", "Loading and preparing images...");
