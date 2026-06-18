@@ -111,6 +111,8 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:film-look-browser-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario film-look-browser'])],
   ['check:focus-ui-api', new Set(['bun scripts/check-focus-ui-api.ts'])],
   ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario focus-ui'])],
+  ['check:hdr-alignment-bracket-proof', new Set(['bun scripts/check-hdr-alignment-bracket-proof.ts'])],
+  ['check:hdr-alignment-bracket-proof:update', new Set(['bun scripts/check-hdr-alignment-bracket-proof.ts --update'])],
   ['check:hdr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario hdr-ui'])],
   ['check:hue-memory-color', new Set(['bun scripts/check-hue-memory-color-gate.ts'])],
   ['check:import-presets', new Set(['bun scripts/check-import-preset-fixtures.ts'])],
