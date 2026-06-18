@@ -22,6 +22,7 @@ import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import { TextColors, TextVariants } from '../../types/typography';
 import { throttle } from '../../utils/timing';
+import { Invokes, type SelectedImage } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Slider from '../ui/Slider';
@@ -29,7 +30,6 @@ import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
 
 import type { Adjustments } from '../../utils/adjustments';
-import type { SelectedImage } from '../ui/AppProperties';
 
 interface GeometryParams {
   distortion: number;
@@ -198,7 +198,7 @@ export default function LensCorrectionModal({
 
   const fetchDistortionParams = async (maker: string, model: string): Promise<LensDistortionParams | null> => {
     try {
-      return await invoke<LensDistortionParams | null>('get_lens_distortion_params', {
+      return await invoke<LensDistortionParams | null>(Invokes.GetLensDistortionParams, {
         maker,
         model,
         focalLength: focalLength,
@@ -244,7 +244,7 @@ export default function LensCorrectionModal({
             vig_k3: currentParams.lensDistortionParams?.vig_k3 ?? 0,
           };
 
-          const result: string = await invoke('preview_geometry_transform', {
+          const result: string = await invoke(Invokes.PreviewGeometryTransform, {
             params: fullParams,
             jsAdjustments: currentAdjustments,
             showLines: false,
@@ -259,7 +259,7 @@ export default function LensCorrectionModal({
 
   useEffect(() => {
     if (isOpen) {
-      void invoke<LensSettings>('load_settings')
+      void invoke<LensSettings>(Invokes.LoadSettings)
         .then((settings) => {
           if (settings.myLenses) {
             setMyLenses(settings.myLenses);
@@ -398,7 +398,10 @@ export default function LensCorrectionModal({
     setDetectionStatus('detecting');
 
     try {
-      const result = await invoke<[string, string] | null>('autodetect_lens', { maker: exifMaker, model: exifModel });
+      const result = await invoke<[string, string] | null>(Invokes.AutodetectLens, {
+        maker: exifMaker,
+        model: exifModel,
+      });
 
       if (result) {
         const [detectedMaker, detectedModel] = result;
@@ -497,7 +500,7 @@ export default function LensCorrectionModal({
         vig_k3: currentAdjustments.lensDistortionParams?.vig_k3 ?? 0,
       };
 
-      void invoke<string>('preview_geometry_transform', {
+      void invoke<string>(Invokes.PreviewGeometryTransform, {
         params: fullParams,
         jsAdjustments: currentAdjustments,
         showLines: false,

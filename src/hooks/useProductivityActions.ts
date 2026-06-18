@@ -116,7 +116,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const handleBatchDenoise = useCallback(
     async (intensity: number, method: 'ai' | 'bm3d', paths: string[]) => {
       try {
-        const savedPaths: string[] = await invoke('batch_denoise_images', { paths, intensity, method });
+        const savedPaths: string[] = await invoke(Invokes.BatchDenoiseImages, { paths, intensity, method });
         await refreshImageList();
         return savedPaths;
       } catch (err) {
