@@ -37,6 +37,12 @@ export interface PanoramaModalState {
   finalImageBase64: string | null;
   isOpen: boolean;
   isProcessing: boolean;
+  lastDryRunCommand: {
+    appServerToolName: string;
+    commandType: 'computationalMerge.createPanorama';
+    dryRun: true;
+    sourceCount: number;
+  } | null;
   progressMessage: string | null;
   settings: PanoramaUiSettings;
   stitchingSourcePaths: Array<string>;
@@ -95,6 +101,7 @@ export const createDefaultPanoramaModalState = (
   finalImageBase64: null,
   isOpen: false,
   isProcessing: false,
+  lastDryRunCommand: null,
   progressMessage: '',
   settings,
   stitchingSourcePaths: [],
