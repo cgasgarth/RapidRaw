@@ -11,6 +11,7 @@ const artifactKindSchema = z.enum([
   'preview_after_private',
   'export_after_private',
   'quality_report_private',
+  'app_server_runtime_report_private',
 ]);
 
 const metricNameSchema = z.enum([
@@ -78,7 +79,7 @@ const runtimeResultIdsSchema = z
 
 const privateRunReportSchema = z
   .object({
-    acceptanceStatus: z.enum(['runtime_apply_capable', 'passed_private_raw_e2e']),
+    acceptanceStatus: z.enum(['private_decode_smoke', 'runtime_apply_capable', 'passed_private_raw_e2e']),
     artifacts: z.array(runArtifactSchema).min(6),
     commandIds: commandIdsSchema,
     featureFamily: featureFamilySchema,

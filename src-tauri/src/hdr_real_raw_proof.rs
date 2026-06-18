@@ -21,6 +21,8 @@ const ARTIFACT_ROOT: &str = "private-artifacts/validation/computational-merge";
 const FIXTURE_ID: &str = "validation.computational-merge.hdr-bracket-alignment.v1";
 const REPORT_ID: &str = "computational-merge-run.hdr-bracket-alignment.v1";
 const SOURCE_DIR: &str = "private-fixtures/hdr/bracket-alignment-v1";
+const RUNTIME_SAMPLE_WIDTH: u32 = 48;
+const RUNTIME_SAMPLE_HEIGHT: u32 = 36;
 const SOURCE_RELATIVE_PATHS: [&str; 3] = [
     "private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw",
     "private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw",
@@ -94,6 +96,27 @@ struct ScreenshotArtifact {
     public_repo_allowed: bool,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HdrPrivateRuntimeSample {
+    fixture_id: String,
+    frames: Vec<HdrPrivateRuntimeSampleFrame>,
+    graph_revision_hash: String,
+    height: u32,
+    width: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HdrPrivateRuntimeSampleFrame {
+    content_hash: String,
+    exposure_ev: f64,
+    graph_revision: String,
+    pixels: Vec<f64>,
+    source_index: usize,
+    source_path: String,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct QualityMetric {
@@ -164,6 +187,7 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
     let preview_path = output_dir.join("hdr-bracket-preview.png");
     let export_path = output_dir.join("hdr-bracket-export.tiff");
     let quality_path = output_dir.join("hdr-bracket-quality.json");
+    let runtime_sample_path = output_dir.join("hdr-bracket-runtime-sample.json");
     let modal_before_path = output_dir.join("hdr-bracket-modal-before.png");
     let modal_after_path = output_dir.join("hdr-bracket-modal-after.png");
     let report_path = output_dir.join("hdr-bracket-private-run-report.json");
@@ -200,8 +224,12 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
         .find(|metric| metric.name == "previewExportMeanAbsDelta")
         .cloned()
         .ok_or_else(|| "missing preview/export parity metric".to_string())?;
+    write_json(
+        &runtime_sample_path,
+        &build_runtime_sample(&loaded_sources, &source_hashes),
+    )?;
     let report = ComputationalMergePrivateRunReport {
-        acceptance_status: "runtime_apply_capable".to_string(),
+        acceptance_status: "private_decode_smoke".to_string(),
         artifacts: vec![
             artifact(private_root, "source_raw_sequence_private", SOURCE_DIR)?,
             artifact(
@@ -238,8 +266,8 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
         fixture_id: FIXTURE_ID.to_string(),
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         graph_revision_hash: graph_revision_hash(&source_hashes),
-        implementation_issue: 1509,
-        notes: "Private RAW HDR bracket decode-to-apply runtime proof; metadata-only report is safe to collect publicly without private pixels.".to_string(),
+        implementation_issue: 2062,
+        notes: "Private RAW HDR bracket direct decode/merge smoke. This metadata-only report is safe to collect publicly without private pixels, but it is not a typed app-server apply proof or passed private RAW E2E acceptance.".to_string(),
         preview_export_parity,
         quality_metrics: metrics,
         report_id: REPORT_ID.to_string(),
@@ -273,6 +301,82 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
     };
     write_json(&report_path, &collection)?;
     Ok(())
+}
+
+fn build_runtime_sample(
+    sources: &[LoadedHdrSource],
+    source_hashes: &[SourceHash],
+) -> HdrPrivateRuntimeSample {
+    let reference_exposure = sources
+        .get(1)
+        .or_else(|| sources.first())
+        .map(exposure_product)
+        .unwrap_or(1.0)
+        .max(1e-9);
+
+    HdrPrivateRuntimeSample {
+        fixture_id: FIXTURE_ID.to_string(),
+        frames: sources
+            .iter()
+            .enumerate()
+            .map(|(source_index, source)| {
+                let source_hash = source_hashes
+                    .get(source_index)
+                    .map(|hash| hash.hash.clone())
+                    .unwrap_or_else(|| sha256_image_pixels(&source.image));
+                HdrPrivateRuntimeSampleFrame {
+                    content_hash: source_hash,
+                    exposure_ev: (exposure_product(source) / reference_exposure)
+                        .max(1e-9)
+                        .log2(),
+                    graph_revision: graph_revision_hash(source_hashes),
+                    pixels: sample_luma_pixels(
+                        &source.image,
+                        RUNTIME_SAMPLE_WIDTH,
+                        RUNTIME_SAMPLE_HEIGHT,
+                    ),
+                    source_index,
+                    source_path: SOURCE_RELATIVE_PATHS[source_index].to_string(),
+                }
+            })
+            .collect(),
+        graph_revision_hash: graph_revision_hash(source_hashes),
+        height: RUNTIME_SAMPLE_HEIGHT,
+        width: RUNTIME_SAMPLE_WIDTH,
+    }
+}
+
+fn exposure_product(source: &LoadedHdrSource) -> f64 {
+    source.exposure.as_secs_f64() * source.iso as f64
+}
+
+fn sample_luma_pixels(image: &DynamicImage, width: u32, height: u32) -> Vec<f64> {
+    let rgb = image.to_rgb8();
+    let source_width = rgb.width().saturating_sub(1).max(1);
+    let source_height = rgb.height().saturating_sub(1).max(1);
+    let target_width = width.saturating_sub(1).max(1);
+    let target_height = height.saturating_sub(1).max(1);
+    let mut pixels = Vec::with_capacity((width * height) as usize);
+
+    for y in 0..height {
+        for x in 0..width {
+            let source_x = x * source_width / target_width;
+            let source_y = y * source_height / target_height;
+            let pixel = rgb.get_pixel(source_x, source_y).0;
+            let luma = (0.2126 * f64::from(pixel[0])
+                + 0.7152 * f64::from(pixel[1])
+                + 0.0722 * f64::from(pixel[2]))
+                / 255.0;
+            pixels.push((luma * 1_000_000.0).round() / 1_000_000.0);
+        }
+    }
+
+    pixels
+}
+
+fn sha256_image_pixels(image: &DynamicImage) -> String {
+    let rgb = image.to_rgb8();
+    format!("sha256:{}", hex_digest(&Sha256::digest(rgb.as_raw())))
 }
 
 fn load_sources(private_root: &Path) -> Result<Vec<LoadedHdrSource>, String> {
