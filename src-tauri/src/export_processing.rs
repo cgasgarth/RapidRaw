@@ -34,6 +34,7 @@ use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 use crate::deblur_render::apply_deblur_stage;
 use crate::denoise_render::apply_denoise_stage;
+use crate::wavelet_render::apply_wavelet_detail_stage;
 use crate::{
     apply_all_transformations, generate_transformed_preview, get_cached_or_generate_mask,
     get_full_image_for_processing, get_or_load_lut, hydrate_adjustments, load_settings_or_default,
@@ -341,11 +342,12 @@ pub(crate) fn process_image_for_export_pipeline(
 
     let denoised_image = apply_denoise_stage(transformed_image.as_ref(), js_adjustments);
     let deblurred_image = apply_deblur_stage(denoised_image.as_ref(), js_adjustments);
+    let wavelet_image = apply_wavelet_detail_stage(deblurred_image.image.as_ref(), js_adjustments);
 
     process_and_get_dynamic_image(
         context,
         state,
-        deblurred_image.image.as_ref(),
+        wavelet_image.as_ref(),
         unique_hash,
         RenderRequest {
             adjustments: all_adjustments,

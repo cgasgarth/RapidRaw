@@ -4,7 +4,7 @@ Issue: #128
 
 ## Goal
 
-Define the first RawEngine detail-by-scale control model tightly enough that the existing Zod recipe, fixture gate, and visual detail workspace can be implemented without inventing UI semantics later. This is a design/control contract only; it does not claim final pixel-quality wavelet rendering.
+Define the first RawEngine detail-by-scale control model tightly enough that the existing Zod recipe, fixture gate, runtime stage, and visual detail workspace can be implemented without inventing UI semantics later. This now has a synthetic runtime proof, but it does not claim final real RAW pixel-quality wavelet rendering.
 
 ## Control Surface
 
@@ -36,7 +36,10 @@ The canonical sidecar/edit-graph payload is `waveletDetailRecipeSchema` in `src/
 - Store a stable recipe id, `schemaVersion: 1`, `colorSpace`, `previewMode`, `edgeThreshold`, `haloSuppression`, and `fine`/`medium`/`coarse` scale objects.
 - Disabled scales must serialize as `enabled: false` and `amount: 0`; radius is still retained for non-destructive re-enable.
 - Preview artifacts use `wavelet_detail.preview.<recipe.id>` ids and include deterministic content hashes.
-- Current preview manifests are explicitly `metadata_manifest_only` and `no_pixel_wavelet_render`; this limitation must stay visible until preview/export pixel parity exists.
+- Current preview manifests are explicitly `metadata_manifest_only` and
+  `no_pixel_wavelet_render`; this limitation applies to the schema preview
+  manifest path, not the separate `check:wavelet-detail-runtime` synthetic
+  runtime proof.
 
 ## UI Placement
 
@@ -48,13 +51,15 @@ The canonical sidecar/edit-graph payload is `waveletDetailRecipeSchema` in `src/
 ## Validation
 
 - `bun run check:wavelet-detail` remains the design contract gate.
+- `bun run check:wavelet-detail-runtime` proves the first synthetic runtime
+  stage mutates pixels deterministically and preserves preview/export parity.
 - Add/keep fixture cases for portrait microtexture, landscape structure, and disabled baseline.
 - Preview/export parity is not proven by #128; it belongs to later runtime/e2e work.
 - A future UI PR must add a visual smoke path that changes all three bands and parses the resulting recipe dataset with Zod.
 
 ## Out Of Scope
 
-- Pixel wavelet rendering quality.
+- Real RAW wavelet rendering quality.
 - GPU/CPU preview-export parity.
 - Real RAW high-ISO detail quality.
 - AI denoise or deblur coupling.

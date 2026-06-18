@@ -42,6 +42,7 @@ mod raw_open_edit_export_proof;
 mod raw_processing;
 mod tagging;
 mod tagging_utils;
+mod wavelet_render;
 mod window_customizer;
 
 use std::collections::{HashMap, hash_map::DefaultHasher};
@@ -485,9 +486,17 @@ fn process_preview_job(
         denoise_render::calculate_denoise_render_hash(new_transform_hash, &adjustments_clone);
     let deblurred_processing_image =
         deblur_render::apply_deblur_stage(denoised_processing_image.as_ref(), &adjustments_clone);
-    let render_input_hash =
+    let deblur_render_hash =
         deblur_render::calculate_deblur_render_hash(denoise_render_hash, &adjustments_clone);
-    let processing_image_ref = deblurred_processing_image.image.as_ref();
+    let wavelet_processing_image = wavelet_render::apply_wavelet_detail_stage(
+        deblurred_processing_image.image.as_ref(),
+        &adjustments_clone,
+    );
+    let render_input_hash = wavelet_render::calculate_wavelet_detail_render_hash(
+        deblur_render_hash,
+        &adjustments_clone,
+    );
+    let processing_image_ref = wavelet_processing_image.as_ref();
 
     let (preview_width, preview_height) = processing_image_ref.dimensions();
 
@@ -1984,10 +1993,12 @@ fn generate_preview_for_path(
         denoise_render::apply_denoise_stage(transformed_image.as_ref(), &js_adjustments);
     let deblurred_image =
         deblur_render::apply_deblur_stage(denoised_image.as_ref(), &js_adjustments);
+    let wavelet_image =
+        wavelet_render::apply_wavelet_detail_stage(deblurred_image.image.as_ref(), &js_adjustments);
     let final_image = process_and_get_dynamic_image(
         &context,
         &state,
-        deblurred_image.image.as_ref(),
+        wavelet_image.as_ref(),
         unique_hash,
         RenderRequest {
             adjustments: all_adjustments,
