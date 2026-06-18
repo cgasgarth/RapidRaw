@@ -1,0 +1,51 @@
+{
+  "cases": [
+    {
+      "featureFamily": "hdr_merge",
+      "fixtureId": "validation.computational-merge.hdr-bracket-alignment.v1",
+      "implementationIssue": 1509,
+      "proofStatus": "manifest_only",
+      "runtimeReportPresent": false,
+      "status": "manifest_only",
+      "uiIssue": 171
+    },
+    {
+      "featureFamily": "panorama_stitch",
+      "fixtureId": "validation.computational-merge.panorama-overlap.v1",
+      "implementationIssue": 1508,
+      "proofStatus": "manifest_only",
+      "runtimeReportPresent": false,
+      "status": "manifest_only",
+      "uiIssue": 1333
+    },
+    {
+      "featureFamily": "focus_stack",
+      "fixtureId": "validation.computational-merge.focus-plane-transition.v1",
+      "implementationIssue": 1507,
+      "proofStatus": "manifest_only",
+      "runtimeReportPresent": false,
+      "status": "manifest_only",
+      "uiIssue": 1334
+    },
+    {
+      "featureFamily": "super_resolution",
+      "fixtureId": "validation.computational-merge.super-resolution-subpixel.v1",
+      "implementationIssue": 1506,
+      "proofStatus": "manifest_only",
+      "runtimeReportPresent": false,
+      "status": "manifest_only",
+      "uiIssue": 1335
+    }
+  ],
+  "checks": [
+    "bun run check:computational-merge-e2e-proof-manifest",
+    "bun run check:computational-merge-private-run-reports"
+  ],
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1809,
+  "privateRunReports": 0,
+  "proofCaseCount": 4,
+  "proofHash": "b147d6376bca6414f1ac4f15cc2417994775c8f7e53a5a23f453b01455d3e2f4",
+  "schemaVersion": 1,
+  "status": "public_contract_private_assets_pending"
+}
