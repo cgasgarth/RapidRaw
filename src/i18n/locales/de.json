@@ -129,6 +129,15 @@
           "soft_contrast": "Weicher Kontrast"
         }
       },
+      "runtimeStatus": {
+        "apiLabel": "API",
+        "ariaLabel": "Laufzeitstatus des Farbeditors",
+        "gpuLabel": "GPU",
+        "previewExport": "Vorschau/Export",
+        "proofed": "Geprüft",
+        "typed": "Typisiert",
+        "uiLabel": "UI"
+      },
       "saturation": "Sättigung",
       "temperature": "Temperatur",
       "tint": "Tonung",
