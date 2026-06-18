@@ -16,15 +16,27 @@ measurement basis, and validation uses without committing any external asset.
 The manifest lives at:
 
 - `fixtures/color/colorchecker-fixture-manifest.json`
+- `docs/validation/public-fixture-manifest.json`
+- `fixtures/detail/private-raw-evidence-ledger.json`
 
 It currently contains:
 
 - `colorchecker.synthetic.acescg-neutral-ramp.v1`
 - `colorchecker.raw.camera-profile-baseline.v1`
+- `real.color.camera-profile-colorchecker.v0`
+- `real.color.camera-profile-skin-chart.v0`
+- `raw-evidence.color.camera-profile-chart.v1`
 
 Both fixtures are metadata-only. Active image assets must add source/provenance,
 hashes, measurement basis, and license evidence before the checker allows
 `active_asset`.
+
+The camera-profile RAW corpus entries are placeholders for issue #1895. They
+reserve public manifest IDs and one private evidence ledger slot, but they do
+not add RAW payloads, commit target reference images, or claim camera-profile
+quality. A later PR must attach approved rights, hashes, capture metadata,
+render artifacts, and DeltaE/skin-tone review evidence before any entry can be
+treated as runtime quality proof.
 
 ## Validation
 
@@ -43,6 +55,8 @@ The checker validates:
 - license/provenance evidence;
 - active assets requiring `sha256:` hashes;
 - metadata-only fixtures not claiming active asset status.
+- camera-profile RAW corpus placeholders staying private or payload-free until
+  rights and reference metadata are approved.
 
 This does not replace DeltaE measurement, ColorChecker patch extraction,
 camera-profile transform tests, preview/export parity, or CPU/GPU parity.
