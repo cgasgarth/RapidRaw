@@ -76,6 +76,7 @@
     "check:layer-overlay-soft-light-runtime": "bun scripts/check-layer-overlay-soft-light-runtime.ts",
     "check:layer-stack-undo-redo": "bun scripts/check-layer-stack-undo-redo.ts",
     "check:layer-opacity-order-runtime": "bun scripts/check-layer-opacity-order-runtime.ts",
+    "check:layer-mask-real-raw-proof": "bun scripts/check-layer-mask-real-raw-proof.ts",
     "check:layer-runtime-parent-status": "bun scripts/check-layer-runtime-parent-status.ts",
     "check:layer-mask-audit": "bun scripts/check-layer-mask-model-audit.ts",
     "check:layer-adjustments": "bun scripts/check-layer-adjustment-operations.ts",

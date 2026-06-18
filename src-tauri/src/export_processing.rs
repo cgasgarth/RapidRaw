@@ -289,7 +289,7 @@ fn apply_output_sharpening(
     DynamicImage::ImageRgb32F(output)
 }
 
-fn prepare_export_masks<'a>(
+pub(crate) fn prepare_export_masks<'a>(
     base_image: &'a DynamicImage,
     js_adjustments: &Value,
     state: &tauri::State<AppState>,

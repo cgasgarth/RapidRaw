@@ -28,6 +28,8 @@ mod formats;
 mod gpu_processing;
 mod image_loader;
 mod image_processing;
+#[cfg(all(test, feature = "tauri-test"))]
+mod layer_mask_real_raw_proof;
 mod lens_correction;
 mod lut_processing;
 mod mask_generation;
