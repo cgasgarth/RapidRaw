@@ -14,15 +14,15 @@ await runComputationalPrivateProof({
       '--no-default-features',
       '--features',
       'required-ci,tauri-test',
-      'sr_real_raw_proof::private_decode_smoke_generates_sr_real_raw_report_when_enabled',
+      'sr_real_raw_proof::private_reconstruction_artifact_smoke_generates_sr_real_raw_report_when_enabled',
       '--',
       '--nocapture',
     ],
     cwd: 'src-tauri',
     env: {
-      RAWENGINE_RUN_PRIVATE_SR_REAL_RAW_DECODE_PROOF: '1',
+      RAWENGINE_RUN_PRIVATE_SR_REAL_RAW_ARTIFACT_PROOF: '1',
     },
-    label: 'SR real RAW Rust decode proof',
+    label: 'SR real RAW Rust artifact proof',
   },
   proofChecks: [
     ['bun', 'run', 'check:sr-runtime-plan-smoke'],
