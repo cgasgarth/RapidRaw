@@ -138,6 +138,11 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set(['bun scripts/check-panorama-seam-exposure-proof.ts --update']),
   ],
   ['check:panorama-projection-crop', new Set(['bun scripts/check-panorama-projection-crop.ts'])],
+  ['check:panorama-projection-memory-proof', new Set(['bun scripts/check-panorama-projection-memory-proof.ts'])],
+  [
+    'check:panorama-projection-memory-proof:update',
+    new Set(['bun scripts/check-panorama-projection-memory-proof.ts --update']),
+  ],
   ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario panorama-ui'])],
   ['check:sr-alignment-detail-proof', new Set(['bun scripts/check-super-resolution-alignment-detail-proof.ts'])],
   [

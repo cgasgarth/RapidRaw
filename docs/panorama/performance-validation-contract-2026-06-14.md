@@ -75,3 +75,8 @@ tiling, or output generation:
 This is not a full runtime benchmark. It is the executable metadata contract
 that required PR CI can run cheaply today, while future runtime PRs add observed
 measurements and optional/nightly image assets.
+
+Issue #1930 adds `bun run check:panorama-projection-memory-proof`, which records
+projection output, crop/full-canvas pixels, PR fixture budget hashes, and a
+proxy memory estimate at
+`docs/validation/panorama-projection-memory-proof-2026-06-18.json`.
