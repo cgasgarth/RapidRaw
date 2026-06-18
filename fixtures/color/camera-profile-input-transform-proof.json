@@ -1,0 +1,63 @@
+{
+  "$schema": "https://rawengine.dev/schemas/camera-profile-input-transform-proof-v1.json",
+  "cases": [
+    {
+      "id": "camera-profile.input-transform.sony-ilce-7m4-chart-patch.v1",
+      "metadata": {
+        "manufacturer": "Sony",
+        "model": "ILCE-7M4",
+        "rawExtension": "ARW"
+      },
+      "expectedProfileId": "camera.sony-ilce-7m4.generic-arw-v1",
+      "expectedInputTransform": "libraw_camera_matrix",
+      "cameraToWorkingMatrix": [
+        [1.12, -0.04, -0.02],
+        [-0.03, 1.05, -0.01],
+        [0.01, -0.08, 1.13]
+      ],
+      "inputCameraRgb": {
+        "red": 0.25,
+        "green": 0.5,
+        "blue": 0.18
+      },
+      "expectedWorkingRgb": {
+        "red": 0.2564,
+        "green": 0.5157,
+        "blue": 0.1659
+      },
+      "runtimeStage": "camera_profile_to_working_space",
+      "tolerance": 1e-12
+    },
+    {
+      "id": "camera-profile.input-transform.embedded-dng-neutral-patch.v1",
+      "metadata": {
+        "manufacturer": "Unknown",
+        "model": "DNG Camera",
+        "rawExtension": "DNG"
+      },
+      "expectedProfileId": "fallback.dng-embedded-matrix",
+      "expectedInputTransform": "embedded_dng_color_matrix",
+      "expectedWarning": "camera_profile_embedded_fallback",
+      "cameraToWorkingMatrix": [
+        [1, 0.02, -0.01],
+        [0.01, 1, 0.01],
+        [-0.01, 0.03, 1]
+      ],
+      "inputCameraRgb": {
+        "red": 0.38,
+        "green": 0.38,
+        "blue": 0.38
+      },
+      "expectedWorkingRgb": {
+        "red": 0.3838,
+        "green": 0.3876,
+        "blue": 0.3876
+      },
+      "runtimeStage": "camera_profile_to_working_space",
+      "tolerance": 1e-12
+    }
+  ],
+  "issue": 1261,
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-18"
+}

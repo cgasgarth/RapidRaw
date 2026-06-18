@@ -69,7 +69,8 @@ or color-science math.
 
 ## Required Follow-Up Order
 
-1. Convert camera profile lookup into a real runtime matrix/profile stage.
+1. Extend the initial camera profile matrix-transform proof into real RAW
+   decoder/profile integration and preview/export parity.
 2. Promote chromatic adaptation from schema/fixture plan to runtime math.
 3. Add CPU reference color pipeline for representative patches.
 4. Add preview/export parity fixtures for full rendered recipes.

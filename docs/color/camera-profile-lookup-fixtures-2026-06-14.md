@@ -11,6 +11,16 @@ The fixture covers:
 - DNG embedded-matrix fallback;
 - generic raw-decoder fallback with a stable warning.
 
-This is schema and lookup-policy validation only. It does not apply camera
-profiles to rendered pixels yet, and it does not replace ColorChecker,
-DeltaE, or CPU/GPU parity tests.
+## Runtime Proof Slice
+
+Issue #1261 adds `bun run check:camera-profile-input-transform`, which validates
+one executable camera-profile/input-transform slice with synthetic chart pixels.
+The gate looks up the selected profile, applies the declared 3x3
+camera-to-working matrix, checks output RGB deltas, and writes the artifact
+report:
+
+`docs/validation/camera-profile-input-transform-proof-2026-06-18.json`
+
+This is a headless transform proof, not a full RAW decoder or preview/export
+parity claim. Real camera chart captures, measured profile quality, and full
+render-path parity remain follow-up work.
