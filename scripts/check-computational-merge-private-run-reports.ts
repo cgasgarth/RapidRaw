@@ -71,7 +71,9 @@ for (const report of reportCollection.reports) {
   const manifestArtifacts = new Map(proofCase.artifacts.map((artifact) => [artifact.kind, artifact]));
   const decodeSmoke =
     report.acceptanceStatus === 'private_decode_smoke' &&
-    (report.featureFamily === 'panorama_stitch' || report.featureFamily === 'focus_stack');
+    (report.featureFamily === 'panorama_stitch' ||
+      report.featureFamily === 'focus_stack' ||
+      report.featureFamily === 'super_resolution');
   if (decodeSmoke) {
     verifyDecodeSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else {
