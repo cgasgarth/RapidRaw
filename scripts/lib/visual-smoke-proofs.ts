@@ -232,6 +232,22 @@ export const commandPaletteWorkflowProofSchema = z.object({
 export const agentChatProofDatasetSchema = z.object({
   agentRuntimeStatus: z.literal('ui_only_demo'),
 });
+export const agentDryRunReviewProofDatasetSchema = z.object({
+  actionCount: z.literal('3'),
+  affectedTargetCount: z.literal('3'),
+  approvalStates: z.string().superRefine((states, context) => {
+    for (const expectedState of ['disabled', 'rejected', 'unavailable']) {
+      if (!states.split(',').includes(expectedState)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Missing dry-run review state ${expectedState}.`,
+        });
+      }
+    }
+  }),
+  parameterDiffCount: z.literal('3'),
+  warningCount: z.literal('2'),
+});
 export const negativeLabWorkspaceProofDatasetSchema = z.object({
   activeStage: z.enum(['colorInversion', 'export', 'inspection']),
   exportReady: z.enum(['false', 'true']),

@@ -430,6 +430,12 @@
           "read": "Read"
         },
         "noAppliedEdits": "No edits applied",
+        "review": {
+          "dryRun": "Dry-run",
+          "parameterDiffs": "Parameter diffs",
+          "title": "Dry-run review",
+          "uiOnly": "Approval controls are visible for review only; apply stays disabled until runtime replay proof exists."
+        },
         "title": "Expert Agent",
         "transcript": "Tool-call transcript",
         "uiOnly": "UI-only"

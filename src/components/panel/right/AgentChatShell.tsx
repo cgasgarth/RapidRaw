@@ -1,7 +1,8 @@
-import { AlertTriangle, CheckCircle2, CircleDashed, Eye, RotateCcw, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Eye, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type {
+  AgentChatDryRunReview,
   AgentChatMessage,
   AgentChatToolCall,
   AgentChatTranscript,
@@ -29,6 +30,13 @@ const statusIcons = {
   warning: AlertTriangle,
 } satisfies Record<AgentChatToolCall['status'], typeof AlertTriangle>;
 
+const reviewActionStyles = {
+  available: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
+  disabled: 'border-white/10 bg-white/5 text-text-secondary',
+  rejected: 'border-red-500/30 bg-red-500/10 text-red-100',
+  unavailable: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
+} satisfies Record<AgentChatDryRunReview['actions'][number]['state'], string>;
+
 function MessageBubble({ message }: { message: AgentChatMessage }) {
   const isUser = message.role === 'user';
 
@@ -47,6 +55,86 @@ function MessageBubble({ message }: { message: AgentChatMessage }) {
           <span>{message.timestamp}</span>
         </div>
         <p className="text-xs leading-5 text-text-primary">{message.body}</p>
+      </div>
+    </div>
+  );
+}
+
+function DryRunReviewPanel({ review }: { review: AgentChatDryRunReview }) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
+      data-action-count={review.actions.length}
+      data-affected-target-count={review.affectedTargets.length}
+      data-approval-states={review.actions.map((action) => action.state).join(',')}
+      data-parameter-diff-count={review.parameterDiffs.length}
+      data-testid="agent-dry-run-review"
+      data-warning-count={review.warnings.length}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+            <CheckCircle2 size={15} />
+            <span>{t('editor.ai.agent.review.title')}</span>
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">{t('editor.ai.agent.review.uiOnly')}</p>
+        </div>
+        <span className="shrink-0 rounded border border-sky-500/25 bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-100">
+          {t('editor.ai.agent.review.dryRun')}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2" data-testid="agent-approval-states">
+        {review.actions.map((action) => (
+          <button
+            className={`rounded-md border px-2 py-2 text-left text-[11px] ${reviewActionStyles[action.state]}`}
+            data-testid={`agent-approval-action-${action.id}`}
+            disabled
+            key={action.id}
+            type="button"
+          >
+            <span className="block font-semibold text-text-primary">{action.label}</span>
+            <span className="mt-1 block uppercase tracking-normal">{action.state}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-1" data-testid="agent-parameter-diffs">
+        <div className="text-[11px] font-semibold uppercase text-text-secondary">
+          {t('editor.ai.agent.review.parameterDiffs')}
+        </div>
+        {review.parameterDiffs.map((diff) => (
+          <div
+            className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded border border-white/10 bg-black/15 px-2 py-1.5 text-[11px]"
+            key={diff.id}
+          >
+            <span className="text-text-primary">{diff.label}</span>
+            <span className="font-mono text-text-secondary">{diff.before}</span>
+            <span className="font-mono text-sky-100">{diff.after}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2" data-testid="agent-affected-targets">
+        {review.affectedTargets.map((target) => (
+          <div className="rounded border border-white/10 bg-black/15 p-2" key={target.id}>
+            <div className="text-[10px] uppercase text-text-secondary">{target.label}</div>
+            <div className="mt-1 truncate text-[11px] text-text-primary">{target.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-1" data-testid="agent-review-warnings">
+        {review.warnings.map((warning) => (
+          <div
+            className="rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-4 text-amber-100"
+            key={warning}
+          >
+            {warning}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -144,22 +232,23 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
         ))}
       </div>
 
+      {transcript.dryRunReview ? <DryRunReviewPanel review={transcript.dryRunReview} /> : null}
+
       <div className="grid grid-cols-2 gap-2" data-testid="agent-chat-actions">
-        <button className="flex items-center justify-center gap-2 rounded-md bg-primary px-2 py-2 text-xs font-semibold text-black">
+        <button
+          className="flex items-center justify-center gap-2 rounded-md bg-primary/40 px-2 py-2 text-xs font-semibold text-black/60"
+          disabled
+          type="button"
+        >
           <CheckCircle2 size={14} />
           {t('editor.ai.agent.actions.approveApply')}
         </button>
-        <button className="flex items-center justify-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-2 text-xs text-text-primary">
+        <button
+          className="flex items-center justify-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-2 text-xs text-text-primary"
+          type="button"
+        >
           <Eye size={14} />
           {t('editor.ai.agent.actions.inspectDiff')}
-        </button>
-        <button className="flex items-center justify-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-2 text-xs text-text-primary">
-          <RotateCcw size={14} />
-          {t('editor.ai.agent.actions.revert')}
-        </button>
-        <button className="flex items-center justify-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-2 text-xs text-text-primary">
-          <RotateCcw size={14} />
-          {t('editor.ai.agent.actions.exportAudit')}
         </button>
       </div>
     </section>
