@@ -32,6 +32,13 @@ const aiToolCapabilities = new Map(
   sampleAiAppServerToolManifestV1.tools.map((tool) => [tool.toolName, new Set(tool.allowedCapabilities)]),
 );
 const failures = [];
+const runtimeCheckScripts = [
+  'check:ai-mask-capabilities',
+  'check:ai-people-masks',
+  'check:ai-people-apply-plan',
+  'check:ai-denoise-app-server-tool',
+  'check:ai-denoise-runtime-apply',
+];
 
 const toolCapabilityByAiMaskCapability = new Map([
   ['depth', 'depth_mask'],
@@ -181,6 +188,10 @@ for (const capability of AI_MASK_CAPABILITY_AUDIT) {
   }
 }
 
+for (const runtimeCheckScript of runtimeCheckScripts) {
+  runPackageScript(runtimeCheckScript);
+}
+
 if (failures.length > 0) {
   console.error('AI app-server route validation failed:');
   for (const failure of failures) {
@@ -190,3 +201,20 @@ if (failures.length > 0) {
 }
 
 console.log('ai app-server routes ok');
+
+function runPackageScript(scriptName: string): void {
+  const result = Bun.spawnSync(['bun', 'run', scriptName], {
+    stderr: 'pipe',
+    stdout: 'pipe',
+  });
+
+  if (result.exitCode === 0) return;
+
+  const output = [new TextDecoder().decode(result.stdout), new TextDecoder().decode(result.stderr)]
+    .join('\n')
+    .split('\n')
+    .filter(Boolean)
+    .slice(-20)
+    .join('\n');
+  failures.push(`${scriptName} failed:\n${output}`);
+}
