@@ -3,16 +3,24 @@ import { useCallback } from 'react';
 
 import { Invokes } from '../components/ui/AppProperties';
 import { useUIStore } from '../store/useUIStore';
+import { getComputationalMergeAppServerRoutePairSummary } from '../utils/computationalMergeAppServerRoutePairs';
 
 export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const setUI = useUIStore((state) => state.setUI);
 
   const handleStartPanorama = useCallback(
     (paths: string[]) => {
+      const dryRunCommand = {
+        appServerToolName: getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName,
+        commandType: 'computationalMerge.createPanorama' as const,
+        dryRun: true as const,
+        sourceCount: paths.length,
+      };
       setUI((state) => ({
         panoramaModalState: {
           ...state.panoramaModalState,
           isProcessing: true,
+          lastDryRunCommand: dryRunCommand,
           error: null,
           finalImageBase64: null,
           progressMessage: 'Starting panorama process...',
