@@ -15,7 +15,22 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Pull Requests
 
-- Up to 3 open PRs at a time.
+- Max two active open PRs total.
+- Before opening a PR, run `bun run check:agent-pr-queue`.
+- Every open PR must have a disposition: merge, fix, close, or explicitly
+  preserve as deferred.
+- Do not leave PRs open for hours without checking status and taking the next
+  action.
+- Do not rebase or force-push a healthy PR that is only waiting on required
+  checks unless it is behind/conflicting or branch protection requires it.
+
+## Startup Preflight
+
+- Before implementation in a new turn or worktree, run
+  `bun run check:agent-preflight`.
+- The preflight must verify repo root, deps/tools, GitHub repo resolution,
+  remotes, branch/worktree state, and current open PR count.
+- If preflight fails, fix that before feature work.
 
 ## GitHub Issues
 
@@ -101,6 +116,14 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   `as unknown as`.
 - Use Zod for TypeScript-facing runtime schemas and structured config validation.
 - Run focused local validation before opening PRs and record evidence in the PR.
+- Before push or PR creation, run `bun run check:current-pr-local` or the same
+  standard local PR lane manually:
+  touched-file format/lint where applicable; typecheck/schema checks when
+  TypeScript or schema files changed; i18n check/lint when UI strings changed;
+  focused feature scripts; bundle budget when frontend bundle-impacting code
+  changed.
+- Do not wait for CI to discover basic formatting, lint, i18n, missing
+  dependency, or bundle-budget failures.
 - Do not treat narrow checks as proof of broad behavior. Match validation scope
   to the requirement being claimed.
 - Treat plan-only, schema-only, API-only, dry-run-only, UI-only, and runtime
@@ -137,6 +160,13 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Resource And Tooling Discipline
 
+- Keep searches repo-scoped by default.
+- Exclude `node_modules`, `dist`, `target`, `src-tauri/target`, plugin caches,
+  and `~/.codex` unless explicitly needed.
+- Prefer `rg -l`, `rg --count`, `jq` summaries, bounded `sed`/`head`/`tail`,
+  and compact scripts.
+- Do not dump full CI logs, full JSON, broad file lists, or unchanged green
+  status.
 - Resource cleanup concerns are primarily about RAM pressure, not disk space.
   Do not delete `node_modules`, build outputs, or target directories just for
   disk cleanup.
