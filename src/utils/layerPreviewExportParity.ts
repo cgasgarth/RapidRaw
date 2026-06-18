@@ -115,3 +115,4 @@ export function renderLayerBlendStack(input: LayerBlendStackInput): LayerBlendSt
 
 export const renderLayerPreviewStack = renderLayerBlendStack;
 export const renderLayerExportStack = renderLayerBlendStack;
+export const renderLayerHeadlessStack = renderLayerBlendStack;
