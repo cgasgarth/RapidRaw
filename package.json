@@ -227,6 +227,7 @@
     "check:panorama-parity": "bun scripts/check-panorama-synthetic-parity.ts",
     "check:panorama-app-server-runtime": "bun scripts/check-panorama-app-server-runtime.ts",
     "check:panorama-runtime-plan-smoke": "bun scripts/check-panorama-runtime-plan-smoke.ts",
+    "check:panorama-ui-action-command": "bun scripts/check-panorama-ui-action-command.ts",
     "check:panorama-ui-api": "bun scripts/check-panorama-ui-api.ts",
     "check:panorama-ui-runtime-bridge": "bun scripts/check-panorama-ui-runtime-bridge.ts",
     "check:panorama-ui": "bun scripts/check-panorama-ui.ts",
