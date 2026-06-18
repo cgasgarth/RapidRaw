@@ -139,9 +139,9 @@
       "fixtureId": "real.detail.high-iso-skin-shadow.v0",
       "class": "public-small",
       "status": "planned",
-      "sourceUrl": null,
+      "sourceUrl": "https://discuss.pixls.us/t/high-iso-noise-help/16177",
       "generator": null,
-      "sourceLicense": "planned permissive or project-owned source",
+      "sourceLicense": "Creative Commons Attribution-ShareAlike, source page states file license",
       "redistributionAllowed": false,
       "publicCiAllowed": false,
       "privateCiOnly": true,
@@ -156,10 +156,10 @@
       "cameraOrScanner": null,
       "captureMethod": "single real high-ISO photograph",
       "validationPurpose": "future skin tone, shadow chroma noise, and detail preservation review",
-      "expectedWarnings": [],
+      "expectedWarnings": ["source_candidate_only", "hash_size_rights_review_required", "no_committed_payload"],
       "reviewer": "RawEngine maintainers",
-      "reviewDate": "2026-06-14",
-      "notes": "Placeholder manifest entry only; no fixture payload is added by this PR. Public CI requires explicit redistributable rights before activation."
+      "reviewDate": "2026-06-18",
+      "notes": "Candidate high-ISO ARW source for #1267. The Pixls Play Raw thread links _DSC1373.ARW and states it is Creative Commons Attribution-ShareAlike; activation still requires exact asset URL, hash, size, attribution text, derivative-output policy, and reviewer sign-off. No fixture payload is added by this PR."
     },
     {
       "fixtureId": "synthetic.sr.slanted-edge-mtf.v0",
