@@ -4,6 +4,7 @@ import { runComputationalPrivateProof } from './lib/computational-private-proof-
 
 await runComputationalPrivateProof({
   featureLabel: 'focus',
+  fixtureId: 'validation.computational-merge.focus-plane-transition.v1',
   privateStep: {
     command: [
       'bun',

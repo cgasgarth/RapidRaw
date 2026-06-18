@@ -15,6 +15,7 @@ const argsSchema = z
 
 export interface ComputationalPrivateProofRunnerConfig {
   featureLabel: string;
+  fixtureId: string;
   proofChecks: Array<Array<string>>;
   privateStep: {
     command: Array<string>;
@@ -79,6 +80,8 @@ export async function runComputationalPrivateProof(config: ComputationalPrivateP
     command: [
       'bun',
       'scripts/check-computational-merge-private-run-reports.ts',
+      '--fixture-id',
+      config.fixtureId,
       ...(args.outputPath === undefined ? [] : ['--input', args.outputPath]),
       ...(args.requireAssets ? ['--require-assets'] : []),
     ],

@@ -4,6 +4,7 @@ import { runComputationalPrivateProof } from './lib/computational-private-proof-
 
 await runComputationalPrivateProof({
   featureLabel: 'SR',
+  fixtureId: 'validation.computational-merge.super-resolution-subpixel.v1',
   privateStep: {
     command: [
       'bun',

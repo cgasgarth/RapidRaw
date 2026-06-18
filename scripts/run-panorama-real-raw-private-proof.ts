@@ -4,6 +4,7 @@ import { runComputationalPrivateProof } from './lib/computational-private-proof-
 
 await runComputationalPrivateProof({
   featureLabel: 'panorama',
+  fixtureId: 'validation.computational-merge.panorama-overlap.v1',
   privateStep: {
     command: [
       'bun',

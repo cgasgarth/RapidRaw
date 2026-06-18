@@ -9,6 +9,7 @@ import { parseComputationalMergePrivateRunReportCollection } from '../src/schema
 
 const requireAssets = process.argv.includes('--require-assets');
 const inputPath = valueAfter('--input') ?? 'fixtures/validation/computational-merge-private-run-reports.json';
+const fixtureId = valueAfter('--fixture-id');
 const root = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 const failures: string[] = [];
 
@@ -25,8 +26,18 @@ const reportCollection = parseComputationalMergePrivateRunReportCollection(
 
 const proofCasesByFixtureId = new Map(manifest.proofCases.map((proofCase) => [proofCase.fixtureId, proofCase]));
 const reportsByFixtureId = new Map(reportCollection.reports.map((report) => [report.fixtureId, report]));
+const selectedProofCases =
+  fixtureId === undefined
+    ? manifest.proofCases
+    : manifest.proofCases.filter((proofCase) => proofCase.fixtureId === fixtureId);
+
+if (fixtureId !== undefined && selectedProofCases.length === 0) {
+  failures.push(`${fixtureId}: unknown computational merge proof fixture.`);
+}
 
 for (const report of reportCollection.reports) {
+  if (fixtureId !== undefined && report.fixtureId !== fixtureId) continue;
+
   const proofCase = proofCasesByFixtureId.get(report.fixtureId);
   if (proofCase === undefined) {
     failures.push(`${report.fixtureId}: private run report has no manifest proof case.`);
@@ -96,7 +107,7 @@ for (const report of reportCollection.reports) {
   }
 }
 
-for (const proofCase of manifest.proofCases) {
+for (const proofCase of selectedProofCases) {
   const report = reportsByFixtureId.get(proofCase.fixtureId);
 
   if (requireAssets && report === undefined) {
