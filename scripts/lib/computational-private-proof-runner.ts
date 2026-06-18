@@ -18,6 +18,7 @@ const argsSchema = z
 export interface ComputationalPrivateProofRunnerConfig {
   featureLabel: string;
   fixtureId: string;
+  postPrivateChecks?: Array<Array<string>>;
   proofChecks: Array<Array<string>>;
   privateStep: {
     command: Array<string>;
@@ -76,6 +77,10 @@ export async function runComputationalPrivateProof(config: ComputationalPrivateP
         ...config.privateStep.env,
       },
     });
+
+    for (const check of config.postPrivateChecks ?? []) {
+      await runCompact(check.join(' '), { command: check, env: { RAWENGINE_PRIVATE_RAW_ROOT: privateRoot } });
+    }
 
     await runCompact('computational merge private report collection', {
       command: [

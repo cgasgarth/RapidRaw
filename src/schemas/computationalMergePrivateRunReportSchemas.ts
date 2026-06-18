@@ -11,6 +11,7 @@ const artifactKindSchema = z.enum([
   'preview_after_private',
   'export_after_private',
   'quality_report_private',
+  'app_server_runtime_report_private',
 ]);
 
 const metricNameSchema = z.enum([
