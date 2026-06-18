@@ -92,6 +92,7 @@
     "check:denoise-preview-export-parity": "bun scripts/check-denoise-workflow-smoke.ts",
     "check:denoise-workflow-smoke": "bun scripts/check-denoise-workflow-smoke.ts",
     "check:denoise-ui-api": "bun scripts/check-denoise-ui-api.ts",
+    "check:ai-denoise-runtime-apply": "bun scripts/check-ai-denoise-runtime-apply.ts",
     "check:denoise-preview-runtime": "bun scripts/run-compact-command.ts --label denoise-preview-runtime --cwd src-tauri -- cargo test --quiet denoise_render --no-default-features --features required-ci",
     "check:export-recipes-ui": "bun scripts/check-export-recipes-ui.ts",
     "check:detail-preview-export-parity": "bun scripts/check-detail-preview-export-parity.ts",

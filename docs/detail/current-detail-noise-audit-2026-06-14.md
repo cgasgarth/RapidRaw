@@ -37,9 +37,11 @@ This audit records the current RapidRAW detail, sharpening, noise, dehaze, and c
 | #132 `detail(defringe): improve defringe controls`            | Add hue/range defringe controls and purple/green fringe fixtures.                   |
 | #133 `detail(dust): add dust spot visualization`              | Add dust overlay and false-positive/false-negative fixture checks.                  |
 | #134 `detail(ai-denoise): research AI denoise path`           | Decide local model, approval, provenance, and app-server migration plan.            |
+| #1866 `detail(runtime): local AI denoise adapter apply proof` | Prove deterministic local adapter apply behavior without claiming real RAW quality. |
 
 ## Validation
 
 - `bunx prettier --check docs/detail/current-detail-noise-audit-2026-06-14.md docs/index.md docs/site-navigation.json`
+- `bun run check:ai-denoise-runtime-apply`
 - `bun scripts/check-markdown-links.ts`
 - `git diff --check`
