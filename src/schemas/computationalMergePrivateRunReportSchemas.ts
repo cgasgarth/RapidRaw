@@ -29,6 +29,10 @@ const metricNameSchema = z.enum([
   'edgeContinuityScore',
   'exposureBracketCoverageEv',
   'focusTransitionArtifactScore',
+  'focusStackLowConfidenceCellRatio',
+  'focusStackOutputPixelCount',
+  'focusStackSourceCoverageRatio',
+  'focusStackWinnerSourceCount',
   'ghostSuppressionScore',
   'highlightRecoveryRatio',
   'panoramaExcludedSourceCount',
@@ -101,6 +105,7 @@ const privateRunReportSchema = z
     acceptanceStatus: z.enum([
       'private_decode_smoke',
       'private_alignment_smoke',
+      'private_focus_stack_artifact_smoke',
       'private_stitch_artifact_smoke',
       'private_preview_export_smoke',
       'private_reconstruction_artifact_smoke',
@@ -174,6 +179,13 @@ const privateRunReportSchema = z
       'merge_output_private',
       'preview_after_private',
       'export_after_private',
+      'quality_report_private',
+    ] as const;
+    const requiredFocusStackArtifacts = [
+      'source_raw_sequence_private',
+      'decode_report_private',
+      'alignment_report_private',
+      'merge_output_private',
       'quality_report_private',
     ] as const;
     if (
@@ -272,6 +284,28 @@ const privateRunReportSchema = z
           context.addIssue({
             code: 'custom',
             message: `Private preview/export smoke report requires ${artifactKind}.`,
+            path: ['artifacts'],
+          });
+        }
+      }
+    } else if (
+      report.acceptanceStatus === 'private_focus_stack_artifact_smoke' &&
+      report.featureFamily === 'focus_stack'
+    ) {
+      for (const artifactKind of requiredFocusStackArtifacts) {
+        if (!artifactKinds.includes(artifactKind)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Private focus stack artifact smoke report requires ${artifactKind}.`,
+            path: ['artifacts'],
+          });
+        }
+      }
+      for (const artifactKind of forbiddenStitchArtifacts) {
+        if (artifactKinds.includes(artifactKind)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Private focus stack artifact smoke report must not claim ${artifactKind}.`,
             path: ['artifacts'],
           });
         }

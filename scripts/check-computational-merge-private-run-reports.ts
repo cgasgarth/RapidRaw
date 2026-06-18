@@ -82,6 +82,8 @@ for (const report of reportCollection.reports) {
     report.acceptanceStatus === 'private_preview_export_smoke' && report.featureFamily === 'panorama_stitch';
   const reconstructionArtifactSmoke =
     report.acceptanceStatus === 'private_reconstruction_artifact_smoke' && report.featureFamily === 'super_resolution';
+  const focusStackArtifactSmoke =
+    report.acceptanceStatus === 'private_focus_stack_artifact_smoke' && report.featureFamily === 'focus_stack';
   if (decodeSmoke) {
     verifyDecodeSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else if (alignmentSmoke) {
@@ -92,6 +94,8 @@ for (const report of reportCollection.reports) {
     verifyPreviewExportSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else if (reconstructionArtifactSmoke) {
     verifyReconstructionArtifactSmokeReport(report, proofCase.localSourceRelativePaths.length);
+  } else if (focusStackArtifactSmoke) {
+    verifyFocusStackArtifactSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else {
     for (const artifact of report.artifacts) {
       const manifestArtifact = manifestArtifacts.get(artifact.kind);
@@ -203,11 +207,88 @@ function metricPassesThreshold(name: string, value: number, threshold: number): 
     name === 'alignmentRejectedPairCount' ||
     name === 'panoramaExcludedSourceCount' ||
     name === 'superResolutionArtifactScore' ||
-    name === 'superResolutionRegistrationResidualPx'
+    name === 'superResolutionRegistrationResidualPx' ||
+    name === 'focusStackLowConfidenceCellRatio'
   ) {
     return value <= threshold;
   }
   return value >= threshold;
+}
+
+function verifyFocusStackArtifactSmokeReport(
+  report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
+  expectedSourceCount: number,
+): void {
+  const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
+  for (const requiredKind of [
+    'source_raw_sequence_private',
+    'decode_report_private',
+    'alignment_report_private',
+    'merge_output_private',
+    'quality_report_private',
+  ]) {
+    if (!artifactKinds.has(requiredKind)) {
+      failures.push(`${report.fixtureId}: focus stack artifact smoke missing ${requiredKind}.`);
+    }
+  }
+  for (const forbiddenKind of ['preview_after_private', 'export_after_private']) {
+    if (artifactKinds.has(forbiddenKind)) {
+      failures.push(`${report.fixtureId}: focus stack artifact smoke must not claim ${forbiddenKind}.`);
+    }
+  }
+
+  const reportMetrics = new Map(report.qualityMetrics.map((metric) => [metric.name, metric]));
+  const decodedSourceCount = reportMetrics.get('decodedSourceCount');
+  const decodedFinitePixelRatio = reportMetrics.get('decodedFinitePixelRatio');
+  const winnerSourceCount = reportMetrics.get('focusStackWinnerSourceCount');
+  const sourceCoverageRatio = reportMetrics.get('focusStackSourceCoverageRatio');
+  const outputPixelCount = reportMetrics.get('focusStackOutputPixelCount');
+  const sharpnessGainRatio = reportMetrics.get('sharpnessGainRatio');
+  const transitionArtifactScore = reportMetrics.get('focusTransitionArtifactScore');
+  const lowConfidenceCellRatio = reportMetrics.get('focusStackLowConfidenceCellRatio');
+
+  if (decodedSourceCount === undefined || decodedSourceCount.value < expectedSourceCount) {
+    failures.push(
+      `${report.fixtureId}: focus stack artifact smoke must prove decodedSourceCount >= ${expectedSourceCount}.`,
+    );
+  }
+  if (decodedFinitePixelRatio === undefined || decodedFinitePixelRatio.value < 1) {
+    failures.push(`${report.fixtureId}: focus stack artifact smoke must prove decodedFinitePixelRatio >= 1.`);
+  }
+  if (winnerSourceCount === undefined || winnerSourceCount.value < 2) {
+    failures.push(`${report.fixtureId}: focus stack artifact smoke must prove at least two winning sources.`);
+  }
+  if (
+    sourceCoverageRatio === undefined ||
+    !metricPassesThreshold(sourceCoverageRatio.name, sourceCoverageRatio.value, sourceCoverageRatio.threshold)
+  ) {
+    failures.push(`${report.fixtureId}: focus stack artifact smoke must prove source coverage ratio meets threshold.`);
+  }
+  if (outputPixelCount === undefined || outputPixelCount.value <= 0) {
+    failures.push(`${report.fixtureId}: focus stack artifact smoke must prove nonzero output pixels.`);
+  }
+  if (
+    sharpnessGainRatio === undefined ||
+    !metricPassesThreshold(sharpnessGainRatio.name, sharpnessGainRatio.value, sharpnessGainRatio.threshold)
+  ) {
+    failures.push(`${report.fixtureId}: focus stack artifact smoke must prove sharpnessGainRatio threshold.`);
+  }
+  if (
+    transitionArtifactScore === undefined ||
+    !metricPassesThreshold(
+      transitionArtifactScore.name,
+      transitionArtifactScore.value,
+      transitionArtifactScore.threshold,
+    )
+  ) {
+    failures.push(`${report.fixtureId}: focus stack artifact smoke must prove transition artifact threshold.`);
+  }
+  if (
+    lowConfidenceCellRatio === undefined ||
+    !metricPassesThreshold(lowConfidenceCellRatio.name, lowConfidenceCellRatio.value, lowConfidenceCellRatio.threshold)
+  ) {
+    failures.push(`${report.fixtureId}: focus stack artifact smoke must prove low confidence cell ratio threshold.`);
+  }
 }
 
 function verifyDecodeSmokeReport(
