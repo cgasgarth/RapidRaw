@@ -163,6 +163,12 @@ const copy = {
   filmPreset: 'Neutral 400',
   focusStackSmoke: 'Focus Stack Smoke',
   panoramaSmoke: 'Panorama UI Smoke',
+  panoramaReview: 'Panorama review',
+  panoramaDryRunPreview: 'Dry-run preview',
+  panoramaArtifactHandoff: 'Artifact handoff',
+  panoramaDryRunTool: 'panorama.stitch.dry_run_command',
+  panoramaArtifactPath: '/tmp/panorama.tif',
+  panoramaSourceOrder: 'left,center,right,detail,sky',
   superResolutionSmoke: 'Super Resolution Smoke',
   colorWorkflow: 'Color Workflow',
   layerWorkflowTitle: 'Local Adjustment Stack',
@@ -809,6 +815,21 @@ function PanoramaVisualSmoke() {
       <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="panorama-modal">
         <div
           className="sr-only"
+          data-artifact-path={copy.panoramaArtifactPath}
+          data-blend-mode={settings.blendMode}
+          data-boundary-mode={settings.boundaryMode}
+          data-command={copy.panoramaDryRunTool}
+          data-exposure-mode={settings.exposureMode}
+          data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
+          data-projection={settings.projection}
+          data-quality-preference={settings.qualityPreference}
+          data-runtime-status="dry_run_preview"
+          data-source-count="5"
+          data-source-order={copy.panoramaSourceOrder}
+          data-testid="panorama-review-workspace-proof"
+        />
+        <div
+          className="sr-only"
           data-blend-mode={settings.blendMode}
           data-boundary-mode={settings.boundaryMode}
           data-exposure-mode={settings.exposureMode}
@@ -838,6 +859,26 @@ function PanoramaVisualSmoke() {
           progressMessage={null}
           settings={settings}
         />
+        <aside className="fixed right-4 top-14 z-50 w-80 rounded-md border border-white/10 bg-black/75 p-3 text-sm shadow-lg">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-semibold">{copy.panoramaReview}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.panoramaDryRunPreview}</span>
+          </div>
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.panoramaDryRunTool}</p>
+              <p>{settings.projection}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.panoramaSourceOrder}</p>
+              <p>{settings.blendMode}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="panorama-artifact-handoff">
+              <p className="text-xs text-[#aab2bd]">{copy.panoramaArtifactHandoff}</p>
+              <p>{copy.panoramaArtifactPath}</p>
+            </div>
+          </div>
+        </aside>
       </div>
     </main>
   );

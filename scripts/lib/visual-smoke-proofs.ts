@@ -208,6 +208,14 @@ export const panoramaUiSettingsProofSchema = z.object({
   projection: z.literal('spherical'),
   qualityPreference: z.literal('preview'),
 });
+export const panoramaReviewWorkspaceProofSchema = z.object({
+  artifactPath: z.literal('/tmp/panorama.tif'),
+  command: z.literal('panorama.stitch.dry_run_command'),
+  projection: z.literal('spherical'),
+  runtimeStatus: z.literal('dry_run_preview'),
+  sourceCount: z.literal('5'),
+  sourceOrder: z.literal('left,center,right,detail,sky'),
+});
 export const focusUiSettingsProofSchema = z.object({
   alignmentMode: z.literal('homography'),
   blendMethod: z.literal('depth_map'),
