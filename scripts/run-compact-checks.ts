@@ -89,6 +89,7 @@ const CHECK_GROUPS = {
     'check:local-contrast-controls',
     'check:selective-color-mask',
     'check:layer-stack',
+    'check:layer-normal-opacity-runtime',
     'check:layer-mask-audit',
     'check:layer-adjustments',
     'check:layer-preview-export-parity',
