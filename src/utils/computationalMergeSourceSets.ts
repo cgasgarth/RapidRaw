@@ -7,6 +7,7 @@ import type { ComputationalMergeE2eProofManifest } from '../schemas/computationa
 import type { PrivateRawEvidenceLedger } from '../schemas/privateRawEvidenceSchemas';
 
 const privatePathPrefixes = ['private-fixtures/', 'private-artifacts/'] as const;
+const sourceSetFeatureFamilies = new Set(['focus_stack', 'panorama_stitch', 'super_resolution']);
 
 export function buildComputationalMergePrivateSourceSets(
   manifest: ComputationalMergeE2eProofManifest,
@@ -17,27 +18,29 @@ export function buildComputationalMergePrivateSourceSets(
   return computationalMergePrivateSourceSetCollectionSchema.parse({
     issue: 1811,
     schemaVersion: 1,
-    sourceSets: manifest.proofCases.map((proofCase) => {
-      const ledgerEntry = ledgerEntriesByEvidenceId.get(proofCase.evidenceId);
-      if (ledgerEntry === undefined) {
-        throw new Error(`${proofCase.fixtureId}: missing ledger entry ${proofCase.evidenceId}.`);
-      }
+    sourceSets: manifest.proofCases
+      .filter((proofCase) => sourceSetFeatureFamilies.has(proofCase.featureFamily))
+      .map((proofCase) => {
+        const ledgerEntry = ledgerEntriesByEvidenceId.get(proofCase.evidenceId);
+        if (ledgerEntry === undefined) {
+          throw new Error(`${proofCase.fixtureId}: missing ledger entry ${proofCase.evidenceId}.`);
+        }
 
-      return {
-        evidenceId: proofCase.evidenceId,
-        featureFamily: proofCase.featureFamily,
-        fixtureId: proofCase.fixtureId,
-        implementationIssue: proofCase.implementationIssue,
-        proofStatus: proofCase.proofStatus,
-        sourceItems: proofCase.localSourceRelativePaths.map((localRelativePath, sourceIndex) => ({
-          expectedRawFormat: ledgerEntry.camera.rawFormat,
-          localRelativePath: assertPrivateSourcePath(localRelativePath, proofCase.fixtureId),
-          publicRepoAllowed: false,
-          sourceIndex,
-        })),
-        uiIssue: proofCase.uiIssue,
-      };
-    }),
+        return {
+          evidenceId: proofCase.evidenceId,
+          featureFamily: proofCase.featureFamily,
+          fixtureId: proofCase.fixtureId,
+          implementationIssue: proofCase.implementationIssue,
+          proofStatus: proofCase.proofStatus,
+          sourceItems: proofCase.localSourceRelativePaths.map((localRelativePath, sourceIndex) => ({
+            expectedRawFormat: ledgerEntry.camera.rawFormat,
+            localRelativePath: assertPrivateSourcePath(localRelativePath, proofCase.fixtureId),
+            publicRepoAllowed: false,
+            sourceIndex,
+          })),
+          uiIssue: proofCase.uiIssue,
+        };
+      }),
   });
 }
 

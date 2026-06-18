@@ -12,11 +12,13 @@ import {
   buildFocusStackUiDryRunCommandV1,
 } from '../packages/rawengine-schema/src/focusStackUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 import {
   parseComputationalMergePrivateRunReportCollection,
   type ComputationalMergePrivateRunReportCollection,
 } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
 
+const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
 const FIXTURE_ID = 'validation.computational-merge.focus-plane-transition.v1';
 const SAMPLE_PATH = `${ARTIFACT_ROOT}/focus-plane-runtime-sample.json`;
@@ -87,7 +89,7 @@ async function runProof(rootPath: string): Promise<void> {
   });
   const dryRun = bus.execute({
     request: buildRequest(sample, dryRunCommand),
-    toolName: 'computationalmerge.focus_stack.dry_run_command',
+    toolName: focusRoutePair.dryRunToolName,
   });
   if (dryRun.kind !== 'dry_run') throw new Error('Expected focus private app-server dry-run result.');
 
@@ -102,7 +104,7 @@ async function runProof(rootPath: string): Promise<void> {
   });
   const applied = bus.execute({
     request: buildRequest(sample, applyCommand),
-    toolName: 'computationalmerge.focus_stack.apply_command',
+    toolName: focusRoutePair.applyToolName,
   });
   if (applied.kind !== 'apply') throw new Error('Expected focus private app-server apply result.');
   if (applied.apply.provenance.runtimeStatus !== 'apply_rendered') {

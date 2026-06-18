@@ -12,11 +12,13 @@ import {
   buildSuperResolutionUiDryRunCommandV1,
 } from '../packages/rawengine-schema/src/superResolutionUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 import {
   parseComputationalMergePrivateRunReportCollection,
   type ComputationalMergePrivateRunReportCollection,
 } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
 
+const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
 const FIXTURE_ID = 'validation.computational-merge.super-resolution-subpixel.v1';
 const SAMPLE_PATH = `${ARTIFACT_ROOT}/sr-subpixel-runtime-sample.json`;
@@ -87,7 +89,7 @@ async function runProof(rootPath: string): Promise<void> {
   });
   const dryRun = bus.execute({
     request: buildRequest(sample, dryRunCommand),
-    toolName: 'computationalmerge.super_resolution.dry_run_command',
+    toolName: superResolutionRoutePair.dryRunToolName,
   });
   if (dryRun.kind !== 'dry_run') throw new Error('Expected SR private app-server dry-run result.');
 
@@ -102,7 +104,7 @@ async function runProof(rootPath: string): Promise<void> {
   });
   const applied = bus.execute({
     request: buildRequest(sample, applyCommand),
-    toolName: 'computationalmerge.super_resolution.apply_command',
+    toolName: superResolutionRoutePair.applyToolName,
   });
   if (applied.kind !== 'apply') throw new Error('Expected SR private app-server apply result.');
   if (applied.apply.provenance.runtimeStatus !== 'apply_rendered') {

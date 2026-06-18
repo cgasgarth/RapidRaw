@@ -6,7 +6,9 @@ import {
   buildHdrMergeUiDryRunCommandV1,
 } from '../packages/rawengine-schema/src/hdrMergeUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 
+const hdrRoutePair = getComputationalMergeAppServerRoutePairSummary('hdr');
 const WIDTH = 48;
 const HEIGHT = 36;
 const BRACKETS = [
@@ -54,7 +56,7 @@ const dryRunCommand = buildHdrMergeUiDryRunCommandV1(controls, {
 const bus = new HdrAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1);
 const dryRun = bus.execute({
   request: buildRequest(dryRunCommand),
-  toolName: 'computationalmerge.hdr.dry_run_command',
+  toolName: hdrRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected HDR UI runtime bridge dry-run result.');
 
@@ -70,7 +72,7 @@ const applyCommand = buildHdrMergeUiApplyCommandV1(controls, {
 
 const applied = bus.execute({
   request: buildRequest(applyCommand),
-  toolName: 'computationalmerge.hdr.apply_command',
+  toolName: hdrRoutePair.applyToolName,
 });
 if (applied.kind !== 'apply') throw new Error('Expected HDR UI runtime bridge apply result.');
 if (applied.apply.provenance.acceptedDryRunPlanId !== dryRun.dryRun.dryRunResult.mergePlan.planId) {
@@ -89,7 +91,7 @@ expectThrows('mismatched accepted HDR UI runtime plan', () =>
         acceptedDryRunPlanHash: 'sha256:not-the-accepted-plan',
       },
     }),
-    toolName: 'computationalmerge.hdr.apply_command',
+    toolName: hdrRoutePair.applyToolName,
   }),
 );
 

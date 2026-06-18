@@ -6,7 +6,9 @@ import {
   buildFocusStackUiDryRunCommandV1,
 } from '../packages/rawengine-schema/src/focusStackUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 
+const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 const WIDTH = 72;
 const HEIGHT = 48;
 const sourceRegions = [
@@ -64,7 +66,7 @@ const dryRunCommand = buildFocusStackUiDryRunCommandV1(controls, {
 const bus = new FocusStackAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1);
 const dryRun = bus.execute({
   request: buildRequest(dryRunCommand),
-  toolName: 'computationalmerge.focus_stack.dry_run_command',
+  toolName: focusRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected focus UI runtime bridge dry-run result.');
 
@@ -80,7 +82,7 @@ const applyCommand = buildFocusStackUiApplyCommandV1(controls, {
 
 const applied = bus.execute({
   request: buildRequest(applyCommand),
-  toolName: 'computationalmerge.focus_stack.apply_command',
+  toolName: focusRoutePair.applyToolName,
 });
 if (applied.kind !== 'apply') throw new Error('Expected focus UI runtime bridge apply result.');
 if (applied.apply.provenance.acceptedDryRunPlanId !== dryRun.dryRun.dryRunResult.mergePlan.planId) {
@@ -105,7 +107,7 @@ expectThrows('mismatched accepted focus UI runtime plan', () =>
         acceptedDryRunPlanHash: 'sha256:not-the-accepted-plan',
       },
     }),
-    toolName: 'computationalmerge.focus_stack.apply_command',
+    toolName: focusRoutePair.applyToolName,
   }),
 );
 

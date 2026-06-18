@@ -12,11 +12,13 @@ import {
   buildPanoramaUiDryRunCommandV1,
 } from '../packages/rawengine-schema/src/panoramaUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 import {
   parseComputationalMergePrivateRunReportCollection,
   type ComputationalMergePrivateRunReportCollection,
 } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
 
+const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
 const FIXTURE_ID = 'validation.computational-merge.panorama-overlap.v1';
 const SAMPLE_PATH = `${ARTIFACT_ROOT}/panorama-overlap-runtime-sample.json`;
@@ -73,7 +75,7 @@ async function runProof(rootPath: string): Promise<void> {
   });
   const dryRun = bus.execute({
     request: buildRequest(sample, dryRunCommand),
-    toolName: 'computationalmerge.panorama.dry_run_command',
+    toolName: panoramaRoutePair.dryRunToolName,
   });
   if (dryRun.kind !== 'dry_run') throw new Error('Expected panorama private app-server dry-run result.');
 
@@ -88,7 +90,7 @@ async function runProof(rootPath: string): Promise<void> {
   });
   const applied = bus.execute({
     request: buildRequest(sample, applyCommand),
-    toolName: 'computationalmerge.panorama.apply_command',
+    toolName: panoramaRoutePair.applyToolName,
   });
   if (applied.kind !== 'apply') throw new Error('Expected panorama private app-server apply result.');
   if (applied.apply.provenance.runtimeStatus !== 'apply_rendered') {

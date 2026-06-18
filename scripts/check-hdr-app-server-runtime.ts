@@ -3,7 +3,9 @@
 import { HdrAppServerRuntimeToolBusV1 } from '../packages/rawengine-schema/src/hdrAppServerRuntime.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
 
+const hdrRoutePair = getComputationalMergeAppServerRoutePairSummary('hdr');
 const WIDTH = 48;
 const HEIGHT = 36;
 const BRACKETS = [
@@ -60,7 +62,7 @@ const dryRunCommand = {
 const bus = new HdrAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1);
 const dryRun = bus.execute({
   request: buildRequest(dryRunCommand),
-  toolName: 'computationalmerge.hdr.dry_run_command',
+  toolName: hdrRoutePair.dryRunToolName,
 });
 if (dryRun.kind !== 'dry_run') throw new Error('Expected HDR dry-run dispatch result.');
 
@@ -82,7 +84,7 @@ const applyCommand = {
 };
 const applied = bus.execute({
   request: buildRequest(applyCommand),
-  toolName: 'computationalmerge.hdr.apply_command',
+  toolName: hdrRoutePair.applyToolName,
 });
 if (applied.kind !== 'apply') throw new Error('Expected HDR apply dispatch result.');
 if (applied.apply.provenance.alignmentConfidence < 0.99) {
@@ -92,7 +94,7 @@ if (applied.apply.provenance.alignmentConfidence < 0.99) {
 expectThrows('unaccepted HDR apply plan', () =>
   new HdrAppServerRuntimeToolBusV1(sampleComputationalMergeAppServerToolManifestV1).execute({
     request: buildRequest(applyCommand),
-    toolName: 'computationalmerge.hdr.apply_command',
+    toolName: hdrRoutePair.applyToolName,
   }),
 );
 
