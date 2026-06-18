@@ -1,0 +1,9 @@
+[
+  {
+    "children": [],
+    "id": "album-broken",
+    "images": "not-an-array",
+    "name": "Broken",
+    "type": "album"
+  }
+]

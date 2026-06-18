@@ -1,0 +1,17 @@
+[
+  {
+    "children": [
+      {
+        "icon": "portfolio",
+        "id": "album-client-selects",
+        "images": ["/Volumes/Photos/Selects/IMG_0001.ARW"],
+        "name": "Client Selects",
+        "type": "album"
+      }
+    ],
+    "icon": "featured",
+    "id": "group-deliveries",
+    "name": "Deliveries",
+    "type": "group"
+  }
+]

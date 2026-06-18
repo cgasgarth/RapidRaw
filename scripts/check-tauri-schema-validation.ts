@@ -1,31 +1,75 @@
-import { readFileSync } from 'node:fs';
+#!/usr/bin/env bun
 
-const files: Record<'app' | 'folderTreeSchema' | 'packageJson' | 'tauriInvoke', string> = {
-  app: readFileSync('src/App.tsx', 'utf8'),
-  folderTreeSchema: readFileSync('src/schemas/folderTreeSchemas.ts', 'utf8'),
-  packageJson: readFileSync('package.json', 'utf8'),
-  tauriInvoke: readFileSync('src/utils/tauriSchemaInvoke.ts', 'utf8'),
+import { existsSync, readFileSync } from 'node:fs';
+
+import type { z } from 'zod';
+
+import { albumTreeSchema } from '../src/schemas/albumSchemas.ts';
+import { folderTreeListSchema } from '../src/schemas/folderTreeSchemas.ts';
+import { parseTauriBoundaryLedger, type TauriBoundaryLedger } from '../src/schemas/tauriBoundaryLedgerSchemas.ts';
+import { parseTauriPayload } from '../src/utils/tauriSchemaInvoke.ts';
+
+type TauriBoundaryEntry = TauriBoundaryLedger['entries'][number];
+
+const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
+
+const schemaByName = {
+  albumTreeSchema,
+  folderTreeListSchema,
+} satisfies Record<TauriBoundaryEntry['zodSchema'], z.ZodType<unknown>>;
+
+const ledger = parseTauriBoundaryLedger(readJson('fixtures/validation/tauri-boundary-ledger.json'));
+const appProperties = readFileSync('src/components/ui/AppProperties.tsx', 'utf8');
+const failures: string[] = [];
+
+const recordFailure = (message: string) => {
+  failures.push(message);
 };
 
-const required: Array<[label: string, passed: boolean]> = [
-  ['tauri invoke helper uses invoke<unknown>', files.tauriInvoke.includes('invoke<unknown>')],
-  ['tauri parse helper uses Zod safeParse', files.tauriInvoke.includes('schema.safeParse(payload)')],
-  ['tauri parse helper formats bounded issues', files.tauriInvoke.includes('.slice(0, 5)')],
-  ['folder tree schema is recursive Zod', files.folderTreeSchema.includes('z.lazy')],
-  ['folder tree schema rejects unknown fields', files.folderTreeSchema.includes('.strict()')],
-  ['App imports folderTreeListSchema', files.app.includes("from './schemas/folderTreeSchemas'")],
-  ['App imports invokeWithSchema', files.app.includes("from './utils/tauriSchemaInvoke'")],
-  [
-    'folder children no longer invoke typed array directly',
-    !files.app.includes('invoke<FolderTreeNode[]>(Invokes.GetFolderChildren'),
-  ],
-  ['folder children uses invokeWithSchema', files.app.includes('invokeWithSchema(')],
-  ['package exposes check script', files.packageJson.includes('"check:tauri-schema-validation"')],
-];
+for (const entry of ledger.entries) {
+  if (!appProperties.includes(`${entry.invokeEnumMember} = '${entry.command}'`)) {
+    recordFailure(`${entry.command}: Invokes.${entry.invokeEnumMember} mapping missing`);
+  }
 
-const failures = required.filter(([, passed]) => !passed).map(([label]) => label);
-if (failures.length > 0) {
-  throw new Error(`tauri schema validation check failed: ${failures.join(', ')}`);
+  for (const callSite of entry.tsCallSites) {
+    if (!existsSync(callSite)) {
+      recordFailure(`${entry.command}: missing call site ${callSite}`);
+      continue;
+    }
+
+    const source = readFileSync(callSite, 'utf8');
+    if (!source.includes(entry.invokeEnumMember)) recordFailure(`${entry.command}: ${callSite} missing invoke enum`);
+    if (!source.includes('invokeWithSchema')) recordFailure(`${entry.command}: ${callSite} missing invokeWithSchema`);
+    if (!source.includes(entry.zodSchema)) recordFailure(`${entry.command}: ${callSite} missing ${entry.zodSchema}`);
+  }
+
+  runParseFixture(entry);
 }
 
-console.log('tauri schema validation ok');
+if (failures.length > 0) {
+  console.error(`tauri schema validation failed (${failures.length})`);
+  for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);
+  process.exit(1);
+}
+
+console.log(`tauri schema validation ok (${ledger.entries.length} boundaries)`);
+
+function runParseFixture(entry: TauriBoundaryEntry) {
+  if (entry.positiveFixturePath === undefined || entry.negativeFixturePath === undefined) return;
+
+  const schema = schemaByName[entry.zodSchema];
+  parseTauriPayload(schema, readJson(entry.positiveFixturePath), `${entry.command} positive`);
+
+  try {
+    parseTauriPayload(schema, readJson(entry.negativeFixturePath), `${entry.command} negative`);
+    recordFailure(`${entry.command}: negative fixture parsed unexpectedly`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes(`Invalid Tauri payload for ${entry.command} negative`)) {
+      recordFailure(`${entry.command}: negative fixture produced wrong error`);
+    }
+    if (message.length > 500) {
+      recordFailure(`${entry.command}: negative fixture error is not bounded`);
+    }
+  }
+}
