@@ -162,6 +162,12 @@ const copy = {
   filmLook: 'Film look',
   filmPreset: 'Neutral 400',
   focusStackSmoke: 'Focus Stack Smoke',
+  focusReview: 'Focus review',
+  focusDryRunPreview: 'Dry-run preview',
+  focusArtifactHandoff: 'Artifact handoff',
+  focusDryRunTool: 'focus.stack.dry_run_command',
+  focusArtifactPath: '/tmp/rawengine-focus-stack-smoke.tif',
+  focusDepthMap: 'Depth map',
   panoramaSmoke: 'Panorama UI Smoke',
   superResolutionSmoke: 'Super Resolution Smoke',
   colorWorkflow: 'Color Workflow',
@@ -739,6 +745,21 @@ function FocusStackVisualSmoke() {
         <div
           className="sr-only"
           data-alignment-mode={settings.alignmentMode}
+          data-artifact-path={copy.focusArtifactPath}
+          data-blend-method={settings.blendMethod}
+          data-command={copy.focusDryRunTool}
+          data-depth-mode={settings.blendMethod}
+          data-halo-policy="flattened_preview"
+          data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
+          data-quality-preference={settings.qualityPreference}
+          data-retouch-layer-policy={settings.retouchLayerPolicy}
+          data-runtime-status="dry_run_preview"
+          data-source-count="6"
+          data-testid="focus-review-workspace-proof"
+        />
+        <div
+          className="sr-only"
+          data-alignment-mode={settings.alignmentMode}
           data-blend-method={settings.blendMethod}
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-quality-preference={settings.qualityPreference}
@@ -759,6 +780,26 @@ function FocusStackVisualSmoke() {
           settings={settings}
           sourceCount={6}
         />
+        <aside className="fixed right-4 top-14 z-50 w-80 rounded-md border border-white/10 bg-black/75 p-3 text-sm shadow-lg">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="font-semibold">{copy.focusReview}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.focusDryRunPreview}</span>
+          </div>
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.focusDryRunTool}</p>
+              <p>{settings.alignmentMode}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.focusDepthMap}</p>
+              <p>{settings.retouchLayerPolicy}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="focus-artifact-handoff">
+              <p className="text-xs text-[#aab2bd]">{copy.focusArtifactHandoff}</p>
+              <p>{copy.focusArtifactPath}</p>
+            </div>
+          </div>
+        </aside>
       </div>
     </main>
   );

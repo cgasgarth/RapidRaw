@@ -223,6 +223,14 @@ export const focusUiSettingsProofSchema = z.object({
   qualityPreference: z.literal('preview'),
   retouchLayerPolicy: z.literal('none'),
 });
+export const focusReviewWorkspaceProofSchema = z.object({
+  artifactPath: z.literal('/tmp/rawengine-focus-stack-smoke.tif'),
+  command: z.literal('focus.stack.dry_run_command'),
+  depthMode: z.literal('depth_map'),
+  haloPolicy: z.literal('flattened_preview'),
+  runtimeStatus: z.literal('dry_run_preview'),
+  sourceCount: z.literal('6'),
+});
 export const superResolutionUiSettingsProofSchema = z.object({
   alignmentMode: z.literal('optical_flow'),
   detailPolicy: z.literal('aggressive_preview_only'),

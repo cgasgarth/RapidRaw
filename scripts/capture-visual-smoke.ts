@@ -14,6 +14,7 @@ import {
   assertNegativeLabInvokeProof,
   commandPaletteWorkflowProofSchema,
   detailWorkspaceProofSchema,
+  focusReviewWorkspaceProofSchema,
   focusUiSettingsProofSchema,
   hdrReviewWorkspaceProofSchema,
   hdrUiSettingsProofSchema,
@@ -201,6 +202,13 @@ async function prepareScenario(page, mode) {
     focusUiSettingsProofSchema.parse(
       await page.getByTestId('focus-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    focusReviewWorkspaceProofSchema.parse(
+      await page.getByTestId('focus-review-workspace-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    await page
+      .getByTestId('focus-artifact-handoff')
+      .getByText('/tmp/rawengine-focus-stack-smoke.tif', { exact: true })
+      .waitFor({ timeout: 10_000 });
     return;
   }
 
