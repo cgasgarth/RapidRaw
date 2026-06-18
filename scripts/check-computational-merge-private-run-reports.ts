@@ -80,7 +80,9 @@ for (const report of reportCollection.reports) {
     report.acceptanceStatus === 'private_stitch_artifact_smoke' && report.featureFamily === 'panorama_stitch';
   const previewExportSmoke =
     report.acceptanceStatus === 'private_preview_export_smoke' &&
-    (report.featureFamily === 'panorama_stitch' || report.featureFamily === 'focus_stack');
+    (report.featureFamily === 'panorama_stitch' ||
+      report.featureFamily === 'focus_stack' ||
+      report.featureFamily === 'super_resolution');
   const reconstructionArtifactSmoke =
     report.acceptanceStatus === 'private_reconstruction_artifact_smoke' && report.featureFamily === 'super_resolution';
   const focusStackArtifactSmoke =
@@ -482,6 +484,8 @@ function verifyPreviewExportSmokeReport(
     verifyStitchArtifactSmokeReport(report, expectedSourceCount, { allowPreviewExport: true });
   } else if (report.featureFamily === 'focus_stack') {
     verifyFocusStackArtifactSmokeReport(report, expectedSourceCount, { allowPreviewExport: true });
+  } else if (report.featureFamily === 'super_resolution') {
+    verifyReconstructionArtifactSmokeReport(report, expectedSourceCount, { allowPreviewExport: true });
   }
   const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
   for (const requiredKind of ['preview_after_private', 'export_after_private']) {
@@ -502,6 +506,7 @@ function verifyPreviewExportSmokeReport(
 function verifyReconstructionArtifactSmokeReport(
   report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
   expectedSourceCount: number,
+  options: { allowPreviewExport?: boolean } = {},
 ): void {
   const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
   for (const requiredKind of [
@@ -516,6 +521,7 @@ function verifyReconstructionArtifactSmokeReport(
     }
   }
   for (const forbiddenKind of ['preview_after_private', 'export_after_private']) {
+    if (options.allowPreviewExport === true) continue;
     if (artifactKinds.has(forbiddenKind)) {
       failures.push(`${report.fixtureId}: reconstruction artifact smoke must not claim ${forbiddenKind}.`);
     }

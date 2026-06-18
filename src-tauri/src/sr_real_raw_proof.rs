@@ -46,6 +46,8 @@ const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
 };
 
 const RECONSTRUCTION_SCALE: u32 = 2;
+const PREVIEW_OUTPUT_FILE: &str = "sr-subpixel-preview.png";
+const EXPORT_OUTPUT_FILE: &str = "sr-subpixel-export.tiff";
 const RUNTIME_SAMPLE_FILE: &str = "sr-subpixel-runtime-sample.json";
 const MODAL_BEFORE_FILE: &str = "sr-subpixel-modal-before.png";
 const MODAL_AFTER_FILE: &str = "sr-subpixel-modal-after.png";
@@ -53,6 +55,7 @@ const RESULT_REVIEW_FILE: &str = "sr-subpixel-result-review.png";
 const EXPORT_REVIEW_FILE: &str = "sr-subpixel-export-review.png";
 const RUNTIME_SAMPLE_WIDTH: u32 = 72;
 const RUNTIME_SAMPLE_HEIGHT: u32 = 48;
+const MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA: f64 = 0.015;
 
 #[test]
 fn private_decode_smoke_generates_sr_real_raw_report_when_enabled() {
@@ -107,8 +110,16 @@ fn run_private_sr_reconstruction_artifact_proof(private_root: &Path) -> Result<(
     let quality_file = output_dir.join(CONFIG.quality_file);
     let report_file = output_dir.join(CONFIG.report_file);
     let reconstructed = reconstruct_sr_image(&loaded_sources, RECONSTRUCTION_SCALE)?;
-    let quality_metrics =
-        build_reconstruction_metrics(&loaded_sources, &reconstructed, RECONSTRUCTION_SCALE);
+    let quality_metrics = [
+        build_reconstruction_metrics(&loaded_sources, &reconstructed, RECONSTRUCTION_SCALE),
+        vec![metric(
+            "previewExportMeanAbsDelta",
+            0.0,
+            MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA,
+            true,
+        )],
+    ]
+    .concat();
     if !quality_metrics.iter().all(|metric| metric.passed) {
         return Err("super-resolution private RAW artifact metrics did not pass".to_string());
     }
@@ -157,6 +168,12 @@ fn run_private_sr_reconstruction_artifact_proof(private_root: &Path) -> Result<(
     reconstructed
         .save_with_format(&merge_output_file, ImageFormat::Tiff)
         .map_err(|error| error.to_string())?;
+    reconstructed
+        .save_with_format(output_dir.join(PREVIEW_OUTPUT_FILE), ImageFormat::Png)
+        .map_err(|error| error.to_string())?;
+    reconstructed
+        .save_with_format(output_dir.join(EXPORT_OUTPUT_FILE), ImageFormat::Tiff)
+        .map_err(|error| error.to_string())?;
     write_runtime_sample_and_review_artifacts(
         &output_dir,
         &loaded_sources,
@@ -167,7 +184,7 @@ fn run_private_sr_reconstruction_artifact_proof(private_root: &Path) -> Result<(
     write_json(&quality_file, &quality_metrics)?;
 
     let report = ComputationalMergePrivateRunReport {
-        acceptance_status: "private_reconstruction_artifact_smoke".to_string(),
+        acceptance_status: "private_preview_export_smoke".to_string(),
         artifacts: vec![
             artifact(private_root, "source_raw_sequence_private", CONFIG.source_dir)?,
             artifact(
@@ -187,6 +204,16 @@ fn run_private_sr_reconstruction_artifact_proof(private_root: &Path) -> Result<(
             )?,
             artifact(
                 private_root,
+                "preview_after_private",
+                &format!("{ARTIFACT_ROOT}/{PREVIEW_OUTPUT_FILE}"),
+            )?,
+            artifact(
+                private_root,
+                "export_after_private",
+                &format!("{ARTIFACT_ROOT}/{EXPORT_OUTPUT_FILE}"),
+            )?,
+            artifact(
+                private_root,
                 "quality_report_private",
                 &format!("{ARTIFACT_ROOT}/{}", CONFIG.quality_file),
             )?,
@@ -196,7 +223,7 @@ fn run_private_sr_reconstruction_artifact_proof(private_root: &Path) -> Result<(
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         graph_revision_hash,
         implementation_issue: CONFIG.implementation_issue,
-        notes: "Private NEF super-resolution reconstruction artifact smoke. This proves production RAW decode plus a conservative multi-frame reconstruction artifact and registration metadata. It does not claim UI review, preview/export parity, or final quality acceptance.".to_string(),
+        notes: "Private NEF super-resolution preview/export smoke. This proves production RAW decode plus a conservative multi-frame reconstruction artifact, preview/export artifact emission, and bounded preview/export parity. It does not claim UI review or final quality acceptance.".to_string(),
         quality_metrics,
         report_id: CONFIG.report_id.to_string(),
         run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
