@@ -186,6 +186,12 @@ const copy = {
   layerWorkflowTitle: 'Local Adjustment Stack',
   layerMoveDown: 'Move down',
   layerToggle: 'Toggle',
+  layerAdd: 'Add layer',
+  layerDuplicate: 'Duplicate layer',
+  layerRenameProof: 'Rename proof',
+  layerOpacity64: 'Opacity 64%',
+  layerBlendOverlay: 'Blend overlay',
+  layerGroupingDeferred: 'Groups deferred',
   layeredPreview: 'Layered preview',
   layerWorkflowDescription: 'Mask, blend, opacity, and order state captured in one smoke path.',
   layerVisibleCount: (count: number) => `${count} visible`,
@@ -504,6 +510,30 @@ function LayerStackWorkflowVisualSmoke() {
   const [selectedLayer, setSelectedLayer] = useState<string>(layerWorkflowFallbackLayer.name);
   const [exportParity, setExportParity] = useState('pending');
 
+  const addLayer = () => {
+    const newLayer: LayerWorkflowState = {
+      blend: 'screen',
+      mask: 'Brush',
+      name: 'Local dodge',
+      opacity: 50,
+      visible: true,
+    };
+    setLayers((currentLayers) => [...currentLayers, newLayer]);
+    setSelectedLayer(newLayer.name);
+  };
+  const duplicateSelectedLayer = () => {
+    const selected = layers.find((layer) => layer.name === selectedLayer);
+    if (selected === undefined) return;
+    const duplicate = { ...selected, name: `${selected.name} copy` };
+    setLayers((currentLayers) => [...currentLayers, duplicate]);
+    setSelectedLayer(duplicate.name);
+  };
+  const updateSelectedLayer = (update: Partial<LayerWorkflowState>) => {
+    setLayers((currentLayers) =>
+      currentLayers.map((layer) => (layer.name === selectedLayer ? { ...layer, ...update } : layer)),
+    );
+    if (update.name !== undefined) setSelectedLayer(update.name);
+  };
   const moveSelectedLayerDown = () => {
     setLayers((currentLayers) => {
       const selectedIndex = currentLayers.findIndex((layer) => layer.name === selectedLayer);
@@ -542,6 +572,8 @@ function LayerStackWorkflowVisualSmoke() {
             className="space-y-2"
             data-active-layer={selectedLayerState.name}
             data-blend-mode={selectedLayerState.blend}
+            data-grouping-state="deferred"
+            data-layer-count={String(layers.length)}
             data-mask={selectedLayerState.mask}
             data-opacity={String(selectedLayerState.opacity)}
             data-testid="layer-stack-workflow-proof"
@@ -573,6 +605,47 @@ function LayerStackWorkflowVisualSmoke() {
           <div className="mt-4 grid grid-cols-2 gap-2">
             <button
               className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
+              onClick={addLayer}
+              type="button"
+            >
+              {copy.layerAdd}
+            </button>
+            <button
+              className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
+              onClick={duplicateSelectedLayer}
+              type="button"
+            >
+              {copy.layerDuplicate}
+            </button>
+            <button
+              className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
+              onClick={() => {
+                updateSelectedLayer({ name: 'Proof polish' });
+              }}
+              type="button"
+            >
+              {copy.layerRenameProof}
+            </button>
+            <button
+              className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
+              onClick={() => {
+                updateSelectedLayer({ opacity: 64 });
+              }}
+              type="button"
+            >
+              {copy.layerOpacity64}
+            </button>
+            <button
+              className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
+              onClick={() => {
+                updateSelectedLayer({ blend: 'overlay' });
+              }}
+              type="button"
+            >
+              {copy.layerBlendOverlay}
+            </button>
+            <button
+              className="rounded-md border border-white/10 bg-[#20252b] px-3 py-2 text-sm"
               onClick={moveSelectedLayerDown}
               type="button"
             >
@@ -585,6 +658,9 @@ function LayerStackWorkflowVisualSmoke() {
             >
               {copy.layerToggle}
             </button>
+          </div>
+          <div className="mt-3 rounded-md border border-white/10 bg-[#1b2026] px-3 py-2 text-xs text-[#aab2bd]">
+            {copy.layerGroupingDeferred}
           </div>
         </aside>
 

@@ -255,11 +255,13 @@ export const superResolutionReviewWorkspaceProofSchema = z.object({
   sourceCount: z.literal('5'),
 });
 export const layerStackWorkflowProofSchema = z.object({
-  activeLayer: z.literal('Portrait burn'),
-  blendMode: z.literal('multiply'),
-  mask: z.literal('Subject brush'),
-  opacity: z.literal('42'),
-  visibleCount: z.literal('2'),
+  activeLayer: z.literal('Proof polish'),
+  blendMode: z.literal('overlay'),
+  groupingState: z.literal('deferred'),
+  layerCount: z.literal('5'),
+  mask: z.literal('Brush'),
+  opacity: z.literal('64'),
+  visibleCount: z.literal('4'),
 });
 export const layerStackExportParityProofSchema = z.object({
   exportParity: z.literal('ready'),
