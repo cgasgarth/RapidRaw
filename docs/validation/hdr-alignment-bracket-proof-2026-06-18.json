@@ -1,0 +1,181 @@
+{
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1927,
+  "proofHash": "6f55d19f2cc436ef9c1e96e44707b033615b93eba36525964ce3f93a3d1bb7ce",
+  "rejectedScenarios": [
+    {
+      "accepted": false,
+      "blockCodes": ["duplicate_exposure_values", "not_a_bracket"],
+      "fixtureId": "hdr.synthetic.rejected-duplicate-exposure.v1",
+      "nextAction": "Ask for distinct exposure EV metadata or disable required bracket validation intentionally."
+    }
+  ],
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "alignmentConfidence": 1,
+      "bracketAccepted": true,
+      "bracketSpanEv": 4,
+      "fixtureId": "hdr.synthetic.static-window.v1",
+      "maxTranslationErrorPx": 0,
+      "referenceSourceIndex": 1,
+      "runtimeStatus": "synthetic_fixture_gate",
+      "transforms": [
+        {
+          "confidence": 1,
+          "expectedTranslationPx": {
+            "x": 0,
+            "y": 0
+          },
+          "sourceIndex": 0,
+          "transformType": "identity",
+          "translationErrorPx": 0,
+          "translationPx": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "confidence": 1,
+          "expectedTranslationPx": {
+            "x": 0,
+            "y": 0
+          },
+          "sourceIndex": 1,
+          "transformType": "identity",
+          "translationErrorPx": 0,
+          "translationPx": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "confidence": 1,
+          "expectedTranslationPx": {
+            "x": 0,
+            "y": 0
+          },
+          "sourceIndex": 2,
+          "transformType": "identity",
+          "translationErrorPx": 0,
+          "translationPx": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      ],
+      "validationPurpose": "Baseline static bracket with recoverable highlights and shadow detail.",
+      "warningCodes": []
+    },
+    {
+      "alignmentConfidence": 1,
+      "bracketAccepted": true,
+      "bracketSpanEv": 4,
+      "fixtureId": "hdr.synthetic.handheld-motion.v1",
+      "maxTranslationErrorPx": 0,
+      "referenceSourceIndex": 1,
+      "runtimeStatus": "synthetic_fixture_gate",
+      "transforms": [
+        {
+          "confidence": 1,
+          "expectedTranslationPx": {
+            "x": -2,
+            "y": 1
+          },
+          "sourceIndex": 0,
+          "transformType": "translation",
+          "translationErrorPx": 0,
+          "translationPx": {
+            "x": -2,
+            "y": 1
+          }
+        },
+        {
+          "confidence": 1,
+          "expectedTranslationPx": {
+            "x": 0,
+            "y": 0
+          },
+          "sourceIndex": 1,
+          "transformType": "identity",
+          "translationErrorPx": 0,
+          "translationPx": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "confidence": 1,
+          "expectedTranslationPx": {
+            "x": 2,
+            "y": -1
+          },
+          "sourceIndex": 2,
+          "transformType": "translation",
+          "translationErrorPx": 0,
+          "translationPx": {
+            "x": 2,
+            "y": -1
+          }
+        }
+      ],
+      "validationPurpose": "Alignment and deghosting metadata fixture for handheld HDR merge validation.",
+      "warningCodes": ["alignment_translation_required", "deghosting_required"]
+    },
+    {
+      "alignmentConfidence": 1,
+      "bracketAccepted": true,
+      "bracketSpanEv": 6,
+      "fixtureId": "hdr.synthetic.highlight-clipping.v1",
+      "maxTranslationErrorPx": 0,
+      "referenceSourceIndex": 1,
+      "runtimeStatus": "synthetic_fixture_gate",
+      "transforms": [
+        {
+          "confidence": 1,
+          "expectedTranslationPx": {
+            "x": 0,
+            "y": 0
+          },
+          "sourceIndex": 0,
+          "transformType": "identity",
+          "translationErrorPx": 0,
+          "translationPx": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "confidence": 1,
+          "expectedTranslationPx": {
+            "x": 0,
+            "y": 0
+          },
+          "sourceIndex": 1,
+          "transformType": "identity",
+          "translationErrorPx": 0,
+          "translationPx": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "confidence": 1,
+          "expectedTranslationPx": {
+            "x": 0,
+            "y": 0
+          },
+          "sourceIndex": 2,
+          "transformType": "identity",
+          "translationErrorPx": 0,
+          "translationPx": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      ],
+      "validationPurpose": "Highlight clipping stress fixture for future scene-linear HDR merge weighting.",
+      "warningCodes": ["clipped_highlight_recovery"]
+    }
+  ]
+}
