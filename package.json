@@ -117,6 +117,7 @@
     "check:public-fixture-manifest": "bun scripts/check-public-fixture-manifest.ts",
     "check:output-sharpening": "bun scripts/check-output-sharpening-fixtures.ts",
     "check:white-balance-picker": "bun scripts/check-white-balance-picker-fixtures.ts",
+    "check:white-balance-tone-runtime-proof": "bun scripts/check-white-balance-tone-runtime-proof.ts",
     "check:capture-sharpening": "bun scripts/check-capture-sharpening-fixtures.ts",
     "check:wavelet-detail": "bun scripts/check-wavelet-detail-fixtures.ts",
     "check:noise-metrics": "bun scripts/check-noise-metric-fixtures.ts",

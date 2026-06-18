@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "proofId": "color.runtime.white-balance-tone.synthetic.v1",
+  "runtimeStatus": "synthetic_runtime_apply_capable",
+  "sourcePixels": [
+    {
+      "red": 0.18,
+      "green": 0.2,
+      "blue": 0.24
+    },
+    {
+      "red": 0.38,
+      "green": 0.33,
+      "blue": 0.28
+    },
+    {
+      "red": 0.56,
+      "green": 0.52,
+      "blue": 0.46
+    },
+    {
+      "red": 0.82,
+      "green": 0.76,
+      "blue": 0.68
+    }
+  ],
+  "whiteBalance": {
+    "temperature": 32,
+    "tint": -18
+  },
+  "toneCommand": {
+    "actor": {
+      "id": "agent_rawengine",
+      "kind": "agent"
+    },
+    "approval": {
+      "approvalClass": "edit_apply",
+      "reason": "Synthetic color runtime proof applies accepted white balance and basic tone edit.",
+      "state": "approved"
+    },
+    "colorPipeline": {
+      "inputColorSpace": "camera_linear_rgb",
+      "operationDomain": "display_referred_rgb",
+      "runtimeStatus": "synthetic_runtime_apply_capable"
+    },
+    "commandId": "command.color-runtime.white-balance-tone.v1",
+    "commandType": "toneColor.setBasicTone",
+    "correlationId": "corr.color-runtime.white-balance-tone.v1",
+    "dryRun": false,
+    "expectedGraphRevision": "graph-rev.color-runtime.white-balance-tone.v1",
+    "parameters": {
+      "blackPoint": -5,
+      "clarity": 8,
+      "contrast": 14,
+      "exposureEv": 0.35,
+      "highlights": -18,
+      "saturation": 10,
+      "shadows": 16,
+      "whitePoint": 6
+    },
+    "schemaVersion": 1,
+    "target": {
+      "kind": "image",
+      "imagePath": "/synthetic/color-runtime-white-balance-tone.raw"
+    }
+  },
+  "expected": {
+    "beforeHash": "sha256:1c7045d40362cbc9ff7e1c955779c2b6d0d2ef2fc39d080554dfd203f0a2118f",
+    "whiteBalancedHash": "sha256:ddeaeb46131279cc86e4ceae3954bbd53ea91e6eebf95cf599fc5430e351f1f5",
+    "afterHash": "sha256:7e4653260bea8a1726e498fb25dcb0f4a449cae2a31476f085c3ef21d6ce17be",
+    "whiteBalanceChangedPixels": 4,
+    "toneChangedPixels": 4,
+    "changedPixels": 4,
+    "outputPixels": [
+      {
+        "blue": 0.358532,
+        "green": 0.355014,
+        "red": 0.307663
+      },
+      {
+        "blue": 0.402213,
+        "green": 0.563175,
+        "red": 0.620684
+      },
+      {
+        "blue": 0.640984,
+        "green": 0.867608,
+        "red": 0.894841
+      },
+      {
+        "blue": 0.93102,
+        "green": 1,
+        "red": 1
+      }
+    ]
+  }
+}
