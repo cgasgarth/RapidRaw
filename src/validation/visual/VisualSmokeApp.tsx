@@ -232,7 +232,8 @@ const copy = {
   focusReview: 'Focus review',
   focusDryRunPreview: 'Dry-run preview',
   focusArtifactHandoff: 'Artifact handoff',
-  focusDryRunTool: 'focus.stack.dry_run_command',
+  focusApplyTool: getComputationalMergeAppServerRoutePairSummary('focus_stack').applyToolName,
+  focusDryRunTool: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
   focusArtifactPath: '/tmp/rawengine-focus-stack-smoke.tif',
   focusDepthMap: 'Depth map',
   panoramaSmoke: 'Panorama UI Smoke',
@@ -905,6 +906,7 @@ function FocusStackVisualSmoke() {
         <div
           className="sr-only"
           data-alignment-mode={settings.alignmentMode}
+          data-apply-command={copy.focusApplyTool}
           data-artifact-path={copy.focusArtifactPath}
           data-blend-method={settings.blendMethod}
           data-command={copy.focusDryRunTool}
