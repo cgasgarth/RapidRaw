@@ -210,6 +210,41 @@
       },
       "status": "planned_private_capture",
       "trackingIssue": 1506
+    },
+    {
+      "artifactClass": "color_checker_reference",
+      "camera": {
+        "cameraMake": "Sony",
+        "cameraModel": "ILCE-7M4",
+        "lens": "FE 55mm F1.8 ZA",
+        "rawFormat": "arw"
+      },
+      "crop": {
+        "height": 1536,
+        "unit": "source_pixels",
+        "width": 2048,
+        "x": 1200,
+        "y": 800
+      },
+      "evidenceId": "raw-evidence.color.camera-profile-chart.v1",
+      "expectedUse": ["color_science", "preview_export_parity"],
+      "exposure": {
+        "aperture": 5.6,
+        "exposureBiasEv": 0,
+        "iso": 100,
+        "shutterSeconds": 0.008
+      },
+      "featureFamily": "color_science",
+      "notes": "Reserved private RAW ColorChecker/reference chart capture for camera-profile matrix validation, DeltaE review, and preview/export parity proof.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private camera-profile RAW target must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1895
     }
   ],
   "issue": 1149,
