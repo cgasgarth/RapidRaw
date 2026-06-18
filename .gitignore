@@ -17,6 +17,12 @@ artifacts/
 private-artifacts/
 private-fixtures/
 .rawengine-private-root/
+docs/validation/local/
+docs/validation/rawengine-goal-progress-report-*.html
+docs/validation/*-local-*.html
+docs/validation/*-local-*.json
+docs/validation/*-local-*.png
+docs/validation/*-local-*.svg
 coverage/
 playwright-report/
 test-results/
