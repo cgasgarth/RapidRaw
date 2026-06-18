@@ -5,6 +5,10 @@
       "fixtureId": "validation.computational-merge.hdr-bracket-alignment.v1",
       "implementationIssue": 2062,
       "proofStatus": "manifest_only",
+      "publicRuntimeBridge": {
+        "check": "bun run check:hdr-ui-runtime-bridge",
+        "status": "runtime_apply_capable"
+      },
       "runtimeReportPresent": false,
       "status": "manifest_only",
       "uiIssue": 171
@@ -14,6 +18,10 @@
       "fixtureId": "validation.computational-merge.panorama-overlap.v1",
       "implementationIssue": 1508,
       "proofStatus": "manifest_only",
+      "publicRuntimeBridge": {
+        "check": "bun run check:panorama-ui-runtime-bridge",
+        "status": "runtime_apply_capable"
+      },
       "runtimeReportPresent": false,
       "status": "manifest_only",
       "uiIssue": 1333
@@ -23,6 +31,10 @@
       "fixtureId": "validation.computational-merge.focus-plane-transition.v1",
       "implementationIssue": 1507,
       "proofStatus": "manifest_only",
+      "publicRuntimeBridge": {
+        "check": "bun run check:focus-ui-runtime-bridge",
+        "status": "runtime_apply_capable"
+      },
       "runtimeReportPresent": false,
       "status": "manifest_only",
       "uiIssue": 1334
@@ -32,6 +44,10 @@
       "fixtureId": "validation.computational-merge.super-resolution-subpixel.v1",
       "implementationIssue": 1506,
       "proofStatus": "manifest_only",
+      "publicRuntimeBridge": {
+        "check": "bun run check:sr-ui-runtime-bridge",
+        "status": "runtime_apply_capable"
+      },
       "runtimeReportPresent": false,
       "status": "manifest_only",
       "uiIssue": 1335
@@ -43,13 +59,17 @@
     "bun run check:hdr-real-raw-private-proof",
     "bun run check:panorama-real-raw-private-proof",
     "bun run check:focus-real-raw-private-proof",
-    "bun run check:sr-real-raw-private-proof"
+    "bun run check:sr-real-raw-private-proof",
+    "bun run check:hdr-ui-runtime-bridge",
+    "bun run check:panorama-ui-runtime-bridge",
+    "bun run check:focus-ui-runtime-bridge",
+    "bun run check:sr-ui-runtime-bridge"
   ],
   "generatedAt": "2026-06-18T00:00:00.000Z",
   "issue": 1809,
   "privateRunReports": 0,
   "proofCaseCount": 4,
-  "proofHash": "508188f138e1bf4fcbaa8ad9c9e5376b7d1a3d026bf98a17ab0a653f3e52cb81",
+  "proofHash": "89fee432e2913fc734832e10a04c6fec5417f615057991965880fb7c315fc07d",
   "schemaVersion": 1,
-  "status": "public_contract_private_assets_pending"
+  "status": "public_runtime_bridges_present_private_assets_pending"
 }

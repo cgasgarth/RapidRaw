@@ -73,13 +73,13 @@
     "Private focus-stack CR3, super-resolution NEF, and panorama RAF source files.",
     "Real RAW panorama, focus stack, and super-resolution runtime reports after private source files exist."
   ],
-  "proofHash": "2f9c8ab63cefd5fc92085be55d5e1671c7588b540e71f2bd63b33d6c6f9055be",
+  "proofHash": "13d9274f69f70b0c77274373e0177e6b8642e65f13de45c9c7053ac3086930f7",
   "schemaVersion": 1,
   "sourceReports": [
     {
       "issue": 1809,
       "name": "Computational merge runtime status",
-      "proofStatus": "public_contract_private_assets_pending",
+      "proofStatus": "public_runtime_bridges_present_private_assets_pending",
       "reportPath": "docs/validation/computational-merge-runtime-status-2026-06-18.json"
     },
     {

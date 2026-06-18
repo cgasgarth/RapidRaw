@@ -21,6 +21,12 @@ const caseSchema = z
       'runtime_apply_capable',
       'e2e_verified_private_assets',
     ]),
+    publicRuntimeBridge: z
+      .object({
+        check: z.string().trim().min(1),
+        status: z.literal('runtime_apply_capable'),
+      })
+      .strict(),
     runtimeReportPresent: z.boolean(),
     status: z.enum([
       'manifest_only',
@@ -44,7 +50,11 @@ const reportSchema = z
     proofCaseCount: z.number().int().min(4),
     proofHash: z.string().regex(/^[a-f0-9]{64}$/u),
     schemaVersion: z.literal(1),
-    status: z.enum(['public_contract_private_assets_pending', 'private_reports_present']),
+    status: z.enum([
+      'public_contract_private_assets_pending',
+      'public_runtime_bridges_present_private_assets_pending',
+      'private_reports_present',
+    ]),
   })
   .strict()
   .superRefine((runtimeStatus, context) => {
@@ -75,6 +85,10 @@ for (const command of [
   ['bun', 'scripts/run-panorama-real-raw-private-proof.ts'],
   ['bun', 'scripts/run-focus-real-raw-private-proof.ts'],
   ['bun', 'scripts/run-sr-real-raw-private-proof.ts'],
+  ['bun', 'run', 'check:hdr-ui-runtime-bridge'],
+  ['bun', 'run', 'check:panorama-ui-runtime-bridge'],
+  ['bun', 'run', 'check:focus-ui-runtime-bridge'],
+  ['bun', 'run', 'check:sr-ui-runtime-bridge'],
 ]) {
   run(command);
 }
@@ -84,13 +98,27 @@ const reportsText = await Bun.file('fixtures/validation/computational-merge-priv
 const manifest = parseComputationalMergeE2eProofManifest(JSON.parse(manifestText));
 const reports = parseComputationalMergePrivateRunReportCollection(JSON.parse(reportsText));
 const reportsByFixtureId = new Map(reports.reports.map((report) => [report.fixtureId, report]));
+const publicRuntimeBridgeByFeatureFamily = new Map([
+  ['hdr_merge', 'bun run check:hdr-ui-runtime-bridge'],
+  ['panorama_stitch', 'bun run check:panorama-ui-runtime-bridge'],
+  ['focus_stack', 'bun run check:focus-ui-runtime-bridge'],
+  ['super_resolution', 'bun run check:sr-ui-runtime-bridge'],
+] as const);
 const cases = manifest.proofCases.map((proofCase) => {
   const report = reportsByFixtureId.get(proofCase.fixtureId);
+  const publicRuntimeCheck = publicRuntimeBridgeByFeatureFamily.get(proofCase.featureFamily);
+  if (publicRuntimeCheck === undefined) {
+    throw new Error(`Missing public runtime bridge check for ${proofCase.featureFamily}.`);
+  }
   return {
     featureFamily: proofCase.featureFamily,
     fixtureId: proofCase.fixtureId,
     implementationIssue: proofCase.implementationIssue,
     proofStatus: proofCase.proofStatus,
+    publicRuntimeBridge: {
+      check: publicRuntimeCheck,
+      status: 'runtime_apply_capable',
+    },
     runtimeReportPresent: report !== undefined,
     status: report?.acceptanceStatus ?? proofCase.proofStatus,
     uiIssue: proofCase.uiIssue,
@@ -98,7 +126,8 @@ const cases = manifest.proofCases.map((proofCase) => {
 });
 
 const privateReportCount = reports.reports.length;
-const status = privateReportCount === 0 ? 'public_contract_private_assets_pending' : 'private_reports_present';
+const status =
+  privateReportCount === 0 ? 'public_runtime_bridges_present_private_assets_pending' : 'private_reports_present';
 const report = reportSchema.parse({
   cases,
   checks: [
@@ -108,6 +137,10 @@ const report = reportSchema.parse({
     'bun run check:panorama-real-raw-private-proof',
     'bun run check:focus-real-raw-private-proof',
     'bun run check:sr-real-raw-private-proof',
+    'bun run check:hdr-ui-runtime-bridge',
+    'bun run check:panorama-ui-runtime-bridge',
+    'bun run check:focus-ui-runtime-bridge',
+    'bun run check:sr-ui-runtime-bridge',
   ],
   generatedAt: GENERATED_AT,
   issue: 1809,
