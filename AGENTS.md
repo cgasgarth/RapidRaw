@@ -55,6 +55,13 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   even when other prose is compressed.
 - Prefer updating existing issues, docs, plan entries, and PR descriptions over
   adding new duplicated summaries.
+- Keep command, script, hook, poll, and validation output token-cheap by default.
+  On success, print only compact summaries. On failure, include the failing step,
+  a short actionable excerpt, and the next action or blocker.
+- Do not emit full logs, full JSON, long file lists, repeated green output, or
+  unchanged status blocks unless they are needed for the next decision.
+- For commonly used commands, prefer package scripts or wrappers that keep
+  normal success output small and bound failure output.
 
 ## Consult And Research
 
