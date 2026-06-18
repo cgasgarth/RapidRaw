@@ -55,9 +55,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Concise Output Discipline
 
-- Keep routine thread replies tight, but not cryptic. If `0%` is default
-  verbosity and `100%` is maximum compression, target about `65%` efficiency:
-  concise status, clear next action, and enough context to follow the work.
+- Keep thread replies tight, but not cryptic. If `0%` is default verbosity and
+  `100%` is maximum compression, target about `65%` efficiency: concise status,
+  clear next action, and enough context to follow the work.
 - Keep routine command, script, hook, poll, and validation output compact by
   default. This is standing project guidance; do not remove it during cleanup.
 - Skip obvious narration and do not repeat the same PR queue, CI, or branch facts
