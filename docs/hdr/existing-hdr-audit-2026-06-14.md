@@ -42,6 +42,19 @@ This is schema-only. It does not yet bind the legacy Tauri HDR runtime to the ve
 - Legacy runtime assumes same dimensions and metadata availability; it has no explicit bracket grouping, ordering, exposure-gap warning, alignment confidence, motion mask, deghost mask, or highlight recovery report.
 - Preview tone mapping is baked into the current display path; editable scene-linear output boundaries are not explicit.
 
+## RAW Corpus Placeholders
+
+Issue #1897 reserves HDR RAW corpus slots:
+
+- `real.hdr.interior-window-bracket.v0`
+- `real.hdr.handheld-ghosting-bracket.v0`
+- `raw-evidence.hdr.interior-window-bracket.v1`
+
+These entries are schema/metadata only. They do not add bracket payloads,
+rendered HDR output, deghost masks, source hashes, or quality claims. A later PR
+must attach approved rights, hashes, bracket metadata, output artifacts, and
+review evidence before these entries can count as runtime HDR proof.
+
 ## Recommended Issue Order
 
 1. #162: capture consult guidance in a summary doc before changing contracts.
