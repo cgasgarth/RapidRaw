@@ -200,6 +200,7 @@ const negativeLabBatchConvertArgsSchema = z.object({
 });
 const negativeLabPreviewReturnProofSchema = z.array(z.string().startsWith('data:image/svg+xml,')).min(3);
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
+const focusStackRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 
 export const hdrUiSettingsProofSchema = z.object({
   deghosting: z.literal('high'),
@@ -239,8 +240,9 @@ export const focusUiSettingsProofSchema = z.object({
   retouchLayerPolicy: z.literal('none'),
 });
 export const focusReviewWorkspaceProofSchema = z.object({
+  applyCommand: z.literal(focusStackRoutePair.applyToolName),
   artifactPath: z.literal('/tmp/rawengine-focus-stack-smoke.tif'),
-  command: z.literal('focus.stack.dry_run_command'),
+  command: z.literal(focusStackRoutePair.dryRunToolName),
   depthMode: z.literal('depth_map'),
   haloPolicy: z.literal('flattened_preview'),
   runtimeStatus: z.literal('dry_run_preview'),
