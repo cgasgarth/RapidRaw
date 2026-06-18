@@ -203,6 +203,7 @@
     "check:negative-lab-workspace": "bun scripts/check-negative-lab-workspace.ts",
     "check:negative-lab-roll-cockpit": "bun scripts/check-negative-lab-roll-cockpit.ts",
     "check:negative-lab-qc-contact-sheet": "bun scripts/generate-negative-lab-qc-contact-sheet.ts",
+    "check:negative-lab-batch-export-proof": "bun scripts/check-negative-lab-batch-export-proof.ts",
     "check:negative-lab-measured-profiles": "bun scripts/check-negative-lab-measured-profiles.ts",
     "check:negative-lab-measured-render-proof": "bun scripts/check-negative-lab-measured-render-proof.ts",
     "check:negative-lab-workspace-smoke": "bun scripts/capture-visual-smoke.ts --scenario negative-lab-workspace",
