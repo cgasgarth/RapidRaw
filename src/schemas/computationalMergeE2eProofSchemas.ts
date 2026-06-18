@@ -21,6 +21,7 @@ const artifactKindSchema = z.enum([
   'preview_after_private',
   'export_after_private',
   'quality_report_private',
+  'app_server_runtime_report_private',
 ]);
 
 const proofMetricNameSchema = z.enum([
@@ -128,11 +129,24 @@ const proofCaseSchema = z
     }
 
     const artifactKinds = new Set(proofCase.artifacts.map((artifact) => artifact.kind));
-    for (const requiredKind of artifactKindSchema.options) {
+    const baseRequiredKinds = artifactKindSchema.options.filter(
+      (artifactKind) => artifactKind !== 'app_server_runtime_report_private',
+    );
+    for (const requiredKind of baseRequiredKinds) {
       if (!artifactKinds.has(requiredKind)) {
         context.addIssue({
           code: 'custom',
           message: `Computational merge E2E proof requires ${requiredKind}.`,
+          path: ['artifacts'],
+        });
+      }
+    }
+
+    if (proofCase.proofStatus === 'runtime_apply_capable' || proofCase.proofStatus === 'e2e_verified_private_assets') {
+      if (!artifactKinds.has('app_server_runtime_report_private')) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Runtime-capable computational merge proof requires app_server_runtime_report_private.',
           path: ['artifacts'],
         });
       }
