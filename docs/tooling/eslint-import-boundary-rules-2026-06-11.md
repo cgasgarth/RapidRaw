@@ -36,7 +36,7 @@ focused follow-up PRs rather than hidden inside one large lint change.
 |    10 | `import-x/no-cycle`           | #542 dependency cycle audit        |
 |   TBD | `boundaries/dependencies`     | #543 cross-layer dependency policy |
 |   658 | `boundaries/no-unknown`       | #1287 element map completion       |
-|    20 | `boundaries/no-unknown-files` | #1287 source descriptor completion |
+|     0 | `boundaries/no-unknown-files` | Promoted in #1948                  |
 
 The duplicate-import findings were fixed in the first PR. Import ordering,
 default-export import naming, and default-member import naming were later
@@ -118,40 +118,23 @@ Measured findings:
 | `boundaries/entry-point`      | 0 findings with the current element map.                                                                                                     |
 | `boundaries/dependencies`     | Not enabled yet; a real layer graph is required before this rule applies useful pressure.                                                    |
 | `boundaries/no-unknown`       | 658 findings when enabled. Most current imports resolve as unknown elements until dependency categories and package schema files are mapped. |
-| `boundaries/no-unknown-files` | 20 findings when enabled. This is small enough for the next focused cleanup PR to make green before broader dependency policy work.          |
+| `boundaries/no-unknown-files` | 0 findings after the #1948 descriptor cleanup.                                                                                               |
 
-Current `boundaries/no-unknown-files` sources:
+Resolved `boundaries/no-unknown-files` source groups:
 
-- `i18next.config.ts`
-- `packages/rawengine-schema/scripts/check-edit-command-bus.ts`
-- `packages/rawengine-schema/scripts/check-focus-app-server-command-bus.ts`
-- `packages/rawengine-schema/scripts/check-hdr-api-tools.ts`
-- `packages/rawengine-schema/scripts/check-hdr-app-server-command-bus.ts`
-- `packages/rawengine-schema/scripts/check-samples.ts`
-- `packages/rawengine-schema/src/editCommandBus.ts`
-- `packages/rawengine-schema/src/focusStackPreflight.ts`
-- `packages/rawengine-schema/src/hdrBracketDetection.ts`
-- `packages/rawengine-schema/src/hdrMergeApiTools.ts`
-- `packages/rawengine-schema/src/hdrMergeUiControls.ts`
-- `packages/rawengine-schema/src/index.ts`
-- `packages/rawengine-schema/src/rawEngineSchemas.ts`
-- `packages/rawengine-schema/src/samplePayloads.ts`
-- `src/@types/i18next.d.ts`
-- `src/@types/react-image-crop.d.ts`
-- `src/App.tsx`
-- `src/main.tsx`
-- `src/validation/visual/VisualSmokeApp.tsx`
-- `src/validation/visual/main.tsx`
+- Root config files.
+- App and validation entrypoints.
+- Local declaration files.
+- Repo scripts and pure TypeScript tests.
+- `packages/rawengine-schema/**`.
 
 Exit criteria before enabling `boundaries/dependencies`:
 
 - Define the allowed layer graph for entry, app, views, panels, adjustments,
   modals, managers, UI, context, hooks, schemas, store, types, utils, i18n, and
   window elements.
-- First make `boundaries/no-unknown-files` green by adding descriptors for
-  app entrypoints, visual validation entrypoints, root config, declaration
-  files, and `packages/rawengine-schema/**`.
-- Then reduce `boundaries/no-unknown` by mapping imported dependency
+- Keep `boundaries/no-unknown-files` green while reducing `boundaries/no-unknown`
+  by mapping imported dependency
   categories and package schema elements.
 - Decide whether type-only imports get a looser graph than value imports.
 - Re-run `bun run check:lint` with `boundaries/dependencies`,
