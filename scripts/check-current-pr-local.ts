@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { extname } from 'node:path';
 
 const textDecoder = new TextDecoder();
@@ -41,6 +41,15 @@ function unique(values: Array<string>): Array<string> {
   return [...new Set(values)].toSorted();
 }
 
+function collectChangedFiles(baseRef: string): Array<string> {
+  return unique([
+    ...gitLines(['diff', '--name-only', '--diff-filter=ACMRTUXB', `${baseRef}...HEAD`]),
+    ...gitLines(['diff', '--name-only', '--diff-filter=ACMRTUXB']),
+    ...gitLines(['diff', '--cached', '--name-only', '--diff-filter=ACMRTUXB']),
+    ...gitLines(['ls-files', '--others', '--exclude-standard']),
+  ]).filter((file) => existsSync(file));
+}
+
 const baseRef = 'origin/main';
 if (!existsSync('.git')) {
   console.error('current pr local failed');
@@ -48,13 +57,27 @@ if (!existsSync('.git')) {
   process.exit(1);
 }
 
+if (process.argv.includes('--self-test')) {
+  const probeFile = '__current_pr_local_untracked_probe__.md';
+  try {
+    writeFileSync(probeFile, '# current-pr-local untracked probe\n');
+    const changedFiles = collectChangedFiles(baseRef);
+    if (!changedFiles.includes(probeFile)) {
+      console.error('current pr local self-test failed');
+      console.error('- untracked files were not included in changed-file detection');
+      process.exit(1);
+    }
+  } finally {
+    rmSync(probeFile, { force: true });
+  }
+
+  console.log('current pr local self-test ok');
+  process.exit(0);
+}
+
 run(['git', 'fetch', 'origin', 'main', '--quiet'], 'fetch main', true);
 
-const changedFiles = unique([
-  ...gitLines(['diff', '--name-only', '--diff-filter=ACMRTUXB', `${baseRef}...HEAD`]),
-  ...gitLines(['diff', '--name-only', '--diff-filter=ACMRTUXB']),
-  ...gitLines(['diff', '--cached', '--name-only', '--diff-filter=ACMRTUXB']),
-]).filter((file) => existsSync(file));
+const changedFiles = collectChangedFiles(baseRef);
 
 if (changedFiles.length === 0) {
   console.log('current pr local ok (no changed files)');
