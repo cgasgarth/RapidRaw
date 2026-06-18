@@ -8014,6 +8014,7 @@ export const negativeLabApplyFrameCropParametersV1Schema = z
 export const negativeLabApplyPlanRequestV1Schema = z
   .object({
     acknowledgedWarningCodes: z.array(negativeWarningCodeSchema),
+    acceptedDryRunPlanHash: z.string().trim().min(1),
     commandId: z.string().trim().min(1),
     dryRunPlanId: z.string().trim().min(1),
     expectedSessionRevision: z.string().trim().min(1),

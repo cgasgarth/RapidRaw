@@ -17,14 +17,14 @@ import {
 } from '../src/utils/negativeLabAppServerRoutes.ts';
 import {
   rawEngineAgentReplayFixtureV1Schema,
+  negativeLabApplyPlanRequestV1Schema,
   negativeLabAppServerToolManifestV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { NegativeLabAppServerRuntimeToolBusV1 } from '../packages/rawengine-schema/src/negativeLabAppServerRuntime.ts';
 import {
   sampleNegativeLabApplyPlanRequestV1,
-  sampleNegativeLabApplyResultV1,
   sampleNegativeLabAppServerToolManifestV1,
   sampleNegativeLabCommandEnvelopeV1,
-  sampleNegativeLabDryRunResultV1,
   sampleToolRegistryV1,
 } from '../packages/rawengine-schema/src/samplePayloads.ts';
 
@@ -61,6 +61,32 @@ const conversionCommand = {
 };
 
 const manifest = negativeLabAppServerToolManifestV1Schema.parse(sampleNegativeLabAppServerToolManifestV1);
+const runtimeBus = new NegativeLabAppServerRuntimeToolBusV1(manifest);
+const runtimeDryRun = runtimeBus.execute({
+  request: sampleNegativeLabCommandEnvelopeV1,
+  toolName: 'negativelab.preview_conversion',
+});
+if (runtimeDryRun.kind !== 'dry_run') {
+  throw new Error('Negative Lab runtime bus did not return a dry-run result.');
+}
+const runtimeApplyRequest = negativeLabApplyPlanRequestV1Schema.parse({
+  ...sampleNegativeLabApplyPlanRequestV1,
+  acceptedDryRunPlanHash: runtimeDryRun.acceptedDryRunPlanHash,
+  dryRunPlanId: runtimeDryRun.dryRun.dryRunPlanId,
+});
+const runtimeApply = runtimeBus.execute({
+  request: runtimeApplyRequest,
+  toolName: 'negativelab.apply_planned_command',
+});
+if (runtimeApply.kind !== 'apply') {
+  throw new Error('Negative Lab runtime bus did not return an apply result.');
+}
+if (runtimeApply.apply.dryRunCommandId !== runtimeDryRun.dryRun.commandId) {
+  throw new Error('Negative Lab runtime bus did not preserve dry-run command identity.');
+}
+if (runtimeApply.apply.changeSet.artifactHandles.length === 0) {
+  throw new Error('Negative Lab runtime bus apply did not emit artifact handles.');
+}
 const routeNames = new Set(NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.map((route) => route.commandName));
 const requiredRouteNames = [
   'negative.lab.build_conversion_plan',
@@ -159,7 +185,7 @@ if (
 const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
   actor,
   deterministicReplayHash: 'sha256:negative-lab-agent-route-tool-e2e',
-  finalGraphRevision: sampleNegativeLabApplyResultV1.appliedGraphRevision,
+  finalGraphRevision: runtimeApply.apply.appliedGraphRevision,
   initialGraphRevision: 'graph_rev_negative_7',
   registry: sampleToolRegistryV1,
   replayId: 'replay_negative_lab_agent_route_tool_e2e_001',
@@ -168,7 +194,7 @@ const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
   steps: [
     {
       auditLog: {
-        affectedArtifactIds: sampleNegativeLabDryRunResultV1.previewArtifacts.map((artifact) => artifact.artifactId),
+        affectedArtifactIds: runtimeDryRun.dryRun.previewArtifacts.map((artifact) => artifact.artifactId),
         affectedImageIds: [target.imagePath],
         noOverwritePolicy: 'never_overwrite_original',
         parameterDiff: [
@@ -182,7 +208,7 @@ const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
           toolKind: 'dry_run',
           toolName: 'negativelab.preview_conversion',
         },
-        warnings: ['route_proof_only_no_renderer_export'],
+        warnings: ['runtime_bus_synthetic_no_real_scan_quality_claim'],
       },
       approval: {
         approvalClass: 'preview_only',
@@ -195,27 +221,25 @@ const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
       inputContentHash: 'sha256:negative-lab-agent-preview-input',
       inputSchemaName: 'NegativeLabCommandEnvelopeV1',
       mutates: false,
-      output: sampleNegativeLabDryRunResultV1,
-      outputContentHash: 'sha256:negative-lab-agent-preview-output',
+      output: runtimeDryRun.dryRun,
+      outputContentHash: runtimeDryRun.acceptedDryRunPlanHash,
       outputSchemaName: 'NegativeLabDryRunResultV1',
       prerequisiteStepIds: [],
       sourceGraphRevision: 'graph_rev_negative_7',
       stepId: 'negative_lab_agent_preview',
       toolKind: 'dry_run',
       toolName: 'negativelab.preview_conversion',
-      warnings: ['route_proof_only_no_renderer_export'],
+      warnings: ['runtime_bus_synthetic_no_real_scan_quality_claim'],
     },
     {
       auditLog: {
-        affectedArtifactIds: sampleNegativeLabApplyResultV1.changeSet.artifactHandles.map(
-          (artifact) => artifact.artifactId,
-        ),
+        affectedArtifactIds: runtimeApply.apply.changeSet.artifactHandles.map((artifact) => artifact.artifactId),
         affectedImageIds: [target.imagePath],
         noOverwritePolicy: 'never_overwrite_original',
         parameterDiff: [
           {
             path: '/dryRunPlanId',
-            value: sampleNegativeLabApplyPlanRequestV1.dryRunPlanId,
+            value: runtimeApplyRequest.dryRunPlanId,
           },
         ],
         rollbackPoint: {
@@ -227,7 +251,7 @@ const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
           toolKind: 'apply',
           toolName: 'negativelab.apply_planned_command',
         },
-        warnings: ['route_proof_only_no_renderer_export'],
+        warnings: ['runtime_bus_synthetic_no_real_scan_quality_claim'],
       },
       approval: {
         approvalClass: 'edit_apply',
@@ -236,32 +260,32 @@ const fixture = rawEngineAgentReplayFixtureV1Schema.parse({
       },
       deterministic: true,
       dryRun: false,
-      input: sampleNegativeLabApplyPlanRequestV1,
-      inputContentHash: 'sha256:negative-lab-agent-apply-input',
+      input: runtimeApplyRequest,
+      inputContentHash: runtimeDryRun.acceptedDryRunPlanHash,
       inputSchemaName: 'NegativeLabApplyPlanRequestV1',
       mutates: true,
-      output: sampleNegativeLabApplyResultV1,
-      outputContentHash: 'sha256:negative-lab-agent-apply-output',
+      output: runtimeApply.apply,
+      outputContentHash: `sha256:${runtimeApply.apply.appliedGraphRevision}`,
       outputSchemaName: 'NegativeLabApplyResultV1',
       prerequisiteStepIds: ['negative_lab_agent_preview'],
-      resultingGraphRevision: sampleNegativeLabApplyResultV1.appliedGraphRevision,
+      resultingGraphRevision: runtimeApply.apply.appliedGraphRevision,
       sourceGraphRevision: 'graph_rev_negative_7',
       stepId: 'negative_lab_agent_apply',
       toolKind: 'apply',
       toolName: 'negativelab.apply_planned_command',
-      warnings: ['route_proof_only_no_renderer_export'],
+      warnings: ['runtime_bus_synthetic_no_real_scan_quality_claim'],
     },
   ],
   target,
   validationProfile: 'golden_replay',
-  warnings: ['route_proof_only_no_renderer_export'],
+  warnings: ['runtime_bus_synthetic_no_real_scan_quality_claim'],
 });
 
-if (fixture.steps.length !== 2 || fixture.finalGraphRevision !== sampleNegativeLabApplyResultV1.appliedGraphRevision) {
+if (fixture.steps.length !== 2 || fixture.finalGraphRevision !== runtimeApply.apply.appliedGraphRevision) {
   throw new Error('Negative Lab agent replay fixture did not validate the preview/apply chain.');
 }
 
-if (sampleNegativeLabApplyResultV1.changeSet.artifactHandles.length === 0) {
+if (runtimeApply.apply.changeSet.artifactHandles.length === 0) {
   throw new Error('Negative Lab agent apply fixture did not include an edited artifact handle.');
 }
 
@@ -418,7 +442,7 @@ const html = `<!doctype html>
     <main>
       <header>
         <h1>Negative Lab Agent Workflow Proof</h1>
-        <p>Route-proof artifact for preview, QC, accepted dry-run apply, and governed stock-family planning.</p>
+        <p>Runtime-bus proof artifact for preview, QC, accepted dry-run apply, and governed stock-family planning.</p>
       </header>
 
       <section class="summary">
@@ -471,5 +495,5 @@ if (current !== formattedHtml) {
 }
 
 console.log(
-  `negative lab agent workflow ok (${requiredRouteNames.length} routes, ${fixture.steps.length} replay steps, route proof only)`,
+  `negative lab agent workflow ok (${requiredRouteNames.length} routes, ${fixture.steps.length} runtime steps)`,
 );
