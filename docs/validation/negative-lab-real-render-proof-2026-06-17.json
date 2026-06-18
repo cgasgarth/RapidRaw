@@ -1,0 +1,35 @@
+{
+  "changedPixelCount": 12,
+  "fixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001",
+  "inputSha256": "sha256:f0913770ce2ec72f2261d6cc0948091e3224d11904049727a42beb864ef5673b",
+  "meanAbsInputDelta": 0.4771733055555555,
+  "outputIntent": "public_fixture_negative_conversion_smoke",
+  "provenance": {
+    "commandName": "negative.lab.public_fixture_render_smoke",
+    "fixtureSourceUrl": "https://commons.wikimedia.org/wiki/File:110_format_negative_closeup_of_frame_Ericht_at_Blairgowrie.jpg",
+    "licenseName": "CC0 1.0 Universal Public Domain Dedication",
+    "noStockOrProfileClaim": true,
+    "sourceFixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001"
+  },
+  "renderedSampleGrid": [
+    [
+      [0.02, 0.02, 0.02],
+      [0.55568, 0.874182, 0.819812],
+      [0.55568, 0.864364, 0.789245],
+      [0.49088, 0.938, 0.814717]
+    ],
+    [
+      [0.67664, 1, 0.98283],
+      [0.41744, 0.677818, 0.646604],
+      [0.52112, 0.795637, 0.768868],
+      [0.56864, 1, 0.91151]
+    ],
+    [
+      [0.464959, 1, 0.79434],
+      [0.2792, 0.476546, 0.478491],
+      [0.33104, 0.520727, 0.539622],
+      [0.57728, 1, 0.94717]
+    ]
+  ],
+  "warningCodes": ["lossy_input", "low_bit_depth_input", "unknown_input_profile", "low_acquisition_confidence"]
+}
