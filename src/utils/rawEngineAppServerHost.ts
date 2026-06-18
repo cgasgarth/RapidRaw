@@ -6,6 +6,7 @@ import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negativeLabAppServerRo
 import { TONE_COLOR_APP_SERVER_ROUTES } from './toneColorAppServerRoutes';
 import {
   AgentRuntimeId,
+  RawEngineAppServerHostToolName,
   rawEngineAppServerAuditEntrySchema,
   rawEngineAppServerCapabilitiesReplaySchema,
   rawEngineAppServerCapabilitiesResponseSchema,
@@ -55,21 +56,21 @@ export const RAW_ENGINE_APP_SERVER_HOST_MANIFEST = rawEngineAppServerHostManifes
       mutates: false,
       outputSchemaName: 'RawEngineAppServerHealthResponseV1',
       toolKind: 'read',
-      toolName: 'rawengine.host.health',
+      toolName: RawEngineAppServerHostToolName.Health,
     },
     {
       inputSchemaName: 'RawEngineAppServerCapabilitiesRequestV1',
       mutates: false,
       outputSchemaName: 'RawEngineAppServerCapabilitiesResponseV1',
       toolKind: 'read',
-      toolName: 'rawengine.host.capabilities',
+      toolName: RawEngineAppServerHostToolName.Capabilities,
     },
     {
       inputSchemaName: 'RawEngineAppServerRouteCatalogRequestV1',
       mutates: false,
       outputSchemaName: 'RawEngineAppServerRouteCatalogResponseV1',
       toolKind: 'read',
-      toolName: 'rawengine.host.route_catalog',
+      toolName: RawEngineAppServerHostToolName.RouteCatalog,
     },
   ],
   transport: 'stdio_jsonl',
@@ -498,11 +499,11 @@ export const handleRawEngineAppServerHostRequest = (request: unknown): RawEngine
   const parsedRequest: RawEngineAppServerHostRequest = rawEngineAppServerHostRequestSchema.parse(request);
 
   switch (parsedRequest.toolName) {
-    case 'rawengine.host.capabilities':
+    case RawEngineAppServerHostToolName.Capabilities:
       return rawEngineAppServerHostResponseSchema.parse(buildRawEngineAppServerCapabilitiesResponse(parsedRequest));
-    case 'rawengine.host.health':
+    case RawEngineAppServerHostToolName.Health:
       return rawEngineAppServerHostResponseSchema.parse(buildRawEngineAppServerHealthResponse(parsedRequest));
-    case 'rawengine.host.route_catalog':
+    case RawEngineAppServerHostToolName.RouteCatalog:
       return rawEngineAppServerHostResponseSchema.parse(buildRawEngineAppServerRouteCatalogResponse(parsedRequest));
   }
 };

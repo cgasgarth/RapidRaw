@@ -23,6 +23,7 @@ import {
   stopRawEngineAppServerSupervisor,
 } from '../src/utils/rawEngineAppServerHost.ts';
 import {
+  RawEngineAppServerHostToolName,
   rawEngineAppServerCapabilitiesReplaySchema,
   rawEngineAppServerHealthReplaySchema,
   rawEngineAppServerHostResponseEnvelopeSchema,
@@ -34,9 +35,9 @@ import {
 
 const failures = [];
 const manifest = rawEngineAppServerHostManifestSchema.parse(RAW_ENGINE_APP_SERVER_HOST_MANIFEST);
-const healthTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.health');
-const capabilitiesTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.capabilities');
-const routeCatalogTool = manifest.tools.find((tool) => tool.toolName === 'rawengine.host.route_catalog');
+const healthTool = manifest.tools.find((tool) => tool.toolName === RawEngineAppServerHostToolName.Health);
+const capabilitiesTool = manifest.tools.find((tool) => tool.toolName === RawEngineAppServerHostToolName.Capabilities);
+const routeCatalogTool = manifest.tools.find((tool) => tool.toolName === RawEngineAppServerHostToolName.RouteCatalog);
 const clientInfo = {
   name: 'rawengine_desktop',
   title: 'RawEngine Desktop',
@@ -275,21 +276,21 @@ if (launchProof.auditEvents.map((event) => event.kind).join(',') !== 'created,st
 }
 
 if (healthTool === undefined) {
-  failures.push('Missing rawengine.host.health tool.');
+  failures.push(`Missing ${RawEngineAppServerHostToolName.Health} tool.`);
 } else {
   if (healthTool.mutates) failures.push('Health tool must be read-only.');
   if (healthTool.toolKind !== 'read') failures.push('Health tool must use read kind.');
 }
 
 if (capabilitiesTool === undefined) {
-  failures.push('Missing rawengine.host.capabilities tool.');
+  failures.push(`Missing ${RawEngineAppServerHostToolName.Capabilities} tool.`);
 } else {
   if (capabilitiesTool.mutates) failures.push('Capabilities tool must be read-only.');
   if (capabilitiesTool.toolKind !== 'read') failures.push('Capabilities tool must use read kind.');
 }
 
 if (routeCatalogTool === undefined) {
-  failures.push('Missing rawengine.host.route_catalog tool.');
+  failures.push(`Missing ${RawEngineAppServerHostToolName.RouteCatalog} tool.`);
 } else {
   if (routeCatalogTool.mutates) failures.push('Route catalog tool must be read-only.');
   if (routeCatalogTool.toolKind !== 'read') failures.push('Route catalog tool must use read kind.');
@@ -298,7 +299,7 @@ if (routeCatalogTool === undefined) {
 const replay = rawEngineAppServerHealthReplaySchema.parse(
   buildRawEngineAppServerHealthReplay({
     requestId: 'health_replay_001',
-    toolName: 'rawengine.host.health',
+    toolName: RawEngineAppServerHostToolName.Health,
   }),
 );
 
@@ -309,14 +310,14 @@ if (replay.response.manifestToolCount !== manifest.tools.length) {
 if (replay.auditLog.length !== 1 || replay.auditLog[0]?.mutates) {
   failures.push('Health replay audit log must be read-only.');
 }
-if (replay.auditLog[0]?.toolName !== 'rawengine.host.health') {
+if (replay.auditLog[0]?.toolName !== RawEngineAppServerHostToolName.Health) {
   failures.push('Health replay audit tool mismatch.');
 }
 
 const capabilitiesReplay = rawEngineAppServerCapabilitiesReplaySchema.parse(
   buildRawEngineAppServerCapabilitiesReplay({
     requestId: 'capabilities_replay_001',
-    toolName: 'rawengine.host.capabilities',
+    toolName: RawEngineAppServerHostToolName.Capabilities,
   }),
 );
 
@@ -326,14 +327,14 @@ if (capabilitiesReplay.response.tools.length !== manifest.tools.length) {
 if (capabilitiesReplay.auditLog.length !== 1 || capabilitiesReplay.auditLog[0]?.mutates) {
   failures.push('Capabilities replay audit log must be read-only.');
 }
-if (capabilitiesReplay.auditLog[0]?.toolName !== 'rawengine.host.capabilities') {
+if (capabilitiesReplay.auditLog[0]?.toolName !== RawEngineAppServerHostToolName.Capabilities) {
   failures.push('Capabilities replay audit tool mismatch.');
 }
 
 const routeCatalogReplay = rawEngineAppServerRouteCatalogReplaySchema.parse(
   buildRawEngineAppServerRouteCatalogReplay({
     requestId: 'route_catalog_replay_001',
-    toolName: 'rawengine.host.route_catalog',
+    toolName: RawEngineAppServerHostToolName.RouteCatalog,
   }),
 );
 
@@ -377,40 +378,40 @@ for (const route of routeCatalogReplay.response.routes.filter((candidate) => can
 if (routeCatalogReplay.auditLog.length !== 1 || routeCatalogReplay.auditLog[0]?.mutates) {
   failures.push('Route catalog replay audit log must be read-only.');
 }
-if (routeCatalogReplay.auditLog[0]?.toolName !== 'rawengine.host.route_catalog') {
+if (routeCatalogReplay.auditLog[0]?.toolName !== RawEngineAppServerHostToolName.RouteCatalog) {
   failures.push('Route catalog replay audit tool mismatch.');
 }
 
 const dispatchedHealth = handleRawEngineAppServerHostRequest({
   requestId: 'dispatch_health_001',
-  toolName: 'rawengine.host.health',
+  toolName: RawEngineAppServerHostToolName.Health,
 });
 if (dispatchedHealth.status !== 'ok') failures.push('Dispatched health request failed.');
 
 const dispatchedCapabilities = handleRawEngineAppServerHostRequest({
   requestId: 'dispatch_capabilities_001',
-  toolName: 'rawengine.host.capabilities',
+  toolName: RawEngineAppServerHostToolName.Capabilities,
 });
 if (dispatchedCapabilities.status !== 'ok') failures.push('Dispatched capabilities request failed.');
 
 const dispatchedRouteCatalog = handleRawEngineAppServerHostRequest({
   requestId: 'dispatch_route_catalog_001',
-  toolName: 'rawengine.host.route_catalog',
+  toolName: RawEngineAppServerHostToolName.RouteCatalog,
 });
 if (dispatchedRouteCatalog.status !== 'ok') failures.push('Dispatched route catalog request failed.');
 
 const envelopeRequests = [
   {
     requestId: 'envelope_health_001',
-    toolName: 'rawengine.host.health',
+    toolName: RawEngineAppServerHostToolName.Health,
   },
   {
     requestId: 'envelope_capabilities_001',
-    toolName: 'rawengine.host.capabilities',
+    toolName: RawEngineAppServerHostToolName.Capabilities,
   },
   {
     requestId: 'envelope_route_catalog_001',
-    toolName: 'rawengine.host.route_catalog',
+    toolName: RawEngineAppServerHostToolName.RouteCatalog,
   },
 ];
 
@@ -437,9 +438,9 @@ const source = [
 
 for (const marker of [
   'RAW_ENGINE_APP_SERVER_HOST_MANIFEST',
-  'rawengine.host.health',
-  'rawengine.host.capabilities',
-  'rawengine.host.route_catalog',
+  RawEngineAppServerHostToolName.Health,
+  RawEngineAppServerHostToolName.Capabilities,
+  RawEngineAppServerHostToolName.RouteCatalog,
   'buildRawEngineAppServerHostResponseEnvelope',
   'buildRawEngineAppServerLifecycleReplay',
   'assertRawEngineAppServerLifecycleReady',
