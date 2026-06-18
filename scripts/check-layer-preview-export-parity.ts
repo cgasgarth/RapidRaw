@@ -6,7 +6,11 @@ import { createHash } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
-import { renderLayerExportStack, renderLayerPreviewStack } from '../src/utils/layerPreviewExportParity.ts';
+import {
+  renderLayerExportStack,
+  renderLayerHeadlessStack,
+  renderLayerPreviewStack,
+} from '../src/utils/layerPreviewExportParity.ts';
 import { layerMaskBlendModeV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const FIXTURE_PATH = 'fixtures/layers/layer-preview-export-parity.json';
@@ -145,16 +149,24 @@ for (const fixture of manifest.cases) {
 
   const preview = renderLayerPreviewStack(fixture);
   const exported = renderLayerExportStack(fixture);
+  const headless = renderLayerHeadlessStack(fixture);
   const previewHash = hashPixels(preview.pixels);
   const exportHash = hashPixels(exported.pixels);
+  const headlessHash = hashPixels(headless.pixels);
   if (previewHash !== exportHash) {
     fail(`${fixture.id}: preview/export pixel hash mismatch`, [previewHash, exportHash]);
+  }
+  if (previewHash !== headlessHash) {
+    fail(`${fixture.id}: preview/headless pixel hash mismatch`, [previewHash, headlessHash]);
   }
   if (previewHash !== fixture.expectedPreviewExportHash) {
     fail(`${fixture.id}: preview/export expected hash mismatch`, [previewHash, fixture.expectedPreviewExportHash]);
   }
   if (JSON.stringify(preview.coverageByLayer) !== JSON.stringify(exported.coverageByLayer)) {
     fail(`${fixture.id}: preview/export coverage mismatch`);
+  }
+  if (JSON.stringify(preview.coverageByLayer) !== JSON.stringify(headless.coverageByLayer)) {
+    fail(`${fixture.id}: preview/headless coverage mismatch`);
   }
   if (JSON.stringify(preview.coverageByLayer) !== JSON.stringify(fixture.expectedCoverageByLayer)) {
     fail(`${fixture.id}: expected coverage mismatch`);
@@ -165,12 +177,14 @@ for (const fixture of manifest.cases) {
 
   await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.preview.ppm`), fixture.width, fixture.height, preview.pixels);
   await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.export.ppm`), fixture.width, fixture.height, exported.pixels);
+  await writePpm(resolve(OUTPUT_DIR, `${fixture.id}.headless.ppm`), fixture.width, fixture.height, headless.pixels);
   await writeFile(
     resolve(OUTPUT_DIR, `${fixture.id}.report.json`),
     `${JSON.stringify(
       {
         coverageByLayer: preview.coverageByLayer,
         exportHash,
+        headlessHash,
         previewHash,
         sidecarArtifactId: fixture.sidecarLayerStack.artifactId,
       },
