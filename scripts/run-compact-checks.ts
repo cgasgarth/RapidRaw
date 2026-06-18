@@ -90,6 +90,7 @@ const CHECK_GROUPS = {
     'check:selective-color-mask',
     'check:layer-stack',
     'check:layer-normal-opacity-runtime',
+    'check:layer-stack-undo-redo',
     'check:layer-mask-audit',
     'check:layer-adjustments',
     'check:layer-preview-export-parity',
