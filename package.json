@@ -113,6 +113,7 @@
     "check:delivery-review-manifest": "bun scripts/check-delivery-review-manifest.ts",
     "check:import-presets": "bun scripts/check-import-preset-fixtures.ts",
     "check:library-sessions": "bun scripts/check-library-session-fixtures.ts",
+    "check:session-import-reload-proof": "bun scripts/check-session-import-reload-proof.ts",
     "check:library-session-ui": "bun scripts/check-library-session-ui.ts",
     "check:export-queue": "bun scripts/check-export-queue-fixtures.ts",
     "check:smart-albums": "bun scripts/check-smart-album-fixtures.ts",

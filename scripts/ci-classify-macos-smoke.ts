@@ -114,6 +114,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:import-presets', new Set(['bun scripts/check-import-preset-fixtures.ts'])],
   ['check:keyboard-shortcut-conflicts', new Set(['bun scripts/check-keyboard-shortcut-conflicts.ts'])],
   ['check:keyboard-shortcuts', new Set(['bun scripts/check-keyboard-shortcuts.ts'])],
+  ['check:session-import-reload-proof', new Set(['bun scripts/check-session-import-reload-proof.ts'])],
   ['check:library-session-ui', new Set(['bun scripts/check-library-session-ui.ts'])],
   ['check:panorama-ui-api', new Set(['bun scripts/check-panorama-ui-api.ts'])],
   ['check:panorama-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario panorama-ui'])],
@@ -792,6 +793,11 @@ function runSelfTest() {
   assertClassification(
     'workflow delivery review fixtures can skip smoke',
     ['fixtures/workflow/delivery-review-manifest.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
+    'workflow session reload fixtures can skip smoke',
+    ['fixtures/workflow/session-import-reload-proof.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification('export fixtures can skip smoke', ['fixtures/export/export-recipes.json'], SMOKE_MODES.NONE);
