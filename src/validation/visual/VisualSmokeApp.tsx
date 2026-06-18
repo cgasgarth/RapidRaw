@@ -37,6 +37,7 @@ const visualSmokeComponents = {
   'focus-ui': FocusStackVisualSmoke,
   'hdr-ui': HdrVisualSmoke,
   'layer-stack-workflow': LayerStackWorkflowVisualSmoke,
+  'library-workflow': LibraryWorkflowVisualSmoke,
   'negative-lab-workspace': NegativeLabVisualSmoke,
   'panorama-ui': PanoramaVisualSmoke,
   'sr-ui': SuperResolutionVisualSmoke,
@@ -128,6 +129,11 @@ const FILM_LOOK_PARITY_FIXTURE_LABEL = 'Synthetic fixture';
 const NEGATIVE_LAB_NO_SAVED_PATHS_LABEL = 'No saved positives yet';
 const formatFilmLookParityDelta = (maxDelta: string) => `Delta ${maxDelta}`;
 const formatLayerBlend = (blend: string) => blend.replace('_', ' ');
+const libraryWorkflowAssets = [
+  { color: 'green', file: 'DSC_0001.NEF', rating: 5, status: 'Keeper', tone: 'from-[#6cbf84] to-[#d9b26f]' },
+  { color: 'green', file: 'DSC_0002.NEF', rating: 4, status: 'Client pick', tone: 'from-[#4f86c6] to-[#c7d8ff]' },
+  { color: 'yellow', file: 'DSC_0003.NEF', rating: 3, status: 'Maybe', tone: 'from-[#d7a84f] to-[#8d6b46]' },
+] as const;
 const detailReviewBands = [
   { label: 'Fine', value: '+18', width: '72%' },
   { label: 'Medium', value: '+9', width: '54%' },
@@ -173,6 +179,24 @@ const copy = {
   readyForHeadlessReplay: 'Ready for headless replay',
   pending: 'Pending',
   frameStatus: (rating: string) => `Rating ${rating} / RAW / edited`,
+  cullSession: 'Cull Session',
+  weddingKeepers: 'Wedding keepers',
+  libraryKeepers: 'Keepers',
+  libraryKeepersCriteria: '4+ / green',
+  librarySurvey: 'Survey',
+  createBwProofCopy: 'Create B&W proof copy',
+  virtualCopyShort: 'VC',
+  libraryRating: (rating: number) => `Rating ${rating}`,
+  libraryStars: (rating: number) => `${rating} stars`,
+  libraryColorLabel: (label: string) => `Color label ${label}`,
+  selectionState: 'Selection State',
+  filter: 'Filter',
+  virtualCopy: 'Virtual copy',
+  repeatableProof: 'Repeatable proof',
+  allSessionFiles: 'All session files',
+  keeperFilterSummary: 'Keepers: rating 4+, green label',
+  replayProofSummary: 'Fixture cull, filter, survey, and virtual-copy state are captured in one replay.',
+  selectedCount: (count: number) => `${count} selected`,
   detailReview: 'Detail Review',
   detailWorkspace: 'Zoom detail workspace',
   detailRuntimeStatus: 'Fixture runtime paths',
@@ -181,8 +205,6 @@ const copy = {
   lumaDetail: 'Luma detail',
   detailBefore: 'Before',
   detailAfter: 'After',
-  detailDenoise: 'Denoise',
-  detailDeblur: 'Deblur',
   detailWavelet: 'Wavelet',
   detailWarningTitle: 'Artifact warning',
   detailRingingReview: 'Ringing review',
@@ -272,7 +294,10 @@ function DetailWorkspaceVisualSmoke() {
             </div>
           </div>
           <div className="grid h-[680px] grid-cols-2 gap-3 overflow-hidden rounded-md border border-white/10 bg-[#11161b] p-3">
-            <div className="relative overflow-hidden rounded bg-gradient-to-br from-[#39434a] via-[#6d6f6b] to-[#b8a475]">
+            <div
+              className="relative overflow-hidden rounded"
+              style={{ background: 'linear-gradient(135deg, #39434a, #6d6f6b, #b8a475)' }}
+            >
               <div className="absolute left-4 top-4 rounded bg-black/50 px-2 py-1 text-xs text-white">
                 {copy.detailBefore}
               </div>
@@ -280,11 +305,14 @@ function DetailWorkspaceVisualSmoke() {
               <div className="absolute inset-y-24 left-28 w-px bg-white/30" />
               <div className="absolute bottom-8 left-8 right-8 h-20 rounded bg-black/20" />
             </div>
-            <div className="relative overflow-hidden rounded bg-gradient-to-br from-[#33434d] via-[#738176] to-[#cfbe88]">
+            <div
+              className="relative overflow-hidden rounded"
+              style={{ background: 'linear-gradient(135deg, #33434d, #738176, #cfbe88)' }}
+            >
               <div className="absolute left-4 top-4 rounded bg-black/50 px-2 py-1 text-xs text-white">
                 {copy.detailAfter}
               </div>
-              <div className="absolute inset-x-8 top-28 h-px bg-white/70 shadow-[0_0_12px_rgba(255,255,255,0.55)]" />
+              <div className="absolute inset-x-8 top-28 h-px bg-white/70 shadow-lg" />
               <div className="absolute inset-y-24 left-28 w-px bg-white/50" />
               <div className="absolute bottom-8 left-8 right-8 h-20 rounded bg-black/15" />
             </div>
@@ -307,7 +335,7 @@ function DetailWorkspaceVisualSmoke() {
                     <span>{band.value}</span>
                   </div>
                   <div className="h-1.5 rounded bg-white/10">
-                    <div className="h-1.5 rounded bg-[#6da7d8]" style={{ width: band.width }} />
+                    <div className="h-1.5 rounded" style={{ backgroundColor: '#6da7d8', width: band.width }} />
                   </div>
                 </div>
               ))}
@@ -319,6 +347,127 @@ function DetailWorkspaceVisualSmoke() {
             <div className="rounded-md border border-white/10 bg-white/5 p-3">
               <p className="text-xs text-[#9ba6b2]">{copy.detailDryRunTool}</p>
               <p>{copy.detailProofSummary}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function LibraryWorkflowVisualSmoke() {
+  const [filterMode, setFilterMode] = useState<'all' | 'keepers'>('all');
+  const [viewMode, setViewMode] = useState<'compare' | 'survey'>('compare');
+  const [virtualCopyId, setVirtualCopyId] = useState('pending');
+  const visibleAssets =
+    filterMode === 'keepers' ? libraryWorkflowAssets.filter((asset) => asset.rating >= 4) : libraryWorkflowAssets;
+  const activeAsset = libraryWorkflowAssets[1];
+  const selectedCount = visibleAssets.filter((asset) => asset.rating >= 4).length;
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode="library-workflow"
+    >
+      <div className="grid h-screen grid-cols-[300px_1fr_360px] overflow-hidden">
+        <aside className="border-r border-white/10 bg-[#16191d] p-4" data-visual-smoke-section="library-filters">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h1 className="text-sm font-semibold">{copy.cullSession}</h1>
+              <p className="text-xs text-[#9ba6b2]">{copy.weddingKeepers}</p>
+            </div>
+            <FolderOpen size={18} className="text-[#d7a84f]" />
+          </div>
+          <div
+            className="space-y-3"
+            data-active-asset={activeAsset.file}
+            data-color-label={activeAsset.color}
+            data-filter-mode={filterMode}
+            data-minimum-rating={filterMode === 'keepers' ? '4' : '0'}
+            data-selected-count={String(selectedCount)}
+            data-testid="library-workflow-proof"
+            data-view-mode={viewMode}
+            data-virtual-copy-id={virtualCopyId}
+          >
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10"
+              onClick={() => {
+                setFilterMode('keepers');
+              }}
+              type="button"
+            >
+              <span>{copy.libraryKeepers}</span>
+              <span className="text-xs text-[#aab2bd]">{copy.libraryKeepersCriteria}</span>
+            </button>
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10"
+              onClick={() => {
+                setViewMode('survey');
+              }}
+              type="button"
+            >
+              <span>{copy.librarySurvey}</span>
+              <span className="text-xs text-[#aab2bd]">{copy.selectedCount(selectedCount)}</span>
+            </button>
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-[#d7a84f]/40 bg-[#302b20] px-3 py-2 text-left text-sm hover:bg-[#3b3323]"
+              onClick={() => {
+                setVirtualCopyId('vc-dsc-0002-bw-proof');
+              }}
+              type="button"
+            >
+              <span>{copy.createBwProofCopy}</span>
+              <span className="text-xs text-[#e0c985]">{copy.virtualCopyShort}</span>
+            </button>
+          </div>
+        </aside>
+        <section className="min-w-0 bg-[#0f1114] p-6" data-visual-smoke-section="library-survey">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase text-[#9ba6b2]">{viewMode}</p>
+              <h2 className="text-lg font-semibold">{activeAsset.file}</h2>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-[#d8dee7]">
+              <CircleGauge size={16} />
+              <span>{copy.libraryRating(activeAsset.rating)}</span>
+            </div>
+          </div>
+          <div className="grid h-[680px] grid-cols-2 gap-4">
+            {visibleAssets.map((asset) => (
+              <div
+                className={`flex min-h-0 flex-col justify-between rounded-md border border-white/10 bg-gradient-to-br ${asset.tone} p-4 text-[#121416] shadow-2xl`}
+                key={asset.file}
+              >
+                <div className="flex items-center justify-between text-sm font-semibold">
+                  <span>{asset.file}</span>
+                  <span>{copy.libraryStars(asset.rating)}</span>
+                </div>
+                <div className="rounded bg-white/70 p-3">
+                  <p className="text-sm font-semibold">{asset.status}</p>
+                  <p className="text-xs">{copy.libraryColorLabel(asset.color)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <aside className="border-l border-white/10 bg-[#181b20] p-4" data-visual-smoke-section="library-sidecar">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold">{copy.selectionState}</h2>
+            <Camera size={18} className="text-[#6cbf84]" />
+          </div>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border border-white/10 bg-white/5 p-3">
+              <p className="text-xs text-[#9ba6b2]">{copy.filter}</p>
+              <p>{filterMode === 'keepers' ? copy.keeperFilterSummary : copy.allSessionFiles}</p>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/5 p-3" data-testid="library-virtual-copy">
+              <p className="text-xs text-[#9ba6b2]">{copy.virtualCopy}</p>
+              <p>{virtualCopyId}</p>
+            </div>
+            <div className="rounded-md border border-white/10 bg-white/5 p-3">
+              <p className="text-xs text-[#9ba6b2]">{copy.repeatableProof}</p>
+              <p>{copy.replayProofSummary}</p>
             </div>
           </div>
         </aside>

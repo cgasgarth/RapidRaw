@@ -120,6 +120,7 @@
     "check:library-sessions": "bun scripts/check-library-session-fixtures.ts",
     "check:session-import-reload-proof": "bun scripts/check-session-import-reload-proof.ts",
     "check:library-session-ui": "bun scripts/check-library-session-ui.ts",
+    "check:library-workflow-smoke": "bun scripts/capture-visual-smoke.ts --scenario library-workflow",
     "check:professional-workflow-status": "bun scripts/check-professional-workflow-status.ts",
     "check:professional-workflow-status:update": "bun scripts/check-professional-workflow-status.ts --update",
     "check:export-queue": "bun scripts/check-export-queue-fixtures.ts",

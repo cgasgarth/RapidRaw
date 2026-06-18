@@ -73,6 +73,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     sectionMinimum: 3,
   },
   {
+    marker: 'Cull Session',
+    mode: 'library-workflow',
+    outputFile: 'library-workflow.png',
+    sectionMinimum: 3,
+  },
+  {
     marker: 'Zoom detail workspace',
     mode: 'detail-workspace',
     outputFile: 'detail-workspace.png',
