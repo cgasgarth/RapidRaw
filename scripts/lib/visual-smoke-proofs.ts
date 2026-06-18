@@ -232,6 +232,15 @@ export const layerStackWorkflowProofSchema = z.object({
 export const layerStackExportParityProofSchema = z.object({
   exportParity: z.literal('ready'),
 });
+export const libraryWorkflowProofSchema = z.object({
+  activeAsset: z.literal('DSC_0002.NEF'),
+  colorLabel: z.literal('green'),
+  filterMode: z.literal('keepers'),
+  minimumRating: z.literal('4'),
+  selectedCount: z.literal('2'),
+  viewMode: z.literal('survey'),
+  virtualCopyId: z.literal('vc-dsc-0002-bw-proof'),
+});
 export const commandPaletteWorkflowProofSchema = z.object({
   focusOpen: z.literal('true'),
   hdrOpen: z.literal('true'),
