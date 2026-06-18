@@ -105,6 +105,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:compare-survey', new Set(['bun scripts/check-compare-survey-fixtures.ts'])],
   ['check:defringe', new Set(['bun scripts/check-defringe-fixtures.ts'])],
   ['check:detail-artifacts', new Set(['bun scripts/check-detail-artifacts.ts'])],
+  ['check:delivery-review-manifest', new Set(['bun scripts/check-delivery-review-manifest.ts'])],
   ['check:export-recipes-ui', new Set(['bun scripts/check-export-recipes-ui.ts'])],
   ['check:film-look-browser-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario film-look-browser'])],
   ['check:focus-ui-api', new Set(['bun scripts/check-focus-ui-api.ts'])],
@@ -212,12 +213,14 @@ function isSafeFixturePath(path) {
     (path.startsWith('fixtures/color/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/detail/') && path.endsWith('.json')) ||
     path.startsWith('fixtures/docs/') ||
+    (path.startsWith('fixtures/export/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/film-simulation/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/layers/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/negative-lab/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/negative-lab/public/') && hasExtension(path, new Set(['.jpg', '.jpeg', '.png']))) ||
     path.startsWith('fixtures/sidecar-roundtrip/') ||
-    (path.startsWith('fixtures/validation/') && path.endsWith('.json'))
+    (path.startsWith('fixtures/validation/') && path.endsWith('.json')) ||
+    (path.startsWith('fixtures/workflow/') && path.endsWith('.json'))
   );
 }
 
@@ -786,6 +789,12 @@ function runSelfTest() {
     ['fixtures/validation/raw-open-edit-export-run-reports.json'],
     SMOKE_MODES.NONE,
   );
+  assertClassification(
+    'workflow delivery review fixtures can skip smoke',
+    ['fixtures/workflow/delivery-review-manifest.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification('export fixtures can skip smoke', ['fixtures/export/export-recipes.json'], SMOKE_MODES.NONE);
   assertClassification(
     'layer fixture outputs can skip smoke',
     ['fixtures/layers/layer-stack-operations.json'],

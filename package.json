@@ -110,6 +110,7 @@
     "check:detail-artifacts": "bun scripts/check-detail-artifacts.ts",
     "check:denoise-cpu-reference": "bun scripts/check-denoise-cpu-reference.ts",
     "check:export-recipes": "bun scripts/check-export-recipe-fixtures.ts",
+    "check:delivery-review-manifest": "bun scripts/check-delivery-review-manifest.ts",
     "check:import-presets": "bun scripts/check-import-preset-fixtures.ts",
     "check:library-sessions": "bun scripts/check-library-session-fixtures.ts",
     "check:library-session-ui": "bun scripts/check-library-session-ui.ts",
