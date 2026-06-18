@@ -26,6 +26,13 @@ await expectRunnerFails({
   privateRoot: await rootWithWrongFixtureReport(),
 });
 
+await expectRunnerFails({
+  args: ['--require-assets'],
+  expected: `${FIXTURE_ID}: runId must match current private proof invocation.`,
+  label: 'private step leaves stale report',
+  privateRoot: await rootWithStaleFixtureReport(),
+});
+
 console.log('computational private proof runner negative cases ok');
 
 async function expectRunnerFails({
@@ -93,7 +100,33 @@ async function rootWithWrongFixtureReport(): Promise<string> {
   return root;
 }
 
+async function rootWithStaleFixtureReport(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), 'rawengine-private-runner-stale-fixture-'));
+  const reportDir = join(root, 'private-artifacts/validation/computational-merge');
+  await mkdir(reportDir, { recursive: true });
+  await writeFile(
+    join(reportDir, 'stale-private-run-report.json'),
+    `${JSON.stringify(privateReportCollection({ fixtureId: FIXTURE_ID, reportId: 'computational-merge-run.hdr-bracket-alignment.v1', runId: 'stale-run' }), null, 2)}\n`,
+  );
+  return root;
+}
+
 function wrongFixtureCollection() {
+  return privateReportCollection({
+    fixtureId: 'validation.computational-merge.other-hdr.v1',
+    reportId: 'computational-merge-run.other-hdr.v1',
+  });
+}
+
+function privateReportCollection({
+  fixtureId,
+  reportId,
+  runId,
+}: {
+  fixtureId: string;
+  reportId: string;
+  runId?: string;
+}) {
   const hash = `sha256:${'0'.repeat(64)}`;
   const asset = (path: string) => ({ hash, path, publicRepoAllowed: false });
   const source = (path: string) => ({ ...asset(path), localRelativePath: path });
@@ -129,7 +162,7 @@ function wrongFixtureCollection() {
         ],
         commandIds: { apply: 'command_apply', dryRun: 'command_dry_run' },
         featureFamily: 'hdr_merge',
-        fixtureId: 'validation.computational-merge.other-hdr.v1',
+        fixtureId,
         generatedAt: '2026-06-18T00:00:00.000Z',
         graphRevisionHash: hash,
         implementationIssue: 2062,
@@ -141,7 +174,8 @@ function wrongFixtureCollection() {
           metric('ghostSuppressionScore', 0.85, 0.85),
           previewExportParity,
         ],
-        reportId: 'computational-merge-run.other-hdr.v1',
+        reportId,
+        ...(runId === undefined ? {} : { runId }),
         runtimeResultIds: { apply: 'runtime_apply', dryRun: 'runtime_dry_run' },
         screenshotArtifacts: [
           {

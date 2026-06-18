@@ -10,6 +10,7 @@ import { parseComputationalMergePrivateRunReportCollection } from '../src/schema
 const requireAssets = process.argv.includes('--require-assets');
 const inputPath = valueAfter('--input') ?? 'fixtures/validation/computational-merge-private-run-reports.json';
 const fixtureId = valueAfter('--fixture-id');
+const requiredRunId = valueAfter('--require-run-id');
 const root = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 const failures: string[] = [];
 
@@ -52,6 +53,9 @@ for (const report of reportCollection.reports) {
   }
   if (report.uiIssue !== proofCase.uiIssue) {
     failures.push(`${report.fixtureId}: UI issue must be #${proofCase.uiIssue}.`);
+  }
+  if (requiredRunId !== undefined && report.runId !== requiredRunId) {
+    failures.push(`${report.fixtureId}: runId must match current private proof invocation.`);
   }
 
   const sourcePaths = new Set(proofCase.localSourceRelativePaths);
