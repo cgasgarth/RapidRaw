@@ -2320,7 +2320,7 @@ const addDuplicateFieldIssues = <TItem, TValue extends DuplicateKeyValue>({
   items,
   message,
   normalize,
-}: DuplicateFieldIssueOptions<TItem, TValue>) => {
+}: DuplicateFieldIssueOptions<TItem, TValue>): void => {
   const seen = new Set<DuplicateKeyValue>();
 
   for (const [index, item] of items.entries()) {
@@ -2357,7 +2357,7 @@ const validateSourceStateCoverage = <TSourceRef extends SourceIndexRef, TSourceS
   sourceImageRefs,
   sourceStates,
   uniqueMessage,
-}: SourceStateCoverageOptions<TSourceRef, TSourceState>) => {
+}: SourceStateCoverageOptions<TSourceRef, TSourceState>): void => {
   const sourceIndexes = new Set(sourceImageRefs.map((source) => source.sourceIndex));
   const stateIndexes = new Set<number>();
 
