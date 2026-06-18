@@ -46,6 +46,7 @@ generator before the release workflow needs one.
 - [Selective color falloff](color/selective-color-falloff-2026-06-14.md)
 - [Skin-tone uniformity](color/skin-tone-uniformity-2026-06-14.md)
 - [Layer workflow model](layers/layer-workflow-model-2026-06-14.md)
+- [Layer runtime parent status](layers/layer-runtime-parent-status-2026-06-18.md)
 - [Mask copy paste runtime evidence](layers/mask-copy-paste-runtime-2026-06-15.md)
 - [AI mask capability audit](layers/ai-mask-capability-audit-2026-06-15.md)
 - [Mask overlay runtime modes](layers/mask-overlay-runtime-2026-06-15.md)
