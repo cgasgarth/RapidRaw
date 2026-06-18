@@ -239,6 +239,11 @@ async function prepareScenario(page, mode) {
     await page.getByRole('button', { name: /Portrait burn/u }).click();
     await page.getByRole('button', { name: 'Move down' }).click();
     await page.getByRole('button', { name: 'Toggle' }).click();
+    await page.getByRole('button', { name: 'Add layer' }).click();
+    await page.getByRole('button', { name: 'Duplicate layer' }).click();
+    await page.getByRole('button', { name: 'Rename proof' }).click();
+    await page.getByRole('button', { name: 'Opacity 64%' }).click();
+    await page.getByRole('button', { name: 'Blend overlay' }).click();
     layerStackWorkflowProofSchema.parse(
       await page.getByTestId('layer-stack-workflow-proof').evaluate((element) => ({ ...element.dataset })),
     );
