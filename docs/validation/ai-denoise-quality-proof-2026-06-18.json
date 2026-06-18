@@ -1,0 +1,71 @@
+{
+  "generatedAt": "2026-06-18T00:00:00.000Z",
+  "issue": 1267,
+  "limitation": "Harness-only report. This does not close #1267 because it does not include two real-derived crops processed by ai_processing::run_ai_denoise / NIND with before, after, diff, and contact-sheet artifacts.",
+  "minEligibleRealRunsRequired": 2,
+  "proofHash": "43bac8e934285635e1822444bf1d0b63317ee4c0fdad54d95b881c712cebe024",
+  "schemaVersion": 1,
+  "status": "harness_only",
+  "validationCrops": [
+    {
+      "artifacts": [],
+      "cropId": "candidate-high-iso-skin-shadow-planned",
+      "executionStatus": "schema_only",
+      "fixtureId": "real.detail.high-iso-skin-shadow.v0",
+      "metrics": {
+        "edgeContrastRatio": null,
+        "highPassCorrelation": null,
+        "lowFrequencyChromaMad": null,
+        "lumaTextureEnergyRatio": null,
+        "maxDeltaE00": null,
+        "meanLumaShift": null,
+        "tileSeamMaxDelta": null,
+        "unsupportedOutputEdgeFraction": null
+      },
+      "model": {
+        "id": "nind_denoise_utnet_684.onnx",
+        "sha256": "ee3586279d514df557ff3f7dec6df37fafc51ba5d3a3435b2cc9ac2d9017e7fe",
+        "sourceUrl": "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/nind_denoise_utnet_684.onnx?download=true"
+      },
+      "outputContentHash": null,
+      "referenceKind": "none",
+      "source": {
+        "attribution": "Pixls.us Play Raw thread candidate; derivative activation still requires attribution and rights review.",
+        "fixtureSourceHash": "5b1a62fb37669f3065479e2c7cf9af4ef031a920cf6feac82d1269e9fdf4a136",
+        "kind": "public_raw",
+        "license": "Creative Commons Attribution-ShareAlike, source page states file license",
+        "sourceUrl": "https://discuss.pixls.us/uploads/short-url/i0oDJE8Iod1m98tg3k5vDjBJmOF.ARW"
+      }
+    },
+    {
+      "artifacts": [],
+      "cropId": "synthetic-control-not-closure-proof",
+      "executionStatus": "dry_run_only",
+      "fixtureId": "synthetic.detail.high-iso-fine-texture.v0",
+      "metrics": {
+        "edgeContrastRatio": 0.98,
+        "highPassCorrelation": 0.97,
+        "lowFrequencyChromaMad": 0.01,
+        "lumaTextureEnergyRatio": 0.93,
+        "maxDeltaE00": 0.4,
+        "meanLumaShift": 0,
+        "tileSeamMaxDelta": 0,
+        "unsupportedOutputEdgeFraction": 0
+      },
+      "model": {
+        "id": "nind_denoise_utnet_684.onnx",
+        "sha256": "ee3586279d514df557ff3f7dec6df37fafc51ba5d3a3435b2cc9ac2d9017e7fe",
+        "sourceUrl": "https://huggingface.co/CyberTimon/RapidRAW-Models/resolve/main/nind_denoise_utnet_684.onnx?download=true"
+      },
+      "outputContentHash": "fnv1a32:00000000",
+      "referenceKind": "none",
+      "source": {
+        "attribution": "Project-generated synthetic control only.",
+        "fixtureSourceHash": null,
+        "kind": "synthetic_control",
+        "license": "project-generated",
+        "sourceUrl": null
+      }
+    }
+  ]
+}
