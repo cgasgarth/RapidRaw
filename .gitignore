@@ -17,6 +17,10 @@ artifacts/
 private-artifacts/
 private-fixtures/
 .rawengine-private-root/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
 *.local
 
 # Editor directories and files
