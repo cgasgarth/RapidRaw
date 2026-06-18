@@ -36,6 +36,12 @@ rejects invalid restarts, and preserves failure details such as
 `health_timeout`. This is process-supervision state proof; wiring it to the
 official Codex sidecar process remains the next runtime integration step.
 
+`scripts/fixtures/rawengine-app-server-stdio-fixture.ts` gives the host checker
+an executable stdio JSONL child process. The checker writes `initialize` and
+`initialized`, validates the child response with Zod, records the actual process
+id, marks the supervisor ready, and stops it. This proves launch/read/stop
+supervision without requiring a local Codex login during CI.
+
 ## Tool Manifest
 
 - `rawengine.host.health`: read-only health check returning runtime, transport, request id, and manifest tool count.

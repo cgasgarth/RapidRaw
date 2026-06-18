@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { readFileSync } from 'node:fs';
+import { z } from 'zod';
 
 import {
   RAW_ENGINE_APP_SERVER_HOST_MANIFEST,
@@ -41,6 +42,32 @@ const clientInfo = {
   title: 'RawEngine Desktop',
   version: '0.1.0',
 };
+const fixtureResponseSchema = z
+  .object({
+    id: z.literal(1),
+    result: z
+      .object({
+        protocol: z.literal('codex_app_server'),
+        ready: z.literal(true),
+        transport: z.literal('stdio_jsonl'),
+      })
+      .strict(),
+  })
+  .strict();
+const fixtureThreadNotificationSchema = z
+  .object({
+    method: z.literal('thread/started'),
+    params: z
+      .object({
+        thread: z
+          .object({
+            id: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict();
 
 const lifecycleCreated = createRawEngineAppServerLifecycleState({ connectionId: 'conn_stdio_001' });
 try {
@@ -159,6 +186,92 @@ try {
   if (!(error instanceof Error) || !error.message.includes('running')) {
     failures.push('Supervisor start rejection should include current phase.');
   }
+}
+
+const runStdioLaunchProof = async () => {
+  let state = createRawEngineAppServerSupervisorState({
+    command: ['bun', 'scripts/fixtures/rawengine-app-server-stdio-fixture.ts'],
+    supervisorId: 'supervisor_stdio_launch_001',
+    timestampIso: '2026-06-17T12:03:00.000Z',
+  });
+
+  const proc = Bun.spawn(state.command, {
+    stderr: 'pipe',
+    stdin: 'pipe',
+    stdout: 'pipe',
+  });
+
+  state = startRawEngineAppServerSupervisor({
+    processId: proc.pid,
+    state,
+    timestampIso: '2026-06-17T12:03:01.000Z',
+  });
+
+  proc.stdin.write(
+    `${JSON.stringify({
+      id: 1,
+      method: 'initialize',
+      params: { clientInfo },
+    })}\n`,
+  );
+  proc.stdin.write(`${JSON.stringify({ method: 'initialized', params: {} })}\n`);
+  proc.stdin.end();
+
+  const stdoutPromise = new Response(proc.stdout).text();
+  const stderrPromise = new Response(proc.stderr).text();
+  const exitCode = await proc.exited;
+  const stdout = await stdoutPromise;
+  const stderr = await stderrPromise;
+
+  if (exitCode !== 0) {
+    return failRawEngineAppServerSupervisor({
+      error: {
+        code: 'unexpected_exit',
+        message: `stdio fixture exited ${exitCode}: ${stderr.trim()}`,
+        recoverable: true,
+      },
+      state,
+      timestampIso: '2026-06-17T12:03:02.000Z',
+    });
+  }
+
+  const responseLines = stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const initializeResponseLine = responseLines[0];
+  const threadStartedLine = responseLines[1];
+
+  if (initializeResponseLine === undefined || threadStartedLine === undefined) {
+    return failRawEngineAppServerSupervisor({
+      error: {
+        code: 'health_timeout',
+        message: 'stdio fixture did not emit initialize response and thread notification.',
+        recoverable: true,
+      },
+      state,
+      timestampIso: '2026-06-17T12:03:02.000Z',
+    });
+  }
+
+  fixtureResponseSchema.parse(JSON.parse(initializeResponseLine));
+  fixtureThreadNotificationSchema.parse(JSON.parse(threadStartedLine));
+  const running = markRawEngineAppServerSupervisorReady({
+    state,
+    timestampIso: '2026-06-17T12:03:02.000Z',
+  });
+
+  return stopRawEngineAppServerSupervisor({
+    state: running,
+    timestampIso: '2026-06-17T12:03:03.000Z',
+  });
+};
+
+const launchProof = rawEngineAppServerSupervisorStateSchema.parse(await runStdioLaunchProof());
+if (launchProof.phase !== 'stopped') failures.push('Executable stdio launch proof must finish stopped.');
+if (launchProof.error !== null) failures.push(`Executable stdio launch proof failed: ${launchProof.error.message}`);
+if (launchProof.auditEvents.map((event) => event.kind).join(',') !== 'created,start,ready,stop') {
+  failures.push('Executable stdio launch proof audit event order mismatch.');
 }
 
 if (healthTool === undefined) {
@@ -304,6 +417,7 @@ for (const marker of [
   'createRawEngineAppServerSupervisorState',
   'cancelRawEngineAppServerSupervisor',
   'rawEngineAppServerSupervisorStateSchema',
+  'rawengine-app-server-stdio-fixture',
   'No UI automation',
   'codex app-server',
   'stdio JSONL',
