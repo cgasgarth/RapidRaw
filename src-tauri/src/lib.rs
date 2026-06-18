@@ -38,6 +38,8 @@ mod mask_generation;
 mod negative_conversion;
 #[cfg(feature = "panorama-opencv-spike")]
 mod panorama_opencv_spike;
+#[cfg(all(test, feature = "tauri-test"))]
+mod panorama_real_raw_proof;
 mod panorama_stitching;
 mod panorama_utils;
 mod preset_converter;

@@ -7,11 +7,22 @@ await runComputationalPrivateProof({
   fixtureId: 'validation.computational-merge.panorama-overlap.v1',
   privateStep: {
     command: [
-      'bun',
-      'scripts/prepare-panorama-real-raw-private-root.ts',
-      ...(process.argv.includes('--require-assets') ? ['--require-assets'] : []),
+      'cargo',
+      'test',
+      '--quiet',
+      '--locked',
+      '--no-default-features',
+      '--features',
+      'required-ci,tauri-test',
+      'panorama_real_raw_proof::private_decode_smoke_generates_panorama_real_raw_report_when_enabled',
+      '--',
+      '--nocapture',
     ],
-    label: 'panorama real RAW private root prep',
+    cwd: 'src-tauri',
+    env: {
+      RAWENGINE_RUN_PRIVATE_PANORAMA_REAL_RAW_DECODE_PROOF: '1',
+    },
+    label: 'panorama real RAW Rust decode proof',
   },
   proofChecks: [
     ['bun', 'run', 'check:panorama-runtime-plan-smoke'],

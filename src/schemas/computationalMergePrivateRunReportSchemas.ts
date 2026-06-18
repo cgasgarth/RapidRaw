@@ -6,6 +6,7 @@ const featureFamilySchema = z.enum(['hdr_merge', 'panorama_stitch', 'focus_stack
 
 const artifactKindSchema = z.enum([
   'source_raw_sequence_private',
+  'decode_report_private',
   'alignment_report_private',
   'merge_output_private',
   'preview_after_private',
@@ -16,6 +17,9 @@ const artifactKindSchema = z.enum([
 
 const metricNameSchema = z.enum([
   'alignmentInlierRatio',
+  'decodedFinitePixelRatio',
+  'decodedNonzeroDimensionCount',
+  'decodedSourceCount',
   'edgeContinuityScore',
   'exposureBracketCoverageEv',
   'focusTransitionArtifactScore',
@@ -80,22 +84,24 @@ const runtimeResultIdsSchema = z
 const privateRunReportSchema = z
   .object({
     acceptanceStatus: z.enum(['private_decode_smoke', 'runtime_apply_capable', 'passed_private_raw_e2e']),
-    artifacts: z.array(runArtifactSchema).min(6),
-    commandIds: commandIdsSchema,
+    artifacts: z.array(runArtifactSchema).min(3),
+    commandIds: commandIdsSchema.optional(),
     featureFamily: featureFamilySchema,
     fixtureId: z.string().regex(/^validation\.computational-merge\.[a-z0-9.-]+\.v[0-9]+$/u),
     generatedAt: z.iso.datetime(),
     graphRevisionHash: sha256Schema,
     implementationIssue: z.number().int().positive(),
     notes: z.string().trim().min(1),
-    previewExportParity: qualityMetricSchema.extend({
-      name: z.literal('previewExportMeanAbsDelta'),
-    }),
+    previewExportParity: qualityMetricSchema
+      .extend({
+        name: z.literal('previewExportMeanAbsDelta'),
+      })
+      .optional(),
     qualityMetrics: z.array(qualityMetricSchema).min(2),
     reportId: z.string().regex(/^computational-merge-run\.[a-z0-9.-]+\.v[0-9]+$/u),
     runId: z.string().trim().min(1).optional(),
-    runtimeResultIds: runtimeResultIdsSchema,
-    screenshotArtifacts: z.array(screenshotArtifactSchema).min(2),
+    runtimeResultIds: runtimeResultIdsSchema.optional(),
+    screenshotArtifacts: z.array(screenshotArtifactSchema),
     sourceHashes: z.array(sourceHashSchema).min(2),
     uiIssue: z.number().int().positive(),
   })
@@ -108,6 +114,74 @@ const privateRunReportSchema = z
         message: 'Run report artifact kinds must be unique.',
         path: ['artifacts'],
       });
+    }
+
+    const requiredDecodeArtifacts = [
+      'source_raw_sequence_private',
+      'decode_report_private',
+      'quality_report_private',
+    ] as const;
+    const forbiddenDecodeArtifacts = ['merge_output_private', 'preview_after_private', 'export_after_private'] as const;
+    if (report.acceptanceStatus === 'private_decode_smoke' && report.featureFamily === 'panorama_stitch') {
+      for (const artifactKind of requiredDecodeArtifacts) {
+        if (!artifactKinds.includes(artifactKind)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Private decode smoke report requires ${artifactKind}.`,
+            path: ['artifacts'],
+          });
+        }
+      }
+      for (const artifactKind of forbiddenDecodeArtifacts) {
+        if (artifactKinds.includes(artifactKind)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Private decode smoke report must not claim ${artifactKind}.`,
+            path: ['artifacts'],
+          });
+        }
+      }
+    } else {
+      for (const artifactKind of [
+        'source_raw_sequence_private',
+        'alignment_report_private',
+        'merge_output_private',
+        'preview_after_private',
+        'export_after_private',
+        'quality_report_private',
+      ] as const) {
+        if (!artifactKinds.includes(artifactKind)) {
+          context.addIssue({
+            code: 'custom',
+            message: `Runtime/E2E private run report requires ${artifactKind}.`,
+            path: ['artifacts'],
+          });
+        }
+      }
+      if (report.commandIds === undefined) {
+        context.addIssue({ code: 'custom', message: 'Runtime/E2E report requires commandIds.', path: ['commandIds'] });
+      }
+      if (report.runtimeResultIds === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Runtime/E2E report requires runtimeResultIds.',
+          path: ['runtimeResultIds'],
+        });
+      }
+      if (report.previewExportParity === undefined) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Runtime/E2E report requires previewExportParity.',
+          path: ['previewExportParity'],
+        });
+      }
+      if (report.screenshotArtifacts.length < 2) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Runtime/E2E report requires at least two screenshot artifacts.',
+          path: ['screenshotArtifacts'],
+        });
+      }
     }
 
     const sourcePaths = report.sourceHashes.map((source) => source.localRelativePath);
