@@ -71,6 +71,9 @@ for (const command of [
   ['bun', 'scripts/check-computational-merge-e2e-proof-manifest.ts'],
   ['bun', 'scripts/check-computational-merge-private-run-reports.ts'],
   ['bun', 'scripts/run-hdr-real-raw-private-proof.ts'],
+  ['bun', 'scripts/run-panorama-real-raw-private-proof.ts'],
+  ['bun', 'scripts/run-focus-real-raw-private-proof.ts'],
+  ['bun', 'scripts/run-sr-real-raw-private-proof.ts'],
 ]) {
   run(command);
 }
@@ -101,6 +104,9 @@ const report = reportSchema.parse({
     'bun run check:computational-merge-e2e-proof-manifest',
     'bun run check:computational-merge-private-run-reports',
     'bun run check:hdr-real-raw-private-proof',
+    'bun run check:panorama-real-raw-private-proof',
+    'bun run check:focus-real-raw-private-proof',
+    'bun run check:sr-real-raw-private-proof',
   ],
   generatedAt: GENERATED_AT,
   issue: 1809,
