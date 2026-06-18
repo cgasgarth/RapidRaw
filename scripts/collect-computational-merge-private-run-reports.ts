@@ -118,7 +118,7 @@ function sampleCollection(): ReturnType<typeof parseComputationalMergePrivateRun
     issue: 1817,
     reports: [
       {
-        acceptanceStatus: 'private_decode_smoke',
+        acceptanceStatus: 'runtime_apply_capable',
         artifacts: [
           artifact('source_raw_sequence_private', 'private-fixtures/hdr/bracket-alignment-v1'),
           artifact('alignment_report_private', `${REPORT_ROOT}/hdr-bracket-alignment.json`),
@@ -126,6 +126,7 @@ function sampleCollection(): ReturnType<typeof parseComputationalMergePrivateRun
           artifact('preview_after_private', `${REPORT_ROOT}/hdr-bracket-preview.png`),
           artifact('export_after_private', `${REPORT_ROOT}/hdr-bracket-export.tiff`),
           artifact('quality_report_private', `${REPORT_ROOT}/hdr-bracket-quality.json`),
+          artifact('app_server_runtime_report_private', `${REPORT_ROOT}/hdr-bracket-app-server-runtime-proof.json`),
         ],
         commandIds: { apply: 'command_hdr_apply', dryRun: 'command_hdr_dry_run' },
         featureFamily: 'hdr_merge',
@@ -133,7 +134,7 @@ function sampleCollection(): ReturnType<typeof parseComputationalMergePrivateRun
         generatedAt: '2026-06-18T00:00:00.000Z',
         graphRevisionHash: hash,
         implementationIssue: 2062,
-        notes: 'sample private computational merge run report using the narrow direct-decode smoke status',
+        notes: 'sample private computational merge run report using runtime apply capability',
         previewExportParity,
         qualityMetrics: [
           metric('exposureBracketCoverageEv', 4, 4),

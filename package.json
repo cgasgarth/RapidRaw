@@ -166,6 +166,7 @@
     "check:focus-real-raw-private-root-assets": "bun scripts/prepare-focus-real-raw-private-root.ts --require-assets",
     "run:focus-real-raw-private-proof": "bun scripts/run-focus-real-raw-private-proof.ts",
     "check:focus-real-raw-private-proof": "bun scripts/run-focus-real-raw-private-proof.ts",
+    "check:focus-real-raw-private-app-server-proof": "bun scripts/check-focus-real-raw-private-app-server-proof.ts",
     "prepare:sr-real-raw-private-root": "bun scripts/prepare-sr-real-raw-private-root.ts",
     "check:sr-real-raw-private-root-prep": "bun scripts/prepare-sr-real-raw-private-root.ts --self-test",
     "check:sr-real-raw-private-root-assets": "bun scripts/prepare-sr-real-raw-private-root.ts --require-assets",

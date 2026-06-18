@@ -29,5 +29,6 @@ await runComputationalPrivateProof({
     ['bun', 'run', 'check:focus-app-server-runtime'],
     ['bun', 'run', 'check:focus-ui-runtime-bridge'],
   ],
+  postPrivateChecks: [['bun', 'run', 'check:focus-real-raw-private-app-server-proof']],
   skipLabel: 'focus real RAW private proof',
 });

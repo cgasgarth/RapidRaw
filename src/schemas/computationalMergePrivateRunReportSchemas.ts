@@ -311,14 +311,19 @@ const privateRunReportSchema = z
         }
       }
     } else {
-      for (const artifactKind of [
+      const requiresPreviewExportParity =
+        report.acceptanceStatus === 'passed_private_raw_e2e' ||
+        report.featureFamily === 'hdr_merge' ||
+        report.featureFamily === 'panorama_stitch';
+      const requiredRuntimeArtifacts = [
         'source_raw_sequence_private',
         'alignment_report_private',
         'merge_output_private',
-        'preview_after_private',
-        'export_after_private',
         'quality_report_private',
-      ] as const) {
+        'app_server_runtime_report_private',
+        ...(requiresPreviewExportParity ? (['preview_after_private', 'export_after_private'] as const) : []),
+      ] as const;
+      for (const artifactKind of requiredRuntimeArtifacts) {
         if (!artifactKinds.includes(artifactKind)) {
           context.addIssue({
             code: 'custom',
@@ -337,7 +342,7 @@ const privateRunReportSchema = z
           path: ['runtimeResultIds'],
         });
       }
-      if (report.previewExportParity === undefined) {
+      if (requiresPreviewExportParity && report.previewExportParity === undefined) {
         context.addIssue({
           code: 'custom',
           message: 'Runtime/E2E report requires previewExportParity.',
