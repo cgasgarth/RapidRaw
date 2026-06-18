@@ -238,7 +238,7 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
         fixture_id: FIXTURE_ID.to_string(),
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         graph_revision_hash: graph_revision_hash(&source_hashes),
-        implementation_issue: 1509,
+        implementation_issue: 2062,
         notes: "Private RAW HDR bracket decode-to-apply runtime proof; metadata-only report is safe to collect publicly without private pixels.".to_string(),
         preview_export_parity,
         quality_metrics: metrics,
