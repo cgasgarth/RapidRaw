@@ -51,6 +51,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   processing, film simulations, deblur, denoise, sharpening/detail math,
   panorama stitching, HDR, focus stacking, super-resolution, app-server/agent
   architecture, GitHub Actions strategy, and tricky UI architecture.
+- Use Computer Use for local macOS app verification when completing
+  user-visible UI or workflow claims. Run the app locally when practical,
+  inspect the actual UI, verify it is good-looking, intuitive, and functional,
+  and fix or track anything that fails.
 - For science/math-heavy image features, iterate rather than claiming maturity
   in one PR: consult first, define the math and rejected alternatives, add
   fixtures/metrics, implement runtime behavior, verify preview/export parity,

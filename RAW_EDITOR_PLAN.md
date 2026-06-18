@@ -18,7 +18,7 @@ The goal is not complete merely because the current backlog slice feels exhauste
 - Work from the next ready unclosed GitHub issue in milestone order unless the user explicitly redirects.
 - Keep `main` protected: no direct commits or pushes to `main`; all substantive work goes through PRs.
 - Keep PRs small to medium and tied to one coherent validation story.
-- Keep at most two active open PRs at a time. Use that cap as an A/B pattern
+- Keep at most three active open PRs at a time. Use that cap as an A/B pattern
   when useful, where one PR can build while another independent PR is prepared
   or validated. Do not use it as permission to leave work open and stale.
 - Use this plan as the source of truth for ordering, constraints, and completion evidence.
@@ -27,6 +27,7 @@ The goal is not complete merely because the current backlog slice feels exhauste
 - Keep capability status explicit: plan-only, schema-only, API-only, dry-run-only, UI-only, runtime apply-capable, and E2E-proven work are different states. A PR may make useful partial progress, but it must not close a full feature issue unless runtime behavior, preview/export behavior, E2E or equivalent workflow coverage, screenshots or artifacts, and remaining gaps are all proven or tracked.
 - Any planning, API-only, or UI-only PR for a user-visible feature must link an E2E or equivalent workflow proof issue unless that proof ships in the same PR.
 - Use the consult skill for major design decisions and high-risk color science, negative processing, panorama, HDR, focus stacking, super-resolution, agent, or UI architecture work.
+- Use Computer Use for local macOS app verification before user-visible feature completion claims: run the app locally when practical, inspect the actual UI, verify the workflow is good-looking, intuitive, and functionally correct, and fix or track anything that does not work.
 - Use Browser/Chrome and sample internet images only with source/license/provenance care. Use image generation when synthetic visual assets or controlled visual test material are appropriate.
 - Do not mark the goal blocked unless the same blocker has repeated across the required blocked audit and no meaningful progress is possible without user input or external-state change.
 - If the user changes direction, update the plan first, then continue from the revised source of truth.
@@ -62,6 +63,7 @@ Screenshot requirements:
 - Screenshots should show the feature working, not only static UI shells.
 - For image-processing features, include before/after or source/output artifacts when licensing and storage policy allow.
 - For agent/app-server tools, include dry-run/apply/audit screenshots or captured HTML-rendered logs showing the tool path and safety boundary.
+- Before the goal is complete, run the local macOS app and verify the review page and representative new UI surfaces through Computer Use. The final review evidence must state what was exercised, what looked or behaved incorrectly, and which PR or issue fixed or tracks each finding. Tracking issue: #1953.
 
 This review page is part of the completion definition for the long-running implementation goal. If the page cannot be fully completed before the time box, the page must still exist and clearly list missing sections, missing screenshots, and follow-up issues.
 
