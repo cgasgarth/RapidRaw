@@ -7,6 +7,90 @@
         {
           "hash": null,
           "kind": "source_raw_sequence_private",
+          "path": "private-fixtures/hdr/bracket-alignment-v1",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "alignment_report_private",
+          "path": "private-artifacts/validation/computational-merge/hdr-bracket-alignment.json",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "merge_output_private",
+          "path": "private-artifacts/validation/computational-merge/hdr-bracket-merge.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_after_private",
+          "path": "private-artifacts/validation/computational-merge/hdr-bracket-preview.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "export_after_private",
+          "path": "private-artifacts/validation/computational-merge/hdr-bracket-export.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "quality_report_private",
+          "path": "private-artifacts/validation/computational-merge/hdr-bracket-quality.json",
+          "publicRepoAllowed": false
+        }
+      ],
+      "evidenceId": "raw-evidence.hdr.bracket-alignment.v1",
+      "expectedMetrics": [
+        {
+          "name": "exposureBracketCoverageEv",
+          "required": true,
+          "threshold": 4
+        },
+        {
+          "name": "highlightRecoveryRatio",
+          "required": true,
+          "threshold": 1.1
+        },
+        {
+          "name": "ghostSuppressionScore",
+          "required": true,
+          "threshold": 0.85
+        },
+        {
+          "name": "previewExportMeanAbsDelta",
+          "required": true,
+          "threshold": 0.015
+        }
+      ],
+      "featureFamily": "hdr_merge",
+      "fixtureId": "validation.computational-merge.hdr-bracket-alignment.v1",
+      "implementationIssue": 1509,
+      "localSourceRelativePaths": [
+        "private-fixtures/hdr/bracket-alignment-v1/frame-01-under.arw",
+        "private-fixtures/hdr/bracket-alignment-v1/frame-02-mid.arw",
+        "private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw"
+      ],
+      "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
+      "notes": "Private RAW HDR bracket E2E proof slot for decode, exposure bracket validation, alignment/deghost review, merge output, preview/export parity, and quality metrics. This manifest is planning evidence only until the private assets and runtime run reports exist.",
+      "proofStatus": "manifest_only",
+      "uiIssue": 171,
+      "workflowSteps": [
+        "open_raw_sequence",
+        "decode_raw_sources",
+        "align_sources",
+        "merge_sources",
+        "render_preview",
+        "export_artifact",
+        "record_quality_metrics"
+      ]
+    },
+    {
+      "artifacts": [
+        {
+          "hash": null,
+          "kind": "source_raw_sequence_private",
           "path": "private-fixtures/panorama/overlap-stitch-v1",
           "publicRepoAllowed": false
         },

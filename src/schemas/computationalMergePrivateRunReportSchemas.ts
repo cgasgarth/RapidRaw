@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 
-const featureFamilySchema = z.enum(['panorama_stitch', 'focus_stack', 'super_resolution']);
+const featureFamilySchema = z.enum(['hdr_merge', 'panorama_stitch', 'focus_stack', 'super_resolution']);
 
 const artifactKindSchema = z.enum([
   'source_raw_sequence_private',
@@ -16,7 +16,10 @@ const artifactKindSchema = z.enum([
 const metricNameSchema = z.enum([
   'alignmentInlierRatio',
   'edgeContinuityScore',
+  'exposureBracketCoverageEv',
   'focusTransitionArtifactScore',
+  'ghostSuppressionScore',
+  'highlightRecoveryRatio',
   'sharpnessGainRatio',
   'superResolutionDetailGainRatio',
   'previewExportMeanAbsDelta',

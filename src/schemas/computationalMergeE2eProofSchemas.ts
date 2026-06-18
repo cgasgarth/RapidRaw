@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 
-const featureFamilySchema = z.enum(['panorama_stitch', 'focus_stack', 'super_resolution']);
+const featureFamilySchema = z.enum(['hdr_merge', 'panorama_stitch', 'focus_stack', 'super_resolution']);
 
 const workflowStepSchema = z.enum([
   'open_raw_sequence',
@@ -26,7 +26,10 @@ const artifactKindSchema = z.enum([
 const proofMetricNameSchema = z.enum([
   'alignmentInlierRatio',
   'edgeContinuityScore',
+  'exposureBracketCoverageEv',
   'focusTransitionArtifactScore',
+  'ghostSuppressionScore',
+  'highlightRecoveryRatio',
   'sharpnessGainRatio',
   'superResolutionDetailGainRatio',
   'previewExportMeanAbsDelta',
@@ -36,6 +39,10 @@ const featureIssues = {
   focus_stack: {
     implementationIssue: 1507,
     uiIssue: 1334,
+  },
+  hdr_merge: {
+    implementationIssue: 1509,
+    uiIssue: 171,
   },
   panorama_stitch: {
     implementationIssue: 1508,
