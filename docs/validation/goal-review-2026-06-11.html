@@ -580,6 +580,14 @@
               </td>
             </tr>
             <tr>
+              <td>HDR private RAW asset prep</td>
+              <td><code>bun run prepare:hdr-real-raw-private-root</code></td>
+              <td>
+                Creates and validates the private root layout for the three-frame ARW bracket slot without committing
+                private pixels. <code>--require-assets</code> intentionally fails until the bracket files exist.
+              </td>
+            </tr>
+            <tr>
               <td>Panorama runtime apply</td>
               <td><code>bun run check:panorama-runtime-plan-smoke</code></td>
               <td>
@@ -677,7 +685,8 @@
           <li>Golden image outputs and perceptual comparison reports.</li>
           <li>OpenAI app-server dry-run/apply/audit screenshots or rendered logs.</li>
           <li>Negative Lab real-scan workflow screenshots and QC overlays.</li>
-          <li>Panorama, HDR, focus stack, and super-resolution real-image validation artifacts.</li>
+          <li>HDR private ARW bracket files for <code>private-fixtures/hdr/bracket-alignment-v1/</code>.</li>
+          <li>Panorama, focus stack, and super-resolution real-image validation artifacts.</li>
           <li>Accessibility and high-DPI UI screenshots.</li>
         </ul>
       </section>
