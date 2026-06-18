@@ -275,12 +275,7 @@ const privateRunReportSchema = z
           });
         }
       }
-    } else if (
-      report.acceptanceStatus === 'private_preview_export_smoke' &&
-      (report.featureFamily === 'panorama_stitch' ||
-        report.featureFamily === 'focus_stack' ||
-        report.featureFamily === 'super_resolution')
-    ) {
+    } else if (report.acceptanceStatus === 'private_preview_export_smoke') {
       for (const artifactKind of requiredPreviewExportArtifacts) {
         if (!artifactKinds.includes(artifactKind)) {
           context.addIssue({

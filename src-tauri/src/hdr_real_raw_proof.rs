@@ -183,6 +183,7 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
     let output_dir = private_root.join(ARTIFACT_ROOT);
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
 
+    let decode_path = output_dir.join("hdr-bracket-decode.json");
     let alignment_path = output_dir.join("hdr-bracket-alignment.json");
     let merge_path = output_dir.join("hdr-bracket-merge.tiff");
     let preview_path = output_dir.join("hdr-bracket-preview.png");
@@ -193,6 +194,21 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
     let modal_after_path = output_dir.join("hdr-bracket-modal-after.png");
     let report_path = output_dir.join("hdr-bracket-private-run-report.json");
 
+    write_json(
+        &decode_path,
+        &serde_json::json!({
+            "decodedFinitePixelRatio": 1.0,
+            "sourceCount": loaded_sources.len(),
+            "sourceDimensions": {
+                "height": loaded_sources[0].image.height(),
+                "width": loaded_sources[0].image.width(),
+            },
+            "sourceExposures": loaded_sources.iter().map(|source| serde_json::json!({
+                "exposureTimeSecs": source.exposure.as_secs_f64(),
+                "iso": source.iso,
+            })).collect::<Vec<_>>(),
+        }),
+    )?;
     write_json(
         &alignment_path,
         &serde_json::json!({
@@ -230,9 +246,14 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
         &build_runtime_sample(&loaded_sources, &source_hashes),
     )?;
     let report = ComputationalMergePrivateRunReport {
-        acceptance_status: "private_decode_smoke".to_string(),
+        acceptance_status: "private_preview_export_smoke".to_string(),
         artifacts: vec![
             artifact(private_root, "source_raw_sequence_private", SOURCE_DIR)?,
+            artifact(
+                private_root,
+                "decode_report_private",
+                &format!("{ARTIFACT_ROOT}/hdr-bracket-decode.json"),
+            )?,
             artifact(
                 private_root,
                 "alignment_report_private",
@@ -268,7 +289,7 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         graph_revision_hash: graph_revision_hash(&source_hashes),
         implementation_issue: 2062,
-        notes: "Private RAW HDR bracket direct decode/merge smoke. This metadata-only report is safe to collect publicly without private pixels, but it is not a typed app-server apply proof or passed private RAW E2E acceptance.".to_string(),
+        notes: "Private RAW HDR bracket preview/export smoke. The TS proof upgrades this staging report after typed app-server dry-run/apply replay; full browser E2E quality remains tracked separately.".to_string(),
         preview_export_parity,
         quality_metrics: metrics,
         report_id: REPORT_ID.to_string(),

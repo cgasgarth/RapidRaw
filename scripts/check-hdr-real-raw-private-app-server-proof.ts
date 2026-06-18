@@ -291,9 +291,10 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
     issue: 1817,
     reports: [
       {
-        acceptanceStatus: 'private_decode_smoke',
+        acceptanceStatus: 'private_preview_export_smoke',
         artifacts: [
           artifact('source_raw_sequence_private', 'private-fixtures/hdr/bracket-alignment-v1'),
+          artifact('decode_report_private', `${ARTIFACT_ROOT}/hdr-bracket-decode.json`),
           artifact('alignment_report_private', `${ARTIFACT_ROOT}/hdr-bracket-alignment.json`),
           artifact('merge_output_private', `${ARTIFACT_ROOT}/hdr-bracket-merge.tiff`),
           artifact('preview_after_private', `${ARTIFACT_ROOT}/hdr-bracket-preview.png`),
@@ -306,7 +307,7 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
         generatedAt: '2026-06-18T00:00:00.000Z',
         graphRevisionHash: hash,
         implementationIssue: 2062,
-        notes: 'sample private decode smoke report',
+        notes: 'sample private HDR preview/export smoke report',
         previewExportParity,
         qualityMetrics: [
           metric('exposureBracketCoverageEv', 4, 4),
