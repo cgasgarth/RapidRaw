@@ -21,6 +21,7 @@ import {
 import { useUIStore } from '../../store/useUIStore';
 import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 
 import type { VisualSmokeMode } from './visualSmokeScenarios';
@@ -245,7 +246,8 @@ const copy = {
   superResolutionReview: 'Super-resolution review',
   superResolutionDryRunPreview: 'Dry-run preview',
   superResolutionArtifactHandoff: 'Artifact handoff',
-  superResolutionDryRunTool: 'super_resolution.merge.dry_run_command',
+  superResolutionApplyTool: getComputationalMergeAppServerRoutePairSummary('super_resolution').applyToolName,
+  superResolutionDryRunTool: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
   superResolutionArtifactPath: '/tmp/rawengine-super-resolution-smoke.tif',
   superResolutionSourceSet: 'handheld burst x5',
   colorWorkflow: 'Color Workflow',
@@ -975,6 +977,7 @@ function SuperResolutionVisualSmoke() {
         <div
           className="sr-only"
           data-alignment-mode={settings.alignmentMode}
+          data-apply-command={copy.superResolutionApplyTool}
           data-artifact-path={copy.superResolutionArtifactPath}
           data-command={copy.superResolutionDryRunTool}
           data-detail-policy={settings.detailPolicy}
