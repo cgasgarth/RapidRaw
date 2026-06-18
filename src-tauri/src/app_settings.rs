@@ -578,7 +578,7 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
 
     if is_first_migration {
         settings.copy_paste_settings.included_adjustments = default_included;
-        settings.copy_paste_settings.known_adjustments = all_current_keys.clone();
+        settings.copy_paste_settings.known_adjustments = all_current_keys;
         settings_modified = true;
     } else {
         let new_features: Vec<String> = all_current_keys
