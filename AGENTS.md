@@ -41,11 +41,17 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 ## Concise Output Discipline
 
 - Optimize long-running work for low-token operation.
+- Keep routine command, script, hook, poll, and validation output
+  token-efficient by default. This is standing project guidance; do not remove
+  or loosen it during cleanup.
 - Keep routine thread updates extremely terse. Fragments like `compile done`,
   `CI pending`, `fixing lint`, or arrow/symbol shorthand are acceptable. Grammar
   can be sacrificed for token efficiency.
 - Skip obvious narration and do not repeat the same PR queue, CI, or branch facts
   unless something changed.
+- Do not repeat unchanged status summaries in thread updates. Only restate
+  command or CI state when it changed, unblocked work, proved a fix, or exposed
+  a blocker.
 - Summarize tool output only when it changes the next action, proves validation,
   or explains a blocker.
 - Use concise conventional commit subjects. Add commit bodies only when the
