@@ -1,12 +1,14 @@
 import { z } from 'zod';
 
+import { EXPORT_QUEUE_FILE_FORMAT_IDS } from '../utils/exportFormatIds';
+
 export const exportQueueJobStatusSchema = z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']);
 export const exportQueuePrioritySchema = z.enum(['normal', 'high']);
 export type ExportQueuePriority = z.infer<typeof exportQueuePrioritySchema>;
 
 export const exportQueueRecipeRefSchema = z
   .object({
-    fileFormat: z.enum(['jpeg', 'png', 'tiff', 'webp', 'jxl', 'avif', 'cube']),
+    fileFormat: z.enum(EXPORT_QUEUE_FILE_FORMAT_IDS),
     recipeId: z.string().trim().min(1),
     recipeName: z.string().trim().min(1),
   })

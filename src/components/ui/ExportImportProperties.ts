@@ -1,27 +1,22 @@
+import {
+  EXPORT_FILE_FORMATS,
+  ExportFileFormatId,
+  type ExportFileFormatId as ExportFileFormatIdType,
+} from '../../utils/exportFormatIds';
+
 import type { Progress } from './AppProperties';
 
 export const EXPORT_TIMEOUT = 4000;
 export const IMPORT_TIMEOUT = 5000;
 
-export enum FileFormats {
-  Jpeg = 'jpeg',
-  Png = 'png',
-  Tiff = 'tiff',
-  Webp = 'webp',
-  Jxl = 'jxl',
-  Avif = 'avif',
-  Cube = 'cube',
-}
+export const FileFormats = ExportFileFormatId;
+export type FileFormats = ExportFileFormatIdType;
 
-export const FILE_FORMATS: Array<FileFormat> = [
-  { id: FileFormats.Jpeg, name: 'JPEG', extensions: ['jpg', 'jpeg'] },
-  { id: FileFormats.Png, name: 'PNG', extensions: ['png'] },
-  { id: FileFormats.Tiff, name: 'TIFF', extensions: ['tiff'] },
-  { id: FileFormats.Webp, name: 'WebP', extensions: ['webp'] },
-  { id: FileFormats.Jxl, name: 'JPEG XL', extensions: ['jxl'] },
-  { id: FileFormats.Avif, name: 'AVIF', extensions: ['avif'] },
-  { id: FileFormats.Cube, name: 'CUBE LUT', extensions: ['cube'] },
-];
+export const FILE_FORMATS: Array<FileFormat> = EXPORT_FILE_FORMATS.map((format) => ({
+  extensions: [...format.extensions],
+  id: format.id,
+  name: format.name,
+}));
 
 export const FILENAME_VARIABLES: Array<string> = [
   '{original_filename}',
