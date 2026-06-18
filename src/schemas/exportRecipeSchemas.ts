@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-export const exportFileFormatSchema = z.enum(['jpeg', 'png', 'tiff', 'webp']);
+import { EXPORT_RECIPE_FILE_FORMAT_IDS, ExportFileFormatId } from '../utils/exportFormatIds';
+
+export const exportFileFormatSchema = z.enum(EXPORT_RECIPE_FILE_FORMAT_IDS);
 export const exportColorProfileSchema = z.enum(['srgb', 'displayP3', 'adobeRgb1998', 'proPhotoRgb', 'sourceEmbedded']);
 export const exportResizeModeSchema = z.enum(['longEdge', 'shortEdge', 'width', 'height']);
 export const watermarkAnchorSchema = z.enum([
@@ -42,7 +44,7 @@ export const exportRecipeSchema = z
   })
   .strict()
   .superRefine((recipe, context) => {
-    if (recipe.fileFormat !== 'jpeg' && recipe.jpegQuality !== 100) {
+    if (recipe.fileFormat !== ExportFileFormatId.Jpeg && recipe.jpegQuality !== 100) {
       context.addIssue({
         code: 'custom',
         message: 'Non-JPEG export recipes must use jpegQuality 100 as a no-op value.',

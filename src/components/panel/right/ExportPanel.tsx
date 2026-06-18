@@ -37,6 +37,8 @@ import UiText from '../../ui/Text';
 import type { Adjustments } from '../../../utils/adjustments';
 import type { TFunction } from 'i18next';
 
+const QUALITY_FILE_FORMATS: ReadonlySet<FileFormats> = new Set([FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl]);
+
 interface ExportPanelProps {
   exportState: ExportState;
   multiSelectedPaths: Array<string>;
@@ -653,7 +655,7 @@ export default function ExportPanel({
                   </button>
                 ))}
               </div>
-              {[FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl].includes(fileFormat) && (
+              {QUALITY_FILE_FORMATS.has(fileFormat) && (
                 <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
                   <Slider
                     defaultValue={90}
