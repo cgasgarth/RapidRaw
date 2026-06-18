@@ -14,15 +14,15 @@ await runComputationalPrivateProof({
       '--no-default-features',
       '--features',
       'required-ci,tauri-test',
-      'focus_real_raw_proof::private_decode_smoke_generates_focus_real_raw_report_when_enabled',
+      'focus_real_raw_proof::private_stack_artifact_smoke_generates_focus_real_raw_report_when_enabled',
       '--',
       '--nocapture',
     ],
     cwd: 'src-tauri',
     env: {
-      RAWENGINE_RUN_PRIVATE_FOCUS_REAL_RAW_DECODE_PROOF: '1',
+      RAWENGINE_RUN_PRIVATE_FOCUS_REAL_RAW_STACK_PROOF: '1',
     },
-    label: 'focus real RAW Rust decode proof',
+    label: 'focus real RAW Rust stack proof',
   },
   proofChecks: [
     ['bun', 'run', 'check:focus-runtime-plan-smoke'],
