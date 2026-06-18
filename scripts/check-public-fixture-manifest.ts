@@ -18,6 +18,8 @@ const requiredHighIsoFixtureIds = new Set([
   'real.layers.local-adjustment-landscape.v0',
   'real.hdr.interior-window-bracket.v0',
   'real.hdr.handheld-ghosting-bracket.v0',
+  'real.panorama.overlap-urban-row.v0',
+  'real.panorama.parallax-foreground.v0',
 ]);
 const presentFixtureIds = new Set(manifest.entries.map((entry) => entry.fixtureId));
 const missingFixtureIds = [...requiredHighIsoFixtureIds].filter((fixtureId) => !presentFixtureIds.has(fixtureId));
