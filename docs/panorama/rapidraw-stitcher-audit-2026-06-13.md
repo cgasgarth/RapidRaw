@@ -21,6 +21,19 @@ derived artifact with a schema, does not expose projection or boundary controls,
 does not normalize exposure/color between frames, does not provide a robust
 large-file memory strategy, and does not have fixture-backed validation.
 
+## RAW Corpus Placeholders
+
+Issue #1898 reserves panorama RAW corpus slots:
+
+- `real.panorama.overlap-urban-row.v0`
+- `real.panorama.parallax-foreground.v0`
+- `raw-evidence.panorama.urban-overlap-row.v1`
+
+These entries are schema/metadata only. They do not add RAW sequences, stitched
+outputs, seam masks, source hashes, or quality claims. A later PR must attach
+approved rights, hashes, ordered-source metadata, render artifacts, and review
+evidence before these entries can count as runtime panorama proof.
+
 ## Current Entry Points
 
 Frontend entry points:

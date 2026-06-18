@@ -177,6 +177,41 @@
       "trackingIssue": 1508
     },
     {
+      "artifactClass": "overlap_stitch_alignment",
+      "camera": {
+        "cameraMake": "Fujifilm",
+        "cameraModel": "X-T5",
+        "lens": "XF 18mm F1.4 R LM WR",
+        "rawFormat": "raf"
+      },
+      "crop": {
+        "height": 1024,
+        "unit": "source_pixels",
+        "width": 1536,
+        "x": 1000,
+        "y": 720
+      },
+      "evidenceId": "raw-evidence.panorama.urban-overlap-row.v1",
+      "expectedUse": ["panorama_stitch", "preview_export_parity"],
+      "exposure": {
+        "aperture": 8,
+        "exposureBiasEv": 0,
+        "iso": 160,
+        "shutterSeconds": 0.004
+      },
+      "featureFamily": "panorama_stitch",
+      "notes": "Reserved private ordered RAW panorama row for overlap matching, seam/exposure review, boundary crop, and preview/export parity proof.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private panorama overlap sequence must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1898
+    },
+    {
       "artifactClass": "focus_plane_transition",
       "camera": {
         "cameraMake": "Canon",
