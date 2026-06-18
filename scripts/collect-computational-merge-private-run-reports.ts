@@ -118,7 +118,7 @@ function sampleCollection(): ReturnType<typeof parseComputationalMergePrivateRun
     issue: 1817,
     reports: [
       {
-        acceptanceStatus: 'runtime_apply_capable',
+        acceptanceStatus: 'private_decode_smoke',
         artifacts: [
           artifact('source_raw_sequence_private', 'private-fixtures/hdr/bracket-alignment-v1'),
           artifact('alignment_report_private', `${REPORT_ROOT}/hdr-bracket-alignment.json`),
@@ -133,7 +133,7 @@ function sampleCollection(): ReturnType<typeof parseComputationalMergePrivateRun
         generatedAt: '2026-06-18T00:00:00.000Z',
         graphRevisionHash: hash,
         implementationIssue: 2062,
-        notes: 'sample private computational merge run report',
+        notes: 'sample private computational merge run report using the narrow direct-decode smoke status',
         previewExportParity,
         qualityMetrics: [
           metric('exposureBracketCoverageEv', 4, 4),

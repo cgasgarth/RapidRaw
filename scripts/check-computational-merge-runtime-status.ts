@@ -25,6 +25,7 @@ const caseSchema = z
     status: z.enum([
       'manifest_only',
       'pending_private_assets',
+      'private_decode_smoke',
       'runtime_apply_capable',
       'e2e_verified_private_assets',
       'passed_private_raw_e2e',
