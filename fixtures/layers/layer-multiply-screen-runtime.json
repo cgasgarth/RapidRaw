@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "layer-multiply-runtime-v1",
+      "width": 2,
+      "height": 1,
+      "basePixels": [
+        { "r": 128, "g": 128, "b": 128 },
+        { "r": 64, "g": 64, "b": 64 }
+      ],
+      "layer": {
+        "id": "multiply-shadow",
+        "name": "Multiply shadow",
+        "blendMode": "multiply",
+        "opacity": 1,
+        "visible": true,
+        "pixels": [
+          { "r": 128, "g": 128, "b": 128 },
+          { "r": 128, "g": 128, "b": 128 }
+        ]
+      },
+      "expectedPixels": [
+        { "r": 64, "g": 64, "b": 64 },
+        { "r": 32, "g": 32, "b": 32 }
+      ],
+      "expectedLumaDirection": "darker"
+    },
+    {
+      "id": "layer-screen-runtime-v1",
+      "width": 2,
+      "height": 1,
+      "basePixels": [
+        { "r": 128, "g": 128, "b": 128 },
+        { "r": 64, "g": 64, "b": 64 }
+      ],
+      "layer": {
+        "id": "screen-highlight",
+        "name": "Screen highlight",
+        "blendMode": "screen",
+        "opacity": 1,
+        "visible": true,
+        "pixels": [
+          { "r": 128, "g": 128, "b": 128 },
+          { "r": 128, "g": 128, "b": 128 }
+        ]
+      },
+      "expectedPixels": [
+        { "r": 192, "g": 192, "b": 192 },
+        { "r": 160, "g": 160, "b": 160 }
+      ],
+      "expectedLumaDirection": "lighter"
+    }
+  ]
+}
