@@ -80,6 +80,8 @@ for (const report of reportCollection.reports) {
     report.acceptanceStatus === 'private_stitch_artifact_smoke' && report.featureFamily === 'panorama_stitch';
   const previewExportSmoke =
     report.acceptanceStatus === 'private_preview_export_smoke' && report.featureFamily === 'panorama_stitch';
+  const reconstructionArtifactSmoke =
+    report.acceptanceStatus === 'private_reconstruction_artifact_smoke' && report.featureFamily === 'super_resolution';
   const focusStackArtifactSmoke =
     report.acceptanceStatus === 'private_focus_stack_artifact_smoke' && report.featureFamily === 'focus_stack';
   if (decodeSmoke) {
@@ -90,6 +92,8 @@ for (const report of reportCollection.reports) {
     verifyStitchArtifactSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else if (previewExportSmoke) {
     verifyPreviewExportSmokeReport(report, proofCase.localSourceRelativePaths.length);
+  } else if (reconstructionArtifactSmoke) {
+    verifyReconstructionArtifactSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else if (focusStackArtifactSmoke) {
     verifyFocusStackArtifactSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else {
@@ -202,6 +206,8 @@ function metricPassesThreshold(name: string, value: number, threshold: number): 
     name === 'alignmentMeanReprojectionErrorPx' ||
     name === 'alignmentRejectedPairCount' ||
     name === 'panoramaExcludedSourceCount' ||
+    name === 'superResolutionArtifactScore' ||
+    name === 'superResolutionRegistrationResidualPx' ||
     name === 'focusStackLowConfidenceCellRatio'
   ) {
     return value <= threshold;
@@ -466,6 +472,55 @@ function verifyPreviewExportSmokeReport(
     !metricPassesThreshold(previewExportParity.name, previewExportParity.value, previewExportParity.threshold)
   ) {
     failures.push(`${report.fixtureId}: preview/export smoke must prove previewExportMeanAbsDelta threshold.`);
+  }
+}
+
+function verifyReconstructionArtifactSmokeReport(
+  report: NonNullable<ReturnType<typeof parseComputationalMergePrivateRunReportCollection>['reports'][number]>,
+  expectedSourceCount: number,
+): void {
+  const artifactKinds = new Set(report.artifacts.map((artifact) => artifact.kind));
+  for (const requiredKind of [
+    'source_raw_sequence_private',
+    'decode_report_private',
+    'alignment_report_private',
+    'merge_output_private',
+    'quality_report_private',
+  ]) {
+    if (!artifactKinds.has(requiredKind)) {
+      failures.push(`${report.fixtureId}: reconstruction artifact smoke missing ${requiredKind}.`);
+    }
+  }
+  for (const forbiddenKind of ['preview_after_private', 'export_after_private']) {
+    if (artifactKinds.has(forbiddenKind)) {
+      failures.push(`${report.fixtureId}: reconstruction artifact smoke must not claim ${forbiddenKind}.`);
+    }
+  }
+
+  const reportMetrics = new Map(report.qualityMetrics.map((metric) => [metric.name, metric]));
+  const decodedSourceCount = reportMetrics.get('decodedSourceCount');
+  const decodedFinitePixelRatio = reportMetrics.get('decodedFinitePixelRatio');
+  const requiredMetrics = [
+    reportMetrics.get('superResolutionDetailGainRatio'),
+    reportMetrics.get('superResolutionOutputPixelCount'),
+    reportMetrics.get('superResolutionSourceCoverageRatio'),
+    reportMetrics.get('superResolutionArtifactScore'),
+    reportMetrics.get('superResolutionRegistrationResidualPx'),
+  ];
+
+  if (decodedSourceCount === undefined || decodedSourceCount.value < expectedSourceCount) {
+    failures.push(`${report.fixtureId}: reconstruction smoke must prove decodedSourceCount >= ${expectedSourceCount}.`);
+  }
+  if (decodedFinitePixelRatio === undefined || decodedFinitePixelRatio.value < 1) {
+    failures.push(`${report.fixtureId}: reconstruction smoke must prove decodedFinitePixelRatio >= 1.`);
+  }
+  for (const requiredMetric of requiredMetrics) {
+    if (
+      requiredMetric === undefined ||
+      !metricPassesThreshold(requiredMetric.name, requiredMetric.value, requiredMetric.threshold)
+    ) {
+      failures.push(`${report.fixtureId}: reconstruction smoke metric failed threshold.`);
+    }
   }
 }
 
