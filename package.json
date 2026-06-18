@@ -110,6 +110,7 @@
     "check:detail-preview-export-parity": "bun scripts/check-detail-preview-export-parity.ts",
     "check:detail-stage-order": "bun scripts/check-detail-stage-order.ts",
     "check:detail-artifacts": "bun scripts/check-detail-artifacts.ts",
+    "check:detail-workspace-smoke": "bun scripts/capture-visual-smoke.ts --scenario detail-workspace",
     "check:denoise-cpu-reference": "bun scripts/check-denoise-cpu-reference.ts",
     "check:export-recipes": "bun scripts/check-export-recipe-fixtures.ts",
     "check:export-batch-proof": "bun scripts/check-export-batch-proof.ts",

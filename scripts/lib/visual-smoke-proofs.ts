@@ -241,6 +241,15 @@ export const libraryWorkflowProofSchema = z.object({
   viewMode: z.literal('survey'),
   virtualCopyId: z.literal('vc-dsc-0002-bw-proof'),
 });
+export const detailWorkspaceProofSchema = z.object({
+  artifactWarning: z.literal('ringing_review'),
+  deblurCommand: z.literal('detail.deblur.dry_run_command'),
+  denoiseStage: z.literal('scene_linear_denoise'),
+  previewMode: z.literal('split'),
+  runtimeStatus: z.literal('fixture_runtime_paths'),
+  waveletMode: z.literal('luma_detail'),
+  zoom: z.literal('200'),
+});
 export const commandPaletteWorkflowProofSchema = z.object({
   focusOpen: z.literal('true'),
   hdrOpen: z.literal('true'),
