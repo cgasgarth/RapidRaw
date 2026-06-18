@@ -664,7 +664,7 @@ fn run_native_denoise(
     accumulator: &mut [f32],
     width: usize,
     height: usize,
-    app_handle: &tauri::AppHandle,
+    progress: &dyn Fn(String),
     params: TileParams,
 ) -> Result<()> {
     let w = width as i32;
@@ -684,7 +684,7 @@ fn run_native_denoise(
 
         if i % 10 == 0 {
             let pct = (i as f32 / total as f32) * 100.0;
-            let _ = app_handle.emit("denoise-progress", format!("Denoising… {:.0}%", pct));
+            progress(format!("Denoising… {:.0}%", pct));
         }
 
         let crop = extract_tile_mirror(img, x0, y0, params.cs);
@@ -759,10 +759,30 @@ pub fn run_ai_denoise(
     session: &Mutex<Session>,
     app_handle: &tauri::AppHandle,
 ) -> Result<DynamicImage> {
+    run_ai_denoise_with_progress(rgb_img, intensity, session, &|message| {
+        let _ = app_handle.emit("denoise-progress", message);
+    })
+}
+
+#[cfg(test)]
+pub fn run_ai_denoise_headless(
+    rgb_img: &Rgb32FImage,
+    intensity: f32,
+    session: &Mutex<Session>,
+) -> Result<DynamicImage> {
+    run_ai_denoise_with_progress(rgb_img, intensity, session, &|_| {})
+}
+
+fn run_ai_denoise_with_progress(
+    rgb_img: &Rgb32FImage,
+    intensity: f32,
+    session: &Mutex<Session>,
+    progress: &dyn Fn(String),
+) -> Result<DynamicImage> {
     let (width, height) = rgb_img.dimensions();
     let params = select_tile_params(intensity);
 
-    let _ = app_handle.emit("denoise-progress", "Denoising (AI NIND)...");
+    progress("Denoising (AI NIND)...".to_string());
     let mut accumulator = vec![0.0f32; width as usize * height as usize * 3];
     run_native_denoise(
         rgb_img,
@@ -770,12 +790,82 @@ pub fn run_ai_denoise(
         &mut accumulator,
         width as usize,
         height as usize,
-        app_handle,
+        progress,
         params,
     )?;
 
     let out_img_buffer = accumulator_to_rgb32f(&accumulator, width, height);
     Ok(DynamicImage::ImageRgb32F(out_img_buffer))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+    use std::sync::Mutex;
+
+    use image::{Rgb, Rgb32FImage};
+    use ort::session::Session;
+    use sha2::{Digest, Sha256};
+
+    use super::run_ai_denoise_headless;
+
+    #[test]
+    fn ai_denoise_headless_smoke_uses_real_nind_model_when_configured() {
+        let Some(model_path) = std::env::var_os("RAWENGINE_AI_DENOISE_MODEL_PATH") else {
+            eprintln!("RAWENGINE_AI_DENOISE_MODEL_PATH not set; skipping real NIND smoke.");
+            return;
+        };
+        let model_path = Path::new(&model_path);
+        assert!(
+            model_path.exists(),
+            "RAWENGINE_AI_DENOISE_MODEL_PATH does not exist: {}",
+            model_path.display()
+        );
+
+        let _ = ort::init().with_name("AI-Denoise-Headless-Test").commit();
+        let session = Mutex::new(
+            Session::builder()
+                .expect("create ONNX session builder")
+                .commit_from_file(model_path)
+                .expect("load NIND ONNX model"),
+        );
+        let input = build_smoke_input();
+        let output =
+            run_ai_denoise_headless(&input, 0.5, &session).expect("run headless NIND denoise");
+        assert_eq!(output.width(), input.width());
+        assert_eq!(output.height(), input.height());
+
+        let output_rgb = output.to_rgb32f();
+        assert_ne!(
+            hash_rgb32f(&input),
+            hash_rgb32f(&output_rgb),
+            "NIND output should change the input."
+        );
+    }
+
+    fn build_smoke_input() -> Rgb32FImage {
+        let mut image = Rgb32FImage::new(32, 32);
+        for (x, y, pixel) in image.enumerate_pixels_mut() {
+            let checker = if (x + y) % 2 == 0 { 0.04 } else { -0.04 };
+            let base = x as f32 / 31.0;
+            *pixel = Rgb([
+                (base + checker).clamp(0.0, 1.0),
+                (y as f32 / 31.0 - checker).clamp(0.0, 1.0),
+                ((x + y) as f32 / 62.0 + checker).clamp(0.0, 1.0),
+            ]);
+        }
+        image
+    }
+
+    fn hash_rgb32f(image: &Rgb32FImage) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        for pixel in image.pixels() {
+            for channel in pixel.0 {
+                hasher.update(channel.to_le_bytes());
+            }
+        }
+        hasher.finalize().to_vec()
+    }
 }
 
 pub fn run_lama_inpainting(
