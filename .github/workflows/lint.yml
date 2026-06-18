@@ -285,7 +285,7 @@ jobs:
 
   rust-pr-check:
     name: 'rust: cargo check PR path gate'
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     if: github.event_name == 'pull_request'
     timeout-minutes: 45
     steps:
@@ -310,10 +310,6 @@ jobs:
       - name: Classify Rust requirement
         id: rust-pr-decision
         run: bun scripts/ci-classify-rust-pr.ts ${{ steps.rust-pr-files.outputs.args }}
-
-      - name: Install Tauri Linux dependencies
-        if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
-        uses: ./.github/actions/install-tauri-linux-deps
 
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
@@ -340,7 +336,7 @@ jobs:
 
   rust-pr-clippy:
     name: 'rust: clippy PR path gate'
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     if: github.event_name == 'pull_request'
     timeout-minutes: 45
     steps:
@@ -365,10 +361,6 @@ jobs:
       - name: Classify Rust requirement
         id: rust-pr-decision
         run: bun scripts/ci-classify-rust-pr.ts ${{ steps.rust-pr-files.outputs.args }}
-
-      - name: Install Tauri Linux dependencies
-        if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
-        uses: ./.github/actions/install-tauri-linux-deps
 
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
