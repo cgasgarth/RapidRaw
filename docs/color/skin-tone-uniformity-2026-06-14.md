@@ -18,14 +18,27 @@ Run:
 
 ```sh
 bun run check:skin-tone-uniformity
+bun run check:hue-memory-color
 ```
 
 The checker validates fixture shape with Zod and proves hue wraparound,
 partial-uniformity, and full-target behavior.
 
+## Hue And Memory-Color Gate
+
+Issue #1932 adds a deterministic synthetic gate for hue linearity, neutral RGB
+drift, and memory-color movement toward target values. The committed review
+artifact is `docs/validation/color-hue-memory-gate-2026-06-18.json`.
+
+- Per-case HSL/RGB tolerance must stay at or below `0.001`.
+- Neutral RGB drift must stay at or below `1e-12`.
+- Memory-color cases must reduce distance to the declared target; subjective
+  review alone is not enough to pass this gate.
+
 ## Validation Evidence
 
 - `bun run check:skin-tone-uniformity`
+- `bun run check:hue-memory-color`
 - `bun run check:types`
 - `bunx eslint src/utils/skinToneUniformity.ts scripts/check-skin-tone-uniformity.ts --max-warnings 0`
 - `bun run check:unsafe-casts`

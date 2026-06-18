@@ -111,6 +111,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:focus-ui-api', new Set(['bun scripts/check-focus-ui-api.ts'])],
   ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario focus-ui'])],
   ['check:hdr-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario hdr-ui'])],
+  ['check:hue-memory-color', new Set(['bun scripts/check-hue-memory-color-gate.ts'])],
   ['check:import-presets', new Set(['bun scripts/check-import-preset-fixtures.ts'])],
   ['check:keyboard-shortcut-conflicts', new Set(['bun scripts/check-keyboard-shortcut-conflicts.ts'])],
   ['check:keyboard-shortcuts', new Set(['bun scripts/check-keyboard-shortcuts.ts'])],
