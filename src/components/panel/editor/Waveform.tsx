@@ -4,9 +4,9 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DisplayMode } from '../../../utils/adjustments';
-import { WaveformData } from '../../ui/AppProperties';
 
 import type { ChannelConfig } from '../../adjustments/Curves';
+import type { WaveformData } from '../../ui/AppProperties';
 
 interface WaveformProps {
   waveformData: WaveformData | null;

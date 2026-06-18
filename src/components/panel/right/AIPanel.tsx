@@ -7,8 +7,8 @@ import {
   useDroppable,
   useSensor,
   useSensors,
-  DragEndEvent,
-  DragStartEvent,
+  type DragEndEvent,
+  type DragStartEvent,
   pointerWithin,
 } from '@dnd-kit/core';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -53,8 +53,8 @@ import {
 } from './maskPanelRowHelpers';
 import {
   Mask,
-  MaskType,
-  SubMask,
+  type MaskType,
+  type SubMask,
   SubMaskMode,
   ToolType,
   MASK_ICON_MAP,
@@ -80,7 +80,6 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { Adjustments, AiPatch } from '../../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../../utils/agentChatTranscriptFixture';
 import {
   cloneMaskLikeContainerForPaste,
@@ -94,13 +93,15 @@ import {
 } from '../../../utils/maskClipboard';
 import { getMaskParameterNumber, mergeMaskParameters, toMaskParameterRecord } from '../../../utils/maskParameterAccess';
 import { createSubMask } from '../../../utils/maskUtils';
-import { BrushSettings, OPTION_SEPARATOR, type Option } from '../../ui/AppProperties';
+import { type BrushSettings, OPTION_SEPARATOR, type Option } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import CollapsibleSection from '../../ui/CollapsibleSection';
 import Input from '../../ui/Input';
 import Slider from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import UiText from '../../ui/Text';
+
+import type { Adjustments, AiPatch } from '../../../utils/adjustments';
 
 interface DragData extends MaskLikeDragData {
   type: 'Container' | 'SubMask' | 'Creation';

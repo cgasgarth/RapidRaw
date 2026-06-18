@@ -1,7 +1,7 @@
-import { type RefObject } from 'react';
-
 import { useImageLoader } from '../../hooks/useImageLoader';
-import { type ImageCacheEntry } from '../../utils/ImageLRUCache';
+
+import type { ImageCacheEntry } from '../../utils/ImageLRUCache';
+import type { RefObject } from 'react';
 
 interface Props {
   cachedEditStateRef: RefObject<ImageCacheEntry | null>;

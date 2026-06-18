@@ -6,10 +6,10 @@ import { useTranslation } from 'react-i18next';
 
 import { IconAperture, IconCalendar, IconClock, IconFocalLength, IconIso, IconShutter } from './ExifIcons';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { SelectedImage } from '../../ui/AppProperties';
 import UiText from '../../ui/Text';
 
 import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
+import type { SelectedImage } from '../../ui/AppProperties';
 
 interface EditorToolbarProps {
   canRedo: boolean;

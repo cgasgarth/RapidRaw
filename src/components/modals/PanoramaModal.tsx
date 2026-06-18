@@ -5,18 +5,19 @@ import { useTranslation } from 'react-i18next';
 import ComputationalMergeReviewPanel from './ComputationalMergeReviewPanel';
 import { MergeErrorState, MergeFooterActions, MergeProcessingState, MergeResultPreview } from './MergeStatusViews';
 import { useModalTransition } from '../../hooks/useModalTransition';
-import {
-  type PanoramaUiBlendMode,
-  type PanoramaUiBoundaryMode,
-  type PanoramaUiExposureMode,
-  type PanoramaUiProjection,
-  type PanoramaUiQualityPreference,
-  type PanoramaUiSettings,
-} from '../../schemas/panoramaUiSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import ComputationalMergeAppServerBadge from '../ui/ComputationalMergeAppServerBadge';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
+
+import type {
+  PanoramaUiBlendMode,
+  PanoramaUiBoundaryMode,
+  PanoramaUiExposureMode,
+  PanoramaUiProjection,
+  PanoramaUiQualityPreference,
+  PanoramaUiSettings,
+} from '../../schemas/panoramaUiSchemas';
 
 interface PanoramaModalProps {
   error: string | null;

@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { z } from 'zod';
+
+import type { z } from 'zod';
 
 const formatSchemaIssues = (issues: z.core.$ZodIssue[]): string =>
   issues

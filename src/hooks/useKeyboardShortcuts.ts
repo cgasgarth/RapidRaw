@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 
 import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
-import { ImageFile, Panel, ExifOverlay } from '../components/ui/AppProperties';
+import { type ImageFile, Panel, ExifOverlay } from '../components/ui/AppProperties';
 import { normalizeKeyboardShortcutMap } from '../schemas/keyboardShortcutSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';

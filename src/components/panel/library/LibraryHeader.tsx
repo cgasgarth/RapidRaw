@@ -10,7 +10,7 @@ import {
   ChevronDown,
   HelpCircle,
 } from 'lucide-react';
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -18,21 +18,23 @@ import { ADVANCED_QUERY_REGEX } from '../../../hooks/useSortedLibrary';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
-import { COLOR_LABELS, Color } from '../../../utils/adjustments';
+import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
 import {
-  FilterCriteria,
+  type FilterCriteria,
   RawStatus,
   EditedStatus,
   LibraryViewMode,
-  Progress,
-  SortCriteria,
+  type Progress,
+  type SortCriteria,
   SortDirection,
   ExifOverlay,
-  ThumbnailAspectRatio,
-  ThumbnailSize,
+  type ThumbnailAspectRatio,
+  type ThumbnailSize,
 } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import UiText from '../../ui/Text';
+
+import type React from 'react';
 
 interface DropdownMenuProps {
   buttonContent: React.ReactNode;

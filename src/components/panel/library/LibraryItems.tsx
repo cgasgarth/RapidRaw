@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
-import { COLOR_LABELS, Color } from '../../../utils/adjustments';
+import { COLOR_LABELS, type Color } from '../../../utils/adjustments';
 import { ThumbnailAspectRatio, type ImageFile, ExifOverlay } from '../../ui/AppProperties';
 import UiText from '../../ui/Text';
 import { IconAperture, IconFocalLength, IconIso, IconShutter } from '../editor/ExifIcons';

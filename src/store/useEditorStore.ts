@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 
-import { ChannelConfig } from '../components/adjustments/Curves';
-import { OverlayMode } from '../components/panel/right/CropPanel';
 import { ToolType } from '../components/panel/right/Masks';
-import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
-import { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
-import { Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, MaskContainer } from '../utils/adjustments';
+import { type Adjustments, DisplayMode, INITIAL_ADJUSTMENTS, type MaskContainer } from '../utils/adjustments';
 import { goToEditHistoryIndex, pushEditHistoryEntry, redoEditHistory, undoEditHistory } from '../utils/editHistory';
 
+import type { ChannelConfig } from '../components/adjustments/Curves';
+import type { OverlayMode } from '../components/panel/right/CropPanel';
+import type { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
+import type { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
 import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
 
 export interface InteractivePatch {

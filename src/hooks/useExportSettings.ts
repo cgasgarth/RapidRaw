@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 
 import {
   ExportColorProfile,
-  ExportPreset,
+  type ExportPreset,
   FILE_FORMATS,
   FileFormats,
   WatermarkAnchor,

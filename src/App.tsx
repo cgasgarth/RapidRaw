@@ -12,10 +12,10 @@ import AppModals from './components/modals/AppModals';
 import FolderTreePanel from './components/panel/FolderTree';
 import ExportPanel from './components/panel/right/ExportPanel';
 import {
-  Album,
-  AlbumItem,
+  type Album,
+  type AlbumItem,
   Invokes,
-  ImageFile,
+  type ImageFile,
   LibraryViewMode,
   Panel,
   Theme,
@@ -33,7 +33,6 @@ import { useAppInitialization } from './hooks/useAppInitialization';
 import { useAppNavigation } from './hooks/useAppNavigation';
 import { useEditorActions } from './hooks/useEditorActions';
 import { useFileOperations } from './hooks/useFileOperations';
-import { ImageDimensions } from './hooks/useImageRenderSize';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useLibraryActions } from './hooks/useLibraryActions';
 import { useProductivityActions } from './hooks/useProductivityActions';
@@ -53,6 +52,7 @@ import { getOptionalCurrentWindow } from './window/currentWindow';
 import TitleBar from './window/TitleBar';
 
 import type { FolderTree as FolderTreeNode } from './components/panel/FolderTree';
+import type { ImageDimensions } from './hooks/useImageRenderSize';
 import type { Adjustments } from './utils/adjustments';
 import type { ImageCacheEntry } from './utils/ImageLRUCache';
 

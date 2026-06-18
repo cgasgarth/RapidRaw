@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import React, { useCallback, useEffect, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useMemo } from 'react';
 
 import { debouncedSave } from './useEditorActions';
 import { Invokes, Panel } from '../components/ui/AppProperties';
@@ -8,9 +8,11 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
-import { Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
+import { type Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { debounce } from '../utils/timing';
+
+import type React from 'react';
 
 interface PreviousAdjustments {
   adjustments: Adjustments;

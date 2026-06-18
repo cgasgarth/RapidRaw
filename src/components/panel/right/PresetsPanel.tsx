@@ -47,12 +47,11 @@ import { useTranslation } from 'react-i18next';
 
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../hooks/useEditorActions';
-import { PresetListType, usePresets, UserPreset } from '../../../hooks/usePresets';
-import { type ColorStylePreset } from '../../../schemas/colorStylePresetSchemas';
+import { PresetListType, usePresets, type UserPreset } from '../../../hooks/usePresets';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
 import { createBlobFromUint8Array } from '../../../utils/blobUtils';
 import { BUILT_IN_COLOR_STYLE_PRESETS } from '../../../utils/colorStylePresetCatalog';
 import ConfigurePresetModal from '../../modals/ConfigurePresetModal';
@@ -61,6 +60,8 @@ import RenameFolderModal from '../../modals/RenameFolderModal';
 import { Invokes, OPTION_SEPARATOR, Panel, type Folder, type Option, type Preset } from '../../ui/AppProperties';
 import Button from '../../ui/Button';
 import UiText from '../../ui/Text';
+
+import type { ColorStylePreset } from '../../../schemas/colorStylePresetSchemas';
 
 interface DroppableFolderItemProps {
   children: ReactNode;

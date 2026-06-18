@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 
 import { createFocusStackPlanOnlyDryRunResultV1 } from '../src/focusStackPreflight.js';
 import { detectHdrBracketV1 } from '../src/hdrBracketDetection.js';

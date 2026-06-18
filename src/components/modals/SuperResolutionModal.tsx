@@ -10,15 +10,16 @@ import {
   ComputationalSetupSourceWarning,
   ComputationalSetupStatusLine,
 } from './ComputationalSetupModalShell';
-import {
-  type SuperResolutionAlignmentMode,
-  type SuperResolutionQualityPreference,
-  type SuperResolutionUiSettings,
-} from '../../schemas/superResolutionUiSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
+
+import type {
+  SuperResolutionAlignmentMode,
+  SuperResolutionQualityPreference,
+  SuperResolutionUiSettings,
+} from '../../schemas/superResolutionUiSchemas';
 
 interface SuperResolutionModalProps {
   isOpen: boolean;

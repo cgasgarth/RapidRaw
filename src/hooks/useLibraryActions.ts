@@ -3,7 +3,7 @@ import { useCallback, type MouseEvent } from 'react';
 import { toast } from 'react-toastify';
 
 import { computeSortedLibrary } from './useSortedLibrary';
-import { Invokes, ImageFile, AlbumItem } from '../components/ui/AppProperties';
+import { Invokes, type ImageFile, type AlbumItem } from '../components/ui/AppProperties';
 import { albumTreeSchema } from '../schemas/albumSchemas';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';

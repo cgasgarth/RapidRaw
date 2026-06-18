@@ -3,7 +3,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 
-import { AppSettings, ImageFile, Invokes } from '../components/ui/AppProperties';
+import { type AppSettings, type ImageFile, Invokes } from '../components/ui/AppProperties';
 import { Status } from '../components/ui/ExportImportProperties';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';

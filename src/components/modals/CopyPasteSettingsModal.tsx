@@ -5,7 +5,12 @@ import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
 import { TextVariants } from '../../types/typography';
-import { ADJUSTMENT_GROUPS, COPYABLE_ADJUSTMENT_KEYS, CopyPasteSettings, PasteMode } from '../../utils/adjustments';
+import {
+  ADJUSTMENT_GROUPS,
+  COPYABLE_ADJUSTMENT_KEYS,
+  type CopyPasteSettings,
+  PasteMode,
+} from '../../utils/adjustments';
 import Button from '../ui/Button';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';

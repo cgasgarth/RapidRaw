@@ -55,13 +55,13 @@ import { useEditorActions } from './useEditorActions';
 import { useLibraryActions } from './useLibraryActions';
 import {
   Invokes,
-  Option,
+  type Option,
   OPTION_SEPARATOR,
   Panel,
-  AlbumItem,
-  Album,
-  ImageFile,
-  AppSettings,
+  type AlbumItem,
+  type Album,
+  type ImageFile,
+  type AppSettings,
 } from '../components/ui/AppProperties';
 import { useContextMenu } from '../context/ContextMenuContext';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS } from '../schemas/focusStackUiSchemas';

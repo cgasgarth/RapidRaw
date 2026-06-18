@@ -2,10 +2,11 @@ import { useTranslation } from 'react-i18next';
 
 import AdjustmentSlider from './AdjustmentSlider';
 import { TextVariants } from '../../types/typography';
-import { Adjustments, DetailsAdjustment } from '../../utils/adjustments';
-import { AppSettings } from '../ui/AppProperties';
+import { type Adjustments, DetailsAdjustment } from '../../utils/adjustments';
 import Switch from '../ui/Switch';
 import UiText from '../ui/Text';
+
+import type { AppSettings } from '../ui/AppProperties';
 
 interface DetailsPanelProps {
   adjustments: Adjustments;
