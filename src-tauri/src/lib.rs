@@ -48,6 +48,8 @@ mod preset_converter;
 mod presets;
 mod raw_open_edit_export_proof;
 mod raw_processing;
+#[cfg(all(test, feature = "tauri-test"))]
+mod sr_real_raw_proof;
 mod tagging;
 mod tagging_utils;
 mod wavelet_render;
