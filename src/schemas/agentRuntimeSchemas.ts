@@ -38,6 +38,18 @@ export const rawEngineAppServerSupervisorEventKindSchema = z.enum([
   'fail',
 ]);
 
+export const RawEngineAppServerHostToolName = {
+  Capabilities: 'rawengine.host.capabilities',
+  Health: 'rawengine.host.health',
+  RouteCatalog: 'rawengine.host.route_catalog',
+} as const;
+
+export const rawEngineAppServerHostToolNameSchema = z.enum([
+  RawEngineAppServerHostToolName.Capabilities,
+  RawEngineAppServerHostToolName.Health,
+  RawEngineAppServerHostToolName.RouteCatalog,
+]);
+
 export const rawEngineAppServerClientInfoSchema = z
   .object({
     name: z.string().trim().min(1),
@@ -159,21 +171,21 @@ export const rawEngineAppServerHostManifestSchema = z
 export const rawEngineAppServerHealthRequestSchema = z
   .object({
     requestId: z.string().trim().min(1),
-    toolName: z.literal('rawengine.host.health'),
+    toolName: z.literal(RawEngineAppServerHostToolName.Health),
   })
   .strict();
 
 export const rawEngineAppServerCapabilitiesRequestSchema = z
   .object({
     requestId: z.string().trim().min(1),
-    toolName: z.literal('rawengine.host.capabilities'),
+    toolName: z.literal(RawEngineAppServerHostToolName.Capabilities),
   })
   .strict();
 
 export const rawEngineAppServerRouteCatalogRequestSchema = z
   .object({
     requestId: z.string().trim().min(1),
-    toolName: z.literal('rawengine.host.route_catalog'),
+    toolName: z.literal(RawEngineAppServerHostToolName.RouteCatalog),
   })
   .strict();
 
@@ -315,6 +327,7 @@ export type RawEngineAppServerHostManifest = z.infer<typeof rawEngineAppServerHo
 export type RawEngineAppServerHostRequest = z.infer<typeof rawEngineAppServerHostRequestSchema>;
 export type RawEngineAppServerHostResponse = z.infer<typeof rawEngineAppServerHostResponseSchema>;
 export type RawEngineAppServerHostResponseEnvelope = z.infer<typeof rawEngineAppServerHostResponseEnvelopeSchema>;
+export type RawEngineAppServerHostToolName = z.infer<typeof rawEngineAppServerHostToolNameSchema>;
 export type RawEngineAppServerLifecycleReplay = z.infer<typeof rawEngineAppServerLifecycleReplaySchema>;
 export type RawEngineAppServerLifecycleState = z.infer<typeof rawEngineAppServerLifecycleStateSchema>;
 export type RawEngineAppServerStructuredError = z.infer<typeof rawEngineAppServerStructuredErrorSchema>;
