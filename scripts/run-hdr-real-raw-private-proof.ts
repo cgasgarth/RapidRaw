@@ -21,6 +21,14 @@ const args = argsSchema.parse({
   requireAssets: process.argv.includes('--require-assets'),
 });
 
+for (const check of [
+  ['bun', 'run', 'check:hdr-runtime-plan-smoke'],
+  ['bun', 'run', 'check:hdr-app-server-runtime'],
+  ['bun', 'run', 'check:hdr-ui-runtime-bridge'],
+]) {
+  await runCompact(check.join(' '), { command: check });
+}
+
 if (args.privateRoot === undefined) {
   if (args.requireAssets) {
     console.error('RAWENGINE_PRIVATE_RAW_ROOT or --root is required with --require-assets.');
