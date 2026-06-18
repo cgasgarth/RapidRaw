@@ -5,6 +5,7 @@ export * from './focusStackRuntimePlan.js';
 export * from './focusStackWeightedBlend.js';
 export * from './derivedArtifactInvalidation.js';
 export * from './editCommandBus.js';
+export * from './editGraphMigrations.js';
 export * from './hdrAlignmentRuntime.js';
 export * from './hdrAppServerRuntime.js';
 export * from './hdrBracketDetection.js';
