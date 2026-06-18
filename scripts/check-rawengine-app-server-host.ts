@@ -362,6 +362,18 @@ for (const route of routeCatalogReplay.response.routes.filter((candidate) => can
     }
   }
 }
+for (const route of routeCatalogReplay.response.routes.filter((candidate) => candidate.family === 'film_look')) {
+  if (!route.runtimeCheckScripts.includes('check:film-look-app-server-routes')) {
+    failures.push(`${route.commandName}: film route catalog entry must expose check:film-look-app-server-routes.`);
+  }
+}
+for (const route of routeCatalogReplay.response.routes.filter((candidate) => candidate.family === 'negative_lab')) {
+  if (!route.runtimeCheckScripts.includes('check:negative-lab-app-server-routes')) {
+    failures.push(
+      `${route.commandName}: Negative Lab route catalog entry must expose check:negative-lab-app-server-routes.`,
+    );
+  }
+}
 if (routeCatalogReplay.auditLog.length !== 1 || routeCatalogReplay.auditLog[0]?.mutates) {
   failures.push('Route catalog replay audit log must be read-only.');
 }
