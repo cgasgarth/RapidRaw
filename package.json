@@ -36,6 +36,7 @@
     "check:i18n": "bun scripts/run-compact-command.ts --label i18n -- i18next-cli extract --ci --dry-run",
     "check:unsafe-casts": "bun scripts/check-unsafe-casts.ts",
     "check:pure-ts-tests": "bun scripts/run-compact-command.ts --label pure-ts-tests -- bun test --reporter=dot tests/pure-ts",
+    "check:pure-ts-coverage": "bun scripts/check-pure-ts-coverage.ts",
     "check:a11y": "bun scripts/check-accessibility-pass.ts",
     "check:ai-fallbacks": "bun scripts/check-ai-provider-fallbacks.ts",
     "check:keyboard-shortcuts": "bun scripts/check-keyboard-shortcuts.ts",
