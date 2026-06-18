@@ -622,8 +622,14 @@
             </tr>
             <tr>
               <td>Super-resolution private RAW asset prep</td>
-              <td><code>bun run check:sr-real-raw-private-root-prep</code></td>
-              <td>Self-test for SR burst private root validation and path-safety behavior.</td>
+              <td>
+                <code>bun run check:sr-real-raw-private-root-prep</code><br />
+                <code>bun run check:sr-real-raw-private-proof</code>
+              </td>
+              <td>
+                Self-test for SR burst private root validation and path-safety behavior plus a skip-safe private proof
+                runner wired through SR runtime, app-server, and UI bridge checks.
+              </td>
             </tr>
             <tr>
               <td>Panorama private RAW asset prep</td>
