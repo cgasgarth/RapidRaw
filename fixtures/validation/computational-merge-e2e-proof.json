@@ -214,6 +214,12 @@
           "kind": "quality_report_private",
           "path": "private-artifacts/validation/computational-merge/focus-plane-quality.json",
           "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "app_server_runtime_report_private",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-app-server-runtime-proof.json",
+          "publicRepoAllowed": false
         }
       ],
       "evidenceId": "raw-evidence.focus-stack.plane-transition.v1",
@@ -243,7 +249,7 @@
         "private-fixtures/focus-stack/plane-transition-v1/frame-03.cr3"
       ],
       "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
-      "notes": "Private RAW focus-stack E2E proof slot for decode, source alignment, sharpness-map merge, preview/export parity, and transition-artifact quality metrics. This manifest is planning evidence only until the private assets and runtime run reports exist.",
+      "notes": "Private RAW focus-stack E2E proof slot for decode, source alignment, sharpness-map merge, app-server dry-run/apply replay, preview/export parity, and transition-artifact quality metrics. This manifest is planning evidence only until private assets and full E2E run reports exist.",
       "proofStatus": "manifest_only",
       "uiIssue": 1334,
       "workflowSteps": [

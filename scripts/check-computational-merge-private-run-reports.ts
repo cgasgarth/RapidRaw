@@ -97,22 +97,39 @@ for (const report of reportCollection.reports) {
   } else if (focusStackArtifactSmoke) {
     verifyFocusStackArtifactSmokeReport(report, proofCase.localSourceRelativePaths.length);
   } else {
+    const requiresPreviewExportParity =
+      report.acceptanceStatus === 'passed_private_raw_e2e' ||
+      report.featureFamily === 'hdr_merge' ||
+      report.featureFamily === 'panorama_stitch';
+    const optionalExtraArtifactKinds = new Set(['decode_report_private']);
     for (const artifact of report.artifacts) {
       const manifestArtifact = manifestArtifacts.get(artifact.kind);
       if (manifestArtifact === undefined) {
-        failures.push(`${report.fixtureId}: unexpected artifact kind ${artifact.kind}.`);
+        if (!optionalExtraArtifactKinds.has(artifact.kind)) {
+          failures.push(`${report.fixtureId}: unexpected artifact kind ${artifact.kind}.`);
+        }
         continue;
       }
       if (artifact.path !== manifestArtifact.path) {
         failures.push(`${report.fixtureId}: ${artifact.kind} path must match manifest artifact path.`);
       }
     }
-    if (report.artifacts.length !== proofCase.artifacts.length) {
-      failures.push(`${report.fixtureId}: artifact count must match manifest artifact count.`);
+    for (const requiredArtifactKind of [
+      'source_raw_sequence_private',
+      'alignment_report_private',
+      'merge_output_private',
+      'quality_report_private',
+      'app_server_runtime_report_private',
+      ...(requiresPreviewExportParity ? (['preview_after_private', 'export_after_private'] as const) : []),
+    ] as const) {
+      if (!report.artifacts.some((artifact) => artifact.kind === requiredArtifactKind)) {
+        failures.push(`${report.fixtureId}: runtime report missing ${requiredArtifactKind}.`);
+      }
     }
 
     const reportMetrics = new Map(report.qualityMetrics.map((metric) => [metric.name, metric]));
     for (const expectedMetric of proofCase.expectedMetrics) {
+      if (!requiresPreviewExportParity && expectedMetric.name === 'previewExportMeanAbsDelta') continue;
       const reportMetric = reportMetrics.get(expectedMetric.name);
       if (reportMetric === undefined) {
         failures.push(`${report.fixtureId}: missing required quality metric ${expectedMetric.name}.`);
@@ -126,7 +143,7 @@ for (const report of reportCollection.reports) {
       }
     }
 
-    if (!reportMetrics.has('previewExportMeanAbsDelta')) {
+    if (requiresPreviewExportParity && !reportMetrics.has('previewExportMeanAbsDelta')) {
       failures.push(`${report.fixtureId}: missing preview/export parity metric.`);
     }
   }

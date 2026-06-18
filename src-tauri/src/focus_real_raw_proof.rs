@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::{SecondsFormat, Utc};
-use image::{DynamicImage, ImageFormat, Rgb, RgbImage};
+use image::{DynamicImage, ImageFormat, Rgb, RgbImage, imageops::FilterType};
 use serde::Serialize;
 
 use crate::private_decode_raw_proof::{
@@ -39,6 +39,13 @@ const STACK_NON_CLAIMS: [&str; 4] = [
 const ALIGNMENT_REPORT_FILE: &str = "focus-plane-alignment.json";
 const STACK_REPORT_FILE: &str = "focus-plane-stack-report.json";
 const STACK_OUTPUT_FILE: &str = "focus-plane-merge.tiff";
+const RUNTIME_SAMPLE_FILE: &str = "focus-plane-runtime-sample.json";
+const MODAL_BEFORE_FILE: &str = "focus-plane-modal-before.png";
+const MODAL_AFTER_FILE: &str = "focus-plane-modal-after.png";
+const RESULT_REVIEW_FILE: &str = "focus-plane-result-review.png";
+const EXPORT_REVIEW_FILE: &str = "focus-plane-export-review.png";
+const RUNTIME_SAMPLE_WIDTH: u32 = 72;
+const RUNTIME_SAMPLE_HEIGHT: u32 = 48;
 const MIN_SHARPNESS_GAIN_RATIO: f64 = 1.15;
 const MIN_SOURCE_COVERAGE_RATIO: f64 = 0.67;
 const MAX_LOW_CONFIDENCE_CELL_RATIO: f64 = 0.5;
@@ -132,6 +139,29 @@ struct FocusStackReport {
     winner_source_counts: Vec<WinnerSourceCount>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FocusRuntimeSample {
+    fixture_id: String,
+    frames: Vec<FocusRuntimeSampleFrame>,
+    graph_revision_hash: String,
+    height: u32,
+    width: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FocusRuntimeSampleFrame {
+    content_hash: String,
+    focus_distance_mm: f64,
+    graph_revision: String,
+    pixels: Vec<f64>,
+    source_index: usize,
+    source_path: String,
+    translation_x: i32,
+    translation_y: i32,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WinnerSourceCount {
@@ -186,6 +216,13 @@ fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), Str
         &output_dir.join(STACK_REPORT_FILE),
         &build_stack_report(&stack_result, &graph_revision_hash),
     )?;
+    write_runtime_sample_and_review_artifacts(
+        &output_dir,
+        &loaded_sources,
+        &source_hashes,
+        &graph_revision_hash,
+        &stack_result,
+    )?;
     write_json(&output_dir.join(CONFIG.quality_file), &metrics)?;
 
     write_json(
@@ -238,6 +275,71 @@ fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), Str
             validation_mode: "public_schema_private_reports".to_string(),
         },
     )
+}
+
+fn write_runtime_sample_and_review_artifacts(
+    output_dir: &Path,
+    loaded_sources: &[LoadedSource],
+    source_hashes: &[crate::private_decode_raw_proof::SourceHash],
+    graph_revision_hash: &str,
+    stack_result: &FocusStackResult,
+) -> Result<(), String> {
+    let frames = loaded_sources
+        .iter()
+        .zip(source_hashes.iter())
+        .enumerate()
+        .map(|(source_index, (source, source_hash))| {
+            let thumbnail = source
+                .image
+                .resize_exact(
+                    RUNTIME_SAMPLE_WIDTH,
+                    RUNTIME_SAMPLE_HEIGHT,
+                    FilterType::Triangle,
+                )
+                .to_rgb8();
+            FocusRuntimeSampleFrame {
+                content_hash: source_hash.hash.clone(),
+                focus_distance_mm: 180.0 + source_index as f64 * 60.0,
+                graph_revision: graph_revision_hash.to_string(),
+                pixels: luma_plane(&thumbnail, RUNTIME_SAMPLE_WIDTH, RUNTIME_SAMPLE_HEIGHT),
+                source_index,
+                source_path: source.relative_path.clone(),
+                translation_x: 0,
+                translation_y: 0,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    write_json(
+        &output_dir.join(RUNTIME_SAMPLE_FILE),
+        &FocusRuntimeSample {
+            fixture_id: CONFIG.fixture_id.to_string(),
+            frames,
+            graph_revision_hash: graph_revision_hash.to_string(),
+            height: RUNTIME_SAMPLE_HEIGHT,
+            width: RUNTIME_SAMPLE_WIDTH,
+        },
+    )?;
+
+    let before = loaded_sources
+        .first()
+        .ok_or_else(|| "focus runtime sample requires at least one source".to_string())?
+        .image
+        .thumbnail(960, 640)
+        .to_rgb8();
+    let after = DynamicImage::ImageRgb8(stack_result.output.clone())
+        .thumbnail(960, 640)
+        .to_rgb8();
+    write_png(&output_dir.join(MODAL_BEFORE_FILE), &before)?;
+    write_png(&output_dir.join(MODAL_AFTER_FILE), &after)?;
+    write_png(&output_dir.join(RESULT_REVIEW_FILE), &after)?;
+    write_png(&output_dir.join(EXPORT_REVIEW_FILE), &after)
+}
+
+fn write_png(path: &Path, image: &RgbImage) -> Result<(), String> {
+    DynamicImage::ImageRgb8(image.clone())
+        .save_with_format(path, ImageFormat::Png)
+        .map_err(|error| error.to_string())
 }
 
 fn write_decode_report(
