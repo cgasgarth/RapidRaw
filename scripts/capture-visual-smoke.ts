@@ -23,6 +23,7 @@ import {
   negativeLabWorkspaceProofDatasetSchema,
   panoramaReviewWorkspaceProofSchema,
   panoramaUiSettingsProofSchema,
+  superResolutionReviewWorkspaceProofSchema,
   superResolutionUiSettingsProofSchema,
 } from './lib/visual-smoke-proofs.ts';
 
@@ -216,6 +217,13 @@ async function prepareScenario(page, mode) {
     superResolutionUiSettingsProofSchema.parse(
       await page.getByTestId('sr-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    superResolutionReviewWorkspaceProofSchema.parse(
+      await page.getByTestId('sr-review-workspace-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    await page
+      .getByTestId('sr-artifact-handoff')
+      .getByText('/tmp/rawengine-super-resolution-smoke.tif', { exact: true })
+      .waitFor({ timeout: 10_000 });
     return;
   }
 

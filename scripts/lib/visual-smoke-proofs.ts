@@ -238,6 +238,14 @@ export const superResolutionUiSettingsProofSchema = z.object({
   outputScale: z.literal('4'),
   qualityPreference: z.literal('preview'),
 });
+export const superResolutionReviewWorkspaceProofSchema = z.object({
+  artifactPath: z.literal('/tmp/rawengine-super-resolution-smoke.tif'),
+  command: z.literal('super_resolution.merge.dry_run_command'),
+  detailPolicy: z.literal('aggressive_preview_only'),
+  outputScale: z.literal('4'),
+  runtimeStatus: z.literal('dry_run_preview'),
+  sourceCount: z.literal('5'),
+});
 export const layerStackWorkflowProofSchema = z.object({
   activeLayer: z.literal('Portrait burn'),
   blendMode: z.literal('multiply'),
