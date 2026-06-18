@@ -62,6 +62,18 @@ import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspa
 type NegativeParams = NegativeLabPresetParams;
 type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
 type NegativeConversionScope = 'active' | 'all';
+type NegativeLabAgentCommitState = 'committing' | 'not_committed' | 'ready_to_commit';
+type NegativeLabAgentDryRunState = 'accepted' | 'blocked' | 'ready';
+const NEGATIVE_LAB_AGENT_DRY_RUN_LABELS = {
+  accepted: 'Dry-run accepted',
+  blocked: 'Dry-run blocked',
+  ready: 'Dry-run ready',
+} satisfies Record<NegativeLabAgentDryRunState, string>;
+const NEGATIVE_LAB_AGENT_COMMIT_LABELS = {
+  committing: 'Committing',
+  not_committed: 'Not committed',
+  ready_to_commit: 'Ready to commit',
+} satisfies Record<NegativeLabAgentCommitState, string>;
 type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
 type DensitometerPatchLabelKey =
   | BaseFogSampleLabelKey
@@ -347,6 +359,19 @@ export default function NegativeConversionModal({
   );
   const isBatchPlanCopied = copiedBatchPlanJson === batchDryRunPlanJson;
   const isBatchPlanAccepted = acceptedBatchPlanJson === batchDryRunPlanJson && !batchDryRunSummary.blocked;
+  const agentDryRunState: NegativeLabAgentDryRunState = batchDryRunSummary.blocked
+    ? 'blocked'
+    : isBatchPlanAccepted
+      ? 'accepted'
+      : 'ready';
+  const agentCommitState: NegativeLabAgentCommitState = isSaving
+    ? 'committing'
+    : isBatchPlanAccepted
+      ? 'ready_to_commit'
+      : 'not_committed';
+  const agentCommandSource = isBatchPlanAccepted
+    ? 'negative.lab.accept_batch_dry_run_plan'
+    : 'negative.lab.build_batch_dry_run_summary';
   const requiresAcceptedBatchPlan = hasMultipleScans && conversionScope === 'all';
   const canSave =
     !isSaving &&
@@ -1049,6 +1074,38 @@ export default function NegativeConversionModal({
     </div>
   );
 
+  const renderAgentActivityPanel = () => (
+    <div
+      className="rounded-md border border-surface bg-bg-primary p-2 text-[11px] text-text-tertiary"
+      data-testid="negative-lab-agent-activity"
+    >
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="font-medium text-text-primary">{t('modals.negativeConversion.agentActivity')}</span>
+      </div>
+      <div className="truncate" data-testid="negative-lab-agent-command-source">
+        {agentCommandSource}
+      </div>
+      <div className="mt-1 grid grid-cols-2 gap-1">
+        <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-agent-dry-run-state">
+          {NEGATIVE_LAB_AGENT_DRY_RUN_LABELS[agentDryRunState]}
+        </span>
+        <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-agent-commit-state">
+          {NEGATIVE_LAB_AGENT_COMMIT_LABELS[agentCommitState]}
+        </span>
+        <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-agent-affected-frames">
+          {t('modals.negativeConversion.agentAffectedFrames', {
+            frameCount: batchDryRunSummary.affectedFrameIds.length,
+          })}
+        </span>
+        <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-agent-warning-count">
+          {t('modals.negativeConversion.frameHealthWarningCount', {
+            warningCount: frameHealthReport.warningCodes.length,
+          })}
+        </span>
+      </div>
+    </div>
+  );
+
   const renderDustScratchReview = () => (
     <div
       className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
@@ -1261,6 +1318,7 @@ export default function NegativeConversionModal({
               </div>
             )}
             {renderBatchReadiness()}
+            {renderAgentActivityPanel()}
           </div>
         </div>
 
