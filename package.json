@@ -200,6 +200,8 @@
     "check:focus-alignment-smoke": "bun scripts/check-focus-translation-alignment-smoke.ts",
     "check:focus-sharpness-map-smoke": "bun scripts/check-focus-sharpness-map-smoke.ts",
     "check:focus-preview-blend-smoke": "bun scripts/check-focus-preview-blend-smoke.ts",
+    "check:focus-blend-halo-proof": "bun scripts/check-focus-blend-halo-proof.ts",
+    "check:focus-blend-halo-proof:update": "bun scripts/check-focus-blend-halo-proof.ts --update",
     "check:focus-ui-api": "bun scripts/check-focus-ui-api.ts",
     "check:focus-ui-runtime-bridge": "bun scripts/check-focus-ui-runtime-bridge.ts",
     "check:focus-review-diagnostics": "bun scripts/check-focus-review-diagnostics.ts",

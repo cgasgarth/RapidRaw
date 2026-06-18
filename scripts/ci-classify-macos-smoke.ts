@@ -109,6 +109,8 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:delivery-review-manifest', new Set(['bun scripts/check-delivery-review-manifest.ts'])],
   ['check:export-recipes-ui', new Set(['bun scripts/check-export-recipes-ui.ts'])],
   ['check:film-look-browser-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario film-look-browser'])],
+  ['check:focus-blend-halo-proof', new Set(['bun scripts/check-focus-blend-halo-proof.ts'])],
+  ['check:focus-blend-halo-proof:update', new Set(['bun scripts/check-focus-blend-halo-proof.ts --update'])],
   ['check:focus-ui-api', new Set(['bun scripts/check-focus-ui-api.ts'])],
   ['check:focus-ui-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario focus-ui'])],
   ['check:hdr-alignment-bracket-proof', new Set(['bun scripts/check-hdr-alignment-bracket-proof.ts'])],
