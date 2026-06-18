@@ -1,0 +1,121 @@
+{
+  "cases": [
+    {
+      "artifactDiff": {
+        "componentDeltas": [0, 0, 0],
+        "maxDelta": 0,
+        "tolerance": 0.000001
+      },
+      "cpuMirrorOutput": [0.374, 0.444, 0.713],
+      "expectedOutput": [0.374, 0.444, 0.713],
+      "gpuPathStatus": "explicitly_unavailable_in_headless_ci",
+      "id": "color.parity.channel-mixer-crossfeed.v1",
+      "operation": "channel_mixer"
+    },
+    {
+      "artifactDiff": {
+        "componentDeltas": [0, 0, 0],
+        "maxDelta": 0,
+        "tolerance": 0.000001
+      },
+      "cpuMirrorOutput": [0.36005849, 0.27826535, 0.14756496],
+      "expectedOutput": [0.36005849, 0.27826535, 0.14756496],
+      "gpuPathStatus": "explicitly_unavailable_in_headless_ci",
+      "id": "color.parity.channel-mixer-preserve-luma.v1",
+      "operation": "channel_mixer"
+    },
+    {
+      "artifactDiff": {
+        "componentDeltas": [0, 0, 0],
+        "maxDelta": 0,
+        "tolerance": 0.000001
+      },
+      "cpuMirrorOutput": [0.59247298, 0.48795268, 0.39355248],
+      "expectedOutput": [0.59247298, 0.48795268, 0.39355248],
+      "gpuPathStatus": "explicitly_unavailable_in_headless_ci",
+      "id": "color.parity.color-balance-rgb-portrait.v1",
+      "operation": "color_balance_rgb"
+    },
+    {
+      "artifactDiff": {
+        "componentDeltas": [0, 0, 0],
+        "maxDelta": 0,
+        "tolerance": 0.000001
+      },
+      "cpuMirrorOutput": [0.26129167, 0.49882954, 0.85513636],
+      "expectedOutput": [0.26129167, 0.49882954, 0.85513636],
+      "gpuPathStatus": "explicitly_unavailable_in_headless_ci",
+      "id": "color.parity.luma-levels-midtone.v1",
+      "operation": "luma_levels"
+    },
+    {
+      "artifactDiff": {
+        "componentDeltas": [0, 0, 0],
+        "maxDelta": 0,
+        "tolerance": 0.000001
+      },
+      "cpuMirrorOutput": [0.42811456, 0.59460356, 1.18920712],
+      "expectedOutput": [0.42811456, 0.59460356, 1.18920712],
+      "gpuPathStatus": "explicitly_unavailable_in_headless_ci",
+      "id": "color.parity.linear-exposure-midgray.v1",
+      "operation": "linear_exposure"
+    },
+    {
+      "artifactDiff": {
+        "componentDeltas": [0, 0, 0],
+        "maxDelta": 0,
+        "tolerance": 0.000001
+      },
+      "cpuMirrorOutput": [0.42693, 0.42735, 0.33573],
+      "expectedOutput": [0.42693, 0.42735, 0.33573],
+      "gpuPathStatus": "explicitly_unavailable_in_headless_ci",
+      "id": "color.parity.white-balance-warm-tint.v1",
+      "operation": "white_balance"
+    },
+    {
+      "artifactDiff": {
+        "componentDeltas": [0, 0, 0],
+        "maxDelta": 0,
+        "tolerance": 0.000001
+      },
+      "cpuMirrorOutput": [0.26689892, 0.83971292, 0.9649699],
+      "expectedOutput": [0.26689892, 0.83971292, 0.9649699],
+      "gpuPathStatus": "explicitly_unavailable_in_headless_ci",
+      "id": "color.parity.legacy-tonemap-highlight.v1",
+      "operation": "legacy_tonemap"
+    }
+  ],
+  "fixturePath": "fixtures/color/cpu-gpu-parity-fixtures.json",
+  "generatedFromSnapshotDate": "2026-06-14",
+  "gpuUnavailableReason": "CI cannot create a deterministic WGPU readback surface for this gate; shader hashes bind the cases to the GPU path until a render-readback harness lands.",
+  "issue": 1933,
+  "schemaVersion": 1,
+  "shaderPath": "src-tauri/src/shaders/shader.wgsl",
+  "shaderFunctions": [
+    {
+      "name": "apply_channel_mixer",
+      "sha256": "sha256:090dd60afc3ee05de093a13a706dd3e33fb1f3f87c7940c5fd14bfa88bd51752"
+    },
+    {
+      "name": "apply_color_balance_rgb",
+      "sha256": "sha256:6b908c0a9c50a6c34aabd2b3519a1346977248e24e2c37c06bb68393ce9f9338"
+    },
+    {
+      "name": "apply_luma_levels",
+      "sha256": "sha256:177cf8b9cf0a02394b2c1990e0b24b35e891976f024ea9b044f687fb17a5bba8"
+    },
+    {
+      "name": "apply_linear_exposure",
+      "sha256": "sha256:221bbd78cee52da68538c489c33b324cd2c24a6ddf59b727d89407f6f83ebb4e"
+    },
+    {
+      "name": "apply_white_balance",
+      "sha256": "sha256:bf50953debcb88e69628c3e560535115e6bdf0b11123a4587416f55ff9382859"
+    },
+    {
+      "name": "legacy_tonemap",
+      "sha256": "sha256:7f5eb65bdcb6ea30cbf0d536f9e3488b0e746bdf5655d6f31b189fddd83b2e0e"
+    }
+  ],
+  "validationMode": "cpu_mirror_with_wgsl_hash_and_explicit_gpu_unavailable_state"
+}

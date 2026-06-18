@@ -1,8 +1,10 @@
 # Color CPU/GPU Parity Fixtures
 
 - Issue: #95 `validation(color): add CPU GPU parity checks for core color operations`
+- Runtime gate slice: #1933 `color(science): CPU GPU parity gate`
 - Scope: WGSL contract hashing plus CPU mirror outputs for core color helpers.
-- Runtime status: no live GPU readback or rendered pixel fixture claim.
+- Runtime status: CPU mirror plus explicit GPU-unavailable state; no live GPU
+  readback or rendered pixel fixture claim.
 
 ## Purpose
 
@@ -27,6 +29,21 @@ The checker hashes the WGSL function bodies for these helpers and compares CPU
 mirror outputs against checked fixture values. Any shader helper drift requires
 an intentional fixture update.
 
+## Current Gate
+
+The #1933 gate writes a committed validation report at
+`docs/validation/color-cpu-gpu-parity-2026-06-18.json`. Each case records:
+
+- the CPU mirror output;
+- the checked expected output;
+- per-channel artifact deltas and the case tolerance;
+- `explicitly_unavailable_in_headless_ci` for the GPU/render path.
+
+This keeps the issue from being closed as schema-only while avoiding a false
+claim that CI has performed deterministic WGPU readback. The shader hashes bind
+the fixture cases to the GPU helper functions until a render-readback harness is
+available.
+
 ## Not Yet Covered
 
 This is not live GPU execution. Follow-up work still needs WGPU readback or
@@ -48,7 +65,6 @@ bun run check:color-cpu-gpu-parity
 ## Validation Evidence
 
 - `bun run check:color-cpu-gpu-parity`
-- `bun run check:color-scope-fixtures`
 - `bun run check:deltae-fixtures`
 - `bun run check:colorchecker-fixtures`
 - `bun run check:unsafe-casts`
