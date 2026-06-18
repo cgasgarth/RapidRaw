@@ -69,8 +69,8 @@ for (const invoke of ['apply_denoising', 'save_denoised_image']) {
     failures.push(`${invoke} must not be mapped until AI denoise dry-run/apply provenance is implemented.`);
   }
 
-  if (route.status === 'deferred' && route.deferredIssue !== '#1276') {
-    failures.push(`${invoke} deferred route must track #1276.`);
+  if (route.status === 'deferred' && route.deferredIssue !== '#1963') {
+    failures.push(`${invoke} deferred route must track #1963.`);
   }
 }
 

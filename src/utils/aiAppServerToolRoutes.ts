@@ -115,7 +115,7 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
       toolCapability: 'denoise',
     },
     {
-      deferredIssue: '#1276',
+      deferredIssue: '#1963',
       reason:
         'The inherited denoise invoke multiplexes classic and AI NIND paths; app-server migration needs a separate denoise dry-run plan with model provenance before mapping.',
       sourceKind: 'tauri_invoke',
@@ -124,7 +124,7 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
       toolCapability: 'denoise',
     },
     {
-      deferredIssue: '#1276',
+      deferredIssue: '#1963',
       reason:
         'Saving denoised output is an artifact-writing apply step and must wait for an accepted AI denoise dry-run plan and audit metadata.',
       sourceKind: 'tauri_invoke',

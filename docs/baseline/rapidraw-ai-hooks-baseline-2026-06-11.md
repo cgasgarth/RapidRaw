@@ -49,7 +49,7 @@ mapped, deferred, or intentionally outside image-editing tool calls.
 | ---------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Subject/foreground/sky/depth masks | mapped                          | Typed dry-run/apply mask tools cover local model mask generation.                                                                                             |
 | Generative replace/inpaint         | mapped                          | Typed enhancement dry-run/apply tools cover approved inpaint edits.                                                                                           |
-| AI denoise                         | deferred to #1276               | The current Tauri invokes multiplex classic and AI denoise and need a denoise dry-run plan, model provenance, and artifact-writing apply path before mapping. |
+| AI denoise                         | deferred to #1963               | The current Tauri invokes multiplex classic and AI denoise and need a denoise dry-run plan, model provenance, and artifact-writing apply path before mapping. |
 | AI tagging/indexing                | outside image-edit tool surface | Tagging mutates library metadata, not image pixels; `clear_ai_tags` remains metadata cleanup.                                                                 |
 
 ## Local Model Capabilities
