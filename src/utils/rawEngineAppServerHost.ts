@@ -334,6 +334,9 @@ const aiRuntimeCheckScriptsForRoute = (route: (typeof AI_APP_SERVER_TOOL_ROUTES)
   return uniqueSorted(checks);
 };
 
+const filmLookRuntimeCheckScripts = ['check:film-look-app-server-routes'];
+const negativeLabRuntimeCheckScripts = ['check:negative-lab-app-server-routes'];
+
 const buildRouteCatalogEntry = ({
   commandName,
   family,
@@ -405,6 +408,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
         inputSchemaNames: [route.inputSchemaName],
         modes: ['host_command'],
         outputSchemaNames: [route.outputSchemaName],
+        runtimeCheckScripts: filmLookRuntimeCheckScripts,
         toolNames: [route.commandName],
       }),
     );
@@ -418,6 +422,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
         inputSchemaNames: [route.inputSchemaName],
         modes: ['host_command'],
         outputSchemaNames: [route.outputSchemaName],
+        runtimeCheckScripts: negativeLabRuntimeCheckScripts,
         toolNames: [route.commandName],
       }),
     );
