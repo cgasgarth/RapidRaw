@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "layer-overlay-runtime-v1",
+      "width": 2,
+      "height": 1,
+      "basePixels": [
+        { "r": 64, "g": 96, "b": 128 },
+        { "r": 160, "g": 192, "b": 224 }
+      ],
+      "layer": {
+        "id": "overlay-contrast",
+        "name": "Overlay contrast",
+        "blendMode": "overlay",
+        "opacity": 1,
+        "visible": true,
+        "pixels": [
+          { "r": 192, "g": 192, "b": 192 },
+          { "r": 64, "g": 64, "b": 64 }
+        ]
+      },
+      "expectedPixels": [
+        { "r": 96, "g": 145, "b": 192 },
+        { "r": 113, "g": 161, "b": 209 }
+      ],
+      "expectedContrastDelta": 16.67
+    },
+    {
+      "id": "layer-soft-light-runtime-v1",
+      "width": 2,
+      "height": 1,
+      "basePixels": [
+        { "r": 64, "g": 96, "b": 128 },
+        { "r": 160, "g": 192, "b": 224 }
+      ],
+      "layer": {
+        "id": "soft-light-rolloff",
+        "name": "Soft light rolloff",
+        "blendMode": "soft_light",
+        "opacity": 1,
+        "visible": true,
+        "pixels": [
+          { "r": 192, "g": 192, "b": 192 },
+          { "r": 64, "g": 64, "b": 64 }
+        ]
+      },
+      "expectedPixels": [
+        { "r": 96, "g": 127, "b": 155 },
+        { "r": 130, "g": 168, "b": 210 }
+      ],
+      "expectedContrastDelta": 43.33
+    }
+  ],
+  "colorAssumptions": [
+    "Synthetic RGB fixture values are treated as display-referred encoded bytes.",
+    "The proof validates current renderer math, not scene-linear color science.",
+    "Preview/export parity for stacked blend modes remains tracked separately."
+  ]
+}
