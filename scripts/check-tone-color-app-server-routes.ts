@@ -225,6 +225,10 @@ for (const commandType of expectedCommandTypes) {
   }
 }
 
+for (const runtimeCheckScript of new Set(TONE_COLOR_APP_SERVER_ROUTES.map((route) => route.runtimeCheckScript))) {
+  runPackageScript(runtimeCheckScript);
+}
+
 if (failures.length > 0) {
   console.error('Tone-color app-server route validation failed:');
   for (const failure of failures) console.error(`- ${failure}`);
@@ -232,3 +236,20 @@ if (failures.length > 0) {
 }
 
 console.log(`tone-color app-server routes ok (${TONE_COLOR_APP_SERVER_ROUTES.length})`);
+
+function runPackageScript(scriptName: string): void {
+  const result = Bun.spawnSync(['bun', 'run', scriptName], {
+    stderr: 'pipe',
+    stdout: 'pipe',
+  });
+
+  if (result.exitCode === 0) return;
+
+  const output = [new TextDecoder().decode(result.stdout), new TextDecoder().decode(result.stderr)]
+    .join('\n')
+    .split('\n')
+    .filter(Boolean)
+    .slice(-20)
+    .join('\n');
+  failures.push(`${scriptName} failed:\n${output}`);
+}
