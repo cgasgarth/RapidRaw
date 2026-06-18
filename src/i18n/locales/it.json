@@ -1433,7 +1433,9 @@
       "stockRegistrySummary": "{{runtimeSafeCount}} runtime-safe / {{referenceOnlyCount}} reference-only",
       "stockRegistryVersion": "v{{version}}",
       "stockMetadata": "",
-      "stockMetadataSummary": ""
+      "stockMetadataSummary": "",
+      "agentActivity": "Agent activity",
+      "agentAffectedFrames": "Affected {{frameCount}}"
     },
     "panorama": {
       "cancel": "Annulla",

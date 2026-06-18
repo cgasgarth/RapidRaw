@@ -1538,6 +1538,8 @@
     },
     "negativeConversion": {
       "acceptBatchPlan": "Accept batch plan",
+      "agentActivity": "Agent activity",
+      "agentAffectedFrames": "Affected {{frameCount}}",
       "applyCustomBase": "Apply sample",
       "autoBaseFog": "Auto base",
       "autoBaseFogTooltip": "Estimate film base and balance color weights",
