@@ -84,6 +84,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     outputFile: 'detail-workspace.png',
     sectionMinimum: 3,
   },
+  {
+    marker: 'Overlay interaction proof',
+    mode: 'detail-dust-spot',
+    outputFile: 'detail-dust-spot.png',
+    sectionMinimum: 2,
+  },
 ] as const;
 
 export type VisualSmokeScenario = (typeof VISUAL_SMOKE_SCENARIOS)[number];

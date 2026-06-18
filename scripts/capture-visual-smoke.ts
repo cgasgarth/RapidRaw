@@ -13,6 +13,7 @@ import {
   assertNegativeLabBatchColorInvokeProof,
   assertNegativeLabInvokeProof,
   commandPaletteWorkflowProofSchema,
+  detailDustSpotProofSchema,
   detailWorkspaceProofSchema,
   focusReviewWorkspaceProofSchema,
   focusUiSettingsProofSchema,
@@ -343,6 +344,17 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('detail-warning').getByText('Ringing review', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    return;
+  }
+
+  if (mode === 'detail-dust-spot') {
+    await page.getByText('Show dust overlay', { exact: true }).click();
+    await page.getByRole('slider', { name: 'Sensitivity' }).fill('72');
+    await page.getByRole('slider', { name: 'Min spot radius' }).fill('6');
+    detailDustSpotProofSchema.parse(
+      await page.getByTestId('detail-dust-spot-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    await page.getByText('Visualization only', { exact: false }).waitFor({ timeout: 10_000 });
     return;
   }
 

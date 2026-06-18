@@ -78,6 +78,9 @@ export enum DetailsAdjustment {
   DeblurEnabled = 'deblurEnabled',
   DeblurSigmaPx = 'deblurSigmaPx',
   DeblurStrength = 'deblurStrength',
+  DustSpotOverlayEnabled = 'dustSpotOverlayEnabled',
+  DustSpotSensitivity = 'dustSpotSensitivity',
+  DustSpotMinRadiusPx = 'dustSpotMinRadiusPx',
   LumaNoiseReduction = 'lumaNoiseReduction',
   LocalContrastHaloGuard = 'localContrastHaloGuard',
   LocalContrastMidtoneMask = 'localContrastMidtoneMask',
@@ -189,6 +192,9 @@ export interface Adjustments {
   deblurEnabled: boolean;
   deblurSigmaPx: number;
   deblurStrength: number;
+  dustSpotMinRadiusPx: number;
+  dustSpotOverlayEnabled: boolean;
+  dustSpotSensitivity: number;
   dehaze: number;
   exposure: number;
   flipHorizontal: boolean;
@@ -619,6 +625,9 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   deblurEnabled: false,
   deblurSigmaPx: 0.8,
   deblurStrength: 0,
+  dustSpotMinRadiusPx: 2,
+  dustSpotOverlayEnabled: false,
+  dustSpotSensitivity: 50,
   dehaze: 0,
   exposure: 0,
   flipHorizontal: false,
@@ -857,6 +866,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     deblurEnabled: loadedAdjustments.deblurEnabled ?? INITIAL_ADJUSTMENTS.deblurEnabled,
     deblurSigmaPx: loadedAdjustments.deblurSigmaPx ?? INITIAL_ADJUSTMENTS.deblurSigmaPx,
     deblurStrength: loadedAdjustments.deblurStrength ?? INITIAL_ADJUSTMENTS.deblurStrength,
+    dustSpotMinRadiusPx: loadedAdjustments.dustSpotMinRadiusPx ?? INITIAL_ADJUSTMENTS.dustSpotMinRadiusPx,
+    dustSpotOverlayEnabled: loadedAdjustments.dustSpotOverlayEnabled ?? INITIAL_ADJUSTMENTS.dustSpotOverlayEnabled,
+    dustSpotSensitivity: loadedAdjustments.dustSpotSensitivity ?? INITIAL_ADJUSTMENTS.dustSpotSensitivity,
     masks: normalizedMasks,
     aiPatches: normalizedAiPatches,
     sectionVisibility: {
@@ -933,6 +945,14 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     {
       label: 'modals.copyPaste.groups.deblur',
       keys: [DetailsAdjustment.DeblurEnabled, DetailsAdjustment.DeblurStrength, DetailsAdjustment.DeblurSigmaPx],
+    },
+    {
+      label: 'modals.copyPaste.groups.dustSpotVisualization',
+      keys: [
+        DetailsAdjustment.DustSpotOverlayEnabled,
+        DetailsAdjustment.DustSpotSensitivity,
+        DetailsAdjustment.DustSpotMinRadiusPx,
+      ],
     },
     {
       label: 'modals.copyPaste.groups.chromaticAberration',
@@ -1062,6 +1082,9 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     DetailsAdjustment.SharpnessThreshold,
     DetailsAdjustment.LumaNoiseReduction,
     DetailsAdjustment.ColorNoiseReduction,
+    DetailsAdjustment.DustSpotOverlayEnabled,
+    DetailsAdjustment.DustSpotSensitivity,
+    DetailsAdjustment.DustSpotMinRadiusPx,
     DetailsAdjustment.ChromaticAberrationRedCyan,
     DetailsAdjustment.ChromaticAberrationBlueYellow,
   ],

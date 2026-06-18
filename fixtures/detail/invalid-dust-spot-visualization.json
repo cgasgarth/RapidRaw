@@ -1,0 +1,22 @@
+[
+  {
+    "case": "disabled-with-candidates",
+    "payload": {
+      "candidateCount": 3,
+      "falsePositiveGuards": ["edge_texture"],
+      "minRadiusPx": 2,
+      "mode": "off",
+      "sensitivity": 0
+    }
+  },
+  {
+    "case": "active-zero-sensitivity",
+    "payload": {
+      "candidateCount": 3,
+      "falsePositiveGuards": ["edge_texture"],
+      "minRadiusPx": 2,
+      "mode": "candidate_overlay",
+      "sensitivity": 0
+    }
+  }
+]
