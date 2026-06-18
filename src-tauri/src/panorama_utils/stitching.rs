@@ -114,7 +114,7 @@ pub fn progressive_seam_stitcher<R: Runtime>(
                 .unwrap_or_default()
                 .to_string_lossy()
         );
-        let _ = app_handle.emit("panorama-progress", &progress_msg);
+        let _ = app_handle.emit(crate::events::PANORAMA_PROGRESS, &progress_msg);
         println!("  - Progressively stitching '{}'", img_to_add_info.filename);
 
         let h_add = &global_homographies[&img_to_add_info.id];

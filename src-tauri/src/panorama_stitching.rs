@@ -289,7 +289,7 @@ pub async fn stitch_panorama(
 
         match panorama_result {
             Ok(render_result) => {
-                let _ = app_handle.emit("panorama-progress", "Creating preview...");
+                let _ = app_handle.emit(crate::events::PANORAMA_PROGRESS, "Creating preview...");
                 println!(
                     "Panorama metadata: {} connected source(s), {} excluded source(s), {} pairwise match(es), estimated peak memory {} bytes",
                     render_result.metadata.connected_source_indices.len(),
@@ -337,7 +337,7 @@ pub async fn stitch_panorama(
                 Ok(())
             }
             Err(e) => {
-                let _ = app_handle.emit("panorama-error", e.clone());
+                let _ = app_handle.emit(crate::events::PANORAMA_ERROR, e.clone());
                 Err(e)
             }
         }
@@ -474,14 +474,20 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         return Err("At least two images are required for a panorama.".to_string());
     }
 
-    let _ = app_handle.emit("panorama-progress", "Starting panorama process...");
+    let _ = app_handle.emit(
+        crate::events::PANORAMA_PROGRESS,
+        "Starting panorama process...",
+    );
     println!(
         "Starting panorama stitching process for {} images...",
         image_paths.len()
     );
 
     let start_time = Instant::now();
-    let _ = app_handle.emit("panorama-progress", "Loading and preparing images...");
+    let _ = app_handle.emit(
+        crate::events::PANORAMA_PROGRESS,
+        "Loading and preparing images...",
+    );
     println!("Loading and preparing images (in parallel)...");
     let brief_pairs = processing::generate_brief_pairs();
 
@@ -490,7 +496,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         .enumerate()
         .map(|(i, filename)| {
             let _ = app_handle.emit(
-                "panorama-progress",
+                crate::events::PANORAMA_PROGRESS,
                 format!(
                     "Processing '{}'",
                     Path::new(filename)
@@ -575,7 +581,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     );
 
     let start_time = Instant::now();
-    let _ = app_handle.emit("panorama-progress", "Finding image matches...");
+    let _ = app_handle.emit(crate::events::PANORAMA_PROGRESS, "Finding image matches...");
     println!("Finding all pairwise matches (in parallel)...");
     let mut pairwise_matches: HashMap<(usize, usize), MatchInfo> = HashMap::new();
 
@@ -662,7 +668,10 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     }
 
     let start_time = Instant::now();
-    let _ = app_handle.emit("panorama-progress", "Determining stitching order...");
+    let _ = app_handle.emit(
+        crate::events::PANORAMA_PROGRESS,
+        "Determining stitching order...",
+    );
     println!("Determining stitching order...");
     let (ordered_indices, global_homographies) =
         build_stitching_order(&image_data, &pairwise_matches);
@@ -683,7 +692,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         .collect();
     println!("Stitching order determined: {:?}", ordered_filenames);
     let _ = app_handle.emit(
-        "panorama-progress",
+        crate::events::PANORAMA_PROGRESS,
         format!("Stitching order: {}", ordered_filenames.join(" -> ")),
     );
 
@@ -697,7 +706,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
             unstitched_count
         );
         println!("{}", warning_msg);
-        let _ = app_handle.emit("panorama-warning", warning_msg);
+        let _ = app_handle.emit(crate::events::PANORAMA_WARNING, warning_msg);
         warnings.push(format!(
             "{} image(s) could not be matched and will be excluded.",
             unstitched_count
@@ -709,7 +718,10 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     );
 
     let start_time = Instant::now();
-    let _ = app_handle.emit("panorama-progress", "Warping and blending images...");
+    let _ = app_handle.emit(
+        crate::events::PANORAMA_PROGRESS,
+        "Warping and blending images...",
+    );
     println!("Warping and blending full-resolution images with progressive optimal seams...");
 
     let panorama = stitching::progressive_seam_stitcher(
@@ -720,7 +732,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
 
     println!("Stitching completed in {:.2?}\n", start_time.elapsed());
 
-    let _ = app_handle.emit("panorama-progress", "Finalizing panorama...");
+    let _ = app_handle.emit(crate::events::PANORAMA_PROGRESS, "Finalizing panorama...");
     let (output_width, output_height) = panorama.dimensions();
     let connected_source_indices = ordered_indices.clone();
     let connected_source_set: HashSet<_> = connected_source_indices.iter().copied().collect();

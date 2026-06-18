@@ -1024,7 +1024,7 @@ pub async fn export_images(
 
                 let current_progress = progress_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
                 let _ = app_handle_clone.emit(
-                    "batch-export-progress",
+                    crate::events::BATCH_EXPORT_PROGRESS,
                     serde_json::json!({
                         "current": current_progress,
                         "total": total_paths,
@@ -1055,22 +1055,22 @@ pub async fn export_images(
                 error_count += 1;
                 log::error!("Export error: {}", e);
                 if total_paths == 1 {
-                    let _ = app_handle.emit("export-error", e);
+                    let _ = app_handle.emit(crate::events::EXPORT_ERROR, e);
                 }
             }
         }
 
         if error_count > 0 && total_paths > 1 {
             let _ = app_handle.emit(
-                "export-complete-with-errors",
+                crate::events::EXPORT_COMPLETE_WITH_ERRORS,
                 serde_json::json!({ "errors": error_count, "total": total_paths }),
             );
         } else if error_count == 0 {
             let _ = app_handle.emit(
-                "batch-export-progress",
+                crate::events::BATCH_EXPORT_PROGRESS,
                 serde_json::json!({ "current": total_paths, "total": total_paths, "path": "" }),
             );
-            let _ = app_handle.emit("export-complete", ());
+            let _ = app_handle.emit(crate::events::EXPORT_COMPLETE, ());
         }
 
         *app_handle

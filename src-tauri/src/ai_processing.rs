@@ -213,9 +213,9 @@ async fn download_and_verify_model(
             println!("Model {} has incorrect hash. Re-downloading.", model_name);
             fs::remove_file(&dest_path)?;
         }
-        let _ = app_handle.emit("ai-model-download-start", model_name);
+        let _ = app_handle.emit(crate::events::AI_MODEL_DOWNLOAD_START, model_name);
         download_model(url, &dest_path).await?;
-        let _ = app_handle.emit("ai-model-download-finish", model_name);
+        let _ = app_handle.emit(crate::events::AI_MODEL_DOWNLOAD_FINISH, model_name);
 
         if !verify_sha256(&dest_path, expected_hash)? {
             return Err(anyhow::anyhow!(
@@ -440,9 +440,9 @@ pub async fn get_or_init_clip_models(
 
     let clip_tokenizer_path = models_dir.join(CLIP_TOKENIZER_FILENAME);
     if !clip_tokenizer_path.exists() {
-        let _ = app_handle.emit("ai-model-download-start", "CLIP Tokenizer");
+        let _ = app_handle.emit(crate::events::AI_MODEL_DOWNLOAD_START, "CLIP Tokenizer");
         download_model(CLIP_TOKENIZER_URL, &clip_tokenizer_path).await?;
-        let _ = app_handle.emit("ai-model-download-finish", "CLIP Tokenizer");
+        let _ = app_handle.emit(crate::events::AI_MODEL_DOWNLOAD_FINISH, "CLIP Tokenizer");
     }
 
     let _ = ort::init().with_name("AI-Tagging").commit();
@@ -760,7 +760,7 @@ pub fn run_ai_denoise(
     app_handle: &tauri::AppHandle,
 ) -> Result<DynamicImage> {
     run_ai_denoise_with_progress(rgb_img, intensity, session, &|message| {
-        let _ = app_handle.emit("denoise-progress", message);
+        let _ = app_handle.emit(crate::events::DENOISE_PROGRESS, message);
     })
 }
 
