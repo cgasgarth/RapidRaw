@@ -129,6 +129,15 @@
           "soft_contrast": "柔和对比"
         }
       },
+      "runtimeStatus": {
+        "apiLabel": "API",
+        "ariaLabel": "颜色编辑器运行状态",
+        "gpuLabel": "GPU",
+        "previewExport": "预览/导出",
+        "proofed": "已验证",
+        "typed": "已类型化",
+        "uiLabel": "UI"
+      },
       "saturation": "饱和度",
       "temperature": "色温",
       "tint": "色调",

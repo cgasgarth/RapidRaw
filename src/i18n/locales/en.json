@@ -129,6 +129,15 @@
           "soft_contrast": "Soft Contrast"
         }
       },
+      "runtimeStatus": {
+        "apiLabel": "API",
+        "ariaLabel": "Color editor runtime status",
+        "gpuLabel": "GPU",
+        "previewExport": "Preview/export",
+        "proofed": "Proofed",
+        "typed": "Typed",
+        "uiLabel": "UI"
+      },
       "saturation": "Saturation",
       "temperature": "Temperature",
       "tint": "Tint",
