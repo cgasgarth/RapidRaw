@@ -1,0 +1,20 @@
+{
+  "artifactPath": "artifacts/workflow/session-import-reload-proof.json",
+  "importedAssets": [
+    {
+      "expectedRating": 4,
+      "expectedTags": ["city skyline", "color:blue", "user:portfolio"],
+      "sidecarPath": "fixtures/sidecar-roundtrip/IMG_0001.CR3.rrdata",
+      "sourcePath": "/Users/example/Pictures/Wedding/RAW/DSC_0001.NEF"
+    },
+    {
+      "expectedRating": 2,
+      "expectedTags": ["color:purple", "golden hour", "user:select"],
+      "sidecarPath": "fixtures/sidecar-roundtrip/IMG_0001.CR3.a1b2c3.rrdata",
+      "sourcePath": "/Users/example/Pictures/Wedding/RAW/DSC_0002.NEF"
+    }
+  ],
+  "schemaVersion": 1,
+  "sessionFixturePath": "fixtures/library/library-sessions.json",
+  "sessionId": "session-wedding-cull"
+}
