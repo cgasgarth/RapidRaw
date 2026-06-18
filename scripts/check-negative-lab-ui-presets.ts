@@ -2,6 +2,7 @@
 // @ts-check
 
 import { NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG } from '../src/utils/negativeLabPresetCatalog.ts';
+import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../src/utils/negativeLabOutputFormatIds.ts';
 import { negativeLabMeasuredProfileCatalogSchema } from '../src/schemas/negativeLabMeasuredProfileSchemas.ts';
 import { parseNegativeLabBuiltInUiPresetCatalog } from '../src/schemas/negativeLabPresetCatalogSchemas.ts';
 import { buildNegativeLabRuntimeProfileBrowserRows } from '../src/utils/negativeLabMeasuredProfileRuntime.ts';
@@ -418,7 +419,7 @@ for (const fileName of readdirSync('src/i18n/locales')) {
     }
   }
 
-  for (const key of ['jpeg_proof', 'tiff16']) {
+  for (const key of NEGATIVE_LAB_OUTPUT_FORMAT_IDS) {
     if (
       typeof negativeConversion?.outputFormats?.[key] !== 'string' ||
       negativeConversion.outputFormats[key].trim().length === 0

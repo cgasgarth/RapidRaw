@@ -44,6 +44,11 @@ import {
   buildNegativeLabFrameHealthReport,
   getNegativeLabScanLabel,
 } from '../../utils/negativeLabFrameHealth';
+import {
+  NegativeLabOutputFormatId,
+  NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS,
+  type NegativeLabOutputFormatId as NegativeOutputFormat,
+} from '../../utils/negativeLabOutputFormatIds';
 import { buildNegativeLabAcceptedPlanIdentity, buildNegativeLabPlanHash } from '../../utils/negativeLabPlanIdentity';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
@@ -62,7 +67,6 @@ import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negative
 import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspaceSchemas';
 
 type NegativeParams = NegativeLabPresetParams;
-type NegativeOutputFormat = 'jpeg_proof' | 'tiff16';
 type NegativeConversionScope = 'active' | 'all';
 type NegativeLabAgentCommitState = 'committing' | 'not_committed' | 'ready_to_commit';
 type NegativeLabAgentDryRunState = 'accepted' | 'blocked' | 'ready';
@@ -84,7 +88,7 @@ type DensitometerPatchLabelKey =
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
-  outputFormat: 'tiff16' as NegativeOutputFormat,
+  outputFormat: NegativeLabOutputFormatId.Tiff16 as NegativeOutputFormat,
   suffix: 'Positive',
 };
 const CUSTOM_BASE_SAMPLE_DEFAULT = {
@@ -454,7 +458,7 @@ export default function NegativeConversionModal({
           ? t('modals.negativeConversion.workflowExportConverting')
           : t('modals.negativeConversion.workflowExportReadyCount', {
               format: t(
-                saveOptions.outputFormat === 'tiff16'
+                saveOptions.outputFormat === NegativeLabOutputFormatId.Tiff16
                   ? 'modals.negativeConversion.outputFormats.tiff16'
                   : 'modals.negativeConversion.outputFormats.jpeg_proof',
               ),
@@ -1932,11 +1936,15 @@ export default function NegativeConversionModal({
           </UiText>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
-              {(['tiff16', 'jpeg_proof'] satisfies Array<NegativeOutputFormat>).map((format) => (
+              {NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS.map((format) => (
                 <button
                   key={format}
                   type="button"
-                  data-testid={format === 'tiff16' ? 'negative-lab-export-tiff16' : 'negative-lab-export-jpeg-proof'}
+                  data-testid={
+                    format === NegativeLabOutputFormatId.Tiff16
+                      ? 'negative-lab-export-tiff16'
+                      : 'negative-lab-export-jpeg-proof'
+                  }
                   aria-pressed={saveOptions.outputFormat === format}
                   onClick={() => {
                     setSaveOptions((current) => ({ ...current, outputFormat: format }));

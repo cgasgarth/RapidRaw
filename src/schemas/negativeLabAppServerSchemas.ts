@@ -22,6 +22,7 @@ import {
 } from './negativeLabStockRegistrySchemas';
 import { negativeLabQcProofReportSchema } from './negativeLabWorkspaceSchemas';
 import { NegativeLabAppServerCommandName } from '../utils/negativeLabAppServerCommandNames';
+import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../utils/negativeLabOutputFormatIds';
 
 export const negativeLabConversionPlanCommandNameSchema = z.literal(NegativeLabAppServerCommandName.ConversionPlan);
 export const negativeLabAcceptedBatchApplyCommandNameSchema = z.literal(
@@ -49,7 +50,7 @@ export const negativeLabAppServerCommandNameSchema = z.union([
   negativeLabStockFamilyConversionCommandNameSchema,
   negativeLabStockRegistryCommandNameSchema,
 ]);
-export const negativeLabAppServerOutputFormatSchema = z.enum(['jpeg_proof', 'tiff16']);
+export const negativeLabAppServerOutputFormatSchema = z.enum(NEGATIVE_LAB_OUTPUT_FORMAT_IDS);
 export const negativeLabAppServerScopeSchema = z.enum(['active', 'all']);
 export const negativeLabProfileProvenanceHashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
 
