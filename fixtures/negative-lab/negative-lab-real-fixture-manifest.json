@@ -251,6 +251,76 @@
       },
       "state": "approved_metadata_only",
       "targetOrStepWedgePresent": false
+    },
+    {
+      "allowedDistribution": "public_repo",
+      "allowedValidationUses": ["schema_roundtrip", "density_math_reference", "warning_stability"],
+      "autoCorrectionBakedIn": "known_absent",
+      "baseFogSampleRegions": [
+        {
+          "coordinateSpace": "source_asset_pixels",
+          "height": 24,
+          "kind": "rect",
+          "width": 36,
+          "x": 8,
+          "y": 8
+        }
+      ],
+      "bitDepth": 8,
+      "captureProfile": "scanner_rendered_public_cc0_reference",
+      "colorProfile": "embedded_srgb_jpeg",
+      "contentHash": "sha256:f0913770ce2ec72f2261d6cc0948091e3224d11904049727a42beb864ef5673b",
+      "derivativeDistributionAllowed": true,
+      "developmentNotes": "Committed small CC0 Wikimedia Commons scan of a 110-format film negative. Used as a public smoke/numeric sample-grid fixture, not a measured stock or profile reference.",
+      "developmentProcessKnown": false,
+      "disallowedValidationUses": [
+        "ui_overlay_smoke",
+        "roll_consistency",
+        "profile_measurement",
+        "stock_reference_mapping",
+        "marketing_screenshot"
+      ],
+      "expectedFixtureWarningCodes": ["fixture_stock_unverified", "fixture_process_unverified"],
+      "expectedNegativeWarningCodes": [
+        "lossy_input",
+        "low_bit_depth_input",
+        "unknown_input_profile",
+        "low_acquisition_confidence"
+      ],
+      "fileFormat": "jpeg",
+      "filmStockDisplayName": "CC0 110-format public negative scan",
+      "filmStockKnown": false,
+      "filmStockSource": "Wikimedia Commons CC0 scan; no named film-stock or process claim.",
+      "fixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001",
+      "fixtureRole": "density_math_reference",
+      "frameFormat": "110_format_color_negative",
+      "lens": "unknown_original_capture_lens",
+      "lightSource": "film_scanner_transmitted_light",
+      "lossyCompression": true,
+      "measurementClaimAllowed": false,
+      "negativeFixtureTier": "permissive_public_scan",
+      "payloadAccess": "committed_public_payload",
+      "processFamily": "c41_color_negative",
+      "profileClaimAllowed": false,
+      "rejectedSampleRegions": [],
+      "reviewIssue": "https://github.com/cgasgarth/RapidRaw/issues/1473",
+      "reviewedAt": "2026-06-17",
+      "reviewer": "RawEngine public fixture gate",
+      "rollOrSheetIdentifier": "wikimedia_cc0_110_ericht_negative",
+      "scanInputMode": "lab_jpeg",
+      "scannerOrCamera": "unknown_film_scanner",
+      "scannerSoftware": "unknown_scanner_pipeline",
+      "scannerSoftwareSettingsKnown": true,
+      "source": {
+        "copyrightOwner": "Laerol",
+        "licenseName": "CC0 1.0 Universal Public Domain Dedication",
+        "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "redistributionEvidence": "Wikimedia Commons file page states the copyright holder released the scan under CC0 and allows copy, modification, distribution, and commercial use.",
+        "sourceKind": "permissive_public",
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:110_format_negative_closeup_of_frame_Ericht_at_Blairgowrie.jpg"
+      },
+      "state": "approved_numeric",
+      "targetOrStepWedgePresent": false
     }
   ],
   "manifestId": "negative_lab_real_fixture_manifest",
