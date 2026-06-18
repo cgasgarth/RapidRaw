@@ -274,6 +274,9 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('color-workflow-adjustment-proof').getByText('CM on', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('skin-tone-uniformity-ui-proof').getByText('Skin 0.725', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     return;
   }
 

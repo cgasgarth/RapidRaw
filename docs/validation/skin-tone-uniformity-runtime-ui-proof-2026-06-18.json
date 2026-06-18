@@ -1,0 +1,59 @@
+{
+  "cases": [
+    {
+      "hueDeltaDegrees": -7.5,
+      "id": "color.skin.uniformity-warm-patch.v1",
+      "inputRgb": {
+        "blue": 0.34,
+        "green": 0.45,
+        "red": 0.72
+      },
+      "maxHslDelta": 0,
+      "maxRgbDelta": 0,
+      "outputRgb": {
+        "blue": 0.3990080851063831,
+        "green": 0.5005205935050392,
+        "red": 0.724991914893617
+      },
+      "runtimeStatus": "apply_runtime_proof",
+      "targetDistanceAfter": 0.211666666667,
+      "targetDistanceBefore": 0.393333333333,
+      "uiProofStatus": "covered_by_color_workflow_visual_smoke"
+    },
+    {
+      "hueDeltaDegrees": 24,
+      "id": "color.skin.uniformity-wraparound.v1",
+      "maxHslDelta": 0,
+      "maxRgbDelta": 0,
+      "runtimeStatus": "apply_runtime_proof",
+      "targetDistanceAfter": 0.043333333333,
+      "targetDistanceBefore": 0.176666666667,
+      "uiProofStatus": "covered_by_color_workflow_visual_smoke"
+    },
+    {
+      "hueDeltaDegrees": -25,
+      "id": "color.skin.uniformity-full-target.v1",
+      "inputRgb": {
+        "blue": 0.25,
+        "green": 0.42,
+        "red": 0.82
+      },
+      "maxHslDelta": 0,
+      "maxRgbDelta": 0,
+      "outputRgb": {
+        "blue": 0.47740000000000005,
+        "green": 0.5658000000000003,
+        "red": 0.7425999999999999
+      },
+      "runtimeStatus": "apply_runtime_proof",
+      "targetDistanceAfter": 0,
+      "targetDistanceBefore": 0.728888888889,
+      "uiProofStatus": "covered_by_color_workflow_visual_smoke"
+    }
+  ],
+  "fixturePath": "fixtures/color/skin-tone-uniformity-fixtures.json",
+  "issue": 1263,
+  "schemaVersion": 1,
+  "validationMode": "skin_tone_uniformity_runtime_and_ui_artifact",
+  "visualSmokeCommand": "bun run check:color-workflow-smoke"
+}

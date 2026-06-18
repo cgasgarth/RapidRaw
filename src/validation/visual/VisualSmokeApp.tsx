@@ -20,6 +20,7 @@ import {
 import { useUIStore } from '../../store/useUIStore';
 import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
+import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 
 import type { VisualSmokeMode } from './visualSmokeScenarios';
 
@@ -346,8 +347,21 @@ const colorSmokeMetricLabels = {
   channelMixer: 'CM',
   colorBalance: 'CB',
   saturation: 'Sat',
+  skinTone: 'Skin',
   temperature: 'Temp',
 } as const;
+const skinToneProof = applySkinToneUniformityToRgbPixel(
+  { blue: 0.34, green: 0.45, red: 0.72 },
+  {
+    hueUniformity: 0.5,
+    luminanceUniformity: 0.4,
+    saturationUniformity: 0.5,
+    targetHueDegrees: 20,
+    targetLuminance: 0.61,
+    targetSaturation: 0.34,
+  },
+);
+const skinToneOutputRed = skinToneProof.outputRgb.red.toFixed(3);
 
 function CommandPaletteWorkflowSmoke() {
   const [isOpen, setIsOpen] = useState(true);
@@ -607,7 +621,7 @@ function FilmLookVisualSmoke() {
               <div className="h-full w-full bg-[radial-gradient(circle_at_42%_35%,rgba(255,244,215,0.45),transparent_22%),linear-gradient(170deg,transparent_42%,rgba(12,31,37,0.72)_43%)]" />
             </div>
             <div
-              className="grid grid-cols-4 gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-sm"
+              className="grid grid-cols-5 gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-sm"
               data-testid="film-look-adjustment-proof"
             >
               <span>{formatSmokeMetric(filmSmokeMetricLabels.temperature, adjustments.temperature)}</span>
@@ -687,6 +701,9 @@ function ColorWorkflowVisualSmoke() {
                   colorSmokeMetricLabels.channelMixer,
                   adjustments.channelMixer.enabled ? 'on' : 'off',
                 )}
+              </span>
+              <span data-testid="skin-tone-uniformity-ui-proof">
+                {formatSmokeMetric(colorSmokeMetricLabels.skinTone, skinToneOutputRed)}
               </span>
             </div>
           </div>
