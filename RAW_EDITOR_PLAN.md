@@ -7,7 +7,7 @@ Target: a high-polish RAW editor that can credibly compete with Capture One and 
 
 ## Active Codex Goal
 
-Current implementation goal: continuously implement RawEngine in the public `cgasgarth/RapidRaw` fork until June 11, 2026 at 5:00 PM Central Time, using this plan as the source of truth for product scope, implementation order, validation requirements, and follow-up work.
+Current implementation goal: continuously implement RawEngine in the public `cgasgarth/RapidRaw` fork until June 15, 2026 at 5:00 PM Central Time, and continue afterward while this roadmap or open GitHub issues still have required work, using this plan as the source of truth for product scope, implementation order, validation requirements, and follow-up work.
 
 Success for the current goal is continuous shipped progress through small or medium pull requests. Each completed work item should have a linked GitHub issue, a focused branch, a merged PR, validation evidence, and follow-up issues for intentional gaps. If one area blocks, document the blocker with evidence and immediately continue on other unblocked work from the roadmap.
 
