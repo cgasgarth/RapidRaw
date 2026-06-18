@@ -13,6 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 default = ["required-ci"]
 panorama-opencv-spike = ["dep:opencv"]
 required-ci = []
+tauri-test = ["tauri/test"]
 
 [dependencies]
 tauri = { version = "2.11", features = [ "macos-private-api", "rustls-tls" ] }

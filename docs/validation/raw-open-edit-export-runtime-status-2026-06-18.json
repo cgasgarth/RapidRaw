@@ -6,13 +6,13 @@
   ],
   "generatedAt": "2026-06-18T00:00:00.000Z",
   "issue": 1376,
-  "proofHash": "0b19d7d6d70965432b6486e6c916a623f72e7d1a09b4056329eeedd8154aad6d",
+  "proofHash": "59762ff19b736c6927c8d970c4af60fabb4a1f1c10301fd3be5b2b6b048b2d0f",
   "schemaVersion": 1,
-  "status": "public_contract_private_assets_pending",
+  "status": "private_reports_present",
   "summary": {
     "commandWrapperTyped": true,
     "manifestProofCases": 1,
-    "privateRunReports": 0,
-    "runtimeStatusForHtmlReview": "Public repo has typed command and manifest checks; private RAW artifacts remain required before #1376 can close."
+    "privateRunReports": 1,
+    "runtimeStatusForHtmlReview": "Private RAW run reports are present; HTML review can summarize runtime proof artifacts."
   }
 }

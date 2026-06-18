@@ -15,6 +15,7 @@ const requireRoot = args.has('--require-root');
 const selfTest = args.has('--self-test');
 const rootArgIndex = process.argv.indexOf('--root');
 const explicitRoot = rootArgIndex >= 0 ? process.argv[rootArgIndex + 1] : undefined;
+const outputPath = valueAfter('--output');
 
 if (selfTest) {
   await runSelfTest();
@@ -31,10 +32,15 @@ if (!privateRoot) {
   process.exit(0);
 }
 
-const reports = await collectPrivateRunReports(privateRoot);
-console.log(`raw open/edit/export private reports ok (${reports.length} report(s))`);
+const collection = await collectPrivateRunReports(privateRoot);
+if (outputPath !== undefined) {
+  await writeFile(outputPath, `${JSON.stringify(collection, null, 2)}\n`);
+}
+console.log(`raw open/edit/export private reports ok (${collection.reports.length} report(s))`);
 
-async function collectPrivateRunReports(privateRoot: string): Promise<unknown[]> {
+async function collectPrivateRunReports(
+  privateRoot: string,
+): Promise<ReturnType<typeof parseRawOpenEditExportRunReportCollection>> {
   const root = resolve(privateRoot);
   const reportPaths = await findReportFiles(join(root, REPORT_ROOT));
   const reports = [];
@@ -46,7 +52,7 @@ async function collectPrivateRunReports(privateRoot: string): Promise<unknown[]>
     reports.push(normalizeWorkflowReport(report, relativeReportPath, sha256(raw)));
   }
 
-  parseRawOpenEditExportRunReportCollection({
+  return parseRawOpenEditExportRunReportCollection({
     $schema: 'https://rawengine.dev/schemas/raw-open-edit-export-run-reports-v1.json',
     issue: 1829,
     reports,
@@ -54,8 +60,6 @@ async function collectPrivateRunReports(privateRoot: string): Promise<unknown[]>
     snapshotDate: new Date().toISOString().slice(0, 10),
     validationMode: 'public_schema_private_reports',
   });
-
-  return reports;
 }
 
 async function findReportFiles(directory: string): Promise<string[]> {
@@ -115,15 +119,20 @@ async function runSelfTest(): Promise<void> {
     const reportPath = join(reportDir, 'sample-v1-workflow-report.json');
     await mkdir(reportDir, { recursive: true });
     await writeFile(reportPath, JSON.stringify(sampleReport(), null, 2));
-    const reports = await collectPrivateRunReports(root);
-    if (reports.length !== 1) {
-      throw new Error(`expected 1 collected report, found ${reports.length}`);
+    const collection = await collectPrivateRunReports(root);
+    if (collection.reports.length !== 1) {
+      throw new Error(`expected 1 collected report, found ${collection.reports.length}`);
     }
   } finally {
     await rm(root, { force: true, recursive: true });
   }
 
   console.log('raw open/edit/export private report collector self-test ok');
+}
+
+function valueAfter(flag: string): string | undefined {
+  const index = process.argv.indexOf(flag);
+  return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
 function sampleReport(): Record<string, unknown> {

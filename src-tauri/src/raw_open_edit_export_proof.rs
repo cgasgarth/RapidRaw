@@ -1,18 +1,20 @@
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use chrono::Utc;
+use chrono::{SecondsFormat, Utc};
 use image::{DynamicImage, ImageFormat};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-use crate::app_settings::load_settings_or_default;
+use crate::app_settings::{AppSettings, load_settings_or_default};
 use crate::app_state::AppState;
-use crate::export_processing::process_image_for_export_pipeline;
+use crate::export_processing::process_image_for_export_pipeline_with_tonemapper_override;
 use crate::formats::is_raw_file;
 use crate::image_loader::load_base_image_from_bytes;
-use crate::image_processing::{ImageMetadata, get_or_init_gpu_context};
+use crate::image_processing::{
+    GpuContext, ImageMetadata, get_or_init_gpu_context, resolve_tonemapper_override,
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -105,6 +107,17 @@ pub async fn run_raw_open_edit_export_proof(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<RawOpenEditExportProofReport, String> {
+    let settings = load_settings_or_default(&app_handle);
+    let context = get_or_init_gpu_context(&state, &app_handle)?;
+    run_raw_open_edit_export_proof_with_context(request, &state, &settings, &context)
+}
+
+fn run_raw_open_edit_export_proof_with_context(
+    request: RawOpenEditExportProofRequest,
+    state: &tauri::State<'_, AppState>,
+    settings: &AppSettings,
+    context: &GpuContext,
+) -> Result<RawOpenEditExportProofReport, String> {
     let private_root = PathBuf::from(&request.private_root_path);
     if !private_root.is_absolute() {
         return Err("privateRootPath must be absolute.".to_string());
@@ -117,44 +130,46 @@ pub async fn run_raw_open_edit_export_proof(
 
     let source_hash_before = sha256_file(&source_path)?;
     let source_bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
-    let settings = load_settings_or_default(&app_handle);
     let source_path_string = source_path.to_string_lossy().to_string();
     let base_image =
-        load_base_image_from_bytes(&source_bytes, &source_path_string, false, &settings, None)
+        load_base_image_from_bytes(&source_bytes, &source_path_string, false, settings, None)
             .map_err(|error| error.to_string())?;
 
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
     let empty_adjustments = json!({});
     let is_raw = is_raw_file(&source_path_string);
-    let preview_before = process_image_for_export_pipeline(
+    let tm_override = resolve_tonemapper_override(settings, is_raw);
+    let preview_before = process_image_for_export_pipeline_with_tonemapper_override(
         &source_path_string,
         &base_image,
         &empty_adjustments,
-        &context,
-        &state,
+        context,
+        state,
         is_raw,
         "raw_open_edit_export_preview_before",
-        &app_handle,
+        tm_override,
+        &[],
     )?;
-    let preview_after = process_image_for_export_pipeline(
+    let preview_after = process_image_for_export_pipeline_with_tonemapper_override(
         &source_path_string,
         &base_image,
         &adjustments,
-        &context,
-        &state,
+        context,
+        state,
         is_raw,
         "raw_open_edit_export_preview_after",
-        &app_handle,
+        tm_override,
+        &[],
     )?;
-    let export_after = process_image_for_export_pipeline(
+    let export_after = process_image_for_export_pipeline_with_tonemapper_override(
         &source_path_string,
         &base_image,
         &adjustments,
-        &context,
-        &state,
+        context,
+        state,
         is_raw,
         "raw_open_edit_export_export_after",
-        &app_handle,
+        tm_override,
+        &[],
     )?;
 
     let slug = slug_from_fixture_id(&request.fixture_id);
@@ -231,12 +246,13 @@ pub async fn run_raw_open_edit_export_proof(
         artifact("sidecar_after_private", &sidecar_after_path),
     ];
 
+    let report_id = raw_open_edit_export_report_id(&request.fixture_id);
     let mut report = RawOpenEditExportProofReport {
         artifacts: Vec::new(),
         edit_command_id: request.edit_command.command_id,
         edit_graph_revision: request.edit_command.expected_graph_revision,
         fixture_id: request.fixture_id,
-        generated_at: Utc::now().to_rfc3339(),
+        generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         metrics: vec![
             metric(
                 "changedPixelRatio",
@@ -269,7 +285,7 @@ pub async fn run_raw_open_edit_export_proof(
         ],
         preview_after: preview_after_path,
         preview_before: preview_before_path,
-        report_id: format!("raw-open-edit-export-run.{}", slug),
+        report_id,
         sidecar_after: sidecar_after_path,
         source_raw,
         tracking_issue: 1376,
@@ -462,10 +478,29 @@ fn slug_from_fixture_id(fixture_id: &str) -> String {
         .replace('.', "-")
 }
 
+fn raw_open_edit_export_report_id(fixture_id: &str) -> String {
+    format!(
+        "raw-open-edit-export-run.{}",
+        fixture_id
+            .strip_prefix("validation.raw-open-edit-export.")
+            .unwrap_or(fixture_id)
+    )
+}
+
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "tauri-test")]
+    use std::fs;
+
     use image::{DynamicImage, Rgba, RgbaImage};
     use serde_json::json;
+    #[cfg(feature = "tauri-test")]
+    use tauri::Manager;
+
+    #[cfg(feature = "tauri-test")]
+    use crate::app_settings::AppSettings;
+    #[cfg(feature = "tauri-test")]
+    use crate::gpu_processing::get_or_init_compute_gpu_context_for_tests;
 
     use super::*;
 
@@ -592,6 +627,66 @@ mod tests {
         assert_eq!(
             slug_from_fixture_id("validation.raw-open-edit-export.edge-ringing.v1"),
             "edge-ringing-v1"
+        );
+        assert_eq!(
+            raw_open_edit_export_report_id("validation.raw-open-edit-export.edge-ringing.v1"),
+            "raw-open-edit-export-run.edge-ringing.v1"
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn private_runtime_smoke_generates_raw_open_edit_export_report_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_RAW_OPEN_EDIT_EXPORT_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            eprintln!("skipping private RAW open/edit/export proof smoke");
+            return;
+        }
+
+        let mut request: RawOpenEditExportProofRequest = serde_json::from_str(
+            &fs::read_to_string("../fixtures/validation/raw-open-edit-export-proof-request.json")
+                .expect("proof request fixture reads"),
+        )
+        .expect("proof request fixture parses");
+        if let Ok(private_root) = std::env::var("RAWENGINE_PRIVATE_RAW_ROOT") {
+            request.private_root_path = private_root;
+        }
+
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let settings = AppSettings::default();
+        let report =
+            run_raw_open_edit_export_proof_with_context(request, &state, &settings, &context)
+                .expect("private RAW open/edit/export proof command runs");
+
+        assert_eq!(report.tracking_issue, 1376);
+        assert!(
+            report
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.kind == "workflow_report_private")
+        );
+        assert!(
+            report
+                .metrics
+                .iter()
+                .any(|metric| metric.name == "changedPixelRatio"
+                    && metric.passed
+                    && metric.value > 0.0)
+        );
+        assert!(
+            report
+                .metrics
+                .iter()
+                .any(|metric| metric.name == "sourceHashUnchanged" && metric.passed)
         );
     }
 }
