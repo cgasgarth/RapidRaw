@@ -1,6 +1,9 @@
 import { z } from 'zod';
 
+import { getComputationalMergeAppServerRoutePairSummary } from '../../src/utils/computationalMergeAppServerRoutePairs.ts';
 import { NegativeLabOutputFormatId } from '../../src/utils/negativeLabOutputFormatIds.ts';
+
+const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 
 const filmLookPresetBaseSchema = z
   .object({
@@ -249,8 +252,9 @@ export const superResolutionUiSettingsProofSchema = z.object({
   qualityPreference: z.literal('preview'),
 });
 export const superResolutionReviewWorkspaceProofSchema = z.object({
+  applyCommand: z.literal(superResolutionRoutePair.applyToolName),
   artifactPath: z.literal('/tmp/rawengine-super-resolution-smoke.tif'),
-  command: z.literal('super_resolution.merge.dry_run_command'),
+  command: z.literal(superResolutionRoutePair.dryRunToolName),
   detailPolicy: z.literal('aggressive_preview_only'),
   outputScale: z.literal('4'),
   runtimeStatus: z.literal('dry_run_preview'),
