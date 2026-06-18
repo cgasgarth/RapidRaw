@@ -317,6 +317,41 @@
       "trackingIssue": 1506
     },
     {
+      "artifactClass": "subpixel_detail_reconstruction",
+      "camera": {
+        "cameraMake": "Sony",
+        "cameraModel": "ILCE-7M4",
+        "lens": "FE 90mm F2.8 Macro G OSS",
+        "rawFormat": "arw"
+      },
+      "crop": {
+        "height": 1024,
+        "unit": "source_pixels",
+        "width": 1024,
+        "x": 1500,
+        "y": 1100
+      },
+      "evidenceId": "raw-evidence.super-resolution.raw-burst-detail.v1",
+      "expectedUse": ["super_resolution", "detail", "preview_export_parity"],
+      "exposure": {
+        "aperture": 5.6,
+        "exposureBiasEv": 0,
+        "iso": 100,
+        "shutterSeconds": 0.002
+      },
+      "featureFamily": "super_resolution",
+      "notes": "Reserved private RAW burst for SR alignment, detail gain, invented-detail review, and preview/export parity proof.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private SR RAW burst must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1900
+    },
+    {
       "artifactClass": "color_checker_reference",
       "camera": {
         "cameraMake": "Sony",

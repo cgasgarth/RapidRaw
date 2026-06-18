@@ -24,9 +24,18 @@ The public fixture manifest now reserves these real-photo fixture categories:
 - `real.sr.handheld-burst-motion.v0`
 - `real.sr.tripod-microshift.v0`
 - `real.sr.panorama-overlap-detail.v0`
+- `real.sr.raw-burst-detail.v0`
+- `real.sr.pixel-shift-tripod.v0`
 
 Each entry is `status: "planned"` and intentionally disables public CI until a
 future PR proves redistribution rights, fixture hashes, and review scope.
+
+Issue #1900 also reserves `raw-evidence.super-resolution.raw-burst-detail.v1`
+in the private RAW evidence ledger. The #1900 entries are schema/metadata only.
+They do not add RAW sequences, SR outputs, alignment maps, source hashes, or
+quality claims. A later PR must attach approved rights, hashes, ordered-source
+metadata, render artifacts, and review evidence before these entries can count
+as runtime SR proof.
 
 ## Required Activation Evidence
 
