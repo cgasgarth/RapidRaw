@@ -18,7 +18,7 @@ The goal is not complete merely because the current backlog slice feels exhauste
 - Work from the next ready unclosed GitHub issue in milestone order unless the user explicitly redirects.
 - Keep `main` protected: no direct commits or pushes to `main`; all substantive work goes through PRs.
 - Keep PRs small to medium and tied to one coherent validation story.
-- Keep at most three active open PRs at a time. Use that cap as an A/B pattern
+- Keep at most two active open PRs at a time. Use that cap as an A/B pattern
   when useful, where one PR can build while another independent PR is prepared
   or validated. Do not use it as permission to leave work open and stale.
 - Use this plan as the source of truth for ordering, constraints, and completion evidence.
