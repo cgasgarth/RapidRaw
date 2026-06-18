@@ -24,6 +24,8 @@ mod denoising;
 mod exif_processing;
 mod export_processing;
 mod file_management;
+#[cfg(all(test, feature = "tauri-test"))]
+mod focus_real_raw_proof;
 mod formats;
 mod gpu_processing;
 #[cfg(all(test, feature = "tauri-test"))]
