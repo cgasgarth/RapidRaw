@@ -1,8 +1,10 @@
-import { mkdir } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
+import { parseComputationalMergePrivateRunReportCollection } from '../../src/schemas/computationalMergePrivateRunReportSchemas.ts';
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../compact-output.ts';
 
 const argsSchema = z
@@ -53,42 +55,65 @@ export async function runComputationalPrivateProof(config: ComputationalPrivateP
   }
 
   const privateRoot = resolve(args.privateRoot);
+  let tempOutputDir: string | undefined;
+  const reportOutputPath =
+    args.outputPath ??
+    join(
+      (tempOutputDir = await mkdtemp(join(tmpdir(), 'rawengine-computational-private-report-'))),
+      'computational-merge-private-run-reports.json',
+    );
+
   if (args.outputPath !== undefined) {
-    await mkdir(dirname(args.outputPath), { recursive: true });
+    await mkdir(dirname(reportOutputPath), { recursive: true });
   }
 
-  await runCompact(config.privateStep.label, {
-    command: config.privateStep.command,
-    cwd: config.privateStep.cwd,
-    env: {
-      RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
-      ...config.privateStep.env,
-    },
-  });
+  try {
+    await runCompact(config.privateStep.label, {
+      command: config.privateStep.command,
+      cwd: config.privateStep.cwd,
+      env: {
+        RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
+        ...config.privateStep.env,
+      },
+    });
 
-  await runCompact('computational merge private report collection', {
-    command: [
-      'bun',
-      'scripts/collect-computational-merge-private-run-reports.ts',
-      '--root',
-      privateRoot,
-      ...(args.outputPath === undefined ? [] : ['--output', args.outputPath]),
-    ],
-  });
+    await runCompact('computational merge private report collection', {
+      command: [
+        'bun',
+        'scripts/collect-computational-merge-private-run-reports.ts',
+        '--root',
+        privateRoot,
+        '--output',
+        reportOutputPath,
+      ],
+    });
 
-  await runCompact('computational merge private report validation', {
-    command: [
-      'bun',
-      'scripts/check-computational-merge-private-run-reports.ts',
-      '--fixture-id',
-      config.fixtureId,
-      ...(args.outputPath === undefined ? [] : ['--input', args.outputPath]),
-      ...(args.requireAssets ? ['--require-assets'] : []),
-    ],
-    env: {
-      RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
-    },
-  });
+    const collectedReports = parseComputationalMergePrivateRunReportCollection(
+      JSON.parse(await readFile(reportOutputPath, 'utf8')),
+    );
+    const reportPresent = collectedReports.reports.some((report) => report.fixtureId === config.fixtureId);
+    if (!reportPresent && !args.requireAssets) {
+      console.log(`${config.skipLabel} skipped (no private run report for ${config.fixtureId})`);
+      return;
+    }
+
+    await runCompact('computational merge private report validation', {
+      command: [
+        'bun',
+        'scripts/check-computational-merge-private-run-reports.ts',
+        '--fixture-id',
+        config.fixtureId,
+        '--input',
+        reportOutputPath,
+        ...(args.requireAssets ? ['--require-assets'] : []),
+      ],
+      env: {
+        RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
+      },
+    });
+  } finally {
+    if (tempOutputDir !== undefined) await rm(tempOutputDir, { force: true, recursive: true });
+  }
 
   console.log(`${config.featureLabel} real RAW private proof ok`);
 }
