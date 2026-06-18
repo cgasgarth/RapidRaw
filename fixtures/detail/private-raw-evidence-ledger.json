@@ -245,6 +245,41 @@
       },
       "status": "planned_private_capture",
       "trackingIssue": 1895
+    },
+    {
+      "artifactClass": "layer_mask_composite",
+      "camera": {
+        "cameraMake": "Canon",
+        "cameraModel": "EOS R5",
+        "lens": "RF 85mm F2 Macro IS STM",
+        "rawFormat": "cr3"
+      },
+      "crop": {
+        "height": 1536,
+        "unit": "source_pixels",
+        "width": 1536,
+        "x": 960,
+        "y": 640
+      },
+      "evidenceId": "raw-evidence.layers.mask-refinement-portrait.v1",
+      "expectedUse": ["layers_masks", "preview_export_parity"],
+      "exposure": {
+        "aperture": 4,
+        "exposureBiasEv": 0,
+        "iso": 200,
+        "shutterSeconds": 0.004
+      },
+      "featureFamily": "layers_masks",
+      "notes": "Reserved private portrait RAW for layer mask edge refinement, overlay, opacity, and preview/export parity proof.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Private layer/mask portrait RAW must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1896
     }
   ],
   "issue": 1149,

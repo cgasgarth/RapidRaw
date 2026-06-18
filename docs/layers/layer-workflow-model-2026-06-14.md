@@ -32,6 +32,19 @@ The current model is not sufficient for the final workflow because:
   adjustment payloads, history, provenance, and invalidation.
 - API and app-server tools need the same command surface as the UI.
 
+## Fixture Corpus
+
+Issue #1896 reserves the first layer/mask RAW corpus placeholders:
+
+- `real.layers.mask-refinement-portrait.v0`
+- `real.layers.local-adjustment-landscape.v0`
+- `raw-evidence.layers.mask-refinement-portrait.v1`
+
+These entries are schema/metadata only. They do not add RAW payloads, mask
+ground truth, rendered pixels, or runtime quality claims. A later PR must attach
+approved rights, hashes, source metadata, mask/reference artifacts, and
+preview/export proof before they can count as runtime layer or mask evidence.
+
 ## Product Model
 
 The layer stack is ordered top to bottom in the UI and evaluated bottom to top in

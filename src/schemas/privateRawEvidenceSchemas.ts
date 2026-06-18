@@ -63,6 +63,8 @@ export const privateRawEvidenceArtifactClassSchema = z.enum([
   'lens_softness',
   'color_checker_reference',
   'skin_tone_reference',
+  'layer_mask_composite',
+  'local_adjustment_mask',
   'subpixel_detail_reconstruction',
 ]);
 
@@ -71,6 +73,7 @@ const privateRawEvidenceFeatureFamilySchema = z.enum([
   'detail',
   'focus_stack',
   'hdr_merge',
+  'layers_masks',
   'panorama_stitch',
   'super_resolution',
 ]);
@@ -90,6 +93,7 @@ export const privateRawEvidenceEntrySchema = z
           'detail',
           'focus_stack',
           'hdr_merge',
+          'layers_masks',
           'panorama_stitch',
           'preview_export_parity',
           'super_resolution',
@@ -112,6 +116,7 @@ export const privateRawEvidenceEntrySchema = z
       detail: 'detail',
       focus_stack: 'focus_stack',
       hdr_merge: 'hdr_merge',
+      layers_masks: 'layers_masks',
       panorama_stitch: 'panorama_stitch',
       super_resolution: 'super_resolution',
     } as const;
@@ -173,6 +178,7 @@ export const privateRawEvidenceLedgerSchema = z
       'detail',
       'focus_stack',
       'hdr_merge',
+      'layers_masks',
       'panorama_stitch',
       'super_resolution',
     ] as const;

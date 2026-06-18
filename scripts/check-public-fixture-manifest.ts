@@ -14,6 +14,8 @@ const requiredHighIsoFixtureIds = new Set([
   'real.detail.high-iso-skin-shadow.v0',
   'real.color.camera-profile-colorchecker.v0',
   'real.color.camera-profile-skin-chart.v0',
+  'real.layers.mask-refinement-portrait.v0',
+  'real.layers.local-adjustment-landscape.v0',
 ]);
 const presentFixtureIds = new Set(manifest.entries.map((entry) => entry.fixtureId));
 const missingFixtureIds = [...requiredHighIsoFixtureIds].filter((fixtureId) => !presentFixtureIds.has(fixtureId));
