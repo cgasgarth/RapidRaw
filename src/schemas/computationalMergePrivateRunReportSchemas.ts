@@ -122,7 +122,10 @@ const privateRunReportSchema = z
       'quality_report_private',
     ] as const;
     const forbiddenDecodeArtifacts = ['merge_output_private', 'preview_after_private', 'export_after_private'] as const;
-    if (report.acceptanceStatus === 'private_decode_smoke' && report.featureFamily === 'panorama_stitch') {
+    if (
+      report.acceptanceStatus === 'private_decode_smoke' &&
+      (report.featureFamily === 'panorama_stitch' || report.featureFamily === 'focus_stack')
+    ) {
       for (const artifactKind of requiredDecodeArtifacts) {
         if (!artifactKinds.includes(artifactKind)) {
           context.addIssue({
