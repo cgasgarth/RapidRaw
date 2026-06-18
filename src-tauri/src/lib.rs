@@ -46,6 +46,8 @@ mod panorama_stitching;
 mod panorama_utils;
 mod preset_converter;
 mod presets;
+#[cfg(all(test, feature = "tauri-test"))]
+mod private_decode_raw_proof;
 mod raw_open_edit_export_proof;
 mod raw_processing;
 #[cfg(all(test, feature = "tauri-test"))]
