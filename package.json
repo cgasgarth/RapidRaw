@@ -25,6 +25,7 @@
     "check:agent-preflight": "bun scripts/check-agent-preflight.ts",
     "check:agent-pr-queue": "bun scripts/check-agent-pr-queue.ts",
     "check:current-pr-local": "bun scripts/check-current-pr-local.ts",
+    "check:current-pr-local:self-test": "bun scripts/check-current-pr-local.ts --self-test",
     "check": "bun run check:quick && bun run check:bundle",
     "check:quick": "bun scripts/run-compact-checks.ts check:quick",
     "check:types": "bun scripts/run-compact-command.ts --label types -- tsc --noEmit --pretty false",
