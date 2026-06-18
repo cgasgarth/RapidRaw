@@ -12,6 +12,8 @@ node_modules
 dist
 dist-ssr
 artifacts/
+private-artifacts/
+private-fixtures/
 *.local
 
 # Editor directories and files
