@@ -277,7 +277,7 @@ const privateRunReportSchema = z
       }
     } else if (
       report.acceptanceStatus === 'private_preview_export_smoke' &&
-      report.featureFamily === 'panorama_stitch'
+      (report.featureFamily === 'panorama_stitch' || report.featureFamily === 'focus_stack')
     ) {
       for (const artifactKind of requiredPreviewExportArtifacts) {
         if (!artifactKinds.includes(artifactKind)) {

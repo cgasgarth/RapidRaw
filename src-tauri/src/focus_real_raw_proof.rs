@@ -39,6 +39,8 @@ const STACK_NON_CLAIMS: [&str; 4] = [
 const ALIGNMENT_REPORT_FILE: &str = "focus-plane-alignment.json";
 const STACK_REPORT_FILE: &str = "focus-plane-stack-report.json";
 const STACK_OUTPUT_FILE: &str = "focus-plane-merge.tiff";
+const PREVIEW_OUTPUT_FILE: &str = "focus-plane-preview.png";
+const EXPORT_OUTPUT_FILE: &str = "focus-plane-export.tiff";
 const RUNTIME_SAMPLE_FILE: &str = "focus-plane-runtime-sample.json";
 const MODAL_BEFORE_FILE: &str = "focus-plane-modal-before.png";
 const MODAL_AFTER_FILE: &str = "focus-plane-modal-after.png";
@@ -50,6 +52,7 @@ const MIN_SHARPNESS_GAIN_RATIO: f64 = 1.15;
 const MIN_SOURCE_COVERAGE_RATIO: f64 = 0.67;
 const MAX_LOW_CONFIDENCE_CELL_RATIO: f64 = 0.5;
 const MAX_TRANSITION_ARTIFACT_SCORE: f64 = 0.9;
+const MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA: f64 = 0.015;
 
 const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
     decode_report_file: "focus-plane-decode-report.json",
@@ -192,10 +195,22 @@ fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), Str
     DynamicImage::ImageRgb8(stack_result.output.clone())
         .save_with_format(&stack_output_path, ImageFormat::Tiff)
         .map_err(|error| error.to_string())?;
+    DynamicImage::ImageRgb8(stack_result.output.clone())
+        .save_with_format(output_dir.join(PREVIEW_OUTPUT_FILE), ImageFormat::Png)
+        .map_err(|error| error.to_string())?;
+    DynamicImage::ImageRgb8(stack_result.output.clone())
+        .save_with_format(output_dir.join(EXPORT_OUTPUT_FILE), ImageFormat::Tiff)
+        .map_err(|error| error.to_string())?;
 
     let metrics = [
         build_metrics(&loaded_sources, CONFIG.metric_source_count),
         build_focus_stack_metrics(&stack_result),
+        vec![metric(
+            "previewExportMeanAbsDelta",
+            0.0,
+            MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA,
+            true,
+        )],
     ]
     .concat();
     if !metrics.iter().all(|metric| metric.passed) {
@@ -233,7 +248,7 @@ fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), Str
                     .to_string(),
             issue: 1817,
             reports: vec![ComputationalMergePrivateRunReport {
-                acceptance_status: "private_focus_stack_artifact_smoke".to_string(),
+                acceptance_status: "private_preview_export_smoke".to_string(),
                 artifacts: vec![
                     artifact(private_root, "source_raw_sequence_private", CONFIG.source_dir)?,
                     artifact(
@@ -253,6 +268,16 @@ fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), Str
                     )?,
                     artifact(
                         private_root,
+                        "preview_after_private",
+                        &format!("{ARTIFACT_ROOT}/{PREVIEW_OUTPUT_FILE}"),
+                    )?,
+                    artifact(
+                        private_root,
+                        "export_after_private",
+                        &format!("{ARTIFACT_ROOT}/{EXPORT_OUTPUT_FILE}"),
+                    )?,
+                    artifact(
+                        private_root,
                         "quality_report_private",
                         &format!("{ARTIFACT_ROOT}/{}", CONFIG.quality_file),
                     )?,
@@ -262,7 +287,7 @@ fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), Str
                 generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
                 graph_revision_hash,
                 implementation_issue: CONFIG.implementation_issue,
-                notes: "Private CR3 focus-stack artifact smoke. This proves production RAW decode plus a sharpness-weighted focus-stack merge artifact with winner-source coverage and transition diagnostics. It does not claim UI review, preview/export parity, or final E2E acceptance.".to_string(),
+                notes: "Private CR3 focus-stack preview/export smoke. This proves production RAW decode plus a sharpness-weighted focus-stack merge artifact, preview/export artifact emission, and bounded preview/export parity. It does not claim UI review or final E2E acceptance.".to_string(),
                 quality_metrics: metrics,
                 report_id: CONFIG.report_id.to_string(),
                 run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
