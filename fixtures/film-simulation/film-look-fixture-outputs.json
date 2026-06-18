@@ -28,6 +28,7 @@
         "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
         "measurementSource": "generic_engineered_starting_point"
       },
+      "runtimeSupport": "adjustment_patch_preview_export",
       "strengthDefault": 70,
       "strengthPreviews": {
         "appliedFull": {
@@ -113,6 +114,7 @@
         "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
         "measurementSource": "generic_engineered_starting_point"
       },
+      "runtimeSupport": "adjustment_patch_preview_export",
       "strengthDefault": 65,
       "strengthPreviews": {
         "appliedFull": {
@@ -208,6 +210,7 @@
         "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
         "measurementSource": "generic_engineered_starting_point"
       },
+      "runtimeSupport": "adjustment_patch_preview_export",
       "strengthDefault": 60,
       "strengthPreviews": {
         "appliedFull": {
@@ -305,6 +308,7 @@
         "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
         "measurementSource": "generic_engineered_starting_point"
       },
+      "runtimeSupport": "adjustment_patch_preview_export",
       "strengthDefault": 55,
       "strengthPreviews": {
         "appliedFull": {
@@ -400,6 +404,7 @@
         "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
         "measurementSource": "generic_engineered_starting_point"
       },
+      "runtimeSupport": "adjustment_patch_preview_export",
       "strengthDefault": 75,
       "strengthPreviews": {
         "appliedFull": {
@@ -497,6 +502,7 @@
         "legalNote": "Generic creative look; not measured from, endorsed by, or claiming to match a film stock.",
         "measurementSource": "generic_engineered_starting_point"
       },
+      "runtimeSupport": "adjustment_patch_preview_export",
       "strengthDefault": 60,
       "strengthPreviews": {
         "appliedFull": {

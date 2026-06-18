@@ -36,6 +36,7 @@ const buildFixture = () => ({
       displayName: look.displayName,
       id: look.id,
       provenance: look.provenance,
+      runtimeSupport: look.runtimeSupport,
       strengthDefault: look.strengthDefault,
       strengthPreviews: {
         appliedFull: buildFilmLookAppliedAdjustmentPatch(look, 100),
