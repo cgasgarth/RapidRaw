@@ -32,6 +32,9 @@ This slice adds:
   luma weighting and optional luminance preservation as the TypeScript runtime;
 - CPU/GPU parity fixture coverage and shader-function hashing for the new WGSL
   function.
+- a #1877 apply artifact report at
+  `docs/validation/color-balance-rgb-apply-proof-2026-06-18.json` with
+  tonal-region weights, applied offsets, and output deltas.
 
 ## Remaining Gaps
 

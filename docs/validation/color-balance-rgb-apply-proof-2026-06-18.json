@@ -1,0 +1,69 @@
+{
+  "cases": [
+    {
+      "appliedOffset": {
+        "blue": 0.012339390718,
+        "green": 0,
+        "red": -0.007385279084
+      },
+      "case": "cinematic shadow cool highlight warm",
+      "expectedNonZeroRanges": ["shadows", "midtones", "highlights"],
+      "inputRgb": {
+        "blue": 0.34,
+        "green": 0.27,
+        "red": 0.22
+      },
+      "luminance": 0.264424,
+      "maxExpectedDelta": 0,
+      "maxOutputDelta": 0.013246749452,
+      "outputRgb": {
+        "blue": 0.3532467494523268,
+        "green": 0.27069531498530197,
+        "red": 0.2131622549955504
+      },
+      "rangeWeights": {
+        "highlights": 0,
+        "midtones": 0.50458883663,
+        "shadows": 0.49541116337
+      },
+      "runtimeStatus": "apply_runtime_proof",
+      "schemaStatus": "validated_by_zod",
+      "uiStatus": "existing_control_surface_not_retested"
+    },
+    {
+      "appliedOffset": {
+        "blue": -0.013091910615,
+        "green": 0.002113186443,
+        "red": 0.017524679479
+      },
+      "case": "portrait midtone warmth",
+      "expectedNonZeroRanges": ["midtones", "highlights"],
+      "inputRgb": {
+        "blue": 0.41,
+        "green": 0.49,
+        "red": 0.58
+      },
+      "luminance": 0.503358,
+      "maxExpectedDelta": 0,
+      "maxOutputDelta": 0.016447520094,
+      "outputRgb": {
+        "blue": 0.3935524799058996,
+        "green": 0.4879526774547909,
+        "red": 0.5924729822912871
+      },
+      "rangeWeights": {
+        "highlights": 0.082558391054,
+        "midtones": 0.845274577282,
+        "shadows": 0.072167031664
+      },
+      "runtimeStatus": "apply_runtime_proof",
+      "schemaStatus": "validated_by_zod",
+      "uiStatus": "existing_control_surface_not_retested"
+    }
+  ],
+  "fixturePath": "fixtures/color/color-balance-rgb.json",
+  "issue": 1877,
+  "previewExportParityStatus": "covered_by_existing_gpu_path_not_retested_here",
+  "schemaVersion": 1,
+  "validationMode": "rgb_color_balance_apply_runtime_artifact"
+}
