@@ -201,7 +201,7 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
         .cloned()
         .ok_or_else(|| "missing preview/export parity metric".to_string())?;
     let report = ComputationalMergePrivateRunReport {
-        acceptance_status: "runtime_apply_capable".to_string(),
+        acceptance_status: "private_decode_smoke".to_string(),
         artifacts: vec![
             artifact(private_root, "source_raw_sequence_private", SOURCE_DIR)?,
             artifact(
@@ -238,8 +238,8 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
         fixture_id: FIXTURE_ID.to_string(),
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         graph_revision_hash: graph_revision_hash(&source_hashes),
-        implementation_issue: 1509,
-        notes: "Private RAW HDR bracket decode-to-apply runtime proof; metadata-only report is safe to collect publicly without private pixels.".to_string(),
+        implementation_issue: 2062,
+        notes: "Private RAW HDR bracket direct decode/merge smoke. This metadata-only report is safe to collect publicly without private pixels, but it is not a typed app-server apply proof or passed private RAW E2E acceptance.".to_string(),
         preview_export_parity,
         quality_metrics: metrics,
         report_id: REPORT_ID.to_string(),
