@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { privateRawFormatSchema } from './privateRawFormatSchemas';
+
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 
 const positiveNumberSchema = z.number().positive();
@@ -28,7 +30,7 @@ const cameraMetadataSchema = z
     cameraMake: z.string().trim().min(1),
     cameraModel: z.string().trim().min(1),
     lens: z.string().trim().min(1).optional(),
-    rawFormat: z.enum(['arw', 'cr2', 'cr3', 'dng', 'nef', 'raf', 'rw2', 'orf', 'pef', 'srw']),
+    rawFormat: privateRawFormatSchema,
   })
   .strict();
 

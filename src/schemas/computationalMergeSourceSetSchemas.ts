@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-export const computationalMergeSourceSetFamilySchema = z.enum(['panorama_stitch', 'focus_stack', 'super_resolution']);
+import { privateRawFormatSchema } from './privateRawFormatSchemas';
 
-const rawFormatSchema = z.enum(['arw', 'cr2', 'cr3', 'dng', 'nef', 'raf', 'rw2', 'orf', 'pef', 'srw']);
+export const computationalMergeSourceSetFamilySchema = z.enum(['panorama_stitch', 'focus_stack', 'super_resolution']);
 
 const sourceItemSchema = z
   .object({
-    expectedRawFormat: rawFormatSchema,
+    expectedRawFormat: privateRawFormatSchema,
     localRelativePath: z.string().trim().min(1),
     publicRepoAllowed: z.literal(false),
     sourceIndex: z.number().int().nonnegative(),
