@@ -585,11 +585,32 @@
             </tr>
             <tr>
               <td>HDR private RAW asset prep</td>
-              <td><code>bun run prepare:hdr-real-raw-private-root</code></td>
               <td>
-                Creates and validates the private root layout for the three-frame ARW bracket slot without committing
-                private pixels. <code>--require-assets</code> intentionally fails until the bracket files exist.
+                <code>bun run prepare:hdr-real-raw-private-root</code><br />
+                <code>bun run prepare:focus-real-raw-private-root</code><br />
+                <code>bun run prepare:sr-real-raw-private-root</code><br />
+                <code>bun run prepare:panorama-real-raw-private-root</code>
               </td>
+              <td>
+                Creates and validates private root layouts for HDR ARW brackets, focus CR3 stacks, SR NEF bursts, and
+                panorama RAF overlap sets without committing private pixels. <code>--require-assets</code> intentionally
+                fails until each source set exists.
+              </td>
+            </tr>
+            <tr>
+              <td>Focus private RAW asset prep</td>
+              <td><code>bun run check:focus-real-raw-private-root-prep</code></td>
+              <td>Self-test for focus-stack private root validation and path-safety behavior.</td>
+            </tr>
+            <tr>
+              <td>Super-resolution private RAW asset prep</td>
+              <td><code>bun run check:sr-real-raw-private-root-prep</code></td>
+              <td>Self-test for SR burst private root validation and path-safety behavior.</td>
+            </tr>
+            <tr>
+              <td>Panorama private RAW asset prep</td>
+              <td><code>bun run check:panorama-real-raw-private-root-prep</code></td>
+              <td>Self-test for panorama overlap private root validation and path-safety behavior.</td>
             </tr>
             <tr>
               <td>Panorama runtime apply</td>
@@ -690,7 +711,11 @@
           <li>OpenAI app-server dry-run/apply/audit screenshots or rendered logs.</li>
           <li>Negative Lab real-scan workflow screenshots and QC overlays.</li>
           <li>HDR private ARW bracket files for <code>private-fixtures/hdr/bracket-alignment-v1/</code>.</li>
-          <li>Panorama, focus stack, and super-resolution real-image validation artifacts.</li>
+          <li>
+            Focus CR3, super-resolution NEF, and panorama RAF private source files for the computational E2E proof
+            slots.
+          </li>
+          <li>Panorama, focus stack, and super-resolution real-image runtime reports.</li>
           <li>Accessibility and high-DPI UI screenshots.</li>
         </ul>
       </section>
