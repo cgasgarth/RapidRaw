@@ -1,0 +1,36 @@
+{
+  "cases": [
+    {
+      "id": "camera-profile.input-transform.sony-ilce-7m4-chart-patch.v1",
+      "inputTransform": "libraw_camera_matrix",
+      "maxRgbDelta": 0,
+      "outputWorkingRgb": {
+        "blue": 0.1659,
+        "green": 0.5157,
+        "red": 0.2564
+      },
+      "profileId": "camera.sony-ilce-7m4.generic-arw-v1",
+      "runtimeStage": "camera_profile_to_working_space",
+      "warning": null
+    },
+    {
+      "id": "camera-profile.input-transform.embedded-dng-neutral-patch.v1",
+      "inputTransform": "embedded_dng_color_matrix",
+      "maxRgbDelta": 0,
+      "outputWorkingRgb": {
+        "blue": 0.3876,
+        "green": 0.3876,
+        "red": 0.3838
+      },
+      "profileId": "fallback.dng-embedded-matrix",
+      "runtimeStage": "camera_profile_to_working_space",
+      "warning": "camera_profile_embedded_fallback"
+    }
+  ],
+  "fixturePath": "fixtures/color/camera-profile-input-transform-proof.json",
+  "generatedFromSnapshotDate": "2026-06-18",
+  "issue": 1261,
+  "lookupFixturePath": "fixtures/color/camera-profile-lookup-fixtures.json",
+  "schemaVersion": 1,
+  "validationMode": "headless_camera_profile_matrix_transform"
+}
