@@ -29,3 +29,10 @@ Run:
 ```sh
 bun run check:hdr-deghosting-smoke
 ```
+
+## Artifact Gate Follow-Up
+
+Issue #1928 adds `bun run check:hdr-deghost-tone-artifact`, which records
+semantic deghost mask/output hashes plus scene-linear and tone-mapped preview
+hashes for the synthetic HDR gate. The report lives at
+`docs/validation/hdr-deghost-tone-artifact-proof-2026-06-18.json`.
