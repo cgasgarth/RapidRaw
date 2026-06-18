@@ -7,42 +7,42 @@
         {
           "hash": null,
           "kind": "source_raw_private",
-          "path": "private-fixtures/detail/edge-ringing-v1.cr3",
+          "path": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
           "publicRepoAllowed": false
         },
         {
           "hash": null,
           "kind": "preview_before_private",
-          "path": "private-artifacts/validation/open-edit-export/edge-ringing-preview-before.png",
+          "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-preview-before.png",
           "publicRepoAllowed": false
         },
         {
           "hash": null,
           "kind": "preview_after_private",
-          "path": "private-artifacts/validation/open-edit-export/edge-ringing-preview-after.png",
+          "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-preview-after.png",
           "publicRepoAllowed": false
         },
         {
           "hash": null,
           "kind": "export_after_private",
-          "path": "private-artifacts/validation/open-edit-export/edge-ringing-export-after.tiff",
+          "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-export-after.tiff",
           "publicRepoAllowed": false
         },
         {
           "hash": null,
           "kind": "sidecar_after_private",
-          "path": "private-artifacts/validation/open-edit-export/edge-ringing-after.rrdata",
+          "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-after.rrdata",
           "publicRepoAllowed": false
         },
         {
           "hash": null,
           "kind": "workflow_report_private",
-          "path": "private-artifacts/validation/open-edit-export/edge-ringing-workflow-report.json",
+          "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-workflow-report.json",
           "publicRepoAllowed": false
         }
       ],
-      "editGraphRevision": "graph-rev.open-edit-export.edge-ringing.v1",
-      "evidenceId": "raw-evidence.detail.edge-ringing.v1",
+      "editGraphRevision": "graph-rev.raw-open-edit-export.high-iso-skin-shadow.v1",
+      "evidenceId": "raw-evidence.detail.high-iso-skin-shadow.v1",
       "expectedMetrics": [
         {
           "name": "previewExportMeanAbsDelta",
@@ -60,9 +60,9 @@
           "threshold": 1
         }
       ],
-      "fixtureId": "validation.raw-open-edit-export.edge-ringing.v1",
-      "localRelativePath": "private-fixtures/detail/edge-ringing-v1.cr3",
-      "notes": "Private RAW workflow proof slot for opening a RAW, applying a representative edit graph, rendering preview, exporting, writing sidecar state, and reloading it. Public repo stores metadata only until private assets are available.",
+      "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
+      "localRelativePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+      "notes": "Private RAW workflow proof slot aligned to the available high-ISO Sony ARW evidence. Public repo stores metadata only until local runtime reports are generated.",
       "status": "pending_private_asset",
       "trackingIssue": 1376,
       "workflowSteps": [
