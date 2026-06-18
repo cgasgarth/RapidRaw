@@ -345,6 +345,23 @@ for (const expectedFamily of ['ai', 'computational_merge', 'film_look', 'negativ
     failures.push(`Route catalog missing ${expectedFamily}.`);
   }
 }
+for (const route of routeCatalogReplay.response.routes.filter((candidate) => candidate.family === 'ai')) {
+  if (!route.runtimeCheckScripts.includes('check:ai-app-server-routes')) {
+    failures.push(`${route.commandName}: AI route catalog entry must expose check:ai-app-server-routes.`);
+  }
+  if (route.toolNames.some((toolName) => toolName.startsWith('ai.mask.'))) {
+    for (const expectedCheck of ['check:ai-mask-capabilities', 'check:ai-people-masks']) {
+      if (!route.runtimeCheckScripts.includes(expectedCheck)) {
+        failures.push(`${route.commandName}: AI mask route catalog entry missing ${expectedCheck}.`);
+      }
+    }
+  }
+  if (route.commandName === 'ai.enhancement.dry_run_command' || route.commandName === 'ai.enhancement.apply_command') {
+    if (!route.runtimeCheckScripts.includes('check:ai-denoise-app-server-tool')) {
+      failures.push(`${route.commandName}: AI enhancement route catalog entry missing denoise tool proof check.`);
+    }
+  }
+}
 if (routeCatalogReplay.auditLog.length !== 1 || routeCatalogReplay.auditLog[0]?.mutates) {
   failures.push('Route catalog replay audit log must be read-only.');
 }

@@ -317,6 +317,23 @@ export const buildRawEngineAppServerLifecycleReplay = ({
 
 const uniqueSorted = (values: Iterable<string>): string[] => [...new Set(values)].sort((a, b) => a.localeCompare(b));
 
+const aiRuntimeCheckScriptsForRoute = (route: (typeof AI_APP_SERVER_TOOL_ROUTES)[number]): string[] => {
+  const checks = new Set<string>(['check:ai-app-server-routes']);
+
+  if (route.toolCapability?.endsWith('_mask')) {
+    checks.add('check:ai-mask-capabilities');
+    checks.add('check:ai-people-masks');
+    if (route.executionMode === 'apply_dry_run_plan') checks.add('check:ai-people-apply-plan');
+  }
+
+  if (route.toolCapability === 'denoise') {
+    checks.add('check:ai-denoise-app-server-tool');
+    checks.add('check:ai-denoise-runtime-apply');
+  }
+
+  return uniqueSorted(checks);
+};
+
 const buildRouteCatalogEntry = ({
   commandName,
   family,
@@ -414,6 +431,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
         inputSchemaNames: route.commandSchemaName === undefined ? ['AiToolRouteCommandV1'] : [route.commandSchemaName],
         modes: route.executionMode === undefined ? ['mapped_invoke'] : [route.executionMode],
         outputSchemaNames: route.outputSchemaName === undefined ? ['AiToolRouteResultV1'] : [route.outputSchemaName],
+        runtimeCheckScripts: aiRuntimeCheckScriptsForRoute(route),
         toolNames: route.appServerToolName === undefined ? [route.sourceOperation] : [route.appServerToolName],
       }),
     );
