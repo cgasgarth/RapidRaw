@@ -1,38 +1,41 @@
 import type { Adjustments } from './adjustments';
 
-export interface EditHistoryState {
-  adjustments: Adjustments;
-  history: Array<Adjustments>;
+export interface EditHistoryState<Entry = Adjustments> {
+  adjustments: Entry;
+  history: Array<Entry>;
   historyIndex: number;
 }
 
-export function pushEditHistoryEntry(
-  history: Array<Adjustments>,
+export function pushEditHistoryEntry<Entry>(
+  history: Array<Entry>,
   historyIndex: number,
-  newAdjustments: Adjustments,
+  newAdjustments: Entry,
   maxEntries = 50,
-): Pick<EditHistoryState, 'history' | 'historyIndex'> {
+): Pick<EditHistoryState<Entry>, 'history' | 'historyIndex'> {
   const nextHistory = history.slice(0, historyIndex + 1);
   nextHistory.push(newAdjustments);
   if (nextHistory.length > maxEntries) nextHistory.shift();
   return { history: nextHistory, historyIndex: nextHistory.length - 1 };
 }
 
-export function undoEditHistory(state: EditHistoryState): EditHistoryState {
+export function undoEditHistory<Entry>(state: EditHistoryState<Entry>): EditHistoryState<Entry> {
   if (state.historyIndex <= 0) return state;
   const historyIndex = state.historyIndex - 1;
   const adjustments = state.history[historyIndex];
   return adjustments ? { ...state, adjustments, historyIndex } : state;
 }
 
-export function redoEditHistory(state: EditHistoryState): EditHistoryState {
+export function redoEditHistory<Entry>(state: EditHistoryState<Entry>): EditHistoryState<Entry> {
   if (state.historyIndex >= state.history.length - 1) return state;
   const historyIndex = state.historyIndex + 1;
   const adjustments = state.history[historyIndex];
   return adjustments ? { ...state, adjustments, historyIndex } : state;
 }
 
-export function goToEditHistoryIndex(state: EditHistoryState, historyIndex: number): EditHistoryState {
+export function goToEditHistoryIndex<Entry>(
+  state: EditHistoryState<Entry>,
+  historyIndex: number,
+): EditHistoryState<Entry> {
   if (historyIndex < 0 || historyIndex >= state.history.length) return state;
   const adjustments = state.history[historyIndex];
   return adjustments ? { ...state, adjustments, historyIndex } : state;
