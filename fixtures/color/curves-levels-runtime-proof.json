@@ -1,0 +1,325 @@
+{
+  "curveCommand": {
+    "actor": {
+      "id": "agent_rawengine",
+      "kind": "agent"
+    },
+    "approval": {
+      "approvalClass": "edit_apply",
+      "reason": "Synthetic curves and levels runtime proof applies approved monotone luma curve after levels.",
+      "state": "approved"
+    },
+    "colorPipeline": {
+      "chromaticAdaptation": {
+        "method": "bradford_v1",
+        "sourceWhitePoint": {
+          "x": 0.3457,
+          "y": 0.3585
+        },
+        "status": "math_validated",
+        "targetWhitePoint": {
+          "x": 0.32168,
+          "y": 0.33767
+        },
+        "warnings": []
+      },
+      "inputDomain": "camera_linear_rgb",
+      "operationDomain": "acescg_linear_v1",
+      "renderTarget": {
+        "bitDepth": 8,
+        "embedIcc": true,
+        "intent": "relative_colorimetric",
+        "outputProfile": "display_p3",
+        "viewTransform": "rawengine_agx_v1"
+      },
+      "sceneToDisplayTransform": "rawengine_agx_v1",
+      "workingSpace": "acescg_linear_v1"
+    },
+    "commandId": "command.color-runtime.curve.v1",
+    "commandType": "toneColor.setToneCurve",
+    "correlationId": "corr.color-runtime.curves-levels.v1",
+    "dryRun": false,
+    "expectedGraphRevision": "graph-rev.color-runtime.curves-levels.v1",
+    "parameters": {
+      "channel": "luma",
+      "interpolation": "monotone_cubic",
+      "points": [
+        {
+          "input": 0,
+          "output": 0
+        },
+        {
+          "input": 0.18,
+          "output": 0.13
+        },
+        {
+          "input": 0.5,
+          "output": 0.52
+        },
+        {
+          "input": 0.82,
+          "output": 0.9
+        },
+        {
+          "input": 1,
+          "output": 1
+        }
+      ]
+    },
+    "schemaVersion": 1,
+    "target": {
+      "kind": "image",
+      "imagePath": "/synthetic/color-runtime-curves-levels.raw"
+    }
+  },
+  "expected": {
+    "afterHash": "sha256:badeddabe9033c9d47ca48ee9b0bc98e17e298e152ed57f9b7aa0c08ec3bb236",
+    "beforeHash": "sha256:b60fcebf5b81f10ac4f33e2c6dea4cacbe8f59ce564fda4a1c1d2415431de334",
+    "changedPixels": 5,
+    "curveChangedPixels": 5,
+    "levelsChangedPixels": 5,
+    "levelsHash": "sha256:2ae8a14838a6954e2832d225e1f7b39ad3a3329c30b6c1c10b576f75c5bc7073",
+    "outputPixels": [
+      {
+        "blue": 0.102611,
+        "green": 0.083284,
+        "red": 0.065792
+      },
+      {
+        "blue": 0.403076,
+        "green": 0.340765,
+        "red": 0.249667
+      },
+      {
+        "blue": 0.597621,
+        "green": 0.597621,
+        "red": 0.597621
+      },
+      {
+        "blue": 0.804692,
+        "green": 0.851771,
+        "red": 0.911504
+      },
+      {
+        "blue": 0.92377,
+        "green": 0.968068,
+        "red": 0.992354
+      }
+    ]
+  },
+  "invalidCommands": [
+    {
+      "case": "unordered curve points",
+      "input": {
+        "actor": {
+          "id": "agent_rawengine",
+          "kind": "agent"
+        },
+        "approval": {
+          "approvalClass": "edit_apply",
+          "reason": "Invalid unordered curve should be rejected.",
+          "state": "approved"
+        },
+        "colorPipeline": {
+          "chromaticAdaptation": {
+            "method": "bradford_v1",
+            "sourceWhitePoint": {
+              "x": 0.3457,
+              "y": 0.3585
+            },
+            "status": "math_validated",
+            "targetWhitePoint": {
+              "x": 0.32168,
+              "y": 0.33767
+            },
+            "warnings": []
+          },
+          "inputDomain": "camera_linear_rgb",
+          "operationDomain": "acescg_linear_v1",
+          "renderTarget": {
+            "bitDepth": 8,
+            "embedIcc": true,
+            "intent": "relative_colorimetric",
+            "outputProfile": "display_p3",
+            "viewTransform": "rawengine_agx_v1"
+          },
+          "sceneToDisplayTransform": "rawengine_agx_v1",
+          "workingSpace": "acescg_linear_v1"
+        },
+        "commandId": "command.color-runtime.invalid-curve.v1",
+        "commandType": "toneColor.setToneCurve",
+        "correlationId": "corr.color-runtime.invalid-curve.v1",
+        "dryRun": false,
+        "expectedGraphRevision": "graph-rev.color-runtime.invalid-curve.v1",
+        "parameters": {
+          "channel": "luma",
+          "interpolation": "monotone_cubic",
+          "points": [
+            {
+              "input": 0,
+              "output": 0
+            },
+            {
+              "input": 0.6,
+              "output": 0.7
+            },
+            {
+              "input": 0.4,
+              "output": 0.5
+            }
+          ]
+        },
+        "schemaVersion": 1,
+        "target": {
+          "kind": "image",
+          "imagePath": "/synthetic/color-runtime-invalid.raw"
+        }
+      }
+    },
+    {
+      "case": "inverted levels input range",
+      "input": {
+        "actor": {
+          "id": "agent_rawengine",
+          "kind": "agent"
+        },
+        "approval": {
+          "approvalClass": "edit_apply",
+          "reason": "Invalid levels range should be rejected.",
+          "state": "approved"
+        },
+        "colorPipeline": {
+          "chromaticAdaptation": {
+            "method": "bradford_v1",
+            "sourceWhitePoint": {
+              "x": 0.3457,
+              "y": 0.3585
+            },
+            "status": "math_validated",
+            "targetWhitePoint": {
+              "x": 0.32168,
+              "y": 0.33767
+            },
+            "warnings": []
+          },
+          "inputDomain": "camera_linear_rgb",
+          "operationDomain": "acescg_linear_v1",
+          "renderTarget": {
+            "bitDepth": 8,
+            "embedIcc": true,
+            "intent": "relative_colorimetric",
+            "outputProfile": "display_p3",
+            "viewTransform": "rawengine_agx_v1"
+          },
+          "sceneToDisplayTransform": "rawengine_agx_v1",
+          "workingSpace": "acescg_linear_v1"
+        },
+        "commandId": "command.color-runtime.invalid-levels.v1",
+        "commandType": "toneColor.setLevels",
+        "correlationId": "corr.color-runtime.invalid-levels.v1",
+        "dryRun": false,
+        "expectedGraphRevision": "graph-rev.color-runtime.invalid-levels.v1",
+        "parameters": {
+          "channel": "luma",
+          "enabled": true,
+          "gamma": 1,
+          "inputBlack": 0.8,
+          "inputWhite": 0.2,
+          "outputBlack": 0,
+          "outputWhite": 1
+        },
+        "schemaVersion": 1,
+        "target": {
+          "kind": "image",
+          "imagePath": "/synthetic/color-runtime-invalid.raw"
+        }
+      }
+    }
+  ],
+  "levelsCommand": {
+    "actor": {
+      "id": "agent_rawengine",
+      "kind": "agent"
+    },
+    "approval": {
+      "approvalClass": "edit_apply",
+      "reason": "Synthetic curves and levels runtime proof applies approved luma levels before curve rendering.",
+      "state": "approved"
+    },
+    "colorPipeline": {
+      "chromaticAdaptation": {
+        "method": "bradford_v1",
+        "sourceWhitePoint": {
+          "x": 0.3457,
+          "y": 0.3585
+        },
+        "status": "math_validated",
+        "targetWhitePoint": {
+          "x": 0.32168,
+          "y": 0.33767
+        },
+        "warnings": []
+      },
+      "inputDomain": "camera_linear_rgb",
+      "operationDomain": "acescg_linear_v1",
+      "renderTarget": {
+        "bitDepth": 8,
+        "embedIcc": true,
+        "intent": "relative_colorimetric",
+        "outputProfile": "display_p3",
+        "viewTransform": "rawengine_agx_v1"
+      },
+      "sceneToDisplayTransform": "rawengine_agx_v1",
+      "workingSpace": "acescg_linear_v1"
+    },
+    "commandId": "command.color-runtime.levels.v1",
+    "commandType": "toneColor.setLevels",
+    "correlationId": "corr.color-runtime.curves-levels.v1",
+    "dryRun": false,
+    "expectedGraphRevision": "graph-rev.color-runtime.curves-levels.v1",
+    "parameters": {
+      "channel": "luma",
+      "enabled": true,
+      "gamma": 1.18,
+      "inputBlack": 0.04,
+      "inputWhite": 0.94,
+      "outputBlack": 0.03,
+      "outputWhite": 0.97
+    },
+    "schemaVersion": 1,
+    "target": {
+      "kind": "image",
+      "imagePath": "/synthetic/color-runtime-curves-levels.raw"
+    }
+  },
+  "proofId": "color.runtime.curves-levels.synthetic.v1",
+  "runtimeStatus": "synthetic_runtime_apply_capable",
+  "schemaVersion": 1,
+  "sourcePixels": [
+    {
+      "blue": 0.12,
+      "green": 0.1,
+      "red": 0.08
+    },
+    {
+      "blue": 0.34,
+      "green": 0.3,
+      "red": 0.24
+    },
+    {
+      "blue": 0.5,
+      "green": 0.5,
+      "red": 0.5
+    },
+    {
+      "blue": 0.68,
+      "green": 0.72,
+      "red": 0.78
+    },
+    {
+      "blue": 0.82,
+      "green": 0.9,
+      "red": 0.95
+    }
+  ]
+}
