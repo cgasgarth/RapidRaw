@@ -49,7 +49,7 @@ export const negativeLabDustScratchReviewFrameSchema = z
 
 export const negativeLabDustScratchReviewReportSchema = z
   .object({
-    frames: z.array(negativeLabDustScratchReviewFrameSchema).min(1),
+    frames: z.array(negativeLabDustScratchReviewFrameSchema),
     reviewCount: z.number().int().nonnegative(),
     retouchCount: z.number().int().nonnegative(),
     schemaVersion: z.literal(NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION),
@@ -102,11 +102,11 @@ export const negativeLabQcProofReportSchema = z
   .object({
     contactSheetColumnCount: z.number().int().min(1).max(8),
     exportReady: z.boolean(),
-    frames: z.array(negativeLabQcProofRowSchema).min(1),
+    frames: z.array(negativeLabQcProofRowSchema),
     includedFrameCount: z.number().int().nonnegative(),
     reviewFrameCount: z.number().int().nonnegative(),
     schemaVersion: z.literal(NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION),
-    totalFrameCount: z.number().int().positive(),
+    totalFrameCount: z.number().int().nonnegative(),
   })
   .strict()
   .superRefine((report, context) => {
@@ -145,7 +145,7 @@ export const negativeLabWorkspaceProofSchema = z
     queuedCount: z.number().int().nonnegative(),
     reviewReport: negativeLabDustScratchReviewReportSchema,
     schemaVersion: z.literal(NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION),
-    targetCount: z.number().int().positive(),
+    targetCount: z.number().int().nonnegative(),
   })
   .strict()
   .superRefine((proof, context) => {
