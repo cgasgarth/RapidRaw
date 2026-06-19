@@ -16,6 +16,7 @@ export * from './hdrMergeWeightingRuntime.js';
 export * from './hdrMergeUiControls.js';
 export * from './hdrRuntimePlan.js';
 export * from './negativeLabAppServerRuntime.js';
+export * from './localAppServerBridge.js';
 export * from './panoramaAppServerRuntime.js';
 export * from './panoramaRuntimePlan.js';
 export * from './panoramaSyntheticStitch.js';
