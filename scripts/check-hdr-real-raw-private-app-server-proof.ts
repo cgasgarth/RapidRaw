@@ -19,6 +19,7 @@ import {
   parseComputationalMergePrivateRunReportCollection,
   type ComputationalMergePrivateRunReportCollection,
 } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
+import { privateRawReportMetric } from './lib/computational-private-report-fixtures.ts';
 
 const hdrRoutePair = getComputationalMergeAppServerRoutePairSummary('hdr');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
@@ -279,14 +280,7 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
   const asset = (path: string) => ({ hash, path, publicRepoAllowed: false });
   const source = (path: string) => ({ ...asset(path), localRelativePath: path });
   const artifact = (kind: string, path: string) => ({ ...asset(path), kind });
-  const metric = (name: string, threshold: number, value: number) => ({
-    name,
-    passed: true,
-    source: 'private_raw_report',
-    threshold,
-    value,
-  });
-  const previewExportParity = metric('previewExportMeanAbsDelta', 0.015, 0);
+  const previewExportParity = privateRawReportMetric('previewExportMeanAbsDelta', 0.015, 0);
 
   return parseComputationalMergePrivateRunReportCollection({
     $schema: 'https://rawengine.dev/schemas/computational-merge-private-run-reports-v1.json',
@@ -312,9 +306,9 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
         notes: 'sample private HDR preview/export smoke report',
         previewExportParity,
         qualityMetrics: [
-          metric('exposureBracketCoverageEv', 4, 4),
-          metric('highlightRecoveryRatio', 1.1, 1.1),
-          metric('ghostSuppressionScore', 0.85, 0.85),
+          privateRawReportMetric('exposureBracketCoverageEv', 4, 4),
+          privateRawReportMetric('highlightRecoveryRatio', 1.1, 1.1),
+          privateRawReportMetric('ghostSuppressionScore', 0.85, 0.85),
           previewExportParity,
         ],
         reportId: 'computational-merge-run.hdr-bracket-alignment.v1',

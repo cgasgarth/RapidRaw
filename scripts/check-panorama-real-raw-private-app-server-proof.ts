@@ -18,6 +18,7 @@ import {
   type ComputationalMergePrivateRunReportCollection,
 } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from './lib/computational-proof-budgets.ts';
+import { privateRawReportMetric } from './lib/computational-private-report-fixtures.ts';
 
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
@@ -291,14 +292,7 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
   const asset = (path: string) => ({ hash, path, publicRepoAllowed: false });
   const source = (path: string) => ({ ...asset(path), localRelativePath: path });
   const artifact = (kind: string, path: string) => ({ ...asset(path), kind });
-  const metric = (name: string, threshold: number, value: number) => ({
-    name,
-    passed: true,
-    source: 'private_raw_report',
-    threshold,
-    value,
-  });
-  const previewExportParity = metric('previewExportMeanAbsDelta', 0.015, 0);
+  const previewExportParity = privateRawReportMetric('previewExportMeanAbsDelta', 0.015, 0);
 
   return parseComputationalMergePrivateRunReportCollection({
     $schema: 'https://rawengine.dev/schemas/computational-merge-private-run-reports-v1.json',
@@ -322,10 +316,10 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
         implementationIssue: 1508,
         notes: 'sample private panorama preview/export report',
         qualityMetrics: [
-          metric('decodedSourceCount', 3, 3),
-          metric('decodedFinitePixelRatio', 1, 1),
-          metric('alignmentInlierRatio', 0.55, 0.65),
-          metric('panoramaStitchedSourceCount', 3, 3),
+          privateRawReportMetric('decodedSourceCount', 3, 3),
+          privateRawReportMetric('decodedFinitePixelRatio', 1, 1),
+          privateRawReportMetric('alignmentInlierRatio', 0.55, 0.65),
+          privateRawReportMetric('panoramaStitchedSourceCount', 3, 3),
           previewExportParity,
         ],
         reportId: 'computational-merge-run.panorama-overlap.v1',
