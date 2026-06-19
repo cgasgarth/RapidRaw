@@ -46,6 +46,6 @@
     </g>
   </g>
   <text x="36" y="1158" fill="#475569" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22">
-    frame_detection_low_confidence: undefined
+    frame_detection_low_confidence: Only partial border was visible on the top edge.
   </text>
 </svg>
