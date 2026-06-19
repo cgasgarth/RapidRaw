@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::{SecondsFormat, Utc};
-use image::ImageFormat;
+use image::{ImageFormat, ImageReader};
 use nalgebra::Point2;
 use serde::Serialize;
 
@@ -448,13 +448,15 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
         .save_with_format(&result_review_path, ImageFormat::Png)
         .map_err(|error| error.to_string())?;
 
-    let export_preview = render_result
-        .image
-        .resize_exact(
-            preview_image.width(),
-            preview_image.height(),
-            image::imageops::FilterType::Triangle,
-        )
+    let mut export_reader = ImageReader::open(&export_output_path)
+        .map_err(|error| error.to_string())?
+        .with_guessed_format()
+        .map_err(|error| error.to_string())?;
+    export_reader.no_limits();
+    let export_preview = export_reader
+        .decode()
+        .map_err(|error| error.to_string())?
+        .thumbnail(800, 800)
         .to_rgb8();
     export_preview
         .save_with_format(&export_review_path, ImageFormat::Png)
@@ -864,6 +866,11 @@ fn build_stitch_metrics(
     } else {
         stitched_source_count / source_count as f64
     };
+    let edge_continuity_score = if source_count == 0 {
+        0.0
+    } else {
+        source_coverage_ratio * (1.0 - excluded_source_count / source_count as f64)
+    };
     let expected_pair_count = source_count.saturating_sub(1) as f64;
 
     vec![
@@ -896,6 +903,12 @@ fn build_stitch_metrics(
             pairwise_match_count,
             expected_pair_count,
             pairwise_match_count >= expected_pair_count,
+        ),
+        metric(
+            "edgeContinuityScore",
+            edge_continuity_score,
+            0.85,
+            edge_continuity_score >= 0.85,
         ),
     ]
 }
