@@ -25,6 +25,19 @@ jobs:
       - name: Build frontend and enforce bundle budget
         run: bun run check:bundle
 
+      - name: Generate bundle analysis report
+        if: ${{ always() }}
+        run: bun run bundle:report
+
+      - name: Upload bundle analysis report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vite-bundle-report
+          path: artifacts/bundle-report/**
+          retention-days: 14
+          if-no-files-found: error
+
       - name: Check translation extraction
         run: bun run i18n:check
 
