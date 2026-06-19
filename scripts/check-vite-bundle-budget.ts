@@ -230,7 +230,12 @@ function visitStaticAsset(name: string, filesByName: Map<string, BundleFile>, vi
   if (visited.has(name)) return;
   const file = filesByName.get(name);
   if (file === undefined) {
-    failures.push(`Initial entry asset is missing from ${bundleBudget.assetsDir}: ${name}`);
+    failures.push({
+      assetName: name,
+      label: 'Initial entry aggregate',
+      metric: 'missing',
+      nextAction: `Run ${reproduceCommand} locally and confirm Vite emitted referenced assets under ${bundleBudget.assetsDir}.`,
+    });
     return;
   }
 

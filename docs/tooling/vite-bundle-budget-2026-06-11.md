@@ -57,6 +57,15 @@ This command builds the minified production frontend and then runs
 Release packaging uses the same frontend contract. See
 [Raw editor frontend release build contract](../release/raw-editor-frontend-release-build-contract-2026-06-19.md).
 
+It also writes a review artifact under `artifacts/bundle-report/`:
+
+- `vite-bundle-report.json` for follow-up diff and trend tooling;
+- `vite-bundle-report.md` for compact human review.
+
+CI uploads this report from the frontend build job. Module and package
+attribution is intentionally tracked separately by #2429 so this report remains
+stable emitted-asset evidence.
+
 ## Policy
 
 - The current monolithic JavaScript chunk is accepted as temporary debt.
