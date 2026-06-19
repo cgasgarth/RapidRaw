@@ -133,6 +133,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:import-presets', new Set(['bun scripts/check-import-preset-fixtures.ts'])],
   ['check:keyboard-shortcut-conflicts', new Set(['bun scripts/check-keyboard-shortcut-conflicts.ts'])],
   ['check:keyboard-shortcuts', new Set(['bun scripts/check-keyboard-shortcuts.ts'])],
+  ['check:layer-blend-runtime', new Set(['bun scripts/check-layer-blend-runtime.ts'])],
   ['check:layer-runtime-parent-status', new Set(['bun scripts/check-layer-runtime-parent-status.ts'])],
   ['check:linear-gradient-mask-command', new Set(['bun scripts/check-linear-gradient-mask-command.ts'])],
   ['check:session-import-reload-proof', new Set(['bun scripts/check-session-import-reload-proof.ts'])],
@@ -942,6 +943,16 @@ function runSelfTest() {
       {
         filename: 'package.json',
         patch: '@@ -80,6 +80,7 @@\n+    "check:mask-compose-command": "bun scripts/check-mask-compose-command.ts",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'layer blend runtime package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch: '@@ -80,6 +80,7 @@\n+    "check:layer-blend-runtime": "bun scripts/check-layer-blend-runtime.ts",',
       },
     ],
     SMOKE_MODES.NONE,
