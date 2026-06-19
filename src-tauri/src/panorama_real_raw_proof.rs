@@ -297,6 +297,7 @@ struct PairAlignmentReport {
     selected_edge: bool,
     source_index_a: usize,
     source_index_b: usize,
+    spatial_support_cell_count: usize,
     transform_3x3_row_major: [f64; 9],
 }
 
@@ -1049,6 +1050,7 @@ fn build_empty_alignment_report(
             selected_edge: true,
             source_index_a: source_index,
             source_index_b: source_index + 1,
+            spatial_support_cell_count: 0,
             transform_3x3_row_major: [f64::NAN; 9],
         })
         .collect();
@@ -1094,6 +1096,7 @@ fn build_pair_alignment_report(
             selected_edge,
             source_index_a,
             source_index_b,
+            spatial_support_cell_count: 0,
             transform_3x3_row_major: [f64::NAN; 9],
         };
     };
@@ -1134,6 +1137,7 @@ fn build_pair_alignment_report(
         selected_edge,
         source_index_a,
         source_index_b,
+        spatial_support_cell_count: pair.spatial_support_cell_count,
         transform_3x3_row_major: pair.homography3x3,
     }
 }
