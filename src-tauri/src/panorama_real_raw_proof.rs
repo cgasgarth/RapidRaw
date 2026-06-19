@@ -250,7 +250,10 @@ fn run_private_alignment_proof(private_root: &Path) -> Result<(), String> {
     let alignment_metrics = build_alignment_metrics(&alignment_report, loaded_sources.len());
     let metrics = [decode_metrics, alignment_metrics].concat();
     if !metrics.iter().all(|metric| metric.passed) {
-        return Err("panorama private RAW alignment metrics did not pass".to_string());
+        return Err(format!(
+            "panorama private RAW alignment metrics did not pass: {}",
+            failed_metric_summary(&metrics)
+        ));
     }
 
     write_decode_report(
@@ -333,7 +336,10 @@ fn run_private_stitch_artifact_proof(private_root: &Path) -> Result<(), String> 
     ]
     .concat();
     if !metrics.iter().all(|metric| metric.passed) {
-        return Err("panorama private RAW stitch artifact metrics did not pass".to_string());
+        return Err(format!(
+            "panorama private RAW stitch artifact metrics did not pass: {}",
+            failed_metric_summary(&metrics)
+        ));
     }
 
     write_decode_report(
@@ -468,7 +474,10 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
     ]
     .concat();
     if !metrics.iter().all(|metric| metric.passed) {
-        return Err("panorama private RAW preview/export metrics did not pass".to_string());
+        return Err(format!(
+            "panorama private RAW preview/export metrics did not pass: {}",
+            failed_metric_summary(&metrics)
+        ));
     }
 
     write_decode_report(
@@ -955,4 +964,21 @@ fn round_metric(value: f64) -> f64 {
         return value;
     }
     (value * 1_000_000.0).round() / 1_000_000.0
+}
+
+fn failed_metric_summary(metrics: &[QualityMetric]) -> String {
+    let failed_metrics = metrics
+        .iter()
+        .filter(|metric| !metric.passed)
+        .map(|metric| {
+            format!(
+                "{} value={} threshold={}",
+                metric.name, metric.value, metric.threshold
+            )
+        })
+        .collect::<Vec<_>>();
+    if failed_metrics.is_empty() {
+        return "no failed metrics recorded".to_string();
+    }
+    failed_metrics.join("; ")
 }
