@@ -84,6 +84,7 @@
     "check:layer-preview-export-parity": "bun scripts/check-layer-preview-export-parity.ts",
     "check:brush-mask": "bun scripts/check-brush-mask-parameters.ts",
     "check:gradient-mask": "bun scripts/check-gradient-mask-parameters.ts",
+    "check:linear-gradient-mask-command": "bun scripts/check-linear-gradient-mask-command.ts",
     "check:luminance-range-mask": "bun scripts/check-luminance-range-mask-parameters.ts",
     "check:color-range-mask": "bun scripts/check-color-range-mask-parameters.ts",
     "check:mask-compose": "bun scripts/check-mask-compose-operations.ts",
