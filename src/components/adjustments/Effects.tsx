@@ -1,10 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import { save as saveDialog } from '@tauri-apps/plugin-dialog';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import AdjustmentSlider from './AdjustmentSlider';
-import FilmLookBrowser from './FilmLookBrowser';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
 import {
@@ -16,6 +15,10 @@ import {
 import { type AppSettings, Invokes, type Preset } from '../ui/AppProperties';
 import LUTControl from '../ui/LUTControl';
 import UiText from '../ui/Text';
+
+const FilmLookBrowser = lazy(() =>
+  import('./FilmLookBrowser.js').then((module) => ({ default: module.FilmLookBrowser })),
+);
 
 interface EffectsPanelProps {
   adjustments: Adjustments;
@@ -174,11 +177,13 @@ export default function EffectsPanel({
       {!isForMask && (
         <div className="space-y-4">
           <div className="p-2 bg-bg-tertiary rounded-md">
-            <FilmLookBrowser
-              onApplyLook={handleFilmLookApply}
-              onSaveLook={handleFilmLookSave}
-              onShareLook={handleFilmLookShare}
-            />
+            <Suspense fallback={null}>
+              <FilmLookBrowser
+                onApplyLook={handleFilmLookApply}
+                onSaveLook={handleFilmLookSave}
+                onShareLook={handleFilmLookShare}
+              />
+            </Suspense>
             {filmLookPresetStatus !== null && (
               <UiText
                 aria-live="polite"
