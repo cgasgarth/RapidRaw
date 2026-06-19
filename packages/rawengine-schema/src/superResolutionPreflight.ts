@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 import {
+  computationalMergePreflightWarningCodes,
+  uniqueComputationalMergePreflightWarningCodes,
+} from './computationalMergeWarningCodes.js';
+import {
   RAW_ENGINE_SCHEMA_VERSION,
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
@@ -76,7 +80,7 @@ export const createSuperResolutionPlanOnlyDryRunResultV1 = (
 
   if (command.parameters.detailPolicy === 'aggressive_preview_only') {
     warnings.push('Aggressive detail is preview-only and must not be applied.');
-    warningCodes.push('geometry_estimate_low_confidence');
+    warningCodes.push(computationalMergePreflightWarningCodes.geometryEstimateLowConfidence);
   }
 
   const sourceCount = command.parameters.sources.length;
@@ -91,11 +95,11 @@ export const createSuperResolutionPlanOnlyDryRunResultV1 = (
 
   if (memoryBudgetRatio > 0.75) {
     warnings.push('Estimated super-resolution dry-run memory is near the configured budget.');
-    warningCodes.push('high_memory_estimate');
+    warningCodes.push(computationalMergePreflightWarningCodes.highMemoryEstimate);
   }
   if (memoryBudgetRatio > 1) {
     blockedReasons.push('memory_budget_exceeded');
-    warningCodes.push('memory_budget_exceeded');
+    warningCodes.push(computationalMergePreflightWarningCodes.memoryBudgetExceeded);
   }
 
   const preflightStatus =
@@ -144,7 +148,7 @@ export const createSuperResolutionPlanOnlyDryRunResultV1 = (
         memoryComponents,
         status: preflightStatus,
         tileCount: 1,
-        warningCodes: uniqueWarningCodes(warningCodes),
+        warningCodes: uniqueComputationalMergePreflightWarningCodes(warningCodes),
       },
       qualityMetrics: {
         alignmentConfidence: preflightStatus === 'blocked_plan_only' ? 0 : 0.88,
@@ -194,7 +198,3 @@ const estimateSuperResolutionMemoryComponents = (
     totalEstimatedPeakBytes,
   };
 };
-
-const uniqueWarningCodes = (
-  warningCodes: Array<ComputationalMergePreflightWarningCodeV1>,
-): Array<ComputationalMergePreflightWarningCodeV1> => [...new Set(warningCodes)];

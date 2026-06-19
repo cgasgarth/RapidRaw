@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 import {
+  computationalMergePreflightWarningCodes,
+  uniqueComputationalMergePreflightWarningCodes,
+} from './computationalMergeWarningCodes.js';
+import {
   computationalMergeCommandEnvelopeV1Schema,
   computationalMergeDryRunResultV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
@@ -88,12 +92,12 @@ export const createFocusStackPlanOnlyDryRunResultV1 = (
 
   if (command.parameters.alignmentMode === 'none') {
     warnings.push('Focus-stack alignment is disabled; apply should require tripod-controlled source review.');
-    warningCodes.push('geometry_estimate_low_confidence');
+    warningCodes.push(computationalMergePreflightWarningCodes.geometryEstimateLowConfidence);
   }
 
   if (command.parameters.blendMethod === 'depth_map') {
     warnings.push('Depth-map blending is schema-planned and remains preview-gated until fixture validation exists.');
-    warningCodes.push('tile_runtime_deferred');
+    warningCodes.push(computationalMergePreflightWarningCodes.tileRuntimeDeferred);
   }
 
   const sourceCount = command.parameters.sources.length;
@@ -107,13 +111,13 @@ export const createFocusStackPlanOnlyDryRunResultV1 = (
   const memoryBudgetRatio = memoryComponents.totalEstimatedPeakBytes / memoryBudgetBytes;
 
   if (memoryBudgetRatio > 0.75) {
-    warningCodes.push('high_memory_estimate');
+    warningCodes.push(computationalMergePreflightWarningCodes.highMemoryEstimate);
     warnings.push('Estimated focus-stack dry-run memory is near the configured budget.');
   }
 
   if (memoryBudgetRatio > 1) {
     blockedReasons.push('memory_budget_exceeded');
-    warningCodes.push('memory_budget_exceeded');
+    warningCodes.push(computationalMergePreflightWarningCodes.memoryBudgetExceeded);
   }
 
   const preflightStatus =
@@ -163,7 +167,7 @@ export const createFocusStackPlanOnlyDryRunResultV1 = (
         memoryComponents,
         status: preflightStatus,
         tileCount: 1,
-        warningCodes: uniqueWarningCodes(warningCodes),
+        warningCodes: uniqueComputationalMergePreflightWarningCodes(warningCodes),
       },
       qualityMetrics: {
         focusCoverageRatio: preflightStatus === 'accepted' ? 1 : 0,
@@ -211,7 +215,3 @@ const estimateFocusStackMemoryComponents = (
       sourceDecodeBytes,
   };
 };
-
-const uniqueWarningCodes = (
-  warningCodes: ComputationalMergePreflightWarningCodeV1[],
-): ComputationalMergePreflightWarningCodeV1[] => Array.from(new Set(warningCodes));
