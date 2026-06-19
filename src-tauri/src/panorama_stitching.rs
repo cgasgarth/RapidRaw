@@ -85,6 +85,12 @@ pub struct PanoramaPairwiseMatchMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct PanoramaSelectedMatchEdgeMetadata {
+    pub source_index: usize,
+    pub target_index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct PanoramaRenderMetadata {
     pub connected_source_indices: Vec<usize>,
     pub estimated_peak_memory_bytes: u64,
@@ -92,6 +98,7 @@ pub struct PanoramaRenderMetadata {
     pub output_height: u32,
     pub output_width: u32,
     pub pairwise_matches: Vec<PanoramaPairwiseMatchMetadata>,
+    pub selected_match_edges: Vec<PanoramaSelectedMatchEdgeMetadata>,
     pub sources: Vec<PanoramaSourceMetadata>,
     pub warnings: Vec<String>,
 }
@@ -689,7 +696,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         "Determining stitching order...",
     );
     println!("Determining stitching order...");
-    let (ordered_indices, global_homographies) =
+    let (ordered_indices, global_homographies, selected_match_edges) =
         build_stitching_order(&image_data, &pairwise_matches);
     for source in &mut source_metadata {
         source.global_transform_3x3 = global_homographies
@@ -771,6 +778,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         output_height,
         output_width,
         pairwise_matches: pairwise_match_metadata,
+        selected_match_edges,
         sources: source_metadata,
         warnings,
     };
@@ -943,6 +951,10 @@ fn upsert_panorama_artifact_metadata(
                 "matchQuality": "accepted",
                 "meanReprojectionErrorPx": pair.mean_reprojection_error_px,
                 "toSourceIndex": pair.target_index,
+            })).collect::<Vec<_>>(),
+            "selectedMatchEdges": metadata.selected_match_edges.iter().map(|edge| json!({
+                "fromSourceIndex": edge.source_index,
+                "toSourceIndex": edge.target_index,
             })).collect::<Vec<_>>(),
             "ransacSeed": 12345,
             "ransacInlierThresholdPx": processing::RANSAC_INLIER_THRESHOLD,
@@ -1382,9 +1394,13 @@ impl Dsu {
 fn build_stitching_order(
     images: &[ImageInfo],
     matches: &HashMap<(usize, usize), MatchInfo>,
-) -> (Vec<usize>, HashMap<usize, Matrix3<f64>>) {
+) -> (
+    Vec<usize>,
+    HashMap<usize, Matrix3<f64>>,
+    Vec<PanoramaSelectedMatchEdgeMetadata>,
+) {
     if images.is_empty() {
-        return (vec![], HashMap::new());
+        return (vec![], HashMap::new(), vec![]);
     }
     let n = images.len();
     if n < 2 {
@@ -1392,7 +1408,7 @@ fn build_stitching_order(
         if n == 1 {
             homographies.insert(0, Matrix3::identity());
         }
-        return ((0..n).collect(), homographies);
+        return ((0..n).collect(), homographies, vec![]);
     }
 
     let mut edges = Vec::new();
@@ -1402,6 +1418,7 @@ fn build_stitching_order(
     edges.sort_by_key(|&(inliers, _, _)| std::cmp::Reverse(inliers));
 
     let mut mst_adj: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut selected_match_edges = Vec::new();
     let mut dsu = Dsu::new(n);
     let mut num_edges = 0;
 
@@ -1410,6 +1427,10 @@ fn build_stitching_order(
             dsu.union(i, j);
             mst_adj.entry(i).or_default().push(j);
             mst_adj.entry(j).or_default().push(i);
+            selected_match_edges.push(PanoramaSelectedMatchEdgeMetadata {
+                source_index: i.min(j),
+                target_index: i.max(j),
+            });
             num_edges += 1;
             if num_edges == n - 1 {
                 break;
@@ -1456,7 +1477,8 @@ fn build_stitching_order(
         }
     }
 
-    (ordered_indices, global_homographies)
+    selected_match_edges.sort_by_key(|edge| (edge.source_index, edge.target_index));
+    (ordered_indices, global_homographies, selected_match_edges)
 }
 
 #[cfg(test)]
@@ -1791,6 +1813,10 @@ mod tests {
                 inliers: 32,
                 match_count: 40,
                 mean_reprojection_error_px: 1.25,
+                source_index: 0,
+                target_index: 1,
+            }],
+            selected_match_edges: vec![PanoramaSelectedMatchEdgeMetadata {
                 source_index: 0,
                 target_index: 1,
             }],
