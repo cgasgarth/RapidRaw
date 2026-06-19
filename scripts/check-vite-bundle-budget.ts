@@ -33,12 +33,16 @@ type BundleBudgetFailure = {
   nextAction: string;
 };
 
+type BundleBudgetWarning = BundleBudgetFailure;
+
 const AssetBudgetSchema = z
   .object({
     extension: z.string().regex(/^\.[a-z0-9]+$/u),
     label: z.string().min(1),
     maxBytes: z.number().int().positive(),
     maxGzipBytes: z.number().int().positive(),
+    warnBytes: z.number().int().positive(),
+    warnGzipBytes: z.number().int().positive(),
   })
   .strict();
 
@@ -94,6 +98,7 @@ const files: BundleFile[] = await Promise.all(
 );
 
 const failures: BundleBudgetFailure[] = [];
+const warnings: BundleBudgetWarning[] = [];
 
 for (const budget of bundleBudget.budgets) {
   const matchingFiles = files.filter((file) => file.extension === budget.extension);
@@ -115,6 +120,17 @@ for (const budget of bundleBudget.budgets) {
   ].join(' | ');
 
   console.log(line);
+
+  warnings.push(
+    ...getThresholdWarnings({
+      actualGzipBytes: largest.gzipSize,
+      actualRawBytes: largest.size,
+      assetName: largest.name,
+      budget,
+      nextAction:
+        'Treat this as early signal: split non-startup UI, remove unused code, or document why temporary headroom is still intentional before the hard fail tier is reached.',
+    }),
+  );
 
   if (largest.size > budget.maxBytes) {
     failures.push({
@@ -154,7 +170,22 @@ console.log(
     `gzip ${formatBytes(initialEntryReport.gzipBytes)} / ${formatBytes(initialEntryBudget.maxGzipBytes)}`,
   ].join(' | '),
 );
+warnings.push(
+  ...getThresholdWarnings({
+    actualGzipBytes: initialEntryReport.gzipBytes,
+    actualRawBytes: initialEntryReport.rawBytes,
+    budget: initialEntryBudget,
+    files: initialEntryFiles.map((file) => file.name),
+    nextAction:
+      'Treat this as early signal: move non-startup code behind dynamic imports or document a temporary exception before the hard fail tier is reached.',
+  }),
+);
 failures.push(...getInitialEntryFailures(initialEntryReport, initialEntryBudget));
+
+for (const warning of warnings.filter((warning) => !isCoveredByFailure(warning, failures))) {
+  console.warn(`Bundle budget warning: ${formatBudgetFailure(warning)}`);
+  if (process.env.GITHUB_ACTIONS === 'true') console.warn(formatGitHubWarningAnnotation(warning));
+}
 
 if (failures.length > 0) {
   console.error(`\nBundle budget exceeded for ${budgetMode}:`);
@@ -224,6 +255,57 @@ function getInitialEntryFailures(
   }
 
   return budgetFailures;
+}
+
+function getThresholdWarnings({
+  actualGzipBytes,
+  actualRawBytes,
+  assetName,
+  budget,
+  files,
+  nextAction,
+}: {
+  actualGzipBytes: number;
+  actualRawBytes: number;
+  assetName?: string;
+  budget: { label: string; maxBytes: number; maxGzipBytes: number; warnBytes: number; warnGzipBytes: number };
+  files?: string[];
+  nextAction: string;
+}): BundleBudgetWarning[] {
+  const budgetWarnings: BundleBudgetWarning[] = [];
+  if (actualRawBytes > budget.warnBytes && actualRawBytes <= budget.maxBytes) {
+    budgetWarnings.push({
+      actualBytes: actualRawBytes,
+      assetName,
+      budgetBytes: budget.warnBytes,
+      files,
+      label: budget.label,
+      metric: 'raw',
+      nextAction,
+    });
+  }
+  if (actualGzipBytes > budget.warnGzipBytes && actualGzipBytes <= budget.maxGzipBytes) {
+    budgetWarnings.push({
+      actualBytes: actualGzipBytes,
+      assetName,
+      budgetBytes: budget.warnGzipBytes,
+      files,
+      label: budget.label,
+      metric: 'gzip',
+      nextAction,
+    });
+  }
+  return budgetWarnings;
+}
+
+function isCoveredByFailure(warning: BundleBudgetWarning, failuresToCheck: BundleBudgetFailure[]): boolean {
+  return failuresToCheck.some(
+    (failure) =>
+      failure.label === warning.label &&
+      failure.metric === warning.metric &&
+      failure.assetName === warning.assetName &&
+      failure.files?.join('\n') === warning.files?.join('\n'),
+  );
 }
 
 function visitStaticAsset(name: string, filesByName: Map<string, BundleFile>, visited: Set<string>): void {
@@ -302,6 +384,12 @@ function formatGitHubAnnotation(failure: BundleBudgetFailure): string {
   return `::error title=${title}::${message}`;
 }
 
+function formatGitHubWarningAnnotation(warning: BundleBudgetWarning): string {
+  const title = escapeGitHubAnnotationProperty(`Bundle budget warning: ${warning.label}`);
+  const message = escapeGitHubAnnotationMessage(formatBudgetFailure(warning));
+  return `::warning title=${title}::${message}`;
+}
+
 function escapeGitHubAnnotationMessage(value: string): string {
   return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
 }
@@ -343,6 +431,25 @@ function runSelfTest(): void {
   }
   if (!annotation.includes(reproduceCommand) || !annotation.includes(bundleRunbook)) {
     throw new Error('self-test: annotation is missing reproduction guidance.');
+  }
+
+  const thresholdWarnings = getThresholdWarnings({
+    actualGzipBytes: 900,
+    actualRawBytes: 900,
+    assetName: 'entry.js',
+    budget: {
+      label: 'Largest JavaScript asset',
+      maxBytes: 1_000,
+      maxGzipBytes: 1_000,
+      warnBytes: 800,
+      warnGzipBytes: 800,
+    },
+    nextAction: 'reduce size before hard fail.',
+  });
+  if (thresholdWarnings.length !== 2) throw new Error('self-test: warning tier was not detected.');
+  const warningAnnotation = formatGitHubWarningAnnotation(thresholdWarnings[0] ?? failSelfTest('warning missing.'));
+  if (!warningAnnotation.startsWith('::warning title=Bundle budget warning%3A Largest JavaScript asset::')) {
+    throw new Error('self-test: GitHub warning annotation format is invalid.');
   }
 
   console.log('vite bundle budget self-test ok');

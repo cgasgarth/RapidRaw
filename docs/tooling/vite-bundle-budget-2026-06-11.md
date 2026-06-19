@@ -28,19 +28,22 @@ owner, reason, and expiration condition.
 
 ## Current Budget
 
-| Asset class              | Raw budget      | Gzip budget   |
-| ------------------------ | --------------- | ------------- |
-| Largest JavaScript asset | 3,072,000 bytes | 900,000 bytes |
-| Largest CSS asset        | 153,600 bytes   | 24,576 bytes  |
+| Asset class              | Raw warning     | Gzip warning  | Raw failure     | Gzip failure  |
+| ------------------------ | --------------- | ------------- | --------------- | ------------- |
+| Largest JavaScript asset | 2,764,800 bytes | 810,000 bytes | 3,072,000 bytes | 900,000 bytes |
+| Largest CSS asset        | 138,240 bytes   | 22,118 bytes  | 153,600 bytes   | 24,576 bytes  |
 
-| Aggregate               | Raw budget      | Gzip budget   |
-| ----------------------- | --------------- | ------------- |
-| Initial entry aggregate | 3,225,600 bytes | 924,576 bytes |
+| Aggregate               | Raw warning     | Gzip warning  | Raw failure     | Gzip failure  |
+| ----------------------- | --------------- | ------------- | --------------- | ------------- |
+| Initial entry aggregate | 2,903,040 bytes | 832,118 bytes | 3,225,600 bytes | 924,576 bytes |
 
 Vite warning limit: 3,000 KiB.
 
-Headroom policy: Temporary monolithic UI headroom; lower after measured chunk
-splitting.
+Headroom policy: Fail budgets keep about 10% emergency headroom above warning
+thresholds.
+
+Warning tier policy: Warnings are non-failing early signals; failures block PRs
+until code is split, removed, or a temporary exception is documented.
 
 ## Validation
 
@@ -94,7 +97,9 @@ explicitly named diagnostic artifacts, not in required production build output.
 ## Policy
 
 - The current monolithic JavaScript chunk is accepted as temporary debt.
-- Growth beyond the raw or gzip budget fails validation.
+- Growth beyond a warning threshold emits a non-failing warning and should be
+  addressed before the hard fail tier is reached.
+- Growth beyond a raw or gzip failure budget fails validation.
 - Initial-entry aggregate budgets include assets directly referenced by
   `dist/index.html` plus recursively static-imported JS/CSS. Dynamic imports are
   excluded from the initial aggregate and remain subject to the per-file caps.
@@ -108,8 +113,9 @@ explicitly named diagnostic artifacts, not in required production build output.
 - `vite.config.js` sets `chunkSizeWarningLimit` to the same raw budget range so
   Vite warnings and the explicit budget gate stay aligned.
 - Normal UI work should not fight sub-kilobyte budget margins. When the baseline
-  is too close to a cap, recalibrate the cap with explicit headroom, then create
-  follow-up issues for bundle reports, chunking, or dependency audits.
+  is too close to a cap, recalibrate the warning and failure tiers with explicit
+  headroom, then create follow-up issues for bundle reports, chunking, or
+  dependency audits.
 - Mainline budget reductions should happen after measured bundle improvements,
   not by forcing feature PRs to remove useful controls or labels.
 

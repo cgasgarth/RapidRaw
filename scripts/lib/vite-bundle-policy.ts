@@ -3,6 +3,8 @@ export type ViteBundleBudgetAssetClass = {
   label: string;
   maxBytes: number;
   maxGzipBytes: number;
+  warnBytes: number;
+  warnGzipBytes: number;
 };
 
 export type ViteBundleBudgetPolicy = {
@@ -12,6 +14,7 @@ export type ViteBundleBudgetPolicy = {
   chunkWarningAssetExtension: ViteBundleBudgetAssetClass['extension'];
   headroomPolicy: string;
   initialEntryAggregate: Omit<ViteBundleBudgetAssetClass, 'extension'>;
+  warningTierPolicy: string;
   units: 'bytes';
 };
 
@@ -24,22 +27,30 @@ export const VITE_BUNDLE_BUDGET_POLICY = {
       label: 'Largest JavaScript asset',
       maxBytes: 3_072_000,
       maxGzipBytes: 900_000,
+      warnBytes: 2_764_800,
+      warnGzipBytes: 810_000,
     },
     {
       extension: '.css',
       label: 'Largest CSS asset',
       maxBytes: 153_600,
       maxGzipBytes: 24_576,
+      warnBytes: 138_240,
+      warnGzipBytes: 22_118,
     },
   ],
   chunkWarningAssetExtension: '.js',
-  headroomPolicy: 'Temporary monolithic UI headroom; lower after measured chunk splitting.',
+  headroomPolicy: 'Fail budgets keep about 10% emergency headroom above warning thresholds.',
   initialEntryAggregate: {
     label: 'Initial entry aggregate',
     maxBytes: 3_225_600,
     maxGzipBytes: 924_576,
+    warnBytes: 2_903_040,
+    warnGzipBytes: 832_118,
   },
   units: 'bytes',
+  warningTierPolicy:
+    'Warnings are non-failing early signals; failures block PRs until code is split, removed, or a temporary exception is documented.',
 } satisfies ViteBundleBudgetPolicy;
 
 export const getViteChunkSizeWarningLimitKb = (): number => {

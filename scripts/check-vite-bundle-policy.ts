@@ -27,6 +27,8 @@ if (!viteConfig.includes('chunkSizeWarningLimit: getViteChunkSizeWarningLimitKb(
 for (const budget of VITE_BUNDLE_BUDGET_POLICY.budgets) {
   const expectedCells = [
     budget.label,
+    formatBundlePolicyBytes(budget.warnBytes),
+    formatBundlePolicyBytes(budget.warnGzipBytes),
     formatBundlePolicyBytes(budget.maxBytes),
     formatBundlePolicyBytes(budget.maxGzipBytes),
   ];
@@ -42,6 +44,8 @@ const hasInitialEntryRow = docs
   .some((line) =>
     [
       initialEntryBudget.label,
+      formatBundlePolicyBytes(initialEntryBudget.warnBytes),
+      formatBundlePolicyBytes(initialEntryBudget.warnGzipBytes),
       formatBundlePolicyBytes(initialEntryBudget.maxBytes),
       formatBundlePolicyBytes(initialEntryBudget.maxGzipBytes),
     ].every((expectedCell) => line.includes(expectedCell)),
@@ -54,6 +58,10 @@ if (!docs.includes(`Vite warning limit: ${getViteChunkSizeWarningLimitKb().toLoc
 
 if (!normalizedDocs.includes(VITE_BUNDLE_BUDGET_POLICY.headroomPolicy)) {
   failures.push('docs bundle policy is missing the shared headroom policy text.');
+}
+
+if (!normalizedDocs.includes(VITE_BUNDLE_BUDGET_POLICY.warningTierPolicy)) {
+  failures.push('docs bundle policy is missing the shared warning tier policy text.');
 }
 
 if (failures.length > 0) {
