@@ -444,7 +444,11 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
 
     let export_preview = render_result
         .image
-        .thumbnail(preview_image.width(), preview_image.height())
+        .resize_exact(
+            preview_image.width(),
+            preview_image.height(),
+            image::imageops::FilterType::Triangle,
+        )
         .to_rgb8();
     export_preview
         .save_with_format(&export_review_path, ImageFormat::Png)
