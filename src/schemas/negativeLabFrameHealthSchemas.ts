@@ -53,7 +53,7 @@ export const negativeLabFrameHealthEntrySchema = z
 export const negativeLabFrameHealthReportSchema = z
   .object({
     activeFrameId: z.string().trim().min(1).nullable(),
-    frames: z.array(negativeLabFrameHealthEntrySchema).min(1),
+    frames: z.array(negativeLabFrameHealthEntrySchema),
     includedCount: z.number().int().nonnegative(),
     queuedCount: z.number().int().nonnegative(),
     schemaVersion: z.literal(NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION),
@@ -83,7 +83,7 @@ export const negativeLabFrameHealthReportSchema = z
 
 export const negativeLabBatchDryRunSummarySchema = z
   .object({
-    affectedFrameIds: z.array(z.string().trim().min(1)).min(1),
+    affectedFrameIds: z.array(z.string().trim().min(1)),
     blocked: z.boolean(),
     frameHealthReport: negativeLabFrameHealthReportSchema,
     plannedApplyCount: z.number().int().nonnegative(),

@@ -28,7 +28,7 @@ const MODE_PRIORITY = new Map([
   [SMOKE_MODES.RELEASE, 2],
 ]);
 
-const RELEASE_PREFIXES = ['src-tauri/'];
+const RELEASE_PREFIXES = ['.cargo/', 'src-tauri/'];
 
 const ALWAYS_REQUIRE_FILES = new Set([
   'bun.lock',
@@ -548,6 +548,7 @@ function runSelfTest() {
   );
   assertDecision('empty file list fails closed decision', [], SMOKE_DECISIONS.FAIL_CLOSED);
   assertClassification('tauri changes require release smoke', ['src-tauri/src/main.rs'], SMOKE_MODES.RELEASE);
+  assertClassification('cargo config changes require release smoke', ['.cargo/config.toml'], SMOKE_MODES.RELEASE);
   assertClassification('package changes require release smoke', ['package.json'], SMOKE_MODES.RELEASE);
   assertClassification(
     'package-lock file lists fail closed without removal status',
