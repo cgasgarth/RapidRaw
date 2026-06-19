@@ -133,6 +133,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:keyboard-shortcut-conflicts', new Set(['bun scripts/check-keyboard-shortcut-conflicts.ts'])],
   ['check:keyboard-shortcuts', new Set(['bun scripts/check-keyboard-shortcuts.ts'])],
   ['check:layer-runtime-parent-status', new Set(['bun scripts/check-layer-runtime-parent-status.ts'])],
+  ['check:linear-gradient-mask-command', new Set(['bun scripts/check-linear-gradient-mask-command.ts'])],
   ['check:session-import-reload-proof', new Set(['bun scripts/check-session-import-reload-proof.ts'])],
   ['check:library-session-ui', new Set(['bun scripts/check-library-session-ui.ts'])],
   ['check:library-workflow-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario library-workflow'])],
@@ -274,6 +275,7 @@ function isSafeFixturePath(path) {
     (path.startsWith('fixtures/export/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/film-simulation/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/layers/') && path.endsWith('.json')) ||
+    (path.startsWith('fixtures/masks/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/negative-lab/') && path.endsWith('.json')) ||
     (path.startsWith('fixtures/negative-lab/public/') && hasExtension(path, new Set(['.jpg', '.jpeg', '.png']))) ||
     (path.startsWith('fixtures/panorama/') && path.endsWith('.json')) ||
@@ -870,6 +872,11 @@ function runSelfTest() {
     SMOKE_MODES.NONE,
   );
   assertClassification(
+    'mask fixture outputs can skip smoke',
+    ['fixtures/masks/linear-gradient-mask-command.json'],
+    SMOKE_MODES.NONE,
+  );
+  assertClassification(
     'sidecar roundtrip fixture outputs can skip smoke',
     ['fixtures/sidecar-roundtrip/IMG_0001.CR3.rrdata'],
     SMOKE_MODES.NONE,
@@ -885,6 +892,17 @@ function runSelfTest() {
   assertClassification(
     'validation scripts can skip smoke',
     ['scripts/check-eslint-escape-hatches.ts'],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'linear gradient mask package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch:
+          '@@ -80,6 +80,7 @@\n+    "check:linear-gradient-mask-command": "bun scripts/check-linear-gradient-mask-command.ts",',
+      },
+    ],
     SMOKE_MODES.NONE,
   );
   assertClassification(
