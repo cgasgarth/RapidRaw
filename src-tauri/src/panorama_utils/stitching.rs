@@ -8,6 +8,10 @@ use tauri::{AppHandle, Emitter, Runtime};
 
 const FEATHER_WIDTH: f64 = 100.0;
 const MIN_NORMALIZED_PROJECTIVE_DENOMINATOR: f64 = 1e-8;
+const OVERLAP_GAIN_MAX: f32 = 2.0;
+const OVERLAP_GAIN_MIN: f32 = 0.5;
+const OVERLAP_GAIN_MIN_SAMPLES: usize = 4;
+const OVERLAP_GAIN_SAMPLE_GRID: u32 = 64;
 
 #[derive(Debug)]
 struct ProjectedImageBounds {
@@ -15,6 +19,14 @@ struct ProjectedImageBounds {
     max_y: f64,
     min_x: f64,
     min_y: f64,
+}
+
+struct OverlapGainGeometry<'a> {
+    h_add_inv: &'a Matrix3<f64>,
+    offset_x: f64,
+    offset_y: f64,
+    out_height: u32,
+    out_width: u32,
 }
 
 struct SeamContext<'a> {
@@ -126,6 +138,19 @@ pub fn progressive_seam_stitcher<R: Runtime>(
             )
         })?;
         let img_to_add = &img_to_add_info.image;
+        let overlap_gain = estimate_overlap_luminance_gain(
+            &panorama,
+            &panorama_mask,
+            img_to_add,
+            &OverlapGainGeometry {
+                h_add_inv: &h_add_inv,
+                offset_x,
+                offset_y,
+                out_height,
+                out_width,
+            },
+        );
+        println!("    - Overlap luminance gain: {:.3}", overlap_gain);
 
         let ctx = SeamContext {
             pano: &panorama,
@@ -225,7 +250,10 @@ pub fn progressive_seam_stitcher<R: Runtime>(
                                         [x as usize * 3..x as usize * 3 + 3]
                                         .try_into()
                                         .unwrap());
-                                    let color_to_add = get_interpolated_pixel(img_to_add, sx, sy);
+                                    let color_to_add = apply_luminance_gain(
+                                        get_interpolated_pixel(img_to_add, sx, sy),
+                                        overlap_gain,
+                                    );
 
                                     let alpha = if new_image_is_dominant_side {
                                         (dist_to_seam + dynamic_feather_width / 2.0)
@@ -256,15 +284,20 @@ pub fn progressive_seam_stitcher<R: Runtime>(
                                         (x as i32) < seam_x_val
                                     };
                                     if new_image_owns_pixel {
-                                        let color_to_add =
-                                            get_interpolated_pixel(img_to_add, sx, sy);
+                                        let color_to_add = apply_luminance_gain(
+                                            get_interpolated_pixel(img_to_add, sx, sy),
+                                            overlap_gain,
+                                        );
                                         let start = x as usize * 3;
                                         row_slice[start..start + 3]
                                             .copy_from_slice(&color_to_add.0);
                                     }
                                 }
                             } else if is_on_add {
-                                let color_to_add = get_interpolated_pixel(img_to_add, sx, sy);
+                                let color_to_add = apply_luminance_gain(
+                                    get_interpolated_pixel(img_to_add, sx, sy),
+                                    overlap_gain,
+                                );
                                 let start = x as usize * 3;
                                 row_slice[start..start + 3].copy_from_slice(&color_to_add.0);
                                 mask_row[x as usize] = 255;
@@ -317,7 +350,10 @@ pub fn progressive_seam_stitcher<R: Runtime>(
                                         [x as usize * 3..x as usize * 3 + 3]
                                         .try_into()
                                         .unwrap());
-                                    let color_to_add = get_interpolated_pixel(img_to_add, sx, sy);
+                                    let color_to_add = apply_luminance_gain(
+                                        get_interpolated_pixel(img_to_add, sx, sy),
+                                        overlap_gain,
+                                    );
 
                                     let alpha = if new_image_is_dominant_side {
                                         (dist_to_seam + dynamic_feather_width / 2.0)
@@ -348,15 +384,20 @@ pub fn progressive_seam_stitcher<R: Runtime>(
                                         (y as i32) < seam_y_val
                                     };
                                     if new_image_owns_pixel {
-                                        let color_to_add =
-                                            get_interpolated_pixel(img_to_add, sx, sy);
+                                        let color_to_add = apply_luminance_gain(
+                                            get_interpolated_pixel(img_to_add, sx, sy),
+                                            overlap_gain,
+                                        );
                                         let start = x as usize * 3;
                                         row_slice[start..start + 3]
                                             .copy_from_slice(&color_to_add.0);
                                     }
                                 }
                             } else if is_on_add {
-                                let color_to_add = get_interpolated_pixel(img_to_add, sx, sy);
+                                let color_to_add = apply_luminance_gain(
+                                    get_interpolated_pixel(img_to_add, sx, sy),
+                                    overlap_gain,
+                                );
                                 let start = x as usize * 3;
                                 row_slice[start..start + 3].copy_from_slice(&color_to_add.0);
                                 mask_row[x as usize] = 255;
@@ -451,6 +492,76 @@ fn checked_output_dimension(span: f64, dimension_name: &str) -> Result<u32, Stri
         return Err(format!("non_finite_projected_bounds: {}", dimension_name));
     }
     Ok(span.ceil() as u32)
+}
+
+fn estimate_overlap_luminance_gain(
+    pano: &Rgb32FImage,
+    pano_mask: &GrayImage,
+    img_to_add: &Rgb32FImage,
+    geometry: &OverlapGainGeometry<'_>,
+) -> f32 {
+    let step_x = (geometry.out_width / OVERLAP_GAIN_SAMPLE_GRID).max(1);
+    let step_y = (geometry.out_height / OVERLAP_GAIN_SAMPLE_GRID).max(1);
+    let mut log_gain_samples = Vec::new();
+
+    for y in (0..geometry.out_height).step_by(step_y as usize) {
+        for x in (0..geometry.out_width).step_by(step_x as usize) {
+            if pano_mask.get_pixel(x, y)[0] == 0 {
+                continue;
+            }
+            let target_p = Point3::new(
+                x as f64 - geometry.offset_x,
+                y as f64 - geometry.offset_y,
+                1.0,
+            );
+            let source_p = geometry.h_add_inv * target_p;
+            if source_p.z.abs() < 1e-8 {
+                continue;
+            }
+            let sx = source_p.x / source_p.z;
+            let sy = source_p.y / source_p.z;
+            if sx < 0.0
+                || sx >= img_to_add.width() as f64
+                || sy < 0.0
+                || sy >= img_to_add.height() as f64
+            {
+                continue;
+            }
+
+            let pano_luma = pixel_luminance(*pano.get_pixel(x, y));
+            let add_luma = pixel_luminance(get_interpolated_pixel(img_to_add, sx, sy));
+            if !is_valid_gain_sample_luminance(pano_luma)
+                || !is_valid_gain_sample_luminance(add_luma)
+            {
+                continue;
+            }
+            log_gain_samples.push((pano_luma / add_luma).ln());
+        }
+    }
+
+    if log_gain_samples.len() < OVERLAP_GAIN_MIN_SAMPLES {
+        return 1.0;
+    }
+    log_gain_samples.sort_by(|left, right| left.total_cmp(right));
+    log_gain_samples[log_gain_samples.len() / 2]
+        .exp()
+        .clamp(OVERLAP_GAIN_MIN, OVERLAP_GAIN_MAX)
+}
+
+fn is_valid_gain_sample_luminance(luminance: f32) -> bool {
+    luminance.is_finite() && (1e-4..0.995).contains(&luminance)
+}
+
+fn pixel_luminance(pixel: Rgb<f32>) -> f32 {
+    0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 * pixel[2]
+}
+
+fn apply_luminance_gain(pixel: Rgb<f32>, gain: f32) -> Rgb<f32> {
+    Rgb([
+        (pixel[0] * gain).max(0.0),
+        (pixel[1] * gain).max(0.0),
+        (pixel[2] * gain).max(0.0),
+    ])
 }
 
 fn find_adaptive_seam(ctx: &SeamContext) -> Option<SeamInfo> {
@@ -772,5 +883,53 @@ mod tests {
         let error = project_image_sample_bounds(&homography, 100, 100).expect_err("pole rejected");
 
         assert_eq!(error, "projective_pole_crossing");
+    }
+
+    #[test]
+    fn overlap_gain_recovers_known_one_stop_difference() {
+        let pano = Rgb32FImage::from_pixel(8, 8, Rgb([0.6, 0.6, 0.6]));
+        let pano_mask = GrayImage::from_pixel(8, 8, image::Luma([255]));
+        let add = Rgb32FImage::from_pixel(8, 8, Rgb([0.3, 0.3, 0.3]));
+
+        let gain = estimate_overlap_luminance_gain(
+            &pano,
+            &pano_mask,
+            &add,
+            &OverlapGainGeometry {
+                h_add_inv: &Matrix3::identity(),
+                offset_x: 0.0,
+                offset_y: 0.0,
+                out_height: 8,
+                out_width: 8,
+            },
+        );
+
+        assert!((gain - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn overlap_gain_ignores_clipped_and_black_samples() {
+        let mut pano = Rgb32FImage::from_pixel(8, 8, Rgb([0.0, 0.0, 0.0]));
+        let mut add = Rgb32FImage::from_pixel(8, 8, Rgb([0.0, 0.0, 0.0]));
+        for x in 0..8 {
+            pano.put_pixel(x, 0, Rgb([1.0, 1.0, 1.0]));
+            add.put_pixel(x, 0, Rgb([1.0, 1.0, 1.0]));
+        }
+        let pano_mask = GrayImage::from_pixel(8, 8, image::Luma([255]));
+
+        let gain = estimate_overlap_luminance_gain(
+            &pano,
+            &pano_mask,
+            &add,
+            &OverlapGainGeometry {
+                h_add_inv: &Matrix3::identity(),
+                offset_x: 0.0,
+                offset_y: 0.0,
+                out_height: 8,
+                out_width: 8,
+            },
+        );
+
+        assert_eq!(gain, 1.0);
     }
 }
