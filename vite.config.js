@@ -29,7 +29,7 @@ export default defineConfig(async () => ({
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
   build: {
     cssMinify: 'esbuild',
-    minify: 'esbuild',
+    minify: 'oxc',
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
     chunkSizeWarningLimit: getViteChunkSizeWarningLimitKb(),
   },

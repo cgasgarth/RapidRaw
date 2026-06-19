@@ -61,6 +61,7 @@ async function loadBuildConfig(debug: boolean): Promise<ViteBuildContract> {
 
 function assertMinificationEnabled(label: string, build: ViteBuildContract): void {
   if (build.minify === false) failures.push(`${label}: build.minify must not be false.`);
+  if (build.minify !== 'oxc') failures.push(`${label}: build.minify expected oxc, got ${String(build.minify)}.`);
   if (build.cssMinify === false) failures.push(`${label}: build.cssMinify must not be false.`);
 }
 
