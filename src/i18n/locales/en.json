@@ -473,8 +473,12 @@
         },
         "noAppliedEdits": "No edits applied",
         "review": {
+          "applyUnavailable": "Apply unavailable",
           "dryRun": "Dry-run",
+          "noReplayApply": "No app-server replay evidence. No edits applied.",
           "parameterDiffs": "Parameter diffs",
+          "pendingApply": "Review decision required; runtime replay is unavailable.",
+          "rejectedApply": "Rejected plans cannot be applied.",
           "title": "Dry-run review",
           "uiOnly": "Approval controls are visible for review only; apply stays disabled until runtime replay proof exists."
         },

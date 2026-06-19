@@ -473,8 +473,12 @@
         },
         "noAppliedEdits": "",
         "review": {
+          "applyUnavailable": "",
           "dryRun": "",
+          "noReplayApply": "",
           "parameterDiffs": "",
+          "pendingApply": "",
+          "rejectedApply": "",
           "title": "",
           "uiOnly": ""
         },

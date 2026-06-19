@@ -68,15 +68,15 @@ const fixture = {
     actions: [
       {
         id: 'approve-dry-run',
-        label: 'Approve dry-run',
+        label: 'Approve plan',
         reason: 'Requires runtime replay before apply can be enabled.',
-        state: 'disabled',
+        state: 'available',
       },
       {
         id: 'reject-plan',
         label: 'Reject plan',
         reason: 'Rejected state is visible and audit-only in this fixture.',
-        state: 'rejected',
+        state: 'available',
       },
       {
         id: 'apply-unavailable',

@@ -341,8 +341,9 @@ export const agentArtifactReviewProofDatasetSchema = z.object({
 export const agentDryRunReviewProofDatasetSchema = z.object({
   actionCount: z.literal('3'),
   affectedTargetCount: z.literal('3'),
+  applyAvailability: z.literal('unavailable'),
   approvalStates: z.string().superRefine((states, context) => {
-    for (const expectedState of ['disabled', 'rejected', 'unavailable']) {
+    for (const expectedState of ['available', 'unavailable']) {
       if (!states.split(',').includes(expectedState)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -351,7 +352,9 @@ export const agentDryRunReviewProofDatasetSchema = z.object({
       }
     }
   }),
+  localReviewDecision: z.enum(['approved', 'pending', 'rejected']),
   parameterDiffCount: z.literal('3'),
+  policyAvailability: z.literal('reviewable'),
   warningCount: z.literal('2'),
 });
 export const negativeLabWorkspaceProofDatasetSchema = z.object({
