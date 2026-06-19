@@ -54,6 +54,9 @@ This command builds the minified production frontend and then runs
 `scripts/check-vite-bundle-budget.ts` against `dist/index.html` and
 `dist/assets`.
 
+Release packaging uses the same frontend contract. See
+[Raw editor frontend release build contract](../release/raw-editor-frontend-release-build-contract-2026-06-19.md).
+
 ## Policy
 
 - The current monolithic JavaScript chunk is accepted as temporary debt.

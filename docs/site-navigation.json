@@ -710,6 +710,10 @@
           "path": "docs/release/macos-package-notarization-dry-run-checklist-2026-06-19.md"
         },
         {
+          "title": "Raw editor frontend release build contract",
+          "path": "docs/release/raw-editor-frontend-release-build-contract-2026-06-19.md"
+        },
+        {
           "title": "Release notes automation",
           "path": "docs/release/release-notes-automation-2026-06-13.md"
         },
