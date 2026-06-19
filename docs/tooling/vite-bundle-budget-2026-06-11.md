@@ -33,6 +33,10 @@ owner, reason, and expiration condition.
 | Largest JavaScript asset | 3,072,000 bytes | 900,000 bytes |
 | Largest CSS asset        | 153,600 bytes   | 24,576 bytes  |
 
+| Aggregate               | Raw budget      | Gzip budget   |
+| ----------------------- | --------------- | ------------- |
+| Initial entry aggregate | 3,225,600 bytes | 924,576 bytes |
+
 Vite warning limit: 3,000 KiB.
 
 Headroom policy: Temporary monolithic UI headroom; lower after measured chunk
@@ -47,12 +51,16 @@ bun run check:bundle
 ```
 
 This command builds the minified production frontend and then runs
-`scripts/check-vite-bundle-budget.ts` against `dist/assets`.
+`scripts/check-vite-bundle-budget.ts` against `dist/index.html` and
+`dist/assets`.
 
 ## Policy
 
 - The current monolithic JavaScript chunk is accepted as temporary debt.
 - Growth beyond the raw or gzip budget fails validation.
+- Initial-entry aggregate budgets include assets directly referenced by
+  `dist/index.html` plus recursively static-imported JS/CSS. Dynamic imports are
+  excluded from the initial aggregate and remain subject to the per-file caps.
 - HDR, panorama, color style, advanced color setup UI, Negative Lab frame queue,
   frame health UI, frame health schema wiring, visible frame warning chips, base
   sample readouts, the stock-family registry panel, and layer grouping controls

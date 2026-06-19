@@ -11,6 +11,7 @@ export type ViteBundleBudgetPolicy = {
   budgets: ViteBundleBudgetAssetClass[];
   chunkWarningAssetExtension: ViteBundleBudgetAssetClass['extension'];
   headroomPolicy: string;
+  initialEntryAggregate: Omit<ViteBundleBudgetAssetClass, 'extension'>;
   units: 'bytes';
 };
 
@@ -33,6 +34,11 @@ export const VITE_BUNDLE_BUDGET_POLICY = {
   ],
   chunkWarningAssetExtension: '.js',
   headroomPolicy: 'Temporary monolithic UI headroom; lower after measured chunk splitting.',
+  initialEntryAggregate: {
+    label: 'Initial entry aggregate',
+    maxBytes: 3_225_600,
+    maxGzipBytes: 924_576,
+  },
   units: 'bytes',
 } satisfies ViteBundleBudgetPolicy;
 
