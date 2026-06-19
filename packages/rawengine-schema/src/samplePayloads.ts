@@ -156,6 +156,16 @@ import {
   withSampleSchemaVersion,
 } from './samplePayloadFactories.js';
 
+export const rapidRawHomographySeamV0Capabilities = {
+  adaptiveSeamFeather: true,
+  autoCrop: true,
+  bundleAdjustment: false,
+  cylindricalProjection: false,
+  exposureNormalization: false,
+  planarHomography: true,
+  tiledRender: false,
+} satisfies PanoramaBackendCapabilityReportV1['capabilities'];
+
 export const sampleQueryEnvelopeV1: QueryEnvelopeV1 = queryEnvelopeV1Schema.parse(
   withSampleSchemaVersion({
     actor: sampleAgentActor(),
@@ -3039,15 +3049,7 @@ export const samplePanoramaArtifactV1: PanoramaArtifactV1 = panoramaArtifactV1Sc
   },
   excludedSources: [],
   engine: {
-    capabilities: {
-      adaptiveSeamFeather: true,
-      autoCrop: true,
-      bundleAdjustment: false,
-      cylindricalProjection: false,
-      exposureNormalization: false,
-      planarHomography: true,
-      tiledRender: false,
-    },
+    capabilities: rapidRawHomographySeamV0Capabilities,
     engineId: 'rapidraw_homography_seam_v0',
     qualityTier: 'legacy_local_preview',
   },
@@ -3171,15 +3173,7 @@ export const samplePanoramaBackendCapabilityReportV1: PanoramaBackendCapabilityR
   panoramaBackendCapabilityReportV1Schema.parse({
     backendId: 'rapidraw_homography_seam_v0',
     backendVersion: 'legacy-current',
-    capabilities: {
-      adaptiveSeamFeather: true,
-      autoCrop: true,
-      bundleAdjustment: false,
-      cylindricalProjection: false,
-      exposureNormalization: false,
-      planarHomography: true,
-      tiledRender: false,
-    },
+    capabilities: rapidRawHomographySeamV0Capabilities,
     ciPolicy: {
       defaultRequiredCiAllowed: true,
       requiredCiBlockers: [],
