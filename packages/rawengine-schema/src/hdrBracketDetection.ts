@@ -12,20 +12,35 @@ import {
 export const hdrBracketDetectionSourceInputV1Schema = z
   .object({
     aperture: z.number().positive().optional(),
+    bitDepth: z.number().int().positive().optional(),
     cameraMake: z.string().trim().min(1).optional(),
     cameraModel: z.string().trim().min(1).optional(),
     captureTimestamp: z.iso.datetime({ offset: true }).optional(),
+    cfaPattern: z.string().trim().min(1).optional(),
     contentHash: z.string().trim().min(1).optional(),
+    cropFactor: z.number().positive().optional(),
     declaredExposureEv: z.number().optional(),
     exposureCompensationEv: z.number().optional(),
     exposureTimeSeconds: z.number().positive().optional(),
+    focalLengthMm: z.number().positive().optional(),
     graphRevision: z.string().trim().min(1).optional(),
     height: z.number().int().positive(),
     imageId: z.string().trim().min(1).optional(),
     imagePath: z.string().trim().min(1),
     iso: z.number().positive().optional(),
     lensModel: z.string().trim().min(1).optional(),
+    lensProfileId: z.string().trim().min(1).optional(),
+    rawActiveArea: z
+      .object({
+        height: z.number().int().positive(),
+        width: z.number().int().positive(),
+        x: z.number().int().nonnegative(),
+        y: z.number().int().nonnegative(),
+      })
+      .strict()
+      .optional(),
     rawBlackLevelKnown: z.boolean(),
+    rawOrientation: z.enum(['normal', 'rotated_90', 'rotated_180', 'rotated_270']).optional(),
     rawWhiteLevelKnown: z.boolean(),
     resolvedBracketRole: z.enum(['over_exposed', 'reference', 'under_exposed', 'unknown']).optional(),
     resolvedExposureEv: z.number().optional(),
@@ -105,6 +120,10 @@ export const detectHdrBracketV1 = (requestValue: unknown): HdrBracketDetectionRe
     blocks.push('dimension_mismatch');
   }
 
+  if (hasRawGeometryMismatch(request.sources)) {
+    blocks.push('raw_geometry_mismatch');
+  }
+
   if (hasCameraOrLensMismatch(request.sources)) {
     warnings.push('camera_or_lens_mismatch');
   }
@@ -117,7 +136,10 @@ export const detectHdrBracketV1 = (requestValue: unknown): HdrBracketDetectionRe
     warnings.push('white_balance_mismatch');
   }
 
-  if (request.sources.some((source) => !source.rawBlackLevelKnown || !source.rawWhiteLevelKnown)) {
+  if (
+    request.sources.some((source) => !source.rawBlackLevelKnown || !source.rawWhiteLevelKnown) ||
+    hasUnverifiedRawGeometry(request.sources)
+  ) {
     warnings.push('dimensions_match_but_raw_geometry_unverified');
   }
 
@@ -141,20 +163,27 @@ export const detectHdrBracketV1 = (requestValue: unknown): HdrBracketDetectionRe
     referenceSourceIndex,
     sourceMetadata: resolvedExposures.map(({ source, value }) => ({
       aperture: source.aperture,
+      bitDepth: source.bitDepth,
       cameraMake: source.cameraMake,
       cameraModel: source.cameraModel,
       captureTimestamp: source.captureTimestamp,
+      cfaPattern: source.cfaPattern,
       contentHash: source.contentHash,
+      cropFactor: source.cropFactor,
       declaredExposureEv: source.declaredExposureEv,
       exposureCompensationEv: source.exposureCompensationEv,
       exposureTimeSeconds: source.exposureTimeSeconds,
+      focalLengthMm: source.focalLengthMm,
       graphRevision: source.graphRevision,
       height: source.height,
       imageId: source.imageId,
       imagePath: source.imagePath,
       iso: source.iso,
       lensModel: source.lensModel,
+      lensProfileId: source.lensProfileId,
+      rawActiveArea: source.rawActiveArea,
       rawBlackLevelKnown: source.rawBlackLevelKnown,
+      rawOrientation: source.rawOrientation,
       rawWhiteLevelKnown: source.rawWhiteLevelKnown,
       resolvedBracketRole: getBracketRole(value),
       resolvedExposureEv: value,
@@ -285,9 +314,34 @@ const hasCameraOrLensMismatch = (sources: HdrBracketDetectionSourceInputV1[]): b
     (source) =>
       isKnownMismatch(source.cameraMake, firstSource.cameraMake) ||
       isKnownMismatch(source.cameraModel, firstSource.cameraModel) ||
-      isKnownMismatch(source.lensModel, firstSource.lensModel),
+      isKnownMismatch(source.lensModel, firstSource.lensModel) ||
+      isKnownMismatch(source.lensProfileId, firstSource.lensProfileId) ||
+      isKnownNumberMismatch(source.focalLengthMm, firstSource.focalLengthMm) ||
+      isKnownNumberMismatch(source.cropFactor, firstSource.cropFactor),
   );
 };
+
+const hasRawGeometryMismatch = (sources: HdrBracketDetectionSourceInputV1[]): boolean => {
+  const [firstSource] = sources;
+  if (firstSource === undefined) return false;
+
+  return sources.some(
+    (source) =>
+      isKnownMismatch(source.rawOrientation, firstSource.rawOrientation) ||
+      isKnownMismatch(source.cfaPattern, firstSource.cfaPattern) ||
+      isKnownNumberMismatch(source.bitDepth, firstSource.bitDepth) ||
+      isKnownActiveAreaMismatch(source.rawActiveArea, firstSource.rawActiveArea),
+  );
+};
+
+const hasUnverifiedRawGeometry = (sources: HdrBracketDetectionSourceInputV1[]): boolean =>
+  sources.some(
+    (source) =>
+      source.rawOrientation === undefined ||
+      source.rawActiveArea === undefined ||
+      source.cfaPattern === undefined ||
+      source.bitDepth === undefined,
+  );
 
 const hasCaptureTimeGap = (sources: HdrBracketDetectionSourceInputV1[], gapWarnSeconds: number): boolean => {
   const timestamps = sources
@@ -357,6 +411,17 @@ const getDetectionConfidence = (warnings: HdrMergeWarningCodeV1[], blocks: HdrMe
 
 const isKnownMismatch = (left: string | undefined, right: string | undefined): boolean =>
   left !== undefined && right !== undefined && left !== right;
+
+const isKnownNumberMismatch = (left: number | undefined, right: number | undefined): boolean =>
+  left !== undefined && right !== undefined && left !== right;
+
+const isKnownActiveAreaMismatch = (
+  left: HdrBracketDetectionSourceInputV1['rawActiveArea'],
+  right: HdrBracketDetectionSourceInputV1['rawActiveArea'],
+): boolean =>
+  left !== undefined &&
+  right !== undefined &&
+  (left.x !== right.x || left.y !== right.y || left.width !== right.width || left.height !== right.height);
 
 const roundEv = (value: number): number => Math.round(value * 1000) / 1000;
 

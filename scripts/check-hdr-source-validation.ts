@@ -22,15 +22,22 @@ const baseSource = (sourceIndex: number, declaredExposureEv: number, overrides: 
   ({
     cameraMake: 'Nikon',
     cameraModel: 'Z8',
+    bitDepth: 14,
     captureTimestamp: `2026-06-19T12:00:0${sourceIndex}.000Z`,
+    cfaPattern: 'rggb',
     contentHash: `sha256:hdr-source-${sourceIndex}`,
+    cropFactor: 1,
     declaredExposureEv,
+    focalLengthMm: 35,
     graphRevision: `graph_hdr_source_${sourceIndex}`,
     height: 4024,
     imageId: `img_hdr_${sourceIndex}`,
     imagePath: `/photos/hdr/HDR_${sourceIndex}.NEF`,
     lensModel: 'NIKKOR Z 24-70mm f/2.8 S',
+    lensProfileId: 'nikon-z-24-70-2-8-s',
+    rawActiveArea: { height: 4024, width: 6048, x: 0, y: 0 },
     rawBlackLevelKnown: true,
+    rawOrientation: 'normal',
     rawWhiteLevelKnown: true,
     sourceIndex,
     whiteBalanceComparable: true,
@@ -139,10 +146,20 @@ expectBlocks(
   [baseSource(0, -2), baseSource(1, 0, { width: 6040 }), baseSource(2, 2)],
   ['dimension_mismatch'],
 );
+expectBlocks(
+  'canonical raw geometry mismatch',
+  [baseSource(0, -2), baseSource(1, 0, { cfaPattern: 'bggr' }), baseSource(2, 2)],
+  ['raw_geometry_mismatch'],
+);
 
 expectWarnings(
   'camera lens mismatch',
   [baseSource(0, -2), baseSource(1, 0, { lensModel: 'Other Lens' }), baseSource(2, 2)],
+  ['camera_or_lens_mismatch'],
+);
+expectWarnings(
+  'lens profile mismatch',
+  [baseSource(0, -2), baseSource(1, 0, { lensProfileId: 'other-lens-profile' }), baseSource(2, 2)],
   ['camera_or_lens_mismatch'],
 );
 expectWarnings(
@@ -162,6 +179,11 @@ expectWarnings(
 expectWarnings(
   'raw geometry unverified',
   [baseSource(0, -2), baseSource(1, 0, { rawBlackLevelKnown: false }), baseSource(2, 2)],
+  ['dimensions_match_but_raw_geometry_unverified'],
+);
+expectWarnings(
+  'canonical raw geometry missing',
+  [baseSource(0, -2), baseSource(1, 0, { rawActiveArea: undefined }), baseSource(2, 2)],
   ['dimensions_match_but_raw_geometry_unverified'],
 );
 expectWarnings('order inferred', [baseSource(0, 0), baseSource(1, -2), baseSource(2, 2)], ['bracket_order_inferred']);
