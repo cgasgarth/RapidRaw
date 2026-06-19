@@ -667,6 +667,12 @@ const expectInvalid = (name: string, schema: z.ZodType, value: unknown) => {
   }
 };
 
+const expectEqual = (name: string, left: unknown, right: unknown) => {
+  if (JSON.stringify(left) !== JSON.stringify(right)) {
+    throw new Error(`Expected ${name}.`);
+  }
+};
+
 const expectThrows = (name: string, action: () => unknown) => {
   try {
     action();
@@ -1477,6 +1483,12 @@ expectInvalid('panorama artifact with duplicate source indexes', panoramaArtifac
     sourceIndex: 0,
   })),
 });
+
+expectEqual(
+  'panorama sample artifact and backend capability report share capabilities',
+  samplePanoramaArtifactV1.engine.capabilities,
+  samplePanoramaBackendCapabilityReportV1.capabilities,
+);
 
 expectInvalid('panorama backend with leaking backend types', panoramaBackendCapabilityReportV1Schema, {
   ...samplePanoramaBackendCapabilityReportV1,
