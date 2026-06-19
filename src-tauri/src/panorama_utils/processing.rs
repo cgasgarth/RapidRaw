@@ -5,17 +5,58 @@ use imageproc::filter::gaussian_blur_f32;
 use nalgebra::{Matrix3, Point2, SymmetricEigen};
 use rand::prelude::*;
 use rayon::prelude::*;
+use serde::Serialize;
 
 pub const MAX_PROCESSING_DIMENSION: u32 = 1600;
 const FAST_THRESHOLD: u8 = 15;
 const NON_MAXIMA_SUPPRESSION_RADIUS: f32 = 15.0;
 const BRIEF_PATCH_SIZE: u32 = 32;
 const MATCH_RATIO_THRESHOLD: f32 = 0.8;
+pub const MAX_BRIEF_MATCH_HAMMING_DISTANCE: u32 = 96;
 pub const RANSAC_ITERATIONS: usize = 2500;
 pub const RANSAC_INLIER_THRESHOLD: f64 = 5.0;
 pub const MIN_INLIERS_FOR_CONNECTION: usize = 15;
 const LOW_DETAIL_WINDOW_RADIUS: u32 = 16;
 const LOW_DETAIL_VARIANCE_THRESHOLD: f64 = 60.0;
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BriefMatchDiagnostics {
+    pub accepted_match_count: usize,
+    pub best_distance: Option<BriefDistanceStats>,
+    pub distance_rejected_count: usize,
+    pub max_accepted_hamming_distance: u32,
+    pub no_second_best_count: usize,
+    pub query_feature_count: usize,
+    pub ratio: Option<BriefRatioStats>,
+    pub ratio_rejected_count: usize,
+    pub reciprocal_rejected_count: usize,
+    pub second_best_distance: Option<BriefDistanceStats>,
+    pub train_feature_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BriefDistanceStats {
+    pub max: u32,
+    pub median: u32,
+    pub min: u32,
+    pub p95: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BriefRatioStats {
+    pub max: f32,
+    pub median: f32,
+    pub min: f32,
+    pub p95: f32,
+}
+
+pub struct FeatureMatchResult {
+    pub diagnostics: BriefMatchDiagnostics,
+    pub matches: Vec<Match>,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct TransferErrorMetrics {
@@ -141,32 +182,71 @@ fn hamming_distance(d1: &Descriptor, d2: &Descriptor) -> u32 {
         .sum()
 }
 
-pub fn match_features(features1: &[Feature], features2: &[Feature]) -> Vec<Match> {
+#[cfg(test)]
+fn match_features(features1: &[Feature], features2: &[Feature]) -> Vec<Match> {
+    match_features_with_diagnostics(features1, features2).matches
+}
+
+pub fn match_features_with_diagnostics(
+    features1: &[Feature],
+    features2: &[Feature],
+) -> FeatureMatchResult {
     if features1.is_empty() || features2.is_empty() {
-        return Vec::new();
+        return FeatureMatchResult {
+            diagnostics: empty_brief_match_diagnostics(features1.len(), features2.len()),
+            matches: Vec::new(),
+        };
     }
     let forward_matches = best_ratio_matches(features1, features2);
     let reverse_matches = best_ratio_matches(features2, features1);
 
-    forward_matches
-        .into_iter()
+    let mut reciprocal_rejected_count = 0;
+    let matches: Vec<Match> = forward_matches
+        .selected
+        .iter()
+        .copied()
         .enumerate()
         .filter_map(|(index1, index2)| {
             let index2 = index2?;
-            if reverse_matches.get(index2).copied().flatten() == Some(index1) {
+            if reverse_matches.selected.get(index2).copied().flatten() == Some(index1) {
                 Some(Match { index1, index2 })
             } else {
+                reciprocal_rejected_count += 1;
                 None
             }
         })
-        .collect()
+        .collect();
+
+    FeatureMatchResult {
+        diagnostics: build_brief_match_diagnostics(
+            features1.len(),
+            features2.len(),
+            &forward_matches,
+            reciprocal_rejected_count,
+            matches.len(),
+        ),
+        matches,
+    }
 }
 
-fn best_ratio_matches(
-    query_features: &[Feature],
-    train_features: &[Feature],
-) -> Vec<Option<usize>> {
-    query_features
+struct BestRatioMatches {
+    distance_rejected_count: usize,
+    evaluated: Vec<Option<BriefBestMatch>>,
+    no_second_best_count: usize,
+    ratio_rejected_count: usize,
+    selected: Vec<Option<usize>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BriefBestMatch {
+    best_distance: u32,
+    index: usize,
+    ratio: f32,
+    second_best_distance: u32,
+}
+
+fn best_ratio_matches(query_features: &[Feature], train_features: &[Feature]) -> BestRatioMatches {
+    let scan_results = query_features
         .par_iter()
         .enumerate()
         .map(|(i, f1)| {
@@ -183,23 +263,152 @@ fn best_ratio_matches(
                     second_best_dist = dist;
                 }
             }
-            if second_best_dist > 0
-                && (best_dist as f32 / second_best_dist as f32) < MATCH_RATIO_THRESHOLD
-            {
-                (i, Some(best_idx))
+            if second_best_dist == u32::MAX || second_best_dist == 0 {
+                (i, None, None, MatchRejectReason::NoSecondBest)
             } else {
-                (i, None)
+                let best = BriefBestMatch {
+                    best_distance: best_dist,
+                    index: best_idx,
+                    ratio: best_dist as f32 / second_best_dist as f32,
+                    second_best_distance: second_best_dist,
+                };
+                if best.ratio >= MATCH_RATIO_THRESHOLD {
+                    (i, Some(best), None, MatchRejectReason::Ratio)
+                } else if best.best_distance > MAX_BRIEF_MATCH_HAMMING_DISTANCE {
+                    (i, Some(best), None, MatchRejectReason::Distance)
+                } else {
+                    (i, Some(best), Some(best.index), MatchRejectReason::None)
+                }
             }
         })
-        .collect::<Vec<_>>()
-        .into_iter()
-        .fold(
-            vec![None; query_features.len()],
-            |mut matches, (index, best)| {
-                matches[index] = best;
-                matches
-            },
-        )
+        .collect::<Vec<_>>();
+
+    let mut evaluated = vec![None; query_features.len()];
+    let mut selected = vec![None; query_features.len()];
+    let mut no_second_best_count = 0;
+    let mut ratio_rejected_count = 0;
+    let mut distance_rejected_count = 0;
+    for (index, best, selected_index, reject_reason) in scan_results {
+        evaluated[index] = best;
+        selected[index] = selected_index;
+        match reject_reason {
+            MatchRejectReason::Distance => distance_rejected_count += 1,
+            MatchRejectReason::NoSecondBest => no_second_best_count += 1,
+            MatchRejectReason::None => {}
+            MatchRejectReason::Ratio => ratio_rejected_count += 1,
+        }
+    }
+
+    BestRatioMatches {
+        distance_rejected_count,
+        evaluated,
+        no_second_best_count,
+        ratio_rejected_count,
+        selected,
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum MatchRejectReason {
+    Distance,
+    NoSecondBest,
+    None,
+    Ratio,
+}
+
+fn build_brief_match_diagnostics(
+    query_feature_count: usize,
+    train_feature_count: usize,
+    forward_matches: &BestRatioMatches,
+    reciprocal_rejected_count: usize,
+    accepted_match_count: usize,
+) -> BriefMatchDiagnostics {
+    let evaluated_matches: Vec<_> = forward_matches
+        .evaluated
+        .iter()
+        .flatten()
+        .copied()
+        .collect();
+    BriefMatchDiagnostics {
+        accepted_match_count,
+        best_distance: distance_stats(
+            evaluated_matches
+                .iter()
+                .map(|candidate| candidate.best_distance)
+                .collect(),
+        ),
+        distance_rejected_count: forward_matches.distance_rejected_count,
+        max_accepted_hamming_distance: MAX_BRIEF_MATCH_HAMMING_DISTANCE,
+        no_second_best_count: forward_matches.no_second_best_count,
+        query_feature_count,
+        ratio: ratio_stats(
+            evaluated_matches
+                .iter()
+                .map(|candidate| candidate.ratio)
+                .collect(),
+        ),
+        ratio_rejected_count: forward_matches.ratio_rejected_count,
+        reciprocal_rejected_count,
+        second_best_distance: distance_stats(
+            evaluated_matches
+                .iter()
+                .map(|candidate| candidate.second_best_distance)
+                .collect(),
+        ),
+        train_feature_count,
+    }
+}
+
+fn empty_brief_match_diagnostics(
+    query_feature_count: usize,
+    train_feature_count: usize,
+) -> BriefMatchDiagnostics {
+    BriefMatchDiagnostics {
+        accepted_match_count: 0,
+        best_distance: None,
+        distance_rejected_count: 0,
+        max_accepted_hamming_distance: MAX_BRIEF_MATCH_HAMMING_DISTANCE,
+        no_second_best_count: query_feature_count,
+        query_feature_count,
+        ratio: None,
+        ratio_rejected_count: 0,
+        reciprocal_rejected_count: 0,
+        second_best_distance: None,
+        train_feature_count,
+    }
+}
+
+fn distance_stats(mut values: Vec<u32>) -> Option<BriefDistanceStats> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_unstable();
+    Some(BriefDistanceStats {
+        max: *values.last().unwrap(),
+        median: percentile_value(&values, 0.5),
+        min: values[0],
+        p95: percentile_value(&values, 0.95),
+    })
+}
+
+fn ratio_stats(mut values: Vec<f32>) -> Option<BriefRatioStats> {
+    values.retain(|value| value.is_finite());
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(|left, right| left.total_cmp(right));
+    Some(BriefRatioStats {
+        max: *values.last().unwrap(),
+        median: percentile_value(&values, 0.5),
+        min: values[0],
+        p95: percentile_value(&values, 0.95),
+    })
+}
+
+fn percentile_value<T: Copy>(sorted_values: &[T], percentile: f64) -> T {
+    let max_index = sorted_values.len().saturating_sub(1);
+    let index = (max_index as f64 * percentile).ceil() as usize;
+    sorted_values[index.min(max_index)]
 }
 
 pub fn find_homography_ransac(
@@ -689,6 +898,64 @@ mod tests {
     }
 
     #[test]
+    fn match_features_rejects_ratio_passing_distant_descriptor() {
+        let features1 = vec![
+            feature_with_hamming_weight(0, 0),
+            feature_with_hamming_weight(BRIEF_DESCRIPTOR_SIZE, 1),
+        ];
+        let features2 = vec![
+            feature_with_hamming_weight(100, 0),
+            feature_with_hamming_weight(140, 1),
+        ];
+
+        let result = match_features_with_diagnostics(&features1, &features2);
+
+        assert!(result.matches.is_empty());
+        assert_eq!(result.diagnostics.distance_rejected_count, 2);
+        assert_eq!(
+            result.diagnostics.max_accepted_hamming_distance,
+            MAX_BRIEF_MATCH_HAMMING_DISTANCE
+        );
+    }
+
+    #[test]
+    fn match_features_reports_brief_distance_diagnostics() {
+        let features1 = vec![
+            feature_with_hamming_weight(0, 0),
+            feature_with_hamming_weight(BRIEF_DESCRIPTOR_SIZE, 1),
+        ];
+        let features2 = vec![
+            feature_with_hamming_weight(32, 0),
+            feature_with_hamming_weight(128, 1),
+        ];
+
+        let result = match_features_with_diagnostics(&features1, &features2);
+
+        assert_eq!(match_pairs(&result.matches), vec![(0, 0)]);
+        assert_eq!(result.diagnostics.accepted_match_count, 1);
+        assert_eq!(result.diagnostics.distance_rejected_count, 1);
+        assert_eq!(result.diagnostics.reciprocal_rejected_count, 0);
+        assert_eq!(
+            result.diagnostics.best_distance,
+            Some(BriefDistanceStats {
+                max: 128,
+                median: 128,
+                min: 32,
+                p95: 128,
+            })
+        );
+        assert_eq!(
+            result.diagnostics.second_best_distance,
+            Some(BriefDistanceStats {
+                max: 224,
+                median: 224,
+                min: 128,
+                p95: 224,
+            })
+        );
+    }
+
+    #[test]
     fn compute_homography_rejects_source_collinear_points() {
         let points = vec![
             (Point2::new(0.0, 0.0), Point2::new(0.0, 0.0)),
@@ -862,6 +1129,20 @@ mod tests {
     fn feature_with_descriptor(first_byte: u8, offset: u32) -> Feature {
         let mut descriptor = [0_u8; BRIEF_DESCRIPTOR_SIZE / 8];
         descriptor[0] = first_byte;
+        Feature {
+            descriptor,
+            keypoint: KeyPoint {
+                x: 20 + offset,
+                y: 30 + offset,
+            },
+        }
+    }
+
+    fn feature_with_hamming_weight(set_bits: usize, offset: u32) -> Feature {
+        let mut descriptor = [0_u8; BRIEF_DESCRIPTOR_SIZE / 8];
+        for bit_index in 0..set_bits.min(BRIEF_DESCRIPTOR_SIZE) {
+            descriptor[bit_index / 8] |= 1 << (bit_index % 8);
+        }
         Feature {
             descriptor,
             keypoint: KeyPoint {

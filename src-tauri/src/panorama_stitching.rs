@@ -55,6 +55,7 @@ pub struct ImageInfo {
 
 #[derive(Clone)]
 pub struct MatchInfo {
+    pub brief_match_diagnostics: processing::BriefMatchDiagnostics,
     pub homography: Matrix3<f64>,
     pub inliers: usize,
     pub match_count: usize,
@@ -97,6 +98,7 @@ pub struct PanoramaSourceMetadata {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PanoramaPairwiseMatchMetadata {
+    pub brief_match_diagnostics: processing::BriefMatchDiagnostics,
     pub homography3x3: [f64; 9],
     pub homography_condition_number: Option<f64>,
     pub inlier_ratio: f64,
@@ -635,7 +637,9 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
             let features1 = &image_data[i].features;
             let features2 = &image_data[j].features;
 
-            let initial_matches = processing::match_features(features1, features2);
+            let feature_match_result =
+                processing::match_features_with_diagnostics(features1, features2);
+            let initial_matches = feature_match_result.matches;
             if initial_matches.len() < processing::MIN_INLIERS_FOR_CONNECTION {
                 return None;
             }
@@ -687,6 +691,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
                     let h_full = scale_mat_j * h_refined * scale_mat_i_inv;
 
                     let match_info = MatchInfo {
+                        brief_match_diagnostics: feature_match_result.diagnostics,
                         homography: h_full,
                         inliers: inliers.len(),
                         match_count: initial_matches.len(),
@@ -823,6 +828,7 @@ fn collect_pairwise_match_metadata(
         .iter()
         .map(
             |(&(source_index, target_index), match_info)| PanoramaPairwiseMatchMetadata {
+                brief_match_diagnostics: match_info.brief_match_diagnostics.clone(),
                 homography3x3: matrix_to_row_major_array(&match_info.homography),
                 homography_condition_number: homography_condition_number(&match_info.homography),
                 inlier_ratio: match_info.inlier_ratio(),
@@ -988,6 +994,7 @@ fn upsert_panorama_artifact_metadata(
                 "homographyConditionNumber": pair.homography_condition_number,
                 "inlierRatio": pair.inlier_ratio,
                 "inliers": pair.inliers,
+                "briefMatcher": pair.brief_match_diagnostics,
                 "matchCount": pair.match_count,
                 "matchQuality": "accepted",
                 "meanReprojectionErrorPx": pair.mean_reprojection_error_px,
@@ -1536,6 +1543,7 @@ mod tests {
         matches.insert(
             (2, 3),
             MatchInfo {
+                brief_match_diagnostics: brief_match_diagnostics_fixture(),
                 homography: Matrix3::identity(),
                 inliers: 21,
                 match_count: 30,
@@ -1547,6 +1555,7 @@ mod tests {
         matches.insert(
             (0, 1),
             MatchInfo {
+                brief_match_diagnostics: brief_match_diagnostics_fixture(),
                 homography: Matrix3::identity(),
                 inliers: 42,
                 match_count: 60,
@@ -1562,6 +1571,7 @@ mod tests {
             metadata,
             vec![
                 PanoramaPairwiseMatchMetadata {
+                    brief_match_diagnostics: brief_match_diagnostics_fixture(),
                     homography3x3: matrix_to_row_major_array(&Matrix3::identity()),
                     homography_condition_number: Some(1.0),
                     inlier_ratio: 0.7,
@@ -1574,6 +1584,7 @@ mod tests {
                     target_index: 1,
                 },
                 PanoramaPairwiseMatchMetadata {
+                    brief_match_diagnostics: brief_match_diagnostics_fixture(),
                     homography3x3: matrix_to_row_major_array(&Matrix3::identity()),
                     homography_condition_number: Some(1.0),
                     inlier_ratio: 0.7,
@@ -1863,6 +1874,7 @@ mod tests {
             output_height: 100,
             output_width: 220,
             pairwise_matches: vec![PanoramaPairwiseMatchMetadata {
+                brief_match_diagnostics: brief_match_diagnostics_fixture(),
                 homography3x3: [1.0, 0.0, 12.0, 0.0, 1.0, 1.5, 0.0, 0.0, 1.0],
                 homography_condition_number: Some(146.009_498),
                 inlier_ratio: 0.8,
@@ -1904,5 +1916,36 @@ mod tests {
     fn set_mtime(path: &Path, unix_seconds: i64) {
         let file_time = filetime::FileTime::from_unix_time(unix_seconds, 0);
         filetime::set_file_mtime(path, file_time).expect("mtime should be set");
+    }
+
+    fn brief_match_diagnostics_fixture() -> processing::BriefMatchDiagnostics {
+        processing::BriefMatchDiagnostics {
+            accepted_match_count: 32,
+            best_distance: Some(processing::BriefDistanceStats {
+                max: 64,
+                median: 28,
+                min: 12,
+                p95: 54,
+            }),
+            distance_rejected_count: 1,
+            max_accepted_hamming_distance: processing::MAX_BRIEF_MATCH_HAMMING_DISTANCE,
+            no_second_best_count: 0,
+            query_feature_count: 80,
+            ratio: Some(processing::BriefRatioStats {
+                max: 0.72,
+                median: 0.34,
+                min: 0.1,
+                p95: 0.68,
+            }),
+            ratio_rejected_count: 4,
+            reciprocal_rejected_count: 3,
+            second_best_distance: Some(processing::BriefDistanceStats {
+                max: 150,
+                median: 96,
+                min: 72,
+                p95: 132,
+            }),
+            train_feature_count: 82,
+        }
     }
 }
