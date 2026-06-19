@@ -36,6 +36,18 @@ for (const budget of VITE_BUNDLE_BUDGET_POLICY.budgets) {
   if (!hasExpectedRow) failures.push(`docs bundle budget table is stale for ${budget.label}.`);
 }
 
+const initialEntryBudget = VITE_BUNDLE_BUDGET_POLICY.initialEntryAggregate;
+const hasInitialEntryRow = docs
+  .split('\n')
+  .some((line) =>
+    [
+      initialEntryBudget.label,
+      formatBundlePolicyBytes(initialEntryBudget.maxBytes),
+      formatBundlePolicyBytes(initialEntryBudget.maxGzipBytes),
+    ].every((expectedCell) => line.includes(expectedCell)),
+  );
+if (!hasInitialEntryRow) failures.push(`docs bundle budget table is stale for ${initialEntryBudget.label}.`);
+
 if (!docs.includes(`Vite warning limit: ${getViteChunkSizeWarningLimitKb().toLocaleString('en-US')} KiB`)) {
   failures.push('docs bundle policy is missing the derived Vite warning limit.');
 }
