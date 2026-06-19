@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { BUILT_IN_EXPORT_RECIPE_IDS, EXPORT_LAST_USED_PRESET_ID } from './exportRecipeIds';
 import { exportRecipeSchema, type ExportRecipe } from './exportRecipeSchemas';
 
 export const exportRecipeUiRowSchema = z
@@ -17,7 +18,7 @@ export const exportRecipeUiRowSchema = z
 
 export type ExportRecipeUiRow = z.infer<typeof exportRecipeUiRowSchema>;
 
-const BUILT_IN_RECIPE_IDS = new Set(['default-hq', 'default-fast', 'client-proof-tiff']);
+const BUILT_IN_RECIPE_IDS: ReadonlySet<string> = new Set(BUILT_IN_EXPORT_RECIPE_IDS);
 
 const recipeIdentitySchema = z
   .object({
@@ -38,7 +39,7 @@ export const buildExportRecipeUiRows = (values: Array<unknown>): Array<ExportRec
   values
     .filter((value) => {
       const identity = recipeIdentitySchema.safeParse(value);
-      return identity.success && identity.data.id !== undefined && identity.data.id !== '__last_used__';
+      return identity.success && identity.data.id !== undefined && identity.data.id !== EXPORT_LAST_USED_PRESET_ID;
     })
     .map((value) => {
       const recipe = asRecipeLike(value);

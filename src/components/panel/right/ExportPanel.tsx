@@ -9,6 +9,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
+import { EXPORT_LAST_USED_PRESET_ID } from '../../../schemas/exportRecipeIds';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { invokeWithSchema } from '../../../utils/tauriSchemaInvoke';
@@ -269,7 +270,7 @@ export default function ExportPanel({
   useEffect(() => {
     if (initDone.current || appSettings === null || !isVisible) return;
     initDone.current = true;
-    const lastUsed = appSettings.exportPresets?.find((p) => p.id === '__last_used__');
+    const lastUsed = appSettings.exportPresets?.find((p) => p.id === EXPORT_LAST_USED_PRESET_ID);
     if (lastUsed) {
       handleApplyPreset(lastUsed);
     }
@@ -280,12 +281,12 @@ export default function ExportPanel({
       if (!appSettings) return;
       const lastUsedPreset: ExportPreset = {
         ...currentSettingsObject,
-        id: '__last_used__',
-        name: '__last_used__',
+        id: EXPORT_LAST_USED_PRESET_ID,
+        name: EXPORT_LAST_USED_PRESET_ID,
         lastExportPath: exportPath,
       };
       const updatedPresets = [
-        ...(appSettings.exportPresets ?? []).filter((p) => p.id !== '__last_used__'),
+        ...(appSettings.exportPresets ?? []).filter((p) => p.id !== EXPORT_LAST_USED_PRESET_ID),
         lastUsedPreset,
       ];
       onSettingsChange({ ...appSettings, exportPresets: updatedPresets });
@@ -529,7 +530,7 @@ export default function ExportPanel({
           : null,
     };
 
-    const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
+    const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === EXPORT_LAST_USED_PRESET_ID)?.lastExportPath;
 
     try {
       const selectedFormat = FILE_FORMATS.find((f) => f.id === fileFormat);
