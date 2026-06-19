@@ -24,6 +24,8 @@ use crate::panorama_utils::{processing, stitching};
 
 pub const BRIEF_DESCRIPTOR_SIZE: usize = 256;
 pub type Descriptor = [u8; BRIEF_DESCRIPTOR_SIZE / 8];
+const MIN_RENDER_ALIGNMENT_INLIER_RATIO: f64 = 0.55;
+const MAX_RENDER_MEAN_REPROJECTION_ERROR_PX: f64 = 5.0;
 
 #[derive(Debug, Clone, Copy)]
 pub struct KeyPoint {
@@ -57,6 +59,23 @@ pub struct MatchInfo {
     pub inliers: usize,
     pub match_count: usize,
     pub mean_reprojection_error_px: f64,
+}
+
+impl MatchInfo {
+    fn inlier_ratio(&self) -> f64 {
+        if self.match_count == 0 {
+            0.0
+        } else {
+            self.inliers as f64 / self.match_count as f64
+        }
+    }
+
+    fn is_graph_eligible(&self) -> bool {
+        self.homography.iter().all(|value| value.is_finite())
+            && self.inliers >= processing::MIN_INLIERS_FOR_CONNECTION
+            && self.inlier_ratio() >= MIN_RENDER_ALIGNMENT_INLIER_RATIO
+            && self.mean_reprojection_error_px <= MAX_RENDER_MEAN_REPROJECTION_ERROR_PX
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -797,11 +816,7 @@ fn collect_pairwise_match_metadata(
         .map(
             |(&(source_index, target_index), match_info)| PanoramaPairwiseMatchMetadata {
                 homography3x3: matrix_to_row_major_array(&match_info.homography),
-                inlier_ratio: if match_info.match_count == 0 {
-                    0.0
-                } else {
-                    match_info.inliers as f64 / match_info.match_count as f64
-                },
+                inlier_ratio: match_info.inlier_ratio(),
                 inliers: match_info.inliers,
                 match_count: match_info.match_count,
                 mean_reprojection_error_px: match_info.mean_reprojection_error_px,
@@ -1413,7 +1428,9 @@ fn build_stitching_order(
 
     let mut edges = Vec::new();
     for (&(i, j), m) in matches {
-        edges.push((m.inliers, i, j));
+        if m.is_graph_eligible() {
+            edges.push((m.inliers, i, j));
+        }
     }
     edges.sort_by_key(|&(inliers, _, _)| std::cmp::Reverse(inliers));
 
