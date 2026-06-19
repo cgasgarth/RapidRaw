@@ -55,6 +55,7 @@ const RESULT_REVIEW_FILE: &str = "sr-subpixel-result-review.png";
 const EXPORT_REVIEW_FILE: &str = "sr-subpixel-export-review.png";
 const RUNTIME_SAMPLE_WIDTH: u32 = 72;
 const RUNTIME_SAMPLE_HEIGHT: u32 = 48;
+const MIN_DETAIL_GAIN_RATIO: f64 = 1.2;
 const MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA: f64 = 0.015;
 
 #[test]
@@ -465,8 +466,8 @@ fn build_reconstruction_metrics(
         metric(
             "superResolutionDetailGainRatio",
             output_pixels / base_pixels.max(1.0),
-            f64::from(scale * scale),
-            output_pixels >= expected_output_pixels,
+            MIN_DETAIL_GAIN_RATIO,
+            output_pixels / base_pixels.max(1.0) >= MIN_DETAIL_GAIN_RATIO,
         ),
         metric(
             "superResolutionOutputPixelCount",
