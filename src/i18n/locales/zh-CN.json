@@ -763,6 +763,12 @@
       "maskAdjustmentsTitle": "蒙版调整",
       "maskingTitle": "蒙版",
       "masksTitle": "蒙版",
+      "overlay": {
+        "edgeThreshold": "边缘阈值",
+        "enabled": "叠加检查",
+        "modeGroup": "蒙版叠加模式",
+        "opacity": "叠加不透明度"
+      },
       "params": {
         "feather": "羽化",
         "globalFeather": "全局羽化",

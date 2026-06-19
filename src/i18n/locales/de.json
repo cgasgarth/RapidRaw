@@ -763,6 +763,12 @@
       "maskAdjustmentsTitle": "Maskenanpassungen",
       "maskingTitle": "Maskieren",
       "masksTitle": "Masken",
+      "overlay": {
+        "edgeThreshold": "Kantenschwellenwert",
+        "enabled": "Overlay-Prüfung",
+        "modeGroup": "Masken-Overlay-Modus",
+        "opacity": "Overlay-Deckkraft"
+      },
       "params": {
         "feather": "Weiche Kante",
         "globalFeather": "Globale weiche Kante",

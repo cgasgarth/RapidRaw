@@ -8,6 +8,7 @@ import type { ChannelConfig } from '../components/adjustments/Curves';
 import type { OverlayMode } from '../components/panel/right/CropPanel';
 import type { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
 import type { BaseRenderSize, ImageDimensions } from '../hooks/useImageRenderSize';
+import type { MaskOverlaySettings } from '../schemas/maskOverlaySchemas';
 import type { BasicToneCommandEnvelope } from '../utils/basicToneCommandBridge';
 
 export interface InteractivePatch {
@@ -59,6 +60,7 @@ interface EditorState {
   isRotationActive: boolean;
   overlayMode: OverlayMode;
   overlayRotation: number;
+  maskOverlaySettings: MaskOverlaySettings;
   isStraightenActive: boolean;
   isWbPickerActive: boolean;
   liveRotation: number | null;
@@ -122,6 +124,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   isRotationActive: false,
   overlayMode: 'thirds',
   overlayRotation: 0,
+  maskOverlaySettings: { edgeThreshold: 0.5, mode: 'rubylith', opacity: 0.5 },
   transformedOriginalUrl: null,
   isStraightenActive: false,
   isWbPickerActive: false,
