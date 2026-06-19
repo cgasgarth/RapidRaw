@@ -99,6 +99,7 @@ const CHECK_GROUPS = {
     'check:layer-adjustments',
     'check:layer-preview-export-parity',
     'check:brush-mask',
+    'check:brush-mask-command',
     'check:gradient-mask',
     'check:luminance-range-mask',
     'check:color-range-mask',
