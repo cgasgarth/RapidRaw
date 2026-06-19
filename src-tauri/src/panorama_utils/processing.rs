@@ -17,6 +17,13 @@ pub const MIN_INLIERS_FOR_CONNECTION: usize = 15;
 const LOW_DETAIL_WINDOW_RADIUS: u32 = 16;
 const LOW_DETAIL_VARIANCE_THRESHOLD: f64 = 60.0;
 
+#[derive(Debug, Clone, Copy)]
+pub struct TransferErrorMetrics {
+    pub forward_error_px: f64,
+    pub reverse_error_px: f64,
+    pub symmetric_error_px: f64,
+}
+
 pub fn calculate_downscale_dimensions(width: u32, height: u32) -> (u32, u32, f64) {
     let long_side = width.max(height);
     if long_side <= MAX_PROCESSING_DIMENSION {
@@ -220,8 +227,6 @@ pub fn find_homography_ransac(
         return None;
     }
 
-    let ransac_inlier_threshold_sq = RANSAC_INLIER_THRESHOLD.powi(2);
-
     for _ in 0..RANSAC_ITERATIONS {
         let sample_indices: Vec<usize> = (0..points.len()).collect();
         let sample_indices = sample_indices
@@ -240,23 +245,16 @@ pub fn find_homography_ransac(
         }
 
         if let Some(h) = compute_homography(&sample_points) {
+            let Some(h_inverse) = h.try_inverse() else {
+                continue;
+            };
             let current_inliers: Vec<Match> = matches
                 .par_iter()
                 .enumerate()
                 .filter_map(|(i, m)| {
                     let (p1, p2) = points[i];
-                    let p1_h = nalgebra::Point3::new(p1.x, p1.y, 1.0);
-                    let p2_h_transformed = h * p1_h;
-                    if p2_h_transformed.z.abs() < 1e-8 {
-                        return None;
-                    }
-                    let p2_transformed = Point2::new(
-                        p2_h_transformed.x / p2_h_transformed.z,
-                        p2_h_transformed.y / p2_h_transformed.z,
-                    );
-                    let dist_sq =
-                        (p2.x - p2_transformed.x).powi(2) + (p2.y - p2_transformed.y).powi(2);
-                    if dist_sq < ransac_inlier_threshold_sq {
+                    let metrics = transfer_error_metrics_with_inverse(&h, &h_inverse, p1, p2)?;
+                    if metrics.symmetric_error_px < RANSAC_INLIER_THRESHOLD {
                         Some(*m)
                     } else {
                         None
@@ -278,30 +276,118 @@ pub fn find_homography_ransac(
     }
 }
 
-pub fn mean_reprojection_error(
+#[cfg(test)]
+fn transfer_error_metrics(
+    homography: &Matrix3<f64>,
+    source: Point2<f64>,
+    target: Point2<f64>,
+) -> Option<TransferErrorMetrics> {
+    let inverse = homography.try_inverse()?;
+    transfer_error_metrics_with_inverse(homography, &inverse, source, target)
+}
+
+fn transfer_error_metrics_with_inverse(
+    homography: &Matrix3<f64>,
+    inverse: &Matrix3<f64>,
+    source: Point2<f64>,
+    target: Point2<f64>,
+) -> Option<TransferErrorMetrics> {
+    let forward_projection = project_point(homography, source)?;
+    let reverse_projection = project_point(inverse, target)?;
+    let forward_error_px = ((target.x - forward_projection.x).powi(2)
+        + (target.y - forward_projection.y).powi(2))
+    .sqrt();
+    let reverse_error_px = ((source.x - reverse_projection.x).powi(2)
+        + (source.y - reverse_projection.y).powi(2))
+    .sqrt();
+    let symmetric_error_px = ((forward_error_px.powi(2) + reverse_error_px.powi(2)) / 2.0).sqrt();
+    if forward_error_px.is_finite()
+        && reverse_error_px.is_finite()
+        && symmetric_error_px.is_finite()
+    {
+        Some(TransferErrorMetrics {
+            forward_error_px,
+            reverse_error_px,
+            symmetric_error_px,
+        })
+    } else {
+        None
+    }
+}
+
+fn project_point(homography: &Matrix3<f64>, point: Point2<f64>) -> Option<Point2<f64>> {
+    let transformed = homography * nalgebra::Point3::new(point.x, point.y, 1.0);
+    if transformed.z.abs() < 1e-8 {
+        return None;
+    }
+    let projected = Point2::new(transformed.x / transformed.z, transformed.y / transformed.z);
+    if projected.x.is_finite() && projected.y.is_finite() {
+        Some(projected)
+    } else {
+        None
+    }
+}
+
+pub fn mean_transfer_error_metrics(
     homography: &Matrix3<f64>,
     inliers: &[Match],
     keypoints1: &[KeyPoint],
     keypoints2: &[KeyPoint],
-) -> f64 {
+) -> TransferErrorMetrics {
     if inliers.is_empty() {
-        return f64::INFINITY;
+        return TransferErrorMetrics {
+            forward_error_px: f64::INFINITY,
+            reverse_error_px: f64::INFINITY,
+            symmetric_error_px: f64::INFINITY,
+        };
     }
-    let sum = inliers
+    let Some(inverse) = homography.try_inverse() else {
+        return TransferErrorMetrics {
+            forward_error_px: f64::INFINITY,
+            reverse_error_px: f64::INFINITY,
+            symmetric_error_px: f64::INFINITY,
+        };
+    };
+    let (sum, count) = inliers
         .iter()
-        .map(|matched| {
+        .filter_map(|matched| {
             let p1 = keypoints1[matched.index1];
             let p2 = keypoints2[matched.index2];
-            let transformed = homography * nalgebra::Point3::new(p1.x as f64, p1.y as f64, 1.0);
-            if transformed.z.abs() < 1e-8 {
-                return f64::INFINITY;
-            }
-            let projected =
-                Point2::new(transformed.x / transformed.z, transformed.y / transformed.z);
-            ((p2.x as f64 - projected.x).powi(2) + (p2.y as f64 - projected.y).powi(2)).sqrt()
+            transfer_error_metrics_with_inverse(
+                homography,
+                &inverse,
+                Point2::new(p1.x as f64, p1.y as f64),
+                Point2::new(p2.x as f64, p2.y as f64),
+            )
         })
-        .sum::<f64>();
-    sum / inliers.len() as f64
+        .fold(
+            (
+                TransferErrorMetrics {
+                    forward_error_px: 0.0,
+                    reverse_error_px: 0.0,
+                    symmetric_error_px: 0.0,
+                },
+                0_usize,
+            ),
+            |(mut sum, count), metrics| {
+                sum.forward_error_px += metrics.forward_error_px;
+                sum.reverse_error_px += metrics.reverse_error_px;
+                sum.symmetric_error_px += metrics.symmetric_error_px;
+                (sum, count + 1)
+            },
+        );
+    if count == 0 {
+        return TransferErrorMetrics {
+            forward_error_px: f64::INFINITY,
+            reverse_error_px: f64::INFINITY,
+            symmetric_error_px: f64::INFINITY,
+        };
+    }
+    TransferErrorMetrics {
+        forward_error_px: sum.forward_error_px / count as f64,
+        reverse_error_px: sum.reverse_error_px / count as f64,
+        symmetric_error_px: sum.symmetric_error_px / count as f64,
+    }
 }
 
 fn ransac_seed(matches: &[Match], keypoints1: &[KeyPoint], keypoints2: &[KeyPoint]) -> u64 {
@@ -687,13 +773,18 @@ mod tests {
         ];
         let points = source_points
             .iter()
-            .map(|source| (*source, project_point(&expected_homography, *source)))
+            .map(|source| {
+                (
+                    *source,
+                    project_point(&expected_homography, *source).expect("projected target"),
+                )
+            })
             .collect::<Vec<_>>();
 
         let homography = compute_homography(&points).expect("projective homography");
 
         for (source, target) in points {
-            let projected = project_point(&homography, source);
+            let projected = project_point(&homography, source).expect("projected point");
             assert!((projected.x - target.x).abs() < 1e-4);
             assert!((projected.y - target.y).abs() < 1e-4);
         }
@@ -701,9 +792,28 @@ mod tests {
         assert!(homography[(2, 1)].abs() > 1e-7);
     }
 
-    fn project_point(homography: &Matrix3<f64>, point: Point2<f64>) -> Point2<f64> {
-        let projected = homography * nalgebra::Point3::new(point.x, point.y, 1.0);
-        Point2::new(projected.x / projected.z, projected.y / projected.z)
+    #[test]
+    fn symmetric_transfer_error_recovers_known_projective_transform() {
+        let homography = Matrix3::new(1.1, 0.08, 125.0, -0.04, 0.95, -50.0, 0.00003, -0.00002, 1.0);
+        let source = Point2::new(10_000.0, 20_000.0);
+        let target = project_point(&homography, source).expect("projected target");
+
+        let metrics =
+            transfer_error_metrics(&homography, source, target).expect("transfer metrics");
+
+        assert!(metrics.forward_error_px < 1e-9);
+        assert!(metrics.reverse_error_px < 1e-9);
+        assert!(metrics.symmetric_error_px < 1e-9);
+    }
+
+    #[test]
+    fn symmetric_transfer_error_rejects_unstable_inverse() {
+        let homography = Matrix3::new(1.0, 0.0, 5.0, 0.0, 0.0, 7.0, 0.0, 0.0, 1.0);
+
+        assert!(
+            transfer_error_metrics(&homography, Point2::new(10.0, 20.0), Point2::new(15.0, 7.0))
+                .is_none()
+        );
     }
 
     #[test]

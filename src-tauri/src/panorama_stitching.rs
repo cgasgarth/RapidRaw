@@ -59,6 +59,8 @@ pub struct MatchInfo {
     pub inliers: usize,
     pub match_count: usize,
     pub mean_reprojection_error_px: f64,
+    pub mean_reverse_reprojection_error_px: f64,
+    pub mean_symmetric_transfer_error_px: f64,
 }
 
 impl MatchInfo {
@@ -72,9 +74,10 @@ impl MatchInfo {
 
     fn is_graph_eligible(&self) -> bool {
         self.homography.iter().all(|value| value.is_finite())
+            && self.homography.is_invertible()
             && self.inliers >= processing::MIN_INLIERS_FOR_CONNECTION
             && self.inlier_ratio() >= MIN_RENDER_ALIGNMENT_INLIER_RATIO
-            && self.mean_reprojection_error_px <= MAX_RENDER_MEAN_REPROJECTION_ERROR_PX
+            && self.mean_symmetric_transfer_error_px <= MAX_RENDER_MEAN_REPROJECTION_ERROR_PX
     }
 }
 
@@ -100,6 +103,8 @@ pub struct PanoramaPairwiseMatchMetadata {
     pub inliers: usize,
     pub match_count: usize,
     pub mean_reprojection_error_px: f64,
+    pub mean_reverse_reprojection_error_px: f64,
+    pub mean_symmetric_transfer_error_px: f64,
     pub source_index: usize,
     pub target_index: usize,
 }
@@ -668,7 +673,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
                     .collect();
 
                 if let Some(h_refined) = processing::compute_homography(&inlier_points) {
-                    let mean_reprojection_error_px = processing::mean_reprojection_error(
+                    let transfer_error_metrics = processing::mean_transfer_error_metrics(
                         &h_refined,
                         &inliers,
                         &keypoints1,
@@ -685,7 +690,9 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
                         homography: h_full,
                         inliers: inliers.len(),
                         match_count: initial_matches.len(),
-                        mean_reprojection_error_px,
+                        mean_reprojection_error_px: transfer_error_metrics.forward_error_px,
+                        mean_reverse_reprojection_error_px: transfer_error_metrics.reverse_error_px,
+                        mean_symmetric_transfer_error_px: transfer_error_metrics.symmetric_error_px,
                     };
                     return Some(((i, j), match_info));
                 }
@@ -822,6 +829,8 @@ fn collect_pairwise_match_metadata(
                 inliers: match_info.inliers,
                 match_count: match_info.match_count,
                 mean_reprojection_error_px: match_info.mean_reprojection_error_px,
+                mean_reverse_reprojection_error_px: match_info.mean_reverse_reprojection_error_px,
+                mean_symmetric_transfer_error_px: match_info.mean_symmetric_transfer_error_px,
                 source_index,
                 target_index,
             },
@@ -982,6 +991,8 @@ fn upsert_panorama_artifact_metadata(
                 "matchCount": pair.match_count,
                 "matchQuality": "accepted",
                 "meanReprojectionErrorPx": pair.mean_reprojection_error_px,
+                "meanReverseReprojectionErrorPx": pair.mean_reverse_reprojection_error_px,
+                "meanSymmetricTransferErrorPx": pair.mean_symmetric_transfer_error_px,
                 "toSourceIndex": pair.target_index,
             })).collect::<Vec<_>>(),
             "selectedMatchEdges": metadata.selected_match_edges.iter().map(|edge| json!({
@@ -1529,6 +1540,8 @@ mod tests {
                 inliers: 21,
                 match_count: 30,
                 mean_reprojection_error_px: 2.1,
+                mean_reverse_reprojection_error_px: 2.2,
+                mean_symmetric_transfer_error_px: 2.15,
             },
         );
         matches.insert(
@@ -1538,6 +1551,8 @@ mod tests {
                 inliers: 42,
                 match_count: 60,
                 mean_reprojection_error_px: 1.4,
+                mean_reverse_reprojection_error_px: 1.6,
+                mean_symmetric_transfer_error_px: 1.5,
             },
         );
 
@@ -1553,6 +1568,8 @@ mod tests {
                     inliers: 42,
                     match_count: 60,
                     mean_reprojection_error_px: 1.4,
+                    mean_reverse_reprojection_error_px: 1.6,
+                    mean_symmetric_transfer_error_px: 1.5,
                     source_index: 0,
                     target_index: 1,
                 },
@@ -1563,6 +1580,8 @@ mod tests {
                     inliers: 21,
                     match_count: 30,
                     mean_reprojection_error_px: 2.1,
+                    mean_reverse_reprojection_error_px: 2.2,
+                    mean_symmetric_transfer_error_px: 2.15,
                     source_index: 2,
                     target_index: 3,
                 },
@@ -1850,6 +1869,8 @@ mod tests {
                 inliers: 32,
                 match_count: 40,
                 mean_reprojection_error_px: 1.25,
+                mean_reverse_reprojection_error_px: 1.35,
+                mean_symmetric_transfer_error_px: 1.3,
                 source_index: 0,
                 target_index: 1,
             }],
