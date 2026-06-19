@@ -5,6 +5,8 @@ import { extname, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { z } from 'zod';
 
+import { VITE_BUNDLE_BUDGET_POLICY } from './lib/vite-bundle-policy.ts';
+
 const AssetBudgetSchema = z
   .object({
     extension: z.string().regex(/^\.[a-z0-9]+$/u),
@@ -22,25 +24,12 @@ const BundleBudgetSchema = z
   .strict();
 
 const bundleBudget = BundleBudgetSchema.parse({
-  assetsDir: 'dist/assets',
-  budgets: [
-    {
-      extension: '.js',
-      label: 'largest JavaScript asset',
-      maxBytes: 3_072_000,
-      maxGzipBytes: 900_000,
-    },
-    {
-      extension: '.css',
-      label: 'largest CSS asset',
-      maxBytes: 153_600,
-      maxGzipBytes: 24_576,
-    },
-  ],
+  assetsDir: VITE_BUNDLE_BUDGET_POLICY.assetsDir,
+  budgets: VITE_BUNDLE_BUDGET_POLICY.budgets,
 });
 
 const assetsDir = new URL(`../${bundleBudget.assetsDir}/`, import.meta.url);
-const budgetMode = 'minified production Vite build';
+const budgetMode = VITE_BUNDLE_BUDGET_POLICY.budgetMode;
 
 const formatBytes = (bytes) => `${(bytes / 1024).toFixed(1)} KiB`;
 

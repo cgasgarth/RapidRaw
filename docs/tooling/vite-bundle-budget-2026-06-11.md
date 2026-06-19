@@ -33,6 +33,11 @@ owner, reason, and expiration condition.
 | Largest JavaScript asset | 3,072,000 bytes | 900,000 bytes |
 | Largest CSS asset        | 153,600 bytes   | 24,576 bytes  |
 
+Vite warning limit: 3,000 KiB.
+
+Headroom policy: Temporary monolithic UI headroom; lower after measured chunk
+splitting.
+
 ## Validation
 
 Run:
