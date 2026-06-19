@@ -275,6 +275,8 @@ struct PairAlignmentReport {
     inlier_ratio: f64,
     match_count: usize,
     mean_reprojection_error_px: f64,
+    mean_reverse_reprojection_error_px: f64,
+    mean_symmetric_transfer_error_px: f64,
     rejected_reasons: Vec<String>,
     selected_edge: bool,
     source_index_a: usize,
@@ -1002,6 +1004,8 @@ fn build_empty_alignment_report(
             inlier_ratio: 0.0,
             match_count: 0,
             mean_reprojection_error_px: f64::INFINITY,
+            mean_reverse_reprojection_error_px: f64::INFINITY,
+            mean_symmetric_transfer_error_px: f64::INFINITY,
             rejected_reasons: vec![
                 "missing_pairwise_match".to_string(),
                 "non_finite_transform".to_string(),
@@ -1043,6 +1047,8 @@ fn build_pair_alignment_report(
             inlier_ratio: 0.0,
             match_count: 0,
             mean_reprojection_error_px: f64::INFINITY,
+            mean_reverse_reprojection_error_px: f64::INFINITY,
+            mean_symmetric_transfer_error_px: f64::INFINITY,
             rejected_reasons: vec![
                 "missing_pairwise_match".to_string(),
                 "non_finite_transform".to_string(),
@@ -1061,6 +1067,8 @@ fn build_pair_alignment_report(
     let homography_condition_number = pair.homography_condition_number.map(round_metric);
     let inlier_ratio = round_metric(pair.inlier_ratio);
     let mean_reprojection_error_px = round_metric(pair.mean_reprojection_error_px);
+    let mean_reverse_reprojection_error_px = round_metric(pair.mean_reverse_reprojection_error_px);
+    let mean_symmetric_transfer_error_px = round_metric(pair.mean_symmetric_transfer_error_px);
     let mut rejected_reasons = Vec::new();
     if !finite_transform {
         rejected_reasons.push("non_finite_transform".to_string());
@@ -1071,7 +1079,7 @@ fn build_pair_alignment_report(
     if inlier_ratio < MIN_ALIGNMENT_INLIER_RATIO {
         rejected_reasons.push("low_inlier_ratio".to_string());
     }
-    if mean_reprojection_error_px > MAX_MEAN_REPROJECTION_ERROR_PX {
+    if mean_symmetric_transfer_error_px > MAX_MEAN_REPROJECTION_ERROR_PX {
         rejected_reasons.push("high_reprojection_error".to_string());
     }
     PairAlignmentReport {
@@ -1082,6 +1090,8 @@ fn build_pair_alignment_report(
         inlier_ratio,
         match_count: pair.match_count,
         mean_reprojection_error_px,
+        mean_reverse_reprojection_error_px,
+        mean_symmetric_transfer_error_px,
         rejected_reasons,
         selected_edge,
         source_index_a,
@@ -1122,11 +1132,17 @@ fn build_alignment_metrics(report: &AlignmentReport, source_count: usize) -> Vec
         .iter()
         .filter(|pair| pair.finite_transform)
         .count() as f64;
-    let mean_error = mean_finite(
+    let mean_forward_error = mean_finite(
         report
             .pair_reports
             .iter()
             .map(|pair| pair.mean_reprojection_error_px),
+    );
+    let mean_symmetric_error = mean_finite(
+        report
+            .pair_reports
+            .iter()
+            .map(|pair| pair.mean_symmetric_transfer_error_px),
     );
 
     vec![
@@ -1168,9 +1184,15 @@ fn build_alignment_metrics(report: &AlignmentReport, source_count: usize) -> Vec
         ),
         metric(
             "alignmentMeanReprojectionErrorPx",
-            mean_error,
+            mean_forward_error,
             MAX_MEAN_REPROJECTION_ERROR_PX,
-            mean_error <= MAX_MEAN_REPROJECTION_ERROR_PX,
+            mean_forward_error <= MAX_MEAN_REPROJECTION_ERROR_PX,
+        ),
+        metric(
+            "alignmentMeanSymmetricTransferErrorPx",
+            mean_symmetric_error,
+            MAX_MEAN_REPROJECTION_ERROR_PX,
+            mean_symmetric_error <= MAX_MEAN_REPROJECTION_ERROR_PX,
         ),
     ]
 }
