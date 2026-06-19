@@ -62,9 +62,19 @@ It also writes a review artifact under `artifacts/bundle-report/`:
 - `vite-bundle-report.json` for follow-up diff and trend tooling;
 - `vite-bundle-report.md` for compact human review.
 
-CI uploads this report from the frontend build job. Module and package
-attribution is intentionally tracked separately by #2429 so this report remains
-stable emitted-asset evidence.
+CI uploads this report from the frontend build job.
+
+The same report can include source-map-backed module and package attribution
+when source maps are intentionally emitted for diagnostics:
+
+```sh
+TAURI_ENV_DEBUG=1 bun run build:frontend
+bun run bundle:report
+```
+
+This diagnostic flow does not change release packaging. Source maps stay out of
+the required production build, but the report explains when maps are unavailable
+instead of emitting misleading empty attribution.
 
 The same gate runs a production payload scan against `dist` to reject sourcemap
 artifacts, sourcemap comments, localhost URLs, local user paths, and
