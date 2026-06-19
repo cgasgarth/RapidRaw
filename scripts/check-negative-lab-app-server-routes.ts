@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
+import { NEGATIVE_LAB_DENSITY_ALGORITHM_ID } from '../src/utils/negativeLabDensityConversion.ts';
 import { NegativeLabOutputFormatId, NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../src/utils/negativeLabOutputFormatIds.ts';
 import {
   buildNegativeLabBatchSummaryRouteResult,
@@ -126,8 +127,10 @@ const conversionPlanResultSchema = z.object({
   }),
   profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
   proof: z.object({
+    densityAlgorithm: z.literal(NEGATIVE_LAB_DENSITY_ALGORITHM_ID),
     deterministic: z.literal(true),
     generatedFrom: z.literal('src/utils/negativeLabMeasuredProfileRuntime.ts'),
+    runtimeConversionHelper: z.literal('src/utils/negativeLabDensityConversion.ts'),
   }),
   sampleRect: z.union([z.null(), z.object({ height: z.number(), width: z.number(), x: z.number(), y: z.number() })]),
   scope: z.enum(['active', 'all']),
@@ -429,6 +432,7 @@ for (const [filePath, marker] of [
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabStockRegistryRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabStockMetadataRouteResult'],
   ['src/utils/negativeLabAppServerRoutes.ts', 'buildNegativeLabConversionPlanResult'],
+  ['src/utils/negativeLabDensityConversion.ts', 'convertNegativeLabDensitySample'],
   ['src/utils/negativeLabMeasuredProfileRuntime.ts', 'resolveNegativeLabRuntimeProfile'],
   ['src/utils/negativeLabPresetCatalog.ts', 'NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG'],
   ['src/utils/negativeLabStockRegistry.ts', 'NEGATIVE_LAB_STOCK_REGISTRY'],

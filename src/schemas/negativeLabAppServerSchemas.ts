@@ -22,6 +22,7 @@ import {
 } from './negativeLabStockRegistrySchemas';
 import { negativeLabQcProofReportSchema } from './negativeLabWorkspaceSchemas';
 import { NegativeLabAppServerCommandName } from '../utils/negativeLabAppServerCommandNames';
+import { NEGATIVE_LAB_DENSITY_ALGORITHM_ID } from '../utils/negativeLabDensityConversion';
 import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../utils/negativeLabOutputFormatIds';
 
 export const negativeLabConversionPlanCommandNameSchema = z.literal(NegativeLabAppServerCommandName.ConversionPlan);
@@ -244,8 +245,10 @@ export const negativeLabConversionPlanResultSchema = z
     profileProvenanceHash: negativeLabProfileProvenanceHashSchema,
     proof: z
       .object({
+        densityAlgorithm: z.literal(NEGATIVE_LAB_DENSITY_ALGORITHM_ID),
         deterministic: z.literal(true),
         generatedFrom: z.literal('src/utils/negativeLabMeasuredProfileRuntime.ts'),
+        runtimeConversionHelper: z.literal('src/utils/negativeLabDensityConversion.ts'),
       })
       .strict(),
     sampleRect: negativeLabBaseFogSampleRectSchema.nullable(),

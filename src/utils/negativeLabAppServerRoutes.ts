@@ -1,5 +1,6 @@
 import { NegativeLabAppServerCommandName } from './negativeLabAppServerCommandNames';
 import { buildNegativeBaseFogDensitometerReadout } from './negativeLabDensitometer';
+import { NEGATIVE_LAB_DENSITY_ALGORITHM_ID } from './negativeLabDensityConversion';
 import { buildNegativeLabDustScratchReviewReport, buildNegativeLabQcProofReport } from './negativeLabDustScratchReview';
 import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport } from './negativeLabFrameHealth';
 import {
@@ -84,8 +85,10 @@ export const buildNegativeLabConversionPlanResult = (
     profile,
     profileProvenanceHash,
     proof: {
+      densityAlgorithm: NEGATIVE_LAB_DENSITY_ALGORITHM_ID,
       deterministic: true,
       generatedFrom: 'src/utils/negativeLabMeasuredProfileRuntime.ts',
+      runtimeConversionHelper: 'src/utils/negativeLabDensityConversion.ts',
     },
     sampleRect: parsedCommand.sampleRect,
     scope: parsedCommand.scope,

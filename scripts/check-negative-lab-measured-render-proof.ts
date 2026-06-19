@@ -9,6 +9,11 @@ import {
   buildNegativeLabRuntimeProfileProvenanceHash,
   resolveNegativeLabRuntimeProfile,
 } from '../src/utils/negativeLabMeasuredProfileRuntime.ts';
+import {
+  NEGATIVE_LAB_DENSITY_ALGORITHM_ID,
+  convertNegativeLabDensitySamples,
+} from '../src/utils/negativeLabDensityConversion.ts';
+import type { NegativeLabRgbTriplet } from '../src/utils/negativeLabDensityConversion.ts';
 
 const rgbTripletSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
 const syntheticProofSchema = z
@@ -31,6 +36,7 @@ const syntheticProofSchema = z
 const renderProofSchema = z
   .object({
     changedPixelCount: z.number().int().positive(),
+    densityAlgorithm: z.literal(NEGATIVE_LAB_DENSITY_ALGORITHM_ID),
     fixtureId: z.literal('negative_lab.synthetic.color_ramp_exposure_offsets_001'),
     genericMeanAbsErrorToKnownPositive: z.number().min(0).max(1),
     measuredMeanAbsDeltaFromGeneric: z.number().min(0).max(1),
@@ -69,26 +75,15 @@ if (fixture === undefined || fixture.baseFogRgb === null) {
 
 const measuredProfile = resolveNegativeLabRuntimeProfile('negative_lab.measured.c41.process_family.v1');
 const genericProfile = resolveNegativeLabRuntimeProfile(measuredProfile.sourceGenericPresetId ?? '');
-const channelKeys = ['red_weight', 'green_weight', 'blue_weight'];
 
-const clamp01 = (value) => Math.min(1, Math.max(0, value));
+const negativeRgb = fixture.negativeRgb;
+const knownPositiveRgb = fixture.knownPositiveRgb;
+const baseFogRgb = fixture.baseFogRgb;
 
-const renderPixels = (profile) =>
-  fixture.negativeRgb.map((negativeRgb) =>
-    negativeRgb.map((channel, channelIndex) => {
-      const paramsKey = channelKeys[channelIndex];
-      const densitySignal = Math.max(0, channel - fixture.baseFogRgb[channelIndex]);
-      const inverted = 1 - densitySignal / Math.max(0.0001, 0.32 * profile.params[paramsKey]);
-      const contrasted = (inverted - 0.5) * profile.params.contrast + 0.5 + profile.params.exposure * 0.25;
+const measuredPixels = convertNegativeLabDensitySamples(negativeRgb, baseFogRgb, measuredProfile.params);
+const genericPixels = convertNegativeLabDensitySamples(negativeRgb, baseFogRgb, genericProfile.params);
 
-      return clamp01(contrasted);
-    }),
-  );
-
-const measuredPixels = renderPixels(measuredProfile);
-const genericPixels = renderPixels(genericProfile);
-
-const meanAbsDelta = (left, right) => {
+const meanAbsDelta = (left: readonly NegativeLabRgbTriplet[], right: readonly NegativeLabRgbTriplet[]): number => {
   let sum = 0;
   let count = 0;
 
@@ -108,16 +103,17 @@ const meanAbsDelta = (left, right) => {
 };
 
 const changedPixelCount = measuredPixels.filter((pixel, pixelIndex) =>
-  pixel.some((channel, channelIndex) => Math.abs(channel - fixture.negativeRgb[pixelIndex][channelIndex]) > 0.01),
+  pixel.some((channel, channelIndex) => Math.abs(channel - negativeRgb[pixelIndex][channelIndex]) > 0.01),
 ).length;
 
 const renderProof = renderProofSchema.parse({
   changedPixelCount,
+  densityAlgorithm: NEGATIVE_LAB_DENSITY_ALGORITHM_ID,
   fixtureId: fixture.fixtureId,
-  genericMeanAbsErrorToKnownPositive: meanAbsDelta(genericPixels, fixture.knownPositiveRgb),
+  genericMeanAbsErrorToKnownPositive: meanAbsDelta(genericPixels, knownPositiveRgb),
   measuredMeanAbsDeltaFromGeneric: meanAbsDelta(measuredPixels, genericPixels),
-  measuredMeanAbsErrorToKnownPositive: meanAbsDelta(measuredPixels, fixture.knownPositiveRgb),
-  measuredMeanAbsInputDelta: meanAbsDelta(measuredPixels, fixture.negativeRgb),
+  measuredMeanAbsErrorToKnownPositive: meanAbsDelta(measuredPixels, knownPositiveRgb),
+  measuredMeanAbsInputDelta: meanAbsDelta(measuredPixels, negativeRgb),
   profileId: measuredProfile.presetId,
   profileProvenanceHash: buildNegativeLabRuntimeProfileProvenanceHash(measuredProfile),
 });

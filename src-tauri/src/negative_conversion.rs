@@ -824,6 +824,7 @@ pub async fn convert_negatives(
 mod tests {
     use super::*;
     use image::{DynamicImage, Pixel, Rgb32FImage};
+    use serde_json::json;
 
     fn render_fixture(
         pixels: Vec<f32>,
@@ -869,6 +870,20 @@ mod tests {
         }
 
         total / count.max(1) as f32
+    }
+
+    fn hash_rendered_image(image: &Rgb32FImage) -> String {
+        let mut hash = 0xcbf29ce484222325_u64;
+        for pixel in image.pixels() {
+            for channel in pixel.channels() {
+                for byte in channel.to_bits().to_le_bytes() {
+                    hash ^= u64::from(byte);
+                    hash = hash.wrapping_mul(0x100000001b3);
+                }
+            }
+        }
+
+        format!("fnv1a64:{hash:016x}")
     }
 
     #[test]
@@ -1320,6 +1335,88 @@ mod tests {
             preview_render.get_pixel(0, 0).channels(),
             preview_render.get_pixel(3, 1).channels()
         );
+    }
+
+    #[test]
+    fn negative_density_cpu_report_proves_apply_capable_fixture_path() {
+        let input = DynamicImage::ImageRgb32F(
+            Rgb32FImage::from_vec(
+                4,
+                2,
+                vec![
+                    0.95, 0.83, 0.44, 0.88, 0.70, 0.38, 0.50, 0.31, 0.18, 0.08, 0.05, 0.03, //
+                    0.92, 0.78, 0.38, 0.68, 0.48, 0.26, 0.32, 0.20, 0.12, 0.06, 0.04, 0.02,
+                ],
+            )
+            .unwrap(),
+        );
+        let params = NegativeConversionParams {
+            red_weight: 1.07,
+            green_weight: 0.96,
+            blue_weight: 1.18,
+            base_fog_strength: 1.0,
+            base_fog_sample: Some(NegativeBaseFogSampleRect {
+                x: 0.0,
+                y: 0.0,
+                width: 0.5,
+                height: 1.0,
+            }),
+            exposure: 0.05,
+            contrast: 1.1,
+        };
+        let rendered = run_pipeline(&input, &params, None).to_rgb32f();
+        let input_rgb = input.to_rgb32f();
+        let input_to_output_delta = mean_abs_delta(&input_rgb, &rendered);
+        let changed_pixel_count = rendered
+            .pixels()
+            .zip(input_rgb.pixels())
+            .filter(|(rendered_pixel, input_pixel)| {
+                rendered_pixel
+                    .channels()
+                    .iter()
+                    .zip(input_pixel.channels())
+                    .any(|(rendered_channel, input_channel)| {
+                        (rendered_channel - input_channel).abs() > 0.01
+                    })
+            })
+            .count();
+        let monotonic_luma = luminance(*rendered.get_pixel(0, 0))
+            < luminance(*rendered.get_pixel(1, 0))
+            && luminance(*rendered.get_pixel(1, 0)) < luminance(*rendered.get_pixel(3, 0));
+
+        assert!(input_to_output_delta > 0.05);
+        assert!(changed_pixel_count > 0);
+        assert!(monotonic_luma);
+
+        if let Ok(report_path) = std::env::var("RAWENGINE_NEGATIVE_LAB_DENSITY_CPU_REPORT") {
+            let report = json!({
+                "algorithm": "density_rgb_v1",
+                "artifactHash": hash_rendered_image(&rendered),
+                "changedPixelCount": changed_pixel_count,
+                "doesNotProve": [
+                    "camera_raw_decode_path",
+                    "automatic_base_fog_estimation",
+                    "display_referred_input_accuracy",
+                    "neutralization_accuracy",
+                    "colorimetric_scene_reconstruction",
+                    "roll_batch_execution",
+                    "ui_app_server_e2e",
+                    "commercial_converter_parity"
+                ],
+                "inputContract": "declared_linear_scan_rgb",
+                "inputToOutputMeanAbsDelta": input_to_output_delta,
+                "issue": 2343,
+                "monotonicLuma": monotonic_luma,
+                "outputDimensions": {
+                    "height": rendered.height(),
+                    "width": rendered.width()
+                },
+                "runtimeStatus": "cpu_apply_capable_fixture_path",
+                "warningMode": "synthetic_linear_fixture_only"
+            });
+            fs::write(report_path, serde_json::to_vec_pretty(&report).unwrap())
+                .expect("write Negative Lab density CPU report");
+        }
     }
 
     #[test]

@@ -309,6 +309,7 @@
     "check:negative-lab-batch-export-proof": "bun scripts/check-negative-lab-batch-export-proof.ts",
     "check:negative-lab-measured-profiles": "bun scripts/check-negative-lab-measured-profiles.ts",
     "check:negative-lab-measured-render-proof": "bun scripts/check-negative-lab-measured-render-proof.ts",
+    "check:negative-lab-density-cpu": "bun scripts/check-negative-lab-density-cpu.ts",
     "check:negative-lab-workspace-smoke": "bun scripts/capture-visual-smoke.ts --scenario negative-lab-workspace",
     "check:negative-lab-batch-color-smoke": "bun scripts/capture-visual-smoke.ts --scenario negative-lab-batch-color-workspace",
     "check:negative-lab-ui-presets": "bun scripts/check-negative-lab-ui-presets.ts",

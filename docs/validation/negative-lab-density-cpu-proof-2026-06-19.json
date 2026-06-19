@@ -1,0 +1,25 @@
+{
+  "algorithm": "density_rgb_v1",
+  "artifactHash": "fnv1a64:8df655677efae33c",
+  "changedPixelCount": 8,
+  "doesNotProve": [
+    "camera_raw_decode_path",
+    "automatic_base_fog_estimation",
+    "display_referred_input_accuracy",
+    "neutralization_accuracy",
+    "colorimetric_scene_reconstruction",
+    "roll_batch_execution",
+    "ui_app_server_e2e",
+    "commercial_converter_parity"
+  ],
+  "inputContract": "declared_linear_scan_rgb",
+  "inputToOutputMeanAbsDelta": 0.6669523119926453,
+  "issue": 2343,
+  "monotonicLuma": true,
+  "outputDimensions": {
+    "height": 2,
+    "width": 4
+  },
+  "runtimeStatus": "cpu_apply_capable_fixture_path",
+  "warningMode": "synthetic_linear_fixture_only"
+}
