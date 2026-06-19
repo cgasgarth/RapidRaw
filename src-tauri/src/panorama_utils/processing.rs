@@ -4,7 +4,6 @@ use imageproc::corners::{Corner, corners_fast9};
 use imageproc::filter::gaussian_blur_f32;
 use nalgebra::{Matrix3, Point2, SVD};
 use rand::prelude::*;
-use rand::rng;
 use rayon::prelude::*;
 
 pub const MAX_PROCESSING_DIMENSION: u32 = 1600;
@@ -175,7 +174,7 @@ pub fn find_homography_ransac(
     keypoints1: &[KeyPoint],
     keypoints2: &[KeyPoint],
 ) -> Option<(Matrix3<f64>, Vec<Match>)> {
-    let mut rng = rng();
+    let mut rng = StdRng::seed_from_u64(ransac_seed(matches, keypoints1, keypoints2));
     let mut best_h: Option<Matrix3<f64>> = None;
     let mut best_inliers: Vec<Match> = Vec::new();
 
@@ -255,6 +254,29 @@ pub fn find_homography_ransac(
     } else {
         None
     }
+}
+
+fn ransac_seed(matches: &[Match], keypoints1: &[KeyPoint], keypoints2: &[KeyPoint]) -> u64 {
+    let mut hash = 0xcbf29ce484222325_u64;
+    mix_u64(&mut hash, matches.len() as u64);
+    for matched in matches {
+        mix_u64(&mut hash, matched.index1 as u64);
+        mix_u64(&mut hash, matched.index2 as u64);
+        if let Some(point) = keypoints1.get(matched.index1) {
+            mix_u64(&mut hash, point.x as u64);
+            mix_u64(&mut hash, point.y as u64);
+        }
+        if let Some(point) = keypoints2.get(matched.index2) {
+            mix_u64(&mut hash, point.x as u64);
+            mix_u64(&mut hash, point.y as u64);
+        }
+    }
+    hash
+}
+
+fn mix_u64(hash: &mut u64, value: u64) {
+    *hash ^= value;
+    *hash = hash.wrapping_mul(0x100000001b3);
 }
 
 fn are_points_collinear(p1: Point2<f64>, p2: Point2<f64>, p3: Point2<f64>) -> bool {
@@ -343,6 +365,54 @@ fn build_integral_images(gray: &GrayImage) -> (Vec<u64>, Vec<u128>) {
         }
     }
     (sat, sat_sq)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ransac_homography_is_deterministic_for_same_inputs() {
+        let mut keypoints1 = Vec::new();
+        let mut keypoints2 = Vec::new();
+        let mut matches = Vec::new();
+
+        for index in 0..24 {
+            let x = 20 + (index % 6) as u32 * 17;
+            let y = 30 + (index / 6) as u32 * 19;
+            keypoints1.push(KeyPoint { x, y });
+            if index < 20 {
+                keypoints2.push(KeyPoint { x: x + 7, y: y + 5 });
+            } else {
+                keypoints2.push(KeyPoint {
+                    x: 240 - index as u32 * 3,
+                    y: 180 + index as u32,
+                });
+            }
+            matches.push(Match {
+                index1: index,
+                index2: index,
+            });
+        }
+
+        let (expected_homography, expected_inliers) =
+            find_homography_ransac(&matches, &keypoints1, &keypoints2)
+                .expect("synthetic translation homography should be found");
+
+        for _ in 0..8 {
+            let (homography, inliers) = find_homography_ransac(&matches, &keypoints1, &keypoints2)
+                .expect("synthetic translation homography should be found");
+            assert_eq!(match_pairs(&inliers), match_pairs(&expected_inliers));
+            assert_eq!(homography.as_slice(), expected_homography.as_slice());
+        }
+    }
+
+    fn match_pairs(matches: &[Match]) -> Vec<(usize, usize)> {
+        matches
+            .iter()
+            .map(|matched| (matched.index1, matched.index2))
+            .collect()
+    }
 }
 
 pub fn generate_low_detail_mask(gray_full: &GrayImage) -> GrayImage {
