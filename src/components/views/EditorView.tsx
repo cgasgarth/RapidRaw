@@ -1,5 +1,6 @@
 import cx from 'clsx';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { lazy, Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useEditorStore } from '../../store/useEditorStore';
@@ -9,13 +10,10 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import BottomBar from '../panel/BottomBar';
 import Editor from '../panel/Editor';
-import AIPanel from '../panel/right/AIPanel';
 import Controls from '../panel/right/ControlsPanel';
 import CropPanel from '../panel/right/CropPanel';
 import ExportPanel from '../panel/right/ExportPanel';
-import MasksPanel from '../panel/right/MasksPanel';
 import MetadataPanel from '../panel/right/MetadataPanel';
-import PresetsPanel from '../panel/right/PresetsPanel';
 import RightPanelSwitcher from '../panel/right/RightPanelSwitcher';
 import { type ImageFile, Orientation, Panel, type ThumbnailAspectRatio } from '../ui/AppProperties';
 import Resizer from '../ui/Resizer';
@@ -26,6 +24,14 @@ import type {
   RefObject,
   PointerEvent as ReactPointerEvent,
 } from 'react';
+
+const AIPanel = lazy(() => import('../panel/right/AIPanel.js').then((module) => ({ default: module.AIPanel })));
+const MasksPanel = lazy(() =>
+  import('../panel/right/MasksPanel.js').then((module) => ({ default: module.MasksPanel })),
+);
+const PresetsPanel = lazy(() =>
+  import('../panel/right/PresetsPanel.js').then((module) => ({ default: module.PresetsPanel })),
+);
 
 const panelVariants: Variants = {
   animate: (direction: number) => ({
@@ -228,35 +234,37 @@ export default function EditorView({
           key={renderedRightPanel}
           variants={panelVariants}
         >
-          {renderedRightPanel &&
-            {
-              [Panel.Adjustments]: <Controls />,
-              [Panel.Ai]: <AIPanel />,
-              [Panel.Crop]: <CropPanel />,
-              [Panel.Export]: (
-                <ExportPanel
-                  exportState={exportState}
-                  multiSelectedPaths={multiSelectedPaths}
-                  selectedImage={selectedImage}
-                  setExportState={setExportState}
-                  appSettings={appSettings}
-                  onSettingsChange={(settings) => {
-                    void handleSettingsChange(settings);
-                  }}
-                  rootPaths={rootPaths}
-                />
-              ),
-              [Panel.Masks]: <MasksPanel />,
-              [Panel.Metadata]: <MetadataPanel />,
-              [Panel.Presets]: (
-                <PresetsPanel
-                  onNavigateToCommunity={() => {
-                    handleBackToLibrary();
-                    setUI({ activeView: 'community' });
-                  }}
-                />
-              ),
-            }[renderedRightPanel]}
+          <Suspense fallback={<div className="h-full w-full bg-bg-secondary" aria-busy="true" />}>
+            {renderedRightPanel &&
+              {
+                [Panel.Adjustments]: <Controls />,
+                [Panel.Ai]: <AIPanel />,
+                [Panel.Crop]: <CropPanel />,
+                [Panel.Export]: (
+                  <ExportPanel
+                    exportState={exportState}
+                    multiSelectedPaths={multiSelectedPaths}
+                    selectedImage={selectedImage}
+                    setExportState={setExportState}
+                    appSettings={appSettings}
+                    onSettingsChange={(settings) => {
+                      void handleSettingsChange(settings);
+                    }}
+                    rootPaths={rootPaths}
+                  />
+                ),
+                [Panel.Masks]: <MasksPanel />,
+                [Panel.Metadata]: <MetadataPanel />,
+                [Panel.Presets]: (
+                  <PresetsPanel
+                    onNavigateToCommunity={() => {
+                      handleBackToLibrary();
+                      setUI({ activeView: 'community' });
+                    }}
+                  />
+                ),
+              }[renderedRightPanel]}
+          </Suspense>
         </motion.div>
       )}
     </AnimatePresence>

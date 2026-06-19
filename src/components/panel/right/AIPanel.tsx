@@ -360,7 +360,7 @@ const ConnectionStatus = ({
   );
 };
 
-export default function AIPanel() {
+export function AIPanel() {
   const { t } = useTranslation();
   const activePatchContainerId = useEditorStore((s) => s.activeAiPatchContainerId);
   const activeSubMaskId = useEditorStore((s) => s.activeAiSubMaskId);
@@ -1243,6 +1243,8 @@ export default function AIPanel() {
     </DndContext>
   );
 }
+
+export default AIPanel;
 
 function NewMaskDropZone({ isOver }: { isOver: boolean }) {
   const { t } = useTranslation();
