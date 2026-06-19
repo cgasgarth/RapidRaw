@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { EditCommandBus, type EditCommandBusContext, type EditCommandDispatchResult } from './editCommandBus.js';
 import {
   ApprovalClass,
+  aiEnhancementApplyResultV1Schema,
+  aiEnhancementCommandEnvelopeV1Schema,
+  aiEnhancementDryRunResultV1Schema,
   rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
@@ -76,6 +79,12 @@ export type RawEngineLocalAppServerBasicToneDryRunCommandV1 = z.infer<
 >;
 export type RawEngineLocalAppServerBasicToneCommandV1 = z.infer<typeof rawEngineLocalAppServerBasicToneCommandV1Schema>;
 
+export const rawEngineLocalAppServerAiEnhancementCommandV1Schema = aiEnhancementCommandEnvelopeV1Schema;
+
+export type RawEngineLocalAppServerAiEnhancementCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerAiEnhancementCommandV1Schema
+>;
+
 const BASIC_TONE_PARAMETER_DIFF_PATHS = {
   blackPoint: '/parameters/blackPoint',
   clarity: '/parameters/clarity',
@@ -134,7 +143,113 @@ const buildBasicToneMutationResult = (
     warnings: [],
   });
 
+const buildAiEnhancementPlanId = (command: RawEngineLocalAppServerAiEnhancementCommandV1): string =>
+  `dryrun_${command.parameters.capability}_${command.commandId}`;
+
+const buildAiEnhancementPlanHash = (command: RawEngineLocalAppServerAiEnhancementCommandV1): string =>
+  `sha256:${[
+    command.expectedGraphRevision,
+    command.target.imagePath,
+    command.parameters.capability,
+    command.parameters.modelId,
+    command.parameters.sourceContentHash,
+    command.parameters.strength,
+  ].join(':')}`;
+
+const buildAiEnhancementPlanKey = (
+  command: Pick<RawEngineLocalAppServerAiEnhancementCommandV1, 'expectedGraphRevision' | 'parameters' | 'target'>,
+): string =>
+  JSON.stringify([
+    command.expectedGraphRevision,
+    command.target,
+    command.parameters.capability,
+    command.parameters.modelId,
+    command.parameters.modelVersion,
+    command.parameters.sourceContentHash,
+    command.parameters.strength,
+    command.parameters.regionMaskArtifactId ?? null,
+  ]);
+
+const buildAiEnhancementDryRunResult = (
+  command: RawEngineLocalAppServerAiEnhancementCommandV1,
+): z.infer<typeof aiEnhancementDryRunResultV1Schema> =>
+  aiEnhancementDryRunResultV1Schema.parse({
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRunPlanHash: buildAiEnhancementPlanHash(command),
+    dryRunPlanId: buildAiEnhancementPlanId(command),
+    enhancementArtifacts: [
+      {
+        artifactId: `artifact_${command.parameters.capability}_${command.commandId}_enhancement`,
+        contentHash: command.parameters.sourceContentHash,
+        dimensions: {
+          height: 1080,
+          width: 1620,
+        },
+        kind: command.parameters.capability === 'inpaint' ? 'generated_patch' : 'denoise_output',
+        storage: 'temp_cache',
+      },
+    ],
+    modelId: command.parameters.modelId,
+    modelVersion: command.parameters.modelVersion,
+    previewArtifacts: [
+      {
+        artifactId: `artifact_${command.parameters.capability}_${command.commandId}_preview`,
+        contentHash: command.parameters.sourceContentHash,
+        dimensions: {
+          height: 1080,
+          width: 1620,
+        },
+        kind: 'preview',
+        storage: 'temp_cache',
+      },
+    ],
+    providerClass: command.parameters.providerClass,
+    providerId: command.parameters.providerId,
+    schemaVersion: command.schemaVersion,
+    sourceContentHash: command.parameters.sourceContentHash,
+    warnings: [],
+  });
+
+const buildAiEnhancementMutationResult = (
+  command: RawEngineLocalAppServerAiEnhancementCommandV1,
+): z.infer<typeof aiEnhancementApplyResultV1Schema> => {
+  const acceptedDryRunPlanHash = command.parameters.acceptedDryRunPlanHash;
+  const acceptedDryRunPlanId = command.parameters.acceptedDryRunPlanId;
+  if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
+    throw new Error('Local app-server bridge AI enhancement apply requires an accepted dry-run plan.');
+  }
+
+  return aiEnhancementApplyResultV1Schema.parse({
+    appliedGraphRevision: [command.expectedGraphRevision, 'ai', command.commandId].join(':'),
+    changedEditNodeIds: [`edit_node_${command.parameters.capability}_${command.target.kind}`],
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRunPlanHash: acceptedDryRunPlanHash,
+    dryRunPlanId: acceptedDryRunPlanId,
+    outputArtifacts: [
+      {
+        artifactId: `artifact_${command.parameters.capability}_${command.commandId}_output`,
+        contentHash: command.parameters.sourceContentHash,
+        dimensions: {
+          height: 1080,
+          width: 1620,
+        },
+        kind: command.parameters.capability === 'inpaint' ? 'generated_patch' : 'denoise_output',
+        storage: 'sidecar_artifact',
+      },
+    ],
+    provenanceEntryIds: [`prov_${command.parameters.capability}_${command.commandId}`],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+};
+
 export class RawEngineLocalAppServerBridge {
+  readonly #acceptedAiEnhancementDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedBasicToneDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #commandBus: EditCommandBus;
   readonly #toolRegistry: RawEngineToolRegistryV1;
@@ -185,6 +300,46 @@ export class RawEngineLocalAppServerBridge {
       },
       schema: rawEngineLocalAppServerBasicToneCommandV1Schema,
     });
+
+    this.#commandBus.register({
+      commandType: 'ai.enhancement.dryRun',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerAiEnhancementCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'ai.enhancement.dryRun') {
+          throw new Error('Local app-server bridge expected an AI enhancement dry-run command.');
+        }
+
+        const dryRunResult = buildAiEnhancementDryRunResult(parsedCommand);
+        this.#acceptedAiEnhancementDryRunPlanKeys.set(buildAiEnhancementPlanKey(parsedCommand), {
+          planHash: dryRunResult.dryRunPlanHash,
+          planId: dryRunResult.dryRunPlanId,
+        });
+        return dryRunResult;
+      },
+      schema: rawEngineLocalAppServerAiEnhancementCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'ai.enhancement.apply',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerAiEnhancementCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'ai.enhancement.apply') {
+          throw new Error('Local app-server bridge expected an AI enhancement apply command.');
+        }
+
+        const plan = this.#acceptedAiEnhancementDryRunPlanKeys.get(buildAiEnhancementPlanKey(parsedCommand));
+        if (
+          plan === undefined ||
+          plan.planHash !== parsedCommand.parameters.acceptedDryRunPlanHash ||
+          plan.planId !== parsedCommand.parameters.acceptedDryRunPlanId
+        ) {
+          throw new Error('Local app-server bridge rejected AI enhancement apply without a matching dry-run.');
+        }
+
+        return buildAiEnhancementMutationResult(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerAiEnhancementCommandV1Schema,
+    });
   }
 }
 
@@ -200,7 +355,12 @@ export const buildRawEngineLocalAppServerToolRegistryQuery = (
   });
 
 export const rawEngineLocalAppServerBridgeCapabilities = Object.freeze({
-  commandTypes: [RawEngineLocalAppServerCommandType.ToolRegistryQuery, 'toneColor.setBasicTone'],
+  commandTypes: [
+    RawEngineLocalAppServerCommandType.ToolRegistryQuery,
+    'ai.enhancement.apply',
+    'ai.enhancement.dryRun',
+    'toneColor.setBasicTone',
+  ],
   mutatingCommands: true,
-  runtimeStatus: 'basic_tone_dry_run_apply',
+  runtimeStatus: 'basic_tone_and_ai_enhancement_dry_run_apply',
 });
