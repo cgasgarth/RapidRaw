@@ -1,3 +1,5 @@
+import { getComputationalMergeAppServerToolName } from './computationalMergeAppServerToolNames';
+
 import type { ComputationalMergeAppServerRouteFamily } from '../schemas/computationalMergeAppServerSchemas';
 
 interface ComputationalMergeAppServerRoutePairSummary {
@@ -5,27 +7,21 @@ interface ComputationalMergeAppServerRoutePairSummary {
   dryRunToolName: string;
 }
 
-export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_PAIRS: Record<
-  ComputationalMergeAppServerRouteFamily,
-  ComputationalMergeAppServerRoutePairSummary
-> = {
-  focus_stack: {
-    applyToolName: 'computationalmerge.focus_stack.apply_command',
-    dryRunToolName: 'computationalmerge.focus_stack.dry_run_command',
-  },
-  hdr: {
-    applyToolName: 'computationalmerge.hdr.apply_command',
-    dryRunToolName: 'computationalmerge.hdr.dry_run_command',
-  },
-  panorama: {
-    applyToolName: 'computationalmerge.panorama.apply_command',
-    dryRunToolName: 'computationalmerge.panorama.dry_run_command',
-  },
-  super_resolution: {
-    applyToolName: 'computationalmerge.super_resolution.apply_command',
-    dryRunToolName: 'computationalmerge.super_resolution.dry_run_command',
-  },
+const buildComputationalMergeAppServerRoutePairSummary = (
+  family: ComputationalMergeAppServerRouteFamily,
+): ComputationalMergeAppServerRoutePairSummary => {
+  return {
+    applyToolName: getComputationalMergeAppServerToolName(family, 'apply_command'),
+    dryRunToolName: getComputationalMergeAppServerToolName(family, 'dry_run_command'),
+  };
 };
+
+export const COMPUTATIONAL_MERGE_APP_SERVER_ROUTE_PAIRS = {
+  focus_stack: buildComputationalMergeAppServerRoutePairSummary('focus_stack'),
+  hdr: buildComputationalMergeAppServerRoutePairSummary('hdr'),
+  panorama: buildComputationalMergeAppServerRoutePairSummary('panorama'),
+  super_resolution: buildComputationalMergeAppServerRoutePairSummary('super_resolution'),
+} satisfies Record<ComputationalMergeAppServerRouteFamily, ComputationalMergeAppServerRoutePairSummary>;
 
 export function getComputationalMergeAppServerRoutePairSummary(
   family: ComputationalMergeAppServerRouteFamily,
