@@ -269,6 +269,7 @@ struct StitchSeamDiagnostics {
 #[serde(rename_all = "camelCase")]
 struct PairAlignmentReport {
     accepted: bool,
+    brief_matcher: Option<processing::BriefMatchDiagnostics>,
     finite_transform: bool,
     homography_condition_number: Option<f64>,
     inlier_count: usize,
@@ -998,6 +999,7 @@ fn build_empty_alignment_report(
     let pair_reports = (0..source_count.saturating_sub(1))
         .map(|source_index| PairAlignmentReport {
             accepted: false,
+            brief_matcher: None,
             finite_transform: false,
             homography_condition_number: None,
             inlier_count: 0,
@@ -1041,6 +1043,7 @@ fn build_pair_alignment_report(
     let Some(pair) = pair else {
         return PairAlignmentReport {
             accepted: false,
+            brief_matcher: None,
             finite_transform: false,
             homography_condition_number: None,
             inlier_count: 0,
@@ -1084,6 +1087,7 @@ fn build_pair_alignment_report(
     }
     PairAlignmentReport {
         accepted: rejected_reasons.is_empty(),
+        brief_matcher: Some(pair.brief_match_diagnostics.clone()),
         finite_transform,
         homography_condition_number,
         inlier_count: pair.inliers,
