@@ -23,7 +23,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           lastDryRunCommand: dryRunCommand,
           error: null,
           finalImageBase64: null,
-          progressMessage: 'Starting panorama process...',
+          progressMessage: 'Starting panorama...',
         },
       }));
       invoke(Invokes.StitchPanorama, { paths }).catch((err: unknown) => {
@@ -50,7 +50,6 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       await refreshImageList();
       return savedPath;
     } catch (err) {
-      console.error('Failed to save panorama:', err);
       setUI((state) => ({ panoramaModalState: { ...state.panoramaModalState, error: String(err) } }));
       throw err;
     }
@@ -58,13 +57,20 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
 
   const handleStartHdr = useCallback(
     (paths: string[]) => {
+      const dryRunCommand = {
+        toolName: getComputationalMergeAppServerRoutePairSummary('hdr').dryRunToolName,
+        commandType: 'computationalMerge.createHdr' as const,
+        dryRun: true as const,
+        sources: paths.length,
+      };
       setUI((state) => ({
         hdrModalState: {
           ...state.hdrModalState,
           isProcessing: true,
+          lastDryRunCommand: dryRunCommand,
           error: null,
           finalImageBase64: null,
-          progressMessage: 'Starting HDR process...',
+          progressMessage: 'Starting HDR',
         },
       }));
       invoke(Invokes.MergeHdr, { paths }).catch((err: unknown) => {
@@ -86,7 +92,6 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       await refreshImageList();
       return savedPath;
     } catch (err) {
-      console.error('Failed to save HDR image:', err);
       setUI((state) => ({ hdrModalState: { ...state.hdrModalState, error: String(err) } }));
       throw err;
     }
@@ -109,8 +114,8 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
       try {
         await invoke(Invokes.ApplyDenoising, {
           path: denoiseModalState.targetPaths[0],
-          intensity: intensity,
-          method: method,
+          intensity,
+          method,
         });
       } catch (err) {
         setUI((state) => ({

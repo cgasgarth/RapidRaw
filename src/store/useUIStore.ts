@@ -53,6 +53,12 @@ export interface HdrModalState {
   finalImageBase64: string | null;
   isOpen: boolean;
   isProcessing: boolean;
+  lastDryRunCommand?: {
+    toolName: string;
+    commandType: 'computationalMerge.createHdr';
+    dryRun: true;
+    sources: number;
+  };
   progressMessage: string | null;
   settings: HdrMergeUiSettings;
   stitchingSourcePaths: Array<string>;
