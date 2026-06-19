@@ -274,6 +274,7 @@ struct PairAlignmentReport {
     inlier_ratio: f64,
     match_count: usize,
     mean_reprojection_error_px: f64,
+    rejected_reasons: Vec<String>,
     selected_edge: bool,
     source_index_a: usize,
     source_index_b: usize,
@@ -999,6 +1000,13 @@ fn build_empty_alignment_report(
             inlier_ratio: 0.0,
             match_count: 0,
             mean_reprojection_error_px: f64::INFINITY,
+            rejected_reasons: vec![
+                "missing_pairwise_match".to_string(),
+                "non_finite_transform".to_string(),
+                "insufficient_inliers".to_string(),
+                "low_inlier_ratio".to_string(),
+                "high_reprojection_error".to_string(),
+            ],
             selected_edge: true,
             source_index_a: source_index,
             source_index_b: source_index + 1,
@@ -1032,6 +1040,13 @@ fn build_pair_alignment_report(
             inlier_ratio: 0.0,
             match_count: 0,
             mean_reprojection_error_px: f64::INFINITY,
+            rejected_reasons: vec![
+                "missing_pairwise_match".to_string(),
+                "non_finite_transform".to_string(),
+                "insufficient_inliers".to_string(),
+                "low_inlier_ratio".to_string(),
+                "high_reprojection_error".to_string(),
+            ],
             selected_edge,
             source_index_a,
             source_index_b,
@@ -1042,16 +1057,27 @@ fn build_pair_alignment_report(
     let finite_transform = pair.homography3x3.iter().all(|value| value.is_finite());
     let inlier_ratio = round_metric(pair.inlier_ratio);
     let mean_reprojection_error_px = round_metric(pair.mean_reprojection_error_px);
+    let mut rejected_reasons = Vec::new();
+    if !finite_transform {
+        rejected_reasons.push("non_finite_transform".to_string());
+    }
+    if pair.inliers < processing::MIN_INLIERS_FOR_CONNECTION {
+        rejected_reasons.push("insufficient_inliers".to_string());
+    }
+    if inlier_ratio < MIN_ALIGNMENT_INLIER_RATIO {
+        rejected_reasons.push("low_inlier_ratio".to_string());
+    }
+    if mean_reprojection_error_px > MAX_MEAN_REPROJECTION_ERROR_PX {
+        rejected_reasons.push("high_reprojection_error".to_string());
+    }
     PairAlignmentReport {
-        accepted: finite_transform
-            && pair.inliers >= processing::MIN_INLIERS_FOR_CONNECTION
-            && inlier_ratio >= MIN_ALIGNMENT_INLIER_RATIO
-            && mean_reprojection_error_px <= MAX_MEAN_REPROJECTION_ERROR_PX,
+        accepted: rejected_reasons.is_empty(),
         finite_transform,
         inlier_count: pair.inliers,
         inlier_ratio,
         match_count: pair.match_count,
         mean_reprojection_error_px,
+        rejected_reasons,
         selected_edge,
         source_index_a,
         source_index_b,
