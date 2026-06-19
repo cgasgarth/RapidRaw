@@ -6,6 +6,7 @@ import {
   buildPanoramaRuntimeDryRunV1,
 } from '../packages/rawengine-schema/src/panoramaRuntimePlan.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from './lib/computational-proof-budgets.ts';
 
 const sourceFrames = [
   {
@@ -54,7 +55,7 @@ const dryRunCommand = {
     exposureNormalization: 'auto',
     lensCorrectionPolicy: 'required_before_stitch',
     maxPreviewDimensionPx: 1200,
-    memoryBudgetBytes: 64_000_000,
+    memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
     outputName: 'Synthetic Runtime Panorama',
     projection: 'cylindrical',
     qualityPreference: 'balanced',

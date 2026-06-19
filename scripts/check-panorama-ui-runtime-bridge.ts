@@ -7,6 +7,7 @@ import {
 } from '../packages/rawengine-schema/src/panoramaUiControls.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from './lib/computational-proof-budgets.ts';
 
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const sourceFrames = [
@@ -27,7 +28,7 @@ const controls = {
   exposureMode: 'gain_compensation',
   lensCorrectionPolicy: 'required_before_stitch',
   maxPreviewDimensionPx: 1200,
-  memoryBudgetBytes: 64_000_000,
+  memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
   outputName: 'Synthetic UI Runtime Panorama',
   projection: 'cylindrical',
   qualityPreference: 'balanced',

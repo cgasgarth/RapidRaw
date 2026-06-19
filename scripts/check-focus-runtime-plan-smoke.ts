@@ -5,6 +5,7 @@ import {
   buildFocusStackRuntimeDryRunV1,
 } from '../packages/rawengine-schema/src/focusStackRuntimePlan.ts';
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from './lib/computational-proof-budgets.ts';
 
 const WIDTH = 72;
 const HEIGHT = 48;
@@ -54,7 +55,7 @@ const dryRunCommand = {
     alignmentMode: 'translation',
     blendMethod: 'weighted_sharpness',
     maxPreviewDimensionPx: 1200,
-    memoryBudgetBytes: 64_000_000,
+    memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
     outputName: 'Synthetic Runtime Focus Stack',
     qualityPreference: 'best',
     retouchLayerPolicy: 'generate_retouch_layer',
