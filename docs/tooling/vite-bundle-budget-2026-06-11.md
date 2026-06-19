@@ -76,6 +76,16 @@ This diagnostic flow does not change release packaging. Source maps stay out of
 the required production build, but the report explains when maps are unavailable
 instead of emitting misleading empty attribution.
 
+Compare two report JSON files locally with:
+
+```sh
+bun run bundle:diff -- --base path/to/base-report.json --head path/to/head-report.json
+```
+
+This writes `vite-bundle-diff.json` and `vite-bundle-diff.md` under
+`artifacts/bundle-report/`. The diff is advisory; the existing budget gate
+remains the pass/fail authority.
+
 The same gate runs a production payload scan against `dist` to reject sourcemap
 artifacts, sourcemap comments, localhost URLs, local user paths, and
 debug/fixture-like asset names. Debug payloads belong in dev-only scripts or
