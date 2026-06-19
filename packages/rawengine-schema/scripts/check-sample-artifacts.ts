@@ -93,6 +93,7 @@ import {
   sampleAiToolCommandEnvelopeV1,
   sampleAiToolDryRunResultV1,
   sampleArtifactHandleV1,
+  sampleBasicToneAgentReplayFixtureV1,
   sampleCommandEnvelopeV1,
   sampleComputationalMergeAppServerToolManifestV1,
   sampleComputationalMergeCommandEnvelopeV1,
@@ -209,6 +210,12 @@ const sampleArtifacts = [
     path: 'packages/rawengine-schema/samples/agent-replay-fixture-v1.json',
     schema: rawEngineAgentReplayFixtureV1Schema,
     value: sampleRawEngineAgentReplayFixtureV1,
+  },
+  {
+    name: 'basic tone agent replay fixture',
+    path: 'packages/rawengine-schema/samples/basic-tone-agent-replay-fixture-v1.json',
+    schema: rawEngineAgentReplayFixtureV1Schema,
+    value: sampleBasicToneAgentReplayFixtureV1,
   },
   {
     name: 'AI tool command envelope',

@@ -947,6 +947,88 @@ export const sampleToneColorMutationResultV1: ToneColorMutationResultV1 = toneCo
   warnings: [],
 });
 
+const sampleToneColorAuditParameterDiff = sampleToneColorDryRunResultV1.parameterDiff.map(
+  ({ path, previousValue, value }) => ({
+    path,
+    previousValue,
+    value,
+  }),
+);
+
+export const sampleBasicToneAgentReplayFixtureV1: RawEngineAgentReplayFixtureV1 =
+  rawEngineAgentReplayFixtureV1Schema.parse({
+    actor: sampleToneColorCommandEnvelopeV1.actor,
+    deterministicReplayHash: 'sha256:sample-basic-tone-agent-apply-replay',
+    finalGraphRevision: sampleToneColorMutationResultV1.appliedGraphRevision,
+    initialGraphRevision: sampleToneColorDryRunResultV1.sourceGraphRevision,
+    registry: sampleToolRegistryV1,
+    replayId: 'replay_agent_basic_tone_apply_001',
+    replayKind: 'agent_tool_replay',
+    schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+    steps: [
+      {
+        auditLog: createSampleReplayAuditLog({
+          affectedArtifactIds: sampleToneColorDryRunResultV1.previewArtifacts.map(({ artifactId }) => artifactId),
+          inputSchemaName: 'ToneColorCommandEnvelopeV1',
+          parameterDiff: sampleToneColorAuditParameterDiff,
+          toolKind: 'dry_run',
+          toolName: 'tonecolor.dry_run_command',
+          warnings: sampleToneColorDryRunResultV1.warnings,
+        }),
+        approval: sampleToneColorCommandEnvelopeV1.approval,
+        deterministic: true,
+        dryRun: true,
+        input: sampleToneColorCommandEnvelopeV1,
+        inputContentHash: 'sha256:sample-basic-tone-dry-run-input',
+        inputSchemaName: 'ToneColorCommandEnvelopeV1',
+        mutates: false,
+        output: sampleToneColorDryRunResultV1,
+        outputContentHash: 'sha256:sample-basic-tone-dry-run-output',
+        outputSchemaName: 'ToneColorDryRunResultV1',
+        prerequisiteStepIds: [],
+        sourceGraphRevision: sampleToneColorDryRunResultV1.sourceGraphRevision,
+        stepId: 'step_basic_tone_dry_run',
+        toolKind: 'dry_run',
+        toolName: 'tonecolor.dry_run_command',
+        warnings: sampleToneColorDryRunResultV1.warnings,
+      },
+      {
+        auditLog: createSampleReplayAuditLog({
+          affectedArtifactIds: ['artifact_tone_color_basic_raw_before', 'artifact_tone_color_basic_raw_after'],
+          inputSchemaName: 'ToneColorCommandEnvelopeV1',
+          parameterDiff: sampleToneColorAuditParameterDiff,
+          rollbackPoint: {
+            graphRevision: sampleToneColorMutationResultV1.sourceGraphRevision,
+            undoRevision: sampleToneColorMutationResultV1.undoRevision,
+          },
+          toolKind: 'apply',
+          toolName: 'tonecolor.apply_command',
+          warnings: sampleToneColorMutationResultV1.warnings,
+        }),
+        approval: sampleToneColorApplyCommandEnvelopeV1.approval,
+        deterministic: true,
+        dryRun: false,
+        input: sampleToneColorApplyCommandEnvelopeV1,
+        inputContentHash: 'sha256:sample-basic-tone-apply-input',
+        inputSchemaName: 'ToneColorCommandEnvelopeV1',
+        mutates: true,
+        output: sampleToneColorMutationResultV1,
+        outputContentHash: 'sha256:sample-basic-tone-apply-output',
+        outputSchemaName: 'ToneColorMutationResultV1',
+        prerequisiteStepIds: ['step_basic_tone_dry_run'],
+        resultingGraphRevision: sampleToneColorMutationResultV1.appliedGraphRevision,
+        sourceGraphRevision: sampleToneColorMutationResultV1.sourceGraphRevision,
+        stepId: 'step_basic_tone_apply',
+        toolKind: 'apply',
+        toolName: 'tonecolor.apply_command',
+        warnings: sampleToneColorMutationResultV1.warnings,
+      },
+    ],
+    target: sampleToneColorCommandEnvelopeV1.target,
+    validationProfile: 'golden_replay',
+    warnings: [],
+  });
+
 export const sampleRawEngineAgentReplayFixtureV1: RawEngineAgentReplayFixtureV1 =
   rawEngineAgentReplayFixtureV1Schema.parse({
     actor: sampleEditGraphCommandEnvelopeV1.actor,
