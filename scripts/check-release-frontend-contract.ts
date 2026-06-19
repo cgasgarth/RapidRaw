@@ -62,7 +62,7 @@ expectEqual(
 );
 expectEqual(tauriConfig.build.frontendDist, '../dist', 'Tauri packaging must consume the same dist directory.');
 
-expectIncludes(viteConfig, "minify: 'esbuild'", 'Vite release builds must keep JavaScript minification enabled.');
+expectIncludes(viteConfig, "minify: 'oxc'", 'Vite release builds must use Oxc JavaScript minification.');
 expectIncludes(viteConfig, "cssMinify: 'esbuild'", 'Vite release builds must keep CSS minification enabled.');
 expectIncludes(viteConfig, 'sourcemap: !!process.env.TAURI_ENV_DEBUG', 'TAURI_ENV_DEBUG may control sourcemaps only.');
 

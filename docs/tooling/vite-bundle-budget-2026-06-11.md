@@ -14,9 +14,9 @@ Bundle budgets measure the minified production Vite build produced by:
 bun run build:frontend
 ```
 
-`vite.config.js` always uses esbuild minification for JavaScript and CSS in
-build output. `TAURI_ENV_DEBUG` only controls sourcemap generation; it does not
-disable minification or relax bundle budgets.
+`vite.config.js` always uses Oxc minification for JavaScript and esbuild
+minification for CSS in build output. `TAURI_ENV_DEBUG` only controls sourcemap
+generation; it does not disable minification or relax bundle budgets.
 
 Use the dev server or debug sourcemaps for local debugging. If a local-only
 unminified diagnostic build is added later, it must be named separately and must
@@ -130,5 +130,5 @@ The next bundle-governance work is tracked in milestone
 - #2401 audits and splits the first oversized UI boundary.
 - #2402 audits large frontend dependencies before new UI growth.
 - #2404 guards production builds against debug-only payloads.
-- #2407 migrates JavaScript minification from esbuild to Oxc when the project is
-  ready for the Vite 8 minifier change.
+- #2407 migrated JavaScript minification from esbuild to Oxc while keeping CSS
+  minification on esbuild.
