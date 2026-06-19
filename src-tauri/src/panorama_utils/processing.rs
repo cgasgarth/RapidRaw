@@ -61,6 +61,7 @@ pub struct FeatureMatchResult {
 #[derive(Debug, Clone, Copy)]
 pub struct TransferErrorMetrics {
     pub forward_error_px: f64,
+    pub p95_symmetric_error_px: f64,
     pub reverse_error_px: f64,
     pub symmetric_error_px: f64,
 }
@@ -516,6 +517,7 @@ fn transfer_error_metrics_with_inverse(
     {
         Some(TransferErrorMetrics {
             forward_error_px,
+            p95_symmetric_error_px: symmetric_error_px,
             reverse_error_px,
             symmetric_error_px,
         })
@@ -546,6 +548,7 @@ pub fn mean_transfer_error_metrics(
     if inliers.is_empty() {
         return TransferErrorMetrics {
             forward_error_px: f64::INFINITY,
+            p95_symmetric_error_px: f64::INFINITY,
             reverse_error_px: f64::INFINITY,
             symmetric_error_px: f64::INFINITY,
         };
@@ -553,11 +556,12 @@ pub fn mean_transfer_error_metrics(
     let Some(inverse) = homography.try_inverse() else {
         return TransferErrorMetrics {
             forward_error_px: f64::INFINITY,
+            p95_symmetric_error_px: f64::INFINITY,
             reverse_error_px: f64::INFINITY,
             symmetric_error_px: f64::INFINITY,
         };
     };
-    let (sum, count) = inliers
+    let metrics = inliers
         .iter()
         .filter_map(|matched| {
             let p1 = keypoints1[matched.index1];
@@ -569,31 +573,38 @@ pub fn mean_transfer_error_metrics(
                 Point2::new(p2.x as f64, p2.y as f64),
             )
         })
-        .fold(
-            (
-                TransferErrorMetrics {
-                    forward_error_px: 0.0,
-                    reverse_error_px: 0.0,
-                    symmetric_error_px: 0.0,
-                },
-                0_usize,
-            ),
-            |(mut sum, count), metrics| {
-                sum.forward_error_px += metrics.forward_error_px;
-                sum.reverse_error_px += metrics.reverse_error_px;
-                sum.symmetric_error_px += metrics.symmetric_error_px;
-                (sum, count + 1)
-            },
-        );
-    if count == 0 {
+        .collect::<Vec<_>>();
+    if metrics.is_empty() {
         return TransferErrorMetrics {
             forward_error_px: f64::INFINITY,
+            p95_symmetric_error_px: f64::INFINITY,
             reverse_error_px: f64::INFINITY,
             symmetric_error_px: f64::INFINITY,
         };
     }
+    let count = metrics.len();
+    let sum = metrics.iter().fold(
+        TransferErrorMetrics {
+            forward_error_px: 0.0,
+            p95_symmetric_error_px: 0.0,
+            reverse_error_px: 0.0,
+            symmetric_error_px: 0.0,
+        },
+        |mut sum, metrics| {
+            sum.forward_error_px += metrics.forward_error_px;
+            sum.reverse_error_px += metrics.reverse_error_px;
+            sum.symmetric_error_px += metrics.symmetric_error_px;
+            sum
+        },
+    );
+    let mut symmetric_errors = metrics
+        .iter()
+        .map(|metrics| metrics.symmetric_error_px)
+        .collect::<Vec<_>>();
+    symmetric_errors.sort_by(|left, right| left.total_cmp(right));
     TransferErrorMetrics {
         forward_error_px: sum.forward_error_px / count as f64,
+        p95_symmetric_error_px: percentile_value(&symmetric_errors, 0.95),
         reverse_error_px: sum.reverse_error_px / count as f64,
         symmetric_error_px: sum.symmetric_error_px / count as f64,
     }
