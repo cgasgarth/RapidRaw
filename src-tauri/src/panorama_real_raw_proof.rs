@@ -29,6 +29,13 @@ const SOURCE_RELATIVE_PATHS: [&str; 3] = [
     "private-fixtures/panorama/overlap-stitch-v1/frame-03.raf",
 ];
 
+const STRESS_SOURCE_RELATIVE_PATHS: [&str; 4] = [
+    "private-fixtures/panorama/stress-pixls-ir-v1/frame-01.arw",
+    "private-fixtures/panorama/stress-pixls-ir-v1/frame-02.arw",
+    "private-fixtures/panorama/stress-pixls-ir-v1/frame-03.arw",
+    "private-fixtures/panorama/stress-pixls-ir-v1/frame-04.arw",
+];
+
 const NON_CLAIMS: [&str; 4] = [
     "not_stitch_quality_verified",
     "not_runtime_apply_capable",
@@ -54,9 +61,16 @@ const MODAL_BEFORE_FILE: &str = "panorama-overlap-modal-before.png";
 const MODAL_AFTER_FILE: &str = "panorama-overlap-modal-after.png";
 const RESULT_REVIEW_FILE: &str = "panorama-overlap-result-review.png";
 const EXPORT_REVIEW_FILE: &str = "panorama-overlap-export-review.png";
+const STRESS_ALIGNMENT_REPORT_FILE: &str = "panorama-stress-pixls-ir-alignment.json";
+const STRESS_STITCH_REPORT_FILE: &str = "panorama-stress-pixls-ir-stitch-report.json";
+const STRESS_STITCH_OUTPUT_FILE: &str = "panorama-stress-pixls-ir-merge.tiff";
+const STRESS_REVIEW_FILE: &str = "panorama-stress-pixls-ir-review.png";
+const STRESS_DIAGNOSTIC_FILE: &str = "panorama-stress-pixls-ir-diagnostic.json";
 const MIN_ALIGNMENT_INLIER_RATIO: f64 = 0.55;
 const MAX_MEAN_REPROJECTION_ERROR_PX: f64 = 5.0;
 const MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA: f64 = 0.015;
+const MIN_DIAGNOSTIC_OUTPUT_MEAN_LUMA: f64 = 0.01;
+const MIN_DIAGNOSTIC_NON_BLACK_PIXEL_RATIO: f64 = 0.01;
 const RUNTIME_SAMPLE_WIDTH: u32 = 72;
 const RUNTIME_SAMPLE_HEIGHT: u32 = 48;
 const RUNTIME_SAMPLE_OVERLAP_WIDTH: u32 = 24;
@@ -75,6 +89,22 @@ const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
     source_dir: "private-fixtures/panorama/overlap-stitch-v1",
     source_relative_paths: &SOURCE_RELATIVE_PATHS,
     ui_issue: 1333,
+};
+
+const STRESS_CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
+    decode_report_file: "panorama-stress-pixls-ir-decode-report.json",
+    expected_format_label: "arw",
+    feature_family: "panorama_stitch",
+    fixture_id: "validation.computational-merge.panorama-stress-pixls-ir.v1",
+    implementation_issue: 2264,
+    metric_source_count: STRESS_SOURCE_RELATIVE_PATHS.len(),
+    notes: "Pixls infrared ARW panorama stress-candidate diagnostic only. This exercises production RAW decode, current BRIEF/RANSAC alignment, and current stitch artifact generation when possible. It is not acceptance evidence and does not claim fixture suitability, app-server apply, preview/export parity, UI review, or stitch quality.",
+    quality_file: "panorama-stress-pixls-ir-quality.json",
+    report_file: "panorama-stress-pixls-ir-private-run-report.json",
+    report_id: "computational-merge-run.panorama-stress-pixls-ir.v1",
+    source_dir: "private-fixtures/panorama/stress-pixls-ir-v1",
+    source_relative_paths: &STRESS_SOURCE_RELATIVE_PATHS,
+    ui_issue: 2148,
 };
 
 #[test]
@@ -151,6 +181,25 @@ fn private_preview_export_smoke_generates_panorama_real_raw_report_when_enabled(
     );
     run_private_preview_export_proof(&private_root)
         .expect("private panorama real RAW preview/export proof runs");
+}
+
+#[test]
+fn private_stress_candidate_diagnostic_generates_panorama_report_when_enabled() {
+    if std::env::var("RAWENGINE_RUN_PRIVATE_PANORAMA_STRESS_CANDIDATE_DIAGNOSTIC")
+        .ok()
+        .as_deref()
+        != Some("1")
+    {
+        eprintln!("skipping private panorama stress-candidate diagnostic");
+        return;
+    }
+
+    let private_root = PathBuf::from(
+        std::env::var("RAWENGINE_PRIVATE_RAW_ROOT")
+            .unwrap_or_else(|_| "/tmp/rawengine-private-root".to_string()),
+    );
+    run_private_stress_candidate_diagnostic(&private_root)
+        .expect("private panorama stress-candidate diagnostic runs");
 }
 
 #[derive(Serialize)]
@@ -232,6 +281,24 @@ struct PairAlignmentReport {
     transform_3x3_row_major: [f64; 9],
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StressCandidateDiagnostic {
+    alignment_report_path: String,
+    decode_report_path: String,
+    fixture_id: String,
+    generated_at: String,
+    graph_revision_hash: String,
+    merge_output_path: Option<String>,
+    non_claims: Vec<String>,
+    quality_metrics: Vec<QualityMetric>,
+    render_error: Option<String>,
+    review_image_path: Option<String>,
+    source_hashes: Vec<crate::private_decode_raw_proof::SourceHash>,
+    stitch_report_path: Option<String>,
+    suitability: String,
+}
+
 struct PreparedSource {
     features: Vec<crate::panorama_stitching::Feature>,
     keypoints: Vec<KeyPoint>,
@@ -246,7 +313,8 @@ fn run_private_alignment_proof(private_root: &Path) -> Result<(), String> {
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
 
     let decode_metrics = build_metrics(&loaded_sources, CONFIG.metric_source_count);
-    let alignment_report = build_alignment_report(&loaded_sources, &graph_revision_hash)?;
+    let alignment_report =
+        build_alignment_report(&loaded_sources, &graph_revision_hash, CONFIG.fixture_id)?;
     let alignment_metrics = build_alignment_metrics(&alignment_report, loaded_sources.len());
     let metrics = [decode_metrics, alignment_metrics].concat();
     if !metrics.iter().all(|metric| metric.passed) {
@@ -261,6 +329,8 @@ fn run_private_alignment_proof(private_root: &Path) -> Result<(), String> {
         &loaded_sources,
         &source_hashes,
         &graph_revision_hash,
+        &CONFIG,
+        &ALIGNMENT_NON_CLAIMS,
     )?;
     write_json(&output_dir.join(ALIGNMENT_REPORT_FILE), &alignment_report)?;
     write_json(&output_dir.join(CONFIG.quality_file), &metrics)?;
@@ -320,15 +390,17 @@ fn run_private_stitch_artifact_proof(private_root: &Path) -> Result<(), String> 
     let output_dir = private_root.join(ARTIFACT_ROOT);
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
 
-    let alignment_report = build_alignment_report(&loaded_sources, &graph_revision_hash)?;
-    let render_result = render_private_panorama(private_root)?;
+    let alignment_report =
+        build_alignment_report(&loaded_sources, &graph_revision_hash, CONFIG.fixture_id)?;
+    let render_result = render_private_panorama(private_root, CONFIG.source_relative_paths)?;
     let stitch_output_path = output_dir.join(STITCH_OUTPUT_FILE);
     render_result
         .image
         .save_with_format(&stitch_output_path, ImageFormat::Tiff)
         .map_err(|error| error.to_string())?;
 
-    let stitch_report = build_stitch_report(&render_result, &graph_revision_hash);
+    let stitch_report =
+        build_stitch_report(&render_result, &graph_revision_hash, CONFIG.fixture_id);
     let metrics = [
         build_metrics(&loaded_sources, CONFIG.metric_source_count),
         build_alignment_metrics(&alignment_report, loaded_sources.len()),
@@ -347,6 +419,8 @@ fn run_private_stitch_artifact_proof(private_root: &Path) -> Result<(), String> 
         &loaded_sources,
         &source_hashes,
         &graph_revision_hash,
+        &CONFIG,
+        &ALIGNMENT_NON_CLAIMS,
     )?;
     write_json(&output_dir.join(ALIGNMENT_REPORT_FILE), &alignment_report)?;
     write_json(&output_dir.join(STITCH_REPORT_FILE), &stitch_report)?;
@@ -412,8 +486,9 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
     let output_dir = private_root.join(ARTIFACT_ROOT);
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
 
-    let alignment_report = build_alignment_report(&loaded_sources, &graph_revision_hash)?;
-    let render_result = render_private_panorama(private_root)?;
+    let alignment_report =
+        build_alignment_report(&loaded_sources, &graph_revision_hash, CONFIG.fixture_id)?;
+    let render_result = render_private_panorama(private_root, CONFIG.source_relative_paths)?;
     let stitch_output_path = output_dir.join(STITCH_OUTPUT_FILE);
     let preview_output_path = output_dir.join(PREVIEW_OUTPUT_FILE);
     let export_output_path = output_dir.join(EXPORT_OUTPUT_FILE);
@@ -462,7 +537,8 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
         .save_with_format(&export_review_path, ImageFormat::Png)
         .map_err(|error| error.to_string())?;
     let preview_export_mean_abs_delta = mean_abs_delta_rgb8(&preview_image, &export_preview)?;
-    let stitch_report = build_stitch_report(&render_result, &graph_revision_hash);
+    let stitch_report =
+        build_stitch_report(&render_result, &graph_revision_hash, CONFIG.fixture_id);
     let metrics = [
         build_metrics(&loaded_sources, CONFIG.metric_source_count),
         build_alignment_metrics(&alignment_report, loaded_sources.len()),
@@ -487,13 +563,20 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
         &loaded_sources,
         &source_hashes,
         &graph_revision_hash,
+        &CONFIG,
+        &ALIGNMENT_NON_CLAIMS,
     )?;
     write_json(&output_dir.join(ALIGNMENT_REPORT_FILE), &alignment_report)?;
     write_json(&output_dir.join(STITCH_REPORT_FILE), &stitch_report)?;
     write_json(&output_dir.join(CONFIG.quality_file), &metrics)?;
     write_json(
         &runtime_sample_path,
-        &build_runtime_sample(&loaded_sources, &source_hashes, &graph_revision_hash),
+        &build_runtime_sample(
+            &loaded_sources,
+            &source_hashes,
+            &graph_revision_hash,
+            &CONFIG,
+        ),
     )?;
 
     write_json(
@@ -558,13 +641,114 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
     )
 }
 
-fn render_private_panorama(private_root: &Path) -> Result<PanoramaRenderResult, String> {
+fn run_private_stress_candidate_diagnostic(private_root: &Path) -> Result<(), String> {
+    let loaded_sources = load_sources(private_root, &STRESS_CONFIG)?;
+    validate_decoded_sources(&loaded_sources, &STRESS_CONFIG)?;
+    let source_hashes = source_hashes(private_root, &STRESS_CONFIG)?;
+    let graph_revision_hash = graph_revision_hash(STRESS_CONFIG.fixture_id, &source_hashes);
+    let output_dir = private_root.join(ARTIFACT_ROOT);
+    fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
+
+    let alignment_report = build_alignment_report(
+        &loaded_sources,
+        &graph_revision_hash,
+        STRESS_CONFIG.fixture_id,
+    )?;
+    let mut quality_metrics = [
+        build_metrics(&loaded_sources, STRESS_CONFIG.metric_source_count),
+        build_alignment_metrics(&alignment_report, loaded_sources.len()),
+    ]
+    .concat();
+    let mut stitch_report_path = None;
+    let mut merge_output_path = None;
+    let mut render_error = None;
+    let mut review_image_path = None;
+
+    match render_private_panorama(private_root, STRESS_CONFIG.source_relative_paths) {
+        Ok(render_result) => {
+            let stitch_output_path = output_dir.join(STRESS_STITCH_OUTPUT_FILE);
+            let review_image_output_path = output_dir.join(STRESS_REVIEW_FILE);
+            render_result
+                .image
+                .save_with_format(&stitch_output_path, ImageFormat::Tiff)
+                .map_err(|error| error.to_string())?;
+            render_result
+                .image
+                .thumbnail(1600, 1600)
+                .to_rgb8()
+                .save_with_format(&review_image_output_path, ImageFormat::Png)
+                .map_err(|error| error.to_string())?;
+            let stitch_report = build_stitch_report(
+                &render_result,
+                &graph_revision_hash,
+                STRESS_CONFIG.fixture_id,
+            );
+            quality_metrics.extend(build_stitch_metrics(&render_result, loaded_sources.len()));
+            quality_metrics.extend(build_visibility_metrics(&render_result.image));
+            write_json(&output_dir.join(STRESS_STITCH_REPORT_FILE), &stitch_report)?;
+            stitch_report_path = Some(format!("{ARTIFACT_ROOT}/{STRESS_STITCH_REPORT_FILE}"));
+            merge_output_path = Some(format!("{ARTIFACT_ROOT}/{STRESS_STITCH_OUTPUT_FILE}"));
+            review_image_path = Some(format!("{ARTIFACT_ROOT}/{STRESS_REVIEW_FILE}"));
+        }
+        Err(error) => {
+            render_error = Some(error);
+        }
+    }
+
+    sanitize_diagnostic_metrics(&mut quality_metrics);
+    write_decode_report(
+        &output_dir,
+        &loaded_sources,
+        &source_hashes,
+        &graph_revision_hash,
+        &STRESS_CONFIG,
+        &ALIGNMENT_NON_CLAIMS,
+    )?;
+    write_json(
+        &output_dir.join(STRESS_ALIGNMENT_REPORT_FILE),
+        &alignment_report,
+    )?;
+    write_json(
+        &output_dir.join(STRESS_CONFIG.quality_file),
+        &quality_metrics,
+    )?;
+    write_json(
+        &output_dir.join(STRESS_DIAGNOSTIC_FILE),
+        &StressCandidateDiagnostic {
+            alignment_report_path: format!("{ARTIFACT_ROOT}/{STRESS_ALIGNMENT_REPORT_FILE}"),
+            decode_report_path: format!("{ARTIFACT_ROOT}/{}", STRESS_CONFIG.decode_report_file),
+            fixture_id: STRESS_CONFIG.fixture_id.to_string(),
+            generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+            graph_revision_hash,
+            merge_output_path,
+            non_claims: ALIGNMENT_NON_CLAIMS
+                .iter()
+                .map(|claim| claim.to_string())
+                .chain([
+                    "stress_candidate_not_accepted".to_string(),
+                    "not_fixture_suitability_verified".to_string(),
+                    "not_visibility_accepted".to_string(),
+                ])
+                .collect(),
+            quality_metrics,
+            render_error,
+            review_image_path,
+            source_hashes,
+            stitch_report_path,
+            suitability: "stress_candidate_not_accepted".to_string(),
+        },
+    )
+}
+
+fn render_private_panorama(
+    private_root: &Path,
+    source_relative_paths: &[&str],
+) -> Result<PanoramaRenderResult, String> {
     let app = tauri::test::mock_builder()
         .manage(AppState::new())
         .build(tauri::test::mock_context(tauri::test::noop_assets()))
         .map_err(|error| error.to_string())?;
-    let image_paths = CONFIG
-        .source_relative_paths
+    let image_paths = source_relative_paths
         .iter()
         .map(|relative_path| {
             private_root
@@ -580,14 +764,23 @@ fn render_private_panorama(private_root: &Path) -> Result<PanoramaRenderResult, 
     )
 }
 
+fn sanitize_diagnostic_metrics(metrics: &mut [QualityMetric]) {
+    for metric in metrics.iter_mut() {
+        if !metric.value.is_finite() {
+            metric.value = 1_000_000.0;
+        }
+    }
+}
+
 fn build_runtime_sample(
     loaded_sources: &[LoadedSource],
     source_hashes: &[crate::private_decode_raw_proof::SourceHash],
     graph_revision_hash: &str,
+    config: &PrivateDecodeProofConfig,
 ) -> PanoramaPrivateRuntimeSample {
     PanoramaPrivateRuntimeSample {
         connected_source_indices: (0..loaded_sources.len()).collect(),
-        fixture_id: CONFIG.fixture_id.to_string(),
+        fixture_id: config.fixture_id.to_string(),
         frames: loaded_sources
             .iter()
             .zip(source_hashes.iter())
@@ -613,6 +806,7 @@ fn build_runtime_sample(
 fn build_stitch_report(
     render_result: &PanoramaRenderResult,
     graph_revision_hash: &str,
+    fixture_id: &str,
 ) -> StitchReport {
     StitchReport {
         boundary_mode: "auto_crop".to_string(),
@@ -622,7 +816,7 @@ fn build_stitch_report(
             mode: "planned_not_applied".to_string(),
             support: "diagnostic_only_current_engine".to_string(),
         },
-        fixture_id: CONFIG.fixture_id.to_string(),
+        fixture_id: fixture_id.to_string(),
         graph_revision_hash: graph_revision_hash.to_string(),
         non_claims: ALIGNMENT_NON_CLAIMS
             .iter()
@@ -647,9 +841,11 @@ fn write_decode_report(
     loaded_sources: &[LoadedSource],
     source_hashes: &[crate::private_decode_raw_proof::SourceHash],
     graph_revision_hash: &str,
+    config: &PrivateDecodeProofConfig,
+    non_claims: &[&str],
 ) -> Result<(), String> {
     write_json(
-        &output_dir.join(CONFIG.decode_report_file),
+        &output_dir.join(config.decode_report_file),
         &DecodeReport {
             decoded_sources: loaded_sources
                 .iter()
@@ -659,16 +855,13 @@ fn write_decode_report(
                     content_hash: source_hash.hash.clone(),
                     height: source.image.height(),
                     local_relative_path: source.relative_path.clone(),
-                    raw_format: CONFIG.expected_format_label.to_string(),
+                    raw_format: config.expected_format_label.to_string(),
                     width: source.image.width(),
                 })
                 .collect(),
-            fixture_id: CONFIG.fixture_id.to_string(),
+            fixture_id: config.fixture_id.to_string(),
             graph_revision_hash: graph_revision_hash.to_string(),
-            non_claims: ALIGNMENT_NON_CLAIMS
-                .iter()
-                .map(|claim| claim.to_string())
-                .collect(),
+            non_claims: non_claims.iter().map(|claim| claim.to_string()).collect(),
         },
     )
 }
@@ -676,6 +869,7 @@ fn write_decode_report(
 fn build_alignment_report(
     loaded_sources: &[LoadedSource],
     graph_revision_hash: &str,
+    fixture_id: &str,
 ) -> Result<AlignmentReport, String> {
     let brief_pairs = processing::generate_brief_pairs();
     let prepared_sources: Vec<PreparedSource> = loaded_sources
@@ -757,7 +951,7 @@ fn build_alignment_report(
     }
 
     Ok(AlignmentReport {
-        fixture_id: CONFIG.fixture_id.to_string(),
+        fixture_id: fixture_id.to_string(),
         graph_revision_hash: graph_revision_hash.to_string(),
         non_claims: ALIGNMENT_NON_CLAIMS
             .iter()
@@ -909,6 +1103,55 @@ fn build_stitch_metrics(
             edge_continuity_score,
             0.85,
             edge_continuity_score >= 0.85,
+        ),
+    ]
+}
+
+fn build_visibility_metrics(image: &image::DynamicImage) -> Vec<QualityMetric> {
+    let rgb = image.to_rgb8();
+    let pixel_count = (rgb.width() as u64 * rgb.height() as u64) as f64;
+    if pixel_count == 0.0 {
+        return vec![
+            metric(
+                "panoramaOutputMeanLuma",
+                0.0,
+                MIN_DIAGNOSTIC_OUTPUT_MEAN_LUMA,
+                false,
+            ),
+            metric(
+                "panoramaOutputNonBlackPixelRatio",
+                0.0,
+                MIN_DIAGNOSTIC_NON_BLACK_PIXEL_RATIO,
+                false,
+            ),
+        ];
+    }
+
+    let mut luma_sum = 0.0;
+    let mut non_black_count = 0.0;
+    for pixel in rgb.pixels() {
+        let [red, green, blue] = pixel.0;
+        let luma = (0.2126 * red as f64 + 0.7152 * green as f64 + 0.0722 * blue as f64) / 255.0;
+        luma_sum += luma;
+        if red > 3 || green > 3 || blue > 3 {
+            non_black_count += 1.0;
+        }
+    }
+
+    let mean_luma = luma_sum / pixel_count;
+    let non_black_ratio = non_black_count / pixel_count;
+    vec![
+        metric(
+            "panoramaOutputMeanLuma",
+            mean_luma,
+            MIN_DIAGNOSTIC_OUTPUT_MEAN_LUMA,
+            mean_luma >= MIN_DIAGNOSTIC_OUTPUT_MEAN_LUMA,
+        ),
+        metric(
+            "panoramaOutputNonBlackPixelRatio",
+            non_black_ratio,
+            MIN_DIAGNOSTIC_NON_BLACK_PIXEL_RATIO,
+            non_black_ratio >= MIN_DIAGNOSTIC_NON_BLACK_PIXEL_RATIO,
         ),
     ]
 }
