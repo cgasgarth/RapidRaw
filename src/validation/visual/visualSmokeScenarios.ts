@@ -11,6 +11,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   HdrUi: 'hdr-ui',
   LayerStackWorkflow: 'layer-stack-workflow',
   LibraryWorkflow: 'library-workflow',
+  MaskOverlayRawProof: 'mask-overlay-raw-proof',
   NegativeLabBatchColorWorkspace: 'negative-lab-batch-color-workspace',
   NegativeLabWorkspace: 'negative-lab-workspace',
   PanoramaUi: 'panorama-ui',
@@ -120,6 +121,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow,
     outputFile: 'layer-stack-workflow.png',
     sectionMinimum: 3,
+  },
+  {
+    marker: 'RAW Mask Overlay Review',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof,
+    outputFile: 'mask-overlay-raw-proof.png',
+    sectionMinimum: 2,
   },
   {
     marker: 'Cull Session',

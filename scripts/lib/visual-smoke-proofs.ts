@@ -300,6 +300,16 @@ export const layerStackWorkflowProofSchema = z.object({
 export const layerStackExportParityProofSchema = z.object({
   exportParity: z.literal('ready'),
 });
+export const maskOverlayRawProofSchema = z.object({
+  edgeThreshold: z.literal('0.64'),
+  hiddenToggled: z.literal('true'),
+  mode: z.literal('edges'),
+  opacity: z.literal('0.70'),
+  overlaySource: z.literal('live_mask_overlay_generator'),
+  sourceKind: z.literal('source_raw_private'),
+  sourcePath: z.literal('private-fixtures/detail/high-iso-skin-shadow-v1.arw'),
+  validationMode: z.literal('visual_smoke_raw_overlay_control_proof'),
+});
 export const libraryWorkflowProofSchema = z.object({
   activeAsset: z.literal('DSC_0002.NEF'),
   colorLabel: z.literal('green'),

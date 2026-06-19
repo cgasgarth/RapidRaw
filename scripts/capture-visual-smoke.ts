@@ -29,6 +29,7 @@ import {
   libraryWorkflowProofSchema,
   layerStackExportParityProofSchema,
   layerStackWorkflowProofSchema,
+  maskOverlayRawProofSchema,
   negativeLabWorkspaceProofDatasetSchema,
   panoramaReviewWorkspaceProofSchema,
   panoramaUiSettingsProofSchema,
@@ -358,6 +359,33 @@ async function prepareScenario(page, mode) {
       .getByTestId('focus-artifact-handoff')
       .getByText('/tmp/rawengine-focus-stack-smoke.tif', { exact: true })
       .waitFor({ timeout: 10_000 });
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof) {
+    const dragSliderToPercent = async (label: string, percent: number) => {
+      const slider = page.getByLabel(label);
+      const box = await slider.boundingBox();
+      if (!box) throw new Error(`Expected ${label} slider to have a bounding box.`);
+      const y = box.y + box.height / 2;
+      await page.mouse.move(box.x + box.width / 2, y);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width * percent, y, { steps: 8 });
+      await page.mouse.up();
+    };
+
+    const controls = page.getByTestId('mask-overlay-review-controls');
+    await controls.waitFor({ timeout: 10_000 });
+    await controls.getByText('Overlay Review', { exact: true }).click();
+    await controls.getByText('Overlay Review', { exact: true }).click();
+    await controls.getByRole('button', { name: 'edges' }).click();
+    await dragSliderToPercent('Overlay Opacity', 0.7);
+    await dragSliderToPercent('Edge Threshold', 0.64);
+    maskOverlayRawProofSchema.parse(
+      await page.getByTestId('mask-overlay-raw-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    const activeEdgeSwatch = await controls.getByRole('button', { name: 'edges' }).getAttribute('aria-pressed');
+    if (activeEdgeSwatch !== 'true') throw new Error(`Expected active edge overlay swatch, got ${activeEdgeSwatch}.`);
     return;
   }
 

@@ -12,6 +12,7 @@ import NegativeConversionModal from '../../components/modals/NegativeConversionM
 import PanoramaModal from '../../components/modals/PanoramaModal';
 import SuperResolutionModal from '../../components/modals/SuperResolutionModal';
 import AgentChatShell from '../../components/panel/right/AgentChatShell';
+import { MaskOverlayReviewControls } from '../../components/panel/right/MasksPanel';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS, type PanoramaUiSettings } from '../../schemas/panoramaUiSchemas';
@@ -24,6 +25,8 @@ import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
+
+import type { MaskOverlaySettings } from '../../schemas/maskOverlaySchemas';
 
 interface VisualSmokeAppProps {
   mode: string;
@@ -72,6 +75,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.HdrUi]: HdrVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof]: MaskOverlayRawProofVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace]: NegativeLabVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
@@ -180,6 +184,101 @@ const detailReviewStages = [
   'capture_sharpen',
   'wavelet_luma_detail',
 ] as const;
+const maskOverlayRawProofSourcePath = 'private-fixtures/detail/high-iso-skin-shadow-v1.arw';
+const maskOverlayRawProofCopy = {
+  fixtureLabel: 'private RAW fixture',
+  fixtureTitle: 'High ISO skin shadow mask',
+  proofState: 'Proof state',
+  runtimeBadge: 'live mask overlay generator',
+  runtimeStatus: 'Runtime status: visual smoke RAW overlay control proof',
+  title: 'RAW Mask Overlay Review',
+} as const;
+const formatMaskOverlayProofState = (mode: string, opacity: number, edgeThreshold: number) =>
+  `${mode} / opacity ${Math.round(opacity * 100)}% / edge ${Math.round(edgeThreshold * 100)}%`;
+
+function MaskOverlayRawProofVisualSmoke() {
+  const [settings, setSettings] = useState<MaskOverlaySettings>({
+    edgeThreshold: 0.5,
+    mode: 'rubylith',
+    opacity: 0.5,
+  });
+  const [hiddenToggled, setHiddenToggled] = useState(false);
+  const overlayEnabled = settings.mode !== 'hidden';
+  const proofMode = overlayEnabled ? settings.mode : 'hidden';
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof}
+    >
+      <div className="grid h-screen grid-cols-[1fr_380px] overflow-hidden">
+        <section className="relative bg-[#0f1114] p-8" data-visual-smoke-section="raw-overlay-preview">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase text-[#9ba6b2]">{maskOverlayRawProofCopy.fixtureLabel}</p>
+              <h1 className="text-lg font-semibold">{maskOverlayRawProofCopy.title}</h1>
+              <p className="mt-1 text-xs text-[#8d97a3]">{maskOverlayRawProofCopy.fixtureTitle}</p>
+            </div>
+            <span className="rounded border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#cbd5df]">
+              {maskOverlayRawProofCopy.runtimeBadge}
+            </span>
+          </div>
+          <div className="relative h-[calc(100%-4rem)] overflow-hidden rounded-md border border-white/10 bg-linear-to-br from-[#1c2830] via-[#584038] to-[#d0a56c]">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_55%_42%,rgba(255,222,180,0.5),transparent_18%),linear-gradient(135deg,rgba(54,95,112,0.55),rgba(98,69,65,0.35))]" />
+            {overlayEnabled && (
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    proofMode === 'edges'
+                      ? `repeating-linear-gradient(45deg, rgba(255,255,255,${settings.edgeThreshold}), rgba(255,255,255,${settings.edgeThreshold}) 2px, transparent 2px, transparent 14px)`
+                      : `rgba(244,63,94,${settings.opacity})`,
+                  opacity: proofMode === 'edges' ? settings.opacity : 1,
+                }}
+              />
+            )}
+            <div className="absolute bottom-8 left-8 rounded border border-white/10 bg-black/35 px-3 py-2 text-xs text-[#d8dee8]">
+              {maskOverlayRawProofSourcePath}
+            </div>
+          </div>
+        </section>
+
+        <aside className="border-l border-white/10 bg-[#15181c] p-4" data-visual-smoke-section="raw-overlay-controls">
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold">{maskOverlayRawProofCopy.runtimeBadge}</h2>
+            <p className="mt-1 text-xs text-[#8d97a3]">{maskOverlayRawProofCopy.runtimeStatus}</p>
+          </div>
+          <MaskOverlayReviewControls
+            settings={settings}
+            onChange={(nextSettings) => {
+              if (settings.mode !== 'hidden' && nextSettings.mode === 'hidden') setHiddenToggled(true);
+              setSettings(nextSettings);
+            }}
+            onDragStateChange={() => {}}
+          />
+          <div
+            className="mt-4 rounded-md border border-white/10 bg-[#1b2026] p-3 text-xs"
+            data-edge-threshold={settings.edgeThreshold.toFixed(2)}
+            data-hidden-toggled={String(hiddenToggled)}
+            data-mode={proofMode}
+            data-opacity={settings.opacity.toFixed(2)}
+            data-overlay-source="live_mask_overlay_generator"
+            data-source-kind="source_raw_private"
+            data-source-path={maskOverlayRawProofSourcePath}
+            data-testid="mask-overlay-raw-proof"
+            data-validation-mode="visual_smoke_raw_overlay_control_proof"
+          >
+            <p className="text-[#8d97a3]">{maskOverlayRawProofCopy.proofState}</p>
+            <p className="mt-1 text-[#f3f4f1]">
+              {formatMaskOverlayProofState(proofMode, settings.opacity, settings.edgeThreshold)}
+            </p>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
 
 function DetailDustSpotVisualSmoke() {
   const [adjustments, setAdjustments] = useState<Adjustments>(INITIAL_ADJUSTMENTS);
