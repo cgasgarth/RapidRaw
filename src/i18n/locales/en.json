@@ -763,6 +763,12 @@
       "maskAdjustmentsTitle": "Mask Adjustments",
       "maskingTitle": "Masking",
       "masksTitle": "Masks",
+      "overlay": {
+        "edgeThreshold": "Edge Threshold",
+        "enabled": "Overlay Review",
+        "modeGroup": "Mask overlay mode",
+        "opacity": "Overlay Opacity"
+      },
       "params": {
         "feather": "Feather",
         "globalFeather": "Global Feather",

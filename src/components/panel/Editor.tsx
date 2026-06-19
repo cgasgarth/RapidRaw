@@ -143,6 +143,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
   const isRotationActive = useEditorStore((s) => s.isRotationActive);
   const overlayMode = useEditorStore((s) => s.overlayMode);
   const overlayRotation = useEditorStore((s) => s.overlayRotation);
+  const maskOverlaySettings = useEditorStore((s) => s.maskOverlaySettings);
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
   const isWbPickerActive = useEditorStore((s) => s.isWbPickerActive);
   const liveRotation = useEditorStore((s) => s.liveRotation);
@@ -1096,7 +1097,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     try {
       const cropOffset = [jsAdjustments.crop?.x || 0, jsAdjustments.crop?.y || 0];
 
-      const { patchesSentToBackend } = useEditorStore.getState();
+      const { maskOverlaySettings, patchesSentToBackend } = useEditorStore.getState();
+      const normalizedOverlaySettings = normalizeMaskOverlaySettings(maskOverlaySettings);
+      if (normalizedOverlaySettings.mode === 'hidden') {
+        setMaskOverlayUrl(null);
+        return;
+      }
 
       const stripSubMasks = (subMasks?: Array<SubMask>) => {
         if (!Array.isArray(subMasks)) return;
@@ -1125,7 +1131,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
         cropOffset,
         height: Math.round(renderSize.height),
         maskDef: strippedMaskDef,
-        overlaySettings: normalizeMaskOverlaySettings(),
+        overlaySettings: normalizedOverlaySettings,
         scale: renderSize.scale,
         width: Math.round(renderSize.width),
         jsAdjustments: strippedAdjustments,
@@ -1432,6 +1438,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
       opacity: 'opacity' in activeMaskDef ? activeMaskDef.opacity : 100,
       subMasks,
       geometry,
+      maskOverlaySettings: normalizeMaskOverlaySettings(maskOverlaySettings),
       renderSize: { w: imageRenderSize.width, h: imageRenderSize.height },
     });
   }, [
@@ -1439,6 +1446,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     activeMaskContainerId,
     activeAiPatchContainerId,
     adjustments,
+    maskOverlaySettings,
     imageRenderSize.width,
     imageRenderSize.height,
   ]);
@@ -1466,7 +1474,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, transformWrappe
     }
 
     if (!maskDefForOverlay) return;
-    requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
+    const frame = requestAnimationFrame(() => {
+      requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
   }, [
     overlayTriggerHash,
     requestMaskOverlay,
