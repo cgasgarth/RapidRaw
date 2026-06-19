@@ -497,6 +497,15 @@
           "title": "",
           "uiOnly": ""
         },
+        "audit": {
+          "evidence": "",
+          "finalRevision": "",
+          "html": "",
+          "initialRevision": "",
+          "target": "",
+          "title": "",
+          "uiOnly": ""
+        },
         "duration": {
           "pending": ""
         },

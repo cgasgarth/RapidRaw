@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type {
   AgentArtifactReview,
+  AgentAuditTranscript,
   AgentChatDryRunReview,
   AgentChatMessage,
   AgentChatToolCall,
@@ -44,6 +45,12 @@ const artifactStatusStyles = {
   ready: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
   review_required: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
 } satisfies Record<AgentArtifactReview['previewArtifacts'][number]['status'], string>;
+
+const auditOutcomeStyles = {
+  blocked: 'border-red-500/30 bg-red-500/10 text-red-100',
+  success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
+  warning: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
+} satisfies Record<AgentAuditTranscript['records'][number]['outcome'], string>;
 
 type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
 
@@ -144,6 +151,120 @@ function ArtifactReviewPanel({ review }: { review: AgentArtifactReview }) {
           </a>
         ))}
       </div>
+    </div>
+  );
+}
+
+function AuditTranscriptViewer({ auditTranscript }: { auditTranscript: AgentAuditTranscript }) {
+  const { t } = useTranslation();
+  const warningCount = auditTranscript.records.reduce((count, record) => count + record.warnings.length, 0);
+  const artifactLinkCount = auditTranscript.records.reduce((count, record) => count + record.artifactLinks.length, 0);
+  const applyRecordCount = auditTranscript.records.filter((record) => record.stage === 'apply').length;
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-white/10 bg-black/15 p-3"
+      data-apply-record-count={applyRecordCount}
+      data-artifact-link-count={artifactLinkCount}
+      data-evidence-tier={auditTranscript.evidenceTier}
+      data-record-count={auditTranscript.records.length}
+      data-replay-root={auditTranscript.replayRoot}
+      data-schema-version={auditTranscript.schemaVersion}
+      data-testid="agent-audit-transcript-viewer"
+      data-warning-count={warningCount}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+            <CircleDashed size={15} />
+            <span>{t('editor.ai.agent.audit.title')}</span>
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">{t('editor.ai.agent.audit.uiOnly')}</p>
+        </div>
+        <span className="shrink-0 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-text-secondary">
+          {t('editor.ai.agent.audit.html')}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-[11px]" data-testid="agent-audit-summary">
+        <div className="rounded border border-white/10 bg-white/[0.03] p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{t('editor.ai.agent.audit.target')}</div>
+          <div className="mt-1 truncate text-text-primary">{auditTranscript.targetLabel}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-white/[0.03] p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{t('editor.ai.agent.audit.evidence')}</div>
+          <div className="mt-1 font-mono text-text-primary">{auditTranscript.evidenceTier}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-white/[0.03] p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{t('editor.ai.agent.audit.initialRevision')}</div>
+          <div className="mt-1 truncate font-mono text-text-primary">{auditTranscript.initialRevision}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-white/[0.03] p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{t('editor.ai.agent.audit.finalRevision')}</div>
+          <div className="mt-1 truncate font-mono text-text-primary">{auditTranscript.finalRevision}</div>
+        </div>
+      </div>
+
+      <ol className="space-y-2" data-testid="agent-audit-transcript-records">
+        {auditTranscript.records.map((record) => (
+          <li
+            className="rounded border border-white/10 bg-white/[0.03] p-2 text-[11px]"
+            data-testid={`agent-audit-record-${record.id}`}
+            key={record.id}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-text-primary">{record.title}</span>
+                  <span className="rounded border border-white/10 bg-black/20 px-1.5 py-0.5 uppercase text-text-secondary">
+                    {record.stage}
+                  </span>
+                </div>
+                <div className="mt-1 truncate font-mono text-text-secondary">{record.toolName}</div>
+              </div>
+              <span className={`shrink-0 rounded border px-1.5 py-0.5 ${auditOutcomeStyles[record.outcome]}`}>
+                {record.outcome}
+              </span>
+            </div>
+
+            <p className="mt-2 leading-4 text-text-secondary">{record.summary}</p>
+
+            <div className="mt-2 grid grid-cols-2 gap-2 font-mono text-[10px] text-text-secondary">
+              <span>{record.timestamp}</span>
+              <span>{record.toolCallId}</span>
+              <span className="truncate">{record.schema}</span>
+              <span className="truncate">{record.requestHash}</span>
+            </div>
+
+            {record.artifactLinks.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5" data-testid={`agent-audit-links-${record.id}`}>
+                {record.artifactLinks.map((artifact) => (
+                  <a
+                    className="inline-flex max-w-full items-center gap-1 rounded border border-sky-500/25 bg-sky-500/10 px-1.5 py-0.5 text-sky-100 hover:border-sky-300/70"
+                    href={artifact.href}
+                    key={artifact.id}
+                  >
+                    <span className="truncate">{artifact.label}</span>
+                  </a>
+                ))}
+              </div>
+            ) : null}
+
+            {record.warnings.length > 0 ? (
+              <div className="mt-2 space-y-1" data-testid={`agent-audit-warnings-${record.id}`}>
+                {record.warnings.map((warning) => (
+                  <div
+                    className="rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-amber-100"
+                    key={warning}
+                  >
+                    {warning}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -351,6 +472,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       </div>
 
       {transcript.artifactReview ? <ArtifactReviewPanel review={transcript.artifactReview} /> : null}
+
+      {transcript.auditTranscript ? <AuditTranscriptViewer auditTranscript={transcript.auditTranscript} /> : null}
 
       {transcript.dryRunReview ? <DryRunReviewPanel review={transcript.dryRunReview} /> : null}
     </section>
