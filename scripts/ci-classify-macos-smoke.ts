@@ -188,6 +188,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:output-sharpening', new Set(['bun scripts/check-output-sharpening-fixtures.ts'])],
   ['check:mask-refine-command-ui', new Set(['bun scripts/check-mask-refinement-command-ui.ts'])],
   ['check:mask-refine-controls', new Set(['bun scripts/check-mask-refinement-controls.ts'])],
+  ['check:mask-compose-command', new Set(['bun scripts/check-mask-compose-command.ts'])],
   ['check:metadata-templates', new Set(['bun scripts/check-metadata-template-fixtures.ts'])],
   ['check:private-raw-evidence', new Set(['bun scripts/check-private-raw-evidence-ledger.ts'])],
   ['check:public-fixture-manifest', new Set(['bun scripts/check-public-fixture-manifest.ts'])],
@@ -920,6 +921,16 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -80,6 +80,7 @@\n+    "check:linear-gradient-mask-command": "bun scripts/check-linear-gradient-mask-command.ts",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'mask compose command package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch: '@@ -80,6 +80,7 @@\n+    "check:mask-compose-command": "bun scripts/check-mask-compose-command.ts",',
       },
     ],
     SMOKE_MODES.NONE,

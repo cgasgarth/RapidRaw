@@ -16,6 +16,7 @@ export * from './hdrMergeWeightingRuntime.js';
 export * from './hdrMergeUiControls.js';
 export * from './hdrRuntimePlan.js';
 export * from './linearGradientMaskCommandRuntime.js';
+export * from './maskComposeCommandRuntime.js';
 export * from './negativeLabAppServerRuntime.js';
 export * from './localAppServerBridge.js';
 export * from './panoramaAppServerRuntime.js';

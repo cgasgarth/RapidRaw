@@ -103,6 +103,7 @@ const CHECK_GROUPS = {
     'check:luminance-range-mask',
     'check:color-range-mask',
     'check:mask-compose',
+    'check:mask-compose-command',
     'check:mask-refine',
     'check:mask-refine-controls',
     'check:mask-refine-command-ui',

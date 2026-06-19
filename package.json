@@ -88,6 +88,7 @@
     "check:luminance-range-mask": "bun scripts/check-luminance-range-mask-parameters.ts",
     "check:color-range-mask": "bun scripts/check-color-range-mask-parameters.ts",
     "check:mask-compose": "bun scripts/check-mask-compose-operations.ts",
+    "check:mask-compose-command": "bun scripts/check-mask-compose-command.ts",
     "check:mask-refine": "bun scripts/check-mask-refinement-parameters.ts",
     "check:mask-refine-controls": "bun scripts/check-mask-refinement-controls.ts",
     "check:mask-refine-command-ui": "bun scripts/check-mask-refinement-command-ui.ts",
