@@ -1,3 +1,4 @@
+import { computationalMergeReviewThresholds } from './computationalMergeReviewThresholds';
 import {
   computationalMergeReviewPanelDiagnosticCollectionSchema,
   type ComputationalMergeReviewPanelDiagnosticCollection,
@@ -70,56 +71,62 @@ export function buildComputationalMergeReviewPanelDiagnostics(
 
 function syntheticMetricsFor(featureFamily: ComputationalMergePrivateSourceSet['featureFamily']) {
   switch (featureFamily) {
-    case 'focus_stack':
+    case 'focus_stack': {
+      const thresholds = computationalMergeReviewThresholds.focus_stack;
       return [
         {
           name: 'sharpnessGainRatio',
           passed: true,
           source: 'synthetic_runtime',
-          threshold: 1.15,
+          threshold: thresholds.sharpnessGainRatio,
           value: 1.16,
         },
         {
           name: 'focusTransitionArtifactScore',
           passed: true,
           source: 'synthetic_runtime',
-          threshold: 0.9,
+          threshold: thresholds.focusTransitionArtifactScore,
           value: 0.91,
         },
       ];
-    case 'super_resolution':
+    }
+    case 'super_resolution': {
+      const thresholds = computationalMergeReviewThresholds.super_resolution;
       return [
         {
           name: 'alignmentInlierRatio',
           passed: true,
           source: 'synthetic_runtime',
-          threshold: 0.65,
+          threshold: thresholds.alignmentInlierRatio,
           value: 0.66,
         },
         {
           name: 'superResolutionDetailGainRatio',
           passed: true,
           source: 'synthetic_runtime',
-          threshold: 1.2,
+          threshold: thresholds.superResolutionDetailGainRatio,
           value: 1.21,
         },
       ];
-    case 'panorama_stitch':
+    }
+    case 'panorama_stitch': {
+      const thresholds = computationalMergeReviewThresholds.panorama_stitch;
       return [
         {
           name: 'alignmentInlierRatio',
           passed: true,
           source: 'synthetic_runtime',
-          threshold: 0.55,
+          threshold: thresholds.alignmentInlierRatio,
           value: 0.56,
         },
         {
           name: 'edgeContinuityScore',
           passed: true,
           source: 'synthetic_runtime',
-          threshold: 0.85,
+          threshold: thresholds.edgeContinuityScore,
           value: 0.86,
         },
       ];
+    }
   }
 }

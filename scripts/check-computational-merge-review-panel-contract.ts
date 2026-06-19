@@ -6,6 +6,7 @@ import { parseComputationalMergeE2eProofManifest } from '../src/schemas/computat
 import { parsePrivateRawEvidenceLedger } from '../src/schemas/privateRawEvidenceSchemas.ts';
 import { buildComputationalMergePrivateSourceSets } from '../src/utils/computationalMergeSourceSets.ts';
 import { buildComputationalMergeReviewPanelDiagnostics } from '../src/utils/computationalMergeReviewPanels.ts';
+import { computationalMergeReviewThresholds } from '../src/utils/computationalMergeReviewThresholds.ts';
 
 const manifest = parseComputationalMergeE2eProofManifest(
   JSON.parse(await readFile('fixtures/validation/computational-merge-e2e-proof.json', 'utf8')),
@@ -42,6 +43,18 @@ for (const diagnostic of diagnostics.diagnostics) {
   if (diagnostic.qualityMetrics.some((metric) => metric.source !== 'synthetic_runtime')) {
     failures.push(`${diagnostic.fixtureId}: public checker must not claim private RAW metrics.`);
   }
+  for (const metric of diagnostic.qualityMetrics) {
+    const expectedThreshold = expectedSyntheticThreshold(diagnostic.featureFamily, metric.name);
+    if (expectedThreshold === undefined) {
+      failures.push(`${diagnostic.fixtureId}: unexpected synthetic metric ${metric.name}.`);
+      continue;
+    }
+    if (metric.threshold !== expectedThreshold) {
+      failures.push(
+        `${diagnostic.fixtureId}: ${metric.name} threshold ${metric.threshold} must equal ${expectedThreshold}.`,
+      );
+    }
+  }
 }
 
 if (failures.length > 0) {
@@ -51,3 +64,33 @@ if (failures.length > 0) {
 }
 
 console.log(`computational merge review-panel contract ok (${diagnostics.diagnostics.length} synthetic diagnostics)`);
+
+function expectedSyntheticThreshold(featureFamily: string, metricName: string): number | undefined {
+  switch (featureFamily) {
+    case 'focus_stack':
+      switch (metricName) {
+        case 'focusTransitionArtifactScore':
+          return computationalMergeReviewThresholds.focus_stack.focusTransitionArtifactScore;
+        case 'sharpnessGainRatio':
+          return computationalMergeReviewThresholds.focus_stack.sharpnessGainRatio;
+      }
+      return undefined;
+    case 'panorama_stitch':
+      switch (metricName) {
+        case 'alignmentInlierRatio':
+          return computationalMergeReviewThresholds.panorama_stitch.alignmentInlierRatio;
+        case 'edgeContinuityScore':
+          return computationalMergeReviewThresholds.panorama_stitch.edgeContinuityScore;
+      }
+      return undefined;
+    case 'super_resolution':
+      switch (metricName) {
+        case 'alignmentInlierRatio':
+          return computationalMergeReviewThresholds.super_resolution.alignmentInlierRatio;
+        case 'superResolutionDetailGainRatio':
+          return computationalMergeReviewThresholds.super_resolution.superResolutionDetailGainRatio;
+      }
+      return undefined;
+  }
+  return undefined;
+}
