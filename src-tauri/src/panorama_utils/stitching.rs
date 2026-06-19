@@ -7,6 +7,15 @@ use std::path::Path;
 use tauri::{AppHandle, Emitter, Runtime};
 
 const FEATHER_WIDTH: f64 = 100.0;
+const MIN_NORMALIZED_PROJECTIVE_DENOMINATOR: f64 = 1e-8;
+
+#[derive(Debug)]
+struct ProjectedImageBounds {
+    max_x: f64,
+    max_y: f64,
+    min_x: f64,
+    min_y: f64,
+}
 
 struct SeamContext<'a> {
     pano: &'a Rgb32FImage,
@@ -35,9 +44,9 @@ pub fn progressive_seam_stitcher<R: Runtime>(
     images: &[&ImageInfo],
     global_homographies: &HashMap<usize, Matrix3<f64>>,
     app_handle: AppHandle<R>,
-) -> Rgb32FImage {
+) -> Result<Rgb32FImage, String> {
     if images.is_empty() {
-        return Rgb32FImage::new(0, 0);
+        return Ok(Rgb32FImage::new(0, 0));
     }
 
     let mut min_x = f64::INFINITY;
@@ -48,27 +57,17 @@ pub fn progressive_seam_stitcher<R: Runtime>(
     for &img_info in images {
         let h = global_homographies[&img_info.id];
         let (w, h_img) = img_info.image.dimensions();
-        let corners = [
-            Point3::new(0.0, 0.0, 1.0),
-            Point3::new(w as f64, 0.0, 1.0),
-            Point3::new(w as f64, h_img as f64, 1.0),
-            Point3::new(0.0, h_img as f64, 1.0),
-        ];
-        for p in corners.iter() {
-            let tp = h * p;
-            let tx = tp.x / tp.z;
-            let ty = tp.y / tp.z;
-            min_x = min_x.min(tx);
-            max_x = max_x.max(tx);
-            min_y = min_y.min(ty);
-            max_y = max_y.max(ty);
-        }
+        let bounds = project_image_sample_bounds(&h, w, h_img)?;
+        min_x = min_x.min(bounds.min_x);
+        max_x = max_x.max(bounds.max_x);
+        min_y = min_y.min(bounds.min_y);
+        max_y = max_y.max(bounds.max_y);
     }
 
     let offset_x = -min_x;
     let offset_y = -min_y;
-    let out_width = (max_x - min_x).ceil() as u32;
-    let out_height = (max_y - min_y).ceil() as u32;
+    let out_width = checked_output_dimension(max_x - min_x, "width")?;
+    let out_height = checked_output_dimension(max_y - min_y, "height")?;
     println!("  - Output canvas size: {}x{}", out_width, out_height);
 
     let mut panorama = Rgb32FImage::new(out_width, out_height);
@@ -76,7 +75,9 @@ pub fn progressive_seam_stitcher<R: Runtime>(
 
     let base_img_info = images[0];
     let h_base = &global_homographies[&base_img_info.id];
-    let h_base_inv = h_base.try_inverse().unwrap();
+    let h_base_inv = h_base
+        .try_inverse()
+        .ok_or_else(|| "base homography is not invertible".to_string())?;
     println!("  - Placing base image: '{}'", base_img_info.filename);
 
     let num_pixels_per_row = out_width as usize * 3;
@@ -118,7 +119,12 @@ pub fn progressive_seam_stitcher<R: Runtime>(
         println!("  - Progressively stitching '{}'", img_to_add_info.filename);
 
         let h_add = &global_homographies[&img_to_add_info.id];
-        let h_add_inv = h_add.try_inverse().unwrap();
+        let h_add_inv = h_add.try_inverse().ok_or_else(|| {
+            format!(
+                "homography for source {} is not invertible",
+                img_to_add_info.id
+            )
+        })?;
         let img_to_add = &img_to_add_info.image;
 
         let ctx = SeamContext {
@@ -361,7 +367,90 @@ pub fn progressive_seam_stitcher<R: Runtime>(
         }
     }
 
-    panorama
+    Ok(panorama)
+}
+
+fn project_image_sample_bounds(
+    homography: &Matrix3<f64>,
+    width: u32,
+    height: u32,
+) -> Result<ProjectedImageBounds, String> {
+    if width == 0 || height == 0 {
+        return Err("source image has zero dimensions".to_string());
+    }
+    if !homography.iter().all(|value| value.is_finite()) {
+        return Err("non_finite_transform".to_string());
+    }
+
+    let width = width as f64;
+    let height = height as f64;
+    let samples = [
+        Point3::new(0.0, 0.0, 1.0),
+        Point3::new(width, 0.0, 1.0),
+        Point3::new(width, height, 1.0),
+        Point3::new(0.0, height, 1.0),
+        Point3::new(width / 2.0, 0.0, 1.0),
+        Point3::new(width, height / 2.0, 1.0),
+        Point3::new(width / 2.0, height, 1.0),
+        Point3::new(0.0, height / 2.0, 1.0),
+        Point3::new(width / 2.0, height / 2.0, 1.0),
+    ];
+    let projected = samples
+        .iter()
+        .map(|sample| homography * sample)
+        .collect::<Vec<_>>();
+    let max_abs_denominator = projected
+        .iter()
+        .map(|sample| sample.z.abs())
+        .fold(0.0_f64, f64::max);
+    if !max_abs_denominator.is_finite() || max_abs_denominator <= f64::EPSILON {
+        return Err("projective_pole_crossing".to_string());
+    }
+
+    let first_sign = projected[0].z.signum();
+    if first_sign == 0.0 {
+        return Err("projective_pole_crossing".to_string());
+    }
+
+    let mut min_x = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for sample in projected {
+        let normalized_denominator = sample.z / max_abs_denominator;
+        if sample.z.signum() != first_sign
+            || normalized_denominator.abs() < MIN_NORMALIZED_PROJECTIVE_DENOMINATOR
+        {
+            return Err("projective_pole_crossing".to_string());
+        }
+        let x = sample.x / sample.z;
+        let y = sample.y / sample.z;
+        if !x.is_finite() || !y.is_finite() {
+            return Err("non_finite_projected_bounds".to_string());
+        }
+        min_x = min_x.min(x);
+        max_x = max_x.max(x);
+        min_y = min_y.min(y);
+        max_y = max_y.max(y);
+    }
+
+    if min_x >= max_x || min_y >= max_y {
+        return Err("degenerate_projected_quad".to_string());
+    }
+
+    Ok(ProjectedImageBounds {
+        max_x,
+        max_y,
+        min_x,
+        min_y,
+    })
+}
+
+fn checked_output_dimension(span: f64, dimension_name: &str) -> Result<u32, String> {
+    if !span.is_finite() || span <= 0.0 || span.ceil() > u32::MAX as f64 {
+        return Err(format!("non_finite_projected_bounds: {}", dimension_name));
+    }
+    Ok(span.ceil() as u32)
 }
 
 fn find_adaptive_seam(ctx: &SeamContext) -> Option<SeamInfo> {
@@ -659,4 +748,29 @@ fn get_interpolated_pixel(img: &Rgb32FImage, x: f64, y: f64) -> Rgb<f32> {
         final_pixel[1] as f32,
         final_pixel[2] as f32,
     ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepts_finite_bounded_projective_warp() {
+        let homography = Matrix3::new(1.0, 0.02, 12.0, -0.01, 0.98, 8.0, 0.00001, -0.00001, 1.0);
+
+        let bounds = project_image_sample_bounds(&homography, 400, 300).expect("bounded warp");
+
+        assert!(bounds.min_x.is_finite());
+        assert!(bounds.max_x > bounds.min_x);
+        assert!(bounds.max_y > bounds.min_y);
+    }
+
+    #[test]
+    fn rejects_projective_pole_before_canvas_allocation() {
+        let homography = Matrix3::new(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, -0.02, 0.0, 1.0);
+
+        let error = project_image_sample_bounds(&homography, 100, 100).expect_err("pole rejected");
+
+        assert_eq!(error, "projective_pole_crossing");
+    }
 }
