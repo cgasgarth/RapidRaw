@@ -40,6 +40,7 @@ const bundleBudget = BundleBudgetSchema.parse({
 });
 
 const assetsDir = new URL(`../${bundleBudget.assetsDir}/`, import.meta.url);
+const budgetMode = 'minified production Vite build';
 
 const formatBytes = (bytes) => `${(bytes / 1024).toFixed(1)} KiB`;
 
@@ -47,7 +48,7 @@ let entries;
 try {
   entries = await readdir(assetsDir, { withFileTypes: true });
 } catch (error) {
-  console.error(`Unable to read ${bundleBudget.assetsDir}. Run the frontend build before checking bundle budget.`);
+  console.error(`Unable to read ${bundleBudget.assetsDir}. Run the ${budgetMode} before checking bundle budget.`);
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 }
@@ -101,11 +102,11 @@ for (const budget of bundleBudget.budgets) {
 }
 
 if (failures.length > 0) {
-  console.error('\nBundle budget exceeded:');
+  console.error(`\nBundle budget exceeded for ${budgetMode}:`);
   for (const failure of failures) {
     console.error(`- ${failure}`);
   }
   process.exit(1);
 }
 
-console.log('Bundle budget passed.');
+console.log(`Bundle budget passed for ${budgetMode}.`);

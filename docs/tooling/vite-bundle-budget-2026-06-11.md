@@ -1,17 +1,37 @@
 # Vite Bundle Budget
 
-Issue: #288
+Issues: #288, #2403
 
-The current RapidRAW frontend build produces one large application chunk. That
-is accepted temporarily, but it is now tracked as an explicit budget instead of
-an unowned Vite warning.
+The RapidRAW frontend still produces one large application chunk. That is
+accepted temporarily, but it is tracked as an explicit budget instead of an
+unowned Vite warning.
 
-## Initial Budget
+## Build Mode Policy
+
+Bundle budgets measure the minified production Vite build produced by:
+
+```sh
+bun run build:frontend
+```
+
+`vite.config.js` always uses esbuild minification for JavaScript and CSS in
+build output. `TAURI_ENV_DEBUG` only controls sourcemap generation; it does not
+disable minification or relax bundle budgets.
+
+Use the dev server or debug sourcemaps for local debugging. If a local-only
+unminified diagnostic build is added later, it must be named separately and must
+not feed required CI, packaging, or bundle-budget measurement. Do not turn off
+release minification to make a bundle check pass.
+
+If a temporary budget exception is needed, track it in a GitHub issue with an
+owner, reason, and expiration condition.
+
+## Current Budget
 
 | Asset class              | Raw budget      | Gzip budget   |
 | ------------------------ | --------------- | ------------- |
-| Largest JavaScript asset | 2,775,000 bytes | 810,000 bytes |
-| Largest CSS asset        | 125,000 bytes   | 20,000 bytes  |
+| Largest JavaScript asset | 3,072,000 bytes | 900,000 bytes |
+| Largest CSS asset        | 153,600 bytes   | 24,576 bytes  |
 
 ## Validation
 
@@ -21,7 +41,7 @@ Run:
 bun run check:bundle
 ```
 
-This command builds the frontend and then runs
+This command builds the minified production frontend and then runs
 `scripts/check-vite-bundle-budget.ts` against `dist/assets`.
 
 ## Policy
@@ -37,3 +57,22 @@ This command builds the frontend and then runs
   the largest chunk.
 - `vite.config.js` sets `chunkSizeWarningLimit` to the same raw budget range so
   Vite warnings and the explicit budget gate stay aligned.
+- Normal UI work should not fight sub-kilobyte budget margins. When the baseline
+  is too close to a cap, recalibrate the cap with explicit headroom, then create
+  follow-up issues for bundle reports, chunking, or dependency audits.
+- Mainline budget reductions should happen after measured bundle improvements,
+  not by forcing feature PRs to remove useful controls or labels.
+
+## Deferred Foundation
+
+The next bundle-governance work is tracked in milestone
+`19: Frontend Bundle Policy Foundation`:
+
+- #2398 recalibrates budgets with warning/fail tiers and exception policy.
+- #2399 adds a bundle analysis report artifact.
+- #2400 adds trend visibility without noisy PR failures.
+- #2401 audits and splits the first oversized UI boundary.
+- #2402 audits large frontend dependencies before new UI growth.
+- #2404 guards production builds against debug-only payloads.
+- #2407 migrates JavaScript minification from esbuild to Oxc when the project is
+  ready for the Vite 8 minifier change.
