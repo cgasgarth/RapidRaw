@@ -78,8 +78,9 @@ export const detectHdrBracketV1 = (requestValue: unknown): HdrBracketDetectionRe
   const exposures = request.sources.map(resolveSourceExposure);
   const warnings: HdrMergeWarningCodeV1[] = [];
   const blocks: HdrMergeBlockCodeV1[] = [];
+  const exposureResolutionResolved = hasCommonExposureResolutionStrategy(exposures);
 
-  if (exposures.some((exposure) => exposure === undefined)) {
+  if (!exposureResolutionResolved) {
     blocks.push('missing_required_exposure_metadata');
     warnings.push('exposure_metadata_missing');
   }
@@ -89,13 +90,14 @@ export const detectHdrBracketV1 = (requestValue: unknown): HdrBracketDetectionRe
   const bracketSpanEv = getExposureSpan(resolvedExposures);
 
   if (
-    uniqueExposureValues.length < 2 ||
-    hasDuplicateExposurePair(resolvedExposures, options.duplicateExposureToleranceEv)
+    exposureResolutionResolved &&
+    (uniqueExposureValues.length < 2 ||
+      hasDuplicateExposurePair(resolvedExposures, options.duplicateExposureToleranceEv))
   ) {
     blocks.push('duplicate_exposure_values');
   }
 
-  if (bracketSpanEv < options.minimumBracketSpanEv) {
+  if (exposureResolutionResolved && bracketSpanEv < options.minimumBracketSpanEv) {
     blocks.push('not_a_bracket');
   }
 
@@ -119,11 +121,11 @@ export const detectHdrBracketV1 = (requestValue: unknown): HdrBracketDetectionRe
     warnings.push('dimensions_match_but_raw_geometry_unverified');
   }
 
-  if (!isExposureOrderAscending(resolvedExposures)) {
+  if (exposureResolutionResolved && !isExposureOrderAscending(resolvedExposures)) {
     warnings.push('bracket_order_inferred');
   }
 
-  if (hasIrregularSpacing(resolvedExposures, options.irregularSpacingToleranceEv)) {
+  if (exposureResolutionResolved && hasIrregularSpacing(resolvedExposures, options.irregularSpacingToleranceEv)) {
     warnings.push('bracket_spacing_irregular');
   }
 
@@ -199,6 +201,13 @@ const resolveSourceExposure = (source: HdrBracketDetectionSourceInputV1): Source
   }
 
   return undefined;
+};
+
+const hasCommonExposureResolutionStrategy = (exposures: Array<SourceExposure | undefined>): boolean => {
+  const methods = exposures.map((exposure) => exposure?.method);
+  const [firstMethod] = methods;
+  if (firstMethod === undefined) return false;
+  return methods.every((method) => method === firstMethod);
 };
 
 const normalizeExposureValues = (

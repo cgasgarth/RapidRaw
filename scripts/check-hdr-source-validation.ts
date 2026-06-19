@@ -63,6 +63,21 @@ const expectAcceptedWithoutBlocks = (
   if (detection.blockCodes.length > 0) failures.push(`${name}: expected no blocks.`);
 };
 
+const expectOnlyBlocks = (
+  name: string,
+  sources: HdrBracketDetectionSourceInputV1[],
+  expectedBlocks: HdrMergeBlockCodeV1[],
+) => {
+  const detection = detectHdrBracketV1({ sources });
+  if (detection.accepted) failures.push(`${name}: expected rejected bracket.`);
+  if (detection.blockCodes.length !== expectedBlocks.length) {
+    failures.push(`${name}: expected blocks ${expectedBlocks.join(',')}, got ${detection.blockCodes.join(',')}.`);
+  }
+  for (const block of expectedBlocks) {
+    if (!detection.blockCodes.includes(block)) failures.push(`${name}: missing block ${block}.`);
+  }
+};
+
 const expectWarnings = (
   name: string,
   sources: HdrBracketDetectionSourceInputV1[],
@@ -80,13 +95,22 @@ if (!accepted.accepted) failures.push('accepted: valid bracket rejected.');
 if (accepted.referenceSourceIndex !== 1) failures.push('accepted: expected 0 EV source as reference.');
 if (accepted.bracketSpanEv !== 4) failures.push('accepted: expected 4 EV bracket span.');
 
-expectBlocks(
+expectOnlyBlocks(
   'missing exposure',
   baseBracket().map(({ declaredExposureEv, ...source }) => {
     void declaredExposureEv;
     return source;
   }),
-  ['missing_required_exposure_metadata', 'duplicate_exposure_values', 'not_a_bracket'],
+  ['missing_required_exposure_metadata'],
+);
+expectOnlyBlocks(
+  'mixed exposure metadata strategies',
+  [
+    baseSource(0, -2),
+    baseSource(1, 0, { declaredExposureEv: undefined, exposureCompensationEv: 0 }),
+    baseSource(2, 0, { aperture: 5.6, declaredExposureEv: undefined, exposureTimeSeconds: 1 / 15, iso: 100 }),
+  ],
+  ['missing_required_exposure_metadata'],
 );
 expectBlocks(
   'duplicate exposure',
