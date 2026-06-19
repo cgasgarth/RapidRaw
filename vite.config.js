@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { getViteChunkSizeWarningLimitKb } from './scripts/lib/vite-bundle-policy.ts';
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -30,6 +31,6 @@ export default defineConfig(async () => ({
     cssMinify: 'esbuild',
     minify: 'esbuild',
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
-    chunkSizeWarningLimit: 3000,
+    chunkSizeWarningLimit: getViteChunkSizeWarningLimitKb(),
   },
 }));
