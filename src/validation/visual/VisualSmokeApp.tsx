@@ -939,6 +939,7 @@ function FocusStackVisualSmoke() {
           isOpen
           loadingImageUrl={panoramaPreviewUrl}
           onClose={() => {}}
+          onPreviewPlan={() => {}}
           onSettingsChange={setSettings}
           settings={settings}
           sourceCount={6}

@@ -29,6 +29,7 @@ import {
   createDefaultSuperResolutionModalState,
   useUIStore,
 } from '../../store/useUIStore';
+import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 
 import type { CopyPasteSettings } from '../../utils/adjustments';
 import type { AppSettings, AlbumItem } from '../ui/AppProperties';
@@ -291,6 +292,19 @@ export default function AppModals(props: AppModalsProps) {
           setUI((state) => ({
             focusStackModalState: createDefaultFocusStackModalState(state.focusStackModalState.settings),
           }));
+        }}
+        onPreviewPlan={() => {
+          setUI({
+            focusStackModalState: {
+              ...focusStackModalState,
+              lastDryRunCommand: {
+                commandType: 'computationalMerge.createFocusStack',
+                dryRun: true,
+                sources: focusStackModalState.sourcePaths.length,
+                toolName: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
+              },
+            },
+          });
         }}
         onSettingsChange={(settings) => {
           setUI((state) => ({
