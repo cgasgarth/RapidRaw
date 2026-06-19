@@ -4,6 +4,7 @@ import { FocusStackAppServerRuntimeToolBusV1 } from '../packages/rawengine-schem
 import { ApprovalClass, RAW_ENGINE_SCHEMA_VERSION } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import { sampleComputationalMergeAppServerToolManifestV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
 import { getComputationalMergeAppServerRoutePairSummary } from '../src/utils/computationalMergeAppServerRoutePairs.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from './lib/computational-proof-budgets.ts';
 
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 const WIDTH = 72;
@@ -52,7 +53,7 @@ const dryRunCommand = {
     alignmentMode: 'translation',
     blendMethod: 'weighted_sharpness',
     maxPreviewDimensionPx: 1200,
-    memoryBudgetBytes: 64_000_000,
+    memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
     outputName: 'Synthetic App Server Runtime Focus Stack',
     qualityPreference: 'best',
     retouchLayerPolicy: 'generate_retouch_layer',

@@ -17,6 +17,7 @@ import {
   parseComputationalMergePrivateRunReportCollection,
   type ComputationalMergePrivateRunReportCollection,
 } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from './lib/computational-proof-budgets.ts';
 
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
@@ -143,7 +144,7 @@ function buildControls(sample: RuntimeSample) {
     alignmentMode: 'translation',
     blendMethod: 'weighted_sharpness',
     maxPreviewDimensionPx: Math.max(sample.width, sample.height),
-    memoryBudgetBytes: 64_000_000,
+    memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
     outputName: 'Private RAW Focus Stack Runtime Proof',
     qualityPreference: 'best',
     retouchLayerPolicy: 'generate_retouch_layer',

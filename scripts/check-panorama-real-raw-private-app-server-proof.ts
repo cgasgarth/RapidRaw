@@ -17,6 +17,7 @@ import {
   parseComputationalMergePrivateRunReportCollection,
   type ComputationalMergePrivateRunReportCollection,
 } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
+import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from './lib/computational-proof-budgets.ts';
 
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
@@ -142,7 +143,7 @@ function buildControls(sample: z.infer<typeof runtimeSampleSchema>) {
     exposureMode: 'gain_compensation',
     lensCorrectionPolicy: 'required_before_stitch',
     maxPreviewDimensionPx: 1200,
-    memoryBudgetBytes: 64_000_000,
+    memoryBudgetBytes: COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES,
     outputName: 'Private RAW Panorama runtime proof',
     projection: 'cylindrical',
     qualityPreference: 'balanced',
