@@ -88,7 +88,10 @@ export const detectHdrBracketV1 = (requestValue: unknown): HdrBracketDetectionRe
   const uniqueExposureValues = distinctExposureValues(resolvedExposures, options.duplicateExposureToleranceEv);
   const bracketSpanEv = getExposureSpan(resolvedExposures);
 
-  if (uniqueExposureValues.length < 2) {
+  if (
+    uniqueExposureValues.length < 2 ||
+    hasDuplicateExposurePair(resolvedExposures, options.duplicateExposureToleranceEv)
+  ) {
     blocks.push('duplicate_exposure_values');
   }
 
@@ -243,6 +246,14 @@ const distinctExposureValues = (exposures: SourceExposure[], toleranceEv: number
   }
 
   return distinctValues;
+};
+
+const hasDuplicateExposurePair = (exposures: SourceExposure[], toleranceEv: number): boolean => {
+  const sortedValues = exposures.map((exposure) => exposure.value).sort((left, right) => left - right);
+  return sortedValues.some((value, index) => {
+    const previousValue = sortedValues[index - 1];
+    return previousValue !== undefined && value - previousValue <= toleranceEv;
+  });
 };
 
 const getExposureSpan = (exposures: SourceExposure[]): number => {

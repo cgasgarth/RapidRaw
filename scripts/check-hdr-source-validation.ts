@@ -2,6 +2,7 @@
 
 import {
   detectHdrBracketV1,
+  type HdrBracketDetectionOptionsV1,
   hdrBracketDetectionRequestV1Schema,
   type HdrBracketDetectionSourceInputV1,
 } from '../packages/rawengine-schema/src/hdrBracketDetection.ts';
@@ -43,12 +44,23 @@ const expectBlocks = (
   name: string,
   sources: HdrBracketDetectionSourceInputV1[],
   expectedBlocks: HdrMergeBlockCodeV1[],
+  options?: HdrBracketDetectionOptionsV1,
 ) => {
-  const detection = detectHdrBracketV1({ sources });
+  const detection = detectHdrBracketV1({ options, sources });
   if (detection.accepted) failures.push(`${name}: expected rejected bracket.`);
   for (const block of expectedBlocks) {
     if (!detection.blockCodes.includes(block)) failures.push(`${name}: missing block ${block}.`);
   }
+};
+
+const expectAcceptedWithoutBlocks = (
+  name: string,
+  sources: HdrBracketDetectionSourceInputV1[],
+  options?: HdrBracketDetectionOptionsV1,
+) => {
+  const detection = detectHdrBracketV1({ options, sources });
+  if (!detection.accepted) failures.push(`${name}: expected accepted bracket, got ${detection.blockCodes.join(',')}.`);
+  if (detection.blockCodes.length > 0) failures.push(`${name}: expected no blocks.`);
 };
 
 const expectWarnings = (
@@ -80,6 +92,22 @@ expectBlocks(
   'duplicate exposure',
   baseBracket().map((source) => ({ ...source, declaredExposureEv: 0 })),
   ['duplicate_exposure_values', 'not_a_bracket'],
+);
+expectBlocks(
+  'partial duplicate exposure',
+  [baseSource(0, -2), baseSource(1, 0), baseSource(2, 0), baseSource(3, 2)],
+  ['duplicate_exposure_values'],
+);
+expectBlocks(
+  'duplicate exposure exact tolerance boundary',
+  [baseSource(0, -2), baseSource(1, 0), baseSource(2, 0.05), baseSource(3, 2)],
+  ['duplicate_exposure_values'],
+  { duplicateExposureToleranceEv: 0.05, irregularSpacingToleranceEv: 3 },
+);
+expectAcceptedWithoutBlocks(
+  'duplicate exposure just above tolerance',
+  [baseSource(0, -2), baseSource(1, 0), baseSource(2, 0.051), baseSource(3, 2)],
+  { duplicateExposureToleranceEv: 0.05, irregularSpacingToleranceEv: 3 },
 );
 expectBlocks('too narrow', [baseSource(0, -0.2), baseSource(1, 0), baseSource(2, 0.2)], ['not_a_bracket']);
 expectBlocks(
