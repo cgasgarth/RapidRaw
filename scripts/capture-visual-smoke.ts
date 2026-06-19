@@ -11,6 +11,7 @@ import {
 } from '../src/validation/visual/visualSmokeScenarios.ts';
 import {
   agentArtifactReviewProofDatasetSchema,
+  agentAuditTranscriptViewerProofDatasetSchema,
   agentDryRunReviewProofDatasetSchema,
   agentChatProofDatasetSchema,
   assertFilmLookExportProof,
@@ -227,6 +228,10 @@ async function prepareScenario(page, mode) {
     const shell = page.getByTestId('agent-chat-shell');
     await shell.waitFor({ timeout: 10_000 });
     agentChatProofDatasetSchema.parse(await shell.evaluate((element) => ({ ...element.dataset })));
+    const auditViewer = page.getByTestId('agent-audit-transcript-viewer');
+    agentAuditTranscriptViewerProofDatasetSchema.parse(
+      await auditViewer.evaluate((element) => ({ ...element.dataset })),
+    );
     const artifacts = page.getByTestId('agent-artifact-review');
     agentArtifactReviewProofDatasetSchema.parse(await artifacts.evaluate((element) => ({ ...element.dataset })));
     const review = page.getByTestId('agent-dry-run-review');
@@ -244,6 +249,26 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('agent-tool-status-tool-3').getByText('blocked', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await auditViewer.getByText('Audit transcript', { exact: true }).waitFor({ timeout: 10_000 });
+    await page.getByTestId('agent-audit-summary').getByText('schema_only', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-audit-summary').getByText('graph_rev_45_preview', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-audit-record-audit-record-tool-2').getByText('warning', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('agent-audit-record-audit-record-tool-3').getByText('blocked', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    const auditArtifactLinkCount = await page
+      .getByTestId('agent-audit-transcript-records')
+      .locator('a[href*="agent-replay-proof-gallery-2026-06-16.html"]')
+      .count();
+    if (auditArtifactLinkCount !== 3) {
+      throw new Error(`Expected 3 visible audit transcript artifact links, found ${auditArtifactLinkCount}.`);
+    }
     await page.getByTestId('agent-before-after-preview').getByText('graph_rev_45_preview', { exact: true }).waitFor({
       timeout: 10_000,
     });

@@ -6,6 +6,14 @@ export const agentChatToolCallStatusSchema = z.enum(['blocked', 'failed', 'queue
 export const agentChatApprovalStateSchema = z.enum(['approved', 'not_required', 'rejected', 'required']);
 export const agentChatReviewActionStateSchema = z.enum(['available', 'disabled', 'rejected', 'unavailable']);
 export const agentArtifactReviewStatusSchema = z.enum(['audit_only', 'ready', 'review_required']);
+export const agentAuditTranscriptOutcomeSchema = z.enum(['blocked', 'success', 'warning']);
+export const agentAuditEvidenceTierSchema = z.enum([
+  'ui_only',
+  'schema_only',
+  'dry_run_only',
+  'runtime_apply',
+  'e2e_verified',
+]);
 
 export const agentChatMessageSchema = z
   .object({
@@ -125,9 +133,49 @@ export const agentArtifactReviewSchema = z
   })
   .strict();
 
+export const agentAuditTranscriptSchema = z
+  .object({
+    evidenceTier: agentAuditEvidenceTierSchema,
+    finalRevision: z.string().min(1),
+    initialRevision: z.string().min(1),
+    records: z
+      .array(
+        z
+          .object({
+            artifactLinks: z.array(
+              z
+                .object({
+                  href: z.string().min(1),
+                  id: z.string().min(1),
+                  label: z.string().min(1),
+                })
+                .strict(),
+            ),
+            id: z.string().min(1),
+            outcome: agentAuditTranscriptOutcomeSchema,
+            requestHash: z.string().regex(/^sha256:[a-f0-9]{16,64}$/u),
+            schema: z.string().min(1),
+            stage: agentChatToolCallModeSchema,
+            summary: z.string().min(1),
+            timestamp: z.string().min(1),
+            title: z.string().min(1),
+            toolCallId: z.string().min(1),
+            toolName: z.string().min(1),
+            warnings: z.array(z.string().min(1)),
+          })
+          .strict(),
+      )
+      .min(1),
+    replayRoot: z.string().min(1),
+    schemaVersion: z.literal(1),
+    targetLabel: z.string().min(1),
+  })
+  .strict();
+
 export const agentChatTranscriptSchema = z
   .object({
     artifactReview: agentArtifactReviewSchema.optional(),
+    auditTranscript: agentAuditTranscriptSchema.optional(),
     dryRunReview: agentChatDryRunReviewSchema.optional(),
     id: z.string().min(1),
     messages: z.array(agentChatMessageSchema).min(1),
@@ -139,6 +187,7 @@ export const agentChatTranscriptSchema = z
 
 export type AgentChatMessage = z.infer<typeof agentChatMessageSchema>;
 export type AgentArtifactReview = z.infer<typeof agentArtifactReviewSchema>;
+export type AgentAuditTranscript = z.infer<typeof agentAuditTranscriptSchema>;
 export type AgentChatToolCall = z.infer<typeof agentChatToolCallSchema>;
 export type AgentChatDryRunReview = z.infer<typeof agentChatDryRunReviewSchema>;
 export type AgentChatTranscript = z.infer<typeof agentChatTranscriptSchema>;

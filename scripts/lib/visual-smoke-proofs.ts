@@ -338,6 +338,15 @@ export const agentArtifactReviewProofDatasetSchema = z.object({
   auditCount: z.literal('3'),
   beforeRevision: z.literal('graph_rev_44'),
 });
+export const agentAuditTranscriptViewerProofDatasetSchema = z.object({
+  applyRecordCount: z.literal('1'),
+  artifactLinkCount: z.literal('3'),
+  evidenceTier: z.literal('schema_only'),
+  recordCount: z.literal('3'),
+  replayRoot: z.string().endsWith('agent-replay-proof-gallery-2026-06-16.html'),
+  schemaVersion: z.literal('1'),
+  warningCount: z.literal('2'),
+});
 export const agentDryRunReviewProofDatasetSchema = z.object({
   actionCount: z.literal('3'),
   affectedTargetCount: z.literal('3'),

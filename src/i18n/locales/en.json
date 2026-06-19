@@ -463,6 +463,15 @@
           "title": "Preview artifacts",
           "uiOnly": "Before/after previews and audit links are review evidence only."
         },
+        "audit": {
+          "evidence": "Evidence",
+          "finalRevision": "Final revision",
+          "html": "HTML",
+          "initialRevision": "Initial revision",
+          "target": "Target",
+          "title": "Audit transcript",
+          "uiOnly": "Local HTML evidence only; no edits are applied."
+        },
         "duration": {
           "pending": "Pending"
         },
