@@ -235,11 +235,7 @@ pub fn find_homography_ransac(
         let sample_points: Vec<(Point2<f64>, Point2<f64>)> =
             sample_indices.iter().map(|&i| points[i]).collect();
 
-        if are_points_collinear(sample_points[0].0, sample_points[1].0, sample_points[2].0)
-            || are_points_collinear(sample_points[0].0, sample_points[1].0, sample_points[3].0)
-            || are_points_collinear(sample_points[0].0, sample_points[2].0, sample_points[3].0)
-            || are_points_collinear(sample_points[1].0, sample_points[2].0, sample_points[3].0)
-        {
+        if correspondence_set_is_degenerate(&sample_points) {
             continue;
         }
 
@@ -336,8 +332,30 @@ fn are_points_collinear(p1: Point2<f64>, p2: Point2<f64>, p3: Point2<f64>) -> bo
     area.abs() < 1e-6
 }
 
-pub fn compute_homography(points: &[(Point2<f64>, Point2<f64>)]) -> Option<Matrix3<f64>> {
+fn has_non_collinear_triplet(points: &[Point2<f64>]) -> bool {
+    for first in 0..points.len() {
+        for second in (first + 1)..points.len() {
+            for third in (second + 1)..points.len() {
+                if !are_points_collinear(points[first], points[second], points[third]) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn correspondence_set_is_degenerate(points: &[(Point2<f64>, Point2<f64>)]) -> bool {
     if points.len() < 4 {
+        return true;
+    }
+    let source_points = points.iter().map(|point| point.0).collect::<Vec<_>>();
+    let target_points = points.iter().map(|point| point.1).collect::<Vec<_>>();
+    !has_non_collinear_triplet(&source_points) || !has_non_collinear_triplet(&target_points)
+}
+
+pub fn compute_homography(points: &[(Point2<f64>, Point2<f64>)]) -> Option<Matrix3<f64>> {
+    if correspondence_set_is_degenerate(points) {
         return None;
     }
     let mut a_rows = Vec::with_capacity(points.len() * 2);
@@ -510,6 +528,30 @@ mod tests {
         let matches = match_features(&features1, &features2);
 
         assert_eq!(match_pairs(&matches), vec![(0, 0)]);
+    }
+
+    #[test]
+    fn compute_homography_rejects_source_collinear_points() {
+        let points = vec![
+            (Point2::new(0.0, 0.0), Point2::new(0.0, 0.0)),
+            (Point2::new(1.0, 0.0), Point2::new(1.0, 0.0)),
+            (Point2::new(2.0, 0.0), Point2::new(2.0, 1.0)),
+            (Point2::new(3.0, 0.0), Point2::new(3.0, 1.0)),
+        ];
+
+        assert!(compute_homography(&points).is_none());
+    }
+
+    #[test]
+    fn compute_homography_rejects_target_collinear_points() {
+        let points = vec![
+            (Point2::new(0.0, 0.0), Point2::new(0.0, 0.0)),
+            (Point2::new(1.0, 0.0), Point2::new(1.0, 0.0)),
+            (Point2::new(0.0, 1.0), Point2::new(2.0, 0.0)),
+            (Point2::new(1.0, 1.0), Point2::new(3.0, 0.0)),
+        ];
+
+        assert!(compute_homography(&points).is_none());
     }
 
     #[test]
