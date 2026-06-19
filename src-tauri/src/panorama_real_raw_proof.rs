@@ -267,8 +267,17 @@ struct PanoramaPrivateRuntimeFrame {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StitchExposureDiagnostics {
+    applied_gain_count: usize,
+    applied_luminance_gains: Vec<StitchOverlapGainReport>,
     mode: String,
     support: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StitchOverlapGainReport {
+    gain: f32,
+    source_index: usize,
 }
 
 #[derive(Serialize)]
@@ -908,8 +917,23 @@ fn build_stitch_report(
         connected_source_indices: render_result.metadata.connected_source_indices.clone(),
         excluded_source_indices: render_result.metadata.excluded_source_indices.clone(),
         exposure_diagnostics: StitchExposureDiagnostics {
-            mode: "planned_not_applied".to_string(),
-            support: "diagnostic_only_current_engine".to_string(),
+            applied_gain_count: render_result
+                .metadata
+                .blend_diagnostics
+                .overlap_gain_applications
+                .len(),
+            applied_luminance_gains: render_result
+                .metadata
+                .blend_diagnostics
+                .overlap_gain_applications
+                .iter()
+                .map(|application| StitchOverlapGainReport {
+                    gain: application.gain,
+                    source_index: application.source_index,
+                })
+                .collect(),
+            mode: "scalar_overlap_luminance_gain_v1".to_string(),
+            support: "implemented_current_engine".to_string(),
         },
         fixture_id: fixture_id.to_string(),
         graph_revision_hash: graph_revision_hash.to_string(),
