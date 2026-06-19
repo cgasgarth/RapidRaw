@@ -119,6 +119,7 @@ const CHECK_GROUPS = {
     'check:negative-lab-measured-render-proof',
     'check:negative-lab-real-fixtures',
     'check:negative-lab-stock-metadata-catalog',
+    'check:negative-lab-stock-metadata-coverage',
   ],
 };
 
