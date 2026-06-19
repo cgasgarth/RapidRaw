@@ -55,6 +55,8 @@ pub struct ImageInfo {
 pub struct MatchInfo {
     pub homography: Matrix3<f64>,
     pub inliers: usize,
+    pub match_count: usize,
+    pub mean_reprojection_error_px: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,8 +64,9 @@ pub struct PanoramaRenderRequest {
     pub image_paths: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PanoramaSourceMetadata {
+    pub global_transform_3x3: Option<[f64; 9]>,
     pub height: u32,
     pub index: usize,
     pub path: String,
@@ -73,7 +76,10 @@ pub struct PanoramaSourceMetadata {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PanoramaPairwiseMatchMetadata {
     pub homography3x3: [f64; 9],
+    pub inlier_ratio: f64,
     pub inliers: usize,
+    pub match_count: usize,
+    pub mean_reprojection_error_px: f64,
     pub source_index: usize,
     pub target_index: usize,
 }
@@ -379,6 +385,7 @@ fn load_panorama_source_metadata_for_plan(
             };
 
             Ok(PanoramaSourceMetadata {
+                global_transform_3x3: None,
                 height,
                 index,
                 path: filename.clone(),
@@ -562,11 +569,12 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         }
     }
 
-    let source_metadata: Vec<PanoramaSourceMetadata> = image_data
+    let mut source_metadata: Vec<PanoramaSourceMetadata> = image_data
         .iter()
         .map(|info| {
             let (width, height) = info.image.dimensions();
             PanoramaSourceMetadata {
+                global_transform_3x3: None,
                 height,
                 index: info.id,
                 path: info.filename.clone(),
@@ -603,7 +611,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
             let keypoints1: Vec<KeyPoint> = features1.iter().map(|f| f.keypoint).collect();
             let keypoints2: Vec<KeyPoint> = features2.iter().map(|f| f.keypoint).collect();
 
-            if let Some((_h_small, inliers)) =
+            if let Some((h_small, inliers)) =
                 processing::find_homography_ransac(&initial_matches, &keypoints1, &keypoints2)
                 && inliers.len() >= processing::MIN_INLIERS_FOR_CONNECTION
             {
@@ -633,6 +641,12 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
                     .collect();
 
                 if let Some(h_refined) = processing::compute_homography(&inlier_points) {
+                    let mean_reprojection_error_px = processing::mean_reprojection_error(
+                        &h_small,
+                        &inliers,
+                        &keypoints1,
+                        &keypoints2,
+                    );
                     let s1 = image_data[i].scale_factor;
                     let s2 = image_data[j].scale_factor;
                     let scale_mat_i_inv =
@@ -643,6 +657,8 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
                     let match_info = MatchInfo {
                         homography: h_full,
                         inliers: inliers.len(),
+                        match_count: initial_matches.len(),
+                        mean_reprojection_error_px,
                     };
                     return Some(((i, j), match_info));
                 }
@@ -675,6 +691,11 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     println!("Determining stitching order...");
     let (ordered_indices, global_homographies) =
         build_stitching_order(&image_data, &pairwise_matches);
+    for source in &mut source_metadata {
+        source.global_transform_3x3 = global_homographies
+            .get(&source.index)
+            .map(matrix_to_row_major_array);
+    }
 
     if ordered_indices.len() < 2 {
         return Err("Could not find a connected sequence of at least two images.".to_string());
@@ -768,7 +789,14 @@ fn collect_pairwise_match_metadata(
         .map(
             |(&(source_index, target_index), match_info)| PanoramaPairwiseMatchMetadata {
                 homography3x3: matrix_to_row_major_array(&match_info.homography),
+                inlier_ratio: if match_info.match_count == 0 {
+                    0.0
+                } else {
+                    match_info.inliers as f64 / match_info.match_count as f64
+                },
                 inliers: match_info.inliers,
+                match_count: match_info.match_count,
+                mean_reprojection_error_px: match_info.mean_reprojection_error_px,
                 source_index,
                 target_index,
             },
@@ -909,8 +937,11 @@ fn upsert_panorama_artifact_metadata(
             "pairwiseMatches": metadata.pairwise_matches.iter().map(|pair| json!({
                 "fromSourceIndex": pair.source_index,
                 "homography3x3": pair.homography3x3,
+                "inlierRatio": pair.inlier_ratio,
                 "inliers": pair.inliers,
+                "matchCount": pair.match_count,
                 "matchQuality": "accepted",
+                "meanReprojectionErrorPx": pair.mean_reprojection_error_px,
                 "toSourceIndex": pair.target_index,
             })).collect::<Vec<_>>(),
             "ransacSeed": 12345,
@@ -1440,6 +1471,8 @@ mod tests {
             MatchInfo {
                 homography: Matrix3::identity(),
                 inliers: 21,
+                match_count: 30,
+                mean_reprojection_error_px: 2.1,
             },
         );
         matches.insert(
@@ -1447,6 +1480,8 @@ mod tests {
             MatchInfo {
                 homography: Matrix3::identity(),
                 inliers: 42,
+                match_count: 60,
+                mean_reprojection_error_px: 1.4,
             },
         );
 
@@ -1457,13 +1492,19 @@ mod tests {
             vec![
                 PanoramaPairwiseMatchMetadata {
                     homography3x3: matrix_to_row_major_array(&Matrix3::identity()),
+                    inlier_ratio: 0.7,
                     inliers: 42,
+                    match_count: 60,
+                    mean_reprojection_error_px: 1.4,
                     source_index: 0,
                     target_index: 1,
                 },
                 PanoramaPairwiseMatchMetadata {
                     homography3x3: matrix_to_row_major_array(&Matrix3::identity()),
+                    inlier_ratio: 0.7,
                     inliers: 21,
+                    match_count: 30,
+                    mean_reprojection_error_px: 2.1,
                     source_index: 2,
                     target_index: 3,
                 },
@@ -1629,12 +1670,14 @@ mod tests {
     fn estimate_legacy_panorama_peak_memory_bytes_accounts_for_major_buffers() {
         let sources = vec![
             PanoramaSourceMetadata {
+                global_transform_3x3: None,
                 height: 100,
                 index: 0,
                 path: "left.dng".to_string(),
                 width: 200,
             },
             PanoramaSourceMetadata {
+                global_transform_3x3: None,
                 height: 100,
                 index: 1,
                 path: "right.dng".to_string(),
@@ -1719,12 +1762,14 @@ mod tests {
     fn sample_plan_sources() -> Vec<PanoramaSourceMetadata> {
         vec![
             PanoramaSourceMetadata {
+                global_transform_3x3: None,
                 height: 50,
                 index: 0,
                 path: "left.dng".to_string(),
                 width: 100,
             },
             PanoramaSourceMetadata {
+                global_transform_3x3: None,
                 height: 50,
                 index: 1,
                 path: "right.dng".to_string(),
@@ -1742,7 +1787,10 @@ mod tests {
             output_width: 220,
             pairwise_matches: vec![PanoramaPairwiseMatchMetadata {
                 homography3x3: [1.0, 0.0, 12.0, 0.0, 1.0, 1.5, 0.0, 0.0, 1.0],
+                inlier_ratio: 0.8,
                 inliers: 32,
+                match_count: 40,
+                mean_reprojection_error_px: 1.25,
                 source_index: 0,
                 target_index: 1,
             }],
