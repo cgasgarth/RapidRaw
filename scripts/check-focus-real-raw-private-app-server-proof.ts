@@ -18,6 +18,7 @@ import {
   type ComputationalMergePrivateRunReportCollection,
 } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
 import { COMPUTATIONAL_PROOF_MEMORY_BUDGET_BYTES } from './lib/computational-proof-budgets.ts';
+import { privateRawReportMetric } from './lib/computational-private-report-fixtures.ts';
 
 const focusRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
@@ -321,13 +322,6 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
   const asset = (path: string) => ({ hash, path, publicRepoAllowed: false });
   const source = (path: string) => ({ ...asset(path), localRelativePath: path });
   const artifact = (kind: string, path: string) => ({ ...asset(path), kind });
-  const metric = (name: string, threshold: number, value: number) => ({
-    name,
-    passed: true,
-    source: 'private_raw_report',
-    threshold,
-    value,
-  });
 
   return parseComputationalMergePrivateRunReportCollection({
     $schema: 'https://rawengine.dev/schemas/computational-merge-private-run-reports-v1.json',
@@ -349,15 +343,15 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
         implementationIssue: 1507,
         notes: 'sample focus stack artifact smoke report',
         qualityMetrics: [
-          metric('decodedSourceCount', 3, 3),
-          metric('decodedFinitePixelRatio', 1, 1),
-          metric('decodedNonzeroDimensionCount', 3, 3),
-          metric('focusStackWinnerSourceCount', 2, 3),
-          metric('focusStackSourceCoverageRatio', 0.67, 1),
-          metric('focusStackOutputPixelCount', 1, 96),
-          metric('sharpnessGainRatio', 1.15, 1.2),
-          metric('focusTransitionArtifactScore', 0.9, 0.2),
-          metric('focusStackLowConfidenceCellRatio', 0.5, 0.1),
+          privateRawReportMetric('decodedSourceCount', 3, 3),
+          privateRawReportMetric('decodedFinitePixelRatio', 1, 1),
+          privateRawReportMetric('decodedNonzeroDimensionCount', 3, 3),
+          privateRawReportMetric('focusStackWinnerSourceCount', 2, 3),
+          privateRawReportMetric('focusStackSourceCoverageRatio', 0.67, 1),
+          privateRawReportMetric('focusStackOutputPixelCount', 1, 96),
+          privateRawReportMetric('sharpnessGainRatio', 1.15, 1.2),
+          privateRawReportMetric('focusTransitionArtifactScore', 0.9, 0.2),
+          privateRawReportMetric('focusStackLowConfidenceCellRatio', 0.5, 0.1),
         ],
         reportId: 'computational-merge-run.focus-plane-transition.v1',
         screenshotArtifacts: [],

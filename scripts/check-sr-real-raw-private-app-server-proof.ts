@@ -17,6 +17,7 @@ import {
   parseComputationalMergePrivateRunReportCollection,
   type ComputationalMergePrivateRunReportCollection,
 } from '../src/schemas/computationalMergePrivateRunReportSchemas.ts';
+import { privateRawReportMetric } from './lib/computational-private-report-fixtures.ts';
 
 const superResolutionRoutePair = getComputationalMergeAppServerRoutePairSummary('super_resolution');
 const ARTIFACT_ROOT = 'private-artifacts/validation/computational-merge';
@@ -301,13 +302,6 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
   const asset = (path: string) => ({ hash, path, publicRepoAllowed: false });
   const source = (path: string) => ({ ...asset(path), localRelativePath: path });
   const artifact = (kind: string, path: string) => ({ ...asset(path), kind });
-  const metric = (name: string, threshold: number, value: number) => ({
-    name,
-    passed: true,
-    source: 'private_raw_report',
-    threshold,
-    value,
-  });
 
   return parseComputationalMergePrivateRunReportCollection({
     $schema: 'https://rawengine.dev/schemas/computational-merge-private-run-reports-v1.json',
@@ -329,14 +323,14 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
         implementationIssue: 1506,
         notes: 'sample super-resolution reconstruction artifact smoke report',
         qualityMetrics: [
-          metric('decodedSourceCount', 4, 4),
-          metric('decodedFinitePixelRatio', 1, 1),
-          metric('decodedNonzeroDimensionCount', 4, 4),
-          metric('superResolutionDetailGainRatio', 4, 4),
-          metric('superResolutionOutputPixelCount', 384, 384),
-          metric('superResolutionSourceCoverageRatio', 1, 1),
-          metric('superResolutionArtifactScore', 0.02, 0),
-          metric('superResolutionRegistrationResidualPx', 0.25, 0.015),
+          privateRawReportMetric('decodedSourceCount', 4, 4),
+          privateRawReportMetric('decodedFinitePixelRatio', 1, 1),
+          privateRawReportMetric('decodedNonzeroDimensionCount', 4, 4),
+          privateRawReportMetric('superResolutionDetailGainRatio', 4, 4),
+          privateRawReportMetric('superResolutionOutputPixelCount', 384, 384),
+          privateRawReportMetric('superResolutionSourceCoverageRatio', 1, 1),
+          privateRawReportMetric('superResolutionArtifactScore', 0.02, 0),
+          privateRawReportMetric('superResolutionRegistrationResidualPx', 0.25, 0.015),
         ],
         reportId: 'computational-merge-run.super-resolution-subpixel.v1',
         screenshotArtifacts: [],
