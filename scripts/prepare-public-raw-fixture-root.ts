@@ -14,6 +14,7 @@ const RAW_PIXLS_LICENSE_NOTE =
 
 const fixtureFamilySchema = z.enum(['focus_stack', 'panorama_stitch', 'super_resolution']);
 type FixtureFamily = z.infer<typeof fixtureFamilySchema>;
+type FixtureSuitability = 'format_smoke_only' | 'runtime_proof_candidate';
 
 interface PublicRawFixtureSource {
   family: FixtureFamily;
@@ -21,6 +22,12 @@ interface PublicRawFixtureSource {
   rawPixlsPath: string;
   sha256: string;
 }
+
+const fixtureFamilySuitability = {
+  focus_stack: 'format_smoke_only',
+  panorama_stitch: 'format_smoke_only',
+  super_resolution: 'runtime_proof_candidate',
+} as const satisfies Record<FixtureFamily, FixtureSuitability>;
 
 const publicRawFixtureSources = [
   {
@@ -87,6 +94,7 @@ const publicRawFixtureSources = [
 
 const argsSchema = z
   .object({
+    allowFormatSmoke: z.boolean(),
     download: z.boolean(),
     family: z.union([fixtureFamilySchema, z.literal('all')]),
     privateRoot: z.string().trim().min(1),
@@ -94,6 +102,7 @@ const argsSchema = z
   .strict();
 
 const args = argsSchema.parse({
+  allowFormatSmoke: process.argv.includes('--allow-format-smoke'),
   download: process.argv.includes('--download'),
   family: parseFamilyArg(),
   privateRoot: process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? DEFAULT_PRIVATE_ROOT,
@@ -107,10 +116,13 @@ if (selectedSources.length === 0) throw new Error(`No public RAW fixture sources
 if (!args.download) {
   console.log(`public RAW fixture plan (${selectedSources.length} files, root=${args.privateRoot})`);
   for (const source of selectedSources) {
-    console.log(`${source.family} ${source.localPath} <= ${sourceUrl(source)}`);
+    console.log(
+      `${source.family} ${fixtureFamilySuitability[source.family]} ${source.localPath} <= ${sourceUrl(source)}`,
+    );
   }
   console.log(RAW_PIXLS_LICENSE_NOTE);
 } else {
+  assertDownloadAllowed(selectedSources);
   await downloadSources(selectedSources);
   console.log(`public RAW fixture download ok (${selectedSources.length} files, root=${args.privateRoot})`);
 }
@@ -119,6 +131,21 @@ function parseFamilyArg(): FixtureFamily | 'all' {
   const familyArgIndex = process.argv.indexOf('--family');
   if (familyArgIndex === -1) return 'all';
   return fixtureFamilySchema.parse(process.argv[familyArgIndex + 1]);
+}
+
+function assertDownloadAllowed(sources: ReadonlyArray<PublicRawFixtureSource>): void {
+  const formatSmokeFamilies = [
+    ...new Set(
+      sources
+        .filter((source) => fixtureFamilySuitability[source.family] === 'format_smoke_only')
+        .map((source) => source.family),
+    ),
+  ];
+  if (formatSmokeFamilies.length > 0 && !args.allowFormatSmoke) {
+    fail(
+      `${formatSmokeFamilies.join(', ')} public RAW fixtures are format-smoke only; pass --allow-format-smoke to download them explicitly.`,
+    );
+  }
 }
 
 async function downloadSources(sources: ReadonlyArray<PublicRawFixtureSource>): Promise<void> {
@@ -156,6 +183,11 @@ function sha256(bytes: Buffer): string {
 
 function sourceUrl(source: PublicRawFixtureSource): string {
   return `${RAW_PIXLS_DOWNLOAD_ROOT}/${source.rawPixlsPath.split('/').map(encodeURIComponent).join('/')}`;
+}
+
+function fail(message: string): never {
+  console.error(message);
+  process.exit(1);
 }
 
 export { RAW_PIXLS_LICENSE_NOTE, RAW_PIXLS_SOURCE_PAGE, publicRawFixtureSources };
