@@ -66,6 +66,11 @@ CI uploads this report from the frontend build job. Module and package
 attribution is intentionally tracked separately by #2429 so this report remains
 stable emitted-asset evidence.
 
+The same gate runs a production payload scan against `dist` to reject sourcemap
+artifacts, sourcemap comments, localhost URLs, local user paths, and
+debug/fixture-like asset names. Debug payloads belong in dev-only scripts or
+explicitly named diagnostic artifacts, not in required production build output.
+
 ## Policy
 
 - The current monolithic JavaScript chunk is accepted as temporary debt.
