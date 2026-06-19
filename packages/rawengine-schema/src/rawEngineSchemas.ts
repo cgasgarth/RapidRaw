@@ -1852,6 +1852,11 @@ export const toneColorMutationResultV1Schema = z
 export const layerMaskCommandTypeV1Schema = z.enum([
   'layerMask.createLayer',
   'layerMask.setLayerOpacity',
+  'layerMask.setLayerVisibility',
+  'layerMask.renameLayer',
+  'layerMask.duplicateLayer',
+  'layerMask.deleteLayer',
+  'layerMask.moveLayer',
   'layerMask.attachMask',
   'layerMask.applyLayerAdjustment',
   'layerMask.createBrushMask',
@@ -1991,6 +1996,7 @@ export const layerMaskCommandEnvelopeV1Schema = z
         parameters: z
           .object({
             blendMode: layerMaskBlendModeV1Schema,
+            layerId: z.string().trim().min(1).optional(),
             layerName: z.string().trim().min(1),
             opacity: z.number().min(0).max(1),
             position: z.enum(['top', 'bottom', 'above_layer', 'below_layer']),
@@ -2022,6 +2028,75 @@ export const layerMaskCommandEnvelopeV1Schema = z
             visible: z.boolean().optional(),
           })
           .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.setLayerVisibility'),
+        parameters: z
+          .object({
+            layerId: z.string().trim().min(1),
+            visible: z.boolean(),
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.renameLayer'),
+        parameters: z
+          .object({
+            layerId: z.string().trim().min(1),
+            layerName: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.duplicateLayer'),
+        parameters: z
+          .object({
+            layerId: z.string().trim().min(1),
+            newLayerId: z.string().trim().min(1).optional(),
+            newLayerName: z.string().trim().min(1).optional(),
+            position: z.enum(['above_source', 'below_source']),
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.deleteLayer'),
+        parameters: z
+          .object({
+            layerId: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+    layerMaskCommandBaseV1Schema
+      .extend({
+        commandType: z.literal('layerMask.moveLayer'),
+        parameters: z
+          .object({
+            layerId: z.string().trim().min(1),
+            position: z.enum(['top', 'bottom', 'above_layer', 'below_layer']),
+            referenceLayerId: z.string().trim().min(1).optional(),
+          })
+          .strict()
+          .superRefine((parameters, context) => {
+            if (
+              ['above_layer', 'below_layer'].includes(parameters.position) &&
+              parameters.referenceLayerId === undefined
+            ) {
+              context.addIssue({
+                code: 'custom',
+                message: 'Relative layer movement requires referenceLayerId.',
+                path: ['referenceLayerId'],
+              });
+            }
+          }),
       })
       .strict(),
     layerMaskCommandBaseV1Schema

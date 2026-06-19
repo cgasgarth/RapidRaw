@@ -1,0 +1,84 @@
+{
+  "expectedFinalLayerIds": ["layer_portrait_copy", "layer_base"],
+  "initialSidecar": {
+    "graphRevision": "graph_rev_layer_stack_1",
+    "layers": [
+      {
+        "adjustmentPreset": "empty_adjustment_layer_v1",
+        "blendMode": "normal",
+        "id": "layer_base",
+        "maskIds": [],
+        "name": "Base Adjustments",
+        "opacity": 1,
+        "visible": true
+      }
+    ],
+    "schemaVersion": 1,
+    "sourceImagePath": "/photos/session/IMG_0001.CR3",
+    "storage": "sidecar_artifact"
+  },
+  "steps": [
+    {
+      "commandType": "layerMask.createLayer",
+      "id": "create_portrait",
+      "parameters": {
+        "blendMode": "soft_light",
+        "layerId": "layer_portrait",
+        "layerName": "Portrait Dodge",
+        "opacity": 0.7,
+        "position": "top",
+        "visible": true
+      }
+    },
+    {
+      "commandType": "layerMask.renameLayer",
+      "id": "rename_portrait",
+      "parameters": {
+        "layerId": "layer_portrait",
+        "layerName": "Portrait Dodge Refined"
+      }
+    },
+    {
+      "commandType": "layerMask.duplicateLayer",
+      "id": "duplicate_portrait",
+      "parameters": {
+        "layerId": "layer_portrait",
+        "newLayerId": "layer_portrait_copy",
+        "newLayerName": "Portrait Dodge Copy",
+        "position": "below_source"
+      }
+    },
+    {
+      "commandType": "layerMask.moveLayer",
+      "id": "move_copy_top",
+      "parameters": {
+        "layerId": "layer_portrait_copy",
+        "position": "top"
+      }
+    },
+    {
+      "commandType": "layerMask.setLayerVisibility",
+      "id": "hide_portrait",
+      "parameters": {
+        "layerId": "layer_portrait",
+        "visible": false
+      }
+    },
+    {
+      "commandType": "layerMask.setLayerOpacity",
+      "id": "fade_copy",
+      "parameters": {
+        "layerId": "layer_portrait_copy",
+        "opacity": 0.42
+      }
+    },
+    {
+      "commandType": "layerMask.deleteLayer",
+      "id": "delete_portrait",
+      "parameters": {
+        "layerId": "layer_portrait"
+      }
+    }
+  ],
+  "version": 1
+}
