@@ -63,6 +63,7 @@ pub struct MatchInfo {
     pub mean_reverse_reprojection_error_px: f64,
     pub mean_symmetric_transfer_error_px: f64,
     pub p95_symmetric_transfer_error_px: f64,
+    pub spatial_support_cell_count: usize,
 }
 
 impl MatchInfo {
@@ -110,6 +111,7 @@ pub struct PanoramaPairwiseMatchMetadata {
     pub mean_symmetric_transfer_error_px: f64,
     pub p95_symmetric_transfer_error_px: f64,
     pub source_index: usize,
+    pub spatial_support_cell_count: usize,
     pub target_index: usize,
 }
 
@@ -708,6 +710,11 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
                         mean_symmetric_transfer_error_px: transfer_error_metrics.symmetric_error_px,
                         p95_symmetric_transfer_error_px: transfer_error_metrics
                             .p95_symmetric_error_px,
+                        spatial_support_cell_count: processing::inlier_spatial_support_cell_count(
+                            &inliers,
+                            &keypoints1,
+                            &keypoints2,
+                        ),
                     };
                     return Some(((i, j), match_info));
                 }
@@ -855,6 +862,7 @@ fn collect_pairwise_match_metadata(
                 mean_symmetric_transfer_error_px: match_info.mean_symmetric_transfer_error_px,
                 p95_symmetric_transfer_error_px: match_info.p95_symmetric_transfer_error_px,
                 source_index,
+                spatial_support_cell_count: match_info.spatial_support_cell_count,
                 target_index,
             },
         )
@@ -1019,6 +1027,7 @@ fn upsert_panorama_artifact_metadata(
                 "meanReverseReprojectionErrorPx": pair.mean_reverse_reprojection_error_px,
                 "meanSymmetricTransferErrorPx": pair.mean_symmetric_transfer_error_px,
                 "p95SymmetricTransferErrorPx": pair.p95_symmetric_transfer_error_px,
+                "spatialSupportCellCount": pair.spatial_support_cell_count,
                 "toSourceIndex": pair.target_index,
             })).collect::<Vec<_>>(),
             "referenceSourceIndex": metadata.reference_source_index,
@@ -1646,9 +1655,14 @@ fn compare_graph_edges(
 ) -> std::cmp::Ordering {
     let left_match = left.2;
     let right_match = right.2;
-    left_match
-        .p95_symmetric_transfer_error_px
-        .total_cmp(&right_match.p95_symmetric_transfer_error_px)
+    right_match
+        .spatial_support_cell_count
+        .cmp(&left_match.spatial_support_cell_count)
+        .then_with(|| {
+            left_match
+                .p95_symmetric_transfer_error_px
+                .total_cmp(&right_match.p95_symmetric_transfer_error_px)
+        })
         .then_with(|| {
             right_match
                 .inlier_ratio()
@@ -1754,6 +1768,7 @@ mod tests {
                 mean_reverse_reprojection_error_px: 2.2,
                 mean_symmetric_transfer_error_px: 2.15,
                 p95_symmetric_transfer_error_px: 2.4,
+                spatial_support_cell_count: 6,
             },
         );
         matches.insert(
@@ -1767,6 +1782,7 @@ mod tests {
                 mean_reverse_reprojection_error_px: 1.6,
                 mean_symmetric_transfer_error_px: 1.5,
                 p95_symmetric_transfer_error_px: 1.8,
+                spatial_support_cell_count: 8,
             },
         );
 
@@ -1787,6 +1803,7 @@ mod tests {
                     mean_symmetric_transfer_error_px: 1.5,
                     p95_symmetric_transfer_error_px: 1.8,
                     source_index: 0,
+                    spatial_support_cell_count: 8,
                     target_index: 1,
                 },
                 PanoramaPairwiseMatchMetadata {
@@ -1801,6 +1818,7 @@ mod tests {
                     mean_symmetric_transfer_error_px: 2.15,
                     p95_symmetric_transfer_error_px: 2.4,
                     source_index: 2,
+                    spatial_support_cell_count: 6,
                     target_index: 3,
                 },
             ]
@@ -1811,9 +1829,9 @@ mod tests {
     fn build_stitching_order_prefers_lower_p95_error_over_raw_inlier_count() {
         let images = sample_image_infos(3);
         let mut matches = HashMap::new();
-        matches.insert((0, 1), graph_match_info(80, 100, 4.0));
-        matches.insert((0, 2), graph_match_info(35, 40, 0.8));
-        matches.insert((1, 2), graph_match_info(30, 40, 0.7));
+        matches.insert((0, 1), graph_match_info(80, 100, 4.0, 8));
+        matches.insert((0, 2), graph_match_info(35, 40, 0.8, 8));
+        matches.insert((1, 2), graph_match_info(30, 40, 0.7, 8));
 
         let order = build_stitching_order(&images, &matches);
 
@@ -1829,13 +1847,33 @@ mod tests {
     }
 
     #[test]
+    fn build_stitching_order_prefers_spatial_support_before_p95_error() {
+        let images = sample_image_infos(3);
+        let mut matches = HashMap::new();
+        matches.insert((0, 1), graph_match_info(35, 40, 2.0, 8));
+        matches.insert((1, 2), graph_match_info(35, 40, 2.1, 8));
+        matches.insert((0, 2), graph_match_info(200, 220, 0.4, 1));
+
+        let order = build_stitching_order(&images, &matches);
+
+        assert_eq!(
+            order
+                .selected_match_edges
+                .iter()
+                .map(|edge| (edge.edge_rank, edge.source_index, edge.target_index))
+                .collect::<Vec<_>>(),
+            vec![(1, 0, 1), (2, 1, 2)]
+        );
+    }
+
+    #[test]
     fn build_stitching_order_chooses_central_reference_source() {
         let images = sample_image_infos(5);
         let mut matches = HashMap::new();
-        matches.insert((0, 1), graph_match_info(40, 50, 1.0));
-        matches.insert((1, 2), graph_match_info(40, 50, 1.0));
-        matches.insert((2, 3), graph_match_info(40, 50, 1.0));
-        matches.insert((3, 4), graph_match_info(40, 50, 1.0));
+        matches.insert((0, 1), graph_match_info(40, 50, 1.0, 8));
+        matches.insert((1, 2), graph_match_info(40, 50, 1.0, 8));
+        matches.insert((2, 3), graph_match_info(40, 50, 1.0, 8));
+        matches.insert((3, 4), graph_match_info(40, 50, 1.0, 8));
 
         let order = build_stitching_order(&images, &matches);
 
@@ -2137,6 +2175,7 @@ mod tests {
                 mean_symmetric_transfer_error_px: 1.3,
                 p95_symmetric_transfer_error_px: 1.6,
                 source_index: 0,
+                spatial_support_cell_count: 8,
                 target_index: 1,
             }],
             reference_source_index: Some(0),
@@ -2208,7 +2247,12 @@ mod tests {
         }
     }
 
-    fn graph_match_info(inliers: usize, match_count: usize, p95_error: f64) -> MatchInfo {
+    fn graph_match_info(
+        inliers: usize,
+        match_count: usize,
+        p95_error: f64,
+        spatial_support_cell_count: usize,
+    ) -> MatchInfo {
         MatchInfo {
             brief_match_diagnostics: brief_match_diagnostics_fixture(),
             homography: Matrix3::identity(),
@@ -2218,6 +2262,7 @@ mod tests {
             mean_reverse_reprojection_error_px: p95_error / 2.0,
             mean_symmetric_transfer_error_px: p95_error / 2.0,
             p95_symmetric_transfer_error_px: p95_error,
+            spatial_support_cell_count,
         }
     }
 

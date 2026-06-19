@@ -6,6 +6,7 @@ use nalgebra::{Matrix3, Point2, SymmetricEigen};
 use rand::prelude::*;
 use rayon::prelude::*;
 use serde::Serialize;
+use std::collections::HashSet;
 
 pub const MAX_PROCESSING_DIMENSION: u32 = 1600;
 const FAST_THRESHOLD: u8 = 15;
@@ -13,6 +14,7 @@ const NON_MAXIMA_SUPPRESSION_RADIUS: f32 = 15.0;
 const BRIEF_PATCH_SIZE: u32 = 32;
 const MATCH_RATIO_THRESHOLD: f32 = 0.8;
 pub const MAX_BRIEF_MATCH_HAMMING_DISTANCE: u32 = 96;
+const INLIER_SUPPORT_GRID_SIZE: usize = 4;
 pub const RANSAC_ITERATIONS: usize = 2500;
 pub const RANSAC_INLIER_THRESHOLD: f64 = 5.0;
 pub const MIN_INLIERS_FOR_CONNECTION: usize = 15;
@@ -610,6 +612,74 @@ pub fn mean_transfer_error_metrics(
     }
 }
 
+pub fn inlier_spatial_support_cell_count(
+    inliers: &[Match],
+    keypoints1: &[KeyPoint],
+    keypoints2: &[KeyPoint],
+) -> usize {
+    let Some(source_bounds) = keypoint_bounds(keypoints1) else {
+        return 0;
+    };
+    let Some(target_bounds) = keypoint_bounds(keypoints2) else {
+        return 0;
+    };
+    let mut source_cells = HashSet::new();
+    let mut target_cells = HashSet::new();
+    for matched in inliers {
+        let Some(source_point) = keypoints1.get(matched.index1) else {
+            continue;
+        };
+        let Some(target_point) = keypoints2.get(matched.index2) else {
+            continue;
+        };
+        source_cells.insert(spatial_support_cell(source_point, source_bounds));
+        target_cells.insert(spatial_support_cell(target_point, target_bounds));
+    }
+    source_cells.len().min(target_cells.len())
+}
+
+#[derive(Clone, Copy)]
+struct KeyPointBounds {
+    max_x: u32,
+    max_y: u32,
+    min_x: u32,
+    min_y: u32,
+}
+
+fn keypoint_bounds(keypoints: &[KeyPoint]) -> Option<KeyPointBounds> {
+    let first = keypoints.first()?;
+    let mut bounds = KeyPointBounds {
+        max_x: first.x,
+        max_y: first.y,
+        min_x: first.x,
+        min_y: first.y,
+    };
+    for keypoint in keypoints.iter().skip(1) {
+        bounds.max_x = bounds.max_x.max(keypoint.x);
+        bounds.max_y = bounds.max_y.max(keypoint.y);
+        bounds.min_x = bounds.min_x.min(keypoint.x);
+        bounds.min_y = bounds.min_y.min(keypoint.y);
+    }
+    Some(bounds)
+}
+
+fn spatial_support_cell(keypoint: &KeyPoint, bounds: KeyPointBounds) -> (usize, usize) {
+    (
+        spatial_support_axis_cell(keypoint.x, bounds.min_x, bounds.max_x),
+        spatial_support_axis_cell(keypoint.y, bounds.min_y, bounds.max_y),
+    )
+}
+
+fn spatial_support_axis_cell(value: u32, min_value: u32, max_value: u32) -> usize {
+    let span = max_value.saturating_sub(min_value);
+    if span == 0 {
+        return 0;
+    }
+    let normalized = (value.saturating_sub(min_value) as f64 / span as f64).clamp(0.0, 1.0);
+    ((normalized * INLIER_SUPPORT_GRID_SIZE as f64).floor() as usize)
+        .min(INLIER_SUPPORT_GRID_SIZE - 1)
+}
+
 fn ransac_seed(matches: &[Match], keypoints1: &[KeyPoint], keypoints2: &[KeyPoint]) -> u64 {
     let mut hash = 0xcbf29ce484222325_u64;
     mix_u64(&mut hash, matches.len() as u64);
@@ -963,6 +1033,58 @@ mod tests {
                 min: 128,
                 p95: 224,
             })
+        );
+    }
+
+    #[test]
+    fn inlier_spatial_support_counts_distributed_grid_cells() {
+        let keypoints1 = vec![
+            KeyPoint { x: 0, y: 0 },
+            KeyPoint { x: 100, y: 0 },
+            KeyPoint { x: 0, y: 100 },
+            KeyPoint { x: 100, y: 100 },
+        ];
+        let keypoints2 = keypoints1.clone();
+        let distributed = vec![
+            Match {
+                index1: 0,
+                index2: 0,
+            },
+            Match {
+                index1: 1,
+                index2: 1,
+            },
+            Match {
+                index1: 2,
+                index2: 2,
+            },
+            Match {
+                index1: 3,
+                index2: 3,
+            },
+        ];
+        let compact = vec![
+            Match {
+                index1: 0,
+                index2: 0,
+            },
+            Match {
+                index1: 0,
+                index2: 0,
+            },
+            Match {
+                index1: 0,
+                index2: 0,
+            },
+        ];
+
+        assert_eq!(
+            inlier_spatial_support_cell_count(&distributed, &keypoints1, &keypoints2),
+            4
+        );
+        assert_eq!(
+            inlier_spatial_support_cell_count(&compact, &keypoints1, &keypoints2),
+            1
         );
     }
 
