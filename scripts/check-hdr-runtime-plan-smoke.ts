@@ -123,6 +123,103 @@ const applied = applyHdrRuntimePlanV1({
   syntheticScenePixels: scene,
 });
 
+const narrowExposureValues = [-0.2, 0, 0.2];
+const narrowBracketSources = dryRunCommand.parameters.sources.map((source, index) => ({
+  ...source,
+  exposureEv: narrowExposureValues[index] ?? 0,
+}));
+const narrowBracketFrames = frames.map((frame, index) => ({
+  ...frame,
+  exposureEv: narrowExposureValues[index] ?? 0,
+}));
+const narrowRequiredDryRunCommand = {
+  ...dryRunCommand,
+  commandId: 'command_hdr_runtime_required_narrow_bracket',
+  correlationId: 'corr_hdr_runtime_required_narrow_bracket',
+  parameters: {
+    ...dryRunCommand.parameters,
+    sources: narrowBracketSources,
+  },
+};
+assertThrows(
+  () =>
+    buildHdrRuntimeDryRunV1({
+      clipThreshold: CLIP_THRESHOLD,
+      command: narrowRequiredDryRunCommand,
+      frames: narrowBracketFrames,
+      motionThreshold: MOTION_THRESHOLD,
+      outputArtifactId: 'artifact_hdr_runtime_required_narrow_output',
+      previewArtifactId: 'artifact_hdr_runtime_required_narrow_preview',
+      searchRadiusPx: SEARCH_RADIUS_PX,
+      sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
+    }),
+  'required dry-run bracket policy',
+);
+
+const narrowRequiredApplyCommand = {
+  ...applyCommand,
+  commandId: 'command_hdr_runtime_required_narrow_apply',
+  correlationId: 'corr_hdr_runtime_required_narrow_apply',
+  parameters: {
+    ...applyCommand.parameters,
+    sources: narrowBracketSources,
+  },
+};
+assertThrows(
+  () =>
+    applyHdrRuntimePlanV1({
+      clipThreshold: CLIP_THRESHOLD,
+      command: narrowRequiredApplyCommand,
+      frames: narrowBracketFrames,
+      motionThreshold: MOTION_THRESHOLD,
+      outputArtifactId: 'artifact_hdr_runtime_required_narrow_apply_output',
+      previewArtifactId: 'artifact_hdr_runtime_required_narrow_apply_preview',
+      searchRadiusPx: SEARCH_RADIUS_PX,
+      sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
+    }),
+  'required apply bracket policy',
+);
+
+const warnDryRun = buildHdrRuntimeDryRunV1({
+  clipThreshold: CLIP_THRESHOLD,
+  command: {
+    ...narrowRequiredDryRunCommand,
+    commandId: 'command_hdr_runtime_warn_narrow_bracket',
+    correlationId: 'corr_hdr_runtime_warn_narrow_bracket',
+    parameters: {
+      ...narrowRequiredDryRunCommand.parameters,
+      bracketValidation: 'warn',
+    },
+  },
+  frames: narrowBracketFrames,
+  motionThreshold: MOTION_THRESHOLD,
+  outputArtifactId: 'artifact_hdr_runtime_warn_narrow_output',
+  previewArtifactId: 'artifact_hdr_runtime_warn_narrow_preview',
+  searchRadiusPx: SEARCH_RADIUS_PX,
+  sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
+});
+assertIncludes(warnDryRun.dryRunResult.warnings, 'bracket_validation_block:not_a_bracket', 'warn bracket policy');
+
+const disabledDryRun = buildHdrRuntimeDryRunV1({
+  clipThreshold: CLIP_THRESHOLD,
+  command: {
+    ...narrowRequiredDryRunCommand,
+    commandId: 'command_hdr_runtime_disabled_narrow_bracket',
+    correlationId: 'corr_hdr_runtime_disabled_narrow_bracket',
+    parameters: {
+      ...narrowRequiredDryRunCommand.parameters,
+      bracketValidation: 'disabled',
+    },
+  },
+  frames: narrowBracketFrames,
+  motionThreshold: MOTION_THRESHOLD,
+  outputArtifactId: 'artifact_hdr_runtime_disabled_narrow_output',
+  previewArtifactId: 'artifact_hdr_runtime_disabled_narrow_preview',
+  searchRadiusPx: SEARCH_RADIUS_PX,
+  sensorWhiteRadiance: SENSOR_WHITE_RADIANCE,
+});
+assertIncludes(disabledDryRun.dryRunResult.warnings, 'bracket_validation_disabled', 'disabled bracket policy');
+
 assertEqual(dryRun.provenance.alignmentMode, 'translation', 'dry-run alignment mode');
 assertEqual(dryRun.provenance.deghosting, 'medium', 'dry-run deghosting');
 assertEqual(dryRun.provenance.qualityMetrics.maxReconstructionMae, 0.015, 'max reconstruction mae');
@@ -246,4 +343,19 @@ function assertEqual(actual, expected, label) {
   if (actual !== expected) {
     throw new Error(`${label}: expected ${expected}, got ${actual}.`);
   }
+}
+
+function assertIncludes(values, expectedValue, label) {
+  if (!values.includes(expectedValue)) {
+    throw new Error(`${label}: expected ${expectedValue}.`);
+  }
+}
+
+function assertThrows(callback, label) {
+  try {
+    callback();
+  } catch {
+    return;
+  }
+  throw new Error(`${label}: expected failure.`);
 }
