@@ -6,10 +6,10 @@ import { TextVariants } from '../../types/typography';
 import {
   clampFilmLookStrength,
   getFilmLookAdjustmentSummaries,
-  getFilmLookBrowserGroups,
   type FilmLookBrowserItem,
   type FilmLookCategory,
 } from '../../utils/filmLookBrowser';
+import { getFilmLookBrowserGroups } from '../../utils/filmLookRegistry';
 import UiText from '../ui/Text';
 
 interface FilmLookBrowserProps {

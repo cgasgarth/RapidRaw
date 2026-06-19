@@ -269,6 +269,184 @@
       "requiredWarnings": ["creative_not_exact_emulation"],
       "schemaVersion": 1,
       "strengthDefault": 60
+    },
+    {
+      "category": "color_warm",
+      "description": "Warm portrait color negative with restrained contrast.",
+      "displayName": "Portra 400 Inspired Portrait",
+      "intendedInputModes": ["raw_photo", "rendered_photo", "negative_lab_positive"],
+      "lookId": "film_look.stock_reference.portra_400_portrait.v1",
+      "lookVersion": "2026-06-19",
+      "nodes": [
+        {
+          "enabledByDefault": true,
+          "nodeId": "tone.portrait_soft_contrast",
+          "nodeKind": "tone_curve",
+          "parameters": {
+            "contrast": 0.08,
+            "shoulder": 0.08
+          },
+          "renderStage": "creative_color_rendering"
+        },
+        {
+          "enabledByDefault": true,
+          "nodeId": "color.warm_skin_bias",
+          "nodeKind": "color_matrix",
+          "parameters": {
+            "saturation": 1.06,
+            "warmth": 0.04
+          },
+          "renderStage": "creative_color_rendering"
+        }
+      ],
+      "provenance": {
+        "claimLevel": "stock_family_reference_metadata",
+        "fixtureIds": [],
+        "legalNamingStatus": "descriptive_stock_family",
+        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "licenseRecordIds": [],
+        "measurementSource": "research_reference_metadata_only",
+        "sourceCitationIds": ["film_stock_public_reference_metadata.v1"],
+        "sourceProfileIds": []
+      },
+      "renderDomain": "working_rgb",
+      "requiredWarnings": ["creative_not_exact_emulation", "requires_user_review"],
+      "schemaVersion": 1,
+      "strengthDefault": 70
+    },
+    {
+      "category": "color_warm",
+      "description": "Golden consumer color negative with soft highlights.",
+      "displayName": "Gold 200 Inspired Warmth",
+      "intendedInputModes": ["raw_photo", "rendered_photo", "negative_lab_positive"],
+      "lookId": "film_look.stock_reference.gold_200_warmth.v1",
+      "lookVersion": "2026-06-19",
+      "nodes": [
+        {
+          "enabledByDefault": true,
+          "nodeId": "tone.consumer_warm_rolloff",
+          "nodeKind": "tone_curve",
+          "parameters": {
+            "blackLift": 0.04,
+            "contrast": -0.04,
+            "shoulder": 0.08
+          },
+          "renderStage": "creative_color_rendering"
+        },
+        {
+          "enabledByDefault": true,
+          "nodeId": "color.golden_warmth",
+          "nodeKind": "color_matrix",
+          "parameters": {
+            "saturation": 1.1,
+            "warmth": 0.09
+          },
+          "renderStage": "creative_color_rendering"
+        }
+      ],
+      "provenance": {
+        "claimLevel": "stock_family_reference_metadata",
+        "fixtureIds": [],
+        "legalNamingStatus": "descriptive_stock_family",
+        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "licenseRecordIds": [],
+        "measurementSource": "research_reference_metadata_only",
+        "sourceCitationIds": ["film_stock_public_reference_metadata.v1"],
+        "sourceProfileIds": []
+      },
+      "renderDomain": "working_rgb",
+      "requiredWarnings": ["creative_not_exact_emulation", "requires_user_review"],
+      "schemaVersion": 1,
+      "strengthDefault": 68
+    },
+    {
+      "category": "color_contrast",
+      "description": "Dense saturated slide color for landscape contrast.",
+      "displayName": "Velvia 50 Inspired Chrome",
+      "intendedInputModes": ["raw_photo", "rendered_photo", "negative_lab_positive"],
+      "lookId": "film_look.stock_reference.velvia_50_chrome.v1",
+      "lookVersion": "2026-06-19",
+      "nodes": [
+        {
+          "enabledByDefault": true,
+          "nodeId": "tone.slide_dense_curve",
+          "nodeKind": "tone_curve",
+          "parameters": {
+            "blackLift": -0.06,
+            "contrast": 0.26,
+            "shoulder": 0.04
+          },
+          "renderStage": "creative_color_rendering"
+        },
+        {
+          "enabledByDefault": true,
+          "nodeId": "color.chrome_saturation",
+          "nodeKind": "color_matrix",
+          "parameters": {
+            "saturation": 1.28
+          },
+          "renderStage": "creative_color_rendering"
+        }
+      ],
+      "provenance": {
+        "claimLevel": "stock_family_reference_metadata",
+        "fixtureIds": [],
+        "legalNamingStatus": "descriptive_stock_family",
+        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "licenseRecordIds": [],
+        "measurementSource": "research_reference_metadata_only",
+        "sourceCitationIds": ["film_stock_public_reference_metadata.v1"],
+        "sourceProfileIds": []
+      },
+      "renderDomain": "working_rgb",
+      "requiredWarnings": ["creative_not_exact_emulation", "requires_user_review"],
+      "schemaVersion": 1,
+      "strengthDefault": 58
+    },
+    {
+      "category": "black_and_white",
+      "description": "Bold high-speed black-and-white with visible grain.",
+      "displayName": "Tri-X 400 Inspired Mono",
+      "intendedInputModes": ["raw_photo", "rendered_photo", "negative_lab_positive"],
+      "lookId": "film_look.stock_reference.tri_x_400_mono.v1",
+      "lookVersion": "2026-06-19",
+      "nodes": [
+        {
+          "enabledByDefault": true,
+          "nodeId": "mono.classic_high_speed_mix",
+          "nodeKind": "black_and_white_mixer",
+          "parameters": {
+            "blue": 0.18,
+            "green": 0.54,
+            "red": 0.28
+          },
+          "renderStage": "creative_color_rendering"
+        },
+        {
+          "enabledByDefault": true,
+          "nodeId": "texture.bold_high_speed_grain",
+          "nodeKind": "grain",
+          "parameters": {
+            "amount": 0.32,
+            "size": 0.48
+          },
+          "renderStage": "texture_rendering"
+        }
+      ],
+      "provenance": {
+        "claimLevel": "stock_family_reference_metadata",
+        "fixtureIds": [],
+        "legalNamingStatus": "descriptive_stock_family",
+        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "licenseRecordIds": [],
+        "measurementSource": "research_reference_metadata_only",
+        "sourceCitationIds": ["film_stock_public_reference_metadata.v1"],
+        "sourceProfileIds": []
+      },
+      "renderDomain": "working_rgb",
+      "requiredWarnings": ["creative_not_exact_emulation", "requires_user_review"],
+      "schemaVersion": 1,
+      "strengthDefault": 72
     }
   ],
   "schemaVersion": 1

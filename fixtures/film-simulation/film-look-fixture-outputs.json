@@ -567,6 +567,434 @@
           "presetType": "style"
         }
       }
+    },
+    {
+      "adjustmentFingerprint": "e366239eb9df4f211bded5f89b6f147b14c232f74013c42ad3b5c0f88a9394fa",
+      "adjustmentSummaries": [
+        {
+          "label": "Temp",
+          "value": 4
+        },
+        {
+          "label": "Contrast",
+          "value": 8
+        },
+        {
+          "label": "Highlights",
+          "value": -8
+        },
+        {
+          "label": "Saturation",
+          "value": 6
+        }
+      ],
+      "category": "color_warm",
+      "description": "Warm portrait color negative with restrained contrast.",
+      "displayName": "Portra 400 Inspired Portrait",
+      "id": "film_look.stock_reference.portra_400_portrait.v1",
+      "provenance": {
+        "claimLevel": "stock_family_reference_metadata",
+        "legalNamingStatus": "descriptive_stock_family",
+        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "measurementSource": "research_reference_metadata_only"
+      },
+      "runtimeSupport": "adjustment_patch_preview_export",
+      "strengthDefault": 70,
+      "strengthPreviews": {
+        "appliedFull": {
+          "temperature": 4,
+          "contrast": 8,
+          "highlights": -8,
+          "shadows": 0,
+          "blacks": 0,
+          "saturation": 6,
+          "glowAmount": 0,
+          "grainAmount": 0,
+          "grainSize": 25
+        },
+        "default": {
+          "temperature": 3,
+          "contrast": 6,
+          "highlights": -6,
+          "saturation": 4
+        },
+        "half": {
+          "temperature": 2,
+          "contrast": 4,
+          "highlights": -4,
+          "saturation": 3
+        },
+        "full": {
+          "temperature": 4,
+          "contrast": 8,
+          "highlights": -8,
+          "saturation": 6
+        }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "temperature": 3,
+            "contrast": 6,
+            "highlights": -6,
+            "saturation": 4
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Portra 400 Inspired Portrait 70%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "temperature": 2,
+            "contrast": 4,
+            "highlights": -4,
+            "saturation": 3
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Portra 400 Inspired Portrait 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "temperature": 4,
+            "contrast": 8,
+            "highlights": -8,
+            "saturation": 6
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Portra 400 Inspired Portrait 100%",
+          "presetType": "style"
+        }
+      }
+    },
+    {
+      "adjustmentFingerprint": "96aa78ef6d60b546b22a798128531ee67b12bf3aaf2607e76a5a11585547b28d",
+      "adjustmentSummaries": [
+        {
+          "label": "Temp",
+          "value": 9
+        },
+        {
+          "label": "Contrast",
+          "value": -4
+        },
+        {
+          "label": "Highlights",
+          "value": -6
+        },
+        {
+          "label": "Blacks",
+          "value": 4
+        },
+        {
+          "label": "Saturation",
+          "value": 10
+        }
+      ],
+      "category": "color_warm",
+      "description": "Golden consumer color negative with soft highlights.",
+      "displayName": "Gold 200 Inspired Warmth",
+      "id": "film_look.stock_reference.gold_200_warmth.v1",
+      "provenance": {
+        "claimLevel": "stock_family_reference_metadata",
+        "legalNamingStatus": "descriptive_stock_family",
+        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "measurementSource": "research_reference_metadata_only"
+      },
+      "runtimeSupport": "adjustment_patch_preview_export",
+      "strengthDefault": 68,
+      "strengthPreviews": {
+        "appliedFull": {
+          "temperature": 9,
+          "contrast": -4,
+          "highlights": -6,
+          "shadows": 0,
+          "blacks": 4,
+          "saturation": 10,
+          "glowAmount": 0,
+          "grainAmount": 0,
+          "grainSize": 25
+        },
+        "default": {
+          "temperature": 6,
+          "contrast": -3,
+          "highlights": -4,
+          "blacks": 3,
+          "saturation": 7
+        },
+        "half": {
+          "temperature": 5,
+          "contrast": -2,
+          "highlights": -3,
+          "blacks": 2,
+          "saturation": 5
+        },
+        "full": {
+          "temperature": 9,
+          "contrast": -4,
+          "highlights": -6,
+          "blacks": 4,
+          "saturation": 10
+        }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "temperature": 6,
+            "contrast": -3,
+            "highlights": -4,
+            "blacks": 3,
+            "saturation": 7
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Gold 200 Inspired Warmth 68%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "temperature": 5,
+            "contrast": -2,
+            "highlights": -3,
+            "blacks": 2,
+            "saturation": 5
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Gold 200 Inspired Warmth 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "temperature": 9,
+            "contrast": -4,
+            "highlights": -6,
+            "blacks": 4,
+            "saturation": 10
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Gold 200 Inspired Warmth 100%",
+          "presetType": "style"
+        }
+      }
+    },
+    {
+      "adjustmentFingerprint": "c8ffad9cc25572f807df32be0d7357a2f93f7264842050dfa90fea7927f31c04",
+      "adjustmentSummaries": [
+        {
+          "label": "Contrast",
+          "value": 26
+        },
+        {
+          "label": "Highlights",
+          "value": -4
+        },
+        {
+          "label": "Blacks",
+          "value": -6
+        },
+        {
+          "label": "Saturation",
+          "value": 28
+        }
+      ],
+      "category": "color_contrast",
+      "description": "Dense saturated slide color for landscape contrast.",
+      "displayName": "Velvia 50 Inspired Chrome",
+      "id": "film_look.stock_reference.velvia_50_chrome.v1",
+      "provenance": {
+        "claimLevel": "stock_family_reference_metadata",
+        "legalNamingStatus": "descriptive_stock_family",
+        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "measurementSource": "research_reference_metadata_only"
+      },
+      "runtimeSupport": "adjustment_patch_preview_export",
+      "strengthDefault": 58,
+      "strengthPreviews": {
+        "appliedFull": {
+          "temperature": 0,
+          "contrast": 26,
+          "highlights": -4,
+          "shadows": 0,
+          "blacks": -6,
+          "saturation": 28,
+          "glowAmount": 0,
+          "grainAmount": 0,
+          "grainSize": 25
+        },
+        "default": {
+          "contrast": 15,
+          "highlights": -2,
+          "blacks": -3,
+          "saturation": 16
+        },
+        "half": {
+          "contrast": 13,
+          "highlights": -2,
+          "blacks": -3,
+          "saturation": 14
+        },
+        "full": {
+          "contrast": 26,
+          "highlights": -4,
+          "blacks": -6,
+          "saturation": 28
+        }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "contrast": 15,
+            "highlights": -2,
+            "blacks": -3,
+            "saturation": 16
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Velvia 50 Inspired Chrome 58%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "contrast": 13,
+            "highlights": -2,
+            "blacks": -3,
+            "saturation": 14
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Velvia 50 Inspired Chrome 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "contrast": 26,
+            "highlights": -4,
+            "blacks": -6,
+            "saturation": 28
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Velvia 50 Inspired Chrome 100%",
+          "presetType": "style"
+        }
+      }
+    },
+    {
+      "adjustmentFingerprint": "55ceca44ea43530f2bbcc33c2438f0ea1034751ab37b77bee476c95534cfc838",
+      "adjustmentSummaries": [
+        {
+          "label": "Contrast",
+          "value": 30
+        },
+        {
+          "label": "Blacks",
+          "value": -8
+        },
+        {
+          "label": "Saturation",
+          "value": -100
+        },
+        {
+          "label": "Grain",
+          "value": 32
+        },
+        {
+          "label": "Grain Size",
+          "value": 48
+        }
+      ],
+      "category": "black_and_white",
+      "description": "Bold high-speed black-and-white with visible grain.",
+      "displayName": "Tri-X 400 Inspired Mono",
+      "id": "film_look.stock_reference.tri_x_400_mono.v1",
+      "provenance": {
+        "claimLevel": "stock_family_reference_metadata",
+        "legalNamingStatus": "descriptive_stock_family",
+        "legalNote": "Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.",
+        "measurementSource": "research_reference_metadata_only"
+      },
+      "runtimeSupport": "adjustment_patch_preview_export",
+      "strengthDefault": 72,
+      "strengthPreviews": {
+        "appliedFull": {
+          "temperature": 0,
+          "contrast": 30,
+          "highlights": 0,
+          "shadows": 0,
+          "blacks": -8,
+          "saturation": -100,
+          "glowAmount": 0,
+          "grainAmount": 32,
+          "grainSize": 48
+        },
+        "default": {
+          "contrast": 22,
+          "blacks": -6,
+          "saturation": -72,
+          "grainAmount": 23,
+          "grainSize": 35
+        },
+        "half": {
+          "contrast": 15,
+          "blacks": -4,
+          "saturation": -50,
+          "grainAmount": 16,
+          "grainSize": 24
+        },
+        "full": {
+          "contrast": 30,
+          "blacks": -8,
+          "saturation": -100,
+          "grainAmount": 32,
+          "grainSize": 48
+        }
+      },
+      "presetDrafts": {
+        "default": {
+          "adjustments": {
+            "contrast": 22,
+            "blacks": -6,
+            "saturation": -72,
+            "grainAmount": 23,
+            "grainSize": 35
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Tri-X 400 Inspired Mono 72%",
+          "presetType": "style"
+        },
+        "half": {
+          "adjustments": {
+            "contrast": 15,
+            "blacks": -4,
+            "saturation": -50,
+            "grainAmount": 16,
+            "grainSize": 24
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Tri-X 400 Inspired Mono 50%",
+          "presetType": "style"
+        },
+        "full": {
+          "adjustments": {
+            "contrast": 30,
+            "blacks": -8,
+            "saturation": -100,
+            "grainAmount": 32,
+            "grainSize": 48
+          },
+          "includeCropTransform": false,
+          "includeMasks": false,
+          "name": "Tri-X 400 Inspired Mono 100%",
+          "presetType": "style"
+        }
+      }
     }
   ],
   "version": 1

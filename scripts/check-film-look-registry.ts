@@ -3,10 +3,12 @@
 import { z } from 'zod';
 
 import { sampleFilmLookCatalogV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../src/utils/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../src/utils/filmLookRegistry.ts';
 
-const genericSafeClaimPattern =
-  /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|identical|ilford|kodak|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;
+const prohibitedClaimPattern =
+  /\b(?:adobe|capture one|dehancer|exact|identical|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|rni|vsco)\b/iu;
+const stockReferenceNamePattern =
+  /\b(?:ektachrome|ektar|fujifilm|gold|hp5|ilford|kodak|portra|provia|superia|t-max|tri-x|velvia)\b/iu;
 
 const filmLookRegistryItemSchema = z
   .object({
@@ -19,17 +21,17 @@ const filmLookRegistryItemSchema = z
     id: z
       .string()
       .trim()
-      .regex(/^film_look\.generic\.[a-z][a-z0-9_]*\.v[0-9]+$/u),
+      .regex(/^film_look\.(?:generic|stock_reference)\.[a-z][a-z0-9_]*\.v[0-9]+$/u),
     provenance: z
       .object({
-        claimLevel: z.literal('generic_engineered'),
-        legalNamingStatus: z.literal('generic_safe_name'),
+        claimLevel: z.enum(['generic_engineered', 'stock_family_reference_metadata']),
+        legalNamingStatus: z.enum(['descriptive_stock_family', 'generic_safe_name']),
         legalNote: z
           .string()
           .trim()
           .min(1)
-          .regex(/\bnot measured\b/iu),
-        measurementSource: z.literal('generic_engineered_starting_point'),
+          .regex(/\bnot (?:measured|official)\b/iu),
+        measurementSource: z.enum(['generic_engineered_starting_point', 'research_reference_metadata_only']),
       })
       .strict(),
     runtimeSupport: z.literal('adjustment_patch_preview_export'),
@@ -67,12 +69,32 @@ for (const look of registry) {
     look.category,
     look.provenance.claimLevel,
     look.provenance.legalNamingStatus,
-    look.provenance.legalNote,
     look.provenance.measurementSource,
   ].join(' ');
 
-  if (genericSafeClaimPattern.test(claimText)) {
-    throw new Error(`${look.id}: generic registry entry includes unsafe brand, stock, or exact-emulation claim.`);
+  if (prohibitedClaimPattern.test(claimText)) {
+    throw new Error(`${look.id}: registry entry includes prohibited official, competitor, or exact-match claim.`);
+  }
+
+  if (look.provenance.claimLevel === 'generic_engineered' && stockReferenceNamePattern.test(claimText)) {
+    throw new Error(`${look.id}: generic registry entry includes stock-family reference text.`);
+  }
+
+  if (
+    look.provenance.claimLevel === 'generic_engineered' &&
+    (look.provenance.legalNamingStatus !== 'generic_safe_name' ||
+      look.provenance.measurementSource !== 'generic_engineered_starting_point')
+  ) {
+    throw new Error(`${look.id}: generic built-in film look must use generic-safe provenance.`);
+  }
+
+  if (
+    look.provenance.claimLevel === 'stock_family_reference_metadata' &&
+    (look.provenance.legalNamingStatus !== 'descriptive_stock_family' ||
+      look.provenance.measurementSource !== 'research_reference_metadata_only' ||
+      !/\binspired\b/iu.test(look.displayName))
+  ) {
+    throw new Error(`${look.id}: stock-reference film look must disclose descriptive inspired metadata.`);
   }
 
   const catalogLook = catalogLooksById.get(look.id);
@@ -96,4 +118,4 @@ for (const look of registry) {
   }
 }
 
-console.log(`film look registry ok (${registry.length} generic runtime-safe looks)`);
+console.log(`film look registry ok (${registry.length} runtime-safe looks)`);

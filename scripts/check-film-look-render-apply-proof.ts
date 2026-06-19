@@ -64,13 +64,21 @@ const proofArtifactSchema = z
 
 type RgbPixel = z.infer<typeof rgbPixelSchema>;
 type ProofArtifact = z.infer<typeof proofArtifactSchema>;
+const sourceFixtureProvenanceSchema = z
+  .object({
+    claimLevel: z.enum(['generic_engineered', 'stock_family_reference_metadata']),
+    legalNamingStatus: z.enum(['descriptive_stock_family', 'generic_safe_name']),
+    legalNote: z.string().trim().min(1),
+    measurementSource: z.enum(['generic_engineered_starting_point', 'research_reference_metadata_only']),
+  })
+  .strict();
 const filmLookSourceFixtureSchema = z
   .object({
     outputs: z.array(
       z
         .object({
           id: z.string().trim().min(1),
-          provenance: proofArtifactSchema.shape.provenance,
+          provenance: sourceFixtureProvenanceSchema,
           runtimeSupport: z.literal('adjustment_patch_preview_export'),
           strengthPreviews: z
             .object({
