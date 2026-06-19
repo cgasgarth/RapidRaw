@@ -599,7 +599,7 @@ export default function NegativeConversionModal({
     setIsEstimatingBaseFog(true);
     try {
       const estimate = await invokeWithSchema(
-        'estimate_negative_base_fog',
+        Invokes.EstimateNegativeBaseFog,
         {
           path: selectedImagePath,
           sampleRect: null,
@@ -634,7 +634,7 @@ export default function NegativeConversionModal({
     setIsEstimatingBaseFog(true);
     try {
       const estimate = await invokeWithSchema(
-        'estimate_negative_base_fog',
+        Invokes.EstimateNegativeBaseFog,
         {
           path: selectedImagePath,
           sampleRect,
@@ -658,7 +658,7 @@ export default function NegativeConversionModal({
       setAcceptedBatchPlanJson(null);
       updatePreview(nextParams);
     } catch (e) {
-      console.error('Negative base/fog sample failed', e);
+      console.error('Base/fog sample failed', e);
     } finally {
       setIsEstimatingBaseFog(false);
     }
@@ -676,7 +676,7 @@ export default function NegativeConversionModal({
     setIsMeasuringCustomBaseSample(true);
     try {
       const estimate = await invokeWithSchema(
-        'estimate_negative_base_fog',
+        Invokes.EstimateNegativeBaseFog,
         {
           path: selectedImagePath,
           sampleRect: customBaseSampleRect,
@@ -685,7 +685,7 @@ export default function NegativeConversionModal({
       );
       setCustomBaseSampleEstimate(estimate);
     } catch (e) {
-      console.error('Negative custom base sample failed', e);
+      console.error('Custom base sample failed', e);
     } finally {
       setIsMeasuringCustomBaseSample(false);
     }
@@ -719,7 +719,7 @@ export default function NegativeConversionModal({
     setIsSamplingPatchProbe(true);
     try {
       const estimate = await invokeWithSchema(
-        'estimate_negative_base_fog',
+        Invokes.EstimateNegativeBaseFog,
         {
           path: selectedImagePath,
           sampleRect,
@@ -730,7 +730,7 @@ export default function NegativeConversionModal({
       setPatchProbeRect(sampleRect);
       setPatchProbeLabel(t(labelKey));
     } catch (e) {
-      console.error('Negative patch probe sample failed', e);
+      console.error('Patch probe sample failed', e);
     } finally {
       setIsSamplingPatchProbe(false);
     }
@@ -778,7 +778,7 @@ export default function NegativeConversionModal({
     setProgress(null);
     try {
       const savedPaths = await invokeWithSchema(
-        'convert_negatives',
+        Invokes.ConvertNegatives,
         {
           paths: pathsToConvert,
           params,

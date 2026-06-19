@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { z } from 'zod';
 
 import VisualSmokeApp from './VisualSmokeApp';
+import { Invokes } from '../../components/ui/AppProperties';
 import '../../i18n';
 import '../../styles.css';
 
@@ -76,6 +77,13 @@ const generatedPreviewBytes = [
   191, 255, 217,
 ];
 
+const previewNegativeConversionCommand: string = Invokes.PreviewNegativeConversion;
+const generatePreviewForPathCommand: string = Invokes.GeneratePreviewForPath;
+const estimateNegativeBaseFogCommand: string = Invokes.EstimateNegativeBaseFog;
+const convertNegativesCommand: string = Invokes.ConvertNegatives;
+const saveCommunityPresetCommand: string = Invokes.SaveCommunityPreset;
+const handleExportPresetsToFileCommand: string = Invokes.HandleExportPresetsToFile;
+
 let callbackId = 0;
 window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ = [];
 window.__RAWENGINE_NEGATIVE_LAB_PREVIEW_RETURNS__ = [];
@@ -87,13 +95,13 @@ window.__TAURI_INTERNALS__ = {
   convertFileSrc: (filePath) => filePath,
   invoke: (command, args, options) => {
     window.__RAWENGINE_VISUAL_SMOKE_INVOKES__?.push({ args, command, options });
-    if (command === 'preview_negative_conversion') {
+    if (command === previewNegativeConversionCommand) {
       const previewUrl = buildNegativeLabPreviewUrl(args);
       window.__RAWENGINE_NEGATIVE_LAB_PREVIEW_RETURNS__?.push(previewUrl);
       return Promise.resolve(previewUrl);
     }
-    if (command === 'generate_preview_for_path') return Promise.resolve(generatedPreviewBytes);
-    if (command === 'estimate_negative_base_fog') {
+    if (command === generatePreviewForPathCommand) return Promise.resolve(generatedPreviewBytes);
+    if (command === estimateNegativeBaseFogCommand) {
       return Promise.resolve({
         baseDensity: [0.145, 0.238, 0.356],
         baseRgb: [0.716, 0.578, 0.441],
@@ -103,13 +111,13 @@ window.__TAURI_INTERNALS__ = {
         redWeight: 1.07,
       });
     }
-    if (command === 'convert_negatives') return Promise.resolve(['/tmp/rawengine-negative-smoke-positive.tif']);
-    if (command === 'save_community_preset') return Promise.resolve(null);
-    if (command === 'handle_export_presets_to_file') return Promise.resolve(null);
+    if (command === convertNegativesCommand) return Promise.resolve(['/tmp/rawengine-negative-smoke-positive.tif']);
+    if (command === saveCommunityPresetCommand) return Promise.resolve(null);
+    if (command === handleExportPresetsToFileCommand) return Promise.resolve(null);
     if (command === 'plugin:dialog|save') return Promise.resolve('/tmp/rawengine-film-look-smoke.rrpreset');
     if (command === 'plugin:event|listen') return Promise.resolve(1);
     if (command === 'plugin:event|unlisten') return Promise.resolve(null);
-    return Promise.reject(new Error(`Unhandled visual smoke Tauri command: ${command}`));
+    return Promise.reject(new Error(`Unhandled visual smoke command: ${command}`));
   },
   transformCallback: () => {
     callbackId += 1;
