@@ -1,5 +1,6 @@
 #![cfg(all(test, feature = "tauri-test"))]
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -201,6 +202,7 @@ fn private_stress_candidate_diagnostic_generates_panorama_report_when_enabled() 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AlignmentReport {
+    candidate_pair_reports: Vec<PairAlignmentReport>,
     fixture_id: String,
     graph_revision_hash: String,
     non_claims: Vec<String>,
@@ -272,6 +274,7 @@ struct PairAlignmentReport {
     inlier_ratio: f64,
     match_count: usize,
     mean_reprojection_error_px: f64,
+    selected_edge: bool,
     source_index_a: usize,
     source_index_b: usize,
     transform_3x3_row_major: [f64; 9],
@@ -942,6 +945,24 @@ fn build_alignment_report_from_render_metadata(
     graph_revision_hash: &str,
     fixture_id: &str,
 ) -> AlignmentReport {
+    let selected_pairs: HashSet<_> = metadata
+        .selected_match_edges
+        .iter()
+        .map(|edge| (edge.source_index, edge.target_index))
+        .collect();
+    let candidate_pair_reports = metadata
+        .pairwise_matches
+        .iter()
+        .map(|pair| {
+            let selected_edge = selected_pairs.contains(&(pair.source_index, pair.target_index));
+            build_pair_alignment_report(
+                pair.source_index,
+                pair.target_index,
+                Some(pair),
+                selected_edge,
+            )
+        })
+        .collect();
     let pair_reports = metadata
         .selected_match_edges
         .iter()
@@ -949,11 +970,12 @@ fn build_alignment_report_from_render_metadata(
             let pair = metadata.pairwise_matches.iter().find(|pair| {
                 pair.source_index == edge.source_index && pair.target_index == edge.target_index
             });
-            build_pair_alignment_report(edge.source_index, edge.target_index, pair)
+            build_pair_alignment_report(edge.source_index, edge.target_index, pair, true)
         })
         .collect();
 
     AlignmentReport {
+        candidate_pair_reports,
         fixture_id: fixture_id.to_string(),
         graph_revision_hash: graph_revision_hash.to_string(),
         non_claims: ALIGNMENT_NON_CLAIMS
@@ -977,6 +999,7 @@ fn build_empty_alignment_report(
             inlier_ratio: 0.0,
             match_count: 0,
             mean_reprojection_error_px: f64::INFINITY,
+            selected_edge: true,
             source_index_a: source_index,
             source_index_b: source_index + 1,
             transform_3x3_row_major: [f64::NAN; 9],
@@ -984,6 +1007,7 @@ fn build_empty_alignment_report(
         .collect();
 
     AlignmentReport {
+        candidate_pair_reports: Vec::new(),
         fixture_id: fixture_id.to_string(),
         graph_revision_hash: graph_revision_hash.to_string(),
         non_claims: ALIGNMENT_NON_CLAIMS
@@ -998,6 +1022,7 @@ fn build_pair_alignment_report(
     source_index_a: usize,
     source_index_b: usize,
     pair: Option<&PanoramaPairwiseMatchMetadata>,
+    selected_edge: bool,
 ) -> PairAlignmentReport {
     let Some(pair) = pair else {
         return PairAlignmentReport {
@@ -1007,6 +1032,7 @@ fn build_pair_alignment_report(
             inlier_ratio: 0.0,
             match_count: 0,
             mean_reprojection_error_px: f64::INFINITY,
+            selected_edge,
             source_index_a,
             source_index_b,
             transform_3x3_row_major: [f64::NAN; 9],
@@ -1026,6 +1052,7 @@ fn build_pair_alignment_report(
         inlier_ratio,
         match_count: pair.match_count,
         mean_reprojection_error_px,
+        selected_edge,
         source_index_a,
         source_index_b,
         transform_3x3_row_major: pair.homography3x3,
