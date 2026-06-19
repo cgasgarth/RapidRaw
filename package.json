@@ -154,6 +154,8 @@
     "check:private-raw-evidence": "bun scripts/check-private-raw-evidence-ledger.ts",
     "check:raw-open-edit-export-proof": "bun scripts/check-raw-open-edit-export-proof.ts",
     "prepare:raw-open-edit-export-private-root": "bun scripts/prepare-raw-open-edit-export-private-root.ts",
+    "prepare:public-raw-fixture-root": "bun scripts/prepare-public-raw-fixture-root.ts --download",
+    "check:public-raw-fixture-root": "bun scripts/prepare-public-raw-fixture-root.ts",
     "prepare:hdr-real-raw-private-root": "bun scripts/prepare-hdr-real-raw-private-root.ts",
     "check:hdr-real-raw-private-root-prep": "bun scripts/prepare-hdr-real-raw-private-root.ts --self-test",
     "check:hdr-real-raw-private-root-assets": "bun scripts/prepare-hdr-real-raw-private-root.ts --require-assets",
