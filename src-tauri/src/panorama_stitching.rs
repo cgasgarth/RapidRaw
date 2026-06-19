@@ -62,6 +62,7 @@ pub struct MatchInfo {
     pub mean_reprojection_error_px: f64,
     pub mean_reverse_reprojection_error_px: f64,
     pub mean_symmetric_transfer_error_px: f64,
+    pub p95_symmetric_transfer_error_px: f64,
 }
 
 impl MatchInfo {
@@ -107,14 +108,19 @@ pub struct PanoramaPairwiseMatchMetadata {
     pub mean_reprojection_error_px: f64,
     pub mean_reverse_reprojection_error_px: f64,
     pub mean_symmetric_transfer_error_px: f64,
+    pub p95_symmetric_transfer_error_px: f64,
     pub source_index: usize,
     pub target_index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PanoramaSelectedMatchEdgeMetadata {
+    pub child_source_index: usize,
+    pub edge_rank: usize,
+    pub parent_source_index: usize,
     pub source_index: usize,
     pub target_index: usize,
+    pub tree_depth: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -125,7 +131,9 @@ pub struct PanoramaRenderMetadata {
     pub output_height: u32,
     pub output_width: u32,
     pub pairwise_matches: Vec<PanoramaPairwiseMatchMetadata>,
+    pub reference_source_index: Option<usize>,
     pub selected_match_edges: Vec<PanoramaSelectedMatchEdgeMetadata>,
+    pub max_transform_chain_length: usize,
     pub sources: Vec<PanoramaSourceMetadata>,
     pub warnings: Vec<String>,
 }
@@ -698,6 +706,8 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
                         mean_reprojection_error_px: transfer_error_metrics.forward_error_px,
                         mean_reverse_reprojection_error_px: transfer_error_metrics.reverse_error_px,
                         mean_symmetric_transfer_error_px: transfer_error_metrics.symmetric_error_px,
+                        p95_symmetric_transfer_error_px: transfer_error_metrics
+                            .p95_symmetric_error_px,
                     };
                     return Some(((i, j), match_info));
                 }
@@ -728,19 +738,20 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         "Determining stitching order...",
     );
     println!("Determining stitching order...");
-    let (ordered_indices, global_homographies, selected_match_edges) =
-        build_stitching_order(&image_data, &pairwise_matches);
+    let stitching_order = build_stitching_order(&image_data, &pairwise_matches);
     for source in &mut source_metadata {
-        source.global_transform_3x3 = global_homographies
+        source.global_transform_3x3 = stitching_order
+            .global_homographies
             .get(&source.index)
             .map(matrix_to_row_major_array);
     }
 
-    if ordered_indices.len() < 2 {
+    if stitching_order.ordered_indices.len() < 2 {
         return Err("Could not find a connected sequence of at least two images.".to_string());
     }
 
-    let ordered_filenames: Vec<_> = ordered_indices
+    let ordered_filenames: Vec<_> = stitching_order
+        .ordered_indices
         .iter()
         .map(|&i| {
             Path::new(&image_data[i].filename)
@@ -756,8 +767,11 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         format!("Stitching order: {}", ordered_filenames.join(" -> ")),
     );
 
-    let stitched_images_info: Vec<&ImageInfo> =
-        ordered_indices.iter().map(|&i| &image_data[i]).collect();
+    let stitched_images_info: Vec<&ImageInfo> = stitching_order
+        .ordered_indices
+        .iter()
+        .map(|&i| &image_data[i])
+        .collect();
     let unstitched_count = image_data.len() - stitched_images_info.len();
     let mut warnings = Vec::new();
     if unstitched_count > 0 {
@@ -786,7 +800,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
 
     let panorama = stitching::progressive_seam_stitcher(
         &stitched_images_info,
-        &global_homographies,
+        &stitching_order.global_homographies,
         app_handle.clone(),
     )?;
 
@@ -794,7 +808,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
 
     let _ = app_handle.emit(crate::events::PANORAMA_PROGRESS, "Finalizing panorama...");
     let (output_width, output_height) = panorama.dimensions();
-    let connected_source_indices = ordered_indices.clone();
+    let connected_source_indices = stitching_order.ordered_indices.clone();
     let connected_source_set: HashSet<_> = connected_source_indices.iter().copied().collect();
     let excluded_source_indices: Vec<_> = image_data
         .iter()
@@ -810,7 +824,9 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         output_height,
         output_width,
         pairwise_matches: pairwise_match_metadata,
-        selected_match_edges,
+        reference_source_index: stitching_order.reference_source_index,
+        selected_match_edges: stitching_order.selected_match_edges,
+        max_transform_chain_length: stitching_order.max_transform_chain_length,
         sources: source_metadata,
         warnings,
     };
@@ -837,6 +853,7 @@ fn collect_pairwise_match_metadata(
                 mean_reprojection_error_px: match_info.mean_reprojection_error_px,
                 mean_reverse_reprojection_error_px: match_info.mean_reverse_reprojection_error_px,
                 mean_symmetric_transfer_error_px: match_info.mean_symmetric_transfer_error_px,
+                p95_symmetric_transfer_error_px: match_info.p95_symmetric_transfer_error_px,
                 source_index,
                 target_index,
             },
@@ -988,6 +1005,7 @@ fn upsert_panorama_artifact_metadata(
             "downscaleMaxDimensionPx": processing::MAX_PROCESSING_DIMENSION,
             "globalHomographyCount": metadata.connected_source_indices.len().saturating_sub(1),
             "minimumInliersForConnection": processing::MIN_INLIERS_FOR_CONNECTION,
+            "maxTransformChainLength": metadata.max_transform_chain_length,
             "pairwiseMatches": metadata.pairwise_matches.iter().map(|pair| json!({
                 "fromSourceIndex": pair.source_index,
                 "homography3x3": pair.homography3x3,
@@ -1000,10 +1018,16 @@ fn upsert_panorama_artifact_metadata(
                 "meanReprojectionErrorPx": pair.mean_reprojection_error_px,
                 "meanReverseReprojectionErrorPx": pair.mean_reverse_reprojection_error_px,
                 "meanSymmetricTransferErrorPx": pair.mean_symmetric_transfer_error_px,
+                "p95SymmetricTransferErrorPx": pair.p95_symmetric_transfer_error_px,
                 "toSourceIndex": pair.target_index,
             })).collect::<Vec<_>>(),
+            "referenceSourceIndex": metadata.reference_source_index,
             "selectedMatchEdges": metadata.selected_match_edges.iter().map(|edge| json!({
+                "edgeRank": edge.edge_rank,
+                "childSourceIndex": edge.child_source_index,
                 "fromSourceIndex": edge.source_index,
+                "parentSourceIndex": edge.parent_source_index,
+                "treeDepth": edge.tree_depth,
                 "toSourceIndex": edge.target_index,
             })).collect::<Vec<_>>(),
             "ransacSeed": 12345,
@@ -1441,16 +1465,43 @@ impl Dsu {
     }
 }
 
+struct StitchingOrder {
+    global_homographies: HashMap<usize, Matrix3<f64>>,
+    max_transform_chain_length: usize,
+    ordered_indices: Vec<usize>,
+    reference_source_index: Option<usize>,
+    selected_match_edges: Vec<PanoramaSelectedMatchEdgeMetadata>,
+}
+
+#[derive(Clone, Copy)]
+struct RankedGraphEdge {
+    cost: f64,
+    rank: usize,
+    source_index: usize,
+    target_index: usize,
+}
+
+#[derive(Clone, Copy)]
+struct TreeEdge {
+    cost: f64,
+    neighbor: usize,
+    rank: usize,
+    source_index: usize,
+    target_index: usize,
+}
+
 fn build_stitching_order(
     images: &[ImageInfo],
     matches: &HashMap<(usize, usize), MatchInfo>,
-) -> (
-    Vec<usize>,
-    HashMap<usize, Matrix3<f64>>,
-    Vec<PanoramaSelectedMatchEdgeMetadata>,
-) {
+) -> StitchingOrder {
     if images.is_empty() {
-        return (vec![], HashMap::new(), vec![]);
+        return StitchingOrder {
+            global_homographies: HashMap::new(),
+            max_transform_chain_length: 0,
+            ordered_indices: vec![],
+            reference_source_index: None,
+            selected_match_edges: vec![],
+        };
     }
     let n = images.len();
     if n < 2 {
@@ -1458,31 +1509,62 @@ fn build_stitching_order(
         if n == 1 {
             homographies.insert(0, Matrix3::identity());
         }
-        return ((0..n).collect(), homographies, vec![]);
+        return StitchingOrder {
+            global_homographies: homographies,
+            max_transform_chain_length: 0,
+            ordered_indices: (0..n).collect(),
+            reference_source_index: Some(0),
+            selected_match_edges: vec![],
+        };
     }
 
     let mut edges = Vec::new();
     for (&(i, j), m) in matches {
         if m.is_graph_eligible() {
-            edges.push((m.inliers, i, j));
+            edges.push((i, j, m));
         }
     }
-    edges.sort_by_key(|&(inliers, _, _)| std::cmp::Reverse(inliers));
+    edges.sort_by(compare_graph_edges);
+    let ranked_edges: Vec<_> = edges
+        .into_iter()
+        .enumerate()
+        .map(
+            |(index, (source_index, target_index, match_info))| RankedGraphEdge {
+                cost: graph_edge_cost(match_info),
+                rank: index + 1,
+                source_index,
+                target_index,
+            },
+        )
+        .collect();
 
-    let mut mst_adj: HashMap<usize, Vec<usize>> = HashMap::new();
-    let mut selected_match_edges = Vec::new();
+    let mut mst_adj: HashMap<usize, Vec<TreeEdge>> = HashMap::new();
     let mut dsu = Dsu::new(n);
     let mut num_edges = 0;
 
-    for &(_, i, j) in &edges {
-        if dsu.find(i) != dsu.find(j) {
-            dsu.union(i, j);
-            mst_adj.entry(i).or_default().push(j);
-            mst_adj.entry(j).or_default().push(i);
-            selected_match_edges.push(PanoramaSelectedMatchEdgeMetadata {
-                source_index: i.min(j),
-                target_index: i.max(j),
-            });
+    for edge in &ranked_edges {
+        if dsu.find(edge.source_index) != dsu.find(edge.target_index) {
+            dsu.union(edge.source_index, edge.target_index);
+            mst_adj
+                .entry(edge.source_index)
+                .or_default()
+                .push(TreeEdge {
+                    cost: edge.cost,
+                    neighbor: edge.target_index,
+                    rank: edge.rank,
+                    source_index: edge.source_index,
+                    target_index: edge.target_index,
+                });
+            mst_adj
+                .entry(edge.target_index)
+                .or_default()
+                .push(TreeEdge {
+                    cost: edge.cost,
+                    neighbor: edge.source_index,
+                    rank: edge.rank,
+                    source_index: edge.source_index,
+                    target_index: edge.target_index,
+                });
             num_edges += 1;
             if num_edges == n - 1 {
                 break;
@@ -1490,25 +1572,36 @@ fn build_stitching_order(
         }
     }
 
-    let start_node = (0..n)
-        .filter(|i| mst_adj.contains_key(i))
-        .min_by_key(|&i| mst_adj.get(&i).map_or(usize::MAX, |v| v.len()))
-        .unwrap_or_else(|| mst_adj.keys().next().copied().unwrap_or(0));
+    let Some(start_node) = choose_central_reference_source(&mst_adj) else {
+        return StitchingOrder {
+            global_homographies: HashMap::new(),
+            max_transform_chain_length: 0,
+            ordered_indices: vec![],
+            reference_source_index: None,
+            selected_match_edges: vec![],
+        };
+    };
 
     let mut ordered_indices = Vec::new();
     let mut global_homographies = HashMap::new();
+    let mut selected_match_edges = Vec::new();
+    let mut max_transform_chain_length = 0;
     let mut q = VecDeque::new();
     let mut visited = HashSet::new();
 
-    q.push_back((start_node, Matrix3::identity()));
+    q.push_back((start_node, Matrix3::identity(), 0_usize));
     visited.insert(start_node);
 
-    while let Some((u, h_u_global)) = q.pop_front() {
+    while let Some((u, h_u_global, depth)) = q.pop_front() {
         ordered_indices.push(u);
         global_homographies.insert(u, h_u_global);
+        max_transform_chain_length = max_transform_chain_length.max(depth);
 
         if let Some(neighbors) = mst_adj.get(&u) {
-            for &v in neighbors {
+            let mut sorted_neighbors = neighbors.clone();
+            sorted_neighbors.sort_by_key(|edge| (edge.rank, edge.neighbor));
+            for edge in sorted_neighbors {
+                let v = edge.neighbor;
                 if !visited.contains(&v) {
                     visited.insert(v);
 
@@ -1523,14 +1616,124 @@ fn build_stitching_order(
                     };
 
                     let h_v_global = h_u_global * h_vu;
-                    q.push_back((v, h_v_global));
+                    selected_match_edges.push(PanoramaSelectedMatchEdgeMetadata {
+                        child_source_index: v,
+                        edge_rank: edge.rank,
+                        parent_source_index: u,
+                        source_index: edge.source_index.min(edge.target_index),
+                        target_index: edge.source_index.max(edge.target_index),
+                        tree_depth: depth + 1,
+                    });
+                    q.push_back((v, h_v_global, depth + 1));
                 }
             }
         }
     }
 
-    selected_match_edges.sort_by_key(|edge| (edge.source_index, edge.target_index));
-    (ordered_indices, global_homographies, selected_match_edges)
+    selected_match_edges.sort_by_key(|edge| edge.edge_rank);
+    StitchingOrder {
+        global_homographies,
+        max_transform_chain_length,
+        ordered_indices,
+        reference_source_index: Some(start_node),
+        selected_match_edges,
+    }
+}
+
+fn compare_graph_edges(
+    left: &(usize, usize, &MatchInfo),
+    right: &(usize, usize, &MatchInfo),
+) -> std::cmp::Ordering {
+    let left_match = left.2;
+    let right_match = right.2;
+    left_match
+        .p95_symmetric_transfer_error_px
+        .total_cmp(&right_match.p95_symmetric_transfer_error_px)
+        .then_with(|| {
+            right_match
+                .inlier_ratio()
+                .total_cmp(&left_match.inlier_ratio())
+        })
+        .then_with(|| right_match.inliers.cmp(&left_match.inliers))
+        .then_with(|| left.0.cmp(&right.0))
+        .then_with(|| left.1.cmp(&right.1))
+}
+
+fn graph_edge_cost(match_info: &MatchInfo) -> f64 {
+    let ratio_penalty = (1.0 - match_info.inlier_ratio()).max(0.0) * 2.0;
+    match_info.p95_symmetric_transfer_error_px + ratio_penalty
+}
+
+fn choose_central_reference_source(mst_adj: &HashMap<usize, Vec<TreeEdge>>) -> Option<usize> {
+    let component = largest_tree_component(mst_adj)?;
+    component.into_iter().min_by(|left, right| {
+        let left_score = tree_reference_score(*left, mst_adj);
+        let right_score = tree_reference_score(*right, mst_adj);
+        left_score
+            .0
+            .total_cmp(&right_score.0)
+            .then_with(|| left_score.1.total_cmp(&right_score.1))
+            .then_with(|| left_score.2.cmp(&right_score.2))
+            .then_with(|| left.cmp(right))
+    })
+}
+
+fn largest_tree_component(mst_adj: &HashMap<usize, Vec<TreeEdge>>) -> Option<Vec<usize>> {
+    let mut visited = HashSet::new();
+    let mut best_component = Vec::new();
+    let mut nodes: Vec<_> = mst_adj.keys().copied().collect();
+    nodes.sort_unstable();
+    for node in nodes {
+        if visited.contains(&node) {
+            continue;
+        }
+        let mut component = Vec::new();
+        let mut q = VecDeque::from([node]);
+        visited.insert(node);
+        while let Some(current) = q.pop_front() {
+            component.push(current);
+            if let Some(edges) = mst_adj.get(&current) {
+                for edge in edges {
+                    if visited.insert(edge.neighbor) {
+                        q.push_back(edge.neighbor);
+                    }
+                }
+            }
+        }
+        component.sort_unstable();
+        if component.len() > best_component.len()
+            || (component.len() == best_component.len() && component < best_component)
+        {
+            best_component = component;
+        }
+    }
+    (!best_component.is_empty()).then_some(best_component)
+}
+
+fn tree_reference_score(
+    source_index: usize,
+    mst_adj: &HashMap<usize, Vec<TreeEdge>>,
+) -> (f64, f64, usize) {
+    let mut max_path_cost = 0.0_f64;
+    let mut total_path_cost = 0.0_f64;
+    let mut max_depth = 0_usize;
+    let mut visited = HashSet::from([source_index]);
+    let mut q = VecDeque::from([(source_index, 0.0_f64, 0_usize)]);
+
+    while let Some((node, path_cost, depth)) = q.pop_front() {
+        max_path_cost = max_path_cost.max(path_cost);
+        total_path_cost += path_cost;
+        max_depth = max_depth.max(depth);
+        if let Some(edges) = mst_adj.get(&node) {
+            for edge in edges {
+                if visited.insert(edge.neighbor) {
+                    q.push_back((edge.neighbor, path_cost + edge.cost, depth + 1));
+                }
+            }
+        }
+    }
+
+    (max_path_cost, total_path_cost, max_depth)
 }
 
 #[cfg(test)]
@@ -1550,6 +1753,7 @@ mod tests {
                 mean_reprojection_error_px: 2.1,
                 mean_reverse_reprojection_error_px: 2.2,
                 mean_symmetric_transfer_error_px: 2.15,
+                p95_symmetric_transfer_error_px: 2.4,
             },
         );
         matches.insert(
@@ -1562,6 +1766,7 @@ mod tests {
                 mean_reprojection_error_px: 1.4,
                 mean_reverse_reprojection_error_px: 1.6,
                 mean_symmetric_transfer_error_px: 1.5,
+                p95_symmetric_transfer_error_px: 1.8,
             },
         );
 
@@ -1580,6 +1785,7 @@ mod tests {
                     mean_reprojection_error_px: 1.4,
                     mean_reverse_reprojection_error_px: 1.6,
                     mean_symmetric_transfer_error_px: 1.5,
+                    p95_symmetric_transfer_error_px: 1.8,
                     source_index: 0,
                     target_index: 1,
                 },
@@ -1593,10 +1799,56 @@ mod tests {
                     mean_reprojection_error_px: 2.1,
                     mean_reverse_reprojection_error_px: 2.2,
                     mean_symmetric_transfer_error_px: 2.15,
+                    p95_symmetric_transfer_error_px: 2.4,
                     source_index: 2,
                     target_index: 3,
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn build_stitching_order_prefers_lower_p95_error_over_raw_inlier_count() {
+        let images = sample_image_infos(3);
+        let mut matches = HashMap::new();
+        matches.insert((0, 1), graph_match_info(80, 100, 4.0));
+        matches.insert((0, 2), graph_match_info(35, 40, 0.8));
+        matches.insert((1, 2), graph_match_info(30, 40, 0.7));
+
+        let order = build_stitching_order(&images, &matches);
+
+        assert_eq!(order.selected_match_edges.len(), 2);
+        assert_eq!(
+            order
+                .selected_match_edges
+                .iter()
+                .map(|edge| (edge.edge_rank, edge.source_index, edge.target_index))
+                .collect::<Vec<_>>(),
+            vec![(1, 1, 2), (2, 0, 2)]
+        );
+    }
+
+    #[test]
+    fn build_stitching_order_chooses_central_reference_source() {
+        let images = sample_image_infos(5);
+        let mut matches = HashMap::new();
+        matches.insert((0, 1), graph_match_info(40, 50, 1.0));
+        matches.insert((1, 2), graph_match_info(40, 50, 1.0));
+        matches.insert((2, 3), graph_match_info(40, 50, 1.0));
+        matches.insert((3, 4), graph_match_info(40, 50, 1.0));
+
+        let order = build_stitching_order(&images, &matches);
+
+        assert_eq!(order.reference_source_index, Some(2));
+        assert_eq!(order.ordered_indices[0], 2);
+        assert_eq!(order.max_transform_chain_length, 2);
+        assert_eq!(
+            order
+                .selected_match_edges
+                .iter()
+                .map(|edge| (edge.source_index, edge.target_index, edge.tree_depth))
+                .collect::<Vec<_>>(),
+            vec![(0, 1, 2), (1, 2, 1), (2, 3, 1), (3, 4, 2)]
         );
     }
 
@@ -1883,13 +2135,20 @@ mod tests {
                 mean_reprojection_error_px: 1.25,
                 mean_reverse_reprojection_error_px: 1.35,
                 mean_symmetric_transfer_error_px: 1.3,
+                p95_symmetric_transfer_error_px: 1.6,
                 source_index: 0,
                 target_index: 1,
             }],
+            reference_source_index: Some(0),
             selected_match_edges: vec![PanoramaSelectedMatchEdgeMetadata {
+                child_source_index: 1,
+                edge_rank: 1,
+                parent_source_index: 0,
                 source_index: 0,
                 target_index: 1,
+                tree_depth: 1,
             }],
+            max_transform_chain_length: 1,
             sources: sample_plan_sources(),
             warnings: Vec::new(),
         }
@@ -1947,5 +2206,31 @@ mod tests {
             }),
             train_feature_count: 82,
         }
+    }
+
+    fn graph_match_info(inliers: usize, match_count: usize, p95_error: f64) -> MatchInfo {
+        MatchInfo {
+            brief_match_diagnostics: brief_match_diagnostics_fixture(),
+            homography: Matrix3::identity(),
+            inliers,
+            match_count,
+            mean_reprojection_error_px: p95_error / 2.0,
+            mean_reverse_reprojection_error_px: p95_error / 2.0,
+            mean_symmetric_transfer_error_px: p95_error / 2.0,
+            p95_symmetric_transfer_error_px: p95_error,
+        }
+    }
+
+    fn sample_image_infos(count: usize) -> Vec<ImageInfo> {
+        (0..count)
+            .map(|id| ImageInfo {
+                features: Vec::new(),
+                filename: format!("frame-{id}.dng"),
+                id,
+                image: Rgb32FImage::new(1, 1),
+                low_detail_mask: GrayImage::new(1, 1),
+                scale_factor: 1.0,
+            })
+            .collect()
     }
 }

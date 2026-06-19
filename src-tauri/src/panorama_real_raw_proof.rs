@@ -222,10 +222,24 @@ struct StitchReport {
     output_height: u32,
     output_width: u32,
     pairwise_match_count: usize,
+    max_transform_chain_length: usize,
+    reference_source_index: Option<usize>,
     seam_diagnostics: StitchSeamDiagnostics,
+    selected_match_edges: Vec<StitchSelectedMatchEdgeReport>,
     stitch_engine: String,
     warning_count: usize,
     warnings: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StitchSelectedMatchEdgeReport {
+    child_source_index: usize,
+    edge_rank: usize,
+    parent_source_index: usize,
+    source_index_a: usize,
+    source_index_b: usize,
+    tree_depth: usize,
 }
 
 #[derive(Serialize)]
@@ -278,6 +292,7 @@ struct PairAlignmentReport {
     mean_reprojection_error_px: f64,
     mean_reverse_reprojection_error_px: f64,
     mean_symmetric_transfer_error_px: f64,
+    p95_symmetric_transfer_error_px: f64,
     rejected_reasons: Vec<String>,
     selected_edge: bool,
     source_index_a: usize,
@@ -904,11 +919,26 @@ fn build_stitch_report(
         output_height: render_result.metadata.output_height,
         output_width: render_result.metadata.output_width,
         pairwise_match_count: render_result.metadata.pairwise_matches.len(),
+        max_transform_chain_length: render_result.metadata.max_transform_chain_length,
+        reference_source_index: render_result.metadata.reference_source_index,
         seam_diagnostics: StitchSeamDiagnostics {
             feather_width_px: 100,
             mode: "adaptive_dp_feather_v1".to_string(),
             support: "implemented_current_engine".to_string(),
         },
+        selected_match_edges: render_result
+            .metadata
+            .selected_match_edges
+            .iter()
+            .map(|edge| StitchSelectedMatchEdgeReport {
+                child_source_index: edge.child_source_index,
+                edge_rank: edge.edge_rank,
+                parent_source_index: edge.parent_source_index,
+                source_index_a: edge.source_index,
+                source_index_b: edge.target_index,
+                tree_depth: edge.tree_depth,
+            })
+            .collect(),
         stitch_engine: "rapidraw_homography_seam_v0".to_string(),
         warning_count: render_result.metadata.warnings.len(),
         warnings: render_result.metadata.warnings.clone(),
@@ -1008,6 +1038,7 @@ fn build_empty_alignment_report(
             mean_reprojection_error_px: f64::INFINITY,
             mean_reverse_reprojection_error_px: f64::INFINITY,
             mean_symmetric_transfer_error_px: f64::INFINITY,
+            p95_symmetric_transfer_error_px: f64::INFINITY,
             rejected_reasons: vec![
                 "missing_pairwise_match".to_string(),
                 "non_finite_transform".to_string(),
@@ -1052,6 +1083,7 @@ fn build_pair_alignment_report(
             mean_reprojection_error_px: f64::INFINITY,
             mean_reverse_reprojection_error_px: f64::INFINITY,
             mean_symmetric_transfer_error_px: f64::INFINITY,
+            p95_symmetric_transfer_error_px: f64::INFINITY,
             rejected_reasons: vec![
                 "missing_pairwise_match".to_string(),
                 "non_finite_transform".to_string(),
@@ -1072,6 +1104,7 @@ fn build_pair_alignment_report(
     let mean_reprojection_error_px = round_metric(pair.mean_reprojection_error_px);
     let mean_reverse_reprojection_error_px = round_metric(pair.mean_reverse_reprojection_error_px);
     let mean_symmetric_transfer_error_px = round_metric(pair.mean_symmetric_transfer_error_px);
+    let p95_symmetric_transfer_error_px = round_metric(pair.p95_symmetric_transfer_error_px);
     let mut rejected_reasons = Vec::new();
     if !finite_transform {
         rejected_reasons.push("non_finite_transform".to_string());
@@ -1096,6 +1129,7 @@ fn build_pair_alignment_report(
         mean_reprojection_error_px,
         mean_reverse_reprojection_error_px,
         mean_symmetric_transfer_error_px,
+        p95_symmetric_transfer_error_px,
         rejected_reasons,
         selected_edge,
         source_index_a,
