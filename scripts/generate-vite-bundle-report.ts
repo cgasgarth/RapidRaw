@@ -16,6 +16,19 @@ type BundleAsset = {
   rawBytes: number;
 };
 
+type BundleFile = BundleAsset & {
+  contents: Buffer;
+  path: string;
+};
+
+type SourceContributor = {
+  asset: string;
+  bytes: number;
+  packageName: string | null;
+  source: string;
+  sourceType: 'first-party' | 'third-party' | 'unknown';
+};
+
 type BundleReport = {
   assets: BundleAsset[];
   budgetMode: string;
@@ -33,6 +46,16 @@ type BundleReport = {
     gzipBytes: number;
     rawBytes: number;
   };
+  sourceMapAnalysis: {
+    reason?: string;
+    status: 'available' | 'unavailable';
+    topPackages: {
+      bytes: number;
+      packageName: string;
+      sourceCount: number;
+    }[];
+    topSources: SourceContributor[];
+  };
   summary: {
     assetCount: number;
     initialEntryGzipBytes: number;
@@ -48,6 +71,14 @@ const CliSchema = z
     outputDir: z.string().min(1),
   })
   .strict();
+
+const SourceMapSchema = z
+  .object({
+    sources: z.array(z.string()),
+    sourcesContent: z.array(z.string().nullable()).optional(),
+    version: z.number(),
+  })
+  .passthrough();
 
 const defaultOutputDir = 'artifacts/bundle-report';
 const cli = CliSchema.parse({
@@ -112,6 +143,7 @@ async function buildReport({
           extension: extname(entry.name),
           gzipBytes: gzipSync(contents).byteLength,
           name: entry.name,
+          path,
           rawBytes: fileStat.size,
         };
       }),
@@ -144,6 +176,7 @@ async function buildReport({
       gzipBytes: sum(initialEntryAssets.map((asset) => asset.gzipBytes)),
       rawBytes: sum(initialEntryAssets.map((asset) => asset.rawBytes)),
     },
+    sourceMapAnalysis: await buildSourceMapAnalysis(files),
     summary: {
       assetCount: assets.length,
       initialEntryGzipBytes: sum(initialEntryAssets.map((asset) => asset.gzipBytes)),
@@ -153,6 +186,86 @@ async function buildReport({
       totalRawBytes: sum(assets.map((asset) => asset.rawBytes)),
     },
   };
+}
+
+async function buildSourceMapAnalysis(files: BundleFile[]): Promise<BundleReport['sourceMapAnalysis']> {
+  const sourceContributors = (
+    await Promise.all(
+      files
+        .filter((file) => file.extension === '.js' || file.extension === '.css')
+        .map(async (file) => readSourceContributors(file)),
+    )
+  ).flat();
+
+  if (sourceContributors.length === 0) {
+    return {
+      reason:
+        'No adjacent source maps were found. Run TAURI_ENV_DEBUG=1 bun run build:frontend, then bun run bundle:report for attribution-only diagnostics.',
+      status: 'unavailable',
+      topPackages: [],
+      topSources: [],
+    };
+  }
+
+  const packageTotals = new Map<string, { bytes: number; sources: Set<string> }>();
+  for (const contributor of sourceContributors) {
+    if (contributor.packageName === null) continue;
+    const existing = packageTotals.get(contributor.packageName) ?? { bytes: 0, sources: new Set<string>() };
+    existing.bytes += contributor.bytes;
+    existing.sources.add(contributor.source);
+    packageTotals.set(contributor.packageName, existing);
+  }
+
+  return {
+    status: 'available',
+    topPackages: [...packageTotals.entries()]
+      .map(([packageName, value]) => ({
+        bytes: value.bytes,
+        packageName,
+        sourceCount: value.sources.size,
+      }))
+      .toSorted((a, b) => b.bytes - a.bytes)
+      .slice(0, 20),
+    topSources: sourceContributors.toSorted((a, b) => b.bytes - a.bytes).slice(0, 30),
+  };
+}
+
+async function readSourceContributors(file: BundleFile): Promise<SourceContributor[]> {
+  const sourceMapPath = `${file.path}.map`;
+  let parsedMap;
+  try {
+    parsedMap = SourceMapSchema.parse(JSON.parse(await readFile(sourceMapPath, 'utf8')));
+  } catch {
+    return [];
+  }
+
+  return parsedMap.sources.map((source, index) => {
+    const sourceContent = parsedMap.sourcesContent?.[index];
+    const packageName = getPackageName(source);
+    return {
+      asset: file.name,
+      bytes: sourceContent === undefined || sourceContent === null ? 0 : Buffer.byteLength(sourceContent),
+      packageName,
+      source,
+      sourceType: packageName === null ? classifyFirstPartySource(source) : 'third-party',
+    };
+  });
+}
+
+function classifyFirstPartySource(source: string): SourceContributor['sourceType'] {
+  if (source.includes('/src/') || source.startsWith('src/') || source.startsWith('../src/')) return 'first-party';
+  return 'unknown';
+}
+
+function getPackageName(source: string): string | null {
+  const nodeModulesIndex = source.lastIndexOf('node_modules/');
+  if (nodeModulesIndex < 0) return null;
+  const packagePath = source.slice(nodeModulesIndex + 'node_modules/'.length);
+  const parts = packagePath.split('/');
+  const [first, second] = parts;
+  if (first === undefined || first.length === 0) return null;
+  if (first.startsWith('@')) return second === undefined ? first : `${first}/${second}`;
+  return first;
 }
 
 function buildBudgetStatuses(assets: BundleAsset[]): BundleReport['budgets'] {
@@ -251,6 +364,10 @@ function renderMarkdown(report: BundleReport): string {
         )} | ${formatBytes(budget.actualGzipBytes)} / ${formatBytes(budget.gzipBudgetBytes)} |`,
     )
     .join('\n');
+  const sourceAttribution =
+    report.sourceMapAnalysis.status === 'available'
+      ? renderSourceAttribution(report)
+      : `## Source Attribution\n\nUnavailable: ${report.sourceMapAnalysis.reason}\n`;
 
   return `# Vite Bundle Report
 
@@ -274,6 +391,37 @@ ${budgetRows}
 | Asset | Type | Raw | Gzip | Initial entry |
 | --- | --- | --- | --- | --- |
 ${topAssets}
+
+${sourceAttribution}
+`;
+}
+
+function renderSourceAttribution(report: BundleReport): string {
+  const topSourceRows = report.sourceMapAnalysis.topSources
+    .slice(0, 15)
+    .map(
+      (source) =>
+        `| \`${source.source}\` | \`${source.asset}\` | ${source.sourceType} | ${source.packageName ?? ''} | ${formatBytes(
+          source.bytes,
+        )} |`,
+    )
+    .join('\n');
+  const topPackageRows = report.sourceMapAnalysis.topPackages
+    .slice(0, 15)
+    .map((entry) => `| \`${entry.packageName}\` | ${formatBytes(entry.bytes)} | ${entry.sourceCount} |`)
+    .join('\n');
+
+  return `## Source Attribution
+
+| Source | Asset | Type | Package | Source bytes |
+| --- | --- | --- | --- | --- |
+${topSourceRows}
+
+## Package Attribution
+
+| Package | Source bytes | Sources |
+| --- | --- | --- |
+${topPackageRows}
 `;
 }
 
@@ -302,6 +450,14 @@ async function runSelfTest(): Promise<void> {
     await Promise.all([
       writeFile(join(root, 'dist/index.html'), '<script type="module" src="/assets/entry.js"></script>'),
       writeFile(join(root, 'dist/assets/entry.js'), 'import "./static.js"; import("./lazy.js"); console.log("entry");'),
+      writeFile(
+        join(root, 'dist/assets/entry.js.map'),
+        JSON.stringify({
+          sources: ['../src/App.tsx', '../node_modules/@scope/pkg/index.js', '../node_modules/react/index.js'],
+          sourcesContent: ['export const app = true;', 'export const scoped = true;', 'export const react = true;'],
+          version: 3,
+        }),
+      ),
       writeFile(join(root, 'dist/assets/static.js'), 'console.log("static");'),
       writeFile(join(root, 'dist/assets/lazy.js'), 'console.log("lazy");'),
     ]);
@@ -313,7 +469,14 @@ async function runSelfTest(): Promise<void> {
 
     if (!report.initialEntry.files.includes('static.js')) throw new Error('self-test: static import missing.');
     if (report.initialEntry.files.includes('lazy.js')) throw new Error('self-test: dynamic import included.');
-    if (report.assets.length !== 3) throw new Error('self-test: asset count mismatch.');
+    if (report.assets.length !== 4) throw new Error('self-test: asset count mismatch.');
+    if (report.sourceMapAnalysis.status !== 'available') throw new Error('self-test: source map analysis unavailable.');
+    if (!report.sourceMapAnalysis.topPackages.some((entry) => entry.packageName === '@scope/pkg')) {
+      throw new Error('self-test: scoped package attribution missing.');
+    }
+    if (!report.sourceMapAnalysis.topSources.some((entry) => entry.sourceType === 'first-party')) {
+      throw new Error('self-test: first-party attribution missing.');
+    }
 
     await writeReport({
       assetsDir: join(root, 'dist/assets'),
