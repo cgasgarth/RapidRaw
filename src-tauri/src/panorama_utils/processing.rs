@@ -675,6 +675,38 @@ mod tests {
     }
 
     #[test]
+    fn compute_homography_recovers_projective_transform() {
+        let expected_homography =
+            Matrix3::new(1.1, 0.08, 125.0, -0.04, 0.95, -50.0, 0.00003, -0.00002, 1.0);
+        let source_points = [
+            Point2::new(10_000.0, 20_000.0),
+            Point2::new(16_000.0, 20_500.0),
+            Point2::new(10_500.0, 25_500.0),
+            Point2::new(16_500.0, 26_000.0),
+            Point2::new(13_000.0, 23_200.0),
+        ];
+        let points = source_points
+            .iter()
+            .map(|source| (*source, project_point(&expected_homography, *source)))
+            .collect::<Vec<_>>();
+
+        let homography = compute_homography(&points).expect("projective homography");
+
+        for (source, target) in points {
+            let projected = project_point(&homography, source);
+            assert!((projected.x - target.x).abs() < 1e-4);
+            assert!((projected.y - target.y).abs() < 1e-4);
+        }
+        assert!(homography[(2, 0)].abs() > 1e-7);
+        assert!(homography[(2, 1)].abs() > 1e-7);
+    }
+
+    fn project_point(homography: &Matrix3<f64>, point: Point2<f64>) -> Point2<f64> {
+        let projected = homography * nalgebra::Point3::new(point.x, point.y, 1.0);
+        Point2::new(projected.x / projected.z, projected.y / projected.z)
+    }
+
+    #[test]
     fn ransac_homography_is_deterministic_for_same_inputs() {
         let mut keypoints1 = Vec::new();
         let mut keypoints2 = Vec::new();
