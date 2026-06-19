@@ -367,54 +367,6 @@ fn build_integral_images(gray: &GrayImage) -> (Vec<u64>, Vec<u128>) {
     (sat, sat_sq)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn ransac_homography_is_deterministic_for_same_inputs() {
-        let mut keypoints1 = Vec::new();
-        let mut keypoints2 = Vec::new();
-        let mut matches = Vec::new();
-
-        for index in 0..24 {
-            let x = 20 + (index % 6) as u32 * 17;
-            let y = 30 + (index / 6) as u32 * 19;
-            keypoints1.push(KeyPoint { x, y });
-            if index < 20 {
-                keypoints2.push(KeyPoint { x: x + 7, y: y + 5 });
-            } else {
-                keypoints2.push(KeyPoint {
-                    x: 240 - index as u32 * 3,
-                    y: 180 + index as u32,
-                });
-            }
-            matches.push(Match {
-                index1: index,
-                index2: index,
-            });
-        }
-
-        let (expected_homography, expected_inliers) =
-            find_homography_ransac(&matches, &keypoints1, &keypoints2)
-                .expect("synthetic translation homography should be found");
-
-        for _ in 0..8 {
-            let (homography, inliers) = find_homography_ransac(&matches, &keypoints1, &keypoints2)
-                .expect("synthetic translation homography should be found");
-            assert_eq!(match_pairs(&inliers), match_pairs(&expected_inliers));
-            assert_eq!(homography.as_slice(), expected_homography.as_slice());
-        }
-    }
-
-    fn match_pairs(matches: &[Match]) -> Vec<(usize, usize)> {
-        matches
-            .iter()
-            .map(|matched| (matched.index1, matched.index2))
-            .collect()
-    }
-}
-
 pub fn generate_low_detail_mask(gray_full: &GrayImage) -> GrayImage {
     println!("    - Generating low-detail mask...");
     let (width, height) = gray_full.dimensions();
@@ -471,4 +423,52 @@ pub fn generate_low_detail_mask(gray_full: &GrayImage) -> GrayImage {
             }
         });
     mask
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ransac_homography_is_deterministic_for_same_inputs() {
+        let mut keypoints1 = Vec::new();
+        let mut keypoints2 = Vec::new();
+        let mut matches = Vec::new();
+
+        for index in 0..24 {
+            let x = 20 + (index % 6) as u32 * 17;
+            let y = 30 + (index / 6) as u32 * 19;
+            keypoints1.push(KeyPoint { x, y });
+            if index < 20 {
+                keypoints2.push(KeyPoint { x: x + 7, y: y + 5 });
+            } else {
+                keypoints2.push(KeyPoint {
+                    x: 240 - index as u32 * 3,
+                    y: 180 + index as u32,
+                });
+            }
+            matches.push(Match {
+                index1: index,
+                index2: index,
+            });
+        }
+
+        let (expected_homography, expected_inliers) =
+            find_homography_ransac(&matches, &keypoints1, &keypoints2)
+                .expect("synthetic translation homography should be found");
+
+        for _ in 0..8 {
+            let (homography, inliers) = find_homography_ransac(&matches, &keypoints1, &keypoints2)
+                .expect("synthetic translation homography should be found");
+            assert_eq!(match_pairs(&inliers), match_pairs(&expected_inliers));
+            assert_eq!(homography.as_slice(), expected_homography.as_slice());
+        }
+    }
+
+    fn match_pairs(matches: &[Match]) -> Vec<(usize, usize)> {
+        matches
+            .iter()
+            .map(|matched| (matched.index1, matched.index2))
+            .collect()
+    }
 }
