@@ -13,6 +13,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   NegativeLabBatchColorWorkspace: 'negative-lab-batch-color-workspace',
   NegativeLabWorkspace: 'negative-lab-workspace',
   PanoramaUi: 'panorama-ui',
+  SrPrivateRawUi: 'sr-private-raw-ui',
   SrUi: 'sr-ui',
 } as const;
 
@@ -74,6 +75,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Super-resolution plan',
     mode: VISUAL_SMOKE_SCENARIO_IDS.SrUi,
     outputFile: 'sr-ui.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Private RAW SR review',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi,
+    outputFile: 'sr-private-raw-ui.png',
     sectionMinimum: 1,
   },
   {

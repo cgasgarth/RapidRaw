@@ -30,6 +30,7 @@ import {
   negativeLabWorkspaceProofDatasetSchema,
   panoramaReviewWorkspaceProofSchema,
   panoramaUiSettingsProofSchema,
+  superResolutionPrivateRawReviewProofSchema,
   superResolutionReviewWorkspaceProofSchema,
   superResolutionUiSettingsProofSchema,
 } from './lib/visual-smoke-proofs.ts';
@@ -51,12 +52,34 @@ const highDpiTargets = [
 ];
 const selectedScenarios =
   requestedScenario === null ? scenarios : scenarios.filter((scenario) => scenario.mode === requestedScenario);
+const requiresSrPrivateRawProof = selectedScenarios.some(
+  (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi,
+);
 
 if (selectedScenarios.length === 0) {
   throw new Error(`Unknown visual smoke scenario: ${requestedScenario ?? '<missing>'}`);
 }
 
 const sleep = (milliseconds) => new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds));
+
+interface SrPrivateRawBrowserProof {
+  artifactRoot: string;
+  exportReviewArtifact: string;
+  exportReviewDataUrl: string;
+  fixtureId: string;
+  previewArtifact: string;
+  previewDataUrl: string;
+  reconstructionPath: string;
+  resultReviewArtifact: string;
+  resultReviewDataUrl: string;
+  sourceCount: string;
+}
+
+declare global {
+  interface Window {
+    __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawBrowserProof;
+  }
+}
 
 async function waitForDevServer() {
   const startedAt = Date.now();
@@ -103,6 +126,34 @@ async function readPngDimensions(path) {
   return {
     height: buffer.readUInt32BE(20),
     width: buffer.readUInt32BE(16),
+  };
+}
+
+async function readPngDataUrl(path) {
+  const buffer = await readFile(path);
+  if (buffer.toString('ascii', 1, 4) !== 'PNG') {
+    throw new Error(`${path} is not a PNG file.`);
+  }
+  return `data:image/png;base64,${buffer.toString('base64')}`;
+}
+
+async function loadSrPrivateRawProof(): Promise<SrPrivateRawBrowserProof> {
+  const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
+  const artifactRoot = `${privateRoot}/private-artifacts/validation/computational-merge`;
+  const previewArtifact = `${artifactRoot}/sr-subpixel-preview.png`;
+  const resultReviewArtifact = `${artifactRoot}/sr-subpixel-result-review.png`;
+  const exportReviewArtifact = `${artifactRoot}/sr-subpixel-export-review.png`;
+  return {
+    artifactRoot,
+    exportReviewArtifact,
+    exportReviewDataUrl: await readPngDataUrl(exportReviewArtifact),
+    fixtureId: 'validation.computational-merge.super-resolution-subpixel.v1',
+    previewArtifact,
+    previewDataUrl: await readPngDataUrl(previewArtifact),
+    reconstructionPath: `${artifactRoot}/sr-subpixel-reconstruction.tiff`,
+    resultReviewArtifact,
+    resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
+    sourceCount: '4',
   };
 }
 
@@ -239,6 +290,24 @@ async function prepareScenario(page, mode) {
     await page
       .getByTestId('sr-artifact-handoff')
       .getByText('/tmp/rawengine-super-resolution-smoke.tif', { exact: true })
+      .waitFor({ timeout: 10_000 });
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi) {
+    superResolutionPrivateRawReviewProofSchema.parse(
+      await page.getByTestId('sr-private-raw-review-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    for (const testId of ['sr-private-raw-preview', 'sr-private-raw-result', 'sr-private-raw-export']) {
+      const loaded = await page.getByTestId(testId).evaluate((element) => {
+        const image = element as HTMLImageElement;
+        return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+      });
+      if (!loaded) throw new Error(`${testId} did not load a nonblank private RAW image.`);
+    }
+    await page
+      .getByTestId('sr-private-raw-artifact-handoff')
+      .getByText('sr-subpixel-reconstruction.tiff', { exact: false })
       .waitFor({ timeout: 10_000 });
     return;
   }
@@ -755,6 +824,14 @@ async function main() {
         },
       });
     });
+    if (requiresSrPrivateRawProof) {
+      await page.addInitScript(
+        (proof: SrPrivateRawBrowserProof) => {
+          window.__RAWENGINE_SR_PRIVATE_RAW_PROOF__ = proof;
+        },
+        await loadSrPrivateRawProof(),
+      );
+    }
 
     page.on('pageerror', (error) => {
       throw error;

@@ -29,6 +29,24 @@ interface VisualSmokeAppProps {
   mode: string;
 }
 
+interface SrPrivateRawVisualProof {
+  exportReviewArtifact: string;
+  exportReviewDataUrl: string;
+  fixtureId: string;
+  previewArtifact: string;
+  previewDataUrl: string;
+  reconstructionPath: string;
+  resultReviewArtifact: string;
+  resultReviewDataUrl: string;
+  sourceCount: string;
+}
+
+declare global {
+  interface Window {
+    __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawVisualProof;
+  }
+}
+
 const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi]: AgentChatVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow]: ColorWorkflowVisualSmoke,
@@ -42,6 +60,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace]: NegativeLabVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrUi]: SuperResolutionVisualSmoke,
 } satisfies Partial<Record<VisualSmokeMode, () => ReactElement>>;
 type VisualSmokeComponentMode = keyof typeof visualSmokeComponents;
@@ -251,6 +270,13 @@ const copy = {
   superResolutionDryRunTool: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
   superResolutionArtifactPath: '/tmp/rawengine-super-resolution-smoke.tif',
   superResolutionSourceSet: 'handheld burst x5',
+  superResolutionPrivateRawReview: 'Private RAW SR review',
+  superResolutionPrivateRawRuntime: 'app-server apply proof',
+  superResolutionPrivateRawPreview: 'RAW preview',
+  superResolutionPrivateRawResult: 'Result review',
+  superResolutionPrivateRawExport: 'Export review',
+  missingPrivateRawProofArtifacts: 'Missing private RAW proof artifacts',
+  privateRawFrameCount: (count: string) => `${count} RAW frames`,
   colorWorkflow: 'Color Workflow',
   layerWorkflowTitle: 'Local Adjustment Stack',
   layerMoveDown: 'Move down',
@@ -1036,6 +1062,105 @@ function SuperResolutionVisualSmoke() {
             <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="sr-artifact-handoff">
               <p className="text-xs text-[#aab2bd]">{copy.superResolutionArtifactHandoff}</p>
               <p>{copy.superResolutionArtifactPath}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function SuperResolutionPrivateRawVisualSmoke() {
+  const proof = window.__RAWENGINE_SR_PRIVATE_RAW_PROOF__;
+
+  if (!proof) {
+    return (
+      <main
+        className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi}
+      >
+        <p>{copy.missingPrivateRawProofArtifacts}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi}
+    >
+      <div className="grid h-screen grid-cols-[1fr_360px] bg-[#0f1114]" data-visual-smoke-section="sr-private-raw">
+        <div className="flex min-w-0 flex-col gap-3 p-5">
+          <div className="flex h-11 items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+            <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+              {copy.superResolutionPrivateRawReview}
+            </span>
+          </div>
+          <div className="grid min-h-0 flex-1 grid-cols-[1fr_1fr] gap-3">
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.superResolutionPrivateRawPreview}</figcaption>
+              <img
+                alt={copy.superResolutionPrivateRawPreview}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="sr-private-raw-preview"
+                src={proof.previewDataUrl}
+              />
+            </figure>
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.superResolutionPrivateRawResult}</figcaption>
+              <img
+                alt={copy.superResolutionPrivateRawResult}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="sr-private-raw-result"
+                src={proof.resultReviewDataUrl}
+              />
+            </figure>
+          </div>
+          <figure className="h-56 rounded-md border border-white/10 bg-[#15191e] p-3">
+            <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.superResolutionPrivateRawExport}</figcaption>
+            <img
+              alt={copy.superResolutionPrivateRawExport}
+              className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+              data-testid="sr-private-raw-export"
+              src={proof.exportReviewDataUrl}
+            />
+          </figure>
+        </div>
+        <aside className="border-l border-white/10 bg-[#171a1f] p-4 text-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{copy.superResolutionReview}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.superResolutionPrivateRawRuntime}</span>
+          </div>
+          <div
+            className="sr-only"
+            data-apply-command={copy.superResolutionApplyTool}
+            data-artifact-path={proof.reconstructionPath}
+            data-command={copy.superResolutionDryRunTool}
+            data-export-review-artifact={proof.exportReviewArtifact}
+            data-fixture-id={proof.fixtureId}
+            data-preview-artifact={proof.previewArtifact}
+            data-result-review-artifact={proof.resultReviewArtifact}
+            data-runtime-status="private_raw_app_server_apply"
+            data-source-count={proof.sourceCount}
+            data-testid="sr-private-raw-review-proof"
+          />
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.superResolutionDryRunTool}</p>
+              <p>{proof.fixtureId}</p>
+            </div>
+            <div
+              className="rounded border border-white/10 bg-white/5 p-2"
+              data-testid="sr-private-raw-artifact-handoff"
+            >
+              <p className="text-xs text-[#aab2bd]">{copy.superResolutionArtifactHandoff}</p>
+              <p className="break-all">{proof.reconstructionPath}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.superResolutionSourceSet}</p>
+              <p>{copy.privateRawFrameCount(proof.sourceCount)}</p>
             </div>
           </div>
         </aside>
