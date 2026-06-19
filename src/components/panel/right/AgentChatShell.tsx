@@ -1,4 +1,5 @@
-import { AlertTriangle, CheckCircle2, CircleDashed, Eye, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type {
@@ -43,6 +44,8 @@ const artifactStatusStyles = {
   ready: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
   review_required: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
 } satisfies Record<AgentArtifactReview['previewArtifacts'][number]['status'], string>;
+
+type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
 
 function MessageBubble({ message }: { message: AgentChatMessage }) {
   const isUser = message.role === 'user';
@@ -147,14 +150,24 @@ function ArtifactReviewPanel({ review }: { review: AgentArtifactReview }) {
 
 function DryRunReviewPanel({ review }: { review: AgentChatDryRunReview }) {
   const { t } = useTranslation();
+  const [localDecision, setLocalDecision] = useState<LocalReviewDecision>('pending');
+  const applyUnavailableReason =
+    localDecision === 'approved'
+      ? t('editor.ai.agent.review.noReplayApply')
+      : localDecision === 'rejected'
+        ? t('editor.ai.agent.review.rejectedApply')
+        : t('editor.ai.agent.review.pendingApply');
 
   return (
     <div
       className="space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
       data-action-count={review.actions.length}
       data-affected-target-count={review.affectedTargets.length}
+      data-apply-availability="unavailable"
       data-approval-states={review.actions.map((action) => action.state).join(',')}
+      data-local-review-decision={localDecision}
       data-parameter-diff-count={review.parameterDiffs.length}
+      data-policy-availability="reviewable"
       data-testid="agent-dry-run-review"
       data-warning-count={review.warnings.length}
     >
@@ -176,8 +189,16 @@ function DryRunReviewPanel({ review }: { review: AgentChatDryRunReview }) {
           <button
             className={`rounded-md border px-2 py-2 text-left text-[11px] ${reviewActionStyles[action.state]}`}
             data-testid={`agent-approval-action-${action.id}`}
-            disabled
+            disabled={action.state !== 'available'}
             key={action.id}
+            onClick={() => {
+              if (action.id === 'approve-dry-run') {
+                setLocalDecision('approved');
+              }
+              if (action.id === 'reject-plan') {
+                setLocalDecision('rejected');
+              }
+            }}
             type="button"
           >
             <span className="block font-semibold text-text-primary">{action.label}</span>
@@ -220,6 +241,18 @@ function DryRunReviewPanel({ review }: { review: AgentChatDryRunReview }) {
             {warning}
           </div>
         ))}
+      </div>
+
+      <div className="rounded border border-white/10 bg-black/20 p-2" data-testid="agent-review-apply-state">
+        <button
+          className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-2 text-left text-[11px] text-text-secondary"
+          data-testid="agent-review-apply-unavailable"
+          disabled
+          type="button"
+        >
+          <span className="block font-semibold text-text-primary">{t('editor.ai.agent.review.applyUnavailable')}</span>
+          <span className="mt-1 block leading-4">{applyUnavailableReason}</span>
+        </button>
       </div>
     </div>
   );
@@ -320,24 +353,6 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       {transcript.artifactReview ? <ArtifactReviewPanel review={transcript.artifactReview} /> : null}
 
       {transcript.dryRunReview ? <DryRunReviewPanel review={transcript.dryRunReview} /> : null}
-
-      <div className="grid grid-cols-2 gap-2" data-testid="agent-chat-actions">
-        <button
-          className="flex items-center justify-center gap-2 rounded-md bg-primary/40 px-2 py-2 text-xs font-semibold text-black/60"
-          disabled
-          type="button"
-        >
-          <CheckCircle2 size={14} />
-          {t('editor.ai.agent.actions.approveApply')}
-        </button>
-        <button
-          className="flex items-center justify-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-2 text-xs text-text-primary"
-          type="button"
-        >
-          <Eye size={14} />
-          {t('editor.ai.agent.actions.inspectDiff')}
-        </button>
-      </div>
     </section>
   );
 }

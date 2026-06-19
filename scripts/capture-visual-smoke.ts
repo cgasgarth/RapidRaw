@@ -244,9 +244,6 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('agent-tool-status-tool-3').getByText('blocked', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await page.getByTestId('agent-chat-actions').getByText('Inspect diff', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
     await page.getByTestId('agent-before-after-preview').getByText('graph_rev_45_preview', { exact: true }).waitFor({
       timeout: 10_000,
     });
@@ -266,15 +263,42 @@ async function prepareScenario(page, mode) {
     if (replayLinkCount !== 3) {
       throw new Error(`Expected 3 visible agent replay links, found ${replayLinkCount}.`);
     }
-    await page.getByTestId('agent-approval-states').getByText('Approve dry-run', { exact: true }).waitFor({
+    await page.getByTestId('agent-approval-states').getByText('Approve plan', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await page.getByTestId('agent-approval-states').getByText('rejected', { exact: true }).waitFor({
+    await page.getByTestId('agent-approval-states').getByText('Reject plan', { exact: true }).waitFor({
       timeout: 10_000,
     });
     await page.getByTestId('agent-approval-states').getByText('unavailable', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    const approveButton = page.getByTestId('agent-approval-action-approve-dry-run');
+    await approveButton.click();
+    const approvedDataset = agentDryRunReviewProofDatasetSchema.parse(
+      await review.evaluate((element) => ({ ...element.dataset })),
+    );
+    if (approvedDataset.localReviewDecision !== 'approved') {
+      throw new Error(`Expected approved local review decision, got ${approvedDataset.localReviewDecision}.`);
+    }
+    const applyButton = page.getByTestId('agent-review-apply-unavailable');
+    if (await applyButton.isEnabled()) {
+      throw new Error('Agent dry-run apply control must stay disabled after local approval.');
+    }
+    await page
+      .getByTestId('agent-review-apply-state')
+      .getByText('No app-server replay evidence', { exact: false })
+      .waitFor({ timeout: 10_000 });
+    const rejectButton = page.getByTestId('agent-approval-action-reject-plan');
+    await rejectButton.click();
+    const rejectedDataset = agentDryRunReviewProofDatasetSchema.parse(
+      await review.evaluate((element) => ({ ...element.dataset })),
+    );
+    if (rejectedDataset.localReviewDecision !== 'rejected') {
+      throw new Error(`Expected rejected local review decision, got ${rejectedDataset.localReviewDecision}.`);
+    }
+    if (await applyButton.isEnabled()) {
+      throw new Error('Agent dry-run apply control must stay disabled after local rejection.');
+    }
     await page.getByTestId('agent-parameter-diffs').getByText('Temperature', { exact: true }).waitFor({
       timeout: 10_000,
     });
@@ -284,8 +308,9 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('agent-review-warnings').getByText('runtime apply', { exact: false }).waitFor({
       timeout: 10_000,
     });
-    if (await page.getByText('Approve apply', { exact: true }).isEnabled()) {
-      throw new Error('Agent apply action must stay disabled in UI-only smoke.');
+    const removedApplyActionCount = await page.getByText('Approve apply', { exact: true }).count();
+    if (removedApplyActionCount !== 0) {
+      throw new Error(`Agent UI-only smoke must not expose Approve apply, found ${removedApplyActionCount}.`);
     }
     return;
   }
