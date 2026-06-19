@@ -1012,6 +1012,7 @@ function SuperResolutionVisualSmoke() {
           isOpen
           loadingImageUrl={panoramaPreviewUrl}
           onClose={() => {}}
+          onPreviewPlan={() => {}}
           onSettingsChange={setSettings}
           settings={settings}
           sourceCount={5}

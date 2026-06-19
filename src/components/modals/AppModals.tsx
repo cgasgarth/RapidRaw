@@ -266,6 +266,19 @@ export default function AppModals(props: AppModalsProps) {
             superResolutionModalState: createDefaultSuperResolutionModalState(state.superResolutionModalState.settings),
           }));
         }}
+        onPreviewPlan={() => {
+          setUI({
+            superResolutionModalState: {
+              ...superResolutionModalState,
+              lastDryRunCommand: {
+                commandType: 'computationalMerge.createSuperResolution',
+                dryRun: true,
+                sources: superResolutionModalState.sourcePaths.length,
+                toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
+              },
+            },
+          });
+        }}
         onSettingsChange={(settings) => {
           setUI((state) => ({
             superResolutionModalState: {

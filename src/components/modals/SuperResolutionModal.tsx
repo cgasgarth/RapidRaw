@@ -25,6 +25,7 @@ interface SuperResolutionModalProps {
   isOpen: boolean;
   loadingImageUrl?: string | null;
   onClose: () => void;
+  onPreviewPlan: () => void;
   onSettingsChange: (settings: SuperResolutionUiSettings) => void;
   settings: SuperResolutionUiSettings;
   sourceCount: number;
@@ -37,6 +38,7 @@ export default function SuperResolutionModal({
   isOpen,
   loadingImageUrl,
   onClose,
+  onPreviewPlan,
   onSettingsChange,
   settings,
   sourceCount,
@@ -93,7 +95,7 @@ export default function SuperResolutionModal({
           >
             {t('modals.superResolution.close')}
           </button>
-          <Button onClick={() => {}} disabled>
+          <Button onClick={onPreviewPlan} disabled={!isSourceCountValid}>
             <Layers3 className="w-4 h-4" />
             {t('modals.superResolution.previewPlan')}
           </Button>

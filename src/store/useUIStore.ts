@@ -66,6 +66,12 @@ export interface HdrModalState {
 
 export interface SuperResolutionModalState {
   isOpen: boolean;
+  lastDryRunCommand?: {
+    commandType: 'computationalMerge.createSuperResolution';
+    dryRun: true;
+    sources: number;
+    toolName: string;
+  };
   settings: SuperResolutionUiSettings;
   sourcePaths: Array<string>;
 }
