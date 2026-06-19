@@ -1,5 +1,4 @@
 import cx from 'clsx';
-import { motion } from 'framer-motion';
 
 import UiText from './Text';
 import { TextVariants } from '../../types/typography';
@@ -38,12 +37,6 @@ const Switch = ({
 }: SwitchProps) => {
   const uniqueId = `switch-${label.replace(/\s+/g, '-').toLowerCase()}`;
 
-  const spring = {
-    type: 'spring',
-    stiffness: 700,
-    damping: 30,
-  } as const;
-
   return (
     <label
       className={cx(
@@ -71,14 +64,12 @@ const Switch = ({
           type="checkbox"
         />
         <div className={cx('w-full h-full bg-card-active/50 rounded-full shadow-inner', trackClassName)}></div>
-        <motion.div
-          className={cx('absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-colors', {
+        <div
+          className={cx('absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-[background-color,transform]', {
             'bg-accent': checked,
             'bg-text-secondary/80': !checked,
           })}
-          transition={spring}
-          initial={false}
-          animate={{ x: checked ? 20 : 0 }}
+          style={{ transform: `translateX(${checked ? 20 : 0}px)` }}
         />
       </div>
     </label>
