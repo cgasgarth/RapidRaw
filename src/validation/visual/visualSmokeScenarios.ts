@@ -6,6 +6,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   DetailWorkspace: 'detail-workspace',
   EmptyLibrary: 'empty-library',
   FilmLookBrowser: 'film-look-browser',
+  FocusPrivateRawUi: 'focus-private-raw-ui',
   FocusUi: 'focus-ui',
   HdrUi: 'hdr-ui',
   LayerStackWorkflow: 'layer-stack-workflow',
@@ -63,6 +64,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Focus-stack plan',
     mode: VISUAL_SMOKE_SCENARIO_IDS.FocusUi,
     outputFile: 'focus-ui.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Private RAW focus review',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi,
+    outputFile: 'focus-private-raw-ui.png',
     sectionMinimum: 1,
   },
   {
