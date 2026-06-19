@@ -4901,6 +4901,151 @@ const genericFilmLookProvenance = {
   sourceProfileIds: [],
 } as const;
 
+const stockReferenceFilmLookProvenance = {
+  claimLevel: 'stock_family_reference_metadata',
+  fixtureIds: [],
+  legalNamingStatus: 'descriptive_stock_family',
+  legalNote: 'Creative stock-inspired approximation; not official, endorsed, measured, or an exact film match.',
+  licenseRecordIds: [],
+  measurementSource: 'research_reference_metadata_only',
+  sourceCitationIds: ['film_stock_public_reference_metadata.v1'],
+  sourceProfileIds: [],
+} as const;
+
+type SampleStockReferenceFilmLookCategory =
+  | 'black_and_white'
+  | 'color_clean'
+  | 'color_contrast'
+  | 'color_cool'
+  | 'color_fade'
+  | 'color_warm';
+
+interface SampleStockReferenceFilmLookInput {
+  category: SampleStockReferenceFilmLookCategory;
+  description: string;
+  displayName: string;
+  lookId: string;
+  nodes: Array<{
+    nodeId: string;
+    nodeKind: 'black_and_white_mixer' | 'color_matrix' | 'grain' | 'split_tone' | 'tone_curve';
+    parameters: Record<string, boolean | number | string | Array<number>>;
+    renderStage: 'creative_color_rendering' | 'texture_rendering';
+  }>;
+  strengthDefault: number;
+}
+
+const makeSampleStockReferenceFilmLook = ({
+  category,
+  description,
+  displayName,
+  lookId,
+  nodes,
+  strengthDefault,
+}: SampleStockReferenceFilmLookInput) => ({
+  category,
+  description,
+  displayName,
+  intendedInputModes: ['raw_photo', 'rendered_photo', 'negative_lab_positive'],
+  lookId,
+  lookVersion: '2026-06-19',
+  nodes: nodes.map((node) => ({
+    ...node,
+    enabledByDefault: true,
+  })),
+  provenance: stockReferenceFilmLookProvenance,
+  renderDomain: 'working_rgb',
+  requiredWarnings: ['creative_not_exact_emulation', 'requires_user_review'],
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+  strengthDefault,
+});
+
+const sampleStockReferenceFilmLookRecipesV1 = [
+  makeSampleStockReferenceFilmLook({
+    category: 'color_warm',
+    description: 'Warm portrait color negative with restrained contrast.',
+    displayName: 'Portra 400 Inspired Portrait',
+    lookId: 'film_look.stock_reference.portra_400_portrait.v1',
+    nodes: [
+      {
+        nodeId: 'tone.portrait_soft_contrast',
+        nodeKind: 'tone_curve',
+        parameters: { contrast: 0.08, shoulder: 0.08 },
+        renderStage: 'creative_color_rendering',
+      },
+      {
+        nodeId: 'color.warm_skin_bias',
+        nodeKind: 'color_matrix',
+        parameters: { saturation: 1.06, warmth: 0.04 },
+        renderStage: 'creative_color_rendering',
+      },
+    ],
+    strengthDefault: 70,
+  }),
+  makeSampleStockReferenceFilmLook({
+    category: 'color_warm',
+    description: 'Golden consumer color negative with soft highlights.',
+    displayName: 'Gold 200 Inspired Warmth',
+    lookId: 'film_look.stock_reference.gold_200_warmth.v1',
+    nodes: [
+      {
+        nodeId: 'tone.consumer_warm_rolloff',
+        nodeKind: 'tone_curve',
+        parameters: { blackLift: 0.04, contrast: -0.04, shoulder: 0.08 },
+        renderStage: 'creative_color_rendering',
+      },
+      {
+        nodeId: 'color.golden_warmth',
+        nodeKind: 'color_matrix',
+        parameters: { saturation: 1.1, warmth: 0.09 },
+        renderStage: 'creative_color_rendering',
+      },
+    ],
+    strengthDefault: 68,
+  }),
+  makeSampleStockReferenceFilmLook({
+    category: 'color_contrast',
+    description: 'Dense saturated slide color for landscape contrast.',
+    displayName: 'Velvia 50 Inspired Chrome',
+    lookId: 'film_look.stock_reference.velvia_50_chrome.v1',
+    nodes: [
+      {
+        nodeId: 'tone.slide_dense_curve',
+        nodeKind: 'tone_curve',
+        parameters: { blackLift: -0.06, contrast: 0.26, shoulder: 0.04 },
+        renderStage: 'creative_color_rendering',
+      },
+      {
+        nodeId: 'color.chrome_saturation',
+        nodeKind: 'color_matrix',
+        parameters: { saturation: 1.28 },
+        renderStage: 'creative_color_rendering',
+      },
+    ],
+    strengthDefault: 58,
+  }),
+  makeSampleStockReferenceFilmLook({
+    category: 'black_and_white',
+    description: 'Bold high-speed black-and-white with visible grain.',
+    displayName: 'Tri-X 400 Inspired Mono',
+    lookId: 'film_look.stock_reference.tri_x_400_mono.v1',
+    nodes: [
+      {
+        nodeId: 'mono.classic_high_speed_mix',
+        nodeKind: 'black_and_white_mixer',
+        parameters: { blue: 0.18, green: 0.54, red: 0.28 },
+        renderStage: 'creative_color_rendering',
+      },
+      {
+        nodeId: 'texture.bold_high_speed_grain',
+        nodeKind: 'grain',
+        parameters: { amount: 0.32, size: 0.48 },
+        renderStage: 'texture_rendering',
+      },
+    ],
+    strengthDefault: 72,
+  }),
+];
+
 export const sampleFilmLookCatalogV1: FilmLookCatalogV1 = filmLookCatalogV1Schema.parse({
   catalogId: 'film_look.generic.builtin.v1',
   catalogVersion: '2026-06-13',
@@ -5119,6 +5264,7 @@ export const sampleFilmLookCatalogV1: FilmLookCatalogV1 = filmLookCatalogV1Schem
       schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
       strengthDefault: 60,
     },
+    ...sampleStockReferenceFilmLookRecipesV1,
   ],
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
 });

@@ -6,9 +6,9 @@ import {
 import {
   buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
-  FILM_LOOK_BROWSER_ITEMS,
   getFilmLookControlledAdjustmentKeys,
 } from './filmLookBrowser';
+import { FILM_LOOK_BROWSER_ITEMS } from './filmLookRegistry';
 import {
   filmLookAppServerCommandSchema,
   filmLookAppServerPatchResultSchema,

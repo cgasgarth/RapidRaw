@@ -5,13 +5,14 @@ import { dirname } from 'node:path';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
-  FILM_LOOK_BROWSER_ITEMS,
   getFilmLookAdjustmentSummaries,
   scaleFilmLookAdjustmentPatch,
 } from '../src/utils/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../src/utils/filmLookRegistry.ts';
 
 const fixtureUrl = new URL('../fixtures/film-simulation/film-look-fixture-outputs.json', import.meta.url);
 const browserSourceUrl = new URL('../src/components/adjustments/FilmLookBrowser.tsx', import.meta.url);
+const registrySourceUrl = new URL('../src/utils/filmLookRegistry.ts', import.meta.url);
 const utilsSourceUrl = new URL('../src/utils/filmLookBrowser.ts', import.meta.url);
 const updateFixture = process.argv.includes('--update');
 
@@ -82,12 +83,12 @@ for (const marker of [
   'FILM_LOOK_FAVORITES_STORAGE_KEY',
   'getFilmLookSwatchStyle',
   'searchQuery',
-  'FILM_LOOK_SEARCH_LABEL',
+  'adjustments.effects.filmLookBrowser.search',
   'activeCategory',
   'categoryTabs',
-  'FILM_LOOK_CATEGORY_FILTER_LABEL',
+  'adjustments.effects.filmLookBrowser.categoryFilter',
   'handleSwapComparisonLooks',
-  'FILM_LOOK_COMPARE_SWAP_LABEL',
+  'adjustments.effects.filmLookBrowser.compareSwap',
 ]) {
   if (!browserSource.includes(marker)) {
     throw new Error(`Film look browser is missing UI marker: ${marker}`);
@@ -102,9 +103,12 @@ for (const marker of ['FilmLookVisualSmoke', 'film-look-browser', 'film-look-adj
   }
 }
 
+const registrySource = await readFile(registrySourceUrl, 'utf8');
 const utilsSource = await readFile(utilsSourceUrl, 'utf8');
-const unsafeClaims =
-  /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|identical|ilford|kodak|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;
+const prohibitedClaims =
+  /\b(?:adobe|capture one|dehancer|exact|identical|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|rni|vsco)\b/iu;
+const stockReferenceNames =
+  /\b(?:ektachrome|ektar|fujifilm|gold|hp5|ilford|kodak|portra|provia|superia|t-max|tri-x|velvia)\b/iu;
 
 for (const look of FILM_LOOK_BROWSER_ITEMS) {
   const claimText = [
@@ -114,31 +118,49 @@ for (const look of FILM_LOOK_BROWSER_ITEMS) {
     look.category,
     look.provenance.claimLevel,
     look.provenance.legalNamingStatus,
-    look.provenance.legalNote,
     look.provenance.measurementSource,
   ].join(' ');
 
-  if (unsafeClaims.test(claimText)) {
-    throw new Error(`${look.id}: generic film look contains unsafe stock, brand, or exact-emulation claim`);
+  if (prohibitedClaims.test(claimText)) {
+    throw new Error(`${look.id}: film look contains prohibited official, competitor, or exact-match claim`);
   }
 
   if (
-    look.provenance.claimLevel !== 'generic_engineered' ||
-    look.provenance.legalNamingStatus !== 'generic_safe_name' ||
-    look.provenance.measurementSource !== 'generic_engineered_starting_point'
+    look.provenance.claimLevel === 'generic_engineered' &&
+    (look.provenance.legalNamingStatus !== 'generic_safe_name' ||
+      look.provenance.measurementSource !== 'generic_engineered_starting_point' ||
+      stockReferenceNames.test(claimText))
   ) {
     throw new Error(`${look.id}: built-in film look must use generic-safe provenance`);
   }
 
-  if (!/\bnot measured\b/iu.test(look.provenance.legalNote)) {
-    throw new Error(`${look.id}: built-in film look legal note must disclose unmeasured status`);
+  if (
+    look.provenance.claimLevel === 'stock_family_reference_metadata' &&
+    (look.provenance.legalNamingStatus !== 'descriptive_stock_family' ||
+      look.provenance.measurementSource !== 'research_reference_metadata_only' ||
+      !/\binspired\b/iu.test(look.displayName))
+  ) {
+    throw new Error(`${look.id}: stock-reference film look must disclose inspired stock metadata`);
+  }
+
+  if (!/\bnot (?:measured|official)\b/iu.test(look.provenance.legalNote)) {
+    throw new Error(`${look.id}: built-in film look legal note must disclose unmeasured or unofficial status`);
+  }
+}
+
+for (const marker of [
+  'GENERIC_FILM_LOOK_PROVENANCE',
+  'STOCK_REFERENCE_FILM_LOOK_PROVENANCE',
+  'FILM_LOOK_BROWSER_ITEMS',
+]) {
+  if (!registrySource.includes(marker)) {
+    throw new Error(`Film look registry is missing catalog marker: ${marker}`);
   }
 }
 
 for (const marker of [
   'buildFilmLookAppliedAdjustmentPatch',
   'buildFilmLookPresetDraft',
-  'GENERIC_FILM_LOOK_PROVENANCE',
   'formatFilmLookPresetName',
   'resetFilmLookControlledAdjustments',
   'scaleFilmLookAdjustmentPatch',

@@ -4,7 +4,8 @@ import { dirname, resolve } from 'node:path';
 
 import { z } from 'zod';
 
-import { buildFilmLookAppliedAdjustmentPatch, FILM_LOOK_BROWSER_ITEMS } from '../src/utils/filmLookBrowser.ts';
+import { buildFilmLookAppliedAdjustmentPatch } from '../src/utils/filmLookBrowser.ts';
+import { FILM_LOOK_BROWSER_ITEMS } from '../src/utils/filmLookRegistry.ts';
 
 const manifestPath = resolve('fixtures/film-simulation/film-look-measured-fixture-manifest.json');
 const outputPath = resolve('fixtures/film-simulation/film-look-measured-fixture-outputs.json');
@@ -191,7 +192,7 @@ const applySyntheticFilmLook = (sourcePixels, lookId, patch) =>
   });
 
 const unsafeClaims =
-  /\b(?:adobe|capture one|dehancer|ektachrome|ektar|exact|fujifilm|fuji|gold|identical|ilford|kodak|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|portra|rni|tri-x|t-max|vsco)\b/iu;
+  /\b(?:adobe|capture one|dehancer|exact|identical|lightroom|mastin|manufacturer[ -]?approved|negative lab pro|nlp|official|rni|vsco)\b/iu;
 const requiredOutputNonClaims = [
   'colorimetric_film_match',
   'manufacturer_endorsement',
@@ -250,9 +251,13 @@ const buildCase = (fixture, look) => {
 };
 
 for (const look of FILM_LOOK_BROWSER_ITEMS) {
-  const claimText = [look.id, look.displayName, look.description, look.provenance.legalNote].join(' ');
+  const claimText = [look.id, look.displayName, look.description].join(' ');
   if (unsafeClaims.test(claimText)) {
-    throw new Error(`${look.id}: measured fixture harness cannot run unsafe named-stock claims.`);
+    throw new Error(`${look.id}: measured fixture harness cannot run official, competitor, or exact-match claims.`);
+  }
+
+  if (look.provenance.claimLevel === 'stock_family_reference_metadata' && !/\binspired\b/iu.test(look.displayName)) {
+    throw new Error(`${look.id}: stock-reference fixture case must stay labeled as inspired.`);
   }
 }
 
