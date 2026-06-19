@@ -247,6 +247,7 @@
     "check:hdr-alignment-smoke": "bun scripts/check-hdr-alignment-smoke.ts",
     "check:hdr-alignment-bracket-proof": "bun scripts/check-hdr-alignment-bracket-proof.ts",
     "check:hdr-alignment-bracket-proof:update": "bun scripts/check-hdr-alignment-bracket-proof.ts --update",
+    "check:hdr-source-validation": "bun scripts/check-hdr-source-validation.ts",
     "check:hdr-deghosting-smoke": "bun scripts/check-hdr-deghosting-smoke.ts",
     "check:hdr-deghost-tone-artifact": "bun scripts/check-hdr-deghost-tone-artifact.ts",
     "check:hdr-deghost-tone-artifact:update": "bun scripts/check-hdr-deghost-tone-artifact.ts --update",
