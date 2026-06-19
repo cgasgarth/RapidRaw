@@ -11,6 +11,8 @@ const RAW_PIXLS_DOWNLOAD_ROOT = 'https://raw.pixls.us/download/data';
 const RAW_PIXLS_SOURCE_PAGE = 'https://raw.pixls.us/';
 const RAW_PIXLS_LICENSE_NOTE =
   'raw.pixls.us upload declaration releases submitted files into the public domain; this script stores local validation copies only.';
+const IDR_FOCUS_STACK_LICENSE_NOTE =
+  'IDR idr0134 / BioImage Archive S-BIAD188 is CC BY 4.0; this script stores local validation copies only.';
 
 const fixtureFamilySchema = z.enum(['focus_stack', 'panorama_stitch', 'super_resolution']);
 type FixtureFamily = z.infer<typeof fixtureFamilySchema>;
@@ -19,76 +21,108 @@ type FixtureSuitability = 'format_smoke_only' | 'runtime_proof_candidate';
 interface PublicRawFixtureSource {
   family: FixtureFamily;
   localPath: string;
-  rawPixlsPath: string;
+  licenseNote: string;
   sha256: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  suitability: FixtureSuitability;
 }
-
-const fixtureFamilySuitability = {
-  focus_stack: 'format_smoke_only',
-  panorama_stitch: 'format_smoke_only',
-  super_resolution: 'runtime_proof_candidate',
-} as const satisfies Record<FixtureFamily, FixtureSuitability>;
 
 const publicRawFixtureSources = [
   {
     family: 'focus_stack',
     localPath: 'private-fixtures/focus-stack/plane-transition-v1/frame-01.cr3',
-    rawPixlsPath: 'Canon/EOS R7/443A0157.CR3',
-    sha256: '887439cb1a45becd6a5c85fe75ae10e6c520a9f13a8b9ed077c6cf5d7c37700c',
+    licenseNote: IDR_FOCUS_STACK_LICENSE_NOTE,
+    sha256: 'bb376fa2f4d5bb2b319f184245a5dc2ee7d1fc1e05673092af1cea66b91cd252',
+    sourceLabel: 'IDR idr0134 / BioImage Archive S-BIAD188',
+    sourceUrl:
+      'https://ftp.ebi.ac.uk/biostudies/fire/S-BIAD/188/S-BIAD188/Files/Diplophyllum%20albicans/IMG_0006%20Diplophyllum%20albicans%20stature%20ventral%20side%20%282.5x%29.CR3',
+    suitability: 'runtime_proof_candidate',
   },
   {
     family: 'focus_stack',
     localPath: 'private-fixtures/focus-stack/plane-transition-v1/frame-02.cr3',
-    rawPixlsPath: 'Canon/EOS R7/443A0159.CR3',
-    sha256: '10a18e3f01ca9cd93408496d3853388ef140830548bfeed4237e40f967eb9d5c',
+    licenseNote: IDR_FOCUS_STACK_LICENSE_NOTE,
+    sha256: '806826bf59d5695b50306d63752dfb94834384be76236e3a8c1e3750f5b89dee',
+    sourceLabel: 'IDR idr0134 / BioImage Archive S-BIAD188',
+    sourceUrl:
+      'https://ftp.ebi.ac.uk/biostudies/fire/S-BIAD/188/S-BIAD188/Files/Diplophyllum%20albicans/IMG_0033%20Diplophyllum%20albicans%20stature%20ventral%20side%20%282.5x%29.CR3',
+    suitability: 'runtime_proof_candidate',
   },
   {
     family: 'focus_stack',
     localPath: 'private-fixtures/focus-stack/plane-transition-v1/frame-03.cr3',
-    rawPixlsPath: 'Canon/EOS R7/443A0161.CR3',
-    sha256: 'c01cee1b598120668370892c16a73da915f2aaec8169c5c60a96efd98d9aa220',
+    licenseNote: IDR_FOCUS_STACK_LICENSE_NOTE,
+    sha256: 'c614c763774796fc77585a542bae2673a90772c7110e65b495018e0ccba08a19',
+    sourceLabel: 'IDR idr0134 / BioImage Archive S-BIAD188',
+    sourceUrl:
+      'https://ftp.ebi.ac.uk/biostudies/fire/S-BIAD/188/S-BIAD188/Files/Diplophyllum%20albicans/IMG_0060%20Diplophyllum%20albicans%20stature%20ventral%20side%20%282.5x%29.CR3',
+    suitability: 'runtime_proof_candidate',
   },
   {
     family: 'super_resolution',
     localPath: 'private-fixtures/super-resolution/subpixel-detail-v1/frame-01.nef',
-    rawPixlsPath: 'Nikon/D3/JD1_8203.NEF',
+    licenseNote: RAW_PIXLS_LICENSE_NOTE,
     sha256: '880c60c5f611adf6b70de3d099f8433492de3a3d96866d570122f17f0a651fc8',
+    sourceLabel: RAW_PIXLS_SOURCE_PAGE,
+    sourceUrl: sourceUrlFromRawPixlsPath('Nikon/D3/JD1_8203.NEF'),
+    suitability: 'runtime_proof_candidate',
   },
   {
     family: 'super_resolution',
     localPath: 'private-fixtures/super-resolution/subpixel-detail-v1/frame-02.nef',
-    rawPixlsPath: 'Nikon/D3/JD1_8204.NEF',
+    licenseNote: RAW_PIXLS_LICENSE_NOTE,
     sha256: 'bd1efee38aab8daf79c199e076785125ece01eb8f5ef6741121b0f313ee4ac04',
+    sourceLabel: RAW_PIXLS_SOURCE_PAGE,
+    sourceUrl: sourceUrlFromRawPixlsPath('Nikon/D3/JD1_8204.NEF'),
+    suitability: 'runtime_proof_candidate',
   },
   {
     family: 'super_resolution',
     localPath: 'private-fixtures/super-resolution/subpixel-detail-v1/frame-03.nef',
-    rawPixlsPath: 'Nikon/D3/JD1_8205.NEF',
+    licenseNote: RAW_PIXLS_LICENSE_NOTE,
     sha256: '6c4ca5ac7525c01c972f517503c47389f2f244c1fab2ad4ea9d10c63d36c42e6',
+    sourceLabel: RAW_PIXLS_SOURCE_PAGE,
+    sourceUrl: sourceUrlFromRawPixlsPath('Nikon/D3/JD1_8205.NEF'),
+    suitability: 'runtime_proof_candidate',
   },
   {
     family: 'super_resolution',
     localPath: 'private-fixtures/super-resolution/subpixel-detail-v1/frame-04.nef',
-    rawPixlsPath: 'Nikon/D3/JD1_8206.NEF',
+    licenseNote: RAW_PIXLS_LICENSE_NOTE,
     sha256: '0626c09a58ca12ee4c12f919772abd4fd053c7d88c2f2b25e8d9be7c26cc7fd5',
+    sourceLabel: RAW_PIXLS_SOURCE_PAGE,
+    sourceUrl: sourceUrlFromRawPixlsPath('Nikon/D3/JD1_8206.NEF'),
+    suitability: 'runtime_proof_candidate',
   },
   {
     family: 'panorama_stitch',
     localPath: 'private-fixtures/panorama/overlap-stitch-v1/frame-01.raf',
-    rawPixlsPath: 'Fujifilm/X-E3/DSCF2175.RAF',
+    licenseNote: RAW_PIXLS_LICENSE_NOTE,
     sha256: 'b2aeb7fd72a9ea116b1dcc2c8a8cf5462b15757ba3aca33bad8ce36339a1642f',
+    sourceLabel: RAW_PIXLS_SOURCE_PAGE,
+    sourceUrl: sourceUrlFromRawPixlsPath('Fujifilm/X-E3/DSCF2175.RAF'),
+    suitability: 'format_smoke_only',
   },
   {
     family: 'panorama_stitch',
     localPath: 'private-fixtures/panorama/overlap-stitch-v1/frame-02.raf',
-    rawPixlsPath: 'Fujifilm/X-E3/DSCF2176.RAF',
+    licenseNote: RAW_PIXLS_LICENSE_NOTE,
     sha256: '03d6e79ae79107c51d0e1c1c9e488a0ab20268cd9fe43f47d8ea3ea310df35c6',
+    sourceLabel: RAW_PIXLS_SOURCE_PAGE,
+    sourceUrl: sourceUrlFromRawPixlsPath('Fujifilm/X-E3/DSCF2176.RAF'),
+    suitability: 'format_smoke_only',
   },
   {
     family: 'panorama_stitch',
     localPath: 'private-fixtures/panorama/overlap-stitch-v1/frame-03.raf',
-    rawPixlsPath: 'Fujifilm/GFX 50R/2019-01-24-14-02-50_DSCF1316_e819634e46ecdb8ea241012ee70ae11e5c220c48.raf',
+    licenseNote: RAW_PIXLS_LICENSE_NOTE,
     sha256: '9d0570010a36fda60823de10837c47b39d7693ad8a87e531c859cfe411e41172',
+    sourceLabel: RAW_PIXLS_SOURCE_PAGE,
+    sourceUrl: sourceUrlFromRawPixlsPath(
+      'Fujifilm/GFX 50R/2019-01-24-14-02-50_DSCF1316_e819634e46ecdb8ea241012ee70ae11e5c220c48.raf',
+    ),
+    suitability: 'format_smoke_only',
   },
 ] as const satisfies ReadonlyArray<PublicRawFixtureSource>;
 
@@ -117,10 +151,12 @@ if (!args.download) {
   console.log(`public RAW fixture plan (${selectedSources.length} files, root=${args.privateRoot})`);
   for (const source of selectedSources) {
     console.log(
-      `${source.family} ${fixtureFamilySuitability[source.family]} ${source.localPath} <= ${sourceUrl(source)}`,
+      `${source.family} ${source.suitability} ${source.localPath} <= ${source.sourceLabel}: ${source.sourceUrl}`,
     );
   }
-  console.log(RAW_PIXLS_LICENSE_NOTE);
+  for (const licenseNote of new Set(selectedSources.map((source) => source.licenseNote))) {
+    console.log(licenseNote);
+  }
 } else {
   assertDownloadAllowed(selectedSources);
   await downloadSources(selectedSources);
@@ -135,11 +171,7 @@ function parseFamilyArg(): FixtureFamily | 'all' {
 
 function assertDownloadAllowed(sources: ReadonlyArray<PublicRawFixtureSource>): void {
   const formatSmokeFamilies = [
-    ...new Set(
-      sources
-        .filter((source) => fixtureFamilySuitability[source.family] === 'format_smoke_only')
-        .map((source) => source.family),
-    ),
+    ...new Set(sources.filter((source) => source.suitability === 'format_smoke_only').map((source) => source.family)),
   ];
   if (formatSmokeFamilies.length > 0 && !args.allowFormatSmoke) {
     fail(
@@ -155,15 +187,15 @@ async function downloadSources(sources: ReadonlyArray<PublicRawFixtureSource>): 
     const existing = await readIfPresent(destination);
     if (existing !== null && sha256(existing) === source.sha256) continue;
 
-    const response = await fetch(sourceUrl(source), {
+    const response = await fetch(source.sourceUrl, {
       headers: { 'User-Agent': 'RawEngine validation fixture downloader' },
     });
-    if (!response.ok) throw new Error(`${source.rawPixlsPath}: download failed with HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`${source.sourceUrl}: download failed with HTTP ${response.status}`);
 
     const bytes = Buffer.from(await response.arrayBuffer());
     const actualSha256 = sha256(bytes);
     if (actualSha256 !== source.sha256) {
-      throw new Error(`${source.rawPixlsPath}: expected sha256 ${source.sha256}, got ${actualSha256}`);
+      throw new Error(`${source.sourceUrl}: expected sha256 ${source.sha256}, got ${actualSha256}`);
     }
     await writeFile(destination, bytes);
   }
@@ -181,8 +213,8 @@ function sha256(bytes: Buffer): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-function sourceUrl(source: PublicRawFixtureSource): string {
-  return `${RAW_PIXLS_DOWNLOAD_ROOT}/${source.rawPixlsPath.split('/').map(encodeURIComponent).join('/')}`;
+function sourceUrlFromRawPixlsPath(path: string): string {
+  return `${RAW_PIXLS_DOWNLOAD_ROOT}/${path.split('/').map(encodeURIComponent).join('/')}`;
 }
 
 function fail(message: string): never {
@@ -190,4 +222,4 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-export { RAW_PIXLS_LICENSE_NOTE, RAW_PIXLS_SOURCE_PAGE, publicRawFixtureSources };
+export { IDR_FOCUS_STACK_LICENSE_NOTE, RAW_PIXLS_LICENSE_NOTE, RAW_PIXLS_SOURCE_PAGE, publicRawFixtureSources };
