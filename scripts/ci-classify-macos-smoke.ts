@@ -102,6 +102,7 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['check:colorchecker-fixtures', new Set(['bun scripts/check-colorchecker-fixtures.ts'])],
   ['check:camera-profile-input-transform', new Set(['bun scripts/check-camera-profile-input-transform-proof.ts'])],
+  ['check:brush-mask-command', new Set(['bun scripts/check-brush-mask-command.ts'])],
   ['check:capture-sharpening', new Set(['bun scripts/check-capture-sharpening-fixtures.ts'])],
   ['check:compare-survey', new Set(['bun scripts/check-compare-survey-fixtures.ts'])],
   ['check:defringe', new Set(['bun scripts/check-defringe-fixtures.ts'])],
@@ -637,6 +638,16 @@ function runSelfTest() {
         filename: 'package.json',
         patch:
           '@@ -120,6 +120,7 @@\n+    "check:command-palette-workflows": "bun scripts/capture-visual-smoke.ts --scenario command-palette-workflows",',
+      },
+    ],
+    SMOKE_MODES.NONE,
+  );
+  assertChangeClassification(
+    'brush mask command package script changes skip smoke',
+    [
+      {
+        filename: 'package.json',
+        patch: '@@ -80,6 +80,7 @@\n+    "check:brush-mask-command": "bun scripts/check-brush-mask-command.ts",',
       },
     ],
     SMOKE_MODES.NONE,
