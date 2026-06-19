@@ -4,6 +4,7 @@ export * from './computationalMergeWarningCodes.js';
 export * from './computationalMergeRuntimeResultBuilders.js';
 export * from './focusStackAppServerRuntime.js';
 export * from './focusStackRuntimePlan.js';
+export * from './focusStackSourceValidation.js';
 export * from './focusStackWeightedBlend.js';
 export * from './derivedArtifactInvalidation.js';
 export * from './editCommandBus.js';

@@ -262,6 +262,7 @@
     "check:hdr-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario hdr-ui",
     "check:focus-fixtures": "bun scripts/check-focus-synthetic-fixtures.ts",
     "check:focus-fixtures:update": "bun scripts/check-focus-synthetic-fixtures.ts --update",
+    "check:focus-source-validation": "bun scripts/check-focus-source-validation.ts",
     "check:focus-app-server-runtime": "bun scripts/check-focus-app-server-runtime.ts",
     "check:focus-runtime-plan-smoke": "bun scripts/check-focus-runtime-plan-smoke.ts",
     "check:focus-alignment-smoke": "bun scripts/check-focus-translation-alignment-smoke.ts",
