@@ -37,7 +37,7 @@ requireMarker(files.lib, 'negative_conversion::estimate_negative_base_fog', 'com
 for (const marker of [
   'handleAutoBaseFog',
   'handleSampleBaseFog',
-  'estimate_negative_base_fog',
+  'Invokes.EstimateNegativeBaseFog',
   'invokeWithSchema',
   'negativeBaseFogEstimateSchema',
   'BASE_FOG_SAMPLE_PRESETS',
