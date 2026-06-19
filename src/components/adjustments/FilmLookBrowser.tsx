@@ -1,5 +1,6 @@
 import { ArrowLeftRight, Check, Film, Save, Share2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { TextVariants } from '../../types/typography';
 import {
@@ -22,33 +23,14 @@ type FilmLookCategoryFilter = FilmLookCategory | 'all';
 
 type FilmLookComparisonSelection = Record<FilmLookComparisonSlot, string | null>;
 
-const FILM_LOOK_BROWSER_TITLE = 'Film Looks';
-const FILM_LOOK_COMPARE_TITLE = 'A/B Compare';
-const FILM_LOOK_COMPARE_EMPTY = 'Choose look';
-const FILM_LOOK_COMPARE_SWAP_LABEL = 'Swap A/B';
 const FILM_LOOK_COMPARE_SLOT_LABELS: Record<FilmLookComparisonSlot, string> = {
   a: 'A',
   b: 'B',
 };
-const FILM_LOOK_COMPARE_APPLY_LABELS: Record<FilmLookComparisonSlot, string> = {
-  a: 'Apply A',
-  b: 'Apply B',
-};
 const FILM_LOOK_COMPARE_SLOTS: Array<FilmLookComparisonSlot> = ['a', 'b'];
-const FILM_LOOK_STRENGTH_LABEL = 'Strength';
 const FILM_LOOK_FAVORITES_STORAGE_KEY = 'rapidraw.filmLookFavorites.v1';
-const FILM_LOOK_FAVORITES_LABEL = 'Favorites';
-const FILM_LOOK_ALL_LABEL = 'All looks';
-const FILM_LOOK_CATEGORY_FILTER_LABEL = 'Look family';
-const FILM_LOOK_ALL_FAMILIES_LABEL = 'All families';
-const FILM_LOOK_EMPTY_FAVORITES = 'No favorites yet';
-const FILM_LOOK_SEARCH_LABEL = 'Search looks';
-const FILM_LOOK_EMPTY_SEARCH = 'No matching looks';
-const formatFilmLookCount = (count: number) => `${count} looks`;
 const formatFilmLookStrength = (strength: number) => `${strength}%`;
 const formatFilmLookAdjustmentValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
-const formatFilmLookSaveLabel = (displayName: string) => `Save ${displayName} as preset`;
-const formatFilmLookShareLabel = (displayName: string) => `Share ${displayName} preset`;
 const getFilmLookSwatchStyle = (look: FilmLookBrowserItem) => {
   const warmth = look.adjustmentPatch.temperature ?? 0;
   const saturation = look.adjustmentPatch.saturation ?? 0;
@@ -86,7 +68,8 @@ const readFavoriteLookIds = (): Set<string> => {
   return isStringArray(parsedFavorites) ? new Set(parsedFavorites) : new Set();
 };
 
-export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLookBrowserProps) {
+export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLookBrowserProps) {
+  const { t } = useTranslation();
   const groups = useMemo(() => getFilmLookBrowserGroups(), []);
   const looksById = useMemo(
     () => new Map(groups.flatMap((group) => group.looks.map((look): [string, FilmLookBrowserItem] => [look.id, look]))),
@@ -113,7 +96,7 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
       {
         category: 'all' as const,
         count: groups.reduce((count, group) => count + group.looks.length, 0),
-        displayName: FILM_LOOK_ALL_FAMILIES_LABEL,
+        displayName: t('adjustments.effects.filmLookBrowser.allFamilies'),
       },
       ...groups.map((group) => ({
         category: group.category,
@@ -121,7 +104,7 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
         displayName: group.displayName,
       })),
     ],
-    [groups],
+    [groups, t],
   );
   const visibleGroups = useMemo(
     () =>
@@ -216,19 +199,19 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <UiText variant={TextVariants.heading}>{FILM_LOOK_BROWSER_TITLE}</UiText>
+        <UiText variant={TextVariants.heading}>{t('adjustments.effects.filmLookBrowser.title')}</UiText>
         <UiText className="tabular-nums" variant={TextVariants.small}>
-          {formatFilmLookCount(visibleLookCount)}
+          {t('adjustments.effects.filmLookBrowser.lookCount', { count: visibleLookCount })}
         </UiText>
       </div>
 
       <input
-        aria-label={FILM_LOOK_SEARCH_LABEL}
+        aria-label={t('adjustments.effects.filmLookBrowser.search')}
         className="w-full rounded-md border border-surface bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent"
         onChange={(event) => {
           setSearchQuery(event.target.value);
         }}
-        placeholder={FILM_LOOK_SEARCH_LABEL}
+        placeholder={t('adjustments.effects.filmLookBrowser.search')}
         type="search"
         value={searchQuery}
       />
@@ -246,7 +229,7 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
           }}
           type="button"
         >
-          {FILM_LOOK_ALL_LABEL}
+          {t('adjustments.effects.filmLookBrowser.allLooks')}
         </button>
         <button
           aria-pressed={showFavoritesOnly}
@@ -260,13 +243,13 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
           }}
           type="button"
         >
-          {FILM_LOOK_FAVORITES_LABEL}
+          {t('adjustments.effects.filmLookBrowser.favorites')}
         </button>
       </div>
 
-      <section className="space-y-2" aria-label={FILM_LOOK_CATEGORY_FILTER_LABEL}>
+      <section className="space-y-2" aria-label={t('adjustments.effects.filmLookBrowser.categoryFilter')}>
         <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
-          {FILM_LOOK_CATEGORY_FILTER_LABEL}
+          {t('adjustments.effects.filmLookBrowser.categoryFilter')}
         </UiText>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {categoryTabs.map((tab) => {
@@ -287,28 +270,30 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                 type="button"
               >
                 <span className="block font-medium">{tab.displayName}</span>
-                <span className="block tabular-nums opacity-70">{formatFilmLookCount(tab.count)}</span>
+                <span className="block tabular-nums opacity-70">
+                  {t('adjustments.effects.filmLookBrowser.lookCount', { count: tab.count })}
+                </span>
               </button>
             );
           })}
         </div>
       </section>
 
-      <section className="space-y-2" aria-label={FILM_LOOK_COMPARE_TITLE}>
+      <section className="space-y-2" aria-label={t('adjustments.effects.filmLookBrowser.compareTitle')}>
         <div className="flex items-center justify-between gap-2">
           <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
-            {FILM_LOOK_COMPARE_TITLE}
+            {t('adjustments.effects.filmLookBrowser.compareTitle')}
           </UiText>
           <button
-            aria-label={FILM_LOOK_COMPARE_SWAP_LABEL}
+            aria-label={t('adjustments.effects.filmLookBrowser.compareSwap')}
             className="inline-flex items-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
-            data-tooltip={FILM_LOOK_COMPARE_SWAP_LABEL}
+            data-tooltip={t('adjustments.effects.filmLookBrowser.compareSwap')}
             disabled={comparisonSelection.a === null && comparisonSelection.b === null}
             onClick={handleSwapComparisonLooks}
             type="button"
           >
             <ArrowLeftRight size={13} aria-hidden="true" />
-            {FILM_LOOK_COMPARE_SWAP_LABEL}
+            {t('adjustments.effects.filmLookBrowser.compareSwap')}
           </button>
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -326,9 +311,9 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                   </UiText>
                   {look !== undefined && (
                     <button
-                      aria-label={`Clear compare ${slotLabel}`}
+                      aria-label={t('adjustments.effects.filmLookBrowser.clearCompare', { slot: slotLabel })}
                       className="rounded p-1 text-text-secondary hover:bg-surface hover:text-text-primary"
-                      data-tooltip={`Clear compare ${slotLabel}`}
+                      data-tooltip={t('adjustments.effects.filmLookBrowser.clearCompare', { slot: slotLabel })}
                       onClick={() => {
                         handleClearComparisonLook(slot);
                       }}
@@ -341,7 +326,7 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
 
                 {look === undefined ? (
                   <UiText variant={TextVariants.small} className="text-text-secondary">
-                    {FILM_LOOK_COMPARE_EMPTY}
+                    {t('adjustments.effects.filmLookBrowser.compareEmpty')}
                   </UiText>
                 ) : (
                   <div className="space-y-2">
@@ -366,7 +351,7 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                       }}
                       type="button"
                     >
-                      {FILM_LOOK_COMPARE_APPLY_LABELS[slot]}
+                      {t('adjustments.effects.filmLookBrowser.compareApply', { slot: slotLabel })}
                     </button>
                   </div>
                 )}
@@ -376,17 +361,17 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
         </div>
       </section>
 
-      <section className="space-y-2" aria-label={FILM_LOOK_STRENGTH_LABEL}>
+      <section className="space-y-2" aria-label={t('adjustments.effects.filmLookBrowser.strength')}>
         <div className="flex items-center justify-between gap-2">
           <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
-            {FILM_LOOK_STRENGTH_LABEL}
+            {t('adjustments.effects.filmLookBrowser.strength')}
           </UiText>
           <UiText variant={TextVariants.small} className="tabular-nums text-text-secondary">
             {formatFilmLookStrength(strengthPercent)}
           </UiText>
         </div>
         <input
-          aria-label={FILM_LOOK_STRENGTH_LABEL}
+          aria-label={t('adjustments.effects.filmLookBrowser.strength')}
           className="w-full accent-accent"
           max={100}
           min={0}
@@ -403,14 +388,14 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
         {showFavoritesOnly && favoriteLookCount === 0 && (
           <div className="rounded-md border border-dashed border-surface bg-bg-secondary p-3 text-center">
             <UiText variant={TextVariants.small} className="text-text-secondary">
-              {FILM_LOOK_EMPTY_FAVORITES}
+              {t('adjustments.effects.filmLookBrowser.emptyFavorites')}
             </UiText>
           </div>
         )}
         {visibleLookCount === 0 && !(showFavoritesOnly && favoriteLookCount === 0) && (
           <div className="rounded-md border border-dashed border-surface bg-bg-secondary p-3 text-center">
             <UiText variant={TextVariants.small} className="text-text-secondary">
-              {FILM_LOOK_EMPTY_SEARCH}
+              {t('adjustments.effects.filmLookBrowser.emptySearch')}
             </UiText>
           </div>
         )}
@@ -424,6 +409,9 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                 const isSelected = selectedLookId === look.id;
                 const isFavorite = favoriteLookIds.has(look.id);
                 const activeStrength = isSelected ? strengthPercent : look.strengthDefault;
+                const favoriteLabel = isFavorite
+                  ? t('adjustments.effects.filmLookBrowser.unfavoriteLook', { displayName: look.displayName })
+                  : t('adjustments.effects.filmLookBrowser.favoriteLook', { displayName: look.displayName });
 
                 return (
                   <div
@@ -470,12 +458,18 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
 
                         return (
                           <button
-                            aria-label={`Compare ${slotLabel}: ${look.displayName}`}
+                            aria-label={t('adjustments.effects.filmLookBrowser.compareLook', {
+                              displayName: look.displayName,
+                              slot: slotLabel,
+                            })}
                             aria-pressed={isPinned}
                             className={`rounded px-2 py-1 text-xs font-medium tabular-nums ${
                               isPinned ? 'bg-accent text-white' : 'bg-bg-tertiary text-text-secondary hover:bg-surface'
                             }`}
-                            data-tooltip={`Compare ${slotLabel}: ${look.displayName}`}
+                            data-tooltip={t('adjustments.effects.filmLookBrowser.compareLook', {
+                              displayName: look.displayName,
+                              slot: slotLabel,
+                            })}
                             key={slot}
                             onClick={() => {
                               handlePinComparisonLook(slot, look);
@@ -487,12 +481,12 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                         );
                       })}
                       <button
-                        aria-label={`${isFavorite ? 'Unfavorite' : 'Favorite'} ${look.displayName}`}
+                        aria-label={favoriteLabel}
                         aria-pressed={isFavorite}
                         className={`rounded bg-bg-tertiary px-2 py-1 text-text-secondary hover:bg-surface ${
                           isFavorite ? 'text-accent' : ''
                         }`}
-                        data-tooltip={`${isFavorite ? 'Unfavorite' : 'Favorite'} ${look.displayName}`}
+                        data-tooltip={favoriteLabel}
                         onClick={() => {
                           toggleFavoriteLook(look);
                         }}
@@ -503,9 +497,13 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                         </span>
                       </button>
                       <button
-                        aria-label={formatFilmLookSaveLabel(look.displayName)}
+                        aria-label={t('adjustments.effects.filmLookBrowser.saveLook', {
+                          displayName: look.displayName,
+                        })}
                         className="rounded bg-bg-tertiary px-2 py-1 text-text-secondary hover:bg-surface"
-                        data-tooltip={formatFilmLookSaveLabel(look.displayName)}
+                        data-tooltip={t('adjustments.effects.filmLookBrowser.saveLook', {
+                          displayName: look.displayName,
+                        })}
                         onClick={() => {
                           onSaveLook(look, activeStrength);
                         }}
@@ -514,9 +512,13 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
                         <Save size={13} aria-hidden="true" className="mx-auto" />
                       </button>
                       <button
-                        aria-label={formatFilmLookShareLabel(look.displayName)}
+                        aria-label={t('adjustments.effects.filmLookBrowser.shareLook', {
+                          displayName: look.displayName,
+                        })}
                         className="rounded bg-bg-tertiary px-2 py-1 text-text-secondary hover:bg-surface"
-                        data-tooltip={formatFilmLookShareLabel(look.displayName)}
+                        data-tooltip={t('adjustments.effects.filmLookBrowser.shareLook', {
+                          displayName: look.displayName,
+                        })}
                         onClick={() => {
                           onShareLook(look, activeStrength);
                         }}
@@ -535,3 +537,5 @@ export default function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }
     </div>
   );
 }
+
+export default FilmLookBrowser;
