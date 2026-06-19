@@ -21,6 +21,18 @@ type InitialEntryReport = {
   rawBytes: number;
 };
 
+type BundleBudgetMetric = 'gzip' | 'missing' | 'raw';
+
+type BundleBudgetFailure = {
+  actualBytes?: number;
+  assetName?: string;
+  budgetBytes?: number;
+  files?: string[];
+  label: string;
+  metric: BundleBudgetMetric;
+  nextAction: string;
+};
+
 const AssetBudgetSchema = z
   .object({
     extension: z.string().regex(/^\.[a-z0-9]+$/u),
@@ -47,6 +59,8 @@ const distIndexPath = new URL('../dist/index.html', import.meta.url);
 const budgetMode = VITE_BUNDLE_BUDGET_POLICY.budgetMode;
 
 const formatBytes = (bytes: number) => `${(bytes / 1024).toFixed(1)} KiB`;
+const reproduceCommand = 'bun run check:bundle';
+const bundleRunbook = 'docs/tooling/vite-bundle-budget-2026-06-11.md';
 
 if (process.argv.includes('--self-test')) {
   runSelfTest();
@@ -79,14 +93,18 @@ const files: BundleFile[] = await Promise.all(
     }),
 );
 
-const failures: string[] = [];
+const failures: BundleBudgetFailure[] = [];
 
 for (const budget of bundleBudget.budgets) {
   const matchingFiles = files.filter((file) => file.extension === budget.extension);
   const largest = matchingFiles.toSorted((a, b) => b.size - a.size)[0];
 
   if (!largest) {
-    failures.push(`${budget.label}: no ${budget.extension} files found in ${bundleBudget.assetsDir}`);
+    failures.push({
+      label: budget.label,
+      metric: 'missing',
+      nextAction: `Run ${reproduceCommand} locally and confirm Vite emitted ${budget.extension} assets under ${bundleBudget.assetsDir}.`,
+    });
     continue;
   }
 
@@ -99,15 +117,27 @@ for (const budget of bundleBudget.budgets) {
   console.log(line);
 
   if (largest.size > budget.maxBytes) {
-    failures.push(
-      `${budget.label}: raw size exceeded (${formatBytes(largest.size)} > ${formatBytes(budget.maxBytes)})`,
-    );
+    failures.push({
+      actualBytes: largest.size,
+      assetName: largest.name,
+      budgetBytes: budget.maxBytes,
+      label: budget.label,
+      metric: 'raw',
+      nextAction:
+        'Split startup code, remove unused code, lazy-load non-initial UI, or open a measured budget recalibration with headroom evidence.',
+    });
   }
 
   if (largest.gzipSize > budget.maxGzipBytes) {
-    failures.push(
-      `${budget.label}: gzip size exceeded (${formatBytes(largest.gzipSize)} > ${formatBytes(budget.maxGzipBytes)})`,
-    );
+    failures.push({
+      actualBytes: largest.gzipSize,
+      assetName: largest.name,
+      budgetBytes: budget.maxGzipBytes,
+      label: budget.label,
+      metric: 'gzip',
+      nextAction:
+        'Inspect dependency composition, split compressible bulk, lazy-load non-initial UI, or open a measured budget recalibration with headroom evidence.',
+    });
   }
 }
 
@@ -129,7 +159,10 @@ failures.push(...getInitialEntryFailures(initialEntryReport, initialEntryBudget)
 if (failures.length > 0) {
   console.error(`\nBundle budget exceeded for ${budgetMode}:`);
   for (const failure of failures) {
-    console.error(`- ${failure}`);
+    console.error(`- ${formatBudgetFailure(failure)}`);
+  }
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    for (const failure of failures) console.error(formatGitHubAnnotation(failure));
   }
   process.exit(1);
 }
@@ -162,24 +195,32 @@ function buildInitialEntryReport({
 function getInitialEntryFailures(
   report: InitialEntryReport,
   budget: { label: string; maxBytes: number; maxGzipBytes: number },
-): string[] {
-  const includedFileNames = report.files.map((file) => file.name).join(', ');
-  const budgetFailures: string[] = [];
+): BundleBudgetFailure[] {
+  const includedFileNames = report.files.map((file) => file.name);
+  const budgetFailures: BundleBudgetFailure[] = [];
 
   if (report.rawBytes > budget.maxBytes) {
-    budgetFailures.push(
-      `${budget.label}: raw size exceeded (${formatBytes(report.rawBytes)} > ${formatBytes(
-        budget.maxBytes,
-      )}); files: ${includedFileNames}`,
-    );
+    budgetFailures.push({
+      actualBytes: report.rawBytes,
+      budgetBytes: budget.maxBytes,
+      files: includedFileNames,
+      label: budget.label,
+      metric: 'raw',
+      nextAction:
+        'Move non-startup code behind dynamic imports, split initial-only dependencies, remove unused code, or open a measured budget recalibration with headroom evidence.',
+    });
   }
 
   if (report.gzipBytes > budget.maxGzipBytes) {
-    budgetFailures.push(
-      `${budget.label}: gzip size exceeded (${formatBytes(report.gzipBytes)} > ${formatBytes(
-        budget.maxGzipBytes,
-      )}); files: ${includedFileNames}`,
-    );
+    budgetFailures.push({
+      actualBytes: report.gzipBytes,
+      budgetBytes: budget.maxGzipBytes,
+      files: includedFileNames,
+      label: budget.label,
+      metric: 'gzip',
+      nextAction:
+        'Inspect startup dependency composition, split compressible bulk behind dynamic imports, or open a measured budget recalibration with headroom evidence.',
+    });
   }
 
   return budgetFailures;
@@ -221,6 +262,49 @@ function extractStaticImportAssetNames(source: string): Set<string> {
   return names;
 }
 
+function formatBudgetFailure(failure: BundleBudgetFailure): string {
+  const parts = [
+    `${failure.label}: ${formatMetricLabel(failure.metric)}${formatAssetSuffix(failure)}`,
+    formatBudgetDelta(failure),
+    `run ${reproduceCommand}`,
+    `see ${bundleRunbook}`,
+    `next: ${failure.nextAction}`,
+  ].filter((part) => part.length > 0);
+  return parts.join(' | ');
+}
+
+function formatMetricLabel(metric: BundleBudgetMetric): string {
+  if (metric === 'raw') return 'raw size exceeded';
+  if (metric === 'gzip') return 'gzip size exceeded';
+  return 'expected asset missing';
+}
+
+function formatAssetSuffix(failure: BundleBudgetFailure): string {
+  if (failure.assetName !== undefined) return ` for ${failure.assetName}`;
+  if (failure.files !== undefined) return ` for ${failure.files.join(', ')}`;
+  return '';
+}
+
+function formatBudgetDelta(failure: BundleBudgetFailure): string {
+  if (failure.actualBytes === undefined || failure.budgetBytes === undefined) return '';
+  const deltaBytes = failure.actualBytes - failure.budgetBytes;
+  return `${formatBytes(failure.actualBytes)} / ${formatBytes(failure.budgetBytes)} (${formatBytes(deltaBytes)} over)`;
+}
+
+function formatGitHubAnnotation(failure: BundleBudgetFailure): string {
+  const title = escapeGitHubAnnotationProperty(`Bundle budget: ${failure.label}`);
+  const message = escapeGitHubAnnotationMessage(formatBudgetFailure(failure));
+  return `::error title=${title}::${message}`;
+}
+
+function escapeGitHubAnnotationMessage(value: string): string {
+  return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+}
+
+function escapeGitHubAnnotationProperty(value: string): string {
+  return escapeGitHubAnnotationMessage(value).replaceAll(':', '%3A').replaceAll(',', '%2C');
+}
+
 function runSelfTest(): void {
   const fixtureFiles = [
     fixtureFile('entry.js', 600, 120, 'import "./static-a.js"; import("./lazy.js");'),
@@ -244,11 +328,23 @@ function runSelfTest(): void {
     maxBytes: 1_000,
     maxGzipBytes: 1_000,
   });
-  if (!aggregateFailures.some((failure) => failure.includes('entry.js') && failure.includes('static-a.js'))) {
+  const formattedFailure = aggregateFailures.map(formatBudgetFailure).join('\n');
+  if (!formattedFailure.includes('entry.js') || !formattedFailure.includes('static-a.js')) {
     throw new Error('self-test: aggregate failure did not list included static files.');
+  }
+  const annotation = formatGitHubAnnotation(aggregateFailures[0] ?? failSelfTest('aggregate failure missing.'));
+  if (!annotation.startsWith('::error title=Bundle budget%3A Initial entry aggregate::')) {
+    throw new Error('self-test: GitHub annotation format is invalid.');
+  }
+  if (!annotation.includes(reproduceCommand) || !annotation.includes(bundleRunbook)) {
+    throw new Error('self-test: annotation is missing reproduction guidance.');
   }
 
   console.log('vite bundle budget self-test ok');
+}
+
+function failSelfTest(message: string): never {
+  throw new Error(`self-test: ${message}`);
 }
 
 function fixtureFile(name: string, size: number, gzipSize: number, source: string): BundleFile {
