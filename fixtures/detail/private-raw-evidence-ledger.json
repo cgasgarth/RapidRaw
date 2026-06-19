@@ -218,6 +218,41 @@
       "camera": {
         "cameraMake": "Fujifilm",
         "cameraModel": "X-T5",
+        "lens": "XF 23mm F2 R WR",
+        "rawFormat": "raf"
+      },
+      "crop": {
+        "height": 1024,
+        "unit": "source_pixels",
+        "width": 1536,
+        "x": 1000,
+        "y": 800
+      },
+      "evidenceId": "raw-evidence.panorama.project-owned-overlap.v2",
+      "expectedUse": ["panorama_stitch", "preview_export_parity"],
+      "exposure": {
+        "aperture": 8,
+        "exposureBiasEv": 0,
+        "iso": 160,
+        "shutterSeconds": 0.004
+      },
+      "featureFamily": "panorama_stitch",
+      "notes": "Reserved project-owned private panorama acceptance sequence. Capture 3-5 ordered RAF frames with one camera/lens/focal length/RAW mode, manual exposure/WB/focus, static textured scene, 30-50% neighboring overlap, no moving subjects, no dominant repeated patterns, and near no-parallax rotation.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "Project-owned private panorama sequence must be captured or explicitly user-provided before status can become private_asset_available.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "planned_private_capture",
+      "trackingIssue": 1508
+    },
+    {
+      "artifactClass": "overlap_stitch_alignment",
+      "camera": {
+        "cameraMake": "Fujifilm",
+        "cameraModel": "X-T5",
         "lens": "XF 18mm F1.4 R LM WR",
         "rawFormat": "raf"
       },
