@@ -1,9 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CheckCircle2, Loader2, Search, Users } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, GitPullRequest, Loader2, Search, Users } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { siGithub } from 'simple-icons';
 
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
@@ -351,15 +350,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
               rel="noopener noreferrer"
               className="text-accent hover:underline inline-flex items-center gap-2"
             >
-              <span
-                dangerouslySetInnerHTML={{
-                  __html: siGithub.svg.replace(
-                    'xmlns="http://www.w3.org/2000/svg"',
-                    'xmlns="http://www.w3.org/2000/svg" fill="currentColor"',
-                  ),
-                }}
-                style={{ display: 'inline-block', width: 14, height: 14 }}
-              />
+              <GitPullRequest aria-hidden="true" size={14} />
               {t('library.community.footerLinkText')}
             </a>
           </UiText>
