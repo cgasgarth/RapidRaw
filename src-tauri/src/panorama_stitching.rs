@@ -95,6 +95,7 @@ pub struct PanoramaSourceMetadata {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PanoramaPairwiseMatchMetadata {
     pub homography3x3: [f64; 9],
+    pub homography_condition_number: Option<f64>,
     pub inlier_ratio: f64,
     pub inliers: usize,
     pub match_count: usize,
@@ -816,6 +817,7 @@ fn collect_pairwise_match_metadata(
         .map(
             |(&(source_index, target_index), match_info)| PanoramaPairwiseMatchMetadata {
                 homography3x3: matrix_to_row_major_array(&match_info.homography),
+                homography_condition_number: homography_condition_number(&match_info.homography),
                 inlier_ratio: match_info.inlier_ratio(),
                 inliers: match_info.inliers,
                 match_count: match_info.match_count,
@@ -828,6 +830,20 @@ fn collect_pairwise_match_metadata(
 
     metadata.sort_by_key(|match_info| (match_info.source_index, match_info.target_index));
     metadata
+}
+
+fn homography_condition_number(homography: &Matrix3<f64>) -> Option<f64> {
+    if !homography.iter().all(|value| value.is_finite()) {
+        return None;
+    }
+    let singular_values = homography.svd(false, false).singular_values;
+    let max_singular = singular_values.max();
+    let min_singular = singular_values.min();
+    if max_singular.is_finite() && min_singular.is_finite() && min_singular > f64::EPSILON {
+        Some(max_singular / min_singular)
+    } else {
+        None
+    }
 }
 
 fn build_pending_panorama_source_refs(paths: &[String]) -> Vec<PendingPanoramaSourceRef> {
@@ -960,6 +976,7 @@ fn upsert_panorama_artifact_metadata(
             "pairwiseMatches": metadata.pairwise_matches.iter().map(|pair| json!({
                 "fromSourceIndex": pair.source_index,
                 "homography3x3": pair.homography3x3,
+                "homographyConditionNumber": pair.homography_condition_number,
                 "inlierRatio": pair.inlier_ratio,
                 "inliers": pair.inliers,
                 "matchCount": pair.match_count,
@@ -1531,6 +1548,7 @@ mod tests {
             vec![
                 PanoramaPairwiseMatchMetadata {
                     homography3x3: matrix_to_row_major_array(&Matrix3::identity()),
+                    homography_condition_number: Some(1.0),
                     inlier_ratio: 0.7,
                     inliers: 42,
                     match_count: 60,
@@ -1540,6 +1558,7 @@ mod tests {
                 },
                 PanoramaPairwiseMatchMetadata {
                     homography3x3: matrix_to_row_major_array(&Matrix3::identity()),
+                    homography_condition_number: Some(1.0),
                     inlier_ratio: 0.7,
                     inliers: 21,
                     match_count: 30,
@@ -1826,6 +1845,7 @@ mod tests {
             output_width: 220,
             pairwise_matches: vec![PanoramaPairwiseMatchMetadata {
                 homography3x3: [1.0, 0.0, 12.0, 0.0, 1.0, 1.5, 0.0, 0.0, 1.0],
+                homography_condition_number: Some(146.009_498),
                 inlier_ratio: 0.8,
                 inliers: 32,
                 match_count: 40,

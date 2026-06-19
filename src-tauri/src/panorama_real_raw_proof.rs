@@ -270,6 +270,7 @@ struct StitchSeamDiagnostics {
 struct PairAlignmentReport {
     accepted: bool,
     finite_transform: bool,
+    homography_condition_number: Option<f64>,
     inlier_count: usize,
     inlier_ratio: f64,
     match_count: usize,
@@ -996,6 +997,7 @@ fn build_empty_alignment_report(
         .map(|source_index| PairAlignmentReport {
             accepted: false,
             finite_transform: false,
+            homography_condition_number: None,
             inlier_count: 0,
             inlier_ratio: 0.0,
             match_count: 0,
@@ -1036,6 +1038,7 @@ fn build_pair_alignment_report(
         return PairAlignmentReport {
             accepted: false,
             finite_transform: false,
+            homography_condition_number: None,
             inlier_count: 0,
             inlier_ratio: 0.0,
             match_count: 0,
@@ -1055,6 +1058,7 @@ fn build_pair_alignment_report(
     };
 
     let finite_transform = pair.homography3x3.iter().all(|value| value.is_finite());
+    let homography_condition_number = pair.homography_condition_number.map(round_metric);
     let inlier_ratio = round_metric(pair.inlier_ratio);
     let mean_reprojection_error_px = round_metric(pair.mean_reprojection_error_px);
     let mut rejected_reasons = Vec::new();
@@ -1073,6 +1077,7 @@ fn build_pair_alignment_report(
     PairAlignmentReport {
         accepted: rejected_reasons.is_empty(),
         finite_transform,
+        homography_condition_number,
         inlier_count: pair.inliers,
         inlier_ratio,
         match_count: pair.match_count,
