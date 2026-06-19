@@ -199,6 +199,7 @@ const negativeLabBatchConvertArgsSchema = z.object({
     .length(2),
 });
 const negativeLabPreviewReturnProofSchema = z.array(z.string().startsWith('data:image/svg+xml,')).min(3);
+const hdrRoutePair = getComputationalMergeAppServerRoutePairSummary('hdr');
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const focusStackRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
 
@@ -208,9 +209,10 @@ export const hdrUiSettingsProofSchema = z.object({
   toneMapPreview: z.literal('false'),
 });
 export const hdrReviewWorkspaceProofSchema = z.object({
+  applyCommand: z.literal(hdrRoutePair.applyToolName),
   artifactPath: z.literal('/tmp/rawengine-hdr-smoke.tif'),
   bracketValidation: z.literal('required'),
-  command: z.literal('hdr.merge.dry_run_command'),
+  command: z.literal(hdrRoutePair.dryRunToolName),
   deghosting: z.literal('high'),
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('3'),

@@ -283,7 +283,8 @@ const copy = {
   hdrReview: 'HDR review',
   hdrDryRunPreview: 'Dry-run preview',
   hdrArtifactHandoff: 'Artifact handoff',
-  hdrDryRunTool: 'hdr.merge.dry_run_command',
+  hdrApplyTool: getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName,
+  hdrDryRunTool: getComputationalMergeAppServerRoutePairSummary('hdr').dryRunToolName,
   hdrArtifactPath: '/tmp/rawengine-hdr-smoke.tif',
   libraryRating: (rating: number) => `Rating ${rating}`,
   libraryStars: (rating: number) => `${rating} stars`,
@@ -1133,6 +1134,7 @@ function HdrVisualSmoke() {
       <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="hdr-modal" />
       <div
         className="sr-only"
+        data-apply-command={copy.hdrApplyTool}
         data-artifact-path={copy.hdrArtifactPath}
         data-bracket-validation={hdrSettings.bracketValidation}
         data-command={copy.hdrDryRunTool}
