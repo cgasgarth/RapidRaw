@@ -387,7 +387,7 @@ function DroppableFolderItem({ folder, onContextMenu, children, onToggle, isExpa
   );
 }
 
-export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
+export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);
@@ -1255,3 +1255,5 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
     </DndContext>
   );
 }
+
+export default PresetsPanel;

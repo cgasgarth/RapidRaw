@@ -947,7 +947,7 @@ function MaskRefinementControls({
   );
 }
 
-export default function MasksPanel() {
+export function MasksPanel() {
   const { t } = useTranslation();
   const { setAdjustments, handleLutSelect } = useEditorActions();
   const { handleGenerateAiDepthMask, handleGenerateAiForegroundMask, handleGenerateAiSkyMask } = useAiMasking();
@@ -1957,6 +1957,8 @@ export default function MasksPanel() {
     </DndContext>
   );
 }
+
+export default MasksPanel;
 
 function NewMaskDropZone({ isOver }: { isOver: boolean }) {
   const { t } = useTranslation();
