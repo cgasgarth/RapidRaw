@@ -197,6 +197,7 @@ generator before the release workflow needs one.
 - [macOS signing plan](release/macos-signing-plan-2026-06-11.md)
 - [macOS notarization workflow](release/macos-notarization-workflow-2026-06-11.md)
 - [macOS package and notarization dry-run checklist](release/macos-package-notarization-dry-run-checklist-2026-06-19.md)
+- [Raw editor frontend release build contract](release/raw-editor-frontend-release-build-contract-2026-06-19.md)
 - [Release notes automation](release/release-notes-automation-2026-06-13.md)
 - [Release metadata, checksums, and SBOM](release/release-metadata-checksums-sbom-2026-06-11.md)
 
