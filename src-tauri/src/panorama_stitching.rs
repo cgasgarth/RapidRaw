@@ -637,7 +637,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
             let keypoints1: Vec<KeyPoint> = features1.iter().map(|f| f.keypoint).collect();
             let keypoints2: Vec<KeyPoint> = features2.iter().map(|f| f.keypoint).collect();
 
-            if let Some((h_small, inliers)) =
+            if let Some((_h_small, inliers)) =
                 processing::find_homography_ransac(&initial_matches, &keypoints1, &keypoints2)
                 && inliers.len() >= processing::MIN_INLIERS_FOR_CONNECTION
             {
@@ -668,7 +668,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
 
                 if let Some(h_refined) = processing::compute_homography(&inlier_points) {
                     let mean_reprojection_error_px = processing::mean_reprojection_error(
-                        &h_small,
+                        &h_refined,
                         &inliers,
                         &keypoints1,
                         &keypoints2,
