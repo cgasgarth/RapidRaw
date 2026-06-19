@@ -6,9 +6,11 @@ import {
   rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
   type RawEngineToolRegistryV1,
   type ToneColorCommandEnvelopeV1,
   type ToneColorDryRunResultV1,
+  type ToneColorMutationResultV1,
 } from './rawEngineSchemas.js';
 import { sampleToolRegistryV1 } from './samplePayloads.js';
 
@@ -54,12 +56,25 @@ export const rawEngineLocalAppServerBasicToneDryRunCommandV1Schema = toneColorCo
   },
 );
 
+export const rawEngineLocalAppServerBasicToneCommandV1Schema = toneColorCommandEnvelopeV1Schema.superRefine(
+  (command, context) => {
+    if (command.commandType !== 'toneColor.setBasicTone') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Local app-server bridge currently supports basic-tone commands only.',
+        path: ['commandType'],
+      });
+    }
+  },
+);
+
 export type RawEngineLocalAppServerToolRegistryQueryV1 = z.infer<
   typeof rawEngineLocalAppServerToolRegistryQueryV1Schema
 >;
 export type RawEngineLocalAppServerBasicToneDryRunCommandV1 = z.infer<
   typeof rawEngineLocalAppServerBasicToneDryRunCommandV1Schema
 >;
+export type RawEngineLocalAppServerBasicToneCommandV1 = z.infer<typeof rawEngineLocalAppServerBasicToneCommandV1Schema>;
 
 const BASIC_TONE_PARAMETER_DIFF_PATHS = {
   blackPoint: '/parameters/blackPoint',
@@ -97,7 +112,30 @@ const buildBasicToneDryRunResult = (
     warnings: [],
   });
 
+const buildBasicTonePlanKey = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>,
+): string => JSON.stringify([command.expectedGraphRevision, command.target, command.parameters]);
+
+const buildBasicToneMutationResult = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.setBasicTone' }>,
+): ToneColorMutationResultV1 =>
+  toneColorMutationResultV1Schema.parse({
+    appliedGraphRevision: `${command.expectedGraphRevision}:apply:${command.commandId}`,
+    changedNodeIds: [`tone_color_basic:${command.target.kind}`],
+    colorPipeline: command.colorPipeline,
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: false,
+    mutates: true,
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: [],
+  });
+
 export class RawEngineLocalAppServerBridge {
+  readonly #acceptedBasicToneDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #commandBus: EditCommandBus;
   readonly #toolRegistry: RawEngineToolRegistryV1;
 
@@ -128,13 +166,24 @@ export class RawEngineLocalAppServerBridge {
     this.#commandBus.register({
       commandType: 'toneColor.setBasicTone',
       execute: (command) => {
-        const parsedCommand = rawEngineLocalAppServerBasicToneDryRunCommandV1Schema.parse(command);
+        const parsedCommand = rawEngineLocalAppServerBasicToneCommandV1Schema.parse(command);
         if (parsedCommand.commandType !== 'toneColor.setBasicTone') {
           throw new Error('Local app-server bridge expected a basic-tone command after schema validation.');
         }
-        return buildBasicToneDryRunResult(parsedCommand);
+        if (parsedCommand.dryRun) {
+          const dryRunResult = buildBasicToneDryRunResult(parsedCommand);
+          this.#acceptedBasicToneDryRunPlanKeys.add(buildBasicTonePlanKey(parsedCommand));
+          return dryRunResult;
+        }
+
+        const planKey = buildBasicTonePlanKey(parsedCommand);
+        if (!this.#acceptedBasicToneDryRunPlanKeys.has(planKey)) {
+          throw new Error('Local app-server bridge rejected basic-tone apply without a matching dry-run.');
+        }
+
+        return buildBasicToneMutationResult(parsedCommand);
       },
-      schema: rawEngineLocalAppServerBasicToneDryRunCommandV1Schema,
+      schema: rawEngineLocalAppServerBasicToneCommandV1Schema,
     });
   }
 }
@@ -152,6 +201,6 @@ export const buildRawEngineLocalAppServerToolRegistryQuery = (
 
 export const rawEngineLocalAppServerBridgeCapabilities = Object.freeze({
   commandTypes: [RawEngineLocalAppServerCommandType.ToolRegistryQuery, 'toneColor.setBasicTone'],
-  mutatingCommands: false,
-  runtimeStatus: 'local_bridge_scaffold',
+  mutatingCommands: true,
+  runtimeStatus: 'basic_tone_dry_run_apply',
 });

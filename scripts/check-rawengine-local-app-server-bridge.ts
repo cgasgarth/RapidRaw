@@ -12,6 +12,7 @@ import {
 import {
   rawEngineToolRegistryV1Schema,
   toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
 } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 
 const failures: string[] = [];
@@ -20,8 +21,8 @@ const commandTypes = bridge.listCommandTypes();
 
 if (!commandTypes.includes('rawengine.local.toolRegistry.query')) failures.push('Tool registry query not registered.');
 if (!commandTypes.includes('toneColor.setBasicTone')) failures.push('Basic tone dry-run command not registered.');
-if (rawEngineLocalAppServerBridgeCapabilities.mutatingCommands) {
-  failures.push('Local app-server bridge scaffold must not advertise mutating commands.');
+if (!rawEngineLocalAppServerBridgeCapabilities.mutatingCommands) {
+  failures.push('Local app-server bridge must advertise the basic-tone mutating apply path.');
 }
 
 const toolRegistry = await bridge.dispatch(buildRawEngineLocalAppServerToolRegistryQuery('local_bridge_tool_registry'));
@@ -48,9 +49,24 @@ if (!dryRun.ok) {
   }
 }
 
-const rejectedApply = await bridge.dispatch(sampleToneColorApplyCommandEnvelopeV1);
-if (rejectedApply.ok || rejectedApply.reason !== 'invalid_command') {
-  failures.push('Local app-server bridge must reject apply-shaped basic tone commands.');
+const unmatchedApplyBridge = createRawEngineLocalAppServerBridge();
+const rejectedApply = await unmatchedApplyBridge.dispatch(sampleToneColorApplyCommandEnvelopeV1);
+if (rejectedApply.ok || rejectedApply.reason !== 'handler_failed') {
+  failures.push('Local app-server bridge must reject apply-shaped basic tone commands before a matching dry-run.');
+}
+
+const applied = await bridge.dispatch(sampleToneColorApplyCommandEnvelopeV1);
+if (!applied.ok) {
+  failures.push(`Basic tone apply failed after accepted dry-run: ${applied.message}`);
+} else {
+  const parsedApply = toneColorMutationResultV1Schema.parse(applied.result);
+  if (!parsedApply.mutates) failures.push('Basic tone apply result must mutate.');
+  if (parsedApply.commandId !== sampleToneColorApplyCommandEnvelopeV1.commandId) {
+    failures.push('Basic tone apply result did not preserve commandId.');
+  }
+  if (parsedApply.sourceGraphRevision !== sampleToneColorApplyCommandEnvelopeV1.expectedGraphRevision) {
+    failures.push('Basic tone apply result did not preserve source revision.');
+  }
 }
 
 const rejectedUnknown = await bridge.dispatch({ commandType: 'toneColor.setToneCurve' });
@@ -64,4 +80,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('rawengine local app-server bridge ok (tool-registry read + basic-tone dry-run)');
+console.log('rawengine local app-server bridge ok (tool-registry read + basic-tone dry-run/apply)');
