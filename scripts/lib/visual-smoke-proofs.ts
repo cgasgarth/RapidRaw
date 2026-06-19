@@ -266,6 +266,17 @@ export const superResolutionReviewWorkspaceProofSchema = z.object({
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('5'),
 });
+export const superResolutionPrivateRawReviewProofSchema = z.object({
+  applyCommand: z.literal(superResolutionRoutePair.applyToolName),
+  artifactPath: z.string().endsWith('/sr-subpixel-reconstruction.tiff'),
+  command: z.literal(superResolutionRoutePair.dryRunToolName),
+  exportReviewArtifact: z.string().endsWith('/sr-subpixel-export-review.png'),
+  fixtureId: z.literal('validation.computational-merge.super-resolution-subpixel.v1'),
+  previewArtifact: z.string().endsWith('/sr-subpixel-preview.png'),
+  resultReviewArtifact: z.string().endsWith('/sr-subpixel-result-review.png'),
+  runtimeStatus: z.literal('private_raw_app_server_apply'),
+  sourceCount: z.literal('4'),
+});
 export const layerStackWorkflowProofSchema = z.object({
   activeLayer: z.literal('Proof polish'),
   blendMode: z.literal('overlay'),
