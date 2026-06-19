@@ -41,8 +41,21 @@ interface SrPrivateRawVisualProof {
   sourceCount: string;
 }
 
+interface FocusPrivateRawVisualProof {
+  exportReviewArtifact: string;
+  exportReviewDataUrl: string;
+  fixtureId: string;
+  previewArtifact: string;
+  previewDataUrl: string;
+  resultReviewArtifact: string;
+  resultReviewDataUrl: string;
+  sourceCount: string;
+  stackPath: string;
+}
+
 declare global {
   interface Window {
+    __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawVisualProof;
     __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawVisualProof;
   }
 }
@@ -54,6 +67,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.DetailDustSpot]: DetailDustSpotVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.DetailWorkspace]: DetailWorkspaceVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser]: FilmLookVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi]: FocusPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusUi]: FocusStackVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrUi]: HdrVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
@@ -254,6 +268,12 @@ const copy = {
   focusDryRunTool: getComputationalMergeAppServerRoutePairSummary('focus_stack').dryRunToolName,
   focusArtifactPath: '/tmp/rawengine-focus-stack-smoke.tif',
   focusDepthMap: 'Depth map',
+  focusPrivateRawReview: 'Private RAW focus review',
+  focusPrivateRawRuntime: 'app-server apply proof',
+  focusPrivateRawPreview: 'RAW preview',
+  focusPrivateRawResult: 'Result review',
+  focusPrivateRawExport: 'Export review',
+  focusPrivateRawSourceSet: 'focus bracket',
   panoramaSmoke: 'Panorama UI Smoke',
   panoramaReview: 'Panorama review',
   panoramaDryRunPreview: 'Dry-run preview',
@@ -989,6 +1009,105 @@ function FocusStackVisualSmoke() {
             <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="focus-artifact-handoff">
               <p className="text-xs text-[#aab2bd]">{copy.focusArtifactHandoff}</p>
               <p>{copy.focusArtifactPath}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function FocusPrivateRawVisualSmoke() {
+  const proof = window.__RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__;
+
+  if (!proof) {
+    return (
+      <main
+        className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi}
+      >
+        <p>{copy.missingPrivateRawProofArtifacts}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi}
+    >
+      <div className="grid h-screen grid-cols-[1fr_360px] bg-[#0f1114]" data-visual-smoke-section="focus-private-raw">
+        <div className="flex min-w-0 flex-col gap-3 p-5">
+          <div className="flex h-11 items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+            <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+              {copy.focusPrivateRawReview}
+            </span>
+          </div>
+          <div className="grid min-h-0 flex-1 grid-cols-[1fr_1fr] gap-3">
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.focusPrivateRawPreview}</figcaption>
+              <img
+                alt={copy.focusPrivateRawPreview}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="focus-private-raw-preview"
+                src={proof.previewDataUrl}
+              />
+            </figure>
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.focusPrivateRawResult}</figcaption>
+              <img
+                alt={copy.focusPrivateRawResult}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="focus-private-raw-result"
+                src={proof.resultReviewDataUrl}
+              />
+            </figure>
+          </div>
+          <figure className="h-56 rounded-md border border-white/10 bg-[#15191e] p-3">
+            <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.focusPrivateRawExport}</figcaption>
+            <img
+              alt={copy.focusPrivateRawExport}
+              className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+              data-testid="focus-private-raw-export"
+              src={proof.exportReviewDataUrl}
+            />
+          </figure>
+        </div>
+        <aside className="border-l border-white/10 bg-[#171a1f] p-4 text-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{copy.focusReview}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.focusPrivateRawRuntime}</span>
+          </div>
+          <div
+            className="sr-only"
+            data-apply-command={copy.focusApplyTool}
+            data-artifact-path={proof.stackPath}
+            data-command={copy.focusDryRunTool}
+            data-export-review-artifact={proof.exportReviewArtifact}
+            data-fixture-id={proof.fixtureId}
+            data-preview-artifact={proof.previewArtifact}
+            data-result-review-artifact={proof.resultReviewArtifact}
+            data-runtime-status="private_raw_app_server_apply"
+            data-source-count={proof.sourceCount}
+            data-testid="focus-private-raw-review-proof"
+          />
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.focusDryRunTool}</p>
+              <p>{proof.fixtureId}</p>
+            </div>
+            <div
+              className="rounded border border-white/10 bg-white/5 p-2"
+              data-testid="focus-private-raw-artifact-handoff"
+            >
+              <p className="text-xs text-[#aab2bd]">{copy.focusArtifactHandoff}</p>
+              <p className="break-all">{proof.stackPath}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.focusPrivateRawSourceSet}</p>
+              <p>{copy.privateRawFrameCount(proof.sourceCount)}</p>
             </div>
           </div>
         </aside>

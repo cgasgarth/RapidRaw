@@ -21,6 +21,7 @@ import {
   detailDustSpotProofSchema,
   detailWorkspaceProofSchema,
   focusReviewWorkspaceProofSchema,
+  focusPrivateRawReviewProofSchema,
   focusUiSettingsProofSchema,
   hdrReviewWorkspaceProofSchema,
   hdrUiSettingsProofSchema,
@@ -55,6 +56,9 @@ const selectedScenarios =
 const requiresSrPrivateRawProof = selectedScenarios.some(
   (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi,
 );
+const requiresFocusPrivateRawProof = selectedScenarios.some(
+  (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi,
+);
 
 if (selectedScenarios.length === 0) {
   throw new Error(`Unknown visual smoke scenario: ${requestedScenario ?? '<missing>'}`);
@@ -75,8 +79,22 @@ interface SrPrivateRawBrowserProof {
   sourceCount: string;
 }
 
+interface FocusPrivateRawBrowserProof {
+  artifactRoot: string;
+  exportReviewArtifact: string;
+  exportReviewDataUrl: string;
+  fixtureId: string;
+  previewArtifact: string;
+  previewDataUrl: string;
+  resultReviewArtifact: string;
+  resultReviewDataUrl: string;
+  sourceCount: string;
+  stackPath: string;
+}
+
 declare global {
   interface Window {
+    __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawBrowserProof;
     __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawBrowserProof;
   }
 }
@@ -154,6 +172,26 @@ async function loadSrPrivateRawProof(): Promise<SrPrivateRawBrowserProof> {
     resultReviewArtifact,
     resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
     sourceCount: '4',
+  };
+}
+
+async function loadFocusPrivateRawProof(): Promise<FocusPrivateRawBrowserProof> {
+  const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
+  const artifactRoot = `${privateRoot}/private-artifacts/validation/computational-merge`;
+  const previewArtifact = `${artifactRoot}/focus-plane-preview.png`;
+  const resultReviewArtifact = `${artifactRoot}/focus-plane-result-review.png`;
+  const exportReviewArtifact = `${artifactRoot}/focus-plane-export-review.png`;
+  return {
+    artifactRoot,
+    exportReviewArtifact,
+    exportReviewDataUrl: await readPngDataUrl(exportReviewArtifact),
+    fixtureId: 'validation.computational-merge.focus-plane-transition.v1',
+    previewArtifact,
+    previewDataUrl: await readPngDataUrl(previewArtifact),
+    resultReviewArtifact,
+    resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
+    sourceCount: '3',
+    stackPath: `${artifactRoot}/focus-plane-merge.tiff`,
   };
 }
 
@@ -269,6 +307,24 @@ async function prepareScenario(page, mode) {
     await page
       .getByTestId('focus-artifact-handoff')
       .getByText('/tmp/rawengine-focus-stack-smoke.tif', { exact: true })
+      .waitFor({ timeout: 10_000 });
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi) {
+    focusPrivateRawReviewProofSchema.parse(
+      await page.getByTestId('focus-private-raw-review-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    for (const testId of ['focus-private-raw-preview', 'focus-private-raw-result', 'focus-private-raw-export']) {
+      const loaded = await page.getByTestId(testId).evaluate((element) => {
+        const image = element as HTMLImageElement;
+        return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+      });
+      if (!loaded) throw new Error(`${testId} did not load a nonblank private RAW image.`);
+    }
+    await page
+      .getByTestId('focus-private-raw-artifact-handoff')
+      .getByText('focus-plane-merge.tiff', { exact: false })
       .waitFor({ timeout: 10_000 });
     return;
   }
@@ -830,6 +886,14 @@ async function main() {
           window.__RAWENGINE_SR_PRIVATE_RAW_PROOF__ = proof;
         },
         await loadSrPrivateRawProof(),
+      );
+    }
+    if (requiresFocusPrivateRawProof) {
+      await page.addInitScript(
+        (proof: FocusPrivateRawBrowserProof) => {
+          window.__RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__ = proof;
+        },
+        await loadFocusPrivateRawProof(),
       );
     }
 

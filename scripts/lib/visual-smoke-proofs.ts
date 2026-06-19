@@ -250,6 +250,17 @@ export const focusReviewWorkspaceProofSchema = z.object({
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('6'),
 });
+export const focusPrivateRawReviewProofSchema = z.object({
+  applyCommand: z.literal(focusStackRoutePair.applyToolName),
+  artifactPath: z.string().endsWith('/focus-plane-merge.tiff'),
+  command: z.literal(focusStackRoutePair.dryRunToolName),
+  exportReviewArtifact: z.string().endsWith('/focus-plane-export-review.png'),
+  fixtureId: z.literal('validation.computational-merge.focus-plane-transition.v1'),
+  previewArtifact: z.string().endsWith('/focus-plane-preview.png'),
+  resultReviewArtifact: z.string().endsWith('/focus-plane-result-review.png'),
+  runtimeStatus: z.literal('private_raw_app_server_apply'),
+  sourceCount: z.literal('3'),
+});
 export const superResolutionUiSettingsProofSchema = z.object({
   alignmentMode: z.literal('optical_flow'),
   detailPolicy: z.literal('aggressive_preview_only'),
