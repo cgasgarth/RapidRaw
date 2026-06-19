@@ -2609,8 +2609,19 @@ export const panoramaAlignmentV1Schema = z
 
 export const panoramaExposureNormalizationV1Schema = z
   .object({
+    appliedGainCount: z.number().int().nonnegative().optional(),
+    appliedLuminanceGains: z
+      .array(
+        z
+          .object({
+            gain: z.number().positive(),
+            sourceIndex: z.number().int().nonnegative(),
+          })
+          .strict(),
+      )
+      .optional(),
     deferredReason: z.string().trim().min(1).optional(),
-    mode: z.enum(['none', 'planned', 'gain_offset_v1']),
+    mode: z.enum(['none', 'planned', 'gain_offset_v1', 'scalar_overlap_luminance_gain_v1']),
     overlapMetrics: z
       .object({
         channelRatioDeltaAfter: z.number().nonnegative().optional(),
@@ -2644,7 +2655,20 @@ export const panoramaExposureNormalizationV1Schema = z
   .refine((settings) => settings.support !== 'implemented_current_engine' || settings.deferredReason === undefined, {
     message: 'Implemented exposure normalization must not include deferredReason.',
     path: ['deferredReason'],
-  });
+  })
+  .refine(
+    (settings) =>
+      settings.mode !== 'scalar_overlap_luminance_gain_v1' ||
+      (settings.support === 'implemented_current_engine' &&
+        settings.appliedGainCount !== undefined &&
+        settings.appliedGainCount > 0 &&
+        settings.appliedLuminanceGains !== undefined &&
+        settings.appliedLuminanceGains.length === settings.appliedGainCount),
+    {
+      message: 'Scalar overlap gain metadata requires implemented support and applied gain details.',
+      path: ['appliedLuminanceGains'],
+    },
+  );
 
 export const panoramaSeamPolicyV1Schema = z
   .object({

@@ -1484,6 +1484,21 @@ expectInvalid('panorama artifact with duplicate source indexes', panoramaArtifac
   })),
 });
 
+expectInvalid('panorama artifact with scalar exposure gain missing applied details', panoramaArtifactV1Schema, {
+  ...samplePanoramaArtifactV1,
+  engine: {
+    ...samplePanoramaArtifactV1.engine,
+    capabilities: {
+      ...samplePanoramaArtifactV1.engine.capabilities,
+      exposureNormalization: true,
+    },
+  },
+  exposureNormalization: {
+    mode: 'scalar_overlap_luminance_gain_v1',
+    support: 'implemented_current_engine',
+  },
+});
+
 expectEqual(
   'panorama sample artifact and backend capability report share capabilities',
   samplePanoramaArtifactV1.engine.capabilities,
