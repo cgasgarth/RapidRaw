@@ -309,7 +309,6 @@ fn run_private_alignment_proof(private_root: &Path) -> Result<(), String> {
         &render_result.metadata,
         &graph_revision_hash,
         CONFIG.fixture_id,
-        loaded_sources.len(),
     );
     let alignment_metrics = build_alignment_metrics(&alignment_report, loaded_sources.len());
     let metrics = [decode_metrics, alignment_metrics].concat();
@@ -391,7 +390,6 @@ fn run_private_stitch_artifact_proof(private_root: &Path) -> Result<(), String> 
         &render_result.metadata,
         &graph_revision_hash,
         CONFIG.fixture_id,
-        loaded_sources.len(),
     );
     let stitch_output_path = output_dir.join(STITCH_OUTPUT_FILE);
     render_result
@@ -491,7 +489,6 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
         &render_result.metadata,
         &graph_revision_hash,
         CONFIG.fixture_id,
-        loaded_sources.len(),
     );
     let stitch_output_path = output_dir.join(STITCH_OUTPUT_FILE);
     let preview_output_path = output_dir.join(PREVIEW_OUTPUT_FILE);
@@ -555,12 +552,6 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
         )],
     ]
     .concat();
-    if !metrics.iter().all(|metric| metric.passed) {
-        return Err(format!(
-            "panorama private RAW preview/export metrics did not pass: {}",
-            failed_metric_summary(&metrics)
-        ));
-    }
 
     write_decode_report(
         &output_dir,
@@ -583,6 +574,13 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
             &CONFIG,
         ),
     )?;
+
+    if !metrics.iter().all(|metric| metric.passed) {
+        return Err(format!(
+            "panorama private RAW preview/export metrics did not pass: {}",
+            failed_metric_summary(&metrics)
+        ));
+    }
 
     write_json(
         &output_dir.join(CONFIG.report_file),
@@ -663,7 +661,6 @@ fn run_private_stress_candidate_diagnostic(private_root: &Path) -> Result<(), St
                 &result.metadata,
                 &graph_revision_hash,
                 STRESS_CONFIG.fixture_id,
-                loaded_sources.len(),
             )
         })
         .unwrap_or_else(|| {
@@ -836,7 +833,7 @@ fn build_runtime_offsets(metadata: &PanoramaRenderMetadata) -> Vec<(u32, i32)> {
         .map(|source| {
             source
                 .global_transform_3x3
-                .map(|transform| (transform[2], transform[5]))
+                .map(projected_origin_offset)
                 .unwrap_or((0.0, 0.0))
         })
         .collect();
@@ -851,13 +848,30 @@ fn build_runtime_offsets(metadata: &PanoramaRenderMetadata) -> Vec<(u32, i32)> {
 
     translations
         .iter()
-        .map(|(x, y)| {
-            (
-                (x - min_x).round().max(0.0) as u32,
-                (y - min_y).round() as i32,
-            )
-        })
+        .map(|(x, y)| (round_to_nonnegative_u32(x - min_x), round_to_i32(y - min_y)))
         .collect()
+}
+
+fn projected_origin_offset(transform: [f64; 9]) -> (f64, f64) {
+    let z = transform[8];
+    if !z.is_finite() || z.abs() < 1e-8 {
+        return (0.0, 0.0);
+    }
+    let x = transform[2] / z;
+    let y = transform[5] / z;
+    if x.is_finite() && y.is_finite() {
+        (x, y)
+    } else {
+        (0.0, 0.0)
+    }
+}
+
+fn round_to_nonnegative_u32(value: f64) -> u32 {
+    value.round().clamp(0.0, u32::MAX as f64) as u32
+}
+
+fn round_to_i32(value: f64) -> i32 {
+    value.round().clamp(i32::MIN as f64, i32::MAX as f64) as i32
 }
 
 fn build_stitch_report(
@@ -927,15 +941,15 @@ fn build_alignment_report_from_render_metadata(
     metadata: &PanoramaRenderMetadata,
     graph_revision_hash: &str,
     fixture_id: &str,
-    source_count: usize,
 ) -> AlignmentReport {
-    let pair_reports = (0..source_count.saturating_sub(1))
-        .map(|source_index| {
-            let source_index_b = source_index + 1;
+    let pair_reports = metadata
+        .selected_match_edges
+        .iter()
+        .map(|edge| {
             let pair = metadata.pairwise_matches.iter().find(|pair| {
-                pair.source_index == source_index && pair.target_index == source_index_b
+                pair.source_index == edge.source_index && pair.target_index == edge.target_index
             });
-            build_pair_alignment_report(source_index, source_index_b, pair)
+            build_pair_alignment_report(edge.source_index, edge.target_index, pair)
         })
         .collect();
 
