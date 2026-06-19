@@ -47,6 +47,7 @@
     "check:command-replay-render": "bun scripts/check-command-replay-render-proof.ts",
     "check:headless-render-command": "bun scripts/check-headless-render-command.ts",
     "check:basic-tone-command-bridge": "bun scripts/check-basic-tone-command-bridge.ts",
+    "check:agent-basic-tone-apply-proof": "bun scripts/check-agent-basic-tone-apply-proof.ts",
     "check:tone-color-app-server-routes": "bun scripts/check-tone-color-app-server-routes.ts",
     "check:derived-artifact-invalidation": "bun scripts/check-derived-artifact-invalidation.ts",
     "check:tauri-schema-validation": "bun scripts/check-tauri-schema-validation.ts",
