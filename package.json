@@ -96,6 +96,7 @@
     "check:mask-refine-controls": "bun scripts/check-mask-refinement-controls.ts",
     "check:mask-refine-command-ui": "bun scripts/check-mask-refinement-command-ui.ts",
     "check:mask-overlay": "bun scripts/check-mask-overlay-modes.ts",
+    "check:mask-overlay-raw-proof": "bun scripts/capture-visual-smoke.ts --scenario mask-overlay-raw-proof",
     "check:mask-copy-paste": "bun scripts/check-mask-copy-paste.ts",
     "check:ai-mask-capabilities": "bun scripts/check-ai-mask-capabilities.ts",
     "check:ai-people-masks": "bun scripts/check-ai-people-mask-contract.ts",

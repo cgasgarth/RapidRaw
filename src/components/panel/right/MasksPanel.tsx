@@ -161,7 +161,7 @@ interface MaskOverlayReviewControlsProps {
   settings: MaskOverlaySettings;
 }
 
-function MaskOverlayReviewControls({ onChange, onDragStateChange, settings }: MaskOverlayReviewControlsProps) {
+export function MaskOverlayReviewControls({ onChange, onDragStateChange, settings }: MaskOverlayReviewControlsProps) {
   const { t } = useTranslation();
   const isEnabled = settings.mode !== 'hidden';
   const activeMode = isEnabled ? settings.mode : 'rubylith';
