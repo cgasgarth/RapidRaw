@@ -9,6 +9,7 @@ export * from './focusStackWeightedBlend.js';
 export * from './derivedArtifactInvalidation.js';
 export * from './editCommandBus.js';
 export * from './editGraphMigrations.js';
+export * from './exportRecipeSchemas.js';
 export * from './hdrAlignmentRuntime.js';
 export * from './hdrAppServerRuntime.js';
 export * from './hdrBracketDetection.js';
