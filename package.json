@@ -72,6 +72,7 @@
     "check:local-contrast-controls": "bun scripts/check-local-contrast-controls.ts",
     "check:selective-color-mask": "bun scripts/check-selective-color-mask-fixtures.ts",
     "check:layer-stack": "bun scripts/check-layer-stack-operations.ts",
+    "check:layer-blend-runtime": "bun scripts/check-layer-blend-runtime.ts",
     "check:layer-multiply-screen-runtime": "bun scripts/check-layer-multiply-screen-runtime.ts",
     "check:layer-normal-opacity-runtime": "bun scripts/check-layer-normal-opacity-runtime.ts",
     "check:layer-overlay-soft-light-runtime": "bun scripts/check-layer-overlay-soft-light-runtime.ts",
