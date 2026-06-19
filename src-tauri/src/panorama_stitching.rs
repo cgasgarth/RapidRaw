@@ -1158,6 +1158,17 @@ fn panorama_exposure_normalization_metadata(
         })
         .collect();
 
+    if applied_gains.is_empty() {
+        return json!({
+            "appliedGainCount": 0,
+            "appliedLuminanceGains": [],
+            "deferredReason": "Scalar overlap luminance gain was skipped because no overlap gain applications were produced.",
+            "mode": "none",
+            "skippedReason": "insufficient_overlap",
+            "support": "schema_only_deferred",
+        });
+    }
+
     json!({
         "appliedGainCount": applied_gains.len(),
         "appliedLuminanceGains": applied_gains,
@@ -2017,6 +2028,69 @@ mod tests {
         assert_eq!(
             artifact["exposureNormalization"]["appliedLuminanceGains"][0]["gain"],
             1.125
+        );
+    }
+
+    #[test]
+    fn write_panorama_output_sidecar_records_skipped_exposure_gain() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let output_path = temp_dir.path().join("IMG_0001_Pano.tiff");
+        fs::write(&output_path, b"panorama-output").expect("output should be written");
+        let mut metadata = sample_render_metadata();
+        metadata.blend_diagnostics.overlap_gain_applications.clear();
+        let source_refs = vec![
+            PendingPanoramaSourceRef {
+                image_path: temp_dir
+                    .path()
+                    .join("IMG_0001.CR3")
+                    .to_string_lossy()
+                    .into_owned(),
+                raw_defaults_applied: true,
+                source_index: 0,
+                virtual_copy_id: None,
+            },
+            PendingPanoramaSourceRef {
+                image_path: temp_dir
+                    .path()
+                    .join("IMG_0002.CR3")
+                    .to_string_lossy()
+                    .into_owned(),
+                raw_defaults_applied: true,
+                source_index: 1,
+                virtual_copy_id: None,
+            },
+        ];
+
+        write_panorama_output_sidecar(&output_path, &metadata, &source_refs)
+            .expect("sidecar should be written");
+
+        let sidecar_path = output_path.with_file_name("IMG_0001_Pano.tiff.rrdata");
+        let sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+        let artifacts = sidecar
+            .raw_engine_artifacts
+            .expect("raw engine artifacts should be present");
+        let artifact = &artifacts.panorama_artifacts[0];
+
+        assert_eq!(
+            artifact["engine"]["capabilities"]["exposureNormalization"],
+            false
+        );
+        assert_eq!(artifact["exposureNormalization"]["mode"], "none");
+        assert_eq!(
+            artifact["exposureNormalization"]["support"],
+            "schema_only_deferred"
+        );
+        assert_eq!(
+            artifact["exposureNormalization"]["skippedReason"],
+            "insufficient_overlap"
+        );
+        assert_eq!(artifact["exposureNormalization"]["appliedGainCount"], 0);
+        assert_eq!(
+            artifact["exposureNormalization"]["appliedLuminanceGains"]
+                .as_array()
+                .expect("applied gains should be an array")
+                .len(),
+            0
         );
     }
 
