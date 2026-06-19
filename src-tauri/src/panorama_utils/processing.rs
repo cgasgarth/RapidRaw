@@ -2,7 +2,7 @@ use crate::panorama_stitching::{BRIEF_DESCRIPTOR_SIZE, Descriptor, Feature, KeyP
 use image::{GrayImage, ImageBuffer, Luma};
 use imageproc::corners::{Corner, corners_fast9};
 use imageproc::filter::gaussian_blur_f32;
-use nalgebra::{Matrix3, Point2, SVD};
+use nalgebra::{Matrix3, Point2, SymmetricEigen};
 use rand::prelude::*;
 use rayon::prelude::*;
 
@@ -358,8 +358,16 @@ pub fn compute_homography(points: &[(Point2<f64>, Point2<f64>)]) -> Option<Matri
     if correspondence_set_is_degenerate(points) {
         return None;
     }
+    let source_points = points.iter().map(|point| point.0).collect::<Vec<_>>();
+    let target_points = points.iter().map(|point| point.1).collect::<Vec<_>>();
+    let (normalized_source_points, source_transform) = normalize_points(&source_points)?;
+    let (normalized_target_points, target_transform) = normalize_points(&target_points)?;
+
     let mut a_rows = Vec::with_capacity(points.len() * 2);
-    for (p1, p2) in points {
+    for (p1, p2) in normalized_source_points
+        .iter()
+        .zip(normalized_target_points.iter())
+    {
         let (x, y) = (p1.x, p1.y);
         let (xp, yp) = (p2.x, p2.y);
         a_rows.push(nalgebra::RowDVector::from_vec(vec![
@@ -386,10 +394,74 @@ pub fn compute_homography(points: &[(Point2<f64>, Point2<f64>)]) -> Option<Matri
         ]));
     }
     let a = nalgebra::DMatrix::from_rows(&a_rows);
-    let svd = SVD::new(a, true, true);
-    let v_t = svd.v_t.expect("SVD failed to compute V_t");
-    let h_vec = v_t.row(v_t.nrows() - 1).transpose();
-    Some(Matrix3::from_iterator(h_vec.iter().cloned()).transpose())
+    let normal_matrix = a.transpose() * a;
+    let eigendecomposition = SymmetricEigen::new(normal_matrix);
+    let smallest_eigenvalue_index = eigendecomposition
+        .eigenvalues
+        .iter()
+        .enumerate()
+        .min_by(|(_, left), (_, right)| left.total_cmp(right))
+        .map(|(index, _)| index)?;
+    let h_vec = eigendecomposition
+        .eigenvectors
+        .column(smallest_eigenvalue_index)
+        .clone_owned();
+    let normalized_homography = Matrix3::from_iterator(h_vec.iter().cloned()).transpose();
+    let target_transform_inv = target_transform.try_inverse()?;
+    normalize_homography_scale(target_transform_inv * normalized_homography * source_transform)
+}
+
+fn normalize_points(points: &[Point2<f64>]) -> Option<(Vec<Point2<f64>>, Matrix3<f64>)> {
+    if points.is_empty() {
+        return None;
+    }
+    let center_x = points.iter().map(|point| point.x).sum::<f64>() / points.len() as f64;
+    let center_y = points.iter().map(|point| point.y).sum::<f64>() / points.len() as f64;
+    let mean_distance = points
+        .iter()
+        .map(|point| ((point.x - center_x).powi(2) + (point.y - center_y).powi(2)).sqrt())
+        .sum::<f64>()
+        / points.len() as f64;
+    if !mean_distance.is_finite() || mean_distance <= f64::EPSILON {
+        return None;
+    }
+
+    let scale = 2.0_f64.sqrt() / mean_distance;
+    let transform = Matrix3::new(
+        scale,
+        0.0,
+        -scale * center_x,
+        0.0,
+        scale,
+        -scale * center_y,
+        0.0,
+        0.0,
+        1.0,
+    );
+    let normalized_points = points
+        .iter()
+        .map(|point| {
+            let normalized = transform * nalgebra::Point3::new(point.x, point.y, 1.0);
+            Point2::new(normalized.x / normalized.z, normalized.y / normalized.z)
+        })
+        .collect();
+
+    Some((normalized_points, transform))
+}
+
+fn normalize_homography_scale(homography: Matrix3<f64>) -> Option<Matrix3<f64>> {
+    if !homography.iter().all(|value| value.is_finite()) {
+        return None;
+    }
+    if homography[(2, 2)].abs() > f64::EPSILON {
+        return Some(homography / homography[(2, 2)]);
+    }
+    let norm = homography.norm();
+    if norm.is_finite() && norm > f64::EPSILON {
+        Some(homography / norm)
+    } else {
+        None
+    }
 }
 
 fn convert_gray_u8_to_f32(img: &GrayImage) -> ImageBuffer<Luma<f32>, Vec<f32>> {
@@ -552,6 +624,54 @@ mod tests {
         ];
 
         assert!(compute_homography(&points).is_none());
+    }
+
+    #[test]
+    fn compute_homography_recovers_large_coordinate_translation() {
+        let points = vec![
+            (
+                Point2::new(10_000.0, 20_000.0),
+                Point2::new(10_125.0, 19_950.0),
+            ),
+            (
+                Point2::new(16_000.0, 20_500.0),
+                Point2::new(16_125.0, 20_450.0),
+            ),
+            (
+                Point2::new(10_500.0, 25_500.0),
+                Point2::new(10_625.0, 25_450.0),
+            ),
+            (
+                Point2::new(16_500.0, 26_000.0),
+                Point2::new(16_625.0, 25_950.0),
+            ),
+            (
+                Point2::new(13_000.0, 23_200.0),
+                Point2::new(13_125.0, 23_150.0),
+            ),
+        ];
+
+        let homography = compute_homography(&points).expect("translation homography");
+
+        assert!((homography[(0, 2)] - 125.0).abs() < 1e-6);
+        assert!((homography[(1, 2)] + 50.0).abs() < 1e-6);
+        assert!((homography[(2, 2)] - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn compute_homography_recovers_exact_four_point_translation() {
+        let points = vec![
+            (Point2::new(0.0, 0.0), Point2::new(125.0, -50.0)),
+            (Point2::new(4000.0, 0.0), Point2::new(4125.0, -50.0)),
+            (Point2::new(0.0, 3000.0), Point2::new(125.0, 2950.0)),
+            (Point2::new(4000.0, 3000.0), Point2::new(4125.0, 2950.0)),
+        ];
+
+        let homography = compute_homography(&points).expect("four-point translation homography");
+
+        assert!((homography[(0, 2)] - 125.0).abs() < 1e-6);
+        assert!((homography[(1, 2)] + 50.0).abs() < 1e-6);
+        assert!((homography[(2, 2)] - 1.0).abs() < 1e-9);
     }
 
     #[test]
