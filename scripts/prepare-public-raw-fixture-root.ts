@@ -13,10 +13,12 @@ const RAW_PIXLS_LICENSE_NOTE =
   'raw.pixls.us upload declaration releases submitted files into the public domain; this script stores local validation copies only.';
 const IDR_FOCUS_STACK_LICENSE_NOTE =
   'IDR idr0134 / BioImage Archive S-BIAD188 is CC BY 4.0; this script stores local validation copies only.';
+const PIXLS_IR_PANORAMA_LICENSE_NOTE =
+  'Pixls Play Raw infrared panorama thread files are CC BY-SA; this script stores local stress-candidate validation copies only.';
 
 const fixtureFamilySchema = z.enum(['focus_stack', 'panorama_stitch', 'super_resolution']);
 type FixtureFamily = z.infer<typeof fixtureFamilySchema>;
-type FixtureSuitability = 'format_smoke_only' | 'runtime_proof_candidate';
+type FixtureSuitability = 'format_smoke_only' | 'runtime_proof_candidate' | 'stress_candidate_not_accepted';
 
 interface PublicRawFixtureSource {
   family: FixtureFamily;
@@ -123,6 +125,42 @@ const publicRawFixtureSources = [
       'Fujifilm/GFX 50R/2019-01-24-14-02-50_DSCF1316_e819634e46ecdb8ea241012ee70ae11e5c220c48.raf',
     ),
     suitability: 'format_smoke_only',
+  },
+  {
+    family: 'panorama_stitch',
+    localPath: 'private-fixtures/panorama/stress-pixls-ir-v1/frame-01.arw',
+    licenseNote: PIXLS_IR_PANORAMA_LICENSE_NOTE,
+    sha256: '6ff3306d1b96fb6167209154f35b82b24f5cbce10b1f36b91b935d8a84111908',
+    sourceLabel: 'Pixls Play Raw infrared panorama thread',
+    sourceUrl: 'https://discuss.pixls.us/uploads/short-url/nJZkxLTPSeKWd1ObE2ArbeKwyHW.ARW',
+    suitability: 'stress_candidate_not_accepted',
+  },
+  {
+    family: 'panorama_stitch',
+    localPath: 'private-fixtures/panorama/stress-pixls-ir-v1/frame-02.arw',
+    licenseNote: PIXLS_IR_PANORAMA_LICENSE_NOTE,
+    sha256: 'ef8df7635dc81795a8cf86ea32fde5c1199931c6e4a92749cfddc98d6582d69a',
+    sourceLabel: 'Pixls Play Raw infrared panorama thread',
+    sourceUrl: 'https://discuss.pixls.us/uploads/short-url/685WsnCE0ifQpnV0rBps0L2S4dn.ARW',
+    suitability: 'stress_candidate_not_accepted',
+  },
+  {
+    family: 'panorama_stitch',
+    localPath: 'private-fixtures/panorama/stress-pixls-ir-v1/frame-03.arw',
+    licenseNote: PIXLS_IR_PANORAMA_LICENSE_NOTE,
+    sha256: '473208ca1bfaac2a56181f899c66cc17412424742d5d81d6a777223d34a96db0',
+    sourceLabel: 'Pixls Play Raw infrared panorama thread',
+    sourceUrl: 'https://discuss.pixls.us/uploads/short-url/lpXHc3S2DFipH1Dl13SDGcR0pfk.ARW',
+    suitability: 'stress_candidate_not_accepted',
+  },
+  {
+    family: 'panorama_stitch',
+    localPath: 'private-fixtures/panorama/stress-pixls-ir-v1/frame-04.arw',
+    licenseNote: PIXLS_IR_PANORAMA_LICENSE_NOTE,
+    sha256: 'a5265f3cf383676b5d659fe54e3fe693ed42bc00e2a19b361b9b8a03e5289050',
+    sourceLabel: 'Pixls Play Raw infrared panorama thread',
+    sourceUrl: 'https://discuss.pixls.us/uploads/short-url/vDDBf8Evy7T8oHF2MwBUDQgrY9E.ARW',
+    suitability: 'stress_candidate_not_accepted',
   },
 ] as const satisfies ReadonlyArray<PublicRawFixtureSource>;
 

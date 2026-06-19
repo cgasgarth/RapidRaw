@@ -12,6 +12,7 @@ const argsSchema = z
     privateRoot: z.string().trim().min(1),
     requireAssets: z.boolean(),
     selfTest: z.boolean(),
+    stressCandidate: z.boolean(),
   })
   .strict();
 
@@ -25,6 +26,11 @@ export interface ComputationalPrivateRootPrepConfig {
   issue: number;
   minSources: number;
   sourceLabel: string;
+  stressCandidate?: {
+    expectedExtension: string;
+    sourceLabel: string;
+    sourceRelativePaths: ReadonlyArray<string>;
+  };
   tempPrefix: string;
 }
 
@@ -42,6 +48,7 @@ export async function runComputationalPrivateRootPrep(config: ComputationalPriva
     privateRoot: process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? DEFAULT_PRIVATE_ROOT,
     requireAssets: process.argv.includes('--require-assets'),
     selfTest: process.argv.includes('--self-test'),
+    stressCandidate: process.argv.includes('--stress-candidate'),
   });
 
   if (args.selfTest) {
@@ -50,6 +57,16 @@ export async function runComputationalPrivateRootPrep(config: ComputationalPriva
     return;
   }
 
+  if (args.stressCandidate) {
+    const result = await prepareStressCandidateRoot(config, args.privateRoot, args.requireAssets);
+    if (!result.ok) {
+      console.error(`${config.featureLabel} real RAW stress-candidate prep failed`);
+      console.error(result.failures.slice(0, 12).join('\n'));
+      process.exit(1);
+    }
+    console.log(result.message);
+    return;
+  }
   const manifest = await readManifest();
   const ledger = await readLedger();
   const result = await preparePrivateRoot(config, manifest, ledger, args.privateRoot, args.requireAssets);
@@ -59,6 +76,51 @@ export async function runComputationalPrivateRootPrep(config: ComputationalPriva
     process.exit(1);
   }
   console.log(result.message);
+}
+
+async function prepareStressCandidateRoot(
+  config: ComputationalPrivateRootPrepConfig,
+  privateRootInput: string,
+  requireAssets: boolean,
+): Promise<PrepareResult> {
+  const stressCandidate = config.stressCandidate;
+  if (stressCandidate === undefined)
+    return failure([`${config.featureLabel}: no stress-candidate fixture configured.`]);
+
+  const failures: Array<string> = [];
+  const privateRoot = resolve(privateRootInput);
+  if (!isAbsolute(privateRootInput)) failures.push('RAWENGINE_PRIVATE_RAW_ROOT must be absolute.');
+
+  const sourcePaths = stressCandidate.sourceRelativePaths.map((sourcePath) => {
+    if (extname(sourcePath).toLowerCase() !== stressCandidate.expectedExtension) {
+      failures.push(`${sourcePath}: expected ${stressCandidate.expectedExtension.slice(1).toUpperCase()} source.`);
+    }
+    return resolvePrivatePath(privateRoot, sourcePath, failures);
+  });
+
+  if (sourcePaths[0] !== undefined) await mkdir(dirname(sourcePaths[0]), { recursive: true });
+  if (failures.length > 0) return failure(failures);
+
+  const missingSources = [];
+  for (const sourcePath of sourcePaths) {
+    if (!(await pathExists(sourcePath))) missingSources.push(relative(privateRoot, sourcePath));
+  }
+  if (missingSources.length === sourcePaths.length && !requireAssets) {
+    return {
+      failures: [],
+      message: `${config.featureLabel} stress-candidate prep skipped (add ${sourcePaths.length} ${stressCandidate.sourceLabel} under ${privateRoot})`,
+      ok: true,
+    };
+  }
+  if (missingSources.length > 0) {
+    return failure(missingSources.map((sourcePath) => `missing private RAW stress-candidate source ${sourcePath}`));
+  }
+
+  return {
+    failures: [],
+    message: `${config.featureLabel} stress-candidate prep ok (${sourcePaths.length} sources; not proof acceptance)`,
+    ok: true,
+  };
 }
 
 async function preparePrivateRoot(
