@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import Dropdown from './Dropdown';
 import UiText from './Text';
 import { useManagedFocus } from '../../hooks/useManagedFocus';
+import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/exportRecipeIds';
 import { buildExportRecipeUiRows } from '../../schemas/exportRecipeUiSchemas';
 import { TextVariants } from '../../types/typography';
 
@@ -97,7 +98,7 @@ export default function ExportPresetsList({
   };
 
   const dropdownOptions = presets
-    .filter((preset) => preset.id !== '__last_used__')
+    .filter((preset) => preset.id !== EXPORT_LAST_USED_PRESET_ID)
     .map((preset) => ({
       label: preset.name,
       value: preset.id,

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
+import { CLIENT_PROOF_TIFF_EXPORT_RECIPE_ID } from '../src/schemas/exportRecipeIds.ts';
 import { buildExportRecipeUiRows, exportRecipeUiRowSchema } from '../src/schemas/exportRecipeUiSchemas.ts';
 
 const recipesJson: unknown = JSON.parse(await readFile('fixtures/export/export-recipes.json', 'utf8'));
@@ -15,7 +16,7 @@ if (rows.length !== recipes.length) {
   failures.push(`Expected ${recipes.length} UI rows, got ${rows.length}.`);
 }
 
-if (!rows.some((row) => row.isBuiltIn && row.id === 'client-proof-tiff')) {
+if (!rows.some((row) => row.isBuiltIn && row.id === CLIENT_PROOF_TIFF_EXPORT_RECIPE_ID)) {
   failures.push('Client proof TIFF built-in recipe must be visible.');
 }
 

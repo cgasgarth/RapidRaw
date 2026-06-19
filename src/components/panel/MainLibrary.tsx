@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
 import SettingsPanel from './SettingsPanel';
+import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/exportRecipeIds';
 import { buildLibrarySessionUiCard } from '../../schemas/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
@@ -181,7 +182,7 @@ export default function MainLibrary(props: MainLibraryProps) {
       buildLibrarySessionUiCard({
         assetCount: props.imageList.length,
         exportRecipeCount:
-          props.appSettings?.exportPresets?.filter((preset) => preset.id !== '__last_used__').length ?? 0,
+          props.appSettings?.exportPresets?.filter((preset) => preset.id !== EXPORT_LAST_USED_PRESET_ID).length ?? 0,
         folderPath: props.currentFolderPath,
         id: 'current-library-session',
         name: props.currentFolderPath?.split('/').pop() || t('library.splash.continueSession'),
