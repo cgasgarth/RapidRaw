@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { z } from 'zod';
 
 import VisualSmokeApp from './VisualSmokeApp';
+import { VISUAL_SMOKE_SCENARIO_IDS } from './visualSmokeScenarios';
 import { Invokes } from '../../components/ui/AppProperties';
 import '../../i18n';
 import '../../styles.css';
@@ -131,7 +132,7 @@ if (!rootElement) {
   throw new Error('Root element not found');
 }
 
-const mode = new URLSearchParams(window.location.search).get('scenario') ?? 'empty-library';
+const mode = new URLSearchParams(window.location.search).get('scenario') ?? VISUAL_SMOKE_SCENARIO_IDS.EmptyLibrary;
 
 createRoot(rootElement).render(
   <React.StrictMode>

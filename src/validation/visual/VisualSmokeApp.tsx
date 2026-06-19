@@ -1,6 +1,7 @@
 import { Camera, CircleGauge, FolderOpen, Layers3, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 
+import { VISUAL_SMOKE_PROOF_TEST_IDS, VISUAL_SMOKE_SCENARIO_IDS, type VisualSmokeMode } from './visualSmokeScenarios';
 import ColorPanel from '../../components/adjustments/Color';
 import DetailsPanel from '../../components/adjustments/Details';
 import EffectsPanel from '../../components/adjustments/Effects';
@@ -24,26 +25,24 @@ import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixtu
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 
-import type { VisualSmokeMode } from './visualSmokeScenarios';
-
 interface VisualSmokeAppProps {
   mode: string;
 }
 
 const visualSmokeComponents = {
-  'agent-chat-ui': AgentChatVisualSmoke,
-  'color-workflow': ColorWorkflowVisualSmoke,
-  'command-palette-workflows': CommandPaletteWorkflowSmoke,
-  'detail-dust-spot': DetailDustSpotVisualSmoke,
-  'detail-workspace': DetailWorkspaceVisualSmoke,
-  'film-look-browser': FilmLookVisualSmoke,
-  'focus-ui': FocusStackVisualSmoke,
-  'hdr-ui': HdrVisualSmoke,
-  'layer-stack-workflow': LayerStackWorkflowVisualSmoke,
-  'library-workflow': LibraryWorkflowVisualSmoke,
-  'negative-lab-workspace': NegativeLabVisualSmoke,
-  'panorama-ui': PanoramaVisualSmoke,
-  'sr-ui': SuperResolutionVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi]: AgentChatVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow]: ColorWorkflowVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows]: CommandPaletteWorkflowSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.DetailDustSpot]: DetailDustSpotVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.DetailWorkspace]: DetailWorkspaceVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser]: FilmLookVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.FocusUi]: FocusStackVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.HdrUi]: HdrVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace]: NegativeLabVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.SrUi]: SuperResolutionVisualSmoke,
 } satisfies Partial<Record<VisualSmokeMode, () => ReactElement>>;
 type VisualSmokeComponentMode = keyof typeof visualSmokeComponents;
 
@@ -57,7 +56,7 @@ function AgentChatVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="agent-chat-ui"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.AgentChatUi}
     >
       <div className="flex h-screen bg-[#0f1114]" data-visual-smoke-section="agent-chat-ui">
         <div className="flex flex-1 items-center justify-center border-r border-white/10 bg-[#14171a] p-8">
@@ -156,7 +155,7 @@ function DetailDustSpotVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="detail-dust-spot"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.DetailDustSpot}
     >
       <div className="grid h-screen grid-cols-[420px_1fr] overflow-hidden">
         <aside
@@ -332,7 +331,7 @@ function DetailWorkspaceVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="detail-workspace"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.DetailWorkspace}
     >
       <div className="grid h-screen grid-cols-[300px_1fr_360px] overflow-hidden">
         <aside className="border-r border-white/10 bg-[#15181c] p-4" data-visual-smoke-section="detail-controls">
@@ -471,7 +470,7 @@ function LibraryWorkflowVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="library-workflow"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow}
     >
       <div className="grid h-screen grid-cols-[300px_1fr_360px] overflow-hidden">
         <aside className="border-r border-white/10 bg-[#16191d] p-4" data-visual-smoke-section="library-filters">
@@ -634,7 +633,7 @@ function LayerStackWorkflowVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="layer-stack-workflow"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow}
     >
       <div className="grid h-screen grid-cols-[280px_1fr_360px] overflow-hidden">
         <aside className="border-r border-white/10 bg-[#15181c] p-4" data-visual-smoke-section="layer-actions">
@@ -854,9 +853,12 @@ function CommandPaletteWorkflowSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="command-palette-workflows"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows}
     >
-      <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="command-palette-workflows">
+      <div
+        className="h-screen bg-[#0f1114]"
+        data-visual-smoke-section={VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows}
+      >
         <div
           className="sr-only"
           data-focus-open={focusOpen}
@@ -864,7 +866,7 @@ function CommandPaletteWorkflowSmoke() {
           data-negative-open={negativeOpen}
           data-panorama-open={panoramaOpen}
           data-sr-open={srOpen}
-          data-testid="command-palette-workflow-proof"
+          data-testid={VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteWorkflowProof}
         />
         <div className="flex h-11 items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
           <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
@@ -874,7 +876,7 @@ function CommandPaletteWorkflowSmoke() {
         </div>
         <button
           className="m-6 rounded border border-white/10 bg-white/5 px-3 py-2 text-sm"
-          data-testid="command-palette-open"
+          data-testid={VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteOpen}
           onClick={() => {
             setIsOpen(true);
           }}
@@ -901,7 +903,7 @@ function FocusStackVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="focus-ui"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.FocusUi}
     >
       <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="focus-modal">
         <div
@@ -976,7 +978,7 @@ function SuperResolutionVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="sr-ui"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.SrUi}
     >
       <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="sr-modal">
         <div
@@ -1049,7 +1051,7 @@ function PanoramaVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="panorama-ui"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi}
     >
       <div className="h-screen bg-[#0f1114]" data-visual-smoke-section="panorama-modal">
         <div
@@ -1131,7 +1133,7 @@ function HdrVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="hdr-ui"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.HdrUi}
     >
       <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="hdr-modal" />
       <div
@@ -1195,7 +1197,7 @@ function NegativeLabVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="negative-lab-workspace"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace}
     >
       <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="negative-lab-modal" />
       <NegativeConversionModal
@@ -1209,7 +1211,7 @@ function NegativeLabVisualSmoke() {
       />
       <div
         className="absolute bottom-4 left-4 z-30 rounded-md border border-white/10 bg-black/70 px-3 py-2 text-xs text-[#f3f4f1]"
-        data-testid="negative-lab-saved-path-proof"
+        data-testid={VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof}
       >
         {savedPaths.length > 0 ? savedPaths.join(', ') : NEGATIVE_LAB_NO_SAVED_PATHS_LABEL}
       </div>
@@ -1227,7 +1229,7 @@ function FilmLookVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="film-look-browser"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser}
     >
       <div className="grid h-screen grid-cols-[1fr_380px] overflow-hidden">
         <section className="relative min-w-0 bg-[#0f1114] p-6" data-visual-smoke-section="film-look-preview">
@@ -1291,7 +1293,7 @@ function ColorWorkflowVisualSmoke() {
     <main
       className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
       data-visual-smoke-ready="true"
-      data-visual-smoke-mode="color-workflow"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow}
     >
       <div className="grid h-screen grid-cols-[1fr_420px] overflow-hidden">
         <section className="relative min-w-0 bg-[#0f1114] p-6" data-visual-smoke-section="color-workflow-preview">
@@ -1343,7 +1345,7 @@ function VisualSmokeApp({ mode }: VisualSmokeAppProps) {
     return <ScenarioComponent />;
   }
 
-  const scenario = mode === 'empty-library' ? 'Empty Library Startup' : 'Editor Shell Smoke';
+  const scenario = mode === VISUAL_SMOKE_SCENARIO_IDS.EmptyLibrary ? 'Empty Library Startup' : 'Editor Shell Smoke';
 
   return (
     <main

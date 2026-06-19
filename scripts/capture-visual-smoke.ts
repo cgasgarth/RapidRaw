@@ -4,7 +4,11 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
-import { VISUAL_SMOKE_SCENARIOS } from '../src/validation/visual/visualSmokeScenarios.ts';
+import {
+  VISUAL_SMOKE_PROOF_TEST_IDS,
+  VISUAL_SMOKE_SCENARIOS,
+  VISUAL_SMOKE_SCENARIO_IDS,
+} from '../src/validation/visual/visualSmokeScenarios.ts';
 import {
   agentArtifactReviewProofDatasetSchema,
   agentDryRunReviewProofDatasetSchema,
@@ -110,11 +114,11 @@ async function assertSectionCount(page, minimum) {
 }
 
 async function prepareScenario(page, mode) {
-  if (mode === 'command-palette-workflows') {
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.CommandPaletteWorkflows) {
     const runCommand = async (query, name) => {
       await page.getByLabel('Search commands').fill(query);
       await page.getByRole('button', { name }).click();
-      await page.getByTestId('command-palette-open').click();
+      await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteOpen).click();
     };
 
     await runCommand('focus', /Open focus stacking/u);
@@ -123,7 +127,9 @@ async function prepareScenario(page, mode) {
     await runCommand('hdr', /Open HDR merge/u);
     await runCommand('negative', /Open negative lab/u);
     commandPaletteWorkflowProofSchema.parse(
-      await page.getByTestId('command-palette-workflow-proof').evaluate((element) => ({ ...element.dataset })),
+      await page
+        .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.CommandPaletteWorkflowProof)
+        .evaluate((element) => ({ ...element.dataset })),
     );
     return;
   }
@@ -408,62 +414,66 @@ async function prepareScenario(page, mode) {
     return;
   }
 
-  if (mode === 'negative-lab-batch-color-workspace') {
-    await page.getByTestId('negative-lab-workspace').waitFor({ timeout: 10_000 });
-    await page.getByTestId('negative-lab-batch-readiness').waitFor({ timeout: 10_000 });
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.NegativeLabBatchColorWorkspace) {
+    await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkspace).waitFor({ timeout: 10_000 });
+    await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
     await page
-      .getByTestId('negative-lab-queued-count')
+      .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
       .getByText('2 queued', { exact: true })
       .waitFor({ timeout: 10_000 });
-    await page.getByTestId('negative-lab-accept-batch-plan').click();
+    await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan).click();
     await page
-      .getByTestId('negative-lab-accept-batch-plan')
+      .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan)
       .getByText('Batch plan accepted', { exact: true })
       .waitFor({ timeout: 10_000 });
     const colorSliders = page.locator('input[type="range"]');
     await colorSliders.nth(1).fill('1.23');
     await colorSliders.nth(2).fill('0.91');
     await colorSliders.nth(3).fill('1.14');
-    await page.getByTestId('negative-lab-accept-batch-plan').click();
+    await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan).click();
     await page
-      .getByTestId('negative-lab-accept-batch-plan')
+      .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan)
       .getByText('Batch plan accepted', { exact: true })
       .waitFor({ timeout: 10_000 });
-    await page.getByTestId('negative-lab-export-jpeg-proof').click();
+    await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabExportJpegProof).click();
     await page.getByRole('button', { name: 'Convert & Save All (2)' }).click();
     await page.waitForFunction(() =>
       (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some((call) => call.command === 'convert_negatives'),
     );
     await assertNegativeLabBatchColorInvokeProof(page);
     await page
-      .getByTestId('negative-lab-saved-path-proof')
+      .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof)
       .getByText('/tmp/rawengine-negative-smoke-positive.tif', { exact: true })
       .waitFor({ timeout: 10_000 });
     return;
   }
 
-  if (mode !== 'negative-lab-workspace') return;
+  if (mode !== VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace) return;
 
-  await page.getByTestId('negative-lab-workspace').waitFor({ timeout: 10_000 });
+  await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkspace).waitFor({ timeout: 10_000 });
   await page.waitForFunction(
-    () => document.querySelector('[data-testid="negative-lab-workspace-proof"]')?.dataset.previewReady === 'true',
+    (workspaceProofTestId) =>
+      document.querySelector(`[data-testid="${workspaceProofTestId}"]`)?.dataset.previewReady === 'true',
+    VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkspaceProof,
   );
   negativeLabWorkspaceProofDatasetSchema.parse(
-    await page.getByTestId('negative-lab-workspace-proof').evaluate((element) => ({ ...element.dataset })),
+    await page
+      .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkspaceProof)
+      .evaluate((element) => ({ ...element.dataset })),
   );
-  await page.getByTestId('negative-lab-workflow-rail').waitFor({ timeout: 10_000 });
-  await page.getByTestId('negative-lab-batch-readiness').waitFor({ timeout: 10_000 });
-  await page.getByTestId('negative-lab-agent-activity').waitFor({ timeout: 10_000 });
+  await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkflowRail).waitFor({ timeout: 10_000 });
+  await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
+  await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentActivity).waitFor({ timeout: 10_000 });
   await page
-    .getByTestId('negative-lab-agent-command-source')
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentCommandSource)
     .getByText(NegativeLabAppServerCommandName.BatchSummary, { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
-    .getByTestId('negative-lab-agent-dry-run-state')
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentDryRunState)
     .getByText('Dry-run ready', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
-    .getByTestId('negative-lab-agent-commit-state')
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentCommitState)
     .getByText('Not committed', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-agent-affected-frames').getByText('Affected 2', { exact: true }).waitFor({
@@ -491,17 +501,17 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-skipped-frame-count').getByText('Skip 0', { exact: true }).waitFor({
     timeout: 10_000,
   });
-  await page.getByTestId('negative-lab-accept-batch-plan').click();
+  await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan).click();
   await page
-    .getByTestId('negative-lab-agent-dry-run-state')
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentDryRunState)
     .getByText('Dry-run accepted', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
-    .getByTestId('negative-lab-agent-commit-state')
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentCommitState)
     .getByText('Ready to commit', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
-    .getByTestId('negative-lab-agent-command-source')
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentCommandSource)
     .getByText(NegativeLabAppServerCommandName.AcceptBatchPlan, { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-active-scan-1').click();
@@ -681,13 +691,13 @@ async function prepareScenario(page, mode) {
   if (!copiedBatchPlan.includes('"plannedApplyCount"') || !copiedBatchPlan.includes('"skippedFrameIds"')) {
     throw new Error('Negative Lab batch plan copy did not include apply/skip JSON.');
   }
-  await page.getByTestId('negative-lab-accept-batch-plan').click();
+  await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan).click();
   await page
-    .getByTestId('negative-lab-accept-batch-plan')
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan)
     .getByText('Batch plan accepted', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
-    .getByTestId('negative-lab-queued-count')
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
     .getByText('1 queued', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-included-status').getByText('1 included', { exact: true }).waitFor({
@@ -695,11 +705,11 @@ async function prepareScenario(page, mode) {
   });
   await page.getByTestId('negative-lab-scope-active').click();
   await page
-    .getByTestId('negative-lab-queued-count')
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
     .getByText('1 queued', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-export-tiff16').waitFor({ timeout: 10_000 });
-  await page.getByTestId('negative-lab-export-jpeg-proof').click();
+  await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabExportJpegProof).click();
   await page.getByRole('button', { name: 'Convert & Save Active' }).click();
   await page.waitForFunction(() =>
     (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some((call) => call.command === 'convert_negatives'),
@@ -707,7 +717,7 @@ async function prepareScenario(page, mode) {
   await assertNegativeLabInvokeProof(page);
   await assertNegativeLabBaseFogPreviewExportProof(page);
   await page
-    .getByTestId('negative-lab-saved-path-proof')
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof)
     .getByText('/tmp/rawengine-negative-smoke-positive.tif', { exact: true })
     .waitFor({ timeout: 10_000 });
 }
@@ -769,14 +779,17 @@ async function main() {
 
     await page.close();
 
-    const shouldCheckHighDpi = requestedScenario === null || requestedScenario === 'empty-library';
+    const shouldCheckHighDpi =
+      requestedScenario === null || requestedScenario === VISUAL_SMOKE_SCENARIO_IDS.EmptyLibrary;
     for (const target of shouldCheckHighDpi ? highDpiTargets : []) {
       const highDpiPage = await browser.newPage({ deviceScaleFactor: target.deviceScaleFactor, viewport });
       highDpiPage.on('pageerror', (error) => {
         throw error;
       });
 
-      await highDpiPage.goto(`${baseUrl}/visual-smoke.html?scenario=empty-library`, { waitUntil: 'networkidle' });
+      await highDpiPage.goto(`${baseUrl}/visual-smoke.html?scenario=${VISUAL_SMOKE_SCENARIO_IDS.EmptyLibrary}`, {
+        waitUntil: 'networkidle',
+      });
       await highDpiPage.locator('[data-visual-smoke-ready="true"]').waitFor({ timeout: 10_000 });
       await assertSectionCount(highDpiPage, 4);
 
