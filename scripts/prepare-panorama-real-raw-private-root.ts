@@ -6,10 +6,10 @@ await runComputationalPrivateRootPrep({
   expectedExtension: '.raf',
   featureFamily: 'panorama_stitch',
   featureLabel: 'panorama',
-  fixtureId: 'validation.computational-merge.panorama-overlap.v1',
+  fixtureId: 'validation.computational-merge.panorama-project-owned-overlap.v2',
   issue: 1508,
   minSources: 3,
-  sourceLabel: 'RAF overlap frames',
+  sourceLabel: 'project-owned RAF overlap v2 frames',
   stressCandidate: {
     expectedExtension: '.arw',
     sourceLabel: 'ARW infrared panorama stress frames',

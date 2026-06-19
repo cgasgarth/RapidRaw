@@ -97,6 +97,91 @@
         {
           "hash": null,
           "kind": "source_raw_sequence_private",
+          "path": "private-fixtures/panorama/project-owned-overlap-v2",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "alignment_report_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-project-owned-overlap-v2-alignment.json",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "merge_output_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-project-owned-overlap-v2-merge.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "preview_after_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-project-owned-overlap-v2-preview.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "export_after_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-project-owned-overlap-v2-export.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "quality_report_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-project-owned-overlap-v2-quality.json",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": null,
+          "kind": "app_server_runtime_report_private",
+          "path": "private-artifacts/validation/computational-merge/panorama-project-owned-overlap-v2-app-server-runtime-proof.json",
+          "publicRepoAllowed": false
+        }
+      ],
+      "evidenceId": "raw-evidence.panorama.project-owned-overlap.v2",
+      "expectedMetrics": [
+        {
+          "name": "alignmentInlierRatio",
+          "required": true,
+          "threshold": 0.55
+        },
+        {
+          "name": "edgeContinuityScore",
+          "required": true,
+          "threshold": 0.85
+        },
+        {
+          "name": "previewExportMeanAbsDelta",
+          "required": true,
+          "threshold": 0.015
+        }
+      ],
+      "featureFamily": "panorama_stitch",
+      "fixtureId": "validation.computational-merge.panorama-project-owned-overlap.v2",
+      "implementationIssue": 1508,
+      "localSourceRelativePaths": [
+        "private-fixtures/panorama/project-owned-overlap-v2/frame-01.raf",
+        "private-fixtures/panorama/project-owned-overlap-v2/frame-02.raf",
+        "private-fixtures/panorama/project-owned-overlap-v2/frame-03.raf"
+      ],
+      "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
+      "notes": "Project-owned private RAW panorama acceptance slot. Capture 3-5 ordered RAF frames with one camera/lens/focal length/RAW mode, manual exposure/WB/focus, static textured scene, 30-50% neighboring overlap, no moving subjects, no dominant repeated patterns, and near no-parallax rotation. This remains manifest-only until private assets, runtime proof, preview/export parity, and reviewed artifacts pass unchanged thresholds.",
+      "proofStatus": "manifest_only",
+      "uiIssue": 1333,
+      "workflowSteps": [
+        "open_raw_sequence",
+        "decode_raw_sources",
+        "align_sources",
+        "merge_sources",
+        "render_preview",
+        "export_artifact",
+        "record_quality_metrics"
+      ]
+    },
+    {
+      "artifacts": [
+        {
+          "hash": null,
+          "kind": "source_raw_sequence_private",
           "path": "private-fixtures/panorama/overlap-stitch-v1",
           "publicRepoAllowed": false
         },
