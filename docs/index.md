@@ -174,6 +174,7 @@ generator before the release workflow needs one.
 - [TypeScript compiler options audit](tooling/typescript-compiler-options-audit-2026-06-10.md)
 - [Skip lib check evaluation](tooling/skip-lib-check-evaluation-2026-06-15.md)
 - [Vite bundle budget](tooling/vite-bundle-budget-2026-06-11.md)
+- [Frontend bundle dependency audit](tooling/frontend-bundle-dependency-audit-2026-06-19.md)
 - [Workflow topology](ci/workflow-topology-2026-06-11.md)
 - [Dependency vulnerability checks](ci/dependency-vulnerability-checks-2026-06-11.md)
 - [Dependency license checks](ci/dependency-license-checks-2026-06-11.md)

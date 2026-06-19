@@ -636,6 +636,10 @@
           "path": "docs/tooling/vite-bundle-budget-2026-06-11.md"
         },
         {
+          "title": "Frontend bundle dependency audit",
+          "path": "docs/tooling/frontend-bundle-dependency-audit-2026-06-19.md"
+        },
+        {
           "title": "Workflow topology",
           "path": "docs/ci/workflow-topology-2026-06-11.md"
         },
