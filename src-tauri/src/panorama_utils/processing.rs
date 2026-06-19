@@ -256,6 +256,32 @@ pub fn find_homography_ransac(
     }
 }
 
+pub fn mean_reprojection_error(
+    homography: &Matrix3<f64>,
+    inliers: &[Match],
+    keypoints1: &[KeyPoint],
+    keypoints2: &[KeyPoint],
+) -> f64 {
+    if inliers.is_empty() {
+        return f64::INFINITY;
+    }
+    let sum = inliers
+        .iter()
+        .map(|matched| {
+            let p1 = keypoints1[matched.index1];
+            let p2 = keypoints2[matched.index2];
+            let transformed = homography * nalgebra::Point3::new(p1.x as f64, p1.y as f64, 1.0);
+            if transformed.z.abs() < 1e-8 {
+                return f64::INFINITY;
+            }
+            let projected =
+                Point2::new(transformed.x / transformed.z, transformed.y / transformed.z);
+            ((p2.x as f64 - projected.x).powi(2) + (p2.y as f64 - projected.y).powi(2)).sqrt()
+        })
+        .sum::<f64>();
+    sum / inliers.len() as f64
+}
+
 fn ransac_seed(matches: &[Match], keypoints1: &[KeyPoint], keypoints2: &[KeyPoint]) -> u64 {
     let mut hash = 0xcbf29ce484222325_u64;
     mix_u64(&mut hash, matches.len() as u64);

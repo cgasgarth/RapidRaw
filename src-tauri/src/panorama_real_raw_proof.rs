@@ -5,14 +5,13 @@ use std::path::{Path, PathBuf};
 
 use chrono::{SecondsFormat, Utc};
 use image::{ImageFormat, ImageReader};
-use nalgebra::Point2;
 use serde::Serialize;
 
 use crate::app_settings::AppSettings;
 use crate::app_state::AppState;
 use crate::panorama_stitching::{
-    KeyPoint, PanoramaRenderRequest, PanoramaRenderResult,
-    render_with_legacy_homography_engine_with_settings,
+    PanoramaPairwiseMatchMetadata, PanoramaRenderMetadata, PanoramaRenderRequest,
+    PanoramaRenderResult, render_with_legacy_homography_engine_with_settings,
 };
 use crate::panorama_utils::processing;
 use crate::private_decode_raw_proof::{
@@ -71,9 +70,6 @@ const MAX_MEAN_REPROJECTION_ERROR_PX: f64 = 5.0;
 const MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA: f64 = 0.015;
 const MIN_DIAGNOSTIC_OUTPUT_MEAN_LUMA: f64 = 0.01;
 const MIN_DIAGNOSTIC_NON_BLACK_PIXEL_RATIO: f64 = 0.01;
-const RUNTIME_SAMPLE_WIDTH: u32 = 72;
-const RUNTIME_SAMPLE_HEIGHT: u32 = 48;
-const RUNTIME_SAMPLE_OVERLAP_WIDTH: u32 = 24;
 
 const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
     decode_report_file: "panorama-overlap-decode-report.json",
@@ -299,11 +295,6 @@ struct StressCandidateDiagnostic {
     suitability: String,
 }
 
-struct PreparedSource {
-    features: Vec<crate::panorama_stitching::Feature>,
-    keypoints: Vec<KeyPoint>,
-}
-
 fn run_private_alignment_proof(private_root: &Path) -> Result<(), String> {
     let loaded_sources = load_sources(private_root, &CONFIG)?;
     validate_decoded_sources(&loaded_sources, &CONFIG)?;
@@ -312,9 +303,14 @@ fn run_private_alignment_proof(private_root: &Path) -> Result<(), String> {
     let output_dir = private_root.join(ARTIFACT_ROOT);
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
 
+    let render_result = render_private_panorama(private_root, CONFIG.source_relative_paths)?;
     let decode_metrics = build_metrics(&loaded_sources, CONFIG.metric_source_count);
-    let alignment_report =
-        build_alignment_report(&loaded_sources, &graph_revision_hash, CONFIG.fixture_id)?;
+    let alignment_report = build_alignment_report_from_render_metadata(
+        &render_result.metadata,
+        &graph_revision_hash,
+        CONFIG.fixture_id,
+        loaded_sources.len(),
+    );
     let alignment_metrics = build_alignment_metrics(&alignment_report, loaded_sources.len());
     let metrics = [decode_metrics, alignment_metrics].concat();
     if !metrics.iter().all(|metric| metric.passed) {
@@ -390,9 +386,13 @@ fn run_private_stitch_artifact_proof(private_root: &Path) -> Result<(), String> 
     let output_dir = private_root.join(ARTIFACT_ROOT);
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
 
-    let alignment_report =
-        build_alignment_report(&loaded_sources, &graph_revision_hash, CONFIG.fixture_id)?;
     let render_result = render_private_panorama(private_root, CONFIG.source_relative_paths)?;
+    let alignment_report = build_alignment_report_from_render_metadata(
+        &render_result.metadata,
+        &graph_revision_hash,
+        CONFIG.fixture_id,
+        loaded_sources.len(),
+    );
     let stitch_output_path = output_dir.join(STITCH_OUTPUT_FILE);
     render_result
         .image
@@ -486,9 +486,13 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
     let output_dir = private_root.join(ARTIFACT_ROOT);
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
 
-    let alignment_report =
-        build_alignment_report(&loaded_sources, &graph_revision_hash, CONFIG.fixture_id)?;
     let render_result = render_private_panorama(private_root, CONFIG.source_relative_paths)?;
+    let alignment_report = build_alignment_report_from_render_metadata(
+        &render_result.metadata,
+        &graph_revision_hash,
+        CONFIG.fixture_id,
+        loaded_sources.len(),
+    );
     let stitch_output_path = output_dir.join(STITCH_OUTPUT_FILE);
     let preview_output_path = output_dir.join(PREVIEW_OUTPUT_FILE);
     let export_output_path = output_dir.join(EXPORT_OUTPUT_FILE);
@@ -574,6 +578,7 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
         &build_runtime_sample(
             &loaded_sources,
             &source_hashes,
+            &render_result.metadata,
             &graph_revision_hash,
             &CONFIG,
         ),
@@ -649,11 +654,25 @@ fn run_private_stress_candidate_diagnostic(private_root: &Path) -> Result<(), St
     let output_dir = private_root.join(ARTIFACT_ROOT);
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
 
-    let alignment_report = build_alignment_report(
-        &loaded_sources,
-        &graph_revision_hash,
-        STRESS_CONFIG.fixture_id,
-    )?;
+    let render_result = render_private_panorama(private_root, STRESS_CONFIG.source_relative_paths);
+    let alignment_report = render_result
+        .as_ref()
+        .ok()
+        .map(|result| {
+            build_alignment_report_from_render_metadata(
+                &result.metadata,
+                &graph_revision_hash,
+                STRESS_CONFIG.fixture_id,
+                loaded_sources.len(),
+            )
+        })
+        .unwrap_or_else(|| {
+            build_empty_alignment_report(
+                &graph_revision_hash,
+                STRESS_CONFIG.fixture_id,
+                loaded_sources.len(),
+            )
+        });
     let mut quality_metrics = [
         build_metrics(&loaded_sources, STRESS_CONFIG.metric_source_count),
         build_alignment_metrics(&alignment_report, loaded_sources.len()),
@@ -664,7 +683,7 @@ fn run_private_stress_candidate_diagnostic(private_root: &Path) -> Result<(), St
     let mut render_error = None;
     let mut review_image_path = None;
 
-    match render_private_panorama(private_root, STRESS_CONFIG.source_relative_paths) {
+    match render_result {
         Ok(render_result) => {
             let stitch_output_path = output_dir.join(STRESS_STITCH_OUTPUT_FILE);
             let review_image_output_path = output_dir.join(STRESS_REVIEW_FILE);
@@ -775,11 +794,13 @@ fn sanitize_diagnostic_metrics(metrics: &mut [QualityMetric]) {
 fn build_runtime_sample(
     loaded_sources: &[LoadedSource],
     source_hashes: &[crate::private_decode_raw_proof::SourceHash],
+    metadata: &PanoramaRenderMetadata,
     graph_revision_hash: &str,
     config: &PrivateDecodeProofConfig,
 ) -> PanoramaPrivateRuntimeSample {
+    let offsets = build_runtime_offsets(metadata);
     PanoramaPrivateRuntimeSample {
-        connected_source_indices: (0..loaded_sources.len()).collect(),
+        connected_source_indices: metadata.connected_source_indices.clone(),
         fixture_id: config.fixture_id.to_string(),
         frames: loaded_sources
             .iter()
@@ -788,19 +809,55 @@ fn build_runtime_sample(
             .map(
                 |(source_index, (source, source_hash))| PanoramaPrivateRuntimeFrame {
                     content_hash: source_hash.hash.clone(),
-                    expected_offset_x: source_index as u32
-                        * (RUNTIME_SAMPLE_WIDTH - RUNTIME_SAMPLE_OVERLAP_WIDTH),
-                    expected_offset_y: if source_index % 2 == 0 { 0 } else { 2 },
+                    expected_offset_x: offsets
+                        .get(source_index)
+                        .map(|offset| offset.0)
+                        .unwrap_or_default(),
+                    expected_offset_y: offsets
+                        .get(source_index)
+                        .map(|offset| offset.1)
+                        .unwrap_or_default(),
                     graph_revision: graph_revision_hash.to_string(),
-                    height: RUNTIME_SAMPLE_HEIGHT,
+                    height: source.image.height(),
                     source_index,
                     source_path: source.relative_path.clone(),
-                    width: RUNTIME_SAMPLE_WIDTH,
+                    width: source.image.width(),
                 },
             )
             .collect(),
         graph_revision_hash: graph_revision_hash.to_string(),
     }
+}
+
+fn build_runtime_offsets(metadata: &PanoramaRenderMetadata) -> Vec<(u32, i32)> {
+    let translations: Vec<_> = metadata
+        .sources
+        .iter()
+        .map(|source| {
+            source
+                .global_transform_3x3
+                .map(|transform| (transform[2], transform[5]))
+                .unwrap_or((0.0, 0.0))
+        })
+        .collect();
+    let min_x = translations
+        .iter()
+        .map(|translation| translation.0)
+        .fold(0.0_f64, f64::min);
+    let min_y = translations
+        .iter()
+        .map(|translation| translation.1)
+        .fold(0.0_f64, f64::min);
+
+    translations
+        .iter()
+        .map(|(x, y)| {
+            (
+                (x - min_x).round().max(0.0) as u32,
+                (y - min_y).round() as i32,
+            )
+        })
+        .collect()
 }
 
 fn build_stitch_report(
@@ -866,91 +923,23 @@ fn write_decode_report(
     )
 }
 
-fn build_alignment_report(
-    loaded_sources: &[LoadedSource],
+fn build_alignment_report_from_render_metadata(
+    metadata: &PanoramaRenderMetadata,
     graph_revision_hash: &str,
     fixture_id: &str,
-) -> Result<AlignmentReport, String> {
-    let brief_pairs = processing::generate_brief_pairs();
-    let prepared_sources: Vec<PreparedSource> = loaded_sources
-        .iter()
-        .map(|source| {
-            let gray_full = image::imageops::colorops::grayscale(&source.image.to_rgb8());
-            let (width, height) = gray_full.dimensions();
-            let (new_width, new_height, _scale_factor) =
-                processing::calculate_downscale_dimensions(width, height);
-            let gray_small = image::imageops::resize(
-                &gray_full,
-                new_width,
-                new_height,
-                image::imageops::FilterType::Triangle,
-            );
-            let features = processing::find_features(&gray_small, &brief_pairs);
-            let keypoints = features.iter().map(|feature| feature.keypoint).collect();
-            PreparedSource {
-                features,
-                keypoints,
-            }
+    source_count: usize,
+) -> AlignmentReport {
+    let pair_reports = (0..source_count.saturating_sub(1))
+        .map(|source_index| {
+            let source_index_b = source_index + 1;
+            let pair = metadata.pairwise_matches.iter().find(|pair| {
+                pair.source_index == source_index && pair.target_index == source_index_b
+            });
+            build_pair_alignment_report(source_index, source_index_b, pair)
         })
         .collect();
 
-    let mut pair_reports = Vec::new();
-    for (source_index, pair) in prepared_sources.windows(2).enumerate() {
-        let left = &pair[0];
-        let right = &pair[1];
-        let matches = processing::match_features(&left.features, &right.features);
-        let Some((homography, inliers)) =
-            processing::find_homography_ransac(&matches, &left.keypoints, &right.keypoints)
-        else {
-            pair_reports.push(PairAlignmentReport {
-                accepted: false,
-                finite_transform: false,
-                inlier_count: 0,
-                inlier_ratio: 0.0,
-                match_count: matches.len(),
-                mean_reprojection_error_px: f64::INFINITY,
-                source_index_a: source_index,
-                source_index_b: source_index + 1,
-                transform_3x3_row_major: [f64::NAN; 9],
-            });
-            continue;
-        };
-
-        let finite_transform = homography.iter().all(|value| value.is_finite());
-        let mean_reprojection_error_px =
-            mean_reprojection_error(&homography, &inliers, &left.keypoints, &right.keypoints);
-        let inlier_ratio = if matches.is_empty() {
-            0.0
-        } else {
-            inliers.len() as f64 / matches.len() as f64
-        };
-        pair_reports.push(PairAlignmentReport {
-            accepted: finite_transform
-                && inliers.len() >= processing::MIN_INLIERS_FOR_CONNECTION
-                && inlier_ratio >= MIN_ALIGNMENT_INLIER_RATIO
-                && mean_reprojection_error_px <= MAX_MEAN_REPROJECTION_ERROR_PX,
-            finite_transform,
-            inlier_count: inliers.len(),
-            inlier_ratio: round_metric(inlier_ratio),
-            match_count: matches.len(),
-            mean_reprojection_error_px: round_metric(mean_reprojection_error_px),
-            source_index_a: source_index,
-            source_index_b: source_index + 1,
-            transform_3x3_row_major: [
-                homography[(0, 0)],
-                homography[(0, 1)],
-                homography[(0, 2)],
-                homography[(1, 0)],
-                homography[(1, 1)],
-                homography[(1, 2)],
-                homography[(2, 0)],
-                homography[(2, 1)],
-                homography[(2, 2)],
-            ],
-        });
-    }
-
-    Ok(AlignmentReport {
+    AlignmentReport {
         fixture_id: fixture_id.to_string(),
         graph_revision_hash: graph_revision_hash.to_string(),
         non_claims: ALIGNMENT_NON_CLAIMS
@@ -958,7 +947,75 @@ fn build_alignment_report(
             .map(|claim| claim.to_string())
             .collect(),
         pair_reports,
-    })
+    }
+}
+
+fn build_empty_alignment_report(
+    graph_revision_hash: &str,
+    fixture_id: &str,
+    source_count: usize,
+) -> AlignmentReport {
+    let pair_reports = (0..source_count.saturating_sub(1))
+        .map(|source_index| PairAlignmentReport {
+            accepted: false,
+            finite_transform: false,
+            inlier_count: 0,
+            inlier_ratio: 0.0,
+            match_count: 0,
+            mean_reprojection_error_px: f64::INFINITY,
+            source_index_a: source_index,
+            source_index_b: source_index + 1,
+            transform_3x3_row_major: [f64::NAN; 9],
+        })
+        .collect();
+
+    AlignmentReport {
+        fixture_id: fixture_id.to_string(),
+        graph_revision_hash: graph_revision_hash.to_string(),
+        non_claims: ALIGNMENT_NON_CLAIMS
+            .iter()
+            .map(|claim| claim.to_string())
+            .collect(),
+        pair_reports,
+    }
+}
+
+fn build_pair_alignment_report(
+    source_index_a: usize,
+    source_index_b: usize,
+    pair: Option<&PanoramaPairwiseMatchMetadata>,
+) -> PairAlignmentReport {
+    let Some(pair) = pair else {
+        return PairAlignmentReport {
+            accepted: false,
+            finite_transform: false,
+            inlier_count: 0,
+            inlier_ratio: 0.0,
+            match_count: 0,
+            mean_reprojection_error_px: f64::INFINITY,
+            source_index_a,
+            source_index_b,
+            transform_3x3_row_major: [f64::NAN; 9],
+        };
+    };
+
+    let finite_transform = pair.homography3x3.iter().all(|value| value.is_finite());
+    let inlier_ratio = round_metric(pair.inlier_ratio);
+    let mean_reprojection_error_px = round_metric(pair.mean_reprojection_error_px);
+    PairAlignmentReport {
+        accepted: finite_transform
+            && pair.inliers >= processing::MIN_INLIERS_FOR_CONNECTION
+            && inlier_ratio >= MIN_ALIGNMENT_INLIER_RATIO
+            && mean_reprojection_error_px <= MAX_MEAN_REPROJECTION_ERROR_PX,
+        finite_transform,
+        inlier_count: pair.inliers,
+        inlier_ratio,
+        match_count: pair.match_count,
+        mean_reprojection_error_px,
+        source_index_a,
+        source_index_b,
+        transform_3x3_row_major: pair.homography3x3,
+    }
 }
 
 fn build_alignment_metrics(report: &AlignmentReport, source_count: usize) -> Vec<QualityMetric> {
@@ -1179,32 +1236,6 @@ fn mean_abs_delta_rgb8(left: &image::RgbImage, right: &image::RgbImage) -> Resul
         })
         .sum::<f64>();
     Ok(sum / channel_count)
-}
-
-fn mean_reprojection_error(
-    homography: &nalgebra::Matrix3<f64>,
-    inliers: &[crate::panorama_stitching::Match],
-    keypoints1: &[KeyPoint],
-    keypoints2: &[KeyPoint],
-) -> f64 {
-    if inliers.is_empty() {
-        return f64::INFINITY;
-    }
-    let sum = inliers
-        .iter()
-        .map(|matched| {
-            let p1 = keypoints1[matched.index1];
-            let p2 = keypoints2[matched.index2];
-            let transformed = homography * nalgebra::Point3::new(p1.x as f64, p1.y as f64, 1.0);
-            if transformed.z.abs() < 1e-8 {
-                return f64::INFINITY;
-            }
-            let projected =
-                Point2::new(transformed.x / transformed.z, transformed.y / transformed.z);
-            ((p2.x as f64 - projected.x).powi(2) + (p2.y as f64 - projected.y).powi(2)).sqrt()
-        })
-        .sum::<f64>();
-    sum / inliers.len() as f64
 }
 
 fn mean_finite(values: impl Iterator<Item = f64>) -> f64 {
