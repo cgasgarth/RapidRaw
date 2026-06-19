@@ -138,14 +138,35 @@ pub fn match_features(features1: &[Feature], features2: &[Feature]) -> Vec<Match
     if features1.is_empty() || features2.is_empty() {
         return Vec::new();
     }
-    features1
+    let forward_matches = best_ratio_matches(features1, features2);
+    let reverse_matches = best_ratio_matches(features2, features1);
+
+    forward_matches
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index1, index2)| {
+            let index2 = index2?;
+            if reverse_matches.get(index2).copied().flatten() == Some(index1) {
+                Some(Match { index1, index2 })
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn best_ratio_matches(
+    query_features: &[Feature],
+    train_features: &[Feature],
+) -> Vec<Option<usize>> {
+    query_features
         .par_iter()
         .enumerate()
-        .filter_map(|(i, f1)| {
+        .map(|(i, f1)| {
             let mut best_dist = u32::MAX;
             let mut second_best_dist = u32::MAX;
             let mut best_idx = 0;
-            for (j, f2) in features2.iter().enumerate() {
+            for (j, f2) in train_features.iter().enumerate() {
                 let dist = hamming_distance(&f1.descriptor, &f2.descriptor);
                 if dist < best_dist {
                     second_best_dist = best_dist;
@@ -158,15 +179,20 @@ pub fn match_features(features1: &[Feature], features2: &[Feature]) -> Vec<Match
             if second_best_dist > 0
                 && (best_dist as f32 / second_best_dist as f32) < MATCH_RATIO_THRESHOLD
             {
-                Some(Match {
-                    index1: i,
-                    index2: best_idx,
-                })
+                (i, Some(best_idx))
             } else {
-                None
+                (i, None)
             }
         })
-        .collect()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .fold(
+            vec![None; query_features.len()],
+            |mut matches, (index, best)| {
+                matches[index] = best;
+                matches
+            },
+        )
 }
 
 pub fn find_homography_ransac(
@@ -456,6 +482,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn match_features_keeps_only_reciprocal_one_to_one_pairs() {
+        let features1 = vec![
+            feature_with_descriptor(0, 0),
+            feature_with_descriptor(1, 1),
+            feature_with_descriptor(240, 2),
+        ];
+        let features2 = vec![
+            feature_with_descriptor(0, 0),
+            feature_with_descriptor(240, 1),
+            feature_with_descriptor(255, 2),
+        ];
+
+        let matches = match_features(&features1, &features2);
+
+        assert_eq!(match_pairs(&matches), vec![(0, 0), (2, 1)]);
+    }
+
+    #[test]
+    fn match_features_rejects_non_reciprocal_duplicate_target() {
+        let features1 = vec![feature_with_descriptor(0, 0), feature_with_descriptor(1, 1)];
+        let features2 = vec![
+            feature_with_descriptor(0, 0),
+            feature_with_descriptor(255, 1),
+        ];
+
+        let matches = match_features(&features1, &features2);
+
+        assert_eq!(match_pairs(&matches), vec![(0, 0)]);
+    }
+
+    #[test]
     fn ransac_homography_is_deterministic_for_same_inputs() {
         let mut keypoints1 = Vec::new();
         let mut keypoints2 = Vec::new();
@@ -496,5 +553,17 @@ mod tests {
             .iter()
             .map(|matched| (matched.index1, matched.index2))
             .collect()
+    }
+
+    fn feature_with_descriptor(first_byte: u8, offset: u32) -> Feature {
+        let mut descriptor = [0_u8; BRIEF_DESCRIPTOR_SIZE / 8];
+        descriptor[0] = first_byte;
+        Feature {
+            descriptor,
+            keypoint: KeyPoint {
+                x: 20 + offset,
+                y: 30 + offset,
+            },
+        }
     }
 }
