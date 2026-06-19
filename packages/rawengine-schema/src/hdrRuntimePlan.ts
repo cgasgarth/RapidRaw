@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { estimateHdrAlignmentTransformsV1 } from './hdrAlignmentRuntime.js';
+import { detectHdrBracketV1, type HdrBracketDetectionSourceInputV1 } from './hdrBracketDetection.js';
 import { countHdrMotionPixelsV1, detectHdrMotionMaskV1 } from './hdrDeghostRuntime.js';
 import { mergeExposureWeightedRadianceV1 } from './hdrMergeWeightingRuntime.js';
 import {
@@ -11,6 +12,7 @@ import {
   type ComputationalMergeCommandEnvelopeV1,
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMutationResultV1,
+  type HdrBracketDetectionResultV1,
 } from './rawEngineSchemas.js';
 
 const HDR_RUNTIME_ENGINE_ID = 'rawengine_hdr_runtime_v1';
@@ -105,6 +107,7 @@ type HdrRuntimeCommandV1 = Extract<
   { commandType: 'computationalMerge.createHdr' }
 >;
 type ParsedHdrRuntimePlanRequestV1 = Omit<HdrRuntimePlanRequestV1, 'command'> & {
+  bracketPolicyWarnings: string[];
   command: HdrRuntimeCommandV1;
 };
 
@@ -265,7 +268,16 @@ const parseHdrRuntimePlanRequest = (requestValue: unknown, dryRun: boolean): Par
     }
   }
 
-  return { ...request, command: request.command };
+  const parsedRequest = { ...request, command: request.command };
+  const bracketPolicy = evaluateHdrRuntimeBracketPolicy(parsedRequest);
+  if (request.command.parameters.bracketValidation === 'required' && !bracketPolicy.accepted) {
+    throw new Error(`HDR runtime bracket validation failed: ${bracketPolicy.blockCodes.join(', ')}`);
+  }
+
+  return {
+    ...parsedRequest,
+    bracketPolicyWarnings: getHdrRuntimeBracketPolicyWarnings(request.command, bracketPolicy),
+  };
 };
 
 const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
@@ -309,6 +321,7 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
     alignment.alignmentConfidence,
     motionCoverageRatio,
     request.command.parameters.deghosting,
+    request.bracketPolicyWarnings,
   );
   const firstFrame = request.frames[0];
   if (firstFrame === undefined) {
@@ -463,12 +476,54 @@ const deriveRuntimeWarnings = (
   alignmentConfidence: number,
   motionCoverageRatio: number,
   deghosting: HdrRuntimeProvenanceV1['deghosting'],
+  bracketPolicyWarnings: string[],
 ): string[] => {
-  const warnings = new Set<string>(['legacy_full_frame_render']);
+  const warnings = new Set<string>(['legacy_full_frame_render', ...bracketPolicyWarnings]);
   if (alignmentConfidence < 0.95) warnings.add('alignment_low_confidence');
   if (motionCoverageRatio > 0) warnings.add('motion_detected');
   if (motionCoverageRatio > 0 && deghosting !== 'off') warnings.add('deghost_mask_generated');
   return [...warnings].sort();
+};
+
+const evaluateHdrRuntimeBracketPolicy = (
+  request: Omit<ParsedHdrRuntimePlanRequestV1, 'bracketPolicyWarnings'>,
+): HdrBracketDetectionResultV1 => {
+  const framesBySourceIndex = new Map(request.frames.map((frame) => [frame.sourceIndex, frame]));
+  const sources: HdrBracketDetectionSourceInputV1[] = request.command.parameters.sources.map((source) => {
+    const frame = framesBySourceIndex.get(source.sourceIndex);
+    if (frame === undefined) {
+      throw new Error(`HDR runtime bracket validation missing frame for source ${source.sourceIndex}.`);
+    }
+
+    return {
+      contentHash: frame.contentHash,
+      declaredExposureEv: source.exposureEv ?? frame.exposureEv,
+      graphRevision: frame.graphRevision,
+      height: frame.height,
+      imageId: source.imageId,
+      imagePath: source.imagePath,
+      rawBlackLevelKnown: true,
+      rawWhiteLevelKnown: true,
+      sourceIndex: source.sourceIndex,
+      whiteBalanceComparable: true,
+      width: frame.width,
+    };
+  });
+
+  return detectHdrBracketV1({ sources });
+};
+
+const getHdrRuntimeBracketPolicyWarnings = (
+  command: HdrRuntimeCommandV1,
+  bracketDetection: HdrBracketDetectionResultV1,
+): string[] => {
+  if (command.parameters.bracketValidation === 'disabled') return ['bracket_validation_disabled'];
+  if (command.parameters.bracketValidation !== 'warn') return [];
+
+  return [
+    ...bracketDetection.blockCodes.map((blockCode) => `bracket_validation_block:${blockCode}`),
+    ...bracketDetection.warningCodes.map((warningCode) => `bracket_validation_warning:${warningCode}`),
+  ];
 };
 
 const buildHdrRuntimeQualityMetrics = (
