@@ -15,12 +15,11 @@ import {
   Users,
   SlidersHorizontal,
 } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
-import SettingsPanel from './SettingsPanel';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../schemas/exportRecipeIds';
 import { buildLibrarySessionUiCard } from '../../schemas/librarySessionUiSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -42,6 +41,8 @@ import { type ImportState, Status } from '../ui/ExportImportProperties';
 import UiText from '../ui/Text';
 
 import type React from 'react';
+
+const SettingsPanel = lazy(() => import('./SettingsPanel.js').then((module) => ({ default: module.SettingsPanel })));
 
 interface MainLibraryProps {
   activePath: string | null;
@@ -300,15 +301,17 @@ export default function MainLibrary(props: MainLibraryProps) {
 
             <div className="w-full h-full flex flex-col p-8 lg:p-16 overflow-y-auto custom-scrollbar relative z-10">
               {showSettings ? (
-                <SettingsPanel
-                  appSettings={props.appSettings}
-                  onBack={() => {
-                    setShowSettings(false);
-                  }}
-                  onLibraryRefresh={props.onLibraryRefresh}
-                  onSettingsChange={props.onSettingsChange}
-                  rootPaths={props.rootPaths}
-                />
+                <Suspense fallback={<div className="min-h-0 flex-1" aria-busy="true" />}>
+                  <SettingsPanel
+                    appSettings={props.appSettings}
+                    onBack={() => {
+                      setShowSettings(false);
+                    }}
+                    onLibraryRefresh={props.onLibraryRefresh}
+                    onSettingsChange={props.onSettingsChange}
+                    rootPaths={props.rootPaths}
+                  />
+                </Suspense>
               ) : (
                 <>
                   <div className="my-auto text-left relative z-10">

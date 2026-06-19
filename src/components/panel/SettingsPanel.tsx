@@ -619,7 +619,7 @@ const PreviewModeSwitch = ({ mode, onModeChange }: PreviewModeSwitchProps) => {
   );
 };
 
-export default function SettingsPanel({
+export function SettingsPanel({
   appSettings,
   onBack,
   onLibraryRefresh,
@@ -2587,3 +2587,5 @@ export default function SettingsPanel({
     </>
   );
 }
+
+export default SettingsPanel;

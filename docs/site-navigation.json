@@ -644,6 +644,10 @@
           "path": "docs/tooling/frontend-animation-boundary-audit-2026-06-19.md"
         },
         {
+          "title": "Frontend Clerk boundary audit",
+          "path": "docs/tooling/frontend-clerk-boundary-audit-2026-06-19.md"
+        },
+        {
           "title": "Workflow topology",
           "path": "docs/ci/workflow-topology-2026-06-11.md"
         },
