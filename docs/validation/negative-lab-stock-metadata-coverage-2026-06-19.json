@@ -1,0 +1,307 @@
+{
+  "byStockClass": [
+    {
+      "count": 4,
+      "stockClass": "black_and_white_negative"
+    },
+    {
+      "count": 3,
+      "stockClass": "cinema_negative"
+    },
+    {
+      "count": 6,
+      "stockClass": "color_negative"
+    },
+    {
+      "count": 3,
+      "stockClass": "slide_reversal"
+    }
+  ],
+  "claimBoundary": "metadata_only_no_runtime_emulation_or_match_claim",
+  "entries": [
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Fujifilm 400",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.fujifilm_400.v1",
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "color_negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.neutral.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Fujifilm Provia 100F",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.fujifilm_provia_100f.v1",
+      "processFamily": "e6_slide_reversal",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "slide_reversal",
+      "suggestedGenericPresetId": null
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Fujifilm Velvia 50",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.fujifilm_velvia_50.v1",
+      "processFamily": "e6_slide_reversal",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "slide_reversal",
+      "suggestedGenericPresetId": null
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Ilford FP4 Plus 125",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.ilford_fp4_plus_125.v1",
+      "processFamily": "black_and_white_silver_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "black_and_white_negative",
+      "suggestedGenericPresetId": "negative_lab.generic.bw.fine_grain.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Ilford HP5 Plus 400",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.ilford_hp5_plus_400.v1",
+      "processFamily": "black_and_white_silver_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "black_and_white_negative",
+      "suggestedGenericPresetId": "negative_lab.generic.bw.push_contrast.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak Ektachrome E100",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_ektachrome_e100.v1",
+      "processFamily": "e6_slide_reversal",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "slide_reversal",
+      "suggestedGenericPresetId": null
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak Ektar 100",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_ektar_100.v1",
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "color_negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.saturated.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak Gold 200",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_gold_200.v1",
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "color_negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.warm_consumer.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak Portra 160",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_portra_160.v1",
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "color_negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.portrait.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak Portra 400",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_portra_400.v1",
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "color_negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.portrait.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak Portra 800",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_portra_800.v1",
+      "processFamily": "c41_color_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "color_negative",
+      "suggestedGenericPresetId": "negative_lab.generic.c41.high_speed.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak T-Max 100",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_t_max_100.v1",
+      "processFamily": "black_and_white_silver_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "black_and_white_negative",
+      "suggestedGenericPresetId": "negative_lab.generic.bw.fine_grain.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak Tri-X 400",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_tri_x_400.v1",
+      "processFamily": "black_and_white_silver_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "black_and_white_negative",
+      "suggestedGenericPresetId": "negative_lab.generic.bw.classic.v1"
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak Vision3 250D 5207",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_vision3_250d_5207.v1",
+      "processFamily": "ecn2_cinema_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "cinema_negative",
+      "suggestedGenericPresetId": null
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak Vision3 500T 5219",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_vision3_500t_5219.v1",
+      "processFamily": "ecn2_cinema_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "cinema_negative",
+      "suggestedGenericPresetId": null
+    },
+    {
+      "claimPolicy": "reference_metadata_no_emulation_no_match_claim",
+      "displayName": "Kodak Vision3 50D 5203",
+      "doesNotProve": [
+        "colorimetric_match",
+        "licensed_profile",
+        "manufacturer_endorsement",
+        "measured_profile",
+        "runtime_application",
+        "stock_emulation"
+      ],
+      "entryId": "negative_lab.stock_metadata.kodak_vision3_50d_5203.v1",
+      "processFamily": "ecn2_cinema_negative",
+      "runtimeStatus": "metadata_only_not_applicable",
+      "stockClass": "cinema_negative",
+      "suggestedGenericPresetId": null
+    }
+  ],
+  "generatedFrom": "src/data/negativeLabStockMetadataCatalog.json",
+  "requiredNonClaims": [
+    "colorimetric_match",
+    "licensed_profile",
+    "manufacturer_endorsement",
+    "measured_profile",
+    "runtime_application",
+    "stock_emulation"
+  ],
+  "schemaVersion": 1,
+  "totalEntries": 16,
+  "validationCommand": "bun run check:negative-lab-stock-metadata-coverage"
+}
