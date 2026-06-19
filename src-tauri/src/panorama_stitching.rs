@@ -127,6 +127,7 @@ pub struct PanoramaSelectedMatchEdgeMetadata {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PanoramaRenderMetadata {
+    pub blend_diagnostics: stitching::StitchBlendDiagnostics,
     pub connected_source_indices: Vec<usize>,
     pub estimated_peak_memory_bytes: u64,
     pub excluded_source_indices: Vec<usize>,
@@ -805,11 +806,12 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     );
     println!("Warping and blending full-resolution images with progressive optimal seams...");
 
-    let panorama = stitching::progressive_seam_stitcher(
+    let stitch_result = stitching::progressive_seam_stitcher(
         &stitched_images_info,
         &stitching_order.global_homographies,
         app_handle.clone(),
     )?;
+    let panorama = stitch_result.image;
 
     println!("Stitching completed in {:.2?}\n", start_time.elapsed());
 
@@ -825,6 +827,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     let estimated_peak_memory_bytes =
         estimate_legacy_panorama_peak_memory_bytes(&source_metadata, output_width, output_height);
     let metadata = PanoramaRenderMetadata {
+        blend_diagnostics: stitch_result.blend_diagnostics,
         connected_source_indices,
         estimated_peak_memory_bytes,
         excluded_source_indices,
@@ -1007,6 +1010,12 @@ fn upsert_panorama_artifact_metadata(
         .collect();
     let output_hash = hash_file_for_artifact(output_path)?;
 
+    let exposure_normalization = panorama_exposure_normalization_metadata(metadata);
+    let exposure_normalization_applied = !metadata
+        .blend_diagnostics
+        .overlap_gain_applications
+        .is_empty();
+
     let artifact = json!({
         "alignment": {
             "algorithmId": "rapidraw_fast9_brief_ransac_v1",
@@ -1060,18 +1069,14 @@ fn upsert_panorama_artifact_metadata(
                 "autoCrop": true,
                 "bundleAdjustment": false,
                 "cylindricalProjection": false,
-                "exposureNormalization": false,
+                "exposureNormalization": exposure_normalization_applied,
                 "planarHomography": true,
                 "tiledRender": false,
             },
             "engineId": "rapidraw_homography_seam_v0",
             "qualityTier": "legacy_local_preview",
         },
-        "exposureNormalization": {
-            "deferredReason": "Current panorama runtime records planned exposure normalization but does not apply it yet.",
-            "mode": "planned",
-            "support": "schema_only_deferred",
-        },
+        "exposureNormalization": exposure_normalization,
         "lensCorrectionPolicy": "required_before_stitch",
         "operationId": "merge.panorama.create",
         "operationVersion": 1,
@@ -1136,6 +1141,29 @@ fn upsert_panorama_artifact_metadata(
     artifacts.panorama_artifacts.push(artifact);
     artifacts.stale_artifact_ids.retain(|id| !id.is_empty());
     Ok(())
+}
+
+fn panorama_exposure_normalization_metadata(
+    metadata: &PanoramaRenderMetadata,
+) -> serde_json::Value {
+    let applied_gains: Vec<_> = metadata
+        .blend_diagnostics
+        .overlap_gain_applications
+        .iter()
+        .map(|application| {
+            json!({
+                "gain": application.gain,
+                "sourceIndex": application.source_index,
+            })
+        })
+        .collect();
+
+    json!({
+        "appliedGainCount": applied_gains.len(),
+        "appliedLuminanceGains": applied_gains,
+        "mode": "scalar_overlap_luminance_gain_v1",
+        "support": "implemented_current_engine",
+    })
 }
 
 fn panorama_warning_codes(metadata: &PanoramaRenderMetadata) -> Vec<String> {
@@ -1973,6 +2001,23 @@ mod tests {
             artifact["alignment"]["pairwiseMatches"][0]["homography3x3"][2],
             12.0
         );
+        assert_eq!(
+            artifact["engine"]["capabilities"]["exposureNormalization"],
+            true
+        );
+        assert_eq!(
+            artifact["exposureNormalization"]["mode"],
+            "scalar_overlap_luminance_gain_v1"
+        );
+        assert_eq!(artifact["exposureNormalization"]["appliedGainCount"], 1);
+        assert_eq!(
+            artifact["exposureNormalization"]["appliedLuminanceGains"][0]["sourceIndex"],
+            1
+        );
+        assert_eq!(
+            artifact["exposureNormalization"]["appliedLuminanceGains"][0]["gain"],
+            1.125
+        );
     }
 
     #[test]
@@ -2158,6 +2203,12 @@ mod tests {
 
     fn sample_render_metadata() -> PanoramaRenderMetadata {
         PanoramaRenderMetadata {
+            blend_diagnostics: stitching::StitchBlendDiagnostics {
+                overlap_gain_applications: vec![stitching::OverlapGainApplication {
+                    gain: 1.125,
+                    source_index: 1,
+                }],
+            },
             connected_source_indices: vec![0, 1],
             estimated_peak_memory_bytes: 128_000,
             excluded_source_indices: Vec::new(),

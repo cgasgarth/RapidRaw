@@ -52,13 +52,32 @@ struct SeamInfo {
     dy: f64,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct OverlapGainApplication {
+    pub gain: f32,
+    pub source_index: usize,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StitchBlendDiagnostics {
+    pub overlap_gain_applications: Vec<OverlapGainApplication>,
+}
+
+pub struct ProgressiveStitchResult {
+    pub blend_diagnostics: StitchBlendDiagnostics,
+    pub image: Rgb32FImage,
+}
+
 pub fn progressive_seam_stitcher<R: Runtime>(
     images: &[&ImageInfo],
     global_homographies: &HashMap<usize, Matrix3<f64>>,
     app_handle: AppHandle<R>,
-) -> Result<Rgb32FImage, String> {
+) -> Result<ProgressiveStitchResult, String> {
     if images.is_empty() {
-        return Ok(Rgb32FImage::new(0, 0));
+        return Ok(ProgressiveStitchResult {
+            blend_diagnostics: StitchBlendDiagnostics::default(),
+            image: Rgb32FImage::new(0, 0),
+        });
     }
 
     let mut min_x = f64::INFINITY;
@@ -84,6 +103,7 @@ pub fn progressive_seam_stitcher<R: Runtime>(
 
     let mut panorama = Rgb32FImage::new(out_width, out_height);
     let mut panorama_mask = GrayImage::new(out_width, out_height);
+    let mut blend_diagnostics = StitchBlendDiagnostics::default();
 
     let base_img_info = images[0];
     let h_base = &global_homographies[&base_img_info.id];
@@ -151,6 +171,12 @@ pub fn progressive_seam_stitcher<R: Runtime>(
             },
         );
         println!("    - Overlap luminance gain: {:.3}", overlap_gain);
+        blend_diagnostics
+            .overlap_gain_applications
+            .push(OverlapGainApplication {
+                gain: overlap_gain,
+                source_index: img_to_add_info.id,
+            });
 
         let ctx = SeamContext {
             pano: &panorama,
@@ -408,7 +434,10 @@ pub fn progressive_seam_stitcher<R: Runtime>(
         }
     }
 
-    Ok(panorama)
+    Ok(ProgressiveStitchResult {
+        blend_diagnostics,
+        image: panorama,
+    })
 }
 
 fn project_image_sample_bounds(
