@@ -776,7 +776,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         &stitched_images_info,
         &global_homographies,
         app_handle.clone(),
-    );
+    )?;
 
     println!("Stitching completed in {:.2?}\n", start_time.elapsed());
 
