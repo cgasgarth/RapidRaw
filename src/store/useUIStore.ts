@@ -72,6 +72,12 @@ export interface SuperResolutionModalState {
 
 export interface FocusStackModalState {
   isOpen: boolean;
+  lastDryRunCommand?: {
+    commandType: 'computationalMerge.createFocusStack';
+    dryRun: true;
+    sources: number;
+    toolName: string;
+  };
   settings: FocusStackUiSettings;
   sourcePaths: Array<string>;
 }

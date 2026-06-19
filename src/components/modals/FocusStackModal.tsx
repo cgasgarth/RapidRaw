@@ -25,6 +25,7 @@ interface FocusStackModalProps {
   isOpen: boolean;
   loadingImageUrl?: string | null;
   onClose: () => void;
+  onPreviewPlan: () => void;
   onSettingsChange: (settings: FocusStackUiSettings) => void;
   settings: FocusStackUiSettings;
   sourceCount: number;
@@ -36,6 +37,7 @@ export default function FocusStackModal({
   isOpen,
   loadingImageUrl,
   onClose,
+  onPreviewPlan,
   onSettingsChange,
   settings,
   sourceCount,
@@ -92,7 +94,7 @@ export default function FocusStackModal({
           >
             {t('modals.focusStack.close')}
           </button>
-          <Button onClick={() => {}} disabled>
+          <Button onClick={onPreviewPlan} disabled={!isSourceCountValid}>
             <Layers3 className="w-4 h-4" />
             {t('modals.focusStack.previewPlan')}
           </Button>

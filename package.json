@@ -259,6 +259,7 @@
     "check:focus-preview-blend-smoke": "bun scripts/check-focus-preview-blend-smoke.ts",
     "check:focus-blend-halo-proof": "bun scripts/check-focus-blend-halo-proof.ts",
     "check:focus-blend-halo-proof:update": "bun scripts/check-focus-blend-halo-proof.ts --update",
+    "check:focus-ui-action-command": "bun scripts/check-focus-ui-action-command.ts",
     "check:focus-ui-api": "bun scripts/check-focus-ui-api.ts",
     "check:focus-ui-runtime-bridge": "bun scripts/check-focus-ui-runtime-bridge.ts",
     "check:focus-review-diagnostics": "bun scripts/check-focus-review-diagnostics.ts",
