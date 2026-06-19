@@ -3675,20 +3675,35 @@ export const hdrMergeStaleStateV1Schema = z.enum(['current', 'stale', 'unknown']
 export const hdrBracketSourceMetadataV1Schema = z
   .object({
     aperture: z.number().positive().optional(),
+    bitDepth: z.number().int().positive().optional(),
     cameraMake: z.string().trim().min(1).optional(),
     cameraModel: z.string().trim().min(1).optional(),
     captureTimestamp: z.iso.datetime({ offset: true }).optional(),
+    cfaPattern: z.string().trim().min(1).optional(),
     contentHash: z.string().trim().min(1).optional(),
+    cropFactor: z.number().positive().optional(),
     declaredExposureEv: z.number().optional(),
     exposureCompensationEv: z.number().optional(),
     exposureTimeSeconds: z.number().positive().optional(),
+    focalLengthMm: z.number().positive().optional(),
     graphRevision: z.string().trim().min(1).optional(),
     height: z.number().int().positive(),
     imageId: z.string().trim().min(1).optional(),
     imagePath: z.string().trim().min(1),
     iso: z.number().positive().optional(),
     lensModel: z.string().trim().min(1).optional(),
+    lensProfileId: z.string().trim().min(1).optional(),
+    rawActiveArea: z
+      .object({
+        height: z.number().int().positive(),
+        width: z.number().int().positive(),
+        x: z.number().int().nonnegative(),
+        y: z.number().int().nonnegative(),
+      })
+      .strict()
+      .optional(),
     rawBlackLevelKnown: z.boolean(),
+    rawOrientation: z.enum(['normal', 'rotated_90', 'rotated_180', 'rotated_270']).optional(),
     rawWhiteLevelKnown: z.boolean(),
     resolvedBracketRole: z.enum(['over_exposed', 'reference', 'under_exposed', 'unknown']),
     resolvedExposureEv: z.number(),
