@@ -195,6 +195,50 @@ export default function PanoramaModal({
             </div>
             <ComputationalMergeAppServerBadge family="panorama" statusLabel={t('editor.ai.connection.ready')} />
           </div>
+          <section
+            className="mb-5 grid grid-cols-3 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
+            data-testid="panorama-setup-summary"
+          >
+            {[
+              {
+                label: t('modals.panorama.summaryProjection'),
+                value: projectionOptions.find((option) => option.value === settings.projection)?.label,
+              },
+              {
+                label: t('modals.panorama.summaryBlend'),
+                value: t(`modals.panorama.blend.${settings.blendMode}.label`),
+              },
+              {
+                label: t('modals.panorama.summaryBoundary'),
+                value: boundaryOptions.find((option) => option.value === settings.boundaryMode)?.label,
+              },
+              {
+                label: t('modals.panorama.summaryExposure'),
+                value: exposureOptions.find((option) => option.value === settings.exposureMode)?.label,
+              },
+              {
+                label: t('modals.panorama.summaryQuality'),
+                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label,
+              },
+              {
+                label: t('modals.panorama.summaryPreviewBudget'),
+                value: t('modals.panorama.previewPixels', { value: settings.maxPreviewDimensionPx }),
+              },
+            ].map((item) => (
+              <div
+                className="rounded border border-border-color bg-bg-primary px-2 py-1.5"
+                data-testid="panorama-setup-summary-chip"
+                key={item.label}
+              >
+                <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                  {item.label}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                  {item.value}
+                </UiText>
+              </div>
+            ))}
+          </section>
 
           {!isSourceCountValid && (
             <div className="mb-5 flex gap-3 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3">

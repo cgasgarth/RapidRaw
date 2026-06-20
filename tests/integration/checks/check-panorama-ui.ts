@@ -29,6 +29,12 @@ const requiredLocaleKeys = [
   'quality.preview',
   'qualityLabel',
   'sourceCountBlocked',
+  'summaryBlend',
+  'summaryBoundary',
+  'summaryExposure',
+  'summaryPreviewBudget',
+  'summaryProjection',
+  'summaryQuality',
   'uiOnlyNotice',
   'workflowStatus',
   'workflowTitle',
@@ -61,6 +67,19 @@ const invalid = panoramaUiSettingsSchema.safeParse({
 if (invalid.success) {
   console.error('Panorama UI schema accepted an oversized preview budget.');
   process.exit(1);
+}
+
+const source = readFileSync('src/components/modals/PanoramaModal.tsx', 'utf8');
+for (const marker of [
+  'panorama-setup-summary',
+  'panorama-setup-summary-chip',
+  'modals.panorama.summaryProjection',
+  'settings.maxPreviewDimensionPx',
+]) {
+  if (!source.includes(marker)) {
+    console.error(`Panorama modal missing setup summary marker: ${marker}`);
+    process.exit(1);
+  }
 }
 
 console.log('panorama UI ok');
