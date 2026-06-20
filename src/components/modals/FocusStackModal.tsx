@@ -59,11 +59,16 @@ export default function FocusStackModal({
     { label: t('modals.focusStack.qualityBalanced'), value: 'balanced' },
     { label: t('modals.focusStack.qualityBest'), value: 'best' },
   ];
+  const selectedAlignmentLabel =
+    alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label ?? '';
   const selectedQualityLabel =
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
   const sourceReadinessLabel = `${t('modals.focusStack.sourceSummary', { count: sourceCount })} - ${
     isSourceCountValid ? t('modals.focusStack.preflight.ready') : t('modals.focusStack.preflight.blocked')
   }`;
+  const stackReadinessLabel = isSourceCountValid
+    ? t('modals.focusStack.preflight.ready')
+    : t('modals.focusStack.preflight.blocked');
 
   const setSetting = useCallback(
     (patch: Partial<FocusStackUiSettings>) => {
@@ -124,6 +129,28 @@ export default function FocusStackModal({
           label={t('modals.focusStack.preflight.retouch')}
           value={t(`modals.focusStack.retouchPolicy.${settings.retouchLayerPolicy}.label`)}
         />
+      </section>
+      <section
+        className="grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm"
+        data-alignment-mode={settings.alignmentMode}
+        data-blend-method={settings.blendMethod}
+        data-source-count={sourceCount}
+        data-stack-ready={String(isSourceCountValid)}
+        data-testid="focus-stack-readiness-summary"
+      >
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.sources')}
+          value={t('modals.focusStack.sourceSummary', { count: sourceCount })}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.alignment')}
+          value={selectedAlignmentLabel}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.blend')}
+          value={t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`)}
+        />
+        <ComputationalSetupStatusLine label={t('modals.focusStack.workflowTitle')} value={stackReadinessLabel} />
       </section>
 
       <section className="grid grid-cols-2 gap-4">
