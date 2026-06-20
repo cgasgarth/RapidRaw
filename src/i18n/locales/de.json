@@ -1625,6 +1625,10 @@
         "sceneLinear": "Scene-linear radiance"
       },
       "strategyLabel": "Merge strategy",
+      "summaryAlignment": "Alignment",
+      "summaryDeghosting": "Deghosting",
+      "summaryPreviewBudget": "Preview",
+      "summaryQuality": "Quality",
       "title": "Zu HDR zusammenfügen",
       "toneMapPreview": "Tone-map preview",
       "uiOnlyNotice": "These controls define the requested HDR merge artifact. Runtime merge quality remains validated by fixture, sidecar, and image-processing checks.",

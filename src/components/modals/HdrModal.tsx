@@ -195,6 +195,42 @@ export default function HdrModal({
             </div>
             <ComputationalMergeAppServerBadge family="hdr" statusLabel={t('editor.ai.connection.ready')} />
           </div>
+          <section
+            className="mb-5 grid grid-cols-2 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
+            data-testid="hdr-setup-summary"
+          >
+            {[
+              {
+                label: t('modals.hdr.summaryAlignment'),
+                value: alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label,
+              },
+              {
+                label: t('modals.hdr.summaryDeghosting'),
+                value: t(`modals.hdr.deghosting.${settings.deghosting}`),
+              },
+              {
+                label: t('modals.hdr.summaryQuality'),
+                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label,
+              },
+              {
+                label: t('modals.hdr.summaryPreviewBudget'),
+                value: t('modals.hdr.previewPixels', { value: settings.maxPreviewDimensionPx }),
+              },
+            ].map((item) => (
+              <div
+                className="rounded border border-border-color bg-bg-primary px-2 py-1.5"
+                data-testid="hdr-setup-summary-chip"
+                key={item.label}
+              >
+                <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                  {item.label}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                  {item.value}
+                </UiText>
+              </div>
+            ))}
+          </section>
 
           {!isSourceCountValid && (
             <div className="mb-5 flex gap-3 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3">

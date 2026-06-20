@@ -29,6 +29,10 @@ const requiredLocaleKeys = [
   'strategy.exposureFusion',
   'strategy.sceneLinear',
   'strategyLabel',
+  'summaryAlignment',
+  'summaryDeghosting',
+  'summaryPreviewBudget',
+  'summaryQuality',
   'toneMapPreview',
   'uiOnlyNotice',
   'workflowStatus',
@@ -58,6 +62,19 @@ const invalid = hdrMergeUiSettingsSchema.safeParse({
 if (invalid.success) {
   console.error('HDR UI schema accepted an oversized preview budget.');
   process.exit(1);
+}
+
+const source = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
+for (const marker of [
+  'hdr-setup-summary',
+  'hdr-setup-summary-chip',
+  'modals.hdr.summaryAlignment',
+  'settings.maxPreviewDimensionPx',
+]) {
+  if (!source.includes(marker)) {
+    console.error(`HDR modal missing setup summary marker: ${marker}`);
+    process.exit(1);
+  }
 }
 
 console.log('hdr merge UI ok');
