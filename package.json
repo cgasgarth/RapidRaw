@@ -69,6 +69,8 @@
     "check:colorchecker-fixtures": "bun scripts/check-colorchecker-fixtures.ts",
     "check:color-style-presets": "bun scripts/check-color-style-presets.ts",
     "check:hue-memory-color": "bun scripts/check-hue-memory-color-gate.ts",
+    "check:selective-color-command-proof": "bun scripts/check-selective-color-command-proof.ts",
+    "check:selective-color-command-proof:update": "bun scripts/check-selective-color-command-proof.ts --update",
     "check:selective-color-ranges": "bun scripts/check-selective-color-ranges.ts",
     "check:selective-color-falloff": "bun scripts/check-selective-color-falloff.ts",
     "check:skin-tone-uniformity": "bun scripts/check-skin-tone-uniformity.ts",
