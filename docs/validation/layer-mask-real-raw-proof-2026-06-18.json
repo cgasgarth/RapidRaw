@@ -39,7 +39,7 @@
   ],
   "fixtureId": "validation.layer-mask-real-raw.high-iso-skin-shadow.v1",
   "generatedAt": "2026-06-18T12:55:04.922Z",
-  "issue": 1247,
+  "issue": 2310,
   "metrics": [
     {
       "name": "maskCoverageRatio",
@@ -72,6 +72,25 @@
       "value": 1
     }
   ],
+  "proofClaims": {
+    "doesNotProve": ["macos_app_ui_e2e_session", "manual_layer_panel_interaction", "public_raw_fixture_distribution"],
+    "proves": [
+      "private_real_raw_decode",
+      "layer_mask_generation",
+      "masked_adjustment_changes_pixels",
+      "mask_refinement_changes_pixels",
+      "refined_preview_export_parity"
+    ]
+  },
   "reportId": "layer-mask-real-raw.high-iso-skin-shadow.v1",
-  "validationMode": "private_raw_metadata_only"
+  "runtimeProof": {
+    "execution": "tauri_test_gpu_pipeline",
+    "macosAppUiE2E": false,
+    "maskPath": "prepare_export_masks + generate_mask_bitmap",
+    "outputArtifactCount": 4,
+    "previewExportParityMetric": "previewExportMeanAbsDelta",
+    "rawDecodePath": "load_base_image_from_bytes",
+    "renderPath": "process_image_for_export_pipeline_with_tonemapper_override"
+  },
+  "validationMode": "private_raw_tauri_runtime_proof"
 }
