@@ -1,0 +1,38 @@
+{
+  "cases": [
+    {
+      "candidateEdgeCount": 6,
+      "pairwiseMatchCount": 3,
+      "referenceSelectionReason": "projected_center_source",
+      "referenceSourceIndex": 1,
+      "selectedEdges": [
+        {
+          "fromSourceIndex": 0,
+          "overlapAreaPx": 2000,
+          "qualityRank": 1,
+          "qualityScore": 0.5,
+          "toSourceIndex": 1
+        },
+        {
+          "fromSourceIndex": 1,
+          "overlapAreaPx": 1960,
+          "qualityRank": 2,
+          "qualityScore": 0.47,
+          "toSourceIndex": 2
+        },
+        {
+          "fromSourceIndex": 2,
+          "overlapAreaPx": 1960,
+          "qualityRank": 3,
+          "qualityScore": 0.47,
+          "toSourceIndex": 3
+        }
+      ],
+      "selectionMode": "quality_ranked_spanning_graph_v1"
+    }
+  ],
+  "issue": 2294,
+  "schemaVersion": 1,
+  "validationMode": "panorama_graph_reference_selection",
+  "validationStatus": "synthetic_runtime_metadata_gate"
+}

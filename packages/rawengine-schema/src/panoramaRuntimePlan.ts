@@ -51,6 +51,26 @@ export const panoramaRuntimeProvenanceV1Schema = z
     alignment: z
       .object({
         algorithmId: z.literal('synthetic_offset_translation_v1'),
+        graph: z
+          .object({
+            candidateEdgeCount: z.number().int().nonnegative(),
+            referenceSelectionReason: z.literal('projected_center_source'),
+            referenceSourceIndex: z.number().int().nonnegative(),
+            selectedEdgeCount: z.number().int().nonnegative(),
+            selectedEdges: z.array(
+              z
+                .object({
+                  fromSourceIndex: z.number().int().nonnegative(),
+                  overlapAreaPx: z.number().int().nonnegative(),
+                  qualityRank: z.number().int().positive(),
+                  qualityScore: z.number(),
+                  toSourceIndex: z.number().int().nonnegative(),
+                })
+                .strict(),
+            ),
+            selectionMode: z.literal('quality_ranked_spanning_graph_v1'),
+          })
+          .strict(),
         pairwiseMatches: z.array(
           z
             .object({
@@ -556,38 +576,171 @@ const buildPanoramaRuntimeAlignment = (
     if (frame === undefined) throw new Error(`Panorama runtime alignment missing source ${sourceIndex}.`);
     return frame;
   });
+  const candidateEdges = buildPanoramaGraphCandidateEdges(connectedFrames);
+  const selectedEdges = selectPanoramaSpanningGraphEdges(candidateEdges, connectedFrames);
 
   return {
     algorithmId: 'synthetic_offset_translation_v1' as const,
-    pairwiseMatches: connectedFrames.slice(1).map((frame, index) => {
-      const previousFrame = connectedFrames[index];
-      if (previousFrame === undefined) throw new Error('Panorama runtime alignment missing previous source frame.');
-      const previousX = previousFrame.expectedOffsetX ?? 0;
-      const previousY = previousFrame.expectedOffsetY ?? 0;
-      const frameX = frame.expectedOffsetX ?? previousX + previousFrame.width;
-      const frameY = frame.expectedOffsetY ?? previousY;
-      const overlapWidth = Math.max(0, previousX + previousFrame.width - frameX);
-      const overlapTop = Math.max(previousY, frameY);
-      const overlapBottom = Math.min(previousY + previousFrame.height, frameY + frame.height);
-      const translationPx = {
-        x: frameX - previousX,
-        y: frameY - previousY,
-      };
-      const homography3x3 = translationHomography3x3(translationPx);
-      return {
-        dltDiagnostics: buildPanoramaHomographyDltDiagnosticsV1({
-          homography3x3,
-          pointPairs: buildSyntheticTranslationPointPairs(previousFrame, translationPx),
-        }),
-        fromSourceIndex: previousFrame.sourceIndex,
-        overlapAreaPx: overlapWidth * Math.max(0, overlapBottom - overlapTop),
-        reprojectionErrorPx: Math.abs(frameY - previousY) / Math.max(1, frame.height),
-        toSourceIndex: frame.sourceIndex,
-        translationPx,
-      };
-    }),
+    graph: {
+      candidateEdgeCount: candidateEdges.length,
+      referenceSelectionReason: 'projected_center_source' as const,
+      referenceSourceIndex: choosePanoramaReferenceSourceIndex(connectedFrames),
+      selectedEdgeCount: selectedEdges.length,
+      selectedEdges: selectedEdges.map(({ edge, qualityRank }) => ({
+        fromSourceIndex: edge.fromFrame.sourceIndex,
+        overlapAreaPx: edge.overlapAreaPx,
+        qualityRank,
+        qualityScore: edge.qualityScore,
+        toSourceIndex: edge.toFrame.sourceIndex,
+      })),
+      selectionMode: 'quality_ranked_spanning_graph_v1' as const,
+    },
+    pairwiseMatches: selectedEdges.map(({ edge }) => buildPanoramaPairwiseMatch(edge)),
   };
 };
+
+interface PanoramaGraphCandidateEdge {
+  fromFrame: PanoramaRuntimeSourceFrameV1;
+  overlapAreaPx: number;
+  qualityScore: number;
+  reprojectionErrorPx: number;
+  toFrame: PanoramaRuntimeSourceFrameV1;
+  translationPx: {
+    x: number;
+    y: number;
+  };
+}
+
+const buildPanoramaGraphCandidateEdges = (
+  connectedFrames: PanoramaRuntimeSourceFrameV1[],
+): PanoramaGraphCandidateEdge[] => {
+  const orderedFrames = [...connectedFrames].sort(comparePanoramaFramePosition);
+  const edges: PanoramaGraphCandidateEdge[] = [];
+  for (let leftIndex = 0; leftIndex < orderedFrames.length; leftIndex += 1) {
+    const fromFrame = orderedFrames[leftIndex];
+    if (fromFrame === undefined) continue;
+    for (let rightIndex = leftIndex + 1; rightIndex < orderedFrames.length; rightIndex += 1) {
+      const toFrame = orderedFrames[rightIndex];
+      if (toFrame === undefined) continue;
+      edges.push(buildPanoramaGraphCandidateEdge(fromFrame, toFrame));
+    }
+  }
+  return edges.toSorted(comparePanoramaGraphCandidateEdge);
+};
+
+const buildPanoramaGraphCandidateEdge = (
+  fromFrame: PanoramaRuntimeSourceFrameV1,
+  toFrame: PanoramaRuntimeSourceFrameV1,
+): PanoramaGraphCandidateEdge => {
+  const fromX = fromFrame.expectedOffsetX ?? 0;
+  const fromY = fromFrame.expectedOffsetY ?? 0;
+  const toX = toFrame.expectedOffsetX ?? fromX + fromFrame.width;
+  const toY = toFrame.expectedOffsetY ?? fromY;
+  const overlapWidth = Math.max(0, fromX + fromFrame.width - toX);
+  const overlapTop = Math.max(fromY, toY);
+  const overlapBottom = Math.min(fromY + fromFrame.height, toY + toFrame.height);
+  const overlapAreaPx = overlapWidth * Math.max(0, overlapBottom - overlapTop);
+  const reprojectionErrorPx = Math.abs(toY - fromY) / Math.max(1, toFrame.height);
+  const overlapRatio =
+    overlapAreaPx / Math.max(1, Math.min(fromFrame.width * fromFrame.height, toFrame.width * toFrame.height));
+  return {
+    fromFrame,
+    overlapAreaPx,
+    qualityScore: roundPanoramaRuntimeMetric(overlapRatio - reprojectionErrorPx),
+    reprojectionErrorPx,
+    toFrame,
+    translationPx: {
+      x: toX - fromX,
+      y: toY - fromY,
+    },
+  };
+};
+
+const selectPanoramaSpanningGraphEdges = (
+  candidateEdges: PanoramaGraphCandidateEdge[],
+  connectedFrames: PanoramaRuntimeSourceFrameV1[],
+): Array<{ edge: PanoramaGraphCandidateEdge; qualityRank: number }> => {
+  const disjointSet = new PanoramaRuntimeDisjointSet(connectedFrames.map((frame) => frame.sourceIndex));
+  const selectedEdges: Array<{ edge: PanoramaGraphCandidateEdge; qualityRank: number }> = [];
+  candidateEdges.forEach((edge, index) => {
+    if (selectedEdges.length >= Math.max(0, connectedFrames.length - 1)) return;
+    if (!disjointSet.union(edge.fromFrame.sourceIndex, edge.toFrame.sourceIndex)) return;
+    selectedEdges.push({ edge, qualityRank: index + 1 });
+  });
+  return selectedEdges.toSorted((left, right) =>
+    comparePanoramaFramePosition(left.edge.fromFrame, right.edge.fromFrame),
+  );
+};
+
+const buildPanoramaPairwiseMatch = (edge: PanoramaGraphCandidateEdge) => {
+  const homography3x3 = translationHomography3x3(edge.translationPx);
+  return {
+    dltDiagnostics: buildPanoramaHomographyDltDiagnosticsV1({
+      homography3x3,
+      pointPairs: buildSyntheticTranslationPointPairs(edge.fromFrame, edge.translationPx),
+    }),
+    fromSourceIndex: edge.fromFrame.sourceIndex,
+    overlapAreaPx: edge.overlapAreaPx,
+    reprojectionErrorPx: edge.reprojectionErrorPx,
+    toSourceIndex: edge.toFrame.sourceIndex,
+    translationPx: edge.translationPx,
+  };
+};
+
+const choosePanoramaReferenceSourceIndex = (connectedFrames: PanoramaRuntimeSourceFrameV1[]): number => {
+  const minLeft = Math.min(...connectedFrames.map((frame) => frame.expectedOffsetX ?? 0));
+  const maxRight = Math.max(...connectedFrames.map((frame) => (frame.expectedOffsetX ?? 0) + frame.width));
+  const centerX = (minLeft + maxRight) / 2;
+  const [referenceFrame] = [...connectedFrames].sort((left, right) => {
+    const leftDistance = Math.abs((left.expectedOffsetX ?? 0) + left.width / 2 - centerX);
+    const rightDistance = Math.abs((right.expectedOffsetX ?? 0) + right.width / 2 - centerX);
+    return leftDistance - rightDistance || left.sourceIndex - right.sourceIndex;
+  });
+  if (referenceFrame === undefined) throw new Error('Panorama runtime alignment missing reference frame.');
+  return referenceFrame.sourceIndex;
+};
+
+const comparePanoramaGraphCandidateEdge = (
+  left: PanoramaGraphCandidateEdge,
+  right: PanoramaGraphCandidateEdge,
+): number =>
+  right.qualityScore - left.qualityScore ||
+  right.overlapAreaPx - left.overlapAreaPx ||
+  left.fromFrame.sourceIndex - right.fromFrame.sourceIndex ||
+  left.toFrame.sourceIndex - right.toFrame.sourceIndex;
+
+const comparePanoramaFramePosition = (
+  left: PanoramaRuntimeSourceFrameV1,
+  right: PanoramaRuntimeSourceFrameV1,
+): number =>
+  (left.expectedOffsetX ?? 0) - (right.expectedOffsetX ?? 0) ||
+  (left.expectedOffsetY ?? 0) - (right.expectedOffsetY ?? 0) ||
+  left.sourceIndex - right.sourceIndex;
+
+class PanoramaRuntimeDisjointSet {
+  readonly #parents: Map<number, number> = new Map<number, number>();
+
+  constructor(sourceIndices: number[]) {
+    for (const sourceIndex of sourceIndices) this.#parents.set(sourceIndex, sourceIndex);
+  }
+
+  find(sourceIndex: number): number {
+    const parent = this.#parents.get(sourceIndex);
+    if (parent === undefined) throw new Error(`Panorama graph missing source ${sourceIndex}.`);
+    if (parent === sourceIndex) return sourceIndex;
+    const root = this.find(parent);
+    this.#parents.set(sourceIndex, root);
+    return root;
+  }
+
+  union(left: number, right: number): boolean {
+    const leftRoot = this.find(left);
+    const rightRoot = this.find(right);
+    if (leftRoot === rightRoot) return false;
+    this.#parents.set(rightRoot, leftRoot);
+    return true;
+  }
+}
 
 const translationHomography3x3 = (translationPx: { x: number; y: number }) =>
   [1, 0, translationPx.x, 0, 1, translationPx.y, 0, 0, 1] as const;
