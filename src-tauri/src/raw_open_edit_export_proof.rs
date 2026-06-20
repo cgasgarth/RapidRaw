@@ -20,7 +20,7 @@ use crate::image_processing::{
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportProofRequest {
     pub artifact_dir_relative: String,
-    pub edit_command: RawOpenEditExportBasicToneCommand,
+    pub edit_command: RawOpenEditExportCommand,
     pub fixture_id: String,
     pub private_root_path: String,
     pub source_relative_path: String,
@@ -28,14 +28,14 @@ pub struct RawOpenEditExportProofRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RawOpenEditExportBasicToneCommand {
+pub struct RawOpenEditExportCommand {
     pub approval: RawOpenEditExportBasicToneApproval,
     pub color_pipeline: RawOpenEditExportColorPipeline,
     pub command_id: String,
     pub command_type: String,
     pub dry_run: bool,
     pub expected_graph_revision: String,
-    pub parameters: RawOpenEditExportBasicToneParameters,
+    pub parameters: Value,
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,6 +93,15 @@ pub struct RawOpenEditExportBasicToneParameters {
     pub saturation: f64,
     pub shadows: f64,
     pub white_point: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportSelectiveColorParameters {
+    pub band: String,
+    pub hue_shift_degrees: f64,
+    pub luminance: f64,
+    pub saturation: f64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -189,7 +198,7 @@ fn run_raw_open_edit_export_proof_with_context(
     let source_path = resolve_private_relative(&private_root, &request.source_relative_path)?;
     let artifact_dir = resolve_private_relative(&private_root, &request.artifact_dir_relative)?;
     fs::create_dir_all(&artifact_dir).map_err(|error| error.to_string())?;
-    let adjustments = basic_tone_adjustments(&request.edit_command)?;
+    let adjustments = edit_command_adjustments(&request.edit_command)?;
 
     let source_hash_before = sha256_file(&source_path)?;
     let source_bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
@@ -372,10 +381,7 @@ fn run_raw_open_edit_export_proof_with_context(
     Ok(report)
 }
 
-fn basic_tone_adjustments(command: &RawOpenEditExportBasicToneCommand) -> Result<Value, String> {
-    if command.command_type != "toneColor.setBasicTone" {
-        return Err("editCommand.commandType must be toneColor.setBasicTone.".to_string());
-    }
+fn edit_command_adjustments(command: &RawOpenEditExportCommand) -> Result<Value, String> {
     if command.dry_run {
         return Err("editCommand must be an apply command, not a dry-run command.".to_string());
     }
@@ -383,15 +389,55 @@ fn basic_tone_adjustments(command: &RawOpenEditExportBasicToneCommand) -> Result
         return Err("editCommand requires approved edit_apply approval.".to_string());
     }
 
+    match command.command_type.as_str() {
+        "toneColor.setBasicTone" => basic_tone_adjustments(&command.parameters),
+        "toneColor.adjustHsl" => selective_color_adjustments(&command.parameters),
+        _ => Err(
+            "editCommand.commandType must be toneColor.setBasicTone or toneColor.adjustHsl."
+                .to_string(),
+        ),
+    }
+}
+
+fn basic_tone_adjustments(parameters: &Value) -> Result<Value, String> {
+    let parameters: RawOpenEditExportBasicToneParameters =
+        serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
+
     Ok(json!({
-        "blacks": command.parameters.black_point,
-        "clarity": command.parameters.clarity,
-        "contrast": command.parameters.contrast,
-        "exposure": command.parameters.exposure_ev,
-        "highlights": command.parameters.highlights,
-        "saturation": command.parameters.saturation,
-        "shadows": command.parameters.shadows,
-        "whites": command.parameters.white_point,
+        "blacks": parameters.black_point,
+        "clarity": parameters.clarity,
+        "contrast": parameters.contrast,
+        "exposure": parameters.exposure_ev,
+        "highlights": parameters.highlights,
+        "saturation": parameters.saturation,
+        "shadows": parameters.shadows,
+        "whites": parameters.white_point,
+    }))
+}
+
+fn selective_color_adjustments(parameters: &Value) -> Result<Value, String> {
+    let parameters: RawOpenEditExportSelectiveColorParameters =
+        serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
+    let range_key = match parameters.band.as_str() {
+        "red" => "reds",
+        "orange" => "oranges",
+        "yellow" => "yellows",
+        "green" => "greens",
+        "aqua" => "aquas",
+        "blue" => "blues",
+        "purple" => "purples",
+        "magenta" => "magentas",
+        _ => return Err("editCommand.parameters.band is not a supported HSL band.".to_string()),
+    };
+
+    Ok(json!({
+        "hsl": {
+            range_key: {
+                "hue": parameters.hue_shift_degrees,
+                "luminance": parameters.luminance,
+                "saturation": parameters.saturation,
+            }
+        }
     }))
 }
 
@@ -597,8 +643,8 @@ mod tests {
 
     use super::*;
 
-    fn sample_basic_tone_command() -> RawOpenEditExportBasicToneCommand {
-        RawOpenEditExportBasicToneCommand {
+    fn sample_basic_tone_command() -> RawOpenEditExportCommand {
+        RawOpenEditExportCommand {
             approval: RawOpenEditExportBasicToneApproval {
                 approval_class: "edit_apply".to_string(),
                 state: "approved".to_string(),
@@ -608,16 +654,37 @@ mod tests {
             command_type: "toneColor.setBasicTone".to_string(),
             dry_run: false,
             expected_graph_revision: "graph-rev.open-edit-export.edge-ringing.v1".to_string(),
-            parameters: RawOpenEditExportBasicToneParameters {
-                black_point: -2.0,
-                clarity: 4.0,
-                contrast: 8.0,
-                exposure_ev: 0.35,
-                highlights: -12.0,
-                saturation: 5.0,
-                shadows: 9.0,
-                white_point: 3.0,
+            parameters: json!({
+                "blackPoint": -2.0,
+                "clarity": 4.0,
+                "contrast": 8.0,
+                "exposureEv": 0.35,
+                "highlights": -12.0,
+                "saturation": 5.0,
+                "shadows": 9.0,
+                "whitePoint": 3.0,
+            }),
+        }
+    }
+
+    fn sample_selective_color_command() -> RawOpenEditExportCommand {
+        RawOpenEditExportCommand {
+            approval: RawOpenEditExportBasicToneApproval {
+                approval_class: "edit_apply".to_string(),
+                state: "approved".to_string(),
             },
+            color_pipeline: sample_color_pipeline(),
+            command_id: "command.raw-open-edit-export.selective-color-orange.v1".to_string(),
+            command_type: "toneColor.adjustHsl".to_string(),
+            dry_run: false,
+            expected_graph_revision: "graph-rev.open-edit-export.selective-color-orange.v1"
+                .to_string(),
+            parameters: json!({
+                "band": "orange",
+                "hueShiftDegrees": 12.0,
+                "luminance": -8.0,
+                "saturation": 28.0,
+            }),
         }
     }
 
@@ -681,7 +748,7 @@ mod tests {
             private_root_path: "/tmp/rawengine-private-root".to_string(),
             source_relative_path: "private-fixtures/detail/edge-ringing-v1.cr3".to_string(),
         };
-        let adjustments = basic_tone_adjustments(&request.edit_command).expect("basic tone maps");
+        let adjustments = edit_command_adjustments(&request.edit_command).expect("basic tone maps");
 
         let sidecar = build_sidecar_json(&request, &adjustments);
 
@@ -698,20 +765,34 @@ mod tests {
     }
 
     #[test]
-    fn basic_tone_adjustments_require_approved_apply_command() {
+    fn edit_command_adjustments_require_approved_apply_command() {
         let valid = sample_basic_tone_command();
         assert_eq!(
-            basic_tone_adjustments(&valid).expect("valid command maps")["whites"],
+            edit_command_adjustments(&valid).expect("valid command maps")["whites"],
             json!(3.0)
         );
 
         let mut dry_run = sample_basic_tone_command();
         dry_run.dry_run = true;
-        assert!(basic_tone_adjustments(&dry_run).is_err());
+        assert!(edit_command_adjustments(&dry_run).is_err());
 
         let mut pending = sample_basic_tone_command();
         pending.approval.state = "pending".to_string();
-        assert!(basic_tone_adjustments(&pending).is_err());
+        assert!(edit_command_adjustments(&pending).is_err());
+    }
+
+    #[test]
+    fn selective_color_command_maps_to_hsl_adjustment() {
+        let valid = sample_selective_color_command();
+        let adjustments = edit_command_adjustments(&valid).expect("selective color maps");
+
+        assert_eq!(adjustments["hsl"]["oranges"]["hue"], json!(12.0));
+        assert_eq!(adjustments["hsl"]["oranges"]["saturation"], json!(28.0));
+        assert_eq!(adjustments["hsl"]["oranges"]["luminance"], json!(-8.0));
+
+        let mut invalid = sample_selective_color_command();
+        invalid.parameters["band"] = json!("teal");
+        assert!(edit_command_adjustments(&invalid).is_err());
     }
 
     #[test]
@@ -810,6 +891,69 @@ mod tests {
                 .metrics
                 .iter()
                 .any(|metric| metric.name == "sourceHashUnchanged" && metric.passed)
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn private_runtime_smoke_generates_selective_color_report_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_RAW_SELECTIVE_COLOR_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            eprintln!("skipping private RAW selective color proof smoke");
+            return;
+        }
+
+        let mut request: RawOpenEditExportProofRequest = serde_json::from_str(
+            &fs::read_to_string("../fixtures/validation/selective-color-raw-proof-request.json")
+                .expect("selective color proof request fixture reads"),
+        )
+        .expect("selective color proof request fixture parses");
+        if let Ok(private_root) = std::env::var("RAWENGINE_PRIVATE_RAW_ROOT") {
+            request.private_root_path = private_root;
+        }
+
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let settings = AppSettings::default();
+        let report =
+            run_raw_open_edit_export_proof_with_context(request, &state, &settings, &context)
+                .expect("private RAW selective color proof command runs");
+
+        assert_eq!(
+            report.edit_command_id,
+            "command.raw-open-edit-export.selective-color-orange.v1"
+        );
+        assert_eq!(
+            report.fixture_id,
+            "validation.raw-open-edit-export.selective-color-orange.v1"
+        );
+        assert!(
+            report
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.kind == "workflow_report_private")
+        );
+        assert!(
+            report
+                .metrics
+                .iter()
+                .any(|metric| metric.name == "changedPixelRatio"
+                    && metric.passed
+                    && metric.value > 0.0)
+        );
+        assert!(
+            report
+                .metrics
+                .iter()
+                .any(|metric| metric.name == "previewExportMeanAbsDelta" && metric.passed)
         );
     }
 }
