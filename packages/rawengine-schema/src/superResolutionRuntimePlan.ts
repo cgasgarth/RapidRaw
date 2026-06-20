@@ -19,6 +19,7 @@ import {
   superResolutionAlignmentDiagnosticsV1Schema,
 } from './superResolutionAlignmentDiagnostics.js';
 import { applyPixelShiftSuperResolutionV1 } from './superResolutionPixelShift.js';
+import { superResolutionReconstructionDiagnosticsV1Schema } from './superResolutionReconstructionDiagnostics.js';
 import { buildSuperResolutionArtifactSidecarRecordV1 } from './superResolutionSidecarProvenance.js';
 
 const SR_RUNTIME_ENGINE_ID = 'rawengine_sr_pixel_shift_runtime_v1';
@@ -88,6 +89,7 @@ export const superResolutionRuntimeProvenanceV1Schema = z
     mode: z.enum(['single_image', 'multi_image']),
     requestedAlignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
     requestedOutputScale: z.number().min(1.1).max(4),
+    reconstructionDiagnostics: superResolutionReconstructionDiagnosticsV1Schema,
     resolvedAlignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
     runtimeStatus: z.enum(['dry_run_rendered', 'apply_rendered']),
     sourceState: z.array(
@@ -319,6 +321,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
       mode: request.command.parameters.mode,
       requestedAlignmentMode: request.command.parameters.alignmentMode,
       requestedOutputScale: request.command.parameters.outputScale,
+      reconstructionDiagnostics: result.reconstructionDiagnostics,
       resolvedAlignmentMode: request.command.parameters.alignmentMode,
       runtimeStatus: 'dry_run_rendered',
       sourceState: request.frames.map((frame) => ({

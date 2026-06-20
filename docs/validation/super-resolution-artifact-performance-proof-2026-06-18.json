@@ -11,10 +11,10 @@
     "fixtureManifestHash": "da4dd0213810c15d8f771baf3a08e40bc558e16e547b9a27547c3dd2937bb598",
     "maxEstimatedPeakMemoryBytes": 4294967296,
     "maxEstimatedRuntimeMs": 15000,
-    "measuredRuntimeMs": 95.146,
+    "measuredRuntimeMs": 90.73,
     "proxyPeakMemoryBytes": 432000000
   },
-  "proofHash": "56ae0187786b940fb95bde7507a5fa9a61e147c4640d3abe065efc65fc118187",
+  "proofHash": "d36a594375581a7370c3eca30ec5030cc34e63d7157e14f28281338f4418472d",
   "schemaVersion": 1,
   "validationStatus": "synthetic_artifact_gate",
   "warnings": ["effective_scale_downgraded", "human_review_required"]

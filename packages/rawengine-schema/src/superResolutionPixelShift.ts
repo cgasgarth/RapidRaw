@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  buildSuperResolutionReconstructionDiagnosticsV1,
+  type SuperResolutionReconstructionDiagnosticsV1,
+} from './superResolutionReconstructionDiagnostics.js';
+
 export const superResolutionPixelShiftFrameV1Schema = z
   .object({
     pixels: z.instanceof(Float32Array),
@@ -26,6 +31,7 @@ export interface SuperResolutionPixelShiftResultV1 {
   outputPixels: Float32Array;
   outputScale: number;
   outputWidth: number;
+  reconstructionDiagnostics: SuperResolutionReconstructionDiagnosticsV1;
 }
 
 export const applyPixelShiftSuperResolutionV1 = (requestValue: unknown): SuperResolutionPixelShiftResultV1 => {
@@ -72,6 +78,12 @@ export const applyPixelShiftSuperResolutionV1 = (requestValue: unknown): SuperRe
     outputPixels,
     outputScale: request.scale,
     outputWidth,
+    reconstructionDiagnostics: buildSuperResolutionReconstructionDiagnosticsV1({
+      outputPixelCount: outputPixels.length,
+      outputPixels,
+      outputScale: request.scale,
+      sampleCounts: weights,
+    }),
   };
 };
 

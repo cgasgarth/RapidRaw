@@ -332,6 +332,8 @@
     "check:sr-synthetic-smoke": "bun tests/integration/checks/check-super-resolution-synthetic-smoke.ts",
     "check:sr-alignment-detail-proof": "bun tests/integration/checks/check-super-resolution-alignment-detail-proof.ts",
     "check:sr-alignment-detail-proof:update": "bun tests/integration/checks/check-super-resolution-alignment-detail-proof.ts --update",
+    "check:sr-reconstruction-proof": "bun tests/integration/checks/check-super-resolution-reconstruction-proof.ts",
+    "check:sr-reconstruction-proof:update": "bun tests/integration/checks/check-super-resolution-reconstruction-proof.ts --update",
     "check:sr-artifact-performance-proof": "bun tests/integration/checks/check-super-resolution-artifact-performance-proof.ts",
     "check:sr-artifact-performance-proof:update": "bun tests/integration/checks/check-super-resolution-artifact-performance-proof.ts --update",
     "check:sr-sidecar-provenance": "bun tests/integration/checks/check-super-resolution-sidecar-provenance.ts",
