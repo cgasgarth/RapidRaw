@@ -201,6 +201,71 @@
     ]
   },
   {
+    "id": "solo-layer-and-group",
+    "initialLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      {
+        "id": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 65,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      {
+        "id": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      { "id": "grade", "name": "Print Grade", "opacity": 90, "visible": true }
+    ],
+    "operations": [
+      { "type": "solo", "layerId": "grade" },
+      { "type": "soloGroup", "groupId": "portrait-group" }
+    ],
+    "expectedLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": false },
+      {
+        "id": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 65,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      {
+        "id": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      { "id": "grade", "name": "Print Grade", "opacity": 90, "visible": false }
+    ],
+    "expectedRenderPlan": [
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 65,
+        "opacityFraction": 0.65,
+        "subMaskCount": 0
+      },
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "opacityFraction": 0.8,
+        "subMaskCount": 0
+      }
+    ]
+  },
+  {
     "id": "duplicate-and-delete",
     "initialLayers": [
       { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },

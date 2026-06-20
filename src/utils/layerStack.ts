@@ -89,6 +89,16 @@ export function setLayerGroupOpacity(
   return layers.map((layer) => (layer.layerGroupId === groupId ? { ...layer, opacity: nextOpacity } : layer));
 }
 
+export function soloLayer(layers: Array<MaskContainer>, layerId: string): Array<MaskContainer> {
+  findLayerIndex(layers, layerId);
+  return layers.map((layer) => ({ ...layer, visible: layer.id === layerId }));
+}
+
+export function soloLayerGroup(layers: Array<MaskContainer>, groupId: string): Array<MaskContainer> {
+  findLayerGroupIndexes(layers, groupId);
+  return layers.map((layer) => ({ ...layer, visible: layer.layerGroupId === groupId }));
+}
+
 export function createAdjustmentLayer(
   layers: Array<MaskContainer>,
   layer: MaskContainer,

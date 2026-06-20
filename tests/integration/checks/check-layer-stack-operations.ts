@@ -19,6 +19,8 @@ import {
   setLayerName,
   setLayerOpacity,
   setLayerVisibility,
+  soloLayer,
+  soloLayerGroup,
   ungroupLayerGroup,
 } from '../../../src/utils/layerStack.ts';
 import { INITIAL_MASK_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
@@ -87,6 +89,18 @@ const operationSchema = z.discriminatedUnion('type', [
       layerId: z.string().trim().min(1),
       type: z.literal('setVisibility'),
       visible: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      layerId: z.string().trim().min(1),
+      type: z.literal('solo'),
+    })
+    .strict(),
+  z
+    .object({
+      groupId: z.string().trim().min(1),
+      type: z.literal('soloGroup'),
     })
     .strict(),
   z
@@ -225,6 +239,10 @@ function applyOperation(layers, operation) {
       return setLayerGroupOpacity(layers, operation.groupId, operation.opacity);
     case 'setVisibility':
       return setLayerVisibility(layers, operation.layerId, operation.visible);
+    case 'solo':
+      return soloLayer(layers, operation.layerId);
+    case 'soloGroup':
+      return soloLayerGroup(layers, operation.groupId);
     case 'move':
       return moveLayer(layers, operation.layerId, operation.direction);
     case 'duplicate':
