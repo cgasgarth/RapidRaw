@@ -234,6 +234,17 @@ export const panoramaReviewWorkspaceProofSchema = z.object({
   sourceCount: z.literal('5'),
   sourceOrder: z.literal('left,center,right,detail,sky'),
 });
+export const panoramaPrivateRawReviewProofSchema = z.object({
+  applyCommand: z.literal(panoramaRoutePair.applyToolName),
+  artifactPath: z.string().endsWith('/panorama-overlap-merge.tiff'),
+  command: z.literal(panoramaRoutePair.dryRunToolName),
+  exportReviewArtifact: z.string().endsWith('/panorama-overlap-export-review.png'),
+  fixtureId: z.literal('validation.computational-merge.panorama-overlap.v1'),
+  previewArtifact: z.string().endsWith('/panorama-overlap-preview.png'),
+  resultReviewArtifact: z.string().endsWith('/panorama-overlap-result-review.png'),
+  runtimeStatus: z.literal('private_raw_app_server_apply'),
+  sourceCount: z.literal('3'),
+});
 export const focusUiSettingsProofSchema = z.object({
   alignmentMode: z.literal('homography'),
   blendMethod: z.literal('depth_map'),
