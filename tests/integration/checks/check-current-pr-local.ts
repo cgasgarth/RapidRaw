@@ -209,6 +209,12 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   addIf((file) => file === 'src/components/panel/right/LayerStackPanel.tsx', ['check:layer-stack-panel-ui']);
   addIf(
     (file) =>
+      file === 'tests/integration/checks/check-layer-mask-private-raw-ui-proof.ts' ||
+      file === 'docs/validation/layer-mask-private-raw-ui-proof-2026-06-20.json',
+    ['check:layer-mask-private-raw-ui-proof'],
+  );
+  addIf(
+    (file) =>
       file === 'src/components/panel/right/AgentChatShell.tsx' || file === 'src/utils/agentAppServerToolReadiness.ts',
     ['check:agent-tool-readiness-ui'],
   );

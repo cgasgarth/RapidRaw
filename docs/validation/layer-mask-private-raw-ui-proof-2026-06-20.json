@@ -1,0 +1,34 @@
+{
+  "doesNotProve": ["full_macos_app_manual_session", "manual_layer_panel_interaction"],
+  "issue": 2310,
+  "privateRawRuntime": {
+    "artifactCount": 6,
+    "fixtureId": "validation.layer-mask-real-raw.high-iso-skin-shadow.v1",
+    "metricCount": 5,
+    "proves": [
+      "private_real_raw_decode",
+      "layer_mask_generation",
+      "masked_adjustment_changes_pixels",
+      "mask_refinement_changes_pixels",
+      "refined_preview_export_parity"
+    ],
+    "runtimeReportPath": "docs/validation/layer-mask-real-raw-proof-2026-06-18.json",
+    "validationMode": "private_raw_tauri_runtime_proof"
+  },
+  "schemaVersion": 1,
+  "validationCommands": [
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:layer-mask-real-raw-proof -- --require-assets",
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:layer-mask-private-raw-ui-smoke",
+    "bun run check:layer-mask-private-raw-ui-proof"
+  ],
+  "visualReview": {
+    "dimensions": {
+      "height": 960,
+      "width": 1440
+    },
+    "scenario": "layer-mask-private-raw-ui",
+    "screenshotHash": "sha256:55544c28d396b3b64bdc5f420c5cb8eb477ed7c160fc4bd0402932e137419a24",
+    "screenshotPath": "artifacts/visual-smoke/layer-mask-private-raw-ui.png",
+    "workflowControlsExercised": true
+  }
+}
