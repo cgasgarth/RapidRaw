@@ -1,0 +1,17 @@
+{
+  "artifactCount": 4,
+  "doesNotProve": ["real_raw_e2e", "laplacian_pyramid_quality", "ui_review_surface"],
+  "focusCoverageRatio": 1,
+  "generatedAt": "2026-06-20T00:00:00.000Z",
+  "issue": 2355,
+  "outputHash": "sha256:9e55f9e4358c25ef975b6a9f3262b4e52e9157d73109b3973bdba0f32aa7fe68",
+  "regionMetrics": [
+    { "expectedSourceIndex": 0, "meanAbsoluteError": 0, "regionId": "foreground-left" },
+    { "expectedSourceIndex": 1, "meanAbsoluteError": 0, "regionId": "mid-plane-center" },
+    { "expectedSourceIndex": 2, "meanAbsoluteError": 0, "regionId": "background-right" }
+  ],
+  "retouchLayerRecommended": true,
+  "runtimeStatus": "apply_rendered",
+  "schemaVersion": 1,
+  "validationMode": "synthetic_focus_blend_runtime_apply"
+}
