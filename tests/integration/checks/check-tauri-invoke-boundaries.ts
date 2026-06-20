@@ -31,7 +31,7 @@ const APPROVED_RAW_INVOKE_BUDGET = {
   'src/hooks/useAppInitialization.ts': { raw: 6, typed: 5 },
   'src/hooks/useAppNavigation.ts': { raw: 14, typed: 10 },
   'src/hooks/useEditorActions.ts': { raw: 8, typed: 3 },
-  'src/hooks/useFileOperations.ts': { raw: 8, typed: 1 },
+  'src/hooks/useFileOperations.ts': { raw: 7, typed: 1 },
   'src/hooks/useImageLoader.ts': { raw: 3, typed: 2 },
   'src/hooks/useImageProcessing.ts': { raw: 5, typed: 0 },
   'src/hooks/useLibraryActions.ts': { raw: 8, typed: 3 },

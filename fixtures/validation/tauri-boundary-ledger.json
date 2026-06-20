@@ -33,6 +33,17 @@
       "status": "runtime-parse-tested",
       "tsCallSites": ["src/store/useSettingsStore.ts"],
       "zodSchema": "emptyTauriResponseSchema"
+    },
+    {
+      "command": "rename_files",
+      "invokeEnumMember": "RenameFiles",
+      "negativeFixturePath": "fixtures/validation/tauri-rename-files-invalid.json",
+      "notes": "File rename returns are parsed as non-empty paths before library selection state is updated.",
+      "positiveFixturePath": "fixtures/validation/tauri-rename-files-valid.json",
+      "rustParityState": "manual-rust-command-shape",
+      "status": "runtime-parse-tested",
+      "tsCallSites": ["src/utils/fileOperationInvokes.ts"],
+      "zodSchema": "fileOperationPathListSchema"
     }
   ],
   "issue": 1301,

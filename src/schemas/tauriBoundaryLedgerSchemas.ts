@@ -20,7 +20,12 @@ const tauriBoundaryEntrySchema = z
     rustParityState: rustParityStateSchema,
     status: tauriBoundaryStatusSchema,
     tsCallSites: z.array(z.string().trim().min(1)).min(1),
-    zodSchema: z.enum(['albumTreeSchema', 'emptyTauriResponseSchema', 'folderTreeListSchema']),
+    zodSchema: z.enum([
+      'albumTreeSchema',
+      'emptyTauriResponseSchema',
+      'fileOperationPathListSchema',
+      'folderTreeListSchema',
+    ]),
   })
   .strict()
   .superRefine((entry, context) => {
@@ -61,7 +66,7 @@ export const tauriBoundaryLedgerSchema = z
       });
     }
 
-    for (const requiredCommand of ['get_folder_children', 'get_albums']) {
+    for (const requiredCommand of ['get_folder_children', 'get_albums', 'rename_files']) {
       if (!commands.includes(requiredCommand)) {
         context.addIssue({
           code: 'custom',
