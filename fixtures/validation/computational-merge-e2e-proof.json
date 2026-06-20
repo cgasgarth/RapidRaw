@@ -5,46 +5,46 @@
     {
       "artifacts": [
         {
-          "hash": null,
-          "kind": "source_raw_sequence_private",
+          "hash": "sha256:372bf9bfb598d5691319b00a2a1488958efb8e1ac1d169047fa54b70341aaf07",
           "path": "private-fixtures/hdr/bracket-alignment-v1",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "source_raw_sequence_private"
         },
         {
-          "hash": null,
-          "kind": "alignment_report_private",
+          "hash": "sha256:ccba655e74f330cb392c6ae69ccee50150bbc545d68ffe8ac859331b36ceaaa8",
           "path": "private-artifacts/validation/computational-merge/hdr-bracket-alignment.json",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "alignment_report_private"
         },
         {
-          "hash": null,
-          "kind": "merge_output_private",
+          "hash": "sha256:ee9fc88383fcdece7cb4ad58f62813b2a751cfbee20ff3a76dcc0dae9423ac41",
           "path": "private-artifacts/validation/computational-merge/hdr-bracket-merge.tiff",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "merge_output_private"
         },
         {
-          "hash": null,
-          "kind": "preview_after_private",
+          "hash": "sha256:95229135d3c7e74b939386a8269aefad45b64a15dd65dd91fcacb120c3ad4932",
           "path": "private-artifacts/validation/computational-merge/hdr-bracket-preview.png",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "preview_after_private"
         },
         {
-          "hash": null,
-          "kind": "export_after_private",
+          "hash": "sha256:ee9fc88383fcdece7cb4ad58f62813b2a751cfbee20ff3a76dcc0dae9423ac41",
           "path": "private-artifacts/validation/computational-merge/hdr-bracket-export.tiff",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "export_after_private"
         },
         {
-          "hash": null,
-          "kind": "quality_report_private",
+          "hash": "sha256:8d129f5f3eaab9f11d8e26e3b7cfbf36d70ef8f6e80601df78d228b497d3b768",
           "path": "private-artifacts/validation/computational-merge/hdr-bracket-quality.json",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "quality_report_private"
         },
         {
-          "hash": null,
-          "kind": "app_server_runtime_report_private",
+          "hash": "sha256:c1a3bf43287b8305ea7c7b77d275592340e306f78e15243a5042be6e071e4390",
           "path": "private-artifacts/validation/computational-merge/hdr-bracket-app-server-runtime-proof.json",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "app_server_runtime_report_private"
         }
       ],
       "evidenceId": "raw-evidence.hdr.bracket-alignment.v1",
@@ -79,8 +79,8 @@
         "private-fixtures/hdr/bracket-alignment-v1/frame-03-over.arw"
       ],
       "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
-      "notes": "Private RAW HDR bracket E2E proof slot for decode, exposure bracket validation, alignment/deghost review, merge output, preview/export parity, app-server dry-run/apply replay, and quality metrics. This public manifest remains planning evidence until private assets and run reports exist.",
-      "proofStatus": "manifest_only",
+      "notes": "Private project-owned Alaska ARW HDR bracket proof has production RAW decode, exposure bracket validation, merge output, preview/export artifacts, typed app-server dry-run/apply replay, and private RAW UI smoke evidence. This is runtime proof, not final HDR/deghosting quality acceptance.",
+      "proofStatus": "runtime_apply_capable",
       "uiIssue": 171,
       "workflowSteps": [
         "open_raw_sequence",
