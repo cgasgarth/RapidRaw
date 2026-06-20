@@ -10,10 +10,55 @@ const COMMITTED_REPORT_PATH = 'docs/validation/negative-lab-public-export-proof-
 const update = process.argv.includes('--update');
 
 const fnvHashSchema = z.string().regex(/^fnv1a64:[a-f0-9]{16}$/u);
+const fnv32HashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
+const f32Literal = (expected: number) =>
+  z.number().refine((actual) => Math.abs(actual - expected) < 0.000001, {
+    message: `Expected approximately ${expected}.`,
+  });
+const appliedProfileSchema = z
+  .object({
+    claimLevel: z.literal('generic_starting_point_only'),
+    claimPolicy: z.literal('generic_starting_point_no_stock_claim'),
+    displayName: z.literal('C-41 Portrait'),
+    doesNotProve: z
+      .array(
+        z.enum([
+          'no_named_stock_emulation_claim',
+          'no_colorimetric_match_claim',
+          'not_measured_from_manufacturer_profile',
+        ]),
+      )
+      .length(3),
+    params: z
+      .object({
+        base_fog_sample: z
+          .object({
+            height: z.literal(0.35),
+            width: z.literal(0.35),
+            x: z.literal(0),
+            y: z.literal(0),
+          })
+          .strict(),
+        base_fog_strength: f32Literal(1),
+        blue_weight: f32Literal(0.98),
+        contrast: f32Literal(0.95),
+        exposure: f32Literal(0.05),
+        green_weight: f32Literal(1),
+        red_weight: f32Literal(1.03),
+      })
+      .strict(),
+    presetId: z.literal('negative_lab.generic.c41.portrait.v1'),
+    processFamily: z.literal('c41_color_negative'),
+    profileProvenanceHash: fnv32HashSchema,
+    runtimeStatus: z.literal('runtime_parameter_applied'),
+    stockFamilyDescriptor: z.literal('Soft portrait color negative'),
+  })
+  .strict();
 
 const reportSchema = z
   .object({
     algorithm: z.literal('density_rgb_v1'),
+    appliedProfile: appliedProfileSchema,
     doesNotProve: z
       .array(
         z.enum([

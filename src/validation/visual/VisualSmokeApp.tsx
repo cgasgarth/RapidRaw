@@ -96,6 +96,10 @@ interface LayerMaskPrivateRawVisualProof {
 }
 
 interface NegativeLabPublicExportVisualProof {
+  appliedProfileClaimPolicy: string;
+  appliedProfileDisplayName: string;
+  appliedProfilePresetId: string;
+  appliedProfileProvenanceHash: string;
   changedPixelRatio: string;
   fixtureId: string;
   outputDataUrl: string;
@@ -281,6 +285,8 @@ const NEGATIVE_LAB_PUBLIC_EXPORT_OUTPUT_LABEL = 'Rendered positive proof';
 const NEGATIVE_LAB_PUBLIC_EXPORT_HANDOFF_LABEL = 'JPEG export handoff';
 const NEGATIVE_LAB_PUBLIC_EXPORT_RUNTIME_LABEL = 'Runtime';
 const NEGATIVE_LAB_PUBLIC_EXPORT_SOURCE_PATH_LABEL = 'Source';
+const NEGATIVE_LAB_PUBLIC_EXPORT_PROFILE_LABEL = 'Applied profile';
+const NEGATIVE_LAB_PUBLIC_EXPORT_PROFILE_CLAIM_POLICY_LABEL = 'Claim policy';
 const formatFilmLookParityDelta = (maxDelta: string) => `Delta ${maxDelta}`;
 const formatLayerBlend = (blend: string) => blend.replace('_', ' ');
 const libraryWorkflowAssets = [
@@ -2058,6 +2064,10 @@ function NegativeLabPublicExportReviewSmoke() {
             data-fixture-id={proof.fixtureId}
             data-output-format={proof.outputFormat}
             data-output-path={proof.outputPath}
+            data-profile-claim-policy={proof.appliedProfileClaimPolicy}
+            data-profile-display-name={proof.appliedProfileDisplayName}
+            data-profile-preset-id={proof.appliedProfilePresetId}
+            data-profile-provenance-hash={proof.appliedProfileProvenanceHash}
             data-runtime-status={proof.runtimeStatus}
             data-source-path={proof.sourcePath}
             data-testid="negative-lab-public-export-review-proof"
@@ -2066,6 +2076,16 @@ function NegativeLabPublicExportReviewSmoke() {
             <div className="rounded border border-white/10 bg-white/5 p-2">
               <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_RUNTIME_LABEL}</p>
               <p>{proof.runtimeStatus}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_PROFILE_LABEL}</p>
+              <p>{proof.appliedProfileDisplayName}</p>
+              <p className="mt-1 break-all text-xs text-[#aab2bd]">{proof.appliedProfilePresetId}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_PROFILE_CLAIM_POLICY_LABEL}</p>
+              <p>{proof.appliedProfileClaimPolicy}</p>
+              <p className="mt-1 break-all text-xs text-[#aab2bd]">{proof.appliedProfileProvenanceHash}</p>
             </div>
             <div className="rounded border border-white/10 bg-white/5 p-2">
               <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_SOURCE_PATH_LABEL}</p>
