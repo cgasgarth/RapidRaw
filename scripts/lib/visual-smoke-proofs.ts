@@ -322,13 +322,13 @@ export const layerStackExportParityProofSchema = z.object({
   exportParity: z.literal('ready'),
 });
 export const layerMaskPrivateRawReviewProofSchema = z.object({
-  exportArtifact: z.string().endsWith('/high-iso-skin-shadow-mask-refined-export.tiff'),
-  fixtureId: z.literal('validation.layer-mask-real-raw.high-iso-skin-shadow.v1'),
+  exportArtifact: z.string().endsWith('/alaska-layer-mask-v1-refined-export.tiff'),
+  fixtureId: z.literal('validation.layer-mask-real-raw.alaska-local-adjustment.v1'),
   metricCount: z.literal('5'),
-  refinedPreviewArtifact: z.string().endsWith('/high-iso-skin-shadow-mask-refined-preview.png'),
+  refinedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-refined-preview.png'),
   runtimeStatus: z.literal('private_raw_tauri_runtime_proof'),
-  unmaskedPreviewArtifact: z.string().endsWith('/high-iso-skin-shadow-mask-unmasked-preview.png'),
-  unrefinedPreviewArtifact: z.string().endsWith('/high-iso-skin-shadow-mask-unrefined-preview.png'),
+  unmaskedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-unmasked-preview.png'),
+  unrefinedPreviewArtifact: z.string().endsWith('/alaska-layer-mask-v1-unrefined-preview.png'),
 });
 export const maskOverlayRawProofSchema = z.object({
   edgeThreshold: z.literal('0.64'),
@@ -337,7 +337,7 @@ export const maskOverlayRawProofSchema = z.object({
   opacity: z.literal('0.70'),
   overlaySource: z.literal('live_mask_overlay_generator'),
   sourceKind: z.literal('source_raw_private'),
-  sourcePath: z.literal('private-fixtures/detail/high-iso-skin-shadow-v1.arw'),
+  sourcePath: z.literal('private-fixtures/layers/alaska-layer-mask-v1.arw'),
   validationMode: z.literal('visual_smoke_raw_overlay_control_proof'),
 });
 export const libraryWorkflowProofSchema = z.object({

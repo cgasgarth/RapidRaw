@@ -22,7 +22,10 @@ use crate::image_processing::{GpuContext, resolve_tonemapper_override};
 use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 
 const ARTIFACT_DIR: &str = "private-artifacts/validation/layer-mask-real-raw";
-const SOURCE_RELATIVE_PATH: &str = "private-fixtures/detail/high-iso-skin-shadow-v1.arw";
+const SOURCE_RELATIVE_PATH: &str = "private-fixtures/layers/alaska-layer-mask-v1.arw";
+const PROOF_SLUG: &str = "alaska-layer-mask-v1";
+const FIXTURE_ID: &str = "validation.layer-mask-real-raw.alaska-local-adjustment.v1";
+const REPORT_ID: &str = "layer-mask-real-raw.alaska-local-adjustment.v1";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -173,22 +176,22 @@ fn run_private_layer_mask_real_raw_proof(
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
     write_image(
         &unmasked_preview,
-        &output_dir.join("high-iso-skin-shadow-mask-unmasked-preview.png"),
+        &output_dir.join(format!("{PROOF_SLUG}-unmasked-preview.png")),
         ImageFormat::Png,
     )?;
     write_image(
         &unrefined_preview,
-        &output_dir.join("high-iso-skin-shadow-mask-unrefined-preview.png"),
+        &output_dir.join(format!("{PROOF_SLUG}-unrefined-preview.png")),
         ImageFormat::Png,
     )?;
     write_image(
         &refined_preview,
-        &output_dir.join("high-iso-skin-shadow-mask-refined-preview.png"),
+        &output_dir.join(format!("{PROOF_SLUG}-refined-preview.png")),
         ImageFormat::Png,
     )?;
     write_image(
         &refined_export,
-        &output_dir.join("high-iso-skin-shadow-mask-refined-export.tiff"),
+        &output_dir.join(format!("{PROOF_SLUG}-refined-export.tiff")),
         ImageFormat::Tiff,
     )?;
 
@@ -197,22 +200,22 @@ fn run_private_layer_mask_real_raw_proof(
         hashed_artifact(
             private_root,
             "unmasked_preview_private",
-            &format!("{ARTIFACT_DIR}/high-iso-skin-shadow-mask-unmasked-preview.png"),
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-unmasked-preview.png"),
         )?,
         hashed_artifact(
             private_root,
             "unrefined_preview_private",
-            &format!("{ARTIFACT_DIR}/high-iso-skin-shadow-mask-unrefined-preview.png"),
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-unrefined-preview.png"),
         )?,
         hashed_artifact(
             private_root,
             "refined_preview_private",
-            &format!("{ARTIFACT_DIR}/high-iso-skin-shadow-mask-refined-preview.png"),
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-refined-preview.png"),
         )?,
         hashed_artifact(
             private_root,
             "refined_export_private",
-            &format!("{ARTIFACT_DIR}/high-iso-skin-shadow-mask-refined-export.tiff"),
+            &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-refined-export.tiff"),
         )?,
     ];
 
@@ -255,12 +258,12 @@ fn run_private_layer_mask_real_raw_proof(
 
     let report = LayerMaskRealRawProofReport {
         artifacts: Vec::new(),
-        fixture_id: "validation.layer-mask-real-raw.high-iso-skin-shadow.v1".to_string(),
+        fixture_id: FIXTURE_ID.to_string(),
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         issue: 2310,
         metrics,
         proof_claims: proof_claims(),
-        report_id: "layer-mask-real-raw.high-iso-skin-shadow.v1".to_string(),
+        report_id: REPORT_ID.to_string(),
         runtime_proof: LayerMaskRuntimeProof {
             execution: "tauri_test_gpu_pipeline".to_string(),
             macos_app_ui_e2e: false,
@@ -272,7 +275,7 @@ fn run_private_layer_mask_real_raw_proof(
         },
         validation_mode: "private_raw_tauri_runtime_proof".to_string(),
     };
-    let report_path = output_dir.join("high-iso-skin-shadow-layer-mask-report.json");
+    let report_path = output_dir.join(format!("{PROOF_SLUG}-report.json"));
     fs::write(
         &report_path,
         serde_json::to_vec_pretty(&report).map_err(|error| error.to_string())?,
@@ -281,7 +284,7 @@ fn run_private_layer_mask_real_raw_proof(
     artifacts.push(hashed_artifact(
         private_root,
         "workflow_report_private",
-        &format!("{ARTIFACT_DIR}/high-iso-skin-shadow-layer-mask-report.json"),
+        &format!("{ARTIFACT_DIR}/{PROOF_SLUG}-report.json"),
     )?);
 
     let report = LayerMaskRealRawProofReport {
