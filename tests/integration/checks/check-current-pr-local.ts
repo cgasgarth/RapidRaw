@@ -164,6 +164,10 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ],
   );
   addIf(
+    (file) => file.includes('filmHalation') || file.includes('film-halation'),
+    ['check:film-halation-runtime-proof'],
+  );
+  addIf(
     (file) => file === 'src/components/adjustments/Effects.tsx' || file === 'src/utils/filmGrainControls.ts',
     ['check:film-grain-ui'],
   );
