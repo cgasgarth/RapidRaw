@@ -181,6 +181,13 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   );
   addIf((file) => file.startsWith('packages/rawengine-schema/src/panorama'), ['check:panorama-runtime-plan-smoke']);
   addIf((file) => file.startsWith('packages/rawengine-schema/src/hdr'), ['check:hdr-ui-runtime-bridge']);
+  addIf(
+    (file) =>
+      file === 'src/components/ui/AppProperties.tsx' ||
+      file === 'src-tauri/src/lib.rs' ||
+      file === 'tests/integration/checks/check-tauri-command-registration.ts',
+    ['check:tauri-command-registration'],
+  );
 
   return [...checks].toSorted();
 }
