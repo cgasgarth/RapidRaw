@@ -172,6 +172,10 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
   );
   addIf(
+    (file) => file.includes('colorStylePreset') || file.includes('color-style') || file.includes('PresetsPanel'),
+    ['check:color-style-presets', 'check:color-style-ui-coverage'],
+  );
+  addIf(
     (file) => file === 'src/components/adjustments/Effects.tsx' || file === 'src/utils/filmGrainControls.ts',
     ['check:film-grain-ui'],
   );

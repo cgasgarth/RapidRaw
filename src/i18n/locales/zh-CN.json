@@ -929,6 +929,7 @@
     "presets": {
       "applyPresetLabel": "应用预设 {{name}}",
       "colorStyles": {
+        "adjustmentCoverage_other": "{{count}} 项调整",
         "applyLabel": "应用色彩风格 {{name}}",
         "count": "{{count}} 个风格",
         "count_other": "{{count}} 个风格",

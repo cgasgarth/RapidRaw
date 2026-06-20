@@ -931,6 +931,8 @@
     "presets": {
       "applyPresetLabel": "Vorgabe {{name}} anwenden",
       "colorStyles": {
+        "adjustmentCoverage_one": "{{count}} Anpassung",
+        "adjustmentCoverage_other": "{{count}} Anpassungen",
         "applyLabel": "Farbstil {{name}} anwenden",
         "count": "{{count}} Stile",
         "count_one": "{{count}} Stil",
