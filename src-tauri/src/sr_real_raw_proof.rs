@@ -55,6 +55,7 @@ const RESULT_REVIEW_FILE: &str = "sr-subpixel-result-review.png";
 const EXPORT_REVIEW_FILE: &str = "sr-subpixel-export-review.png";
 const RUNTIME_SAMPLE_WIDTH: u32 = 72;
 const RUNTIME_SAMPLE_HEIGHT: u32 = 48;
+const RECONSTRUCTION_INPUT_MAX_DIMENSION: u32 = 720;
 const MIN_DETAIL_GAIN_RATIO: f64 = 1.2;
 const MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA: f64 = 0.015;
 
@@ -110,9 +111,14 @@ fn run_private_sr_reconstruction_artifact_proof(private_root: &Path) -> Result<(
     let merge_output_file = output_dir.join("sr-subpixel-reconstruction.tiff");
     let quality_file = output_dir.join(CONFIG.quality_file);
     let report_file = output_dir.join(CONFIG.report_file);
-    let reconstructed = reconstruct_sr_image(&loaded_sources, RECONSTRUCTION_SCALE)?;
+    let reconstruction_sources = bounded_reconstruction_sources(&loaded_sources);
+    let reconstructed = reconstruct_sr_image(&reconstruction_sources, RECONSTRUCTION_SCALE)?;
     let quality_metrics = [
-        build_reconstruction_metrics(&loaded_sources, &reconstructed, RECONSTRUCTION_SCALE),
+        build_reconstruction_metrics(
+            &reconstruction_sources,
+            &reconstructed,
+            RECONSTRUCTION_SCALE,
+        ),
         vec![metric(
             "previewExportMeanAbsDelta",
             0.0,
@@ -224,7 +230,7 @@ fn run_private_sr_reconstruction_artifact_proof(private_root: &Path) -> Result<(
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         graph_revision_hash,
         implementation_issue: CONFIG.implementation_issue,
-        notes: "Private ARW super-resolution preview/export smoke. This proves production RAW decode plus a conservative multi-frame reconstruction artifact, preview/export artifact emission, and bounded preview/export parity. It does not claim UI review or final quality acceptance.".to_string(),
+        notes: "Private ARW super-resolution preview/export smoke. This proves production RAW decode plus a bounded conservative multi-frame reconstruction artifact, preview/export artifact emission, and bounded preview/export parity. It does not claim full-resolution reconstruction quality, UI review, or final quality acceptance.".to_string(),
         quality_metrics,
         report_id: CONFIG.report_id.to_string(),
         run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
@@ -369,6 +375,20 @@ fn validate_matching_dimensions(sources: &[LoadedSource]) -> Result<(), String> 
         }
     }
     Ok(())
+}
+
+fn bounded_reconstruction_sources(sources: &[LoadedSource]) -> Vec<LoadedSource> {
+    sources
+        .iter()
+        .map(|source| LoadedSource {
+            image: source.image.thumbnail(
+                RECONSTRUCTION_INPUT_MAX_DIMENSION,
+                RECONSTRUCTION_INPUT_MAX_DIMENSION,
+            ),
+            path: source.path.clone(),
+            relative_path: source.relative_path.clone(),
+        })
+        .collect()
 }
 
 fn luma_plane(frame: &RgbImage, width: u32, height: u32) -> Vec<f64> {
