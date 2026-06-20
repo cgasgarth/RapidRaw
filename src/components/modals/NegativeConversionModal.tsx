@@ -1867,6 +1867,50 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 </span>
               </div>
               <div
+                className="mb-2 grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-secondary p-2 text-[11px]"
+                data-export-ready={String(workspaceProof.exportReady)}
+                data-preview-ready={String(workspaceProof.previewReady)}
+                data-profile-status={selectedProfile.profileStatus}
+                data-runtime-status={selectedProfile.runtimeStatus}
+                data-testid="negative-lab-selected-stock-readiness"
+              >
+                <div
+                  className="min-w-0 rounded bg-bg-primary px-2 py-1"
+                  data-testid="negative-lab-stock-readiness-profile"
+                >
+                  <span className="block truncate text-text-tertiary">
+                    {t('modals.negativeConversion.workflowPreset')}
+                  </span>
+                  <span className="block truncate text-text-secondary">{selectedPresetClaimLabel}</span>
+                </div>
+                <div
+                  className="min-w-0 rounded bg-bg-primary px-2 py-1"
+                  data-testid="negative-lab-stock-readiness-preview"
+                >
+                  <span className="block truncate text-text-tertiary">
+                    {t('modals.negativeConversion.workflowColorTiming')}
+                  </span>
+                  <span className="block truncate text-text-secondary">
+                    {workspaceProof.previewReady
+                      ? t('modals.negativeConversion.previewReady')
+                      : t('modals.negativeConversion.workflowExportBlocked')}
+                  </span>
+                </div>
+                <div
+                  className="min-w-0 rounded bg-bg-primary px-2 py-1"
+                  data-testid="negative-lab-stock-readiness-export"
+                >
+                  <span className="block truncate text-text-tertiary">
+                    {t('modals.negativeConversion.workflowExport')}
+                  </span>
+                  <span className="block truncate text-text-secondary">
+                    {workspaceProof.exportReady
+                      ? t('modals.negativeConversion.presetRuntimeApplied')
+                      : t('modals.negativeConversion.workflowExportBlocked')}
+                  </span>
+                </div>
+              </div>
+              <div
                 className="mb-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-secondary p-2 text-[11px] text-text-tertiary"
                 data-testid="negative-lab-preset-metadata"
               >

@@ -60,8 +60,14 @@ if (qcProofReport.frames.some((frame) => frame.exportBlockedReason !== null)) {
 
 for (const marker of [
   'negative-lab-workflow-readiness-strip',
+  'negative-lab-selected-stock-readiness',
+  'negative-lab-stock-readiness-profile',
+  'negative-lab-stock-readiness-preview',
+  'negative-lab-stock-readiness-export',
   'data-preview-ready={String(workspaceProof.previewReady)}',
   'data-export-ready={String(workspaceProof.exportReady)}',
+  'data-profile-status={selectedProfile.profileStatus}',
+  'data-runtime-status={selectedProfile.runtimeStatus}',
   'modals.negativeConversion.workflowExportBlocked',
 ]) {
   if (!modalSource.includes(marker)) {
