@@ -7,11 +7,7 @@ import { z } from 'zod';
 const APP_PROPERTIES_PATH = 'src/components/ui/AppProperties.tsx';
 const RUST_LIB_PATH = 'src-tauri/src/lib.rs';
 
-const knownFrontendOnlyInvokes = {
-  generate_fullscreen_preview: 'Invokes enum still carries a removed fullscreen preview command.',
-  generate_thumbnails_progressive: 'Invokes enum still carries a removed progressive thumbnail command.',
-  invoke_generative_replace: 'AI route manifest still names the legacy inpaint preview command.',
-} as const;
+const knownFrontendOnlyInvokes = {} as const;
 
 const knownRegisteredStringInvokes = {
   clear_image_caches: 'SettingsPanel still uses this as a string invoke.',

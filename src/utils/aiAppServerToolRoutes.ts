@@ -84,9 +84,10 @@ export const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSch
     },
     {
       ...aiEnhancementDryRun,
-      reason: 'Generative inpaint preview maps to the typed AI enhancement dry-run tool before apply approval.',
-      ...mappedTauriInvoke,
-      sourceOperation: 'invoke_generative_replace',
+      reason:
+        'Generative inpaint preview maps directly to the typed AI enhancement dry-run tool because the legacy Tauri preview invoke is no longer registered.',
+      ...mappedAppServerTool,
+      sourceOperation: AiAppServerToolName.EnhancementDryRunCommand,
       toolCapability: AiAppServerToolCapability.Inpaint,
     },
     {
