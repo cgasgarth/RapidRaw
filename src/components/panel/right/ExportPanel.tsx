@@ -328,7 +328,7 @@ export default function ExportPanel({
       }
       try {
         const dims: ImageDimensions = await invokeWithSchema(
-          'get_image_dimensions',
+          Invokes.GetImageDimensions,
           { path: pathsToExport[0] },
           imageDimensionsSchema,
         );
@@ -348,7 +348,7 @@ export default function ExportPanel({
       }
       try {
         const dimensions = await invokeWithSchema(
-          'get_image_dimensions',
+          Invokes.GetImageDimensions,
           { path: watermarkPath },
           imageDimensionsSchema,
         );

@@ -9,14 +9,7 @@ const RUST_LIB_PATH = 'src-tauri/src/lib.rs';
 
 const knownFrontendOnlyInvokes = {} as const;
 
-const knownRegisteredStringInvokes = {
-  clear_image_caches: 'SettingsPanel still uses this as a string invoke.',
-  delete_files_from_disk: 'useFileOperations still selects delete mode through a string invoke.',
-  delete_files_with_associated: 'useFileOperations still selects associated delete mode through a string invoke.',
-  get_image_dimensions: 'ExportPanel still validates dimensions through a string invoke.',
-  get_lensfun_lenses_for_maker: 'Lens correction UI still loads maker lenses through string invokes.',
-  get_lensfun_makers: 'Lens correction UI still loads makers through string invokes.',
-} as const;
+const knownRegisteredStringInvokes = {} as const;
 
 const commandNameSchema = z.string().regex(/^[a-z][a-z0-9_]*$/u);
 
