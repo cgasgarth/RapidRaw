@@ -48,5 +48,5 @@ Required local checks for this manifest:
 
 - `bun run check:panorama-fixtures`
 - `bun run docs:check`
-- `bun run format:check -- scripts/check-panorama-fixture-manifest.ts fixtures/panorama/panorama-fixture-manifest.json docs/validation/panorama-fixture-manifest-2026-06-13.md package.json`
+- `bun run format:check -- tests/integration/checks/check-panorama-fixture-manifest.ts fixtures/panorama/panorama-fixture-manifest.json docs/validation/panorama-fixture-manifest-2026-06-13.md package.json`
 - `bun run check:unsafe-casts`

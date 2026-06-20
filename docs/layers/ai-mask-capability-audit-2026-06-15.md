@@ -23,7 +23,7 @@
 `src/utils/aiMaskCapabilities.ts` exposes the runtime audit table after parsing
 through `src/schemas/aiMaskingSchemas.ts`.
 
-`scripts/check-ai-mask-capabilities.ts` verifies:
+`tests/integration/checks/check-ai-mask-capabilities.ts` verifies:
 
 - fixture and runtime audit table parity;
 - Zod schema coverage for all required capability names;

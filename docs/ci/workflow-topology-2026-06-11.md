@@ -73,7 +73,7 @@ without waiting for, canceling, or being grouped with an older main run. Hosted
 runner capacity can still queue jobs, but RawEngine should not add GitHub
 Actions configuration that serializes main heads.
 
-`scripts/check-github-workflow-policy.ts` enforces this by rejecting any
+`tests/integration/checks/check-github-workflow-policy.ts` enforces this by rejecting any
 workflow that runs on push to `main` and defines `concurrency`. Its self-test
 covers block, inline, and scalar `main` branch declarations so a shorthand YAML
 edit cannot bypass the policy. Keep that guard in the required

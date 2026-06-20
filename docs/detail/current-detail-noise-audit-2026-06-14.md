@@ -48,5 +48,5 @@ This audit records the current RapidRAW detail, sharpening, noise, dehaze, and c
 - `bunx prettier --check docs/detail/current-detail-noise-audit-2026-06-14.md docs/index.md docs/site-navigation.json`
 - `bun run check:ai-denoise-runtime-apply`
 - `bun run check:wavelet-detail-runtime`
-- `bun scripts/check-markdown-links.ts`
+- `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`

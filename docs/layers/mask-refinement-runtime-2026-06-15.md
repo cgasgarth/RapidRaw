@@ -24,7 +24,7 @@ bitmap is generated:
 
 ## Validation
 
-`scripts/check-mask-refinement-parameters.ts` verifies fixture normalization,
+`tests/integration/checks/check-mask-refinement-parameters.ts` verifies fixture normalization,
 invalid schema rejection, and Rust renderer coverage for the refinement struct,
 edge shift, feathering, and submask wiring.
 

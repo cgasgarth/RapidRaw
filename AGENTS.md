@@ -141,6 +141,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Keep frequently reused local checks and hooks token-efficient. On success,
   prefer compact summaries over full command/file lists; on failure, preserve
   actionable tool output.
+- Put new integration, validation, runtime-proof, fixture-proof, and E2E-style
+  checks in `tests/integration/checks/`. Keep `scripts/` for reusable helpers,
+  generators, CI classifiers, and command wrappers rather than adding new
+  top-level `scripts/check-*.ts` files.
 - Do not edit existing tests solely to reduce token output. Compact the
   commonly reused runner, package script, hook, or reporting layer instead.
 - Keep GitHub Actions current on supported major versions and maintain the

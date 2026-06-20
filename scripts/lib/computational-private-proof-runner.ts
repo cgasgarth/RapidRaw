@@ -111,7 +111,7 @@ export async function runComputationalPrivateProof(config: ComputationalPrivateP
     await runCompact('computational merge private report validation', {
       command: [
         'bun',
-        'scripts/check-computational-merge-private-run-reports.ts',
+        'tests/integration/checks/check-computational-merge-private-run-reports.ts',
         '--fixture-id',
         config.fixtureId,
         '--input',
