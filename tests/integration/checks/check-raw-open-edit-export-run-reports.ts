@@ -79,6 +79,17 @@ for (const report of reports) {
   if (reportArtifacts.get('sidecar_after_private')?.path !== report.sidecarAfter.path) {
     failures.push(`${report.fixtureId}: sidecarAfter must match sidecar_after_private artifact.`);
   }
+  if (report.renderPaths !== undefined) {
+    if (report.renderPaths.previewBeforeWriterId === report.renderPaths.previewAfterWriterId) {
+      failures.push(`${report.fixtureId}: preview render writer IDs must be distinct.`);
+    }
+    if (report.renderPaths.previewAfterFormat !== 'png') {
+      failures.push(`${report.fixtureId}: previewAfterFormat must be png.`);
+    }
+    if (report.renderPaths.exportAfterFormat !== 'tiff') {
+      failures.push(`${report.fixtureId}: exportAfterFormat must be tiff.`);
+    }
+  }
 
   const reportMetrics = new Map(report.metrics.map((metric) => [metric.name, metric]));
   for (const expectedMetric of proofCase.expectedMetrics) {
@@ -115,7 +126,7 @@ for (const proofCase of proofCases) {
     failures.push(`${proofCase.fixtureId}: --require-assets requires a private run report.`);
   }
 
-  if (proofCase.status === 'accepted_private_asset' && report === undefined) {
+  if (requireAssets && proofCase.status === 'accepted_private_asset' && report === undefined) {
     failures.push(`${proofCase.fixtureId}: accepted private RAW proof requires a private run report.`);
   }
 }

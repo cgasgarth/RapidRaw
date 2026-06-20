@@ -177,6 +177,16 @@ const qualityMetricSchema = z
   })
   .strict();
 
+const renderPathsSchema = z
+  .object({
+    exportAfterFormat: z.literal('tiff'),
+    exportAfterWriterId: z.string().trim().min(1),
+    previewAfterFormat: z.literal('png'),
+    previewAfterWriterId: z.string().trim().min(1),
+    previewBeforeWriterId: z.string().trim().min(1),
+  })
+  .strict();
+
 const privateRunReportSchema = z
   .object({
     artifacts: z.array(runArtifactSchema).min(6),
@@ -188,6 +198,7 @@ const privateRunReportSchema = z
     metrics: z.array(qualityMetricSchema).min(4),
     previewAfter: hashedPathSchema,
     previewBefore: hashedPathSchema,
+    renderPaths: renderPathsSchema.optional(),
     reportId: z.string().regex(/^raw-open-edit-export-run\.[a-z0-9.-]+\.v[0-9]+$/u),
     sidecarAfter: hashedPathSchema,
     sourceRaw: hashedPathSchema,

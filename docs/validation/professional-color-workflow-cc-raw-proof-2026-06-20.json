@@ -17,7 +17,7 @@
     "icc_colorimetric_accuracy"
   ],
   "fixtureId": "validation.color.professional-workflow.local-cc-raw.v1",
-  "generatedAt": "2026-06-20T21:59:09.459Z",
+  "generatedAt": "2026-06-20T23:13:25.650Z",
   "issue": 2309,
   "localRawRuntime": {
     "artifactRoot": "private-artifacts/validation/open-edit-export",
@@ -29,6 +29,13 @@
       "sourceHashUnchanged": 1
     },
     "rawRuntimeFixtureId": "validation.raw-open-edit-export.professional-color.v1",
+    "renderPaths": {
+      "exportAfterFormat": "tiff",
+      "exportAfterWriterId": "raw_open_edit_export_export_after",
+      "previewAfterFormat": "png",
+      "previewAfterWriterId": "raw_open_edit_export_preview_after",
+      "previewBeforeWriterId": "raw_open_edit_export_preview_before"
+    },
     "status": "passed",
     "workflowReportPath": "private-artifacts/validation/open-edit-export/professional-color-v1-workflow-report.json"
   },
@@ -72,7 +79,7 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:09b551a9f7a5f01ac0adffe2efc8da987a58cf7c51e2a23cf9934b3230ca6765",
+      "hash": "sha256:c52cab57aec5b91f96b5914b73b7e97672f172ac8e55b4e026ae07810c69e1cd",
       "kind": "visual_smoke_screenshot",
       "path": "artifacts/visual-smoke/color-workflow.png",
       "publicRepoAllowed": false
