@@ -1,0 +1,48 @@
+{
+  "fixtureId": "colorchecker.synthetic.render-gate.v1",
+  "fixturePath": "fixtures/color/colorchecker-render-gate.json",
+  "issue": 2328,
+  "maxDeltaE00": 0.777521,
+  "meanDeltaE00": 0.603481,
+  "patchCount": 6,
+  "patches": [
+    {
+      "deltaE00": 0.163711,
+      "id": "neutral-50",
+      "maxDeltaE00": 0.3,
+      "status": "passed"
+    },
+    {
+      "deltaE00": 0.777521,
+      "id": "warm-orange",
+      "maxDeltaE00": 1.2,
+      "status": "passed"
+    },
+    {
+      "deltaE00": 0.529608,
+      "id": "foliage-green",
+      "maxDeltaE00": 1.2,
+      "status": "passed"
+    },
+    {
+      "deltaE00": 0.753309,
+      "id": "sky-blue",
+      "maxDeltaE00": 1.4,
+      "status": "passed"
+    },
+    {
+      "deltaE00": 0.75309,
+      "id": "deep-shadow",
+      "maxDeltaE00": 1.5,
+      "status": "passed"
+    },
+    {
+      "deltaE00": 0.643648,
+      "id": "paper-white",
+      "maxDeltaE00": 0.8,
+      "status": "passed"
+    }
+  ],
+  "schemaVersion": 1,
+  "validationMode": "colorchecker_synthetic_deltae_render_gate"
+}
