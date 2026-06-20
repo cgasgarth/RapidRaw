@@ -14,6 +14,8 @@ mod android_integration;
 mod app_settings;
 mod app_state;
 mod cache_utils;
+#[cfg(feature = "validation-harness")]
+mod color_gpu_readback_probe;
 mod culling;
 mod deblur_api;
 pub mod deblur_cpu_reference;
@@ -2616,6 +2618,8 @@ pub fn run() {
             presets::handle_export_presets_to_file,
             presets::save_community_preset,
             file_management::clear_all_sidecars,
+            #[cfg(feature = "validation-harness")]
+            color_gpu_readback_probe::run_color_gpu_readback_probe,
             #[cfg(feature = "validation-harness")]
             raw_open_edit_export_proof::run_raw_open_edit_export_proof,
             file_management::clear_thumbnail_cache,

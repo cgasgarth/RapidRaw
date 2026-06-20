@@ -19,9 +19,11 @@ const REPORT_PATH = 'docs/validation/color-cpu-gpu-parity-2026-06-18.json';
 const SHADER_PATH = 'src-tauri/src/shaders/shader.wgsl';
 const UPDATE = process.argv.includes('--update');
 const GPU_PATH_STATUS = 'explicitly_unavailable_in_headless_ci';
+const GPU_READBACK_PROBE_STATUS = 'validation_harness_command_available_not_ci_executed';
 const CPU_PREVIEW_EXPORT_STATUS = 'synthetic_cpu_preview_export_match';
 const GPU_UNAVAILABLE_REASON =
   'CI cannot create a deterministic WGPU readback surface for this gate; shader hashes bind the cases to the GPU path until a render-readback harness lands.';
+const GPU_READBACK_PROBE_HASH = 'sha256:be2ed0f28ed5d492dfd4f03c6f6f0ca559819d57f38a474448e57d8da41dc572';
 
 const colorArtifactSchema = z
   .object({
@@ -65,6 +67,18 @@ const parityReportSchema = z
       .object({
         reason: z.literal(GPU_UNAVAILABLE_REASON),
         status: z.literal(GPU_PATH_STATUS),
+      })
+      .strict(),
+    gpuReadbackProbe: z
+      .object({
+        command: z.literal('run_color_gpu_readback_probe'),
+        expectedByteHash: z.literal(GPU_READBACK_PROBE_HASH),
+        maxByteDelta: z.literal(0),
+        pixelCount: z.literal(4),
+        readbackBytes: z.literal(16),
+        status: z.literal(GPU_READBACK_PROBE_STATUS),
+        textureFormat: z.literal('rgba8unorm'),
+        validationMode: z.literal('wgpu_copy_texture_to_buffer_readback_probe'),
       })
       .strict(),
     issue: z.literal(2326),
@@ -136,6 +150,16 @@ function buildReport(manifest: ColorParityManifest) {
     gpuReadback: {
       reason: GPU_UNAVAILABLE_REASON,
       status: GPU_PATH_STATUS,
+    },
+    gpuReadbackProbe: {
+      command: 'run_color_gpu_readback_probe',
+      expectedByteHash: GPU_READBACK_PROBE_HASH,
+      maxByteDelta: 0,
+      pixelCount: 4,
+      readbackBytes: 16,
+      status: GPU_READBACK_PROBE_STATUS,
+      textureFormat: 'rgba8unorm',
+      validationMode: 'wgpu_copy_texture_to_buffer_readback_probe',
     },
     issue: 2326,
     schemaVersion: 2,
