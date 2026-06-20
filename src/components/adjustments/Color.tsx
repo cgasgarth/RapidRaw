@@ -46,6 +46,7 @@ type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustmen
 type LevelsNumericKey = Exclude<keyof Adjustments['levels'], 'enabled'>;
 
 const colorGradingSwatchKeys = ['shadows', 'midtones', 'highlights', 'global'] as const;
+type ColorGradingPreset = (typeof COLOR_GRADING_PRESETS)[number];
 
 const getColorGradingSwatchColor = (value: HueSatLum) => {
   const saturation = Math.round(Math.min(88, Math.max(8, 30 + value.saturation * 0.55)));
@@ -53,6 +54,14 @@ const getColorGradingSwatchColor = (value: HueSatLum) => {
 
   return `hsl(${Math.round(value.hue)} ${saturation}% ${lightness}%)`;
 };
+
+const areColorGradingWheelValuesEqual = (left: HueSatLum, right: HueSatLum) =>
+  left.hue === right.hue && left.saturation === right.saturation && left.luminance === right.luminance;
+
+const isColorGradingPresetApplied = (colorGrading: Adjustments['colorGrading'], preset: ColorGradingPreset): boolean =>
+  colorGrading.balance === preset.balance &&
+  colorGrading.blending === preset.blending &&
+  colorGradingSwatchKeys.every((key) => areColorGradingWheelValuesEqual(colorGrading[key], preset[key]));
 
 const colorRuntimeStatusItems = [
   ['gpuLabel', 'previewExport'],
@@ -196,6 +205,10 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
   const [activeTab, setActiveTab] = useState<'3way' | 'global'>('3way');
   const [isExpanded, setIsExpanded] = useState(false);
   const colorGrading = adjustments.colorGrading;
+  const activePresetId = useMemo(
+    () => COLOR_GRADING_PRESETS.find((preset) => isColorGradingPresetApplied(colorGrading, preset))?.id ?? null,
+    [colorGrading],
+  );
 
   const handleApplyPreset = (preset: (typeof COLOR_GRADING_PRESETS)[number]) => {
     setAdjustments((prev: Adjustments) => ({
@@ -297,6 +310,7 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
       <div className="mb-4 grid grid-cols-1 gap-2">
         {COLOR_GRADING_PRESETS.map((preset) => {
           const categoryLabel = t(`adjustments.color.grading.presetCategories.${preset.category}`);
+          const isActivePreset = activePresetId === preset.id;
 
           return (
             <button
@@ -306,7 +320,13 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
                 category: categoryLabel,
                 name: preset.name,
               })}
-              className="rounded-md border border-border bg-bg-secondary px-2.5 py-2 text-left text-xs text-text-secondary transition-colors hover:border-accent hover:bg-surface hover:text-text-primary"
+              aria-pressed={isActivePreset}
+              className={`rounded-md border px-2.5 py-2 text-left text-xs transition-colors hover:border-accent hover:text-text-primary ${
+                isActivePreset
+                  ? 'border-accent bg-accent/10 text-text-primary ring-1 ring-accent/40'
+                  : 'border-border bg-bg-secondary text-text-secondary hover:bg-surface'
+              }`}
+              data-active={isActivePreset ? 'true' : 'false'}
               data-testid="color-grading-preset-card"
               key={preset.id}
               onClick={() => {
