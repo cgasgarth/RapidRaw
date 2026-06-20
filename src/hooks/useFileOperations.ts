@@ -11,6 +11,7 @@ import { useProcessStore } from '../store/useProcessStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useUIStore } from '../store/useUIStore';
 import { formatUnknownError } from '../utils/errorFormatting';
+import { renameFilesWithSchema } from '../utils/fileOperationInvokes';
 
 interface ImportSettings {
   dateFolderFormat: string;
@@ -228,7 +229,7 @@ export function useFileOperations(
 
       if (renameTargetPaths.length > 0 && nameTemplate) {
         try {
-          const newPaths: Array<string> = await invoke(Invokes.RenameFiles, {
+          const newPaths = await renameFilesWithSchema({
             nameTemplate,
             paths: renameTargetPaths,
           });

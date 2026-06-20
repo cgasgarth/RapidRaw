@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import type { z } from 'zod';
 
 import { albumTreeSchema } from '../../../src/schemas/albumSchemas.ts';
+import { fileOperationPathListSchema } from '../../../src/schemas/fileOperationSchemas.ts';
 import { folderTreeListSchema } from '../../../src/schemas/folderTreeSchemas.ts';
 import { parseTauriBoundaryLedger, type TauriBoundaryLedger } from '../../../src/schemas/tauriBoundaryLedgerSchemas.ts';
 import { emptyTauriResponseSchema } from '../../../src/schemas/tauriResponseSchemas.ts';
@@ -17,6 +18,7 @@ const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'
 const schemaByName = {
   albumTreeSchema,
   emptyTauriResponseSchema,
+  fileOperationPathListSchema,
   folderTreeListSchema,
 } satisfies Record<TauriBoundaryEntry['zodSchema'], z.ZodType<unknown>>;
 
