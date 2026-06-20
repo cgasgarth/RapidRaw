@@ -22,11 +22,20 @@ const renderReportSchema = z
     beforeHash: z.string().length(16),
     changedPixels: z.number().int().positive(),
     commandId: z.string().min(1),
+    doesNotProve: z
+      .array(z.enum(['independent_preview_export_paths', 'real_raw_decode', 'gpu_parity', 'local_app_ui_e2e']))
+      .min(1),
     graphRevision: z.string().min(1),
     issue: z.literal(2322),
+    proofEntrypoints: z
+      .object({
+        export: z.literal('renderBasicTone'),
+        preview: z.literal('renderBasicTone'),
+      })
+      .strict(),
     previewExportMaxDelta: z.literal(0),
     schemaVersion: z.literal(1),
-    runtimeStatus: z.literal('synthetic_headless_preview_export_parity'),
+    runtimeStatus: z.literal('synthetic_shared_renderer_preview_export_match'),
     validationMode: z.literal('typed_command_replay_golden_render'),
   })
   .strict()
@@ -123,11 +132,16 @@ const report = renderReportSchema.parse({
   beforeHash: hashPixels(before),
   changedPixels,
   commandId: parsedCommand.commandId,
+  doesNotProve: ['independent_preview_export_paths', 'real_raw_decode', 'gpu_parity', 'local_app_ui_e2e'],
   graphRevision: parsedCommand.expectedGraphRevision,
   issue: 2322,
+  proofEntrypoints: {
+    export: 'renderBasicTone',
+    preview: 'renderBasicTone',
+  },
   previewExportMaxDelta,
   schemaVersion: 1,
-  runtimeStatus: 'synthetic_headless_preview_export_parity',
+  runtimeStatus: 'synthetic_shared_renderer_preview_export_match',
   validationMode: 'typed_command_replay_golden_render',
 });
 
