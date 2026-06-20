@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "issue": 2321,
+  "runtimeStatus": "typed_command_envelope_compatibility_fixture",
+  "legacyAdjustmentPayload": {
+    "blacks": -8,
+    "brightness": 0.2,
+    "clarity": 14,
+    "contrast": 22,
+    "exposure": 0.4,
+    "highlights": -18,
+    "saturation": 7,
+    "shadows": 16,
+    "whites": 5
+  },
+  "expectedCommandParameters": {
+    "blackPoint": -8,
+    "clarity": 14,
+    "contrast": 22,
+    "exposureEv": 0.4,
+    "highlights": -18,
+    "saturation": 7,
+    "shadows": 16,
+    "whitePoint": 5
+  }
+}

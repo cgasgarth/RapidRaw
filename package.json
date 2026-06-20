@@ -44,6 +44,7 @@
     "check:keyboard-shortcut-conflicts": "bun scripts/check-keyboard-shortcut-conflicts.ts",
     "check:edit-graph-history": "bun scripts/check-edit-graph-history-commands.ts",
     "check:edit-history-replay": "bun scripts/check-edit-history-replay.ts",
+    "check:typed-adjustment-command-envelope": "bun scripts/check-typed-adjustment-command-envelope.ts",
     "check:command-replay-render": "bun scripts/check-command-replay-render-proof.ts",
     "check:command-replay-render:update": "bun scripts/check-command-replay-render-proof.ts --update",
     "check:headless-render-command": "bun scripts/check-headless-render-command.ts",
