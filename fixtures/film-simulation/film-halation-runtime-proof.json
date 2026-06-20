@@ -1,0 +1,152 @@
+{
+  "doesNotProve": [
+    "physical_film_halation",
+    "measured_stock_behavior",
+    "spectral_emulsion_model",
+    "real_raw_quality",
+    "gpu_parity",
+    "ui_e2e"
+  ],
+  "fixtureInput": {
+    "colorSpace": "working-linear-rgb-d65",
+    "kind": "synthetic-film-halation-runtime-proof",
+    "scene": "specular-discs-edges-ramps-neutral-control"
+  },
+  "generatedFrom": "tests/integration/checks/check-film-halation-runtime-proof.ts",
+  "proofId": "film.halation.conservative.runtime.synthetic.v1",
+  "result": {
+    "afterHash": "fnv1a32:5620732d",
+    "beforeHash": "fnv1a32:ace59cf2",
+    "changedPixels": 137,
+    "claimBoundary": "rgb_creative_approximation_not_physical_film_halation",
+    "metrics": {
+      "broadCoverageRatio": 0.738889,
+      "changedPixelRatio": 0.761111,
+      "maxAbsDelta": 0.046594,
+      "maxLumaDelta": 0.02896,
+      "neutralPatchMaxDelta": 0.035328,
+      "outputClipCount": 0
+    },
+    "previewApproximation": false,
+    "provenance": {
+      "algorithmId": "halation.conservative.v1",
+      "colorDomain": "working_linear_rgb",
+      "constants": {
+        "grayReferenceLuma": 0.18,
+        "lumaCoefficients": {
+          "b": 0.0722,
+          "g": 0.7152,
+          "r": 0.2126
+        },
+        "warmEndpointXyY": "0.46,0.40,1.0"
+      },
+      "controls": {
+        "amount": 100,
+        "enabled": true,
+        "highlightThresholdEv": 1.5,
+        "sigmaShortEdgeFraction": 0.004,
+        "warmth": 0.6
+      },
+      "edgeMode": "clamp_to_edge",
+      "kernel": "gaussian_mask_only_reference",
+      "referenceWhite": "D65",
+      "renderStage": "late_working_linear_before_output_transform",
+      "sigmaPx": 4.8,
+      "workingSpace": "linear_srgb_d65"
+    },
+    "runtimeStatus": "synthetic_cpu_reference_runtime_apply_capable",
+    "schemaVersion": 1,
+    "warnings": [
+      "HALATION_BROAD_COVERAGE",
+      "HALATION_EXCESSIVE_NEUTRAL_SHIFT",
+      "HALATION_PARAMETERS_OUTSIDE_VALIDATED_RANGE"
+    ],
+    "representativeMaskSamples": [
+      {
+        "blurred": 0.178673,
+        "highlight": 0.414878,
+        "quantity": 0.061172,
+        "x": 0,
+        "y": 0
+      },
+      {
+        "blurred": 0.177399,
+        "highlight": 0,
+        "quantity": 0.177399,
+        "x": 1,
+        "y": 0
+      },
+      {
+        "blurred": 0.178485,
+        "highlight": 0,
+        "quantity": 0.178485,
+        "x": 2,
+        "y": 0
+      },
+      {
+        "blurred": 0.181862,
+        "highlight": 0,
+        "quantity": 0.181862,
+        "x": 3,
+        "y": 0
+      },
+      {
+        "blurred": 0.187199,
+        "highlight": 0,
+        "quantity": 0.187199,
+        "x": 4,
+        "y": 0
+      },
+      {
+        "blurred": 0.194021,
+        "highlight": 0,
+        "quantity": 0.194021,
+        "x": 5,
+        "y": 0
+      },
+      {
+        "blurred": 0.20188,
+        "highlight": 0,
+        "quantity": 0.20188,
+        "x": 6,
+        "y": 0
+      },
+      {
+        "blurred": 0.210522,
+        "highlight": 1,
+        "quantity": 0,
+        "x": 7,
+        "y": 0
+      },
+      {
+        "blurred": 0.219988,
+        "highlight": 0,
+        "quantity": 0.219988,
+        "x": 8,
+        "y": 0
+      },
+      {
+        "blurred": 0.230607,
+        "highlight": 0,
+        "quantity": 0.230607,
+        "x": 9,
+        "y": 0
+      },
+      {
+        "blurred": 0.24287,
+        "highlight": 0,
+        "quantity": 0.24287,
+        "x": 10,
+        "y": 0
+      },
+      {
+        "blurred": 0.257246,
+        "highlight": 0,
+        "quantity": 0.257246,
+        "x": 11,
+        "y": 0
+      }
+    ]
+  },
+  "schemaVersion": 1
+}
