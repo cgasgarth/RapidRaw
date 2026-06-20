@@ -18,6 +18,8 @@
       "whites": "Biele"
     },
     "color": {
+      "activeRangeAdjustedHue": "Adjusted hue",
+      "activeRangeDeltas": "HSL deltas",
       "ariaSelectColor": "Wybierz kolor {{name}}",
       "blackWhiteMixer": {
         "ariaSelectChannel": "Wybierz kanał czarno-biały {{name}}",

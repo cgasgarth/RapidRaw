@@ -91,6 +91,7 @@
     "check:selective-color-command-proof:update": "bun tests/integration/checks/check-selective-color-command-proof.ts --update",
     "check:selective-color-independent-proof": "bun tests/integration/checks/check-selective-color-independent-proof.ts",
     "check:selective-color-independent-proof:update": "bun tests/integration/checks/check-selective-color-independent-proof.ts --update",
+    "check:selective-color-ui": "bun tests/integration/checks/check-selective-color-ui.ts",
     "check:selective-color-ranges": "bun tests/integration/checks/check-selective-color-ranges.ts",
     "check:selective-color-falloff": "bun tests/integration/checks/check-selective-color-falloff.ts",
     "check:skin-tone-uniformity": "bun tests/integration/checks/check-skin-tone-uniformity.ts",
