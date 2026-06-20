@@ -1,0 +1,40 @@
+{
+  "alignmentConfidence": 1,
+  "doesNotProve": ["homography_alignment", "real_raw_e2e", "moving_subject_deghost_quality"],
+  "generatedAt": "2026-06-20T00:00:00.000Z",
+  "issue": 2349,
+  "outputHash": "sha256:da80a71bf02877d3376d1a9d2769184e89f18fb77f1fe11f850deb80414d70a6",
+  "referenceSourceIndex": 1,
+  "schemaVersion": 1,
+  "searchRadiusPx": 5,
+  "transforms": [
+    {
+      "confidence": 1,
+      "expectedTranslationPx": { "x": -2, "y": 1 },
+      "overlapRatio": 0.948568,
+      "rmsError": 0,
+      "sourceIndex": 0,
+      "transformType": "translation",
+      "translationPx": { "x": -2, "y": 1 }
+    },
+    {
+      "confidence": 1,
+      "expectedTranslationPx": { "x": 0, "y": 0 },
+      "overlapRatio": 1,
+      "rmsError": 0,
+      "sourceIndex": 1,
+      "transformType": "identity",
+      "translationPx": { "x": 0, "y": 0 }
+    },
+    {
+      "confidence": 1,
+      "expectedTranslationPx": { "x": 3, "y": -2 },
+      "overlapRatio": 0.913411,
+      "rmsError": 0,
+      "sourceIndex": 2,
+      "transformType": "translation",
+      "translationPx": { "x": 3, "y": -2 }
+    }
+  ],
+  "validationMode": "synthetic_hdr_translation_alignment_runtime"
+}

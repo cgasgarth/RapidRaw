@@ -282,6 +282,8 @@
     "check:hdr-alignment-smoke": "bun tests/integration/checks/check-hdr-alignment-smoke.ts",
     "check:hdr-alignment-bracket-proof": "bun tests/integration/checks/check-hdr-alignment-bracket-proof.ts",
     "check:hdr-alignment-bracket-proof:update": "bun tests/integration/checks/check-hdr-alignment-bracket-proof.ts --update",
+    "check:hdr-alignment-runtime-proof": "bun tests/integration/checks/check-hdr-alignment-runtime-proof.ts",
+    "check:hdr-alignment-runtime-proof:update": "bun tests/integration/checks/check-hdr-alignment-runtime-proof.ts --update",
     "check:hdr-source-validation": "bun tests/integration/checks/check-hdr-source-validation.ts",
     "check:hdr-deghosting-smoke": "bun tests/integration/checks/check-hdr-deghosting-smoke.ts",
     "check:hdr-deghost-tone-artifact": "bun tests/integration/checks/check-hdr-deghost-tone-artifact.ts",
