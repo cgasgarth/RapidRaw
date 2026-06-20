@@ -35,6 +35,7 @@ const requiredLocaleKeys = [
   'summaryPreviewBudget',
   'summaryProjection',
   'summaryQuality',
+  'summarySources',
   'uiOnlyNotice',
   'workflowStatus',
   'workflowTitle',
@@ -74,6 +75,7 @@ for (const marker of [
   'panorama-setup-summary',
   'panorama-setup-summary-chip',
   'modals.panorama.summaryProjection',
+  'modals.panorama.summarySources',
   'settings.maxPreviewDimensionPx',
 ]) {
   if (!source.includes(marker)) {

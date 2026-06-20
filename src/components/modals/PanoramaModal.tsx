@@ -201,8 +201,12 @@ export default function PanoramaModal({
           >
             {[
               {
+                label: t('modals.panorama.summarySources'),
+                value: String(imageCount ?? 0),
+              },
+              {
                 label: t('modals.panorama.summaryProjection'),
-                value: projectionOptions.find((option) => option.value === settings.projection)?.label,
+                value: projectionOptions.find((option) => option.value === settings.projection)?.label ?? '',
               },
               {
                 label: t('modals.panorama.summaryBlend'),
@@ -210,15 +214,15 @@ export default function PanoramaModal({
               },
               {
                 label: t('modals.panorama.summaryBoundary'),
-                value: boundaryOptions.find((option) => option.value === settings.boundaryMode)?.label,
+                value: boundaryOptions.find((option) => option.value === settings.boundaryMode)?.label ?? '',
               },
               {
                 label: t('modals.panorama.summaryExposure'),
-                value: exposureOptions.find((option) => option.value === settings.exposureMode)?.label,
+                value: exposureOptions.find((option) => option.value === settings.exposureMode)?.label ?? '',
               },
               {
                 label: t('modals.panorama.summaryQuality'),
-                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label,
+                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '',
               },
               {
                 label: t('modals.panorama.summaryPreviewBudget'),
