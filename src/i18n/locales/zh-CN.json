@@ -910,6 +910,7 @@
         "applyLabel": "应用色彩风格 {{name}}",
         "count": "{{count}} 个风格",
         "count_other": "{{count}} 个风格",
+        "defaultBadge": "默认",
         "title": "色彩风格"
       },
       "dialog": {

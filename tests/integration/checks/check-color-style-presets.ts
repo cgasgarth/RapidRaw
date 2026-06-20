@@ -44,6 +44,7 @@ const catalog = parseColorStylePresetCatalog({
   version: fixture.version,
 });
 const invalidCases = await readJson('fixtures/color/invalid-color-style-presets.json');
+const presetsPanelSource = await readFile('src/components/panel/right/PresetsPanel.tsx', 'utf8');
 const failures = [];
 
 const sourceCatalog = parseColorStylePresetCatalog(COLOR_STYLE_PRESET_CATALOG);
@@ -51,6 +52,16 @@ const sourceIds = sourceCatalog.presets.map((preset) => preset.id).join(',');
 const fixtureIds = catalog.presets.map((preset) => preset.id).join(',');
 if (sourceCatalog.defaultPresetId !== catalog.defaultPresetId || sourceIds !== fixtureIds) {
   failures.push('source catalog must match color-style fixture ids.');
+}
+
+for (const marker of [
+  'COLOR_STYLE_PRESET_CATALOG.defaultPresetId',
+  'color-style-default-preset-badge',
+  'editor.presets.colorStyles.defaultBadge',
+]) {
+  if (!presetsPanelSource.includes(marker)) {
+    failures.push(`PresetsPanel.tsx missing color style UI marker: ${marker}.`);
+  }
 }
 
 for (const preset of catalog.presets) {

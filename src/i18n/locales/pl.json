@@ -962,6 +962,7 @@
         "count_few": "{{count}} style",
         "count_many": "{{count}} stylów",
         "count_other": "{{count}} stylu",
+        "defaultBadge": "Domyślny",
         "title": "Style kolorów"
       },
       "dialog": {

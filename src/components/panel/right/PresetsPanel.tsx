@@ -53,7 +53,7 @@ import { useUIStore } from '../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { type Adjustments, INITIAL_ADJUSTMENTS, ADJUSTMENT_GROUPS } from '../../../utils/adjustments';
 import { createBlobFromUint8Array } from '../../../utils/blobUtils';
-import { BUILT_IN_COLOR_STYLE_PRESETS } from '../../../utils/colorStylePresetCatalog';
+import { BUILT_IN_COLOR_STYLE_PRESETS, COLOR_STYLE_PRESET_CATALOG } from '../../../utils/colorStylePresetCatalog';
 import ConfigurePresetModal from '../../modals/ConfigurePresetModal';
 import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
@@ -1112,30 +1112,48 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
                   </UiText>
                 </div>
                 <div className="grid gap-2">
-                  {BUILT_IN_COLOR_STYLE_PRESETS.map((preset) => (
-                    <button
-                      aria-label={t('editor.presets.colorStyles.applyLabel', { name: preset.name })}
-                      className="rounded-md border border-surface bg-bg-secondary p-2 text-left transition-colors hover:bg-surface"
-                      data-tooltip={preset.description}
-                      key={preset.id}
-                      onClick={() => {
-                        handleApplyColorStylePreset(preset);
-                      }}
-                      type="button"
-                    >
-                      <span className="flex items-center justify-between gap-2">
-                        <UiText className="truncate" weight={TextWeights.medium}>
-                          {preset.name}
+                  {BUILT_IN_COLOR_STYLE_PRESETS.map((preset) => {
+                    const isDefaultPreset = preset.id === COLOR_STYLE_PRESET_CATALOG.defaultPresetId;
+
+                    return (
+                      <button
+                        aria-label={t('editor.presets.colorStyles.applyLabel', { name: preset.name })}
+                        className="rounded-md border border-surface bg-bg-secondary p-2 text-left transition-colors hover:bg-surface"
+                        data-tooltip={preset.description}
+                        key={preset.id}
+                        onClick={() => {
+                          handleApplyColorStylePreset(preset);
+                        }}
+                        type="button"
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <UiText className="truncate" weight={TextWeights.medium}>
+                              {preset.name}
+                            </UiText>
+                            {isDefaultPreset && (
+                              <UiText
+                                className="shrink-0 rounded border border-accent/40 px-1 text-accent"
+                                data-testid="color-style-default-preset-badge"
+                                variant={TextVariants.small}
+                              >
+                                {t('editor.presets.colorStyles.defaultBadge')}
+                              </UiText>
+                            )}
+                          </span>
+                          <UiText
+                            variant={TextVariants.small}
+                            className="uppercase tracking-normal text-text-secondary"
+                          >
+                            {preset.category.replaceAll('_', ' ')}
+                          </UiText>
+                        </span>
+                        <UiText variant={TextVariants.small} className="mt-1 block text-text-secondary">
+                          {preset.previewTags.join(' / ')}
                         </UiText>
-                        <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
-                          {preset.category.replaceAll('_', ' ')}
-                        </UiText>
-                      </span>
-                      <UiText variant={TextVariants.small} className="mt-1 block text-text-secondary">
-                        {preset.previewTags.join(' / ')}
-                      </UiText>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
               <AnimatePresence>
