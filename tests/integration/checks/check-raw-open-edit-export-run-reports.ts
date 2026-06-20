@@ -9,6 +9,7 @@ import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/
 
 const requireAssets = process.argv.includes('--require-assets');
 const allowFreshHashes = process.argv.includes('--allow-fresh-hashes');
+const fixtureIdFilter = valueAfter('--fixture-id');
 const root = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 const inputPath = valueAfter('--input') ?? 'fixtures/validation/raw-open-edit-export-run-reports.json';
 const failures: string[] = [];
@@ -22,10 +23,18 @@ const manifest = parseRawOpenEditExportProofManifest(
 );
 const reportCollection = parseRawOpenEditExportRunReportCollection(JSON.parse(await readFile(inputPath, 'utf8')));
 
-const proofCasesByFixtureId = new Map(manifest.proofCases.map((proofCase) => [proofCase.fixtureId, proofCase]));
-const reportsByFixtureId = new Map(reportCollection.reports.map((report) => [report.fixtureId, report]));
+const proofCases =
+  fixtureIdFilter === undefined
+    ? manifest.proofCases
+    : manifest.proofCases.filter((proofCase) => proofCase.fixtureId === fixtureIdFilter);
+const reports =
+  fixtureIdFilter === undefined
+    ? reportCollection.reports
+    : reportCollection.reports.filter((report) => report.fixtureId === fixtureIdFilter);
+const proofCasesByFixtureId = new Map(proofCases.map((proofCase) => [proofCase.fixtureId, proofCase]));
+const reportsByFixtureId = new Map(reports.map((report) => [report.fixtureId, report]));
 
-for (const report of reportCollection.reports) {
+for (const report of reports) {
   const proofCase = proofCasesByFixtureId.get(report.fixtureId);
   if (proofCase === undefined) {
     failures.push(`${report.fixtureId}: private run report has no manifest proof case.`);
@@ -99,7 +108,7 @@ for (const report of reportCollection.reports) {
   }
 }
 
-for (const proofCase of manifest.proofCases) {
+for (const proofCase of proofCases) {
   const report = reportsByFixtureId.get(proofCase.fixtureId);
 
   if (requireAssets && report === undefined) {
@@ -147,9 +156,7 @@ if (failures.length > 0) {
 }
 
 const mode =
-  reportCollection.reports.length === 0
-    ? 'public schema mode; no private reports committed'
-    : `${reportCollection.reports.length} private report(s)`;
+  reports.length === 0 ? 'public schema mode; no private reports committed' : `${reports.length} private report(s)`;
 console.log(`raw open/edit/export run reports ok (${mode})`);
 
 function valueAfter(flag: string): string | undefined {

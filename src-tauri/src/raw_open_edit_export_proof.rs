@@ -1162,4 +1162,69 @@ mod tests {
                 .any(|metric| metric.name == "previewExportMeanAbsDelta" && metric.passed)
         );
     }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn private_runtime_smoke_generates_professional_color_report_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_RAW_PROFESSIONAL_COLOR_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            eprintln!("skipping private RAW professional color proof smoke");
+            return;
+        }
+
+        let mut request: RawOpenEditExportProofRequest = serde_json::from_str(
+            &fs::read_to_string(
+                "../fixtures/validation/professional-color-workflow-proof-request.json",
+            )
+            .expect("professional color proof request fixture reads"),
+        )
+        .expect("professional color proof request fixture parses");
+        if let Ok(private_root) = std::env::var("RAWENGINE_PRIVATE_RAW_ROOT") {
+            request.private_root_path = private_root;
+        }
+
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let settings = AppSettings::default();
+        let report =
+            run_raw_open_edit_export_proof_with_context(request, &state, &settings, &context)
+                .expect("private RAW professional color proof command runs");
+
+        assert_eq!(
+            report.edit_command_id,
+            "command.raw-open-edit-export.professional-color.v1"
+        );
+        assert_eq!(
+            report.fixture_id,
+            "validation.raw-open-edit-export.professional-color.v1"
+        );
+        assert!(
+            report
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.kind == "workflow_report_private")
+        );
+        assert!(
+            report
+                .metrics
+                .iter()
+                .any(|metric| metric.name == "changedPixelRatio"
+                    && metric.passed
+                    && metric.value > 0.0)
+        );
+        assert!(
+            report
+                .metrics
+                .iter()
+                .any(|metric| metric.name == "previewExportMeanAbsDelta" && metric.passed)
+        );
+    }
 }
