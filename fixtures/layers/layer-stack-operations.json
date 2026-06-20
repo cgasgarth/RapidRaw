@@ -266,6 +266,46 @@
     ]
   },
   {
+    "id": "show-all-layers",
+    "initialLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": false },
+      { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": false }
+    ],
+    "operations": [{ "type": "showAll" }],
+    "expectedLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      { "id": "skin", "name": "Skin Uniformity", "opacity": 65, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true }
+    ],
+    "expectedRenderPlan": [
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "tone",
+        "name": "Tone Balance",
+        "opacity": 100,
+        "opacityFraction": 1,
+        "subMaskCount": 0
+      },
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 65,
+        "opacityFraction": 0.65,
+        "subMaskCount": 0
+      },
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "opacityFraction": 0.8,
+        "subMaskCount": 0
+      }
+    ]
+  },
+  {
     "id": "duplicate-and-delete",
     "initialLayers": [
       { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
