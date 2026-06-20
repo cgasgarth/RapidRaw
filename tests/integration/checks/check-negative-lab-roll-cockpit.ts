@@ -30,6 +30,7 @@ for (const marker of [
   'negative-lab-workflow-queued',
   'negative-lab-workflow-preview',
   'negative-lab-workflow-export',
+  'negative-lab-selected-stock-readiness',
   'negative-lab-frame-warning-chip-',
   'negative-lab-planned-apply-count',
   'negative-lab-skipped-frame-count',
