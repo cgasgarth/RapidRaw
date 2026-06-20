@@ -231,6 +231,7 @@
         "lookCount_other": "{{count}} looks",
         "measurementSource": "Source",
         "provenanceTitle": "Look provenance",
+        "resultCount": "{{visibleCount}} of {{totalCount}} looks",
         "saveLook": "Save {{displayName}} as preset",
         "search": "Search looks",
         "shareLook": "Share {{displayName}} preset",

@@ -108,6 +108,7 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<FilmLookSortMode>('catalog');
 
+  const totalLookCount = useMemo(() => groups.reduce((count, group) => count + group.looks.length, 0), [groups]);
   const favoriteLookCount = useMemo(
     () => groups.reduce((count, group) => count + group.looks.filter((look) => favoriteLookIds.has(look.id)).length, 0),
     [favoriteLookIds, groups],
@@ -236,8 +237,11 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <UiText variant={TextVariants.heading}>{t('adjustments.effects.filmLookBrowser.title')}</UiText>
-        <UiText className="tabular-nums" variant={TextVariants.small}>
-          {t('adjustments.effects.filmLookBrowser.lookCount', { count: visibleLookCount })}
+        <UiText className="tabular-nums" data-testid="film-look-result-count" variant={TextVariants.small}>
+          {t('adjustments.effects.filmLookBrowser.resultCount', {
+            totalCount: totalLookCount,
+            visibleCount: visibleLookCount,
+          })}
         </UiText>
       </div>
 
