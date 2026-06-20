@@ -29,6 +29,9 @@ await runComputationalPrivateProof({
     ['bun', 'run', 'check:sr-app-server-runtime'],
     ['bun', 'run', 'check:sr-ui-runtime-bridge'],
   ],
-  postPrivateChecks: [['bun', 'run', 'check:sr-real-raw-private-app-server-proof']],
+  postPrivateChecks: [
+    ['bun', 'run', 'check:sr-real-raw-private-app-server-proof'],
+    ['bun', 'run', 'check:sr-private-raw-ui-smoke'],
+  ],
   skipLabel: 'SR real RAW private proof',
 });
