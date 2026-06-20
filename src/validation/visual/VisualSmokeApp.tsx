@@ -58,9 +58,22 @@ interface FocusPrivateRawVisualProof {
   stackPath: string;
 }
 
+interface PanoramaPrivateRawVisualProof {
+  exportReviewArtifact: string;
+  exportReviewDataUrl: string;
+  fixtureId: string;
+  panoramaPath: string;
+  previewArtifact: string;
+  previewDataUrl: string;
+  resultReviewArtifact: string;
+  resultReviewDataUrl: string;
+  sourceCount: string;
+}
+
 declare global {
   interface Window {
     __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawVisualProof;
+    __RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__?: PanoramaPrivateRawVisualProof;
     __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawVisualProof;
   }
 }
@@ -79,6 +92,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof]: MaskOverlayRawProofVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace]: NegativeLabVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi]: PanoramaPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrUi]: SuperResolutionVisualSmoke,
@@ -430,6 +444,12 @@ const copy = {
   panoramaReview: 'Panorama review',
   panoramaDryRunPreview: 'Dry-run preview',
   panoramaArtifactHandoff: 'Artifact handoff',
+  panoramaPrivateRawMissing: 'Missing panorama private RAW proof payload',
+  panoramaPrivateRawReview: 'Private RAW panorama review',
+  panoramaPrivateRawRuntime: 'Private RAW',
+  panoramaPrivateRawResultAlt: 'Panorama private RAW stitched result review',
+  panoramaPrivateRawPreviewAlt: 'Panorama private RAW preview',
+  panoramaPrivateRawExportAlt: 'Panorama private RAW export review',
   panoramaApplyTool: getComputationalMergeAppServerRoutePairSummary('panorama').applyToolName,
   panoramaDryRunTool: getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName,
   panoramaArtifactPath: '/tmp/panorama.tif',
@@ -1514,6 +1534,107 @@ function PanoramaVisualSmoke() {
             <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="panorama-artifact-handoff">
               <p className="text-xs text-[#aab2bd]">{copy.panoramaArtifactHandoff}</p>
               <p>{copy.panoramaArtifactPath}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function PanoramaPrivateRawVisualSmoke() {
+  const proof = window.__RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__;
+  if (!proof) {
+    return (
+      <main
+        className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi}
+      >
+        <div className="flex h-screen items-center justify-center">{copy.panoramaPrivateRawMissing}</div>
+      </main>
+    );
+  }
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi}
+    >
+      <div
+        className="grid h-screen grid-cols-[1fr_360px] bg-[#0f1114]"
+        data-visual-smoke-section="panorama-private-raw"
+      >
+        <section className="grid grid-rows-[44px_1fr_260px] overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+            <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+              {copy.panoramaPrivateRawReview}
+            </span>
+          </div>
+          <figure className="relative min-h-0 overflow-hidden border-b border-white/10 bg-black">
+            <img
+              alt={copy.panoramaPrivateRawResultAlt}
+              className="h-full w-full object-contain"
+              data-testid="panorama-private-raw-result"
+              src={proof.resultReviewDataUrl}
+            />
+            <figcaption className="absolute left-4 top-4 rounded bg-black/75 px-3 py-1 text-xs text-[#d7dce2]">
+              {proof.fixtureId}
+            </figcaption>
+          </figure>
+          <div className="grid grid-cols-2 gap-3 p-3">
+            <figure className="overflow-hidden rounded border border-white/10 bg-black">
+              <img
+                alt={copy.panoramaPrivateRawPreviewAlt}
+                className="h-full w-full object-contain"
+                data-testid="panorama-private-raw-preview"
+                src={proof.previewDataUrl}
+              />
+            </figure>
+            <figure className="overflow-hidden rounded border border-white/10 bg-black">
+              <img
+                alt={copy.panoramaPrivateRawExportAlt}
+                className="h-full w-full object-contain"
+                data-testid="panorama-private-raw-export"
+                src={proof.exportReviewDataUrl}
+              />
+            </figure>
+          </div>
+        </section>
+        <aside className="border-l border-white/10 bg-[#171a1f] p-4 text-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{copy.panoramaReview}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.panoramaPrivateRawRuntime}</span>
+          </div>
+          <div
+            className="sr-only"
+            data-apply-command={copy.panoramaApplyTool}
+            data-artifact-path={proof.panoramaPath}
+            data-command={copy.panoramaDryRunTool}
+            data-export-review-artifact={proof.exportReviewArtifact}
+            data-fixture-id={proof.fixtureId}
+            data-preview-artifact={proof.previewArtifact}
+            data-result-review-artifact={proof.resultReviewArtifact}
+            data-runtime-status="private_raw_app_server_apply"
+            data-source-count={proof.sourceCount}
+            data-testid="panorama-private-raw-review-proof"
+          />
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.panoramaDryRunTool}</p>
+              <p>{proof.fixtureId}</p>
+            </div>
+            <div
+              className="rounded border border-white/10 bg-white/5 p-2"
+              data-testid="panorama-private-raw-artifact-handoff"
+            >
+              <p className="text-xs text-[#aab2bd]">{copy.panoramaArtifactHandoff}</p>
+              <p className="break-all">{proof.panoramaPath}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.panoramaSourceOrder}</p>
+              <p>{copy.privateRawFrameCount(proof.sourceCount)}</p>
             </div>
           </div>
         </aside>

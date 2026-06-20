@@ -14,6 +14,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   MaskOverlayRawProof: 'mask-overlay-raw-proof',
   NegativeLabBatchColorWorkspace: 'negative-lab-batch-color-workspace',
   NegativeLabWorkspace: 'negative-lab-workspace',
+  PanoramaPrivateRawUi: 'panorama-private-raw-ui',
   PanoramaUi: 'panorama-ui',
   SrPrivateRawUi: 'sr-private-raw-ui',
   SrUi: 'sr-ui',
@@ -60,6 +61,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Panorama review',
     mode: VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi,
     outputFile: 'panorama-ui.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Private RAW panorama review',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi,
+    outputFile: 'panorama-private-raw-ui.png',
     sectionMinimum: 1,
   },
   {

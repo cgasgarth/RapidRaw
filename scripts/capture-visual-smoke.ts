@@ -32,6 +32,7 @@ import {
   layerStackExportParityProofSchema,
   layerStackWorkflowProofSchema,
   maskOverlayRawProofSchema,
+  panoramaPrivateRawReviewProofSchema,
   negativeLabWorkspaceProofDatasetSchema,
   panoramaReviewWorkspaceProofSchema,
   panoramaUiSettingsProofSchema,
@@ -63,6 +64,9 @@ const requiresSrPrivateRawProof = selectedScenarios.some(
 );
 const requiresFocusPrivateRawProof = selectedScenarios.some(
   (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi,
+);
+const requiresPanoramaPrivateRawProof = selectedScenarios.some(
+  (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi,
 );
 
 if (selectedScenarios.length === 0) {
@@ -97,9 +101,22 @@ interface FocusPrivateRawBrowserProof {
   stackPath: string;
 }
 
+interface PanoramaPrivateRawBrowserProof {
+  exportReviewArtifact: string;
+  exportReviewDataUrl: string;
+  fixtureId: string;
+  panoramaPath: string;
+  previewArtifact: string;
+  previewDataUrl: string;
+  resultReviewArtifact: string;
+  resultReviewDataUrl: string;
+  sourceCount: string;
+}
+
 declare global {
   interface Window {
     __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawBrowserProof;
+    __RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__?: PanoramaPrivateRawBrowserProof;
     __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawBrowserProof;
   }
 }
@@ -197,6 +214,25 @@ async function loadFocusPrivateRawProof(): Promise<FocusPrivateRawBrowserProof> 
     resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
     sourceCount: '3',
     stackPath: `${artifactRoot}/focus-plane-merge.tiff`,
+  };
+}
+
+async function loadPanoramaPrivateRawProof(): Promise<PanoramaPrivateRawBrowserProof> {
+  const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
+  const artifactRoot = `${privateRoot}/private-artifacts/validation/computational-merge`;
+  const previewArtifact = `${artifactRoot}/panorama-overlap-preview.png`;
+  const resultReviewArtifact = `${artifactRoot}/panorama-overlap-result-review.png`;
+  const exportReviewArtifact = `${artifactRoot}/panorama-overlap-export-review.png`;
+  return {
+    exportReviewArtifact,
+    exportReviewDataUrl: await readPngDataUrl(exportReviewArtifact),
+    fixtureId: 'validation.computational-merge.panorama-overlap.v1',
+    panoramaPath: `${artifactRoot}/panorama-overlap-merge.tiff`,
+    previewArtifact,
+    previewDataUrl: await readPngDataUrl(previewArtifact),
+    resultReviewArtifact,
+    resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
+    sourceCount: '3',
   };
 }
 
@@ -406,6 +442,28 @@ async function prepareScenario(page, mode) {
     await page
       .getByTestId('focus-private-raw-artifact-handoff')
       .getByText('focus-plane-merge.tiff', { exact: false })
+      .waitFor({ timeout: 10_000 });
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi) {
+    panoramaPrivateRawReviewProofSchema.parse(
+      await page.getByTestId('panorama-private-raw-review-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    for (const testId of [
+      'panorama-private-raw-preview',
+      'panorama-private-raw-result',
+      'panorama-private-raw-export',
+    ]) {
+      const loaded = await page.getByTestId(testId).evaluate((element) => {
+        const image = element as HTMLImageElement;
+        return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+      });
+      if (!loaded) throw new Error(`${testId} did not load a nonblank private RAW image.`);
+    }
+    await page
+      .getByTestId('panorama-private-raw-artifact-handoff')
+      .getByText('panorama-overlap-merge.tiff', { exact: false })
       .waitFor({ timeout: 10_000 });
     return;
   }
@@ -1011,6 +1069,14 @@ async function main() {
           window.__RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__ = proof;
         },
         await loadFocusPrivateRawProof(),
+      );
+    }
+    if (requiresPanoramaPrivateRawProof) {
+      await page.addInitScript(
+        (proof: PanoramaPrivateRawBrowserProof) => {
+          window.__RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__ = proof;
+        },
+        await loadPanoramaPrivateRawProof(),
       );
     }
 
