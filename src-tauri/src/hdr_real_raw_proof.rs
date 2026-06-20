@@ -220,15 +220,13 @@ fn run_private_hdr_real_raw_proof(private_root: &Path) -> Result<(), String> {
             },
         }),
     )?;
+    let review_before = loaded_sources[1].image.thumbnail(960, 640);
+    let review_after = hdr_merged.thumbnail(960, 640);
     write_image(&hdr_merged, &merge_path, ImageFormat::Tiff)?;
-    write_image(&hdr_merged, &preview_path, ImageFormat::Png)?;
+    write_image(&review_after, &preview_path, ImageFormat::Png)?;
     write_image(&hdr_merged, &export_path, ImageFormat::Tiff)?;
-    write_image(
-        &loaded_sources[1].image,
-        &modal_before_path,
-        ImageFormat::Png,
-    )?;
-    write_image(&hdr_merged, &modal_after_path, ImageFormat::Png)?;
+    write_image(&review_before, &modal_before_path, ImageFormat::Png)?;
+    write_image(&review_after, &modal_after_path, ImageFormat::Png)?;
 
     let metrics = build_metrics(&loaded_sources, &hdr_merged);
     write_json(&quality_path, &metrics)?;
@@ -506,9 +504,18 @@ fn clipped_high_ratio(image: &DynamicImage) -> f64 {
 }
 
 fn write_image(image: &DynamicImage, path: &Path, format: ImageFormat) -> Result<(), String> {
-    image
+    encodable_image(image, format)
         .save_with_format(path, format)
         .map_err(|error| error.to_string())
+}
+
+fn encodable_image(image: &DynamicImage, format: ImageFormat) -> DynamicImage {
+    match format {
+        ImageFormat::Png | ImageFormat::Tiff if image.as_rgb32f().is_some() => {
+            DynamicImage::ImageRgb16(image.to_rgb16())
+        }
+        _ => image.clone(),
+    }
 }
 
 fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
@@ -609,4 +616,21 @@ fn collect_files(
 
 fn hex_digest(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+#[test]
+fn write_image_encodes_rgb32f_png_preview() {
+    let output_path = std::env::temp_dir().join(format!(
+        "rawengine-hdr-rgb32f-png-{}.png",
+        Utc::now().timestamp_nanos_opt().unwrap_or_default()
+    ));
+    let image = DynamicImage::ImageRgb32F(image::ImageBuffer::from_fn(2, 2, |_x, _y| {
+        image::Rgb([0.5, 0.25, 0.75])
+    }));
+
+    write_image(&image, &output_path, ImageFormat::Png).expect("encode RGB32F proof PNG");
+    let decoded = image::open(&output_path).expect("decode proof PNG");
+    assert_eq!(decoded.dimensions(), (2, 2));
+
+    let _ = fs::remove_file(output_path);
 }
