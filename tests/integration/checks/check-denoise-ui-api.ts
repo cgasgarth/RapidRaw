@@ -102,7 +102,7 @@ const dryRunResult = detailDenoiseDryRunResultV1Schema.safeParse({
   mutates: false,
   runtime: runtime.success ? runtime.data : null,
   schemaVersion: 1,
-  warnings: ['UI/API dry run validated; runtime preview/export parity is checked by check:denoise-e2e.'],
+  warnings: ['UI/API dry run validated; preview/export parity remains a separate runtime proof.'],
 });
 
 if (!dryRunResult.success) {
