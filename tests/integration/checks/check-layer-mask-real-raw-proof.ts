@@ -92,16 +92,25 @@ const proofClaimsSchema = z
   });
 
 const runtimeProofSchema = z
-  .object({
+  .looseObject({
     execution: z.literal('tauri_test_gpu_pipeline'),
-    macosAppUiE2E: z.literal(false),
+    macosAppUiE2e: z.literal(false).optional(),
+    macosAppUiE2E: z.literal(false).optional(),
     maskPath: z.literal('prepare_export_masks + generate_mask_bitmap'),
     outputArtifactCount: z.literal(4),
     previewExportParityMetric: z.literal('previewExportMeanAbsDelta'),
     rawDecodePath: z.literal('load_base_image_from_bytes'),
     renderPath: z.literal('process_image_for_export_pipeline_with_tonemapper_override'),
   })
-  .strict();
+  .superRefine((runtimeProof, context) => {
+    if (runtimeProof.macosAppUiE2E !== false && runtimeProof.macosAppUiE2e !== false) {
+      context.addIssue({
+        code: 'custom',
+        message: 'runtime proof must explicitly mark macOS app UI E2E as false',
+        path: ['macosAppUiE2E'],
+      });
+    }
+  });
 
 const reportSchema = z
   .object({

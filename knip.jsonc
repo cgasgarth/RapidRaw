@@ -19,7 +19,7 @@
     "i18next.config.ts",
   ],
   "ignore": ["dist/**", "node_modules/**", "src-tauri/**"],
-  "ignoreBinaries": ["scripts/run-compact-command.ts"],
+  "ignoreBinaries": ["scripts/run-compact-command.ts", "sips"],
   "ignoreDependencies": ["i18next-cli", "license-checker-rseidelsohn"],
   "ignoreIssues": {
     "packages/rawengine-schema/src/**/*.ts": ["exports", "types"],
