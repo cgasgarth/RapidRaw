@@ -283,6 +283,8 @@
     "check:focus-alignment-sharpness-proof": "bun tests/integration/checks/check-focus-alignment-sharpness-proof.ts",
     "check:focus-alignment-sharpness-proof:update": "bun tests/integration/checks/check-focus-alignment-sharpness-proof.ts --update",
     "check:focus-sharpness-map-smoke": "bun tests/integration/checks/check-focus-sharpness-map-smoke.ts",
+    "check:focus-confidence-source-map": "bun tests/integration/checks/check-focus-confidence-source-map.ts",
+    "check:focus-confidence-source-map:update": "bun tests/integration/checks/check-focus-confidence-source-map.ts --update",
     "check:focus-preview-blend-smoke": "bun tests/integration/checks/check-focus-preview-blend-smoke.ts",
     "check:focus-blend-halo-proof": "bun tests/integration/checks/check-focus-blend-halo-proof.ts",
     "check:focus-blend-halo-proof:update": "bun tests/integration/checks/check-focus-blend-halo-proof.ts --update",
