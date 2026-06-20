@@ -13,6 +13,11 @@ interface CommandResult {
   stdout: string;
 }
 
+interface CommandSpec {
+  command: Array<string>;
+  label: string;
+}
+
 function run(command: Array<string>, label: string, quietSuccess = false): CommandResult {
   const result = Bun.spawnSync(command, {
     stderr: 'pipe',
@@ -50,6 +55,148 @@ function collectChangedFiles(baseRef: string): Array<string> {
   ]).filter((file) => existsSync(file));
 }
 
+function hasAny(changedFiles: ReadonlyArray<string>, predicate: (file: string) => boolean): boolean {
+  return changedFiles.some(predicate);
+}
+
+function routeCommandsForChangedFiles(changedFiles: ReadonlyArray<string>): Array<CommandSpec> {
+  const commands: Array<CommandSpec> = [
+    { command: ['bun', 'run', 'check:agent-preflight'], label: 'agent preflight' },
+    { command: ['bun', 'run', 'check:agent-pr-queue'], label: 'agent pr queue' },
+  ];
+
+  const formatFiles = changedFiles.filter((file) => FORMAT_EXTENSIONS.has(extname(file)));
+  if (formatFiles.length > 0) {
+    commands.push({ command: ['bun', 'prettier', '--check', ...formatFiles], label: 'format changed' });
+  }
+
+  const lintFiles = changedFiles.filter((file) => LINT_EXTENSIONS.has(extname(file)));
+  if (lintFiles.length > 0) {
+    commands.push({ command: ['bun', 'eslint', ...lintFiles, '--max-warnings', '0'], label: 'lint changed' });
+    commands.push({ command: ['bun', 'run', 'check:types'], label: 'types' });
+  }
+
+  if (hasAny(changedFiles, (file) => file.startsWith('packages/rawengine-schema/') || file.includes('/schemas/'))) {
+    commands.push({ command: ['bun', 'run', 'schema:check'], label: 'schema' });
+  }
+
+  if (hasAny(changedFiles, (file) => file.endsWith('.tsx') || file.startsWith('src/i18n/locales/'))) {
+    commands.push({ command: ['bun', 'run', 'check:i18n'], label: 'i18n' });
+  }
+
+  if (
+    hasAny(
+      changedFiles,
+      (file) =>
+        file === 'package.json' ||
+        file.startsWith('.github/') ||
+        file.startsWith('scripts/') ||
+        file.startsWith('tests/integration/checks/'),
+    )
+  ) {
+    commands.push({ command: ['bun', 'run', 'check:compact-commands'], label: 'compact commands' });
+  }
+
+  if (
+    hasAny(
+      changedFiles,
+      (file) =>
+        file === 'vite.config.js' ||
+        file.startsWith('src/') ||
+        file.startsWith('public/') ||
+        file.startsWith('index.html'),
+    )
+  ) {
+    commands.push({ command: ['bun', 'run', 'check:bundle'], label: 'bundle' });
+  }
+
+  if (hasAny(changedFiles, isRustRuntimeFile)) {
+    commands.push({ command: ['bun', 'run', 'check:rust:fmt'], label: 'rust fmt' });
+    commands.push({ command: ['bun', 'run', 'check:rust:check'], label: 'rust check' });
+    commands.push({ command: ['bun', 'run', 'check:rust:clippy'], label: 'rust clippy' });
+  }
+
+  if (hasAny(changedFiles, isShaderOrRenderFile)) {
+    commands.push({ command: ['bun', 'run', 'check:visual-smoke:pr'], label: 'visual smoke pr' });
+  }
+
+  for (const routedCheck of routeFeatureChecks(changedFiles)) {
+    commands.push({ command: ['bun', 'run', routedCheck], label: routedCheck });
+  }
+
+  const changedCheckFiles = changedFiles.filter(
+    (file) =>
+      file.startsWith('tests/integration/checks/check-') &&
+      file.endsWith('.ts') &&
+      !file.endsWith('check-current-pr-local.ts'),
+  );
+  if (changedCheckFiles.length > 20) {
+    commands.push({ command: ['bun', 'run', 'check:validation-test-paths'], label: 'validation test paths' });
+  } else {
+    for (const file of changedCheckFiles) {
+      commands.push({ command: ['bun', file], label: file });
+    }
+  }
+
+  return commands;
+}
+
+function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> {
+  const checks = new Set<string>();
+  const addIf = (predicate: (file: string) => boolean, scripts: Array<string>): void => {
+    if (hasAny(changedFiles, predicate)) {
+      for (const script of scripts) checks.add(script);
+    }
+  };
+
+  addIf((file) => file.includes('filmGrain') || file.includes('film-grain'), ['check:film-grain-runtime-proof']);
+  addIf(
+    (file) => file.includes('focusConfidenceSourceMap') || file.includes('focus-confidence-source-map'),
+    ['check:focus-confidence-source-map'],
+  );
+  addIf(
+    (file) => file.startsWith('packages/rawengine-schema/src/focusStack'),
+    ['check:focus-runtime-plan-smoke', 'check:focus-preview-blend-smoke'],
+  );
+  addIf(
+    (file) => file.startsWith('packages/rawengine-schema/src/superResolution'),
+    ['check:super-resolution-app-server-runtime'],
+  );
+  addIf((file) => file.startsWith('packages/rawengine-schema/src/panorama'), ['check:panorama-runtime-plan-smoke']);
+  addIf((file) => file.startsWith('packages/rawengine-schema/src/hdr'), ['check:hdr-ui-runtime-bridge']);
+
+  return [...checks].toSorted();
+}
+
+function isRustRuntimeFile(file: string): boolean {
+  return (
+    file === 'src-tauri/Cargo.toml' ||
+    file === 'src-tauri/Cargo.lock' ||
+    (file.startsWith('src-tauri/') && file.endsWith('.rs'))
+  );
+}
+
+function isShaderOrRenderFile(file: string): boolean {
+  return (
+    file.endsWith('.wgsl') ||
+    file.endsWith('.glsl') ||
+    file.endsWith('.metal') ||
+    file.startsWith('src/render/') ||
+    file.startsWith('src/shaders/') ||
+    file.startsWith('src-tauri/shaders/')
+  );
+}
+
+function assertSelfTestRoute(files: Array<string>, expectedLabels: Array<string>): void {
+  const labels = new Set(routeCommandsForChangedFiles(files).map((command) => command.label));
+  const missing = expectedLabels.filter((label) => !labels.has(label));
+  if (missing.length > 0) {
+    console.error('current pr local self-test failed');
+    console.error(`- ${files.join(', ')} missing route labels: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+}
+
 const baseRef = 'origin/main';
 if (!existsSync('.git')) {
   console.error('current pr local failed');
@@ -71,6 +218,15 @@ if (process.argv.includes('--self-test')) {
     rmSync(probeFile, { force: true });
   }
 
+  assertSelfTestRoute(['src-tauri/src/file_management.rs'], ['rust fmt', 'rust check', 'rust clippy']);
+  assertSelfTestRoute(['src/shaders/preview.wgsl'], ['visual smoke pr']);
+  assertSelfTestRoute(['src/utils/focusConfidenceSourceMap.ts'], ['check:focus-confidence-source-map']);
+  assertSelfTestRoute(['packages/rawengine-schema/src/filmGrainRuntime.ts'], ['check:film-grain-runtime-proof']);
+  assertSelfTestRoute(
+    ['packages/rawengine-schema/src/focusStackWeightedBlend.ts'],
+    ['check:focus-preview-blend-smoke'],
+  );
+
   console.log('current pr local self-test ok');
   process.exit(0);
 }
@@ -84,67 +240,7 @@ if (changedFiles.length === 0) {
   process.exit(0);
 }
 
-const commands: Array<{ command: Array<string>; label: string }> = [
-  { command: ['bun', 'run', 'check:agent-preflight'], label: 'agent preflight' },
-  { command: ['bun', 'run', 'check:agent-pr-queue'], label: 'agent pr queue' },
-];
-
-const formatFiles = changedFiles.filter((file) => FORMAT_EXTENSIONS.has(extname(file)));
-if (formatFiles.length > 0) {
-  commands.push({ command: ['bun', 'prettier', '--check', ...formatFiles], label: 'format changed' });
-}
-
-const lintFiles = changedFiles.filter((file) => LINT_EXTENSIONS.has(extname(file)));
-if (lintFiles.length > 0) {
-  commands.push({ command: ['bun', 'eslint', ...lintFiles, '--max-warnings', '0'], label: 'lint changed' });
-  commands.push({ command: ['bun', 'run', 'check:types'], label: 'types' });
-}
-
-if (changedFiles.some((file) => file.startsWith('packages/rawengine-schema/') || file.includes('/schemas/'))) {
-  commands.push({ command: ['bun', 'run', 'schema:check'], label: 'schema' });
-}
-
-if (changedFiles.some((file) => file.endsWith('.tsx') || file.startsWith('src/i18n/locales/'))) {
-  commands.push({ command: ['bun', 'run', 'check:i18n'], label: 'i18n' });
-}
-
-if (
-  changedFiles.some(
-    (file) =>
-      file === 'package.json' ||
-      file.startsWith('.github/') ||
-      file.startsWith('scripts/') ||
-      file.startsWith('tests/integration/checks/'),
-  )
-) {
-  commands.push({ command: ['bun', 'run', 'check:compact-commands'], label: 'compact commands' });
-}
-
-if (
-  changedFiles.some(
-    (file) =>
-      file === 'vite.config.js' ||
-      file.startsWith('src/') ||
-      file.startsWith('public/') ||
-      file.startsWith('index.html'),
-  )
-) {
-  commands.push({ command: ['bun', 'run', 'check:bundle'], label: 'bundle' });
-}
-
-const changedCheckFiles = changedFiles.filter(
-  (file) =>
-    file.startsWith('tests/integration/checks/check-') &&
-    file.endsWith('.ts') &&
-    !file.endsWith('check-current-pr-local.ts'),
-);
-if (changedCheckFiles.length > 20) {
-  commands.push({ command: ['bun', 'run', 'check:validation-test-paths'], label: 'validation test paths' });
-} else {
-  for (const file of changedCheckFiles) {
-    commands.push({ command: ['bun', file], label: file });
-  }
-}
+const commands = routeCommandsForChangedFiles(changedFiles);
 
 const seenCommands = new Set<string>();
 let failed = false;
