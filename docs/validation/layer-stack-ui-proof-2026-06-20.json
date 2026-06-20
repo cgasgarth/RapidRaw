@@ -1,0 +1,30 @@
+{
+  "doesNotProve": [
+    "full_macos_app_manual_session",
+    "private_raw_source_decode",
+    "real_raw_export_acceptance",
+    "retouch_pixel_layer_workflow"
+  ],
+  "issue": 2310,
+  "layerRuntime": {
+    "coverageLayerCount": 5,
+    "previewExportHash": "sha256:62b1a1a3b49900f19fe56696a457b5a35cdb1588bf0636af604b36d57745756e",
+    "sidecarArtifactId": "layer_stack_preview_export_parity_v1"
+  },
+  "schemaVersion": 1,
+  "validationCommands": [
+    "bun run check:layer-stack-commands",
+    "bun run check:layer-preview-export-parity",
+    "bun run check:layer-workflow-smoke",
+    "bun run check:layer-stack-ui-proof"
+  ],
+  "visualReview": {
+    "dimensions": {
+      "height": 960,
+      "width": 1440
+    },
+    "scenario": "layer-stack-workflow",
+    "screenshotPath": "artifacts/visual-smoke/layer-stack-workflow.png",
+    "workflowControlsExercised": true
+  }
+}
