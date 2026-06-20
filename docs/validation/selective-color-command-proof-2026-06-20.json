@@ -1,0 +1,29 @@
+{
+  "applyCommandId": "command_selective_color_orange_apply_001",
+  "changedPixels": 2,
+  "commandType": "toneColor.adjustHsl",
+  "doesNotProve": ["real_raw_decode", "gpu_parity", "local_app_ui_e2e"],
+  "dryRunCommandId": "command_selective_color_orange_preview_001",
+  "issue": 2329,
+  "previewExportMaxDelta": 0,
+  "previewHash": "sha256:49ab44152671a80cc6e57cbd5be11dd99817e7d83e35bfc145139fc22aa8b962",
+  "schemaVersion": 1,
+  "sidecarGraphRevision": "graph_rev_selective_color_orange_001",
+  "sidecarSerializedHash": "sha256:8ae100cf251d51baf0572b886cbe94e649859634530b23c07eb60251679f17f9",
+  "sourceHash": "sha256:01f3c06f1e72445b912d4a6c87f6fd0b86e9ad020ef27a5cf769ee08d5aa847a",
+  "targetedRuntime": {
+    "influence": 0.914269740994,
+    "inputRgb": {
+      "blue": 0.12,
+      "green": 0.38,
+      "red": 0.92
+    },
+    "outputRgb": {
+      "blue": 0,
+      "green": 0.374889035597,
+      "red": 0.838860656981
+    },
+    "rangeKey": "oranges"
+  },
+  "validationMode": "selective_color_command_preview_export_sidecar_synthetic_proof"
+}
