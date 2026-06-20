@@ -21,6 +21,7 @@ type FilmLookAdjustmentKey =
 
 export type FilmLookAdjustmentPatch = Partial<Pick<Adjustments, FilmLookAdjustmentKey>>;
 export type FilmLookRuntimeSupportState = 'adjustment_patch_preview_export';
+export type FilmLookSortMode = 'adjustment_count_desc' | 'catalog' | 'name_asc' | 'strength_desc';
 
 export interface FilmLookBrowserItem {
   adjustmentPatch: FilmLookAdjustmentPatch;
@@ -101,6 +102,36 @@ export const getFilmLookAdjustmentSummaries = (look: FilmLookBrowserItem): Array
       },
     ];
   });
+
+const compareFilmLookNames = (left: FilmLookBrowserItem, right: FilmLookBrowserItem) =>
+  left.displayName.localeCompare(right.displayName, 'en-US', { sensitivity: 'base' });
+
+export const sortFilmLookBrowserItems = (
+  looks: Array<FilmLookBrowserItem>,
+  sortMode: FilmLookSortMode,
+): Array<FilmLookBrowserItem> => {
+  const sortedLooks = [...looks];
+
+  if (sortMode === 'name_asc') {
+    return sortedLooks.toSorted(compareFilmLookNames);
+  }
+
+  if (sortMode === 'strength_desc') {
+    return sortedLooks.toSorted(
+      (left, right) => right.strengthDefault - left.strengthDefault || compareFilmLookNames(left, right),
+    );
+  }
+
+  if (sortMode === 'adjustment_count_desc') {
+    return sortedLooks.toSorted(
+      (left, right) =>
+        getFilmLookAdjustmentSummaries(right).length - getFilmLookAdjustmentSummaries(left).length ||
+        compareFilmLookNames(left, right),
+    );
+  }
+
+  return sortedLooks;
+};
 
 export const clampFilmLookStrength = (strength: number): number =>
   Math.min(MAX_FILM_LOOK_STRENGTH, Math.max(MIN_FILM_LOOK_STRENGTH, Math.round(strength)));
