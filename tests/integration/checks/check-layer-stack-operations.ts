@@ -8,6 +8,7 @@ import {
   buildLayerRenderPlan,
   createAdjustmentLayer,
   deleteLayer,
+  deleteLayerGroup,
   duplicateLayer,
   groupLayerWithNext,
   moveLayer,
@@ -82,6 +83,12 @@ const operationSchema = z.discriminatedUnion('type', [
     .object({
       layerId: z.string().trim().min(1),
       type: z.literal('delete'),
+    })
+    .strict(),
+  z
+    .object({
+      groupId: z.string().trim().min(1),
+      type: z.literal('deleteGroup'),
     })
     .strict(),
   z
@@ -174,6 +181,8 @@ function applyOperation(layers, operation) {
       return duplicateLayer(layers, operation.layerId, operation.newLayerId, operation.name);
     case 'delete':
       return deleteLayer(layers, operation.layerId);
+    case 'deleteGroup':
+      return deleteLayerGroup(layers, operation.groupId);
     case 'groupWithNext':
       return groupLayerWithNext(layers, operation.layerId, operation.groupId, operation.groupName);
     case 'moveGroup':

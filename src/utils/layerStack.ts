@@ -73,6 +73,14 @@ export function deleteLayer(layers: Array<MaskContainer>, layerId: string): Arra
   return layers.filter((layer) => layer.id !== layerId);
 }
 
+export function deleteLayerGroup(layers: Array<MaskContainer>, groupId: string): Array<MaskContainer> {
+  if (!layers.some((layer) => layer.layerGroupId === groupId)) {
+    throw new LayerStackOperationError(`Layer group ${groupId} does not exist.`);
+  }
+
+  return layers.filter((layer) => layer.layerGroupId !== groupId);
+}
+
 export function duplicateLayer(
   layers: Array<MaskContainer>,
   layerId: string,

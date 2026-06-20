@@ -114,6 +114,41 @@
     ]
   },
   {
+    "id": "delete-layer-group",
+    "initialLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      {
+        "id": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 65,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      {
+        "id": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      { "id": "grade", "name": "Print Grade", "opacity": 90, "visible": true }
+    ],
+    "operations": [{ "type": "deleteGroup", "groupId": "portrait-group" }],
+    "expectedLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      { "id": "grade", "name": "Print Grade", "opacity": 90, "visible": true }
+    ]
+  },
+  {
+    "id": "delete-missing-layer-group-blocked",
+    "initialLayers": [{ "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true }],
+    "operations": [{ "type": "deleteGroup", "groupId": "missing-group" }],
+    "expectedError": "does not exist",
+    "expectedLayers": [{ "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true }]
+  },
+  {
     "id": "nested-group-blocked",
     "initialLayers": [
       {
