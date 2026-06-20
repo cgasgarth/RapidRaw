@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  buildPanoramaHomographyDltDiagnosticsV1,
+  panoramaHomographyDltDiagnosticsV1Schema,
+  type PanoramaHomographyPointPairV1,
+} from './panoramaHomographyDiagnostics.js';
 import { renderSyntheticPanoramaStitchV1, type PanoramaSyntheticSourceFrameV1 } from './panoramaSyntheticStitch.js';
 import {
   RAW_ENGINE_SCHEMA_VERSION,
@@ -59,6 +64,7 @@ export const panoramaRuntimeProvenanceV1Schema = z
                   y: z.number().int(),
                 })
                 .strict(),
+              dltDiagnostics: panoramaHomographyDltDiagnosticsV1Schema,
             })
             .strict(),
         ),
@@ -536,18 +542,45 @@ const buildPanoramaRuntimeAlignment = (
       const overlapWidth = Math.max(0, previousX + previousFrame.width - frameX);
       const overlapTop = Math.max(previousY, frameY);
       const overlapBottom = Math.min(previousY + previousFrame.height, frameY + frame.height);
+      const translationPx = {
+        x: frameX - previousX,
+        y: frameY - previousY,
+      };
+      const homography3x3 = translationHomography3x3(translationPx);
       return {
+        dltDiagnostics: buildPanoramaHomographyDltDiagnosticsV1({
+          homography3x3,
+          pointPairs: buildSyntheticTranslationPointPairs(previousFrame, translationPx),
+        }),
         fromSourceIndex: previousFrame.sourceIndex,
         overlapAreaPx: overlapWidth * Math.max(0, overlapBottom - overlapTop),
         reprojectionErrorPx: Math.abs(frameY - previousY) / Math.max(1, frame.height),
         toSourceIndex: frame.sourceIndex,
-        translationPx: {
-          x: frameX - previousX,
-          y: frameY - previousY,
-        },
+        translationPx,
       };
     }),
   };
+};
+
+const translationHomography3x3 = (translationPx: { x: number; y: number }) =>
+  [1, 0, translationPx.x, 0, 1, translationPx.y, 0, 0, 1] as const;
+
+const buildSyntheticTranslationPointPairs = (
+  sourceFrame: PanoramaRuntimeSourceFrameV1,
+  translationPx: { x: number; y: number },
+): PanoramaHomographyPointPairV1[] => {
+  const maxX = sourceFrame.width - 1;
+  const maxY = sourceFrame.height - 1;
+  const sourcePoints: [number, number][] = [
+    [0, 0],
+    [maxX, 0],
+    [0, maxY],
+    [maxX, maxY],
+  ];
+  return sourcePoints.map(([x, y]) => ({
+    source: [x, y],
+    target: [x + translationPx.x, y + translationPx.y],
+  }));
 };
 
 const buildPanoramaRuntimeQualityMetrics = (
@@ -638,6 +671,7 @@ const alignmentForPanoramaRuntimeArtifact = (
   pairwiseMatches: provenance.alignment.pairwiseMatches.map((match) => ({
     fromSourceIndex: match.fromSourceIndex,
     homography3x3: [1, 0, match.translationPx.x, 0, 1, match.translationPx.y, 0, 0, 1],
+    homographyDiagnostics: match.dltDiagnostics,
     inliers: Math.max(15, match.overlapAreaPx),
     matchQuality: 'accepted',
     reprojectionErrorPx: match.reprojectionErrorPx,

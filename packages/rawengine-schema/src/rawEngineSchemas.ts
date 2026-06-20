@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { artifactHandleV1Schema } from './artifactSchemas.js';
+import { panoramaHomographyDltDiagnosticsV1Schema } from './panoramaHomographyDiagnostics.js';
 
 export { artifactHandleV1Schema } from './artifactSchemas.js';
 export type { ArtifactHandleV1 } from './artifactSchemas.js';
@@ -2662,6 +2663,7 @@ export const panoramaPairwiseMatchV1Schema = z
       z.number(),
       z.number(),
     ]),
+    homographyDiagnostics: panoramaHomographyDltDiagnosticsV1Schema.optional(),
     inliers: z.number().int().nonnegative(),
     matchQuality: z.enum(['accepted', 'weak', 'rejected']),
     reprojectionErrorPx: z.number().nonnegative().optional(),

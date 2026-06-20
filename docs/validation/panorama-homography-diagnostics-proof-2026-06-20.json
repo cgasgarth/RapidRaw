@@ -1,0 +1,78 @@
+{
+  "cases": [
+    {
+      "actionableMessage": "Homography DLT diagnostics accepted.",
+      "case": "runtime-first-pair",
+      "conditionNumber": 3.847685134038,
+      "correspondenceCount": 4,
+      "designMatrixRank": 8,
+      "homographyScaleAbs": 1,
+      "minimumProjectiveScaleAbs": 1,
+      "normalizedResidualRms": 0,
+      "provenance": {
+        "boundedFailureMode": "not_applicable",
+        "diagnosticSchema": "panoramaHomographyDltDiagnosticsV1",
+        "runtimeStatus": "synthetic_homography_dlt_diagnostic_proof"
+      },
+      "status": "accepted",
+      "warningCodes": []
+    },
+    {
+      "actionableMessage": "Homography DLT diagnostics accepted.",
+      "case": "runtime-second-pair",
+      "conditionNumber": 3.847685134038,
+      "correspondenceCount": 4,
+      "designMatrixRank": 8,
+      "homographyScaleAbs": 1,
+      "minimumProjectiveScaleAbs": 1,
+      "normalizedResidualRms": 0,
+      "provenance": {
+        "boundedFailureMode": "not_applicable",
+        "diagnosticSchema": "panoramaHomographyDltDiagnosticsV1",
+        "runtimeStatus": "synthetic_homography_dlt_diagnostic_proof"
+      },
+      "status": "accepted",
+      "warningCodes": []
+    },
+    {
+      "actionableMessage": "Matched panorama points are rank deficient; add non-collinear overlap matches.",
+      "case": "collinear-rank-deficient",
+      "conditionNumber": null,
+      "correspondenceCount": 4,
+      "designMatrixRank": 5,
+      "failureCode": "dlt_rank_deficient",
+      "homographyScaleAbs": 1,
+      "minimumProjectiveScaleAbs": 1,
+      "normalizedResidualRms": 0,
+      "provenance": {
+        "boundedFailureMode": "actionable_error",
+        "diagnosticSchema": "panoramaHomographyDltDiagnosticsV1",
+        "runtimeStatus": "synthetic_homography_dlt_diagnostic_proof"
+      },
+      "status": "rejected",
+      "warningCodes": []
+    },
+    {
+      "actionableMessage": "Homography scale is degenerate near zero; reject this alignment and re-estimate.",
+      "case": "scale-degenerate",
+      "conditionNumber": 3.847685134038,
+      "correspondenceCount": 4,
+      "designMatrixRank": 8,
+      "failureCode": "homography_scale_degenerate",
+      "homographyScaleAbs": 0,
+      "minimumProjectiveScaleAbs": 0,
+      "normalizedResidualRms": 1000000000,
+      "provenance": {
+        "boundedFailureMode": "actionable_error",
+        "diagnosticSchema": "panoramaHomographyDltDiagnosticsV1",
+        "runtimeStatus": "synthetic_homography_dlt_diagnostic_proof"
+      },
+      "status": "rejected",
+      "warningCodes": []
+    }
+  ],
+  "doesNotProve": ["real_raw_e2e", "raw_decode_quality", "ui_e2e"],
+  "issue": 2296,
+  "schemaVersion": 1,
+  "validationMode": "panorama_homography_dlt_runtime_diagnostics"
+}
