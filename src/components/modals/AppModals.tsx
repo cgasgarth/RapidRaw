@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -11,7 +12,6 @@ import DenoiseModal from './DenoiseModal';
 import FocusStackModal from './FocusStackModal';
 import HdrModal from './HdrModal';
 import ImportSettingsModal from './ImportSettingsModal';
-import NegativeConversionModal from './NegativeConversionModal';
 import PanoramaModal from './PanoramaModal';
 import RenameFileModal from './RenameFileModal';
 import RenameFolderModal from './RenameFolderModal';
@@ -33,6 +33,10 @@ import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/comp
 
 import type { CopyPasteSettings } from '../../utils/adjustments';
 import type { AppSettings, AlbumItem } from '../ui/AppProperties';
+
+const NegativeConversionModal = lazy(() =>
+  import('./NegativeConversionModal.js').then((module) => ({ default: module.NegativeConversionModal })),
+);
 
 interface DeleteOptions {
   includeAssociated: boolean;
@@ -330,30 +334,34 @@ export default function AppModals(props: AppModalsProps) {
         settings={focusStackModalState.settings}
         sourceCount={focusStackModalState.sourcePaths.length}
       />
-      <NegativeConversionModal
-        isOpen={negativeModalState.isOpen}
-        onClose={() => {
-          setUI((state) => ({ negativeModalState: { ...state.negativeModalState, isOpen: false } }));
-        }}
-        targetPaths={negativeModalState.targetPaths}
-        onSave={(savedPaths) => {
-          void props
-            .refreshImageList()
-            .then(() => {
-              if (
-                selectedImage &&
-                negativeModalState.targetPaths.includes(selectedImage.path) &&
-                savedPaths.length > 0
-              ) {
-                const savedPath = savedPaths[0];
-                if (savedPath) props.handleImageSelect(savedPath);
-              }
-            })
-            .catch((err: unknown) => {
-              console.error('Failed to refresh image list after negative conversion:', err);
-            });
-        }}
-      />
+      {negativeModalState.isOpen && (
+        <Suspense fallback={null}>
+          <NegativeConversionModal
+            isOpen={negativeModalState.isOpen}
+            onClose={() => {
+              setUI((state) => ({ negativeModalState: { ...state.negativeModalState, isOpen: false } }));
+            }}
+            targetPaths={negativeModalState.targetPaths}
+            onSave={(savedPaths) => {
+              void props
+                .refreshImageList()
+                .then(() => {
+                  if (
+                    selectedImage &&
+                    negativeModalState.targetPaths.includes(selectedImage.path) &&
+                    savedPaths.length > 0
+                  ) {
+                    const savedPath = savedPaths[0];
+                    if (savedPath) props.handleImageSelect(savedPath);
+                  }
+                })
+                .catch((err: unknown) => {
+                  console.error('Failed to refresh image list after negative conversion:', err);
+                });
+            }}
+          />
+        </Suspense>
+      )}
       <DenoiseModal
         isOpen={denoiseModalState.isOpen}
         onClose={() => {

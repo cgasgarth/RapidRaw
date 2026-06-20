@@ -200,12 +200,7 @@ interface NegativeConversionModalProps {
   onSave: (savedPaths: string[]) => void;
 }
 
-export default function NegativeConversionModal({
-  isOpen,
-  onClose,
-  targetPaths,
-  onSave,
-}: NegativeConversionModalProps) {
+export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }: NegativeConversionModalProps) {
   const { t } = useTranslation();
   const [params, setParams] = useState<NegativeParams>(DEFAULT_PARAMS);
   const [selectedPresetId, setSelectedPresetId] = useState<string>(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
