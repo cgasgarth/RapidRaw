@@ -1665,6 +1665,11 @@ function ColorWorkflowVisualSmoke() {
               <span data-testid="skin-tone-uniformity-ui-proof">
                 {formatSmokeMetric(colorSmokeMetricLabels.skinTone, skinToneOutputRed)}
               </span>
+              <span data-testid="selective-color-ui-proof">
+                {formatSmokeMetric('Orange', adjustments.hsl.oranges.hue)}
+              </span>
+              <span>{formatSmokeMetric('Orange sat', adjustments.hsl.oranges.saturation)}</span>
+              <span>{formatSmokeMetric('Orange lum', adjustments.hsl.oranges.luminance)}</span>
             </div>
           </div>
         </section>
