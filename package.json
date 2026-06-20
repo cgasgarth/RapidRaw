@@ -361,6 +361,7 @@
     "check:super-resolution-app-server-runtime": "bun run check:sr-app-server-runtime",
     "check:sr-runtime-plan-smoke": "bun tests/integration/checks/check-super-resolution-runtime-plan-smoke.ts",
     "check:sr-source-validation": "bun tests/integration/checks/check-super-resolution-source-validation.ts",
+    "check:sr-ui-preflight": "bun tests/integration/checks/check-super-resolution-ui-preflight.ts",
     "check:sr-ui-action-command": "bun tests/integration/checks/check-super-resolution-ui-action-command.ts",
     "check:sr-synthetic-smoke": "bun tests/integration/checks/check-super-resolution-synthetic-smoke.ts",
     "check:sr-alignment-detail-proof": "bun tests/integration/checks/check-super-resolution-alignment-detail-proof.ts",
