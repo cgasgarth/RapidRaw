@@ -6,13 +6,18 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
+import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
+
 const REPORT_PATH = 'docs/validation/professional-color-workflow-cc-raw-proof-2026-06-20.json';
+const REQUEST_PATH = 'fixtures/validation/professional-color-workflow-proof-request.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const requireAssets = process.argv.includes('--require-assets');
 const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
-const WORKFLOW_REPORT_PATH =
-  'private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-workflow-report.json';
+const request = rawOpenEditExportProofRequestSchema.parse(JSON.parse(await readFile(REQUEST_PATH, 'utf8')));
+const WORKFLOW_REPORT_PATH = `${request.artifactDirRelative}/professional-color-v1-workflow-report.json`;
 const VISUAL_SMOKE_SCREENSHOT_PATH = 'artifacts/visual-smoke/color-workflow.png';
+const PROFESSIONAL_RUNTIME_COMMAND =
+  'RAWENGINE_RUN_PRIVATE_RAW_PROFESSIONAL_COLOR_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_professional_color_report_when_enabled -- --nocapture';
 
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const artifactSchema = z
@@ -69,26 +74,23 @@ const reportSchema = z
     issue: z.literal(2309),
     localRawRuntime: z
       .object({
-        artifactRoot: z.literal('private-artifacts/validation/open-edit-export'),
-        command: z.literal(
-          'RAWENGINE_RUN_PRIVATE_RAW_OPEN_EDIT_EXPORT_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_raw_open_edit_export_report_when_enabled -- --nocapture',
-        ),
-        editCommandId: z.literal('command.raw-open-edit-export.basic-tone.v1'),
+        artifactRoot: z.literal(request.artifactDirRelative),
+        command: z.literal(PROFESSIONAL_RUNTIME_COMMAND),
+        editCommandId: z.literal(request.editCommand.commandId),
         metrics: metricSchema,
-        rawRuntimeFixtureId: z.literal('validation.raw-open-edit-export.high-iso-skin-shadow.v1'),
+        rawRuntimeFixtureId: z.literal(request.fixtureId),
         status: z.literal('passed'),
-        workflowReportPath: z.literal(
-          'private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-workflow-report.json',
-        ),
+        workflowReportPath: z.literal(WORKFLOW_REPORT_PATH),
       })
       .strict(),
     schemaVersion: z.literal(1),
     sourceRaw: z
       .object({
-        downloadedFrom: z.literal('https://www.rawsamples.ch/index.php/en/sony'),
-        licenseEvidence: z.literal('https://www.rawsamples.ch/index.php/en/legal-stuff'),
-        licenseSummary: z.literal('Creative Commons RAW sample for software development validation.'),
-        localPath: z.literal('private-fixtures/detail/high-iso-skin-shadow-v1.arw'),
+        licenseEvidence: z.literal(
+          'User explicitly provided /Users/cgas/Pictures/Capture One/Alaska as project-owned RAW validation input for this repo.',
+        ),
+        licenseSummary: z.literal('Project-owned local RAW sample for software development validation.'),
+        localPath: z.literal(request.sourceRelativePath),
         sha256: hashSchema,
       })
       .strict(),
@@ -132,7 +134,7 @@ const workflowReportSchema = z
           .extend({ kind: artifactSchema.shape.kind.exclude(['visual_smoke_screenshot']) }),
       )
       .length(5),
-    fixtureId: z.literal('validation.raw-open-edit-export.high-iso-skin-shadow.v1'),
+    fixtureId: z.literal(request.fixtureId),
     metrics: z.array(workflowMetricSchema).length(4),
     sourceRaw: z.object({ hash: hashSchema, path: z.string(), publicRepoAllowed: z.literal(false) }).strict(),
   })
@@ -170,10 +172,9 @@ if (UPDATE_REPORT) {
     generatedAt: new Date().toISOString(),
     issue: 2309,
     localRawRuntime: {
-      artifactRoot: 'private-artifacts/validation/open-edit-export',
-      command:
-        'RAWENGINE_RUN_PRIVATE_RAW_OPEN_EDIT_EXPORT_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_raw_open_edit_export_report_when_enabled -- --nocapture',
-      editCommandId: 'command.raw-open-edit-export.basic-tone.v1',
+      artifactRoot: request.artifactDirRelative,
+      command: PROFESSIONAL_RUNTIME_COMMAND,
+      editCommandId: request.editCommand.commandId,
       metrics: metricMap(workflowReport.metrics),
       rawRuntimeFixtureId: workflowReport.fixtureId,
       status: 'passed',
@@ -181,9 +182,9 @@ if (UPDATE_REPORT) {
     },
     schemaVersion: 1,
     sourceRaw: {
-      downloadedFrom: 'https://www.rawsamples.ch/index.php/en/sony',
-      licenseEvidence: 'https://www.rawsamples.ch/index.php/en/legal-stuff',
-      licenseSummary: 'Creative Commons RAW sample for software development validation.',
+      licenseEvidence:
+        'User explicitly provided /Users/cgas/Pictures/Capture One/Alaska as project-owned RAW validation input for this repo.',
+      licenseSummary: 'Project-owned local RAW sample for software development validation.',
       localPath: workflowReport.sourceRaw.path,
       sha256: workflowReport.sourceRaw.hash,
     },

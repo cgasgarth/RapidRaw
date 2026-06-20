@@ -56,7 +56,7 @@
     },
     "schemaVersion": 1,
     "target": {
-      "imagePath": "private-fixtures/color/professional-workflow-v1/rawengine-professional-color-v1.arw",
+      "imagePath": "private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw",
       "kind": "image"
     }
   },
@@ -64,9 +64,9 @@
   "privateRootPath": "/tmp/rawengine-private-root",
   "sourceMetadata": {
     "cameraMake": "Sony",
-    "cameraModel": "DSLR-A100",
+    "cameraModel": "ILCE-7M3",
     "privacySafeCameraId": "camera.raw-open-edit-export.professional-color.v1",
     "rawFormat": "arw"
   },
-  "sourceRelativePath": "private-fixtures/color/professional-workflow-v1/rawengine-professional-color-v1.arw"
+  "sourceRelativePath": "private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw"
 }

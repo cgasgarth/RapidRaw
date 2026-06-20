@@ -462,7 +462,8 @@
       "artifactClass": "general_color_reference",
       "camera": {
         "cameraMake": "Sony",
-        "cameraModel": "DSLR-A100",
+        "cameraModel": "ILCE-7M3",
+        "lens": "FE 24-105mm F4 G OSS",
         "rawFormat": "arw"
       },
       "crop": {
@@ -480,15 +481,15 @@
         "shutterSeconds": 0.01
       },
       "featureFamily": "color_science",
-      "fileSha256": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
-      "localRelativePath": "private-fixtures/color/professional-workflow-v1/RAW_SONY_A100.ARW",
-      "notes": "Private-root RAWSamples Sony A100 ARW reserved for professional color workflow preview/export validation. It is a generic color workflow source, not a measured ColorChecker chart.",
+      "fileSha256": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+      "localRelativePath": "private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw",
+      "notes": "Project-owned Alaska ARW reserved for professional color workflow preview/export validation. It is a generic color workflow source, not a measured ColorChecker chart.",
       "rights": {
         "allowedUse": "local_validation_only",
-        "copyrightOwner": "RAWSamples.ch contributor",
-        "evidence": "RAWSamples.ch Sony sample plus legal page allow local software-development validation; public repo stores metadata and hashes only.",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "User explicitly provided /Users/cgas/Pictures/Capture One/Alaska as project-owned RAW validation input for this repo.",
         "publicRepoAllowed": false,
-        "rightsStatus": "third_party_restricted"
+        "rightsStatus": "project_owned"
       },
       "status": "private_asset_available",
       "trackingIssue": 1376
