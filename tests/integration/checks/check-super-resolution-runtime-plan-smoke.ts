@@ -1,5 +1,8 @@
 #!/usr/bin/env bun
 
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
 import {
   applySuperResolutionRuntimePlanV1,
   buildSuperResolutionRuntimeDryRunV1,
@@ -16,6 +19,8 @@ const LOW_HEIGHT = 32;
 const HIGH_WIDTH = LOW_WIDTH * SCALE;
 const HIGH_HEIGHT = LOW_HEIGHT * SCALE;
 const MIN_IMPROVEMENT_RATIO = 0.65;
+const OUTPUT_DIR = resolve('artifacts/super-resolution-runtime-plan-smoke');
+const REPORT_PATH = resolve(OUTPUT_DIR, 'super-resolution-runtime-plan-smoke-report.json');
 
 const sourceFrameDefs = [
   { shiftX: 0, shiftY: 0, sourceIndex: 0 },
@@ -105,6 +110,20 @@ const applied = applySuperResolutionRuntimePlanV1({
 assertEqual(applied.provenance.runtimeStatus, 'apply_rendered', 'apply runtime status');
 assertEqual(applied.provenance.acceptedDryRunPlanId, dryRun.dryRunResult.mergePlan.planId, 'accepted plan id');
 assertEqual(applied.provenance.effectiveOutputScale, SCALE, 'effective output scale');
+assertEqual(
+  applied.provenance.alignmentDiagnostics.algorithmId,
+  'declared_pixel_shift_lattice_diagnostics_v1',
+  'alignment algorithm',
+);
+assertEqual(applied.provenance.alignmentDiagnostics.status, 'complete_declared_lattice', 'alignment status');
+assertEqual(applied.provenance.alignmentDiagnostics.confidence, 1, 'alignment confidence');
+assertEqual(applied.provenance.alignmentDiagnostics.phaseCoverageRatio, 1, 'alignment phase coverage');
+assertEqual(
+  applied.provenance.alignmentDiagnostics.uniqueShiftPhaseCount,
+  sourceFrameDefs.length,
+  'unique shift phases',
+);
+assertEqual(applied.provenance.alignmentDiagnostics.geometryConsistent, true, 'alignment geometry consistency');
 assertEqual(applied.provenance.confidenceMap.completeSampleRatio, 1, 'complete sample ratio');
 assertEqual(applied.provenance.confidenceMap.minSampleCount, 1, 'minimum sample count');
 assertEqual(applied.provenance.confidenceMap.maxSampleCount, 1, 'maximum sample count');
@@ -132,6 +151,7 @@ if (improvementRatio < MIN_IMPROVEMENT_RATIO) {
 
 const result = {
   acceptedDryRunPlanId: applied.provenance.acceptedDryRunPlanId,
+  alignmentDiagnostics: applied.provenance.alignmentDiagnostics,
   artifactCount: applied.mutationResult.outputArtifacts.length,
   fixture: 'synthetic_sr_runtime_plan_v1',
   frameRegistrations: applied.provenance.frameRegistrations,
@@ -143,7 +163,11 @@ const result = {
   outputArtifactContentHash: outputArtifact.contentHash,
   outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex'),
   outputSize: dryRun.dryRunResult.mergePlan.outputDimensions,
+  runtimeStatus: applied.provenance.runtimeStatus,
 };
+await mkdir(OUTPUT_DIR, { recursive: true });
+await writeFile(REPORT_PATH, `${JSON.stringify(result, null, 2)}\n`);
+
 if (process.argv.includes('--verbose')) {
   console.log(JSON.stringify(result, null, 2));
 } else {
