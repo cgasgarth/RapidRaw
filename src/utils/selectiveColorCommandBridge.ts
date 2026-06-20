@@ -19,8 +19,60 @@ export const TONE_COLOR_HSL_BANDS = ['red', 'orange', 'yellow', 'green', 'aqua',
 
 export type SelectiveColorCommandRangeKey = (typeof SELECTIVE_COLOR_COMMAND_RANGE_KEYS)[number];
 export type ToneColorHslBand = (typeof TONE_COLOR_HSL_BANDS)[number];
-export type SelectiveColorCommandContextActor = Record<string, unknown>;
-export type SelectiveColorCommandContextTarget = Record<string, unknown> & { kind: 'image' | 'virtual_copy' };
+
+const selectiveColorCommandContextActorSchema = z.looseObject({
+  id: z.string().trim().min(1),
+  kind: z.enum(['agent', 'batch', 'cli', 'plugin', 'server', 'test', 'ui']),
+  sessionId: z.string().trim().min(1).optional(),
+});
+
+const selectiveColorCommandContextTargetSchema = z
+  .looseObject({
+    id: z.string().trim().min(1).optional(),
+    imagePath: z.string().trim().min(1).optional(),
+    kind: z.enum(['image', 'virtual_copy']),
+    virtualCopyId: z.string().trim().min(1).nullable().optional(),
+  })
+  .refine((target) => target.id !== undefined || target.imagePath !== undefined, {
+    message: 'Target requires an id or imagePath.',
+  });
+
+const selectiveColorCommandColorPipelineSchema = z.looseObject({});
+
+export const selectiveColorCommandEnvelopeSchema = z
+  .object({
+    actor: selectiveColorCommandContextActorSchema,
+    approval: z
+      .object({
+        approvalClass: z.enum(['edit_apply', 'preview_only']),
+        reason: z.string().trim().min(1),
+        state: z.enum(['approved', 'not_required']),
+      })
+      .strict(),
+    colorPipeline: selectiveColorCommandColorPipelineSchema,
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('toneColor.adjustHsl'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.boolean(),
+    expectedGraphRevision: z.string().trim().min(1),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    parameters: z
+      .object({
+        band: z.enum(TONE_COLOR_HSL_BANDS),
+        hueShiftDegrees: z.number().min(-180).max(180),
+        luminance: z.number().min(-100).max(100),
+        saturation: z.number().min(-100).max(100),
+      })
+      .strict(),
+    schemaVersion: z.literal(SELECTIVE_COLOR_COMMAND_SCHEMA_VERSION),
+    target: selectiveColorCommandContextTargetSchema,
+  })
+  .strict();
+
+export type SelectiveColorCommandContextActor = z.infer<typeof selectiveColorCommandContextActorSchema>;
+export type SelectiveColorCommandContextTarget = z.infer<typeof selectiveColorCommandContextTargetSchema>;
+export type SelectiveColorCommandColorPipeline = z.infer<typeof selectiveColorCommandColorPipelineSchema>;
+export type SelectiveColorCommandEnvelope = z.infer<typeof selectiveColorCommandEnvelopeSchema>;
 
 export const selectiveColorAdjustmentPayloadSchema = z
   .object({
@@ -37,33 +89,9 @@ export const selectiveColorAdjustmentPayloadSchema = z
 
 export type SelectiveColorAdjustmentPayload = z.infer<typeof selectiveColorAdjustmentPayloadSchema>;
 
-export interface SelectiveColorCommandEnvelope {
-  actor: SelectiveColorCommandContextActor;
-  approval: {
-    approvalClass: 'edit_apply' | 'preview_only';
-    reason: string;
-    state: 'approved' | 'not_required';
-  };
-  colorPipeline: Record<string, unknown>;
-  commandId: string;
-  commandType: 'toneColor.adjustHsl';
-  correlationId: string;
-  dryRun: boolean;
-  expectedGraphRevision: string;
-  idempotencyKey?: string;
-  parameters: {
-    band: ToneColorHslBand;
-    hueShiftDegrees: number;
-    luminance: number;
-    saturation: number;
-  };
-  schemaVersion: typeof SELECTIVE_COLOR_COMMAND_SCHEMA_VERSION;
-  target: SelectiveColorCommandContextTarget;
-}
-
 export interface SelectiveColorCommandBridgeContext {
   actor: SelectiveColorCommandContextActor;
-  colorPipeline: Record<string, unknown>;
+  colorPipeline: SelectiveColorCommandColorPipeline;
   commandId: string;
   correlationId: string;
   expectedGraphRevision: string;
@@ -76,6 +104,8 @@ export interface SelectiveColorImageCommandContextOptions {
   imagePath: string;
   operationId: string;
   sessionId: string;
+  colorPipeline?: SelectiveColorCommandColorPipeline;
+  virtualCopyId?: string;
 }
 
 export interface SelectiveColorCommandBridgeOptions {
@@ -85,6 +115,26 @@ export interface SelectiveColorCommandBridgeOptions {
 
 const DEFAULT_PREVIEW_REASON = 'Preview selective color adjustment before mutating the edit graph.';
 const DEFAULT_APPLY_REASON = 'Apply accepted selective color adjustment through the typed command bridge.';
+const DEFAULT_COLOR_PIPELINE: SelectiveColorCommandColorPipeline = {
+  chromaticAdaptation: {
+    method: 'bradford_v1',
+    sourceWhitePoint: { x: 0.3457, y: 0.3585 },
+    status: 'math_validated',
+    targetWhitePoint: { x: 0.32168, y: 0.33767 },
+    warnings: [],
+  },
+  inputDomain: 'camera_linear_rgb',
+  operationDomain: 'acescg_linear_v1',
+  renderTarget: {
+    bitDepth: 8,
+    embedIcc: true,
+    intent: 'relative_colorimetric',
+    outputProfile: 'display_p3',
+    viewTransform: 'rawengine_agx_v1',
+  },
+  sceneToDisplayTransform: 'rawengine_agx_v1',
+  workingSpace: 'acescg_linear_v1',
+};
 
 const COMMAND_RANGE_TO_HSL_BAND = {
   aquas: 'aqua',
@@ -109,36 +159,19 @@ const HSL_BAND_TO_COMMAND_RANGE = {
 } as const satisfies Record<ToneColorHslBand, SelectiveColorCommandRangeKey>;
 
 export const buildSelectiveColorImageCommandContext = ({
+  colorPipeline = DEFAULT_COLOR_PIPELINE,
   expectedGraphRevision,
   imagePath,
   operationId,
   sessionId,
+  virtualCopyId,
 }: SelectiveColorImageCommandContextOptions): SelectiveColorCommandBridgeContext => ({
   actor: {
     id: 'rapidraw-ui',
     kind: 'ui',
     sessionId,
   },
-  colorPipeline: {
-    chromaticAdaptation: {
-      method: 'bradford_v1',
-      sourceWhitePoint: { x: 0.3457, y: 0.3585 },
-      status: 'math_validated',
-      targetWhitePoint: { x: 0.32168, y: 0.33767 },
-      warnings: [],
-    },
-    inputDomain: 'camera_linear_rgb',
-    operationDomain: 'acescg_linear_v1',
-    renderTarget: {
-      bitDepth: 8,
-      embedIcc: true,
-      intent: 'relative_colorimetric',
-      outputProfile: 'display_p3',
-      viewTransform: 'rawengine_agx_v1',
-    },
-    sceneToDisplayTransform: 'rawengine_agx_v1',
-    workingSpace: 'acescg_linear_v1',
-  },
+  colorPipeline,
   commandId: `selective_color_${operationId}`,
   correlationId: `selective_color_corr_${operationId}`,
   expectedGraphRevision,
@@ -146,6 +179,7 @@ export const buildSelectiveColorImageCommandContext = ({
   target: {
     imagePath,
     kind: 'image',
+    ...(virtualCopyId !== undefined ? { virtualCopyId } : {}),
   },
 });
 
@@ -185,23 +219,25 @@ export const buildSelectiveColorCommandEnvelope = (
     envelope.idempotencyKey = context.idempotencyKey;
   }
 
-  return envelope;
+  return parseSelectiveColorCommandEnvelope(envelope);
 };
 
-export const applySelectiveColorCommandEnvelopeToAdjustments = (
-  base: Adjustments,
-  command: SelectiveColorCommandEnvelope,
-): Adjustments => {
-  const rangeKey = HSL_BAND_TO_COMMAND_RANGE[command.parameters.band];
+export const parseSelectiveColorCommandEnvelope = (command: unknown): SelectiveColorCommandEnvelope => {
+  return selectiveColorCommandEnvelopeSchema.parse(command);
+};
+
+export const applySelectiveColorCommandEnvelopeToAdjustments = (base: Adjustments, command: unknown): Adjustments => {
+  const parsedCommand = parseSelectiveColorCommandEnvelope(command);
+  const rangeKey = HSL_BAND_TO_COMMAND_RANGE[parsedCommand.parameters.band];
 
   return {
     ...base,
     hsl: {
       ...base.hsl,
       [rangeKey]: {
-        hue: command.parameters.hueShiftDegrees,
-        luminance: command.parameters.luminance,
-        saturation: command.parameters.saturation,
+        hue: parsedCommand.parameters.hueShiftDegrees,
+        luminance: parsedCommand.parameters.luminance,
+        saturation: parsedCommand.parameters.saturation,
       },
     },
   };
