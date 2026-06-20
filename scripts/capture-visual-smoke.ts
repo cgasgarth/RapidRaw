@@ -157,7 +157,11 @@ interface NegativeLabPublicExportBrowserProof {
   appliedProfileDisplayName: string;
   appliedProfilePresetId: string;
   appliedProfileProvenanceHash: string;
+  baseFogSample: string;
+  baseFogStrength: string;
   changedPixelRatio: string;
+  densityWeights: string;
+  exportPlanId: string;
   fixtureId: string;
   outputDataUrl: string;
   outputFormat: string;
@@ -175,6 +179,28 @@ const negativeLabPublicExportReportSchema = z
         displayName: z.literal('C-41 Portrait'),
         presetId: z.literal('negative_lab.generic.c41.portrait.v1'),
         profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      })
+      .passthrough(),
+    controlSurface: z
+      .object({
+        baseFog: z
+          .object({
+            sampleRect: z.object({ height: z.number(), width: z.number(), x: z.number(), y: z.number() }).passthrough(),
+            strength: z.number(),
+          })
+          .passthrough(),
+        density: z
+          .object({
+            blueWeight: z.number(),
+            greenWeight: z.number(),
+            redWeight: z.number(),
+          })
+          .passthrough(),
+        export: z
+          .object({
+            acceptedDryRunPlanId: z.string().trim().min(1),
+          })
+          .passthrough(),
       })
       .passthrough(),
   })
@@ -405,7 +431,11 @@ async function loadNegativeLabPublicExportProof(): Promise<NegativeLabPublicExpo
     appliedProfileDisplayName: report.appliedProfile.displayName,
     appliedProfilePresetId: report.appliedProfile.presetId,
     appliedProfileProvenanceHash: report.appliedProfile.profileProvenanceHash,
+    baseFogSample: `${report.controlSurface.baseFog.sampleRect.x},${report.controlSurface.baseFog.sampleRect.y},${report.controlSurface.baseFog.sampleRect.width},${report.controlSurface.baseFog.sampleRect.height}`,
+    baseFogStrength: String(report.controlSurface.baseFog.strength),
     changedPixelRatio: '1',
+    densityWeights: `${report.controlSurface.density.redWeight},${report.controlSurface.density.greenWeight},${report.controlSurface.density.blueWeight}`,
+    exportPlanId: report.controlSurface.export.acceptedDryRunPlanId,
     fixtureId: 'negative_lab.real.public.cc0_110_ericht_negative_001',
     outputDataUrl: await readJpegDataUrl(outputPath),
     outputFormat: 'jpeg_proof',

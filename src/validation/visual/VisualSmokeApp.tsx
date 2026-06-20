@@ -100,7 +100,11 @@ interface NegativeLabPublicExportVisualProof {
   appliedProfileDisplayName: string;
   appliedProfilePresetId: string;
   appliedProfileProvenanceHash: string;
+  baseFogSample: string;
+  baseFogStrength: string;
   changedPixelRatio: string;
+  densityWeights: string;
+  exportPlanId: string;
   fixtureId: string;
   outputDataUrl: string;
   outputFormat: string;
@@ -2060,7 +2064,11 @@ function NegativeLabPublicExportReviewSmoke() {
           </div>
           <div
             className="sr-only"
+            data-base-fog-sample={proof.baseFogSample}
+            data-base-fog-strength={proof.baseFogStrength}
             data-changed-pixel-ratio={proof.changedPixelRatio}
+            data-density-weights={proof.densityWeights}
+            data-export-plan-id={proof.exportPlanId}
             data-fixture-id={proof.fixtureId}
             data-output-format={proof.outputFormat}
             data-output-path={proof.outputPath}

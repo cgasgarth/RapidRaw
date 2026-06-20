@@ -29,6 +29,42 @@ const exportReportSchema = z
     appliedProfile: appliedProfileSchema.passthrough(),
     doesNotProve: z.array(z.string().min(1)).min(1),
     fixtureId: z.literal('negative_lab.real.public.cc0_110_ericht_negative_001'),
+    controlSurface: z
+      .object({
+        baseFog: z
+          .object({
+            sampleRect: z
+              .object({ height: z.literal(0.35), width: z.literal(0.35), x: z.literal(0), y: z.literal(0) })
+              .strict(),
+            strength: z.number().min(0).max(1.25),
+          })
+          .strict(),
+        density: z
+          .object({
+            blueWeight: z.number().positive(),
+            contrast: z.number().positive(),
+            exposure: z.number(),
+            greenWeight: z.number().positive(),
+            redWeight: z.number().positive(),
+          })
+          .strict(),
+        export: z
+          .object({
+            acceptedDryRunPlanHash: fnv32HashSchema,
+            acceptedDryRunPlanId: z.literal('negative_lab_batch_plan_2f4a91bc'),
+            outputFormat: z.literal('jpeg_proof'),
+            profileProvenanceHash: fnv32HashSchema,
+            suffix: z.literal('Positive'),
+          })
+          .strict(),
+        preset: appliedProfileSchema.pick({
+          claimPolicy: true,
+          displayName: true,
+          presetId: true,
+          processFamily: true,
+        }),
+      })
+      .strict(),
     inputToOutputMeanAbsDelta: z.number().gt(0.01),
     metrics: z
       .object({
@@ -81,6 +117,7 @@ const uiProofReportSchema = z
         ),
       })
       .strict(),
+    controlSurface: exportReportSchema.shape.controlSurface,
     fixtureId: z.literal('negative_lab.real.public.cc0_110_ericht_negative_001'),
     issue: z.literal(2311),
     schemaVersion: z.literal(1),
@@ -160,6 +197,7 @@ const expectedReport = uiProofReportSchema.parse({
     outputPath: exportReport.output.path,
     sidecarPath: exportReport.sidecar.path,
   },
+  controlSurface: exportReport.controlSurface,
   fixtureId: exportReport.fixtureId,
   issue: 2311,
   schemaVersion: 1,

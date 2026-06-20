@@ -39,6 +39,37 @@
     "stock_library_maturity"
   ],
   "fixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001",
+  "controlSurface": {
+    "baseFog": {
+      "sampleRect": {
+        "height": 0.35,
+        "width": 0.35,
+        "x": 0,
+        "y": 0
+      },
+      "strength": 1
+    },
+    "density": {
+      "blueWeight": 0.9800000190734863,
+      "contrast": 0.949999988079071,
+      "exposure": 0.05000000074505806,
+      "greenWeight": 1,
+      "redWeight": 1.0299999713897705
+    },
+    "export": {
+      "acceptedDryRunPlanHash": "fnv1a32:2f4a91bc",
+      "acceptedDryRunPlanId": "negative_lab_batch_plan_2f4a91bc",
+      "outputFormat": "jpeg_proof",
+      "profileProvenanceHash": "fnv1a32:9d4a13c8",
+      "suffix": "Positive"
+    },
+    "preset": {
+      "claimPolicy": "generic_starting_point_no_stock_claim",
+      "displayName": "C-41 Portrait",
+      "presetId": "negative_lab.generic.c41.portrait.v1",
+      "processFamily": "c41_color_negative"
+    }
+  },
   "inputToOutputMeanAbsDelta": 0.4844345450401306,
   "issue": 2311,
   "metrics": {
