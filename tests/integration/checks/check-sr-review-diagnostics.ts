@@ -9,6 +9,8 @@ const contractSource = readFileSync('src/utils/computationalMergeReviewPanels.ts
 
 for (const marker of [
   'sr-review-diagnostics',
+  'sr-output-scale-summary',
+  'outputPixelMultiplier',
   'sections={[',
   'modals.superResolution.preflight.sources',
   'modals.superResolution.preflight.scale',
