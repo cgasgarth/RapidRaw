@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import AdjustmentSlider from './AdjustmentSlider';
 import { TextVariants } from '../../types/typography';
 import { type Adjustments, Effect, CreativeAdjustment } from '../../utils/adjustments';
+import { buildFilmGrainPresetAdjustmentPatch, FILM_GRAIN_UI_PRESETS } from '../../utils/filmGrainControls';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   buildFilmLookPresetDraft,
@@ -82,6 +83,13 @@ export default function EffectsPanel({
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       ...buildFilmLookAppliedAdjustmentPatch(look, strength),
+    }));
+  };
+
+  const handleFilmGrainPresetApply = (preset: (typeof FILM_GRAIN_UI_PRESETS)[number]) => {
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      ...buildFilmGrainPresetAdjustmentPatch(preset),
     }));
   };
 
@@ -267,10 +275,31 @@ export default function EffectsPanel({
           )}
 
           {adjustmentVisibility['grain'] !== false && (
-            <div className="p-2 bg-bg-tertiary rounded-md">
-              <UiText variant={TextVariants.heading} className="mb-2">
-                {t('adjustments.effects.grain')}
-              </UiText>
+            <div className="p-2 bg-bg-tertiary rounded-md" data-testid="film-grain-ui-controls">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <UiText variant={TextVariants.heading}>{t('adjustments.effects.grain')}</UiText>
+                <span
+                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary"
+                  data-testid="film-grain-renderer-status"
+                >
+                  {t('adjustments.effects.grainRendererStatus')}
+                </span>
+              </div>
+              <div className="mb-3 grid grid-cols-3 gap-2" data-testid="film-grain-preset-shortcuts">
+                {FILM_GRAIN_UI_PRESETS.map((preset) => (
+                  <button
+                    className="rounded border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-primary transition-colors hover:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
+                    data-testid={`film-grain-preset-${preset.id}`}
+                    key={preset.id}
+                    onClick={() => {
+                      handleFilmGrainPresetApply(preset);
+                    }}
+                    type="button"
+                  >
+                    {t(preset.labelKey)}
+                  </button>
+                ))}
+              </div>
               <AdjustmentSlider
                 label={t('adjustments.effects.amount')}
                 max={100}
@@ -308,6 +337,12 @@ export default function EffectsPanel({
                 onDragStateChange={onDragStateChange}
                 fillOrigin="min"
               />
+              <div
+                className="mt-3 rounded border border-surface bg-bg-secondary px-3 py-2 text-xs text-text-secondary"
+                data-testid="film-grain-chroma-planned"
+              >
+                {t('adjustments.effects.grainChromaPlanned')}
+              </div>
             </div>
           )}
         </div>

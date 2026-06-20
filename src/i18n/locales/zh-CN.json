@@ -235,6 +235,13 @@
       },
       "glow": "发光",
       "grain": "颗粒",
+      "grainChromaPlanned": "色度颗粒控制已规划；当前渲染器应用亮度颗粒。",
+      "grainPresets": {
+        "classic400": "ISO 400",
+        "fine100": "ISO 100",
+        "push1600": "ISO 1600"
+      },
+      "grainRendererStatus": "亮度颗粒",
       "halation": "光晕",
       "lightFlares": "光线耀斑",
       "lut": "LUT",

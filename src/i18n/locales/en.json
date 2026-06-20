@@ -235,6 +235,13 @@
       },
       "glow": "Glow",
       "grain": "Grain",
+      "grainChromaPlanned": "Chroma grain controls are planned; current renderer applies luma grain.",
+      "grainPresets": {
+        "classic400": "ISO 400",
+        "fine100": "ISO 100",
+        "push1600": "ISO 1600"
+      },
+      "grainRendererStatus": "Luma grain",
       "halation": "Halation",
       "lightFlares": "Light Flares",
       "lut": "LUT",
