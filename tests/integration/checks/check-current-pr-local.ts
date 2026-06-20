@@ -209,6 +209,10 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:panorama-lo-ransac-proof'],
   );
   addIf(
+    (file) => file.includes('panoramaLocalOptimizationRansac') || file.includes('panorama-distributed-inlier-proof'),
+    ['check:panorama-distributed-inlier-proof'],
+  );
+  addIf(
     (file) => file.includes('panoramaHomographyDiagnostics') || file.includes('panorama-homography-diagnostics'),
     ['check:panorama-homography-diagnostics'],
   );

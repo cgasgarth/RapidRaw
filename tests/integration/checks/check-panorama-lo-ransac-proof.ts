@@ -63,6 +63,7 @@ const translationSuccessSchema = z
         y: z.literal(2.2),
       })
       .strict(),
+    spatialSupport: z.unknown().optional(),
   })
   .strict();
 const artifactOptimizationSchema = z

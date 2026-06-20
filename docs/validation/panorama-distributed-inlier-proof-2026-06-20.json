@@ -1,0 +1,40 @@
+{
+  "cases": [
+    {
+      "case": "distributed-inliers-accepted",
+      "inlierCount": 5,
+      "refinedModel": {
+        "model": "translation",
+        "x": 12,
+        "y": 3
+      },
+      "spatialSupport": {
+        "gridColumns": 2,
+        "gridRows": 2,
+        "minimumOccupiedCells": 3,
+        "occupiedCellCount": 4,
+        "occupiedCellRatio": 1,
+        "occupiedCells": ["0:0", "0:1", "1:0", "1:1"],
+        "status": "accepted"
+      }
+    },
+    {
+      "case": "concentrated-inliers-rejected",
+      "failureCode": "insufficient_spatial_support",
+      "matchCount": 5,
+      "spatialSupport": {
+        "gridColumns": 2,
+        "gridRows": 2,
+        "minimumOccupiedCells": 3,
+        "occupiedCellCount": 1,
+        "occupiedCellRatio": 0.25,
+        "occupiedCells": ["0:0"],
+        "status": "rejected"
+      }
+    }
+  ],
+  "issue": 2289,
+  "schemaVersion": 1,
+  "validationMode": "panorama_distributed_inlier_support",
+  "validationStatus": "synthetic_runtime_metadata_gate"
+}
