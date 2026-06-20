@@ -213,6 +213,44 @@
   },
   "issue": 2326,
   "schemaVersion": 2,
+  "shaderCoverage": [
+    {
+      "caseCount": 2,
+      "operation": "channel_mixer",
+      "shaderFunction": "apply_channel_mixer",
+      "shaderHash": "sha256:090dd60afc3ee05de093a13a706dd3e33fb1f3f87c7940c5fd14bfa88bd51752"
+    },
+    {
+      "caseCount": 1,
+      "operation": "color_balance_rgb",
+      "shaderFunction": "apply_color_balance_rgb",
+      "shaderHash": "sha256:6b908c0a9c50a6c34aabd2b3519a1346977248e24e2c37c06bb68393ce9f9338"
+    },
+    {
+      "caseCount": 1,
+      "operation": "legacy_tonemap",
+      "shaderFunction": "legacy_tonemap",
+      "shaderHash": "sha256:7f5eb65bdcb6ea30cbf0d536f9e3488b0e746bdf5655d6f31b189fddd83b2e0e"
+    },
+    {
+      "caseCount": 1,
+      "operation": "linear_exposure",
+      "shaderFunction": "apply_linear_exposure",
+      "shaderHash": "sha256:221bbd78cee52da68538c489c33b324cd2c24a6ddf59b727d89407f6f83ebb4e"
+    },
+    {
+      "caseCount": 1,
+      "operation": "luma_levels",
+      "shaderFunction": "apply_luma_levels",
+      "shaderHash": "sha256:177cf8b9cf0a02394b2c1990e0b24b35e891976f024ea9b044f687fb17a5bba8"
+    },
+    {
+      "caseCount": 1,
+      "operation": "white_balance",
+      "shaderFunction": "apply_white_balance",
+      "shaderHash": "sha256:bf50953debcb88e69628c3e560535115e6bdf0b11123a4587416f55ff9382859"
+    }
+  ],
   "shaderPath": "src-tauri/src/shaders/shader.wgsl",
   "shaderFunctions": [
     {
