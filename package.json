@@ -45,6 +45,7 @@
     "check:edit-graph-history": "bun scripts/check-edit-graph-history-commands.ts",
     "check:edit-history-replay": "bun scripts/check-edit-history-replay.ts",
     "check:command-replay-render": "bun scripts/check-command-replay-render-proof.ts",
+    "check:command-replay-render:update": "bun scripts/check-command-replay-render-proof.ts --update",
     "check:headless-render-command": "bun scripts/check-headless-render-command.ts",
     "check:basic-tone-command-bridge": "bun scripts/check-basic-tone-command-bridge.ts",
     "check:agent-basic-tone-apply-proof": "bun scripts/check-agent-basic-tone-apply-proof.ts",

@@ -1,0 +1,12 @@
+{
+  "afterHash": "b63f211ea7c40116",
+  "beforeHash": "fc7bcdd624223e3d",
+  "changedPixels": 4,
+  "commandId": "basic_tone_command_replay_render_001",
+  "graphRevision": "graph-rev.command-replay.synthetic.v1",
+  "issue": 2322,
+  "previewExportMaxDelta": 0,
+  "schemaVersion": 1,
+  "runtimeStatus": "synthetic_headless_preview_export_parity",
+  "validationMode": "typed_command_replay_golden_render"
+}
