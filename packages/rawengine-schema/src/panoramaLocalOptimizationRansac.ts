@@ -16,10 +16,37 @@ export const panoramaLoRansacMatchV1Schema = z
 
 export const panoramaLoRansacTranslationRequestV1Schema = z
   .object({
+    imageSize: z
+      .object({
+        height: z.number().int().positive(),
+        width: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
     inlierTolerancePx: z.number().positive(),
     matches: z.array(panoramaLoRansacMatchV1Schema),
     maxSeedModels: z.number().int().positive().optional(),
     minimumInliers: z.number().int().positive(),
+    spatialSupport: z
+      .object({
+        gridColumns: z.number().int().positive(),
+        gridRows: z.number().int().positive(),
+        minimumOccupiedCells: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+const spatialSupportResultSchema = z
+  .object({
+    gridColumns: z.number().int().positive(),
+    gridRows: z.number().int().positive(),
+    minimumOccupiedCells: z.number().int().positive(),
+    occupiedCellCount: z.number().int().nonnegative(),
+    occupiedCellRatio: z.number().min(0).max(1),
+    occupiedCells: z.array(z.string().min(1)),
+    status: z.enum(['accepted', 'rejected']),
   })
   .strict();
 
@@ -29,11 +56,12 @@ export const panoramaLoRansacTranslationResultV1Schema = z.discriminatedUnion('k
       algorithmId: z.literal(PANORAMA_LO_RANSAC_ALGORITHM_ID),
       deterministicTieBreak: z.literal(PANORAMA_LO_TIE_BREAK),
       evaluatedSeedModelCount: z.number().int().nonnegative(),
-      failureCode: z.literal('insufficient_inlier_matches'),
+      failureCode: z.enum(['insufficient_inlier_matches', 'insufficient_spatial_support']),
       inlierTolerancePx: z.number().positive(),
       kind: z.literal('failure'),
       matchCount: z.number().int().nonnegative(),
       minimumInliers: z.number().int().positive(),
+      spatialSupport: spatialSupportResultSchema.optional(),
     })
     .strict(),
   z
@@ -70,6 +98,7 @@ export const panoramaLoRansacTranslationResultV1Schema = z.discriminatedUnion('k
           y: z.number(),
         })
         .strict(),
+      spatialSupport: spatialSupportResultSchema.optional(),
     })
     .strict(),
 ]);
@@ -105,6 +134,23 @@ export const estimatePanoramaLoRansacTranslationV1 = (requestValue: unknown): Pa
       kind: 'failure',
       matchCount: request.matches.length,
       minimumInliers: request.minimumInliers,
+    });
+  }
+  const spatialSupport =
+    request.spatialSupport === undefined || request.imageSize === undefined
+      ? undefined
+      : calculateSpatialSupport(best.inliers, request.imageSize, request.spatialSupport);
+  if (spatialSupport?.status === 'rejected') {
+    return panoramaLoRansacTranslationResultV1Schema.parse({
+      algorithmId: PANORAMA_LO_RANSAC_ALGORITHM_ID,
+      deterministicTieBreak: PANORAMA_LO_TIE_BREAK,
+      evaluatedSeedModelCount: seedLimit,
+      failureCode: 'insufficient_spatial_support',
+      inlierTolerancePx: request.inlierTolerancePx,
+      kind: 'failure',
+      matchCount: request.matches.length,
+      minimumInliers: request.minimumInliers,
+      spatialSupport,
     });
   }
 
@@ -147,6 +193,7 @@ export const estimatePanoramaLoRansacTranslationV1 = (requestValue: unknown): Pa
       x: roundMetric(best.translation.x),
       y: roundMetric(best.translation.y),
     },
+    spatialSupport,
   });
 };
 
@@ -165,6 +212,35 @@ const translationError = (match: PanoramaLoRansacMatchV1, translation: Translati
   const dy = match.left[1] + translation.y - match.right[1];
   return Math.hypot(dx, dy);
 };
+
+const calculateSpatialSupport = (
+  inliers: PanoramaLoRansacMatchV1[],
+  imageSize: { height: number; width: number },
+  support: { gridColumns: number; gridRows: number; minimumOccupiedCells: number },
+) => {
+  const occupiedCells = new Set<string>();
+  for (const inlier of inliers) {
+    const column = clamp(
+      Math.floor((inlier.left[0] / imageSize.width) * support.gridColumns),
+      0,
+      support.gridColumns - 1,
+    );
+    const row = clamp(Math.floor((inlier.left[1] / imageSize.height) * support.gridRows), 0, support.gridRows - 1);
+    occupiedCells.add(`${column}:${row}`);
+  }
+  const occupiedCellCount = occupiedCells.size;
+  return spatialSupportResultSchema.parse({
+    gridColumns: support.gridColumns,
+    gridRows: support.gridRows,
+    minimumOccupiedCells: support.minimumOccupiedCells,
+    occupiedCellCount,
+    occupiedCellRatio: roundMetric(occupiedCellCount / Math.max(1, support.gridColumns * support.gridRows)),
+    occupiedCells: [...occupiedCells].toSorted(),
+    status: occupiedCellCount >= support.minimumOccupiedCells ? 'accepted' : 'rejected',
+  });
+};
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 const average = (values: number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
 
