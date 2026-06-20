@@ -173,6 +173,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   and `~/.codex` unless explicitly needed.
 - Prefer `rg -l`, `rg --count`, `jq` summaries, bounded `sed`/`head`/`tail`,
   and compact scripts.
+- Use `ast-grep` (`sg`) for syntax-aware code searches and structural rewrites.
+  Prefer `rg` for plain text, filenames, and quick literal discovery; use
+  `sg --lang <language> -p '<pattern>'` when the query depends on code
+  structure.
 - Do not dump full CI logs, full JSON, broad file lists, or unchanged green
   status.
 - Resource cleanup concerns are primarily about RAM pressure, not disk space.
