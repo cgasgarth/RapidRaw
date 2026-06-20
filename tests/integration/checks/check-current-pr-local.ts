@@ -151,7 +151,11 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
 
   addIf(
     (file) => file.includes('filmGrain') || file.includes('film-grain'),
-    ['check:film-grain-provenance', 'check:film-grain-runtime-proof'],
+    ['check:film-grain-provenance', 'check:film-grain-runtime-proof', 'check:film-grain-ui'],
+  );
+  addIf(
+    (file) => file === 'src/components/adjustments/Effects.tsx' || file === 'src/utils/filmGrainControls.ts',
+    ['check:film-grain-ui'],
   );
   addIf(
     (file) => file.includes('focusConfidenceSourceMap') || file.includes('focus-confidence-source-map'),
@@ -224,7 +228,10 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src-tauri/src/file_management.rs'], ['rust fmt', 'rust check', 'rust clippy']);
   assertSelfTestRoute(['src/shaders/preview.wgsl'], ['visual smoke pr']);
   assertSelfTestRoute(['src/utils/focusConfidenceSourceMap.ts'], ['check:focus-confidence-source-map']);
-  assertSelfTestRoute(['packages/rawengine-schema/src/filmGrainRuntime.ts'], ['check:film-grain-runtime-proof']);
+  assertSelfTestRoute(
+    ['packages/rawengine-schema/src/filmGrainRuntime.ts'],
+    ['check:film-grain-runtime-proof', 'check:film-grain-ui'],
+  );
   assertSelfTestRoute(
     ['packages/rawengine-schema/src/focusStackWeightedBlend.ts'],
     ['check:focus-preview-blend-smoke'],

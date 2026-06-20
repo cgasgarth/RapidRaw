@@ -235,6 +235,13 @@
       },
       "glow": "Glühen",
       "grain": "Körnung",
+      "grainChromaPlanned": "Chroma-Körnung ist geplant; der aktuelle Renderer nutzt Luma-Körnung.",
+      "grainPresets": {
+        "classic400": "ISO 400",
+        "fine100": "ISO 100",
+        "push1600": "ISO 1600"
+      },
+      "grainRendererStatus": "Luma-Körnung",
       "halation": "Lichthof",
       "lightFlares": "Blendenflecke",
       "lut": "LUT",

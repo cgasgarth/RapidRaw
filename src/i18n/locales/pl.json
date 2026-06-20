@@ -237,6 +237,13 @@
       },
       "glow": "Poświata",
       "grain": "Ziarno",
+      "grainChromaPlanned": "Sterowanie ziarnem chroma jest planowane; obecny renderer stosuje ziarno luma.",
+      "grainPresets": {
+        "classic400": "ISO 400",
+        "fine100": "ISO 100",
+        "push1600": "ISO 1600"
+      },
+      "grainRendererStatus": "Ziarno luma",
       "halation": "Halacja",
       "lightFlares": "Flary świetlne",
       "lut": "LUT",
