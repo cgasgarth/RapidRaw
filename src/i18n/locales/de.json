@@ -912,6 +912,7 @@
         "count": "{{count}} Stile",
         "count_one": "{{count}} Stil",
         "count_other": "{{count}} Stile",
+        "defaultBadge": "Standard",
         "title": "Farbstile"
       },
       "dialog": {
