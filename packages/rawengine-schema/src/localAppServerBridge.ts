@@ -6,6 +6,9 @@ import {
   aiEnhancementApplyResultV1Schema,
   aiEnhancementCommandEnvelopeV1Schema,
   aiEnhancementDryRunResultV1Schema,
+  aiToolApplyResultV1Schema,
+  aiToolCommandEnvelopeV1Schema,
+  aiToolDryRunResultV1Schema,
   rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
@@ -107,6 +110,10 @@ export type RawEngineLocalAppServerHslCommandV1 = z.infer<typeof rawEngineLocalA
 export type RawEngineLocalAppServerSkinToneUniformityCommandV1 = z.infer<
   typeof rawEngineLocalAppServerSkinToneUniformityCommandV1Schema
 >;
+
+export const rawEngineLocalAppServerAiToolCommandV1Schema = aiToolCommandEnvelopeV1Schema;
+
+export type RawEngineLocalAppServerAiToolCommandV1 = z.infer<typeof rawEngineLocalAppServerAiToolCommandV1Schema>;
 
 export const rawEngineLocalAppServerAiEnhancementCommandV1Schema = aiEnhancementCommandEnvelopeV1Schema;
 
@@ -329,6 +336,110 @@ const buildSkinToneUniformityMutationResult = (
     warnings: [...SKIN_TONE_UNIFORMITY_WARNINGS],
   });
 
+const buildAiToolPlanId = (command: RawEngineLocalAppServerAiToolCommandV1): string =>
+  `dryrun_${command.parameters.capability}_${command.commandId}`;
+
+const buildAiToolPlanHash = (command: RawEngineLocalAppServerAiToolCommandV1): string =>
+  `sha256:${[
+    command.expectedGraphRevision,
+    command.target.imagePath,
+    command.parameters.capability,
+    command.parameters.maskName,
+    command.parameters.modelId,
+    command.parameters.sourceContentHash,
+  ].join(':')}`;
+
+const buildAiToolPlanKey = (
+  command: Pick<RawEngineLocalAppServerAiToolCommandV1, 'expectedGraphRevision' | 'parameters' | 'target'>,
+): string =>
+  JSON.stringify([
+    command.expectedGraphRevision,
+    command.target,
+    command.parameters.capability,
+    command.parameters.maskName,
+    command.parameters.modelId,
+    command.parameters.modelVersion,
+    command.parameters.sourceContentHash,
+  ]);
+
+const buildAiToolDryRunResult = (
+  command: RawEngineLocalAppServerAiToolCommandV1,
+): z.infer<typeof aiToolDryRunResultV1Schema> =>
+  aiToolDryRunResultV1Schema.parse({
+    commandId: command.commandId,
+    commandType: 'ai.mask.generateSubject',
+    correlationId: command.correlationId,
+    dryRunPlanHash: buildAiToolPlanHash(command),
+    dryRunPlanId: buildAiToolPlanId(command),
+    maskArtifacts: [
+      {
+        artifactId: `artifact_${command.parameters.capability}_${command.commandId}_mask`,
+        contentHash: command.parameters.sourceContentHash,
+        dimensions: {
+          height: 1080,
+          width: 1620,
+        },
+        kind: 'mask',
+        storage: 'temp_cache',
+      },
+    ],
+    modelId: command.parameters.modelId,
+    modelVersion: command.parameters.modelVersion,
+    previewArtifacts: [
+      {
+        artifactId: `artifact_${command.parameters.capability}_${command.commandId}_preview`,
+        contentHash: command.parameters.sourceContentHash,
+        dimensions: {
+          height: 1080,
+          width: 1620,
+        },
+        kind: 'preview',
+        storage: 'temp_cache',
+      },
+    ],
+    providerClass: command.parameters.providerClass,
+    providerId: command.parameters.providerId,
+    schemaVersion: command.schemaVersion,
+    sourceContentHash: command.parameters.sourceContentHash,
+    warnings: ['Synthetic AI mask app-server proof: no real RAW model inference claim.'],
+  });
+
+const buildAiToolMutationResult = (
+  command: RawEngineLocalAppServerAiToolCommandV1,
+): z.infer<typeof aiToolApplyResultV1Schema> => {
+  const acceptedDryRunPlanHash = command.parameters.acceptedDryRunPlanHash;
+  const acceptedDryRunPlanId = command.parameters.acceptedDryRunPlanId;
+  if (acceptedDryRunPlanHash === undefined || acceptedDryRunPlanId === undefined) {
+    throw new Error('Local app-server bridge AI mask apply requires an accepted dry-run plan.');
+  }
+
+  return aiToolApplyResultV1Schema.parse({
+    appliedGraphRevision: [command.expectedGraphRevision, 'ai_mask', command.commandId].join(':'),
+    changedMaskIds: [`mask_${command.parameters.capability}_${command.commandId}`],
+    commandId: command.commandId,
+    commandType: 'ai.mask.applySubject',
+    correlationId: command.correlationId,
+    dryRunPlanHash: acceptedDryRunPlanHash,
+    dryRunPlanId: acceptedDryRunPlanId,
+    outputArtifacts: [
+      {
+        artifactId: `artifact_${command.parameters.capability}_${command.commandId}_sidecar`,
+        contentHash: command.parameters.sourceContentHash,
+        dimensions: {
+          height: 1080,
+          width: 1620,
+        },
+        kind: 'mask',
+        storage: 'sidecar_artifact',
+      },
+    ],
+    provenanceEntryIds: [`prov_${command.parameters.capability}_${command.commandId}`],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: ['Synthetic AI mask app-server proof: no real RAW model inference claim.'],
+  });
+};
+
 const buildAiEnhancementPlanId = (command: RawEngineLocalAppServerAiEnhancementCommandV1): string =>
   `dryrun_${command.parameters.capability}_${command.commandId}`;
 
@@ -436,6 +547,7 @@ const buildAiEnhancementMutationResult = (
 
 export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiEnhancementDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
+  readonly #acceptedAiToolDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedBasicToneDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedSkinToneUniformityDryRunPlanKeys: Set<string> = new Set<string>();
@@ -572,6 +684,46 @@ export class RawEngineLocalAppServerBridge {
     });
 
     this.#commandBus.register({
+      commandType: 'ai.mask.generateSubject',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerAiToolCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'ai.mask.generateSubject') {
+          throw new Error('Local app-server bridge expected an AI mask dry-run command.');
+        }
+
+        const dryRunResult = buildAiToolDryRunResult(parsedCommand);
+        this.#acceptedAiToolDryRunPlanKeys.set(buildAiToolPlanKey(parsedCommand), {
+          planHash: dryRunResult.dryRunPlanHash,
+          planId: dryRunResult.dryRunPlanId,
+        });
+        return dryRunResult;
+      },
+      schema: rawEngineLocalAppServerAiToolCommandV1Schema,
+    });
+
+    this.#commandBus.register({
+      commandType: 'ai.mask.applySubject',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerAiToolCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'ai.mask.applySubject') {
+          throw new Error('Local app-server bridge expected an AI mask apply command.');
+        }
+
+        const plan = this.#acceptedAiToolDryRunPlanKeys.get(buildAiToolPlanKey(parsedCommand));
+        if (
+          plan === undefined ||
+          plan.planHash !== parsedCommand.parameters.acceptedDryRunPlanHash ||
+          plan.planId !== parsedCommand.parameters.acceptedDryRunPlanId
+        ) {
+          throw new Error('Local app-server bridge rejected AI mask apply without a matching dry-run.');
+        }
+
+        return buildAiToolMutationResult(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerAiToolCommandV1Schema,
+    });
+
+    this.#commandBus.register({
       commandType: 'ai.enhancement.dryRun',
       execute: (command) => {
         const parsedCommand = rawEngineLocalAppServerAiEnhancementCommandV1Schema.parse(command);
@@ -621,7 +773,7 @@ export const buildRawEngineLocalAppServerBridgeCapabilities = (
 ): {
   commandTypes: string[];
   mutatingCommands: boolean;
-  runtimeStatus: 'basic_tone_hsl_skin_tone_and_ai_enhancement_dry_run_apply';
+  runtimeStatus: 'basic_tone_hsl_skin_tone_ai_mask_and_ai_enhancement_dry_run_apply';
 } => {
   const commandTypes = bridge.listCommandTypes().sort((left, right) => left.localeCompare(right));
 
@@ -629,10 +781,11 @@ export const buildRawEngineLocalAppServerBridgeCapabilities = (
     commandTypes,
     mutatingCommands:
       commandTypes.includes('ai.enhancement.apply') ||
+      commandTypes.includes('ai.mask.applySubject') ||
       commandTypes.includes('toneColor.adjustHsl') ||
       commandTypes.includes('toneColor.adjustSkinToneUniformity') ||
       commandTypes.includes('toneColor.setBasicTone'),
-    runtimeStatus: 'basic_tone_hsl_skin_tone_and_ai_enhancement_dry_run_apply',
+    runtimeStatus: 'basic_tone_hsl_skin_tone_ai_mask_and_ai_enhancement_dry_run_apply',
   };
 };
 
