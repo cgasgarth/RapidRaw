@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::{SecondsFormat, Utc};
-use image::{ImageFormat, ImageReader};
+use image::{DynamicImage, ImageFormat, ImageReader};
 use serde::Serialize;
 
 use crate::app_settings::AppSettings;
@@ -61,6 +61,8 @@ const MODAL_BEFORE_FILE: &str = "panorama-overlap-modal-before.png";
 const MODAL_AFTER_FILE: &str = "panorama-overlap-modal-after.png";
 const RESULT_REVIEW_FILE: &str = "panorama-overlap-result-review.png";
 const EXPORT_REVIEW_FILE: &str = "panorama-overlap-export-review.png";
+const BOUNDED_RENDER_INPUT_DIR: &str = "panorama-overlap-bounded-inputs";
+const RENDER_INPUT_MAX_DIMENSION: u32 = 1600;
 const STRESS_ALIGNMENT_REPORT_FILE: &str = "panorama-stress-pixls-ir-alignment.json";
 const STRESS_STITCH_REPORT_FILE: &str = "panorama-stress-pixls-ir-stitch-report.json";
 const STRESS_STITCH_OUTPUT_FILE: &str = "panorama-stress-pixls-ir-merge.tiff";
@@ -494,7 +496,7 @@ fn run_private_stitch_artifact_proof(private_root: &Path) -> Result<(), String> 
                 generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
                 graph_revision_hash,
                 implementation_issue: CONFIG.implementation_issue,
-                notes: "Private ARW panorama stitch artifact smoke. This proves production RAW decode plus the legacy RapidRaw homography/seam stitch engine can emit a private panorama artifact with source coverage and diagnostics. It does not claim app-server apply, preview/export parity, or UI review.".to_string(),
+                notes: "Private ARW panorama stitch artifact smoke. This proves production RAW decode plus the legacy RapidRaw homography/seam stitch engine can emit a bounded panorama artifact with source coverage and diagnostics. It does not claim full-resolution stitch quality, app-server apply, preview/export parity, or UI review.".to_string(),
                 quality_metrics: metrics,
                 report_id: CONFIG.report_id.to_string(),
                 run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
@@ -517,7 +519,9 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
     let output_dir = private_root.join(ARTIFACT_ROOT);
     fs::create_dir_all(&output_dir).map_err(|error| error.to_string())?;
 
-    let render_result = render_private_panorama(private_root, CONFIG.source_relative_paths)?;
+    let render_input_paths =
+        write_bounded_render_sources(&output_dir, &loaded_sources, BOUNDED_RENDER_INPUT_DIR)?;
+    let render_result = render_private_panorama_paths(render_input_paths)?;
     let alignment_report = build_alignment_report_from_render_metadata(
         &render_result.metadata,
         &graph_revision_hash,
@@ -662,7 +666,7 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
                 generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
                 graph_revision_hash,
                 implementation_issue: CONFIG.implementation_issue,
-                notes: "Private ARW panorama preview/export smoke. This proves production RAW decode, stitch artifact generation, private preview and export artifacts, and preview/export pixel parity. It does not claim UI review or final user-visible E2E acceptance.".to_string(),
+                notes: "Private ARW panorama preview/export smoke. This proves production RAW decode, bounded stitch artifact generation, private preview and export artifacts, and preview/export pixel parity. It does not claim full-resolution stitch quality, UI review, or final user-visible E2E acceptance.".to_string(),
                 quality_metrics: metrics,
                 report_id: CONFIG.report_id.to_string(),
                 run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
@@ -793,24 +797,54 @@ fn render_private_panorama(
     private_root: &Path,
     source_relative_paths: &[&str],
 ) -> Result<PanoramaRenderResult, String> {
+    render_private_panorama_paths(
+        source_relative_paths
+            .iter()
+            .map(|relative_path| {
+                private_root
+                    .join(relative_path)
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect(),
+    )
+}
+
+fn render_private_panorama_paths(image_paths: Vec<String>) -> Result<PanoramaRenderResult, String> {
     let app = tauri::test::mock_builder()
         .manage(AppState::new())
         .build(tauri::test::mock_context(tauri::test::noop_assets()))
         .map_err(|error| error.to_string())?;
-    let image_paths = source_relative_paths
-        .iter()
-        .map(|relative_path| {
-            private_root
-                .join(relative_path)
-                .to_string_lossy()
-                .to_string()
-        })
-        .collect();
     render_with_legacy_homography_engine_with_settings(
         PanoramaRenderRequest { image_paths },
         app.handle().clone(),
         AppSettings::default(),
     )
+}
+
+fn write_bounded_render_sources(
+    output_dir: &Path,
+    loaded_sources: &[LoadedSource],
+    directory_name: &str,
+) -> Result<Vec<String>, String> {
+    let render_input_dir = output_dir.join(directory_name);
+    fs::create_dir_all(&render_input_dir).map_err(|error| error.to_string())?;
+
+    loaded_sources
+        .iter()
+        .enumerate()
+        .map(|(index, source)| {
+            let output_path = render_input_dir.join(format!("frame-{:02}.tiff", index + 1));
+            bounded_render_image(&source.image)
+                .save_with_format(&output_path, ImageFormat::Tiff)
+                .map_err(|error| error.to_string())?;
+            Ok(output_path.to_string_lossy().to_string())
+        })
+        .collect()
+}
+
+fn bounded_render_image(image: &DynamicImage) -> DynamicImage {
+    image.thumbnail(RENDER_INPUT_MAX_DIMENSION, RENDER_INPUT_MAX_DIMENSION)
 }
 
 fn sanitize_diagnostic_metrics(metrics: &mut [QualityMetric]) {

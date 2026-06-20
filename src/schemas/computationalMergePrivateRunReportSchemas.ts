@@ -22,6 +22,7 @@ const metricNameSchema = z.enum([
   'alignmentInlierRatio',
   'alignmentMatchCount',
   'alignmentMeanReprojectionErrorPx',
+  'alignmentMeanSymmetricTransferErrorPx',
   'alignmentRejectedPairCount',
   'decodedFinitePixelRatio',
   'decodedNonzeroDimensionCount',
