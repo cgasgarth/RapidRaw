@@ -63,6 +63,7 @@ export const privateRawEvidenceArtifactClassSchema = z.enum([
   'motion_blur',
   'overlap_stitch_alignment',
   'lens_softness',
+  'general_color_reference',
   'color_checker_reference',
   'skin_tone_reference',
   'layer_mask_composite',

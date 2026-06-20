@@ -11,31 +11,31 @@
           "kind": "source_raw_private"
         },
         {
-          "hash": "sha256:ff9f2140e661978d91612ad6280d36b6d3a6e20145169705f6cb746395bdbdfd",
+          "hash": "sha256:603d3031d47e7ccbc215e6bf597c46076e733076c8763aa1531cf9155c6520e3",
           "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-preview-before.png",
           "publicRepoAllowed": false,
           "kind": "preview_before_private"
         },
         {
-          "hash": "sha256:73b524c0e70cbae199c7e16b90e67046ae517960f942c957cec418bf5f435d4c",
+          "hash": "sha256:067dff830818527683f24363cd4d7be6b14ee281d235eedd383f5fcc89a1624e",
           "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-preview-after.png",
           "publicRepoAllowed": false,
           "kind": "preview_after_private"
         },
         {
-          "hash": "sha256:189c12489c2001039777bf5d0431a77e2e401ec862f39ac256d1b8e5486991f0",
+          "hash": "sha256:ffbb077f3dd8a8bf6775faf1d50b3179df06bba808f0a38d1ac19573c6a6e2da",
           "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-export-after.tiff",
           "publicRepoAllowed": false,
           "kind": "export_after_private"
         },
         {
-          "hash": "sha256:2a1753da9b6bc746864d225f41f5743b56d5cb787bbc6e8efb811c2118119201",
+          "hash": "sha256:a82ff62320d4caa621a4192550445e50fb80c8f607f0fa2a0f455274bcd0498f",
           "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-after.rrdata",
           "publicRepoAllowed": false,
           "kind": "sidecar_after_private"
         },
         {
-          "hash": "sha256:f444611d6c52a79781d187dd441ba5b9b0e60b9f7f44ed0e82a8a92881014160",
+          "hash": "sha256:967c92c4dfac67d57c38899157776b7f903d658b257dd0da4bc7a3f2e4459e39",
           "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-workflow-report.json",
           "publicRepoAllowed": false,
           "kind": "workflow_report_private"
@@ -134,14 +134,14 @@
       "editCommandId": "command.raw-open-edit-export.basic-tone.v1",
       "editGraphRevision": "graph-rev.raw-open-edit-export.high-iso-skin-shadow.v1",
       "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
-      "generatedAt": "2026-06-18T12:38:50.683Z",
+      "generatedAt": "2026-06-20T11:17:56.751Z",
       "metrics": [
         {
           "name": "changedPixelRatio",
           "passed": true,
           "source": "private_raw_report",
           "threshold": 0,
-          "value": 0.9935232083333333
+          "value": 0.9936348333333334
         },
         {
           "name": "previewExportMeanAbsDelta",
@@ -166,18 +166,18 @@
         }
       ],
       "previewAfter": {
-        "hash": "sha256:73b524c0e70cbae199c7e16b90e67046ae517960f942c957cec418bf5f435d4c",
+        "hash": "sha256:067dff830818527683f24363cd4d7be6b14ee281d235eedd383f5fcc89a1624e",
         "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-preview-after.png",
         "publicRepoAllowed": false
       },
       "previewBefore": {
-        "hash": "sha256:ff9f2140e661978d91612ad6280d36b6d3a6e20145169705f6cb746395bdbdfd",
+        "hash": "sha256:603d3031d47e7ccbc215e6bf597c46076e733076c8763aa1531cf9155c6520e3",
         "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-preview-before.png",
         "publicRepoAllowed": false
       },
       "reportId": "raw-open-edit-export-run.high-iso-skin-shadow.v1",
       "sidecarAfter": {
-        "hash": "sha256:2a1753da9b6bc746864d225f41f5743b56d5cb787bbc6e8efb811c2118119201",
+        "hash": "sha256:a82ff62320d4caa621a4192550445e50fb80c8f607f0fa2a0f455274bcd0498f",
         "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-after.rrdata",
         "publicRepoAllowed": false
       },
@@ -187,9 +187,195 @@
         "publicRepoAllowed": false
       },
       "trackingIssue": 1376
+    },
+    {
+      "artifacts": [
+        {
+          "hash": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
+          "path": "private-fixtures/color/professional-workflow-v1/rawengine-professional-color-v1.arw",
+          "publicRepoAllowed": false,
+          "kind": "source_raw_private"
+        },
+        {
+          "hash": "sha256:c2f7186bbccc78917e810e7ea3083576ef16513cfd68548c6acf1d86ecedf195",
+          "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-before.png",
+          "publicRepoAllowed": false,
+          "kind": "preview_before_private"
+        },
+        {
+          "hash": "sha256:bf3a3e4ac1a3dd5afd3d69a6bbc6dd008d4796a25bd192e8422a9ab9f519cd98",
+          "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-after.png",
+          "publicRepoAllowed": false,
+          "kind": "preview_after_private"
+        },
+        {
+          "hash": "sha256:07e5c02f103d51909711b8a6546193a58ead1dfb59ffbaf49e51139a46d63431",
+          "path": "private-artifacts/validation/open-edit-export/professional-color-v1-export-after.tiff",
+          "publicRepoAllowed": false,
+          "kind": "export_after_private"
+        },
+        {
+          "hash": "sha256:2487f133517a1431c1c840fb6530c5e76587e7446f2ec4953425274e306ac5bf",
+          "path": "private-artifacts/validation/open-edit-export/professional-color-v1-after.rrdata",
+          "publicRepoAllowed": false,
+          "kind": "sidecar_after_private"
+        },
+        {
+          "hash": "sha256:a6d75793452be45c6c90623b75ad4abcb3985bc8728be03e2d6f4eb65ba88dae",
+          "path": "private-artifacts/validation/open-edit-export/professional-color-v1-workflow-report.json",
+          "publicRepoAllowed": false,
+          "kind": "workflow_report_private"
+        }
+      ],
+      "colorManagement": {
+        "conformance": "mismatch",
+        "decoderTrace": {
+          "cameraCalibration": {
+            "applied": "not_surfaced_by_current_decoder_trace",
+            "presence": "not_surfaced_by_current_decoder_trace",
+            "source": "raw_open_edit_export_validation_spine"
+          },
+          "cameraMake": "Sony",
+          "cameraModel": "DSLR-A100",
+          "decodedDimensions": {
+            "height": 2600,
+            "width": 3880
+          },
+          "privacySafeCameraId": "camera.raw-open-edit-export.professional-color.v1",
+          "rawFormat": "arw",
+          "sourceHash": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
+          "whiteBalance": {
+            "applied": "not_surfaced_by_current_decoder_trace",
+            "presence": "not_surfaced_by_current_decoder_trace",
+            "source": "raw_open_edit_export_validation_spine"
+          }
+        },
+        "doesNotProve": [
+          "acescg_working_space",
+          "bradford_chromatic_adaptation",
+          "camera_profile_quality",
+          "capture_one_class_quality",
+          "display_device_visual_match",
+          "display_p3_export",
+          "gpu_color_parity",
+          "icc_embedding",
+          "icc_colorimetric_accuracy",
+          "sixteen_bit_export"
+        ],
+        "observedColorPipeline": {
+          "bitDepth": 8,
+          "cmmUsed": false,
+          "displayProfileCorrectness": "not_proven",
+          "exportColorEncoding": "current_srgb_pipe_rgba8",
+          "exportFormat": "tiff",
+          "gamutMapping": "not_proven",
+          "iccProfileEmbedded": false,
+          "inputDomain": "decoder_camera_rgb_observed",
+          "operationDomain": "linear_srgb_d65_observed",
+          "outputProfile": "untagged_srgb_pipe",
+          "renderingIntentApplied": false,
+          "sceneToDisplayTransform": "rawengine_agx_v1",
+          "transferStatus": "current_srgb_pipe_rgba8_export",
+          "viewTransform": "rawengine_agx_v1",
+          "workingBuffer": "linear_srgb_d65_observed"
+        },
+        "proofLevel": "private_raw_runtime_color_management_metadata",
+        "requestedColorPipeline": {
+          "chromaticAdaptation": {
+            "method": "bradford_v1",
+            "sourceWhitePoint": {
+              "x": 0.3457,
+              "y": 0.3585
+            },
+            "status": "math_validated",
+            "targetWhitePoint": {
+              "x": 0.32168,
+              "y": 0.33767
+            },
+            "warnings": []
+          },
+          "inputDomain": "camera_linear_rgb",
+          "operationDomain": "acescg_linear_v1",
+          "renderTarget": {
+            "bitDepth": 16,
+            "embedIcc": true,
+            "intent": "relative_colorimetric",
+            "outputProfile": "display_p3",
+            "viewTransform": "rawengine_agx_v1"
+          },
+          "sceneToDisplayTransform": "rawengine_agx_v1",
+          "workingSpace": "acescg_linear_v1"
+        },
+        "runtimeEnvironment": {
+          "wgpuAdapter": "not_surfaced_by_current_proof",
+          "wgpuBackend": "not_surfaced_by_current_proof"
+        },
+        "trackingIssue": 2308,
+        "warnings": [
+          "Requested ACEScg/Display-P3/16-bit/ICC fields are request intent only; observed runtime remains the current RGBA8 sRGB-pipe export.",
+          "Decoder calibration and white-balance metadata are not surfaced by this proof trace yet.",
+          "WGPU adapter/backend are not surfaced by this proof trace yet."
+        ]
+      },
+      "editCommandId": "command.raw-open-edit-export.professional-color.v1",
+      "editGraphRevision": "graph-rev.raw-open-edit-export.professional-color.v1",
+      "fixtureId": "validation.raw-open-edit-export.professional-color.v1",
+      "generatedAt": "2026-06-20T18:36:51.098Z",
+      "metrics": [
+        {
+          "name": "changedPixelRatio",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0,
+          "value": 0.9999984139571768
+        },
+        {
+          "name": "previewExportMeanAbsDelta",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0.015,
+          "value": 0
+        },
+        {
+          "name": "sidecarReloadRevisionMatch",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 1,
+          "value": 1
+        },
+        {
+          "name": "sourceHashUnchanged",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 1,
+          "value": 1
+        }
+      ],
+      "previewAfter": {
+        "hash": "sha256:bf3a3e4ac1a3dd5afd3d69a6bbc6dd008d4796a25bd192e8422a9ab9f519cd98",
+        "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-after.png",
+        "publicRepoAllowed": false
+      },
+      "previewBefore": {
+        "hash": "sha256:c2f7186bbccc78917e810e7ea3083576ef16513cfd68548c6acf1d86ecedf195",
+        "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-before.png",
+        "publicRepoAllowed": false
+      },
+      "reportId": "raw-open-edit-export-run.professional-color.v1",
+      "sidecarAfter": {
+        "hash": "sha256:2487f133517a1431c1c840fb6530c5e76587e7446f2ec4953425274e306ac5bf",
+        "path": "private-artifacts/validation/open-edit-export/professional-color-v1-after.rrdata",
+        "publicRepoAllowed": false
+      },
+      "sourceRaw": {
+        "hash": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
+        "path": "private-fixtures/color/professional-workflow-v1/rawengine-professional-color-v1.arw",
+        "publicRepoAllowed": false
+      },
+      "trackingIssue": 1376
     }
   ],
   "schemaVersion": 1,
-  "snapshotDate": "2026-06-18",
+  "snapshotDate": "2026-06-20",
   "validationMode": "public_schema_private_reports"
 }

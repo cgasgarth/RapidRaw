@@ -459,6 +459,41 @@
       "trackingIssue": 1895
     },
     {
+      "artifactClass": "general_color_reference",
+      "camera": {
+        "cameraMake": "Sony",
+        "cameraModel": "DSLR-A100",
+        "rawFormat": "arw"
+      },
+      "crop": {
+        "height": 1536,
+        "unit": "source_pixels",
+        "width": 2048,
+        "x": 768,
+        "y": 512
+      },
+      "evidenceId": "raw-evidence.color.professional-workflow.v1",
+      "expectedUse": ["color_science", "preview_export_parity"],
+      "exposure": {
+        "exposureBiasEv": 0,
+        "iso": 100,
+        "shutterSeconds": 0.01
+      },
+      "featureFamily": "color_science",
+      "fileSha256": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
+      "localRelativePath": "private-fixtures/color/professional-workflow-v1/RAW_SONY_A100.ARW",
+      "notes": "Private-root RAWSamples Sony A100 ARW reserved for professional color workflow preview/export validation. It is a generic color workflow source, not a measured ColorChecker chart.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RAWSamples.ch contributor",
+        "evidence": "RAWSamples.ch Sony sample plus legal page allow local software-development validation; public repo stores metadata and hashes only.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "third_party_restricted"
+      },
+      "status": "private_asset_available",
+      "trackingIssue": 1376
+    },
+    {
       "artifactClass": "layer_mask_composite",
       "camera": {
         "cameraMake": "Canon",

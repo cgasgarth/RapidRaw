@@ -1,10 +1,15 @@
 #!/usr/bin/env bun
 
-import { resolve } from 'node:path';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 import { z } from 'zod';
 
 import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from './compact-output.ts';
+
+const FIXTURE_ID = 'validation.raw-open-edit-export.professional-color.v1';
+const REQUEST_PATH = 'fixtures/validation/professional-color-workflow-proof-request.json';
 
 const argsSchema = z
   .object({
@@ -48,24 +53,84 @@ if (args.privateRoot === undefined) {
 
 const privateRoot = resolve(args.privateRoot);
 
-await runRequired('RAW color-management private proof runner', [
+await runRequired('professional color private root prep', [
   'bun',
-  'run',
-  'run:raw-color-management-private-proof',
+  'scripts/prepare-raw-open-edit-export-private-root.ts',
   '--root',
   privateRoot,
+  '--request',
+  REQUEST_PATH,
   ...(args.requireAssets ? ['--require-assets'] : []),
 ]);
 
 await runRequired(
-  'professional color private artifact validation',
-  ['bun', 'run', 'check:professional-color-workflow-local-raw-proof', '--require-assets'],
+  'professional color Rust runtime proof',
+  [
+    'cargo',
+    '+1.95.0',
+    'test',
+    '--locked',
+    '--no-default-features',
+    '--features',
+    'required-ci,validation-harness,tauri-test',
+    'raw_open_edit_export_proof::tests::private_runtime_smoke_generates_professional_color_report_when_enabled',
+    '--',
+    '--nocapture',
+  ],
   {
+    cwd: 'src-tauri',
     env: {
+      RAWENGINE_RUN_PRIVATE_RAW_PROFESSIONAL_COLOR_PROOF: '1',
       RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
     },
   },
 );
+
+const tempOutputDir = await mkdtemp(join(tmpdir(), 'rawengine-professional-color-report-'));
+const reportOutputPath = join(tempOutputDir, 'raw-open-edit-export-run-reports.json');
+
+try {
+  await runRequired('professional color private report collection', [
+    'bun',
+    'scripts/collect-raw-open-edit-export-private-run-reports.ts',
+    '--root',
+    privateRoot,
+    '--require-root',
+    '--fixture-id',
+    FIXTURE_ID,
+    '--output',
+    reportOutputPath,
+  ]);
+
+  const collection = JSON.parse(await readFile(reportOutputPath, 'utf8')) as {
+    reports?: Array<{ fixtureId?: string }>;
+  };
+  if (!collection.reports?.some((report) => report.fixtureId === FIXTURE_ID)) {
+    console.error(`${FIXTURE_ID}: missing collected private run report.`);
+    process.exit(1);
+  }
+
+  await runRequired(
+    'professional color private report validation',
+    [
+      'bun',
+      'tests/integration/checks/check-raw-open-edit-export-run-reports.ts',
+      '--input',
+      reportOutputPath,
+      '--allow-fresh-hashes',
+      '--require-assets',
+      '--fixture-id',
+      FIXTURE_ID,
+    ],
+    {
+      env: {
+        RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
+      },
+    },
+  );
+} finally {
+  await rm(tempOutputDir, { force: true, recursive: true });
+}
 
 console.log('professional color workflow private proof ok');
 

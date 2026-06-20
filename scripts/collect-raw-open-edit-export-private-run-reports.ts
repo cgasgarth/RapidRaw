@@ -15,6 +15,7 @@ const requireRoot = args.has('--require-root');
 const selfTest = args.has('--self-test');
 const rootArgIndex = process.argv.indexOf('--root');
 const explicitRoot = rootArgIndex >= 0 ? process.argv[rootArgIndex + 1] : undefined;
+const fixtureIdFilter = valueAfter('--fixture-id');
 const outputPath = valueAfter('--output');
 
 if (selfTest) {
@@ -55,7 +56,7 @@ async function collectPrivateRunReports(
   return parseRawOpenEditExportRunReportCollection({
     $schema: 'https://rawengine.dev/schemas/raw-open-edit-export-run-reports-v1.json',
     issue: 1829,
-    reports,
+    reports: fixtureIdFilter === undefined ? reports : reports.filter((report) => report.fixtureId === fixtureIdFilter),
     schemaVersion: 1,
     snapshotDate: new Date().toISOString().slice(0, 10),
     validationMode: 'public_schema_private_reports',

@@ -11,11 +11,11 @@ import { parseRawOpenEditExportProofManifest } from '../src/schemas/rawOpenEditE
 const args = new Set(process.argv.slice(2));
 const copyMode = args.has('--copy');
 const requireAssets = args.has('--require-assets');
+const manifestPath = valueAfter('--manifest') ?? 'fixtures/validation/raw-open-edit-export-proof.json';
+const requestPath = valueAfter('--request') ?? 'fixtures/validation/raw-open-edit-export-proof-request.json';
 
-const requestJson: unknown = JSON.parse(
-  await readFile('fixtures/validation/raw-open-edit-export-proof-request.json', 'utf8'),
-);
-const proofJson: unknown = JSON.parse(await readFile('fixtures/validation/raw-open-edit-export-proof.json', 'utf8'));
+const requestJson: unknown = JSON.parse(await readFile(requestPath, 'utf8'));
+const proofJson: unknown = JSON.parse(await readFile(manifestPath, 'utf8'));
 const ledgerJson: unknown = JSON.parse(await readFile('fixtures/detail/private-raw-evidence-ledger.json', 'utf8'));
 
 const request = rawOpenEditExportProofRequestSchema.parse(requestJson);
@@ -34,11 +34,12 @@ if (ledgerEntry === undefined) {
 if (ledgerEntry.localRelativePath === undefined || ledgerEntry.fileSha256 === undefined) {
   fail(`${ledgerEntry.evidenceId}: available source path and hash are required.`);
 }
-if (!isAbsolute(request.privateRootPath)) {
+const privateRootPath = valueAfter('--root') ?? request.privateRootPath;
+if (!isAbsolute(privateRootPath)) {
   fail('privateRootPath must be absolute.');
 }
 
-const sourcePath = resolve(ledgerEntry.localRelativePath);
+const sourcePath = await resolveSourcePath(privateRootPath, ledgerEntry.localRelativePath);
 const sourceExists = await pathExists(sourcePath);
 if (!sourceExists) {
   const message = `${ledgerEntry.evidenceId}: missing local source ${ledgerEntry.localRelativePath}`;
@@ -56,17 +57,18 @@ if (sourceHash !== ledgerEntry.fileSha256) {
 
 const linkedPaths = [request.sourceRelativePath, ledgerEntry.localRelativePath];
 for (const relativePath of linkedPaths) {
-  const targetPath = resolvePrivatePath(request.privateRootPath, relativePath);
+  const targetPath = resolvePrivatePath(privateRootPath, relativePath);
   await linkOrCopy(sourcePath, targetPath);
 }
-await mkdir(resolvePrivatePath(request.privateRootPath, request.artifactDirRelative), { recursive: true });
+await mkdir(resolvePrivatePath(privateRootPath, request.artifactDirRelative), { recursive: true });
 
 console.log(
-  `raw open/edit/export private root ok (${copyMode ? 'copy' : 'symlink'}, fixture=${request.fixtureId}, root=${request.privateRootPath})`,
+  `raw open/edit/export private root ok (${copyMode ? 'copy' : 'symlink'}, fixture=${request.fixtureId}, root=${privateRootPath})`,
 );
 
 async function linkOrCopy(source: string, target: string): Promise<void> {
   await mkdir(dirname(target), { recursive: true });
+  if (source === target) return;
   await rm(target, { force: true });
   if (copyMode) {
     await copyFile(source, target);
@@ -76,6 +78,13 @@ async function linkOrCopy(source: string, target: string): Promise<void> {
   await symlink(source, target);
   const stat = await lstat(target);
   if (!stat.isSymbolicLink()) fail(`${target}: expected symlink.`);
+}
+
+async function resolveSourcePath(privateRoot: string, localRelativePath: string): Promise<string> {
+  const repoLocalSourcePath = resolve(localRelativePath);
+  if (await pathExists(repoLocalSourcePath)) return repoLocalSourcePath;
+
+  return resolvePrivatePath(privateRoot, localRelativePath);
 }
 
 function resolvePrivatePath(root: string, relativePath: string): string {
@@ -97,4 +106,9 @@ async function pathExists(path: string): Promise<boolean> {
 function fail(message: string): never {
   console.error(`raw open/edit/export private root failed: ${message}`);
   process.exit(1);
+}
+
+function valueAfter(flag: string): string | undefined {
+  const index = process.argv.indexOf(flag);
+  return index >= 0 ? process.argv[index + 1] : undefined;
 }

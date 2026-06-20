@@ -1,0 +1,72 @@
+{
+  "$schema": "https://rawengine.dev/schemas/raw-open-edit-export-proof-request-v1.json",
+  "artifactDirRelative": "private-artifacts/validation/open-edit-export",
+  "editCommand": {
+    "actor": {
+      "id": "agent.professional-color-proof",
+      "kind": "agent",
+      "sessionId": "professional-color-proof"
+    },
+    "approval": {
+      "approvalClass": "edit_apply",
+      "reason": "Apply accepted professional color workflow command for RAW preview/export proof.",
+      "state": "approved"
+    },
+    "colorPipeline": {
+      "chromaticAdaptation": {
+        "method": "bradford_v1",
+        "sourceWhitePoint": {
+          "x": 0.3457,
+          "y": 0.3585
+        },
+        "status": "math_validated",
+        "targetWhitePoint": {
+          "x": 0.32168,
+          "y": 0.33767
+        },
+        "warnings": []
+      },
+      "inputDomain": "camera_linear_rgb",
+      "operationDomain": "acescg_linear_v1",
+      "renderTarget": {
+        "bitDepth": 16,
+        "embedIcc": true,
+        "intent": "relative_colorimetric",
+        "outputProfile": "display_p3",
+        "viewTransform": "rawengine_agx_v1"
+      },
+      "sceneToDisplayTransform": "rawengine_agx_v1",
+      "workingSpace": "acescg_linear_v1"
+    },
+    "commandId": "command.raw-open-edit-export.professional-color.v1",
+    "commandType": "toneColor.setBasicTone",
+    "correlationId": "corr.raw-open-edit-export.professional-color.v1",
+    "dryRun": false,
+    "expectedGraphRevision": "graph-rev.raw-open-edit-export.professional-color.v1",
+    "idempotencyKey": "idem.raw-open-edit-export.professional-color.v1",
+    "parameters": {
+      "blackPoint": -3,
+      "clarity": 6,
+      "contrast": 10,
+      "exposureEv": 0.25,
+      "highlights": -15,
+      "saturation": 7,
+      "shadows": 11,
+      "whitePoint": 4
+    },
+    "schemaVersion": 1,
+    "target": {
+      "imagePath": "private-fixtures/color/professional-workflow-v1/rawengine-professional-color-v1.arw",
+      "kind": "image"
+    }
+  },
+  "fixtureId": "validation.raw-open-edit-export.professional-color.v1",
+  "privateRootPath": "/tmp/rawengine-private-root",
+  "sourceMetadata": {
+    "cameraMake": "Sony",
+    "cameraModel": "DSLR-A100",
+    "privacySafeCameraId": "camera.raw-open-edit-export.professional-color.v1",
+    "rawFormat": "arw"
+  },
+  "sourceRelativePath": "private-fixtures/color/professional-workflow-v1/rawengine-professional-color-v1.arw"
+}
