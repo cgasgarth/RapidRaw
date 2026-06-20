@@ -49,6 +49,14 @@ export const filmGrainControlsV1Schema = z
   })
   .strict();
 
+export const filmGrainAdjustmentPatchV1Schema = z
+  .object({
+    grainAmount: z.number().min(0).max(100),
+    grainRoughness: z.number().min(0).max(100),
+    grainSize: z.number().min(0).max(100),
+  })
+  .strict();
+
 export const filmGrainCoordinatePolicyV1Schema = z.enum([
   'image_pixel_stable_v1',
   'variant_pixel_stable_v1',
@@ -113,9 +121,20 @@ export const filmGrainProvenanceSidecarEnvelopeV1Schema = z.looseObject({
     .optional(),
 });
 
+export const filmGrainSidecarReloadStateV1Schema = z
+  .object({
+    adjustmentPatch: filmGrainAdjustmentPatchV1Schema,
+    effectiveSeed: z.number().int().nonnegative(),
+    provenanceId: z.string().regex(/^film_grain_provenance_[a-z0-9_]+$/u),
+    staleState: filmGrainProvenanceStaleStateV1Schema,
+  })
+  .strict();
+
+export type FilmGrainAdjustmentPatchV1 = z.infer<typeof filmGrainAdjustmentPatchV1Schema>;
 export type FilmGrainControlsV1 = z.infer<typeof filmGrainControlsV1Schema>;
 export type FilmGrainSidecarProvenanceV1 = z.infer<typeof filmGrainSidecarProvenanceV1Schema>;
 export type FilmGrainProvenanceSidecarEnvelopeV1 = z.infer<typeof filmGrainProvenanceSidecarEnvelopeV1Schema>;
+export type FilmGrainSidecarReloadStateV1 = z.infer<typeof filmGrainSidecarReloadStateV1Schema>;
 
 export interface BuildFilmGrainSidecarProvenanceOptions {
   colorDomain: z.infer<typeof filmGrainColorDomainV1Schema>;
@@ -197,6 +216,33 @@ export const readFilmGrainProvenanceFromSidecar = (sidecar: unknown): FilmGrainS
   return parsed.rawEngine?.filmGrainProvenance;
 };
 
+export const buildFilmGrainControlsFromAdjustmentPatch = (
+  adjustmentPatch: FilmGrainAdjustmentPatchV1,
+): FilmGrainControlsV1 => {
+  const patch = filmGrainAdjustmentPatchV1Schema.parse(adjustmentPatch);
+  return filmGrainControlsV1Schema.parse({
+    amount: patch.grainAmount,
+    roughness: patch.grainRoughness,
+    size: patch.grainSize,
+  });
+};
+
+export const buildFilmGrainAdjustmentPatchFromControls = (
+  controls: FilmGrainControlsV1,
+): FilmGrainAdjustmentPatchV1 => {
+  const parsedControls = filmGrainControlsV1Schema.parse(controls);
+  return filmGrainAdjustmentPatchV1Schema.parse({
+    grainAmount: parsedControls.amount,
+    grainRoughness: parsedControls.roughness,
+    grainSize: parsedControls.size,
+  });
+};
+
+export const buildFilmGrainAdjustmentPatchFromProvenance = (
+  provenance: FilmGrainSidecarProvenanceV1,
+): FilmGrainAdjustmentPatchV1 =>
+  buildFilmGrainAdjustmentPatchFromControls(filmGrainSidecarProvenanceV1Schema.parse(provenance).controls);
+
 export const classifyFilmGrainProvenanceStaleState = (
   provenance: FilmGrainSidecarProvenanceV1,
   current: Pick<
@@ -231,6 +277,37 @@ export const classifyFilmGrainProvenanceStaleState = (
   return filmGrainProvenanceStaleStateV1Schema.parse({
     invalidationReasons: reasons,
     state: reasons.length > 0 ? 'stale' : 'current',
+  });
+};
+
+export const markFilmGrainProvenanceStaleState = (
+  provenance: FilmGrainSidecarProvenanceV1,
+  current: Pick<
+    BuildFilmGrainSidecarProvenanceOptions,
+    'colorDomain' | 'coordinatePolicy' | 'controls' | 'model' | 'sourceContentHash'
+  >,
+): FilmGrainSidecarProvenanceV1 =>
+  filmGrainSidecarProvenanceV1Schema.parse({
+    ...provenance,
+    staleState: classifyFilmGrainProvenanceStaleState(provenance, current),
+  });
+
+export const readFilmGrainSidecarReloadState = (
+  sidecar: unknown,
+  current: Pick<
+    BuildFilmGrainSidecarProvenanceOptions,
+    'colorDomain' | 'coordinatePolicy' | 'controls' | 'model' | 'sourceContentHash'
+  >,
+): FilmGrainSidecarReloadStateV1 | undefined => {
+  const provenance = readFilmGrainProvenanceFromSidecar(sidecar);
+  if (provenance === undefined) return undefined;
+
+  const staleState = classifyFilmGrainProvenanceStaleState(provenance, current);
+  return filmGrainSidecarReloadStateV1Schema.parse({
+    adjustmentPatch: buildFilmGrainAdjustmentPatchFromProvenance(provenance),
+    effectiveSeed: provenance.effectiveSeed,
+    provenanceId: provenance.provenanceId,
+    staleState,
   });
 };
 

@@ -5,8 +5,11 @@
   "issue": 2485,
   "provenanceHash": "sha256:52a76e3063fa4949c965c1ef3863efd8761b4b66c5ac5b7f73e64b4b5a3f0c4f",
   "provenanceId": "film_grain_provenance_af5b7c13",
+  "reloadAdjustmentMatch": true,
+  "reloadHash": "sha256:c2beab34bb740dd2c9bb61247c3f79fa2e9cb99d1a57d1894b545494ebc68c2d",
   "reloadSeedMatch": true,
   "schemaVersion": 1,
+  "staleMarkedState": "stale",
   "sidecarHash": "sha256:667dd18eb42c2dc55136bd680ab0d74b98aa395725b7b062ef1c9ee689f0d628",
   "staleReasons": ["algorithm_version_changed"],
   "validationMode": "film_grain_sidecar_provenance_roundtrip"

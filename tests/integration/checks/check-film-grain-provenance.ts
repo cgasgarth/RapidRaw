@@ -7,10 +7,14 @@ import { z } from 'zod';
 
 import {
   applyFilmGrainProvenanceToSidecar,
+  buildFilmGrainAdjustmentPatchFromProvenance,
+  buildFilmGrainControlsFromAdjustmentPatch,
   buildFilmGrainSidecarProvenance,
   classifyFilmGrainProvenanceStaleState,
   filmGrainSidecarProvenanceV1Schema,
+  markFilmGrainProvenanceStaleState,
   readFilmGrainProvenanceFromSidecar,
+  readFilmGrainSidecarReloadState,
 } from '../../../packages/rawengine-schema/src/filmGrainProvenance.ts';
 import { sampleFilmGrainModelV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 
@@ -25,8 +29,11 @@ const reportSchema = z
     issue: z.literal(2485),
     provenanceHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     provenanceId: z.string().min(1),
+    reloadAdjustmentMatch: z.literal(true),
+    reloadHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     reloadSeedMatch: z.literal(true),
     schemaVersion: z.literal(1),
+    staleMarkedState: z.literal('stale'),
     sidecarHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     staleReasons: z.array(z.literal('algorithm_version_changed')).length(1),
     validationMode: z.literal('film_grain_sidecar_provenance_roundtrip'),
@@ -65,6 +72,12 @@ if (JSON.stringify(reloaded.controls) !== JSON.stringify(provenance.controls)) {
 
 filmGrainSidecarProvenanceV1Schema.parse(reloaded);
 
+const adjustmentPatch = buildFilmGrainAdjustmentPatchFromProvenance(provenance);
+const rebuiltControls = buildFilmGrainControlsFromAdjustmentPatch(adjustmentPatch);
+if (JSON.stringify(rebuiltControls) !== JSON.stringify(provenance.controls)) {
+  throw new Error('Film grain sidecar adjustment patch does not rebuild controls.');
+}
+
 const staleModel = {
   ...sampleFilmGrainModelV1,
   modelVersion: `${sampleFilmGrainModelV1.modelVersion}-next`,
@@ -80,6 +93,17 @@ if (staleState.state !== 'stale' || !staleState.invalidationReasons.includes('al
   throw new Error('Film grain provenance must become stale after algorithm/model version changes.');
 }
 
+const staleProvenance = markFilmGrainProvenanceStaleState(provenance, {
+  colorDomain: provenance.colorDomain,
+  controls: provenance.controls,
+  coordinatePolicy: provenance.coordinatePolicy,
+  model: staleModel,
+  sourceContentHash,
+});
+if (staleProvenance.staleState.state !== 'stale') {
+  throw new Error('Film grain provenance stale marker did not persist stale state.');
+}
+
 const currentState = classifyFilmGrainProvenanceStaleState(provenance, {
   colorDomain: provenance.colorDomain,
   controls: provenance.controls,
@@ -89,6 +113,24 @@ const currentState = classifyFilmGrainProvenanceStaleState(provenance, {
 });
 if (currentState.state !== 'current') throw new Error('Unchanged film grain provenance should stay current.');
 
+const reloadState = readFilmGrainSidecarReloadState(sidecar, {
+  colorDomain: provenance.colorDomain,
+  controls: provenance.controls,
+  coordinatePolicy: provenance.coordinatePolicy,
+  model: sampleFilmGrainModelV1,
+  sourceContentHash,
+});
+if (reloadState === undefined) throw new Error('Film grain sidecar reload state was not found.');
+if (reloadState.effectiveSeed !== provenance.effectiveSeed) {
+  throw new Error('Film grain reload state changed effective seed.');
+}
+if (reloadState.staleState.state !== 'current') {
+  throw new Error('Film grain reload state should be current for matching settings.');
+}
+if (JSON.stringify(reloadState.adjustmentPatch) !== JSON.stringify(adjustmentPatch)) {
+  throw new Error('Film grain reload state adjustment patch does not match provenance controls.');
+}
+
 const report = reportSchema.parse({
   doesNotProve: ['gpu_grain_parity', 'preview_export_parity', 'ui_e2e', 'real_raw_render'],
   effectiveSeed: provenance.effectiveSeed,
@@ -96,8 +138,11 @@ const report = reportSchema.parse({
   issue: 2485,
   provenanceHash: hashJson(provenance),
   provenanceId: provenance.provenanceId,
+  reloadAdjustmentMatch: JSON.stringify(reloadState.adjustmentPatch) === JSON.stringify(adjustmentPatch),
+  reloadHash: hashJson(reloadState),
   reloadSeedMatch: reloaded.effectiveSeed === provenance.effectiveSeed,
   schemaVersion: 1,
+  staleMarkedState: staleProvenance.staleState.state,
   sidecarHash: hashJson(sidecar),
   staleReasons: staleState.invalidationReasons,
   validationMode: 'film_grain_sidecar_provenance_roundtrip',
