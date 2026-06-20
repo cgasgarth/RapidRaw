@@ -672,7 +672,11 @@ export default function ColorPanel({
   const activeColorBalance = colorBalanceRgb[activeColorBalanceRange];
   const channelMixer = adjustments.channelMixer;
   const activeChannelMixerRow = channelMixer[activeChannelMixerOutput];
-  const baseHue = getSelectiveColorRange(activeColor).centerHueDegrees;
+  const activeSelectiveColorRange = getSelectiveColorRange(activeColor);
+  const baseHue = activeSelectiveColorRange.centerHueDegrees;
+  const activeSelectiveColorRangeLabel = t(activeSelectiveColorRange.labelKey);
+  const activeSelectiveColorRangeCenter = `${Math.round(activeSelectiveColorRange.centerHueDegrees)}°`;
+  const activeSelectiveColorRangeWidth = `${Math.round(activeSelectiveColorRange.widthDegrees)}°`;
   const effectiveHue = baseHue + (currentHsl.hue || 0);
   const levels = adjustments.levels;
   const inputBlackMax = Math.max(0, Math.min(99, Math.round(levels.inputWhite * 100) - 1));
@@ -1291,6 +1295,23 @@ export default function ColorPanel({
         <UiText variant={TextVariants.heading} className="mb-3">
           {t('adjustments.color.colorMixer')}
         </UiText>
+        <div
+          className="mb-3 grid grid-cols-[1fr_auto] items-center gap-2 rounded-md border border-surface bg-bg-primary px-2 py-1.5 text-xs"
+          data-testid="selective-color-range-summary"
+        >
+          <span className="truncate font-medium text-text-primary" data-testid="selective-color-range-summary-label">
+            {activeSelectiveColorRangeLabel}
+          </span>
+          <span className="flex items-center gap-2 text-text-tertiary">
+            <span>{t('adjustments.color.hue')}</span>
+            <span className="tabular-nums text-text-secondary" data-testid="selective-color-range-summary-center">
+              {activeSelectiveColorRangeCenter}
+            </span>
+            <span className="tabular-nums text-text-secondary" data-testid="selective-color-range-summary-width">
+              {activeSelectiveColorRangeWidth}
+            </span>
+          </span>
+        </div>
         <div className="flex justify-between mb-4 px-1">
           {HSL_COLORS.map(({ name, color, label }) => (
             <ColorSwatch

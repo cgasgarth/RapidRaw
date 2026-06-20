@@ -8,6 +8,7 @@ import { SELECTIVE_COLOR_RANGES } from '../../../src/utils/selectiveColorRanges.
 
 const FIXTURE_PATH = 'fixtures/color/selective-color-ranges.json';
 const SHADER_PATH = 'src-tauri/src/shaders/shader.wgsl';
+const COLOR_PANEL_PATH = 'src/components/adjustments/Color.tsx';
 
 const rangeKeySchema = z.enum(['reds', 'oranges', 'yellows', 'greens', 'aquas', 'blues', 'purples', 'magentas']);
 const labelKeySchema = z.enum(rangeKeySchema.options.map((key) => `adjustments.color.mixerColors.${key}`));
@@ -43,6 +44,7 @@ const parseShaderRanges = (source) => {
 
 const fixture = manifestSchema.parse(JSON.parse(await readFile(FIXTURE_PATH, 'utf8')));
 const shaderRanges = parseShaderRanges(await readFile(SHADER_PATH, 'utf8'));
+const colorPanelSource = await readFile(COLOR_PANEL_PATH, 'utf8');
 
 const failures = [];
 
@@ -81,6 +83,18 @@ for (const [index, expectedRange] of fixture.ranges.entries()) {
   }
   if (shaderRange.widthDegrees !== expectedRange.widthDegrees) {
     failures.push(`${expectedRange.key}: WGSL width mismatch: ${shaderRange.widthDegrees}.`);
+  }
+}
+
+for (const marker of [
+  'selective-color-range-summary',
+  'selective-color-range-summary-label',
+  'selective-color-range-summary-center',
+  'selective-color-range-summary-width',
+  'activeSelectiveColorRange.widthDegrees',
+]) {
+  if (!colorPanelSource.includes(marker)) {
+    failures.push(`Color Mixer UI is missing selective color range summary marker: ${marker}.`);
   }
 }
 
