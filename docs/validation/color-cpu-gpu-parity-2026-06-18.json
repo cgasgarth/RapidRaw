@@ -191,7 +191,8 @@
     "real_gpu_pixel_readback",
     "full_preview_pipeline_parity",
     "full_export_pipeline_parity",
-    "raw_file_color_management_parity"
+    "raw_file_color_management_parity",
+    "full_gpu_shader_preview_export_parity"
   ],
   "fixturePath": "fixtures/color/cpu-gpu-parity-fixtures.json",
   "generatedFromSnapshotDate": "2026-06-14",
@@ -205,7 +206,8 @@
     "maxByteDelta": 0,
     "pixelCount": 4,
     "readbackBytes": 16,
-    "status": "validation_harness_command_available_not_ci_executed",
+    "runtimeProofPath": "docs/validation/color-gpu-readback-runtime-smoke-2026-06-20.json",
+    "status": "validation_harness_runtime_smoke_committed",
     "textureFormat": "rgba8unorm",
     "validationMode": "wgpu_copy_texture_to_buffer_readback_probe"
   },
