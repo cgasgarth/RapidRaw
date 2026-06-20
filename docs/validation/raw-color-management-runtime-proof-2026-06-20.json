@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "artifacts": {
+        "exportHash": "sha256:189c12489c2001039777bf5d0431a77e2e401ec862f39ac256d1b8e5486991f0",
+        "sourceRawHash": "sha256:5b1a62fb37669f3065479e2c7cf9af4ef031a920cf6feac82d1269e9fdf4a136",
+        "workflowReportHash": "sha256:f444611d6c52a79781d187dd441ba5b9b0e60b9f7f44ed0e82a8a92881014160"
+      },
+      "colorManagement": {
+        "bitDepth": 16,
+        "embedIcc": true,
+        "inputDomain": "camera_linear_rgb",
+        "intent": "relative_colorimetric",
+        "operationDomain": "acescg_linear_v1",
+        "outputProfile": "display_p3",
+        "proofLevel": "private_raw_runtime_color_management_metadata",
+        "sceneToDisplayTransform": "rawengine_agx_v1",
+        "viewTransform": "rawengine_agx_v1",
+        "workingSpace": "acescg_linear_v1"
+      },
+      "commandId": "command.raw-open-edit-export.basic-tone.v1",
+      "doesNotProve": [
+        "camera_profile_quality",
+        "capture_one_class_quality",
+        "display_device_visual_match",
+        "gpu_color_parity",
+        "icc_colorimetric_accuracy"
+      ],
+      "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
+      "metrics": {
+        "changedPixelRatio": 0.9935232083333333,
+        "previewExportMeanAbsDelta": 0,
+        "sourceHashUnchanged": 1
+      },
+      "sourceRelativePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw"
+    }
+  ],
+  "colorSyncProofPath": "docs/validation/macos-colorsync-display-proof-2026-06-20.json",
+  "issue": 2308,
+  "requestPath": "fixtures/validation/raw-open-edit-export-proof-request.json",
+  "runReportsPath": "fixtures/validation/raw-open-edit-export-run-reports.json",
+  "schemaVersion": 1,
+  "validationMode": "private_raw_color_management_runtime_metadata"
+}

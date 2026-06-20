@@ -31,6 +31,70 @@ const metricNameSchema = z.enum([
   'sourceHashUnchanged',
 ]);
 
+const whitePointSchema = z
+  .object({
+    x: z.number().positive(),
+    y: z.number().positive(),
+  })
+  .strict();
+
+const colorManagementProofSchema = z
+  .object({
+    chromaticAdaptation: z
+      .object({
+        method: z.literal('bradford_v1'),
+        sourceWhitePoint: whitePointSchema,
+        status: z.literal('math_validated'),
+        targetWhitePoint: whitePointSchema,
+      })
+      .strict(),
+    displayTransform: z
+      .object({
+        bitDepth: z.literal(16),
+        embedIcc: z.literal(true),
+        intent: z.literal('relative_colorimetric'),
+        outputProfile: z.literal('display_p3'),
+        sceneToDisplayTransform: z.literal('rawengine_agx_v1'),
+        viewTransform: z.literal('rawengine_agx_v1'),
+      })
+      .strict(),
+    doesNotProve: z
+      .array(
+        z.enum([
+          'camera_profile_quality',
+          'capture_one_class_quality',
+          'display_device_visual_match',
+          'gpu_color_parity',
+          'icc_colorimetric_accuracy',
+        ]),
+      )
+      .min(5),
+    inputDomain: z.literal('camera_linear_rgb'),
+    operationDomain: z.literal('acescg_linear_v1'),
+    proofLevel: z.literal('private_raw_runtime_color_management_metadata'),
+    trackingIssue: z.literal(2308),
+    workingSpace: z.literal('acescg_linear_v1'),
+  })
+  .strict()
+  .superRefine((proof, context) => {
+    const doesNotProve = new Set(proof.doesNotProve);
+    for (const nonClaim of [
+      'camera_profile_quality',
+      'capture_one_class_quality',
+      'display_device_visual_match',
+      'gpu_color_parity',
+      'icc_colorimetric_accuracy',
+    ] as const) {
+      if (!doesNotProve.has(nonClaim)) {
+        context.addIssue({
+          code: 'custom',
+          message: `Color-management proof must explicitly avoid claiming ${nonClaim}.`,
+          path: ['doesNotProve'],
+        });
+      }
+    }
+  });
+
 const runArtifactSchema = hashedPathSchema.extend({
   kind: artifactKindSchema,
 });
@@ -48,6 +112,7 @@ const qualityMetricSchema = z
 const privateRunReportSchema = z
   .object({
     artifacts: z.array(runArtifactSchema).min(6),
+    colorManagement: colorManagementProofSchema,
     editCommandId: z.string().trim().min(1),
     editGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
     fixtureId: z.string().regex(/^validation\.raw-open-edit-export\.[a-z0-9.-]+\.v[0-9]+$/u),
