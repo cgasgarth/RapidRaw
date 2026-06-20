@@ -244,9 +244,9 @@
       "fixtureId": "validation.computational-merge.panorama-overlap.v1",
       "implementationIssue": 1508,
       "localSourceRelativePaths": [
-        "private-fixtures/panorama/overlap-stitch-v1/frame-01.raf",
-        "private-fixtures/panorama/overlap-stitch-v1/frame-02.raf",
-        "private-fixtures/panorama/overlap-stitch-v1/frame-03.raf"
+        "private-fixtures/panorama/overlap-stitch-v1/frame-01.arw",
+        "private-fixtures/panorama/overlap-stitch-v1/frame-02.arw",
+        "private-fixtures/panorama/overlap-stitch-v1/frame-03.arw"
       ],
       "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
       "notes": "Private RAW panorama E2E proof slot for decode, feature alignment, stitch/blend output, preview/export parity, app-server dry-run/apply replay, review artifacts, and quality metrics. This public manifest remains planning evidence until private assets and runtime run reports exist.",
