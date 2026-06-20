@@ -76,6 +76,7 @@ const CHECK_GROUPS = {
     'check:preview-scopes',
     'check:color-cpu-gpu-parity',
     'check:gamut-mapping',
+    'check:working-space-contract',
     'check:black-white-mixer',
     'check:color-balance-rgb',
     'check:channel-mixer',

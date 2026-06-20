@@ -114,6 +114,7 @@
     "check:deltae-fixtures": "bun scripts/check-deltae-fixtures.ts",
     "check:math-invariants": "bun scripts/check-math-invariants.ts",
     "check:color-cpu-gpu-parity": "bun scripts/check-color-cpu-gpu-parity.ts",
+    "check:working-space-contract": "bun scripts/check-working-space-contract.ts",
     "check:defringe": "bun scripts/check-defringe-fixtures.ts",
     "check:dust-spot-visualization": "bun scripts/check-dust-spot-visualization.ts",
     "check:ai-people-render": "bun scripts/check-ai-people-render-fixtures.ts",
