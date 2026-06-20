@@ -23,6 +23,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   action.
 - Do not rebase or force-push a healthy PR that is only waiting on required
   checks unless it is behind/conflicting or branch protection requires it.
+- Feature PRs may exceed cleanup/CI/tooling PRs, but cleanup/CI/tooling PRs
+  must not exceed feature PRs. Keep vertical feature delivery ahead of
+  foundation polish.
 
 ## Startup Preflight
 
