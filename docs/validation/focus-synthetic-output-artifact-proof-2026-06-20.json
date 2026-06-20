@@ -1,0 +1,34 @@
+{
+  "artifacts": {
+    "stackedPreview": {
+      "contentHash": "sha256:bd5771ae59eec041baf2b5893b58bd61407d01c5a47664ad0bcfdc4939901c35",
+      "format": "pgm_u8_preview",
+      "path": "artifacts/validation/focus-synthetic-output-artifact/focus-stack-preview.pgm",
+      "publicRepoAllowed": false
+    }
+  },
+  "doesNotProve": [
+    "app_ui_e2e",
+    "halo_quality_maturity",
+    "real_raw_focus_bracket_decode",
+    "retouch_workflow_quality",
+    "tiff_export_pipeline"
+  ],
+  "fixtureId": "focus.synthetic.public.three-plane-output.v1",
+  "generatedAt": "2026-06-20T09:35:00.000Z",
+  "issue": 2313,
+  "metrics": {
+    "fallbackPixelCount": 0,
+    "nonfiniteOutputPixelCount": 0,
+    "outputChangedFromReferenceRatio": 0.666667,
+    "selectedRegionMaeMax": 0
+  },
+  "runtimeStatus": "synthetic_focus_stack_output_artifact_rendered",
+  "schemaVersion": 1,
+  "sourceStack": {
+    "frameCount": 3,
+    "height": 64,
+    "sourceStackHash": "sha256:b0a38bb3733470592238ab301a108dc07bbe062cb58077b237bb80ab9219e281",
+    "width": 96
+  }
+}

@@ -332,6 +332,8 @@
     "check:focus-preview-blend-smoke": "bun tests/integration/checks/check-focus-preview-blend-smoke.ts",
     "check:focus-blend-runtime-proof": "bun tests/integration/checks/check-focus-blend-runtime-proof.ts",
     "check:focus-blend-runtime-proof:update": "bun tests/integration/checks/check-focus-blend-runtime-proof.ts --update",
+    "check:focus-synthetic-output-artifact": "bun tests/integration/checks/check-focus-synthetic-output-artifact.ts",
+    "check:focus-synthetic-output-artifact:update": "bun tests/integration/checks/check-focus-synthetic-output-artifact.ts --update",
     "check:focus-blend-halo-proof": "bun tests/integration/checks/check-focus-blend-halo-proof.ts",
     "check:focus-blend-halo-proof:update": "bun tests/integration/checks/check-focus-blend-halo-proof.ts --update",
     "check:focus-ui-action-command": "bun tests/integration/checks/check-focus-ui-action-command.ts",
