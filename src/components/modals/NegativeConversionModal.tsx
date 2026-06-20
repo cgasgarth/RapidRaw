@@ -73,11 +73,17 @@ import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspa
 type NegativeParams = NegativeLabPresetParams;
 type NegativeConversionScope = 'active' | 'all';
 type NegativeLabProfileFilter = 'all' | 'black_and_white_silver' | 'color_negative' | 'measured';
+type NegativeLabProfileSort = 'catalog' | 'evidence_desc' | 'name_asc' | 'runtime_applied';
 type NegativeLabProfileFilterLabelKey =
   | 'modals.negativeConversion.profileFilterAll'
   | 'modals.negativeConversion.profileFilterBlackAndWhite'
   | 'modals.negativeConversion.profileFilterColorNegative'
   | 'modals.negativeConversion.profileFilterMeasured';
+type NegativeLabProfileSortLabelKey =
+  | 'modals.negativeConversion.profileSortCatalog'
+  | 'modals.negativeConversion.profileSortEvidence'
+  | 'modals.negativeConversion.profileSortName'
+  | 'modals.negativeConversion.profileSortRuntime';
 type NegativeLabAgentCommitState = 'committing' | 'not_committed' | 'ready_to_commit';
 type NegativeLabAgentDryRunState = 'accepted' | 'blocked' | 'ready';
 const NEGATIVE_LAB_AGENT_DRY_RUN_LABELS = {
@@ -102,6 +108,18 @@ const NEGATIVE_LAB_PROFILE_FILTER_TEST_IDS = {
   color_negative: 'negative-lab-profile-filter-color_negative',
   measured: 'negative-lab-profile-filter-measured',
 } satisfies Record<NegativeLabProfileFilter, string>;
+const NEGATIVE_LAB_PROFILE_SORTS = [
+  { id: 'catalog', labelKey: 'modals.negativeConversion.profileSortCatalog' },
+  { id: 'name_asc', labelKey: 'modals.negativeConversion.profileSortName' },
+  { id: 'evidence_desc', labelKey: 'modals.negativeConversion.profileSortEvidence' },
+  { id: 'runtime_applied', labelKey: 'modals.negativeConversion.profileSortRuntime' },
+] satisfies Array<{ id: NegativeLabProfileSort; labelKey: NegativeLabProfileSortLabelKey }>;
+const NEGATIVE_LAB_PROFILE_SORT_TEST_IDS = {
+  catalog: 'negative-lab-profile-sort-catalog',
+  evidence_desc: 'negative-lab-profile-sort-evidence_desc',
+  name_asc: 'negative-lab-profile-sort-name_asc',
+  runtime_applied: 'negative-lab-profile-sort-runtime_applied',
+} satisfies Record<NegativeLabProfileSort, string>;
 type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
 type DensitometerPatchLabelKey =
   | BaseFogSampleLabelKey
@@ -175,6 +193,37 @@ const matchesNegativeLabProfileFilter = (
   if (filter === 'measured') return profile.profileStatus === 'fixture_measured';
   return profile.filmClass === filter;
 };
+const compareNegativeLabProfileNames = (
+  left: NegativeLabRuntimeProfileBrowserRow,
+  right: NegativeLabRuntimeProfileBrowserRow,
+) => left.displayName.localeCompare(right.displayName, 'en-US', { sensitivity: 'base' });
+const sortNegativeLabProfiles = (
+  profiles: Array<NegativeLabRuntimeProfileBrowserRow>,
+  sortMode: NegativeLabProfileSort,
+) => {
+  if (sortMode === 'name_asc') {
+    return profiles.toSorted(compareNegativeLabProfileNames);
+  }
+
+  if (sortMode === 'evidence_desc') {
+    return profiles.toSorted(
+      (left, right) =>
+        right.evidenceFixtureCount - left.evidenceFixtureCount || compareNegativeLabProfileNames(left, right),
+    );
+  }
+
+  if (sortMode === 'runtime_applied') {
+    return profiles.toSorted((left, right) => {
+      const leftScore = left.runtimeStatus === 'runtime_parameter_applied' ? 1 : 0;
+      const rightScore = right.runtimeStatus === 'runtime_parameter_applied' ? 1 : 0;
+      return rightScore - leftScore || compareNegativeLabProfileNames(left, right);
+    });
+  }
+
+  return profiles;
+};
+const isNegativeLabProfileSort = (value: string): value is NegativeLabProfileSort =>
+  NEGATIVE_LAB_PROFILE_SORTS.some((sort) => sort.id === value);
 const formatStockMetadataIso = (
   nominalIso: (typeof NEGATIVE_LAB_STOCK_METADATA_CATALOG.entries)[number]['nominalIso'],
 ) => (nominalIso === null ? 'ISO -' : `${nominalIso.unit} ${nominalIso.value}`);
@@ -290,6 +339,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [activePathIndex, setActivePathIndex] = useState(0);
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [profileFilter, setProfileFilter] = useState<NegativeLabProfileFilter>('all');
+  const [profileSort, setProfileSort] = useState<NegativeLabProfileSort>('catalog');
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [isCompareActive, setIsCompareActive] = useState(false);
@@ -419,21 +469,21 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       ),
     [],
   );
-  const visibleProfileRows = useMemo(
-    () =>
-      NEGATIVE_LAB_PROFILE_BROWSER_ROWS.filter((profile) => {
-        if (!matchesNegativeLabProfileFilter(profile, profileFilter)) {
-          return false;
-        }
+  const visibleProfileRows = useMemo(() => {
+    const filteredProfiles = NEGATIVE_LAB_PROFILE_BROWSER_ROWS.filter((profile) => {
+      if (!matchesNegativeLabProfileFilter(profile, profileFilter)) {
+        return false;
+      }
 
-        if (normalizedProfileSearchQuery.length === 0) {
-          return true;
-        }
+      if (normalizedProfileSearchQuery.length === 0) {
+        return true;
+      }
 
-        return getNegativeLabProfileSearchText(profile).includes(normalizedProfileSearchQuery);
-      }),
-    [normalizedProfileSearchQuery, profileFilter],
-  );
+      return getNegativeLabProfileSearchText(profile).includes(normalizedProfileSearchQuery);
+    });
+
+    return sortNegativeLabProfiles(filteredProfiles, profileSort);
+  }, [normalizedProfileSearchQuery, profileFilter, profileSort]);
   const frameHealthReport = useMemo(
     () =>
       buildNegativeLabFrameHealthReport({
@@ -1633,6 +1683,29 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             type="search"
             value={profileSearchQuery}
           />
+          <label className="mb-3 block space-y-1">
+            <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
+              {t('modals.negativeConversion.profileSort')}
+            </UiText>
+            <select
+              aria-label={t('modals.negativeConversion.profileSort')}
+              className="w-full rounded-md border border-surface bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent"
+              data-testid="negative-lab-profile-sort"
+              onChange={(event) => {
+                const nextSort = event.currentTarget.value;
+                if (isNegativeLabProfileSort(nextSort)) {
+                  setProfileSort(nextSort);
+                }
+              }}
+              value={profileSort}
+            >
+              {NEGATIVE_LAB_PROFILE_SORTS.map((sort) => (
+                <option data-testid={NEGATIVE_LAB_PROFILE_SORT_TEST_IDS[sort.id]} key={sort.id} value={sort.id}>
+                  {t(sort.labelKey)}
+                </option>
+              ))}
+            </select>
+          </label>
           <div
             className="mb-3 flex gap-2 overflow-x-auto pb-1"
             data-testid="negative-lab-profile-filter-tabs"
