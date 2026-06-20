@@ -1,0 +1,106 @@
+{
+  "generatedAt": "2026-06-20T00:00:00.000Z",
+  "issue": 2364,
+  "requiredPackageScripts": [
+    {
+      "command": "bun tests/integration/checks/check-local-raw-ui-validation-harness.ts",
+      "name": "check:local-raw-ui-validation-harness"
+    },
+    {
+      "command": "bun scripts/prepare-public-raw-fixture-root.ts --download",
+      "name": "prepare:public-raw-fixture-root"
+    },
+    {
+      "command": "bun scripts/prepare-public-raw-fixture-root.ts",
+      "name": "check:public-raw-fixture-root"
+    },
+    {
+      "command": "bun scripts/capture-visual-smoke.ts --scenario empty-library",
+      "name": "check:visual-smoke:pr"
+    },
+    {
+      "command": "bun tests/integration/checks/check-raw-open-edit-export-proof.ts",
+      "name": "check:raw-open-edit-export-proof"
+    },
+    {
+      "command": "bun tests/integration/checks/check-raw-open-edit-export-command-wrapper.ts",
+      "name": "check:raw-open-edit-export-command-wrapper"
+    },
+    {
+      "command": "bun tests/integration/checks/check-raw-open-edit-export-run-reports.ts",
+      "name": "check:raw-open-edit-export-run-reports"
+    },
+    {
+      "command": "bun tests/integration/checks/check-raw-open-edit-export-runtime-status.ts",
+      "name": "check:raw-open-edit-export-runtime-status"
+    },
+    {
+      "command": "bun scripts/capture-visual-smoke.ts --scenario focus-private-raw-ui",
+      "name": "check:focus-private-raw-ui-smoke"
+    },
+    {
+      "command": "bun scripts/capture-visual-smoke.ts --scenario sr-private-raw-ui",
+      "name": "check:sr-private-raw-ui-smoke"
+    },
+    {
+      "command": "bun scripts/run-compact-checks.ts --label computational-private-proof-runners check:hdr-real-raw-private-proof check:panorama-real-raw-private-proof check:focus-real-raw-private-proof check:sr-real-raw-private-proof",
+      "name": "check:computational-private-proof-runners"
+    }
+  ],
+  "runtimeArtifactContract": {
+    "minimumArtifacts": [
+      "RAW source path(s) and fixture id",
+      "launched app URL or Tauri bundle identifier",
+      "screenshot of the UI state before the edit",
+      "screenshot of the UI state after the edit",
+      "rendered/exported image artifact path",
+      "machine-readable run report with hashes and status"
+    ],
+    "privateRawRootEnv": "RAWENGINE_PRIVATE_RAW_ROOT",
+    "requiresActualAppRun": true,
+    "requiresRawSources": true
+  },
+  "schemaVersion": 1,
+  "status": "harness_ready_private_raw_execution_required",
+  "validationLanes": [
+    {
+      "commands": ["prepare:public-raw-fixture-root", "check:public-raw-fixture-root", "check:visual-smoke:pr"],
+      "expectedEvidence": ["Public RAW fixture root is prepared.", "Vite UI opens and captures a smoke screenshot."],
+      "id": "public-ui-smoke",
+      "purpose": "Prove the local UI launch path is working before private RAW feature runs.",
+      "proofBoundary": "Public smoke only; it does not prove private RAW output quality."
+    },
+    {
+      "commands": [
+        "check:raw-open-edit-export-proof",
+        "check:raw-open-edit-export-command-wrapper",
+        "check:raw-open-edit-export-run-reports",
+        "check:raw-open-edit-export-runtime-status"
+      ],
+      "expectedEvidence": [
+        "Typed open/edit/export manifest is valid.",
+        "Accepted private run reports are detected when present."
+      ],
+      "id": "raw-open-edit-export",
+      "purpose": "Keep the open/edit/export runtime proof path wired to typed manifests and report acceptance.",
+      "proofBoundary": "Public mode is contract-only until private RAW reports are present."
+    },
+    {
+      "commands": ["check:focus-private-raw-ui-smoke", "check:sr-private-raw-ui-smoke"],
+      "expectedEvidence": [
+        "Private RAW review panels render using local proof artifacts.",
+        "Screenshots land under artifacts/visual-smoke."
+      ],
+      "id": "private-raw-ui-review",
+      "purpose": "Render private RAW computational review screens through the actual app UI.",
+      "proofBoundary": "Requires local private artifacts; missing artifacts must stay visible instead of being treated as pass."
+    },
+    {
+      "commands": ["check:computational-private-proof-runners"],
+      "expectedEvidence": ["HDR, focus, panorama, and super-resolution private proof runners are invokable."],
+      "id": "computational-private-runners",
+      "purpose": "Provide the reusable local lane for heavy RAW feature proof generation.",
+      "proofBoundary": "Runner invocation alone is not a substitute for per-feature UI review and output validation."
+    }
+  ]
+}
