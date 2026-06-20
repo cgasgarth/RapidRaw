@@ -16,6 +16,12 @@
   "sidecarGraphRevision": "graph_rev_selective_color_orange_001",
   "sidecarSerializedHash": "sha256:02e408ee11e7c5ec688db7a8d8408bc1013fc86da6c690ae88cc69dd4193ab7f",
   "sourceHash": "sha256:01f3c06f1e72445b912d4a6c87f6fd0b86e9ad020ef27a5cf769ee08d5aa847a",
+  "renderContext": {
+    "canonicalSchema": "rawEngineColorPipelineContextV1Schema",
+    "inputDomain": "camera_linear_rgb",
+    "operationDomain": "acescg_linear_v1",
+    "workingSpace": "acescg_linear_v1"
+  },
   "targetedRuntime": {
     "influence": 0.914269740994,
     "inputRgb": {

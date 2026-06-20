@@ -37,7 +37,17 @@ const selectiveColorCommandContextTargetSchema = z
     message: 'Target requires an id or imagePath.',
   });
 
-const selectiveColorCommandColorPipelineSchema = z.looseObject({});
+const selectiveColorCommandColorPipelineSchema = z
+  .object({
+    chromaticAdaptation: z.looseObject({}),
+    gamutMapping: z.looseObject({}).optional(),
+    inputDomain: z.string().trim().min(1),
+    operationDomain: z.string().trim().min(1),
+    renderTarget: z.looseObject({}).optional(),
+    sceneToDisplayTransform: z.string().trim().min(1).optional(),
+    workingSpace: z.string().trim().min(1),
+  })
+  .strict();
 
 export const selectiveColorCommandEnvelopeSchema = z
   .object({
@@ -104,7 +114,7 @@ export interface SelectiveColorImageCommandContextOptions {
   imagePath: string;
   operationId: string;
   sessionId: string;
-  colorPipeline?: SelectiveColorCommandColorPipeline;
+  colorPipeline: SelectiveColorCommandColorPipeline;
   virtualCopyId?: string;
 }
 
@@ -115,27 +125,6 @@ export interface SelectiveColorCommandBridgeOptions {
 
 const DEFAULT_PREVIEW_REASON = 'Preview selective color adjustment before mutating the edit graph.';
 const DEFAULT_APPLY_REASON = 'Apply accepted selective color adjustment through the typed command bridge.';
-const DEFAULT_COLOR_PIPELINE: SelectiveColorCommandColorPipeline = {
-  chromaticAdaptation: {
-    method: 'bradford_v1',
-    sourceWhitePoint: { x: 0.3457, y: 0.3585 },
-    status: 'math_validated',
-    targetWhitePoint: { x: 0.32168, y: 0.33767 },
-    warnings: [],
-  },
-  inputDomain: 'camera_linear_rgb',
-  operationDomain: 'acescg_linear_v1',
-  renderTarget: {
-    bitDepth: 8,
-    embedIcc: true,
-    intent: 'relative_colorimetric',
-    outputProfile: 'display_p3',
-    viewTransform: 'rawengine_agx_v1',
-  },
-  sceneToDisplayTransform: 'rawengine_agx_v1',
-  workingSpace: 'acescg_linear_v1',
-};
-
 const COMMAND_RANGE_TO_HSL_BAND = {
   aquas: 'aqua',
   blues: 'blue',
@@ -159,7 +148,7 @@ const HSL_BAND_TO_COMMAND_RANGE = {
 } as const satisfies Record<ToneColorHslBand, SelectiveColorCommandRangeKey>;
 
 export const buildSelectiveColorImageCommandContext = ({
-  colorPipeline = DEFAULT_COLOR_PIPELINE,
+  colorPipeline,
   expectedGraphRevision,
   imagePath,
   operationId,

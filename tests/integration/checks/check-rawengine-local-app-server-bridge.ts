@@ -8,6 +8,7 @@ import {
 import {
   sampleAiEnhancementApplyCommandEnvelopeV1,
   sampleAiEnhancementCommandEnvelopeV1,
+  sampleRawEngineSceneColorPipelineV1,
   sampleToneColorApplyCommandEnvelopeV1,
   sampleToneColorCommandEnvelopeV1,
 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
@@ -82,6 +83,7 @@ if (!applied.ok) {
 }
 
 const selectiveColorContext = buildSelectiveColorImageCommandContext({
+  colorPipeline: sampleRawEngineSceneColorPipelineV1,
   expectedGraphRevision: 'graph_rev_local_bridge_selective_color',
   imagePath: '/validation/local-bridge-selective-color.CR3',
   operationId: 'local_bridge_orange',
