@@ -68,6 +68,11 @@ const artifacts = [
     'runtime',
   ),
   artifact(
+    'Negative Lab public export UI proof',
+    'docs/validation/negative-lab-public-export-ui-proof-2026-06-20.json',
+    'runtime',
+  ),
+  artifact(
     'Selective color command proof',
     'docs/validation/selective-color-command-proof-2026-06-20.json',
     'synthetic',
@@ -77,6 +82,11 @@ const artifacts = [
     'docs/validation/selective-color-independent-proof-2026-06-20.json',
     'synthetic',
   ),
+  artifact(
+    'Selective color private RAW UI proof',
+    'docs/validation/selective-color-private-ui-proof-2026-06-20.json',
+    'private-gated',
+  ),
   artifact('Validation inventory', 'docs/validation/validation-inventory-report-2026-06-20.json', 'review'),
   artifact('Public fixture manifest', 'docs/validation/public-fixture-manifest.json', 'review'),
 ] satisfies Array<z.infer<typeof artifactSchema>>;
@@ -85,7 +95,7 @@ const report = reportSchema.parse({
   artifacts,
   generatedAt: GENERATED_AT,
   issue: 2365,
-  openRuntimeIssues: [1508, 2148, 2308, 2309, 2310, 2311, 2312, 2313, 2314, 2315],
+  openRuntimeIssues: [1508, 2148, 2308, 2309, 2310, 2311, 2312, 2313, 2314, 2315, 2476],
   schemaVersion: 1,
   summary: {
     totalValidationScripts: inventory.summary.totalScripts,
