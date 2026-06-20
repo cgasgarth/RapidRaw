@@ -173,6 +173,7 @@ export default function LayerStackPanel({
   const rows = useMemo(() => getLayerRows(masks, collapsedGroupIds), [collapsedGroupIds, masks]);
   const [localSelectedLayerId, setLocalSelectedLayerId] = useState<string>(BASE_LAYER_ID);
   const selectedLayerId = activeMaskContainerId ?? localSelectedLayerId;
+  const visibleLayerCount = masks.filter((mask) => mask.visible).length;
 
   const activeRow = rows.find((row) => row.id === selectedLayerId) ?? rows[0];
   const isBaseSelected = activeRow?.isBase ?? true;
@@ -355,6 +356,13 @@ export default function LayerStackPanel({
               data-testid="layer-stack-count"
             >
               {t('editor.layers.layerCount', { count: masks.length })}
+            </UiText>
+            <UiText
+              variant={TextVariants.small}
+              className="block tabular-nums text-text-tertiary"
+              data-testid="layer-visible-count"
+            >
+              {t('editor.layers.visibleLayerCount', { count: visibleLayerCount })}
             </UiText>
           </span>
         </div>
