@@ -1403,6 +1403,7 @@
       "profileMeasuredClaimPolicy": "Process-family measured profile; no named-stock or colorimetric-match claim.",
       "profileResultCount": "{{visibleCount}} of {{totalCount}} profiles",
       "profileSearch": "Search profiles",
+      "profileSearchClear": "Clear profile search",
       "profileSearchEmpty": "No matching profiles",
       "profileSort": "Sort profiles",
       "profileSortCatalog": "Catalog order",
