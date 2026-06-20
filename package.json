@@ -63,6 +63,7 @@
     "check:tauri-schema-validation": "bun tests/integration/checks/check-tauri-schema-validation.ts",
     "check:tauri-invoke-boundaries": "bun tests/integration/checks/check-tauri-invoke-boundaries.ts",
     "check:tauri-invoke-boundaries:self-test": "bun tests/integration/checks/check-tauri-invoke-boundaries.ts --self-test",
+    "check:tauri-command-registration": "bun tests/integration/checks/check-tauri-command-registration.ts",
     "check:color-abi": "bun tests/integration/checks/check-color-adjustment-abi-parity.ts",
     "check:color-pipeline-audit": "bun tests/integration/checks/check-color-pipeline-audit.ts",
     "check:preview-scopes": "bun tests/integration/checks/check-preview-scopes.ts",
