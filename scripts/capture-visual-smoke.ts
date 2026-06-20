@@ -899,6 +899,13 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-base-sample-readout')
     .getByText('Custom base sample', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.waitForFunction(() =>
+    (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some(
+      (call) =>
+        call.command === 'preview_negative_conversion' &&
+        JSON.stringify(call.args ?? {}).includes('"base_fog_sample":{"height":0.18,"width":0.18,"x":0.25,"y":0.25}'),
+    ),
+  );
   await page.getByTestId('negative-lab-undo-base-sample').click();
   await page.getByTestId('negative-lab-base-sample-readout').getByText('Left edge', { exact: true }).waitFor({
     timeout: 10_000,
@@ -926,9 +933,9 @@ async function prepareScenario(page, mode) {
   if (!copiedBatchPlan.includes('"plannedApplyCount"') || !copiedBatchPlan.includes('"skippedFrameIds"')) {
     throw new Error('Negative Lab batch plan copy did not include apply/skip JSON.');
   }
-  await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan).click();
+  await page.getByTestId('negative-lab-accept-batch-plan').click();
   await page
-    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAcceptBatchPlan)
+    .getByTestId('negative-lab-accept-batch-plan')
     .getByText('Batch plan accepted', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
