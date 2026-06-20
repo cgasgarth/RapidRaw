@@ -110,6 +110,23 @@ export default function SuperResolutionModal({
       )}
 
       <ComputationalSetupOptionSection title={t('modals.superResolution.scaleLabel')}>
+        <div
+          className="mb-3 grid grid-cols-3 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-sm"
+          data-testid="sr-output-scale-summary"
+        >
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.sources')}
+            value={String(sourceCount)}
+          />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.scale')}
+            value={t('modals.superResolution.scaleValue', { scale: settings.outputScale })}
+          />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.outputPixels')}
+            value={t('modals.superResolution.outputPixelMultiplier', { multiplier: outputPixelMultiplier })}
+          />
+        </div>
         <div className="grid grid-cols-4 gap-2">
           {scaleOptions.map((scale) => (
             <button
