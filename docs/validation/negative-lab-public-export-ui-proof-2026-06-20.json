@@ -1,0 +1,36 @@
+{
+  "doesNotProve": [
+    "camera_raw_decode_path",
+    "capture_one_class_quality",
+    "commercial_converter_parity",
+    "full_macos_app_manual_session",
+    "icc_colorimetric_accuracy",
+    "raw_scan_input",
+    "stock_library_maturity"
+  ],
+  "exportProof": {
+    "changedPixelRatio": 1,
+    "contentHash": "fnv1a64:83c7a7b0d5fe8819",
+    "inputToOutputMeanAbsDelta": 0.5021131038665771,
+    "outputFormat": "jpeg_proof",
+    "outputPath": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg",
+    "sidecarPath": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.rrdata"
+  },
+  "fixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001",
+  "issue": 2311,
+  "schemaVersion": 1,
+  "sourcePath": "fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg",
+  "validationCommands": [
+    "bun run check:negative-lab-public-export-review-smoke",
+    "bun run check:negative-lab-public-export-ui-proof"
+  ],
+  "visualReview": {
+    "dimensions": {
+      "height": 960,
+      "width": 1440
+    },
+    "scenario": "negative-lab-public-export-review",
+    "screenshotPath": "artifacts/visual-smoke/negative-lab-public-export-review.png",
+    "sourceAndOutputImagesLoaded": true
+  }
+}
