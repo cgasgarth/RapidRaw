@@ -1,0 +1,89 @@
+{
+  "doesNotProve": [
+    "depth_map",
+    "final_blending",
+    "focus_breathing_compensation",
+    "real_raw_quality",
+    "segmentation",
+    "ui_e2e"
+  ],
+  "fixtures": [
+    {
+      "fixtureId": "focus.synthetic.three-plane.v1",
+      "grid": {
+        "cellCount": 768,
+        "cellSize": 8,
+        "lowConfidenceCellRatio": 0.661458
+      },
+      "referenceSourceIndex": 0,
+      "sourceSummaries": [
+        {
+          "sourceIndex": 0,
+          "winnerCellRatio": 0.273438
+        },
+        {
+          "sourceIndex": 1,
+          "winnerCellRatio": 0.371094
+        },
+        {
+          "sourceIndex": 2,
+          "winnerCellRatio": 0.355469
+        }
+      ],
+      "warningCodes": []
+    },
+    {
+      "fixtureId": "focus.synthetic.translated-three-plane.v1",
+      "grid": {
+        "cellCount": 768,
+        "cellSize": 8,
+        "lowConfidenceCellRatio": 0.688802
+      },
+      "referenceSourceIndex": 0,
+      "sourceSummaries": [
+        {
+          "sourceIndex": 0,
+          "winnerCellRatio": 0.33724
+        },
+        {
+          "sourceIndex": 1,
+          "winnerCellRatio": 0.315104
+        },
+        {
+          "sourceIndex": 2,
+          "winnerCellRatio": 0.347656
+        }
+      ],
+      "warningCodes": ["alignment_translation_required"]
+    },
+    {
+      "fixtureId": "focus.synthetic.breathing-stale-source.v1",
+      "grid": {
+        "cellCount": 1040,
+        "cellSize": 8,
+        "lowConfidenceCellRatio": 0.713462
+      },
+      "referenceSourceIndex": 0,
+      "sourceSummaries": [
+        {
+          "sourceIndex": 0,
+          "winnerCellRatio": 0.311538
+        },
+        {
+          "sourceIndex": 1,
+          "winnerCellRatio": 0.371154
+        },
+        {
+          "sourceIndex": 2,
+          "winnerCellRatio": 0.317308
+        }
+      ],
+      "warningCodes": ["alignment_translation_required", "focus_breathing_detected"]
+    }
+  ],
+  "generatedFrom": "tests/integration/checks/check-focus-confidence-source-map.ts",
+  "issue": 2354,
+  "schemaVersion": 1,
+  "sourceSharpnessArtifact": "artifacts/focus-sharpness-map/focus-sharpness-map-report.json",
+  "status": "synthetic_source_confidence_artifact_generated"
+}
