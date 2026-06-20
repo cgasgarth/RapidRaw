@@ -1,7 +1,35 @@
 {
   "alignment": {
+    "algorithmId": "declared_pixel_shift_lattice_diagnostics_v1",
+    "confidence": 1,
+    "evidencePath": "artifacts/super-resolution-runtime-plan-smoke/super-resolution-runtime-plan-smoke-report.json",
     "expectedFrameCount": 4,
-    "missingShiftWarningPath": "unsupported_source_set_requires_explicit_warning",
+    "expectedShiftPhases": [
+      {
+        "shiftX": 0,
+        "shiftY": 0
+      },
+      {
+        "shiftX": 1,
+        "shiftY": 0
+      },
+      {
+        "shiftX": 0,
+        "shiftY": 1
+      },
+      {
+        "shiftX": 1,
+        "shiftY": 1
+      }
+    ],
+    "limitations": [
+      "declared_integer_offsets_only",
+      "no_rotation_scale_or_perspective_estimation",
+      "no_optical_flow_or_local_warp_estimation",
+      "no_photometric_normalization"
+    ],
+    "phaseCoverageRatio": 1,
+    "referenceSourceIndex": 0,
     "sourceFrames": [
       {
         "shiftX": 0,
@@ -20,7 +48,8 @@
         "shiftY": 1
       }
     ],
-    "status": "pixel_shift_offsets_declared"
+    "sourceReportHash": "aa1e2c4ac4bea5e72305cce8545f8212b8e74d8ebe7f7180e99ca1d3dd93110d",
+    "status": "complete_declared_lattice"
   },
   "detail": {
     "baselineMae": 0.059477884795948434,
@@ -28,8 +57,8 @@
     "improvementRatio": 1,
     "srMae": 0
   },
-  "generatedAt": "2026-06-18T00:00:00.000Z",
-  "issue": 1940,
+  "generatedAt": "2026-06-20T00:00:00.000Z",
+  "issue": 2357,
   "output": {
     "dimensions": {
       "height": 64,
@@ -38,7 +67,7 @@
     "scale": 2,
     "sourceReportHash": "8d4c76a36b780c9dab7c0e342baca9b1321285f9820e6aedc9132816e355b88d"
   },
-  "proofHash": "bafd16295d55132a7a43d09e1833fb7b0c2a2d28d38aa65ae64ea09cae366884",
+  "proofHash": "af1299a1dfe58f3a4a84aeb76c1c30d6f2cafb2c95918704d46537cdc21ffa9d",
   "schemaVersion": 1,
   "validationStatus": "synthetic_artifact_gate"
 }

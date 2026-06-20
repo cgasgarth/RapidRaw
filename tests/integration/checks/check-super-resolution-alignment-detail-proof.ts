@@ -6,7 +6,9 @@ import { z } from 'zod';
 
 const REPORT_PATH = 'docs/validation/super-resolution-alignment-detail-proof-2026-06-18.json';
 const SMOKE_REPORT_PATH = 'artifacts/super-resolution-synthetic-smoke/super-resolution-synthetic-smoke-report.json';
-const GENERATED_AT = '2026-06-18T00:00:00.000Z';
+const RUNTIME_REPORT_PATH =
+  'artifacts/super-resolution-runtime-plan-smoke/super-resolution-runtime-plan-smoke-report.json';
+const GENERATED_AT = '2026-06-20T00:00:00.000Z';
 const MIN_CHANGED_PIXEL_RATIO = 0.35;
 const MIN_IMPROVEMENT_RATIO = 0.65;
 const MAX_SR_MAE = 0.01;
@@ -24,15 +26,64 @@ const smokeReportSchema = z
     srMae: z.number().min(0).max(MAX_SR_MAE),
   })
   .strict();
+const alignmentDiagnosticsSchema = z
+  .object({
+    algorithmId: z.literal('declared_pixel_shift_lattice_diagnostics_v1'),
+    confidence: z.literal(1),
+    expectedShiftPhases: smokeReportSchema.shape.sourceFrames,
+    frameCount: z.literal(4),
+    geometryConsistent: z.literal(true),
+    limitations: z
+      .array(
+        z.enum([
+          'declared_integer_offsets_only',
+          'no_rotation_scale_or_perspective_estimation',
+          'no_optical_flow_or_local_warp_estimation',
+          'no_photometric_normalization',
+        ]),
+      )
+      .length(4),
+    phaseCoverageRatio: z.literal(1),
+    referenceSourceIndex: z.literal(0),
+    status: z.literal('complete_declared_lattice'),
+    uniqueShiftPhaseCount: z.literal(4),
+  })
+  .strict();
+const runtimeReportSchema = z
+  .object({
+    alignmentDiagnostics: alignmentDiagnosticsSchema,
+    fixture: z.literal('synthetic_sr_runtime_plan_v1'),
+    frameRegistrations: z.array(
+      z
+        .object({
+          confidence: z.literal(1),
+          shiftX: z.number().int(),
+          shiftY: z.number().int(),
+          sourceIndex: z.number().int(),
+        })
+        .strict(),
+    ),
+    improvementRatio: z.number().min(MIN_IMPROVEMENT_RATIO).max(1),
+    outputSha256: hashSchema,
+    runtimeStatus: z.literal('apply_rendered'),
+  })
+  .passthrough();
 
 const reportSchema = z
   .object({
     alignment: z
       .object({
+        algorithmId: z.literal('declared_pixel_shift_lattice_diagnostics_v1'),
+        confidence: z.literal(1),
+        evidencePath: z.literal(RUNTIME_REPORT_PATH),
         expectedFrameCount: z.literal(4),
-        missingShiftWarningPath: z.literal('unsupported_source_set_requires_explicit_warning'),
+        expectedShiftPhases: smokeReportSchema.shape.sourceFrames,
+        limitations: alignmentDiagnosticsSchema.shape.limitations,
+        phaseCoverageRatio: z.literal(1),
+        referenceSourceIndex: z.literal(0),
         sourceFrames: smokeReportSchema.shape.sourceFrames,
-        status: z.literal('pixel_shift_offsets_declared'),
+        sourceReportHash: hashSchema,
+        status: z.literal('complete_declared_lattice'),
       })
       .strict(),
     detail: z
@@ -44,7 +95,7 @@ const reportSchema = z
       })
       .strict(),
     generatedAt: z.iso.datetime({ offset: true }),
-    issue: z.literal(1940),
+    issue: z.literal(2357),
     output: z
       .object({
         dimensions: smokeReportSchema.shape.highResolutionDimensions,
@@ -60,8 +111,11 @@ const reportSchema = z
 
 const update = process.argv.includes('--update');
 run(['bun', 'tests/integration/checks/check-super-resolution-synthetic-smoke.ts']);
+run(['bun', 'tests/integration/checks/check-super-resolution-runtime-plan-smoke.ts']);
 const smokeReportText = await Bun.file(SMOKE_REPORT_PATH).text();
 const smokeReport = smokeReportSchema.parse(JSON.parse(smokeReportText));
+const runtimeReportText = await Bun.file(RUNTIME_REPORT_PATH).text();
+const runtimeReport = runtimeReportSchema.parse(JSON.parse(runtimeReportText));
 const output = {
   dimensions: smokeReport.highResolutionDimensions,
   scale: smokeReport.outputScale,
@@ -69,10 +123,17 @@ const output = {
 };
 const report = reportSchema.parse({
   alignment: {
+    algorithmId: runtimeReport.alignmentDiagnostics.algorithmId,
+    confidence: runtimeReport.alignmentDiagnostics.confidence,
+    evidencePath: RUNTIME_REPORT_PATH,
     expectedFrameCount: 4,
-    missingShiftWarningPath: 'unsupported_source_set_requires_explicit_warning',
+    expectedShiftPhases: runtimeReport.alignmentDiagnostics.expectedShiftPhases,
+    limitations: runtimeReport.alignmentDiagnostics.limitations,
+    phaseCoverageRatio: runtimeReport.alignmentDiagnostics.phaseCoverageRatio,
+    referenceSourceIndex: runtimeReport.alignmentDiagnostics.referenceSourceIndex,
     sourceFrames: smokeReport.sourceFrames,
-    status: 'pixel_shift_offsets_declared',
+    sourceReportHash: hashString(runtimeReportText),
+    status: runtimeReport.alignmentDiagnostics.status,
   },
   detail: {
     baselineMae: smokeReport.baselineMae,
@@ -81,9 +142,9 @@ const report = reportSchema.parse({
     srMae: smokeReport.srMae,
   },
   generatedAt: GENERATED_AT,
-  issue: 1940,
+  issue: 2357,
   output,
-  proofHash: hashString(JSON.stringify({ detail: smokeReport, output })),
+  proofHash: hashString(JSON.stringify({ detail: smokeReport, output, runtime: runtimeReport })),
   schemaVersion: 1,
   validationStatus: 'synthetic_artifact_gate',
 });

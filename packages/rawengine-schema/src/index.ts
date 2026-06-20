@@ -33,6 +33,7 @@ export * from './panoramaRuntimePlan.js';
 export * from './panoramaSyntheticStitch.js';
 export * from './rawEngineSchemas.js';
 export * from './samplePayloads.js';
+export * from './superResolutionAlignmentDiagnostics.js';
 export * from './superResolutionAppServerRuntime.js';
 export * from './superResolutionRuntimePlan.js';
 export * from './superResolutionSidecarProvenance.js';

@@ -13,6 +13,11 @@ import {
   type ComputationalMergeMutationResultV1,
   type SuperResolutionArtifactV1,
 } from './rawEngineSchemas.js';
+import {
+  assertSuperResolutionAlignmentDiagnosticsRenderableV1,
+  buildSuperResolutionAlignmentDiagnosticsV1,
+  superResolutionAlignmentDiagnosticsV1Schema,
+} from './superResolutionAlignmentDiagnostics.js';
 import { applyPixelShiftSuperResolutionV1 } from './superResolutionPixelShift.js';
 import { buildSuperResolutionArtifactSidecarRecordV1 } from './superResolutionSidecarProvenance.js';
 
@@ -46,6 +51,7 @@ export const superResolutionRuntimeProvenanceV1Schema = z
   .object({
     acceptedDryRunPlanHash: z.string().trim().min(1).optional(),
     acceptedDryRunPlanId: z.string().trim().min(1).optional(),
+    alignmentDiagnostics: superResolutionAlignmentDiagnosticsV1Schema,
     changedPixelRatioAgainstNearest: z.number().min(0).max(1),
     confidenceMap: z
       .object({
@@ -273,6 +279,8 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
     throw new Error('Super-resolution runtime requires at least one frame.');
   }
   const scale = request.command.parameters.outputScale;
+  const alignmentDiagnostics = buildSuperResolutionAlignmentDiagnosticsV1(request.frames, scale);
+  assertSuperResolutionAlignmentDiagnosticsRenderableV1(alignmentDiagnostics);
   const result = applyPixelShiftSuperResolutionV1({
     frames: request.frames.map((frame) => ({
       pixels: frame.pixels,
@@ -289,6 +297,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
     height: result.outputHeight,
     outputPixels: result.outputPixels,
     provenance: superResolutionRuntimeProvenanceV1Schema.parse({
+      alignmentDiagnostics,
       changedPixelRatioAgainstNearest: roundSrMetric(result.changedPixelRatioAgainstNearest),
       confidenceMap: buildSrConfidenceMap(request.frames, result.outputWidth, result.outputHeight, result.outputScale),
       detailPolicy: request.command.parameters.detailPolicy,
@@ -302,7 +311,7 @@ const renderSuperResolutionRuntime = (request: ParsedSuperResolutionRuntimePlanR
       engineId: SR_RUNTIME_ENGINE_ID,
       engineVersion: SR_RUNTIME_ENGINE_VERSION,
       frameRegistrations: request.frames.map((frame) => ({
-        confidence: 1,
+        confidence: alignmentDiagnostics.confidence,
         shiftX: frame.shiftX,
         shiftY: frame.shiftY,
         sourceIndex: frame.sourceIndex,
