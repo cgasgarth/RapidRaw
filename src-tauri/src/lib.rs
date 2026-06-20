@@ -49,6 +49,7 @@ mod preset_converter;
 mod presets;
 #[cfg(all(test, feature = "tauri-test"))]
 mod private_decode_raw_proof;
+#[cfg(feature = "validation-harness")]
 mod raw_open_edit_export_proof;
 mod raw_processing;
 #[cfg(all(test, feature = "tauri-test"))]
@@ -2614,6 +2615,7 @@ pub fn run() {
             presets::handle_export_presets_to_file,
             presets::save_community_preset,
             file_management::clear_all_sidecars,
+            #[cfg(feature = "validation-harness")]
             raw_open_edit_export_proof::run_raw_open_edit_export_proof,
             file_management::clear_thumbnail_cache,
             file_management::set_color_label_for_paths,

@@ -177,6 +177,7 @@
     "check:noise-metrics": "bun tests/integration/checks/check-noise-metric-fixtures.ts",
     "check:private-raw-evidence": "bun tests/integration/checks/check-private-raw-evidence-ledger.ts",
     "check:raw-open-edit-export-proof": "bun tests/integration/checks/check-raw-open-edit-export-proof.ts",
+    "check:raw-open-edit-export-validation-feature": "bun scripts/run-compact-command.ts --label raw-open-edit-export-validation-feature --cwd src-tauri -- cargo check --locked --no-default-features --features required-ci,validation-harness",
     "prepare:raw-open-edit-export-private-root": "bun scripts/prepare-raw-open-edit-export-private-root.ts",
     "prepare:public-raw-fixture-root": "bun scripts/prepare-public-raw-fixture-root.ts --download",
     "check:public-raw-fixture-root": "bun scripts/prepare-public-raw-fixture-root.ts",

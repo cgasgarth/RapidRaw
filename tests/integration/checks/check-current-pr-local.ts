@@ -188,6 +188,19 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
       file === 'tests/integration/checks/check-tauri-command-registration.ts',
     ['check:tauri-command-registration'],
   );
+  addIf(
+    (file) =>
+      file === 'src-tauri/Cargo.toml' ||
+      file === 'src-tauri/src/lib.rs' ||
+      file === 'src-tauri/src/raw_open_edit_export_proof.rs' ||
+      file === 'src/utils/rawOpenEditExportProofCommand.ts' ||
+      file === 'tests/integration/checks/check-raw-open-edit-export-command-wrapper.ts',
+    [
+      'check:raw-open-edit-export-command-wrapper',
+      'check:raw-open-edit-export-proof',
+      'check:raw-open-edit-export-validation-feature',
+    ],
+  );
 
   return [...checks].toSorted();
 }
