@@ -71,6 +71,11 @@ export default function HdrModal({
     { label: t('modals.hdr.strategy.sceneLinear'), value: 'scene_linear_radiance' },
     { label: t('modals.hdr.strategy.exposureFusion'), value: 'exposure_fusion_preview' },
   ];
+  const selectedAlignmentLabel =
+    alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label ?? '';
+  const selectedQualityLabel =
+    qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
+  const selectedStrategyLabel = strategyOptions.find((option) => option.value === settings.mergeStrategy)?.label ?? '';
 
   const setSetting = useCallback(
     (patch: Partial<HdrMergeUiSettings>) => {
@@ -202,11 +207,13 @@ export default function HdrModal({
             {[
               {
                 label: t('modals.hdr.summarySources'),
-                value: String(imageCount ?? 0),
+                value: `${t('modals.hdr.summarySourceCount', { count: imageCount ?? 0 })} - ${
+                  isSourceCountValid ? t('modals.hdr.summaryReady') : t('modals.hdr.summaryBlocked')
+                }`,
               },
               {
                 label: t('modals.hdr.summaryAlignment'),
-                value: alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label ?? '',
+                value: selectedAlignmentLabel,
               },
               {
                 label: t('modals.hdr.summaryDeghosting'),
@@ -214,15 +221,19 @@ export default function HdrModal({
               },
               {
                 label: t('modals.hdr.summaryQuality'),
-                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '',
+                value: selectedQualityLabel,
               },
               {
-                label: t('modals.hdr.strategyLabel'),
-                value: strategyOptions.find((option) => option.value === settings.mergeStrategy)?.label ?? '',
+                label: t('modals.hdr.summaryStrategy'),
+                value: selectedStrategyLabel,
               },
               {
                 label: t('modals.hdr.summaryPreviewBudget'),
                 value: t('modals.hdr.previewPixels', { value: settings.maxPreviewDimensionPx }),
+              },
+              {
+                label: t('modals.hdr.summaryToneMapPreview'),
+                value: settings.toneMapPreview ? t('modals.hdr.summaryOn') : t('modals.hdr.summaryOff'),
               },
             ].map((item) => (
               <div
