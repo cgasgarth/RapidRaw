@@ -11,6 +11,7 @@ import {
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
   type RawEngineToolRegistryV1,
+  type ToneColorHslBandV1,
   type ToneColorCommandEnvelopeV1,
   type ToneColorDryRunResultV1,
   type ToneColorMutationResultV1,
@@ -71,6 +72,18 @@ export const rawEngineLocalAppServerBasicToneCommandV1Schema = toneColorCommandE
   },
 );
 
+export const rawEngineLocalAppServerHslCommandV1Schema = toneColorCommandEnvelopeV1Schema.superRefine(
+  (command, context) => {
+    if (command.commandType !== 'toneColor.adjustHsl') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Local app-server bridge expected an HSL/selective-color command.',
+        path: ['commandType'],
+      });
+    }
+  },
+);
+
 export type RawEngineLocalAppServerToolRegistryQueryV1 = z.infer<
   typeof rawEngineLocalAppServerToolRegistryQueryV1Schema
 >;
@@ -78,6 +91,7 @@ export type RawEngineLocalAppServerBasicToneDryRunCommandV1 = z.infer<
   typeof rawEngineLocalAppServerBasicToneDryRunCommandV1Schema
 >;
 export type RawEngineLocalAppServerBasicToneCommandV1 = z.infer<typeof rawEngineLocalAppServerBasicToneCommandV1Schema>;
+export type RawEngineLocalAppServerHslCommandV1 = z.infer<typeof rawEngineLocalAppServerHslCommandV1Schema>;
 
 export const rawEngineLocalAppServerAiEnhancementCommandV1Schema = aiEnhancementCommandEnvelopeV1Schema;
 
@@ -170,6 +184,73 @@ const buildBasicToneMutationResult = (
     sourceGraphRevision: command.expectedGraphRevision,
     undoRevision: command.expectedGraphRevision,
     warnings: [],
+  });
+
+const HSL_PARAMETER_DIFF_PATHS = [
+  ['hueShiftDegrees', 'hueShiftDegrees'],
+  ['saturation', 'saturation'],
+  ['luminance', 'luminance'],
+] as const satisfies ReadonlyArray<
+  readonly [keyof Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>['parameters'], string]
+>;
+
+const SUPPORTED_HSL_BANDS = new Set<ToneColorHslBandV1>([
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'aqua',
+  'blue',
+  'purple',
+  'magenta',
+]);
+
+const buildHslWarnings = (band: ToneColorHslBandV1): string[] =>
+  SUPPORTED_HSL_BANDS.has(band) ? [] : [`Unsupported HSL/selective-color band: ${band}.`];
+
+const buildHslDryRunResult = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>,
+): ToneColorDryRunResultV1 =>
+  toneColorDryRunResultV1Schema.parse({
+    colorPipeline: command.colorPipeline,
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: true,
+    mutates: false,
+    parameterDiff: HSL_PARAMETER_DIFF_PATHS.map(([key, path]) => ({
+      module: 'hsl',
+      path: `/parameters/${command.parameters.band}/${path}`,
+      previousValue: 0,
+      value: command.parameters[key],
+    })),
+    predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
+    previewArtifacts: [],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: buildHslWarnings(command.parameters.band),
+  });
+
+const buildHslPlanKey = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>,
+): string => JSON.stringify([command.expectedGraphRevision, command.target, command.parameters]);
+
+const buildHslMutationResult = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustHsl' }>,
+): ToneColorMutationResultV1 =>
+  toneColorMutationResultV1Schema.parse({
+    appliedGraphRevision: `${command.expectedGraphRevision}:apply:${command.commandId}`,
+    changedNodeIds: [`tone_color_hsl:${command.parameters.band}:${command.target.kind}`],
+    colorPipeline: command.colorPipeline,
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: false,
+    mutates: true,
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: buildHslWarnings(command.parameters.band),
   });
 
 const buildAiEnhancementPlanId = (command: RawEngineLocalAppServerAiEnhancementCommandV1): string =>
@@ -280,6 +361,7 @@ const buildAiEnhancementMutationResult = (
 export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiEnhancementDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedBasicToneDryRunPlanKeys: Set<string> = new Set<string>();
+  readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
   readonly #commandBus: EditCommandBus;
   readonly #toolRegistry: RawEngineToolRegistryV1;
@@ -367,6 +449,29 @@ export class RawEngineLocalAppServerBridge {
     });
 
     this.#commandBus.register({
+      commandType: 'toneColor.adjustHsl',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerHslCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'toneColor.adjustHsl') {
+          throw new Error('Local app-server bridge expected an HSL/selective-color command after schema validation.');
+        }
+        if (parsedCommand.dryRun) {
+          const dryRunResult = buildHslDryRunResult(parsedCommand);
+          this.#acceptedHslDryRunPlanKeys.add(buildHslPlanKey(parsedCommand));
+          return dryRunResult;
+        }
+
+        const planKey = buildHslPlanKey(parsedCommand);
+        if (!this.#acceptedHslDryRunPlanKeys.has(planKey)) {
+          throw new Error('Local app-server bridge rejected HSL/selective-color apply without a matching dry-run.');
+        }
+
+        return buildHslMutationResult(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerHslCommandV1Schema,
+    });
+
+    this.#commandBus.register({
       commandType: 'ai.enhancement.dryRun',
       execute: (command) => {
         const parsedCommand = rawEngineLocalAppServerAiEnhancementCommandV1Schema.parse(command);
@@ -424,8 +529,9 @@ export const rawEngineLocalAppServerBridgeCapabilities = Object.freeze({
     RawEngineLocalAppServerCommandType.ToolRegistryQuery,
     'ai.enhancement.apply',
     'ai.enhancement.dryRun',
+    'toneColor.adjustHsl',
     'toneColor.setBasicTone',
   ],
   mutatingCommands: true,
-  runtimeStatus: 'basic_tone_and_ai_enhancement_dry_run_apply',
+  runtimeStatus: 'basic_tone_hsl_and_ai_enhancement_dry_run_apply',
 });
