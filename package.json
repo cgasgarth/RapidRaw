@@ -491,6 +491,7 @@
     "check:agent-rollback-proof": "bun tests/integration/checks/check-agent-rollback-proof.ts",
     "check:agent-proof-gallery": "bun scripts/generate-agent-proof-gallery.ts",
     "check:agent-chat-ui": "bun scripts/capture-visual-smoke.ts --scenario agent-chat-ui",
+    "check:agent-tool-readiness-ui": "bun tests/integration/checks/check-agent-tool-readiness-ui.ts",
     "check:layer-workflow-smoke": "bun scripts/capture-visual-smoke.ts --scenario layer-stack-workflow",
     "check:rawengine-app-server-host": "bun tests/integration/checks/check-rawengine-app-server-host.ts",
     "check:rawengine-local-app-server-bridge": "bun tests/integration/checks/check-rawengine-local-app-server-bridge.ts",

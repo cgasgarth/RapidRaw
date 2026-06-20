@@ -208,6 +208,11 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   );
   addIf((file) => file === 'src/components/panel/right/LayerStackPanel.tsx', ['check:layer-stack-panel-ui']);
   addIf(
+    (file) =>
+      file === 'src/components/panel/right/AgentChatShell.tsx' || file === 'src/utils/agentAppServerToolReadiness.ts',
+    ['check:agent-tool-readiness-ui'],
+  );
+  addIf(
     (file) => file.includes('panoramaSyntheticStitch') || file.includes('panorama-exposure-runtime-proof'),
     ['check:panorama-exposure-runtime-proof'],
   );
@@ -330,6 +335,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/components/panel/right/MasksPanel.tsx'], ['check:mask-readiness-ui']);
   assertSelfTestRoute(['src/components/adjustments/Color.tsx'], ['check:professional-color-workflow-ui']);
   assertSelfTestRoute(['src/components/panel/right/LayerStackPanel.tsx'], ['check:layer-stack-panel-ui']);
+  assertSelfTestRoute(['src/components/panel/right/AgentChatShell.tsx'], ['check:agent-tool-readiness-ui']);
 
   console.log('current pr local self-test ok');
   process.exit(0);
