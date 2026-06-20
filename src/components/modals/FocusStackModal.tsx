@@ -59,6 +59,11 @@ export default function FocusStackModal({
     { label: t('modals.focusStack.qualityBalanced'), value: 'balanced' },
     { label: t('modals.focusStack.qualityBest'), value: 'best' },
   ];
+  const selectedQualityLabel =
+    qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
+  const sourceReadinessLabel = `${t('modals.focusStack.sourceSummary', { count: sourceCount })} - ${
+    isSourceCountValid ? t('modals.focusStack.preflight.ready') : t('modals.focusStack.preflight.blocked')
+  }`;
 
   const setSetting = useCallback(
     (patch: Partial<FocusStackUiSettings>) => {
@@ -109,11 +114,8 @@ export default function FocusStackModal({
         className="grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-sm"
         data-testid="focus-stack-setup-summary"
       >
-        <ComputationalSetupStatusLine label={t('modals.focusStack.preflight.sources')} value={String(sourceCount)} />
-        <ComputationalSetupStatusLine
-          label={t('modals.focusStack.qualityLabel')}
-          value={qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? ''}
-        />
+        <ComputationalSetupStatusLine label={t('modals.focusStack.preflight.sources')} value={sourceReadinessLabel} />
+        <ComputationalSetupStatusLine label={t('modals.focusStack.qualityLabel')} value={selectedQualityLabel} />
         <ComputationalSetupStatusLine
           label={t('modals.focusStack.preflight.blend')}
           value={t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`)}
@@ -234,7 +236,7 @@ export default function FocusStackModal({
           <UiText variant={TextVariants.heading}>{t('modals.focusStack.preflightTitle')}</UiText>
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm">
-          <ComputationalSetupStatusLine label={t('modals.focusStack.preflight.sources')} value={String(sourceCount)} />
+          <ComputationalSetupStatusLine label={t('modals.focusStack.preflight.sources')} value={sourceReadinessLabel} />
           <ComputationalSetupStatusLine
             label={t('modals.focusStack.preflight.alignment')}
             value={t(`modals.focusStack.alignment.${settings.alignmentMode}`)}
@@ -243,10 +245,7 @@ export default function FocusStackModal({
             label={t('modals.focusStack.preflight.blend')}
             value={t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`)}
           />
-          <ComputationalSetupStatusLine
-            label={t('modals.focusStack.qualityLabel')}
-            value={qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? ''}
-          />
+          <ComputationalSetupStatusLine label={t('modals.focusStack.qualityLabel')} value={selectedQualityLabel} />
           <ComputationalSetupStatusLine
             label={t('modals.focusStack.preflight.retouch')}
             value={t(`modals.focusStack.retouchPolicy.${settings.retouchLayerPolicy}.label`)}
@@ -294,7 +293,7 @@ export default function FocusStackModal({
             rows: [
               {
                 label: t('modals.focusStack.preflight.sources'),
-                value: String(sourceCount),
+                value: sourceReadinessLabel,
               },
               {
                 label: t('modals.focusStack.preflight.alignment'),
@@ -302,7 +301,7 @@ export default function FocusStackModal({
               },
               {
                 label: t('modals.focusStack.qualityLabel'),
-                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '',
+                value: selectedQualityLabel,
               },
               {
                 label: t('modals.focusStack.preflight.previewBudget'),

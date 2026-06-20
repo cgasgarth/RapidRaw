@@ -10,8 +10,11 @@ const contractSource = readFileSync('src/utils/computationalMergeReviewPanels.ts
 for (const marker of [
   'focus-review-diagnostics',
   'focus-stack-setup-summary',
+  'sourceReadinessLabel',
   'sections={[',
   'modals.focusStack.preflight.sources',
+  'modals.focusStack.preflight.ready',
+  'modals.focusStack.preflight.blocked',
   'modals.focusStack.preflight.alignment',
   'modals.focusStack.qualityLabel',
   'modals.focusStack.preflight.previewBudget',
