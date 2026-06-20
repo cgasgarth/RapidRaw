@@ -738,9 +738,11 @@
     },
     "layers": {
       "actions": {
+        "collapseGroup": "Collapse group",
         "createAdjustmentLayer": "Create adjustment layer",
         "delete": "Delete layer",
         "duplicate": "Duplicate layer",
+        "expandGroup": "Expand group",
         "groupWithNext": "Group with next layer",
         "hide": "Hide layer",
         "moveDown": "Move layer down",

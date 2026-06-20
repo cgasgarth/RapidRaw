@@ -1,5 +1,17 @@
 import cx from 'clsx';
-import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, Layers3, Plus, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Eye,
+  EyeOff,
+  GripVertical,
+  Layers3,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -39,6 +51,7 @@ interface LayerRowModel {
   groupLayerCount: number;
   id: string;
   isBase: boolean;
+  isGroupCollapsed: boolean;
   isGroupHeader: boolean;
   isGroupedLayer: boolean;
   maskCount: number;
@@ -59,7 +72,7 @@ const blendModes = [
   { labelKey: 'editor.layers.blendModes.luminosity', value: 'Luminosity' },
 ] as const;
 
-function getLayerRows(masks: Array<MaskContainer>): Array<LayerRowModel> {
+function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string>): Array<LayerRowModel> {
   const groupSummaries = buildLayerGroupSummaries(masks);
   const rows: Array<LayerRowModel> = [];
   const emittedGroupIds = new Set<string>();
@@ -74,6 +87,7 @@ function getLayerRows(masks: Array<MaskContainer>): Array<LayerRowModel> {
         groupLayerCount: groupSummary?.layerCount ?? 1,
         id: `group:${mask.layerGroupId}`,
         isBase: false,
+        isGroupCollapsed: collapsedGroupIds.has(mask.layerGroupId),
         isGroupHeader: true,
         isGroupedLayer: false,
         maskCount: groupSummary?.layerIds.length ?? 1,
@@ -84,12 +98,17 @@ function getLayerRows(masks: Array<MaskContainer>): Array<LayerRowModel> {
       });
     }
 
+    if (mask.layerGroupId && collapsedGroupIds.has(mask.layerGroupId)) {
+      return;
+    }
+
     rows.push({
       blendMode: 'Normal',
       groupId: mask.layerGroupId ?? null,
       groupLayerCount: 0,
       id: mask.id,
       isBase: false,
+      isGroupCollapsed: false,
       isGroupHeader: false,
       isGroupedLayer: mask.layerGroupId !== undefined,
       maskCount: mask.subMasks.length,
@@ -107,6 +126,7 @@ function getLayerRows(masks: Array<MaskContainer>): Array<LayerRowModel> {
       groupLayerCount: 0,
       id: BASE_LAYER_ID,
       isBase: true,
+      isGroupCollapsed: false,
       isGroupHeader: false,
       isGroupedLayer: false,
       maskCount: 0,
@@ -128,7 +148,8 @@ export default function LayerStackPanel({
   onSetMaskContainers,
 }: LayerStackPanelProps) {
   const { t } = useTranslation();
-  const rows = useMemo(() => getLayerRows(masks), [masks]);
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
+  const rows = useMemo(() => getLayerRows(masks, collapsedGroupIds), [collapsedGroupIds, masks]);
   const [localSelectedLayerId, setLocalSelectedLayerId] = useState<string>(BASE_LAYER_ID);
   const selectedLayerId = activeMaskContainerId ?? localSelectedLayerId;
 
@@ -153,6 +174,19 @@ export default function LayerStackPanel({
   const selectRow = (row: LayerRowModel) => {
     setLocalSelectedLayerId(row.id);
     onSelectMaskContainer(row.isBase || row.isGroupHeader ? null : row.id);
+  };
+  const toggleGroupCollapsed = (groupId: string) => {
+    setCollapsedGroupIds((currentGroupIds) => {
+      const nextGroupIds = new Set(currentGroupIds);
+      if (nextGroupIds.has(groupId)) {
+        nextGroupIds.delete(groupId);
+      } else {
+        nextGroupIds.add(groupId);
+      }
+      return nextGroupIds;
+    });
+    setLocalSelectedLayerId(`group:${groupId}`);
+    onSelectMaskContainer(null);
   };
   const handleRowKeyDown = (event: KeyboardEvent<HTMLDivElement>, row: LayerRowModel) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -314,10 +348,43 @@ export default function LayerStackPanel({
               role="button"
               tabIndex={0}
             >
-              <GripVertical
-                size={15}
-                className={row.isBase || row.isGroupedLayer ? 'text-transparent' : 'text-text-secondary'}
-              />
+              {row.isGroupHeader && row.groupId ? (
+                (() => {
+                  const groupId = row.groupId;
+
+                  return (
+                    <button
+                      aria-label={
+                        row.isGroupCollapsed
+                          ? t('editor.layers.actions.expandGroup')
+                          : t('editor.layers.actions.collapseGroup')
+                      }
+                      className="h-6 w-6 rounded text-text-secondary hover:bg-card-active hover:text-text-primary"
+                      data-tooltip={
+                        row.isGroupCollapsed
+                          ? t('editor.layers.actions.expandGroup')
+                          : t('editor.layers.actions.collapseGroup')
+                      }
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggleGroupCollapsed(groupId);
+                      }}
+                      type="button"
+                    >
+                      {row.isGroupCollapsed ? (
+                        <ChevronRight size={15} className="mx-auto" />
+                      ) : (
+                        <ChevronDown size={15} className="mx-auto" />
+                      )}
+                    </button>
+                  );
+                })()
+              ) : (
+                <GripVertical
+                  size={15}
+                  className={row.isBase || row.isGroupedLayer ? 'text-transparent' : 'text-text-secondary'}
+                />
+              )}
               <span className="flex h-7 w-7 items-center justify-center rounded bg-bg-primary text-text-secondary ring-1 ring-surface">
                 <Layers3 size={15} />
               </span>
