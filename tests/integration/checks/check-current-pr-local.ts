@@ -221,6 +221,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:panorama-homography-diagnostics'],
   );
   addIf((file) => file.startsWith('packages/rawengine-schema/src/hdr'), ['check:hdr-ui-runtime-bridge']);
+  addIf((file) => file === 'src/components/modals/HdrModal.tsx', ['check:hdr-merge-ui']);
   addIf(
     (file) =>
       file === 'src/components/ui/AppProperties.tsx' ||
