@@ -1768,6 +1768,10 @@
         "license_review_required": "License review required"
       },
       "profileEvidenceCount": "{{fixtureCount}} fixture(s)",
+      "profileFilterAll": "All",
+      "profileFilterBlackAndWhite": "B&W",
+      "profileFilterColorNegative": "Color",
+      "profileFilterMeasured": "Measured",
       "profileMeasuredBadge": "Measured",
       "profileMeasuredClaimPolicy": "Process-family measured profile; no named-stock or colorimetric-match claim.",
       "profileSearch": "Search profiles",
