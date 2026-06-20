@@ -134,6 +134,7 @@
     "check:math-invariants": "bun tests/integration/checks/check-math-invariants.ts",
     "check:color-cpu-gpu-parity": "bun tests/integration/checks/check-color-cpu-gpu-parity.ts",
     "check:color-gpu-readback-probe": "bun tests/integration/checks/check-color-gpu-readback-probe.ts",
+    "check:color-gpu-readback-runtime-smoke": "RAWENGINE_RUN_GPU_READBACK_PROBE=1 RAWENGINE_GPU_READBACK_PROOF_PATH=../docs/validation/color-gpu-readback-runtime-smoke-2026-06-20.json bun scripts/run-compact-command.ts --label color-gpu-readback-runtime-smoke --cwd src-tauri -- cargo test --quiet --locked --no-default-features --features required-ci,validation-harness,tauri-test color_gpu_readback_probe::tests::runtime_smoke_reads_back_gpu_texture_when_enabled",
     "check:working-space-contract": "bun tests/integration/checks/check-working-space-contract.ts",
     "check:defringe": "bun tests/integration/checks/check-defringe-fixtures.ts",
     "check:dust-spot-visualization": "bun tests/integration/checks/check-dust-spot-visualization.ts",
