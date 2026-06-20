@@ -4832,7 +4832,8 @@ Issues:
     generative enhancement claims.
   - Required gates to add over iterations: `check:denoise-fixtures`,
     `check:denoise-cpu-reference`, `check:denoise-preview-runtime`,
-    `check:denoise-preview-export-parity`, `check:denoise-e2e`,
+    `check:denoise-workflow-smoke`, future denoise preview/export parity,
+    future denoise UI E2E,
     `check:deblur-fixtures`, `check:deblur-cpu-reference`,
     `check:deblur-ringing`, `check:deblur-preview-runtime`,
     `check:deblur-preview-export-parity`, `check:deblur-e2e`,

@@ -67,7 +67,10 @@ The first runtime PR should pass:
 - `bun run check:denoise-fixtures`
 - `bun run check:denoise-cpu-reference`
 - `bun run check:denoise-preview-runtime`
-- `bun run check:denoise-preview-export-parity`
+- `bun run check:denoise-workflow-smoke`
+
+The preview/export parity proof remains pending until preview and export run
+through independent production paths.
 
 Maturity requires additional evidence:
 
