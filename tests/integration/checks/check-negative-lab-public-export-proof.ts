@@ -73,6 +73,49 @@ const reportSchema = z
       )
       .min(7),
     fixtureId: z.literal('negative_lab.real.public.cc0_110_ericht_negative_001'),
+    controlSurface: z
+      .object({
+        baseFog: z
+          .object({
+            sampleRect: z
+              .object({
+                height: z.literal(0.35),
+                width: z.literal(0.35),
+                x: z.literal(0),
+                y: z.literal(0),
+              })
+              .strict(),
+            strength: f32Literal(1),
+          })
+          .strict(),
+        density: z
+          .object({
+            blueWeight: f32Literal(0.98),
+            contrast: f32Literal(0.95),
+            exposure: f32Literal(0.05),
+            greenWeight: f32Literal(1),
+            redWeight: f32Literal(1.03),
+          })
+          .strict(),
+        export: z
+          .object({
+            acceptedDryRunPlanHash: z.literal('fnv1a32:2f4a91bc'),
+            acceptedDryRunPlanId: z.literal('negative_lab_batch_plan_2f4a91bc'),
+            outputFormat: z.literal('jpeg_proof'),
+            profileProvenanceHash: fnv32HashSchema,
+            suffix: z.literal('Positive'),
+          })
+          .strict(),
+        preset: z
+          .object({
+            claimPolicy: z.literal('generic_starting_point_no_stock_claim'),
+            displayName: z.literal('C-41 Portrait'),
+            presetId: z.literal('negative_lab.generic.c41.portrait.v1'),
+            processFamily: z.literal('c41_color_negative'),
+          })
+          .strict(),
+      })
+      .strict(),
     inputToOutputMeanAbsDelta: z.number().gt(0.01),
     issue: z.literal(2311),
     metrics: z

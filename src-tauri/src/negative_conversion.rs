@@ -1563,6 +1563,37 @@ mod tests {
                 "stock_library_maturity"
             ],
             "fixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001",
+            "controlSurface": {
+                "baseFog": {
+                    "sampleRect": {
+                        "height": 0.35,
+                        "width": 0.35,
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "strength": params.base_fog_strength
+                },
+                "density": {
+                    "blueWeight": params.blue_weight,
+                    "contrast": params.contrast,
+                    "exposure": params.exposure,
+                    "greenWeight": params.green_weight,
+                    "redWeight": params.red_weight
+                },
+                "export": {
+                    "acceptedDryRunPlanHash": save_options.accepted_dry_run_plan_hash,
+                    "acceptedDryRunPlanId": save_options.accepted_dry_run_plan_id,
+                    "outputFormat": "jpeg_proof",
+                    "profileProvenanceHash": save_options.profile_provenance_hash,
+                    "suffix": save_options.suffix
+                },
+                "preset": {
+                    "claimPolicy": applied_profile_claim_policy,
+                    "displayName": applied_profile_display_name,
+                    "presetId": applied_profile_id,
+                    "processFamily": "c41_color_negative"
+                }
+            },
             "inputToOutputMeanAbsDelta": input_to_output_delta,
             "issue": 2311,
             "metrics": {
