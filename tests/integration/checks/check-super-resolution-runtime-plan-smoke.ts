@@ -129,6 +129,25 @@ assertEqual(applied.provenance.confidenceMap.minSampleCount, 1, 'minimum sample 
 assertEqual(applied.provenance.confidenceMap.maxSampleCount, 1, 'maximum sample count');
 assertEqual(applied.provenance.detailQuality.outputPixelCount, HIGH_WIDTH * HIGH_HEIGHT, 'detail output pixels');
 assertEqual(
+  applied.provenance.reconstructionDiagnostics.algorithmId,
+  'integer_pixel_shift_interleave_x2_v1',
+  'reconstruction algorithm',
+);
+assertEqual(applied.provenance.reconstructionDiagnostics.status, 'accepted', 'reconstruction status');
+assertEqual(applied.provenance.reconstructionDiagnostics.filledPixelRatio, 1, 'reconstruction filled ratio');
+assertEqual(applied.provenance.reconstructionDiagnostics.finiteOutputRatio, 1, 'reconstruction finite ratio');
+assertEqual(applied.provenance.reconstructionDiagnostics.missingPixelCount, 0, 'reconstruction missing pixels');
+assertEqual(
+  applied.provenance.reconstructionDiagnostics.duplicateSamplePixelCount,
+  0,
+  'reconstruction duplicate sample pixels',
+);
+assertEqual(
+  applied.provenance.reconstructionDiagnostics.averageSamplesPerOutputPixel,
+  1,
+  'reconstruction average samples',
+);
+assertEqual(
   applied.provenance.detailQuality.sourcePixelCount,
   LOW_WIDTH * LOW_HEIGHT * frames.length,
   'detail source pixels',
@@ -158,9 +177,11 @@ const result = {
   quality: {
     confidenceMap: applied.provenance.confidenceMap,
     detailQuality: applied.provenance.detailQuality,
+    reconstructionDiagnostics: applied.provenance.reconstructionDiagnostics,
   },
   improvementRatio,
   outputArtifactContentHash: outputArtifact.contentHash,
+  performanceEstimate: dryRun.dryRunResult.mergePlan.performanceEstimate,
   outputSha256: new Bun.CryptoHasher('sha256').update(new Uint8Array(applied.outputPixels.buffer)).digest('hex'),
   outputSize: dryRun.dryRunResult.mergePlan.outputDimensions,
   runtimeStatus: applied.provenance.runtimeStatus,

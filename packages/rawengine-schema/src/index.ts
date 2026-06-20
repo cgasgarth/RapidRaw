@@ -36,6 +36,7 @@ export * from './rawEngineSchemas.js';
 export * from './samplePayloads.js';
 export * from './superResolutionAlignmentDiagnostics.js';
 export * from './superResolutionAppServerRuntime.js';
+export * from './superResolutionReconstructionDiagnostics.js';
 export * from './superResolutionRuntimePlan.js';
 export * from './superResolutionSidecarProvenance.js';
 export * from './superResolutionSourceValidation.js';

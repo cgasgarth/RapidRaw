@@ -1,0 +1,30 @@
+{
+  "acceptedConsultRecommendations": [
+    "Use conservative integer pixel-shift interleave for the first x2 runtime proof.",
+    "Gate claims on complete unique declared x2 lattice, finite output, and filled output pixels.",
+    "Defer motion robustness, photometric normalization, demosaic-aware detail claims, and final quality claims."
+  ],
+  "doesNotProve": ["real_raw_e2e", "preview_export_parity", "motion_robustness", "final_detail_quality"],
+  "generatedAt": "2026-06-20T00:00:00.000Z",
+  "issue": 2358,
+  "performanceEstimate": { "estimatedPeakMemoryBytes": 98304, "estimatedRuntimeMs": 1, "requiresBackgroundJob": false },
+  "reconstructionDiagnostics": {
+    "algorithmId": "integer_pixel_shift_interleave_x2_v1",
+    "averageSamplesPerOutputPixel": 1,
+    "duplicateSamplePixelCount": 0,
+    "duplicateSampleRatio": 0,
+    "filledPixelRatio": 1,
+    "finiteOutputRatio": 1,
+    "missingPixelCount": 0,
+    "outputPixelCount": 6144,
+    "outputScale": 2,
+    "reconstructionMethod": "integer_shift_interleave_average",
+    "singleSamplePixelCount": 6144,
+    "status": "accepted",
+    "warningCodes": []
+  },
+  "runtimeFixture": "synthetic_sr_runtime_plan_v1",
+  "runtimeStatus": "runtime_apply_capable_first_pass",
+  "schemaVersion": 1,
+  "validationMode": "synthetic_sr_x2_reconstruction_runtime_proof"
+}
