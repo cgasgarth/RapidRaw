@@ -43,6 +43,8 @@
     "check:validation-inventory": "bun scripts/generate-validation-inventory-report.ts",
     "check:validation-inventory:update": "bun scripts/generate-validation-inventory-report.ts --update",
     "check:validation-inventory:self-test": "bun scripts/generate-validation-inventory-report.ts --self-test",
+    "check:goal-progress-report": "bun scripts/generate-goal-progress-report.ts",
+    "check:goal-progress-report:update": "bun scripts/generate-goal-progress-report.ts --update",
     "check:proof-level-semantics": "bun tests/integration/checks/check-proof-level-semantics.ts",
     "check:proof-level-semantics:self-test": "bun tests/integration/checks/check-proof-level-semantics.ts --self-test",
     "check:i18n": "bun scripts/run-compact-command.ts --label i18n -- i18next-cli extract --ci --dry-run",
