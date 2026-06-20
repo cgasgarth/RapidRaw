@@ -84,6 +84,18 @@ export const rawEngineLocalAppServerHslCommandV1Schema = toneColorCommandEnvelop
   },
 );
 
+export const rawEngineLocalAppServerSkinToneUniformityCommandV1Schema = toneColorCommandEnvelopeV1Schema.superRefine(
+  (command, context) => {
+    if (command.commandType !== 'toneColor.adjustSkinToneUniformity') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Local app-server bridge expected a skin-tone uniformity command.',
+        path: ['commandType'],
+      });
+    }
+  },
+);
+
 export type RawEngineLocalAppServerToolRegistryQueryV1 = z.infer<
   typeof rawEngineLocalAppServerToolRegistryQueryV1Schema
 >;
@@ -92,6 +104,9 @@ export type RawEngineLocalAppServerBasicToneDryRunCommandV1 = z.infer<
 >;
 export type RawEngineLocalAppServerBasicToneCommandV1 = z.infer<typeof rawEngineLocalAppServerBasicToneCommandV1Schema>;
 export type RawEngineLocalAppServerHslCommandV1 = z.infer<typeof rawEngineLocalAppServerHslCommandV1Schema>;
+export type RawEngineLocalAppServerSkinToneUniformityCommandV1 = z.infer<
+  typeof rawEngineLocalAppServerSkinToneUniformityCommandV1Schema
+>;
 
 export const rawEngineLocalAppServerAiEnhancementCommandV1Schema = aiEnhancementCommandEnvelopeV1Schema;
 
@@ -253,6 +268,67 @@ const buildHslMutationResult = (
     warnings: buildHslWarnings(command.parameters.band),
   });
 
+const SKIN_TONE_UNIFORMITY_PARAMETER_DIFF_PATHS = [
+  'hueUniformity',
+  'saturationUniformity',
+  'luminanceUniformity',
+  'targetHueDegrees',
+  'targetSaturation',
+  'targetLuminance',
+  'maxHueShiftDegrees',
+] as const satisfies ReadonlyArray<
+  keyof Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustSkinToneUniformity' }>['parameters']
+>;
+
+const SKIN_TONE_UNIFORMITY_WARNINGS = [
+  'Experimental skin-tone uniformity command: synthetic/runtime proof only; no real RAW e2e or preview/export parity claim.',
+] as const;
+
+const buildSkinToneUniformityDryRunResult = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustSkinToneUniformity' }>,
+): ToneColorDryRunResultV1 =>
+  toneColorDryRunResultV1Schema.parse({
+    colorPipeline: command.colorPipeline,
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: true,
+    mutates: false,
+    parameterDiff: SKIN_TONE_UNIFORMITY_PARAMETER_DIFF_PATHS.map((key) => ({
+      module: 'skin_tone_uniformity',
+      path: `/parameters/skinToneUniformity/${key}`,
+      previousValue: 0,
+      value: command.parameters[key],
+    })),
+    predictedGraphRevision: `${command.expectedGraphRevision}:preview:${command.commandId}`,
+    previewArtifacts: [],
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    warnings: [...SKIN_TONE_UNIFORMITY_WARNINGS],
+  });
+
+const buildSkinToneUniformityPlanKey = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustSkinToneUniformity' }>,
+): string => JSON.stringify([command.expectedGraphRevision, command.target, command.parameters]);
+
+const buildSkinToneUniformityMutationResult = (
+  command: Extract<ToneColorCommandEnvelopeV1, { commandType: 'toneColor.adjustSkinToneUniformity' }>,
+): ToneColorMutationResultV1 =>
+  toneColorMutationResultV1Schema.parse({
+    appliedGraphRevision: `${command.expectedGraphRevision}:apply:${command.commandId}`,
+    changedNodeIds: [`tone_color_skin_uniformity:${command.target.kind}`],
+    colorPipeline: command.colorPipeline,
+    commandId: command.commandId,
+    commandType: command.commandType,
+    correlationId: command.correlationId,
+    dryRun: false,
+    mutates: true,
+    schemaVersion: command.schemaVersion,
+    sourceGraphRevision: command.expectedGraphRevision,
+    undoRevision: command.expectedGraphRevision,
+    warnings: [...SKIN_TONE_UNIFORMITY_WARNINGS],
+  });
+
 const buildAiEnhancementPlanId = (command: RawEngineLocalAppServerAiEnhancementCommandV1): string =>
   `dryrun_${command.parameters.capability}_${command.commandId}`;
 
@@ -362,6 +438,7 @@ export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiEnhancementDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedBasicToneDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
+  readonly #acceptedSkinToneUniformityDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
   readonly #commandBus: EditCommandBus;
   readonly #toolRegistry: RawEngineToolRegistryV1;
@@ -472,6 +549,29 @@ export class RawEngineLocalAppServerBridge {
     });
 
     this.#commandBus.register({
+      commandType: 'toneColor.adjustSkinToneUniformity',
+      execute: (command) => {
+        const parsedCommand = rawEngineLocalAppServerSkinToneUniformityCommandV1Schema.parse(command);
+        if (parsedCommand.commandType !== 'toneColor.adjustSkinToneUniformity') {
+          throw new Error('Local app-server bridge expected a skin-tone uniformity command after schema validation.');
+        }
+        if (parsedCommand.dryRun) {
+          const dryRunResult = buildSkinToneUniformityDryRunResult(parsedCommand);
+          this.#acceptedSkinToneUniformityDryRunPlanKeys.add(buildSkinToneUniformityPlanKey(parsedCommand));
+          return dryRunResult;
+        }
+
+        const planKey = buildSkinToneUniformityPlanKey(parsedCommand);
+        if (!this.#acceptedSkinToneUniformityDryRunPlanKeys.has(planKey)) {
+          throw new Error('Local app-server bridge rejected skin-tone uniformity apply without a matching dry-run.');
+        }
+
+        return buildSkinToneUniformityMutationResult(parsedCommand);
+      },
+      schema: rawEngineLocalAppServerSkinToneUniformityCommandV1Schema,
+    });
+
+    this.#commandBus.register({
       commandType: 'ai.enhancement.dryRun',
       execute: (command) => {
         const parsedCommand = rawEngineLocalAppServerAiEnhancementCommandV1Schema.parse(command);
@@ -521,7 +621,7 @@ export const buildRawEngineLocalAppServerBridgeCapabilities = (
 ): {
   commandTypes: string[];
   mutatingCommands: boolean;
-  runtimeStatus: 'basic_tone_hsl_and_ai_enhancement_dry_run_apply';
+  runtimeStatus: 'basic_tone_hsl_skin_tone_and_ai_enhancement_dry_run_apply';
 } => {
   const commandTypes = bridge.listCommandTypes().sort((left, right) => left.localeCompare(right));
 
@@ -530,8 +630,9 @@ export const buildRawEngineLocalAppServerBridgeCapabilities = (
     mutatingCommands:
       commandTypes.includes('ai.enhancement.apply') ||
       commandTypes.includes('toneColor.adjustHsl') ||
+      commandTypes.includes('toneColor.adjustSkinToneUniformity') ||
       commandTypes.includes('toneColor.setBasicTone'),
-    runtimeStatus: 'basic_tone_hsl_and_ai_enhancement_dry_run_apply',
+    runtimeStatus: 'basic_tone_hsl_skin_tone_and_ai_enhancement_dry_run_apply',
   };
 };
 

@@ -51,6 +51,20 @@
       "uiProofStatus": "covered_by_color_workflow_visual_smoke"
     }
   ],
+  "commandProof": {
+    "applyCommandId": "command_tone_color_skin_uniformity_apply_001",
+    "changedNodeId": "tone_color_skin_uniformity:image",
+    "commandType": "toneColor.adjustSkinToneUniformity",
+    "dryRunCommandId": "command_tone_color_skin_uniformity_preview_001",
+    "experimental": true,
+    "issue": 2332,
+    "localAppServerBridge": "dry_run_then_apply_required",
+    "maxHueShiftDegrees": 18,
+    "runtimeStatus": "experimental_runtime_slice",
+    "warnings": [
+      "Experimental skin-tone uniformity command: synthetic/runtime proof only; no real RAW e2e or preview/export parity claim."
+    ]
+  },
   "fixturePath": "fixtures/color/skin-tone-uniformity-fixtures.json",
   "issue": 1263,
   "schemaVersion": 1,

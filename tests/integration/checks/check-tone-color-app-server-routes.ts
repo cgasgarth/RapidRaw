@@ -128,6 +128,27 @@ if (!parsedHslCommand.success || parsedHslCommand.data.commandType !== 'toneColo
   failures.push('Tone-color HSL command does not validate the color-mixer route type.');
 }
 
+const parsedSkinToneCommand = toneColorCommandEnvelopeV1Schema.safeParse({
+  ...sampleToneColorCommandEnvelopeV1,
+  commandId: 'command_tone_color_skin_uniformity_preview_sample',
+  commandType: 'toneColor.adjustSkinToneUniformity',
+  correlationId: 'corr_tone_color_skin_uniformity_preview_sample',
+  idempotencyKey: 'idem_tone_color_skin_uniformity_preview_sample',
+  parameters: {
+    experimental: true,
+    hueUniformity: 0.45,
+    luminanceUniformity: 0.25,
+    maxHueShiftDegrees: 18,
+    saturationUniformity: 0.35,
+    targetHueDegrees: 22,
+    targetLuminance: 0.58,
+    targetSaturation: 0.36,
+  },
+});
+if (!parsedSkinToneCommand.success || parsedSkinToneCommand.data.commandType !== 'toneColor.adjustSkinToneUniformity') {
+  failures.push('Tone-color skin-tone uniformity command does not validate the experimental route type.');
+}
+
 const parsedColorGradingCommand = toneColorCommandEnvelopeV1Schema.safeParse({
   ...sampleToneColorCommandEnvelopeV1,
   commandId: 'command_tone_color_color_grading_preview_sample',

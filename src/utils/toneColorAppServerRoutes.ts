@@ -21,6 +21,7 @@ const applyRoute = {
 } as const;
 const executableCommandTypes = new Set<ToneColorAppServerCommandType>([
   'toneColor.adjustHsl',
+  'toneColor.adjustSkinToneUniformity',
   'toneColor.setBasicTone',
 ]);
 
@@ -96,6 +97,24 @@ export const TONE_COLOR_APP_SERVER_ROUTE_MANIFEST = toneColorAppServerRouteManif
         'HSL color mixer applies reuse the approved tone/color apply tool and persist an undoable edit graph update.',
       runtimeCheckScript: 'check:selective-color-ranges',
       status: routeStatusForCommand('toneColor.adjustHsl'),
+    },
+    {
+      commandType: 'toneColor.adjustSkinToneUniformity',
+      ...dryRunRoute,
+      inputSchemaName,
+      reason:
+        'Experimental skin-tone uniformity dry-runs use bounded tone/color command parameters and runtime fixture validation.',
+      runtimeCheckScript: 'check:skin-tone-uniformity',
+      status: routeStatusForCommand('toneColor.adjustSkinToneUniformity'),
+    },
+    {
+      commandType: 'toneColor.adjustSkinToneUniformity',
+      ...applyRoute,
+      inputSchemaName,
+      reason:
+        'Experimental skin-tone uniformity applies reuse the approved tone/color apply tool with conservative runtime warnings.',
+      runtimeCheckScript: 'check:skin-tone-uniformity',
+      status: routeStatusForCommand('toneColor.adjustSkinToneUniformity'),
     },
     {
       commandType: 'toneColor.setColorGrading',
