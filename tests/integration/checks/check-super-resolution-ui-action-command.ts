@@ -18,10 +18,10 @@ const actionMetadataSchema = z
   .strict();
 
 const sourcePaths = [
-  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-01.nef',
-  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-02.nef',
-  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-03.nef',
-  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-04.nef',
+  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-01.arw',
+  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-02.arw',
+  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-03.arw',
+  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-04.arw',
 ];
 const settings = {
   ...DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,

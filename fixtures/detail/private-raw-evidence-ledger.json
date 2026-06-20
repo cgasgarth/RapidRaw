@@ -356,10 +356,10 @@
     {
       "artifactClass": "subpixel_detail_reconstruction",
       "camera": {
-        "cameraMake": "Nikon",
-        "cameraModel": "Z 8",
-        "lens": "NIKKOR Z 50mm f/1.8 S",
-        "rawFormat": "nef"
+        "cameraMake": "Sony",
+        "cameraModel": "ILCE-7M3",
+        "lens": "FE 24-105mm F4 G OSS",
+        "rawFormat": "arw"
       },
       "crop": {
         "height": 1024,
@@ -371,17 +371,17 @@
       "evidenceId": "raw-evidence.super-resolution.subpixel-detail.v1",
       "expectedUse": ["super_resolution", "detail", "preview_export_parity"],
       "exposure": {
-        "aperture": 5.6,
+        "aperture": 4,
         "exposureBiasEv": 0,
-        "iso": 100,
-        "shutterSeconds": 0.002
+        "iso": 200,
+        "shutterSeconds": 0.004
       },
       "featureFamily": "super_resolution",
-      "notes": "Reserved private burst for real RAW super-resolution alignment, detail gain, zippering artifacts, and export parity proof.",
+      "notes": "Project-owned Alaska ARW burst for real RAW super-resolution alignment, detail gain, zippering artifacts, and export parity proof.",
       "rights": {
         "allowedUse": "local_validation_only",
         "copyrightOwner": "RawEngine private fixture owner",
-        "evidence": "Private burst capture must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "evidence": "User explicitly provided /Users/cgas/Pictures/Capture One/Alaska as project-owned RAW validation input for this repo.",
         "publicRepoAllowed": false,
         "rightsStatus": "project_owned"
       },
