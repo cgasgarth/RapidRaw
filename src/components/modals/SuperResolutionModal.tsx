@@ -61,11 +61,16 @@ export default function SuperResolutionModal({
     { label: t('modals.superResolution.qualityBalanced'), value: 'balanced' },
     { label: t('modals.superResolution.qualityBest'), value: 'best' },
   ];
+  const selectedAlignmentLabel =
+    alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label ?? '';
   const selectedQualityLabel =
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
   const sourceReadinessLabel = `${t('modals.superResolution.sourceSummary', { count: sourceCount })} - ${
     isSourceCountValid ? t('modals.superResolution.preflight.ready') : t('modals.superResolution.preflight.blocked')
   }`;
+  const reconstructionReadinessLabel = isSourceCountValid
+    ? t('modals.superResolution.preflight.ready')
+    : t('modals.superResolution.preflight.blocked');
 
   const setSetting = useCallback(
     (patch: Partial<SuperResolutionUiSettings>) => {
@@ -151,6 +156,32 @@ export default function SuperResolutionModal({
           ))}
         </div>
       </ComputationalSetupOptionSection>
+
+      <section
+        className="grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm"
+        data-alignment-mode={settings.alignmentMode}
+        data-detail-policy={settings.detailPolicy}
+        data-reconstruction-ready={String(isSourceCountValid)}
+        data-source-count={sourceCount}
+        data-testid="sr-readiness-summary"
+      >
+        <ComputationalSetupStatusLine
+          label={t('modals.superResolution.preflight.sources')}
+          value={t('modals.superResolution.sourceSummary', { count: sourceCount })}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.superResolution.preflight.alignment')}
+          value={selectedAlignmentLabel}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.superResolution.preflight.detail')}
+          value={t(`modals.superResolution.detailPolicy.${settings.detailPolicy}.label`)}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.superResolution.workflowTitle')}
+          value={reconstructionReadinessLabel}
+        />
+      </section>
 
       <section className="grid grid-cols-2 gap-4">
         <div>
