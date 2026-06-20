@@ -58,6 +58,8 @@
     "check:preview-scopes": "bun scripts/check-preview-scopes.ts",
     "check:black-white-mixer": "bun scripts/check-black-white-mixer.ts",
     "check:color-balance-rgb": "bun scripts/check-color-balance-rgb.ts",
+    "check:color-balance-command-proof": "bun scripts/check-color-balance-command-proof.ts",
+    "check:color-balance-command-proof:update": "bun scripts/check-color-balance-command-proof.ts --update",
     "check:channel-mixer": "bun scripts/check-channel-mixer.ts",
     "check:levels-runtime": "bun scripts/check-levels-runtime.ts",
     "check:color-grading-presets": "bun scripts/check-color-grading-presets.ts",
