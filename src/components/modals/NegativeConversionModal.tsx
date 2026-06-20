@@ -16,6 +16,7 @@ import {
   Copy,
   ChevronLeft,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
@@ -1672,17 +1673,32 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               </UiText>
             </div>
           </div>
-          <input
-            aria-label={t('modals.negativeConversion.profileSearch')}
-            className="mb-3 w-full rounded-md border border-surface bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent"
-            data-testid="negative-lab-profile-search"
-            onChange={(event) => {
-              setProfileSearchQuery(event.currentTarget.value);
-            }}
-            placeholder={t('modals.negativeConversion.profileSearch')}
-            type="search"
-            value={profileSearchQuery}
-          />
+          <div className="relative mb-3">
+            <input
+              aria-label={t('modals.negativeConversion.profileSearch')}
+              className="w-full rounded-md border border-surface bg-bg-primary px-3 py-2 pr-10 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent"
+              data-testid="negative-lab-profile-search"
+              onChange={(event) => {
+                setProfileSearchQuery(event.currentTarget.value);
+              }}
+              placeholder={t('modals.negativeConversion.profileSearch')}
+              type="search"
+              value={profileSearchQuery}
+            />
+            <button
+              aria-label={t('modals.negativeConversion.profileSearchClear')}
+              className="absolute right-1 top-1 h-8 w-8 rounded text-text-secondary transition-colors hover:bg-surface hover:text-text-primary disabled:pointer-events-none disabled:opacity-0"
+              data-testid="negative-lab-profile-search-clear"
+              data-tooltip={t('modals.negativeConversion.profileSearchClear')}
+              disabled={profileSearchQuery.length === 0}
+              onClick={() => {
+                setProfileSearchQuery('');
+              }}
+              type="button"
+            >
+              <X aria-hidden="true" className="mx-auto" size={14} />
+            </button>
+          </div>
           <label className="mb-3 block space-y-1">
             <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
               {t('modals.negativeConversion.profileSort')}
