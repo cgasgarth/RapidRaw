@@ -434,7 +434,9 @@
     "check:deblur-workflow-smoke": "bun tests/integration/checks/check-deblur-workflow-smoke.ts",
     "check:deblur-ui-api": "bun tests/integration/checks/check-deblur-ui-api.ts",
     "check:deblur-app-server-tool": "bun tests/integration/checks/check-deblur-app-server-tool.ts",
-    "check:panorama-real-raw-private-app-server-proof": "bun tests/integration/checks/check-panorama-real-raw-private-app-server-proof.ts"
+    "check:panorama-real-raw-private-app-server-proof": "bun tests/integration/checks/check-panorama-real-raw-private-app-server-proof.ts",
+    "check:macos-colorsync-display-proof": "bun tests/integration/checks/check-macos-colorsync-display-proof.ts",
+    "check:macos-colorsync-display-proof:update": "bun tests/integration/checks/check-macos-colorsync-display-proof.ts --update"
   },
   "dependencies": {
     "@clerk/react": "^6.9.1",

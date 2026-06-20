@@ -1,0 +1,36 @@
+{
+  "displaySnapshot": {
+    "candidateDisplayProfileCount": 1,
+    "candidateDisplayProfiles": [
+      {
+        "fileLabel": "Color LCD-sanitized.icc",
+        "sha256Prefix": "56e2fe120335a383",
+        "sizeBytes": 4064
+      }
+    ],
+    "mainDisplay": {
+      "connectionType": "spdisplays_internal",
+      "displayType": "spdisplays_built-in-liquid-retina-xdr",
+      "name": "Color LCD",
+      "pixelResolution": "spdisplays_3024x1964Retina",
+      "pixels": "3600 x 2338"
+    },
+    "source": "system_profiler SPDisplaysDataType -json + ColorSync display profile directory"
+  },
+  "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
+  "generatedAt": "2026-06-20T01:06:45.397Z",
+  "issue": 2327,
+  "outputTransform": {
+    "bitDepth": 16,
+    "embedIcc": true,
+    "intent": "relative_colorimetric",
+    "outputProfile": "display_p3",
+    "sceneToDisplayTransform": "rawengine_agx_v1",
+    "viewTransform": "rawengine_agx_v1",
+    "workingSpace": "acescg_linear_v1"
+  },
+  "rawImagePathFromCommand": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+  "runtimeStatus": "local_macos_colorsync_display_transform_proof",
+  "schemaVersion": 1,
+  "sourceRelativePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw"
+}

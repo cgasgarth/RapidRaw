@@ -82,5 +82,7 @@
       "reason": "Lightning CSS native optional packages; MPL-2.0 is weak copyleft and accepted with notice tracking."
     }
   ],
-  "missingLicenseFileAllowed": {}
+  "missingLicenseFileAllowed": {
+    "@pkgr/core@0.3.6": "Package metadata declares MIT; npm package does not ship a license file."
+  }
 }
