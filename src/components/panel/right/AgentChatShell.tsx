@@ -1,6 +1,8 @@
-import { AlertTriangle, CheckCircle2, CircleDashed, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Server, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { buildAgentAppServerToolReadinessSummary } from '../../../utils/agentAppServerToolReadiness';
 
 import type {
   AgentArtifactReview,
@@ -53,6 +55,8 @@ const auditOutcomeStyles = {
 } satisfies Record<AgentAuditTranscript['records'][number]['outcome'], string>;
 
 type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
+
+const formatRouteFamily = (family: string): string => family.replaceAll('_', ' ');
 
 function MessageBubble({ message }: { message: AgentChatMessage }) {
   const isUser = message.role === 'user';
@@ -433,6 +437,77 @@ function ToolCallRow({ toolCall }: { toolCall: AgentChatToolCall }) {
   );
 }
 
+function AppServerToolReadinessSummary() {
+  const { t } = useTranslation();
+  const summary = buildAgentAppServerToolReadinessSummary();
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3"
+      data-apply-route-count={summary.applyRouteCount}
+      data-dry-run-route-count={summary.dryRunRouteCount}
+      data-family-count={summary.familyCount}
+      data-host-command-route-count={summary.hostCommandRouteCount}
+      data-route-count={summary.routeCount}
+      data-runtime-check-count={summary.runtimeCheckCount}
+      data-testid="agent-app-server-tool-readiness"
+      data-tool-count={summary.toolCount}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-semibold text-text-primary">
+            <Server size={15} />
+            <span>{t('editor.ai.agent.readiness.title')}</span>
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">
+            {t('editor.ai.agent.readiness.registeredOnly')}
+          </p>
+        </div>
+        <span className="shrink-0 rounded border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-100">
+          {t('editor.ai.agent.readiness.appServer')}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2 text-[11px]" data-testid="agent-app-server-tool-readiness-counts">
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{t('editor.ai.agent.readiness.tools')}</div>
+          <div className="mt-1 font-mono text-text-primary">{summary.toolCount}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{t('editor.ai.agent.readiness.routes')}</div>
+          <div className="mt-1 font-mono text-text-primary">{summary.routeCount}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{t('editor.ai.agent.readiness.dryRuns')}</div>
+          <div className="mt-1 font-mono text-text-primary">{summary.dryRunRouteCount}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{t('editor.ai.agent.readiness.applies')}</div>
+          <div className="mt-1 font-mono text-text-primary">{summary.applyRouteCount}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5" data-testid="agent-app-server-tool-readiness-families">
+        {summary.families.map((family) => (
+          <span
+            className="rounded border border-white/10 bg-black/15 px-2 py-1 text-[11px] text-text-secondary"
+            data-apply-route-count={family.applyRouteCount}
+            data-dry-run-route-count={family.dryRunRouteCount}
+            data-family={family.family}
+            data-route-count={family.routeCount}
+            data-testid={`agent-app-server-tool-family-${family.family}`}
+            data-tool-count={family.toolCount}
+            key={family.family}
+          >
+            <span className="text-text-primary">{formatRouteFamily(family.family)}</span>
+            <span className="ml-1 font-mono">{family.toolCount}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AgentChatShell({ transcript }: AgentChatShellProps) {
   const { t } = useTranslation();
 
@@ -460,6 +535,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
           <MessageBubble key={message.id} message={message} />
         ))}
       </div>
+
+      <AppServerToolReadinessSummary />
 
       <div className="space-y-2" data-testid="agent-tool-transcript">
         <div className="flex items-center justify-between text-xs">

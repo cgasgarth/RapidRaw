@@ -554,6 +554,15 @@
           "read": ""
         },
         "noAppliedEdits": "",
+        "readiness": {
+          "applies": "",
+          "appServer": "",
+          "dryRuns": "",
+          "registeredOnly": "",
+          "routes": "",
+          "title": "",
+          "tools": ""
+        },
         "review": {
           "applyUnavailable": "",
           "dryRun": "",

@@ -518,6 +518,15 @@
           "read": "Read"
         },
         "noAppliedEdits": "No edits applied",
+        "readiness": {
+          "applies": "Applies",
+          "appServer": "App-server",
+          "dryRuns": "Dry-runs",
+          "registeredOnly": "Registered tool surfaces only; runtime output validation remains per feature.",
+          "routes": "Routes",
+          "title": "Tool readiness",
+          "tools": "Tools"
+        },
         "review": {
           "applyUnavailable": "Apply unavailable",
           "dryRun": "Dry-run",
