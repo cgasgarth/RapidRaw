@@ -4,6 +4,16 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
+import { createRawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
+import {
+  toneColorCommandEnvelopeV1Schema,
+  toneColorDryRunResultV1Schema,
+  toneColorMutationResultV1Schema,
+} from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  sampleToneColorApplyCommandEnvelopeV1,
+  sampleToneColorCommandEnvelopeV1,
+} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { applySkinToneUniformity, applySkinToneUniformityToRgbPixel } from '../../../src/utils/skinToneUniformity.ts';
 
 const FIXTURE_PATH = 'fixtures/color/skin-tone-uniformity-fixtures.json';
@@ -65,6 +75,20 @@ const reportCaseSchema = z
 const reportSchema = z
   .object({
     cases: z.array(reportCaseSchema).min(1),
+    commandProof: z
+      .object({
+        applyCommandId: z.literal('command_tone_color_skin_uniformity_apply_001'),
+        changedNodeId: z.literal('tone_color_skin_uniformity:image'),
+        commandType: z.literal('toneColor.adjustSkinToneUniformity'),
+        dryRunCommandId: z.literal('command_tone_color_skin_uniformity_preview_001'),
+        experimental: z.literal(true),
+        issue: z.literal(2332),
+        localAppServerBridge: z.literal('dry_run_then_apply_required'),
+        maxHueShiftDegrees: z.number().min(0).max(30),
+        runtimeStatus: z.literal('experimental_runtime_slice'),
+        warnings: z.array(z.string().min(1)).min(1),
+      })
+      .strict(),
     fixturePath: z.literal(FIXTURE_PATH),
     issue: z.literal(1263),
     schemaVersion: z.literal(1),
@@ -93,6 +117,64 @@ const manifest = manifestSchema.parse(JSON.parse(await readFile(FIXTURE_PATH, 'u
 const fields = ['hueDegrees', 'saturation', 'luminance'];
 const failures = [];
 const reportCases = [];
+const commandSettings = {
+  experimental: true,
+  hueUniformity: 0.45,
+  luminanceUniformity: 0.25,
+  maxHueShiftDegrees: 18,
+  saturationUniformity: 0.35,
+  targetHueDegrees: 22,
+  targetLuminance: 0.58,
+  targetSaturation: 0.36,
+} as const;
+const dryRunCommand = toneColorCommandEnvelopeV1Schema.parse({
+  ...sampleToneColorCommandEnvelopeV1,
+  commandId: 'command_tone_color_skin_uniformity_preview_001',
+  commandType: 'toneColor.adjustSkinToneUniformity',
+  correlationId: 'corr_tone_color_skin_uniformity_preview_001',
+  idempotencyKey: 'idem_tone_color_skin_uniformity_preview_001',
+  parameters: commandSettings,
+});
+const bridge = createRawEngineLocalAppServerBridge();
+const rejectedApply = await createRawEngineLocalAppServerBridge().dispatch({
+  ...sampleToneColorApplyCommandEnvelopeV1,
+  commandId: 'command_tone_color_skin_uniformity_apply_001',
+  commandType: 'toneColor.adjustSkinToneUniformity',
+  correlationId: 'corr_tone_color_skin_uniformity_apply_001',
+  idempotencyKey: 'idem_tone_color_skin_uniformity_apply_001',
+  parameters: commandSettings,
+});
+if (rejectedApply.ok || rejectedApply.reason !== 'handler_failed') {
+  failures.push('Skin-tone uniformity apply must be rejected before a matching dry-run.');
+}
+const dryRunResult = await bridge.dispatch(dryRunCommand);
+if (!dryRunResult.ok) {
+  failures.push(`Skin-tone uniformity dry-run failed: ${dryRunResult.message}`);
+}
+const parsedDryRunResult = dryRunResult.ok ? toneColorDryRunResultV1Schema.parse(dryRunResult.result) : undefined;
+const applyCommand = toneColorCommandEnvelopeV1Schema.parse({
+  ...sampleToneColorApplyCommandEnvelopeV1,
+  commandId: 'command_tone_color_skin_uniformity_apply_001',
+  commandType: 'toneColor.adjustSkinToneUniformity',
+  correlationId: 'corr_tone_color_skin_uniformity_apply_001',
+  idempotencyKey: 'idem_tone_color_skin_uniformity_apply_001',
+  parameters: commandSettings,
+});
+const applyResult = await bridge.dispatch(applyCommand);
+if (!applyResult.ok) {
+  failures.push(`Skin-tone uniformity apply failed after matching dry-run: ${applyResult.message}`);
+}
+const parsedApplyResult = applyResult.ok ? toneColorMutationResultV1Schema.parse(applyResult.result) : undefined;
+
+if (!parsedDryRunResult?.parameterDiff.some((diff) => diff.path === '/parameters/skinToneUniformity/hueUniformity')) {
+  failures.push('Skin-tone uniformity dry-run must include hue uniformity diff.');
+}
+if (!parsedDryRunResult?.warnings.some((warning) => warning.includes('Experimental skin-tone uniformity command'))) {
+  failures.push('Skin-tone uniformity dry-run must include experimental warning.');
+}
+if (!parsedApplyResult?.changedNodeIds.includes('tone_color_skin_uniformity:image')) {
+  failures.push('Skin-tone uniformity apply must report the changed skin-tone node.');
+}
 
 for (const testCase of manifest.cases) {
   const actual = applySkinToneUniformity(testCase.input, testCase.settings);
@@ -141,6 +223,18 @@ for (const testCase of manifest.cases) {
 
 const report = reportSchema.parse({
   cases: reportCases,
+  commandProof: {
+    applyCommandId: 'command_tone_color_skin_uniformity_apply_001',
+    changedNodeId: 'tone_color_skin_uniformity:image',
+    commandType: 'toneColor.adjustSkinToneUniformity',
+    dryRunCommandId: 'command_tone_color_skin_uniformity_preview_001',
+    experimental: true,
+    issue: 2332,
+    localAppServerBridge: 'dry_run_then_apply_required',
+    maxHueShiftDegrees: commandSettings.maxHueShiftDegrees,
+    runtimeStatus: 'experimental_runtime_slice',
+    warnings: parsedApplyResult?.warnings ?? [],
+  },
   fixturePath: FIXTURE_PATH,
   issue: 1263,
   schemaVersion: 1,

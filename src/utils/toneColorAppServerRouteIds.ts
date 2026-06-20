@@ -3,6 +3,7 @@ export const TONE_COLOR_APP_SERVER_COMMAND_TYPES = [
   'toneColor.setToneCurve',
   'toneColor.setWhiteBalance',
   'toneColor.adjustHsl',
+  'toneColor.adjustSkinToneUniformity',
   'toneColor.setColorGrading',
   'toneColor.setLevels',
   'toneColor.setChannelMixer',

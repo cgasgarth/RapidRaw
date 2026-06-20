@@ -1475,6 +1475,7 @@ export const toneColorCommandTypeV1Schema = z.enum([
   'toneColor.setToneCurve',
   'toneColor.setWhiteBalance',
   'toneColor.adjustHsl',
+  'toneColor.adjustSkinToneUniformity',
   'toneColor.setColorGrading',
   'toneColor.setLevels',
   'toneColor.setChannelMixer',
@@ -1643,6 +1644,23 @@ export const toneColorCommandEnvelopeV1Schema = z
       .strict(),
     toneColorCommandBaseV1Schema
       .extend({
+        commandType: z.literal('toneColor.adjustSkinToneUniformity'),
+        parameters: z
+          .object({
+            experimental: z.literal(true),
+            hueUniformity: z.number().min(0).max(0.75),
+            luminanceUniformity: z.number().min(0).max(0.75),
+            maxHueShiftDegrees: z.number().min(0).max(30),
+            saturationUniformity: z.number().min(0).max(0.75),
+            targetHueDegrees: z.number().min(0).lt(360),
+            targetLuminance: z.number().min(0).max(1),
+            targetSaturation: z.number().min(0).max(1),
+          })
+          .strict(),
+      })
+      .strict(),
+    toneColorCommandBaseV1Schema
+      .extend({
         commandType: z.literal('toneColor.setColorGrading'),
         parameters: z
           .object({
@@ -1804,6 +1822,7 @@ export const toneColorParameterDiffV1Schema = z
       'tone_curve',
       'white_balance',
       'hsl',
+      'skin_tone_uniformity',
       'color_grading',
       'levels',
       'channel_mixer',

@@ -30,6 +30,7 @@ export const toneColorAppServerRouteSchema = z
       'check:channel-mixer',
       'check:color-balance-rgb',
       'check:black-white-mixer',
+      'check:skin-tone-uniformity',
     ]),
     status: toneColorAppServerRouteStatusSchema,
     toolName: z.enum(TONE_COLOR_APP_SERVER_TOOL_NAMES),
