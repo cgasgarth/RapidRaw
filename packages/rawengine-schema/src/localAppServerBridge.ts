@@ -85,6 +85,35 @@ export type RawEngineLocalAppServerAiEnhancementCommandV1 = z.infer<
   typeof rawEngineLocalAppServerAiEnhancementCommandV1Schema
 >;
 
+const rawEngineLocalAppServerAuditCommandProbeV1Schema = z.looseObject({
+  commandId: z.string().trim().min(1),
+  commandType: z.string().trim().min(1),
+  correlationId: z.string().trim().min(1),
+  dryRun: z.boolean(),
+});
+
+const rawEngineLocalAppServerAuditResultProbeV1Schema = z.looseObject({
+  mutates: z.boolean(),
+  warnings: z.array(z.string().trim().min(1)),
+});
+
+export const rawEngineLocalAppServerAuditEventV1Schema = z
+  .object({
+    commandId: z.string().trim().min(1),
+    commandType: z.string().trim().min(1),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.boolean(),
+    eventId: z.string().trim().min(1),
+    mutates: z.boolean(),
+    requestId: z.string().trim().min(1).optional(),
+    status: z.enum(['completed', 'rejected']),
+    timestampIso: z.iso.datetime(),
+    warnings: z.array(z.string().trim().min(1)),
+  })
+  .strict();
+
+export type RawEngineLocalAppServerAuditEventV1 = z.infer<typeof rawEngineLocalAppServerAuditEventV1Schema>;
+
 const BASIC_TONE_PARAMETER_DIFF_PATHS = {
   blackPoint: '/parameters/blackPoint',
   clarity: '/parameters/clarity',
@@ -251,6 +280,7 @@ const buildAiEnhancementMutationResult = (
 export class RawEngineLocalAppServerBridge {
   readonly #acceptedAiEnhancementDryRunPlanKeys: Map<string, { planHash: string; planId: string }> = new Map();
   readonly #acceptedBasicToneDryRunPlanKeys: Set<string> = new Set<string>();
+  readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
   readonly #commandBus: EditCommandBus;
   readonly #toolRegistry: RawEngineToolRegistryV1;
 
@@ -260,15 +290,50 @@ export class RawEngineLocalAppServerBridge {
     this.#registerHandlers();
   }
 
-  dispatch<TResult = unknown>(
-    command: unknown,
-    context?: EditCommandBusContext,
-  ): Promise<EditCommandDispatchResult<TResult>> {
-    return this.#commandBus.dispatch<TResult>(command, context);
+  async dispatch(command: unknown, context?: EditCommandBusContext): Promise<EditCommandDispatchResult> {
+    const result = await this.#commandBus.dispatch(command, context);
+    this.#recordAuditEvent(command, result, context);
+    return result;
   }
 
   listCommandTypes(): string[] {
     return this.#commandBus.listCommandTypes();
+  }
+
+  listAuditEvents(): Array<RawEngineLocalAppServerAuditEventV1> {
+    return this.#auditEvents.map((event) => rawEngineLocalAppServerAuditEventV1Schema.parse(event));
+  }
+
+  #recordAuditEvent(
+    command: unknown,
+    result: EditCommandDispatchResult,
+    context: EditCommandBusContext | undefined,
+  ): void {
+    const commandProbe = rawEngineLocalAppServerAuditCommandProbeV1Schema.safeParse(command);
+    if (!commandProbe.success) return;
+
+    const resultProbe = result.ok
+      ? rawEngineLocalAppServerAuditResultProbeV1Schema.safeParse(result.result)
+      : ({ success: false } satisfies { success: false });
+    const warnings = resultProbe.success ? resultProbe.data.warnings : [];
+    const mutates = resultProbe.success ? resultProbe.data.mutates : false;
+    const status = result.ok ? 'completed' : 'rejected';
+    const timestampIso = (context?.now ?? (() => new Date()))().toISOString();
+
+    this.#auditEvents.push(
+      rawEngineLocalAppServerAuditEventV1Schema.parse({
+        commandId: commandProbe.data.commandId,
+        commandType: commandProbe.data.commandType,
+        correlationId: commandProbe.data.correlationId,
+        dryRun: commandProbe.data.dryRun,
+        eventId: `audit_${this.#auditEvents.length + 1}_${commandProbe.data.commandId}`,
+        mutates,
+        ...(context?.requestId === undefined ? {} : { requestId: context.requestId }),
+        status,
+        timestampIso,
+        warnings,
+      }),
+    );
   }
 
   #registerHandlers(): void {

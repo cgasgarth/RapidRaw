@@ -408,6 +408,7 @@
     "check:layer-workflow-smoke": "bun scripts/capture-visual-smoke.ts --scenario layer-stack-workflow",
     "check:rawengine-app-server-host": "bun scripts/check-rawengine-app-server-host.ts",
     "check:rawengine-local-app-server-bridge": "bun scripts/check-rawengine-local-app-server-bridge.ts",
+    "check:local-app-server-audit-events": "bun scripts/check-local-app-server-audit-events.ts",
     "check:ui-api-coverage": "bun scripts/check-ui-api-coverage.ts",
     "schema:focus-app-server": "bun packages/rawengine-schema/scripts/check-focus-app-server-command-bus.ts",
     "schema:hdr-app-server": "bun packages/rawengine-schema/scripts/check-hdr-app-server-command-bus.ts",
