@@ -43,11 +43,20 @@ const reportSchema = z
     applyCommandId: z.string().min(1),
     changedPixels: z.number().int().positive(),
     commandType: z.literal('toneColor.adjustHsl'),
-    doesNotProve: z.array(z.enum(['real_raw_decode', 'gpu_parity', 'local_app_ui_e2e'])).min(1),
+    doesNotProve: z
+      .array(z.enum(['independent_preview_export_paths', 'real_raw_decode', 'gpu_parity', 'local_app_ui_e2e']))
+      .min(1),
     dryRunCommandId: z.string().min(1),
     issue: z.literal(2329),
+    proofEntrypoints: z
+      .object({
+        export: z.literal('applySelectiveColorToRgbPixel'),
+        preview: z.literal('applySelectiveColorToRgbPixel'),
+      })
+      .strict(),
     previewExportMaxDelta: z.literal(0),
     previewHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    runtimeStatus: z.literal('synthetic_shared_pixel_function_preview_export_match'),
     schemaVersion: z.literal(1),
     sidecarGraphRevision: z.string().min(1),
     sidecarSerializedHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
@@ -239,11 +248,16 @@ const report = reportSchema.parse({
   applyCommandId: applyCommand.commandId,
   changedPixels,
   commandType: applyCommand.commandType,
-  doesNotProve: ['real_raw_decode', 'gpu_parity', 'local_app_ui_e2e'],
+  doesNotProve: ['independent_preview_export_paths', 'real_raw_decode', 'gpu_parity', 'local_app_ui_e2e'],
   dryRunCommandId: dryRunCommand.commandId,
   issue: 2329,
+  proofEntrypoints: {
+    export: 'applySelectiveColorToRgbPixel',
+    preview: 'applySelectiveColorToRgbPixel',
+  },
   previewExportMaxDelta,
   previewHash: hashJson(previewPixels),
+  runtimeStatus: 'synthetic_shared_pixel_function_preview_export_match',
   schemaVersion: 1,
   sidecarGraphRevision: sidecarGraph.graphRevision,
   sidecarSerializedHash: hashJson(sidecarPayload),

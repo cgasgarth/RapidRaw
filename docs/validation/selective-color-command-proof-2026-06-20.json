@@ -2,11 +2,16 @@
   "applyCommandId": "command_selective_color_orange_apply_001",
   "changedPixels": 2,
   "commandType": "toneColor.adjustHsl",
-  "doesNotProve": ["real_raw_decode", "gpu_parity", "local_app_ui_e2e"],
+  "doesNotProve": ["independent_preview_export_paths", "real_raw_decode", "gpu_parity", "local_app_ui_e2e"],
   "dryRunCommandId": "command_selective_color_orange_preview_001",
   "issue": 2329,
+  "proofEntrypoints": {
+    "export": "applySelectiveColorToRgbPixel",
+    "preview": "applySelectiveColorToRgbPixel"
+  },
   "previewExportMaxDelta": 0,
   "previewHash": "sha256:49ab44152671a80cc6e57cbd5be11dd99817e7d83e35bfc145139fc22aa8b962",
+  "runtimeStatus": "synthetic_shared_pixel_function_preview_export_match",
   "schemaVersion": 1,
   "sidecarGraphRevision": "graph_rev_selective_color_orange_001",
   "sidecarSerializedHash": "sha256:02e408ee11e7c5ec688db7a8d8408bc1013fc86da6c690ae88cc69dd4193ab7f",

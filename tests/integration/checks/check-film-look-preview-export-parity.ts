@@ -37,6 +37,13 @@ const manifestSchema = z.object({
     kind: z.literal('synthetic-film-look-preview-export-parity'),
     scene: z.literal('ramp-color-chips-highlight-edge'),
   }),
+  proofEntrypoints: z
+    .object({
+      export: z.literal('applySyntheticFilmLook'),
+      preview: z.literal('applySyntheticFilmLook'),
+    })
+    .strict(),
+  runtimeStatus: z.literal('synthetic_shared_renderer_preview_export_match'),
   generatedFrom: z.literal('tests/integration/checks/check-film-look-preview-export-parity.ts'),
   version: z.literal(1),
 });
@@ -164,12 +171,23 @@ const buildManifest = () => ({
 
     return runCase(look);
   }),
-  doesNotProve: ['real_raw_quality', 'gpu_parity', 'measured_film_stock_emulation', 'photochemical_density_domain'],
+  doesNotProve: [
+    'independent_preview_export_paths',
+    'real_raw_quality',
+    'gpu_parity',
+    'measured_film_stock_emulation',
+    'photochemical_density_domain',
+  ],
   fixtureInput: {
     colorSpace: 'synthetic-display-linear-rgb',
     kind: 'synthetic-film-look-preview-export-parity',
     scene: 'ramp-color-chips-highlight-edge',
   },
+  proofEntrypoints: {
+    export: 'applySyntheticFilmLook',
+    preview: 'applySyntheticFilmLook',
+  },
+  runtimeStatus: 'synthetic_shared_renderer_preview_export_match',
   generatedFrom: 'tests/integration/checks/check-film-look-preview-export-parity.ts',
   version: 1,
 });

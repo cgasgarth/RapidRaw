@@ -30,6 +30,41 @@ const requiredDocPhrases = [
   'preview/export parity proof remains pending',
   '`bun run check:denoise-workflow-smoke`',
 ] as const;
+const proofEntrypointsSchema = z
+  .object({
+    export: z.string().trim().min(1),
+    preview: z.string().trim().min(1),
+  })
+  .strict();
+const proofReportSchema = z
+  .object({
+    doesNotProve: z.array(z.string().trim().min(1)).default([]),
+    proofEntrypoints: proofEntrypointsSchema.optional(),
+    runtimeStatus: z.string().trim().min(1).optional(),
+    validationMode: z.string().trim().min(1).optional(),
+  })
+  .passthrough();
+const proofManifestSchema = z
+  .object({
+    doesNotProve: z.array(z.string().trim().min(1)).default([]),
+    proofEntrypoints: proofEntrypointsSchema.optional(),
+    runtimeStatus: z.string().trim().min(1).optional(),
+  })
+  .passthrough();
+const syntheticSharedEntrypointReports = [
+  {
+    path: 'docs/validation/command-replay-render-proof-2026-06-20.json',
+    schema: proofReportSchema,
+  },
+  {
+    path: 'docs/validation/selective-color-command-proof-2026-06-20.json',
+    schema: proofReportSchema,
+  },
+  {
+    path: 'fixtures/film-simulation/film-look-preview-export-parity.json',
+    schema: proofManifestSchema,
+  },
+] as const;
 
 const packageJson = packageJsonSchema.parse(JSON.parse(await readFile('package.json', 'utf8')));
 const failures: Array<string> = [];
@@ -61,6 +96,11 @@ for (const phrase of requiredDocPhrases) {
   }
 }
 
+for (const report of syntheticSharedEntrypointReports) {
+  const parsedReport = report.schema.parse(JSON.parse(await readFile(report.path, 'utf8')));
+  failures.push(...collectSyntheticSharedEntrypointFailures(report.path, parsedReport));
+}
+
 if (process.argv.includes('--self-test')) {
   const invalidPackage = packageJsonSchema.parse({
     scripts: {
@@ -70,6 +110,18 @@ if (process.argv.includes('--self-test')) {
   });
   if (collectOverclaimingAliasFailures(invalidPackage.scripts).length === 0) {
     failures.push('self-test did not reject an overclaiming denoise e2e alias.');
+  }
+
+  const invalidIndependentClaim = proofReportSchema.parse({
+    doesNotProve: [],
+    proofEntrypoints: {
+      export: 'renderSyntheticPixels',
+      preview: 'renderSyntheticPixels',
+    },
+    runtimeStatus: 'independent_preview_export_parity',
+  });
+  if (collectSyntheticSharedEntrypointFailures('self-test', invalidIndependentClaim).length === 0) {
+    failures.push('self-test did not reject independent parity overclaim with shared entrypoints.');
   }
 }
 
@@ -91,4 +143,29 @@ function collectOverclaimingAliasFailures(scripts: Record<string, string>): Arra
       ? []
       : [`${alias.script}: remove or replace with real proof before reintroducing. ${alias.reason}`],
   );
+}
+
+function collectSyntheticSharedEntrypointFailures(
+  path: string,
+  report: z.infer<typeof proofReportSchema>,
+): Array<string> {
+  const reportFailures: string[] = [];
+  const entrypoints = report.proofEntrypoints;
+  if (entrypoints === undefined) {
+    reportFailures.push(`${path}: synthetic preview/export proof must declare proofEntrypoints.`);
+    return reportFailures;
+  }
+
+  const sharedEntrypoint = entrypoints.preview === entrypoints.export;
+  if (!sharedEntrypoint) return reportFailures;
+
+  if (report.runtimeStatus?.includes('independent') === true) {
+    reportFailures.push(`${path}: shared preview/export entrypoint cannot claim independent parity.`);
+  }
+
+  if (!report.doesNotProve.includes('independent_preview_export_paths')) {
+    reportFailures.push(`${path}: shared preview/export proof must list independent_preview_export_paths as unproven.`);
+  }
+
+  return reportFailures;
 }
