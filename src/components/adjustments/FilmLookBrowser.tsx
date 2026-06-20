@@ -539,6 +539,10 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
             <span className="text-right text-text-secondary">
               {formatFilmLookToken(selectedLook.provenance.claimLevel)}
             </span>
+            <span>{t('adjustments.effects.filmLookBrowser.family')}</span>
+            <span className="text-right text-text-secondary" data-testid="film-look-family-field">
+              {formatFilmLookToken(selectedLook.category)}
+            </span>
             <span>{t('adjustments.effects.filmLookBrowser.measurementSource')}</span>
             <span className="text-right text-text-secondary">
               {formatFilmLookToken(selectedLook.provenance.measurementSource)}

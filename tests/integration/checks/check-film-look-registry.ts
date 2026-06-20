@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { readFileSync } from 'node:fs';
+
 import { z } from 'zod';
 
 import { sampleFilmLookCatalogV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
@@ -42,6 +44,7 @@ const filmLookRegistryItemSchema = z
 const registrySchema = z.array(filmLookRegistryItemSchema).min(1);
 const registry = registrySchema.parse(FILM_LOOK_BROWSER_ITEMS);
 const catalogLooksById = new Map(sampleFilmLookCatalogV1.looks.map((look) => [look.lookId, look]));
+const browserSource = readFileSync('src/components/adjustments/FilmLookBrowser.tsx', 'utf8');
 
 const duplicateValues = (values: Array<string>) => {
   const counts = new Map<string, number>();
@@ -59,6 +62,16 @@ if (duplicateIds.length > 0) {
 const duplicateNames = duplicateValues(registry.map((look) => look.displayName.toLocaleLowerCase('en-US')));
 if (duplicateNames.length > 0) {
   throw new Error(`Film look registry has duplicate display names: ${duplicateNames.join(', ')}`);
+}
+
+for (const marker of [
+  'adjustments.effects.filmLookBrowser.family',
+  'film-look-family-field',
+  'formatFilmLookToken(selectedLook.category)',
+]) {
+  if (!browserSource.includes(marker)) {
+    throw new Error(`Film look browser missing family inspector marker: ${marker}`);
+  }
 }
 
 for (const look of registry) {

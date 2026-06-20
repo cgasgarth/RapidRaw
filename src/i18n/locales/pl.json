@@ -224,6 +224,7 @@
         "compareTitle": "A/B Compare",
         "emptyFavorites": "No favorites yet",
         "emptySearch": "No matching looks",
+        "family": "Family",
         "favoriteLook": "Favorite {{displayName}}",
         "favorites": "Favorites",
         "legalNamingStatus": "Naming",
