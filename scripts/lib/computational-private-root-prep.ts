@@ -1,4 +1,4 @@
-import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, extname, isAbsolute, relative, resolve } from 'node:path';
 
@@ -9,14 +9,38 @@ import { parsePrivateRawEvidenceLedger } from '../../src/schemas/privateRawEvide
 
 const argsSchema = z
   .object({
+    materialize: z.enum(['copy', 'symlink']),
     privateRoot: z.string().trim().min(1),
     requireAssets: z.boolean(),
     selfTest: z.boolean(),
+    source: z.string().trim().min(1).optional(),
     stressCandidate: z.boolean(),
   })
   .strict();
 
+const exiftoolRowSchema = z
+  .object({
+    CreateDate: z.string().optional(),
+    ExposureCompensation: z.number().optional(),
+    ExposureTime: z.number().optional(),
+    FNumber: z.number().optional(),
+    FileName: z.string().optional(),
+    ISO: z.number().optional(),
+    LensModel: z.string().optional(),
+    Model: z.string().optional(),
+    SourceFile: z.string().trim().min(1),
+  })
+  .passthrough();
+
+const exiftoolRowsSchema = z.array(exiftoolRowSchema);
+
+type ExiftoolRow = z.infer<typeof exiftoolRowSchema>;
+
 const DEFAULT_PRIVATE_ROOT = '/tmp/rawengine-private-root';
+const HDR_INGEST_REPORT_PATH = 'private-artifacts/validation/computational-merge/hdr-source-ingest.json';
+const MAX_HDR_BRACKET_SPAN_SECONDS = 20;
+const MAX_HDR_BRACKET_SEQUENCE_GAP = 12;
+const MIN_HDR_BRACKET_SPREAD_EV = 4;
 
 export interface ComputationalPrivateRootPrepConfig {
   expectedExtension: string;
@@ -46,13 +70,16 @@ type Ledger = ReturnType<typeof parsePrivateRawEvidenceLedger>;
 export async function runComputationalPrivateRootPrep(config: ComputationalPrivateRootPrepConfig): Promise<void> {
   const args = argsSchema.parse({
     privateRoot: process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? DEFAULT_PRIVATE_ROOT,
+    materialize: valueAfter('--materialize') ?? process.env.RAWENGINE_PRIVATE_RAW_MATERIALIZE ?? 'symlink',
     requireAssets: process.argv.includes('--require-assets'),
     selfTest: process.argv.includes('--self-test'),
+    source: valueAfter('--source') ?? process.env.RAWENGINE_PRIVATE_RAW_SOURCE,
     stressCandidate: process.argv.includes('--stress-candidate'),
   });
 
   if (args.selfTest) {
     await runSelfTest(config);
+    await runSourceIngestSelfTest(config);
     console.log(`${config.featureLabel} real RAW private root prep self-test ok`);
     return;
   }
@@ -69,6 +96,16 @@ export async function runComputationalPrivateRootPrep(config: ComputationalPriva
   }
   const manifest = await readManifest();
   const ledger = await readLedger();
+  if (args.source !== undefined) {
+    const result = await ingestPrivateSources(config, manifest, args.privateRoot, args.source, args.materialize);
+    if (!result.ok) {
+      console.error(`${config.featureLabel} real RAW private source ingest failed`);
+      console.error(result.failures.slice(0, 12).join('\n'));
+      process.exit(1);
+    }
+    console.log(result.message);
+    return;
+  }
   const result = await preparePrivateRoot(config, manifest, ledger, args.privateRoot, args.requireAssets);
   if (!result.ok) {
     console.error(`${config.featureLabel} real RAW private root prep failed`);
@@ -119,6 +156,59 @@ async function prepareStressCandidateRoot(
   return {
     failures: [],
     message: `${config.featureLabel} stress-candidate prep ok (${sourcePaths.length} sources; not proof acceptance)`,
+    ok: true,
+  };
+}
+
+async function ingestPrivateSources(
+  config: ComputationalPrivateRootPrepConfig,
+  manifest: Manifest,
+  privateRootInput: string,
+  sourceRootInput: string,
+  materialize: 'copy' | 'symlink',
+): Promise<PrepareResult> {
+  if (config.featureFamily !== 'hdr_merge') {
+    return failure([`${config.featureLabel}: --source ingest currently supports HDR brackets only.`]);
+  }
+
+  const failures: Array<string> = [];
+  const privateRoot = resolve(privateRootInput);
+  const sourceRoot = resolve(sourceRootInput);
+  if (!isAbsolute(privateRootInput)) failures.push('RAWENGINE_PRIVATE_RAW_ROOT must be absolute.');
+  if (!(await pathExists(sourceRoot))) failures.push(`${sourceRoot}: source directory does not exist.`);
+
+  const proofCase = manifest.proofCases.find((candidate) => candidate.fixtureId === config.fixtureId);
+  if (proofCase === undefined) failures.push(`${config.fixtureId}: missing proof case.`);
+  const targetPaths =
+    proofCase?.localSourceRelativePaths.map((sourcePath) => resolvePrivatePath(privateRoot, sourcePath, failures)) ??
+    [];
+  if (targetPaths.length < config.minSources) {
+    failures.push(`${config.fixtureId}: expected at least ${config.minSources} target source paths.`);
+  }
+  if (failures.length > 0) return failure(failures);
+
+  const rawPaths = await findRawPaths(sourceRoot, config.expectedExtension);
+  if (rawPaths.length < config.minSources) {
+    return failure([
+      `${sourceRoot}: found ${rawPaths.length} ${config.expectedExtension.toUpperCase()} files; need ${config.minSources}.`,
+    ]);
+  }
+
+  const metadata = await readExifMetadata(rawPaths);
+  const candidate = chooseHdrBracketCandidate(metadata, config.minSources);
+  if (candidate === undefined) {
+    return failure([
+      `${sourceRoot}: no ${config.minSources}-frame HDR bracket candidate found (need <=${MAX_HDR_BRACKET_SPAN_SECONDS}s, sequence gap <=${MAX_HDR_BRACKET_SEQUENCE_GAP}, >=${MIN_HDR_BRACKET_SPREAD_EV} EV spread).`,
+    ]);
+  }
+
+  const selected = [...candidate.rows].sort((left, right) => exposureValue(right) - exposureValue(left));
+  await materializePrivateSources(selected, targetPaths, materialize);
+  await writeHdrIngestReport(privateRoot, sourceRoot, selected, candidate.spreadEv, materialize);
+
+  return {
+    failures: [],
+    message: `${config.featureLabel} private source ingest ok (${selected.length} sources; ${candidate.spreadEv.toFixed(2)} EV; ${materialize})`,
     ok: true,
   };
 }
@@ -219,6 +309,236 @@ async function runSelfTest(config: ComputationalPrivateRootPrepConfig): Promise<
   }
 }
 
+async function runSourceIngestSelfTest(config: ComputationalPrivateRootPrepConfig): Promise<void> {
+  if (config.featureFamily !== 'hdr_merge') return;
+
+  const root = await mkdtemp(resolve(tmpdir(), `${config.tempPrefix}source-root-`));
+  const sourceRoot = await mkdtemp(resolve(tmpdir(), `${config.tempPrefix}source-input-`));
+  try {
+    const sourceRows = [
+      sampleExifRow(sourceRoot, '_DSC0001.ARW', '2026:06:20 12:00:00', 1 / 4000, 8, 100),
+      sampleExifRow(sourceRoot, '_DSC0002.ARW', '2026:06:20 12:00:04', 1 / 1000, 8, 100),
+      sampleExifRow(sourceRoot, '_DSC0003.ARW', '2026:06:20 12:00:08', 1 / 250, 8, 100),
+    ];
+    for (const row of sourceRows) await writeFile(row.SourceFile, 'fake-private-hdr-raw');
+
+    const manifest = await readManifest();
+    const proofCase = manifest.proofCases.find((candidate) => candidate.fixtureId === config.fixtureId);
+    if (proofCase === undefined) throw new Error(`${config.fixtureId}: missing proof case.`);
+
+    const candidate = chooseHdrBracketCandidate(sourceRows, 3);
+    if (candidate === undefined || candidate.spreadEv < MIN_HDR_BRACKET_SPREAD_EV) {
+      throw new Error('Expected synthetic HDR bracket source candidate.');
+    }
+
+    const failures: Array<string> = [];
+    const targetPaths = proofCase.localSourceRelativePaths.map((sourcePath) =>
+      resolvePrivatePath(root, sourcePath, failures),
+    );
+    if (failures.length > 0) throw new Error(failures.join('; '));
+    await materializePrivateSources(
+      [...candidate.rows].sort((left, right) => exposureValue(right) - exposureValue(left)),
+      targetPaths,
+      'copy',
+    );
+    for (const targetPath of targetPaths) {
+      if (!(await pathExists(targetPath))) throw new Error(`${targetPath}: expected copied private source.`);
+    }
+  } finally {
+    await rm(root, { force: true, recursive: true });
+    await rm(sourceRoot, { force: true, recursive: true });
+  }
+}
+
+async function findRawPaths(root: string, expectedExtension: string): Promise<Array<string>> {
+  const paths: Array<string> = [];
+  const entries = await readdir(root, { withFileTypes: true });
+  for (const entry of entries) {
+    const path = resolve(root, entry.name);
+    if (entry.isDirectory()) {
+      paths.push(...(await findRawPaths(path, expectedExtension)));
+      continue;
+    }
+    if (entry.isFile() && extname(entry.name).toLowerCase() === expectedExtension) paths.push(path);
+  }
+  return paths.sort();
+}
+
+async function readExifMetadata(paths: ReadonlyArray<string>): Promise<Array<ExiftoolRow>> {
+  const rows: Array<ExiftoolRow> = [];
+  for (let index = 0; index < paths.length; index += 200) {
+    const chunk = paths.slice(index, index + 200);
+    const result = Bun.spawnSync([
+      'exiftool',
+      '-json',
+      '-n',
+      '-SourceFile',
+      '-FileName',
+      '-CreateDate',
+      '-ExposureTime',
+      '-FNumber',
+      '-ISO',
+      '-ExposureCompensation',
+      '-Model',
+      '-LensModel',
+      ...chunk,
+    ]);
+    if (!result.success) {
+      throw new Error(`exiftool failed while reading ${chunk.length} RAW files.`);
+    }
+    rows.push(...exiftoolRowsSchema.parse(JSON.parse(result.stdout.toString())));
+  }
+  return rows.filter(isHdrMetadataUsable);
+}
+
+function chooseHdrBracketCandidate(rows: ReadonlyArray<ExiftoolRow>, sourceCount: number) {
+  const candidates = rows
+    .filter(isHdrMetadataUsable)
+    .sort((left, right) => captureTimestamp(left) - captureTimestamp(right));
+  let best: { rows: ReadonlyArray<ExiftoolRow>; spreadEv: number } | undefined;
+
+  for (let index = 0; index <= candidates.length - sourceCount; index += 1) {
+    const window = candidates.slice(index, index + sourceCount);
+    if (!hasConsistentCaptureMetadata(window)) continue;
+
+    const first = window[0];
+    const last = window[window.length - 1];
+    if (first === undefined || last === undefined) continue;
+
+    const spanSeconds = captureTimestamp(last) - captureTimestamp(first);
+    const sequenceGap = sequenceNumber(last) - sequenceNumber(first);
+    const exposureValues = window.map(exposureValue);
+    const spreadEv = Math.max(...exposureValues) - Math.min(...exposureValues);
+    if (
+      spanSeconds > MAX_HDR_BRACKET_SPAN_SECONDS ||
+      sequenceGap > MAX_HDR_BRACKET_SEQUENCE_GAP ||
+      spreadEv < MIN_HDR_BRACKET_SPREAD_EV
+    ) {
+      continue;
+    }
+    if (best === undefined || spreadEv > best.spreadEv) best = { rows: window, spreadEv };
+  }
+
+  return best;
+}
+
+function isHdrMetadataUsable(row: ExiftoolRow): row is ExiftoolRow & {
+  CreateDate: string;
+  ExposureTime: number;
+  FNumber: number;
+  ISO: number;
+} {
+  return (
+    row.CreateDate !== undefined &&
+    row.ExposureTime !== undefined &&
+    row.ExposureTime > 0 &&
+    row.FNumber !== undefined &&
+    row.FNumber > 0 &&
+    row.ISO !== undefined &&
+    row.ISO > 0 &&
+    Number.isFinite(sequenceNumber(row)) &&
+    Number.isFinite(captureTimestamp(row)) &&
+    Number.isFinite(exposureValue(row))
+  );
+}
+
+function hasConsistentCaptureMetadata(rows: ReadonlyArray<ExiftoolRow>): boolean {
+  const [first] = rows;
+  if (first === undefined) return false;
+  return rows.every((row) => row.Model === first.Model && row.LensModel === first.LensModel);
+}
+
+function captureTimestamp(row: ExiftoolRow): number {
+  const match = /^(?<year>\d{4}):(?<month>\d{2}):(?<day>\d{2}) (?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})/u.exec(
+    row.CreateDate ?? '',
+  );
+  if (match?.groups === undefined) return Number.NaN;
+  const { day, hour, minute, month, second, year } = match.groups;
+  return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)) / 1000;
+}
+
+function exposureValue(row: ExiftoolRow): number {
+  if (row.ExposureTime === undefined || row.FNumber === undefined || row.ISO === undefined) return Number.NaN;
+  return Math.log2((row.FNumber * row.FNumber) / row.ExposureTime) - Math.log2(row.ISO / 100);
+}
+
+function sequenceNumber(row: ExiftoolRow): number {
+  const match = /(\d+)/u.exec(row.FileName ?? basename(row.SourceFile));
+  return match === null ? Number.NaN : Number(match[1]);
+}
+
+async function materializePrivateSources(
+  selectedRows: ReadonlyArray<ExiftoolRow>,
+  targetPaths: ReadonlyArray<string>,
+  materialize: 'copy' | 'symlink',
+): Promise<void> {
+  for (const [index, targetPath] of targetPaths.entries()) {
+    const sourcePath = selectedRows[index]?.SourceFile;
+    if (sourcePath === undefined) throw new Error(`${targetPath}: missing selected source.`);
+    await mkdir(dirname(targetPath), { recursive: true });
+    await rm(targetPath, { force: true });
+    if (materialize === 'copy') {
+      await copyFile(sourcePath, targetPath);
+    } else {
+      await symlink(sourcePath, targetPath);
+    }
+  }
+}
+
+async function writeHdrIngestReport(
+  privateRoot: string,
+  sourceRoot: string,
+  selectedRows: ReadonlyArray<ExiftoolRow>,
+  spreadEv: number,
+  materialize: 'copy' | 'symlink',
+): Promise<void> {
+  const reportPath = resolvePrivatePath(privateRoot, HDR_INGEST_REPORT_PATH, []);
+  await mkdir(dirname(reportPath), { recursive: true });
+  await writeFile(
+    reportPath,
+    `${JSON.stringify(
+      {
+        featureFamily: 'hdr_merge',
+        materialize,
+        selectedSources: selectedRows.map((row) => ({
+          captureDate: row.CreateDate,
+          exposureEv: Number(exposureValue(row).toFixed(4)),
+          exposureTime: row.ExposureTime,
+          fileName: row.FileName ?? basename(row.SourceFile),
+          iso: row.ISO,
+          lensModel: row.LensModel,
+          model: row.Model,
+          sourceRelativePath: relative(sourceRoot, row.SourceFile),
+        })),
+        sourceRoot,
+        spreadEv: Number(spreadEv.toFixed(4)),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+function sampleExifRow(
+  root: string,
+  fileName: string,
+  createDate: string,
+  exposureTime: number,
+  fNumber: number,
+  iso: number,
+): ExiftoolRow {
+  return exiftoolRowSchema.parse({
+    CreateDate: createDate,
+    ExposureTime: exposureTime,
+    FNumber: fNumber,
+    FileName: fileName,
+    ISO: iso,
+    LensModel: 'Synthetic 35mm',
+    Model: 'Synthetic Camera',
+    SourceFile: resolve(root, fileName),
+  });
+}
+
 async function readManifest(): Promise<Manifest> {
   return parseComputationalMergeE2eProofManifest(
     JSON.parse(await readFile('fixtures/validation/computational-merge-e2e-proof.json', 'utf8')),
@@ -255,4 +575,9 @@ async function pathExists(path: string): Promise<boolean> {
 
 function failure(failures: Array<string>): PrepareResult {
   return { failures, message: '', ok: false };
+}
+
+function valueAfter(flag: string): string | undefined {
+  const index = process.argv.indexOf(flag);
+  return index >= 0 ? process.argv[index + 1] : undefined;
 }
