@@ -14,6 +14,7 @@ default = ["required-ci"]
 panorama-opencv-spike = ["dep:opencv"]
 required-ci = []
 tauri-test = ["tauri/test"]
+validation-harness = []
 
 [dependencies]
 tauri = { version = "2.11", features = [ "macos-private-api", "rustls-tls" ] }

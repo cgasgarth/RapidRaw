@@ -42,6 +42,15 @@ if (staleFrontendAllowlist.length > 0) {
 if (staleRegisteredAllowlist.length > 0) {
   failures.push(`Remove stale registered-only allowlist entries: ${staleRegisteredAllowlist.join(', ')}`);
 }
+if (invokes.has('run_raw_open_edit_export_proof')) {
+  failures.push('Validation-only run_raw_open_edit_export_proof must not be exposed through Invokes.');
+}
+if (registered.has('run_raw_open_edit_export_proof')) {
+  failures.push('Default Tauri command registration must omit validation-only run_raw_open_edit_export_proof.');
+}
+if (!rustLib.includes('#[cfg(feature = "validation-harness")]')) {
+  failures.push('Validation-only Tauri commands must use a validation-harness cfg gate.');
+}
 
 if (failures.length > 0) {
   console.error('Tauri command registration drift failed:');
@@ -69,11 +78,13 @@ function parseInvokesEnum(source: string): Set<string> {
 function parseTauriRegisteredCommands(source: string): Set<string> {
   const body = /generate_handler!\s*\[(?<body>[\s\S]*?)\]\s*\)/u.exec(source)?.groups?.body;
   if (body === undefined) throw new Error('Unable to locate tauri::generate_handler registration.');
+  const defaultBody = body.replace(/#\[cfg\(feature = "validation-harness"\)\]\s*[A-Za-z0-9_:]+,?/gu, '');
 
-  const commands = body
+  const commands = defaultBody
     .split(/,|\n/u)
     .map((entry) => entry.replace(/\/\/.*$/u, '').trim())
     .filter(Boolean)
+    .filter((entry) => !entry.startsWith('#['))
     .map((entry) => entry.split('::').at(-1))
     .filter((entry): entry is string => entry !== undefined)
     .map((entry) => commandNameSchema.parse(entry));

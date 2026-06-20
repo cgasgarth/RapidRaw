@@ -1,5 +1,4 @@
 import { invokeWithSchema } from './tauriSchemaInvoke';
-import { Invokes } from '../components/ui/AppProperties';
 import {
   rawOpenEditExportProofReportSchema,
   rawOpenEditExportProofRequestSchema,
@@ -7,14 +6,16 @@ import {
   type RawOpenEditExportProofRequest,
 } from '../schemas/rawOpenEditExportCommandSchemas';
 
+const RAW_OPEN_EDIT_EXPORT_PROOF_COMMAND = 'run_raw_open_edit_export_proof';
+
 export async function runRawOpenEditExportProofCommand(
   request: RawOpenEditExportProofRequest,
 ): Promise<RawOpenEditExportProofReport> {
   const parsedRequest = rawOpenEditExportProofRequestSchema.parse(request);
   return invokeWithSchema(
-    Invokes.RunRawOpenEditExportProof,
+    RAW_OPEN_EDIT_EXPORT_PROOF_COMMAND,
     { request: parsedRequest },
     rawOpenEditExportProofReportSchema,
-    Invokes.RunRawOpenEditExportProof,
+    RAW_OPEN_EDIT_EXPORT_PROOF_COMMAND,
   );
 }
