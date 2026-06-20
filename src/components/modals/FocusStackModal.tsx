@@ -105,6 +105,25 @@ export default function FocusStackModal({
         <ComputationalSetupSourceWarning>{t('modals.focusStack.sourceCountBlocked')}</ComputationalSetupSourceWarning>
       )}
 
+      <section
+        className="grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-sm"
+        data-testid="focus-stack-setup-summary"
+      >
+        <ComputationalSetupStatusLine label={t('modals.focusStack.preflight.sources')} value={String(sourceCount)} />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.qualityLabel')}
+          value={qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? ''}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.blend')}
+          value={t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`)}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.retouch')}
+          value={t(`modals.focusStack.retouchPolicy.${settings.retouchLayerPolicy}.label`)}
+        />
+      </section>
+
       <section className="grid grid-cols-2 gap-4">
         <div>
           <UiText variant={TextVariants.heading} className="mb-2">
