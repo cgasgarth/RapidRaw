@@ -236,6 +236,8 @@
     "check:film-grain-provenance:update": "bun tests/integration/checks/check-film-grain-provenance.ts --update",
     "check:film-grain-runtime-proof": "bun tests/integration/checks/check-film-grain-runtime-proof.ts",
     "check:film-grain-runtime-proof:update": "bun tests/integration/checks/check-film-grain-runtime-proof.ts --update",
+    "check:film-grain-preview-export-parity": "bun tests/integration/checks/check-film-grain-preview-export-parity.ts",
+    "check:film-grain-preview-export-parity:update": "bun tests/integration/checks/check-film-grain-preview-export-parity.ts --update",
     "check:film-grain-ui": "bun tests/integration/checks/check-film-grain-ui-controls.ts",
     "check:film-simulation-review-artifacts": "bun tests/integration/checks/check-film-simulation-review-artifacts.ts",
     "check:film-simulation-review-artifacts:update": "bun tests/integration/checks/check-film-simulation-review-artifacts.ts --update",
