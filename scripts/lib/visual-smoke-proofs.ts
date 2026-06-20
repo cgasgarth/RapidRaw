@@ -360,6 +360,14 @@ export const commandPaletteWorkflowProofSchema = z.object({
   panoramaOpen: z.literal('true'),
   srOpen: z.literal('true'),
 });
+export const negativeLabPublicExportReviewProofSchema = z.object({
+  changedPixelRatio: z.literal('1'),
+  fixtureId: z.literal('negative_lab.real.public.cc0_110_ericht_negative_001'),
+  outputFormat: z.literal('jpeg_proof'),
+  outputPath: z.string().endsWith('/110-format-ericht-negative-cc0-320-Positive.jpg'),
+  runtimeStatus: z.literal('public_negative_scan_positive_export_rendered'),
+  sourcePath: z.literal('fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg'),
+});
 export const selectiveColorUiProofDatasetSchema = z.object({
   activeRange: z.literal('oranges'),
   commandType: z.literal('toneColor.adjustHsl'),
