@@ -265,6 +265,8 @@
     "check:panorama-blend-exposure": "bun tests/integration/checks/check-panorama-blend-exposure.ts",
     "check:panorama-exposure-runtime-proof": "bun tests/integration/checks/check-panorama-exposure-runtime-proof.ts",
     "check:panorama-exposure-runtime-proof:update": "bun tests/integration/checks/check-panorama-exposure-runtime-proof.ts --update",
+    "check:panorama-graph-reference-proof": "bun tests/integration/checks/check-panorama-graph-reference-proof.ts",
+    "check:panorama-graph-reference-proof:update": "bun tests/integration/checks/check-panorama-graph-reference-proof.ts --update",
     "check:panorama-seam-exposure-proof": "bun tests/integration/checks/check-panorama-seam-exposure-proof.ts",
     "check:panorama-seam-exposure-proof:update": "bun tests/integration/checks/check-panorama-seam-exposure-proof.ts --update",
     "check:panorama-projection-crop": "bun tests/integration/checks/check-panorama-projection-crop.ts",
