@@ -79,6 +79,9 @@ for (const invalidCase of invalidCases) {
 
 for (const marker of [
   'data-testid="color-grading-preset-card"',
+  'data-active={isActivePreset ?',
+  'aria-pressed={isActivePreset}',
+  'isColorGradingPresetApplied',
   'color-grading-preset-swatch-${key}',
   'adjustments.color.grading.applyPreset',
   'adjustments.color.grading.blendingValue',
