@@ -18,9 +18,11 @@ pub struct ColorGpuReadbackProbeReport {
     pub issue: u32,
     pub max_byte_delta: u8,
     pub pixel_count: u32,
+    pub proof_status: String,
     pub readback_bytes: u32,
     pub runtime_status: String,
     pub texture_format: String,
+    pub validation_scope: String,
     pub validation_mode: String,
     pub width: u32,
 }
@@ -99,10 +101,89 @@ fn run_color_gpu_readback_probe_with_context(
         issue: 2326,
         max_byte_delta,
         pixel_count: width * height,
+        proof_status: "runtime_apply_capable".to_string(),
         readback_bytes: readback.len() as u32,
         runtime_status: "validation_harness_gpu_texture_readback_probe".to_string(),
         texture_format: "rgba8unorm".to_string(),
+        validation_scope: "gpu_texture_upload_and_readback_probe_only".to_string(),
         validation_mode: "wgpu_copy_texture_to_buffer_readback_probe".to_string(),
         width,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::image_processing::GpuContext;
+    use std::sync::Arc;
+
+    const RUN_ENV: &str = "RAWENGINE_RUN_GPU_READBACK_PROBE";
+    const PROOF_PATH_ENV: &str = "RAWENGINE_GPU_READBACK_PROOF_PATH";
+
+    fn build_compute_context() -> Result<GpuContext, String> {
+        let instance =
+            wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
+        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            compatible_surface: None,
+            ..Default::default()
+        }))
+        .map_err(|error| format!("Failed to find a wgpu adapter: {}", error))?;
+
+        let mut required_features = wgpu::Features::empty();
+        if adapter
+            .features()
+            .contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES)
+        {
+            required_features |= wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
+        }
+        let limits = adapter.limits();
+        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+            label: Some("Color GPU Readback Probe Test Device"),
+            required_features,
+            required_limits: limits.clone(),
+            experimental_features: wgpu::ExperimentalFeatures::default(),
+            memory_hints: wgpu::MemoryHints::Performance,
+            trace: wgpu::Trace::Off,
+        }))
+        .map_err(|error| error.to_string())?;
+
+        Ok(GpuContext {
+            device: Arc::new(device),
+            queue: Arc::new(queue),
+            limits,
+            display: Arc::new(std::sync::Mutex::new(None)),
+        })
+    }
+
+    fn write_runtime_proof(report: &ColorGpuReadbackProbeReport) -> Result<(), String> {
+        let Ok(path) = std::env::var(PROOF_PATH_ENV) else {
+            return Ok(());
+        };
+        let path = std::path::PathBuf::from(path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        let report_json =
+            serde_json::to_string_pretty(report).map_err(|error| error.to_string())?;
+        std::fs::write(path, format!("{report_json}\n")).map_err(|error| error.to_string())
+    }
+
+    #[test]
+    fn runtime_smoke_reads_back_gpu_texture_when_enabled() {
+        if std::env::var(RUN_ENV).ok().as_deref() != Some("1") {
+            return;
+        }
+
+        let context = build_compute_context().expect("GPU compute context should initialize");
+        let report = run_color_gpu_readback_probe_with_context(&context)
+            .expect("GPU readback probe should round-trip bytes");
+        assert_eq!(
+            report.byte_hash,
+            "sha256:be2ed0f28ed5d492dfd4f03c6f6f0ca559819d57f38a474448e57d8da41dc572"
+        );
+        assert_eq!(report.max_byte_delta, 0);
+        assert_eq!(report.proof_status, "runtime_apply_capable");
+        write_runtime_proof(&report).expect("runtime proof should be written");
+    }
 }

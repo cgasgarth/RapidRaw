@@ -1,0 +1,20 @@
+{
+  "byteHash": "sha256:be2ed0f28ed5d492dfd4f03c6f6f0ca559819d57f38a474448e57d8da41dc572",
+  "doesNotProve": [
+    "full_preview_pipeline_parity",
+    "full_export_pipeline_parity",
+    "raw_file_color_management_parity",
+    "shader_function_parity"
+  ],
+  "height": 2,
+  "issue": 2326,
+  "maxByteDelta": 0,
+  "pixelCount": 4,
+  "proofStatus": "runtime_apply_capable",
+  "readbackBytes": 16,
+  "runtimeStatus": "validation_harness_gpu_texture_readback_probe",
+  "textureFormat": "rgba8unorm",
+  "validationScope": "gpu_texture_upload_and_readback_probe_only",
+  "validationMode": "wgpu_copy_texture_to_buffer_readback_probe",
+  "width": 2
+}
