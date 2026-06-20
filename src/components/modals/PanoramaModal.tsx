@@ -77,6 +77,14 @@ export default function PanoramaModal({
     { label: t('modals.panorama.exposure.gainCompensation'), value: 'gain_compensation' },
     { label: t('modals.panorama.exposure.none'), value: 'none' },
   ];
+  const selectedBoundaryLabel = boundaryOptions.find((option) => option.value === settings.boundaryMode)?.label ?? '';
+  const selectedExposureLabel = exposureOptions.find((option) => option.value === settings.exposureMode)?.label ?? '';
+  const selectedProjectionLabel = projectionOptions.find((option) => option.value === settings.projection)?.label ?? '';
+  const selectedQualityLabel =
+    qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
+  const sourceReadinessLabel = `${t('modals.panorama.summarySourceCount', { count: imageCount ?? 0 })} - ${
+    isSourceCountValid ? t('modals.panorama.summaryReady') : t('modals.panorama.summaryBlocked')
+  }`;
 
   const setSetting = useCallback(
     (patch: Partial<PanoramaUiSettings>) => {
@@ -202,11 +210,11 @@ export default function PanoramaModal({
             {[
               {
                 label: t('modals.panorama.summarySources'),
-                value: String(imageCount ?? 0),
+                value: sourceReadinessLabel,
               },
               {
                 label: t('modals.panorama.summaryProjection'),
-                value: projectionOptions.find((option) => option.value === settings.projection)?.label ?? '',
+                value: selectedProjectionLabel,
               },
               {
                 label: t('modals.panorama.summaryBlend'),
@@ -214,15 +222,15 @@ export default function PanoramaModal({
               },
               {
                 label: t('modals.panorama.summaryBoundary'),
-                value: boundaryOptions.find((option) => option.value === settings.boundaryMode)?.label ?? '',
+                value: selectedBoundaryLabel,
               },
               {
                 label: t('modals.panorama.summaryExposure'),
-                value: exposureOptions.find((option) => option.value === settings.exposureMode)?.label ?? '',
+                value: selectedExposureLabel,
               },
               {
                 label: t('modals.panorama.summaryQuality'),
-                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '',
+                value: selectedQualityLabel,
               },
               {
                 label: t('modals.panorama.summaryPreviewBudget'),
@@ -386,16 +394,20 @@ export default function PanoramaModal({
                   title: t('modals.panorama.workflowTitle'),
                   rows: [
                     {
+                      label: t('modals.panorama.summarySources'),
+                      value: sourceReadinessLabel,
+                    },
+                    {
                       label: t('modals.panorama.projectionLabel'),
-                      value: t(`modals.panorama.projection.${settings.projection}`),
+                      value: selectedProjectionLabel,
                     },
                     {
                       label: t('modals.panorama.boundaryLabel'),
-                      value: boundaryOptions.find((option) => option.value === settings.boundaryMode)?.label ?? '',
+                      value: selectedBoundaryLabel,
                     },
                     {
                       label: t('modals.panorama.exposureLabel'),
-                      value: exposureOptions.find((option) => option.value === settings.exposureMode)?.label ?? '',
+                      value: selectedExposureLabel,
                     },
                     {
                       label: t('modals.panorama.previewBudgetLabel'),
