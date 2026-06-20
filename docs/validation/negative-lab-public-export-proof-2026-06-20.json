@@ -1,5 +1,34 @@
 {
   "algorithm": "density_rgb_v1",
+  "appliedProfile": {
+    "claimLevel": "generic_starting_point_only",
+    "claimPolicy": "generic_starting_point_no_stock_claim",
+    "displayName": "C-41 Portrait",
+    "doesNotProve": [
+      "no_named_stock_emulation_claim",
+      "no_colorimetric_match_claim",
+      "not_measured_from_manufacturer_profile"
+    ],
+    "params": {
+      "base_fog_sample": {
+        "height": 0.35,
+        "width": 0.35,
+        "x": 0,
+        "y": 0
+      },
+      "base_fog_strength": 1,
+      "blue_weight": 0.9800000190734863,
+      "contrast": 0.949999988079071,
+      "exposure": 0.05000000074505806,
+      "green_weight": 1,
+      "red_weight": 1.0299999713897705
+    },
+    "presetId": "negative_lab.generic.c41.portrait.v1",
+    "processFamily": "c41_color_negative",
+    "profileProvenanceHash": "fnv1a32:9d4a13c8",
+    "runtimeStatus": "runtime_parameter_applied",
+    "stockFamilyDescriptor": "Soft portrait color negative"
+  },
   "doesNotProve": [
     "camera_raw_decode_path",
     "capture_one_class_quality",
@@ -10,14 +39,14 @@
     "stock_library_maturity"
   ],
   "fixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001",
-  "inputToOutputMeanAbsDelta": 0.5021131038665771,
+  "inputToOutputMeanAbsDelta": 0.4844345450401306,
   "issue": 2311,
   "metrics": {
     "changedPixelRatio": 1,
-    "inputToOutputMeanAbsDelta": 0.5021131038665771
+    "inputToOutputMeanAbsDelta": 0.4844345450401306
   },
   "output": {
-    "contentHash": "fnv1a64:83c7a7b0d5fe8819",
+    "contentHash": "fnv1a64:20cf2ca592bd20fc",
     "dimensions": {
       "height": 183,
       "width": 330
