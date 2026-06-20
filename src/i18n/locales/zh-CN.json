@@ -1877,6 +1877,7 @@
       "workflowColorTiming": "色彩",
       "workflowCustomPresetDetail": "自定义混合",
       "workflowExport": "导出",
+      "workflowExportBlocked": "Export blocked",
       "workflowExportConverting": "转换中",
       "workflowExportReadyCount": "{{format}} / {{queuedCount}} queued",
       "workflowExportReadyJpeg": "JPEG 校样就绪",

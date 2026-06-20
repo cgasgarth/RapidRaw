@@ -1962,6 +1962,7 @@
       "workflowColorTiming": "Kolor",
       "workflowCustomPresetDetail": "Własny miks",
       "workflowExport": "Eksport",
+      "workflowExportBlocked": "Export blocked",
       "workflowExportConverting": "Konwersja",
       "workflowExportReadyCount": "{{format}} / {{queuedCount}} queued",
       "workflowExportReadyJpeg": "Próba JPEG gotowa",

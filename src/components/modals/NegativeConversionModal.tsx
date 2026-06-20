@@ -2434,27 +2434,59 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const renderWorkflowRail = () => (
     <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none">
       <div
-        className="pointer-events-auto grid grid-cols-6 gap-2 rounded-md border border-white/10 bg-black/65 p-2 shadow-xl backdrop-blur-md"
+        className="pointer-events-auto rounded-md border border-white/10 bg-black/65 p-2 shadow-xl backdrop-blur-md"
         data-testid="negative-lab-workflow-rail"
       >
-        {workflowStages.map((stage) => {
-          return (
-            <div key={stage.id} className="min-w-0 rounded-sm bg-white/5 px-3 py-2">
-              <div className="flex min-w-0 items-center gap-2 text-white">
-                <span className={cx('shrink-0', stage.isComplete ? 'text-accent' : 'text-white/35')} aria-hidden="true">
+        <div className="grid grid-cols-6 gap-2">
+          {workflowStages.map((stage) => {
+            return (
+              <div key={stage.id} className="min-w-0 rounded-sm bg-white/5 px-3 py-2">
+                <div className="flex min-w-0 items-center gap-2 text-white">
                   <span
-                    className={cx(
-                      'block size-3 rounded-full border',
-                      stage.isComplete ? 'border-accent bg-accent' : 'border-white/35',
-                    )}
-                  />
-                </span>
-                <span className="truncate text-xs font-semibold">{stage.label}</span>
+                    className={cx('shrink-0', stage.isComplete ? 'text-accent' : 'text-white/35')}
+                    aria-hidden="true"
+                  >
+                    <span
+                      className={cx(
+                        'block size-3 rounded-full border',
+                        stage.isComplete ? 'border-accent bg-accent' : 'border-white/35',
+                      )}
+                    />
+                  </span>
+                  <span className="truncate text-xs font-semibold">{stage.label}</span>
+                </div>
+                <div className="mt-1 truncate text-[11px] leading-tight text-white/60">{stage.detail}</div>
               </div>
-              <div className="mt-1 truncate text-[11px] leading-tight text-white/60">{stage.detail}</div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        <div
+          className="mt-2 grid grid-cols-3 gap-2 border-t border-white/10 pt-2 text-[11px] text-white/65"
+          data-export-ready={String(workspaceProof.exportReady)}
+          data-preview-ready={String(workspaceProof.previewReady)}
+          data-testid="negative-lab-workflow-readiness-strip"
+        >
+          <span className="truncate rounded-sm bg-white/5 px-2 py-1" data-testid="negative-lab-workflow-queued">
+            {t('modals.negativeConversion.queuedScans', { queuedCount: workspaceProof.queuedCount })}
+          </span>
+          <span className="truncate rounded-sm bg-white/5 px-2 py-1" data-testid="negative-lab-workflow-preview">
+            {workspaceProof.previewReady
+              ? t('modals.negativeConversion.previewReady')
+              : t('modals.negativeConversion.previewPending')}
+          </span>
+          <span className="truncate rounded-sm bg-white/5 px-2 py-1" data-testid="negative-lab-workflow-export">
+            {workspaceProof.exportReady
+              ? t('modals.negativeConversion.workflowExportReadyCount', {
+                  format: t(
+                    saveOptions.outputFormat === NegativeLabOutputFormatId.Tiff16
+                      ? 'modals.negativeConversion.outputFormats.tiff16'
+                      : 'modals.negativeConversion.outputFormats.jpeg_proof',
+                  ),
+                  queuedCount: workspaceProof.queuedCount,
+                })
+              : t('modals.negativeConversion.workflowExportBlocked')}
+          </span>
+        </div>
       </div>
     </div>
   );
