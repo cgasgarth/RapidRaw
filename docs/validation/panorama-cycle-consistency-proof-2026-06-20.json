@@ -1,0 +1,24 @@
+{
+  "cases": [
+    {
+      "candidateEdgeCount": 3,
+      "rejectedEdgeCount": 1,
+      "rejectedEdges": [
+        {
+          "fromSourceIndex": 0,
+          "qualityRank": 3,
+          "reason": "cycle_residual_exceeded",
+          "residualPx": 10,
+          "toSourceIndex": 2
+        }
+      ],
+      "residualThresholdPx": 2,
+      "selectedEdgeCount": 2,
+      "validationMode": "translation_cycle_residual_v1"
+    }
+  ],
+  "issue": 2293,
+  "schemaVersion": 1,
+  "validationMode": "panorama_cycle_consistency_rejection",
+  "validationStatus": "synthetic_runtime_metadata_gate"
+}
