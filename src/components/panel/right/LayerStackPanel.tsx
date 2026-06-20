@@ -345,9 +345,18 @@ export default function LayerStackPanel({
       <div className="px-4 pt-4 pb-3 flex items-center justify-between">
         <div className="flex min-w-0 items-center gap-2">
           <Layers3 size={18} className="shrink-0 text-text-secondary" />
-          <UiText variant={TextVariants.heading} className="truncate">
-            {t('editor.layers.title')}
-          </UiText>
+          <span className="min-w-0">
+            <UiText variant={TextVariants.heading} className="block truncate">
+              {t('editor.layers.title')}
+            </UiText>
+            <UiText
+              variant={TextVariants.small}
+              className="block tabular-nums text-text-tertiary"
+              data-testid="layer-stack-count"
+            >
+              {t('editor.layers.layerCount', { count: masks.length })}
+            </UiText>
+          </span>
         </div>
         <div className="flex items-center gap-1">
           <button

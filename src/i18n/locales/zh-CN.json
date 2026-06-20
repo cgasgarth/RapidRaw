@@ -734,6 +734,9 @@
       "groupCount_one": "{{count}} layer",
       "groupCount_other": "{{count}} layers",
       "groupType": "Folder",
+      "layerCount": "{{count}} adjustment layer",
+      "layerCount_one": "{{count}} adjustment layer",
+      "layerCount_other": "{{count}} adjustment layers",
       "maskCount": {
         "count": "{{count}} mask",
         "count_one": "{{count}} mask",
