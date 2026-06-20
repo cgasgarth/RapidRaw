@@ -12,6 +12,7 @@ export * from './editGraphMigrations.js';
 export * from './exportRecipeSchemas.js';
 export * from './filmGrainProvenance.js';
 export * from './filmGrainRuntime.js';
+export * from './filmHalationRuntime.js';
 export * from './hdrAlignmentRuntime.js';
 export * from './hdrAppServerRuntime.js';
 export * from './hdrBracketDetection.js';
