@@ -147,6 +147,7 @@
     "check:ai-people-apply-plan": "bun tests/integration/checks/check-ai-people-layer-apply-plan.ts",
     "check:denoise-fixtures": "bun tests/integration/checks/check-denoise-fixtures.ts",
     "check:denoise-workflow-smoke": "bun tests/integration/checks/check-denoise-workflow-smoke.ts",
+    "check:denoise-ui-summary": "bun tests/integration/checks/check-denoise-ui-summary.ts",
     "check:denoise-ui-api": "bun tests/integration/checks/check-denoise-ui-api.ts",
     "check:ai-denoise-source-fixture": "bun tests/integration/checks/check-ai-denoise-source-fixture.ts",
     "check:ai-denoise-quality-proof": "bun tests/integration/checks/check-ai-denoise-quality-proof.ts",
