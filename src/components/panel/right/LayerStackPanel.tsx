@@ -10,6 +10,7 @@ import {
   canGroupLayerWithNext,
   createAdjustmentLayer,
   deleteLayer,
+  deleteLayerGroup,
   duplicateLayer,
   groupLayerWithNext,
   moveLayer,
@@ -215,6 +216,10 @@ export default function LayerStackPanel({
   };
   const deleteActiveLayer = () => {
     if (!activeRow || activeRow.isBase) return;
+    if (activeRow.isGroupHeader && activeRow.groupId) {
+      applyLayerStack(deleteLayerGroup(masks, activeRow.groupId), BASE_LAYER_ID);
+      return;
+    }
     applyLayerStack(deleteLayer(masks, activeRow.id), BASE_LAYER_ID);
   };
 
@@ -403,7 +408,7 @@ export default function LayerStackPanel({
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
               data-tooltip={t('editor.layers.actions.delete')}
-              disabled={isBaseSelected || isGroupHeaderSelected}
+              disabled={isBaseSelected}
               onClick={deleteActiveLayer}
               type="button"
             >
