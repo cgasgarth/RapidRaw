@@ -10,5 +10,5 @@ Status: lint guard hardening.
 
 ## Validation
 
-- `bun scripts/check-unsafe-casts.ts --self-test`
+- `bun tests/integration/checks/check-unsafe-casts.ts --self-test`
 - `bun run check:unsafe-casts`

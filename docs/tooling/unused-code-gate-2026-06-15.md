@@ -49,8 +49,8 @@ Remaining cleanup candidates after the split:
   - `src/schemas/agentRuntimeSchemas.ts`
 - Tooling scripts/configs that may need explicit entry modeling:
   - `i18next.config.ts`
-  - `scripts/check-agent-approval-boundaries.ts`
-  - `scripts/check-markdown-links.ts`
+  - `tests/integration/checks/check-agent-approval-boundaries.ts`
+  - `tests/integration/checks/check-markdown-links.ts`
 - Wrapped binary dependencies modeled in `ignoreDependencies`:
   - `i18next-cli`
   - `license-checker-rseidelsohn`

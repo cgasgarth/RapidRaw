@@ -1,23 +1,23 @@
 {
   "commands": [
     {
-      "command": "bun scripts/check-library-session-fixtures.ts",
+      "command": "bun tests/integration/checks/check-library-session-fixtures.ts",
       "status": "passed"
     },
     {
-      "command": "bun scripts/check-session-import-reload-proof.ts",
+      "command": "bun tests/integration/checks/check-session-import-reload-proof.ts",
       "status": "passed"
     },
     {
-      "command": "bun scripts/check-metadata-sidecar-workflow-proof.ts",
+      "command": "bun tests/integration/checks/check-metadata-sidecar-workflow-proof.ts",
       "status": "passed"
     },
     {
-      "command": "bun scripts/check-export-queue-fixtures.ts",
+      "command": "bun tests/integration/checks/check-export-queue-fixtures.ts",
       "status": "passed"
     },
     {
-      "command": "bun scripts/check-delivery-review-manifest.ts",
+      "command": "bun tests/integration/checks/check-delivery-review-manifest.ts",
       "status": "passed"
     },
     {

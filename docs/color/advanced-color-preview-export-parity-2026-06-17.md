@@ -53,6 +53,6 @@ This slice adds:
 - `bun run check:color-cpu-gpu-parity`
 - `bun run check:color-abi`
 - `bun run check:types`
-- `bun run check:lint -- src/utils/colorCpuGpuParity.ts scripts/check-color-adjustment-abi-parity.ts`
+- `bun run check:lint -- src/utils/colorCpuGpuParity.ts tests/integration/checks/check-color-adjustment-abi-parity.ts`
 - `cargo fmt --manifest-path src-tauri/Cargo.toml --check`
 - `cargo check --manifest-path src-tauri/Cargo.toml --no-default-features --features required-ci`

@@ -12,7 +12,7 @@ bun run docs:check
 ```
 
 This command runs Prettier's Markdown formatter in check mode and then validates
-internal Markdown links with `scripts/check-markdown-links.ts`.
+internal Markdown links with `tests/integration/checks/check-markdown-links.ts`.
 
 ## Scope
 

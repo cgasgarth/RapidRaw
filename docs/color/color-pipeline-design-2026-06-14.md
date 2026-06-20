@@ -216,5 +216,5 @@ Tier 3: product-quality gates.
 ## Validation
 
 - `bunx prettier --check docs/color/color-pipeline-design-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md`
-- `bun scripts/check-markdown-links.ts`
+- `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`

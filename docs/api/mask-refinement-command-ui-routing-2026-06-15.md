@@ -3,7 +3,7 @@
 - Issue: #79 `api(commands): route representative UI operations through command bus`
 - UI path: masks panel refinement controls
 - Command: `layerMask.refineMask`
-- Validation: `scripts/check-mask-refinement-command-ui.ts`
+- Validation: `tests/integration/checks/check-mask-refinement-command-ui.ts`
 
 ## Scope
 

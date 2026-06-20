@@ -33,8 +33,8 @@ where a red-range edit must leave a blue patch unchanged within tolerance.
 
 - `bun run check:selective-color-falloff`
 - `bun run check:types`
-- `bunx eslint src/utils/selectiveColorFalloff.ts scripts/check-selective-color-falloff.ts --max-warnings 0`
+- `bunx eslint src/utils/selectiveColorFalloff.ts tests/integration/checks/check-selective-color-falloff.ts --max-warnings 0`
 - `bun run check:unsafe-casts`
-- `bunx prettier --check src/utils/selectiveColorFalloff.ts scripts/check-selective-color-falloff.ts fixtures/color/selective-color-falloff-fixtures.json docs/color/selective-color-falloff-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
-- `bun scripts/check-markdown-links.ts`
+- `bunx prettier --check src/utils/selectiveColorFalloff.ts tests/integration/checks/check-selective-color-falloff.ts fixtures/color/selective-color-falloff-fixtures.json docs/color/selective-color-falloff-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md package.json`
+- `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`

@@ -117,5 +117,5 @@ Milestone 5 should add these gates before broad color-quality claims:
 ## Validation
 
 - `bunx prettier --check docs/color/scene-to-display-transform-adr-2026-06-14.md docs/index.md docs/site-navigation.json RAW_EDITOR_PLAN.md`
-- `bun scripts/check-markdown-links.ts`
+- `bun tests/integration/checks/check-markdown-links.ts`
 - `git diff --check`

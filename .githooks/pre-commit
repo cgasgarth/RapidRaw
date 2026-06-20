@@ -13,4 +13,4 @@ export RAWENGINE_COMPACT_MAX_LINES="${RAWENGINE_COMPACT_MAX_LINES:-16}"
 export RAWENGINE_COMPACT_HEAD_LINES="${RAWENGINE_COMPACT_HEAD_LINES:-5}"
 export RAWENGINE_COMPACT_TAIL_LINES="${RAWENGINE_COMPACT_TAIL_LINES:-8}"
 
-bun scripts/check-staged-files.ts
+bun tests/integration/checks/check-staged-files.ts

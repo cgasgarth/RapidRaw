@@ -14,7 +14,7 @@ const RUST_RELEVANT_PREFIXES = [
   '.cargo/',
   '.github/workflows/lint.yml',
   'scripts/ci-classify-rust-pr.ts',
-  'scripts/check-rust-feature-policy.ts',
+  'tests/integration/checks/check-rust-feature-policy.ts',
   'src-tauri/',
 ];
 

@@ -2,7 +2,7 @@
 
 Use `bun test` for pure TypeScript logic when the target is deterministic, fast, and benefits from multiple named assertions. Good targets include schema packages, command buses, math helpers, parsing helpers, and small utility modules.
 
-Keep `scripts/check-*.ts` for repository policy checks, fixture manifest scans, multi-process validation, external CLIs, generated artifact comparisons, or checks that need custom compact failure output.
+Keep `tests/integration/checks/check-*.ts` for repository policy checks, fixture manifest scans, multi-process validation, external CLIs, generated artifact comparisons, or checks that need custom compact failure output.
 
 Initial adopted command:
 

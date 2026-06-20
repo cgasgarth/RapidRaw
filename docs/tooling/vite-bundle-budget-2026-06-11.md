@@ -54,7 +54,7 @@ bun run check:bundle
 ```
 
 This command builds the minified production frontend and then runs
-`scripts/check-vite-bundle-budget.ts` against `dist/index.html` and
+`tests/integration/checks/check-vite-bundle-budget.ts` against `dist/index.html` and
 `dist/assets`.
 
 Release packaging uses the same frontend contract. See

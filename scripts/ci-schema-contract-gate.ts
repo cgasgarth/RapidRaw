@@ -54,8 +54,8 @@ const RELEVANT_PREFIXES = ['packages/rawengine-schema/', 'src/schemas/', 'src-ta
 const RELEVANT_FILES = new Set([
   '.github/workflows/lint.yml',
   'bun.lock',
-  'scripts/check-generated-type-drift.ts',
-  'scripts/check-tauri-schema-validation.ts',
+  'tests/integration/checks/check-generated-type-drift.ts',
+  'tests/integration/checks/check-tauri-schema-validation.ts',
   'src/App.tsx',
   'src/utils/tauriSchemaInvoke.ts',
 ]);

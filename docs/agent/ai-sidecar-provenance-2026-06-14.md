@@ -16,7 +16,7 @@ operation without storing raw prompt text.
 
 ## Validation
 
-`scripts/check-sidecar-roundtrip.ts` validates fixture `.rrdata` files with Zod
+`tests/integration/checks/check-sidecar-roundtrip.ts` validates fixture `.rrdata` files with Zod
 and now requires AI provenance entries in the primary sidecar fixture. The
 fixture proves that mask and denoise apply operations preserve provider, model,
 settings, dry-run, approval, source, and output artifact references through a

@@ -152,7 +152,7 @@ evidence before these entries can count as runtime focus-stack proof.
 The first deterministic synthetic fixture manifest and generator live at:
 
 - `fixtures/focus-stacking/focus-synthetic-bracket-fixtures.json`
-- `scripts/check-focus-synthetic-fixtures.ts`
+- `tests/integration/checks/check-focus-synthetic-fixtures.ts`
 
 They generate tiny temporary PPM sources during validation and verify stable
 fixture hashes. They do not commit raster assets or claim runtime focus-stack
