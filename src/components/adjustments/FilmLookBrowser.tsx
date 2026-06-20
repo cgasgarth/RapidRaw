@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Check, Film, Save, Share2, X } from 'lucide-react';
+import { ArrowLeftRight, Check, Film, Save, Share2, Star, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -492,9 +492,12 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
                         }}
                         type="button"
                       >
-                        <span aria-hidden="true" className="block text-center text-xs font-semibold">
-                          F
-                        </span>
+                        <Star
+                          size={13}
+                          aria-hidden="true"
+                          className="mx-auto"
+                          fill={isFavorite ? 'currentColor' : 'none'}
+                        />
                       </button>
                       <button
                         aria-label={t('adjustments.effects.filmLookBrowser.saveLook', {
