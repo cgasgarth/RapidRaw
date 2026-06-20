@@ -408,8 +408,21 @@ export interface MaskAdjustments {
   whites: number;
 }
 
+export const LAYER_BLEND_MODES = [
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'soft_light',
+  'luminosity',
+  'color',
+] as const;
+export type LayerBlendMode = (typeof LAYER_BLEND_MODES)[number];
+export const DEFAULT_LAYER_BLEND_MODE: LayerBlendMode = 'normal';
+
 export interface MaskContainer {
   adjustments: MaskAdjustments;
+  blendMode?: LayerBlendMode;
   id: string;
   invert: boolean;
   layerGroupId?: string;
@@ -592,6 +605,7 @@ export const INITIAL_MASK_ADJUSTMENTS: MaskAdjustments = {
 
 export const INITIAL_MASK_CONTAINER: MaskContainer = {
   adjustments: INITIAL_MASK_ADJUSTMENTS,
+  blendMode: DEFAULT_LAYER_BLEND_MODE,
   id: '',
   invert: false,
   name: 'New Mask',

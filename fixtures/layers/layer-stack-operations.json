@@ -46,6 +46,18 @@
     ]
   },
   {
+    "id": "set-layer-blend-mode",
+    "initialLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true }
+    ],
+    "operations": [{ "type": "setBlendMode", "layerId": "sky", "blendMode": "soft_light" }],
+    "expectedLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      { "id": "sky", "name": "Sky Recover", "opacity": 80, "visible": true, "blendMode": "soft_light" }
+    ]
+  },
+  {
     "id": "rename-layer-and-group",
     "initialLayers": [
       { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },

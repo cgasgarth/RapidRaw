@@ -1,4 +1,4 @@
-import type { MaskContainer } from './adjustments';
+import { DEFAULT_LAYER_BLEND_MODE, LAYER_BLEND_MODES, type LayerBlendMode, type MaskContainer } from './adjustments';
 
 export type LayerStackMoveDirection = 'down' | 'up';
 
@@ -57,6 +57,19 @@ export function setLayerVisibility(
 export function setLayerOpacity(layers: Array<MaskContainer>, layerId: string, opacity: number): Array<MaskContainer> {
   findLayerIndex(layers, layerId);
   return layers.map((layer) => (layer.id === layerId ? { ...layer, opacity: clampLayerOpacity(opacity) } : layer));
+}
+
+export function setLayerBlendMode(
+  layers: Array<MaskContainer>,
+  layerId: string,
+  blendMode: LayerBlendMode,
+): Array<MaskContainer> {
+  findLayerIndex(layers, layerId);
+  return layers.map((layer) => (layer.id === layerId ? { ...layer, blendMode } : layer));
+}
+
+export function normalizeLayerBlendMode(blendMode: string | undefined): LayerBlendMode {
+  return LAYER_BLEND_MODES.find((candidate) => candidate === blendMode) ?? DEFAULT_LAYER_BLEND_MODE;
 }
 
 export function setLayerName(layers: Array<MaskContainer>, layerId: string, name: string): Array<MaskContainer> {
