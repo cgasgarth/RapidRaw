@@ -52,6 +52,22 @@ export function setLayerOpacity(layers: Array<MaskContainer>, layerId: string, o
   return layers.map((layer) => (layer.id === layerId ? { ...layer, opacity: clampLayerOpacity(opacity) } : layer));
 }
 
+export function createAdjustmentLayer(
+  layers: Array<MaskContainer>,
+  layer: MaskContainer,
+  insertIndex = 0,
+): Array<MaskContainer> {
+  if (layers.some((existingLayer) => existingLayer.id === layer.id)) {
+    throw new LayerStackOperationError(`Layer ${layer.id} already exists.`);
+  }
+
+  const nextLayer = structuredClone(layer);
+  nextLayer.opacity = clampLayerOpacity(nextLayer.opacity);
+  const clampedInsertIndex = Math.max(0, Math.min(layers.length, Math.round(insertIndex)));
+
+  return [...layers.slice(0, clampedInsertIndex), nextLayer, ...layers.slice(clampedInsertIndex)];
+}
+
 export function deleteLayer(layers: Array<MaskContainer>, layerId: string): Array<MaskContainer> {
   findLayerIndex(layers, layerId);
   return layers.filter((layer) => layer.id !== layerId);
