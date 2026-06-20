@@ -11,8 +11,10 @@ import {
   type ComputationalMergeCommandEnvelopeV1,
   type ComputationalMergeDryRunResultV1,
   type ComputationalMergeMutationResultV1,
+  type SuperResolutionArtifactV1,
 } from './rawEngineSchemas.js';
 import { applyPixelShiftSuperResolutionV1 } from './superResolutionPixelShift.js';
+import { buildSuperResolutionArtifactSidecarRecordV1 } from './superResolutionSidecarProvenance.js';
 
 const SR_RUNTIME_ENGINE_ID = 'rawengine_sr_pixel_shift_runtime_v1';
 const SR_RUNTIME_ENGINE_VERSION = '0.1.0';
@@ -115,6 +117,7 @@ export interface SuperResolutionRuntimeApplyResultV1 {
   mutationResult: ComputationalMergeMutationResultV1;
   outputPixels: Float32Array;
   provenance: SuperResolutionRuntimeProvenanceV1;
+  sidecarArtifact: SuperResolutionArtifactV1;
 }
 
 export const buildSuperResolutionRuntimeDryRunV1 = (requestValue: unknown): SuperResolutionRuntimeDryRunResultV1 => {
@@ -201,6 +204,16 @@ export const applySuperResolutionRuntimePlanV1 = (requestValue: unknown): SuperR
       width: runtime.width,
     }),
   ];
+  const outputArtifact = outputArtifacts.find((artifact) => artifact.kind === 'merge_output');
+  if (outputArtifact === undefined) {
+    throw new Error('Super-resolution runtime apply did not produce an output artifact.');
+  }
+  const provenance = superResolutionRuntimeProvenanceV1Schema.parse({
+    ...runtime.provenance,
+    acceptedDryRunPlanHash,
+    acceptedDryRunPlanId,
+    runtimeStatus: 'apply_rendered',
+  });
 
   const mutationResult = buildComputationalMergeMutationResultV1({
     appliedGraphRevision: `${request.command.expectedGraphRevision}:sr-apply`,
@@ -215,11 +228,13 @@ export const applySuperResolutionRuntimePlanV1 = (requestValue: unknown): SuperR
   return {
     mutationResult,
     outputPixels: runtime.outputPixels,
-    provenance: superResolutionRuntimeProvenanceV1Schema.parse({
-      ...runtime.provenance,
-      acceptedDryRunPlanHash,
-      acceptedDryRunPlanId,
-      runtimeStatus: 'apply_rendered',
+    provenance,
+    sidecarArtifact: buildSuperResolutionArtifactSidecarRecordV1({
+      command: request.command,
+      createdAt: new Date().toISOString(),
+      outputArtifact,
+      previewArtifacts: [],
+      provenance,
     }),
   };
 };
