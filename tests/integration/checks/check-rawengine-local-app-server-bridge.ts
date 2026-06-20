@@ -19,6 +19,10 @@ import {
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  buildSelectiveColorCommandEnvelope,
+  buildSelectiveColorImageCommandContext,
+} from '../../../src/utils/selectiveColorCommandBridge.ts';
 
 const failures: string[] = [];
 const bridge = createRawEngineLocalAppServerBridge();
@@ -26,6 +30,7 @@ const commandTypes = bridge.listCommandTypes();
 
 if (!commandTypes.includes('rawengine.local.toolRegistry.query')) failures.push('Tool registry query not registered.');
 if (!commandTypes.includes('toneColor.setBasicTone')) failures.push('Basic tone dry-run command not registered.');
+if (!commandTypes.includes('toneColor.adjustHsl')) failures.push('Selective color/HSL command not registered.');
 if (!commandTypes.includes('ai.enhancement.dryRun')) failures.push('AI enhancement dry-run command not registered.');
 if (!commandTypes.includes('ai.enhancement.apply')) failures.push('AI enhancement apply command not registered.');
 if (!rawEngineLocalAppServerBridgeCapabilities.mutatingCommands) {
@@ -73,6 +78,59 @@ if (!applied.ok) {
   }
   if (parsedApply.sourceGraphRevision !== sampleToneColorApplyCommandEnvelopeV1.expectedGraphRevision) {
     failures.push('Basic tone apply result did not preserve source revision.');
+  }
+}
+
+const selectiveColorContext = buildSelectiveColorImageCommandContext({
+  expectedGraphRevision: 'graph_rev_local_bridge_selective_color',
+  imagePath: '/validation/local-bridge-selective-color.CR3',
+  operationId: 'local_bridge_orange',
+  sessionId: 'local-app-server-bridge-check',
+});
+const selectiveColorDryRunCommand = buildSelectiveColorCommandEnvelope(
+  { adjustment: { hue: 6, luminance: -8, saturation: 14 }, rangeKey: 'oranges' },
+  {
+    ...selectiveColorContext,
+    commandId: 'command_local_bridge_selective_color_preview',
+    correlationId: 'corr_local_bridge_selective_color_preview',
+    idempotencyKey: 'idem_local_bridge_selective_color_preview',
+  },
+  { dryRun: true },
+);
+const selectiveColorApplyCommand = buildSelectiveColorCommandEnvelope(
+  { adjustment: { hue: 6, luminance: -8, saturation: 14 }, rangeKey: 'oranges' },
+  {
+    ...selectiveColorContext,
+    commandId: 'command_local_bridge_selective_color_apply',
+    correlationId: 'corr_local_bridge_selective_color_apply',
+    idempotencyKey: 'idem_local_bridge_selective_color_apply',
+  },
+  { dryRun: false },
+);
+
+const unmatchedSelectiveApplyBridge = createRawEngineLocalAppServerBridge();
+const rejectedSelectiveApply = await unmatchedSelectiveApplyBridge.dispatch(selectiveColorApplyCommand);
+if (rejectedSelectiveApply.ok || rejectedSelectiveApply.reason !== 'handler_failed') {
+  failures.push('Local app-server bridge must reject selective color apply before a matching dry-run.');
+}
+
+const selectiveDryRun = await bridge.dispatch(selectiveColorDryRunCommand);
+if (!selectiveDryRun.ok) {
+  failures.push(`Selective color dry-run failed: ${selectiveDryRun.message}`);
+} else {
+  const parsedSelectiveDryRun = toneColorDryRunResultV1Schema.parse(selectiveDryRun.result);
+  if (!parsedSelectiveDryRun.parameterDiff.some((diff) => diff.path === '/parameters/orange/hueShiftDegrees')) {
+    failures.push('Selective color dry-run result did not include orange hue diff.');
+  }
+}
+
+const selectiveApplied = await bridge.dispatch(selectiveColorApplyCommand);
+if (!selectiveApplied.ok) {
+  failures.push(`Selective color apply failed after accepted dry-run: ${selectiveApplied.message}`);
+} else {
+  const parsedSelectiveApply = toneColorMutationResultV1Schema.parse(selectiveApplied.result);
+  if (!parsedSelectiveApply.changedNodeIds.includes('tone_color_hsl:orange:image')) {
+    failures.push('Selective color apply result did not report the orange HSL node.');
   }
 }
 
@@ -125,4 +183,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('rawengine local app-server bridge ok (tool-registry + tone/ai dry-run/apply)');
+console.log('rawengine local app-server bridge ok (tool-registry + tone/hsl/ai dry-run/apply)');

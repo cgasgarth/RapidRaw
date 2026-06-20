@@ -6,16 +6,22 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import {
+  createRawEngineLocalAppServerBridge,
+  rawEngineLocalAppServerBridgeCapabilities,
+} from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
+import {
   editGraphSnapshotV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
-  toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { sampleEditGraphSnapshotV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
-  sampleEditGraphSnapshotV1,
-  sampleToneColorCommandEnvelopeV1,
-} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+  applySelectiveColorCommandEnvelopeToAdjustments,
+  buildSelectiveColorCommandEnvelope,
+  buildSelectiveColorImageCommandContext,
+} from '../../../src/utils/selectiveColorCommandBridge.ts';
 import { applySelectiveColorToRgbPixel, type RgbPixel } from '../../../src/utils/selectiveColorRuntime.ts';
 
 const REPORT_PATH = 'docs/validation/selective-color-command-proof-2026-06-20.json';
@@ -58,35 +64,64 @@ const adjustment = {
   luminance: -11,
   saturation: 22,
 };
-const commandParameters = {
-  band: 'orange',
-  hueShiftDegrees: adjustment.hue,
-  luminance: adjustment.luminance,
-  saturation: adjustment.saturation,
-};
 
-const dryRunCommand = toneColorCommandEnvelopeV1Schema.parse({
-  ...sampleToneColorCommandEnvelopeV1,
-  commandId: 'command_selective_color_orange_preview_001',
-  commandType: 'toneColor.adjustHsl',
-  correlationId: 'corr_selective_color_orange_preview_001',
-  dryRun: true,
-  idempotencyKey: 'idem_selective_color_orange_preview_001',
-  parameters: commandParameters,
+const commandContext = buildSelectiveColorImageCommandContext({
+  expectedGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
+  imagePath: '/validation/selective-color-orange.CR3',
+  operationId: 'orange_001',
+  sessionId: 'selective-color-command-proof',
 });
 
-const applyCommand = toneColorCommandEnvelopeV1Schema.parse({
-  ...dryRunCommand,
-  approval: {
-    approvalClass: 'edit_apply',
-    reason: 'Apply accepted orange selective color adjustment to the edit graph sidecar.',
-    state: 'approved',
+const dryRunCommand = buildSelectiveColorCommandEnvelope(
+  { adjustment, rangeKey: 'oranges' },
+  {
+    ...commandContext,
+    commandId: 'command_selective_color_orange_preview_001',
+    correlationId: 'corr_selective_color_orange_preview_001',
+    idempotencyKey: 'idem_selective_color_orange_preview_001',
   },
-  commandId: 'command_selective_color_orange_apply_001',
-  correlationId: 'corr_selective_color_orange_apply_001',
-  dryRun: false,
-  idempotencyKey: 'idem_selective_color_orange_apply_001',
-});
+  { dryRun: true },
+);
+
+const applyCommand = buildSelectiveColorCommandEnvelope(
+  { adjustment, rangeKey: 'oranges' },
+  {
+    ...commandContext,
+    commandId: 'command_selective_color_orange_apply_001',
+    correlationId: 'corr_selective_color_orange_apply_001',
+    idempotencyKey: 'idem_selective_color_orange_apply_001',
+  },
+  {
+    dryRun: false,
+    reason: 'Apply accepted orange selective color adjustment to the edit graph sidecar.',
+  },
+);
+
+const bridge = createRawEngineLocalAppServerBridge();
+const rejectedApply = await createRawEngineLocalAppServerBridge().dispatch(applyCommand);
+if (rejectedApply.ok || rejectedApply.reason !== 'handler_failed') {
+  throw new Error('Selective color apply must be rejected before a matching dry-run.');
+}
+
+if (!rawEngineLocalAppServerBridgeCapabilities.commandTypes.includes('toneColor.adjustHsl')) {
+  throw new Error('Local app-server bridge must advertise toneColor.adjustHsl support.');
+}
+
+const dryRunResult = await bridge.dispatch(dryRunCommand);
+if (!dryRunResult.ok) throw new Error(`Selective color dry-run failed: ${dryRunResult.message}`);
+const parsedDryRunResult = toneColorDryRunResultV1Schema.parse(dryRunResult.result);
+if (!parsedDryRunResult.parameterDiff.some((diff) => diff.path === '/parameters/orange/saturation')) {
+  throw new Error('Selective color dry-run must include an orange saturation diff.');
+}
+
+const applyResult = await bridge.dispatch(applyCommand);
+if (!applyResult.ok) throw new Error(`Selective color apply failed after matching dry-run: ${applyResult.message}`);
+const parsedApplyResult = toneColorMutationResultV1Schema.parse(applyResult.result);
+
+const replayedAdjustments = applySelectiveColorCommandEnvelopeToAdjustments(INITIAL_ADJUSTMENTS, applyCommand);
+if (replayedAdjustments.hsl.oranges.hue !== adjustment.hue) {
+  throw new Error('Selective color command replay did not update orange hue.');
+}
 
 const sourcePixels: RgbPixel[] = [
   { blue: 0.08, green: 0.26, red: 0.88 },
@@ -150,50 +185,12 @@ const sidecarPayload = {
   version: 1,
 };
 
-toneColorDryRunResultV1Schema.parse({
-  colorPipeline: dryRunCommand.colorPipeline,
-  commandId: dryRunCommand.commandId,
-  commandType: dryRunCommand.commandType,
-  correlationId: dryRunCommand.correlationId,
-  dryRun: true,
-  mutates: false,
-  parameterDiff: [
-    {
-      module: 'hsl',
-      path: '/parameters/orange',
-      previousValue: { hueShiftDegrees: 0, luminance: 0, saturation: 0 },
-      value: commandParameters,
-    },
-  ],
-  predictedGraphRevision: sidecarGraph.graphRevision,
-  previewArtifacts: [
-    {
-      artifactId: 'artifact_selective_color_orange_preview_001',
-      contentHash: hashJson(previewPixels),
-      dimensions: { height: 1, width: sourcePixels.length },
-      kind: 'preview',
-      storage: 'temp_cache',
-    },
-  ],
-  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-  sourceGraphRevision: dryRunCommand.expectedGraphRevision,
-  warnings: [],
-});
-
-toneColorMutationResultV1Schema.parse({
-  appliedGraphRevision: sidecarGraph.graphRevision,
-  changedNodeIds: ['node_selective_color_orange_001'],
-  colorPipeline: applyCommand.colorPipeline,
-  commandId: applyCommand.commandId,
-  commandType: applyCommand.commandType,
-  correlationId: applyCommand.correlationId,
-  dryRun: false,
-  mutates: true,
-  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
-  sourceGraphRevision: applyCommand.expectedGraphRevision,
-  undoRevision: applyCommand.expectedGraphRevision,
-  warnings: [],
-});
+if (parsedDryRunResult.sourceGraphRevision !== sampleEditGraphSnapshotV1.graphRevision) {
+  throw new Error('Selective color dry-run did not preserve the source graph revision.');
+}
+if (!parsedApplyResult.changedNodeIds.includes('tone_color_hsl:orange:image')) {
+  throw new Error('Selective color apply result did not report the orange HSL node.');
+}
 
 const targetedRuntime = previewResults[1];
 if (targetedRuntime === undefined) throw new Error('Selective color proof requires a targeted orange sample.');
