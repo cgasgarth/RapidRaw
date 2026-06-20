@@ -1,0 +1,31 @@
+{
+  "doesNotProve": ["real_raw_quality", "measured_film_stock_emulation", "photochemical_density_domain", "gpu_parity"],
+  "fixtureInput": {
+    "colorSpace": "synthetic-display-linear-rgb",
+    "kind": "synthetic-film-grain-runtime-proof",
+    "scene": "shadow-midtone-highlight-ramp"
+  },
+  "generatedFrom": "tests/integration/checks/check-film-grain-runtime-proof.ts",
+  "proofId": "film.grain.runtime.cpu-reference.synthetic.v1",
+  "result": {
+    "afterHash": "fnv1a32:002a50e0",
+    "beforeHash": "fnv1a32:beff1d9b",
+    "changedPixels": 180,
+    "metrics": {
+      "averageAbsDelta": 0.007684,
+      "changedPixelRatio": 1,
+      "maxAbsDelta": 0.019923
+    },
+    "modelId": "film.grain.procedural_luma_chroma.v1",
+    "provenance": {
+      "algorithm": "procedural_luma_chroma_noise_v1",
+      "claimBoundary": "synthetic_cpu_reference_not_measured_stock_emulation",
+      "renderStage": "creative_final_after_glow",
+      "seed": 1007031017,
+      "seedPolicy": "stable_per_variant"
+    },
+    "runtimeStatus": "cpu_reference_runtime_apply_capable",
+    "schemaVersion": 1
+  },
+  "schemaVersion": 1
+}

@@ -227,6 +227,8 @@
     "check:film-look-render-apply-proof:update": "bun tests/integration/checks/check-film-look-render-apply-proof.ts --update",
     "check:film-look-preview-export-parity": "bun tests/integration/checks/check-film-look-preview-export-parity.ts",
     "check:film-look-preview-export-parity:update": "bun tests/integration/checks/check-film-look-preview-export-parity.ts --update",
+    "check:film-grain-runtime-proof": "bun tests/integration/checks/check-film-grain-runtime-proof.ts",
+    "check:film-grain-runtime-proof:update": "bun tests/integration/checks/check-film-grain-runtime-proof.ts --update",
     "check:film-simulation-review-artifacts": "bun tests/integration/checks/check-film-simulation-review-artifacts.ts",
     "check:film-simulation-review-artifacts:update": "bun tests/integration/checks/check-film-simulation-review-artifacts.ts --update",
     "check:film-look-measured-fixtures": "bun tests/integration/checks/check-film-look-measured-fixtures.ts",
