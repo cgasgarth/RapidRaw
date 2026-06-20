@@ -85,6 +85,9 @@ export default function PanoramaModal({
   const sourceReadinessLabel = `${t('modals.panorama.summarySourceCount', { count: imageCount ?? 0 })} - ${
     isSourceCountValid ? t('modals.panorama.summaryReady') : t('modals.panorama.summaryBlocked')
   }`;
+  const stitchReadinessLabel = isSourceCountValid
+    ? t('modals.panorama.summaryReady')
+    : t('modals.panorama.summaryBlocked');
 
   const setSetting = useCallback(
     (patch: Partial<PanoramaUiSettings>) => {
@@ -243,6 +246,51 @@ export default function PanoramaModal({
                 key={item.label}
               >
                 <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+                  {item.label}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                  {item.value}
+                </UiText>
+              </div>
+            ))}
+          </section>
+          <section
+            className="mb-5 grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2 text-xs"
+            data-boundary-mode={settings.boundaryMode}
+            data-exposure-mode={settings.exposureMode}
+            data-projection={settings.projection}
+            data-source-count={imageCount ?? 0}
+            data-stitch-ready={String(isSourceCountValid)}
+            data-testid="panorama-stitch-readiness-summary"
+          >
+            {[
+              {
+                label: t('modals.panorama.summarySources'),
+                value: t('modals.panorama.summarySourceCount', { count: imageCount ?? 0 }),
+              },
+              {
+                label: t('modals.panorama.summaryExposure'),
+                value: selectedExposureLabel,
+              },
+              {
+                label: t('modals.panorama.summaryBoundary'),
+                value: selectedBoundaryLabel,
+              },
+              {
+                label: t('modals.panorama.summaryQuality'),
+                value: stitchReadinessLabel,
+              },
+            ].map((item) => (
+              <div
+                className={`rounded border px-2 py-1.5 ${
+                  item.value === stitchReadinessLabel && !isSourceCountValid
+                    ? 'border-red-500/40 bg-red-500/10'
+                    : 'border-border-color bg-bg-primary'
+                }`}
+                data-testid="panorama-stitch-readiness-chip"
+                key={item.label}
+              >
+                <UiText as="span" variant={TextVariants.small} className="block truncate text-text-tertiary">
                   {item.label}
                 </UiText>
                 <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">

@@ -9,6 +9,12 @@ const contractSource = readFileSync('src/utils/computationalMergeReviewPanels.ts
 
 for (const marker of [
   'panorama-review-diagnostics',
+  'panorama-stitch-readiness-summary',
+  'panorama-stitch-readiness-chip',
+  'data-stitch-ready={String(isSourceCountValid)}',
+  'data-exposure-mode={settings.exposureMode}',
+  'data-boundary-mode={settings.boundaryMode}',
+  'stitchReadinessLabel',
   'sections={[',
   'sourceReadinessLabel',
   'modals.panorama.summarySourceCount',
