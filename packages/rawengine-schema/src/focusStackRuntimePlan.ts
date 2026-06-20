@@ -248,7 +248,7 @@ export const applyFocusStackRuntimePlanV1 = (requestValue: unknown): FocusStackR
           `${acceptedDryRunPlanHash}:${request.retouchLayerArtifactId}:${renderedContentHash}`,
         )}`,
         height: runtime.height,
-        kind: 'generated_patch',
+        kind: 'mask',
         storage: 'sidecar_artifact',
         width: runtime.width,
       }),
