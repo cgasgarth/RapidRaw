@@ -13,6 +13,8 @@ for (const marker of [
   'modals.focusStack.preflight.sources',
   'modals.focusStack.preflight.alignment',
   'modals.focusStack.qualityLabel',
+  'modals.focusStack.preflight.previewBudget',
+  'settings.maxPreviewDimensionPx',
   'modals.focusStack.preflight.blend',
   'modals.focusStack.review.transitions',
   'modals.focusStack.review.privateRawPending',
