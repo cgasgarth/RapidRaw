@@ -321,6 +321,7 @@
     "check:hdr-ui-runtime-bridge": "bun tests/integration/checks/check-hdr-ui-runtime-bridge.ts",
     "check:hdr-performance-smoke": "bun tests/integration/checks/check-hdr-performance-smoke.ts",
     "check:hdr-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario hdr-ui",
+    "check:hdr-private-raw-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario hdr-private-raw-ui",
     "check:focus-fixtures": "bun tests/integration/checks/check-focus-synthetic-fixtures.ts",
     "check:focus-fixtures:update": "bun tests/integration/checks/check-focus-synthetic-fixtures.ts --update",
     "check:focus-source-validation": "bun tests/integration/checks/check-focus-source-validation.ts",

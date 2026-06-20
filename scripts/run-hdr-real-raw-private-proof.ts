@@ -29,6 +29,9 @@ await runComputationalPrivateProof({
     ['bun', 'run', 'check:hdr-app-server-runtime'],
     ['bun', 'run', 'check:hdr-ui-runtime-bridge'],
   ],
-  postPrivateChecks: [['bun', 'run', 'check:hdr-real-raw-private-app-server-proof']],
+  postPrivateChecks: [
+    ['bun', 'run', 'check:hdr-real-raw-private-app-server-proof'],
+    ['bun', 'run', 'check:hdr-private-raw-ui-smoke'],
+  ],
   skipLabel: 'hdr real RAW private proof',
 });

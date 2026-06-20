@@ -8,6 +8,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   FilmLookBrowser: 'film-look-browser',
   FocusPrivateRawUi: 'focus-private-raw-ui',
   FocusUi: 'focus-ui',
+  HdrPrivateRawUi: 'hdr-private-raw-ui',
   HdrUi: 'hdr-ui',
   LayerMaskPrivateRawUi: 'layer-mask-private-raw-ui',
   LayerStackWorkflow: 'layer-stack-workflow',
@@ -87,6 +88,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'HDR merge setup',
     mode: VISUAL_SMOKE_SCENARIO_IDS.HdrUi,
     outputFile: 'hdr-ui.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Private RAW HDR review',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi,
+    outputFile: 'hdr-private-raw-ui.png',
     sectionMinimum: 1,
   },
   {
