@@ -199,6 +199,16 @@
     "reason": "CI cannot create a deterministic WGPU readback surface for this gate; shader hashes bind the cases to the GPU path until a render-readback harness lands.",
     "status": "explicitly_unavailable_in_headless_ci"
   },
+  "gpuReadbackProbe": {
+    "command": "run_color_gpu_readback_probe",
+    "expectedByteHash": "sha256:be2ed0f28ed5d492dfd4f03c6f6f0ca559819d57f38a474448e57d8da41dc572",
+    "maxByteDelta": 0,
+    "pixelCount": 4,
+    "readbackBytes": 16,
+    "status": "validation_harness_command_available_not_ci_executed",
+    "textureFormat": "rgba8unorm",
+    "validationMode": "wgpu_copy_texture_to_buffer_readback_probe"
+  },
   "issue": 2326,
   "schemaVersion": 2,
   "shaderPath": "src-tauri/src/shaders/shader.wgsl",

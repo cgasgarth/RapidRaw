@@ -457,7 +457,7 @@ pub fn get_or_init_compute_gpu_context_for_tests(
     Ok(new_context)
 }
 
-fn read_texture_data_roi(
+pub(crate) fn read_texture_data_roi(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     texture: &wgpu::Texture,
