@@ -295,22 +295,31 @@ async function runSelfTest(): Promise<void> {
 function sampleRuntimeSample(): RuntimeSample {
   const width = 12;
   const height = 8;
+  const sourcePaths = [
+    'private-fixtures/focus-stack/alaska-plane-v1/_DSC7509.ARW',
+    'private-fixtures/focus-stack/alaska-plane-v1/_DSC7510.ARW',
+    'private-fixtures/focus-stack/alaska-plane-v1/_DSC7511.ARW',
+  ];
   return runtimeSampleSchema.parse({
     fixtureId: FIXTURE_ID,
-    frames: [0, 1, 2].map((sourceIndex) => ({
-      contentHash: `sha256:${String(sourceIndex).repeat(64)}`,
-      focusDistanceMm: 180 + sourceIndex * 60,
-      graphRevision: `sha256:${'a'.repeat(64)}`,
-      pixels: Array.from({ length: width * height }, (_value, index) => {
-        const x = index % width;
-        const active = Math.floor((x / width) * 3) === sourceIndex;
-        return active ? 0.8 : 0.12 + sourceIndex * 0.01;
-      }),
-      sourceIndex,
-      sourcePath: `private-fixtures/focus-stack/plane-transition-v1/frame-0${sourceIndex + 1}.cr3`,
-      translationX: 0,
-      translationY: 0,
-    })),
+    frames: [0, 1, 2].map((sourceIndex) => {
+      const sourcePath = sourcePaths[sourceIndex];
+      if (sourcePath === undefined) throw new Error(`Missing focus sample source path ${sourceIndex}.`);
+      return {
+        contentHash: `sha256:${String(sourceIndex).repeat(64)}`,
+        focusDistanceMm: 180 + sourceIndex * 60,
+        graphRevision: `sha256:${'a'.repeat(64)}`,
+        pixels: Array.from({ length: width * height }, (_value, index) => {
+          const x = index % width;
+          const active = Math.floor((x / width) * 3) === sourceIndex;
+          return active ? 0.8 : 0.12 + sourceIndex * 0.01;
+        }),
+        sourceIndex,
+        sourcePath,
+        translationX: 0,
+        translationY: 0,
+      };
+    }),
     graphRevisionHash: `sha256:${'b'.repeat(64)}`,
     height,
     width,
@@ -330,7 +339,7 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
       {
         acceptanceStatus: 'private_focus_stack_artifact_smoke',
         artifacts: [
-          artifact('source_raw_sequence_private', 'private-fixtures/focus-stack/plane-transition-v1'),
+          artifact('source_raw_sequence_private', 'private-fixtures/focus-stack/alaska-plane-v1'),
           artifact('decode_report_private', `${ARTIFACT_ROOT}/focus-plane-decode-report.json`),
           artifact('alignment_report_private', `${ARTIFACT_ROOT}/focus-plane-alignment.json`),
           artifact('merge_output_private', `${ARTIFACT_ROOT}/focus-plane-merge.tiff`),
@@ -356,9 +365,9 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
         reportId: 'computational-merge-run.focus-plane-transition.v1',
         screenshotArtifacts: [],
         sourceHashes: [
-          source('private-fixtures/focus-stack/plane-transition-v1/frame-01.cr3'),
-          source('private-fixtures/focus-stack/plane-transition-v1/frame-02.cr3'),
-          source('private-fixtures/focus-stack/plane-transition-v1/frame-03.cr3'),
+          source('private-fixtures/focus-stack/alaska-plane-v1/_DSC7509.ARW'),
+          source('private-fixtures/focus-stack/alaska-plane-v1/_DSC7510.ARW'),
+          source('private-fixtures/focus-stack/alaska-plane-v1/_DSC7511.ARW'),
         ],
         uiIssue: 1334,
       },

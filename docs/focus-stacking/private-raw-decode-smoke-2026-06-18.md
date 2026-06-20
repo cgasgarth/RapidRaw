@@ -5,7 +5,7 @@
 
 ## Boundary
 
-The first private focus-stack RAW slice is `private_decode_smoke` only. It proves the production RAW loader can ingest the private CR3 focus bracket and emit metadata-only evidence. It does not claim focus alignment, stack quality, app-server apply, preview/export parity, UI review, or full private RAW E2E acceptance.
+The first private focus-stack RAW slice is `private_decode_smoke` only. It proves the production RAW loader can ingest the private project-owned Alaska ARW focus sequence and emit metadata-only evidence. It does not claim focus alignment, stack quality, app-server apply, preview/export parity, UI review, or full private RAW E2E acceptance.
 
 ## Semantics
 

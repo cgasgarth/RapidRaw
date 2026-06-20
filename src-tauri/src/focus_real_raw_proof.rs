@@ -17,9 +17,9 @@ use crate::private_decode_raw_proof::{
 };
 
 const SOURCE_RELATIVE_PATHS: [&str; 3] = [
-    "private-fixtures/focus-stack/plane-transition-v1/frame-01.cr3",
-    "private-fixtures/focus-stack/plane-transition-v1/frame-02.cr3",
-    "private-fixtures/focus-stack/plane-transition-v1/frame-03.cr3",
+    "private-fixtures/focus-stack/alaska-plane-v1/_DSC7509.ARW",
+    "private-fixtures/focus-stack/alaska-plane-v1/_DSC7510.ARW",
+    "private-fixtures/focus-stack/alaska-plane-v1/_DSC7511.ARW",
 ];
 
 const NON_CLAIMS: [&str; 4] = [
@@ -56,16 +56,16 @@ const MAX_PREVIEW_EXPORT_MEAN_ABS_DELTA: f64 = 0.015;
 
 const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
     decode_report_file: "focus-plane-decode-report.json",
-    expected_format_label: "cr3",
+    expected_format_label: "arw",
     feature_family: "focus_stack",
     fixture_id: "validation.computational-merge.focus-plane-transition.v1",
     implementation_issue: 1507,
     metric_source_count: SOURCE_RELATIVE_PATHS.len(),
-    notes: "Private CR3 focus-stack direct decode smoke only. This proves production RAW loader ingest, nonzero decoded dimensions, finite decoded pixel payloads, source hashing, and metadata-only report collection. It does not claim focus alignment, stack quality, app-server apply, preview/export parity, or UI review.",
+    notes: "Private project-owned Alaska ARW focus-stack direct decode smoke only. This proves production RAW loader ingest, nonzero decoded dimensions, finite decoded pixel payloads, source hashing, and metadata-only report collection. It does not claim focus alignment, stack quality, app-server apply, preview/export parity, or UI review.",
     quality_file: "focus-plane-quality.json",
     report_file: "focus-plane-private-run-report.json",
     report_id: "computational-merge-run.focus-plane-transition.v1",
-    source_dir: "private-fixtures/focus-stack/plane-transition-v1",
+    source_dir: "private-fixtures/focus-stack/alaska-plane-v1",
     source_relative_paths: &SOURCE_RELATIVE_PATHS,
     ui_issue: 1334,
 };
@@ -213,6 +213,7 @@ fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), Str
         )],
     ]
     .concat();
+    write_json(&output_dir.join(CONFIG.quality_file), &metrics)?;
     if !metrics.iter().all(|metric| metric.passed) {
         return Err("focus private RAW stack artifact metrics did not pass".to_string());
     }
@@ -238,8 +239,6 @@ fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), Str
         &graph_revision_hash,
         &stack_result,
     )?;
-    write_json(&output_dir.join(CONFIG.quality_file), &metrics)?;
-
     write_json(
         &output_dir.join(CONFIG.report_file),
         &ComputationalMergePrivateRunReportCollection {
@@ -287,7 +286,7 @@ fn run_private_focus_stack_artifact_proof(private_root: &Path) -> Result<(), Str
                 generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
                 graph_revision_hash,
                 implementation_issue: CONFIG.implementation_issue,
-                notes: "Private CR3 focus-stack preview/export smoke. This proves production RAW decode plus a sharpness-weighted focus-stack merge artifact, preview/export artifact emission, and bounded preview/export parity. It does not claim UI review or final E2E acceptance.".to_string(),
+                notes: "Private project-owned Alaska ARW focus-stack preview/export smoke. This proves production RAW decode plus a sharpness-weighted focus-stack merge artifact, preview/export artifact emission, and bounded preview/export parity. It does not claim UI review or final E2E acceptance.".to_string(),
                 quality_metrics: metrics,
                 report_id: CONFIG.report_id.to_string(),
                 run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),

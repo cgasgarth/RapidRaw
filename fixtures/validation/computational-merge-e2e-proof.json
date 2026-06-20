@@ -265,43 +265,43 @@
     {
       "artifacts": [
         {
-          "hash": null,
+          "hash": "sha256:e760e462e52502bba7bf8c0a510edf7fe46411b330c61a354b65141e81ea6e6a",
           "kind": "source_raw_sequence_private",
-          "path": "private-fixtures/focus-stack/plane-transition-v1",
+          "path": "private-fixtures/focus-stack/alaska-plane-v1",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:cd1cd07f7aa19c5fd170e6e2cfc5636477e205f22baeebc4b38b1539bedaa484",
           "kind": "alignment_report_private",
           "path": "private-artifacts/validation/computational-merge/focus-plane-alignment.json",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:bf82f8ccdfd00983ae36b32ee576ff174ad6f9e831040f947aef65226c2038ae",
           "kind": "merge_output_private",
           "path": "private-artifacts/validation/computational-merge/focus-plane-merge.tiff",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:146d4fd5bc3945cf42c3097f7fae052eb0978bc5f2949ecd7122759c26f8108b",
           "kind": "preview_after_private",
           "path": "private-artifacts/validation/computational-merge/focus-plane-preview.png",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:bf82f8ccdfd00983ae36b32ee576ff174ad6f9e831040f947aef65226c2038ae",
           "kind": "export_after_private",
           "path": "private-artifacts/validation/computational-merge/focus-plane-export.tiff",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:0365dab98bb2afc658a309ee8278eb4065d8531154786cd1bfbfe4fb35099d49",
           "kind": "quality_report_private",
           "path": "private-artifacts/validation/computational-merge/focus-plane-quality.json",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:3868d8d4c47741e2760019b0c0de5f45d174b8f2cc2ab977c04c4e89e2314887",
           "kind": "app_server_runtime_report_private",
           "path": "private-artifacts/validation/computational-merge/focus-plane-app-server-runtime-proof.json",
           "publicRepoAllowed": false
@@ -329,13 +329,13 @@
       "fixtureId": "validation.computational-merge.focus-plane-transition.v1",
       "implementationIssue": 1507,
       "localSourceRelativePaths": [
-        "private-fixtures/focus-stack/plane-transition-v1/frame-01.cr3",
-        "private-fixtures/focus-stack/plane-transition-v1/frame-02.cr3",
-        "private-fixtures/focus-stack/plane-transition-v1/frame-03.cr3"
+        "private-fixtures/focus-stack/alaska-plane-v1/_DSC7509.ARW",
+        "private-fixtures/focus-stack/alaska-plane-v1/_DSC7510.ARW",
+        "private-fixtures/focus-stack/alaska-plane-v1/_DSC7511.ARW"
       ],
       "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
-      "notes": "Private RAW focus-stack E2E proof slot for decode, source alignment, sharpness-map merge, app-server dry-run/apply replay, preview/export parity, and transition-artifact quality metrics. This manifest is planning evidence only until private assets and full E2E run reports exist.",
-      "proofStatus": "manifest_only",
+      "notes": "Private project-owned Alaska ARW focus-stack proof has production RAW decode, source alignment, sharpness-map merge output, preview/export artifacts, typed app-server dry-run/apply replay, and private RAW UI smoke evidence. This is runtime proof, not final focus-stack quality acceptance.",
+      "proofStatus": "runtime_apply_capable",
       "uiIssue": 1334,
       "workflowSteps": [
         "open_raw_sequence",
