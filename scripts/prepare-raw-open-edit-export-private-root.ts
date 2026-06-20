@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
-import { access, lstat, mkdir, readFile, rm, symlink, copyFile } from 'node:fs/promises';
+import { access, copyFile, lstat, mkdir, readFile, readdir, rm, symlink } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 
 import { parsePrivateRawEvidenceLedger } from '../src/schemas/privateRawEvidenceSchemas.ts';
@@ -35,7 +35,7 @@ if (ledgerEntry === undefined) {
 if (ledgerEntry.localRelativePath === undefined || ledgerEntry.fileSha256 === undefined) {
   fail(`${ledgerEntry.evidenceId}: available source path and hash are required.`);
 }
-const privateRootPath = valueAfter('--root') ?? request.privateRootPath;
+const privateRootPath = valueAfter('--root') ?? process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? request.privateRootPath;
 if (!isAbsolute(privateRootPath)) {
   fail('privateRootPath must be absolute.');
 }
@@ -43,13 +43,14 @@ if (!isAbsolute(privateRootPath)) {
 if (sourceOverridePath !== undefined) {
   const overridePath = resolve(sourceOverridePath);
   if (!(await pathExists(overridePath))) fail(`${overridePath}: source override does not exist.`);
+  const overrideSourcePath = await resolveSourceOverridePath(overridePath, ledgerEntry.fileSha256);
   const overrideHash = `sha256:${createHash('sha256')
-    .update(await readFile(overridePath))
+    .update(await readFile(overrideSourcePath))
     .digest('hex')}`;
   if (overrideHash !== ledgerEntry.fileSha256) {
     fail(`${ledgerEntry.evidenceId}: source override expected ${ledgerEntry.fileSha256}, got ${overrideHash}.`);
   }
-  await linkOrCopy(overridePath, resolvePrivatePath(privateRootPath, ledgerEntry.localRelativePath));
+  await linkOrCopy(overrideSourcePath, resolvePrivatePath(privateRootPath, ledgerEntry.localRelativePath));
 }
 
 const sourcePath = await resolveSourcePath(privateRootPath, ledgerEntry.localRelativePath);
@@ -98,6 +99,33 @@ async function resolveSourcePath(privateRoot: string, localRelativePath: string)
   if (await pathExists(repoLocalSourcePath)) return repoLocalSourcePath;
 
   return resolvePrivatePath(privateRoot, localRelativePath);
+}
+
+async function resolveSourceOverridePath(path: string, expectedHash: string): Promise<string> {
+  const sourceStat = await lstat(path);
+  if (!sourceStat.isDirectory()) return path;
+
+  const entries = await readdir(path, { withFileTypes: true });
+  const rawCandidates = entries
+    .filter((entry) => entry.isFile() && /\.(arw|cr2|cr3|dng|nef|orf|raf|rw2)$/iu.test(entry.name))
+    .map((entry) => resolve(path, entry.name));
+  const matches: string[] = [];
+
+  for (const candidate of rawCandidates) {
+    const candidateHash = `sha256:${createHash('sha256')
+      .update(await readFile(candidate))
+      .digest('hex')}`;
+    if (candidateHash === expectedHash) matches.push(candidate);
+  }
+
+  if (matches.length === 0) {
+    fail(`${path}: source override directory does not contain RAW ${expectedHash}.`);
+  }
+  if (matches.length > 1) {
+    fail(`${path}: source override directory has multiple RAW files with ${expectedHash}.`);
+  }
+
+  return matches[0] ?? fail(`${path}: failed to resolve source override.`);
 }
 
 function resolvePrivatePath(root: string, relativePath: string): string {
