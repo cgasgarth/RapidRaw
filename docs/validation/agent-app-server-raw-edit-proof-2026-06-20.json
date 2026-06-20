@@ -1,0 +1,76 @@
+{
+  "apply": {
+    "approvalState": "approved",
+    "auditEventId": "audit_2_command_agent_app_server_raw_edit_apply_2315",
+    "commandId": "command_agent_app_server_raw_edit_apply_2315",
+    "dryRun": false,
+    "mutates": true,
+    "status": "completed",
+    "toolName": "tonecolor.apply_command",
+    "appliedGraphRevision": "graph_rev_agent_app_server_raw_edit_initial_2315:apply:command_agent_app_server_raw_edit_apply_2315",
+    "changedNodeIds": ["tone_color_basic:image"],
+    "undoRevision": "graph_rev_agent_app_server_raw_edit_initial_2315"
+  },
+  "chat": {
+    "assistantPlan": "Use app-server tool discovery, run a non-mutating basic tone dry-run, require edit-apply approval, then apply the matching command without overwriting the original RAW.",
+    "userPrompt": "Make DSC_2315.NEF a little warmer, lift the shadows, protect highlights, show me the preview, then apply if approved."
+  },
+  "dryRun": {
+    "approvalState": "not_required",
+    "auditEventId": "audit_1_command_agent_app_server_raw_edit_dry_run_2315",
+    "commandId": "command_agent_app_server_raw_edit_dry_run_2315",
+    "dryRun": true,
+    "mutates": false,
+    "status": "completed",
+    "toolName": "tonecolor.dry_run_command",
+    "parameterDiffPaths": [
+      "/parameters/blackPoint",
+      "/parameters/clarity",
+      "/parameters/contrast",
+      "/parameters/exposureEv",
+      "/parameters/highlights",
+      "/parameters/saturation",
+      "/parameters/shadows",
+      "/parameters/whitePoint"
+    ],
+    "predictedGraphRevision": "graph_rev_agent_app_server_raw_edit_initial_2315:preview:command_agent_app_server_raw_edit_dry_run_2315"
+  },
+  "issue": 2315,
+  "limits": [
+    "Runs the RawEngine local app-server bridge in-process; it does not launch the official Codex app-server sidecar or desktop app.",
+    "Targets a RAW image path and mutates a typed virtual-copy edit graph; it does not decode RAW pixels.",
+    "Before, after, and export entries are deterministic audit artifact handles; this is not a rendered before/after/export image proof."
+  ],
+  "proofHashes": {
+    "applyCommand": "sha256:67ad899a0e28f5af8c35774f2a6aef20f03bbda3d528aa8878d2d9be1ee0f1eb",
+    "dryRunCommand": "sha256:8e372b3a2b22413ed6c8ff3cbf50dc378215c992f42b2f4622835f9c2ef10af1",
+    "replayFixture": "sha256:772ecaa9138133931822c0bb2a9a4141e30f34276fdc3de1f52f998283d2e68a",
+    "reportInputs": "sha256:e0d72e471ea256f76669985d9990a61458bb5ba3576dea86372700406952e7c8"
+  },
+  "proofStatus": "runtime_apply_partial",
+  "rawTarget": {
+    "afterArtifactId": "artifact_agent_app_server_raw_edit_after_virtual_copy_2315",
+    "beforeArtifactId": "artifact_agent_app_server_raw_edit_before_raw_2315",
+    "exportArtifactId": "artifact_agent_app_server_raw_edit_export_audit_2315",
+    "imagePath": "/photos/agent-proof/DSC_2315.NEF",
+    "noOverwritePolicy": "never_overwrite_original",
+    "virtualCopyId": "vc_agent_app_server_raw_edit_2315"
+  },
+  "refs": ["#2315"],
+  "rejectedApplyBeforeDryRun": {
+    "approvalState": "approved",
+    "auditEventId": "audit_1_command_agent_app_server_raw_edit_apply_2315",
+    "commandId": "command_agent_app_server_raw_edit_apply_2315",
+    "dryRun": false,
+    "mutates": false,
+    "status": "rejected",
+    "toolName": "tonecolor.apply_command"
+  },
+  "schemaVersion": 1,
+  "toolRegistry": {
+    "applyTool": "tonecolor.apply_command",
+    "dryRunTool": "tonecolor.dry_run_command",
+    "registryHash": "sha256:c32ed04e765da1c3c715df1e709ca13de32824d13db08fad30a711065abdd388"
+  },
+  "validationMode": "agent_chat_raw_app_server_bridge_apply_proof"
+}
