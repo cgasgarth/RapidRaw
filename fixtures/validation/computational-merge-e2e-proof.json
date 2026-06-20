@@ -180,46 +180,46 @@
     {
       "artifacts": [
         {
-          "hash": null,
-          "kind": "source_raw_sequence_private",
+          "hash": "sha256:3c7aa12ad3a6b50a90d5b5cd4b50387093b42188737ce6598d0ff3ba32d0816d",
           "path": "private-fixtures/panorama/overlap-stitch-v1",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "source_raw_sequence_private"
         },
         {
-          "hash": null,
-          "kind": "alignment_report_private",
+          "hash": "sha256:479655795a5cc1abe55827ab65b9ff189c8e1722543f0b666bff146dedf82765",
           "path": "private-artifacts/validation/computational-merge/panorama-overlap-alignment.json",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "alignment_report_private"
         },
         {
-          "hash": null,
-          "kind": "merge_output_private",
+          "hash": "sha256:f1d03fc151bc17d39b3ec5b061e47fc044b634156f7d95fd408781efd8ce1f1c",
           "path": "private-artifacts/validation/computational-merge/panorama-overlap-merge.tiff",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "merge_output_private"
         },
         {
-          "hash": null,
-          "kind": "preview_after_private",
+          "hash": "sha256:9ccfcb15c41063a31e6de9f8e5422508e00c9dbab15b1788d38f72ef019acb1f",
           "path": "private-artifacts/validation/computational-merge/panorama-overlap-preview.png",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "preview_after_private"
         },
         {
-          "hash": null,
-          "kind": "export_after_private",
+          "hash": "sha256:f1d03fc151bc17d39b3ec5b061e47fc044b634156f7d95fd408781efd8ce1f1c",
           "path": "private-artifacts/validation/computational-merge/panorama-overlap-export.tiff",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "export_after_private"
         },
         {
-          "hash": null,
-          "kind": "quality_report_private",
+          "hash": "sha256:4a3357dfbb151361f5cc796c7bce3aa065caa58a73d8a1e20e1976e69aae1357",
           "path": "private-artifacts/validation/computational-merge/panorama-overlap-quality.json",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "quality_report_private"
         },
         {
-          "hash": null,
-          "kind": "app_server_runtime_report_private",
+          "hash": "sha256:2428f5a004c80f968371a429cd199a8f5a80a59b0f5439123526de98d42b4f54",
           "path": "private-artifacts/validation/computational-merge/panorama-overlap-app-server-runtime-proof.json",
-          "publicRepoAllowed": false
+          "publicRepoAllowed": false,
+          "kind": "app_server_runtime_report_private"
         }
       ],
       "evidenceId": "raw-evidence.panorama.overlap-stitch.v1",
@@ -249,8 +249,8 @@
         "private-fixtures/panorama/overlap-stitch-v1/frame-03.arw"
       ],
       "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
-      "notes": "Private RAW panorama E2E proof slot for decode, feature alignment, stitch/blend output, preview/export parity, app-server dry-run/apply replay, review artifacts, and quality metrics. This public manifest remains planning evidence until private assets and runtime run reports exist.",
-      "proofStatus": "manifest_only",
+      "notes": "Private project-owned Alaska ARW panorama overlap proof has production RAW decode, feature alignment, stitch/blend output, preview/export artifacts, typed app-server dry-run/apply replay, and private RAW UI smoke evidence. This accepts the fixture for runtime validation, but not final panorama quality acceptance.",
+      "proofStatus": "runtime_apply_capable",
       "uiIssue": 1333,
       "workflowSteps": [
         "open_raw_sequence",

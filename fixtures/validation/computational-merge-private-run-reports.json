@@ -335,6 +335,257 @@
       "acceptanceStatus": "runtime_apply_capable",
       "artifacts": [
         {
+          "hash": "sha256:3c7aa12ad3a6b50a90d5b5cd4b50387093b42188737ce6598d0ff3ba32d0816d",
+          "path": "private-fixtures/panorama/overlap-stitch-v1",
+          "publicRepoAllowed": false,
+          "kind": "source_raw_sequence_private"
+        },
+        {
+          "hash": "sha256:7372257e8af5d9a915dbc1143979f7e2dc87bad06b92cf4fd0d52c5d260a9514",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-decode-report.json",
+          "publicRepoAllowed": false,
+          "kind": "decode_report_private"
+        },
+        {
+          "hash": "sha256:479655795a5cc1abe55827ab65b9ff189c8e1722543f0b666bff146dedf82765",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-alignment.json",
+          "publicRepoAllowed": false,
+          "kind": "alignment_report_private"
+        },
+        {
+          "hash": "sha256:f1d03fc151bc17d39b3ec5b061e47fc044b634156f7d95fd408781efd8ce1f1c",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-merge.tiff",
+          "publicRepoAllowed": false,
+          "kind": "merge_output_private"
+        },
+        {
+          "hash": "sha256:9ccfcb15c41063a31e6de9f8e5422508e00c9dbab15b1788d38f72ef019acb1f",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-preview.png",
+          "publicRepoAllowed": false,
+          "kind": "preview_after_private"
+        },
+        {
+          "hash": "sha256:f1d03fc151bc17d39b3ec5b061e47fc044b634156f7d95fd408781efd8ce1f1c",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-export.tiff",
+          "publicRepoAllowed": false,
+          "kind": "export_after_private"
+        },
+        {
+          "hash": "sha256:4a3357dfbb151361f5cc796c7bce3aa065caa58a73d8a1e20e1976e69aae1357",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-quality.json",
+          "publicRepoAllowed": false,
+          "kind": "quality_report_private"
+        },
+        {
+          "hash": "sha256:2428f5a004c80f968371a429cd199a8f5a80a59b0f5439123526de98d42b4f54",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-app-server-runtime-proof.json",
+          "publicRepoAllowed": false,
+          "kind": "app_server_runtime_report_private"
+        }
+      ],
+      "commandIds": {
+        "apply": "command_panorama_private_raw_apply_v1",
+        "dryRun": "command_panorama_private_raw_dry_run_v1"
+      },
+      "featureFamily": "panorama_stitch",
+      "fixtureId": "validation.computational-merge.panorama-overlap.v1",
+      "generatedAt": "2026-06-20T00:00:00.000Z",
+      "graphRevisionHash": "sha256:5bd274b65cbfc311fa6761f5d6dff16de338454894805e9c538e4d9e07521fe2",
+      "implementationIssue": 1508,
+      "notes": "Private RAW panorama overlap decoded samples replayed through the typed app-server dry-run/apply bus. This proves runtime apply capability and accepts the Alaska overlap fixture for validation, but does not claim final stitch/deghost/seam quality acceptance.",
+      "previewExportParity": {
+        "name": "previewExportMeanAbsDelta",
+        "passed": true,
+        "source": "private_raw_report",
+        "threshold": 0.015,
+        "value": 0
+      },
+      "qualityMetrics": [
+        {
+          "name": "decodedSourceCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 3,
+          "value": 3
+        },
+        {
+          "name": "decodedFinitePixelRatio",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 1,
+          "value": 1
+        },
+        {
+          "name": "decodedNonzeroDimensionCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 3,
+          "value": 3
+        },
+        {
+          "name": "alignmentMatchCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 30,
+          "value": 805
+        },
+        {
+          "name": "alignmentInlierCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 30,
+          "value": 799
+        },
+        {
+          "name": "alignmentInlierRatio",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0.55,
+          "value": 0.992547
+        },
+        {
+          "name": "alignmentAcceptedPairCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 2,
+          "value": 2
+        },
+        {
+          "name": "alignmentRejectedPairCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0,
+          "value": 0
+        },
+        {
+          "name": "alignmentFiniteTransformCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 2,
+          "value": 2
+        },
+        {
+          "name": "alignmentMeanReprojectionErrorPx",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 5,
+          "value": 0.659166
+        },
+        {
+          "name": "alignmentMeanSymmetricTransferErrorPx",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 5,
+          "value": 0.659187
+        },
+        {
+          "name": "panoramaStitchedSourceCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 3,
+          "value": 3
+        },
+        {
+          "name": "panoramaExcludedSourceCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0,
+          "value": 0
+        },
+        {
+          "name": "panoramaOutputSourceCoverageRatio",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 1,
+          "value": 1
+        },
+        {
+          "name": "panoramaOutputPixelCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 1,
+          "value": 1709868
+        },
+        {
+          "name": "panoramaPairwiseMatchCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 2,
+          "value": 3
+        },
+        {
+          "name": "edgeContinuityScore",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0.85,
+          "value": 1
+        },
+        {
+          "name": "previewExportMeanAbsDelta",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0.015,
+          "value": 0
+        }
+      ],
+      "reportId": "computational-merge-run.panorama-overlap.v1",
+      "runId": "private-run-1781997578650-f2822a4f-4b48-4ff3-92d7-c5df0d68b95a",
+      "runtimeResultIds": {
+        "apply": "derived_command_panorama_private_raw_apply_v1",
+        "dryRun": "panorama_plan_command_panorama_private_raw_dry_run_v1"
+      },
+      "screenshotArtifacts": [
+        {
+          "hash": "sha256:a90b64aea8d0b93e89170ff276e9a8551497dbc0d27e025e0e1b971cf106aa4b",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-modal-before.png",
+          "publicRepoAllowed": false,
+          "label": "modal_before_apply"
+        },
+        {
+          "hash": "sha256:9ccfcb15c41063a31e6de9f8e5422508e00c9dbab15b1788d38f72ef019acb1f",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-modal-after.png",
+          "publicRepoAllowed": false,
+          "label": "modal_after_apply"
+        },
+        {
+          "hash": "sha256:9ccfcb15c41063a31e6de9f8e5422508e00c9dbab15b1788d38f72ef019acb1f",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-result-review.png",
+          "publicRepoAllowed": false,
+          "label": "result_review"
+        },
+        {
+          "hash": "sha256:9ccfcb15c41063a31e6de9f8e5422508e00c9dbab15b1788d38f72ef019acb1f",
+          "path": "private-artifacts/validation/computational-merge/panorama-overlap-export-review.png",
+          "publicRepoAllowed": false,
+          "label": "export_review"
+        }
+      ],
+      "sourceHashes": [
+        {
+          "hash": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+          "path": "private-fixtures/panorama/overlap-stitch-v1/frame-01.arw",
+          "publicRepoAllowed": false,
+          "localRelativePath": "private-fixtures/panorama/overlap-stitch-v1/frame-01.arw"
+        },
+        {
+          "hash": "sha256:c2d22ae20b568f9adc8e5a77b848ae8dabe2b3c927360b5d61c837bc56285171",
+          "path": "private-fixtures/panorama/overlap-stitch-v1/frame-02.arw",
+          "publicRepoAllowed": false,
+          "localRelativePath": "private-fixtures/panorama/overlap-stitch-v1/frame-02.arw"
+        },
+        {
+          "hash": "sha256:8cee53ce636535e536c357756552bcd3d4ad8b2e0f51cda98fa2b335fd6a825e",
+          "path": "private-fixtures/panorama/overlap-stitch-v1/frame-03.arw",
+          "publicRepoAllowed": false,
+          "localRelativePath": "private-fixtures/panorama/overlap-stitch-v1/frame-03.arw"
+        }
+      ],
+      "uiIssue": 1333
+    },
+    {
+      "acceptanceStatus": "runtime_apply_capable",
+      "artifacts": [
+        {
           "hash": "sha256:5618bb18a45b0800984300ec53adf6cff04ea77d051c28472a21c585ad85a59e",
           "path": "private-fixtures/super-resolution/alaska-burst-v1",
           "publicRepoAllowed": false,
