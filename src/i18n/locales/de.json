@@ -731,6 +731,7 @@
       "groupCount": "{{count}} layer",
       "groupCount_one": "{{count}} layer",
       "groupCount_other": "{{count}} layers",
+      "groupType": "Folder",
       "maskCount": {
         "count": "{{count}} mask",
         "count_one": "{{count}} mask",

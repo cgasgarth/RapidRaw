@@ -16,7 +16,13 @@ import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../utils/adjustments';
+import {
+  DEFAULT_LAYER_BLEND_MODE,
+  INITIAL_MASK_ADJUSTMENTS,
+  LAYER_BLEND_MODES,
+  type LayerBlendMode,
+  type MaskContainer,
+} from '../../../utils/adjustments';
 import {
   buildLayerGroupSummaries,
   canGroupLayerWithNext,
@@ -28,6 +34,8 @@ import {
   groupLayerWithNext,
   moveLayer,
   moveLayerGroup,
+  normalizeLayerBlendMode,
+  setLayerBlendMode,
   setLayerGroupName,
   setLayerGroupOpacity,
   setLayerName,
@@ -49,7 +57,7 @@ interface LayerStackPanelProps {
 }
 
 interface LayerRowModel {
-  blendMode: string;
+  blendMode: LayerBlendMode | null;
   groupId: string | null;
   groupLayerCount: number;
   id: string;
@@ -67,14 +75,23 @@ const BASE_LAYER_ID = 'base-raw-layer';
 const LAYER_OPACITY_PRESETS = [0, 25, 50, 75, 100] as const;
 
 const blendModes = [
-  { labelKey: 'editor.layers.blendModes.normal', value: 'Normal' },
-  { labelKey: 'editor.layers.blendModes.multiply', value: 'Multiply' },
-  { labelKey: 'editor.layers.blendModes.screen', value: 'Screen' },
-  { labelKey: 'editor.layers.blendModes.overlay', value: 'Overlay' },
-  { labelKey: 'editor.layers.blendModes.softLight', value: 'Soft Light' },
-  { labelKey: 'editor.layers.blendModes.color', value: 'Color' },
-  { labelKey: 'editor.layers.blendModes.luminosity', value: 'Luminosity' },
+  { labelKey: 'editor.layers.blendModes.normal', value: 'normal' },
+  { labelKey: 'editor.layers.blendModes.multiply', value: 'multiply' },
+  { labelKey: 'editor.layers.blendModes.screen', value: 'screen' },
+  { labelKey: 'editor.layers.blendModes.overlay', value: 'overlay' },
+  { labelKey: 'editor.layers.blendModes.softLight', value: 'soft_light' },
+  { labelKey: 'editor.layers.blendModes.color', value: 'color' },
+  { labelKey: 'editor.layers.blendModes.luminosity', value: 'luminosity' },
 ] as const;
+type BlendModeLabelKey = (typeof blendModes)[number]['labelKey'];
+
+function isLayerBlendMode(value: string): value is LayerBlendMode {
+  return LAYER_BLEND_MODES.some((blendMode) => blendMode === value);
+}
+
+function getBlendModeLabelKey(value: LayerBlendMode): BlendModeLabelKey {
+  return blendModes.find((blendMode) => blendMode.value === value)?.labelKey ?? 'editor.layers.blendModes.normal';
+}
 
 function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string>): Array<LayerRowModel> {
   const groupSummaries = buildLayerGroupSummaries(masks);
@@ -86,7 +103,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
       const groupSummary = groupSummaries.find((group) => group.id === mask.layerGroupId);
       emittedGroupIds.add(mask.layerGroupId);
       rows.push({
-        blendMode: 'Folder',
+        blendMode: null,
         groupId: mask.layerGroupId,
         groupLayerCount: groupSummary?.layerCount ?? 1,
         id: `group:${mask.layerGroupId}`,
@@ -107,7 +124,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
     }
 
     rows.push({
-      blendMode: 'Normal',
+      blendMode: normalizeLayerBlendMode(mask.blendMode),
       groupId: mask.layerGroupId ?? null,
       groupLayerCount: 0,
       id: mask.id,
@@ -125,7 +142,7 @@ function getLayerRows(masks: Array<MaskContainer>, collapsedGroupIds: Set<string
   return [
     ...rows,
     {
-      blendMode: 'Normal',
+      blendMode: DEFAULT_LAYER_BLEND_MODE,
       groupId: null,
       groupLayerCount: 0,
       id: BASE_LAYER_ID,
@@ -217,6 +234,9 @@ export default function LayerStackPanel({
   const updateLayerOpacity = (layerId: string, opacity: number) => {
     applyLayerStack(setLayerOpacity(masks, layerId, opacity), layerId);
   };
+  const updateLayerBlendMode = (layerId: string, blendMode: LayerBlendMode) => {
+    applyLayerStack(setLayerBlendMode(masks, layerId, blendMode), layerId);
+  };
   const updateGroupOpacity = (groupId: string, opacity: number) => {
     applyLayerStack(setLayerGroupOpacity(masks, groupId, opacity), `group:${groupId}`);
   };
@@ -242,6 +262,7 @@ export default function LayerStackPanel({
     const layerId = crypto.randomUUID();
     const layer: MaskContainer = {
       adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+      blendMode: DEFAULT_LAYER_BLEND_MODE,
       id: layerId,
       invert: false,
       name: t('editor.layers.newAdjustmentLayerName', { count: masks.length + 1 }),
@@ -418,7 +439,8 @@ export default function LayerStackPanel({
                 </UiText>
                 <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block truncate">
                   {t('editor.layers.rowSummary', {
-                    blendMode: row.blendMode,
+                    blendMode:
+                      row.blendMode === null ? t('editor.layers.groupType') : t(getBlendModeLabelKey(row.blendMode)),
                     maskCount: row.isGroupHeader
                       ? t('editor.layers.groupCount', { count: row.groupLayerCount })
                       : getMaskCountLabel(row.maskCount),
@@ -485,8 +507,15 @@ export default function LayerStackPanel({
             <div className="relative">
               <select
                 className="h-8 w-full appearance-none rounded-md bg-surface px-2 pr-7 text-sm text-text-primary outline-none disabled:opacity-60"
-                disabled
-                value={activeRow.blendMode}
+                data-testid="layer-blend-mode-select"
+                disabled={isBaseSelected || isGroupHeaderSelected}
+                onChange={(event) => {
+                  const blendMode = event.currentTarget.value;
+                  if (!activeRow.isBase && !activeRow.isGroupHeader && isLayerBlendMode(blendMode)) {
+                    updateLayerBlendMode(activeRow.id, blendMode);
+                  }
+                }}
+                value={activeRow.blendMode ?? DEFAULT_LAYER_BLEND_MODE}
               >
                 {blendModes.map((blendMode) => (
                   <option key={blendMode.value} value={blendMode.value}>

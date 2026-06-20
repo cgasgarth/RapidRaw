@@ -14,6 +14,7 @@ import {
   groupLayerWithNext,
   moveLayer,
   moveLayerGroup,
+  setLayerBlendMode,
   setLayerGroupName,
   setLayerGroupOpacity,
   setLayerName,
@@ -28,6 +29,7 @@ import { INITIAL_MASK_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
 const layerFixtureSchema = z
   .object({
+    blendMode: z.enum(['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'luminosity', 'color']).optional(),
     id: z.string().trim().min(1),
     layerGroupId: z.string().trim().min(1).optional(),
     layerGroupName: z.string().trim().min(1).optional(),
@@ -62,6 +64,13 @@ const operationSchema = z.discriminatedUnion('type', [
       layerId: z.string().trim().min(1),
       opacity: z.number(),
       type: z.literal('setOpacity'),
+    })
+    .strict(),
+  z
+    .object({
+      blendMode: z.enum(['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'luminosity', 'color']),
+      layerId: z.string().trim().min(1),
+      type: z.literal('setBlendMode'),
     })
     .strict(),
   z
@@ -197,6 +206,7 @@ const fixtures = z
 function toMaskContainer(layer) {
   return {
     adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+    ...(layer.blendMode ? { blendMode: layer.blendMode } : {}),
     id: layer.id,
     invert: false,
     ...(layer.layerGroupId ? { layerGroupId: layer.layerGroupId } : {}),
@@ -210,6 +220,7 @@ function toMaskContainer(layer) {
 
 function summarize(layers) {
   return layers.map((layer) => ({
+    ...(layer.blendMode ? { blendMode: layer.blendMode } : {}),
     id: layer.id,
     ...(layer.layerGroupId ? { layerGroupId: layer.layerGroupId } : {}),
     ...(layer.layerGroupName ? { layerGroupName: layer.layerGroupName } : {}),
@@ -237,6 +248,8 @@ function applyOperation(layers, operation) {
       );
     case 'setOpacity':
       return setLayerOpacity(layers, operation.layerId, operation.opacity);
+    case 'setBlendMode':
+      return setLayerBlendMode(layers, operation.layerId, operation.blendMode);
     case 'rename':
       return setLayerName(layers, operation.layerId, operation.name);
     case 'renameGroup':
