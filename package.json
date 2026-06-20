@@ -130,6 +130,7 @@
     "check:mask-overlay": "bun tests/integration/checks/check-mask-overlay-modes.ts",
     "check:mask-overlay-raw-proof": "bun scripts/capture-visual-smoke.ts --scenario mask-overlay-raw-proof",
     "check:mask-copy-paste": "bun tests/integration/checks/check-mask-copy-paste.ts",
+    "check:mask-readiness-ui": "bun tests/integration/checks/check-mask-readiness-ui.ts",
     "check:ai-mask-capabilities": "bun tests/integration/checks/check-ai-mask-capabilities.ts",
     "check:ai-mask-app-server-tool": "bun tests/integration/checks/check-ai-mask-app-server-tool.ts",
     "check:ai-people-masks": "bun tests/integration/checks/check-ai-people-mask-contract.ts",

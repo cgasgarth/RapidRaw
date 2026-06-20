@@ -1079,6 +1079,12 @@ export function MasksPanel() {
 
   const activeContainer = adjustments.masks.find((m) => m.id === activeMaskContainerId);
   const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeMaskId);
+  const activeMaskHasBrush = activeContainer?.subMasks.some((subMask) => subMask.type === Mask.Brush) ?? false;
+  const activeMaskHasGradient =
+    activeContainer?.subMasks.some((subMask) => subMask.type === Mask.Linear || subMask.type === Mask.Radial) ?? false;
+  const activeMaskHasRange =
+    activeContainer?.subMasks.some((subMask) => subMask.type === Mask.Color || subMask.type === Mask.Luminance) ??
+    false;
   const isAiMask =
     activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth].includes(activeSubMaskData.type);
 
@@ -1867,6 +1873,39 @@ export function MasksPanel() {
                 <UiText variant={TextVariants.heading} className="mb-2">
                   {t('editor.masks.maskAdjustmentsTitle')}
                 </UiText>
+                {activeContainer && (
+                  <div
+                    className="mb-3 grid grid-cols-4 gap-2 rounded-md border border-surface bg-bg-secondary p-2 text-[11px]"
+                    data-component-count={activeContainer.subMasks.length}
+                    data-has-brush={String(activeMaskHasBrush)}
+                    data-has-gradient={String(activeMaskHasGradient)}
+                    data-has-range={String(activeMaskHasRange)}
+                    data-testid="mask-readiness-summary"
+                  >
+                    <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-components">
+                      <span className="block truncate text-text-tertiary">{t('editor.masks.masksTitle')}</span>
+                      <span className="block truncate text-text-secondary">{activeContainer.subMasks.length}</span>
+                    </div>
+                    <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-brush">
+                      <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Brush)}</span>
+                      <span className="block truncate text-text-secondary">
+                        {activeMaskHasBrush ? t('editor.masks.maskAdjustmentsTitle') : t('editor.masks.addNewMask')}
+                      </span>
+                    </div>
+                    <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-gradient">
+                      <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Linear)}</span>
+                      <span className="block truncate text-text-secondary">
+                        {activeMaskHasGradient ? t('editor.masks.maskAdjustmentsTitle') : t('editor.masks.addNewMask')}
+                      </span>
+                    </div>
+                    <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-range">
+                      <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Color)}</span>
+                      <span className="block truncate text-text-secondary">
+                        {activeMaskHasRange ? t('editor.masks.maskAdjustmentsTitle') : t('editor.masks.addNewMask')}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <SettingsPanel
                   container={activeContainer ?? null}
                   activeSubMask={activeSubMaskData || null}

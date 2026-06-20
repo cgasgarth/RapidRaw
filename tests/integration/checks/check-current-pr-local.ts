@@ -168,6 +168,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:film-halation-runtime-proof'],
   );
   addIf((file) => file === 'src/components/adjustments/FilmLookBrowser.tsx', ['check:film-look-browser-ui']);
+  addIf((file) => file === 'src/components/panel/right/MasksPanel.tsx', ['check:mask-readiness-ui']);
   addIf(
     (file) => file.includes('selectiveColor') || file.includes('selective-color'),
     ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
@@ -326,6 +327,7 @@ if (process.argv.includes('--self-test')) {
     ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
   );
   assertSelfTestRoute(['src/components/adjustments/FilmLookBrowser.tsx'], ['check:film-look-browser-ui']);
+  assertSelfTestRoute(['src/components/panel/right/MasksPanel.tsx'], ['check:mask-readiness-ui']);
   assertSelfTestRoute(['src/components/adjustments/Color.tsx'], ['check:professional-color-workflow-ui']);
   assertSelfTestRoute(['src/components/panel/right/LayerStackPanel.tsx'], ['check:layer-stack-panel-ui']);
 
