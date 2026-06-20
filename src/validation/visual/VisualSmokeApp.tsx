@@ -13,6 +13,8 @@ import PanoramaModal from '../../components/modals/PanoramaModal';
 import SuperResolutionModal from '../../components/modals/SuperResolutionModal';
 import AgentChatShell from '../../components/panel/right/AgentChatShell';
 import { MaskOverlayReviewControls } from '../../components/panel/right/MasksPanel';
+import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher';
+import { Panel } from '../../components/ui/AppProperties';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
 import { DEFAULT_PANORAMA_UI_SETTINGS, type PanoramaUiSettings } from '../../schemas/panoramaUiSchemas';
@@ -80,6 +82,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrUi]: SuperResolutionVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail]: WorkflowRailVisualSmoke,
 } satisfies Partial<Record<VisualSmokeMode, () => ReactElement>>;
 type VisualSmokeComponentMode = keyof typeof visualSmokeComponents;
 
@@ -87,6 +90,56 @@ const isVisualSmokeComponentMode = (mode: string): mode is VisualSmokeComponentM
 
 const agentChatSmokeTitle = 'Agent chat UI smoke';
 const agentChatSmokeRuntime = 'UI-only';
+const workflowRailDensityTitle = 'Workflow rail density';
+const workflowRailRuntime = 'UI polish';
+const workflowRailTargetProof = 'Fixed 36px icon targets keep the rail compact without changing panel order.';
+const workflowRailActivePanelLabel = 'Active panel';
+const workflowRailNoPanelLabel = 'none';
+
+function WorkflowRailVisualSmoke() {
+  const [activePanel, setActivePanel] = useState<Panel | null>(Panel.Adjustments);
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail}
+    >
+      <div className="grid h-screen grid-cols-[1fr_360px] bg-[#0f1114]" data-visual-smoke-section="workflow-shell">
+        <section className="flex min-w-0 items-center justify-center border-r border-white/10 bg-[#121518] p-10">
+          <div className="aspect-[4/3] w-full max-w-4xl rounded-md border border-white/10 bg-gradient-to-br from-[#29333b] via-[#677565] to-[#d7b078] shadow-2xl" />
+        </section>
+
+        <aside className="grid grid-cols-[42px_1fr] bg-[#171a1f]" data-visual-smoke-section="workflow-rail">
+          <RightPanelSwitcher activePanel={activePanel} isInstantTransition={true} onPanelSelect={setActivePanel} />
+          <div className="border-l border-white/10 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-sm font-semibold">{workflowRailDensityTitle}</span>
+              <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+                {workflowRailRuntime}
+              </span>
+            </div>
+            <div className="space-y-2 text-xs text-[#aab2bd]">
+              <div className="rounded-md border border-white/10 bg-white/5 p-3">{workflowRailTargetProof}</div>
+              <div className="rounded-md border border-white/10 bg-white/5 p-3">
+                {workflowRailActivePanelLabel}: {activePanel ?? workflowRailNoPanelLabel}
+              </div>
+            </div>
+
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <RightPanelSwitcher
+                activePanel={activePanel}
+                isInstantTransition={true}
+                layout="horizontal"
+                onPanelSelect={setActivePanel}
+              />
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
 
 function AgentChatVisualSmoke() {
   return (

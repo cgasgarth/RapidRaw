@@ -234,6 +234,7 @@
     "check:generated-types": "bun tests/integration/checks/check-generated-type-drift.ts",
     "check:command-palette-workflows": "bun scripts/capture-visual-smoke.ts --scenario command-palette-workflows",
     "check:color-workflow-smoke": "bun scripts/capture-visual-smoke.ts --scenario color-workflow",
+    "check:workflow-rail-smoke": "bun scripts/capture-visual-smoke.ts --scenario workflow-rail",
     "check:film-fixtures": "bun tests/integration/checks/check-film-look-fixture-outputs.ts",
     "check:film-fixtures:update": "bun tests/integration/checks/check-film-look-fixture-outputs.ts --update",
     "check:film-look-registry": "bun tests/integration/checks/check-film-look-registry.ts",

@@ -17,6 +17,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   PanoramaUi: 'panorama-ui',
   SrPrivateRawUi: 'sr-private-raw-ui',
   SrUi: 'sr-ui',
+  WorkflowRail: 'workflow-rail',
 } as const;
 
 export const VISUAL_SMOKE_PROOF_TEST_IDS = {
@@ -114,6 +115,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Color Workflow',
     mode: VISUAL_SMOKE_SCENARIO_IDS.ColorWorkflow,
     outputFile: 'color-workflow.png',
+    sectionMinimum: 2,
+  },
+  {
+    marker: 'Workflow rail density',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.WorkflowRail,
+    outputFile: 'workflow-rail.png',
     sectionMinimum: 2,
   },
   {

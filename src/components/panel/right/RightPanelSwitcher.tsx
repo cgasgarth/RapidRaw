@@ -22,17 +22,23 @@ export default function RightPanelSwitcher({
   const isHorizontal = layout === 'horizontal';
 
   return (
-    <div className={isHorizontal ? 'flex items-center overflow-x-auto p-1 gap-1' : 'flex flex-col p-1 gap-1 h-full'}>
+    <div
+      className={
+        isHorizontal ? 'flex items-center gap-0.5 overflow-x-auto p-0.5' : 'flex h-full flex-col gap-0.5 p-0.5'
+      }
+    >
       {RIGHT_PANEL_GROUPS.map((group, groupIndex) => (
-        <div key={groupIndex} className={isHorizontal ? 'flex items-center gap-1' : 'flex flex-col gap-1'}>
+        <div key={groupIndex} className={isHorizontal ? 'flex items-center gap-0.5' : 'flex flex-col gap-0.5'}>
           {groupIndex > 0 && (
             <div
-              className={isHorizontal ? 'w-px h-6 bg-surface self-stretch my-auto' : 'w-6 h-px bg-surface self-center'}
+              className={isHorizontal ? 'my-auto h-5 w-px self-stretch bg-surface' : 'h-px w-5 self-center bg-surface'}
             />
           )}
           {group.map(({ fallbackLabel, icon: Icon, id, tooltipKey }) => (
             <button
-              className={`relative rounded-md transition-colors duration-200 ${isHorizontal ? 'p-2 shrink-0' : 'p-2'} ${
+              aria-label={t(tooltipKey, { defaultValue: fallbackLabel })}
+              aria-pressed={activePanel === id}
+              className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-colors duration-150 ${
                 activePanel === id
                   ? 'text-text-primary'
                   : 'text-text-secondary hover:bg-surface hover:text-text-primary'
@@ -41,6 +47,7 @@ export default function RightPanelSwitcher({
               onClick={() => {
                 onPanelSelect(id);
               }}
+              type="button"
               data-tooltip={t(tooltipKey, { defaultValue: fallbackLabel })}
             >
               {activePanel === id && (
@@ -50,7 +57,7 @@ export default function RightPanelSwitcher({
                   transition={isInstantTransition ? { duration: 0 } : { type: 'spring', bounce: 0.2, duration: 0.4 }}
                 />
               )}
-              <Icon size={20} className="relative z-10" />
+              <Icon size={18} className="relative z-10" />
             </button>
           ))}
         </div>
