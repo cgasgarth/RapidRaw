@@ -77,6 +77,13 @@ const source = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
 for (const marker of [
   'hdr-setup-summary',
   'hdr-setup-summary-chip',
+  'hdr-readiness-summary',
+  'hdr-readiness-sources',
+  'hdr-readiness-validation',
+  'hdr-readiness-alignment',
+  'hdr-readiness-merge',
+  'data-merge-ready={String(isSourceCountValid)}',
+  'data-bracket-validation={settings.bracketValidation}',
   'modals.hdr.summarySources',
   'modals.hdr.summarySourceCount',
   'modals.hdr.summaryReady',
