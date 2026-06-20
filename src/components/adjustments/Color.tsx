@@ -96,6 +96,42 @@ const ColorRuntimeStatusRail = () => {
   );
 };
 
+const ColorWorkflowReadinessRail = () => {
+  const { t } = useTranslation();
+  const readinessItems = [
+    { key: 'profile-tone', label: t('adjustments.color.profileTone.title') },
+    { key: 'rgb-balance', label: t('adjustments.color.colorBalanceRgb.title') },
+    { key: 'channel-mixer', label: t('adjustments.color.channelMixer.title') },
+    { key: 'selective-color', label: t('adjustments.color.colorMixer') },
+    { key: 'grading', label: t('adjustments.color.colorGrading') },
+  ] as const;
+
+  return (
+    <div
+      className="grid grid-cols-2 gap-1 rounded-md border border-border bg-bg-tertiary p-1"
+      data-channel-mixer-ready="true"
+      data-color-balance-ready="true"
+      data-grading-ready="true"
+      data-profile-tone-ready="true"
+      data-selective-color-ready="true"
+      data-testid="professional-color-workflow-readiness"
+    >
+      {readinessItems.map((item) => (
+        <div
+          className="min-w-0 rounded bg-bg-secondary px-2 py-1"
+          data-testid="professional-color-readiness-item"
+          key={item.key}
+        >
+          <div className="truncate text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
+            {item.label}
+          </div>
+          <div className="truncate text-xs font-medium text-text-primary">{t(runtimeStatusKey('proofed'))}</div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const formatPercent = (value: number) => `${String(value)}%`;
 const formatSignedInteger = (value: number) => (value > 0 ? `+${value}` : String(value));
 const CAMERA_PROFILE_IDS = [
@@ -893,6 +929,7 @@ export default function ColorPanel({
   return (
     <div className="space-y-4">
       {!isForMask && <ColorRuntimeStatusRail />}
+      {!isForMask && <ColorWorkflowReadinessRail />}
       {!isForMask &&
         (adjustmentVisibility[ColorAdjustment.CameraProfile] !== false ||
           adjustmentVisibility[ColorAdjustment.ToneCurve] !== false) && (
