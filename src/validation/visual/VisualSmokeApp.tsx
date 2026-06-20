@@ -82,10 +82,22 @@ interface LayerMaskPrivateRawVisualProof {
   unrefinedPreviewDataUrl: string;
 }
 
+interface NegativeLabPublicExportVisualProof {
+  changedPixelRatio: string;
+  fixtureId: string;
+  outputDataUrl: string;
+  outputFormat: string;
+  outputPath: string;
+  runtimeStatus: string;
+  sourceDataUrl: string;
+  sourcePath: string;
+}
+
 declare global {
   interface Window {
     __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawVisualProof;
     __RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__?: LayerMaskPrivateRawVisualProof;
+    __RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__?: NegativeLabPublicExportVisualProof;
     __RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__?: PanoramaPrivateRawVisualProof;
     __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawVisualProof;
   }
@@ -105,6 +117,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof]: MaskOverlayRawProofVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview]: NegativeLabPublicExportReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace]: NegativeLabVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi]: PanoramaPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
@@ -247,6 +260,12 @@ const layerWorkflowInitialStack = [
 const FILM_LOOK_PARITY_TITLE = 'Rendered parity proof';
 const FILM_LOOK_PARITY_FIXTURE_LABEL = 'Synthetic fixture';
 const NEGATIVE_LAB_NO_SAVED_PATHS_LABEL = 'No saved positives yet';
+const NEGATIVE_LAB_PUBLIC_EXPORT_REVIEW_TITLE = 'Public negative export review';
+const NEGATIVE_LAB_PUBLIC_EXPORT_SOURCE_LABEL = 'CC0 scan input';
+const NEGATIVE_LAB_PUBLIC_EXPORT_OUTPUT_LABEL = 'Rendered positive proof';
+const NEGATIVE_LAB_PUBLIC_EXPORT_HANDOFF_LABEL = 'JPEG export handoff';
+const NEGATIVE_LAB_PUBLIC_EXPORT_RUNTIME_LABEL = 'Runtime';
+const NEGATIVE_LAB_PUBLIC_EXPORT_SOURCE_PATH_LABEL = 'Source';
 const formatFilmLookParityDelta = (maxDelta: string) => `Delta ${maxDelta}`;
 const formatLayerBlend = (blend: string) => blend.replace('_', ' ');
 const libraryWorkflowAssets = [
@@ -1852,6 +1871,96 @@ function NegativeLabVisualSmoke() {
         data-testid={VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabSavedPathProof}
       >
         {savedPaths.length > 0 ? savedPaths.join(', ') : NEGATIVE_LAB_NO_SAVED_PATHS_LABEL}
+      </div>
+    </main>
+  );
+}
+
+function NegativeLabPublicExportReviewSmoke() {
+  const proof = window.__RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__;
+
+  if (!proof) {
+    return (
+      <main
+        className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview}
+      >
+        <p>{copy.missingPrivateRawProofArtifacts}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview}
+    >
+      <div
+        className="grid h-screen grid-cols-[1fr_360px] bg-[#0f1114]"
+        data-visual-smoke-section="negative-lab-public-export-review"
+      >
+        <section className="grid grid-rows-[44px_1fr] overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+            <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+              {NEGATIVE_LAB_PUBLIC_EXPORT_REVIEW_TITLE}
+            </span>
+          </div>
+          <div className="grid min-h-0 grid-cols-2 gap-3 p-4">
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_SOURCE_LABEL}</figcaption>
+              <img
+                alt={NEGATIVE_LAB_PUBLIC_EXPORT_SOURCE_LABEL}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="negative-lab-public-export-source"
+                src={proof.sourceDataUrl}
+              />
+            </figure>
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_OUTPUT_LABEL}</figcaption>
+              <img
+                alt={NEGATIVE_LAB_PUBLIC_EXPORT_OUTPUT_LABEL}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="negative-lab-public-export-output"
+                src={proof.outputDataUrl}
+              />
+            </figure>
+          </div>
+        </section>
+        <aside className="border-l border-white/10 bg-[#171a1f] p-4 text-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{NEGATIVE_LAB_PUBLIC_EXPORT_HANDOFF_LABEL}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{proof.outputFormat}</span>
+          </div>
+          <div
+            className="sr-only"
+            data-changed-pixel-ratio={proof.changedPixelRatio}
+            data-fixture-id={proof.fixtureId}
+            data-output-format={proof.outputFormat}
+            data-output-path={proof.outputPath}
+            data-runtime-status={proof.runtimeStatus}
+            data-source-path={proof.sourcePath}
+            data-testid="negative-lab-public-export-review-proof"
+          />
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_RUNTIME_LABEL}</p>
+              <p>{proof.runtimeStatus}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_SOURCE_PATH_LABEL}</p>
+              <p className="break-all">{proof.sourcePath}</p>
+            </div>
+            <div
+              className="rounded border border-white/10 bg-white/5 p-2"
+              data-testid="negative-lab-public-export-artifact-handoff"
+            >
+              <p className="text-xs text-[#aab2bd]">{NEGATIVE_LAB_PUBLIC_EXPORT_HANDOFF_LABEL}</p>
+              <p className="break-all">{proof.outputPath}</p>
+            </div>
+          </div>
+        </aside>
       </div>
     </main>
   );

@@ -35,6 +35,7 @@ import {
   maskOverlayRawProofSchema,
   panoramaPrivateRawReviewProofSchema,
   negativeLabWorkspaceProofDatasetSchema,
+  negativeLabPublicExportReviewProofSchema,
   panoramaReviewWorkspaceProofSchema,
   panoramaUiSettingsProofSchema,
   selectiveColorUiProofDatasetSchema,
@@ -71,6 +72,9 @@ const requiresPanoramaPrivateRawProof = selectedScenarios.some(
 );
 const requiresLayerMaskPrivateRawProof = selectedScenarios.some(
   (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi,
+);
+const requiresNegativeLabPublicExportProof = selectedScenarios.some(
+  (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview,
 );
 
 if (selectedScenarios.length === 0) {
@@ -129,10 +133,22 @@ interface LayerMaskPrivateRawBrowserProof {
   unrefinedPreviewDataUrl: string;
 }
 
+interface NegativeLabPublicExportBrowserProof {
+  changedPixelRatio: string;
+  fixtureId: string;
+  outputDataUrl: string;
+  outputFormat: string;
+  outputPath: string;
+  runtimeStatus: string;
+  sourceDataUrl: string;
+  sourcePath: string;
+}
+
 declare global {
   interface Window {
     __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawBrowserProof;
     __RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__?: LayerMaskPrivateRawBrowserProof;
+    __RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__?: NegativeLabPublicExportBrowserProof;
     __RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__?: PanoramaPrivateRawBrowserProof;
     __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawBrowserProof;
   }
@@ -192,6 +208,14 @@ async function readPngDataUrl(path) {
     throw new Error(`${path} is not a PNG file.`);
   }
   return `data:image/png;base64,${buffer.toString('base64')}`;
+}
+
+async function readJpegDataUrl(path) {
+  const buffer = await readFile(path);
+  if (buffer.toString('hex', 0, 2) !== 'ffd8') {
+    throw new Error(`${path} is not a JPEG file.`);
+  }
+  return `data:image/jpeg;base64,${buffer.toString('base64')}`;
 }
 
 async function loadSrPrivateRawProof(): Promise<SrPrivateRawBrowserProof> {
@@ -269,6 +293,22 @@ async function loadLayerMaskPrivateRawProof(): Promise<LayerMaskPrivateRawBrowse
     unmaskedPreviewDataUrl: await readPngDataUrl(unmaskedPreviewArtifact),
     unrefinedPreviewArtifact,
     unrefinedPreviewDataUrl: await readPngDataUrl(unrefinedPreviewArtifact),
+  };
+}
+
+async function loadNegativeLabPublicExportProof(): Promise<NegativeLabPublicExportBrowserProof> {
+  const sourcePath = 'fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg';
+  const outputPath =
+    'src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg';
+  return {
+    changedPixelRatio: '1',
+    fixtureId: 'negative_lab.real.public.cc0_110_ericht_negative_001',
+    outputDataUrl: await readJpegDataUrl(outputPath),
+    outputFormat: 'jpeg_proof',
+    outputPath,
+    runtimeStatus: 'public_negative_scan_positive_export_rendered',
+    sourceDataUrl: await readJpegDataUrl(sourcePath),
+    sourcePath,
   };
 }
 
@@ -795,6 +835,24 @@ async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview) {
+    negativeLabPublicExportReviewProofSchema.parse(
+      await page.getByTestId('negative-lab-public-export-review-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    for (const testId of ['negative-lab-public-export-source', 'negative-lab-public-export-output']) {
+      const loaded = await page.getByTestId(testId).evaluate((element) => {
+        const image = element as HTMLImageElement;
+        return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+      });
+      if (!loaded) throw new Error(`${testId} did not load a nonblank public negative image.`);
+    }
+    await page
+      .getByTestId('negative-lab-public-export-artifact-handoff')
+      .getByText('110-format-ericht-negative-cc0-320-Positive.jpg', { exact: false })
+      .waitFor({ timeout: 10_000 });
+    return;
+  }
+
   if (mode !== VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace) return;
 
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkspace).waitFor({ timeout: 10_000 });
@@ -1143,6 +1201,14 @@ async function main() {
           window.__RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__ = proof;
         },
         await loadLayerMaskPrivateRawProof(),
+      );
+    }
+    if (requiresNegativeLabPublicExportProof) {
+      await page.addInitScript(
+        (proof: NegativeLabPublicExportBrowserProof) => {
+          window.__RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__ = proof;
+        },
+        await loadNegativeLabPublicExportProof(),
       );
     }
 

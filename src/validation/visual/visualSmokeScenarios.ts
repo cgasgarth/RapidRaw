@@ -14,6 +14,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   LibraryWorkflow: 'library-workflow',
   MaskOverlayRawProof: 'mask-overlay-raw-proof',
   NegativeLabBatchColorWorkspace: 'negative-lab-batch-color-workspace',
+  NegativeLabPublicExportReview: 'negative-lab-public-export-review',
   NegativeLabWorkspace: 'negative-lab-workspace',
   PanoramaPrivateRawUi: 'panorama-private-raw-ui',
   PanoramaUi: 'panorama-ui',
@@ -111,6 +112,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     marker: 'Negative Conversion',
     mode: VISUAL_SMOKE_SCENARIO_IDS.NegativeLabBatchColorWorkspace,
     outputFile: 'negative-lab-batch-color-workspace.png',
+    sectionMinimum: 1,
+  },
+  {
+    marker: 'Public negative export review',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview,
+    outputFile: 'negative-lab-public-export-review.png',
     sectionMinimum: 1,
   },
   {
