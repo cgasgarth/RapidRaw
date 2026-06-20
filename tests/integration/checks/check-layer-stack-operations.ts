@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import {
   buildLayerRenderPlan,
+  createAdjustmentLayer,
   deleteLayer,
   duplicateLayer,
   groupLayerWithNext,
@@ -40,6 +41,14 @@ const renderPlanItemSchema = z
   .strict();
 
 const operationSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      insertIndex: z.number().int().nonnegative().optional(),
+      name: z.string().trim().min(1),
+      newLayerId: z.string().trim().min(1),
+      type: z.literal('create'),
+    })
+    .strict(),
   z
     .object({
       layerId: z.string().trim().min(1),
@@ -141,6 +150,20 @@ function summarize(layers) {
 
 function applyOperation(layers, operation) {
   switch (operation.type) {
+    case 'create':
+      return createAdjustmentLayer(
+        layers,
+        {
+          adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+          id: operation.newLayerId,
+          invert: false,
+          name: operation.name,
+          opacity: 100,
+          subMasks: [],
+          visible: true,
+        },
+        operation.insertIndex,
+      );
     case 'setOpacity':
       return setLayerOpacity(layers, operation.layerId, operation.opacity);
     case 'setVisibility':

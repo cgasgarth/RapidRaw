@@ -4,9 +4,11 @@ import { type KeyboardEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../utils/adjustments';
 import {
   buildLayerGroupSummaries,
   canGroupLayerWithNext,
+  createAdjustmentLayer,
   deleteLayer,
   duplicateLayer,
   groupLayerWithNext,
@@ -18,8 +20,6 @@ import {
 } from '../../../utils/layerStack';
 import Slider, { type SliderChangeEvent } from '../../ui/Slider';
 import UiText from '../../ui/Text';
-
-import type { MaskContainer } from '../../../utils/adjustments';
 
 interface LayerStackPanelProps {
   activeMaskContainerId: string | null;
@@ -171,6 +171,19 @@ export default function LayerStackPanel({
   const updateLayerOpacity = (layerId: string, opacity: number) => {
     applyLayerStack(setLayerOpacity(masks, layerId, opacity), layerId);
   };
+  const createActiveAdjustmentLayer = () => {
+    const layerId = crypto.randomUUID();
+    const layer: MaskContainer = {
+      adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+      id: layerId,
+      invert: false,
+      name: t('editor.layers.newAdjustmentLayerName', { count: masks.length + 1 }),
+      opacity: 100,
+      subMasks: [],
+      visible: true,
+    };
+    applyLayerStack(createAdjustmentLayer(masks, layer), layerId);
+  };
   const moveActiveLayer = (direction: 'down' | 'up') => {
     if (!activeRow || activeRow.isBase) return;
     if (activeRow.isGroupHeader && activeRow.groupId) {
@@ -226,8 +239,8 @@ export default function LayerStackPanel({
           </button>
           <button
             className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
-            data-tooltip="Create adjustment layer"
-            disabled
+            data-tooltip={t('editor.layers.actions.createAdjustmentLayer')}
+            onClick={createActiveAdjustmentLayer}
             type="button"
           >
             <Plus size={17} className="mx-auto" />

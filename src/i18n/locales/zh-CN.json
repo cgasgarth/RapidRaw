@@ -689,6 +689,7 @@
     },
     "layers": {
       "actions": {
+        "createAdjustmentLayer": "Create adjustment layer",
         "delete": "Delete layer",
         "duplicate": "Duplicate layer",
         "groupWithNext": "Group with next layer",
@@ -719,6 +720,8 @@
         "count_other": "{{count}} masks",
         "none": "No masks"
       },
+      "newAdjustmentLayerName": "Adjustment Layer {{count}}",
+      "newAdjustmentLayerName_other": "Adjustment Layer {{count}}",
       "rowSummary": "{{blendMode}} - {{opacity}}% - {{maskCount}}",
       "title": "Layers"
     },

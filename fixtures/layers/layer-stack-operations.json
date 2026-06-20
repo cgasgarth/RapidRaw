@@ -1,5 +1,39 @@
 [
   {
+    "id": "create-adjustment-layer",
+    "initialLayers": [{ "id": "base-tone", "name": "Base Tone", "opacity": 100, "visible": true }],
+    "operations": [{ "type": "create", "newLayerId": "local-contrast", "name": "Local Contrast", "insertIndex": 0 }],
+    "expectedLayers": [
+      { "id": "local-contrast", "name": "Local Contrast", "opacity": 100, "visible": true },
+      { "id": "base-tone", "name": "Base Tone", "opacity": 100, "visible": true }
+    ],
+    "expectedRenderPlan": [
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "local-contrast",
+        "name": "Local Contrast",
+        "opacity": 100,
+        "opacityFraction": 1,
+        "subMaskCount": 0
+      },
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "base-tone",
+        "name": "Base Tone",
+        "opacity": 100,
+        "opacityFraction": 1,
+        "subMaskCount": 0
+      }
+    ]
+  },
+  {
+    "id": "create-adjustment-layer-duplicate-id-blocked",
+    "initialLayers": [{ "id": "base-tone", "name": "Base Tone", "opacity": 100, "visible": true }],
+    "operations": [{ "type": "create", "newLayerId": "base-tone", "name": "Duplicate Tone", "insertIndex": 0 }],
+    "expectedError": "already exists",
+    "expectedLayers": [{ "id": "base-tone", "name": "Base Tone", "opacity": 100, "visible": true }]
+  },
+  {
     "id": "opacity-clamps-to-range",
     "initialLayers": [
       { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
