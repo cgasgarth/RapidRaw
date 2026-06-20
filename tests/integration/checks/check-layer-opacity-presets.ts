@@ -9,7 +9,10 @@ for (const marker of [
   'layer-opacity-presets',
   'layer-opacity-preset-${presetOpacity}',
   'layer-stack-count',
+  'layer-visible-count',
   'editor.layers.layerCount',
+  'editor.layers.visibleLayerCount',
+  'visibleLayerCount = masks.filter',
   'updateActiveOpacity(presetOpacity)',
   'editor.layers.opacityPreset',
 ]) {

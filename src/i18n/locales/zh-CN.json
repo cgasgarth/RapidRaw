@@ -749,7 +749,9 @@
       "newAdjustmentLayerName_other": "Adjustment Layer {{count}}",
       "opacityPreset": "Set opacity to {{opacity}}",
       "rowSummary": "{{blendMode}} - {{opacity}}% - {{maskCount}}",
-      "title": "Layers"
+      "title": "Layers",
+      "visibleLayerCount": "{{count}} visible",
+      "visibleLayerCount_other": "{{count}} visible"
     },
     "masks": {
       "actions": {
