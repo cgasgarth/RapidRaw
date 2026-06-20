@@ -32,6 +32,7 @@ const CHECK_GROUPS = {
     'check:keyboard-shortcut-conflicts',
     'check:edit-graph-history',
     'check:edit-history-replay',
+    'check:typed-adjustment-command-envelope',
     'check:basic-tone-command-bridge',
     'check:tone-color-app-server-routes',
     'check:rawengine-app-server-host',

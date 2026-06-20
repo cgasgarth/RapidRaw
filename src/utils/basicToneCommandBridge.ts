@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import type { Adjustments } from './adjustments';
 
 export const BASIC_TONE_COMMAND_SCHEMA_VERSION = 1;
@@ -10,6 +12,20 @@ export const BasicToneApprovalClass = {
 export type BasicToneApprovalClass = (typeof BasicToneApprovalClass)[keyof typeof BasicToneApprovalClass];
 export type BasicToneCommandContextActor = Record<string, unknown>;
 export type BasicToneCommandContextTarget = Record<string, unknown> & { kind: 'image' | 'virtual_copy' };
+
+export const legacyBasicToneAdjustmentPayloadSchema = z.looseObject({
+  blacks: z.number().min(-100).max(100),
+  brightness: z.number().min(-100).max(100),
+  clarity: z.number().min(-100).max(100),
+  contrast: z.number().min(-100).max(100),
+  exposure: z.number().min(-10).max(10),
+  highlights: z.number().min(-100).max(100),
+  saturation: z.number().min(-100).max(100),
+  shadows: z.number().min(-100).max(100),
+  whites: z.number().min(-100).max(100),
+});
+
+export type LegacyBasicToneAdjustmentPayload = z.infer<typeof legacyBasicToneAdjustmentPayloadSchema>;
 
 export interface BasicToneCommandEnvelope {
   actor: BasicToneCommandContextActor;
@@ -121,13 +137,11 @@ export const hasBasicToneAdjustmentChange = (previous: Adjustments, next: Adjust
   BASIC_TONE_ADJUSTMENT_KEYS.some((key) => previous[key] !== next[key]);
 
 export const buildBasicToneCommandEnvelope = (
-  adjustments: Pick<
-    Adjustments,
-    'blacks' | 'brightness' | 'clarity' | 'contrast' | 'exposure' | 'highlights' | 'saturation' | 'shadows' | 'whites'
-  >,
+  adjustments: LegacyBasicToneAdjustmentPayload,
   context: BasicToneCommandBridgeContext,
   options: BasicToneCommandBridgeOptions,
 ): BasicToneCommandEnvelope => {
+  const typedAdjustments = legacyBasicToneAdjustmentPayloadSchema.parse(adjustments);
   const envelope: BasicToneCommandEnvelope = {
     actor: context.actor,
     approval: {
@@ -142,14 +156,14 @@ export const buildBasicToneCommandEnvelope = (
     dryRun: options.dryRun,
     expectedGraphRevision: context.expectedGraphRevision,
     parameters: {
-      blackPoint: adjustments.blacks,
-      clarity: adjustments.clarity,
-      contrast: adjustments.contrast,
-      exposureEv: adjustments.exposure,
-      highlights: adjustments.highlights,
-      saturation: adjustments.saturation,
-      shadows: adjustments.shadows,
-      whitePoint: adjustments.whites,
+      blackPoint: typedAdjustments.blacks,
+      clarity: typedAdjustments.clarity,
+      contrast: typedAdjustments.contrast,
+      exposureEv: typedAdjustments.exposure,
+      highlights: typedAdjustments.highlights,
+      saturation: typedAdjustments.saturation,
+      shadows: typedAdjustments.shadows,
+      whitePoint: typedAdjustments.whites,
     },
     schemaVersion: BASIC_TONE_COMMAND_SCHEMA_VERSION,
     target: context.target,
@@ -161,3 +175,18 @@ export const buildBasicToneCommandEnvelope = (
 
   return envelope;
 };
+
+export const applyBasicToneCommandEnvelopeToAdjustments = (
+  base: Adjustments,
+  command: BasicToneCommandEnvelope,
+): Adjustments => ({
+  ...base,
+  blacks: command.parameters.blackPoint,
+  clarity: command.parameters.clarity,
+  contrast: command.parameters.contrast,
+  exposure: command.parameters.exposureEv,
+  highlights: command.parameters.highlights,
+  saturation: command.parameters.saturation,
+  shadows: command.parameters.shadows,
+  whites: command.parameters.whitePoint,
+});
