@@ -22,6 +22,17 @@
       "status": "runtime-parse-tested",
       "tsCallSites": ["src/components/panel/FolderTree.tsx", "src/hooks/useLibraryActions.ts"],
       "zodSchema": "albumTreeSchema"
+    },
+    {
+      "command": "save_settings",
+      "invokeEnumMember": "SaveSettings",
+      "negativeFixturePath": "fixtures/validation/tauri-empty-response-invalid.json",
+      "notes": "SettingsPanel save changes route through useSettingsStore and reject non-empty Tauri responses before treating the save as accepted.",
+      "positiveFixturePath": "fixtures/validation/tauri-empty-response-valid.json",
+      "rustParityState": "manual-rust-command-shape",
+      "status": "runtime-parse-tested",
+      "tsCallSites": ["src/store/useSettingsStore.ts"],
+      "zodSchema": "emptyTauriResponseSchema"
     }
   ],
   "issue": 1301,

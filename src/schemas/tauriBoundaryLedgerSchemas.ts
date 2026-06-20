@@ -20,7 +20,7 @@ const tauriBoundaryEntrySchema = z
     rustParityState: rustParityStateSchema,
     status: tauriBoundaryStatusSchema,
     tsCallSites: z.array(z.string().trim().min(1)).min(1),
-    zodSchema: z.enum(['albumTreeSchema', 'folderTreeListSchema']),
+    zodSchema: z.enum(['albumTreeSchema', 'emptyTauriResponseSchema', 'folderTreeListSchema']),
   })
   .strict()
   .superRefine((entry, context) => {

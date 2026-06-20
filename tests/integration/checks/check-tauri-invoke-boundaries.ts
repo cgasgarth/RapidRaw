@@ -38,7 +38,6 @@ const APPROVED_RAW_INVOKE_BUDGET = {
   'src/hooks/usePresets.ts': { raw: 5, typed: 2 },
   'src/hooks/useProductivityActions.ts': { raw: 8, typed: 1 },
   'src/hooks/useThumbnails.ts': { raw: 2, typed: 0 },
-  'src/store/useSettingsStore.ts': { raw: 1, typed: 0 },
   'src/utils/frontendLogBridge.ts': { raw: 1, typed: 0 },
 };
 

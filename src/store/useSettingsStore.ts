@@ -1,8 +1,9 @@
-import { invoke } from '@tauri-apps/api/core';
 import { platform } from '@tauri-apps/plugin-os';
 import { create } from 'zustand';
 
 import { type AppSettings, type SupportedTypes, Invokes, type Theme } from '../components/ui/AppProperties';
+import { emptyTauriResponseSchema } from '../schemas/tauriResponseSchemas';
+import { invokeWithSchema } from '../utils/tauriSchemaInvoke';
 import { DEFAULT_THEME_ID } from '../utils/themes';
 
 interface SettingsState {
@@ -56,7 +57,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ appSettings: newSettings });
 
     try {
-      await invoke(Invokes.SaveSettings, { settings: settingsToSave });
+      await invokeWithSchema(Invokes.SaveSettings, { settings: settingsToSave }, emptyTauriResponseSchema);
     } catch (err) {
       console.error('Failed to save settings:', err);
     }
