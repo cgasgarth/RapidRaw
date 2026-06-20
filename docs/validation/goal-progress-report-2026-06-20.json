@@ -32,6 +32,12 @@
     },
     {
       "exists": true,
+      "label": "Negative Lab public export UI proof",
+      "path": "docs/validation/negative-lab-public-export-ui-proof-2026-06-20.json",
+      "status": "runtime"
+    },
+    {
+      "exists": true,
       "label": "Selective color command proof",
       "path": "docs/validation/selective-color-command-proof-2026-06-20.json",
       "status": "synthetic"
@@ -41,6 +47,12 @@
       "label": "Selective color independent proof",
       "path": "docs/validation/selective-color-independent-proof-2026-06-20.json",
       "status": "synthetic"
+    },
+    {
+      "exists": true,
+      "label": "Selective color private RAW UI proof",
+      "path": "docs/validation/selective-color-private-ui-proof-2026-06-20.json",
+      "status": "private-gated"
     },
     {
       "exists": true,
@@ -57,7 +69,7 @@
   ],
   "generatedAt": "2026-06-20T00:00:00.000Z",
   "issue": 2365,
-  "openRuntimeIssues": [1508, 2148, 2308, 2309, 2310, 2311, 2312, 2313, 2314, 2315],
+  "openRuntimeIssues": [1508, 2148, 2308, 2309, 2310, 2311, 2312, 2313, 2314, 2315, 2476],
   "schemaVersion": 1,
   "summary": { "totalValidationScripts": 454, "workflowReferencedScripts": 38 },
   "validationCommands": [
