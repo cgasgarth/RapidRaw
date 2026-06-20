@@ -20,6 +20,7 @@ import {
 
 const PANORAMA_RUNTIME_ENGINE_ID = 'rawengine_panorama_synthetic_v1';
 const PANORAMA_RUNTIME_ENGINE_VERSION = '0.1.0';
+const PANORAMA_CYCLE_RESIDUAL_THRESHOLD_PX = 2;
 
 export const panoramaRuntimeSourceFrameV1Schema = z
   .object({
@@ -35,6 +36,23 @@ export const panoramaRuntimeSourceFrameV1Schema = z
 
 export const panoramaRuntimePlanRequestV1Schema = z
   .object({
+    candidateTransformOverrides: z
+      .array(
+        z
+          .object({
+            fromSourceIndex: z.number().int().nonnegative(),
+            reason: z.literal('synthetic_cycle_inconsistency_fixture'),
+            toSourceIndex: z.number().int().nonnegative(),
+            translationPx: z
+              .object({
+                x: z.number().int(),
+                y: z.number().int(),
+              })
+              .strict(),
+          })
+          .strict(),
+      )
+      .default([]),
     command: computationalMergeCommandEnvelopeV1Schema,
     connectedSourceIndices: z.array(z.number().int().nonnegative()).min(1),
     outputArtifactId: z.string().trim().min(1),
@@ -54,6 +72,24 @@ export const panoramaRuntimeProvenanceV1Schema = z
         graph: z
           .object({
             candidateEdgeCount: z.number().int().nonnegative(),
+            cycleConsistency: z
+              .object({
+                rejectedEdgeCount: z.number().int().nonnegative(),
+                rejectedEdges: z.array(
+                  z
+                    .object({
+                      fromSourceIndex: z.number().int().nonnegative(),
+                      qualityRank: z.number().int().positive(),
+                      reason: z.literal('cycle_residual_exceeded'),
+                      residualPx: z.number().nonnegative(),
+                      toSourceIndex: z.number().int().nonnegative(),
+                    })
+                    .strict(),
+                ),
+                residualThresholdPx: z.number().positive(),
+                validationMode: z.literal('translation_cycle_residual_v1'),
+              })
+              .strict(),
             referenceSelectionReason: z.literal('projected_center_source'),
             referenceSourceIndex: z.number().int().nonnegative(),
             selectedEdgeCount: z.number().int().nonnegative(),
@@ -435,7 +471,11 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
     height: stitched.output.height,
     outputPixels: stitched.outputPixels,
     provenance: panoramaRuntimeProvenanceV1Schema.parse({
-      alignment: buildPanoramaRuntimeAlignment(request.sourceFrames, request.connectedSourceIndices),
+      alignment: buildPanoramaRuntimeAlignment(
+        request.sourceFrames,
+        request.connectedSourceIndices,
+        request.candidateTransformOverrides,
+      ),
       boundaryMode: request.command.parameters.boundaryMode,
       crop: buildPanoramaRuntimeCrop(
         request.command.parameters.boundaryMode,
@@ -569,6 +609,7 @@ const buildPanoramaRuntimeCrop = (
 const buildPanoramaRuntimeAlignment = (
   sourceFrames: PanoramaRuntimeSourceFrameV1[],
   connectedSourceIndices: number[],
+  candidateTransformOverrides: PanoramaRuntimePlanRequestV1['candidateTransformOverrides'],
 ) => {
   const framesByIndex = new Map(sourceFrames.map((frame) => [frame.sourceIndex, frame]));
   const connectedFrames = connectedSourceIndices.map((sourceIndex) => {
@@ -576,17 +617,29 @@ const buildPanoramaRuntimeAlignment = (
     if (frame === undefined) throw new Error(`Panorama runtime alignment missing source ${sourceIndex}.`);
     return frame;
   });
-  const candidateEdges = buildPanoramaGraphCandidateEdges(connectedFrames);
-  const selectedEdges = selectPanoramaSpanningGraphEdges(candidateEdges, connectedFrames);
+  const candidateEdges = buildPanoramaGraphCandidateEdges(connectedFrames, candidateTransformOverrides);
+  const graphSelection = selectPanoramaSpanningGraphEdges(candidateEdges, connectedFrames);
 
   return {
     algorithmId: 'synthetic_offset_translation_v1' as const,
     graph: {
       candidateEdgeCount: candidateEdges.length,
+      cycleConsistency: {
+        rejectedEdgeCount: graphSelection.rejectedEdges.length,
+        rejectedEdges: graphSelection.rejectedEdges.map(({ edge, qualityRank, residualPx }) => ({
+          fromSourceIndex: edge.fromFrame.sourceIndex,
+          qualityRank,
+          reason: 'cycle_residual_exceeded' as const,
+          residualPx,
+          toSourceIndex: edge.toFrame.sourceIndex,
+        })),
+        residualThresholdPx: PANORAMA_CYCLE_RESIDUAL_THRESHOLD_PX,
+        validationMode: 'translation_cycle_residual_v1' as const,
+      },
       referenceSelectionReason: 'projected_center_source' as const,
       referenceSourceIndex: choosePanoramaReferenceSourceIndex(connectedFrames),
-      selectedEdgeCount: selectedEdges.length,
-      selectedEdges: selectedEdges.map(({ edge, qualityRank }) => ({
+      selectedEdgeCount: graphSelection.selectedEdges.length,
+      selectedEdges: graphSelection.selectedEdges.map(({ edge, qualityRank }) => ({
         fromSourceIndex: edge.fromFrame.sourceIndex,
         overlapAreaPx: edge.overlapAreaPx,
         qualityRank,
@@ -595,7 +648,7 @@ const buildPanoramaRuntimeAlignment = (
       })),
       selectionMode: 'quality_ranked_spanning_graph_v1' as const,
     },
-    pairwiseMatches: selectedEdges.map(({ edge }) => buildPanoramaPairwiseMatch(edge)),
+    pairwiseMatches: graphSelection.selectedEdges.map(({ edge }) => buildPanoramaPairwiseMatch(edge)),
   };
 };
 
@@ -613,6 +666,7 @@ interface PanoramaGraphCandidateEdge {
 
 const buildPanoramaGraphCandidateEdges = (
   connectedFrames: PanoramaRuntimeSourceFrameV1[],
+  candidateTransformOverrides: PanoramaRuntimePlanRequestV1['candidateTransformOverrides'],
 ): PanoramaGraphCandidateEdge[] => {
   const orderedFrames = [...connectedFrames].sort(comparePanoramaFramePosition);
   const edges: PanoramaGraphCandidateEdge[] = [];
@@ -622,7 +676,7 @@ const buildPanoramaGraphCandidateEdges = (
     for (let rightIndex = leftIndex + 1; rightIndex < orderedFrames.length; rightIndex += 1) {
       const toFrame = orderedFrames[rightIndex];
       if (toFrame === undefined) continue;
-      edges.push(buildPanoramaGraphCandidateEdge(fromFrame, toFrame));
+      edges.push(buildPanoramaGraphCandidateEdge(fromFrame, toFrame, candidateTransformOverrides));
     }
   }
   return edges.toSorted(comparePanoramaGraphCandidateEdge);
@@ -631,6 +685,7 @@ const buildPanoramaGraphCandidateEdges = (
 const buildPanoramaGraphCandidateEdge = (
   fromFrame: PanoramaRuntimeSourceFrameV1,
   toFrame: PanoramaRuntimeSourceFrameV1,
+  candidateTransformOverrides: PanoramaRuntimePlanRequestV1['candidateTransformOverrides'],
 ): PanoramaGraphCandidateEdge => {
   const fromX = fromFrame.expectedOffsetX ?? 0;
   const fromY = fromFrame.expectedOffsetY ?? 0;
@@ -643,13 +698,18 @@ const buildPanoramaGraphCandidateEdge = (
   const reprojectionErrorPx = Math.abs(toY - fromY) / Math.max(1, toFrame.height);
   const overlapRatio =
     overlapAreaPx / Math.max(1, Math.min(fromFrame.width * fromFrame.height, toFrame.width * toFrame.height));
+  const override = candidateTransformOverrides.find(
+    (candidateOverride) =>
+      candidateOverride.fromSourceIndex === fromFrame.sourceIndex &&
+      candidateOverride.toSourceIndex === toFrame.sourceIndex,
+  );
   return {
     fromFrame,
     overlapAreaPx,
     qualityScore: roundPanoramaRuntimeMetric(overlapRatio - reprojectionErrorPx),
     reprojectionErrorPx,
     toFrame,
-    translationPx: {
+    translationPx: override?.translationPx ?? {
       x: toX - fromX,
       y: toY - fromY,
     },
@@ -659,18 +719,77 @@ const buildPanoramaGraphCandidateEdge = (
 const selectPanoramaSpanningGraphEdges = (
   candidateEdges: PanoramaGraphCandidateEdge[],
   connectedFrames: PanoramaRuntimeSourceFrameV1[],
-): Array<{ edge: PanoramaGraphCandidateEdge; qualityRank: number }> => {
+): {
+  rejectedEdges: Array<{ edge: PanoramaGraphCandidateEdge; qualityRank: number; residualPx: number }>;
+  selectedEdges: Array<{ edge: PanoramaGraphCandidateEdge; qualityRank: number }>;
+} => {
   const disjointSet = new PanoramaRuntimeDisjointSet(connectedFrames.map((frame) => frame.sourceIndex));
   const selectedEdges: Array<{ edge: PanoramaGraphCandidateEdge; qualityRank: number }> = [];
+  const rejectedEdges: Array<{ edge: PanoramaGraphCandidateEdge; qualityRank: number; residualPx: number }> = [];
   candidateEdges.forEach((edge, index) => {
+    const qualityRank = index + 1;
+    const pathTranslation = findPanoramaGraphPathTranslation(
+      selectedEdges,
+      edge.fromFrame.sourceIndex,
+      edge.toFrame.sourceIndex,
+    );
+    if (pathTranslation !== null) {
+      const residualPx = translationResidualPx(pathTranslation, edge.translationPx);
+      if (residualPx > PANORAMA_CYCLE_RESIDUAL_THRESHOLD_PX) {
+        rejectedEdges.push({ edge, qualityRank, residualPx: roundPanoramaRuntimeMetric(residualPx) });
+      }
+      return;
+    }
     if (selectedEdges.length >= Math.max(0, connectedFrames.length - 1)) return;
     if (!disjointSet.union(edge.fromFrame.sourceIndex, edge.toFrame.sourceIndex)) return;
-    selectedEdges.push({ edge, qualityRank: index + 1 });
+    selectedEdges.push({ edge, qualityRank });
   });
-  return selectedEdges.toSorted((left, right) =>
-    comparePanoramaFramePosition(left.edge.fromFrame, right.edge.fromFrame),
-  );
+  return {
+    rejectedEdges,
+    selectedEdges: selectedEdges.toSorted((left, right) =>
+      comparePanoramaFramePosition(left.edge.fromFrame, right.edge.fromFrame),
+    ),
+  };
 };
+
+const findPanoramaGraphPathTranslation = (
+  selectedEdges: Array<{ edge: PanoramaGraphCandidateEdge; qualityRank: number }>,
+  fromSourceIndex: number,
+  toSourceIndex: number,
+): { x: number; y: number } | null => {
+  const adjacency = new Map<number, Array<{ targetSourceIndex: number; x: number; y: number }>>();
+  for (const { edge } of selectedEdges) {
+    const from = edge.fromFrame.sourceIndex;
+    const to = edge.toFrame.sourceIndex;
+    const fromEdges = adjacency.get(from) ?? [];
+    fromEdges.push({ targetSourceIndex: to, ...edge.translationPx });
+    adjacency.set(from, fromEdges);
+    const toEdges = adjacency.get(to) ?? [];
+    toEdges.push({ targetSourceIndex: from, x: -edge.translationPx.x, y: -edge.translationPx.y });
+    adjacency.set(to, toEdges);
+  }
+
+  const pending: Array<{ sourceIndex: number; x: number; y: number }> = [{ sourceIndex: fromSourceIndex, x: 0, y: 0 }];
+  const visited = new Set<number>();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current === undefined) continue;
+    if (current.sourceIndex === toSourceIndex) return { x: current.x, y: current.y };
+    if (visited.has(current.sourceIndex)) continue;
+    visited.add(current.sourceIndex);
+    for (const edge of adjacency.get(current.sourceIndex) ?? []) {
+      pending.push({
+        sourceIndex: edge.targetSourceIndex,
+        x: current.x + edge.x,
+        y: current.y + edge.y,
+      });
+    }
+  }
+  return null;
+};
+
+const translationResidualPx = (left: { x: number; y: number }, right: { x: number; y: number }): number =>
+  Math.hypot(left.x - right.x, left.y - right.y);
 
 const buildPanoramaPairwiseMatch = (edge: PanoramaGraphCandidateEdge) => {
   const homography3x3 = translationHomography3x3(edge.translationPx);
@@ -768,7 +887,11 @@ const buildPanoramaRuntimeQualityMetrics = (
   outputWidth: number,
   outputHeight: number,
 ): PanoramaRuntimeProvenanceV1['qualityMetrics'] => {
-  const alignment = buildPanoramaRuntimeAlignment(request.sourceFrames, request.connectedSourceIndices);
+  const alignment = buildPanoramaRuntimeAlignment(
+    request.sourceFrames,
+    request.connectedSourceIndices,
+    request.candidateTransformOverrides,
+  );
   const sourcePixelCount = request.sourceFrames.reduce((total, frame) => total + frame.width * frame.height, 0);
   const overlapAreaTotal = alignment.pairwiseMatches.reduce((total, match) => total + match.overlapAreaPx, 0);
   const crop = buildPanoramaRuntimeCrop(request.command.parameters.boundaryMode, outputWidth, outputHeight);
