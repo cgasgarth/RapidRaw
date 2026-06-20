@@ -192,6 +192,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     (file) => file.startsWith('packages/rawengine-schema/src/superResolution'),
     ['check:super-resolution-app-server-runtime'],
   );
+  addIf((file) => file === 'src/components/modals/SuperResolutionModal.tsx', ['check:sr-review-diagnostics']);
   addIf(
     (file) => file.includes('superResolutionReconstruction') || file.includes('super-resolution-reconstruction'),
     ['check:sr-reconstruction-proof'],
