@@ -72,6 +72,12 @@ import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspa
 
 type NegativeParams = NegativeLabPresetParams;
 type NegativeConversionScope = 'active' | 'all';
+type NegativeLabProfileFilter = 'all' | 'black_and_white_silver' | 'color_negative' | 'measured';
+type NegativeLabProfileFilterLabelKey =
+  | 'modals.negativeConversion.profileFilterAll'
+  | 'modals.negativeConversion.profileFilterBlackAndWhite'
+  | 'modals.negativeConversion.profileFilterColorNegative'
+  | 'modals.negativeConversion.profileFilterMeasured';
 type NegativeLabAgentCommitState = 'committing' | 'not_committed' | 'ready_to_commit';
 type NegativeLabAgentDryRunState = 'accepted' | 'blocked' | 'ready';
 const NEGATIVE_LAB_AGENT_DRY_RUN_LABELS = {
@@ -84,6 +90,18 @@ const NEGATIVE_LAB_AGENT_COMMIT_LABELS = {
   not_committed: 'Not committed',
   ready_to_commit: 'Ready to commit',
 } satisfies Record<NegativeLabAgentCommitState, string>;
+const NEGATIVE_LAB_PROFILE_FILTERS = [
+  { id: 'all', labelKey: 'modals.negativeConversion.profileFilterAll' },
+  { id: 'color_negative', labelKey: 'modals.negativeConversion.profileFilterColorNegative' },
+  { id: 'black_and_white_silver', labelKey: 'modals.negativeConversion.profileFilterBlackAndWhite' },
+  { id: 'measured', labelKey: 'modals.negativeConversion.profileFilterMeasured' },
+] satisfies Array<{ id: NegativeLabProfileFilter; labelKey: NegativeLabProfileFilterLabelKey }>;
+const NEGATIVE_LAB_PROFILE_FILTER_TEST_IDS = {
+  all: 'negative-lab-profile-filter-all',
+  black_and_white_silver: 'negative-lab-profile-filter-black_and_white_silver',
+  color_negative: 'negative-lab-profile-filter-color_negative',
+  measured: 'negative-lab-profile-filter-measured',
+} satisfies Record<NegativeLabProfileFilter, string>;
 type BaseFogSampleLabelKey = 'modals.negativeConversion.sampleCenterPatch' | 'modals.negativeConversion.sampleLeftEdge';
 type DensitometerPatchLabelKey =
   | BaseFogSampleLabelKey
@@ -149,6 +167,14 @@ const getNegativeLabProfileSearchText = (profile: NegativeLabRuntimeProfileBrows
   ]
     .join(' ')
     .toLocaleLowerCase('en-US');
+const matchesNegativeLabProfileFilter = (
+  profile: NegativeLabRuntimeProfileBrowserRow,
+  filter: NegativeLabProfileFilter,
+) => {
+  if (filter === 'all') return true;
+  if (filter === 'measured') return profile.profileStatus === 'fixture_measured';
+  return profile.filmClass === filter;
+};
 const formatStockMetadataIso = (
   nominalIso: (typeof NEGATIVE_LAB_STOCK_METADATA_CATALOG.entries)[number]['nominalIso'],
 ) => (nominalIso === null ? 'ISO -' : `${nominalIso.unit} ${nominalIso.value}`);
@@ -263,6 +289,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [includedPathSet, setIncludedPathSet] = useState<Set<string>>(() => getInitialIncludedPaths(targetPaths));
   const [activePathIndex, setActivePathIndex] = useState(0);
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
+  const [profileFilter, setProfileFilter] = useState<NegativeLabProfileFilter>('all');
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [isCompareActive, setIsCompareActive] = useState(false);
@@ -374,14 +401,38 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       ? t('modals.negativeConversion.presetRuntimeApplied')
       : t('modals.negativeConversion.presetRuntimeCatalogOnly');
   const normalizedProfileSearchQuery = profileSearchQuery.trim().toLocaleLowerCase('en-US');
+  const profileFilterCounts = useMemo(
+    () =>
+      NEGATIVE_LAB_PROFILE_FILTERS.reduce<Record<NegativeLabProfileFilter, number>>(
+        (counts, filter) => ({
+          ...counts,
+          [filter.id]: NEGATIVE_LAB_PROFILE_BROWSER_ROWS.filter((profile) =>
+            matchesNegativeLabProfileFilter(profile, filter.id),
+          ).length,
+        }),
+        {
+          all: 0,
+          black_and_white_silver: 0,
+          color_negative: 0,
+          measured: 0,
+        },
+      ),
+    [],
+  );
   const visibleProfileRows = useMemo(
     () =>
-      normalizedProfileSearchQuery.length === 0
-        ? NEGATIVE_LAB_PROFILE_BROWSER_ROWS
-        : NEGATIVE_LAB_PROFILE_BROWSER_ROWS.filter((profile) =>
-            getNegativeLabProfileSearchText(profile).includes(normalizedProfileSearchQuery),
-          ),
-    [normalizedProfileSearchQuery],
+      NEGATIVE_LAB_PROFILE_BROWSER_ROWS.filter((profile) => {
+        if (!matchesNegativeLabProfileFilter(profile, profileFilter)) {
+          return false;
+        }
+
+        if (normalizedProfileSearchQuery.length === 0) {
+          return true;
+        }
+
+        return getNegativeLabProfileSearchText(profile).includes(normalizedProfileSearchQuery);
+      }),
+    [normalizedProfileSearchQuery, profileFilter],
   );
   const frameHealthReport = useMemo(
     () =>
@@ -1582,6 +1633,36 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             type="search"
             value={profileSearchQuery}
           />
+          <div
+            className="mb-3 flex gap-2 overflow-x-auto pb-1"
+            data-testid="negative-lab-profile-filter-tabs"
+            role="group"
+          >
+            {NEGATIVE_LAB_PROFILE_FILTERS.map((filter) => {
+              const isActive = profileFilter === filter.id;
+
+              return (
+                <button
+                  aria-pressed={isActive}
+                  className={cx(
+                    'shrink-0 rounded-md border px-3 py-2 text-left text-xs transition-colors',
+                    isActive
+                      ? 'border-accent bg-accent/10 text-text-primary'
+                      : 'border-surface bg-bg-primary text-text-secondary hover:bg-surface',
+                  )}
+                  data-testid={NEGATIVE_LAB_PROFILE_FILTER_TEST_IDS[filter.id]}
+                  key={filter.id}
+                  onClick={() => {
+                    setProfileFilter(filter.id);
+                  }}
+                  type="button"
+                >
+                  <span className="block font-medium">{t(filter.labelKey)}</span>
+                  <span className="block tabular-nums opacity-70">{profileFilterCounts[filter.id]}</span>
+                </button>
+              );
+            })}
+          </div>
           {visibleProfileRows.length === 0 && (
             <div
               className="rounded-md border border-dashed border-surface bg-bg-primary p-3 text-center"
