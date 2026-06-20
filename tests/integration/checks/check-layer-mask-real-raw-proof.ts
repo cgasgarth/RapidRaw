@@ -52,15 +52,68 @@ const metricSchema = z
   })
   .strict();
 
+const proofClaimsSchema = z
+  .object({
+    doesNotProve: z.array(
+      z.enum(['macos_app_ui_e2e_session', 'manual_layer_panel_interaction', 'public_raw_fixture_distribution']),
+    ),
+    proves: z.array(
+      z.enum([
+        'private_real_raw_decode',
+        'layer_mask_generation',
+        'masked_adjustment_changes_pixels',
+        'mask_refinement_changes_pixels',
+        'refined_preview_export_parity',
+      ]),
+    ),
+  })
+  .strict()
+  .superRefine((claims, context) => {
+    const requiredProofs = new Set([
+      'private_real_raw_decode',
+      'layer_mask_generation',
+      'masked_adjustment_changes_pixels',
+      'mask_refinement_changes_pixels',
+      'refined_preview_export_parity',
+    ]);
+    for (const proof of requiredProofs) {
+      if (!claims.proves.includes(proof)) {
+        context.addIssue({ code: 'custom', message: `missing proof claim ${proof}`, path: ['proves'] });
+      }
+    }
+
+    if (!claims.doesNotProve.includes('macos_app_ui_e2e_session')) {
+      context.addIssue({
+        code: 'custom',
+        message: 'layer/mask proof must not claim macOS UI E2E without app evidence',
+        path: ['doesNotProve'],
+      });
+    }
+  });
+
+const runtimeProofSchema = z
+  .object({
+    execution: z.literal('tauri_test_gpu_pipeline'),
+    macosAppUiE2E: z.literal(false),
+    maskPath: z.literal('prepare_export_masks + generate_mask_bitmap'),
+    outputArtifactCount: z.literal(4),
+    previewExportParityMetric: z.literal('previewExportMeanAbsDelta'),
+    rawDecodePath: z.literal('load_base_image_from_bytes'),
+    renderPath: z.literal('process_image_for_export_pipeline_with_tonemapper_override'),
+  })
+  .strict();
+
 const reportSchema = z
   .object({
     artifacts: z.array(artifactSchema).length(6),
     fixtureId: z.literal('validation.layer-mask-real-raw.high-iso-skin-shadow.v1'),
     generatedAt: z.iso.datetime(),
-    issue: z.literal(1247),
+    issue: z.literal(2310),
     metrics: z.array(metricSchema).length(5),
+    proofClaims: proofClaimsSchema,
     reportId: z.literal('layer-mask-real-raw.high-iso-skin-shadow.v1'),
-    validationMode: z.literal('private_raw_metadata_only'),
+    runtimeProof: runtimeProofSchema,
+    validationMode: z.literal('private_raw_tauri_runtime_proof'),
   })
   .strict()
   .superRefine((report, context) => {

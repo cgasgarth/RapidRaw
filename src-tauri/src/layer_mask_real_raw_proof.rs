@@ -32,7 +32,9 @@ struct LayerMaskRealRawProofReport {
     generated_at: String,
     issue: u32,
     metrics: Vec<LayerMaskMetric>,
+    proof_claims: LayerMaskProofClaims,
     report_id: String,
+    runtime_proof: LayerMaskRuntimeProof,
     validation_mode: String,
 }
 
@@ -52,6 +54,25 @@ struct LayerMaskMetric {
     passed: bool,
     threshold: f64,
     value: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LayerMaskProofClaims {
+    does_not_prove: Vec<String>,
+    proves: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LayerMaskRuntimeProof {
+    execution: String,
+    macos_app_ui_e2e: bool,
+    mask_path: String,
+    output_artifact_count: u32,
+    preview_export_parity_metric: String,
+    raw_decode_path: String,
+    render_path: String,
 }
 
 #[test]
@@ -236,10 +257,20 @@ fn run_private_layer_mask_real_raw_proof(
         artifacts: Vec::new(),
         fixture_id: "validation.layer-mask-real-raw.high-iso-skin-shadow.v1".to_string(),
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
-        issue: 1247,
+        issue: 2310,
         metrics,
+        proof_claims: proof_claims(),
         report_id: "layer-mask-real-raw.high-iso-skin-shadow.v1".to_string(),
-        validation_mode: "private_raw_metadata_only".to_string(),
+        runtime_proof: LayerMaskRuntimeProof {
+            execution: "tauri_test_gpu_pipeline".to_string(),
+            macos_app_ui_e2e: false,
+            mask_path: "prepare_export_masks + generate_mask_bitmap".to_string(),
+            output_artifact_count: 4,
+            preview_export_parity_metric: "previewExportMeanAbsDelta".to_string(),
+            raw_decode_path: "load_base_image_from_bytes".to_string(),
+            render_path: "process_image_for_export_pipeline_with_tonemapper_override".to_string(),
+        },
+        validation_mode: "private_raw_tauri_runtime_proof".to_string(),
     };
     let report_path = output_dir.join("high-iso-skin-shadow-layer-mask-report.json");
     fs::write(
@@ -355,6 +386,23 @@ fn mask_refinement(enabled: bool) -> Value {
             "featherPx": 0.0,
             "smoothness": 0.0
         })
+    }
+}
+
+fn proof_claims() -> LayerMaskProofClaims {
+    LayerMaskProofClaims {
+        does_not_prove: vec![
+            "macos_app_ui_e2e_session".to_string(),
+            "manual_layer_panel_interaction".to_string(),
+            "public_raw_fixture_distribution".to_string(),
+        ],
+        proves: vec![
+            "private_real_raw_decode".to_string(),
+            "layer_mask_generation".to_string(),
+            "masked_adjustment_changes_pixels".to_string(),
+            "mask_refinement_changes_pixels".to_string(),
+            "refined_preview_export_parity".to_string(),
+        ],
     }
 }
 
