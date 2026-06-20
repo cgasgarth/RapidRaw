@@ -18,6 +18,12 @@ export interface LayerRenderPlanItem {
   subMaskCount: number;
 }
 
+export interface DuplicateLayerGroupLayerInput {
+  duplicateName: string;
+  layerId: string;
+  newLayerId: string;
+}
+
 export class LayerStackOperationError extends Error {
   constructor(message: string) {
     super(message);
@@ -104,6 +110,61 @@ export function duplicateLayer(
   return [...layers.slice(0, sourceIndex + 1), duplicate, ...layers.slice(sourceIndex + 1)];
 }
 
+export function duplicateLayerGroup(
+  layers: Array<MaskContainer>,
+  groupId: string,
+  newGroupId: string,
+  duplicateGroupName: string,
+  layerInputs: Array<DuplicateLayerGroupLayerInput>,
+): Array<MaskContainer> {
+  if (layers.some((layer) => layer.layerGroupId === newGroupId || layer.id === newGroupId)) {
+    throw new LayerStackOperationError(`Layer group ${newGroupId} already exists.`);
+  }
+
+  const groupIndexes = findLayerGroupIndexes(layers, groupId);
+  const groupLayers = groupIndexes.map((index) => {
+    const layer = layers[index];
+    if (layer === undefined) {
+      throw new LayerStackOperationError(`Layer group ${groupId} does not exist.`);
+    }
+    return layer;
+  });
+  if (groupLayers.length !== layerInputs.length) {
+    throw new LayerStackOperationError(`Layer group ${groupId} duplicate input count does not match group size.`);
+  }
+
+  const inputsByLayerId = new Map(layerInputs.map((input) => [input.layerId, input]));
+  const duplicatedLayerIds = new Set<string>();
+  const duplicates = groupLayers.map((sourceLayer) => {
+    const input = inputsByLayerId.get(sourceLayer.id);
+    if (input === undefined) {
+      throw new LayerStackOperationError(`Layer group ${groupId} duplicate input missing ${sourceLayer.id}.`);
+    }
+    if (duplicatedLayerIds.has(input.newLayerId) || layers.some((layer) => layer.id === input.newLayerId)) {
+      throw new LayerStackOperationError(`Layer ${input.newLayerId} already exists.`);
+    }
+    duplicatedLayerIds.add(input.newLayerId);
+
+    const duplicate = structuredClone(sourceLayer);
+    duplicate.id = input.newLayerId;
+    duplicate.name = input.duplicateName;
+    duplicate.layerGroupId = newGroupId;
+    duplicate.layerGroupName = duplicateGroupName;
+    duplicate.subMasks = duplicate.subMasks.map((subMask) => ({
+      ...subMask,
+      id: `${input.newLayerId}-${subMask.id}`,
+    }));
+    return duplicate;
+  });
+
+  const insertIndex = groupIndexes.at(-1);
+  if (insertIndex === undefined) {
+    throw new LayerStackOperationError(`Layer group ${groupId} does not exist.`);
+  }
+
+  return [...layers.slice(0, insertIndex + 1), ...duplicates, ...layers.slice(insertIndex + 1)];
+}
+
 export function moveLayer(
   layers: Array<MaskContainer>,
   layerId: string,
@@ -169,12 +230,7 @@ export function moveLayerGroup(
   groupId: string,
   direction: LayerStackMoveDirection,
 ): Array<MaskContainer> {
-  const groupIndexes = layers
-    .map((layer, index) => (layer.layerGroupId === groupId ? index : -1))
-    .filter((index) => index >= 0);
-  if (groupIndexes.length === 0) {
-    throw new LayerStackOperationError(`Layer group ${groupId} does not exist.`);
-  }
+  const groupIndexes = findLayerGroupIndexes(layers, groupId);
 
   const startIndex = groupIndexes[0];
   const endIndex = groupIndexes.at(-1);
@@ -244,6 +300,16 @@ export function buildLayerRenderPlan(layers: Array<MaskContainer>): Array<LayerR
 
 function groupFields(layerGroupId: string | undefined, layerGroupName: string | undefined) {
   return layerGroupId === undefined ? {} : { layerGroupId, layerGroupName };
+}
+
+function findLayerGroupIndexes(layers: Array<MaskContainer>, groupId: string): Array<number> {
+  const groupIndexes = layers
+    .map((layer, index) => (layer.layerGroupId === groupId ? index : -1))
+    .filter((index) => index >= 0);
+  if (groupIndexes.length === 0) {
+    throw new LayerStackOperationError(`Layer group ${groupId} does not exist.`);
+  }
+  return groupIndexes;
 }
 
 function moveLayerBlock(

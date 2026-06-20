@@ -12,6 +12,7 @@ import {
   deleteLayer,
   deleteLayerGroup,
   duplicateLayer,
+  duplicateLayerGroup,
   groupLayerWithNext,
   moveLayer,
   moveLayerGroup,
@@ -208,6 +209,25 @@ export default function LayerStackPanel({
   };
   const duplicateActiveLayer = () => {
     if (!activeRow || activeRow.isBase) return;
+    if (activeRow.isGroupHeader && activeRow.groupId) {
+      const newGroupId = crypto.randomUUID();
+      const groupLayers = masks.filter((mask) => mask.layerGroupId === activeRow.groupId);
+      applyLayerStack(
+        duplicateLayerGroup(
+          masks,
+          activeRow.groupId,
+          newGroupId,
+          t('editor.layers.copyName', { name: activeRow.name }),
+          groupLayers.map((layer) => ({
+            duplicateName: t('editor.layers.copyName', { name: layer.name }),
+            layerId: layer.id,
+            newLayerId: crypto.randomUUID(),
+          })),
+        ),
+        `group:${newGroupId}`,
+      );
+      return;
+    }
     const newLayerId = crypto.randomUUID();
     applyLayerStack(
       duplicateLayer(masks, activeRow.id, newLayerId, t('editor.layers.copyName', { name: activeRow.name })),
@@ -390,7 +410,7 @@ export default function LayerStackPanel({
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
               data-tooltip={t('editor.layers.actions.duplicate')}
-              disabled={isBaseSelected || isGroupHeaderSelected}
+              disabled={isBaseSelected}
               onClick={duplicateActiveLayer}
               type="button"
             >

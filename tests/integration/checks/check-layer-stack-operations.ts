@@ -10,6 +10,7 @@ import {
   deleteLayer,
   deleteLayerGroup,
   duplicateLayer,
+  duplicateLayerGroup,
   groupLayerWithNext,
   moveLayer,
   moveLayerGroup,
@@ -77,6 +78,25 @@ const operationSchema = z.discriminatedUnion('type', [
       name: z.string().trim().min(1),
       newLayerId: z.string().trim().min(1),
       type: z.literal('duplicate'),
+    })
+    .strict(),
+  z
+    .object({
+      groupId: z.string().trim().min(1),
+      groupName: z.string().trim().min(1),
+      layerInputs: z
+        .array(
+          z
+            .object({
+              duplicateName: z.string().trim().min(1),
+              layerId: z.string().trim().min(1),
+              newLayerId: z.string().trim().min(1),
+            })
+            .strict(),
+        )
+        .min(1),
+      newGroupId: z.string().trim().min(1),
+      type: z.literal('duplicateGroup'),
     })
     .strict(),
   z
@@ -179,6 +199,14 @@ function applyOperation(layers, operation) {
       return moveLayer(layers, operation.layerId, operation.direction);
     case 'duplicate':
       return duplicateLayer(layers, operation.layerId, operation.newLayerId, operation.name);
+    case 'duplicateGroup':
+      return duplicateLayerGroup(
+        layers,
+        operation.groupId,
+        operation.newGroupId,
+        operation.groupName,
+        operation.layerInputs,
+      );
     case 'delete':
       return deleteLayer(layers, operation.layerId);
     case 'deleteGroup':
