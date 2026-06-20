@@ -54,6 +54,7 @@ export interface ComputationalPrivateRootPrepConfig {
   fixtureId: string;
   issue: number;
   minSources: number;
+  preferredSourceFileNames?: ReadonlyArray<string>;
   sourceLabel: string;
   stressCandidate?: {
     expectedExtension: string;
@@ -205,9 +206,10 @@ async function ingestPrivateSources(
 
   const metadata = await readExifMetadata(rawPaths);
   const candidate =
-    config.featureFamily === 'hdr_merge'
+    choosePreferredSourceCandidate(metadata, config.preferredSourceFileNames, config.featureFamily) ??
+    (config.featureFamily === 'hdr_merge'
       ? chooseHdrBracketCandidate(metadata, config.minSources)
-      : chooseCaptureSequenceCandidate(metadata, config.minSources);
+      : chooseCaptureSequenceCandidate(metadata, config.minSources));
   if (candidate === undefined) {
     return failure([
       `${sourceRoot}: no ${config.minSources}-frame ${config.featureLabel} source candidate found (${sourceCandidateRequirement(config.featureFamily)}).`,
@@ -479,6 +481,38 @@ function chooseCaptureSequenceCandidate(rows: ReadonlyArray<ExiftoolRow>, source
   }
 
   return best;
+}
+
+function choosePreferredSourceCandidate(
+  rows: ReadonlyArray<ExiftoolRow>,
+  preferredFileNames: ReadonlyArray<string> | undefined,
+  featureFamily: 'hdr_merge' | 'panorama_stitch' | 'super_resolution',
+) {
+  if (preferredFileNames === undefined || preferredFileNames.length === 0) return undefined;
+
+  const usableRowsByName = new Map(
+    rows
+      .filter(isHdrMetadataUsable)
+      .map((row) => [(row.FileName ?? basename(row.SourceFile)).toLowerCase(), row] as const),
+  );
+  const preferredRows = preferredFileNames
+    .map((fileName) => usableRowsByName.get(fileName.toLowerCase()))
+    .filter((row): row is ExiftoolRow => row !== undefined);
+  if (preferredRows.length !== preferredFileNames.length) return undefined;
+  if (!hasConsistentCaptureMetadata(preferredRows)) return undefined;
+  if (featureFamily === 'panorama_stitch' && !hasConsistentPanoramaExposure(preferredRows)) return undefined;
+
+  const first = preferredRows[0];
+  const last = preferredRows[preferredRows.length - 1];
+  if (first === undefined || last === undefined) return undefined;
+
+  const spanSeconds = captureTimestamp(last) - captureTimestamp(first);
+  const sequenceGap = sequenceNumber(last) - sequenceNumber(first);
+  return {
+    rows: preferredRows,
+    score: preferredRows.length * 100 - spanSeconds - sequenceGap,
+    scoreLabel: 'preferredSequenceScore',
+  };
 }
 
 function isHdrMetadataUsable(row: ExiftoolRow): row is ExiftoolRow & {
