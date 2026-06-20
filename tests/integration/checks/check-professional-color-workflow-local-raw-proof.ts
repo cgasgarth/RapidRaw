@@ -1,14 +1,18 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
 const REPORT_PATH = 'docs/validation/professional-color-workflow-cc-raw-proof-2026-06-20.json';
+const UPDATE_REPORT = process.argv.includes('--update');
 const requireAssets = process.argv.includes('--require-assets');
 const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
+const WORKFLOW_REPORT_PATH =
+  'private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-workflow-report.json';
+const VISUAL_SMOKE_SCREENSHOT_PATH = 'artifacts/visual-smoke/color-workflow.png';
 
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const artifactSchema = z
@@ -107,17 +111,92 @@ const reportSchema = z
     }
   });
 
-const report = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
+const workflowMetricSchema = z
+  .object({
+    name: z.enum([
+      'changedPixelRatio',
+      'previewExportMeanAbsDelta',
+      'sidecarReloadRevisionMatch',
+      'sourceHashUnchanged',
+    ]),
+    value: z.number(),
+  })
+  .passthrough();
+
+const workflowReportSchema = z
+  .object({
+    artifacts: z
+      .array(
+        artifactSchema
+          .omit({ kind: true })
+          .extend({ kind: artifactSchema.shape.kind.exclude(['visual_smoke_screenshot']) }),
+      )
+      .length(5),
+    fixtureId: z.literal('validation.raw-open-edit-export.high-iso-skin-shadow.v1'),
+    metrics: z.array(workflowMetricSchema).length(4),
+    sourceRaw: z.object({ hash: hashSchema, path: z.string(), publicRepoAllowed: z.literal(false) }).strict(),
+  })
+  .passthrough();
+
 const failures: string[] = [];
 
-if (requireAssets && privateRoot === undefined) {
+if ((UPDATE_REPORT || requireAssets) && privateRoot === undefined) {
   failures.push('RAWENGINE_PRIVATE_RAW_ROOT is required with --require-assets.');
 }
 
+let report: z.infer<typeof reportSchema>;
+if (UPDATE_REPORT) {
+  const workflowReport = await readWorkflowReport();
+  const visualSmokeScreenshot = await visualSmokeArtifact();
+  report = reportSchema.parse({
+    colorManagement: {
+      inputDomain: 'camera_linear_rgb',
+      operationDomain: 'acescg_linear_v1',
+      outputProfile: 'display_p3',
+      proofLevel: 'private_raw_runtime_color_management_metadata',
+      sceneToDisplayTransform: 'rawengine_agx_v1',
+      viewTransform: 'rawengine_agx_v1',
+      workingSpace: 'acescg_linear_v1',
+    },
+    doesNotProve: [
+      'camera_profile_quality',
+      'capture_one_class_quality',
+      'display_device_visual_match',
+      'full_macos_app_manual_session',
+      'gpu_color_parity',
+      'icc_colorimetric_accuracy',
+    ],
+    fixtureId: 'validation.color.professional-workflow.local-cc-raw.v1',
+    generatedAt: new Date().toISOString(),
+    issue: 2309,
+    localRawRuntime: {
+      artifactRoot: 'private-artifacts/validation/open-edit-export',
+      command:
+        'RAWENGINE_RUN_PRIVATE_RAW_OPEN_EDIT_EXPORT_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_raw_open_edit_export_report_when_enabled -- --nocapture',
+      editCommandId: 'command.raw-open-edit-export.basic-tone.v1',
+      metrics: metricMap(workflowReport.metrics),
+      rawRuntimeFixtureId: workflowReport.fixtureId,
+      status: 'passed',
+      workflowReportPath: WORKFLOW_REPORT_PATH,
+    },
+    schemaVersion: 1,
+    sourceRaw: {
+      downloadedFrom: 'https://www.rawsamples.ch/index.php/en/sony',
+      licenseEvidence: 'https://www.rawsamples.ch/index.php/en/legal-stuff',
+      licenseSummary: 'Creative Commons RAW sample for software development validation.',
+      localPath: workflowReport.sourceRaw.path,
+      sha256: workflowReport.sourceRaw.hash,
+    },
+    validationMode: 'local_cc_raw_runtime_plus_visual_smoke',
+    workflowArtifacts: [...workflowReport.artifacts, visualSmokeScreenshot],
+  });
+  await writeFile(REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
+} else {
+  report = reportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
+}
+
 if (requireAssets && privateRoot !== undefined) {
-  const workflowReport = JSON.parse(
-    await readFile(resolve(privateRoot, report.localRawRuntime.workflowReportPath), 'utf8'),
-  );
+  const workflowReport = await readWorkflowReport();
   if (workflowReport.fixtureId !== report.localRawRuntime.rawRuntimeFixtureId) {
     failures.push('workflow report fixture ID must match local raw runtime fixture ID.');
   }
@@ -148,3 +227,36 @@ if (failures.length > 0) {
 
 const mode = requireAssets ? 'assets verified' : 'schema verified';
 console.log(`professional color workflow local RAW proof ok (${mode})`);
+
+async function readWorkflowReport(): Promise<z.infer<typeof workflowReportSchema>> {
+  if (privateRoot === undefined) throw new Error('RAWENGINE_PRIVATE_RAW_ROOT is required.');
+  return workflowReportSchema.parse(JSON.parse(await readFile(resolve(privateRoot, WORKFLOW_REPORT_PATH), 'utf8')));
+}
+
+async function visualSmokeArtifact(): Promise<z.infer<typeof artifactSchema>> {
+  return artifactSchema.parse({
+    hash: hashBuffer(await readFile(VISUAL_SMOKE_SCREENSHOT_PATH)),
+    kind: 'visual_smoke_screenshot',
+    path: VISUAL_SMOKE_SCREENSHOT_PATH,
+    publicRepoAllowed: false,
+  });
+}
+
+function metricMap(metrics: ReadonlyArray<z.infer<typeof workflowMetricSchema>>): z.infer<typeof metricSchema> {
+  const byName = new Map(metrics.map((metric) => [metric.name, metric.value]));
+  return {
+    changedPixelRatio: requiredMetric(byName, 'changedPixelRatio'),
+    previewExportMeanAbsDelta: requiredMetric(byName, 'previewExportMeanAbsDelta'),
+    sourceHashUnchanged: requiredMetric(byName, 'sourceHashUnchanged'),
+  };
+}
+
+function requiredMetric(metrics: ReadonlyMap<string, number>, name: string): number {
+  const value = metrics.get(name);
+  if (value === undefined) throw new Error(`missing workflow metric ${name}`);
+  return value;
+}
+
+function hashBuffer(value: Buffer): string {
+  return `sha256:${createHash('sha256').update(value).digest('hex')}`;
+}
