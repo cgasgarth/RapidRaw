@@ -1,0 +1,45 @@
+{
+  "cases": [
+    {
+      "afterHash": "sha256:66fd1c272a8d761b",
+      "baselineMaxDelta": 0.008346,
+      "caseId": "film.grain.preview_export.iso_100_fine",
+      "changedPixelRatio": 1,
+      "exportHash": "sha256:66fd1c272a8d761b",
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "sha256:66fd1c272a8d761b",
+      "seed": 3762280132
+    },
+    {
+      "afterHash": "sha256:db6bbc0c1b271d29",
+      "baselineMaxDelta": 0.019271,
+      "caseId": "film.grain.preview_export.iso_400_classic",
+      "changedPixelRatio": 1,
+      "exportHash": "sha256:db6bbc0c1b271d29",
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "sha256:db6bbc0c1b271d29",
+      "seed": 3762280132
+    },
+    {
+      "afterHash": "sha256:7e68c47f3c4e5ddb",
+      "baselineMaxDelta": 0.033123,
+      "caseId": "film.grain.preview_export.iso_1600_push",
+      "changedPixelRatio": 1,
+      "exportHash": "sha256:7e68c47f3c4e5ddb",
+      "maxAllowedPreviewExportDelta": 0,
+      "previewExportMaxDelta": 0,
+      "previewHash": "sha256:7e68c47f3c4e5ddb",
+      "seed": 3762280132
+    }
+  ],
+  "doesNotProve": ["real_raw_quality", "measured_film_stock_emulation", "gpu_parity", "photochemical_density_domain"],
+  "fixtureInput": {
+    "colorSpace": "synthetic-display-linear-rgb",
+    "kind": "synthetic-film-grain-preview-export-parity",
+    "scene": "shadow-midtone-highlight-ramp-with-color-chips"
+  },
+  "generatedFrom": "tests/integration/checks/check-film-grain-preview-export-parity.ts",
+  "version": 1
+}

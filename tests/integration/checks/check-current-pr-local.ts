@@ -156,7 +156,12 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
 
   addIf(
     (file) => file.includes('filmGrain') || file.includes('film-grain'),
-    ['check:film-grain-provenance', 'check:film-grain-runtime-proof', 'check:film-grain-ui'],
+    [
+      'check:film-grain-provenance',
+      'check:film-grain-runtime-proof',
+      'check:film-grain-preview-export-parity',
+      'check:film-grain-ui',
+    ],
   );
   addIf(
     (file) => file === 'src/components/adjustments/Effects.tsx' || file === 'src/utils/filmGrainControls.ts',
@@ -235,7 +240,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/utils/focusConfidenceSourceMap.ts'], ['check:focus-confidence-source-map']);
   assertSelfTestRoute(
     ['packages/rawengine-schema/src/filmGrainRuntime.ts'],
-    ['check:film-grain-runtime-proof', 'check:film-grain-ui'],
+    ['check:film-grain-runtime-proof', 'check:film-grain-preview-export-parity', 'check:film-grain-ui'],
   );
   assertSelfTestRoute(
     ['tests/integration/checks/check-schema-contract-gate.ts'],
