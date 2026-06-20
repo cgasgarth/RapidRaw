@@ -36,6 +36,18 @@ const regionSchema = z
 const reportSchema = z
   .object({
     artifactCount: z.number().int().min(4),
+    diagnosticArtifacts: z
+      .array(
+        z
+          .object({
+            artifactId: z.string().trim().min(1),
+            contentHash: z.string().regex(/^sha256:[a-f0-9]+$/u),
+            diagnosticType: z.enum(['source_selection', 'focus_confidence', 'retouch_risk']),
+            kind: z.literal('mask'),
+          })
+          .strict(),
+      )
+      .length(3),
     doesNotProve: z.array(z.enum(['real_raw_e2e', 'laplacian_pyramid_quality', 'ui_review_surface'])).min(1),
     fallbackMetrics: z
       .object({
@@ -47,7 +59,8 @@ const reportSchema = z
       .strict(),
     focusCoverageRatio: z.literal(1),
     generatedAt: z.iso.datetime({ offset: true }),
-    issue: z.literal(2538),
+    generatedPatchArtifactCount: z.literal(0),
+    issue: z.literal(2537),
     qualityMetrics: z
       .object({
         blackPixelCount: z.literal(0),
@@ -68,6 +81,7 @@ const reportSchema = z
       .strict(),
     regionMetrics: z.array(regionSchema).min(3),
     retouchLayerRecommended: z.literal(true),
+    retouchRiskArtifactCount: z.literal(1),
     runtimeStatus: z.literal('apply_rendered'),
     schemaVersion: z.literal(1),
     translatedBorderMetrics: z
@@ -189,16 +203,19 @@ if (fallbackMetrics.observedFallbackPixelCount !== fallbackMetrics.expectedFallb
 }
 const report = reportSchema.parse({
   artifactCount: applied.mutationResult.outputArtifacts.length,
+  diagnosticArtifacts: buildDiagnosticArtifactProof(),
   doesNotProve: ['real_raw_e2e', 'laplacian_pyramid_quality', 'ui_review_surface'],
   fallbackMetrics,
   focusCoverageRatio: dryRun.provenance.focusCoverageRatio,
   generatedAt: GENERATED_AT,
-  issue: 2538,
+  generatedPatchArtifactCount: countArtifactsByKind('generated_patch'),
+  issue: 2537,
   qualityMetrics: buildQualityMetrics(dryRun.outputPixels, applied.outputPixels),
   outputHash: hashFloat32(applied.outputPixels),
   referenceSource: applied.provenance.referenceSource,
   regionMetrics,
   retouchLayerRecommended: applied.provenance.qualityMetrics.retouchLayerRecommended,
+  retouchRiskArtifactCount: diagnosticArtifactsFor('retouch_risk').length,
   runtimeStatus: applied.provenance.runtimeStatus,
   schemaVersion: 1,
   translatedBorderMetrics: translatedBorderMetrics(applied.outputPixels),
@@ -343,6 +360,48 @@ function buildQualityMetrics(
     nonfiniteOutputPixelCount: 0,
     seamBandP95Error: seamBandP95Error(appliedPixels),
   };
+}
+
+function buildDiagnosticArtifactProof(): Array<{
+  artifactId: string;
+  contentHash: string;
+  diagnosticType: 'focus_confidence' | 'retouch_risk' | 'source_selection';
+  kind: 'mask';
+}> {
+  return [
+    diagnosticArtifact('artifact_focus_blend_sharpness', 'source_selection'),
+    diagnosticArtifact('artifact_focus_blend_depth_confidence', 'focus_confidence'),
+    diagnosticArtifact('artifact_focus_blend_retouch', 'retouch_risk'),
+  ];
+}
+
+function diagnosticArtifact(
+  artifactId: string,
+  diagnosticType: 'focus_confidence' | 'retouch_risk' | 'source_selection',
+): {
+  artifactId: string;
+  contentHash: string;
+  diagnosticType: 'focus_confidence' | 'retouch_risk' | 'source_selection';
+  kind: 'mask';
+} {
+  const artifact = applied.mutationResult.outputArtifacts.find((candidate) => candidate.artifactId === artifactId);
+  if (artifact === undefined || artifact.contentHash === undefined || artifact.kind !== 'mask') {
+    throw new Error(`Expected focus diagnostic mask artifact ${artifactId}.`);
+  }
+  return {
+    artifactId: artifact.artifactId,
+    contentHash: artifact.contentHash,
+    diagnosticType,
+    kind: 'mask',
+  };
+}
+
+function diagnosticArtifactsFor(diagnosticType: 'focus_confidence' | 'retouch_risk' | 'source_selection') {
+  return buildDiagnosticArtifactProof().filter((artifact) => artifact.diagnosticType === diagnosticType);
+}
+
+function countArtifactsByKind(kind: string): number {
+  return applied.mutationResult.outputArtifacts.filter((artifact) => artifact.kind === kind).length;
 }
 
 function buffersEqual(left: Float32Array, right: Float32Array): boolean {
