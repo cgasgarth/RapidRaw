@@ -14,6 +14,8 @@ import {
   groupLayerWithNext,
   moveLayer,
   moveLayerGroup,
+  setLayerGroupName,
+  setLayerName,
   setLayerOpacity,
   setLayerVisibility,
   ungroupLayerGroup,
@@ -56,6 +58,20 @@ const operationSchema = z.discriminatedUnion('type', [
       layerId: z.string().trim().min(1),
       opacity: z.number(),
       type: z.literal('setOpacity'),
+    })
+    .strict(),
+  z
+    .object({
+      layerId: z.string().trim().min(1),
+      name: z.string(),
+      type: z.literal('rename'),
+    })
+    .strict(),
+  z
+    .object({
+      groupId: z.string().trim().min(1),
+      name: z.string(),
+      type: z.literal('renameGroup'),
     })
     .strict(),
   z
@@ -193,6 +209,10 @@ function applyOperation(layers, operation) {
       );
     case 'setOpacity':
       return setLayerOpacity(layers, operation.layerId, operation.opacity);
+    case 'rename':
+      return setLayerName(layers, operation.layerId, operation.name);
+    case 'renameGroup':
+      return setLayerGroupName(layers, operation.groupId, operation.name);
     case 'setVisibility':
       return setLayerVisibility(layers, operation.layerId, operation.visible);
     case 'move':

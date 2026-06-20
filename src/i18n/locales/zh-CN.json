@@ -724,6 +724,7 @@
         "count_other": "{{count}} masks",
         "none": "No masks"
       },
+      "name": "Name",
       "newAdjustmentLayerName": "Adjustment Layer {{count}}",
       "newAdjustmentLayerName_other": "Adjustment Layer {{count}}",
       "rowSummary": "{{blendMode}} - {{opacity}}% - {{maskCount}}",

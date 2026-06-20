@@ -46,6 +46,58 @@
     ]
   },
   {
+    "id": "rename-layer-and-group",
+    "initialLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      {
+        "id": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 65,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      {
+        "id": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      }
+    ],
+    "operations": [
+      { "type": "rename", "layerId": "tone", "name": "Base Tone Refined" },
+      { "type": "renameGroup", "groupId": "portrait-group", "name": "Portrait Local Edits" }
+    ],
+    "expectedLayers": [
+      { "id": "tone", "name": "Base Tone Refined", "opacity": 100, "visible": true },
+      {
+        "id": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 65,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Local Edits"
+      },
+      {
+        "id": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Local Edits"
+      }
+    ]
+  },
+  {
+    "id": "rename-empty-layer-blocked",
+    "initialLayers": [{ "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true }],
+    "operations": [{ "type": "rename", "layerId": "tone", "name": " " }],
+    "expectedError": "must not be empty",
+    "expectedLayers": [{ "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true }]
+  },
+  {
     "id": "visibility-and-reorder",
     "initialLayers": [
       { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
