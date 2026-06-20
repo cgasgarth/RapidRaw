@@ -270,6 +270,12 @@ function sampleRuntimeSample(): RuntimeSample {
   const width = 12;
   const height = 8;
   const outputScale = 2;
+  const sourcePaths = [
+    'private-fixtures/super-resolution/alaska-burst-v1/_DSC7861.ARW',
+    'private-fixtures/super-resolution/alaska-burst-v1/_DSC7862.ARW',
+    'private-fixtures/super-resolution/alaska-burst-v1/_DSC7863.ARW',
+    'private-fixtures/super-resolution/alaska-burst-v1/_DSC7864.ARW',
+  ];
   return runtimeSampleSchema.parse({
     fixtureId: FIXTURE_ID,
     frames: [
@@ -277,19 +283,23 @@ function sampleRuntimeSample(): RuntimeSample {
       { shiftX: 1, shiftY: 0, sourceIndex: 1 },
       { shiftX: 0, shiftY: 1, sourceIndex: 2 },
       { shiftX: 1, shiftY: 1, sourceIndex: 3 },
-    ].map((frame) => ({
-      contentHash: `sha256:${String(frame.sourceIndex).repeat(64)}`,
-      graphRevision: `sha256:${'a'.repeat(64)}`,
-      pixels: Array.from({ length: width * height }, (_value, index) => {
-        const x = index % width;
-        const y = Math.floor(index / width);
-        return Math.min(1, 0.12 + x * 0.02 + y * 0.015 + frame.sourceIndex * 0.005);
-      }),
-      shiftX: frame.shiftX,
-      shiftY: frame.shiftY,
-      sourceIndex: frame.sourceIndex,
-      sourcePath: `private-fixtures/super-resolution/subpixel-detail-v1/frame-0${frame.sourceIndex + 1}.arw`,
-    })),
+    ].map((frame) => {
+      const sourcePath = sourcePaths[frame.sourceIndex];
+      if (sourcePath === undefined) throw new Error(`Missing SR sample source path ${frame.sourceIndex}.`);
+      return {
+        contentHash: `sha256:${String(frame.sourceIndex).repeat(64)}`,
+        graphRevision: `sha256:${'a'.repeat(64)}`,
+        pixels: Array.from({ length: width * height }, (_value, index) => {
+          const x = index % width;
+          const y = Math.floor(index / width);
+          return Math.min(1, 0.12 + x * 0.02 + y * 0.015 + frame.sourceIndex * 0.005);
+        }),
+        shiftX: frame.shiftX,
+        shiftY: frame.shiftY,
+        sourceIndex: frame.sourceIndex,
+        sourcePath,
+      };
+    }),
     graphRevisionHash: `sha256:${'b'.repeat(64)}`,
     height,
     outputScale,
@@ -310,7 +320,7 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
       {
         acceptanceStatus: 'private_reconstruction_artifact_smoke',
         artifacts: [
-          artifact('source_raw_sequence_private', 'private-fixtures/super-resolution/subpixel-detail-v1'),
+          artifact('source_raw_sequence_private', 'private-fixtures/super-resolution/alaska-burst-v1'),
           artifact('decode_report_private', `${ARTIFACT_ROOT}/sr-subpixel-decode-report.json`),
           artifact('alignment_report_private', `${ARTIFACT_ROOT}/sr-subpixel-registration.json`),
           artifact('merge_output_private', `${ARTIFACT_ROOT}/sr-subpixel-reconstruction.tiff`),
@@ -335,10 +345,10 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
         reportId: 'computational-merge-run.super-resolution-subpixel.v1',
         screenshotArtifacts: [],
         sourceHashes: [
-          source('private-fixtures/super-resolution/subpixel-detail-v1/frame-01.arw'),
-          source('private-fixtures/super-resolution/subpixel-detail-v1/frame-02.arw'),
-          source('private-fixtures/super-resolution/subpixel-detail-v1/frame-03.arw'),
-          source('private-fixtures/super-resolution/subpixel-detail-v1/frame-04.arw'),
+          source('private-fixtures/super-resolution/alaska-burst-v1/_DSC7861.ARW'),
+          source('private-fixtures/super-resolution/alaska-burst-v1/_DSC7862.ARW'),
+          source('private-fixtures/super-resolution/alaska-burst-v1/_DSC7863.ARW'),
+          source('private-fixtures/super-resolution/alaska-burst-v1/_DSC7864.ARW'),
         ],
         uiIssue: 1335,
       },

@@ -32,7 +32,7 @@ For super-resolution fixture prep, use:
 RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" bun scripts/prepare-sr-real-raw-private-root.ts --source "/absolute/path/to/raw-folder" --materialize symlink
 ```
 
-The SR selector uses the same ordered burst requirements as panorama and writes four project-owned RAW sources into `private-fixtures/super-resolution/subpixel-detail-v1/`.
+The SR selector uses the same ordered burst requirements as panorama and writes four project-owned RAW sources into `private-fixtures/super-resolution/alaska-burst-v1/`.
 
 Validation rules:
 
