@@ -6,8 +6,10 @@ import { TextVariants } from '../../types/typography';
 import {
   clampFilmLookStrength,
   getFilmLookAdjustmentSummaries,
+  sortFilmLookBrowserItems,
   type FilmLookBrowserItem,
   type FilmLookCategory,
+  type FilmLookSortMode,
 } from '../../utils/filmLookBrowser';
 import { getFilmLookBrowserGroups } from '../../utils/filmLookRegistry';
 import UiText from '../ui/Text';
@@ -29,6 +31,7 @@ const FILM_LOOK_COMPARE_SLOT_LABELS: Record<FilmLookComparisonSlot, string> = {
 };
 const FILM_LOOK_COMPARE_SLOTS: Array<FilmLookComparisonSlot> = ['a', 'b'];
 const FILM_LOOK_FAVORITES_STORAGE_KEY = 'rapidraw.filmLookFavorites.v1';
+const FILM_LOOK_SORT_MODES: Array<FilmLookSortMode> = ['catalog', 'name_asc', 'strength_desc', 'adjustment_count_desc'];
 const formatFilmLookStrength = (strength: number) => `${strength}%`;
 const formatFilmLookAdjustmentValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
 const formatFilmLookToken = (value: string) => value.split('_').join(' ');
@@ -68,6 +71,8 @@ const getFilmLookSwatchStyle = (look: FilmLookBrowserItem) => {
 };
 const isStringArray = (value: unknown): value is Array<string> =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
+const isFilmLookSortMode = (value: string): value is FilmLookSortMode =>
+  FILM_LOOK_SORT_MODES.some((mode) => mode === value);
 
 const readFavoriteLookIds = (): Set<string> => {
   if (typeof window === 'undefined') {
@@ -100,6 +105,7 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [activeCategory, setActiveCategory] = useState<FilmLookCategoryFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortMode, setSortMode] = useState<FilmLookSortMode>('catalog');
 
   const favoriteLookCount = useMemo(
     () => groups.reduce((count, group) => count + group.looks.filter((look) => favoriteLookIds.has(look.id)).length, 0),
@@ -127,20 +133,23 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
         .filter((group) => activeCategory === 'all' || group.category === activeCategory)
         .map((group) => ({
           ...group,
-          looks: group.looks.filter((look) => {
-            if (showFavoritesOnly && !favoriteLookIds.has(look.id)) {
-              return false;
-            }
+          looks: sortFilmLookBrowserItems(
+            group.looks.filter((look) => {
+              if (showFavoritesOnly && !favoriteLookIds.has(look.id)) {
+                return false;
+              }
 
-            if (normalizedSearchQuery.length === 0) {
-              return true;
-            }
+              if (normalizedSearchQuery.length === 0) {
+                return true;
+              }
 
-            return getFilmLookSearchText(look, group.displayName).includes(normalizedSearchQuery);
-          }),
+              return getFilmLookSearchText(look, group.displayName).includes(normalizedSearchQuery);
+            }),
+            sortMode,
+          ),
         }))
         .filter((group) => group.looks.length > 0),
-    [activeCategory, favoriteLookIds, groups, normalizedSearchQuery, showFavoritesOnly],
+    [activeCategory, favoriteLookIds, groups, normalizedSearchQuery, showFavoritesOnly, sortMode],
   );
   const visibleLookCount = visibleGroups.reduce((total, group) => total + group.looks.length, 0);
   const selectedLook = selectedLookId === null ? undefined : looksById.get(selectedLookId);
@@ -230,6 +239,30 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
         type="search"
         value={searchQuery}
       />
+
+      <label className="block space-y-1">
+        <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
+          {t('adjustments.effects.filmLookBrowser.sort')}
+        </UiText>
+        <select
+          aria-label={t('adjustments.effects.filmLookBrowser.sort')}
+          className="w-full rounded-md border border-surface bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent"
+          onChange={(event) => {
+            const nextSortMode = event.target.value;
+
+            if (isFilmLookSortMode(nextSortMode)) {
+              setSortMode(nextSortMode);
+            }
+          }}
+          value={sortMode}
+        >
+          {FILM_LOOK_SORT_MODES.map((mode) => (
+            <option key={mode} value={mode}>
+              {t(`adjustments.effects.filmLookBrowser.sortModes.${mode}`)}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <div className="grid grid-cols-2 gap-2">
         <button

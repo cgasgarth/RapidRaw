@@ -235,6 +235,13 @@
         "saveLook": "Save {{displayName}} as preset",
         "search": "Search looks",
         "shareLook": "Share {{displayName}} preset",
+        "sort": "Sort",
+        "sortModes": {
+          "adjustment_count_desc": "Most controls",
+          "catalog": "Default order",
+          "name_asc": "Name",
+          "strength_desc": "Strongest default"
+        },
         "strength": "Strength",
         "title": "Film Looks",
         "unfavoriteLook": "Unfavorite {{displayName}}"
