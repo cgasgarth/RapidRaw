@@ -149,7 +149,10 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     }
   };
 
-  addIf((file) => file.includes('filmGrain') || file.includes('film-grain'), ['check:film-grain-runtime-proof']);
+  addIf(
+    (file) => file.includes('filmGrain') || file.includes('film-grain'),
+    ['check:film-grain-provenance', 'check:film-grain-runtime-proof'],
+  );
   addIf(
     (file) => file.includes('focusConfidenceSourceMap') || file.includes('focus-confidence-source-map'),
     ['check:focus-confidence-source-map'],
