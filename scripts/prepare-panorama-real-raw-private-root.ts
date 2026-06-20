@@ -9,6 +9,7 @@ await runComputationalPrivateRootPrep({
   fixtureId: 'validation.computational-merge.panorama-overlap.v1',
   issue: 1508,
   minSources: 3,
+  preferredSourceFileNames: ['_DSC7853.ARW', '_DSC7854.ARW', '_DSC7855.ARW'],
   sourceLabel: 'project-owned ARW overlap frames',
   stressCandidate: {
     expectedExtension: '.arw',
