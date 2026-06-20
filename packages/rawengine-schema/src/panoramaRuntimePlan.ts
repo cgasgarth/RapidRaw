@@ -83,6 +83,31 @@ export const panoramaRuntimeProvenanceV1Schema = z
     engineId: z.literal(PANORAMA_RUNTIME_ENGINE_ID),
     engineVersion: z.literal(PANORAMA_RUNTIME_ENGINE_VERSION),
     exposureNormalization: z.enum(['none', 'auto', 'gain_compensation']),
+    exposureNormalizationResult: z
+      .object({
+        appliedGainCount: z.number().int().nonnegative().optional(),
+        appliedLuminanceGains: z
+          .array(
+            z
+              .object({
+                gain: z.number().positive(),
+                sourceIndex: z.number().int().nonnegative(),
+              })
+              .strict(),
+          )
+          .optional(),
+        mode: z.enum(['none', 'scalar_overlap_luminance_gain_v1']),
+        overlapMetrics: z
+          .object({
+            medianLogLuminanceDeltaAfter: z.number().nonnegative().optional(),
+            medianLogLuminanceDeltaBefore: z.number().nonnegative().optional(),
+          })
+          .strict()
+          .optional(),
+        skippedReason: z.enum(['insufficient_overlap', 'not_requested']).optional(),
+        support: z.literal('implemented_current_engine'),
+      })
+      .strict(),
     excludedSourceCount: z.number().int().nonnegative(),
     lensCorrectionPolicy: z.enum(['unchanged', 'required_before_stitch', 'applied_before_stitch']),
     projectedBounds: z
@@ -303,7 +328,7 @@ export const buildPanoramaRuntimeArtifactV1 = ({
         autoCrop: true,
         bundleAdjustment: false,
         cylindricalProjection: false,
-        exposureNormalization: false,
+        exposureNormalization: true,
         planarHomography: true,
         tiledRender: false,
       },
@@ -375,11 +400,12 @@ const parsePanoramaRuntimePlanRequest = (
 const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
   const stitched = renderSyntheticPanoramaStitchV1({
     connectedSourceIndices: request.connectedSourceIndices,
+    exposureNormalization: request.command.parameters.exposureNormalization,
     expectedWarningCodes: expectedWarningsForCommand(request.command),
     fixtureId: `panorama.runtime.${request.command.commandId}.v1`,
     memoryBudgetBytes: request.command.parameters.memoryBudgetBytes ?? 4_000_000_000,
     seed: request.seed,
-    sourceFrames: request.sourceFrames.map(toSyntheticSourceFrame),
+    sourceFrames: request.sourceFrames.map((frame) => toSyntheticSourceFrame(frame, request.command)),
   });
   if (stitched.outputPixels === null) {
     throw new Error('Panorama runtime plan expected renderable synthetic output pixels.');
@@ -399,6 +425,7 @@ const renderPanoramaRuntime = (request: ParsedPanoramaRuntimePlanRequestV1) => {
       engineId: PANORAMA_RUNTIME_ENGINE_ID,
       engineVersion: PANORAMA_RUNTIME_ENGINE_VERSION,
       exposureNormalization: request.command.parameters.exposureNormalization,
+      exposureNormalizationResult: stitched.exposureNormalization,
       excludedSourceCount: stitched.excludedSourceCount,
       lensCorrectionPolicy: request.command.parameters.lensCorrectionPolicy,
       projectedBounds: {
@@ -604,7 +631,11 @@ const buildPanoramaRuntimeQualityMetrics = (
   };
 };
 
-const toSyntheticSourceFrame = (frame: PanoramaRuntimeSourceFrameV1): PanoramaSyntheticSourceFrameV1 => ({
+const toSyntheticSourceFrame = (
+  frame: PanoramaRuntimeSourceFrameV1,
+  command: PanoramaRuntimeCommandV1,
+): PanoramaSyntheticSourceFrameV1 => ({
+  exposureEv: command.parameters.sources.find((source) => source.sourceIndex === frame.sourceIndex)?.exposureEv ?? 0,
   expectedOffsetX: frame.expectedOffsetX,
   expectedOffsetY: frame.expectedOffsetY,
   height: frame.height,
@@ -708,21 +739,21 @@ const projectionSettingsForPanoramaRuntimeArtifact = (
 const exposureNormalizationForPanoramaRuntimeArtifact = (
   provenance: PanoramaRuntimeProvenanceV1,
 ): PanoramaArtifactV1['exposureNormalization'] => {
-  if (provenance.exposureNormalization === 'none') {
+  const result = provenance.exposureNormalizationResult;
+  if (result.mode === 'none') {
     return {
       mode: 'none',
-      skippedReason: 'not_requested',
+      skippedReason: result.skippedReason ?? 'not_requested',
       support: 'implemented_current_engine',
     };
   }
 
   return {
-    deferredReason: 'Synthetic runtime records requested exposure normalization but does not alter pixels yet.',
-    mode: 'planned',
-    overlapMetrics: {
-      medianLogLuminanceDeltaBefore: roundPanoramaRuntimeMetric(provenance.qualityMetrics.meanOverlapAreaPx / 10_000),
-    },
-    support: 'schema_only_deferred',
+    appliedGainCount: result.appliedGainCount,
+    appliedLuminanceGains: result.appliedLuminanceGains,
+    mode: 'scalar_overlap_luminance_gain_v1',
+    overlapMetrics: result.overlapMetrics,
+    support: 'implemented_current_engine',
   };
 };
 
