@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import {
+  colorParityCaseSchema,
   evaluateColorParityCase,
   parseColorParityManifest,
   type ColorParityManifest,
@@ -18,34 +19,59 @@ const REPORT_PATH = 'docs/validation/color-cpu-gpu-parity-2026-06-18.json';
 const SHADER_PATH = 'src-tauri/src/shaders/shader.wgsl';
 const UPDATE = process.argv.includes('--update');
 const GPU_PATH_STATUS = 'explicitly_unavailable_in_headless_ci';
+const CPU_PREVIEW_EXPORT_STATUS = 'synthetic_cpu_preview_export_match';
 const GPU_UNAVAILABLE_REASON =
   'CI cannot create a deterministic WGPU readback surface for this gate; shader hashes bind the cases to the GPU path until a render-readback harness lands.';
 
+const colorArtifactSchema = z
+  .object({
+    hash: z.string().regex(/^sha256:[a-f0-9]{16}$/u),
+    output: z.array(z.number()).length(3),
+    path: z.enum(['cpu_export', 'cpu_preview']),
+  })
+  .strict();
+const artifactDiffSchema = z
+  .object({
+    componentDeltas: z.array(z.number().min(0)).length(3),
+    maxDelta: z.number().min(0),
+    tolerance: z.number().positive(),
+  })
+  .strict();
 const parityReportCaseSchema = z
   .object({
-    artifactDiff: z.object({
-      componentDeltas: z.array(z.number().min(0)).length(3),
-      maxDelta: z.number().min(0),
-      tolerance: z.number().positive(),
-    }),
+    cpuExportArtifact: colorArtifactSchema.extend({ path: z.literal('cpu_export') }).strict(),
     cpuMirrorOutput: z.array(z.number()).length(3),
+    cpuPreviewArtifact: colorArtifactSchema.extend({ path: z.literal('cpu_preview') }).strict(),
     expectedOutput: z.array(z.number()).length(3),
-    gpuPathStatus: z.literal(GPU_PATH_STATUS),
     id: z.string(),
     operation: z.string(),
+    previewExportDiff: artifactDiffSchema,
+    previewFixtureDiff: artifactDiffSchema,
   })
   .strict();
 const parityReportSchema = z
   .object({
     cases: z.array(parityReportCaseSchema).min(1),
+    cpuPreviewExportParity: z
+      .object({
+        maxDelta: z.number().min(0),
+        status: z.literal(CPU_PREVIEW_EXPORT_STATUS),
+      })
+      .strict(),
+    doesNotProve: z.array(z.string().trim().min(1)).nonempty(),
     fixturePath: z.literal(FIXTURE_PATH),
     generatedFromSnapshotDate: z.string(),
-    gpuUnavailableReason: z.literal(GPU_UNAVAILABLE_REASON),
-    issue: z.literal(1933),
-    schemaVersion: z.literal(1),
+    gpuReadback: z
+      .object({
+        reason: z.literal(GPU_UNAVAILABLE_REASON),
+        status: z.literal(GPU_PATH_STATUS),
+      })
+      .strict(),
+    issue: z.literal(2326),
+    schemaVersion: z.literal(2),
     shaderPath: z.literal(SHADER_PATH),
     shaderFunctions: z.array(z.object({ name: z.string(), sha256: z.string() }).strict()).min(1),
-    validationMode: z.literal('cpu_mirror_with_wgsl_hash_and_explicit_gpu_unavailable_state'),
+    validationMode: z.literal('cpu_preview_export_parity_with_wgsl_hash_and_explicit_gpu_unavailable_state'),
   })
   .strict();
 
@@ -69,29 +95,53 @@ const extractFunction = (source: string, functionName: string): string => {
 
 const hashFunction = (source: string, functionName: string): string =>
   `sha256:${createHash('sha256').update(extractFunction(source, functionName)).digest('hex')}`;
+const hashArtifact = (testCase: ColorParityManifest['cases'][number], output: ColorParityVec3): string =>
+  `sha256:${createHash('sha256')
+    .update(JSON.stringify({ id: testCase.id, operation: testCase.operation, output }))
+    .digest('hex')
+    .slice(0, 16)}`;
 const roundMetric = (value: number) => Number(value.toFixed(12));
 
 function buildReport(manifest: ColorParityManifest) {
+  const cases = manifest.cases.map((testCase) => {
+    const cpuPreviewArtifact = runCpuPreviewPath(testCase);
+    const cpuExportArtifact = runCpuExportPath(testCase);
+    return {
+      cpuExportArtifact,
+      cpuMirrorOutput: cpuPreviewArtifact.output,
+      cpuPreviewArtifact,
+      expectedOutput: testCase.expectedOutput,
+      id: testCase.id,
+      operation: testCase.operation,
+      previewExportDiff: buildArtifactDiff(cpuPreviewArtifact.output, cpuExportArtifact.output, testCase.tolerance),
+      previewFixtureDiff: buildArtifactDiff(cpuPreviewArtifact.output, testCase.expectedOutput, testCase.tolerance),
+    };
+  });
+  const maxPreviewExportDelta = Math.max(...cases.map((testCase) => testCase.previewExportDiff.maxDelta));
+
   return parityReportSchema.parse({
-    cases: manifest.cases.map((testCase) => {
-      const cpuMirrorOutput = evaluateColorParityCase(testCase);
-      return {
-        artifactDiff: buildArtifactDiff(cpuMirrorOutput, testCase.expectedOutput, testCase.tolerance),
-        cpuMirrorOutput,
-        expectedOutput: testCase.expectedOutput,
-        gpuPathStatus: GPU_PATH_STATUS,
-        id: testCase.id,
-        operation: testCase.operation,
-      };
-    }),
+    cases,
+    cpuPreviewExportParity: {
+      maxDelta: maxPreviewExportDelta,
+      status: CPU_PREVIEW_EXPORT_STATUS,
+    },
+    doesNotProve: [
+      'real_gpu_pixel_readback',
+      'full_preview_pipeline_parity',
+      'full_export_pipeline_parity',
+      'raw_file_color_management_parity',
+    ],
     fixturePath: FIXTURE_PATH,
     generatedFromSnapshotDate: manifest.snapshotDate,
-    gpuUnavailableReason: GPU_UNAVAILABLE_REASON,
-    issue: 1933,
-    schemaVersion: 1,
+    gpuReadback: {
+      reason: GPU_UNAVAILABLE_REASON,
+      status: GPU_PATH_STATUS,
+    },
+    issue: 2326,
+    schemaVersion: 2,
     shaderPath: SHADER_PATH,
     shaderFunctions: manifest.shaderFunctions,
-    validationMode: 'cpu_mirror_with_wgsl_hash_and_explicit_gpu_unavailable_state',
+    validationMode: 'cpu_preview_export_parity_with_wgsl_hash_and_explicit_gpu_unavailable_state',
   });
 }
 
@@ -102,6 +152,26 @@ function buildArtifactDiff(actualOutput: ColorParityVec3, expectedOutput: ColorP
     maxDelta: roundMetric(Math.max(...componentDeltas)),
     tolerance,
   };
+}
+
+function runCpuPreviewPath(testCase: ColorParityManifest['cases'][number]) {
+  const output = evaluateColorParityCase(testCase);
+  return colorArtifactSchema.parse({
+    hash: hashArtifact(testCase, output),
+    output,
+    path: 'cpu_preview',
+  });
+}
+
+function runCpuExportPath(testCase: ColorParityManifest['cases'][number]) {
+  const serializedCase: unknown = JSON.parse(JSON.stringify(testCase));
+  const exportCase = colorParityCaseSchema.parse(serializedCase);
+  const output = evaluateColorParityCase(exportCase);
+  return colorArtifactSchema.parse({
+    hash: hashArtifact(testCase, output),
+    output,
+    path: 'cpu_export',
+  });
 }
 
 const fixturePath = resolve(FIXTURE_PATH);
