@@ -55,6 +55,10 @@ import {
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
 } from '../../utils/negativeLabPresetCatalog';
 import { buildNegativeLabProfileBrowserRows } from '../../utils/negativeLabProfileBrowserRows';
+import {
+  NEGATIVE_LAB_STOCK_METADATA_CATALOG,
+  buildNegativeLabStockMetadataCounts,
+} from '../../utils/negativeLabStockMetadataCatalog';
 import { NEGATIVE_LAB_STOCK_REGISTRY, buildNegativeLabStockRegistryCounts } from '../../utils/negativeLabStockRegistry';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { throttle } from '../../utils/timing';
@@ -119,13 +123,11 @@ const NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID = new Map(
   NEGATIVE_LAB_PROFILE_BROWSER_ROWS.map((row) => [row.presetId, row]),
 );
 const NEGATIVE_LAB_STOCK_REGISTRY_COUNTS = buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY);
-const NEGATIVE_LAB_STOCK_METADATA_COUNTS = {
-  blackAndWhiteNegativeCount: 4,
-  cinemaNegativeCount: 3,
-  colorNegativeCount: 6,
-  slideReversalCount: 3,
-};
+const NEGATIVE_LAB_STOCK_METADATA_COUNTS = buildNegativeLabStockMetadataCounts(NEGATIVE_LAB_STOCK_METADATA_CATALOG);
 const formatStockRegistryToken = (value: string) => value.split('_').join(' ');
+const formatStockMetadataIso = (
+  nominalIso: (typeof NEGATIVE_LAB_STOCK_METADATA_CATALOG.entries)[number]['nominalIso'],
+) => (nominalIso === null ? 'ISO -' : `${nominalIso.unit} ${nominalIso.value}`);
 const DENSITOMETER_CHANNEL_LABEL_KEYS: Record<
   NegativeBaseFogDensitometerReadout['dominantChannel'],
   | 'modals.negativeConversion.densitometerChannelRed'
@@ -1441,19 +1443,97 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             data-testid="negative-lab-stock-metadata"
           >
             <div className="mb-2">
-              <div>
-                <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
-                  {t('modals.negativeConversion.stockMetadata')}
-                </UiText>
-                <UiText variant={TextVariants.small} className="text-text-tertiary">
-                  {t('modals.negativeConversion.stockMetadataSummary', {
-                    blackAndWhiteCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.blackAndWhiteNegativeCount,
-                    cinemaCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.cinemaNegativeCount,
-                    colorCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.colorNegativeCount,
-                    slideCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.slideReversalCount,
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
+                    {t('modals.negativeConversion.stockMetadata')}
+                  </UiText>
+                  <UiText variant={TextVariants.small} className="text-text-tertiary">
+                    {t('modals.negativeConversion.stockMetadataSummary', {
+                      blackAndWhiteCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.blackAndWhiteNegativeCount,
+                      cinemaCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.cinemaNegativeCount,
+                      colorCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.colorNegativeCount,
+                      slideCount: NEGATIVE_LAB_STOCK_METADATA_COUNTS.slideReversalCount,
+                    })}
+                  </UiText>
+                </div>
+                <span className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary">
+                  {t('modals.negativeConversion.stockRegistryVersion', {
+                    version: NEGATIVE_LAB_STOCK_METADATA_CATALOG.version,
                   })}
-                </UiText>
+                </span>
               </div>
+            </div>
+            <div className="max-h-80 space-y-2 overflow-y-auto pr-1" data-testid="negative-lab-stock-metadata-list">
+              {NEGATIVE_LAB_STOCK_METADATA_CATALOG.entries.map((entry) => {
+                const mappedProfile =
+                  entry.suggestedGenericPresetId === null
+                    ? null
+                    : NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID.get(entry.suggestedGenericPresetId);
+                const isSuggestedProfileSelectable =
+                  mappedProfile !== null && mappedProfile !== undefined && mappedProfile.isSelectable;
+
+                return (
+                  <div
+                    className="rounded-md border border-surface bg-bg-secondary p-2 text-xs"
+                    data-runtime-status={entry.runtimeStatus}
+                    data-testid={`negative-lab-stock-metadata-entry-${entry.entryId}`}
+                    key={entry.entryId}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <UiText variant={TextVariants.small} className="truncate font-medium text-text-primary">
+                          {entry.displayName}
+                        </UiText>
+                        <UiText variant={TextVariants.small} className="text-text-tertiary">
+                          {entry.stockFamilyDescriptor}
+                        </UiText>
+                      </div>
+                      <span className="shrink-0 rounded bg-bg-primary px-1.5 py-0.5 text-[10px] text-text-tertiary">
+                        {formatStockMetadataIso(entry.nominalIso)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] text-text-tertiary">
+                      <span>{formatStockRegistryToken(entry.stockClass)}</span>
+                      <span>{formatStockRegistryToken(entry.processFamily)}</span>
+                      <span>{t('modals.negativeConversion.stockMetadataOnly')}</span>
+                    </div>
+                    <UiText variant={TextVariants.small} className="mt-1 text-text-tertiary">
+                      {entry.colorResponseNotes}
+                    </UiText>
+                    <button
+                      className="mt-2 w-full rounded border border-surface bg-bg-primary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                      data-testid={`negative-lab-stock-metadata-suggested-preset-${entry.entryId}`}
+                      disabled={!isSuggestedProfileSelectable}
+                      onClick={() => {
+                        if (mappedProfile !== null && mappedProfile !== undefined) {
+                          handlePresetSelect(mappedProfile);
+                        }
+                      }}
+                      type="button"
+                    >
+                      {isSuggestedProfileSelectable
+                        ? t('modals.negativeConversion.stockMetadataUseSuggestedPreset', {
+                            presetName: mappedProfile.displayName,
+                          })
+                        : t('modals.negativeConversion.stockMetadataNoRuntimePreset')}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div
+            className="mb-3 rounded-md border border-surface bg-bg-primary p-3"
+            data-testid="negative-lab-stock-metadata-policy"
+          >
+            <div>
+              <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
+                {t('modals.negativeConversion.stockMetadataPolicy')}
+              </UiText>
+              <UiText variant={TextVariants.small} className="text-text-tertiary">
+                {t('modals.negativeConversion.stockMetadataPolicyDetail')}
+              </UiText>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-2">
