@@ -293,7 +293,15 @@ const workflowStageKeys = [
   'stockRegistryVersion',
   'workflowExportReadyCount',
 ];
-const stockMetadataLocaleKeys = ['stockMetadata', 'stockMetadataSummary'];
+const stockMetadataLocaleKeys = [
+  'stockMetadata',
+  'stockMetadataNoRuntimePreset',
+  'stockMetadataOnly',
+  'stockMetadataPolicy',
+  'stockMetadataPolicyDetail',
+  'stockMetadataSummary',
+  'stockMetadataUseSuggestedPreset',
+];
 const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
 const backendSource = readFileSync('src-tauri/src/negative_conversion.rs', 'utf8');
 
@@ -378,7 +386,12 @@ for (const marker of [
   'negative-lab-profile-runtime-status',
   'negative-lab-stock-family-',
   'negative-lab-stock-metadata',
+  'negative-lab-stock-metadata-entry-',
+  'negative-lab-stock-metadata-list',
+  'negative-lab-stock-metadata-policy',
+  'negative-lab-stock-metadata-suggested-preset-',
   'negative-lab-stock-registry',
+  'NEGATIVE_LAB_STOCK_METADATA_CATALOG',
   'NEGATIVE_LAB_STOCK_METADATA_COUNTS',
   'NEGATIVE_LAB_STOCK_REGISTRY',
 ]) {

@@ -1433,7 +1433,12 @@
       "stockRegistrySummary": "{{runtimeSafeCount}} runtime-safe / {{referenceOnlyCount}} reference-only",
       "stockRegistryVersion": "v{{version}}",
       "stockMetadata": "",
+      "stockMetadataNoRuntimePreset": "Metadata only",
+      "stockMetadataOnly": "metadata only",
+      "stockMetadataPolicy": "Reference policy",
+      "stockMetadataPolicyDetail": "Named stocks are references only until project-owned measurements prove a runtime profile.",
       "stockMetadataSummary": "",
+      "stockMetadataUseSuggestedPreset": "Use generic preset: {{presetName}}",
       "agentActivity": "Agent activity",
       "agentAffectedFrames": "Affected {{frameCount}}"
     },
