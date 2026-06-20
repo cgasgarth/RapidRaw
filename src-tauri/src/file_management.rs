@@ -153,6 +153,21 @@ fn rrexif_sidecar_path(source_path: &Path) -> PathBuf {
     source_path.with_file_name(rrexif_name)
 }
 
+fn save_metadata_sidecar(sidecar_path: &Path, metadata: &ImageMetadata) -> Result<(), String> {
+    crate::exif_processing::save_sidecar_metadata_atomic(sidecar_path, metadata)
+}
+
+fn save_metadata_sidecar_or_warn(sidecar_path: &Path, metadata: &ImageMetadata, context: &str) {
+    if let Err(err) = save_metadata_sidecar(sidecar_path, metadata) {
+        log::warn!(
+            "{} failed for sidecar {}: {}",
+            context,
+            sidecar_path.display(),
+            err
+        );
+    }
+}
+
 fn copy_existing_file(source_path: &Path, destination_path: &Path) -> Result<(), String> {
     if source_path.exists() {
         fs::copy(source_path, destination_path).map_err(|e| e.to_string())?;
@@ -206,11 +221,8 @@ fn expand_image_file_rows(
         let (is_edited, tags, rating) = {
             let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
-            if enable_xmp_sync
-                && sync_metadata_from_xmp(&path_buf, &mut metadata)
-                && let Ok(json) = serde_json::to_string_pretty(&metadata)
-            {
-                let _ = fs::write(&sidecar_path, json);
+            if enable_xmp_sync && sync_metadata_from_xmp(&path_buf, &mut metadata) {
+                save_metadata_sidecar_or_warn(&sidecar_path, &metadata, "XMP import");
             }
 
             let is_raw = crate::formats::is_raw_file(&path_str);
@@ -292,48 +304,51 @@ pub async fn update_exif_fields(
     paths: Vec<String>,
     updates: HashMap<String, String>,
 ) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        paths
-            .par_iter()
-            .map(|path| -> Result<(), String> {
-                let original_path = Path::new(&path);
-                let primary_path = crate::exif_processing::get_primary_sidecar_path(original_path);
-                let temp_metadata = crate::exif_processing::load_sidecar(&primary_path);
+    tauri::async_runtime::spawn_blocking(move || update_exif_fields_blocking(paths, updates))
+        .await
+        .map_err(|e| format!("Task failed: {}", e))?
+}
 
-                let mut exif_data = temp_metadata.exif.unwrap_or_else(|| {
-                    if let Some(existing) =
-                        crate::exif_processing::read_rrexif_sidecar(original_path)
-                    {
-                        existing
-                    } else if let Ok(mmap) = read_file_mapped(original_path) {
-                        crate::exif_processing::read_exif_data_from_bytes(path, &mmap)
-                    } else if let Ok(bytes) = fs::read(original_path) {
-                        crate::exif_processing::read_exif_data_from_bytes(path, &bytes)
-                    } else {
-                        HashMap::new()
-                    }
-                });
+fn update_exif_fields_blocking(
+    paths: Vec<String>,
+    updates: HashMap<String, String>,
+) -> Result<(), String> {
+    paths
+        .par_iter()
+        .map(|path| -> Result<(), String> {
+            let original_path = Path::new(&path);
+            let primary_path = crate::exif_processing::get_primary_sidecar_path(original_path);
+            let temp_metadata = crate::exif_processing::load_sidecar(&primary_path);
 
-                for (k, v) in &updates {
-                    let trimmed = v.trim();
-                    if trimmed.is_empty() {
-                        exif_data.remove(k);
-                    } else {
-                        exif_data.insert(k.clone(), trimmed.to_string());
-                    }
+            let mut exif_data = temp_metadata.exif.unwrap_or_else(|| {
+                if let Some(existing) = crate::exif_processing::read_rrexif_sidecar(original_path) {
+                    existing
+                } else if let Ok(mmap) = read_file_mapped(original_path) {
+                    crate::exif_processing::read_exif_data_from_bytes(path, &mmap)
+                } else if let Ok(bytes) = fs::read(original_path) {
+                    crate::exif_processing::read_exif_data_from_bytes(path, &bytes)
+                } else {
+                    HashMap::new()
                 }
+            });
 
-                let mut final_metadata = crate::exif_processing::load_sidecar(&primary_path);
+            for (k, v) in &updates {
+                let trimmed = v.trim();
+                if trimmed.is_empty() {
+                    exif_data.remove(k);
+                } else {
+                    exif_data.insert(k.clone(), trimmed.to_string());
+                }
+            }
 
-                final_metadata.exif = Some(exif_data);
-                crate::exif_processing::save_sidecar_metadata_atomic(&primary_path, &final_metadata)
-                    .map_err(|e| format!("{}: {}", path, e))
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map(|_| ())
-    })
-    .await
-    .map_err(|e| format!("Task failed: {}", e))?
+            let mut final_metadata = crate::exif_processing::load_sidecar(&primary_path);
+
+            final_metadata.exif = Some(exif_data);
+            save_metadata_sidecar(&primary_path, &final_metadata)
+                .map_err(|e| format!("{}: {}", path, e))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map(|_| ())
 }
 
 #[tauri::command]
@@ -662,11 +677,8 @@ pub fn get_album_images(
             let (is_edited, tags, rating) = {
                 let mut metadata = crate::exif_processing::load_sidecar(&sidecar_path);
 
-                if enable_xmp_sync
-                    && sync_metadata_from_xmp(&source_path, &mut metadata)
-                    && let Ok(json) = serde_json::to_string_pretty(&metadata)
-                {
-                    let _ = fs::write(&sidecar_path, json);
+                if enable_xmp_sync && sync_metadata_from_xmp(&source_path, &mut metadata) {
+                    save_metadata_sidecar_or_warn(&sidecar_path, &metadata, "XMP import");
                 }
 
                 let is_raw = crate::formats::is_raw_file(&source_path);
@@ -1926,8 +1938,7 @@ pub fn save_metadata_and_update_thumbnail(
 
     metadata.adjustments = final_adjustments;
 
-    let json_string = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    std::fs::write(&sidecar_path, json_string).map_err(|e| e.to_string())?;
+    save_metadata_sidecar(&sidecar_path, &metadata)?;
 
     if let Ok(settings) = load_settings(app_handle.clone())
         && settings.enable_xmp_sync.unwrap_or(false)
@@ -3193,7 +3204,7 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
   </rdf:Description>
  </rdf:RDF>
 </x:xmpmeta>"#;
-        if let Err(e) = fs::write(&xmp_path, skeleton) {
+        if let Err(e) = crate::exif_processing::write_text_file_atomic(&xmp_path, skeleton) {
             log::error!("Failed to create skeleton XMP: {}", e);
             return;
         }
@@ -3279,6 +3290,53 @@ pub fn sync_metadata_to_xmp(source_path: &Path, metadata: &ImageMetadata, create
             }
         }
 
-        let _ = fs::write(&xmp_file, content);
+        if let Err(e) = crate::exif_processing::write_text_file_atomic(&xmp_file, &content) {
+            log::warn!("Failed to sync XMP sidecar {}: {}", xmp_file.display(), e);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_exif_fields_blocking_writes_primary_sidecar_atomically() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let image_path = temp_dir.path().join("image.raf");
+        fs::write(&image_path, b"raw").expect("source image");
+
+        update_exif_fields_blocking(
+            vec![image_path.to_string_lossy().into_owned()],
+            HashMap::from([("Artist".to_string(), "RawEngine".to_string())]),
+        )
+        .expect("exif update");
+
+        let sidecar_path = crate::exif_processing::get_primary_sidecar_path(&image_path);
+        let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
+        assert_eq!(
+            metadata.exif.as_ref().and_then(|exif| exif.get("Artist")),
+            Some(&"RawEngine".to_string())
+        );
+    }
+
+    #[test]
+    fn update_exif_fields_blocking_reports_mixed_batch_write_failure() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let good_image_path = temp_dir.path().join("good.raf");
+        fs::write(&good_image_path, b"raw").expect("source image");
+        let missing_parent_path = temp_dir.path().join("missing").join("bad.raf");
+
+        let err = update_exif_fields_blocking(
+            vec![
+                good_image_path.to_string_lossy().into_owned(),
+                missing_parent_path.to_string_lossy().into_owned(),
+            ],
+            HashMap::from([("Artist".to_string(), "RawEngine".to_string())]),
+        )
+        .expect_err("mixed batch should report write failure");
+
+        assert!(err.contains("bad.raf"));
+        assert!(!crate::exif_processing::get_primary_sidecar_path(&missing_parent_path).exists());
     }
 }

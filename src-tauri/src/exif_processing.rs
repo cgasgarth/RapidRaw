@@ -1104,8 +1104,13 @@ pub fn save_sidecar_metadata_atomic(
             e
         )
     })?;
-    write_text_atomic(sidecar_path, &json)
+    write_text_file_atomic(sidecar_path, &json)
         .map_err(|e| format!("Failed to write sidecar {}: {}", sidecar_path.display(), e))
+}
+
+pub fn write_text_file_atomic(path: &Path, content: &str) -> Result<(), String> {
+    write_text_atomic(path, content)
+        .map_err(|e| format!("Failed to write {}: {}", path.display(), e))
 }
 
 fn write_text_atomic(path: &Path, content: &str) -> std::io::Result<()> {
@@ -1262,5 +1267,18 @@ mod tests {
 
         assert!(err.contains("Failed to write sidecar"));
         assert!(!sidecar_path.exists());
+    }
+
+    #[test]
+    fn write_text_file_atomic_preserves_existing_directory_on_replace_failure() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let directory_path = temp_dir.path().join("image.raf.rrdata");
+        fs::create_dir(&directory_path).expect("target directory");
+
+        let err = write_text_file_atomic(&directory_path, "replacement")
+            .expect_err("persisting over a directory should fail");
+
+        assert!(err.contains("Failed to write"));
+        assert!(directory_path.is_dir());
     }
 }
