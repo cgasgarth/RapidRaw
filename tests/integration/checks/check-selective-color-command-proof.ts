@@ -12,6 +12,7 @@ import {
 import {
   editGraphSnapshotV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
+  toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
@@ -21,6 +22,8 @@ import {
   applySelectiveColorCommandEnvelopeToAdjustments,
   buildSelectiveColorCommandEnvelope,
   buildSelectiveColorImageCommandContext,
+  parseSelectiveColorCommandEnvelope,
+  selectiveColorCommandEnvelopeSchema,
 } from '../../../src/utils/selectiveColorCommandBridge.ts';
 import { applySelectiveColorToRgbPixel, type RgbPixel } from '../../../src/utils/selectiveColorRuntime.ts';
 
@@ -83,6 +86,9 @@ const dryRunCommand = buildSelectiveColorCommandEnvelope(
   { dryRun: true },
 );
 
+toneColorCommandEnvelopeV1Schema.parse(dryRunCommand);
+selectiveColorCommandEnvelopeSchema.parse(dryRunCommand);
+
 const applyCommand = buildSelectiveColorCommandEnvelope(
   { adjustment, rangeKey: 'oranges' },
   {
@@ -96,6 +102,40 @@ const applyCommand = buildSelectiveColorCommandEnvelope(
     reason: 'Apply accepted orange selective color adjustment to the edit graph sidecar.',
   },
 );
+
+toneColorCommandEnvelopeV1Schema.parse(applyCommand);
+parseSelectiveColorCommandEnvelope(applyCommand);
+
+const runtimeContext = buildSelectiveColorImageCommandContext({
+  colorPipeline: dryRunCommand.colorPipeline,
+  expectedGraphRevision: 'graph_rev_context_probe',
+  imagePath: '/validation/selective-color-context-probe.CR3',
+  operationId: 'context_probe',
+  sessionId: 'selective-color-command-proof',
+  virtualCopyId: 'virtual_copy_context_probe',
+});
+const runtimeContextCommand = buildSelectiveColorCommandEnvelope({ adjustment, rangeKey: 'oranges' }, runtimeContext, {
+  dryRun: true,
+});
+if (
+  runtimeContextCommand.expectedGraphRevision !== runtimeContext.expectedGraphRevision ||
+  runtimeContextCommand.target.imagePath !== runtimeContext.target.imagePath ||
+  runtimeContextCommand.target.virtualCopyId !== runtimeContext.target.virtualCopyId ||
+  JSON.stringify(runtimeContextCommand.colorPipeline) !== JSON.stringify(runtimeContext.colorPipeline)
+) {
+  throw new Error('Selective color command context did not match the render request context.');
+}
+
+const malformedEnvelope = selectiveColorCommandEnvelopeSchema.safeParse({
+  ...dryRunCommand,
+  parameters: {
+    ...dryRunCommand.parameters,
+    hueShiftDegrees: 240,
+  },
+});
+if (malformedEnvelope.success) {
+  throw new Error('Selective color command schema must reject malformed HSL envelopes.');
+}
 
 const bridge = createRawEngineLocalAppServerBridge();
 const rejectedApply = await createRawEngineLocalAppServerBridge().dispatch(applyCommand);
