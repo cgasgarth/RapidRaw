@@ -45,6 +45,15 @@ interface ColorPanelProps {
 type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
 type LevelsNumericKey = Exclude<keyof Adjustments['levels'], 'enabled'>;
 
+const colorGradingSwatchKeys = ['shadows', 'midtones', 'highlights', 'global'] as const;
+
+const getColorGradingSwatchColor = (value: HueSatLum) => {
+  const saturation = Math.round(Math.min(88, Math.max(8, 30 + value.saturation * 0.55)));
+  const lightness = Math.round(Math.min(78, Math.max(16, 46 + value.luminance * 0.35)));
+
+  return `hsl(${Math.round(value.hue)} ${saturation}% ${lightness}%)`;
+};
+
 const colorRuntimeStatusItems = [
   ['gpuLabel', 'previewExport'],
   ['apiLabel', 'typed'],
@@ -285,20 +294,50 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
         </button>
       </div>
 
-      <div className="mb-4 flex gap-1 overflow-x-auto pb-1">
-        {COLOR_GRADING_PRESETS.map((preset) => (
-          <button
-            className="shrink-0 rounded bg-bg-secondary px-2 py-1 text-xs font-medium text-text-secondary hover:bg-surface hover:text-text-primary"
-            data-tooltip={preset.category}
-            key={preset.id}
-            onClick={() => {
-              handleApplyPreset(preset);
-            }}
-            type="button"
-          >
-            {preset.name}
-          </button>
-        ))}
+      <div className="mb-4 grid grid-cols-1 gap-2">
+        {COLOR_GRADING_PRESETS.map((preset) => {
+          const categoryLabel = t(`adjustments.color.grading.presetCategories.${preset.category}`);
+
+          return (
+            <button
+              aria-label={t('adjustments.color.grading.applyPreset', {
+                balance: preset.balance,
+                blending: preset.blending,
+                category: categoryLabel,
+                name: preset.name,
+              })}
+              className="rounded-md border border-border bg-bg-secondary px-2.5 py-2 text-left text-xs text-text-secondary transition-colors hover:border-accent hover:bg-surface hover:text-text-primary"
+              data-testid="color-grading-preset-card"
+              key={preset.id}
+              onClick={() => {
+                handleApplyPreset(preset);
+              }}
+              type="button"
+            >
+              <span className="flex min-w-0 items-center justify-between gap-2">
+                <span className="truncate font-semibold text-text-primary">{preset.name}</span>
+                <span className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal">
+                  {categoryLabel}
+                </span>
+              </span>
+              <span aria-hidden="true" className="mt-2 grid grid-cols-4 gap-1">
+                {colorGradingSwatchKeys.map((key) => (
+                  <span
+                    className="h-2 rounded-full border border-black/10"
+                    data-testid={`color-grading-preset-swatch-${key}`}
+                    key={key}
+                    style={{ backgroundColor: getColorGradingSwatchColor(preset[key]) }}
+                  />
+                ))}
+              </span>
+              <span className="mt-2 flex items-center gap-2 text-[10px] font-medium text-text-secondary">
+                <span>{t('adjustments.color.grading.blendingValue', { value: preset.blending })}</span>
+                <span className="h-1 w-1 rounded-full bg-text-secondary/40" aria-hidden="true" />
+                <span>{t('adjustments.color.grading.balanceValue', { value: preset.balance })}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="relative w-full mb-4">

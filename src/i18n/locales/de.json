@@ -75,11 +75,20 @@
       "colorGrading": "Color Grading",
       "colorMixer": "Farbmischer",
       "grading": {
+        "applyPreset": "Color-Grading-Vorgabe {{name}} anwenden. Kategorie {{category}}, Mischen {{blending}}, Abgleich {{balance}}.",
         "balance": "Abgleich",
+        "balanceValue": "Abgl. {{value}}",
         "blending": "Mischen",
+        "blendingValue": "Mix {{value}}",
         "global": "Global",
         "highlights": "Lichter",
         "midtones": "Mitteltöne",
+        "presetCategories": {
+          "cinematic": "Kino",
+          "landscape": "Landschaft",
+          "neutral": "Neutral",
+          "portrait": "Porträt"
+        },
         "shadows": "Tiefen"
       },
       "hue": "Farbton",

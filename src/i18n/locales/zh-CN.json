@@ -75,11 +75,20 @@
       "colorGrading": "颜色分级",
       "colorMixer": "颜色混合器",
       "grading": {
+        "applyPreset": "应用 {{name}} 颜色分级预设。类别 {{category}}，混合 {{blending}}，平衡 {{balance}}。",
         "balance": "平衡",
+        "balanceValue": "平衡 {{value}}",
         "blending": "混合",
+        "blendingValue": "混合 {{value}}",
         "global": "全局",
         "highlights": "高光",
         "midtones": "中间调",
+        "presetCategories": {
+          "cinematic": "电影",
+          "landscape": "风景",
+          "neutral": "中性",
+          "portrait": "人像"
+        },
         "shadows": "阴影"
       },
       "hue": "色相",

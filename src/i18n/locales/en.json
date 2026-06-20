@@ -75,11 +75,20 @@
       "colorGrading": "Color Grading",
       "colorMixer": "Color Mixer",
       "grading": {
+        "applyPreset": "Apply {{name}} color grading preset. Category {{category}}, blending {{blending}}, balance {{balance}}.",
         "balance": "Balance",
+        "balanceValue": "Bal {{value}}",
         "blending": "Blending",
+        "blendingValue": "Blend {{value}}",
         "global": "Global",
         "highlights": "Highlights",
         "midtones": "Midtones",
+        "presetCategories": {
+          "cinematic": "Cinematic",
+          "landscape": "Landscape",
+          "neutral": "Neutral",
+          "portrait": "Portrait"
+        },
         "shadows": "Shadows"
       },
       "hue": "Hue",
