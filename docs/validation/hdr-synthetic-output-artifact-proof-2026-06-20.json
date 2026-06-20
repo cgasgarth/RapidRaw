@@ -1,0 +1,33 @@
+{
+  "artifacts": {
+    "mergedPreview": {
+      "contentHash": "sha256:6849088231a3cb86fc0441a01b28a4f5aa86d220a0ca902e2f70f89492ce84eb",
+      "format": "pgm_u8_preview",
+      "path": "artifacts/validation/hdr-synthetic-output-artifact/merged-preview.pgm",
+      "publicRepoAllowed": false
+    }
+  },
+  "doesNotProve": [
+    "app_ui_e2e",
+    "deghost_visual_quality",
+    "export_tiff_pipeline",
+    "real_raw_bracket_decode",
+    "tone_mapping_quality"
+  ],
+  "fixtureId": "hdr.synthetic.public.bracket-output.v1",
+  "generatedAt": "2026-06-20T09:25:00.000Z",
+  "issue": 2312,
+  "metrics": {
+    "meanAbsoluteError": 0,
+    "recoveredHighlightPixelRatio": 1,
+    "unrecoveredClippedPixelRatio": 0
+  },
+  "runtimeStatus": "synthetic_hdr_merge_output_artifact_rendered",
+  "schemaVersion": 1,
+  "sourceBracket": {
+    "exposureEvs": [-2, 0, 2],
+    "height": 64,
+    "syntheticSceneHash": "sha256:833ad67ea38bf8155aaa16ba2005f115a52ab5aa21b3fd47ebc78cb0393179e2",
+    "width": 96
+  }
+}
