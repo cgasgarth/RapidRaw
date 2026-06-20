@@ -52,7 +52,7 @@
     },
     "schemaVersion": 1,
     "target": {
-      "imagePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+      "imagePath": "private-fixtures/color/selective-color-orange-v1/alaska-dsc7853.arw",
       "kind": "image"
     }
   },
@@ -61,8 +61,8 @@
   "sourceMetadata": {
     "cameraMake": "Sony",
     "cameraModel": "ILCE-7M3",
-    "privacySafeCameraId": "camera.raw-open-edit-export.high-iso-skin-shadow.v1",
+    "privacySafeCameraId": "camera.raw-open-edit-export.selective-color-orange-alaska.v1",
     "rawFormat": "arw"
   },
-  "sourceRelativePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw"
+  "sourceRelativePath": "private-fixtures/color/selective-color-orange-v1/alaska-dsc7853.arw"
 }

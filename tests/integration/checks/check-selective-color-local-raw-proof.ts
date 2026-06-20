@@ -6,12 +6,15 @@ import { resolve } from 'node:path';
 
 import { z } from 'zod';
 
+import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
+
 const REPORT_PATH = 'docs/validation/selective-color-local-raw-proof-2026-06-20.json';
-const WORKFLOW_REPORT_PATH =
-  'private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json';
+const REQUEST_PATH = 'fixtures/validation/selective-color-raw-proof-request.json';
 const UPDATE_REPORT = process.argv.includes('--update');
 const requireAssets = process.argv.includes('--require-assets');
 const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
+const request = rawOpenEditExportProofRequestSchema.parse(JSON.parse(await readFile(REQUEST_PATH, 'utf8')));
+const WORKFLOW_REPORT_PATH = `${request.artifactDirRelative}/selective-color-orange-v1-workflow-report.json`;
 
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const workflowArtifactSchema = z
@@ -97,8 +100,8 @@ const summaryReportSchema = z
     schemaVersion: z.literal(1),
     sourceRaw: z
       .object({
-        fixtureStatus: z.literal('private_cc_raw_not_committed'),
-        localPath: z.literal('private-fixtures/detail/high-iso-skin-shadow-v1.arw'),
+        fixtureStatus: z.enum(['private_cc_raw_not_committed', 'private_project_owned_raw_not_committed']),
+        localPath: z.literal(request.sourceRelativePath),
         sha256: hashSchema,
       })
       .strict(),
@@ -137,8 +140,8 @@ if (UPDATE_REPORT) {
     },
     schemaVersion: 1,
     sourceRaw: {
-      fixtureStatus: 'private_cc_raw_not_committed',
-      localPath: 'private-fixtures/detail/high-iso-skin-shadow-v1.arw',
+      fixtureStatus: 'private_project_owned_raw_not_committed',
+      localPath: request.sourceRelativePath,
       sha256: workflowReport.sourceRaw.hash,
     },
     validationMode: 'private_raw_selective_color_preview_export_sidecar_proof',

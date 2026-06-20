@@ -494,6 +494,43 @@
       "trackingIssue": 1376
     },
     {
+      "artifactClass": "general_color_reference",
+      "camera": {
+        "cameraMake": "Sony",
+        "cameraModel": "ILCE-7M3",
+        "lens": "FE 24-105mm F4 G OSS",
+        "rawFormat": "arw"
+      },
+      "crop": {
+        "height": 1536,
+        "unit": "source_pixels",
+        "width": 2048,
+        "x": 1200,
+        "y": 850
+      },
+      "evidenceId": "raw-evidence.color.selective-color-orange-alaska.v1",
+      "expectedUse": ["color_science", "preview_export_parity"],
+      "exposure": {
+        "aperture": 7.1,
+        "exposureBiasEv": 0,
+        "iso": 500,
+        "shutterSeconds": 0.0005
+      },
+      "featureFamily": "color_science",
+      "fileSha256": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+      "localRelativePath": "private-fixtures/color/selective-color-orange-v1/alaska-dsc7853.arw",
+      "notes": "Project-owned Alaska ARW reserved for selective orange color preview/export and sidecar reload proof. The RAW payload is local-only and not committed.",
+      "rights": {
+        "allowedUse": "local_validation_only",
+        "copyrightOwner": "RawEngine private fixture owner",
+        "evidence": "User explicitly provided /Users/cgas/Pictures/Capture One/Alaska as project-owned RAW validation input for this repo.",
+        "publicRepoAllowed": false,
+        "rightsStatus": "project_owned"
+      },
+      "status": "private_asset_available",
+      "trackingIssue": 1376
+    },
+    {
       "artifactClass": "layer_mask_composite",
       "camera": {
         "cameraMake": "Canon",

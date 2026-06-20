@@ -4,10 +4,16 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 import { z } from 'zod';
 
+import { rawOpenEditExportProofRequestSchema } from '../../../src/schemas/rawOpenEditExportCommandSchemas.ts';
+
 const RAW_PROOF_REPORT_PATH = 'docs/validation/selective-color-local-raw-proof-2026-06-20.json';
+const REQUEST_PATH = 'fixtures/validation/selective-color-raw-proof-request.json';
 const UI_PROOF_REPORT_PATH = 'docs/validation/selective-color-private-ui-proof-2026-06-20.json';
 const SCREENSHOT_PATH = 'artifacts/visual-smoke/color-workflow.png';
 const update = process.argv.includes('--update');
+const request = rawOpenEditExportProofRequestSchema.parse(JSON.parse(await readFile(REQUEST_PATH, 'utf8')));
+const workflowReportPath = `${request.artifactDirRelative}/selective-color-orange-v1-workflow-report.json`;
+const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const pngDimensionsSchema = z.object({ height: z.literal(960), width: z.literal(1440) }).strict();
@@ -28,15 +34,13 @@ const rawProofReportSchema = z
           })
           .strict(),
         status: z.literal('passed'),
-        workflowReportPath: z.literal(
-          'private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json',
-        ),
+        workflowReportPath: z.literal(workflowReportPath),
       })
       .passthrough(),
     sourceRaw: z
       .object({
-        fixtureStatus: z.literal('private_cc_raw_not_committed'),
-        localPath: z.literal('private-fixtures/detail/high-iso-skin-shadow-v1.arw'),
+        fixtureStatus: z.enum(['private_cc_raw_not_committed', 'private_project_owned_raw_not_committed']),
+        localPath: z.literal(request.sourceRelativePath),
         sha256: sha256Schema,
       })
       .strict(),
@@ -66,9 +70,7 @@ const uiProofReportSchema = z
         metrics: rawProofReportSchema.shape.localRawRuntime.shape.metrics,
         sourceRawSha256: sha256Schema,
         workflowArtifactCount: z.number().int().min(6),
-        workflowReportPath: z.literal(
-          'private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json',
-        ),
+        workflowReportPath: z.literal(workflowReportPath),
       })
       .strict(),
     schemaVersion: z.literal(1),
@@ -117,9 +119,13 @@ async function readPngDimensions(path: string) {
   });
 }
 
-runCommand(['bun', 'run', 'check:selective-color-local-raw-proof', '--', '--require-assets'], {
-  RAWENGINE_PRIVATE_RAW_ROOT: '/tmp/rawengine-private-root',
-});
+if (privateRoot === undefined) {
+  runCommand(['bun', 'run', 'check:selective-color-local-raw-proof']);
+} else {
+  runCommand(['bun', 'run', 'check:selective-color-local-raw-proof', '--', '--require-assets'], {
+    RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
+  });
+}
 runCommand(['bun', 'scripts/capture-visual-smoke.ts', '--scenario', 'color-workflow']);
 
 const rawProofReport = rawProofReportSchema.parse(JSON.parse(await readFile(RAW_PROOF_REPORT_PATH, 'utf8')));

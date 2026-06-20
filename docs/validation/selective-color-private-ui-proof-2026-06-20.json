@@ -11,12 +11,12 @@
   "rawRuntime": {
     "editCommandId": "command.raw-open-edit-export.selective-color-orange.v1",
     "metrics": {
-      "changedPixelRatio": 0.163750875,
+      "changedPixelRatio": 0.14221079166666667,
       "previewExportMeanAbsDelta": 0,
       "sidecarReloadRevisionMatch": 1,
       "sourceHashUnchanged": 1
     },
-    "sourceRawSha256": "sha256:5b1a62fb37669f3065479e2c7cf9af4ef031a920cf6feac82d1269e9fdf4a136",
+    "sourceRawSha256": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
     "workflowArtifactCount": 6,
     "workflowReportPath": "private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json"
   },
