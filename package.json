@@ -109,6 +109,7 @@
     "check:layer-mask-audit": "bun tests/integration/checks/check-layer-mask-model-audit.ts",
     "check:layer-adjustments": "bun tests/integration/checks/check-layer-adjustment-operations.ts",
     "check:layer-preview-export-parity": "bun tests/integration/checks/check-layer-preview-export-parity.ts",
+    "check:layer-mask-private-raw-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario layer-mask-private-raw-ui",
     "check:brush-mask": "bun tests/integration/checks/check-brush-mask-parameters.ts",
     "check:brush-mask-command": "bun tests/integration/checks/check-brush-mask-command.ts",
     "check:gradient-mask": "bun tests/integration/checks/check-gradient-mask-parameters.ts",

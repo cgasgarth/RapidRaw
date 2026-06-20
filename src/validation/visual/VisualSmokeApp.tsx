@@ -70,9 +70,22 @@ interface PanoramaPrivateRawVisualProof {
   sourceCount: string;
 }
 
+interface LayerMaskPrivateRawVisualProof {
+  exportArtifact: string;
+  fixtureId: string;
+  metricCount: string;
+  refinedPreviewArtifact: string;
+  refinedPreviewDataUrl: string;
+  unmaskedPreviewArtifact: string;
+  unmaskedPreviewDataUrl: string;
+  unrefinedPreviewArtifact: string;
+  unrefinedPreviewDataUrl: string;
+}
+
 declare global {
   interface Window {
     __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawVisualProof;
+    __RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__?: LayerMaskPrivateRawVisualProof;
     __RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__?: PanoramaPrivateRawVisualProof;
     __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawVisualProof;
   }
@@ -88,6 +101,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi]: FocusPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusUi]: FocusStackVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrUi]: HdrVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi]: LayerMaskPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.MaskOverlayRawProof]: MaskOverlayRawProofVisualSmoke,
@@ -483,6 +497,13 @@ const copy = {
   layerWorkflowDescription: 'Mask, blend, opacity, and order state captured in one smoke path.',
   layerVisibleCount: (count: number) => `${count} visible`,
   layerRuntimeEvidence: 'Runtime evidence',
+  layerMaskPrivateRawReview: 'Private RAW layer mask review',
+  layerMaskPrivateRawRuntime: 'Private RAW runtime',
+  layerMaskPrivateRawUnmasked: 'Unmasked RAW preview',
+  layerMaskPrivateRawUnrefined: 'Unrefined mask preview',
+  layerMaskPrivateRawRefined: 'Refined mask preview',
+  layerMaskPrivateRawExport: 'TIFF export handoff',
+  layerMaskPrivateRawMetricCount: (count: string) => `${count} metrics`,
   selectedLayer: 'Selected layer',
   maskBlendOpacity: 'Mask / blend / opacity',
   comparePreviewExport: 'Compare preview/export',
@@ -1181,6 +1202,106 @@ function FocusStackVisualSmoke() {
             <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="focus-artifact-handoff">
               <p className="text-xs text-[#aab2bd]">{copy.focusArtifactHandoff}</p>
               <p>{copy.focusArtifactPath}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function LayerMaskPrivateRawVisualSmoke() {
+  const proof = window.__RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__;
+
+  if (!proof) {
+    return (
+      <main
+        className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi}
+      >
+        <p>{copy.missingPrivateRawProofArtifacts}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi}
+    >
+      <div
+        className="grid h-screen grid-cols-[1fr_360px] bg-[#0f1114]"
+        data-visual-smoke-section="layer-mask-private-raw"
+      >
+        <section className="grid grid-rows-[44px_1fr] overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+            <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+              {copy.layerMaskPrivateRawReview}
+            </span>
+          </div>
+          <div className="grid min-h-0 grid-cols-3 gap-3 p-4">
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.layerMaskPrivateRawUnmasked}</figcaption>
+              <img
+                alt={copy.layerMaskPrivateRawUnmasked}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="layer-mask-private-raw-unmasked"
+                src={proof.unmaskedPreviewDataUrl}
+              />
+            </figure>
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.layerMaskPrivateRawUnrefined}</figcaption>
+              <img
+                alt={copy.layerMaskPrivateRawUnrefined}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="layer-mask-private-raw-unrefined"
+                src={proof.unrefinedPreviewDataUrl}
+              />
+            </figure>
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.layerMaskPrivateRawRefined}</figcaption>
+              <img
+                alt={copy.layerMaskPrivateRawRefined}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="layer-mask-private-raw-refined"
+                src={proof.refinedPreviewDataUrl}
+              />
+            </figure>
+          </div>
+        </section>
+        <aside className="border-l border-white/10 bg-[#171a1f] p-4 text-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{copy.layerRuntimeEvidence}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.layerMaskPrivateRawRuntime}</span>
+          </div>
+          <div
+            className="sr-only"
+            data-export-artifact={proof.exportArtifact}
+            data-fixture-id={proof.fixtureId}
+            data-metric-count={proof.metricCount}
+            data-refined-preview-artifact={proof.refinedPreviewArtifact}
+            data-runtime-status="private_raw_tauri_runtime_proof"
+            data-testid="layer-mask-private-raw-review-proof"
+            data-unmasked-preview-artifact={proof.unmaskedPreviewArtifact}
+            data-unrefined-preview-artifact={proof.unrefinedPreviewArtifact}
+          />
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.layerMaskPrivateRawRuntime}</p>
+              <p>{proof.fixtureId}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.layerRuntimeEvidence}</p>
+              <p>{copy.layerMaskPrivateRawMetricCount(proof.metricCount)}</p>
+            </div>
+            <div
+              className="rounded border border-white/10 bg-white/5 p-2"
+              data-testid="layer-mask-private-raw-artifact-handoff"
+            >
+              <p className="text-xs text-[#aab2bd]">{copy.layerMaskPrivateRawExport}</p>
+              <p className="break-all">{proof.exportArtifact}</p>
             </div>
           </div>
         </aside>

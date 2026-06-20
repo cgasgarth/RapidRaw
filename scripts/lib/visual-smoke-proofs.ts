@@ -311,6 +311,15 @@ export const layerStackWorkflowProofSchema = z.object({
 export const layerStackExportParityProofSchema = z.object({
   exportParity: z.literal('ready'),
 });
+export const layerMaskPrivateRawReviewProofSchema = z.object({
+  exportArtifact: z.string().endsWith('/high-iso-skin-shadow-mask-refined-export.tiff'),
+  fixtureId: z.literal('validation.layer-mask-real-raw.high-iso-skin-shadow.v1'),
+  metricCount: z.literal('5'),
+  refinedPreviewArtifact: z.string().endsWith('/high-iso-skin-shadow-mask-refined-preview.png'),
+  runtimeStatus: z.literal('private_raw_tauri_runtime_proof'),
+  unmaskedPreviewArtifact: z.string().endsWith('/high-iso-skin-shadow-mask-unmasked-preview.png'),
+  unrefinedPreviewArtifact: z.string().endsWith('/high-iso-skin-shadow-mask-unrefined-preview.png'),
+});
 export const maskOverlayRawProofSchema = z.object({
   edgeThreshold: z.literal('0.64'),
   hiddenToggled: z.literal('true'),
