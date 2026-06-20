@@ -89,6 +89,7 @@ export default function HdrModal({
       : settings.bracketValidation === 'warn'
         ? t('modals.hdr.bracketValidation.warn')
         : t('modals.hdr.bracketValidation.disabled');
+  const mergeReadinessLabel = isSourceCountValid ? t('modals.hdr.summaryReady') : t('modals.hdr.summaryBlocked');
 
   useEffect(() => {
     if (!isOpen) {
@@ -249,6 +250,61 @@ export default function HdrModal({
                 </UiText>
               </div>
             ))}
+          </section>
+          <section
+            className="mb-5 grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-secondary/70 p-2"
+            data-alignment-mode={settings.alignmentMode}
+            data-bracket-validation={settings.bracketValidation}
+            data-merge-ready={String(isSourceCountValid)}
+            data-source-count={imageCount ?? 0}
+            data-testid="hdr-readiness-summary"
+          >
+            <div
+              className="rounded border border-border-color bg-bg-primary px-2 py-1.5"
+              data-testid="hdr-readiness-sources"
+            >
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-tertiary">
+                {t('modals.hdr.summarySources')}
+              </UiText>
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                {t('modals.hdr.summarySourceCount', { count: imageCount ?? 0 })}
+              </UiText>
+            </div>
+            <div
+              className="rounded border border-border-color bg-bg-primary px-2 py-1.5"
+              data-testid="hdr-readiness-validation"
+            >
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-tertiary">
+                {t('modals.hdr.bracketValidationLabel')}
+              </UiText>
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                {bracketValidationLabel}
+              </UiText>
+            </div>
+            <div
+              className="rounded border border-border-color bg-bg-primary px-2 py-1.5"
+              data-testid="hdr-readiness-alignment"
+            >
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-tertiary">
+                {t('modals.hdr.summaryAlignment')}
+              </UiText>
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                {selectedAlignmentLabel}
+              </UiText>
+            </div>
+            <div
+              className={`rounded border px-2 py-1.5 ${
+                isSourceCountValid ? 'border-accent/50 bg-accent/10' : 'border-red-500/40 bg-red-500/10'
+              }`}
+              data-testid="hdr-readiness-merge"
+            >
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-tertiary">
+                {t('modals.hdr.summaryStrategy')}
+              </UiText>
+              <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+                {mergeReadinessLabel}
+              </UiText>
+            </div>
           </section>
 
           {!isSourceCountValid && (
