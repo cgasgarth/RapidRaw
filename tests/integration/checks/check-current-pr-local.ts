@@ -16,6 +16,7 @@ interface CommandResult {
   code: number;
   stderr: string;
   stdout: string;
+  timedOut: boolean;
 }
 
 interface CommandSpec {
@@ -23,22 +24,48 @@ interface CommandSpec {
   label: string;
 }
 
+const DEFAULT_TIMEOUT_MS = readPositiveInt('RAWENGINE_CURRENT_PR_LOCAL_TIMEOUT_MS', 10 * 60 * 1000);
+const LONG_TIMEOUT_MS = readPositiveInt('RAWENGINE_CURRENT_PR_LOCAL_LONG_TIMEOUT_MS', 20 * 60 * 1000);
+
 function run(command: Array<string>, label: string, quietSuccess = false): CommandResult {
+  const timeout = timeoutFor(label, command);
   const result = Bun.spawnSync(command, {
     stderr: 'pipe',
     stdout: 'pipe',
+    timeout,
   });
   const stdout = textDecoder.decode(result.stdout).trim();
   const stderr = textDecoder.decode(result.stderr).trim();
-  if (result.exitCode === 0) {
+  const timedOut = result.exitCode === null && result.signalCode === 'SIGTERM';
+  const code = result.exitCode ?? 124;
+  if (code === 0) {
     if (!quietSuccess) console.log(`${label} ok`);
   } else {
-    console.error(`${label} failed`);
+    console.error(timedOut ? `${label} timed out after ${timeout}ms` : `${label} failed`);
     console.error(`$ ${command.join(' ')}`);
     const output = [stdout, stderr].filter(Boolean).join('\n').split('\n').slice(-20).join('\n');
     if (output) console.error(output);
   }
-  return { code: result.exitCode, stderr, stdout };
+  return { code, stderr, stdout, timedOut };
+}
+
+function timeoutFor(label: string, command: ReadonlyArray<string>): number {
+  if (
+    label.includes('rust') ||
+    label.includes('bundle') ||
+    label.includes('visual smoke') ||
+    command.some((part) => part === 'cargo' || part.includes('cargo'))
+  ) {
+    return LONG_TIMEOUT_MS;
+  }
+  return DEFAULT_TIMEOUT_MS;
+}
+
+function readPositiveInt(name: string, fallback: number): number {
+  const value = process.env[name];
+  if (value === undefined) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function gitLines(args: Array<string>): Array<string> {
