@@ -11,12 +11,16 @@ import {
 } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
   editGraphSnapshotV1Schema,
+  rawEngineColorPipelineContextV1Schema,
   RAW_ENGINE_SCHEMA_VERSION,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
-import { sampleEditGraphSnapshotV1 } from '../../../packages/rawengine-schema/src/samplePayloads.ts';
+import {
+  sampleEditGraphSnapshotV1,
+  sampleRawEngineSceneColorPipelineV1,
+} from '../../../packages/rawengine-schema/src/samplePayloads.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
@@ -61,6 +65,14 @@ const reportSchema = z
     sidecarGraphRevision: z.string().min(1),
     sidecarSerializedHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     sourceHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    renderContext: z
+      .object({
+        canonicalSchema: z.literal('rawEngineColorPipelineContextV1Schema'),
+        inputDomain: z.string().min(1),
+        operationDomain: z.string().min(1),
+        workingSpace: z.string().min(1),
+      })
+      .strict(),
     targetedRuntime: z.object({
       influence: z.number().min(0).max(1),
       inputRgb: rgbPixelSchema,
@@ -78,6 +90,7 @@ const adjustment = {
 };
 
 const commandContext = buildSelectiveColorImageCommandContext({
+  colorPipeline: sampleRawEngineSceneColorPipelineV1,
   expectedGraphRevision: sampleEditGraphSnapshotV1.graphRevision,
   imagePath: '/validation/selective-color-orange.CR3',
   operationId: 'orange_001',
@@ -97,6 +110,7 @@ const dryRunCommand = buildSelectiveColorCommandEnvelope(
 
 toneColorCommandEnvelopeV1Schema.parse(dryRunCommand);
 selectiveColorCommandEnvelopeSchema.parse(dryRunCommand);
+rawEngineColorPipelineContextV1Schema.parse(dryRunCommand.colorPipeline);
 
 const applyCommand = buildSelectiveColorCommandEnvelope(
   { adjustment, rangeKey: 'oranges' },
@@ -134,6 +148,7 @@ if (
 ) {
   throw new Error('Selective color command context did not match the render request context.');
 }
+toneColorCommandEnvelopeV1Schema.parse(runtimeContextCommand);
 
 const malformedEnvelope = selectiveColorCommandEnvelopeSchema.safeParse({
   ...dryRunCommand,
@@ -262,6 +277,12 @@ const report = reportSchema.parse({
   sidecarGraphRevision: sidecarGraph.graphRevision,
   sidecarSerializedHash: hashJson(sidecarPayload),
   sourceHash: hashJson(sourcePixels),
+  renderContext: {
+    canonicalSchema: 'rawEngineColorPipelineContextV1Schema',
+    inputDomain: dryRunCommand.colorPipeline.inputDomain,
+    operationDomain: dryRunCommand.colorPipeline.operationDomain,
+    workingSpace: dryRunCommand.colorPipeline.workingSpace,
+  },
   targetedRuntime: {
     influence: roundMetric(targetedRuntime.influence),
     inputRgb: sourcePixels[1],
