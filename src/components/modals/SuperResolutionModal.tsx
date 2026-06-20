@@ -244,6 +244,10 @@ export default function SuperResolutionModal({
             value={t('modals.superResolution.outputPixelMultiplier', { multiplier: outputPixelMultiplier })}
           />
           <ComputationalSetupStatusLine
+            label={t('modals.superResolution.qualityLabel')}
+            value={qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? ''}
+          />
+          <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.alignment')}
             value={t(`modals.superResolution.alignment.${settings.alignmentMode}`)}
           />
