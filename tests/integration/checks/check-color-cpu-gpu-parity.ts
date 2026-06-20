@@ -19,11 +19,12 @@ const REPORT_PATH = 'docs/validation/color-cpu-gpu-parity-2026-06-18.json';
 const SHADER_PATH = 'src-tauri/src/shaders/shader.wgsl';
 const UPDATE = process.argv.includes('--update');
 const GPU_PATH_STATUS = 'explicitly_unavailable_in_headless_ci';
-const GPU_READBACK_PROBE_STATUS = 'validation_harness_command_available_not_ci_executed';
+const GPU_READBACK_PROBE_STATUS = 'validation_harness_runtime_smoke_committed';
 const CPU_PREVIEW_EXPORT_STATUS = 'synthetic_cpu_preview_export_match';
 const GPU_UNAVAILABLE_REASON =
   'CI cannot create a deterministic WGPU readback surface for this gate; shader hashes bind the cases to the GPU path until a render-readback harness lands.';
 const GPU_READBACK_PROBE_HASH = 'sha256:be2ed0f28ed5d492dfd4f03c6f6f0ca559819d57f38a474448e57d8da41dc572';
+const GPU_READBACK_RUNTIME_PROOF_PATH = 'docs/validation/color-gpu-readback-runtime-smoke-2026-06-20.json';
 
 const colorArtifactSchema = z
   .object({
@@ -76,6 +77,7 @@ const parityReportSchema = z
         maxByteDelta: z.literal(0),
         pixelCount: z.literal(4),
         readbackBytes: z.literal(16),
+        runtimeProofPath: z.literal(GPU_READBACK_RUNTIME_PROOF_PATH),
         status: z.literal(GPU_READBACK_PROBE_STATUS),
         textureFormat: z.literal('rgba8unorm'),
         validationMode: z.literal('wgpu_copy_texture_to_buffer_readback_probe'),
@@ -88,6 +90,19 @@ const parityReportSchema = z
     validationMode: z.literal('cpu_preview_export_parity_with_wgsl_hash_and_explicit_gpu_unavailable_state'),
   })
   .strict();
+const gpuReadbackRuntimeProofSchema = z
+  .object({
+    byteHash: z.literal(GPU_READBACK_PROBE_HASH),
+    issue: z.literal(2326),
+    maxByteDelta: z.literal(0),
+    pixelCount: z.literal(4),
+    proofStatus: z.literal('runtime_apply_capable'),
+    readbackBytes: z.literal(16),
+    runtimeStatus: z.literal('validation_harness_gpu_texture_readback_probe'),
+    textureFormat: z.literal('rgba8unorm'),
+    validationMode: z.literal('wgpu_copy_texture_to_buffer_readback_probe'),
+  })
+  .passthrough();
 
 const extractFunction = (source: string, functionName: string): string => {
   const start = source.indexOf(`fn ${functionName}(`);
@@ -144,6 +159,7 @@ function buildReport(manifest: ColorParityManifest) {
       'full_preview_pipeline_parity',
       'full_export_pipeline_parity',
       'raw_file_color_management_parity',
+      'full_gpu_shader_preview_export_parity',
     ],
     fixturePath: FIXTURE_PATH,
     generatedFromSnapshotDate: manifest.snapshotDate,
@@ -157,6 +173,7 @@ function buildReport(manifest: ColorParityManifest) {
       maxByteDelta: 0,
       pixelCount: 4,
       readbackBytes: 16,
+      runtimeProofPath: GPU_READBACK_RUNTIME_PROOF_PATH,
       status: GPU_READBACK_PROBE_STATUS,
       textureFormat: 'rgba8unorm',
       validationMode: 'wgpu_copy_texture_to_buffer_readback_probe',
@@ -201,6 +218,9 @@ function runCpuExportPath(testCase: ColorParityManifest['cases'][number]) {
 const fixturePath = resolve(FIXTURE_PATH);
 const shaderSource = await readFile(SHADER_PATH, 'utf8');
 const manifest = parseColorParityManifest(JSON.parse(await readFile(fixturePath, 'utf8')));
+const gpuReadbackRuntimeProof = gpuReadbackRuntimeProofSchema.parse(
+  JSON.parse(await readFile(GPU_READBACK_RUNTIME_PROOF_PATH, 'utf8')),
+);
 
 let nextManifest = manifest;
 if (UPDATE) {
@@ -222,6 +242,9 @@ for (const entry of nextManifest.shaderFunctions) {
   if (actualHash !== entry.sha256) {
     failures.push(`${entry.name}: expected ${entry.sha256}, got ${actualHash}`);
   }
+}
+if (gpuReadbackRuntimeProof.byteHash !== GPU_READBACK_PROBE_HASH) {
+  failures.push(`${GPU_READBACK_RUNTIME_PROOF_PATH}: byte hash must match the parity report probe hash.`);
 }
 
 for (const testCase of nextManifest.cases) {
