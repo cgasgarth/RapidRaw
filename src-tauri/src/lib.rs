@@ -9,6 +9,7 @@ mod adjustment_utils;
 mod ai_commands;
 mod ai_connector;
 mod ai_processing;
+mod album_management;
 mod android_integration;
 mod app_settings;
 mod app_state;
@@ -2622,9 +2623,9 @@ pub fn run() {
             file_management::set_rating_for_paths,
             file_management::import_files,
             file_management::create_virtual_copy,
-            file_management::get_albums,
-            file_management::save_albums,
-            file_management::add_to_album,
+            album_management::get_albums,
+            album_management::save_albums,
+            album_management::add_to_album,
             file_management::get_album_images,
             tagging::start_background_indexing,
             tagging::clear_ai_tags,
