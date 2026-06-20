@@ -36,6 +36,8 @@ const QUICK_ROUTED = [
   'check:film-fixtures',
   'check:film-look-preview-export-parity',
   'check:film-look-measured-fixtures',
+  'check:film-grain-provenance',
+  'check:film-grain-runtime-proof',
   'check:export-recipes',
   'check:export-recipes-ui',
   'check:import-presets',
