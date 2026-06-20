@@ -33,6 +33,8 @@ import {
   setLayerName,
   setLayerOpacity,
   setLayerVisibility,
+  soloLayer,
+  soloLayerGroup,
   ungroupLayerGroup,
 } from '../../../utils/layerStack';
 import Slider, { type SliderChangeEvent } from '../../ui/Slider';
@@ -258,6 +260,14 @@ export default function LayerStackPanel({
   const ungroupActiveLayer = () => {
     if (!activeGroupId) return;
     applyLayerStack(ungroupLayerGroup(masks, activeGroupId), BASE_LAYER_ID);
+  };
+  const soloActiveLayer = () => {
+    if (!activeRow || activeRow.isBase) return;
+    if (activeRow.isGroupHeader && activeRow.groupId) {
+      applyLayerStack(soloLayerGroup(masks, activeRow.groupId), activeRow.id);
+      return;
+    }
+    applyLayerStack(soloLayer(masks, activeRow.id), activeRow.id);
   };
   const duplicateActiveLayer = () => {
     if (!activeRow || activeRow.isBase) return;
@@ -517,6 +527,15 @@ export default function LayerStackPanel({
               type="button"
             >
               <ArrowDown size={16} className="mx-auto" />
+            </button>
+            <button
+              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+              data-tooltip={t('editor.layers.actions.solo')}
+              disabled={isBaseSelected}
+              onClick={soloActiveLayer}
+              type="button"
+            >
+              <Eye size={16} className="mx-auto" />
             </button>
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
