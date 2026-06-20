@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import {
   colorParityCaseSchema,
+  colorParityShaderFunctionSchema,
   evaluateColorParityCase,
   parseColorParityManifest,
   type ColorParityManifest,
@@ -25,6 +26,17 @@ const GPU_UNAVAILABLE_REASON =
   'CI cannot create a deterministic WGPU readback surface for this gate; shader hashes bind the cases to the GPU path until a render-readback harness lands.';
 const GPU_READBACK_PROBE_HASH = 'sha256:be2ed0f28ed5d492dfd4f03c6f6f0ca559819d57f38a474448e57d8da41dc572';
 const GPU_READBACK_RUNTIME_PROOF_PATH = 'docs/validation/color-gpu-readback-runtime-smoke-2026-06-20.json';
+const OPERATION_SHADER_FUNCTIONS = {
+  channel_mixer: 'apply_channel_mixer',
+  color_balance_rgb: 'apply_color_balance_rgb',
+  legacy_tonemap: 'legacy_tonemap',
+  linear_exposure: 'apply_linear_exposure',
+  luma_levels: 'apply_luma_levels',
+  white_balance: 'apply_white_balance',
+} satisfies Record<
+  ColorParityManifest['cases'][number]['operation'],
+  ColorParityManifest['shaderFunctions'][number]['name']
+>;
 
 const colorArtifactSchema = z
   .object({
@@ -50,6 +62,14 @@ const parityReportCaseSchema = z
     operation: z.string(),
     previewExportDiff: artifactDiffSchema,
     previewFixtureDiff: artifactDiffSchema,
+  })
+  .strict();
+const shaderCoverageSchema = z
+  .object({
+    caseCount: z.number().int().positive(),
+    operation: colorParityCaseSchema.shape.operation,
+    shaderFunction: colorParityShaderFunctionSchema.shape.name,
+    shaderHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
   })
   .strict();
 const parityReportSchema = z
@@ -85,6 +105,7 @@ const parityReportSchema = z
       .strict(),
     issue: z.literal(2326),
     schemaVersion: z.literal(2),
+    shaderCoverage: z.array(shaderCoverageSchema).length(6),
     shaderPath: z.literal(SHADER_PATH),
     shaderFunctions: z.array(z.object({ name: z.string(), sha256: z.string() }).strict()).min(1),
     validationMode: z.literal('cpu_preview_export_parity_with_wgsl_hash_and_explicit_gpu_unavailable_state'),
@@ -147,6 +168,15 @@ function buildReport(manifest: ColorParityManifest) {
     };
   });
   const maxPreviewExportDelta = Math.max(...cases.map((testCase) => testCase.previewExportDiff.maxDelta));
+  const shaderHashByName = new Map(manifest.shaderFunctions.map((entry) => [entry.name, entry.sha256] as const));
+  const shaderCoverage = Object.entries(OPERATION_SHADER_FUNCTIONS).map(([operation, shaderFunction]) =>
+    shaderCoverageSchema.parse({
+      caseCount: cases.filter((testCase) => testCase.operation === operation).length,
+      operation,
+      shaderFunction,
+      shaderHash: shaderHashByName.get(shaderFunction),
+    }),
+  );
 
   return parityReportSchema.parse({
     cases,
@@ -180,6 +210,7 @@ function buildReport(manifest: ColorParityManifest) {
     },
     issue: 2326,
     schemaVersion: 2,
+    shaderCoverage,
     shaderPath: SHADER_PATH,
     shaderFunctions: manifest.shaderFunctions,
     validationMode: 'cpu_preview_export_parity_with_wgsl_hash_and_explicit_gpu_unavailable_state',
