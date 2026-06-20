@@ -207,6 +207,8 @@
     "check:raw-open-edit-export-run-reports": "bun tests/integration/checks/check-raw-open-edit-export-run-reports.ts",
     "check:raw-open-edit-export-runtime-status": "bun tests/integration/checks/check-raw-open-edit-export-runtime-status.ts",
     "check:raw-open-edit-export-runtime-status:update": "bun tests/integration/checks/check-raw-open-edit-export-runtime-status.ts --update",
+    "check:local-raw-ui-validation-harness": "bun tests/integration/checks/check-local-raw-ui-validation-harness.ts",
+    "check:local-raw-ui-validation-harness:update": "bun tests/integration/checks/check-local-raw-ui-validation-harness.ts --update",
     "check:computational-merge-e2e-proof-manifest": "bun tests/integration/checks/check-computational-merge-e2e-proof-manifest.ts",
     "check:computational-merge-private-report-collector": "bun scripts/collect-computational-merge-private-run-reports.ts --self-test",
     "collect:computational-merge-private-run-reports": "bun scripts/collect-computational-merge-private-run-reports.ts",
