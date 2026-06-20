@@ -1438,10 +1438,18 @@ mod tests {
         fs::create_dir_all(output_dir).expect("create Negative Lab public export proof dir");
 
         let input = image::open(source_path).expect("open public negative fixture");
+        let applied_profile_id = "negative_lab.generic.c41.portrait.v1";
+        let applied_profile_display_name = "C-41 Portrait";
+        let applied_profile_claim_policy = "generic_starting_point_no_stock_claim";
+        let applied_profile_does_not_prove = [
+            "no_named_stock_emulation_claim",
+            "no_colorimetric_match_claim",
+            "not_measured_from_manufacturer_profile",
+        ];
         let params = NegativeConversionParams {
-            red_weight: 1.08,
-            green_weight: 0.97,
-            blue_weight: 1.16,
+            red_weight: 1.03,
+            green_weight: 1.0,
+            blue_weight: 0.98,
             base_fog_strength: 1.0,
             base_fog_sample: Some(NegativeBaseFogSampleRect {
                 x: 0.0,
@@ -1449,8 +1457,8 @@ mod tests {
                 width: 0.35,
                 height: 0.35,
             }),
-            exposure: 0.08,
-            contrast: 1.12,
+            exposure: 0.05,
+            contrast: 0.95,
         };
         let bounds_ref = downscale_f32_image(&input, 1080, 1080);
         let ref_rgb = bounds_ref.to_rgb32f();
@@ -1479,7 +1487,7 @@ mod tests {
             accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
             output_format: NegativeConversionOutputFormat::JpegProof,
-            profile_provenance_hash: Some("fnv1a32:2f4a91bc".to_string()),
+            profile_provenance_hash: Some("fnv1a32:9d4a13c8".to_string()),
             suffix: "Positive".to_string(),
         };
         write_negative_lab_output_sidecar(
@@ -1520,6 +1528,31 @@ mod tests {
         );
         let report = json!({
             "algorithm": "density_rgb_v1",
+            "appliedProfile": {
+                "claimLevel": "generic_starting_point_only",
+                "claimPolicy": applied_profile_claim_policy,
+                "displayName": applied_profile_display_name,
+                "doesNotProve": applied_profile_does_not_prove,
+                "params": {
+                    "base_fog_sample": {
+                        "height": 0.35,
+                        "width": 0.35,
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "base_fog_strength": params.base_fog_strength,
+                    "blue_weight": params.blue_weight,
+                    "contrast": params.contrast,
+                    "exposure": params.exposure,
+                    "green_weight": params.green_weight,
+                    "red_weight": params.red_weight
+                },
+                "presetId": applied_profile_id,
+                "processFamily": "c41_color_negative",
+                "profileProvenanceHash": "fnv1a32:9d4a13c8",
+                "runtimeStatus": "runtime_parameter_applied",
+                "stockFamilyDescriptor": "Soft portrait color negative"
+            },
             "doesNotProve": [
                 "camera_raw_decode_path",
                 "capture_one_class_quality",

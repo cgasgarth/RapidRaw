@@ -375,6 +375,10 @@ export const negativeLabPublicExportReviewProofSchema = z.object({
   fixtureId: z.literal('negative_lab.real.public.cc0_110_ericht_negative_001'),
   outputFormat: z.literal('jpeg_proof'),
   outputPath: z.string().endsWith('/110-format-ericht-negative-cc0-320-Positive.jpg'),
+  profileClaimPolicy: z.literal('generic_starting_point_no_stock_claim'),
+  profileDisplayName: z.literal('C-41 Portrait'),
+  profilePresetId: z.literal('negative_lab.generic.c41.portrait.v1'),
+  profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
   runtimeStatus: z.literal('public_negative_scan_positive_export_rendered'),
   sourcePath: z.literal('fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg'),
 });

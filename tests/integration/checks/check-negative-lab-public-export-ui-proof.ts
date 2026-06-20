@@ -10,10 +10,23 @@ const SCREENSHOT_PATH = 'artifacts/visual-smoke/negative-lab-public-export-revie
 const update = process.argv.includes('--update');
 
 const fnvHashSchema = z.string().regex(/^fnv1a64:[a-f0-9]{16}$/u);
+const fnv32HashSchema = z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u);
 const pngDimensionsSchema = z.object({ height: z.literal(960), width: z.literal(1440) }).strict();
+const appliedProfileSchema = z
+  .object({
+    claimPolicy: z.literal('generic_starting_point_no_stock_claim'),
+    displayName: z.literal('C-41 Portrait'),
+    presetId: z.literal('negative_lab.generic.c41.portrait.v1'),
+    processFamily: z.literal('c41_color_negative'),
+    profileProvenanceHash: fnv32HashSchema,
+    runtimeStatus: z.literal('runtime_parameter_applied'),
+    stockFamilyDescriptor: z.literal('Soft portrait color negative'),
+  })
+  .strict();
 
 const exportReportSchema = z
   .object({
+    appliedProfile: appliedProfileSchema.passthrough(),
     doesNotProve: z.array(z.string().min(1)).min(1),
     fixtureId: z.literal('negative_lab.real.public.cc0_110_ericht_negative_001'),
     inputToOutputMeanAbsDelta: z.number().gt(0.01),
@@ -55,6 +68,7 @@ const uiProofReportSchema = z
     doesNotProve: z.array(z.string().min(1)).min(1),
     exportProof: z
       .object({
+        appliedProfile: appliedProfileSchema,
         changedPixelRatio: z.number().gt(0.05),
         contentHash: fnvHashSchema,
         inputToOutputMeanAbsDelta: z.number().gt(0.01),
@@ -130,6 +144,15 @@ const expectedReport = uiProofReportSchema.parse({
     'stock_library_maturity',
   ],
   exportProof: {
+    appliedProfile: {
+      claimPolicy: exportReport.appliedProfile.claimPolicy,
+      displayName: exportReport.appliedProfile.displayName,
+      presetId: exportReport.appliedProfile.presetId,
+      processFamily: exportReport.appliedProfile.processFamily,
+      profileProvenanceHash: exportReport.appliedProfile.profileProvenanceHash,
+      runtimeStatus: exportReport.appliedProfile.runtimeStatus,
+      stockFamilyDescriptor: exportReport.appliedProfile.stockFamilyDescriptor,
+    },
     changedPixelRatio: exportReport.metrics.changedPixelRatio,
     contentHash: exportReport.output.contentHash,
     inputToOutputMeanAbsDelta: exportReport.metrics.inputToOutputMeanAbsDelta,

@@ -9,9 +9,18 @@
     "stock_library_maturity"
   ],
   "exportProof": {
+    "appliedProfile": {
+      "claimPolicy": "generic_starting_point_no_stock_claim",
+      "displayName": "C-41 Portrait",
+      "presetId": "negative_lab.generic.c41.portrait.v1",
+      "processFamily": "c41_color_negative",
+      "profileProvenanceHash": "fnv1a32:9d4a13c8",
+      "runtimeStatus": "runtime_parameter_applied",
+      "stockFamilyDescriptor": "Soft portrait color negative"
+    },
     "changedPixelRatio": 1,
-    "contentHash": "fnv1a64:83c7a7b0d5fe8819",
-    "inputToOutputMeanAbsDelta": 0.5021131038665771,
+    "contentHash": "fnv1a64:20cf2ca592bd20fc",
+    "inputToOutputMeanAbsDelta": 0.4844345450401306,
     "outputFormat": "jpeg_proof",
     "outputPath": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg",
     "sidecarPath": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.rrdata"

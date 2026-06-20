@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+import { z } from 'zod';
 import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
 import { sampleToneColorCommandEnvelopeV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
 import { toneColorCommandEnvelopeV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
@@ -152,6 +153,10 @@ interface LayerMaskPrivateRawBrowserProof {
 }
 
 interface NegativeLabPublicExportBrowserProof {
+  appliedProfileClaimPolicy: string;
+  appliedProfileDisplayName: string;
+  appliedProfilePresetId: string;
+  appliedProfileProvenanceHash: string;
   changedPixelRatio: string;
   fixtureId: string;
   outputDataUrl: string;
@@ -161,6 +166,19 @@ interface NegativeLabPublicExportBrowserProof {
   sourceDataUrl: string;
   sourcePath: string;
 }
+
+const negativeLabPublicExportReportSchema = z
+  .object({
+    appliedProfile: z
+      .object({
+        claimPolicy: z.literal('generic_starting_point_no_stock_claim'),
+        displayName: z.literal('C-41 Portrait'),
+        presetId: z.literal('negative_lab.generic.c41.portrait.v1'),
+        profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      })
+      .passthrough(),
+  })
+  .passthrough();
 
 declare global {
   interface Window {
@@ -379,7 +397,14 @@ async function loadNegativeLabPublicExportProof(): Promise<NegativeLabPublicExpo
   const sourcePath = 'fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg';
   const outputPath =
     'src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg';
+  const report = negativeLabPublicExportReportSchema.parse(
+    JSON.parse(await readFile('docs/validation/negative-lab-public-export-proof-2026-06-20.json', 'utf8')),
+  );
   return {
+    appliedProfileClaimPolicy: report.appliedProfile.claimPolicy,
+    appliedProfileDisplayName: report.appliedProfile.displayName,
+    appliedProfilePresetId: report.appliedProfile.presetId,
+    appliedProfileProvenanceHash: report.appliedProfile.profileProvenanceHash,
     changedPixelRatio: '1',
     fixtureId: 'negative_lab.real.public.cc0_110_ericht_negative_001',
     outputDataUrl: await readJpegDataUrl(outputPath),
