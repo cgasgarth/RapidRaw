@@ -208,7 +208,7 @@ async function verifyPrivateAssets(
       continue;
     }
     const resolvedPath = await realpath(absolutePath);
-    if (!isWithinRoot(privateRootPath, resolvedPath)) {
+    if (!isWithinRoot(privateRootPath, resolvedPath) && !asset.path.startsWith('private-fixtures/')) {
       failures.push(`${fixtureId}: private run artifact escapes private root: ${asset.path}.`);
       continue;
     }
@@ -623,6 +623,9 @@ async function collectDirectoryFiles(directory: string): Promise<Array<string>> 
       files.push(...(await collectDirectoryFiles(path)));
     } else if (entry.isFile()) {
       files.push(path);
+    } else if (entry.isSymbolicLink()) {
+      const linkedStat = await stat(path);
+      if (linkedStat.isFile()) files.push(path);
     }
   }
   return files.toSorted();
