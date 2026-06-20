@@ -1,0 +1,14 @@
+{
+  "confidenceMapHash": "sha256:72b367cae746b80f77e8f8cfa72069f0d38a23843472bb2f938351e2091695b7",
+  "doesNotProve": ["real_raw_e2e", "ui_overlay", "final_blend_quality"],
+  "generatedAt": "2026-06-20T00:00:00.000Z",
+  "issue": 2351,
+  "runtimeDryRunExposesConfidenceMap": true,
+  "schemaVersion": 1,
+  "summary": {
+    "averageConfidence": 0.079486,
+    "maxConfidence": 1,
+    "motionCoverageRatio": 0.063672
+  },
+  "validationMode": "synthetic_hdr_deghost_confidence_map"
+}

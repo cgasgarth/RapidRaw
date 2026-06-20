@@ -3,7 +3,6 @@ export * from './focusStackPreflight.js';
 export * from './computationalMergeWarningCodes.js';
 export * from './computationalMergeRuntimeResultBuilders.js';
 export * from './focusStackAppServerRuntime.js';
-export * from './focusStackAlignmentRuntime.js';
 export * from './focusStackRuntimePlan.js';
 export * from './focusStackSourceValidation.js';
 export * from './focusStackWeightedBlend.js';

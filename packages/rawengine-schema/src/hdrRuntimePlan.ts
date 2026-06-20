@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { estimateHdrAlignmentTransformsV1 } from './hdrAlignmentRuntime.js';
 import { detectHdrBracketV1, type HdrBracketDetectionSourceInputV1 } from './hdrBracketDetection.js';
-import { countHdrMotionPixelsV1, detectHdrMotionMaskV1 } from './hdrDeghostRuntime.js';
+import { buildHdrDeghostConfidenceMapV1, countHdrMotionPixelsV1, detectHdrMotionMaskV1 } from './hdrDeghostRuntime.js';
 import { mergeExposureWeightedRadianceV1 } from './hdrMergeWeightingRuntime.js';
 import {
   RAW_ENGINE_SCHEMA_VERSION,
@@ -114,12 +114,14 @@ type ParsedHdrRuntimePlanRequestV1 = Omit<HdrRuntimePlanRequestV1, 'command'> & 
 export interface HdrRuntimeDryRunResultV1 {
   dryRunResult: ComputationalMergeDryRunResultV1;
   mergedPixels: Float64Array;
+  motionConfidenceMap: Float64Array;
   motionMask: Uint8Array;
   provenance: HdrRuntimeProvenanceV1;
 }
 
 export interface HdrRuntimeApplyResultV1 {
   mergedPixels: Float64Array;
+  motionConfidenceMap: Float64Array;
   mutationResult: ComputationalMergeMutationResultV1;
   provenance: HdrRuntimeProvenanceV1;
 }
@@ -181,6 +183,7 @@ export const buildHdrRuntimeDryRunV1 = (requestValue: unknown): HdrRuntimeDryRun
   return {
     dryRunResult,
     mergedPixels: runtime.mergedPixels,
+    motionConfidenceMap: runtime.motionConfidenceMap,
     motionMask: runtime.motionMask,
     provenance: runtime.provenance,
   };
@@ -228,6 +231,7 @@ export const applyHdrRuntimePlanV1 = (requestValue: unknown): HdrRuntimeApplyRes
 
   return {
     mergedPixels: runtime.mergedPixels,
+    motionConfidenceMap: runtime.motionConfidenceMap,
     mutationResult,
     provenance: hdrRuntimeProvenanceV1Schema.parse({
       ...runtime.provenance,
@@ -305,7 +309,7 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
     sensorWhiteRadiance: request.sensorWhiteRadiance,
     width: request.frames[0]?.width,
   });
-  const motionMask = detectHdrMotionMaskV1({
+  const deghostRequest = {
     frames: alignedFrames.map((frame) => ({
       height: frame.height,
       pixels: normalizeFrameForAlignment(frame),
@@ -314,7 +318,9 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
     })),
     motionThreshold: request.command.parameters.deghosting === 'off' ? 1_000_000_000 : request.motionThreshold,
     referenceSourceIndex,
-  });
+  };
+  const motionMask = detectHdrMotionMaskV1(deghostRequest);
+  const motionConfidenceMap = buildHdrDeghostConfidenceMapV1(deghostRequest);
   const motionCoverageRatio = countHdrMotionPixelsV1(motionMask) / motionMask.length;
   applyReferencePixelsInMotionRegions(mergedPixels, alignedFrames, motionMask, referenceSourceIndex);
   const warnings = deriveRuntimeWarnings(
@@ -331,6 +337,7 @@ const renderHdrRuntimePixels = (request: ParsedHdrRuntimePlanRequestV1) => {
   return {
     height: firstFrame.height,
     mergedPixels,
+    motionConfidenceMap,
     motionMask,
     provenance: hdrRuntimeProvenanceV1Schema.parse({
       alignmentConfidence: alignment.alignmentConfidence,
