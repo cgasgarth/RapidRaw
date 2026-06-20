@@ -8,7 +8,10 @@ for (const marker of [
   'FILM_LOOK_STRENGTH_PRESETS = [25, 50, 75, 100]',
   'film-look-strength-presets',
   'film-look-strength-preset-${presetStrength}',
+  'film-look-strength-reset-default',
+  'resetSelectedLookStrength',
   'strengthPreset',
+  'strengthResetDefault',
   'handleStrengthChange(presetStrength)',
 ]) {
   if (!source.includes(marker)) {
