@@ -5,6 +5,26 @@ import {
 } from '../src/editGraphMigrations.js';
 import { RAW_ENGINE_SCHEMA_VERSION } from '../src/rawEngineSchemas.js';
 import { sampleCommandEnvelopeV1 } from '../src/samplePayloads.js';
+import { readFile } from 'node:fs/promises';
+import { z } from 'zod';
+
+const policySchema = z
+  .object({
+    $schema: z.string().url(),
+    compatibilityNotes: z.array(z.string().trim().min(1)).min(1),
+    documentKind: z.literal(EDIT_GRAPH_DOCUMENT_KIND),
+    fromSchemaVersion: z.literal(LEGACY_EDIT_GRAPH_SCHEMA_VERSION),
+    issue: z.literal(2323),
+    requiredMigrationIds: z.array(z.literal('edit-graph-document-v0-to-v1')).min(1),
+    schemaVersion: z.literal(1),
+    toSchemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
+    validationMode: z.literal('edit_graph_schema_migration_policy'),
+  })
+  .strict();
+
+const policy = policySchema.parse(
+  JSON.parse(await readFile('fixtures/validation/edit-graph-migration-policy.json', 'utf8')),
+);
 
 const legacyDocument = {
   documentId: 'edit_graph_legacy_001',
@@ -26,6 +46,9 @@ if (migrated.document.operations[0]?.schemaVersion !== RAW_ENGINE_SCHEMA_VERSION
 }
 if (migrated.migrationIds.join(',') !== 'edit-graph-document-v0-to-v1') {
   throw new Error('Expected deterministic edit graph migration id.');
+}
+if (migrated.migrationIds.join(',') !== policy.requiredMigrationIds.join(',')) {
+  throw new Error('Edit graph migration ids must match the migration policy fixture.');
 }
 
 const current = migrateEditGraphDocumentV1(migrated.document);
