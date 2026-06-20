@@ -1,0 +1,20 @@
+{
+  "doesNotProve": ["filesystem_sidecar_write", "ui_reload_badge", "real_raw_e2e"],
+  "issue": 2359,
+  "outputArtifactHash": "sha256:eaa523c7",
+  "provenanceRecordHash": "sha256:ef924dccd22ad3150d455dbf5641f8aa3614416144c503c4346b384c237db216",
+  "reloadedArtifactId": "artifact_record_artifact_sr_sidecar_output",
+  "runtimeApplySidecarRecord": true,
+  "sidecarHash": "sha256:c0d4df51ba61f4e0b53842c969be86cff5857096716b24fee5b9ffa5669c9ba8",
+  "staleReasons": [
+    "source_content_hash_changed",
+    "source_graph_revision_changed",
+    "source_set_changed",
+    "output_artifact_changed",
+    "detail_policy_changed",
+    "scale_changed",
+    "alignment_settings_changed",
+    "engine_version_changed"
+  ],
+  "validationMode": "sr_sidecar_provenance_roundtrip"
+}
