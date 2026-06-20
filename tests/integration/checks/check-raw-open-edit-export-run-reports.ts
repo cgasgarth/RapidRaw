@@ -8,7 +8,9 @@ import { parseRawOpenEditExportProofManifest } from '../../../src/schemas/rawOpe
 import { parseRawOpenEditExportRunReportCollection } from '../../../src/schemas/rawOpenEditExportRunReportSchemas.ts';
 
 const requireAssets = process.argv.includes('--require-assets');
+const allowFreshHashes = process.argv.includes('--allow-fresh-hashes');
 const root = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
+const inputPath = valueAfter('--input') ?? 'fixtures/validation/raw-open-edit-export-run-reports.json';
 const failures: string[] = [];
 
 if (requireAssets && root === undefined) {
@@ -18,9 +20,7 @@ if (requireAssets && root === undefined) {
 const manifest = parseRawOpenEditExportProofManifest(
   JSON.parse(await readFile('fixtures/validation/raw-open-edit-export-proof.json', 'utf8')),
 );
-const reportCollection = parseRawOpenEditExportRunReportCollection(
-  JSON.parse(await readFile('fixtures/validation/raw-open-edit-export-run-reports.json', 'utf8')),
-);
+const reportCollection = parseRawOpenEditExportRunReportCollection(JSON.parse(await readFile(inputPath, 'utf8')));
 
 const proofCasesByFixtureId = new Map(manifest.proofCases.map((proofCase) => [proofCase.fixtureId, proofCase]));
 const reportsByFixtureId = new Map(reportCollection.reports.map((report) => [report.fixtureId, report]));
@@ -53,7 +53,7 @@ for (const report of reportCollection.reports) {
     if (artifact.path !== manifestArtifact.path) {
       failures.push(`${report.fixtureId}: ${artifact.kind} path must match manifest.`);
     }
-    if (manifestArtifact.hash !== null && artifact.hash !== manifestArtifact.hash) {
+    if (!allowFreshHashes && manifestArtifact.hash !== null && artifact.hash !== manifestArtifact.hash) {
       failures.push(`${report.fixtureId}: ${artifact.kind} hash must match manifest.`);
     }
   }
@@ -151,3 +151,8 @@ const mode =
     ? 'public schema mode; no private reports committed'
     : `${reportCollection.reports.length} private report(s)`;
 console.log(`raw open/edit/export run reports ok (${mode})`);
+
+function valueAfter(flag: string): string | undefined {
+  const index = process.argv.indexOf(flag);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+}

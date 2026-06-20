@@ -7,24 +7,39 @@
         "workflowReportHash": "sha256:f444611d6c52a79781d187dd441ba5b9b0e60b9f7f44ed0e82a8a92881014160"
       },
       "colorManagement": {
-        "bitDepth": 16,
-        "embedIcc": true,
-        "inputDomain": "camera_linear_rgb",
-        "intent": "relative_colorimetric",
-        "operationDomain": "acescg_linear_v1",
-        "outputProfile": "display_p3",
+        "conformance": "mismatch",
+        "observedBitDepth": 8,
+        "observedExportColorEncoding": "current_srgb_pipe_rgba8",
+        "observedIccProfileEmbedded": false,
+        "observedOperationDomain": "linear_srgb_d65_observed",
+        "observedOutputProfile": "untagged_srgb_pipe",
         "proofLevel": "private_raw_runtime_color_management_metadata",
-        "sceneToDisplayTransform": "rawengine_agx_v1",
-        "viewTransform": "rawengine_agx_v1",
-        "workingSpace": "acescg_linear_v1"
+        "requestedOperationDomain": "acescg_linear_v1",
+        "requestedOutputProfile": "display_p3",
+        "requestedRenderBitDepth": 16,
+        "requestedViewTransform": "rawengine_agx_v1"
       },
       "commandId": "command.raw-open-edit-export.basic-tone.v1",
+      "decoderTrace": {
+        "cameraMake": "Sony",
+        "cameraModel": "ILCE-7M3",
+        "decodedHeight": 4000,
+        "decodedWidth": 6000,
+        "privacySafeCameraId": "camera.raw-open-edit-export.high-iso-skin-shadow.v1",
+        "rawFormat": "arw",
+        "sourceHash": "sha256:5b1a62fb37669f3065479e2c7cf9af4ef031a920cf6feac82d1269e9fdf4a136"
+      },
       "doesNotProve": [
+        "acescg_working_space",
+        "bradford_chromatic_adaptation",
         "camera_profile_quality",
         "capture_one_class_quality",
         "display_device_visual_match",
+        "display_p3_export",
         "gpu_color_parity",
-        "icc_colorimetric_accuracy"
+        "icc_embedding",
+        "icc_colorimetric_accuracy",
+        "sixteen_bit_export"
       ],
       "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
       "metrics": {
@@ -35,7 +50,6 @@
       "sourceRelativePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw"
     }
   ],
-  "colorSyncProofPath": "docs/validation/macos-colorsync-display-proof-2026-06-20.json",
   "issue": 2308,
   "requestPath": "fixtures/validation/raw-open-edit-export-proof-request.json",
   "runReportsPath": "fixtures/validation/raw-open-edit-export-run-reports.json",
