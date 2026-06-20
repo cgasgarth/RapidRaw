@@ -155,6 +155,7 @@ const normalizeSampleRect = (rect: NegativeLabBaseFogSampleRect): NegativeLabBas
 const formatPercentValue = (value: number) => `${Math.round(value)}%`;
 const formatDensityValue = (value: number) => value.toFixed(3);
 const formatRgbValue = (value: number) => `${Math.round(value * 255)}`;
+const formatSignedRecipeValue = (value: number) => (value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2));
 const NEGATIVE_LAB_PROFILE_BROWSER_ROWS = buildNegativeLabProfileBrowserRows();
 const NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID = new Map(
   NEGATIVE_LAB_PROFILE_BROWSER_ROWS.map((row) => [row.presetId, row]),
@@ -1947,6 +1948,38 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             </button>
           </div>
           <div className="space-y-3">
+            <div
+              className="grid grid-cols-2 gap-2 rounded-md border border-surface bg-bg-primary p-2 text-[11px] text-text-tertiary"
+              data-testid="negative-lab-recipe-summary"
+            >
+              <span className="col-span-2 font-semibold text-text-secondary">
+                {t('modals.negativeConversion.colorTiming')}
+              </span>
+              <span>{t('modals.negativeConversion.baseFogStrength')}</span>
+              <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-recipe-base">
+                {formatPercentValue(params.base_fog_strength * 100)}
+              </span>
+              <span>{t('modals.negativeConversion.redWeight')}</span>
+              <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-recipe-red">
+                {params.red_weight.toFixed(2)}
+              </span>
+              <span>{t('modals.negativeConversion.greenWeight')}</span>
+              <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-recipe-green">
+                {params.green_weight.toFixed(2)}
+              </span>
+              <span>{t('modals.negativeConversion.blueWeight')}</span>
+              <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-recipe-blue">
+                {params.blue_weight.toFixed(2)}
+              </span>
+              <span>{t('modals.negativeConversion.exposure')}</span>
+              <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-recipe-exposure">
+                {formatSignedRecipeValue(params.exposure)}
+              </span>
+              <span>{t('modals.negativeConversion.contrast')}</span>
+              <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-recipe-contrast">
+                {params.contrast.toFixed(2)}
+              </span>
+            </div>
             <Slider
               label={t('modals.negativeConversion.baseFogStrength')}
               value={params.base_fog_strength}
