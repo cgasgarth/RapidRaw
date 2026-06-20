@@ -64,6 +64,7 @@ interface LayerRowModel {
 }
 
 const BASE_LAYER_ID = 'base-raw-layer';
+const LAYER_OPACITY_PRESETS = [0, 25, 50, 75, 100] as const;
 
 const blendModes = [
   { labelKey: 'editor.layers.blendModes.normal', value: 'Normal' },
@@ -218,6 +219,14 @@ export default function LayerStackPanel({
   };
   const updateGroupOpacity = (groupId: string, opacity: number) => {
     applyLayerStack(setLayerGroupOpacity(masks, groupId, opacity), `group:${groupId}`);
+  };
+  const updateActiveOpacity = (opacity: number) => {
+    if (!activeRow || activeRow.isBase) return;
+    if (activeRow.isGroupHeader && activeRow.groupId) {
+      updateGroupOpacity(activeRow.groupId, opacity);
+      return;
+    }
+    updateLayerOpacity(activeRow.id, opacity);
   };
   const updateActiveLayerName = (name: string) => {
     if (!activeRow || activeRow.isBase) return;
@@ -497,18 +506,38 @@ export default function LayerStackPanel({
             max={100}
             min={0}
             onChange={(event: SliderChangeEvent) => {
-              if (activeRow.isGroupHeader && activeRow.groupId) {
-                updateGroupOpacity(activeRow.groupId, Number(event.target.value));
-                return;
-              }
-
-              if (!activeRow.isBase) {
-                updateLayerOpacity(activeRow.id, Number(event.target.value));
-              }
+              updateActiveOpacity(Number(event.target.value));
             }}
             step={1}
             value={activeRow.opacity}
           />
+          <div className="grid grid-cols-5 gap-1" data-testid="layer-opacity-presets">
+            {LAYER_OPACITY_PRESETS.map((presetOpacity) => {
+              const isActiveOpacity = activeRow.opacity === presetOpacity;
+
+              return (
+                <button
+                  aria-label={t('editor.layers.opacityPreset', { opacity: `${presetOpacity}%` })}
+                  aria-pressed={isActiveOpacity}
+                  className={cx(
+                    'rounded border px-2 py-1 text-xs tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                    isActiveOpacity
+                      ? 'border-accent bg-accent/10 text-text-primary'
+                      : 'border-surface bg-surface text-text-secondary hover:bg-card-active',
+                  )}
+                  data-testid={`layer-opacity-preset-${presetOpacity}`}
+                  disabled={isBaseSelected}
+                  key={presetOpacity}
+                  onClick={() => {
+                    updateActiveOpacity(presetOpacity);
+                  }}
+                  type="button"
+                >
+                  {presetOpacity}%
+                </button>
+              );
+            })}
+          </div>
 
           <div className="flex items-center justify-end gap-1">
             <button
