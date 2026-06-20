@@ -9,6 +9,7 @@ export const VISUAL_SMOKE_SCENARIO_IDS = {
   FocusPrivateRawUi: 'focus-private-raw-ui',
   FocusUi: 'focus-ui',
   HdrUi: 'hdr-ui',
+  LayerMaskPrivateRawUi: 'layer-mask-private-raw-ui',
   LayerStackWorkflow: 'layer-stack-workflow',
   LibraryWorkflow: 'library-workflow',
   MaskOverlayRawProof: 'mask-overlay-raw-proof',
@@ -135,6 +136,12 @@ export const VISUAL_SMOKE_SCENARIOS = [
     mode: VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow,
     outputFile: 'layer-stack-workflow.png',
     sectionMinimum: 3,
+  },
+  {
+    marker: 'Private RAW layer mask review',
+    mode: VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi,
+    outputFile: 'layer-mask-private-raw-ui.png',
+    sectionMinimum: 1,
   },
   {
     marker: 'RAW Mask Overlay Review',

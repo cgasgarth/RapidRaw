@@ -29,6 +29,7 @@ import {
   hdrReviewWorkspaceProofSchema,
   hdrUiSettingsProofSchema,
   libraryWorkflowProofSchema,
+  layerMaskPrivateRawReviewProofSchema,
   layerStackExportParityProofSchema,
   layerStackWorkflowProofSchema,
   maskOverlayRawProofSchema,
@@ -67,6 +68,9 @@ const requiresFocusPrivateRawProof = selectedScenarios.some(
 );
 const requiresPanoramaPrivateRawProof = selectedScenarios.some(
   (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi,
+);
+const requiresLayerMaskPrivateRawProof = selectedScenarios.some(
+  (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi,
 );
 
 if (selectedScenarios.length === 0) {
@@ -113,9 +117,22 @@ interface PanoramaPrivateRawBrowserProof {
   sourceCount: string;
 }
 
+interface LayerMaskPrivateRawBrowserProof {
+  exportArtifact: string;
+  fixtureId: string;
+  metricCount: string;
+  refinedPreviewArtifact: string;
+  refinedPreviewDataUrl: string;
+  unmaskedPreviewArtifact: string;
+  unmaskedPreviewDataUrl: string;
+  unrefinedPreviewArtifact: string;
+  unrefinedPreviewDataUrl: string;
+}
+
 declare global {
   interface Window {
     __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawBrowserProof;
+    __RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__?: LayerMaskPrivateRawBrowserProof;
     __RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__?: PanoramaPrivateRawBrowserProof;
     __RAWENGINE_SR_PRIVATE_RAW_PROOF__?: SrPrivateRawBrowserProof;
   }
@@ -233,6 +250,25 @@ async function loadPanoramaPrivateRawProof(): Promise<PanoramaPrivateRawBrowserP
     resultReviewArtifact,
     resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
     sourceCount: '3',
+  };
+}
+
+async function loadLayerMaskPrivateRawProof(): Promise<LayerMaskPrivateRawBrowserProof> {
+  const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
+  const artifactRoot = `${privateRoot}/private-artifacts/validation/layer-mask-real-raw`;
+  const unmaskedPreviewArtifact = `${artifactRoot}/high-iso-skin-shadow-mask-unmasked-preview.png`;
+  const unrefinedPreviewArtifact = `${artifactRoot}/high-iso-skin-shadow-mask-unrefined-preview.png`;
+  const refinedPreviewArtifact = `${artifactRoot}/high-iso-skin-shadow-mask-refined-preview.png`;
+  return {
+    exportArtifact: `${artifactRoot}/high-iso-skin-shadow-mask-refined-export.tiff`,
+    fixtureId: 'validation.layer-mask-real-raw.high-iso-skin-shadow.v1',
+    metricCount: '5',
+    refinedPreviewArtifact,
+    refinedPreviewDataUrl: await readPngDataUrl(refinedPreviewArtifact),
+    unmaskedPreviewArtifact,
+    unmaskedPreviewDataUrl: await readPngDataUrl(unmaskedPreviewArtifact),
+    unrefinedPreviewArtifact,
+    unrefinedPreviewDataUrl: await readPngDataUrl(unrefinedPreviewArtifact),
   };
 }
 
@@ -464,6 +500,28 @@ async function prepareScenario(page, mode) {
     await page
       .getByTestId('panorama-private-raw-artifact-handoff')
       .getByText('panorama-overlap-merge.tiff', { exact: false })
+      .waitFor({ timeout: 10_000 });
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi) {
+    layerMaskPrivateRawReviewProofSchema.parse(
+      await page.getByTestId('layer-mask-private-raw-review-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    for (const testId of [
+      'layer-mask-private-raw-unmasked',
+      'layer-mask-private-raw-unrefined',
+      'layer-mask-private-raw-refined',
+    ]) {
+      const loaded = await page.getByTestId(testId).evaluate((element) => {
+        const image = element as HTMLImageElement;
+        return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+      });
+      if (!loaded) throw new Error(`${testId} did not load a nonblank private RAW image.`);
+    }
+    await page
+      .getByTestId('layer-mask-private-raw-artifact-handoff')
+      .getByText('high-iso-skin-shadow-mask-refined-export.tiff', { exact: false })
       .waitFor({ timeout: 10_000 });
     return;
   }
@@ -1077,6 +1135,14 @@ async function main() {
           window.__RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__ = proof;
         },
         await loadPanoramaPrivateRawProof(),
+      );
+    }
+    if (requiresLayerMaskPrivateRawProof) {
+      await page.addInitScript(
+        (proof: LayerMaskPrivateRawBrowserProof) => {
+          window.__RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__ = proof;
+        },
+        await loadLayerMaskPrivateRawProof(),
       );
     }
 
