@@ -1779,6 +1779,7 @@
       "profileFilterMeasured": "Measured",
       "profileMeasuredBadge": "Measured",
       "profileMeasuredClaimPolicy": "Process-family measured profile; no named-stock or colorimetric-match claim.",
+      "profileResultCount": "{{visibleCount}} of {{totalCount}} profiles",
       "profileSearch": "Search profiles",
       "profileSearchEmpty": "No matching profiles",
       "profileSort": "Sort profiles",
