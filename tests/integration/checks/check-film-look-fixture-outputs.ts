@@ -87,6 +87,8 @@ for (const marker of [
   'activeCategory',
   'categoryTabs',
   'adjustments.effects.filmLookBrowser.categoryFilter',
+  'getFilmLookSearchText',
+  'look.provenance.legalNote',
   'handleSwapComparisonLooks',
   'adjustments.effects.filmLookBrowser.compareSwap',
   'film-look-provenance-inspector',
