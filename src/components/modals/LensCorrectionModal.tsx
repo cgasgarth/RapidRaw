@@ -287,14 +287,14 @@ export default function LensCorrectionModal({
         updatePreview(initParams);
       }, 0);
 
-      void invoke<Array<string>>('get_lensfun_makers')
+      void invoke<Array<string>>(Invokes.GetLensfunMakers)
         .then((m) => {
           setMakers(m);
         })
         .catch(console.error);
 
       if (initParams.lensMaker) {
-        void invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: initParams.lensMaker })
+        void invoke<Array<string>>(Invokes.GetLensfunLensesForMaker, { maker: initParams.lensMaker })
           .then((l) => {
             setLenses(l);
           })
@@ -326,7 +326,7 @@ export default function LensCorrectionModal({
     setLenses([]);
     setDetectionStatus('idle');
 
-    void invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker })
+    void invoke<Array<string>>(Invokes.GetLensfunLensesForMaker, { maker })
       .then((l) => {
         setLenses(l);
       })
@@ -358,7 +358,7 @@ export default function LensCorrectionModal({
     setParams(tempParams);
     setDetectionStatus('idle');
 
-    void invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: selected.maker })
+    void invoke<Array<string>>(Invokes.GetLensfunLensesForMaker, { maker: selected.maker })
       .then((l) => {
         setLenses(l);
       })
@@ -406,7 +406,7 @@ export default function LensCorrectionModal({
       if (result) {
         const [detectedMaker, detectedModel] = result;
 
-        void invoke<Array<string>>('get_lensfun_lenses_for_maker', { maker: detectedMaker })
+        void invoke<Array<string>>(Invokes.GetLensfunLensesForMaker, { maker: detectedMaker })
           .then((l) => {
             setLenses(l);
           })

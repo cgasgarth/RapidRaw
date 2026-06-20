@@ -74,7 +74,7 @@ export function useFileOperations(
       }
 
       try {
-        const command = options.includeAssociated ? 'delete_files_with_associated' : 'delete_files_from_disk';
+        const command = options.includeAssociated ? Invokes.DeleteFilesWithAssociated : Invokes.DeleteFilesFromDisk;
         await invoke(command, { paths: pathsToDelete });
         await refreshImageList();
 

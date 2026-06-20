@@ -789,7 +789,7 @@ export function SettingsPanel({
   }, []);
 
   useEffect(() => {
-    invokeWithSchema('get_lensfun_makers', {}, stringArraySchema).then(setLensMakers).catch(console.error);
+    invokeWithSchema(Invokes.GetLensfunMakers, {}, stringArraySchema).then(setLensMakers).catch(console.error);
   }, []);
 
   const handleProcessingSettingChange = async <K extends ProcessingSettingKey>(
@@ -813,7 +813,7 @@ export function SettingsPanel({
         key === 'rawPreprocessingSharpening' ||
         key === 'applyPreprocessingToNonRaws'
       ) {
-        await invokeWithSchema('clear_image_caches', {}, emptyResponseSchema);
+        await invokeWithSchema(Invokes.ClearImageCaches, {}, emptyResponseSchema);
       }
     }
   };
@@ -845,7 +845,7 @@ export function SettingsPanel({
     setTempLensModel('');
     setLensModels([]);
     if (maker) {
-      invokeWithSchema('get_lensfun_lenses_for_maker', { maker }, stringArraySchema)
+      invokeWithSchema(Invokes.GetLensfunLensesForMaker, { maker }, stringArraySchema)
         .then(setLensModels)
         .catch(console.error);
     }
