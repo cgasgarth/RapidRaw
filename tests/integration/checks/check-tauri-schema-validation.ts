@@ -7,6 +7,7 @@ import type { z } from 'zod';
 import { albumTreeSchema } from '../../../src/schemas/albumSchemas.ts';
 import { folderTreeListSchema } from '../../../src/schemas/folderTreeSchemas.ts';
 import { parseTauriBoundaryLedger, type TauriBoundaryLedger } from '../../../src/schemas/tauriBoundaryLedgerSchemas.ts';
+import { emptyTauriResponseSchema } from '../../../src/schemas/tauriResponseSchemas.ts';
 import { parseTauriPayload } from '../../../src/utils/tauriSchemaInvoke.ts';
 
 type TauriBoundaryEntry = TauriBoundaryLedger['entries'][number];
@@ -15,6 +16,7 @@ const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'
 
 const schemaByName = {
   albumTreeSchema,
+  emptyTauriResponseSchema,
   folderTreeListSchema,
 } satisfies Record<TauriBoundaryEntry['zodSchema'], z.ZodType<unknown>>;
 
