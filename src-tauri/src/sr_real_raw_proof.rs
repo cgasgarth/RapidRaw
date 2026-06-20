@@ -15,10 +15,10 @@ use crate::private_decode_raw_proof::{
 };
 
 const SOURCE_RELATIVE_PATHS: [&str; 4] = [
-    "private-fixtures/super-resolution/subpixel-detail-v1/frame-01.nef",
-    "private-fixtures/super-resolution/subpixel-detail-v1/frame-02.nef",
-    "private-fixtures/super-resolution/subpixel-detail-v1/frame-03.nef",
-    "private-fixtures/super-resolution/subpixel-detail-v1/frame-04.nef",
+    "private-fixtures/super-resolution/subpixel-detail-v1/frame-01.arw",
+    "private-fixtures/super-resolution/subpixel-detail-v1/frame-02.arw",
+    "private-fixtures/super-resolution/subpixel-detail-v1/frame-03.arw",
+    "private-fixtures/super-resolution/subpixel-detail-v1/frame-04.arw",
 ];
 
 const NON_CLAIMS: [&str; 5] = [
@@ -31,12 +31,12 @@ const NON_CLAIMS: [&str; 5] = [
 
 const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
     decode_report_file: "sr-subpixel-decode-report.json",
-    expected_format_label: "nef",
+    expected_format_label: "arw",
     feature_family: "super_resolution",
     fixture_id: "validation.computational-merge.super-resolution-subpixel.v1",
     implementation_issue: 1506,
     metric_source_count: SOURCE_RELATIVE_PATHS.len(),
-    notes: "Private NEF super-resolution direct decode smoke only. This proves production RAW loader ingest, nonzero decoded dimensions, finite decoded pixel payloads, source hashing, and metadata-only report collection. It does not claim registration quality, reconstruction quality, app-server apply, preview/export parity, or UI review.",
+    notes: "Private ARW super-resolution direct decode smoke only. This proves production RAW loader ingest, nonzero decoded dimensions, finite decoded pixel payloads, source hashing, and metadata-only report collection. It does not claim registration quality, reconstruction quality, app-server apply, preview/export parity, or UI review.",
     quality_file: "sr-subpixel-quality.json",
     report_file: "sr-subpixel-private-run-report.json",
     report_id: "computational-merge-run.super-resolution-subpixel.v1",
@@ -224,7 +224,7 @@ fn run_private_sr_reconstruction_artifact_proof(private_root: &Path) -> Result<(
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         graph_revision_hash,
         implementation_issue: CONFIG.implementation_issue,
-        notes: "Private NEF super-resolution preview/export smoke. This proves production RAW decode plus a conservative multi-frame reconstruction artifact, preview/export artifact emission, and bounded preview/export parity. It does not claim UI review or final quality acceptance.".to_string(),
+        notes: "Private ARW super-resolution preview/export smoke. This proves production RAW decode plus a conservative multi-frame reconstruction artifact, preview/export artifact emission, and bounded preview/export parity. It does not claim UI review or final quality acceptance.".to_string(),
         quality_metrics,
         report_id: CONFIG.report_id.to_string(),
         run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),

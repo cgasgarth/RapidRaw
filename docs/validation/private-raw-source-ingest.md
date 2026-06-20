@@ -26,9 +26,18 @@ RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" bun scripts/prepare-panorama-real-raw-privat
 
 The panorama selector looks for an ordered project-owned RAW sequence with matching camera, lens, focal length, aperture, ISO, and shutter speed. This proves local fixture materialization only; panorama runtime proof still requires the dedicated private proof runner.
 
+For super-resolution fixture prep, use:
+
+```sh
+RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" bun scripts/prepare-sr-real-raw-private-root.ts --source "/absolute/path/to/raw-folder" --materialize symlink
+```
+
+The SR selector uses the same ordered burst requirements as panorama and writes four project-owned RAW sources into `private-fixtures/super-resolution/subpixel-detail-v1/`.
+
 Validation rules:
 
 - RAW payloads stay local and ignored.
 - The selected trio must be same camera/lens metadata, close in capture time, close in sequence number, and at least 4 EV apart.
 - Panorama selections must preserve a consistent exposure/capture setup and ordered frame sequence.
+- Super-resolution selections must preserve a consistent exposure/capture setup and ordered burst sequence.
 - Use `--materialize copy` when symlinks are not suitable for downstream tooling.
