@@ -61,6 +61,11 @@ export default function SuperResolutionModal({
     { label: t('modals.superResolution.qualityBalanced'), value: 'balanced' },
     { label: t('modals.superResolution.qualityBest'), value: 'best' },
   ];
+  const selectedQualityLabel =
+    qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
+  const sourceReadinessLabel = `${t('modals.superResolution.sourceSummary', { count: sourceCount })} - ${
+    isSourceCountValid ? t('modals.superResolution.preflight.ready') : t('modals.superResolution.preflight.blocked')
+  }`;
 
   const setSetting = useCallback(
     (patch: Partial<SuperResolutionUiSettings>) => {
@@ -116,7 +121,7 @@ export default function SuperResolutionModal({
         >
           <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.sources')}
-            value={String(sourceCount)}
+            value={sourceReadinessLabel}
           />
           <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.scale')}
@@ -243,10 +248,7 @@ export default function SuperResolutionModal({
             label={t('modals.superResolution.preflight.outputPixels')}
             value={t('modals.superResolution.outputPixelMultiplier', { multiplier: outputPixelMultiplier })}
           />
-          <ComputationalSetupStatusLine
-            label={t('modals.superResolution.qualityLabel')}
-            value={qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? ''}
-          />
+          <ComputationalSetupStatusLine label={t('modals.superResolution.qualityLabel')} value={selectedQualityLabel} />
           <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.alignment')}
             value={t(`modals.superResolution.alignment.${settings.alignmentMode}`)}
@@ -294,7 +296,7 @@ export default function SuperResolutionModal({
             rows: [
               {
                 label: t('modals.superResolution.preflight.sources'),
-                value: String(sourceCount),
+                value: sourceReadinessLabel,
               },
               {
                 label: t('modals.superResolution.preflight.scale'),
@@ -310,7 +312,7 @@ export default function SuperResolutionModal({
               },
               {
                 label: t('modals.superResolution.qualityLabel'),
-                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '',
+                value: selectedQualityLabel,
               },
             ],
           },

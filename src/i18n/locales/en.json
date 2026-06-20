@@ -2031,11 +2031,13 @@
       "planDependency": "Final apply requires an accepted dry-run plan from the super-resolution API.",
       "preflight": {
         "alignment": "Alignment",
+        "blocked": "Blocked",
         "detail": "Detail",
         "memory": "Memory",
         "outputPixels": "Output pixels",
         "pending": "Not estimated",
         "provenance": "Provenance",
+        "ready": "Ready",
         "required": "Required",
         "scale": "Scale",
         "sources": "Sources"
