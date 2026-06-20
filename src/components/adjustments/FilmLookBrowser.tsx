@@ -225,6 +225,13 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
     }));
   };
 
+  const handleClearComparisonLooks = () => {
+    setComparisonSelection({
+      a: null,
+      b: null,
+    });
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -337,17 +344,30 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
           <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
             {t('adjustments.effects.filmLookBrowser.compareTitle')}
           </UiText>
-          <button
-            aria-label={t('adjustments.effects.filmLookBrowser.compareSwap')}
-            className="inline-flex items-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
-            data-tooltip={t('adjustments.effects.filmLookBrowser.compareSwap')}
-            disabled={comparisonSelection.a === null && comparisonSelection.b === null}
-            onClick={handleSwapComparisonLooks}
-            type="button"
-          >
-            <ArrowLeftRight size={13} aria-hidden="true" />
-            {t('adjustments.effects.filmLookBrowser.compareSwap')}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              aria-label={t('adjustments.effects.filmLookBrowser.compareClearAll')}
+              className="rounded-md border border-surface bg-bg-secondary px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+              data-testid="film-look-compare-clear-all"
+              data-tooltip={t('adjustments.effects.filmLookBrowser.compareClearAll')}
+              disabled={comparisonSelection.a === null && comparisonSelection.b === null}
+              onClick={handleClearComparisonLooks}
+              type="button"
+            >
+              {t('adjustments.effects.filmLookBrowser.compareClearAll')}
+            </button>
+            <button
+              aria-label={t('adjustments.effects.filmLookBrowser.compareSwap')}
+              className="inline-flex items-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+              data-tooltip={t('adjustments.effects.filmLookBrowser.compareSwap')}
+              disabled={comparisonSelection.a === null && comparisonSelection.b === null}
+              onClick={handleSwapComparisonLooks}
+              type="button"
+            >
+              <ArrowLeftRight size={13} aria-hidden="true" />
+              {t('adjustments.effects.filmLookBrowser.compareSwap')}
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
           {FILM_LOOK_COMPARE_SLOTS.map((slot) => {

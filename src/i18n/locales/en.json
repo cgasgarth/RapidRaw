@@ -217,6 +217,7 @@
         "claimLevel": "Claim",
         "clearCompare": "Clear compare {{slot}}",
         "compareApply": "Apply {{slot}}",
+        "compareClearAll": "Clear",
         "compareEmpty": "Choose look",
         "compareLook": "Compare {{slot}}: {{displayName}}",
         "compareSwap": "Swap A/B",
