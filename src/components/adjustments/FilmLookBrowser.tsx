@@ -32,6 +32,7 @@ const FILM_LOOK_COMPARE_SLOT_LABELS: Record<FilmLookComparisonSlot, string> = {
 const FILM_LOOK_COMPARE_SLOTS: Array<FilmLookComparisonSlot> = ['a', 'b'];
 const FILM_LOOK_FAVORITES_STORAGE_KEY = 'rapidraw.filmLookFavorites.v1';
 const FILM_LOOK_SORT_MODES: Array<FilmLookSortMode> = ['catalog', 'name_asc', 'strength_desc', 'adjustment_count_desc'];
+const FILM_LOOK_STRENGTH_PRESETS = [25, 50, 75, 100] as const;
 const formatFilmLookStrength = (strength: number) => `${strength}%`;
 const formatFilmLookAdjustmentValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
 const formatFilmLookToken = (value: string) => value.split('_').join(' ');
@@ -430,6 +431,33 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
           type="range"
           value={strengthPercent}
         />
+        <div className="grid grid-cols-4 gap-1" data-testid="film-look-strength-presets">
+          {FILM_LOOK_STRENGTH_PRESETS.map((presetStrength) => {
+            const isActiveStrength = strengthPercent === presetStrength;
+
+            return (
+              <button
+                aria-label={t('adjustments.effects.filmLookBrowser.strengthPreset', {
+                  strength: formatFilmLookStrength(presetStrength),
+                })}
+                aria-pressed={isActiveStrength}
+                className={`rounded border px-2 py-1 text-xs tabular-nums transition-colors ${
+                  isActiveStrength
+                    ? 'border-accent bg-accent/10 text-text-primary'
+                    : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface'
+                }`}
+                data-testid={`film-look-strength-preset-${presetStrength}`}
+                key={presetStrength}
+                onClick={() => {
+                  handleStrengthChange(presetStrength);
+                }}
+                type="button"
+              >
+                {formatFilmLookStrength(presetStrength)}
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       {selectedLook !== undefined && (

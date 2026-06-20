@@ -243,6 +243,7 @@
           "strength_desc": "Strongest default"
         },
         "strength": "Strength",
+        "strengthPreset": "Set strength to {{strength}}",
         "title": "Film Looks",
         "unfavoriteLook": "Unfavorite {{displayName}}"
       },
