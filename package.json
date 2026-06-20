@@ -374,6 +374,7 @@
     "check:negative-lab-roll-session-reload": "bun tests/integration/checks/check-negative-lab-roll-session-reload.ts",
     "check:negative-lab-qc-contact-sheet": "bun scripts/generate-negative-lab-qc-contact-sheet.ts",
     "check:negative-lab-batch-export-proof": "bun tests/integration/checks/check-negative-lab-batch-export-proof.ts",
+    "check:negative-lab-public-export-proof": "bun tests/integration/checks/check-negative-lab-public-export-proof.ts",
     "check:negative-lab-measured-profiles": "bun tests/integration/checks/check-negative-lab-measured-profiles.ts",
     "check:negative-lab-measured-render-proof": "bun tests/integration/checks/check-negative-lab-measured-render-proof.ts",
     "check:negative-lab-density-cpu": "bun tests/integration/checks/check-negative-lab-density-cpu.ts",

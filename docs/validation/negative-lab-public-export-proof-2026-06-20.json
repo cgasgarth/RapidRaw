@@ -1,0 +1,41 @@
+{
+  "algorithm": "density_rgb_v1",
+  "doesNotProve": [
+    "camera_raw_decode_path",
+    "capture_one_class_quality",
+    "commercial_converter_parity",
+    "full_macos_app_manual_session",
+    "icc_colorimetric_accuracy",
+    "raw_scan_input",
+    "stock_library_maturity"
+  ],
+  "fixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001",
+  "inputToOutputMeanAbsDelta": 0.5021131038665771,
+  "issue": 2311,
+  "metrics": {
+    "changedPixelRatio": 1,
+    "inputToOutputMeanAbsDelta": 0.5021131038665771
+  },
+  "output": {
+    "contentHash": "fnv1a64:83c7a7b0d5fe8819",
+    "dimensions": {
+      "height": 183,
+      "width": 330
+    },
+    "format": "jpeg_proof",
+    "path": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg"
+  },
+  "runtimeStatus": "public_negative_scan_positive_export_rendered",
+  "schemaVersion": 1,
+  "sidecar": {
+    "containsNegativeLabArtifact": true,
+    "path": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.rrdata",
+    "runtimeGeneratedIds": true
+  },
+  "source": {
+    "license": "CC0 public fixture",
+    "manifest": "fixtures/negative-lab/public/110-format-ericht-negative-cc0-samples.json",
+    "path": "fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg",
+    "sha256": "sha256:f0913770ce2ec72f2261d6cc0948091e3224d11904049727a42beb864ef5673b"
+  }
+}

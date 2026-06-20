@@ -1420,6 +1420,150 @@ mod tests {
     }
 
     #[test]
+    fn negative_lab_public_scan_exports_positive_report_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            eprintln!("skipping Negative Lab public export proof");
+            return;
+        }
+
+        let report_path = std::env::var("RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_REPORT")
+            .expect("RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_REPORT is required");
+        let source_path =
+            Path::new("../fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg");
+        let output_dir = Path::new("target/negative-lab-public-export-proof");
+        fs::create_dir_all(output_dir).expect("create Negative Lab public export proof dir");
+
+        let input = image::open(source_path).expect("open public negative fixture");
+        let params = NegativeConversionParams {
+            red_weight: 1.08,
+            green_weight: 0.97,
+            blue_weight: 1.16,
+            base_fog_strength: 1.0,
+            base_fog_sample: Some(NegativeBaseFogSampleRect {
+                x: 0.0,
+                y: 0.0,
+                width: 0.35,
+                height: 0.35,
+            }),
+            exposure: 0.08,
+            contrast: 1.12,
+        };
+        let bounds_ref = downscale_f32_image(&input, 1080, 1080);
+        let ref_rgb = bounds_ref.to_rgb32f();
+        let (ref_w, ref_h) = ref_rgb.dimensions();
+        let log_pixels: Vec<f32> = ref_rgb
+            .as_raw()
+            .iter()
+            .map(|&value| -value.clamp(1e-6, 1.0).log10())
+            .collect();
+        let bounds = analyze_bounds(
+            &log_pixels,
+            ref_w as usize,
+            ref_h as usize,
+            params.base_fog_sample,
+        );
+        let rendered = run_pipeline(&input, &params, Some(bounds));
+        let output_path = output_dir.join("110-format-ericht-negative-cc0-320-Positive.jpg");
+        let mut buf = Cursor::new(Vec::new());
+        rendered
+            .to_rgb8()
+            .write_with_encoder(JpegEncoder::new_with_quality(&mut buf, JPEG_PROOF_QUALITY))
+            .expect("encode public negative positive JPEG");
+        fs::write(&output_path, buf.into_inner()).expect("write public negative positive JPEG");
+
+        let save_options = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
+            accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
+            output_format: NegativeConversionOutputFormat::JpegProof,
+            profile_provenance_hash: Some("fnv1a32:2f4a91bc".to_string()),
+            suffix: "Positive".to_string(),
+        };
+        write_negative_lab_output_sidecar(
+            &output_path,
+            source_path,
+            &params,
+            &save_options,
+            rendered.width(),
+            rendered.height(),
+        )
+        .expect("write public negative positive sidecar");
+
+        let input_rgb = input.to_rgb32f();
+        let rendered_rgb = rendered.to_rgb32f();
+        let changed_pixel_ratio = rendered_rgb
+            .pixels()
+            .zip(input_rgb.pixels())
+            .filter(|(rendered_pixel, input_pixel)| {
+                rendered_pixel
+                    .channels()
+                    .iter()
+                    .zip(input_pixel.channels())
+                    .any(|(rendered_channel, input_channel)| {
+                        (rendered_channel - input_channel).abs() > 0.01
+                    })
+            })
+            .count() as f32
+            / (rendered.width() * rendered.height()).max(1) as f32;
+        let input_to_output_delta = mean_abs_delta(&input_rgb, &rendered_rgb);
+
+        assert!(changed_pixel_ratio > 0.05);
+        assert!(input_to_output_delta > 0.01);
+
+        let sidecar_path = negative_lab_output_sidecar_path(&output_path);
+        assert!(
+            sidecar_path.exists(),
+            "Negative Lab public export proof must write a sidecar"
+        );
+        let report = json!({
+            "algorithm": "density_rgb_v1",
+            "doesNotProve": [
+                "camera_raw_decode_path",
+                "capture_one_class_quality",
+                "commercial_converter_parity",
+                "full_macos_app_manual_session",
+                "icc_colorimetric_accuracy",
+                "raw_scan_input",
+                "stock_library_maturity"
+            ],
+            "fixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001",
+            "inputToOutputMeanAbsDelta": input_to_output_delta,
+            "issue": 2311,
+            "metrics": {
+                "changedPixelRatio": changed_pixel_ratio,
+                "inputToOutputMeanAbsDelta": input_to_output_delta
+            },
+            "output": {
+                "contentHash": hash_negative_lab_output_file(&output_path).expect("hash output"),
+                "dimensions": {
+                    "height": rendered.height(),
+                    "width": rendered.width()
+                },
+                "format": "jpeg_proof",
+                "path": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg"
+            },
+            "runtimeStatus": "public_negative_scan_positive_export_rendered",
+            "schemaVersion": 1,
+            "sidecar": {
+                "containsNegativeLabArtifact": true,
+                "path": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.rrdata",
+                "runtimeGeneratedIds": true
+            },
+            "source": {
+                "license": "CC0 public fixture",
+                "manifest": "fixtures/negative-lab/public/110-format-ericht-negative-cc0-samples.json",
+                "path": "fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg",
+                "sha256": "sha256:f0913770ce2ec72f2261d6cc0948091e3224d11904049727a42beb864ef5673b"
+            }
+        });
+        fs::write(report_path, serde_json::to_vec_pretty(&report).unwrap())
+            .expect("write Negative Lab public export report");
+    }
+
+    #[test]
     fn sampled_base_fog_preview_export_acceptance_changes_render() {
         let input = DynamicImage::ImageRgb32F(
             Rgb32FImage::from_vec(
