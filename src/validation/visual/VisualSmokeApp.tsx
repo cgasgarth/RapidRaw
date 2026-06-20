@@ -58,6 +58,19 @@ interface FocusPrivateRawVisualProof {
   stackPath: string;
 }
 
+interface HdrPrivateRawVisualProof {
+  afterArtifact: string;
+  afterDataUrl: string;
+  beforeArtifact: string;
+  beforeDataUrl: string;
+  exportArtifact: string;
+  fixtureId: string;
+  mergeArtifact: string;
+  previewArtifact: string;
+  previewDataUrl: string;
+  sourceCount: string;
+}
+
 interface PanoramaPrivateRawVisualProof {
   exportReviewArtifact: string;
   exportReviewDataUrl: string;
@@ -96,6 +109,7 @@ interface NegativeLabPublicExportVisualProof {
 declare global {
   interface Window {
     __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawVisualProof;
+    __RAWENGINE_HDR_PRIVATE_RAW_PROOF__?: HdrPrivateRawVisualProof;
     __RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__?: LayerMaskPrivateRawVisualProof;
     __RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__?: NegativeLabPublicExportVisualProof;
     __RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__?: PanoramaPrivateRawVisualProof;
@@ -112,6 +126,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.FilmLookBrowser]: FilmLookVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi]: FocusPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.FocusUi]: FocusStackVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi]: HdrPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.HdrUi]: HdrVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi]: LayerMaskPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
@@ -473,6 +488,11 @@ const copy = {
   focusPrivateRawResult: 'Result review',
   focusPrivateRawExport: 'Export review',
   focusPrivateRawSourceSet: 'focus bracket',
+  hdrPrivateRawReview: 'Private RAW HDR review',
+  hdrPrivateRawRuntime: 'Private RAW',
+  hdrPrivateRawBefore: 'Middle bracket preview',
+  hdrPrivateRawAfter: 'Merged result review',
+  hdrPrivateRawPreview: 'Tone-mapped preview',
   panoramaSmoke: 'Panorama UI Smoke',
   panoramaReview: 'Panorama review',
   panoramaDryRunPreview: 'Dry-run preview',
@@ -543,6 +563,7 @@ const copy = {
   hdrApplyTool: getComputationalMergeAppServerRoutePairSummary('hdr').applyToolName,
   hdrDryRunTool: getComputationalMergeAppServerRoutePairSummary('hdr').dryRunToolName,
   hdrArtifactPath: '/tmp/rawengine-hdr-smoke.tif',
+  hdrSourceSet: 'HDR bracket',
   libraryRating: (rating: number) => `Rating ${rating}`,
   libraryStars: (rating: number) => `${rating} stars`,
   libraryColorLabel: (label: string) => `Color label ${label}`,
@@ -1419,6 +1440,104 @@ function FocusPrivateRawVisualSmoke() {
             </div>
             <div className="rounded border border-white/10 bg-white/5 p-2">
               <p className="text-xs text-[#aab2bd]">{copy.focusPrivateRawSourceSet}</p>
+              <p>{copy.privateRawFrameCount(proof.sourceCount)}</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function HdrPrivateRawVisualSmoke() {
+  const proof = window.__RAWENGINE_HDR_PRIVATE_RAW_PROOF__;
+
+  if (!proof) {
+    return (
+      <main
+        className="grid h-full min-h-screen place-items-center bg-[#111316] text-[#f3f4f1] font-sans"
+        data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi}
+      >
+        <p>{copy.missingPrivateRawProofArtifacts}</p>
+      </main>
+    );
+  }
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi}
+    >
+      <div className="grid h-screen grid-cols-[1fr_360px] bg-[#0f1114]" data-visual-smoke-section="hdr-private-raw">
+        <section className="grid grid-rows-[44px_1fr_220px] overflow-hidden">
+          <div className="flex items-center justify-between border-b border-white/10 bg-[#181b1f] px-4">
+            <span className="text-sm font-semibold tracking-normal">{copy.brand}</span>
+            <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#aab2bd]">
+              {copy.hdrPrivateRawReview}
+            </span>
+          </div>
+          <div className="grid min-h-0 grid-cols-2 gap-3 p-4">
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.hdrPrivateRawBefore}</figcaption>
+              <img
+                alt={copy.hdrPrivateRawBefore}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="hdr-private-raw-before"
+                src={proof.beforeDataUrl}
+              />
+            </figure>
+            <figure className="min-h-0 rounded-md border border-white/10 bg-[#15191e] p-3">
+              <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.hdrPrivateRawAfter}</figcaption>
+              <img
+                alt={copy.hdrPrivateRawAfter}
+                className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+                data-testid="hdr-private-raw-after"
+                src={proof.afterDataUrl}
+              />
+            </figure>
+          </div>
+          <figure className="m-4 mt-0 overflow-hidden rounded-md border border-white/10 bg-[#15191e] p-3">
+            <figcaption className="mb-2 text-xs text-[#aab2bd]">{copy.hdrPrivateRawPreview}</figcaption>
+            <img
+              alt={copy.hdrPrivateRawPreview}
+              className="h-[calc(100%-1.5rem)] w-full rounded object-contain"
+              data-testid="hdr-private-raw-preview"
+              src={proof.previewDataUrl}
+            />
+          </figure>
+        </section>
+        <aside className="border-l border-white/10 bg-[#171a1f] p-4 text-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="font-semibold">{copy.hdrReview}</span>
+            <span className="rounded bg-white/10 px-2 py-0.5 text-xs">{copy.hdrPrivateRawRuntime}</span>
+          </div>
+          <div
+            className="sr-only"
+            data-after-artifact={proof.afterArtifact}
+            data-before-artifact={proof.beforeArtifact}
+            data-export-artifact={proof.exportArtifact}
+            data-fixture-id={proof.fixtureId}
+            data-merge-artifact={proof.mergeArtifact}
+            data-preview-artifact={proof.previewArtifact}
+            data-runtime-status="private_raw_app_server_apply"
+            data-source-count={proof.sourceCount}
+            data-testid="hdr-private-raw-review-proof"
+          />
+          <div className="space-y-2">
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.hdrPrivateRawRuntime}</p>
+              <p>{proof.fixtureId}</p>
+            </div>
+            <div
+              className="rounded border border-white/10 bg-white/5 p-2"
+              data-testid="hdr-private-raw-artifact-handoff"
+            >
+              <p className="text-xs text-[#aab2bd]">{copy.hdrArtifactHandoff}</p>
+              <p className="break-all">{proof.mergeArtifact}</p>
+            </div>
+            <div className="rounded border border-white/10 bg-white/5 p-2">
+              <p className="text-xs text-[#aab2bd]">{copy.hdrSourceSet}</p>
               <p>{copy.privateRawFrameCount(proof.sourceCount)}</p>
             </div>
           </div>

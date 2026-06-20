@@ -272,6 +272,16 @@ export const focusPrivateRawReviewProofSchema = z.object({
   runtimeStatus: z.literal('private_raw_app_server_apply'),
   sourceCount: z.literal('3'),
 });
+export const hdrPrivateRawReviewProofSchema = z.object({
+  afterArtifact: z.string().endsWith('/hdr-bracket-modal-after.png'),
+  beforeArtifact: z.string().endsWith('/hdr-bracket-modal-before.png'),
+  exportArtifact: z.string().endsWith('/hdr-bracket-export.tiff'),
+  fixtureId: z.literal('validation.computational-merge.hdr-bracket-alignment.v1'),
+  mergeArtifact: z.string().endsWith('/hdr-bracket-merge.tiff'),
+  previewArtifact: z.string().endsWith('/hdr-bracket-preview.png'),
+  runtimeStatus: z.literal('private_raw_app_server_apply'),
+  sourceCount: z.literal('3'),
+});
 export const superResolutionUiSettingsProofSchema = z.object({
   alignmentMode: z.literal('optical_flow'),
   detailPolicy: z.literal('aggressive_preview_only'),

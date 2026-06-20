@@ -26,6 +26,7 @@ import {
   focusReviewWorkspaceProofSchema,
   focusPrivateRawReviewProofSchema,
   focusUiSettingsProofSchema,
+  hdrPrivateRawReviewProofSchema,
   hdrReviewWorkspaceProofSchema,
   hdrUiSettingsProofSchema,
   libraryWorkflowProofSchema,
@@ -66,6 +67,9 @@ const requiresSrPrivateRawProof = selectedScenarios.some(
 );
 const requiresFocusPrivateRawProof = selectedScenarios.some(
   (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.FocusPrivateRawUi,
+);
+const requiresHdrPrivateRawProof = selectedScenarios.some(
+  (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi,
 );
 const requiresPanoramaPrivateRawProof = selectedScenarios.some(
   (scenario) => scenario.mode === VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi,
@@ -109,6 +113,19 @@ interface FocusPrivateRawBrowserProof {
   stackPath: string;
 }
 
+interface HdrPrivateRawBrowserProof {
+  afterArtifact: string;
+  afterDataUrl: string;
+  beforeArtifact: string;
+  beforeDataUrl: string;
+  exportArtifact: string;
+  fixtureId: string;
+  mergeArtifact: string;
+  previewArtifact: string;
+  previewDataUrl: string;
+  sourceCount: string;
+}
+
 interface PanoramaPrivateRawBrowserProof {
   exportReviewArtifact: string;
   exportReviewDataUrl: string;
@@ -147,6 +164,7 @@ interface NegativeLabPublicExportBrowserProof {
 declare global {
   interface Window {
     __RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__?: FocusPrivateRawBrowserProof;
+    __RAWENGINE_HDR_PRIVATE_RAW_PROOF__?: HdrPrivateRawBrowserProof;
     __RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__?: LayerMaskPrivateRawBrowserProof;
     __RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__?: NegativeLabPublicExportBrowserProof;
     __RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__?: PanoramaPrivateRawBrowserProof;
@@ -255,6 +273,26 @@ async function loadFocusPrivateRawProof(): Promise<FocusPrivateRawBrowserProof> 
     resultReviewDataUrl: await readPngDataUrl(resultReviewArtifact),
     sourceCount: '3',
     stackPath: `${artifactRoot}/focus-plane-merge.tiff`,
+  };
+}
+
+async function loadHdrPrivateRawProof(): Promise<HdrPrivateRawBrowserProof> {
+  const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
+  const artifactRoot = `${privateRoot}/private-artifacts/validation/computational-merge`;
+  const beforeArtifact = `${artifactRoot}/hdr-bracket-modal-before.png`;
+  const afterArtifact = `${artifactRoot}/hdr-bracket-modal-after.png`;
+  const previewArtifact = `${artifactRoot}/hdr-bracket-preview.png`;
+  return {
+    afterArtifact,
+    afterDataUrl: await readPngDataUrl(afterArtifact),
+    beforeArtifact,
+    beforeDataUrl: await readPngDataUrl(beforeArtifact),
+    exportArtifact: `${artifactRoot}/hdr-bracket-export.tiff`,
+    fixtureId: 'validation.computational-merge.hdr-bracket-alignment.v1',
+    mergeArtifact: `${artifactRoot}/hdr-bracket-merge.tiff`,
+    previewArtifact,
+    previewDataUrl: await readPngDataUrl(previewArtifact),
+    sourceCount: '3',
   };
 }
 
@@ -518,6 +556,24 @@ async function prepareScenario(page, mode) {
     await page
       .getByTestId('focus-private-raw-artifact-handoff')
       .getByText('focus-plane-merge.tiff', { exact: false })
+      .waitFor({ timeout: 10_000 });
+    return;
+  }
+
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.HdrPrivateRawUi) {
+    hdrPrivateRawReviewProofSchema.parse(
+      await page.getByTestId('hdr-private-raw-review-proof').evaluate((element) => ({ ...element.dataset })),
+    );
+    for (const testId of ['hdr-private-raw-before', 'hdr-private-raw-after', 'hdr-private-raw-preview']) {
+      const loaded = await page.getByTestId(testId).evaluate((element) => {
+        const image = element as HTMLImageElement;
+        return image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+      });
+      if (!loaded) throw new Error(`${testId} did not load a nonblank private RAW image.`);
+    }
+    await page
+      .getByTestId('hdr-private-raw-artifact-handoff')
+      .getByText('hdr-bracket-merge.tiff', { exact: false })
       .waitFor({ timeout: 10_000 });
     return;
   }
@@ -1185,6 +1241,14 @@ async function main() {
           window.__RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__ = proof;
         },
         await loadFocusPrivateRawProof(),
+      );
+    }
+    if (requiresHdrPrivateRawProof) {
+      await page.addInitScript(
+        (proof: HdrPrivateRawBrowserProof) => {
+          window.__RAWENGINE_HDR_PRIVATE_RAW_PROOF__ = proof;
+        },
+        await loadHdrPrivateRawProof(),
       );
     }
     if (requiresPanoramaPrivateRawProof) {
