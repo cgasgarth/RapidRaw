@@ -286,6 +286,8 @@
     "check:hdr-deghosting-smoke": "bun tests/integration/checks/check-hdr-deghosting-smoke.ts",
     "check:hdr-deghost-tone-artifact": "bun tests/integration/checks/check-hdr-deghost-tone-artifact.ts",
     "check:hdr-deghost-tone-artifact:update": "bun tests/integration/checks/check-hdr-deghost-tone-artifact.ts --update",
+    "check:hdr-deghost-confidence-map": "bun tests/integration/checks/check-hdr-deghost-confidence-map.ts",
+    "check:hdr-deghost-confidence-map:update": "bun tests/integration/checks/check-hdr-deghost-confidence-map.ts --update",
     "check:hdr-app-server-runtime": "bun tests/integration/checks/check-hdr-app-server-runtime.ts",
     "check:hdr-runtime-plan-smoke": "bun tests/integration/checks/check-hdr-runtime-plan-smoke.ts",
     "check:hdr-merge-weighting-smoke": "bun tests/integration/checks/check-hdr-merge-weighting-smoke.ts",
