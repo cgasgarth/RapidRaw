@@ -1882,6 +1882,7 @@
       "workflowColorTiming": "Farbe",
       "workflowCustomPresetDetail": "Eigene Mischung",
       "workflowExport": "Export",
+      "workflowExportBlocked": "Export blocked",
       "workflowExportConverting": "Wird umgewandelt",
       "workflowExportReadyCount": "{{format}} / {{queuedCount}} queued",
       "workflowExportReadyJpeg": "JPEG-Proof bereit",

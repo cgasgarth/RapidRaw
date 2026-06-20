@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import {
   buildNegativeLabDustScratchReviewReport,
   buildNegativeLabQcProofReport,
@@ -31,6 +33,7 @@ const proof = negativeLabWorkspaceProofSchema.parse({
   schemaVersion: NEGATIVE_LAB_WORKSPACE_SCHEMA_VERSION,
   targetCount: targetPaths.length,
 });
+const modalSource = readFileSync('src/components/modals/NegativeConversionModal.tsx', 'utf8');
 
 if (proof.reviewReport.frames.length !== targetPaths.length) {
   throw new Error('Negative Lab workspace review did not cover every frame.');
@@ -53,6 +56,17 @@ if (
 
 if (qcProofReport.frames.some((frame) => frame.exportBlockedReason !== null)) {
   throw new Error('Negative Lab QC proof report blocked export-ready proof rows.');
+}
+
+for (const marker of [
+  'negative-lab-workflow-readiness-strip',
+  'data-preview-ready={String(workspaceProof.previewReady)}',
+  'data-export-ready={String(workspaceProof.exportReady)}',
+  'modals.negativeConversion.workflowExportBlocked',
+]) {
+  if (!modalSource.includes(marker)) {
+    throw new Error(`Negative Lab workspace UI marker missing: ${marker}`);
+  }
 }
 
 console.log(`negative lab workspace ok (${proof.targetCount} frames, heuristic inspection + QC proof only)`);

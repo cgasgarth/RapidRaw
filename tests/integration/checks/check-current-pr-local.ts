@@ -200,6 +200,10 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   addIf((file) => file.startsWith('packages/rawengine-schema/src/panorama'), ['check:panorama-runtime-plan-smoke']);
   addIf((file) => file === 'src/components/modals/PanoramaModal.tsx', ['check:panorama-review-diagnostics']);
   addIf(
+    (file) => file === 'src/components/modals/NegativeConversionModal.tsx',
+    ['check:negative-lab-workspace', 'check:negative-lab-roll-cockpit'],
+  );
+  addIf(
     (file) => file.includes('panoramaSyntheticStitch') || file.includes('panorama-exposure-runtime-proof'),
     ['check:panorama-exposure-runtime-proof'],
   );
