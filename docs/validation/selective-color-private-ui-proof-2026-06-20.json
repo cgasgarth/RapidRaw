@@ -1,0 +1,38 @@
+{
+  "doesNotProve": [
+    "capture_one_class_color_quality",
+    "full_macos_app_manual_session",
+    "gpu_cpu_parity",
+    "icc_colorimetric_accuracy",
+    "public_raw_fixture"
+  ],
+  "fixtureId": "validation.raw-open-edit-export.selective-color-orange.v1",
+  "issue": 2476,
+  "rawRuntime": {
+    "editCommandId": "command.raw-open-edit-export.selective-color-orange.v1",
+    "metrics": {
+      "changedPixelRatio": 0.163750875,
+      "previewExportMeanAbsDelta": 0,
+      "sidecarReloadRevisionMatch": 1,
+      "sourceHashUnchanged": 1
+    },
+    "sourceRawSha256": "sha256:5b1a62fb37669f3065479e2c7cf9af4ef031a920cf6feac82d1269e9fdf4a136",
+    "workflowArtifactCount": 6,
+    "workflowReportPath": "private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json"
+  },
+  "schemaVersion": 1,
+  "validationCommands": [
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root bun run check:selective-color-local-raw-proof -- --require-assets",
+    "bun scripts/capture-visual-smoke.ts --scenario color-workflow",
+    "bun run check:selective-color-private-ui-proof"
+  ],
+  "visualReview": {
+    "dimensions": {
+      "height": 960,
+      "width": 1440
+    },
+    "scenario": "color-workflow",
+    "screenshotPath": "artifacts/visual-smoke/color-workflow.png",
+    "selectiveColorControlsExercised": true
+  }
+}
