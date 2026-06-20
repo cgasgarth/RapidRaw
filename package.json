@@ -169,6 +169,8 @@
     "check:professional-workflow-status": "bun tests/integration/checks/check-professional-workflow-status.ts",
     "check:professional-workflow-status:update": "bun tests/integration/checks/check-professional-workflow-status.ts --update",
     "check:professional-color-workflow-local-raw-proof": "bun tests/integration/checks/check-professional-color-workflow-local-raw-proof.ts",
+    "run:professional-color-workflow-private-proof": "bun scripts/run-professional-color-workflow-private-proof.ts",
+    "check:professional-color-workflow-private-proof": "bun scripts/run-professional-color-workflow-private-proof.ts",
     "check:export-queue": "bun tests/integration/checks/check-export-queue-fixtures.ts",
     "check:smart-albums": "bun tests/integration/checks/check-smart-album-fixtures.ts",
     "check:metadata-templates": "bun tests/integration/checks/check-metadata-template-fixtures.ts",
