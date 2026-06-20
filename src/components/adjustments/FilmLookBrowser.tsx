@@ -245,16 +245,31 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
         </UiText>
       </div>
 
-      <input
-        aria-label={t('adjustments.effects.filmLookBrowser.search')}
-        className="w-full rounded-md border border-surface bg-bg-secondary px-3 py-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent"
-        onChange={(event) => {
-          setSearchQuery(event.target.value);
-        }}
-        placeholder={t('adjustments.effects.filmLookBrowser.search')}
-        type="search"
-        value={searchQuery}
-      />
+      <div className="relative">
+        <input
+          aria-label={t('adjustments.effects.filmLookBrowser.search')}
+          className="w-full rounded-md border border-surface bg-bg-secondary px-3 py-2 pr-10 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent"
+          onChange={(event) => {
+            setSearchQuery(event.target.value);
+          }}
+          placeholder={t('adjustments.effects.filmLookBrowser.search')}
+          type="search"
+          value={searchQuery}
+        />
+        <button
+          aria-label={t('adjustments.effects.filmLookBrowser.searchClear')}
+          className="absolute right-1 top-1 h-8 w-8 rounded text-text-secondary transition-colors hover:bg-surface hover:text-text-primary disabled:pointer-events-none disabled:opacity-0"
+          data-testid="film-look-search-clear"
+          data-tooltip={t('adjustments.effects.filmLookBrowser.searchClear')}
+          disabled={searchQuery.length === 0}
+          onClick={() => {
+            setSearchQuery('');
+          }}
+          type="button"
+        >
+          <X aria-hidden="true" className="mx-auto" size={14} />
+        </button>
+      </div>
 
       <label className="block space-y-1">
         <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">

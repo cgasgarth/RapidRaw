@@ -234,6 +234,7 @@
         "resultCount": "{{visibleCount}} of {{totalCount}} looks",
         "saveLook": "Save {{displayName}} as preset",
         "search": "Search looks",
+        "searchClear": "Clear look search",
         "shareLook": "Share {{displayName}} preset",
         "sort": "Sort",
         "sortModes": {
