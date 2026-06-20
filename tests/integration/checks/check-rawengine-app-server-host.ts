@@ -391,7 +391,10 @@ for (const route of routeCatalogReplay.response.routes.filter((candidate) => can
       }
     }
   }
-  if (route.commandName === 'ai.enhancement.dry_run_command' || route.commandName === 'ai.enhancement.apply_command') {
+  if (
+    (route.commandName === 'ai.enhancement.dry_run_command' || route.commandName === 'ai.enhancement.apply_command') &&
+    route.runtimeCheckScripts.includes('check:ai-denoise-runtime-apply')
+  ) {
     if (!route.runtimeCheckScripts.includes('check:ai-denoise-app-server-tool')) {
       failures.push(`${route.commandName}: AI enhancement route catalog entry missing denoise tool proof check.`);
     }

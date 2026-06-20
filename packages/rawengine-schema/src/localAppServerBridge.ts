@@ -516,6 +516,25 @@ export class RawEngineLocalAppServerBridge {
 export const createRawEngineLocalAppServerBridge = (): RawEngineLocalAppServerBridge =>
   new RawEngineLocalAppServerBridge();
 
+export const buildRawEngineLocalAppServerBridgeCapabilities = (
+  bridge = createRawEngineLocalAppServerBridge(),
+): {
+  commandTypes: string[];
+  mutatingCommands: boolean;
+  runtimeStatus: 'basic_tone_hsl_and_ai_enhancement_dry_run_apply';
+} => {
+  const commandTypes = bridge.listCommandTypes().sort((left, right) => left.localeCompare(right));
+
+  return {
+    commandTypes,
+    mutatingCommands:
+      commandTypes.includes('ai.enhancement.apply') ||
+      commandTypes.includes('toneColor.adjustHsl') ||
+      commandTypes.includes('toneColor.setBasicTone'),
+    runtimeStatus: 'basic_tone_hsl_and_ai_enhancement_dry_run_apply',
+  };
+};
+
 export const buildRawEngineLocalAppServerToolRegistryQuery = (
   requestId: string,
 ): RawEngineLocalAppServerToolRegistryQueryV1 =>
@@ -524,14 +543,6 @@ export const buildRawEngineLocalAppServerToolRegistryQuery = (
     requestId,
   });
 
-export const rawEngineLocalAppServerBridgeCapabilities = Object.freeze({
-  commandTypes: [
-    RawEngineLocalAppServerCommandType.ToolRegistryQuery,
-    'ai.enhancement.apply',
-    'ai.enhancement.dryRun',
-    'toneColor.adjustHsl',
-    'toneColor.setBasicTone',
-  ],
-  mutatingCommands: true,
-  runtimeStatus: 'basic_tone_hsl_and_ai_enhancement_dry_run_apply',
-});
+export const rawEngineLocalAppServerBridgeCapabilities = Object.freeze(
+  buildRawEngineLocalAppServerBridgeCapabilities(),
+);

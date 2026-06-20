@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'node:fs';
 
+import { rawEngineLocalAppServerBridgeCapabilities } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
   sampleToolRegistryV1,
   sampleToneColorCommandEnvelopeV1,
@@ -15,6 +16,7 @@ import {
   TONE_COLOR_APP_SERVER_EXECUTION_MODES,
   TONE_COLOR_APP_SERVER_TOOL_NAMES,
   ToneColorAppServerExecutionMode,
+  ToneColorAppServerRouteStatus,
 } from '../../../src/utils/toneColorAppServerRouteIds.ts';
 import { TONE_COLOR_APP_SERVER_ROUTES } from '../../../src/utils/toneColorAppServerRoutes.ts';
 
@@ -23,6 +25,7 @@ const packageScripts = new Set(Object.keys(packageJson.scripts ?? {}));
 const routeToolNames = new Set(TONE_COLOR_APP_SERVER_ROUTES.map((route) => route.toolName));
 const expectedCommandTypes = toneColorCommandTypeV1Schema.options;
 const expectedCommandTypeSet = new Set<string>(expectedCommandTypes);
+const executableCommandTypes = new Set(rawEngineLocalAppServerBridgeCapabilities.commandTypes);
 const failures = [];
 
 if (JSON.stringify(TONE_COLOR_APP_SERVER_COMMAND_TYPES) !== JSON.stringify(expectedCommandTypes)) {
@@ -51,6 +54,14 @@ for (const route of TONE_COLOR_APP_SERVER_ROUTES) {
   const expectedMutates = route.executionMode === ToneColorAppServerExecutionMode.ApplyDryRunPlan;
   if (tool.mutates !== expectedMutates) {
     failures.push(`${route.toolName} mutates flag does not match route execution mode.`);
+  }
+
+  const executable = executableCommandTypes.has(route.commandType);
+  if (executable && route.status !== ToneColorAppServerRouteStatus.Mapped) {
+    failures.push(`${route.commandType} has an executable bridge handler but is not marked mapped.`);
+  }
+  if (!executable && route.status !== ToneColorAppServerRouteStatus.MappedUnavailable) {
+    failures.push(`${route.commandType} lacks an executable bridge handler but is not marked unavailable.`);
   }
 
   if (!packageScripts.has(route.runtimeCheckScript)) {

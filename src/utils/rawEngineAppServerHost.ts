@@ -3,6 +3,7 @@ import { COMPUTATIONAL_MERGE_APP_SERVER_ROUTES } from './computationalMergeAppSe
 import { DETAIL_APP_SERVER_ROUTES } from './detailAppServerRoutes';
 import { FILM_LOOK_APP_SERVER_ROUTE_MANIFEST } from './filmLookAppServerRoutes';
 import { NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST } from './negativeLabAppServerRoutes';
+import { ToneColorAppServerRouteStatus } from './toneColorAppServerRouteIds';
 import { TONE_COLOR_APP_SERVER_ROUTES } from './toneColorAppServerRoutes';
 import {
   AgentRuntimeId,
@@ -421,9 +422,12 @@ const buildRouteCatalogEntry = ({
 
 export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCatalogEntry[] => {
   const catalog: RawEngineAppServerRouteCatalogEntry[] = [];
-  const toneColorCommandNames = uniqueSorted(TONE_COLOR_APP_SERVER_ROUTES.map((route) => route.commandType));
+  const mappedToneColorRoutes = TONE_COLOR_APP_SERVER_ROUTES.filter(
+    (route) => route.status === ToneColorAppServerRouteStatus.Mapped,
+  );
+  const toneColorCommandNames = uniqueSorted(mappedToneColorRoutes.map((route) => route.commandType));
   for (const commandName of toneColorCommandNames) {
-    const routes = TONE_COLOR_APP_SERVER_ROUTES.filter((route) => route.commandType === commandName);
+    const routes = mappedToneColorRoutes.filter((route) => route.commandType === commandName);
     catalog.push(
       buildRouteCatalogEntry({
         commandName,
