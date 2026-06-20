@@ -1,0 +1,60 @@
+{
+  "agentBridge": {
+    "applyCommandId": "command_agent_app_server_raw_edit_apply_2315",
+    "applyTool": "tonecolor.apply_command",
+    "dryRunCommandId": "command_agent_app_server_raw_edit_dry_run_2315",
+    "dryRunTool": "tonecolor.dry_run_command",
+    "reportHash": "sha256:75c5ec4039f1778a46317c5d3a9591d27c1004eaba9381456168bed12e0117f4",
+    "reportPath": "docs/validation/agent-app-server-raw-edit-proof-2026-06-20.json"
+  },
+  "generatedAt": "2026-06-20T11:21:02.618Z",
+  "issue": 2315,
+  "limits": [
+    "Runs the RawEngine local app-server bridge in-process, not the official Codex app-server sidecar.",
+    "Verifies private RAW before/after/export artifacts from the RAW runtime proof, but does not prove the chat agent launched the desktop app.",
+    "Links agent apply intent to a representative RAW artifact lane; full #2315 still needs one unified app-server plus app run."
+  ],
+  "privateRawRuntime": {
+    "artifacts": [
+      {
+        "hash": "sha256:5b1a62fb37669f3065479e2c7cf9af4ef031a920cf6feac82d1269e9fdf4a136",
+        "kind": "source_raw_private",
+        "path": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+        "publicRepoAllowed": false
+      },
+      {
+        "hash": "sha256:603d3031d47e7ccbc215e6bf597c46076e733076c8763aa1531cf9155c6520e3",
+        "kind": "preview_before_private",
+        "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-preview-before.png",
+        "publicRepoAllowed": false
+      },
+      {
+        "hash": "sha256:067dff830818527683f24363cd4d7be6b14ee281d235eedd383f5fcc89a1624e",
+        "kind": "preview_after_private",
+        "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-preview-after.png",
+        "publicRepoAllowed": false
+      },
+      {
+        "hash": "sha256:ffbb077f3dd8a8bf6775faf1d50b3179df06bba808f0a38d1ac19573c6a6e2da",
+        "kind": "export_after_private",
+        "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-export-after.tiff",
+        "publicRepoAllowed": false
+      },
+      {
+        "hash": "sha256:a82ff62320d4caa621a4192550445e50fb80c8f607f0fa2a0f455274bcd0498f",
+        "kind": "sidecar_after_private",
+        "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-after.rrdata",
+        "publicRepoAllowed": false
+      }
+    ],
+    "changedPixelRatio": 0.9936348333333334,
+    "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
+    "previewExportMeanAbsDelta": 0,
+    "sourceHashUnchanged": 1,
+    "sourceRawHash": "sha256:5b1a62fb37669f3065479e2c7cf9af4ef031a920cf6feac82d1269e9fdf4a136",
+    "workflowReportPath": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-workflow-report.json"
+  },
+  "proofStatus": "partial_agent_apply_plus_private_raw_artifacts",
+  "schemaVersion": 1,
+  "validationMode": "agent_app_server_bridge_plus_private_raw_artifact_proof"
+}
