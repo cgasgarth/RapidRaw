@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
-import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from './compact-output.ts';
+import { formatCommandForLog, readBoundedStream, writeBoundedOutput } from '../../../scripts/compact-output.ts';
 
 const GITHUB_FILE_SCHEMA = z
   .object({
@@ -242,7 +242,8 @@ function runSelfTest() {
     [
       {
         filename: 'package.json',
-        patch: '@@ -1,3 +1,4 @@\n+    "schema:contract-gate": "bun scripts/ci-schema-contract-gate.ts",',
+        patch:
+          '@@ -1,3 +1,4 @@\n+    "schema:contract-gate": "bun tests/integration/checks/check-schema-contract-gate.ts",',
       },
     ],
     true,

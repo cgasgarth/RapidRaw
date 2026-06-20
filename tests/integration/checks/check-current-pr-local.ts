@@ -6,6 +6,11 @@ import { extname } from 'node:path';
 const textDecoder = new TextDecoder();
 const FORMAT_EXTENSIONS = new Set(['.css', '.html', '.json', '.jsonc', '.md', '.ts', '.tsx', '.yml', '.yaml']);
 const LINT_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx']);
+const CHANGED_CHECK_SELF_TEST_ARGS = new Map<string, Array<string>>([
+  ['tests/integration/checks/check-ci-classify-macos-smoke.ts', ['--self-test']],
+  ['tests/integration/checks/check-ci-classify-rust-pr.ts', ['--self-test']],
+  ['tests/integration/checks/check-schema-contract-gate.ts', ['--self-test']],
+]);
 
 interface CommandResult {
   code: number;
@@ -134,7 +139,7 @@ function routeCommandsForChangedFiles(changedFiles: ReadonlyArray<string>): Arra
     commands.push({ command: ['bun', 'run', 'check:validation-test-paths'], label: 'validation test paths' });
   } else {
     for (const file of changedCheckFiles) {
-      commands.push({ command: ['bun', file], label: file });
+      commands.push({ command: ['bun', file, ...(CHANGED_CHECK_SELF_TEST_ARGS.get(file) ?? [])], label: file });
     }
   }
 
@@ -231,6 +236,10 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(
     ['packages/rawengine-schema/src/filmGrainRuntime.ts'],
     ['check:film-grain-runtime-proof', 'check:film-grain-ui'],
+  );
+  assertSelfTestRoute(
+    ['tests/integration/checks/check-schema-contract-gate.ts'],
+    ['tests/integration/checks/check-schema-contract-gate.ts'],
   );
   assertSelfTestRoute(
     ['packages/rawengine-schema/src/focusStackWeightedBlend.ts'],
