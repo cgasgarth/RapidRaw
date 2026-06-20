@@ -1,0 +1,188 @@
+{
+  "artifacts": [
+    {
+      "hash": "sha256:5618bb18a45b0800984300ec53adf6cff04ea77d051c28472a21c585ad85a59e",
+      "kind": "source_raw_sequence_private",
+      "path": "private-fixtures/super-resolution/alaska-burst-v1",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:8d61385a3dd44abd6f53e0764c2e5eebe9c6b86a88a0702fe35674c79c2b76ab",
+      "kind": "decode_report_private",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-decode-report.json",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:36519a2ac97e0c9901e88fe1f3df4d731b7a7f7c83ff36b9b11981656c2398f7",
+      "kind": "alignment_report_private",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-registration.json",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:d1080dfabb43d5a915a7968fe5eeacd7456f4dc03e7a856665cbfa762c15827c",
+      "kind": "merge_output_private",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-reconstruction.tiff",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:f9054581d337409b04e50aa3160a83d8a08738408a5e38c9e3908c5997f4287d",
+      "kind": "preview_after_private",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-preview.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:d1080dfabb43d5a915a7968fe5eeacd7456f4dc03e7a856665cbfa762c15827c",
+      "kind": "export_after_private",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-export.tiff",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:9def8b5d3e049154debba70a7c47427415fcbfd2871fc8699ce6e0056b10e513",
+      "kind": "quality_report_private",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-quality.json",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:2ad1ab05180a43ff6fe4a349c3251c6299b155ef438b26d475c967bf69679be5",
+      "kind": "app_server_runtime_report_private",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-app-server-runtime-proof.json",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:00628bb60e93110f40fcc1db138fc52fa980041d98df19f7db9e65faca88bd7e",
+      "kind": "modal_before_apply",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-modal-before.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:e34d4568b8ce96181043fab0a6af530d7a5adcd9dad01fe49afa484fb56dae3e",
+      "kind": "modal_after_apply",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-modal-after.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:e34d4568b8ce96181043fab0a6af530d7a5adcd9dad01fe49afa484fb56dae3e",
+      "kind": "result_review",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-result-review.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:e34d4568b8ce96181043fab0a6af530d7a5adcd9dad01fe49afa484fb56dae3e",
+      "kind": "export_review",
+      "path": "private-artifacts/validation/computational-merge/sr-subpixel-export-review.png",
+      "publicRepoAllowed": false
+    }
+  ],
+  "fixtureId": "validation.computational-merge.super-resolution-subpixel.v1",
+  "generatedAt": "2026-06-20T22:15:38.407Z",
+  "issue": 2314,
+  "metrics": [
+    {
+      "name": "decodedSourceCount",
+      "passed": true,
+      "threshold": 4,
+      "value": 4
+    },
+    {
+      "name": "decodedFinitePixelRatio",
+      "passed": true,
+      "threshold": 1,
+      "value": 1
+    },
+    {
+      "name": "decodedNonzeroDimensionCount",
+      "passed": true,
+      "threshold": 4,
+      "value": 4
+    },
+    {
+      "name": "superResolutionDetailGainRatio",
+      "passed": true,
+      "threshold": 1.2,
+      "value": 4
+    },
+    {
+      "name": "superResolutionOutputPixelCount",
+      "passed": true,
+      "threshold": 1382400,
+      "value": 1382400
+    },
+    {
+      "name": "superResolutionSourceCoverageRatio",
+      "passed": true,
+      "threshold": 1,
+      "value": 1
+    },
+    {
+      "name": "superResolutionArtifactScore",
+      "passed": true,
+      "threshold": 0.02,
+      "value": 0
+    },
+    {
+      "name": "superResolutionRegistrationResidualPx",
+      "passed": true,
+      "threshold": 0.25,
+      "value": 0.015
+    },
+    {
+      "name": "previewExportMeanAbsDelta",
+      "passed": true,
+      "threshold": 0.015,
+      "value": 0
+    }
+  ],
+  "proofClaims": {
+    "doesNotProve": [
+      "manual_macos_app_session",
+      "motion_robustness",
+      "final_detail_quality",
+      "demosaic_aware_sr_quality"
+    ],
+    "proves": [
+      "project_owned_alaska_raw_burst_ingest",
+      "production_raw_decode_for_four_sources",
+      "bounded_x2_reconstruction_artifact",
+      "preview_export_artifact_generation",
+      "typed_app_server_dry_run_apply",
+      "private_raw_review_ui_smoke"
+    ]
+  },
+  "reportId": "computational-merge-run.super-resolution-subpixel.v1",
+  "runtimeProof": {
+    "appServerRuntime": "runtime_apply_capable",
+    "outputArtifactCount": 12,
+    "previewExportParityMetric": "previewExportMeanAbsDelta",
+    "rawDecodePath": "load_base_image_from_bytes",
+    "reconstructionPath": "sr_real_raw_proof::reconstruct_sr_image",
+    "sourceSet": "project-owned Alaska ARW burst _DSC7861.ARW-_DSC7864.ARW",
+    "uiSmokeScenario": "sr-private-raw-ui"
+  },
+  "sourceHashes": [
+    {
+      "hash": "sha256:0eb9813940f9aa18abe99033d41de30d5e0cf69dfbb25ab578cc2ab831d956a4",
+      "path": "private-fixtures/super-resolution/alaska-burst-v1/_DSC7861.ARW",
+      "publicRepoAllowed": false,
+      "localRelativePath": "private-fixtures/super-resolution/alaska-burst-v1/_DSC7861.ARW"
+    },
+    {
+      "hash": "sha256:c805504e930d0798ae24853de8ad14ecf5328bbb0961bde5916f455cae11f747",
+      "path": "private-fixtures/super-resolution/alaska-burst-v1/_DSC7862.ARW",
+      "publicRepoAllowed": false,
+      "localRelativePath": "private-fixtures/super-resolution/alaska-burst-v1/_DSC7862.ARW"
+    },
+    {
+      "hash": "sha256:13bcc0fa7fa93e402bda2d9d1715bae55210ee6d7719e8a9e342f1dbd904ff74",
+      "path": "private-fixtures/super-resolution/alaska-burst-v1/_DSC7863.ARW",
+      "publicRepoAllowed": false,
+      "localRelativePath": "private-fixtures/super-resolution/alaska-burst-v1/_DSC7863.ARW"
+    },
+    {
+      "hash": "sha256:a812c8ae6d9a3a14790d58007ae8f538c5f41b4fc92c285436c0feeab02bef39",
+      "path": "private-fixtures/super-resolution/alaska-burst-v1/_DSC7864.ARW",
+      "publicRepoAllowed": false,
+      "localRelativePath": "private-fixtures/super-resolution/alaska-burst-v1/_DSC7864.ARW"
+    }
+  ],
+  "validationMode": "private_raw_app_server_ui_smoke"
+}

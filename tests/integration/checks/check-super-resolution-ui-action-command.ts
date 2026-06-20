@@ -18,10 +18,10 @@ const actionMetadataSchema = z
   .strict();
 
 const sourcePaths = [
-  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-01.arw',
-  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-02.arw',
-  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-03.arw',
-  '/private-fixtures/super-resolution/subpixel-detail-v1/frame-04.arw',
+  '/private-fixtures/super-resolution/alaska-burst-v1/_DSC7861.ARW',
+  '/private-fixtures/super-resolution/alaska-burst-v1/_DSC7862.ARW',
+  '/private-fixtures/super-resolution/alaska-burst-v1/_DSC7863.ARW',
+  '/private-fixtures/super-resolution/alaska-burst-v1/_DSC7864.ARW',
 ];
 const settings = {
   ...DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,

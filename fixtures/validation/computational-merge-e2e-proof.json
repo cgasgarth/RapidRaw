@@ -350,43 +350,43 @@
     {
       "artifacts": [
         {
-          "hash": null,
+          "hash": "sha256:5618bb18a45b0800984300ec53adf6cff04ea77d051c28472a21c585ad85a59e",
           "kind": "source_raw_sequence_private",
-          "path": "private-fixtures/super-resolution/subpixel-detail-v1",
+          "path": "private-fixtures/super-resolution/alaska-burst-v1",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:36519a2ac97e0c9901e88fe1f3df4d731b7a7f7c83ff36b9b11981656c2398f7",
           "kind": "alignment_report_private",
           "path": "private-artifacts/validation/computational-merge/sr-subpixel-registration.json",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:d1080dfabb43d5a915a7968fe5eeacd7456f4dc03e7a856665cbfa762c15827c",
           "kind": "merge_output_private",
           "path": "private-artifacts/validation/computational-merge/sr-subpixel-reconstruction.tiff",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:f9054581d337409b04e50aa3160a83d8a08738408a5e38c9e3908c5997f4287d",
           "kind": "preview_after_private",
           "path": "private-artifacts/validation/computational-merge/sr-subpixel-preview.png",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:d1080dfabb43d5a915a7968fe5eeacd7456f4dc03e7a856665cbfa762c15827c",
           "kind": "export_after_private",
           "path": "private-artifacts/validation/computational-merge/sr-subpixel-export.tiff",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:9def8b5d3e049154debba70a7c47427415fcbfd2871fc8699ce6e0056b10e513",
           "kind": "quality_report_private",
           "path": "private-artifacts/validation/computational-merge/sr-subpixel-quality.json",
           "publicRepoAllowed": false
         },
         {
-          "hash": null,
+          "hash": "sha256:2ad1ab05180a43ff6fe4a349c3251c6299b155ef438b26d475c967bf69679be5",
           "kind": "app_server_runtime_report_private",
           "path": "private-artifacts/validation/computational-merge/sr-subpixel-app-server-runtime-proof.json",
           "publicRepoAllowed": false
@@ -414,14 +414,14 @@
       "fixtureId": "validation.computational-merge.super-resolution-subpixel.v1",
       "implementationIssue": 1506,
       "localSourceRelativePaths": [
-        "private-fixtures/super-resolution/subpixel-detail-v1/frame-01.arw",
-        "private-fixtures/super-resolution/subpixel-detail-v1/frame-02.arw",
-        "private-fixtures/super-resolution/subpixel-detail-v1/frame-03.arw",
-        "private-fixtures/super-resolution/subpixel-detail-v1/frame-04.arw"
+        "private-fixtures/super-resolution/alaska-burst-v1/_DSC7861.ARW",
+        "private-fixtures/super-resolution/alaska-burst-v1/_DSC7862.ARW",
+        "private-fixtures/super-resolution/alaska-burst-v1/_DSC7863.ARW",
+        "private-fixtures/super-resolution/alaska-burst-v1/_DSC7864.ARW"
       ],
       "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
-      "notes": "Private RAW super-resolution E2E proof slot for decode, subpixel registration, detail reconstruction, app-server dry-run/apply replay, preview/export parity, and artifact quality metrics. This manifest is planning evidence only until private assets and full E2E run reports exist.",
-      "proofStatus": "manifest_only",
+      "notes": "Private project-owned Alaska ARW burst proof has production RAW decode, bounded x2 reconstruction output, preview/export artifacts, typed app-server dry-run/apply replay, and private RAW UI smoke evidence. This is runtime proof, not final reconstruction-quality acceptance.",
+      "proofStatus": "runtime_apply_capable",
       "uiIssue": 1335,
       "workflowSteps": [
         "open_raw_sequence",
@@ -435,6 +435,6 @@
     }
   ],
   "schemaVersion": 1,
-  "snapshotDate": "2026-06-17",
+  "snapshotDate": "2026-06-20",
   "validationMode": "schema_public_assets_private"
 }
