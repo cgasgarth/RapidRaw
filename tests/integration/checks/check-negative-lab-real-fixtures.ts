@@ -51,6 +51,14 @@ const renderProofSchema = z
     fixtureId: z.literal(publicRenderFixtureId),
     inputSha256: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     meanAbsInputDelta: z.number().min(0).max(1),
+    metrics: z
+      .object({
+        changedPixelCount: z.number().int().positive(),
+        changedSampleRatio: z.number().min(0).max(1),
+        meanAbsInputDelta: z.number().min(0).max(1),
+        warningCount: z.number().int().positive(),
+      })
+      .strict(),
     outputIntent: z.literal('public_fixture_negative_conversion_smoke'),
     provenance: z
       .object({
@@ -62,6 +70,8 @@ const renderProofSchema = z
       })
       .strict(),
     renderedSampleGrid: z.array(z.array(rgbTripletSchema).min(1)).min(1),
+    schemaVersion: z.literal(1),
+    validationMode: z.literal('public_fixture_negative_conversion_smoke'),
     warningCodes: z.array(z.string().min(1)).min(1),
   })
   .strict()
@@ -193,16 +203,24 @@ if (sampleGrid.sourceImageSha256 !== sourceImageSha256 || publicRenderFixture.co
 
 const renderedSampleGrid = renderPositiveSampleGrid(sampleGrid.sampleGrid);
 const flattenedInputGrid = sampleGrid.sampleGrid.flat();
-const renderProof = renderProofSchema.parse({
-  changedPixelCount: renderedSampleGrid.flat().filter((pixel, pixelIndex) => {
-    const sourcePixel = flattenedInputGrid[pixelIndex];
-    if (sourcePixel === undefined) throw new Error(`Missing source pixel ${pixelIndex}.`);
+const changedPixelCount = renderedSampleGrid.flat().filter((pixel, pixelIndex) => {
+  const sourcePixel = flattenedInputGrid[pixelIndex];
+  if (sourcePixel === undefined) throw new Error(`Missing source pixel ${pixelIndex}.`);
 
-    return pixel.some((channel, channelIndex) => Math.abs(channel - sourcePixel[channelIndex]) > 0.01);
-  }).length,
+  return pixel.some((channel, channelIndex) => Math.abs(channel - sourcePixel[channelIndex]) > 0.01);
+}).length;
+const meanAbsInputDelta = meanAbsDelta(renderedSampleGrid, sampleGrid.sampleGrid);
+const renderProof = renderProofSchema.parse({
+  changedPixelCount,
   fixtureId: publicRenderFixture.fixtureId,
   inputSha256: sourceImageSha256,
-  meanAbsInputDelta: meanAbsDelta(renderedSampleGrid, sampleGrid.sampleGrid),
+  meanAbsInputDelta,
+  metrics: {
+    changedPixelCount,
+    changedSampleRatio: changedPixelCount / flattenedInputGrid.length,
+    meanAbsInputDelta,
+    warningCount: publicRenderFixture.expectedNegativeWarningCodes.length,
+  },
   outputIntent: 'public_fixture_negative_conversion_smoke',
   provenance: {
     commandName: 'negative.lab.public_fixture_render_smoke',
@@ -212,6 +230,8 @@ const renderProof = renderProofSchema.parse({
     sourceFixtureId: publicRenderFixture.fixtureId,
   },
   renderedSampleGrid,
+  schemaVersion: 1,
+  validationMode: 'public_fixture_negative_conversion_smoke',
   warningCodes: publicRenderFixture.expectedNegativeWarningCodes,
 });
 const prettierConfig = (await resolveConfig(renderProofUrl.pathname)) ?? {};
