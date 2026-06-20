@@ -293,40 +293,44 @@ pub async fn update_exif_fields(
     updates: HashMap<String, String>,
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        paths.par_iter().for_each(|path| {
-            let original_path = Path::new(&path);
-            let primary_path = crate::exif_processing::get_primary_sidecar_path(original_path);
-            let temp_metadata = crate::exif_processing::load_sidecar(&primary_path);
+        paths
+            .par_iter()
+            .map(|path| -> Result<(), String> {
+                let original_path = Path::new(&path);
+                let primary_path = crate::exif_processing::get_primary_sidecar_path(original_path);
+                let temp_metadata = crate::exif_processing::load_sidecar(&primary_path);
 
-            let mut exif_data = temp_metadata.exif.unwrap_or_else(|| {
-                if let Some(existing) = crate::exif_processing::read_rrexif_sidecar(original_path) {
-                    existing
-                } else if let Ok(mmap) = read_file_mapped(original_path) {
-                    crate::exif_processing::read_exif_data_from_bytes(path, &mmap)
-                } else if let Ok(bytes) = fs::read(original_path) {
-                    crate::exif_processing::read_exif_data_from_bytes(path, &bytes)
-                } else {
-                    HashMap::new()
+                let mut exif_data = temp_metadata.exif.unwrap_or_else(|| {
+                    if let Some(existing) =
+                        crate::exif_processing::read_rrexif_sidecar(original_path)
+                    {
+                        existing
+                    } else if let Ok(mmap) = read_file_mapped(original_path) {
+                        crate::exif_processing::read_exif_data_from_bytes(path, &mmap)
+                    } else if let Ok(bytes) = fs::read(original_path) {
+                        crate::exif_processing::read_exif_data_from_bytes(path, &bytes)
+                    } else {
+                        HashMap::new()
+                    }
+                });
+
+                for (k, v) in &updates {
+                    let trimmed = v.trim();
+                    if trimmed.is_empty() {
+                        exif_data.remove(k);
+                    } else {
+                        exif_data.insert(k.clone(), trimmed.to_string());
+                    }
                 }
-            });
 
-            for (k, v) in &updates {
-                let trimmed = v.trim();
-                if trimmed.is_empty() {
-                    exif_data.remove(k);
-                } else {
-                    exif_data.insert(k.clone(), trimmed.to_string());
-                }
-            }
+                let mut final_metadata = crate::exif_processing::load_sidecar(&primary_path);
 
-            let mut final_metadata = crate::exif_processing::load_sidecar(&primary_path);
-
-            final_metadata.exif = Some(exif_data);
-            if let Ok(json) = serde_json::to_string_pretty(&final_metadata) {
-                let _ = std::fs::write(&primary_path, json);
-            }
-        });
-        Ok(())
+                final_metadata.exif = Some(exif_data);
+                crate::exif_processing::save_sidecar_metadata_atomic(&primary_path, &final_metadata)
+                    .map_err(|e| format!("{}: {}", path, e))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|_| ())
     })
     .await
     .map_err(|e| format!("Task failed: {}", e))?

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::io::{BufReader, Cursor};
+use std::io::{BufReader, Cursor, Write};
 use std::path::{Path, PathBuf};
 
 use crate::formats::is_raw_file;
@@ -1090,8 +1090,33 @@ fn load_primary_metadata(image_path: &Path) -> ImageMetadata {
 
 fn save_primary_metadata(image_path: &Path, metadata: &ImageMetadata) -> std::io::Result<()> {
     let primary = get_primary_sidecar_path(image_path);
-    let json = serde_json::to_string_pretty(metadata).map_err(std::io::Error::other)?;
-    fs::write(&primary, json)
+    save_sidecar_metadata_atomic(&primary, metadata).map_err(std::io::Error::other)
+}
+
+pub fn save_sidecar_metadata_atomic(
+    sidecar_path: &Path,
+    metadata: &ImageMetadata,
+) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(metadata).map_err(|e| {
+        format!(
+            "Failed to serialize sidecar {}: {}",
+            sidecar_path.display(),
+            e
+        )
+    })?;
+    write_text_atomic(sidecar_path, &json)
+        .map_err(|e| format!("Failed to write sidecar {}: {}", sidecar_path.display(), e))
+}
+
+fn write_text_atomic(path: &Path, content: &str) -> std::io::Result<()> {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let mut temp_file = tempfile::NamedTempFile::new_in(parent)?;
+    temp_file.write_all(content.as_bytes())?;
+    temp_file.as_file_mut().sync_all()?;
+    temp_file
+        .persist(path)
+        .map(|_| ())
+        .map_err(|persist_error| persist_error.error)
 }
 
 pub fn read_rrexif_sidecar(image_path: &Path) -> Option<HashMap<String, String>> {
@@ -1201,4 +1226,41 @@ pub fn write_rrexif_sidecar(source_path_str: &str, target_image_path: &Path) -> 
     metadata.exif = Some(exif_data);
     save_primary_metadata(target_image_path, &metadata)
         .map_err(|e| format!("Failed to write sidecar: {}", e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn save_sidecar_metadata_atomic_roundtrips_json() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("image.raf.rrdata");
+        let metadata = ImageMetadata {
+            exif: Some(HashMap::from([(
+                "Artist".to_string(),
+                "RawEngine".to_string(),
+            )])),
+            ..Default::default()
+        };
+
+        save_sidecar_metadata_atomic(&sidecar_path, &metadata).expect("atomic sidecar write");
+
+        let reloaded = load_sidecar(&sidecar_path);
+        assert_eq!(
+            reloaded.exif.as_ref().and_then(|exif| exif.get("Artist")),
+            Some(&"RawEngine".to_string())
+        );
+    }
+
+    #[test]
+    fn save_sidecar_metadata_atomic_reports_missing_parent() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("missing").join("image.raf.rrdata");
+        let err = save_sidecar_metadata_atomic(&sidecar_path, &ImageMetadata::default())
+            .expect_err("missing parent should fail");
+
+        assert!(err.contains("Failed to write sidecar"));
+        assert!(!sidecar_path.exists());
+    }
 }
