@@ -185,6 +185,10 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
       }
     }
   };
+  const resetSelectedLookStrength = () => {
+    if (selectedLook === undefined) return;
+    handleStrengthChange(selectedLook.strengthDefault);
+  };
 
   const toggleFavoriteLook = (look: FilmLookBrowserItem) => {
     setFavoriteLookIds((currentFavorites) => {
@@ -458,6 +462,15 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
             );
           })}
         </div>
+        <button
+          className="w-full rounded border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+          data-testid="film-look-strength-reset-default"
+          disabled={selectedLook === undefined || strengthPercent === selectedLook.strengthDefault}
+          onClick={resetSelectedLookStrength}
+          type="button"
+        >
+          {t('adjustments.effects.filmLookBrowser.strengthResetDefault')}
+        </button>
       </section>
 
       {selectedLook !== undefined && (

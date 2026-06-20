@@ -244,6 +244,7 @@
         },
         "strength": "Strength",
         "strengthPreset": "Set strength to {{strength}}",
+        "strengthResetDefault": "Reset to look default",
         "title": "Film Looks",
         "unfavoriteLook": "Unfavorite {{displayName}}"
       },
