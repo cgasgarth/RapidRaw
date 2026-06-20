@@ -508,6 +508,8 @@
     "check:macos-colorsync-display-proof:update": "bun tests/integration/checks/check-macos-colorsync-display-proof.ts --update",
     "check:selective-color-local-raw-proof": "bun tests/integration/checks/check-selective-color-local-raw-proof.ts",
     "check:selective-color-local-raw-proof:update": "bun tests/integration/checks/check-selective-color-local-raw-proof.ts --update",
+    "run:selective-color-local-raw-private-proof": "bun scripts/run-selective-color-local-raw-private-proof.ts",
+    "check:selective-color-local-raw-private-proof": "bun scripts/run-selective-color-local-raw-private-proof.ts",
     "check:panorama-private-raw-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario panorama-private-raw-ui"
   },
   "dependencies": {
