@@ -987,6 +987,10 @@
     "presets": {
       "applyPresetLabel": "Zastosuj preset {{name}}",
       "colorStyles": {
+        "adjustmentCoverage_one": "{{count}} korekta",
+        "adjustmentCoverage_few": "{{count}} korekty",
+        "adjustmentCoverage_many": "{{count}} korekt",
+        "adjustmentCoverage_other": "{{count}} korekty",
         "applyLabel": "Zastosuj styl koloru {{name}}",
         "count": "{{count}} style",
         "count_one": "{{count}} styl",

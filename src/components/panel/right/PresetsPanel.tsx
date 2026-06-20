@@ -120,6 +120,7 @@ type PreviewQueueItem = { folderId: string | null; preset: Preset };
 const isPresetEntry = (item: UserPreset): item is PresetEntry => !!item.preset;
 const isFolderEntry = (item: UserPreset): item is FolderEntry => !!item.folder;
 const toDragId = (id: DragStartEvent['active']['id']): string => String(id);
+const getColorStyleAdjustmentCount = (preset: ColorStylePreset): number => Object.keys(preset.adjustmentPatch).length;
 const isPresetListType = (value: unknown): value is PresetListType =>
   value === PresetListType.Folder || value === PresetListType.Preset;
 const getPresetDragType = (data: unknown): PresetListType | null => {
@@ -1150,6 +1151,16 @@ export function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProps) {
                         </span>
                         <UiText variant={TextVariants.small} className="mt-1 block text-text-secondary">
                           {preset.previewTags.join(' / ')}
+                        </UiText>
+                        <UiText
+                          as="span"
+                          variant={TextVariants.small}
+                          className="mt-2 inline-flex rounded border border-border-color px-1.5 py-0.5 text-[10px] text-text-secondary"
+                          data-testid={`color-style-adjustment-count-${preset.id}`}
+                        >
+                          {t('editor.presets.colorStyles.adjustmentCoverage', {
+                            count: getColorStyleAdjustmentCount(preset),
+                          })}
                         </UiText>
                       </button>
                     );

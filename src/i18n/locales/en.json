@@ -931,6 +931,8 @@
     "presets": {
       "applyPresetLabel": "Apply preset {{name}}",
       "colorStyles": {
+        "adjustmentCoverage_one": "{{count}} adjustment",
+        "adjustmentCoverage_other": "{{count}} adjustments",
         "applyLabel": "Apply color style {{name}}",
         "count": "{{count}} styles",
         "count_one": "{{count}} style",
