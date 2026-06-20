@@ -23,7 +23,12 @@ if (missingKeys.length > 0) {
 
 const source = readFileSync('src/components/panel/right/LayerStackPanel.tsx', 'utf8');
 for (const marker of [
+  'data-testid="layer-stack-composition-summary"',
   'data-testid="layer-stack-count-summary"',
+  'data-testid="layer-hidden-count"',
+  'data-visible-layer-count={visibleLayerCount}',
+  'data-hidden-layer-count={hiddenLayerCount}',
+  'data-group-count={groupCount}',
   'editor.layers.hiddenLayerCount',
   'editor.layers.groupSummaryCount',
 ]) {
