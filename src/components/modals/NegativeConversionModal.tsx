@@ -200,6 +200,14 @@ interface NegativeConversionModalProps {
   onSave: (savedPaths: string[]) => void;
 }
 
+interface BaseFogSampleUndoEntry {
+  activeBaseFogSampleLabel: string | null;
+  baseFogConfidence: number | null;
+  baseFogEstimate: NegativeBaseFogEstimate | null;
+  params: NegativeParams;
+  selectedPresetId: string;
+}
+
 export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }: NegativeConversionModalProps) {
   const { t } = useTranslation();
   const [params, setParams] = useState<NegativeParams>(DEFAULT_PARAMS);
@@ -222,6 +230,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [copiedBatchPlanJson, setCopiedBatchPlanJson] = useState<string | null>(null);
   const [acceptedBatchPlanJson, setAcceptedBatchPlanJson] = useState<string | null>(null);
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
+  const [baseFogSampleUndoStack, setBaseFogSampleUndoStack] = useState<BaseFogSampleUndoEntry[]>([]);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
   const [conversionScope, setConversionScope] = useState<NegativeConversionScope>('all');
@@ -551,6 +560,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setBaseFogEstimate(null);
       setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(null);
+      setBaseFogSampleUndoStack([]);
       setCustomBaseSampleRect(CUSTOM_BASE_SAMPLE_DEFAULT);
       setCustomBaseSampleEstimate(null);
       setActivePathIndex(0);
@@ -585,8 +595,36 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogEstimate(null);
     setBaseFogReadoutCopied(false);
     setActiveBaseFogSampleLabel(null);
+    setBaseFogSampleUndoStack([]);
     setParams(preset.params);
     updatePreview(preset.params);
+  };
+
+  const pushBaseFogSampleUndoEntry = () => {
+    setBaseFogSampleUndoStack((stack) => [
+      ...stack,
+      {
+        activeBaseFogSampleLabel,
+        baseFogConfidence,
+        baseFogEstimate,
+        params,
+        selectedPresetId,
+      },
+    ]);
+  };
+
+  const handleUndoBaseFogSample = () => {
+    const previous = baseFogSampleUndoStack.at(-1);
+    if (previous === undefined) return;
+    setBaseFogSampleUndoStack((stack) => stack.slice(0, -1));
+    setBaseFogConfidence(previous.baseFogConfidence);
+    setBaseFogEstimate(previous.baseFogEstimate);
+    setBaseFogReadoutCopied(false);
+    setActiveBaseFogSampleLabel(previous.activeBaseFogSampleLabel);
+    setSelectedPresetId(previous.selectedPresetId);
+    setParams(previous.params);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(previous.params);
   };
 
   const handleAutoBaseFog = async () => {
@@ -609,6 +647,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         green_weight: estimate.greenWeight,
         red_weight: estimate.redWeight,
       };
+      pushBaseFogSampleUndoEntry();
       setBaseFogConfidence(estimate.confidence);
       setBaseFogEstimate(estimate);
       setBaseFogReadoutCopied(false);
@@ -644,6 +683,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         green_weight: estimate.greenWeight,
         red_weight: estimate.redWeight,
       };
+      pushBaseFogSampleUndoEntry();
       setBaseFogConfidence(estimate.confidence);
       setBaseFogEstimate(estimate);
       setBaseFogReadoutCopied(false);
@@ -696,6 +736,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       green_weight: customBaseSampleEstimate.greenWeight,
       red_weight: customBaseSampleEstimate.redWeight,
     };
+    pushBaseFogSampleUndoEntry();
     setBaseFogConfidence(customBaseSampleEstimate.confidence);
     setBaseFogEstimate(customBaseSampleEstimate);
     setBaseFogReadoutCopied(false);
@@ -1633,6 +1674,17 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                data-testid="negative-lab-undo-base-sample"
+                data-tooltip={t('contextMenus.editor.undo')}
+                disabled={baseFogSampleUndoStack.length === 0 || isEstimatingBaseFog || isSaving}
+                onClick={handleUndoBaseFogSample}
+                className="inline-flex w-full items-center justify-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RotateCcw size={13} />
+                {t('contextMenus.editor.undo')}
+              </button>
             </div>
             {baseFogConfidence !== null && (
               <UiText data-testid="negative-lab-confidence" variant={TextVariants.small} className="text-text-tertiary">

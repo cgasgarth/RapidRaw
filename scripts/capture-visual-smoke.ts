@@ -871,6 +871,10 @@ async function prepareScenario(page, mode) {
     .getByTestId('negative-lab-base-sample-readout')
     .getByText('Custom base sample', { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-undo-base-sample').click();
+  await page.getByTestId('negative-lab-base-sample-readout').getByText('Left edge', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId('negative-lab-copy-readout').click();
   await page.getByTestId('negative-lab-copy-readout').getByText('Copied readout', { exact: true }).waitFor({
     timeout: 10_000,
