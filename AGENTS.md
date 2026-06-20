@@ -154,6 +154,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   output image or generated artifacts. Schemas, dry-runs, synthetic fixtures, or
   UI-only smoke checks are useful intermediate proof, but they are not enough to
   close a feature as complete.
+- The user has explicitly allowed project validation to use their own RAW files
+  under `/Users/cgas/Pictures/Capture One/Alaska`. Use that folder for private
+  local RAW proof when it fits the feature, but do not commit those RAW files or
+  generated private image artifacts.
 - Do not count planning, schema, API, or UI-only work as a complete feature
   unless end-to-end workflow proof exists in the same PR. If E2E proof is not
   included, state the runtime status explicitly and keep or create a follow-up
