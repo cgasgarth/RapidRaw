@@ -1,0 +1,51 @@
+{
+  "artifacts": {
+    "reconstructionPreview": {
+      "contentHash": "sha256:8ae4f09c9c12e8cccd3731f8a04a0fc75ec8ae0aab8bf999f79f2f3855053a74",
+      "format": "pgm_u8_preview",
+      "path": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-preview.pgm",
+      "publicRepoAllowed": false
+    }
+  },
+  "doesNotProve": [
+    "app_ui_e2e",
+    "demosaic_aware_detail_quality",
+    "motion_robustness",
+    "real_raw_burst_decode",
+    "tiff_export_pipeline"
+  ],
+  "fixtureId": "sr.synthetic.public.pixel-shift-output.v1",
+  "generatedAt": "2026-06-20T09:45:00.000Z",
+  "issue": 2314,
+  "metrics": {
+    "changedPixelRatioAgainstNearest": 0.737703,
+    "filledPixelRatio": 1,
+    "finiteOutputRatio": 1,
+    "meanAbsoluteErrorAgainstNearest": 0.086695,
+    "missingPixelCount": 0
+  },
+  "reconstructionDiagnostics": {
+    "algorithmId": "integer_pixel_shift_interleave_x2_v1",
+    "averageSamplesPerOutputPixel": 1,
+    "duplicateSamplePixelCount": 0,
+    "duplicateSampleRatio": 0,
+    "filledPixelRatio": 1,
+    "finiteOutputRatio": 1,
+    "missingPixelCount": 0,
+    "outputPixelCount": 6912,
+    "outputScale": 2,
+    "reconstructionMethod": "integer_shift_interleave_average",
+    "singleSamplePixelCount": 6912,
+    "status": "accepted",
+    "warningCodes": []
+  },
+  "runtimeStatus": "synthetic_sr_output_artifact_rendered",
+  "schemaVersion": 1,
+  "sourceBurst": {
+    "frameCount": 4,
+    "height": 36,
+    "scale": 2,
+    "sourceBurstHash": "sha256:fac1aabe8f50023d16e95374b27b03758f9702175bc3595386162bc6c7042f58",
+    "width": 48
+  }
+}
