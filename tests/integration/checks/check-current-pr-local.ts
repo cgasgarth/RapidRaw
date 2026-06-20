@@ -203,6 +203,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     (file) => file === 'src/components/modals/NegativeConversionModal.tsx',
     ['check:negative-lab-workspace', 'check:negative-lab-roll-cockpit'],
   );
+  addIf((file) => file === 'src/components/panel/right/LayerStackPanel.tsx', ['check:layer-stack-panel-ui']);
   addIf(
     (file) => file.includes('panoramaSyntheticStitch') || file.includes('panorama-exposure-runtime-proof'),
     ['check:panorama-exposure-runtime-proof'],
@@ -322,6 +323,7 @@ if (process.argv.includes('--self-test')) {
     ['src/utils/selectiveColorRuntime.ts'],
     ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
   );
+  assertSelfTestRoute(['src/components/panel/right/LayerStackPanel.tsx'], ['check:layer-stack-panel-ui']);
 
   console.log('current pr local self-test ok');
   process.exit(0);

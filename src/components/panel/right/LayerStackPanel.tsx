@@ -367,22 +367,6 @@ export default function LayerStackPanel({
             >
               {t('editor.layers.layerCount', { count: masks.length })}
             </UiText>
-            <UiText
-              variant={TextVariants.small}
-              className="block tabular-nums text-text-tertiary"
-              data-testid="layer-visible-count"
-            >
-              {t('editor.layers.visibleLayerCount', { count: visibleLayerCount })}
-            </UiText>
-            <UiText
-              variant={TextVariants.small}
-              className="block tabular-nums text-text-tertiary"
-              data-testid="layer-stack-count-summary"
-            >
-              {t('editor.layers.hiddenLayerCount', { count: hiddenLayerCount })}
-              {' / '}
-              {t('editor.layers.groupSummaryCount', { count: groupCount })}
-            </UiText>
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -404,6 +388,39 @@ export default function LayerStackPanel({
             <Plus size={17} className="mx-auto" />
           </button>
         </div>
+      </div>
+
+      <div
+        className="mx-3 mb-3 grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-secondary/70 p-2"
+        data-group-count={groupCount}
+        data-hidden-layer-count={hiddenLayerCount}
+        data-testid="layer-stack-composition-summary"
+        data-visible-layer-count={visibleLayerCount}
+      >
+        <UiText
+          variant={TextVariants.small}
+          weight={TextWeights.medium}
+          className="truncate rounded bg-bg-primary px-2 py-1 text-center tabular-nums text-text-secondary"
+          data-testid="layer-visible-count"
+        >
+          {t('editor.layers.visibleLayerCount', { count: visibleLayerCount })}
+        </UiText>
+        <UiText
+          variant={TextVariants.small}
+          weight={TextWeights.medium}
+          className="truncate rounded bg-bg-primary px-2 py-1 text-center tabular-nums text-text-secondary"
+          data-testid="layer-hidden-count"
+        >
+          {t('editor.layers.hiddenLayerCount', { count: hiddenLayerCount })}
+        </UiText>
+        <UiText
+          variant={TextVariants.small}
+          weight={TextWeights.medium}
+          className="truncate rounded bg-bg-primary px-2 py-1 text-center tabular-nums text-text-secondary"
+          data-testid="layer-stack-count-summary"
+        >
+          {t('editor.layers.groupSummaryCount', { count: groupCount })}
+        </UiText>
       </div>
 
       <div className="px-3 pb-3 space-y-1">

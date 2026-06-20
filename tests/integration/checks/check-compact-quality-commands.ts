@@ -4,7 +4,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 
 const ROOT = process.cwd();
 const WORKFLOW_DIR = '.github/workflows';
