@@ -1,0 +1,41 @@
+{
+  "artifactFormat": "ppm_p6_synthetic_bytes",
+  "commandType": "toneColor.adjustHsl",
+  "doesNotProve": [
+    "gpu_parity",
+    "independent_pixel_core",
+    "local_app_ui_e2e",
+    "production_export_pipeline",
+    "production_preview_pipeline",
+    "real_raw_decode"
+  ],
+  "issue": 2524,
+  "parentIssue": 2476,
+  "persistedEditReload": {
+    "graphRevision": "graph_rev_selective_color_independent_artifact_001",
+    "reloadedHash": "sha256:2a6d9fc1b6cfcd34839ff80fc987f6a4bdbc07ceb94572fc2407ce4f591a40ad",
+    "sidecarHash": "sha256:2a6d9fc1b6cfcd34839ff80fc987f6a4bdbc07ceb94572fc2407ce4f591a40ad"
+  },
+  "previewExportMaxDelta": 0,
+  "previewExportPixelHashMatch": true,
+  "proofEntrypoints": {
+    "export": "renderSelectiveColorExportArtifact",
+    "preview": "renderSelectiveColorPreviewArtifact"
+  },
+  "runtimeStatus": "independent_artifact_writers_shared_pixel_core",
+  "schemaVersion": 1,
+  "source": {
+    "fixtureStatus": "synthetic_rgb_grid_not_raw",
+    "height": 2,
+    "sourceHash": "sha256:01f319632a70119e1cf34ef82fc324ea8cf9f199e232a50e150d2f11dc66eba1",
+    "width": 3
+  },
+  "targetRange": "oranges",
+  "validationMode": "selective_color_independent_artifact_contract",
+  "writtenArtifacts": {
+    "exportHash": "sha256:5ac79e1a2e1447f60f3a41057f727e661678af6eaa6613fafacfc9f0248bdf2c",
+    "exportPath": "virtual://selective-color/export.ppm",
+    "previewHash": "sha256:65d8fe7c0bf0152aeb1a16ee591b8a8969a4ee8ea3f22048fe36f38001d26146",
+    "previewPath": "virtual://selective-color/preview.ppm"
+  }
+}
