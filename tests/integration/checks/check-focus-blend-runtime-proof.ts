@@ -22,6 +22,8 @@ const FALLBACK_HEIGHT = 8;
 const MAX_REGION_MAE = 0.035;
 const MIN_TRANSLATED_BORDER_VALUE = 0.15;
 const REFERENCE_SOURCE_INDEX = 1;
+const MAX_SEAM_BAND_P95_ERROR = 0.02;
+const MAX_EXCESS_SEAM_GRADIENT = 0.001;
 
 const regionSchema = z
   .object({
@@ -45,7 +47,17 @@ const reportSchema = z
       .strict(),
     focusCoverageRatio: z.literal(1),
     generatedAt: z.iso.datetime({ offset: true }),
-    issue: z.literal(2539),
+    issue: z.literal(2538),
+    qualityMetrics: z
+      .object({
+        blackPixelCount: z.literal(0),
+        dryRunApplyPixelsEqual: z.literal(true),
+        excessSeamGradient: z.number().min(0).max(MAX_EXCESS_SEAM_GRADIENT),
+        invalidSourceContributionCount: z.number().int().nonnegative(),
+        nonfiniteOutputPixelCount: z.literal(0),
+        seamBandP95Error: z.number().min(0).max(MAX_SEAM_BAND_P95_ERROR),
+      })
+      .strict(),
     outputHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
     referenceSource: z
       .object({
@@ -181,7 +193,8 @@ const report = reportSchema.parse({
   fallbackMetrics,
   focusCoverageRatio: dryRun.provenance.focusCoverageRatio,
   generatedAt: GENERATED_AT,
-  issue: 2539,
+  issue: 2538,
+  qualityMetrics: buildQualityMetrics(dryRun.outputPixels, applied.outputPixels),
   outputHash: hashFloat32(applied.outputPixels),
   referenceSource: applied.provenance.referenceSource,
   regionMetrics,
@@ -298,6 +311,106 @@ function translatedBorderMetrics(outputPixels: Float32Array): { minOutputValue: 
     minOutputValue: roundMetric(minOutputValue),
     zeroPixelCount,
   };
+}
+
+function buildQualityMetrics(
+  dryRunPixels: Float32Array,
+  appliedPixels: Float32Array,
+): {
+  blackPixelCount: 0;
+  dryRunApplyPixelsEqual: true;
+  excessSeamGradient: number;
+  invalidSourceContributionCount: number;
+  nonfiniteOutputPixelCount: 0;
+  seamBandP95Error: number;
+} {
+  if (!buffersEqual(dryRunPixels, appliedPixels)) {
+    throw new Error('Focus blend dry-run and apply pixels diverged.');
+  }
+  const blackPixelCount = countMatching(appliedPixels, (value) => value === 0);
+  const nonfiniteOutputPixelCount = countMatching(appliedPixels, (value) => !Number.isFinite(value));
+  if (blackPixelCount !== 0 || nonfiniteOutputPixelCount !== 0) {
+    throw new Error(
+      `Focus blend output contains invalid pixels: black=${blackPixelCount} nonfinite=${nonfiniteOutputPixelCount}.`,
+    );
+  }
+  return {
+    blackPixelCount: 0,
+    dryRunApplyPixelsEqual: true,
+    excessSeamGradient: seamGradientMetrics(appliedPixels).excessSeamGradient,
+    invalidSourceContributionCount:
+      applied.provenance.sharpnessSettings.diagnosticCount - fallbackMetrics.observedFallbackPixelCount,
+    nonfiniteOutputPixelCount: 0,
+    seamBandP95Error: seamBandP95Error(appliedPixels),
+  };
+}
+
+function buffersEqual(left: Float32Array, right: Float32Array): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function countMatching(pixels: Float32Array, predicate: (value: number) => boolean): number {
+  return pixels.reduce((count, value) => count + (predicate(value) ? 1 : 0), 0);
+}
+
+function seamBandP95Error(outputPixels: Float32Array): number {
+  const errors: number[] = [];
+  for (const seamX of [24, 48]) {
+    for (let y = 1; y < HEIGHT - FALLBACK_HEIGHT - 1; y += 1) {
+      for (let x = seamX - 1; x <= seamX + 1; x += 1) {
+        const expectedFrame = expectedFrameForRegion(regionForPixel(x, y));
+        const expected = sampleAligned(expectedFrame, expectedFrameForRegion(lowConfidenceFallbackRegion), x, y);
+        if (expected === undefined) continue;
+        errors.push(Math.abs((outputPixels[y * WIDTH + x] ?? 0) - expected));
+      }
+    }
+  }
+  return roundMetric(percentile(errors, 0.95));
+}
+
+function seamGradientMetrics(outputPixels: Float32Array): { excessSeamGradient: number } {
+  const seamGradients = [24, 48].flatMap((seamX) =>
+    range(1, HEIGHT - FALLBACK_HEIGHT - 1).map((y) =>
+      Math.abs(pixelAt(outputPixels, seamX, y) - pixelAt(outputPixels, seamX - 1, y)),
+    ),
+  );
+  const interiorGradients = [12, 36, 60].flatMap((x) =>
+    range(1, HEIGHT - FALLBACK_HEIGHT - 1).map((y) =>
+      Math.abs(pixelAt(outputPixels, x, y) - pixelAt(outputPixels, x - 1, y)),
+    ),
+  );
+  return {
+    excessSeamGradient: roundMetric(Math.max(0, average(seamGradients) - average(interiorGradients))),
+  };
+}
+
+function regionForPixel(x: number, y: number): ProofRegion {
+  const region = [...sourceRegions, lowConfidenceFallbackRegion].find(
+    (candidate) =>
+      x >= candidate.x && x < candidate.x + candidate.width && y >= candidate.y && y < candidate.y + candidate.height,
+  );
+  if (region === undefined) throw new Error(`Focus blend proof missing region for ${x},${y}.`);
+  return region;
+}
+
+function pixelAt(pixels: Float32Array, x: number, y: number): number {
+  return pixels[y * WIDTH + x] ?? 0;
+}
+
+function percentile(values: number[], percentileValue: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * percentileValue) - 1);
+  return sorted[index] ?? 0;
+}
+
+function range(start: number, endExclusive: number): number[] {
+  return Array.from({ length: Math.max(0, endExclusive - start) }, (_, index) => start + index);
+}
+
+function average(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0) / Math.max(1, values.length);
 }
 
 function expectedFrameForRegion(region: ProofRegion): (typeof frames)[number] {

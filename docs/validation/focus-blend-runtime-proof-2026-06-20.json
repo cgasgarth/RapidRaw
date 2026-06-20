@@ -9,7 +9,15 @@
   },
   "focusCoverageRatio": 1,
   "generatedAt": "2026-06-20T00:00:00.000Z",
-  "issue": 2539,
+  "issue": 2538,
+  "qualityMetrics": {
+    "blackPixelCount": 0,
+    "dryRunApplyPixelsEqual": true,
+    "excessSeamGradient": 0,
+    "invalidSourceContributionCount": 151,
+    "nonfiniteOutputPixelCount": 0,
+    "seamBandP95Error": 0
+  },
   "outputHash": "sha256:c6c86c67b8243ade32844b608bd1467da96f25e92815ca9a71b47c973c70b6ca",
   "referenceSource": {
     "fallbackPolicy": "low_confidence_or_invalid_contributors",
