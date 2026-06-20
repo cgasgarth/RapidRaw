@@ -8,6 +8,7 @@ import { z } from 'zod';
 const REPORT_PATH = 'docs/validation/layer-mask-private-raw-ui-proof-2026-06-20.json';
 const RUNTIME_REPORT_PATH = 'docs/validation/layer-mask-real-raw-proof-2026-06-18.json';
 const SCREENSHOT_PATH = 'artifacts/visual-smoke/layer-mask-private-raw-ui.png';
+const FIXTURE_ID = 'validation.layer-mask-real-raw.alaska-local-adjustment.v1';
 const update = process.argv.includes('--update');
 
 const sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
@@ -23,7 +24,7 @@ const artifactSchema = z
 const runtimeReportSchema = z
   .object({
     artifacts: z.array(artifactSchema).min(6),
-    fixtureId: z.literal('validation.layer-mask-real-raw.high-iso-skin-shadow.v1'),
+    fixtureId: z.literal(FIXTURE_ID),
     issue: z.literal(2310),
     metrics: z.array(z.object({ name: z.string().min(1), passed: z.literal(true), value: z.number() })).min(5),
     proofClaims: z.object({
@@ -39,7 +40,7 @@ const proofReportSchema = z
     privateRawRuntime: z
       .object({
         artifactCount: z.number().int().min(6),
-        fixtureId: z.literal('validation.layer-mask-real-raw.high-iso-skin-shadow.v1'),
+        fixtureId: z.literal(FIXTURE_ID),
         metricCount: z.number().int().min(5),
         proves: z.array(z.string().min(1)).min(5),
         runtimeReportPath: z.literal(RUNTIME_REPORT_PATH),
@@ -97,13 +98,17 @@ async function fileHash(path: string): Promise<string> {
     .digest('hex')}`;
 }
 
-const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
-runCommand(['bun', 'run', 'check:layer-mask-real-raw-proof', '--', '--require-assets'], {
-  RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
-});
-runCommand(['bun', 'run', 'check:layer-mask-private-raw-ui-smoke'], {
-  RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
-});
+const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
+if (privateRoot === undefined) {
+  runCommand(['bun', 'run', 'check:layer-mask-real-raw-proof']);
+} else {
+  runCommand(['bun', 'run', 'check:layer-mask-real-raw-proof', '--', '--require-assets'], {
+    RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
+  });
+  runCommand(['bun', 'run', 'check:layer-mask-private-raw-ui-smoke'], {
+    RAWENGINE_PRIVATE_RAW_ROOT: privateRoot,
+  });
+}
 
 const runtimeReport = runtimeReportSchema.parse(JSON.parse(await readFile(RUNTIME_REPORT_PATH, 'utf8')));
 const expectedReport = proofReportSchema.parse({

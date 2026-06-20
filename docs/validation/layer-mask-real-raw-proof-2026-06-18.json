@@ -1,44 +1,44 @@
 {
   "artifacts": [
     {
-      "hash": "sha256:5b1a62fb37669f3065479e2c7cf9af4ef031a920cf6feac82d1269e9fdf4a136",
+      "hash": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
       "kind": "source_raw_private",
-      "path": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+      "path": "private-fixtures/layers/alaska-layer-mask-v1.arw",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:ff9f2140e661978d91612ad6280d36b6d3a6e20145169705f6cb746395bdbdfd",
+      "hash": "sha256:475b07edef2ac1b418b397fddb5c708701e7580aee6356234321ae7bea31159c",
       "kind": "unmasked_preview_private",
-      "path": "private-artifacts/validation/layer-mask-real-raw/high-iso-skin-shadow-mask-unmasked-preview.png",
+      "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-unmasked-preview.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:722ee47cd79ba985b37f06540a0498b618ec0ffaf054f835126f489e6dc95801",
+      "hash": "sha256:eda6e67e6470a1eaf27a8e979ae9666374624fd7b81e6bad7a597ccc14ea4400",
       "kind": "unrefined_preview_private",
-      "path": "private-artifacts/validation/layer-mask-real-raw/high-iso-skin-shadow-mask-unrefined-preview.png",
+      "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-unrefined-preview.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:341f323092a46de252880bc7a7349c0a8cb0617315da1585a75729c5973d90fe",
+      "hash": "sha256:96c9ccc8e79f69a3a36054beefac3a69611c9c5e97d6fdefdc47f8fba348bbbf",
       "kind": "refined_preview_private",
-      "path": "private-artifacts/validation/layer-mask-real-raw/high-iso-skin-shadow-mask-refined-preview.png",
+      "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-refined-preview.png",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:0c3d817a71991865a47edf406ad41c5147726f349e0405d44a09435f09e4a78c",
+      "hash": "sha256:3d226b246d7eeb461d61973eb52a229236b181bc6ab9a34f245c4766efeb5910",
       "kind": "refined_export_private",
-      "path": "private-artifacts/validation/layer-mask-real-raw/high-iso-skin-shadow-mask-refined-export.tiff",
+      "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-refined-export.tiff",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:3e205864d4c1255649e1e4f2c8a57852726de1a0813460db8c9409f929c4f799",
+      "hash": "sha256:be35a5fb6492e264ecb72d71fdc85b5c0bc4d3b43dfba2b1d5c1f88e68e71139",
       "kind": "workflow_report_private",
-      "path": "private-artifacts/validation/layer-mask-real-raw/high-iso-skin-shadow-layer-mask-report.json",
+      "path": "private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-report.json",
       "publicRepoAllowed": false
     }
   ],
-  "fixtureId": "validation.layer-mask-real-raw.high-iso-skin-shadow.v1",
-  "generatedAt": "2026-06-18T12:55:04.922Z",
+  "fixtureId": "validation.layer-mask-real-raw.alaska-local-adjustment.v1",
+  "generatedAt": "2026-06-20T22:04:42.760Z",
   "issue": 2310,
   "metrics": [
     {
@@ -51,13 +51,13 @@
       "name": "maskedChangedPixelRatio",
       "passed": true,
       "threshold": 0.01,
-      "value": 0.08285291666666666
+      "value": 0.08261620833333333
     },
     {
       "name": "refinementChangedPixelRatio",
       "passed": true,
       "threshold": 0.0001,
-      "value": 0.17695625
+      "value": 0.17748720833333334
     },
     {
       "name": "previewExportMeanAbsDelta",
@@ -82,10 +82,10 @@
       "refined_preview_export_parity"
     ]
   },
-  "reportId": "layer-mask-real-raw.high-iso-skin-shadow.v1",
+  "reportId": "layer-mask-real-raw.alaska-local-adjustment.v1",
   "runtimeProof": {
     "execution": "tauri_test_gpu_pipeline",
-    "macosAppUiE2E": false,
+    "macosAppUiE2e": false,
     "maskPath": "prepare_export_masks + generate_mask_bitmap",
     "outputArtifactCount": 4,
     "previewExportParityMetric": "previewExportMeanAbsDelta",

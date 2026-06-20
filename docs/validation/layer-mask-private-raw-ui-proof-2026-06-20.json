@@ -3,7 +3,7 @@
   "issue": 2310,
   "privateRawRuntime": {
     "artifactCount": 6,
-    "fixtureId": "validation.layer-mask-real-raw.high-iso-skin-shadow.v1",
+    "fixtureId": "validation.layer-mask-real-raw.alaska-local-adjustment.v1",
     "metricCount": 5,
     "proves": [
       "private_real_raw_decode",
@@ -27,7 +27,7 @@
       "width": 1440
     },
     "scenario": "layer-mask-private-raw-ui",
-    "screenshotHash": "sha256:55544c28d396b3b64bdc5f420c5cb8eb477ed7c160fc4bd0402932e137419a24",
+    "screenshotHash": "sha256:b3f25491f24468334ce8781625244af0c5db0ec38d46a6958d127dfb885871ef",
     "screenshotPath": "artifacts/visual-smoke/layer-mask-private-raw-ui.png",
     "workflowControlsExercised": true
   }

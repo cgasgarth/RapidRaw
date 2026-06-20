@@ -7,8 +7,9 @@ import { join, resolve } from 'node:path';
 import { z } from 'zod';
 
 const REPORT_PATH = 'docs/validation/layer-mask-real-raw-proof-2026-06-18.json';
-const PRIVATE_REPORT_PATH =
-  'private-artifacts/validation/layer-mask-real-raw/high-iso-skin-shadow-layer-mask-report.json';
+const PRIVATE_REPORT_PATH = 'private-artifacts/validation/layer-mask-real-raw/alaska-layer-mask-v1-report.json';
+const FIXTURE_ID = 'validation.layer-mask-real-raw.alaska-local-adjustment.v1';
+const REPORT_ID = 'layer-mask-real-raw.alaska-local-adjustment.v1';
 
 const args = process.argv.slice(2);
 const requireAssets = args.includes('--require-assets');
@@ -115,12 +116,12 @@ const runtimeProofSchema = z
 const reportSchema = z
   .object({
     artifacts: z.array(artifactSchema).length(6),
-    fixtureId: z.literal('validation.layer-mask-real-raw.high-iso-skin-shadow.v1'),
+    fixtureId: z.literal(FIXTURE_ID),
     generatedAt: z.iso.datetime(),
     issue: z.literal(2310),
     metrics: z.array(metricSchema).length(5),
     proofClaims: proofClaimsSchema,
-    reportId: z.literal('layer-mask-real-raw.high-iso-skin-shadow.v1'),
+    reportId: z.literal(REPORT_ID),
     runtimeProof: runtimeProofSchema,
     validationMode: z.literal('private_raw_tauri_runtime_proof'),
   })

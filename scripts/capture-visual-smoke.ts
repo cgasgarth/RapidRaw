@@ -377,12 +377,12 @@ async function loadPanoramaPrivateRawProof(): Promise<PanoramaPrivateRawBrowserP
 async function loadLayerMaskPrivateRawProof(): Promise<LayerMaskPrivateRawBrowserProof> {
   const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT ?? '/tmp/rawengine-private-root';
   const artifactRoot = `${privateRoot}/private-artifacts/validation/layer-mask-real-raw`;
-  const unmaskedPreviewArtifact = `${artifactRoot}/high-iso-skin-shadow-mask-unmasked-preview.png`;
-  const unrefinedPreviewArtifact = `${artifactRoot}/high-iso-skin-shadow-mask-unrefined-preview.png`;
-  const refinedPreviewArtifact = `${artifactRoot}/high-iso-skin-shadow-mask-refined-preview.png`;
+  const unmaskedPreviewArtifact = `${artifactRoot}/alaska-layer-mask-v1-unmasked-preview.png`;
+  const unrefinedPreviewArtifact = `${artifactRoot}/alaska-layer-mask-v1-unrefined-preview.png`;
+  const refinedPreviewArtifact = `${artifactRoot}/alaska-layer-mask-v1-refined-preview.png`;
   return {
-    exportArtifact: `${artifactRoot}/high-iso-skin-shadow-mask-refined-export.tiff`,
-    fixtureId: 'validation.layer-mask-real-raw.high-iso-skin-shadow.v1',
+    exportArtifact: `${artifactRoot}/alaska-layer-mask-v1-refined-export.tiff`,
+    fixtureId: 'validation.layer-mask-real-raw.alaska-local-adjustment.v1',
     metricCount: '5',
     refinedPreviewArtifact,
     refinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(refinedPreviewArtifact),
@@ -683,7 +683,7 @@ async function prepareScenario(page, mode) {
     }
     await page
       .getByTestId('layer-mask-private-raw-artifact-handoff')
-      .getByText('high-iso-skin-shadow-mask-refined-export.tiff', { exact: false })
+      .getByText('alaska-layer-mask-v1-refined-export.tiff', { exact: false })
       .waitFor({ timeout: 10_000 });
     return;
   }
