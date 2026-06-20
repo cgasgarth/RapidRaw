@@ -244,6 +244,10 @@ export default function FocusStackModal({
             value={t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`)}
           />
           <ComputationalSetupStatusLine
+            label={t('modals.focusStack.qualityLabel')}
+            value={qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? ''}
+          />
+          <ComputationalSetupStatusLine
             label={t('modals.focusStack.preflight.retouch')}
             value={t(`modals.focusStack.retouchPolicy.${settings.retouchLayerPolicy}.label`)}
           />
