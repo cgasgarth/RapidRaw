@@ -18,6 +18,7 @@ export const hdrDeghostRequestV1Schema = z
   .strict();
 
 export const hdrDeghostMotionMaskV1Schema = z.instanceof(Uint8Array);
+export const hdrDeghostConfidenceMapV1Schema = z.instanceof(Float64Array);
 export const hdrDeghostPixelBufferV1Schema = z.instanceof(Float64Array);
 
 export type HdrSyntheticFrameV1 = z.infer<typeof hdrSyntheticFrameV1Schema>;
@@ -29,6 +30,12 @@ export interface HdrMotionMaskMetricsV1 {
   precision: number;
   recall: number;
   truePositive: number;
+}
+
+export interface HdrDeghostConfidenceSummaryV1 {
+  averageConfidence: number;
+  maxConfidence: number;
+  motionCoverageRatio: number;
 }
 
 export const detectHdrMotionMaskV1 = (requestValue: unknown): Uint8Array => {
@@ -45,6 +52,44 @@ export const detectHdrMotionMaskV1 = (requestValue: unknown): Uint8Array => {
   }
 
   return motionMask;
+};
+
+export const buildHdrDeghostConfidenceMapV1 = (requestValue: unknown): Float64Array => {
+  const { referenceFrame, request } = parseHdrDeghostRequest(requestValue);
+  const confidenceMap = new Float64Array(referenceFrame.pixels.length);
+  const denominator = Math.max(request.motionThreshold, Number.EPSILON);
+
+  for (let index = 0; index < referenceFrame.pixels.length; index += 1) {
+    const referenceValue = referenceFrame.pixels[index] ?? 0;
+    let maxDelta = 0;
+    for (const frame of request.frames) {
+      maxDelta = Math.max(maxDelta, Math.abs((frame.pixels[index] ?? 0) - referenceValue));
+    }
+    confidenceMap[index] = roundHdrMetric(Math.min(1, maxDelta / denominator));
+  }
+
+  return hdrDeghostConfidenceMapV1Schema.parse(confidenceMap);
+};
+
+export const summarizeHdrDeghostConfidenceMapV1 = (
+  confidenceMapValue: unknown,
+  motionMaskValue: unknown,
+): HdrDeghostConfidenceSummaryV1 => {
+  const confidenceMap = hdrDeghostConfidenceMapV1Schema.parse(confidenceMapValue);
+  const motionMask = parseHdrMotionMask(motionMaskValue, confidenceMap.length);
+  let total = 0;
+  let maxConfidence = 0;
+
+  for (const confidence of confidenceMap) {
+    total += confidence;
+    maxConfidence = Math.max(maxConfidence, confidence);
+  }
+
+  return {
+    averageConfidence: roundHdrMetric(safeRatio(total, confidenceMap.length, 0)),
+    maxConfidence: roundHdrMetric(maxConfidence),
+    motionCoverageRatio: roundHdrMetric(countHdrMotionPixelsV1(motionMask) / motionMask.length),
+  };
 };
 
 export const mergeHdrWithReferenceInMotionRegionsV1 = (
