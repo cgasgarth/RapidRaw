@@ -2046,11 +2046,13 @@
         }
       },
       "detailPolicyLabel": "Detail policy",
+      "outputPixelMultiplier": "{{multiplier}}x pixels",
       "planDependency": "Final apply requires an accepted dry-run plan from the super-resolution API.",
       "preflight": {
         "alignment": "Alignment",
         "detail": "Detail",
         "memory": "Memory",
+        "outputPixels": "Output pixels",
         "pending": "Not estimated",
         "provenance": "Provenance",
         "required": "Required",
