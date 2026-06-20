@@ -32,6 +32,20 @@ const FILM_LOOK_FAVORITES_STORAGE_KEY = 'rapidraw.filmLookFavorites.v1';
 const formatFilmLookStrength = (strength: number) => `${strength}%`;
 const formatFilmLookAdjustmentValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
 const formatFilmLookToken = (value: string) => value.split('_').join(' ');
+const getFilmLookSearchText = (look: FilmLookBrowserItem, groupName: string) =>
+  [
+    look.displayName,
+    look.description,
+    groupName,
+    look.provenance.claimLevel,
+    look.provenance.legalNamingStatus,
+    look.provenance.legalNote,
+    look.provenance.measurementSource,
+    look.runtimeSupport,
+    ...getFilmLookAdjustmentSummaries(look).map((summary) => `${summary.label} ${summary.value}`),
+  ]
+    .join(' ')
+    .toLocaleLowerCase('en-US');
 const getFilmLookSwatchStyle = (look: FilmLookBrowserItem) => {
   const warmth = look.adjustmentPatch.temperature ?? 0;
   const saturation = look.adjustmentPatch.saturation ?? 0;
@@ -122,10 +136,7 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
               return true;
             }
 
-            return [look.displayName, look.description, group.displayName]
-              .join(' ')
-              .toLocaleLowerCase('en-US')
-              .includes(normalizedSearchQuery);
+            return getFilmLookSearchText(look, group.displayName).includes(normalizedSearchQuery);
           }),
         }))
         .filter((group) => group.looks.length > 0),
