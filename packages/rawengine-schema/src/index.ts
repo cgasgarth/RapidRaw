@@ -30,6 +30,7 @@ export * from './negativeLabAppServerRuntime.js';
 export * from './localAppServerBridge.js';
 export * from './panoramaAppServerRuntime.js';
 export * from './panoramaHomographyDiagnostics.js';
+export * from './panoramaLocalOptimizationRansac.js';
 export * from './panoramaRuntimePlan.js';
 export * from './panoramaSyntheticStitch.js';
 export * from './rawEngineSchemas.js';
