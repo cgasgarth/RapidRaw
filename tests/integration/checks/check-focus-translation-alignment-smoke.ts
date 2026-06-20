@@ -6,19 +6,14 @@ import { performance } from 'node:perf_hooks';
 
 import { z } from 'zod';
 
+import { estimateFocusStackAlignmentV1 } from '../../../packages/rawengine-schema/src/focusStackAlignmentRuntime.ts';
+
 const MANIFEST_PATH = resolve('fixtures/focus-stacking/focus-synthetic-bracket-fixtures.json');
 const SEARCH_RADIUS_PIXELS = 6;
 const MIN_COVERAGE_RATIO = 0.9;
 const MAX_RESIDUAL = 0.004;
 const MIN_CONFIDENCE = 0.85;
 const TIER_1_BUDGET_MS = 5_000;
-
-const TranslationSchema = z
-  .object({
-    dx: z.number().int(),
-    dy: z.number().int(),
-  })
-  .strict();
 
 const SourceFrameSchema = z
   .object({
@@ -75,23 +70,6 @@ const FocusFixtureManifestSchema = z
   })
   .passthrough();
 
-const AlignmentWarningSchema = z.enum([
-  'alignment_high_residual',
-  'alignment_insufficient_coverage',
-  'alignment_scale_mismatch',
-]);
-
-const AlignmentResultSchema = z
-  .object({
-    confidence: z.number().min(0).max(1),
-    coverageRatio: z.number().min(0).max(1),
-    residual: z.number().nonnegative(),
-    sourceIndex: z.number().int().nonnegative(),
-    translation: TranslationSchema,
-    warningCodes: z.array(AlignmentWarningSchema),
-  })
-  .strict();
-
 function fail(message, detail) {
   console.error(message);
   if (detail !== undefined) {
@@ -130,69 +108,6 @@ function createTranslatedScene(fixture, sourceFrame) {
     }
   }
   return pixels;
-}
-
-function scoreTranslation(reference, candidate, width, height, translation) {
-  let absoluteError = 0;
-  let comparedPixels = 0;
-
-  for (let y = SEARCH_RADIUS_PIXELS; y < height - SEARCH_RADIUS_PIXELS; y += 1) {
-    for (let x = SEARCH_RADIUS_PIXELS; x < width - SEARCH_RADIUS_PIXELS; x += 1) {
-      const candidateX = x - translation.dx;
-      const candidateY = y - translation.dy;
-      if (candidateX < 0 || candidateX >= width || candidateY < 0 || candidateY >= height) {
-        continue;
-      }
-
-      absoluteError += Math.abs((reference[y * width + x] ?? 0) - (candidate[candidateY * width + candidateX] ?? 0));
-      comparedPixels += 1;
-    }
-  }
-
-  const innerPixelCount = Math.max(1, (width - SEARCH_RADIUS_PIXELS * 2) * (height - SEARCH_RADIUS_PIXELS * 2));
-  return {
-    coverageRatio: comparedPixels / innerPixelCount,
-    residual: absoluteError / Math.max(1, comparedPixels),
-  };
-}
-
-function estimateTranslation(reference, candidate, sourceFrame) {
-  const scoredTranslations = [];
-  for (let dy = -SEARCH_RADIUS_PIXELS; dy <= SEARCH_RADIUS_PIXELS; dy += 1) {
-    for (let dx = -SEARCH_RADIUS_PIXELS; dx <= SEARCH_RADIUS_PIXELS; dx += 1) {
-      const translation = { dx, dy };
-      scoredTranslations.push({
-        ...scoreTranslation(reference, candidate, sourceFrame.width, sourceFrame.height, translation),
-        translation,
-      });
-    }
-  }
-
-  scoredTranslations.sort((left, right) => left.residual - right.residual);
-  const best = scoredTranslations[0];
-  const secondBest = scoredTranslations[1];
-  if (best === undefined || secondBest === undefined) {
-    fail(`source ${sourceFrame.sourceIndex}: missing translation scores`);
-  }
-
-  const residualMargin = Math.max(0, secondBest.residual - best.residual);
-  const confidence = Math.min(1, residualMargin / Math.max(best.residual, 0.0001));
-  const warningCodes = [];
-  if (best.coverageRatio < MIN_COVERAGE_RATIO) {
-    warningCodes.push('alignment_insufficient_coverage');
-  }
-  if (best.residual > MAX_RESIDUAL || confidence < MIN_CONFIDENCE) {
-    warningCodes.push('alignment_high_residual');
-  }
-
-  return AlignmentResultSchema.parse({
-    confidence: Number(confidence.toFixed(6)),
-    coverageRatio: Number(best.coverageRatio.toFixed(6)),
-    residual: Number(best.residual.toFixed(6)),
-    sourceIndex: sourceFrame.sourceIndex,
-    translation: best.translation,
-    warningCodes,
-  });
 }
 
 function expectedAlignmentTranslation(referenceFrame, candidateFrame) {
@@ -237,11 +152,39 @@ function assertWarningPath(fixture, referenceFrame) {
   const flatCandidate = new Float32Array(reference.length);
   flatCandidate.fill(0.5);
 
-  const result = estimateTranslation(reference, flatCandidate, {
-    ...referenceFrame,
-    sourceIndex: 99,
+  const result = estimateFocusStackAlignmentV1({
+    frames: [
+      {
+        height: referenceFrame.height,
+        pixels: reference,
+        sourceIndex: referenceFrame.sourceIndex,
+        width: referenceFrame.width,
+      },
+      {
+        height: referenceFrame.height,
+        pixels: flatCandidate,
+        sourceIndex: 99,
+        width: referenceFrame.width,
+      },
+    ],
+    maxResidual: MAX_RESIDUAL,
+    minConfidence: MIN_CONFIDENCE,
+    minCoverageRatio: MIN_COVERAGE_RATIO,
+    referenceSourceIndex: referenceFrame.sourceIndex,
+    searchRadiusPx: SEARCH_RADIUS_PIXELS,
   });
-  if (!result.warningCodes.includes('alignment_high_residual')) {
+
+  const candidateDiagnostic = result.diagnostics.find((diagnostic) => diagnostic.sourceIndex === 99);
+  if (candidateDiagnostic === undefined) {
+    fail(`${fixture.fixtureId}: missing flat candidate diagnostic`, result);
+  }
+  if (
+    !candidateDiagnostic.warningCodes.includes('alignment_high_residual') ||
+    !candidateDiagnostic.warningCodes.includes('alignment_low_confidence') ||
+    !candidateDiagnostic.blockCodes.includes('alignment_high_residual') ||
+    candidateDiagnostic.status !== 'blocked' ||
+    !result.blocked
+  ) {
     fail(`${fixture.fixtureId}: high-residual warning path did not trigger`, result);
   }
 }
@@ -258,11 +201,31 @@ for (const fixture of manifest.fixtures.filter(isPureTranslationFixture)) {
     fail(`${fixture.fixtureId}: missing source index 0 reference`);
   }
 
-  const reference = createTranslatedScene(fixture, referenceFrame);
+  const alignment = estimateFocusStackAlignmentV1({
+    frames: fixture.sourceFrames.map((sourceFrame) => ({
+      height: sourceFrame.height,
+      pixels: createTranslatedScene(fixture, sourceFrame),
+      sourceIndex: sourceFrame.sourceIndex,
+      width: sourceFrame.width,
+    })),
+    maxResidual: MAX_RESIDUAL,
+    minConfidence: MIN_CONFIDENCE,
+    minCoverageRatio: MIN_COVERAGE_RATIO,
+    referenceSourceIndex: referenceFrame.sourceIndex,
+    searchRadiusPx: SEARCH_RADIUS_PIXELS,
+  });
+  assertEqual(alignment.referenceSource.sourceIndex, referenceFrame.sourceIndex, 'reference source', fixture.fixtureId);
+  assertEqual(alignment.referenceSource.reason, 'requested_source_index', 'reference reason', fixture.fixtureId);
+  if (alignment.blocked) {
+    fail(`${fixture.fixtureId}: pure translation fixture was blocked`, alignment);
+  }
+
   const results = [];
   for (const sourceFrame of fixture.sourceFrames) {
-    const candidate = createTranslatedScene(fixture, sourceFrame);
-    const result = estimateTranslation(reference, candidate, sourceFrame);
+    const result = alignment.diagnostics.find((diagnostic) => diagnostic.sourceIndex === sourceFrame.sourceIndex);
+    if (result === undefined) {
+      fail(`${fixture.fixtureId}: missing source ${sourceFrame.sourceIndex} diagnostic`, alignment);
+    }
     const expected = expectedAlignmentTranslation(referenceFrame, sourceFrame);
 
     assertEqual(result.translation.dx, expected.dx, `source ${sourceFrame.sourceIndex} dx`, fixture.fixtureId);
