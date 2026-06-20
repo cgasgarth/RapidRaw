@@ -10,6 +10,10 @@ const contractSource = readFileSync('src/utils/computationalMergeReviewPanels.ts
 for (const marker of [
   'panorama-review-diagnostics',
   'sections={[',
+  'sourceReadinessLabel',
+  'modals.panorama.summarySourceCount',
+  'modals.panorama.summaryReady',
+  'modals.panorama.summaryBlocked',
   'modals.panorama.projectionLabel',
   'modals.panorama.boundaryLabel',
   'modals.panorama.exposureLabel',
