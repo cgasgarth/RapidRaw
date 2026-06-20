@@ -21,8 +21,15 @@ if (missingKeys.length > 0) {
 const source = readFileSync('src/components/adjustments/FilmLookBrowser.tsx', 'utf8');
 for (const marker of [
   'data-testid="film-look-favorites-count"',
+  'data-testid="film-look-readiness-summary"',
+  'data-testid="film-look-readiness-family"',
+  'data-testid="film-look-readiness-claim"',
+  'data-testid="film-look-readiness-runtime"',
+  'data-preview-export-ready={String(selectedLookRuntimeReady)}',
+  'data-claim-level={selectedLook.provenance.claimLevel}',
   'adjustments.effects.filmLookBrowser.favoriteCount',
   'favoriteLookCount',
+  'selectedLookRuntimeReady',
 ]) {
   if (!source.includes(marker)) {
     console.error(`Film Look browser missing favorite count marker: ${marker}`);

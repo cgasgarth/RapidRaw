@@ -157,6 +157,7 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
   const selectedLook = selectedLookId === null ? undefined : looksById.get(selectedLookId);
   const selectedLookAdjustmentSummaries =
     selectedLook === undefined ? [] : getFilmLookAdjustmentSummaries(selectedLook);
+  const selectedLookRuntimeReady = selectedLook?.runtimeSupport === 'adjustment_patch_preview_export';
 
   useEffect(() => {
     window.localStorage.setItem(FILM_LOOK_FAVORITES_STORAGE_KEY, JSON.stringify([...favoriteLookIds].toSorted()));
@@ -564,6 +565,36 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
                 {summary.label} {formatFilmLookAdjustmentValue(summary.value)}
               </span>
             ))}
+          </div>
+          <div
+            className="grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-primary p-2 text-[11px]"
+            data-claim-level={selectedLook.provenance.claimLevel}
+            data-look-family={selectedLook.category}
+            data-preview-export-ready={String(selectedLookRuntimeReady)}
+            data-testid="film-look-readiness-summary"
+          >
+            <div className="min-w-0 rounded bg-bg-secondary px-2 py-1" data-testid="film-look-readiness-family">
+              <span className="block truncate text-text-tertiary">
+                {t('adjustments.effects.filmLookBrowser.family')}
+              </span>
+              <span className="block truncate text-text-secondary">{formatFilmLookToken(selectedLook.category)}</span>
+            </div>
+            <div className="min-w-0 rounded bg-bg-secondary px-2 py-1" data-testid="film-look-readiness-claim">
+              <span className="block truncate text-text-tertiary">
+                {t('adjustments.effects.filmLookBrowser.claimLevel')}
+              </span>
+              <span className="block truncate text-text-secondary">
+                {formatFilmLookToken(selectedLook.provenance.claimLevel)}
+              </span>
+            </div>
+            <div className="min-w-0 rounded bg-bg-secondary px-2 py-1" data-testid="film-look-readiness-runtime">
+              <span className="block truncate text-text-tertiary">
+                {t('adjustments.effects.filmLookBrowser.measurementSource')}
+              </span>
+              <span className="block truncate text-text-secondary">
+                {formatFilmLookToken(selectedLook.runtimeSupport)}
+              </span>
+            </div>
           </div>
         </section>
       )}
