@@ -41,6 +41,7 @@ const aiToolCapabilities = new Map(
 const failures = [];
 const runtimeCheckScripts = [
   'check:ai-mask-capabilities',
+  'check:ai-mask-app-server-tool',
   'check:ai-people-masks',
   'check:ai-people-apply-plan',
   'check:ai-denoise-app-server-tool',

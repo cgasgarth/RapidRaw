@@ -377,6 +377,7 @@ const aiRuntimeCheckScriptsForRoute = (route: (typeof AI_APP_SERVER_TOOL_ROUTES)
   const checks = new Set<string>(['check:ai-app-server-routes']);
 
   if (route.toolCapability?.endsWith('_mask')) {
+    checks.add('check:ai-mask-app-server-tool');
     checks.add('check:ai-mask-capabilities');
     checks.add('check:ai-people-masks');
     if (route.executionMode === 'apply_dry_run_plan') checks.add('check:ai-people-apply-plan');
