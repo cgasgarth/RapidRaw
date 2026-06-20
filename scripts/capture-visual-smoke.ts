@@ -1,7 +1,8 @@
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdir, readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
 import { sampleToneColorCommandEnvelopeV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
@@ -228,6 +229,46 @@ async function readPngDataUrl(path) {
   return `data:image/png;base64,${buffer.toString('base64')}`;
 }
 
+async function runSipsPngThumbnail(sourcePath, outputPath, maxDimension) {
+  await new Promise((resolveSips, rejectSips) => {
+    const child = spawn('sips', ['-Z', String(maxDimension), sourcePath, '--out', outputPath], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    let stderr = '';
+
+    child.stderr.on('data', (chunk) => {
+      stderr = `${stderr}${chunk.toString()}`.slice(-1_000);
+    });
+    child.once('error', rejectSips);
+    child.once('exit', (code) => {
+      if (code === 0) {
+        resolveSips(undefined);
+        return;
+      }
+
+      rejectSips(new Error(`sips thumbnail failed for ${sourcePath}: ${stderr.trim() || `exit ${code}`}`));
+    });
+  });
+}
+
+async function readLayerMaskPreviewDataUrl(path) {
+  const dimensions = await readPngDimensions(path);
+  const maxPreviewDimension = 720;
+  if (Math.max(dimensions.width, dimensions.height) <= maxPreviewDimension) {
+    return readPngDataUrl(path);
+  }
+
+  const tempDir = await mkdtemp(join(tmpdir(), 'rawengine-layer-preview-'));
+  const outputPath = join(tempDir, 'preview.png');
+
+  try {
+    await runSipsPngThumbnail(path, outputPath, maxPreviewDimension);
+    return await readPngDataUrl(outputPath);
+  } finally {
+    await rm(tempDir, { force: true, recursive: true });
+  }
+}
+
 async function readJpegDataUrl(path) {
   const buffer = await readFile(path);
   if (buffer.toString('hex', 0, 2) !== 'ffd8') {
@@ -326,11 +367,11 @@ async function loadLayerMaskPrivateRawProof(): Promise<LayerMaskPrivateRawBrowse
     fixtureId: 'validation.layer-mask-real-raw.high-iso-skin-shadow.v1',
     metricCount: '5',
     refinedPreviewArtifact,
-    refinedPreviewDataUrl: await readPngDataUrl(refinedPreviewArtifact),
+    refinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(refinedPreviewArtifact),
     unmaskedPreviewArtifact,
-    unmaskedPreviewDataUrl: await readPngDataUrl(unmaskedPreviewArtifact),
+    unmaskedPreviewDataUrl: await readLayerMaskPreviewDataUrl(unmaskedPreviewArtifact),
     unrefinedPreviewArtifact,
-    unrefinedPreviewDataUrl: await readPngDataUrl(unrefinedPreviewArtifact),
+    unrefinedPreviewDataUrl: await readLayerMaskPreviewDataUrl(unrefinedPreviewArtifact),
   };
 }
 
@@ -1213,6 +1254,17 @@ async function main() {
   let browser;
 
   try {
+    const srPrivateRawProof = requiresSrPrivateRawProof ? await loadSrPrivateRawProof() : undefined;
+    const focusPrivateRawProof = requiresFocusPrivateRawProof ? await loadFocusPrivateRawProof() : undefined;
+    const hdrPrivateRawProof = requiresHdrPrivateRawProof ? await loadHdrPrivateRawProof() : undefined;
+    const panoramaPrivateRawProof = requiresPanoramaPrivateRawProof ? await loadPanoramaPrivateRawProof() : undefined;
+    const layerMaskPrivateRawProof = requiresLayerMaskPrivateRawProof
+      ? await loadLayerMaskPrivateRawProof()
+      : undefined;
+    const negativeLabPublicExportProof = requiresNegativeLabPublicExportProof
+      ? await loadNegativeLabPublicExportProof()
+      : undefined;
+
     await waitForDevServer();
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ deviceScaleFactor: 1, viewport });
@@ -1227,53 +1279,35 @@ async function main() {
         },
       });
     });
-    if (requiresSrPrivateRawProof) {
-      await page.addInitScript(
-        (proof: SrPrivateRawBrowserProof) => {
-          window.__RAWENGINE_SR_PRIVATE_RAW_PROOF__ = proof;
-        },
-        await loadSrPrivateRawProof(),
-      );
+    if (srPrivateRawProof !== undefined) {
+      await page.addInitScript((proof: SrPrivateRawBrowserProof) => {
+        window.__RAWENGINE_SR_PRIVATE_RAW_PROOF__ = proof;
+      }, srPrivateRawProof);
     }
-    if (requiresFocusPrivateRawProof) {
-      await page.addInitScript(
-        (proof: FocusPrivateRawBrowserProof) => {
-          window.__RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__ = proof;
-        },
-        await loadFocusPrivateRawProof(),
-      );
+    if (focusPrivateRawProof !== undefined) {
+      await page.addInitScript((proof: FocusPrivateRawBrowserProof) => {
+        window.__RAWENGINE_FOCUS_PRIVATE_RAW_PROOF__ = proof;
+      }, focusPrivateRawProof);
     }
-    if (requiresHdrPrivateRawProof) {
-      await page.addInitScript(
-        (proof: HdrPrivateRawBrowserProof) => {
-          window.__RAWENGINE_HDR_PRIVATE_RAW_PROOF__ = proof;
-        },
-        await loadHdrPrivateRawProof(),
-      );
+    if (hdrPrivateRawProof !== undefined) {
+      await page.addInitScript((proof: HdrPrivateRawBrowserProof) => {
+        window.__RAWENGINE_HDR_PRIVATE_RAW_PROOF__ = proof;
+      }, hdrPrivateRawProof);
     }
-    if (requiresPanoramaPrivateRawProof) {
-      await page.addInitScript(
-        (proof: PanoramaPrivateRawBrowserProof) => {
-          window.__RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__ = proof;
-        },
-        await loadPanoramaPrivateRawProof(),
-      );
+    if (panoramaPrivateRawProof !== undefined) {
+      await page.addInitScript((proof: PanoramaPrivateRawBrowserProof) => {
+        window.__RAWENGINE_PANORAMA_PRIVATE_RAW_PROOF__ = proof;
+      }, panoramaPrivateRawProof);
     }
-    if (requiresLayerMaskPrivateRawProof) {
-      await page.addInitScript(
-        (proof: LayerMaskPrivateRawBrowserProof) => {
-          window.__RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__ = proof;
-        },
-        await loadLayerMaskPrivateRawProof(),
-      );
+    if (layerMaskPrivateRawProof !== undefined) {
+      await page.addInitScript((proof: LayerMaskPrivateRawBrowserProof) => {
+        window.__RAWENGINE_LAYER_MASK_PRIVATE_RAW_PROOF__ = proof;
+      }, layerMaskPrivateRawProof);
     }
-    if (requiresNegativeLabPublicExportProof) {
-      await page.addInitScript(
-        (proof: NegativeLabPublicExportBrowserProof) => {
-          window.__RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__ = proof;
-        },
-        await loadNegativeLabPublicExportProof(),
-      );
+    if (negativeLabPublicExportProof !== undefined) {
+      await page.addInitScript((proof: NegativeLabPublicExportBrowserProof) => {
+        window.__RAWENGINE_NEGATIVE_LAB_PUBLIC_EXPORT_PROOF__ = proof;
+      }, negativeLabPublicExportProof);
     }
 
     page.on('pageerror', (error) => {
