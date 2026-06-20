@@ -154,12 +154,22 @@ if (requireAssets && privateRoot !== undefined) {
   if (workflowReport.fixtureId !== summary.fixtureId) {
     failures.push('workflow report fixture ID must match committed summary.');
   }
+  if (workflowReport.reportId !== 'raw-open-edit-export-run.selective-color-orange.v1') {
+    failures.push('workflow report ID must match selective-color proof run.');
+  }
+  if (workflowReport.editCommandId !== summary.localRawRuntime.editCommandId) {
+    failures.push('workflow report edit command ID must match committed summary.');
+  }
+
   for (const artifact of summary.workflowArtifacts) {
     const absolutePath = resolve(privateRoot, artifact.path);
     try {
       await access(absolutePath);
     } catch {
       failures.push(`${artifact.kind}: missing artifact ${artifact.path}`);
+      continue;
+    }
+    if (artifact.kind === 'workflow_report_private') {
       continue;
     }
     const actualHash = createHash('sha256')
