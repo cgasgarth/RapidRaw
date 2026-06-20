@@ -299,8 +299,11 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ],
   ['schema:samples', new Set(['bun packages/rawengine-schema/scripts/check-sample-artifacts.ts'])],
   ['schema:samples:update', new Set(['bun packages/rawengine-schema/scripts/check-sample-artifacts.ts --update'])],
-  ['schema:contract-gate', new Set(['bun scripts/ci-schema-contract-gate.ts'])],
-  ['schema:contract-gate:self-test', new Set(['bun scripts/ci-schema-contract-gate.ts --self-test'])],
+  ['schema:contract-gate', new Set(['bun tests/integration/checks/check-schema-contract-gate.ts'])],
+  [
+    'schema:contract-gate:self-test',
+    new Set(['bun tests/integration/checks/check-schema-contract-gate.ts --self-test']),
+  ],
   [
     'schema:sr-app-server',
     new Set(['bun packages/rawengine-schema/scripts/check-super-resolution-app-server-command-bus.ts']),
@@ -1036,7 +1039,7 @@ function runSelfTest() {
     ['README.md', 'src-tauri/Cargo.toml'],
     SMOKE_MODES.RELEASE,
   );
-  console.log('ci-classify-macos-smoke self-test passed');
+  console.log('check-ci-classify-macos-smoke self-test passed');
 }
 
 const args = process.argv.slice(2);
@@ -1053,7 +1056,7 @@ if (args.includes('--self-test')) {
 
   if (!filesPath && !pullFilesJsonPath && !pullFilesNdjsonPath) {
     throw new Error(
-      'Usage: bun scripts/ci-classify-macos-smoke.ts --files <changed-files.txt> | --pull-files-json <pull-files.json> | --pull-files-ndjson <pull-files.ndjson>',
+      'Usage: bun tests/integration/checks/check-ci-classify-macos-smoke.ts --files <changed-files.txt> | --pull-files-json <pull-files.json> | --pull-files-ndjson <pull-files.ndjson>',
     );
   }
 

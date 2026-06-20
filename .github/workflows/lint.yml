@@ -249,7 +249,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          bun scripts/ci-classify-macos-smoke.ts ${{ steps.macos-smoke-files.outputs.args }} > .macos-smoke.outputs
+          bun tests/integration/checks/check-ci-classify-macos-smoke.ts ${{ steps.macos-smoke-files.outputs.args }} > .macos-smoke.outputs
           cat .macos-smoke.outputs >> "$GITHUB_OUTPUT"
           cat .macos-smoke.outputs
 
@@ -326,7 +326,7 @@ jobs:
 
       - name: Classify Rust requirement
         id: rust-pr-decision
-        run: bun scripts/ci-classify-rust-pr.ts ${{ steps.rust-pr-files.outputs.args }}
+        run: bun tests/integration/checks/check-ci-classify-rust-pr.ts ${{ steps.rust-pr-files.outputs.args }}
 
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'
@@ -377,7 +377,7 @@ jobs:
 
       - name: Classify Rust requirement
         id: rust-pr-decision
-        run: bun scripts/ci-classify-rust-pr.ts ${{ steps.rust-pr-files.outputs.args }}
+        run: bun tests/integration/checks/check-ci-classify-rust-pr.ts ${{ steps.rust-pr-files.outputs.args }}
 
       - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
         if: steps.rust-pr-decision.outputs.rust_ci_required == 'true'

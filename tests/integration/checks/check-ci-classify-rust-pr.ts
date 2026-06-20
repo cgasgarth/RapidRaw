@@ -13,7 +13,7 @@ const PullFileSchema = z.object({
 const RUST_RELEVANT_PREFIXES = [
   '.cargo/',
   '.github/workflows/lint.yml',
-  'scripts/ci-classify-rust-pr.ts',
+  'tests/integration/checks/check-ci-classify-rust-pr.ts',
   'tests/integration/checks/check-rust-feature-policy.ts',
   'src-tauri/',
 ];
