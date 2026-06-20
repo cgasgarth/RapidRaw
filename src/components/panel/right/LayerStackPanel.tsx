@@ -17,6 +17,7 @@ import {
   moveLayer,
   moveLayerGroup,
   setLayerGroupName,
+  setLayerGroupOpacity,
   setLayerName,
   setLayerOpacity,
   setLayerVisibility,
@@ -77,7 +78,7 @@ function getLayerRows(masks: Array<MaskContainer>): Array<LayerRowModel> {
         isGroupedLayer: false,
         maskCount: groupSummary?.layerIds.length ?? 1,
         name: groupSummary?.name ?? tFallbackLayerGroupName(),
-        opacity: 100,
+        opacity: groupSummary?.opacity ?? 100,
         visible:
           groupSummary?.layerIds.every((layerId) => masks.find((layer) => layer.id === layerId)?.visible) ?? true,
       });
@@ -163,7 +164,9 @@ export default function LayerStackPanel({
   const applyLayerStack = (nextMasks: Array<MaskContainer>, nextSelectedLayerId = selectedLayerId) => {
     onSetMaskContainers(nextMasks);
     setLocalSelectedLayerId(nextSelectedLayerId);
-    onSelectMaskContainer(nextSelectedLayerId === BASE_LAYER_ID ? null : nextSelectedLayerId);
+    onSelectMaskContainer(
+      nextSelectedLayerId === BASE_LAYER_ID || nextSelectedLayerId.startsWith('group:') ? null : nextSelectedLayerId,
+    );
   };
   const updateLayerVisibility = (layerId: string, visible: boolean) => {
     applyLayerStack(setLayerVisibility(masks, layerId, visible), layerId);
@@ -174,6 +177,9 @@ export default function LayerStackPanel({
   };
   const updateLayerOpacity = (layerId: string, opacity: number) => {
     applyLayerStack(setLayerOpacity(masks, layerId, opacity), layerId);
+  };
+  const updateGroupOpacity = (groupId: string, opacity: number) => {
+    applyLayerStack(setLayerGroupOpacity(masks, groupId, opacity), `group:${groupId}`);
   };
   const updateActiveLayerName = (name: string) => {
     if (!activeRow || activeRow.isBase) return;
@@ -403,13 +409,18 @@ export default function LayerStackPanel({
 
           <Slider
             defaultValue={100}
-            disabled={isBaseSelected || isGroupHeaderSelected}
+            disabled={isBaseSelected}
             fillOrigin="min"
             label={t('editor.masks.settings.opacity')}
             max={100}
             min={0}
             onChange={(event: SliderChangeEvent) => {
-              if (!activeRow.isBase && !activeRow.isGroupHeader) {
+              if (activeRow.isGroupHeader && activeRow.groupId) {
+                updateGroupOpacity(activeRow.groupId, Number(event.target.value));
+                return;
+              }
+
+              if (!activeRow.isBase) {
                 updateLayerOpacity(activeRow.id, Number(event.target.value));
               }
             }}

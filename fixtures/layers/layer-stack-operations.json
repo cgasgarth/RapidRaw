@@ -98,6 +98,74 @@
     "expectedLayers": [{ "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true }]
   },
   {
+    "id": "group-opacity-updates-member-layers",
+    "initialLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      {
+        "id": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 65,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      {
+        "id": "sky",
+        "name": "Sky Recover",
+        "opacity": 80,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      }
+    ],
+    "operations": [{ "type": "setGroupOpacity", "groupId": "portrait-group", "opacity": 42 }],
+    "expectedLayers": [
+      { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },
+      {
+        "id": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 42,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      },
+      {
+        "id": "sky",
+        "name": "Sky Recover",
+        "opacity": 42,
+        "visible": true,
+        "layerGroupId": "portrait-group",
+        "layerGroupName": "Portrait Group"
+      }
+    ],
+    "expectedRenderPlan": [
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "tone",
+        "name": "Tone Balance",
+        "opacity": 100,
+        "opacityFraction": 1,
+        "subMaskCount": 0
+      },
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "skin",
+        "name": "Skin Uniformity",
+        "opacity": 42,
+        "opacityFraction": 0.42,
+        "subMaskCount": 0
+      },
+      {
+        "adjustmentKeys": ["sharpnessThreshold"],
+        "layerId": "sky",
+        "name": "Sky Recover",
+        "opacity": 42,
+        "opacityFraction": 0.42,
+        "subMaskCount": 0
+      }
+    ]
+  },
+  {
     "id": "visibility-and-reorder",
     "initialLayers": [
       { "id": "tone", "name": "Tone Balance", "opacity": 100, "visible": true },

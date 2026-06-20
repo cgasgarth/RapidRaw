@@ -7,6 +7,7 @@ export interface LayerGroupSummary {
   layerCount: number;
   layerIds: Array<string>;
   name: string;
+  opacity: number;
 }
 
 export interface LayerRenderPlanItem {
@@ -76,6 +77,16 @@ export function setLayerGroupName(layers: Array<MaskContainer>, groupId: string,
   }
 
   return layers.map((layer) => (layer.layerGroupId === groupId ? { ...layer, layerGroupName: nextName } : layer));
+}
+
+export function setLayerGroupOpacity(
+  layers: Array<MaskContainer>,
+  groupId: string,
+  opacity: number,
+): Array<MaskContainer> {
+  findLayerGroupIndexes(layers, groupId);
+  const nextOpacity = clampLayerOpacity(opacity);
+  return layers.map((layer) => (layer.layerGroupId === groupId ? { ...layer, opacity: nextOpacity } : layer));
 }
 
 export function createAdjustmentLayer(
@@ -283,6 +294,9 @@ export function buildLayerGroupSummaries(layers: Array<MaskContainer>): Array<La
     if (existing) {
       existing.layerCount += 1;
       existing.layerIds.push(layer.id);
+      existing.opacity = clampLayerOpacity(
+        (existing.opacity * (existing.layerCount - 1) + clampLayerOpacity(layer.opacity)) / existing.layerCount,
+      );
       continue;
     }
 
@@ -291,6 +305,7 @@ export function buildLayerGroupSummaries(layers: Array<MaskContainer>): Array<La
       layerCount: 1,
       layerIds: [layer.id],
       name: layer.layerGroupName?.trim() || 'Layer Group',
+      opacity: clampLayerOpacity(layer.opacity),
     });
   }
 
