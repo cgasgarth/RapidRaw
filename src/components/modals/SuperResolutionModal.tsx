@@ -47,6 +47,7 @@ export default function SuperResolutionModal({
 
   const isSourceCountValid = sourceCount >= 2;
   const isAggressivePreviewOnly = settings.detailPolicy === 'aggressive_preview_only';
+  const outputPixelMultiplier = Number((settings.outputScale * settings.outputScale).toFixed(2));
 
   const alignmentOptions: Array<OptionItem<SuperResolutionAlignmentMode>> = [
     { label: t('modals.superResolution.alignmentAuto'), value: 'auto' },
@@ -222,6 +223,10 @@ export default function SuperResolutionModal({
             value={t('modals.superResolution.scaleValue', { scale: settings.outputScale })}
           />
           <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.outputPixels')}
+            value={t('modals.superResolution.outputPixelMultiplier', { multiplier: outputPixelMultiplier })}
+          />
+          <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.alignment')}
             value={t(`modals.superResolution.alignment.${settings.alignmentMode}`)}
           />
@@ -273,6 +278,10 @@ export default function SuperResolutionModal({
               {
                 label: t('modals.superResolution.preflight.scale'),
                 value: t('modals.superResolution.scaleValue', { scale: settings.outputScale }),
+              },
+              {
+                label: t('modals.superResolution.preflight.outputPixels'),
+                value: t('modals.superResolution.outputPixelMultiplier', { multiplier: outputPixelMultiplier }),
               },
               {
                 label: t('modals.superResolution.preflight.alignment'),
