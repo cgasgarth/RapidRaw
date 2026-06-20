@@ -8,7 +8,7 @@ import EffectsPanel from '../../components/adjustments/Effects';
 import CommandPaletteModal from '../../components/modals/CommandPaletteModal';
 import FocusStackModal from '../../components/modals/FocusStackModal';
 import HdrModal from '../../components/modals/HdrModal';
-import NegativeConversionModal from '../../components/modals/NegativeConversionModal';
+import { NegativeConversionModal } from '../../components/modals/NegativeConversionModal';
 import PanoramaModal from '../../components/modals/PanoramaModal';
 import SuperResolutionModal from '../../components/modals/SuperResolutionModal';
 import AgentChatShell from '../../components/panel/right/AgentChatShell';

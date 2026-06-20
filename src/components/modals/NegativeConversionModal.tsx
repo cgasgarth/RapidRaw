@@ -2288,5 +2288,3 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     </div>
   );
 }
-
-export default NegativeConversionModal;
