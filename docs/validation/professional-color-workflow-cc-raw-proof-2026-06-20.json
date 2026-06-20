@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "issue": 2309,
+  "fixtureId": "validation.color.professional-workflow.local-cc-raw.v1",
+  "generatedAt": "2026-06-20T09:02:00.000Z",
+  "validationMode": "local_cc_raw_runtime_plus_visual_smoke",
+  "sourceRaw": {
+    "localPath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+    "sha256": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
+    "downloadedFrom": "https://www.rawsamples.ch/index.php/en/sony",
+    "licenseEvidence": "https://www.rawsamples.ch/index.php/en/legal-stuff",
+    "licenseSummary": "Creative Commons RAW sample for software development validation."
+  },
+  "localRawRuntime": {
+    "status": "passed",
+    "command": "RAWENGINE_RUN_PRIVATE_RAW_OPEN_EDIT_EXPORT_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_raw_open_edit_export_report_when_enabled -- --nocapture",
+    "rawRuntimeFixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
+    "editCommandId": "command.raw-open-edit-export.basic-tone.v1",
+    "artifactRoot": "private-artifacts/validation/open-edit-export",
+    "workflowReportPath": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-workflow-report.json",
+    "metrics": {
+      "changedPixelRatio": 0.9999131641554322,
+      "previewExportMeanAbsDelta": 0,
+      "sourceHashUnchanged": 1
+    }
+  },
+  "colorManagement": {
+    "inputDomain": "camera_linear_rgb",
+    "operationDomain": "acescg_linear_v1",
+    "workingSpace": "acescg_linear_v1",
+    "outputProfile": "display_p3",
+    "sceneToDisplayTransform": "rawengine_agx_v1",
+    "viewTransform": "rawengine_agx_v1",
+    "proofLevel": "private_raw_runtime_color_management_metadata"
+  },
+  "workflowArtifacts": [
+    {
+      "kind": "source_raw_private",
+      "path": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+      "hash": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
+      "publicRepoAllowed": false
+    },
+    {
+      "kind": "preview_before_private",
+      "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-preview-before.png",
+      "hash": "sha256:c6e2f893ff0741e277a46068f085e62eb7610a7c276c1976a786e329f8c46002",
+      "publicRepoAllowed": false
+    },
+    {
+      "kind": "preview_after_private",
+      "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-preview-after.png",
+      "hash": "sha256:9aecb2e1796d6cc7d15148bacd1c37884c8731c11256cd9934a58db0283125ec",
+      "publicRepoAllowed": false
+    },
+    {
+      "kind": "export_after_private",
+      "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-export-after.tiff",
+      "hash": "sha256:1f1399b9bf22fecedd986b1007f82084ae024bebc03937ce63deeda102d727c3",
+      "publicRepoAllowed": false
+    },
+    {
+      "kind": "sidecar_after_private",
+      "path": "private-artifacts/validation/open-edit-export/high-iso-skin-shadow-v1-after.rrdata",
+      "hash": "sha256:2d44654ced13ac9fc59bfbc7afbf7d28003ee4b179937d4ec0fc881dafdbbb2d",
+      "publicRepoAllowed": false
+    },
+    {
+      "kind": "visual_smoke_screenshot",
+      "path": "artifacts/visual-smoke/color-workflow.png",
+      "hash": "sha256:5260646614bd443e2b2c6783ad6074e073c3be7efde9b643d50f80f67c6fbc01",
+      "publicRepoAllowed": false
+    }
+  ],
+  "doesNotProve": [
+    "camera_profile_quality",
+    "capture_one_class_quality",
+    "display_device_visual_match",
+    "full_macos_app_manual_session",
+    "gpu_color_parity",
+    "icc_colorimetric_accuracy"
+  ]
+}

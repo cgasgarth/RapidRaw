@@ -603,6 +603,7 @@ mod tests {
                 approval_class: "edit_apply".to_string(),
                 state: "approved".to_string(),
             },
+            color_pipeline: sample_color_pipeline(),
             command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
             command_type: "toneColor.setBasicTone".to_string(),
             dry_run: false,
@@ -617,6 +618,34 @@ mod tests {
                 shadows: 9.0,
                 white_point: 3.0,
             },
+        }
+    }
+
+    fn sample_color_pipeline() -> RawOpenEditExportColorPipeline {
+        RawOpenEditExportColorPipeline {
+            chromatic_adaptation: RawOpenEditExportChromaticAdaptation {
+                method: "bradford_v1".to_string(),
+                source_white_point: RawOpenEditExportWhitePoint {
+                    x: 0.3457,
+                    y: 0.3585,
+                },
+                status: "math_validated".to_string(),
+                target_white_point: RawOpenEditExportWhitePoint {
+                    x: 0.32168,
+                    y: 0.33767,
+                },
+            },
+            input_domain: "camera_linear_rgb".to_string(),
+            operation_domain: "acescg_linear_v1".to_string(),
+            render_target: RawOpenEditExportRenderTarget {
+                bit_depth: 16,
+                embed_icc: true,
+                intent: "relative_colorimetric".to_string(),
+                output_profile: "display_p3".to_string(),
+                view_transform: "rawengine_agx_v1".to_string(),
+            },
+            scene_to_display_transform: "rawengine_agx_v1".to_string(),
+            working_space: "acescg_linear_v1".to_string(),
         }
     }
 
@@ -693,6 +722,7 @@ mod tests {
         );
         let report = RawOpenEditExportProofReport {
             artifacts: vec![artifact("preview_before_private", &asset)],
+            color_management: color_management_proof(&sample_color_pipeline()),
             edit_command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
             edit_graph_revision: "graph-rev.raw-open-edit-export.sample.v1".to_string(),
             fixture_id: "validation.raw-open-edit-export.sample.v1".to_string(),
