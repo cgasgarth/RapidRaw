@@ -188,6 +188,10 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:super-resolution-app-server-runtime'],
   );
   addIf((file) => file.startsWith('packages/rawengine-schema/src/panorama'), ['check:panorama-runtime-plan-smoke']);
+  addIf(
+    (file) => file.includes('panoramaHomographyDiagnostics') || file.includes('panorama-homography-diagnostics'),
+    ['check:panorama-homography-diagnostics'],
+  );
   addIf((file) => file.startsWith('packages/rawengine-schema/src/hdr'), ['check:hdr-ui-runtime-bridge']);
   addIf(
     (file) =>
