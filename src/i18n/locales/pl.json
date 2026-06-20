@@ -1834,6 +1834,8 @@
       "profileEvidenceCount": "{{fixtureCount}} fixture(s)",
       "profileMeasuredBadge": "Measured",
       "profileMeasuredClaimPolicy": "Process-family measured profile; no named-stock or colorimetric-match claim.",
+      "profileSearch": "Search profiles",
+      "profileSearchEmpty": "No matching profiles",
       "qcProofHint": "Contact-sheet proof state for batch handoff; image pixels are not retouched here.",
       "qcProofReport": "QC proof report",
       "queuedScans": "{{queuedCount}} queued",

@@ -125,6 +125,30 @@ const NEGATIVE_LAB_PROFILE_BROWSER_ROW_BY_ID = new Map(
 const NEGATIVE_LAB_STOCK_REGISTRY_COUNTS = buildNegativeLabStockRegistryCounts(NEGATIVE_LAB_STOCK_REGISTRY);
 const NEGATIVE_LAB_STOCK_METADATA_COUNTS = buildNegativeLabStockMetadataCounts(NEGATIVE_LAB_STOCK_METADATA_CATALOG);
 const formatStockRegistryToken = (value: string) => value.split('_').join(' ');
+const getNegativeLabProfileSearchText = (profile: NegativeLabRuntimeProfileBrowserRow) =>
+  [
+    profile.claimLevel,
+    profile.claimPolicy,
+    profile.displayName,
+    profile.filmClass,
+    profile.measurementProfileId ?? '',
+    profile.presetId,
+    profile.processFamily,
+    profile.profileStatus,
+    profile.provenanceSummary,
+    profile.runtimeStatus,
+    profile.sourceGenericPresetId ?? '',
+    String(profile.evidenceFixtureCount),
+    String(profile.params.base_fog_strength),
+    String(profile.params.blue_weight),
+    String(profile.params.contrast),
+    String(profile.params.exposure),
+    String(profile.params.green_weight),
+    String(profile.params.red_weight),
+    ...profile.doesNotProve,
+  ]
+    .join(' ')
+    .toLocaleLowerCase('en-US');
 const formatStockMetadataIso = (
   nominalIso: (typeof NEGATIVE_LAB_STOCK_METADATA_CATALOG.entries)[number]['nominalIso'],
 ) => (nominalIso === null ? 'ISO -' : `${nominalIso.unit} ${nominalIso.value}`);
@@ -238,6 +262,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [conversionScope, setConversionScope] = useState<NegativeConversionScope>('all');
   const [includedPathSet, setIncludedPathSet] = useState<Set<string>>(() => getInitialIncludedPaths(targetPaths));
   const [activePathIndex, setActivePathIndex] = useState(0);
+  const [profileSearchQuery, setProfileSearchQuery] = useState('');
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [isCompareActive, setIsCompareActive] = useState(false);
@@ -348,6 +373,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     selectedProfile?.runtimeStatus === 'runtime_parameter_applied'
       ? t('modals.negativeConversion.presetRuntimeApplied')
       : t('modals.negativeConversion.presetRuntimeCatalogOnly');
+  const normalizedProfileSearchQuery = profileSearchQuery.trim().toLocaleLowerCase('en-US');
+  const visibleProfileRows = useMemo(
+    () =>
+      normalizedProfileSearchQuery.length === 0
+        ? NEGATIVE_LAB_PROFILE_BROWSER_ROWS
+        : NEGATIVE_LAB_PROFILE_BROWSER_ROWS.filter((profile) =>
+            getNegativeLabProfileSearchText(profile).includes(normalizedProfileSearchQuery),
+          ),
+    [normalizedProfileSearchQuery],
+  );
   const frameHealthReport = useMemo(
     () =>
       buildNegativeLabFrameHealthReport({
@@ -1536,8 +1571,29 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               </UiText>
             </div>
           </div>
+          <input
+            aria-label={t('modals.negativeConversion.profileSearch')}
+            className="mb-3 w-full rounded-md border border-surface bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent"
+            data-testid="negative-lab-profile-search"
+            onChange={(event) => {
+              setProfileSearchQuery(event.currentTarget.value);
+            }}
+            placeholder={t('modals.negativeConversion.profileSearch')}
+            type="search"
+            value={profileSearchQuery}
+          />
+          {visibleProfileRows.length === 0 && (
+            <div
+              className="rounded-md border border-dashed border-surface bg-bg-primary p-3 text-center"
+              data-testid="negative-lab-profile-search-empty"
+            >
+              <UiText variant={TextVariants.small} className="text-text-secondary">
+                {t('modals.negativeConversion.profileSearchEmpty')}
+              </UiText>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-2">
-            {NEGATIVE_LAB_PROFILE_BROWSER_ROWS.map((preset) => {
+            {visibleProfileRows.map((preset) => {
               const isSelected = selectedPresetId === preset.presetId;
 
               return (

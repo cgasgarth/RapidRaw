@@ -1396,6 +1396,8 @@
       "profileEvidenceCount": "{{fixtureCount}} fixture(s)",
       "profileMeasuredBadge": "Measured",
       "profileMeasuredClaimPolicy": "Process-family measured profile; no named-stock or colorimetric-match claim.",
+      "profileSearch": "Search profiles",
+      "profileSearchEmpty": "No matching profiles",
       "presetRuntimeApplied": "Runtime applied",
       "presetRuntimeCatalogOnly": "Catalog only",
       "presetSpeedClass": "Speed class",
