@@ -205,6 +205,10 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:panorama-cycle-consistency-proof'],
   );
   addIf(
+    (file) => file.includes('panoramaLocalOptimizationRansac') || file.includes('panorama-lo-ransac-proof'),
+    ['check:panorama-lo-ransac-proof'],
+  );
+  addIf(
     (file) => file.includes('panoramaHomographyDiagnostics') || file.includes('panorama-homography-diagnostics'),
     ['check:panorama-homography-diagnostics'],
   );

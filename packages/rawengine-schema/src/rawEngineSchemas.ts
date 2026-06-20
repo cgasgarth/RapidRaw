@@ -2676,6 +2676,16 @@ export const panoramaAlignmentV1Schema = z
     algorithmId: z.literal('rapidraw_fast9_brief_ransac_v1'),
     downscaleMaxDimensionPx: z.number().int().positive(),
     globalHomographyCount: z.number().int().nonnegative(),
+    localOptimization: z
+      .object({
+        algorithmId: z.literal('deterministic_inlier_mean_refinement_v1'),
+        boundedIterationCount: z.number().int().nonnegative(),
+        deterministicTieBreak: z.literal('first_max_consensus_lowest_match_index'),
+        refinedModelType: z.literal('translation_xy'),
+        support: z.literal('synthetic_translation_metadata_only'),
+      })
+      .strict()
+      .optional(),
     minimumInliersForConnection: z.number().int().positive(),
     pairwiseMatches: z.array(panoramaPairwiseMatchV1Schema),
     ransacSeed: z.number().int().nonnegative().optional(),

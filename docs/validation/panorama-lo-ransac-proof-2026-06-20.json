@@ -1,0 +1,45 @@
+{
+  "cases": [
+    {
+      "artifactLocalOptimization": {
+        "algorithmId": "deterministic_inlier_mean_refinement_v1",
+        "boundedIterationCount": 1,
+        "deterministicTieBreak": "first_max_consensus_lowest_match_index",
+        "refinedModelType": "translation_xy",
+        "support": "synthetic_translation_metadata_only"
+      },
+      "estimate": {
+        "algorithmId": "synthetic_descriptor_translation_lo_ransac_v1",
+        "deterministicTieBreak": "first_max_consensus_lowest_match_index",
+        "evaluatedSeedModelCount": 6,
+        "inlierCount": 5,
+        "inlierTolerancePx": 0.85,
+        "kind": "success",
+        "localOptimization": {
+          "algorithmId": "deterministic_inlier_mean_refinement_v1",
+          "improvedMeanInlierError": true,
+          "iterationCount": 1,
+          "meanInlierErrorAfterPx": 0.237541,
+          "meanInlierErrorBeforePx": 0.449226,
+          "refinedModel": {
+            "model": "translation",
+            "x": 48,
+            "y": 2
+          }
+        },
+        "matchCount": 6,
+        "maxInlierErrorPx": 0.447214,
+        "seedModel": {
+          "model": "translation",
+          "seedMatchIndex": 0,
+          "x": 48.4,
+          "y": 2.2
+        }
+      }
+    }
+  ],
+  "issue": 2290,
+  "schemaVersion": 1,
+  "validationMode": "panorama_local_optimization_ransac",
+  "validationStatus": "synthetic_runtime_metadata_gate"
+}

@@ -279,6 +279,8 @@
     "check:panorama-app-server-runtime": "bun tests/integration/checks/check-panorama-app-server-runtime.ts",
     "check:panorama-homography-diagnostics": "bun tests/integration/checks/check-panorama-homography-diagnostics.ts",
     "check:panorama-homography-diagnostics:update": "bun tests/integration/checks/check-panorama-homography-diagnostics.ts --update",
+    "check:panorama-lo-ransac-proof": "bun tests/integration/checks/check-panorama-lo-ransac-proof.ts",
+    "check:panorama-lo-ransac-proof:update": "bun tests/integration/checks/check-panorama-lo-ransac-proof.ts --update",
     "check:panorama-runtime-plan-smoke": "bun tests/integration/checks/check-panorama-runtime-plan-smoke.ts",
     "check:panorama-ui-action-command": "bun tests/integration/checks/check-panorama-ui-action-command.ts",
     "check:panorama-ui-api": "bun tests/integration/checks/check-panorama-ui-api.ts",

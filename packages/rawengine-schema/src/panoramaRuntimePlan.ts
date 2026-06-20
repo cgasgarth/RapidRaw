@@ -974,6 +974,13 @@ const alignmentForPanoramaRuntimeArtifact = (
   algorithmId: 'rapidraw_fast9_brief_ransac_v1',
   downscaleMaxDimensionPx: 1600,
   globalHomographyCount: provenance.alignment.pairwiseMatches.length,
+  localOptimization: {
+    algorithmId: 'deterministic_inlier_mean_refinement_v1',
+    boundedIterationCount: provenance.alignment.pairwiseMatches.length,
+    deterministicTieBreak: 'first_max_consensus_lowest_match_index',
+    refinedModelType: 'translation_xy',
+    support: 'synthetic_translation_metadata_only',
+  },
   minimumInliersForConnection: 15,
   pairwiseMatches: provenance.alignment.pairwiseMatches.map((match) => ({
     fromSourceIndex: match.fromSourceIndex,
