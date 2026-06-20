@@ -1,0 +1,47 @@
+{
+  "$schema": "https://rawengine.dev/schemas/colorchecker-render-gate-v1.json",
+  "fixtureId": "colorchecker.synthetic.render-gate.v1",
+  "issue": 2328,
+  "patches": [
+    {
+      "id": "neutral-50",
+      "maxDeltaE00": 0.3,
+      "referenceLab": { "a": 0, "b": 0, "l": 50 },
+      "renderedLab": { "a": 0.08, "b": -0.05, "l": 50.1 }
+    },
+    {
+      "id": "warm-orange",
+      "maxDeltaE00": 1.2,
+      "referenceLab": { "a": 25, "b": 48, "l": 62 },
+      "renderedLab": { "a": 25.8, "b": 47.3, "l": 61.6 }
+    },
+    {
+      "id": "foliage-green",
+      "maxDeltaE00": 1.2,
+      "referenceLab": { "a": -29, "b": 31, "l": 45 },
+      "renderedLab": { "a": -28.3, "b": 30.2, "l": 45.4 }
+    },
+    {
+      "id": "sky-blue",
+      "maxDeltaE00": 1.4,
+      "referenceLab": { "a": -7, "b": -32, "l": 58 },
+      "renderedLab": { "a": -6.4, "b": -31.1, "l": 58.5 }
+    },
+    {
+      "id": "deep-shadow",
+      "maxDeltaE00": 1.5,
+      "referenceLab": { "a": 2, "b": -3, "l": 18 },
+      "renderedLab": { "a": 2.4, "b": -2.6, "l": 18.5 }
+    },
+    {
+      "id": "paper-white",
+      "maxDeltaE00": 0.8,
+      "referenceLab": { "a": -0.5, "b": 1.8, "l": 92 },
+      "renderedLab": { "a": -0.2, "b": 1.3, "l": 91.8 }
+    }
+  ],
+  "renderSource": "synthetic_public_lab_patch_grid",
+  "schemaVersion": 1,
+  "snapshotDate": "2026-06-20",
+  "validationMode": "colorchecker_synthetic_deltae_render_gate"
+}
