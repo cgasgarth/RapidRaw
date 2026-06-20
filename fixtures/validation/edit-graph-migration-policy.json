@@ -1,0 +1,15 @@
+{
+  "$schema": "https://rawengine.dev/schemas/edit-graph-migration-policy-v1.json",
+  "compatibilityNotes": [
+    "Current edit-graph documents are accepted without migration.",
+    "Legacy v0 command envelopes are upgraded by adding the current schemaVersion to every operation.",
+    "Future schemaVersion changes must add a migration id or an explicit unsupported-version rejection."
+  ],
+  "documentKind": "rawengine.editGraph",
+  "fromSchemaVersion": 0,
+  "issue": 2323,
+  "requiredMigrationIds": ["edit-graph-document-v0-to-v1"],
+  "schemaVersion": 1,
+  "toSchemaVersion": 1,
+  "validationMode": "edit_graph_schema_migration_policy"
+}
