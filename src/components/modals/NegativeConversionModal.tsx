@@ -2331,6 +2331,29 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             {t('modals.negativeConversion.exportOptions')}
           </UiText>
           <div className="space-y-3">
+            <div
+              className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-surface bg-bg-primary p-2 text-xs text-text-tertiary"
+              data-testid="negative-lab-export-summary"
+            >
+              <span>{t('modals.negativeConversion.exportOptions')}</span>
+              <span className="text-right text-text-secondary" data-testid="negative-lab-export-summary-format">
+                {t(`modals.negativeConversion.outputFormats.${saveOptions.outputFormat}`)}
+              </span>
+              <span>{t('modals.negativeConversion.outputSuffix')}</span>
+              <span className="text-right text-text-secondary" data-testid="negative-lab-export-summary-suffix">
+                {saveOptions.suffix || '-'}
+              </span>
+              <span data-testid="negative-lab-export-summary-scope">
+                {t(
+                  conversionScope === 'all'
+                    ? 'modals.negativeConversion.scopeAll'
+                    : 'modals.negativeConversion.scopeActive',
+                )}
+              </span>
+              <span className="text-right text-text-secondary" data-testid="negative-lab-export-summary-count">
+                {t('modals.negativeConversion.queuedScans', { queuedCount: pathsToConvert.length })}
+              </span>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS.map((format) => (
                 <button
