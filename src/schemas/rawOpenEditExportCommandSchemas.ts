@@ -196,11 +196,46 @@ export const rawOpenEditExportBasicToneCommandSchema = z
   })
   .strict();
 
+export const rawOpenEditExportAdjustHslCommandSchema = z
+  .object({
+    actor: jsonObjectSchema,
+    approval: z
+      .object({
+        approvalClass: z.literal('edit_apply'),
+        reason: z.string().trim().min(1),
+        state: z.literal('approved'),
+      })
+      .strict(),
+    colorPipeline: colorPipelineSchema,
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('toneColor.adjustHsl'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    expectedGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    parameters: z
+      .object({
+        band: z.enum(['red', 'orange', 'yellow', 'green', 'aqua', 'blue', 'purple', 'magenta']),
+        hueShiftDegrees: z.number().min(-180).max(180),
+        luminance: z.number().min(-100).max(100),
+        saturation: z.number().min(-100).max(100),
+      })
+      .strict(),
+    schemaVersion: z.literal(1),
+    target: targetJsonObjectSchema,
+  })
+  .strict();
+
+export const rawOpenEditExportCommandSchema = z.discriminatedUnion('commandType', [
+  rawOpenEditExportBasicToneCommandSchema,
+  rawOpenEditExportAdjustHslCommandSchema,
+]);
+
 export const rawOpenEditExportProofRequestSchema = z
   .object({
     $schema: z.url().optional(),
     artifactDirRelative: privatePathSchema,
-    editCommand: rawOpenEditExportBasicToneCommandSchema,
+    editCommand: rawOpenEditExportCommandSchema,
     fixtureId: z.string().regex(/^validation\.raw-open-edit-export\.[a-z0-9.-]+\.v[0-9]+$/u),
     privateRootPath: z.string().trim().min(1),
     sourceMetadata: z

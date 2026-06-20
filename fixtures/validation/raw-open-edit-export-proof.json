@@ -63,7 +63,7 @@
       "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
       "localRelativePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
       "notes": "Private RAW workflow proof slot aligned to the available high-ISO Sony ARW evidence. Public repo stores metadata only until local runtime reports are generated.",
-      "status": "accepted_private_asset",
+      "status": "pending_private_asset",
       "trackingIssue": 1376,
       "workflowSteps": [
         "open_raw",
@@ -135,6 +135,78 @@
       "fixtureId": "validation.raw-open-edit-export.professional-color.v1",
       "localRelativePath": "private-fixtures/color/professional-workflow-v1/rawengine-professional-color-v1.arw",
       "notes": "Professional color workflow RAW proof slot using the private-root Sony A100 ARW source. This proves RAW preview/export plumbing for a representative color edit, not measured chart color accuracy.",
+      "status": "accepted_private_asset",
+      "trackingIssue": 1376,
+      "workflowSteps": [
+        "open_raw",
+        "apply_edit_graph",
+        "render_preview",
+        "export_image",
+        "write_sidecar",
+        "reload_sidecar"
+      ]
+    },
+    {
+      "artifacts": [
+        {
+          "hash": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+          "kind": "source_raw_private",
+          "path": "private-fixtures/color/selective-color-orange-v1/alaska-dsc7853.arw",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": "sha256:b7c68dd85b6e638a17ec1a38651e344b61d51618ac9614f74c7da990bd980dc1",
+          "kind": "preview_before_private",
+          "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-preview-before.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": "sha256:caa374f393425b206c4d3568706045cc1138fa9a17c12cce7fe8701605e48d01",
+          "kind": "preview_after_private",
+          "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-preview-after.png",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": "sha256:e04be7c627ac4c4d6b88f59071240f67c90f702f256556d16f35d5bcc64f2439",
+          "kind": "export_after_private",
+          "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-export-after.tiff",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": "sha256:67f2d87394a44b60b4fadf9c6a0b31a7af9a8580fc7c5c39dcb99b0c46fd693f",
+          "kind": "sidecar_after_private",
+          "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-after.rrdata",
+          "publicRepoAllowed": false
+        },
+        {
+          "hash": "sha256:9ef49cbddfeafdba48fe5bb0bcf2ce95a05b5c34b75547ad93cc92f13a4d7b8f",
+          "kind": "workflow_report_private",
+          "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json",
+          "publicRepoAllowed": false
+        }
+      ],
+      "editGraphRevision": "graph-rev.raw-open-edit-export.selective-color-orange.v1",
+      "evidenceId": "raw-evidence.color.selective-color-orange-alaska.v1",
+      "expectedMetrics": [
+        {
+          "name": "previewExportMeanAbsDelta",
+          "required": true,
+          "threshold": 0.015
+        },
+        {
+          "name": "sidecarReloadRevisionMatch",
+          "required": true,
+          "threshold": 1
+        },
+        {
+          "name": "sourceHashUnchanged",
+          "required": true,
+          "threshold": 1
+        }
+      ],
+      "fixtureId": "validation.raw-open-edit-export.selective-color-orange.v1",
+      "localRelativePath": "private-fixtures/color/selective-color-orange-v1/alaska-dsc7853.arw",
+      "notes": "Project-owned Alaska ARW selective orange proof slot for RAW preview/export parity, sidecar reload, and private artifact validation. It advances #2476 but does not by itself prove Capture One-class color quality.",
       "status": "accepted_private_asset",
       "trackingIssue": 1376,
       "workflowSteps": [

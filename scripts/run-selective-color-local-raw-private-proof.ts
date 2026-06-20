@@ -30,6 +30,8 @@ const args = argsSchema.parse({
   requireAssets: process.argv.includes('--require-assets'),
 });
 
+const REQUEST_PATH = 'fixtures/validation/selective-color-raw-proof-request.json';
+
 await runRequired('selective color committed RAW proof summary', [
   'bun',
   'run',
@@ -50,6 +52,8 @@ const prepare = await runCommand({
   command: [
     'bun',
     'scripts/prepare-raw-open-edit-export-private-root.ts',
+    '--request',
+    REQUEST_PATH,
     '--root',
     privateRoot,
     ...(args.requireAssets ? ['--require-assets'] : []),
@@ -60,6 +64,8 @@ if (prepare.exitCode !== 0) {
   reportFailure('RAW open/edit/export private root prep', prepare, [
     'bun',
     'scripts/prepare-raw-open-edit-export-private-root.ts',
+    '--request',
+    REQUEST_PATH,
     '--root',
     privateRoot,
   ]);

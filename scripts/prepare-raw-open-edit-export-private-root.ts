@@ -13,6 +13,7 @@ const copyMode = args.has('--copy');
 const requireAssets = args.has('--require-assets');
 const manifestPath = valueAfter('--manifest') ?? 'fixtures/validation/raw-open-edit-export-proof.json';
 const requestPath = valueAfter('--request') ?? 'fixtures/validation/raw-open-edit-export-proof-request.json';
+const sourceOverridePath = valueAfter('--source') ?? process.env.RAWENGINE_PRIVATE_RAW_SOURCE;
 
 const requestJson: unknown = JSON.parse(await readFile(requestPath, 'utf8'));
 const proofJson: unknown = JSON.parse(await readFile(manifestPath, 'utf8'));
@@ -37,6 +38,18 @@ if (ledgerEntry.localRelativePath === undefined || ledgerEntry.fileSha256 === un
 const privateRootPath = valueAfter('--root') ?? request.privateRootPath;
 if (!isAbsolute(privateRootPath)) {
   fail('privateRootPath must be absolute.');
+}
+
+if (sourceOverridePath !== undefined) {
+  const overridePath = resolve(sourceOverridePath);
+  if (!(await pathExists(overridePath))) fail(`${overridePath}: source override does not exist.`);
+  const overrideHash = `sha256:${createHash('sha256')
+    .update(await readFile(overridePath))
+    .digest('hex')}`;
+  if (overrideHash !== ledgerEntry.fileSha256) {
+    fail(`${ledgerEntry.evidenceId}: source override expected ${ledgerEntry.fileSha256}, got ${overrideHash}.`);
+  }
+  await linkOrCopy(overridePath, resolvePrivatePath(privateRootPath, ledgerEntry.localRelativePath));
 }
 
 const sourcePath = await resolveSourcePath(privateRootPath, ledgerEntry.localRelativePath);
