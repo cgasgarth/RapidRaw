@@ -1,10 +1,21 @@
 {
   "artifactCount": 4,
   "doesNotProve": ["real_raw_e2e", "laplacian_pyramid_quality", "ui_review_surface"],
+  "fallbackMetrics": {
+    "expectedFallbackPixelCount": 576,
+    "meanAbsoluteError": 0,
+    "observedFallbackPixelCount": 576,
+    "referenceSourceIndex": 1
+  },
   "focusCoverageRatio": 1,
   "generatedAt": "2026-06-20T00:00:00.000Z",
-  "issue": 2355,
-  "outputHash": "sha256:9e55f9e4358c25ef975b6a9f3262b4e52e9157d73109b3973bdba0f32aa7fe68",
+  "issue": 2539,
+  "outputHash": "sha256:c6c86c67b8243ade32844b608bd1467da96f25e92815ca9a71b47c973c70b6ca",
+  "referenceSource": {
+    "fallbackPolicy": "low_confidence_or_invalid_contributors",
+    "selectionReason": "explicit_request",
+    "sourceIndex": 1
+  },
   "regionMetrics": [
     { "expectedSourceIndex": 0, "meanAbsoluteError": 0, "regionId": "foreground-left" },
     { "expectedSourceIndex": 1, "meanAbsoluteError": 0, "regionId": "mid-plane-center" },
@@ -13,5 +24,6 @@
   "retouchLayerRecommended": true,
   "runtimeStatus": "apply_rendered",
   "schemaVersion": 1,
+  "translatedBorderMetrics": { "minOutputValue": 0.213725, "zeroPixelCount": 0 },
   "validationMode": "synthetic_focus_blend_runtime_apply"
 }

@@ -18,7 +18,10 @@ const REPORT_PATH = 'docs/validation/focus-blend-runtime-proof-2026-06-20.json';
 const GENERATED_AT = '2026-06-20T00:00:00.000Z';
 const WIDTH = 72;
 const HEIGHT = 48;
+const FALLBACK_HEIGHT = 8;
 const MAX_REGION_MAE = 0.035;
+const MIN_TRANSLATED_BORDER_VALUE = 0.15;
+const REFERENCE_SOURCE_INDEX = 1;
 
 const regionSchema = z
   .object({
@@ -32,24 +35,54 @@ const reportSchema = z
   .object({
     artifactCount: z.number().int().min(4),
     doesNotProve: z.array(z.enum(['real_raw_e2e', 'laplacian_pyramid_quality', 'ui_review_surface'])).min(1),
+    fallbackMetrics: z
+      .object({
+        expectedFallbackPixelCount: z.number().int().positive(),
+        meanAbsoluteError: z.number().min(0).max(0),
+        observedFallbackPixelCount: z.number().int().positive(),
+        referenceSourceIndex: z.literal(REFERENCE_SOURCE_INDEX),
+      })
+      .strict(),
     focusCoverageRatio: z.literal(1),
     generatedAt: z.iso.datetime({ offset: true }),
-    issue: z.literal(2355),
+    issue: z.literal(2539),
     outputHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+    referenceSource: z
+      .object({
+        fallbackPolicy: z.literal('low_confidence_or_invalid_contributors'),
+        selectionReason: z.literal('explicit_request'),
+        sourceIndex: z.literal(REFERENCE_SOURCE_INDEX),
+      })
+      .strict(),
     regionMetrics: z.array(regionSchema).min(3),
     retouchLayerRecommended: z.literal(true),
     runtimeStatus: z.literal('apply_rendered'),
     schemaVersion: z.literal(1),
+    translatedBorderMetrics: z
+      .object({
+        minOutputValue: z.number().min(MIN_TRANSLATED_BORDER_VALUE),
+        zeroPixelCount: z.literal(0),
+      })
+      .strict(),
     validationMode: z.literal('synthetic_focus_blend_runtime_apply'),
   })
   .strict();
 
 const update = process.argv.includes('--update');
 const sourceRegions = [
-  { expectedSourceIndex: 0, height: HEIGHT, regionId: 'foreground-left', width: 24, x: 0, y: 0 },
-  { expectedSourceIndex: 1, height: HEIGHT, regionId: 'mid-plane-center', width: 24, x: 24, y: 0 },
-  { expectedSourceIndex: 2, height: HEIGHT, regionId: 'background-right', width: 24, x: 48, y: 0 },
+  { expectedSourceIndex: 0, height: HEIGHT - FALLBACK_HEIGHT, regionId: 'foreground-left', width: 24, x: 0, y: 0 },
+  { expectedSourceIndex: 1, height: HEIGHT - FALLBACK_HEIGHT, regionId: 'mid-plane-center', width: 24, x: 24, y: 0 },
+  { expectedSourceIndex: 2, height: HEIGHT - FALLBACK_HEIGHT, regionId: 'background-right', width: 24, x: 48, y: 0 },
 ];
+const lowConfidenceFallbackRegion = {
+  expectedSourceIndex: REFERENCE_SOURCE_INDEX,
+  height: FALLBACK_HEIGHT,
+  regionId: 'low-confidence-reference-fallback',
+  width: WIDTH,
+  x: 0,
+  y: HEIGHT - FALLBACK_HEIGHT,
+};
+type ProofRegion = (typeof sourceRegions)[number] | typeof lowConfidenceFallbackRegion;
 const frames = [0, 1, 2].map((sourceIndex) => ({
   contentHash: `sha256:focus-blend-source-${sourceIndex}`,
   focusDistanceMm: 180 + sourceIndex * 60,
@@ -61,17 +94,29 @@ const frames = [0, 1, 2].map((sourceIndex) => ({
   translationY: sourceIndex === 2 ? -1 : 0,
   width: WIDTH,
 }));
-const cells = sourceRegions.map((region) => ({
-  height: region.height,
-  lowConfidence: false,
-  sourceScores: [0, 1, 2].map((sourceIndex) => ({
-    relativeConfidence: sourceIndex === region.expectedSourceIndex ? 1 : 0.01,
-    sourceIndex,
-  })),
-  width: region.width,
-  x: region.x,
-  y: region.y,
-}));
+const cells = sourceRegions
+  .map((region) => ({
+    height: region.height,
+    lowConfidence: false,
+    sourceScores: [0, 1, 2].map((sourceIndex) => ({
+      relativeConfidence: sourceIndex === region.expectedSourceIndex ? 1 : 0.01,
+      sourceIndex,
+    })),
+    width: region.width,
+    x: region.x,
+    y: region.y,
+  }))
+  .concat({
+    height: lowConfidenceFallbackRegion.height,
+    lowConfidence: true,
+    sourceScores: [0, 1, 2].map((sourceIndex) => ({
+      relativeConfidence: sourceIndex === 2 ? 1 : 0.01,
+      sourceIndex,
+    })),
+    width: lowConfidenceFallbackRegion.width,
+    x: lowConfidenceFallbackRegion.x,
+    y: lowConfidenceFallbackRegion.y,
+  });
 
 const dryRunCommand = buildFocusCommand(true);
 const dryRun = buildFocusStackRuntimeDryRunV1({
@@ -81,6 +126,7 @@ const dryRun = buildFocusStackRuntimeDryRunV1({
   frames,
   outputArtifactId: 'artifact_focus_blend_output',
   previewArtifactId: 'artifact_focus_blend_preview',
+  referenceSourceIndex: REFERENCE_SOURCE_INDEX,
   retouchLayerArtifactId: 'artifact_focus_blend_retouch',
   sharpnessMapArtifactId: 'artifact_focus_blend_sharpness',
 });
@@ -98,6 +144,7 @@ const applied = applyFocusStackRuntimePlanV1({
   frames,
   outputArtifactId: 'artifact_focus_blend_output',
   previewArtifactId: 'artifact_focus_blend_preview',
+  referenceSourceIndex: REFERENCE_SOURCE_INDEX,
   retouchLayerArtifactId: 'artifact_focus_blend_retouch',
   sharpnessMapArtifactId: 'artifact_focus_blend_sharpness',
 });
@@ -111,17 +158,37 @@ const regionMetrics = sourceRegions.map((region) =>
     regionId: region.regionId,
   }),
 );
+const fallbackMetrics = {
+  expectedFallbackPixelCount: lowConfidenceFallbackRegion.width * lowConfidenceFallbackRegion.height,
+  meanAbsoluteError: roundMetric(
+    regionMeanAbsoluteError(
+      applied.outputPixels,
+      expectedFrameForRegion(lowConfidenceFallbackRegion),
+      lowConfidenceFallbackRegion,
+    ),
+  ),
+  observedFallbackPixelCount: applied.provenance.sharpnessSettings.fallbackPixelCount,
+  referenceSourceIndex: applied.provenance.referenceSource.sourceIndex,
+};
+if (fallbackMetrics.observedFallbackPixelCount !== fallbackMetrics.expectedFallbackPixelCount) {
+  throw new Error(
+    `Expected ${fallbackMetrics.expectedFallbackPixelCount} reference fallback pixels, got ${fallbackMetrics.observedFallbackPixelCount}.`,
+  );
+}
 const report = reportSchema.parse({
   artifactCount: applied.mutationResult.outputArtifacts.length,
   doesNotProve: ['real_raw_e2e', 'laplacian_pyramid_quality', 'ui_review_surface'],
+  fallbackMetrics,
   focusCoverageRatio: dryRun.provenance.focusCoverageRatio,
   generatedAt: GENERATED_AT,
-  issue: 2355,
+  issue: 2539,
   outputHash: hashFloat32(applied.outputPixels),
+  referenceSource: applied.provenance.referenceSource,
   regionMetrics,
   retouchLayerRecommended: applied.provenance.qualityMetrics.retouchLayerRecommended,
   runtimeStatus: applied.provenance.runtimeStatus,
   schemaVersion: 1,
+  translatedBorderMetrics: translatedBorderMetrics(applied.outputPixels),
   validationMode: 'synthetic_focus_blend_runtime_apply',
 });
 const reportJson = await format(JSON.stringify(report), {
@@ -198,12 +265,11 @@ function createFocusFrame(sourceIndex: number): Float32Array {
 function regionMeanAbsoluteError(
   outputPixels: Float32Array,
   expectedFrame: (typeof frames)[number],
-  region: (typeof sourceRegions)[number],
+  region: ProofRegion,
 ): number {
   let total = 0;
   let count = 0;
-  const referenceFrame = frames[0];
-  if (referenceFrame === undefined) throw new Error('Focus blend proof requires a reference frame.');
+  const referenceFrame = expectedFrameForRegion(lowConfidenceFallbackRegion);
   for (let y = region.y; y < region.y + region.height; y += 1) {
     for (let x = region.x; x < region.x + region.width; x += 1) {
       const expected = sampleAligned(expectedFrame, referenceFrame, x, y);
@@ -215,7 +281,26 @@ function regionMeanAbsoluteError(
   return total / Math.max(1, count);
 }
 
-function expectedFrameForRegion(region: (typeof sourceRegions)[number]): (typeof frames)[number] {
+function translatedBorderMetrics(outputPixels: Float32Array): { minOutputValue: number; zeroPixelCount: number } {
+  let minOutputValue = Number.POSITIVE_INFINITY;
+  let zeroPixelCount = 0;
+  const y = sourceRegions[2]?.y;
+  const region = sourceRegions[2];
+  if (region === undefined || y === undefined) {
+    throw new Error('Focus blend proof requires a translated border region.');
+  }
+  for (let x = region.x; x < region.x + region.width; x += 1) {
+    const value = outputPixels[y * WIDTH + x] ?? 0;
+    minOutputValue = Math.min(minOutputValue, value);
+    if (value === 0) zeroPixelCount += 1;
+  }
+  return {
+    minOutputValue: roundMetric(minOutputValue),
+    zeroPixelCount,
+  };
+}
+
+function expectedFrameForRegion(region: ProofRegion): (typeof frames)[number] {
   const frame = frames.find((candidate) => candidate.sourceIndex === region.expectedSourceIndex);
   if (frame === undefined) {
     throw new Error(`Focus blend proof missing expected frame for region ${region.regionId}.`);

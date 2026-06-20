@@ -176,21 +176,21 @@ function blendFixture(fixture, sharpnessFixture) {
   return { blended: blendResult.outputPixels, referenceFrame, sourceLumas };
 }
 
-function meanAbsoluteErrorForRegion(blended, sourceLumas, fixture, referenceFrame, region) {
-  const expectedFrame = fixture.sourceFrames.find(
-    (sourceFrame) => sourceFrame.sourceIndex === region.expectedSourceIndex,
-  );
-  const expectedLuma = sourceLumas.get(region.expectedSourceIndex);
-  if (expectedFrame === undefined || expectedLuma === undefined) {
-    fail(`${fixture.fixtureId}: missing expected source frame for preview metric`, {
-      regionId: region.regionId,
-      expectedSourceIndex: region.expectedSourceIndex,
-    });
-  }
+function meanAbsoluteErrorForRegion(blended, sourceLumas, fixture, sharpnessFixture, referenceFrame, region) {
   let total = 0;
   let count = 0;
   for (let y = region.y; y < region.y + region.height; y += 1) {
     for (let x = region.x; x < region.x + region.width; x += 1) {
+      const sharpnessCell = sharpnessCellForPixel(sharpnessFixture.map.cells, x, y);
+      const expectedSourceIndex = sharpnessCell.lowConfidence ? referenceFrame.sourceIndex : region.expectedSourceIndex;
+      const expectedFrame = fixture.sourceFrames.find((sourceFrame) => sourceFrame.sourceIndex === expectedSourceIndex);
+      const expectedLuma = sourceLumas.get(expectedSourceIndex);
+      if (expectedFrame === undefined || expectedLuma === undefined) {
+        fail(`${fixture.fixtureId}: missing expected source frame for preview metric`, {
+          expectedSourceIndex,
+          regionId: region.regionId,
+        });
+      }
       const expected = sampleAligned(expectedLuma, expectedFrame, referenceFrame, x, y);
       if (expected === undefined) continue;
       total += Math.abs((blended[y * referenceFrame.width + x] ?? 0) - expected);
@@ -198,6 +198,17 @@ function meanAbsoluteErrorForRegion(blended, sourceLumas, fixture, referenceFram
     }
   }
   return total / Math.max(1, count);
+}
+
+function sharpnessCellForPixel(cells, x, y) {
+  const cell = cells.find(
+    (candidate) =>
+      x >= candidate.x && x < candidate.x + candidate.width && y >= candidate.y && y < candidate.y + candidate.height,
+  );
+  if (cell === undefined) {
+    fail('Missing sharpness cell for preview metric', { x, y });
+  }
+  return cell;
 }
 
 function haloRiskCellRatio(sharpnessFixture, fixture, blended, referenceFrame) {
@@ -252,7 +263,14 @@ for (const fixture of manifest.fixtures) {
   await writePgm(artifactPath, blended, referenceFrame.width, referenceFrame.height);
 
   const regionMetrics = fixture.expectedWinnerRegions.map((region) => {
-    const meanAbsoluteError = meanAbsoluteErrorForRegion(blended, sourceLumas, fixture, referenceFrame, region);
+    const meanAbsoluteError = meanAbsoluteErrorForRegion(
+      blended,
+      sourceLumas,
+      fixture,
+      sharpnessFixture,
+      referenceFrame,
+      region,
+    );
     return {
       expectedSourceIndex: region.expectedSourceIndex,
       meanAbsoluteError: round6(meanAbsoluteError),
