@@ -25,6 +25,7 @@ const exiftoolRowSchema = z
     ExposureTime: z.number().optional(),
     FNumber: z.number().optional(),
     FileName: z.string().optional(),
+    FocalLength: z.number().optional(),
     ISO: z.number().optional(),
     LensModel: z.string().optional(),
     Model: z.string().optional(),
@@ -38,9 +39,12 @@ type ExiftoolRow = z.infer<typeof exiftoolRowSchema>;
 
 const DEFAULT_PRIVATE_ROOT = '/tmp/rawengine-private-root';
 const HDR_INGEST_REPORT_PATH = 'private-artifacts/validation/computational-merge/hdr-source-ingest.json';
+const PANORAMA_INGEST_REPORT_PATH = 'private-artifacts/validation/computational-merge/panorama-source-ingest.json';
 const MAX_HDR_BRACKET_SPAN_SECONDS = 20;
 const MAX_HDR_BRACKET_SEQUENCE_GAP = 12;
 const MIN_HDR_BRACKET_SPREAD_EV = 4;
+const MAX_PANORAMA_SEQUENCE_SPAN_SECONDS = 60;
+const MAX_PANORAMA_SEQUENCE_GAP = 12;
 
 export interface ComputationalPrivateRootPrepConfig {
   expectedExtension: string;
@@ -167,8 +171,8 @@ async function ingestPrivateSources(
   sourceRootInput: string,
   materialize: 'copy' | 'symlink',
 ): Promise<PrepareResult> {
-  if (config.featureFamily !== 'hdr_merge') {
-    return failure([`${config.featureLabel}: --source ingest currently supports HDR brackets only.`]);
+  if (config.featureFamily !== 'hdr_merge' && config.featureFamily !== 'panorama_stitch') {
+    return failure([`${config.featureLabel}: --source ingest currently supports HDR and panorama sources only.`]);
   }
 
   const failures: Array<string> = [];
@@ -195,20 +199,26 @@ async function ingestPrivateSources(
   }
 
   const metadata = await readExifMetadata(rawPaths);
-  const candidate = chooseHdrBracketCandidate(metadata, config.minSources);
+  const candidate =
+    config.featureFamily === 'hdr_merge'
+      ? chooseHdrBracketCandidate(metadata, config.minSources)
+      : choosePanoramaSequenceCandidate(metadata, config.minSources);
   if (candidate === undefined) {
     return failure([
-      `${sourceRoot}: no ${config.minSources}-frame HDR bracket candidate found (need <=${MAX_HDR_BRACKET_SPAN_SECONDS}s, sequence gap <=${MAX_HDR_BRACKET_SEQUENCE_GAP}, >=${MIN_HDR_BRACKET_SPREAD_EV} EV spread).`,
+      `${sourceRoot}: no ${config.minSources}-frame ${config.featureLabel} source candidate found (${sourceCandidateRequirement(config.featureFamily)}).`,
     ]);
   }
 
-  const selected = [...candidate.rows].sort((left, right) => exposureValue(right) - exposureValue(left));
+  const selected =
+    config.featureFamily === 'hdr_merge'
+      ? [...candidate.rows].sort((left, right) => exposureValue(right) - exposureValue(left))
+      : [...candidate.rows].sort((left, right) => sequenceNumber(left) - sequenceNumber(right));
   await materializePrivateSources(selected, targetPaths, materialize);
-  await writeHdrIngestReport(privateRoot, sourceRoot, selected, candidate.spreadEv, materialize);
+  await writeSourceIngestReport(privateRoot, sourceRoot, selected, candidate.score, materialize, config.featureFamily);
 
   return {
     failures: [],
-    message: `${config.featureLabel} private source ingest ok (${selected.length} sources; ${candidate.spreadEv.toFixed(2)} EV; ${materialize})`,
+    message: `${config.featureLabel} private source ingest ok (${selected.length} sources; ${candidate.scoreLabel}: ${candidate.score.toFixed(2)}; ${materialize})`,
     ok: true,
   };
 }
@@ -326,8 +336,14 @@ async function runSourceIngestSelfTest(config: ComputationalPrivateRootPrepConfi
     const proofCase = manifest.proofCases.find((candidate) => candidate.fixtureId === config.fixtureId);
     if (proofCase === undefined) throw new Error(`${config.fixtureId}: missing proof case.`);
 
-    const candidate = chooseHdrBracketCandidate(sourceRows, 3);
-    if (candidate === undefined || candidate.spreadEv < MIN_HDR_BRACKET_SPREAD_EV) {
+    const candidate =
+      config.featureFamily === 'hdr_merge'
+        ? chooseHdrBracketCandidate(sourceRows, 3)
+        : choosePanoramaSequenceCandidate(sourceRows, 3);
+    if (
+      candidate === undefined ||
+      (config.featureFamily === 'hdr_merge' && candidate.score < MIN_HDR_BRACKET_SPREAD_EV)
+    ) {
       throw new Error('Expected synthetic HDR bracket source candidate.');
     }
 
@@ -336,11 +352,11 @@ async function runSourceIngestSelfTest(config: ComputationalPrivateRootPrepConfi
       resolvePrivatePath(root, sourcePath, failures),
     );
     if (failures.length > 0) throw new Error(failures.join('; '));
-    await materializePrivateSources(
-      [...candidate.rows].sort((left, right) => exposureValue(right) - exposureValue(left)),
-      targetPaths,
-      'copy',
-    );
+    const selectedRows =
+      config.featureFamily === 'hdr_merge'
+        ? [...candidate.rows].sort((left, right) => exposureValue(right) - exposureValue(left))
+        : [...candidate.rows].sort((left, right) => sequenceNumber(left) - sequenceNumber(right));
+    await materializePrivateSources(selectedRows, targetPaths, 'copy');
     for (const targetPath of targetPaths) {
       if (!(await pathExists(targetPath))) throw new Error(`${targetPath}: expected copied private source.`);
     }
@@ -377,6 +393,7 @@ async function readExifMetadata(paths: ReadonlyArray<string>): Promise<Array<Exi
       '-CreateDate',
       '-ExposureTime',
       '-FNumber',
+      '-FocalLength',
       '-ISO',
       '-ExposureCompensation',
       '-Model',
@@ -395,7 +412,7 @@ function chooseHdrBracketCandidate(rows: ReadonlyArray<ExiftoolRow>, sourceCount
   const candidates = rows
     .filter(isHdrMetadataUsable)
     .sort((left, right) => captureTimestamp(left) - captureTimestamp(right));
-  let best: { rows: ReadonlyArray<ExiftoolRow>; spreadEv: number } | undefined;
+  let best: { rows: ReadonlyArray<ExiftoolRow>; score: number; scoreLabel: string } | undefined;
 
   for (let index = 0; index <= candidates.length - sourceCount; index += 1) {
     const window = candidates.slice(index, index + sourceCount);
@@ -416,7 +433,33 @@ function chooseHdrBracketCandidate(rows: ReadonlyArray<ExiftoolRow>, sourceCount
     ) {
       continue;
     }
-    if (best === undefined || spreadEv > best.spreadEv) best = { rows: window, spreadEv };
+    if (best === undefined || spreadEv > best.score) best = { rows: window, score: spreadEv, scoreLabel: 'spreadEv' };
+  }
+
+  return best;
+}
+
+function choosePanoramaSequenceCandidate(rows: ReadonlyArray<ExiftoolRow>, sourceCount: number) {
+  const candidates = rows
+    .filter(isHdrMetadataUsable)
+    .sort((left, right) => captureTimestamp(left) - captureTimestamp(right));
+  let best: { rows: ReadonlyArray<ExiftoolRow>; score: number; scoreLabel: string } | undefined;
+
+  for (let index = 0; index <= candidates.length - sourceCount; index += 1) {
+    const window = candidates.slice(index, index + sourceCount);
+    if (!hasConsistentCaptureMetadata(window) || !hasConsistentPanoramaExposure(window)) continue;
+
+    const first = window[0];
+    const last = window[window.length - 1];
+    if (first === undefined || last === undefined) continue;
+
+    const spanSeconds = captureTimestamp(last) - captureTimestamp(first);
+    const sequenceGap = sequenceNumber(last) - sequenceNumber(first);
+    if (spanSeconds > MAX_PANORAMA_SEQUENCE_SPAN_SECONDS || sequenceGap > MAX_PANORAMA_SEQUENCE_GAP) {
+      continue;
+    }
+    const score = window.length * 100 - spanSeconds - sequenceGap;
+    if (best === undefined || score > best.score) best = { rows: window, score, scoreLabel: 'sequenceScore' };
   }
 
   return best;
@@ -446,6 +489,30 @@ function hasConsistentCaptureMetadata(rows: ReadonlyArray<ExiftoolRow>): boolean
   const [first] = rows;
   if (first === undefined) return false;
   return rows.every((row) => row.Model === first.Model && row.LensModel === first.LensModel);
+}
+
+function hasConsistentPanoramaExposure(rows: ReadonlyArray<ExiftoolRow>): boolean {
+  const [first] = rows;
+  if (
+    first === undefined ||
+    first.FNumber === undefined ||
+    first.FocalLength === undefined ||
+    first.ISO === undefined ||
+    first.ExposureTime === undefined
+  ) {
+    return false;
+  }
+  return rows.every(
+    (row) =>
+      row.FNumber !== undefined &&
+      row.FocalLength !== undefined &&
+      row.ISO !== undefined &&
+      row.ExposureTime !== undefined &&
+      Math.abs(row.FNumber - first.FNumber) <= 0.01 &&
+      Math.abs(row.FocalLength - first.FocalLength) <= 0.1 &&
+      row.ISO === first.ISO &&
+      Math.abs(row.ExposureTime - first.ExposureTime) <= 1e-9,
+  );
 }
 
 function captureTimestamp(row: ExiftoolRow): number {
@@ -485,25 +552,31 @@ async function materializePrivateSources(
   }
 }
 
-async function writeHdrIngestReport(
+async function writeSourceIngestReport(
   privateRoot: string,
   sourceRoot: string,
   selectedRows: ReadonlyArray<ExiftoolRow>,
-  spreadEv: number,
+  score: number,
   materialize: 'copy' | 'symlink',
+  featureFamily: 'hdr_merge' | 'panorama_stitch',
 ): Promise<void> {
-  const reportPath = resolvePrivatePath(privateRoot, HDR_INGEST_REPORT_PATH, []);
+  const reportPath = resolvePrivatePath(
+    privateRoot,
+    featureFamily === 'hdr_merge' ? HDR_INGEST_REPORT_PATH : PANORAMA_INGEST_REPORT_PATH,
+    [],
+  );
   await mkdir(dirname(reportPath), { recursive: true });
   await writeFile(
     reportPath,
     `${JSON.stringify(
       {
-        featureFamily: 'hdr_merge',
+        featureFamily,
         materialize,
         selectedSources: selectedRows.map((row) => ({
           captureDate: row.CreateDate,
           exposureEv: Number(exposureValue(row).toFixed(4)),
           exposureTime: row.ExposureTime,
+          focalLength: row.FocalLength,
           fileName: row.FileName ?? basename(row.SourceFile),
           iso: row.ISO,
           lensModel: row.LensModel,
@@ -511,7 +584,7 @@ async function writeHdrIngestReport(
           sourceRelativePath: relative(sourceRoot, row.SourceFile),
         })),
         sourceRoot,
-        spreadEv: Number(spreadEv.toFixed(4)),
+        score: Number(score.toFixed(4)),
       },
       null,
       2,
@@ -532,11 +605,19 @@ function sampleExifRow(
     ExposureTime: exposureTime,
     FNumber: fNumber,
     FileName: fileName,
+    FocalLength: 35,
     ISO: iso,
     LensModel: 'Synthetic 35mm',
     Model: 'Synthetic Camera',
     SourceFile: resolve(root, fileName),
   });
+}
+
+function sourceCandidateRequirement(featureFamily: 'hdr_merge' | 'panorama_stitch'): string {
+  if (featureFamily === 'hdr_merge') {
+    return `need <=${MAX_HDR_BRACKET_SPAN_SECONDS}s, sequence gap <=${MAX_HDR_BRACKET_SEQUENCE_GAP}, >=${MIN_HDR_BRACKET_SPREAD_EV} EV spread`;
+  }
+  return `need <=${MAX_PANORAMA_SEQUENCE_SPAN_SECONDS}s, sequence gap <=${MAX_PANORAMA_SEQUENCE_GAP}, same camera/lens/focal length/exposure`;
 }
 
 async function readManifest(): Promise<Manifest> {

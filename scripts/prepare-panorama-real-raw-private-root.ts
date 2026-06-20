@@ -3,13 +3,13 @@
 import { runComputationalPrivateRootPrep } from './lib/computational-private-root-prep.ts';
 
 await runComputationalPrivateRootPrep({
-  expectedExtension: '.raf',
+  expectedExtension: '.arw',
   featureFamily: 'panorama_stitch',
   featureLabel: 'panorama',
-  fixtureId: 'validation.computational-merge.panorama-project-owned-overlap.v2',
+  fixtureId: 'validation.computational-merge.panorama-overlap.v1',
   issue: 1508,
   minSources: 3,
-  sourceLabel: 'project-owned RAF overlap v2 frames',
+  sourceLabel: 'project-owned ARW overlap frames',
   stressCandidate: {
     expectedExtension: '.arw',
     sourceLabel: 'ARW infrared panorama stress frames',

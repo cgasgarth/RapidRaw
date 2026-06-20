@@ -24,9 +24,9 @@ use crate::private_decode_raw_proof::{
 };
 
 const SOURCE_RELATIVE_PATHS: [&str; 3] = [
-    "private-fixtures/panorama/overlap-stitch-v1/frame-01.raf",
-    "private-fixtures/panorama/overlap-stitch-v1/frame-02.raf",
-    "private-fixtures/panorama/overlap-stitch-v1/frame-03.raf",
+    "private-fixtures/panorama/overlap-stitch-v1/frame-01.arw",
+    "private-fixtures/panorama/overlap-stitch-v1/frame-02.arw",
+    "private-fixtures/panorama/overlap-stitch-v1/frame-03.arw",
 ];
 
 const STRESS_SOURCE_RELATIVE_PATHS: [&str; 4] = [
@@ -74,12 +74,12 @@ const MIN_DIAGNOSTIC_NON_BLACK_PIXEL_RATIO: f64 = 0.01;
 
 const CONFIG: PrivateDecodeProofConfig = PrivateDecodeProofConfig {
     decode_report_file: "panorama-overlap-decode-report.json",
-    expected_format_label: "raf",
+    expected_format_label: "arw",
     feature_family: "panorama_stitch",
     fixture_id: "validation.computational-merge.panorama-overlap.v1",
     implementation_issue: 1508,
     metric_source_count: SOURCE_RELATIVE_PATHS.len(),
-    notes: "Private RAF panorama overlap direct decode smoke only. This proves production RAW loader ingest, nonzero decoded dimensions, finite decoded pixel payloads, source hashing, and metadata-only report collection. It does not claim panorama alignment, stitch quality, app-server apply, preview/export parity, or UI review.",
+    notes: "Private ARW panorama overlap direct decode smoke only. This proves production RAW loader ingest, nonzero decoded dimensions, finite decoded pixel payloads, source hashing, and metadata-only report collection. It does not claim panorama alignment, stitch quality, app-server apply, preview/export parity, or UI review.",
     quality_file: "panorama-overlap-quality.json",
     report_file: "panorama-overlap-private-run-report.json",
     report_id: "computational-merge-run.panorama-overlap.v1",
@@ -395,7 +395,7 @@ fn run_private_alignment_proof(private_root: &Path) -> Result<(), String> {
                 generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
                 graph_revision_hash,
                 implementation_issue: CONFIG.implementation_issue,
-                notes: "Private RAF panorama alignment smoke. This proves production RAW decode plus the existing BRIEF/RANSAC homography alignment path on the private overlap sequence. It does not claim stitched output, app-server apply, preview/export parity, or UI review.".to_string(),
+                notes: "Private ARW panorama alignment smoke. This proves production RAW decode plus the existing BRIEF/RANSAC homography alignment path on the private overlap sequence. It does not claim stitched output, app-server apply, preview/export parity, or UI review.".to_string(),
                 quality_metrics: metrics,
                 report_id: CONFIG.report_id.to_string(),
                 run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
@@ -494,7 +494,7 @@ fn run_private_stitch_artifact_proof(private_root: &Path) -> Result<(), String> 
                 generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
                 graph_revision_hash,
                 implementation_issue: CONFIG.implementation_issue,
-                notes: "Private RAF panorama stitch artifact smoke. This proves production RAW decode plus the legacy RapidRaw homography/seam stitch engine can emit a private panorama artifact with source coverage and diagnostics. It does not claim app-server apply, preview/export parity, or UI review.".to_string(),
+                notes: "Private ARW panorama stitch artifact smoke. This proves production RAW decode plus the legacy RapidRaw homography/seam stitch engine can emit a private panorama artifact with source coverage and diagnostics. It does not claim app-server apply, preview/export parity, or UI review.".to_string(),
                 quality_metrics: metrics,
                 report_id: CONFIG.report_id.to_string(),
                 run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),
@@ -662,7 +662,7 @@ fn run_private_preview_export_proof(private_root: &Path) -> Result<(), String> {
                 generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
                 graph_revision_hash,
                 implementation_issue: CONFIG.implementation_issue,
-                notes: "Private RAF panorama preview/export smoke. This proves production RAW decode, stitch artifact generation, private preview and export artifacts, and preview/export pixel parity. It does not claim UI review or final user-visible E2E acceptance.".to_string(),
+                notes: "Private ARW panorama preview/export smoke. This proves production RAW decode, stitch artifact generation, private preview and export artifacts, and preview/export pixel parity. It does not claim UI review or final user-visible E2E acceptance.".to_string(),
                 quality_metrics: metrics,
                 report_id: CONFIG.report_id.to_string(),
                 run_id: std::env::var("RAWENGINE_COMPUTATIONAL_PRIVATE_RUN_ID").ok(),

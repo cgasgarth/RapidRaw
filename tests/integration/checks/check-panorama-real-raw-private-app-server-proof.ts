@@ -325,9 +325,9 @@ function samplePrivateReportCollection(): ComputationalMergePrivateRunReportColl
         reportId: 'computational-merge-run.panorama-overlap.v1',
         screenshotArtifacts: [],
         sourceHashes: [
-          source('private-fixtures/panorama/overlap-stitch-v1/frame-01.raf'),
-          source('private-fixtures/panorama/overlap-stitch-v1/frame-02.raf'),
-          source('private-fixtures/panorama/overlap-stitch-v1/frame-03.raf'),
+          source('private-fixtures/panorama/overlap-stitch-v1/frame-01.arw'),
+          source('private-fixtures/panorama/overlap-stitch-v1/frame-02.arw'),
+          source('private-fixtures/panorama/overlap-stitch-v1/frame-03.arw'),
         ],
         uiIssue: 1333,
       },

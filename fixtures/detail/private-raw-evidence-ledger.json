@@ -35,7 +35,7 @@
         "publicRepoAllowed": false,
         "rightsStatus": "third_party_restricted"
       },
-      "status": "private_asset_available",
+      "status": "planned_private_capture",
       "trackingIssue": 1376
     },
     {
@@ -181,10 +181,10 @@
     {
       "artifactClass": "overlap_stitch_alignment",
       "camera": {
-        "cameraMake": "Fujifilm",
-        "cameraModel": "X-T5",
-        "lens": "XF 23mm F2 R WR",
-        "rawFormat": "raf"
+        "cameraMake": "Sony",
+        "cameraModel": "ILCE-7M3",
+        "lens": "FE 24-105mm F4 G OSS",
+        "rawFormat": "arw"
       },
       "crop": {
         "height": 768,
@@ -196,17 +196,17 @@
       "evidenceId": "raw-evidence.panorama.overlap-stitch.v1",
       "expectedUse": ["panorama_stitch", "preview_export_parity"],
       "exposure": {
-        "aperture": 8,
+        "aperture": 4,
         "exposureBiasEv": 0,
         "iso": 200,
         "shutterSeconds": 0.004
       },
       "featureFamily": "panorama_stitch",
-      "notes": "Reserved private overlap sequence for real RAW panorama feature matching, seam/blend inspection, and export parity proof.",
+      "notes": "Project-owned Alaska ARW overlap sequence for real RAW panorama feature matching, seam/blend inspection, and export parity proof.",
       "rights": {
         "allowedUse": "local_validation_only",
         "copyrightOwner": "RawEngine private fixture owner",
-        "evidence": "Private panorama sequence must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "evidence": "User explicitly provided /Users/cgas/Pictures/Capture One/Alaska as project-owned RAW validation input for this repo.",
         "publicRepoAllowed": false,
         "rightsStatus": "project_owned"
       },
