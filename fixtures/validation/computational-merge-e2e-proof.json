@@ -414,10 +414,10 @@
       "fixtureId": "validation.computational-merge.super-resolution-subpixel.v1",
       "implementationIssue": 1506,
       "localSourceRelativePaths": [
-        "private-fixtures/super-resolution/subpixel-detail-v1/frame-01.nef",
-        "private-fixtures/super-resolution/subpixel-detail-v1/frame-02.nef",
-        "private-fixtures/super-resolution/subpixel-detail-v1/frame-03.nef",
-        "private-fixtures/super-resolution/subpixel-detail-v1/frame-04.nef"
+        "private-fixtures/super-resolution/subpixel-detail-v1/frame-01.arw",
+        "private-fixtures/super-resolution/subpixel-detail-v1/frame-02.arw",
+        "private-fixtures/super-resolution/subpixel-detail-v1/frame-03.arw",
+        "private-fixtures/super-resolution/subpixel-detail-v1/frame-04.arw"
       ],
       "nonClaims": ["not_runtime_e2e_verified", "not_ui_verified", "not_quality_accepted", "private_assets_not_public"],
       "notes": "Private RAW super-resolution E2E proof slot for decode, subpixel registration, detail reconstruction, app-server dry-run/apply replay, preview/export parity, and artifact quality metrics. This manifest is planning evidence only until private assets and full E2E run reports exist.",
