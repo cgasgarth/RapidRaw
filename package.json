@@ -166,6 +166,7 @@
     "check:library-workflow-smoke": "bun scripts/capture-visual-smoke.ts --scenario library-workflow",
     "check:professional-workflow-status": "bun tests/integration/checks/check-professional-workflow-status.ts",
     "check:professional-workflow-status:update": "bun tests/integration/checks/check-professional-workflow-status.ts --update",
+    "check:professional-color-workflow-local-raw-proof": "bun tests/integration/checks/check-professional-color-workflow-local-raw-proof.ts",
     "check:export-queue": "bun tests/integration/checks/check-export-queue-fixtures.ts",
     "check:smart-albums": "bun tests/integration/checks/check-smart-album-fixtures.ts",
     "check:metadata-templates": "bun tests/integration/checks/check-metadata-template-fixtures.ts",
