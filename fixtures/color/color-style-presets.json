@@ -29,6 +29,20 @@
         "blue": 0.42079999999999995
       },
       "tolerance": 0.000001
+    },
+    {
+      "presetId": "color_style.cinematic.warm_shadow_rolloff.v1",
+      "inputRgb": {
+        "red": 0.62,
+        "green": 0.48,
+        "blue": 0.32
+      },
+      "expectedRgb": {
+        "red": 0.6521907850611574,
+        "green": 0.4752090944259225,
+        "blue": 0.30510645731141517
+      },
+      "tolerance": 0.000001
     }
   ],
   "presets": [
@@ -98,6 +112,34 @@
         "vibrance": 0,
         "saturation": -2,
         "curveMode": "parametric"
+      }
+    },
+    {
+      "version": 1,
+      "id": "color_style.cinematic.warm_shadow_rolloff.v1",
+      "name": "Warm Shadow Rolloff",
+      "description": "Cinematic color preset with warm mids, cooled shadows, and restrained blue saturation.",
+      "category": "cinematic",
+      "previewTags": ["cinematic", "warm-mids", "cool-shadows"],
+      "createdAt": "2026-06-20T00:00:00.000Z",
+      "updatedAt": "2026-06-20T00:00:00.000Z",
+      "adjustmentPatch": {
+        "temperature": 5,
+        "tint": 1,
+        "vibrance": 10,
+        "saturation": 2,
+        "hsl": {
+          "oranges": { "hue": -3, "saturation": 6, "luminance": 1 },
+          "blues": { "hue": -5, "saturation": -8, "luminance": -4 }
+        },
+        "colorGrading": {
+          "global": { "hue": 36, "saturation": 5, "luminance": 0 },
+          "shadows": { "hue": 218, "saturation": 5, "luminance": -2 },
+          "midtones": { "hue": 34, "saturation": 8, "luminance": 1 },
+          "highlights": { "hue": 44, "saturation": 4, "luminance": 1 },
+          "balance": 12,
+          "blending": 62
+        }
       }
     }
   ]

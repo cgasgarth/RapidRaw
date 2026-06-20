@@ -72,6 +72,34 @@ export const COLOR_STYLE_PRESET_CATALOG = {
         curveMode: 'parametric',
       },
     },
+    {
+      version: 1,
+      id: 'color_style.cinematic.warm_shadow_rolloff.v1',
+      name: 'Warm Shadow Rolloff',
+      description: 'Cinematic color preset with warm mids, cooled shadows, and restrained blue saturation.',
+      category: 'cinematic',
+      previewTags: ['cinematic', 'warm-mids', 'cool-shadows'],
+      createdAt: '2026-06-20T00:00:00.000Z',
+      updatedAt: '2026-06-20T00:00:00.000Z',
+      adjustmentPatch: {
+        temperature: 5,
+        tint: 1,
+        vibrance: 10,
+        saturation: 2,
+        hsl: {
+          oranges: { hue: -3, saturation: 6, luminance: 1 },
+          blues: { hue: -5, saturation: -8, luminance: -4 },
+        },
+        colorGrading: {
+          global: { hue: 36, saturation: 5, luminance: 0 },
+          shadows: { hue: 218, saturation: 5, luminance: -2 },
+          midtones: { hue: 34, saturation: 8, luminance: 1 },
+          highlights: { hue: 44, saturation: 4, luminance: 1 },
+          balance: 12,
+          blending: 62,
+        },
+      },
+    },
   ],
 } satisfies ColorStylePresetCatalog;
 
