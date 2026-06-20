@@ -97,6 +97,7 @@ const ColorRuntimeStatusRail = () => {
 };
 
 const formatPercent = (value: number) => `${String(value)}%`;
+const formatSignedInteger = (value: number) => (value > 0 ? `+${value}` : String(value));
 const CAMERA_PROFILE_IDS = [
   'camera_standard',
   'camera_neutral',
@@ -678,6 +679,12 @@ export default function ColorPanel({
   const activeSelectiveColorRangeCenter = `${Math.round(activeSelectiveColorRange.centerHueDegrees)}°`;
   const activeSelectiveColorRangeWidth = `${Math.round(activeSelectiveColorRange.widthDegrees)}°`;
   const effectiveHue = baseHue + (currentHsl.hue || 0);
+  const activeSelectiveColorAdjustedHue = `${Math.round(((effectiveHue % 360) + 360) % 360)}°`;
+  const activeSelectiveColorDeltaSummary = [
+    `H ${formatSignedInteger(currentHsl.hue)}`,
+    `S ${formatSignedInteger(currentHsl.saturation)}`,
+    `L ${formatSignedInteger(currentHsl.luminance)}`,
+  ].join(' / ');
   const levels = adjustments.levels;
   const inputBlackMax = Math.max(0, Math.min(99, Math.round(levels.inputWhite * 100) - 1));
   const inputWhiteMin = Math.min(100, Math.max(1, Math.round(levels.inputBlack * 100) + 1));
@@ -1310,6 +1317,14 @@ export default function ColorPanel({
             <span className="tabular-nums text-text-secondary" data-testid="selective-color-range-summary-width">
               {activeSelectiveColorRangeWidth}
             </span>
+          </span>
+          <span className="text-text-tertiary">{t('adjustments.color.activeRangeAdjustedHue')}</span>
+          <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-adjusted-hue">
+            {activeSelectiveColorAdjustedHue}
+          </span>
+          <span className="text-text-tertiary">{t('adjustments.color.activeRangeDeltas')}</span>
+          <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-hsl-deltas">
+            {activeSelectiveColorDeltaSummary}
           </span>
         </div>
         <div className="flex justify-between mb-4 px-1">

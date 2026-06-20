@@ -18,6 +18,8 @@
       "whites": "Whites"
     },
     "color": {
+      "activeRangeAdjustedHue": "Adjusted hue",
+      "activeRangeDeltas": "HSL deltas",
       "ariaSelectColor": "Select {{name}} color",
       "blackWhiteMixer": {
         "ariaSelectChannel": "Select {{name}} black and white channel",

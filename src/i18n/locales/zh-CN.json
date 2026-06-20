@@ -18,6 +18,8 @@
       "whites": "白色"
     },
     "color": {
+      "activeRangeAdjustedHue": "Adjusted hue",
+      "activeRangeDeltas": "HSL deltas",
       "ariaSelectColor": "选择 {{name}} 颜色",
       "blackWhiteMixer": {
         "ariaSelectChannel": "选择 {{name}} 黑白通道",
