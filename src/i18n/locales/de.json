@@ -234,6 +234,8 @@
         "emptyFavorites": "No favorites yet",
         "emptySearch": "No matching looks",
         "family": "Family",
+        "favoriteCount_one": "{{count}} favorite",
+        "favoriteCount_other": "{{count}} favorites",
         "favoriteLook": "Favorite {{displayName}}",
         "favorites": "Favorites",
         "legalNamingStatus": "Naming",

@@ -322,7 +322,10 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
           }}
           type="button"
         >
-          {t('adjustments.effects.filmLookBrowser.favorites')}
+          <span className="block">{t('adjustments.effects.filmLookBrowser.favorites')}</span>
+          <span className="block tabular-nums opacity-70" data-testid="film-look-favorites-count">
+            {t('adjustments.effects.filmLookBrowser.favoriteCount', { count: favoriteLookCount })}
+          </span>
         </button>
       </div>
 
