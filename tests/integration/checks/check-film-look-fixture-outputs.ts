@@ -87,6 +87,8 @@ for (const marker of [
   'getFilmLookSwatchStyle',
   'searchQuery',
   'adjustments.effects.filmLookBrowser.search',
+  'adjustments.effects.filmLookBrowser.searchClear',
+  'film-look-search-clear',
   'activeCategory',
   'categoryTabs',
   'adjustments.effects.filmLookBrowser.categoryFilter',
