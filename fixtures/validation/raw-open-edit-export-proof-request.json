@@ -62,5 +62,11 @@
   },
   "fixtureId": "validation.raw-open-edit-export.high-iso-skin-shadow.v1",
   "privateRootPath": "/tmp/rawengine-private-root",
+  "sourceMetadata": {
+    "cameraMake": "Sony",
+    "cameraModel": "ILCE-7M3",
+    "privacySafeCameraId": "camera.raw-open-edit-export.high-iso-skin-shadow.v1",
+    "rawFormat": "arw"
+  },
   "sourceRelativePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw"
 }

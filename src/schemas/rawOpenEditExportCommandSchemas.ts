@@ -61,35 +61,103 @@ const colorPipelineSchema = z
 
 const colorManagementProofSchema = z
   .object({
-    chromaticAdaptation: colorPipelineSchema.shape.chromaticAdaptation.omit({ warnings: true }),
-    displayTransform: z
+    conformance: z.enum(['matched', 'partial', 'mismatch']),
+    decoderTrace: z
       .object({
-        bitDepth: z.literal(16),
-        embedIcc: z.literal(true),
-        intent: z.literal('relative_colorimetric'),
-        outputProfile: z.literal('display_p3'),
-        sceneToDisplayTransform: z.literal('rawengine_agx_v1'),
-        viewTransform: z.literal('rawengine_agx_v1'),
+        cameraCalibration: z
+          .object({
+            applied: z.string().min(1),
+            presence: z.string().min(1),
+            source: z.string().min(1),
+          })
+          .strict(),
+        cameraMake: z.string().trim().min(1),
+        cameraModel: z.string().trim().min(1),
+        decodedDimensions: z
+          .object({ height: z.number().int().positive(), width: z.number().int().positive() })
+          .strict(),
+        privacySafeCameraId: z.string().trim().min(1),
+        rawFormat: z.string().trim().min(1),
+        sourceHash: sha256Schema,
+        whiteBalance: z
+          .object({
+            applied: z.string().min(1),
+            presence: z.string().min(1),
+            source: z.string().min(1),
+          })
+          .strict(),
       })
       .strict(),
     doesNotProve: z
       .array(
         z.enum([
+          'acescg_working_space',
+          'bradford_chromatic_adaptation',
           'camera_profile_quality',
           'capture_one_class_quality',
           'display_device_visual_match',
+          'display_p3_export',
           'gpu_color_parity',
+          'icc_embedding',
           'icc_colorimetric_accuracy',
+          'sixteen_bit_export',
         ]),
       )
-      .min(5),
-    inputDomain: z.literal('camera_linear_rgb'),
-    operationDomain: z.literal('acescg_linear_v1'),
+      .min(9),
+    observedColorPipeline: z
+      .object({
+        bitDepth: z.literal(8),
+        cmmUsed: z.literal(false),
+        displayProfileCorrectness: z.literal('not_proven'),
+        exportColorEncoding: z.literal('current_srgb_pipe_rgba8'),
+        exportFormat: z.literal('tiff'),
+        gamutMapping: z.literal('not_proven'),
+        iccProfileEmbedded: z.literal(false),
+        inputDomain: z.literal('decoder_camera_rgb_observed'),
+        operationDomain: z.literal('linear_srgb_d65_observed'),
+        outputProfile: z.literal('untagged_srgb_pipe'),
+        renderingIntentApplied: z.literal(false),
+        sceneToDisplayTransform: z.literal('rawengine_agx_v1'),
+        transferStatus: z.literal('current_srgb_pipe_rgba8_export'),
+        viewTransform: z.literal('rawengine_agx_v1'),
+        workingBuffer: z.literal('linear_srgb_d65_observed'),
+      })
+      .strict(),
     proofLevel: z.literal('private_raw_runtime_color_management_metadata'),
+    requestedColorPipeline: colorPipelineSchema,
+    runtimeEnvironment: z
+      .object({
+        wgpuAdapter: z.string().min(1),
+        wgpuBackend: z.string().min(1),
+      })
+      .strict(),
     trackingIssue: z.literal(2308),
-    workingSpace: z.literal('acescg_linear_v1'),
+    warnings: z.array(z.string().min(1)).min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((proof, context) => {
+    const doesNotProve = new Set(proof.doesNotProve);
+    for (const nonClaim of [
+      'acescg_working_space',
+      'bradford_chromatic_adaptation',
+      'camera_profile_quality',
+      'capture_one_class_quality',
+      'display_device_visual_match',
+      'display_p3_export',
+      'gpu_color_parity',
+      'icc_embedding',
+      'icc_colorimetric_accuracy',
+      'sixteen_bit_export',
+    ] as const) {
+      if (!doesNotProve.has(nonClaim)) {
+        context.addIssue({
+          code: 'custom',
+          message: `Color-management proof must explicitly avoid claiming ${nonClaim}.`,
+          path: ['doesNotProve'],
+        });
+      }
+    }
+  });
 
 const jsonObjectSchema = z.record(z.string(), jsonValueSchema);
 const targetJsonObjectSchema = z.object({ kind: z.enum(['image', 'virtual_copy']) }).catchall(jsonValueSchema);
@@ -135,6 +203,14 @@ export const rawOpenEditExportProofRequestSchema = z
     editCommand: rawOpenEditExportBasicToneCommandSchema,
     fixtureId: z.string().regex(/^validation\.raw-open-edit-export\.[a-z0-9.-]+\.v[0-9]+$/u),
     privateRootPath: z.string().trim().min(1),
+    sourceMetadata: z
+      .object({
+        cameraMake: z.string().trim().min(1),
+        cameraModel: z.string().trim().min(1),
+        privacySafeCameraId: z.string().trim().min(1),
+        rawFormat: z.string().trim().min(1),
+      })
+      .strict(),
     sourceRelativePath: privatePathSchema,
   })
   .strict();

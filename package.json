@@ -225,6 +225,7 @@
     "check:raw-open-edit-export-private-proof-acceptance": "bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test",
     "check:raw-open-edit-export-run-reports": "bun tests/integration/checks/check-raw-open-edit-export-run-reports.ts",
     "check:raw-color-management-runtime-proof": "bun tests/integration/checks/check-raw-color-management-runtime-proof.ts",
+    "run:raw-color-management-private-proof": "bun scripts/run-raw-color-management-private-proof.ts",
     "check:raw-open-edit-export-runtime-status": "bun tests/integration/checks/check-raw-open-edit-export-runtime-status.ts",
     "check:raw-open-edit-export-runtime-status:update": "bun tests/integration/checks/check-raw-open-edit-export-runtime-status.ts --update",
     "check:local-raw-ui-validation-harness": "bun tests/integration/checks/check-local-raw-ui-validation-harness.ts",

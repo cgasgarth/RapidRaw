@@ -17,35 +17,48 @@ use crate::image_processing::{
 };
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportProofRequest {
+    #[serde(rename = "$schema")]
+    pub schema: Option<String>,
     pub artifact_dir_relative: String,
     pub edit_command: RawOpenEditExportCommand,
     pub fixture_id: String,
     pub private_root_path: String,
+    pub source_metadata: RawOpenEditExportSourceMetadata,
     pub source_relative_path: String,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportCommand {
+    pub actor: Value,
     pub approval: RawOpenEditExportBasicToneApproval,
     pub color_pipeline: RawOpenEditExportColorPipeline,
     pub command_id: String,
     pub command_type: String,
+    pub correlation_id: String,
     pub dry_run: bool,
     pub expected_graph_revision: String,
+    pub idempotency_key: Option<String>,
     pub parameters: Value,
+    pub schema_version: u32,
+    pub target: Value,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportBasicToneApproval {
     pub approval_class: String,
+    pub reason: String,
     pub state: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportColorPipeline {
     pub chromatic_adaptation: RawOpenEditExportChromaticAdaptation,
@@ -57,15 +70,18 @@ pub struct RawOpenEditExportColorPipeline {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportChromaticAdaptation {
     pub method: String,
     pub source_white_point: RawOpenEditExportWhitePoint,
     pub status: String,
     pub target_white_point: RawOpenEditExportWhitePoint,
+    pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportWhitePoint {
     pub x: f64,
@@ -73,6 +89,7 @@ pub struct RawOpenEditExportWhitePoint {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportRenderTarget {
     pub bit_depth: u32,
@@ -83,6 +100,17 @@ pub struct RawOpenEditExportRenderTarget {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportSourceMetadata {
+    pub camera_make: String,
+    pub camera_model: String,
+    pub privacy_safe_camera_id: String,
+    pub raw_format: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportBasicToneParameters {
     pub black_point: f64,
@@ -96,6 +124,7 @@ pub struct RawOpenEditExportBasicToneParameters {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportSelectiveColorParameters {
     pub band: String,
@@ -131,28 +160,73 @@ pub struct RawOpenEditExportProofMetric {
     pub value: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportColorManagementProof {
-    pub chromatic_adaptation: RawOpenEditExportChromaticAdaptation,
-    pub display_transform: RawOpenEditExportDisplayTransform,
+    pub conformance: String,
+    pub decoder_trace: RawOpenEditExportDecoderTrace,
     pub does_not_prove: Vec<String>,
-    pub input_domain: String,
-    pub operation_domain: String,
+    pub observed_color_pipeline: RawOpenEditExportObservedColorPipeline,
     pub proof_level: String,
+    pub requested_color_pipeline: RawOpenEditExportColorPipeline,
+    pub runtime_environment: RawOpenEditExportRuntimeEnvironment,
     pub tracking_issue: u32,
-    pub working_space: String,
+    pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RawOpenEditExportDisplayTransform {
+pub struct RawOpenEditExportObservedColorPipeline {
     pub bit_depth: u32,
-    pub embed_icc: bool,
-    pub intent: String,
+    pub cmm_used: bool,
+    pub display_profile_correctness: String,
+    pub export_color_encoding: String,
+    pub export_format: String,
+    pub gamut_mapping: String,
+    pub icc_profile_embedded: bool,
+    pub input_domain: String,
+    pub operation_domain: String,
     pub output_profile: String,
+    pub rendering_intent_applied: bool,
     pub scene_to_display_transform: String,
+    pub transfer_status: String,
     pub view_transform: String,
+    pub working_buffer: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportDecoderTrace {
+    pub camera_calibration: RawOpenEditExportTraceStatus,
+    pub camera_make: String,
+    pub camera_model: String,
+    pub decoded_dimensions: RawOpenEditExportDimensions,
+    pub privacy_safe_camera_id: String,
+    pub raw_format: String,
+    pub source_hash: String,
+    pub white_balance: RawOpenEditExportTraceStatus,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportTraceStatus {
+    pub applied: String,
+    pub presence: String,
+    pub source: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportDimensions {
+    pub height: u32,
+    pub width: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportRuntimeEnvironment {
+    pub wgpu_adapter: String,
+    pub wgpu_backend: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -209,7 +283,8 @@ fn run_raw_open_edit_export_proof_with_context(
 
     let empty_adjustments = json!({});
     let is_raw = is_raw_file(&source_path_string);
-    let tm_override = resolve_tonemapper_override(settings, is_raw);
+    let tm_override = tonemapper_override_for_proof(&request.edit_command.color_pipeline)
+        .or_else(|| resolve_tonemapper_override(settings, is_raw));
     let preview_before = process_image_for_export_pipeline_with_tonemapper_override(
         &source_path_string,
         &base_image,
@@ -283,7 +358,8 @@ fn run_raw_open_edit_export_proof_with_context(
     )?;
 
     let sidecar_path = resolve_private_relative(&private_root, &sidecar_after_relative)?;
-    let sidecar_json = build_sidecar_json(&request, &adjustments);
+    let color_management = color_management_proof(&request, &source_hash_before, &base_image);
+    let sidecar_json = build_sidecar_json(&request, &adjustments, &color_management);
     fs::write(
         &sidecar_path,
         serde_json::to_vec_pretty(&sidecar_json).map_err(|error| error.to_string())?,
@@ -321,7 +397,7 @@ fn run_raw_open_edit_export_proof_with_context(
     let report_id = raw_open_edit_export_report_id(&request.fixture_id);
     let mut report = RawOpenEditExportProofReport {
         artifacts: Vec::new(),
-        color_management: color_management_proof(&request.edit_command.color_pipeline),
+        color_management,
         edit_command_id: request.edit_command.command_id,
         edit_graph_revision: request.edit_command.expected_graph_revision,
         fixture_id: request.fixture_id,
@@ -441,14 +517,18 @@ fn selective_color_adjustments(parameters: &Value) -> Result<Value, String> {
     }))
 }
 
-fn build_sidecar_json(request: &RawOpenEditExportProofRequest, adjustments: &Value) -> Value {
+fn build_sidecar_json(
+    request: &RawOpenEditExportProofRequest,
+    adjustments: &Value,
+    color_management: &RawOpenEditExportColorManagementProof,
+) -> Value {
     let metadata = ImageMetadata {
         adjustments: adjustments.clone(),
         ..Default::default()
     };
     let mut value = serde_json::to_value(metadata).unwrap_or_else(|_| json!({}));
     value["rawOpenEditExportProof"] = json!({
-        "colorManagement": color_management_proof(&request.edit_command.color_pipeline),
+        "colorManagement": color_management,
         "editCommandId": request.edit_command.command_id,
         "editGraphRevision": request.edit_command.expected_graph_revision,
         "fixtureId": request.fixture_id,
@@ -458,30 +538,85 @@ fn build_sidecar_json(request: &RawOpenEditExportProofRequest, adjustments: &Val
 }
 
 fn color_management_proof(
-    pipeline: &RawOpenEditExportColorPipeline,
+    request: &RawOpenEditExportProofRequest,
+    source_hash: &str,
+    decoded_image: &DynamicImage,
 ) -> RawOpenEditExportColorManagementProof {
+    let pipeline = &request.edit_command.color_pipeline;
     RawOpenEditExportColorManagementProof {
-        chromatic_adaptation: pipeline.chromatic_adaptation.clone(),
-        display_transform: RawOpenEditExportDisplayTransform {
-            bit_depth: pipeline.render_target.bit_depth,
-            embed_icc: pipeline.render_target.embed_icc,
-            intent: pipeline.render_target.intent.clone(),
-            output_profile: pipeline.render_target.output_profile.clone(),
-            scene_to_display_transform: pipeline.scene_to_display_transform.clone(),
-            view_transform: pipeline.render_target.view_transform.clone(),
+        conformance: "mismatch".to_string(),
+        decoder_trace: RawOpenEditExportDecoderTrace {
+            camera_calibration: trace_status_not_surfaced(),
+            camera_make: request.source_metadata.camera_make.clone(),
+            camera_model: request.source_metadata.camera_model.clone(),
+            decoded_dimensions: RawOpenEditExportDimensions {
+                height: decoded_image.height(),
+                width: decoded_image.width(),
+            },
+            privacy_safe_camera_id: request.source_metadata.privacy_safe_camera_id.clone(),
+            raw_format: request.source_metadata.raw_format.clone(),
+            source_hash: source_hash.to_string(),
+            white_balance: trace_status_not_surfaced(),
         },
         does_not_prove: vec![
+            "acescg_working_space".to_string(),
+            "bradford_chromatic_adaptation".to_string(),
             "camera_profile_quality".to_string(),
             "capture_one_class_quality".to_string(),
             "display_device_visual_match".to_string(),
+            "display_p3_export".to_string(),
             "gpu_color_parity".to_string(),
+            "icc_embedding".to_string(),
             "icc_colorimetric_accuracy".to_string(),
+            "sixteen_bit_export".to_string(),
         ],
-        input_domain: pipeline.input_domain.clone(),
-        operation_domain: pipeline.operation_domain.clone(),
+        observed_color_pipeline: RawOpenEditExportObservedColorPipeline {
+            bit_depth: 8,
+            cmm_used: false,
+            display_profile_correctness: "not_proven".to_string(),
+            export_color_encoding: "current_srgb_pipe_rgba8".to_string(),
+            export_format: "tiff".to_string(),
+            gamut_mapping: "not_proven".to_string(),
+            icc_profile_embedded: false,
+            input_domain: "decoder_camera_rgb_observed".to_string(),
+            operation_domain: "linear_srgb_d65_observed".to_string(),
+            output_profile: "untagged_srgb_pipe".to_string(),
+            rendering_intent_applied: false,
+            scene_to_display_transform: pipeline.scene_to_display_transform.clone(),
+            transfer_status: "current_srgb_pipe_rgba8_export".to_string(),
+            view_transform: pipeline.render_target.view_transform.clone(),
+            working_buffer: "linear_srgb_d65_observed".to_string(),
+        },
         proof_level: "private_raw_runtime_color_management_metadata".to_string(),
+        requested_color_pipeline: pipeline.clone(),
+        runtime_environment: RawOpenEditExportRuntimeEnvironment {
+            wgpu_adapter: "not_surfaced_by_current_proof".to_string(),
+            wgpu_backend: "not_surfaced_by_current_proof".to_string(),
+        },
         tracking_issue: 2308,
-        working_space: pipeline.working_space.clone(),
+        warnings: vec![
+            "Requested ACEScg/Display-P3/16-bit/ICC fields are request intent only; observed runtime remains the current RGBA8 sRGB-pipe export.".to_string(),
+            "Decoder calibration and white-balance metadata are not surfaced by this proof trace yet.".to_string(),
+            "WGPU adapter/backend are not surfaced by this proof trace yet.".to_string(),
+        ],
+    }
+}
+
+fn trace_status_not_surfaced() -> RawOpenEditExportTraceStatus {
+    RawOpenEditExportTraceStatus {
+        applied: "not_surfaced_by_current_decoder_trace".to_string(),
+        presence: "not_surfaced_by_current_decoder_trace".to_string(),
+        source: "raw_open_edit_export_validation_spine".to_string(),
+    }
+}
+
+fn tonemapper_override_for_proof(pipeline: &RawOpenEditExportColorPipeline) -> Option<u32> {
+    if pipeline.scene_to_display_transform == "rawengine_agx_v1"
+        && pipeline.render_target.view_transform == "rawengine_agx_v1"
+    {
+        Some(1)
+    } else {
+        None
     }
 }
 
@@ -645,15 +780,24 @@ mod tests {
 
     fn sample_basic_tone_command() -> RawOpenEditExportCommand {
         RawOpenEditExportCommand {
+            actor: json!({
+                "id": "agent.raw-proof-command-wrapper",
+                "kind": "agent",
+                "sessionId": "raw-proof-command-wrapper"
+            }),
             approval: RawOpenEditExportBasicToneApproval {
                 approval_class: "edit_apply".to_string(),
+                reason: "Apply accepted basic tone command for RAW open/edit/export runtime proof."
+                    .to_string(),
                 state: "approved".to_string(),
             },
             color_pipeline: sample_color_pipeline(),
             command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
             command_type: "toneColor.setBasicTone".to_string(),
+            correlation_id: "corr.raw-open-edit-export.basic-tone.v1".to_string(),
             dry_run: false,
             expected_graph_revision: "graph-rev.open-edit-export.edge-ringing.v1".to_string(),
+            idempotency_key: Some("idem.raw-open-edit-export.edge-ringing.v1".to_string()),
             parameters: json!({
                 "blackPoint": -2.0,
                 "clarity": 4.0,
@@ -664,26 +808,47 @@ mod tests {
                 "shadows": 9.0,
                 "whitePoint": 3.0,
             }),
+            schema_version: 1,
+            target: json!({
+                "imagePath": "private-fixtures/detail/edge-ringing-v1.cr3",
+                "kind": "image"
+            }),
         }
     }
 
     fn sample_selective_color_command() -> RawOpenEditExportCommand {
         RawOpenEditExportCommand {
+            actor: json!({
+                "id": "agent.selective-color-proof-wrapper",
+                "kind": "agent",
+                "sessionId": "selective-color-proof-wrapper"
+            }),
             approval: RawOpenEditExportBasicToneApproval {
                 approval_class: "edit_apply".to_string(),
+                reason: "Apply accepted orange selective color command for RAW preview/export parity proof."
+                    .to_string(),
                 state: "approved".to_string(),
             },
             color_pipeline: sample_color_pipeline(),
             command_id: "command.raw-open-edit-export.selective-color-orange.v1".to_string(),
             command_type: "toneColor.adjustHsl".to_string(),
+            correlation_id: "corr.raw-open-edit-export.selective-color-orange.v1".to_string(),
             dry_run: false,
             expected_graph_revision: "graph-rev.open-edit-export.selective-color-orange.v1"
                 .to_string(),
+            idempotency_key: Some(
+                "idem.raw-open-edit-export.selective-color-orange.v1".to_string(),
+            ),
             parameters: json!({
                 "band": "orange",
                 "hueShiftDegrees": 12.0,
                 "luminance": -8.0,
                 "saturation": 28.0,
+            }),
+            schema_version: 1,
+            target: json!({
+                "imagePath": "private-fixtures/detail/edge-ringing-v1.cr3",
+                "kind": "image"
             }),
         }
     }
@@ -701,6 +866,7 @@ mod tests {
                     x: 0.32168,
                     y: 0.33767,
                 },
+                warnings: Vec::new(),
             },
             input_domain: "camera_linear_rgb".to_string(),
             operation_domain: "acescg_linear_v1".to_string(),
@@ -713,6 +879,27 @@ mod tests {
             },
             scene_to_display_transform: "rawengine_agx_v1".to_string(),
             working_space: "acescg_linear_v1".to_string(),
+        }
+    }
+
+    fn sample_source_metadata() -> RawOpenEditExportSourceMetadata {
+        RawOpenEditExportSourceMetadata {
+            camera_make: "Canon".to_string(),
+            camera_model: "EOS R5".to_string(),
+            privacy_safe_camera_id: "camera.raw-open-edit-export.edge-ringing.v1".to_string(),
+            raw_format: "cr3".to_string(),
+        }
+    }
+
+    fn sample_request() -> RawOpenEditExportProofRequest {
+        RawOpenEditExportProofRequest {
+            schema: None,
+            artifact_dir_relative: "private-artifacts/validation/open-edit-export".to_string(),
+            edit_command: sample_basic_tone_command(),
+            fixture_id: "validation.raw-open-edit-export.edge-ringing.v1".to_string(),
+            private_root_path: "/tmp/rawengine-private-root".to_string(),
+            source_metadata: sample_source_metadata(),
+            source_relative_path: "private-fixtures/detail/edge-ringing-v1.cr3".to_string(),
         }
     }
 
@@ -741,16 +928,16 @@ mod tests {
 
     #[test]
     fn sidecar_json_preserves_edit_graph_revision() {
-        let request = RawOpenEditExportProofRequest {
-            artifact_dir_relative: "private-artifacts/validation/open-edit-export".to_string(),
-            edit_command: sample_basic_tone_command(),
-            fixture_id: "validation.raw-open-edit-export.edge-ringing.v1".to_string(),
-            private_root_path: "/tmp/rawengine-private-root".to_string(),
-            source_relative_path: "private-fixtures/detail/edge-ringing-v1.cr3".to_string(),
-        };
+        let request = sample_request();
         let adjustments = edit_command_adjustments(&request.edit_command).expect("basic tone maps");
+        let decoded_image = DynamicImage::new_rgba8(2, 3);
+        let color_management = color_management_proof(
+            &request,
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            &decoded_image,
+        );
 
-        let sidecar = build_sidecar_json(&request, &adjustments);
+        let sidecar = build_sidecar_json(&request, &adjustments, &color_management);
 
         assert_eq!(sidecar["adjustments"]["exposure"], json!(0.35));
         assert_eq!(sidecar["adjustments"]["contrast"], json!(8.0));
@@ -761,6 +948,10 @@ mod tests {
         assert_eq!(
             sidecar["rawOpenEditExportProof"]["trackingIssue"],
             json!(1376)
+        );
+        assert_eq!(
+            sidecar["rawOpenEditExportProof"]["colorManagement"]["observedColorPipeline"]["bitDepth"],
+            json!(8)
         );
     }
 
@@ -803,7 +994,11 @@ mod tests {
         );
         let report = RawOpenEditExportProofReport {
             artifacts: vec![artifact("preview_before_private", &asset)],
-            color_management: color_management_proof(&sample_color_pipeline()),
+            color_management: color_management_proof(
+                &sample_request(),
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                &DynamicImage::new_rgba8(2, 3),
+            ),
             edit_command_id: "command.raw-open-edit-export.basic-tone.v1".to_string(),
             edit_graph_revision: "graph-rev.raw-open-edit-export.sample.v1".to_string(),
             fixture_id: "validation.raw-open-edit-export.sample.v1".to_string(),
@@ -824,6 +1019,17 @@ mod tests {
         assert!(value.get("sidecarAfter").is_some());
         assert!(value.get("sourceRaw").is_some());
         assert!(value.get("sourceHashUnchanged").is_none());
+        assert!(
+            value["colorManagement"]
+                .get("requestedColorPipeline")
+                .is_some()
+        );
+        assert!(
+            value["colorManagement"]
+                .get("observedColorPipeline")
+                .is_some()
+        );
+        assert!(value["colorManagement"].get("displayTransform").is_none());
     }
 
     #[test]
