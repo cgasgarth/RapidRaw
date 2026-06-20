@@ -10,6 +10,8 @@ export const TONE_COLOR_APP_SERVER_COMMAND_TYPES = [
   'toneColor.setBlackWhiteMixer',
 ] as const;
 
+export type ToneColorAppServerCommandType = (typeof TONE_COLOR_APP_SERVER_COMMAND_TYPES)[number];
+
 export const ToneColorAppServerExecutionMode = {
   ApplyDryRunPlan: 'apply_dry_run_plan',
   DryRunCommand: 'dry_run_command',
@@ -25,9 +27,16 @@ export const TONE_COLOR_APP_SERVER_EXECUTION_MODES = [
 
 export const ToneColorAppServerRouteStatus = {
   Mapped: 'mapped',
+  MappedUnavailable: 'mapped_unavailable',
 } as const;
 
-export const TONE_COLOR_APP_SERVER_ROUTE_STATUSES = [ToneColorAppServerRouteStatus.Mapped] as const;
+export type ToneColorAppServerRouteStatus =
+  (typeof ToneColorAppServerRouteStatus)[keyof typeof ToneColorAppServerRouteStatus];
+
+export const TONE_COLOR_APP_SERVER_ROUTE_STATUSES = [
+  ToneColorAppServerRouteStatus.Mapped,
+  ToneColorAppServerRouteStatus.MappedUnavailable,
+] as const;
 
 export const ToneColorAppServerSchemaName = {
   CommandEnvelope: 'ToneColorCommandEnvelopeV1',
