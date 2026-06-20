@@ -89,6 +89,11 @@ for (const marker of [
   'adjustments.effects.filmLookBrowser.categoryFilter',
   'handleSwapComparisonLooks',
   'adjustments.effects.filmLookBrowser.compareSwap',
+  'film-look-provenance-inspector',
+  'film-look-provenance-fields',
+  'film-look-adjustment-summary',
+  'adjustments.effects.filmLookBrowser.provenanceTitle',
+  'formatFilmLookToken',
 ]) {
   if (!browserSource.includes(marker)) {
     throw new Error(`Film look browser is missing UI marker: ${marker}`);

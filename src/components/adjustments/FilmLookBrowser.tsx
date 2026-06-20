@@ -31,6 +31,7 @@ const FILM_LOOK_COMPARE_SLOTS: Array<FilmLookComparisonSlot> = ['a', 'b'];
 const FILM_LOOK_FAVORITES_STORAGE_KEY = 'rapidraw.filmLookFavorites.v1';
 const formatFilmLookStrength = (strength: number) => `${strength}%`;
 const formatFilmLookAdjustmentValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
+const formatFilmLookToken = (value: string) => value.split('_').join(' ');
 const getFilmLookSwatchStyle = (look: FilmLookBrowserItem) => {
   const warmth = look.adjustmentPatch.temperature ?? 0;
   const saturation = look.adjustmentPatch.saturation ?? 0;
@@ -131,6 +132,9 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
     [activeCategory, favoriteLookIds, groups, normalizedSearchQuery, showFavoritesOnly],
   );
   const visibleLookCount = visibleGroups.reduce((total, group) => total + group.looks.length, 0);
+  const selectedLook = selectedLookId === null ? undefined : looksById.get(selectedLookId);
+  const selectedLookAdjustmentSummaries =
+    selectedLook === undefined ? [] : getFilmLookAdjustmentSummaries(selectedLook);
 
   useEffect(() => {
     window.localStorage.setItem(FILM_LOOK_FAVORITES_STORAGE_KEY, JSON.stringify([...favoriteLookIds].toSorted()));
@@ -383,6 +387,55 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
           value={strengthPercent}
         />
       </section>
+
+      {selectedLook !== undefined && (
+        <section
+          className="space-y-2 rounded-md border border-surface bg-bg-secondary p-3"
+          data-runtime-support={selectedLook.runtimeSupport}
+          data-testid="film-look-provenance-inspector"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
+                {t('adjustments.effects.filmLookBrowser.provenanceTitle')}
+              </UiText>
+              <UiText variant={TextVariants.small} className="truncate text-text-tertiary">
+                {selectedLook.displayName}
+              </UiText>
+            </div>
+            <span className="rounded border border-surface bg-bg-primary px-2 py-1 text-[11px] text-text-secondary">
+              {formatFilmLookToken(selectedLook.runtimeSupport)}
+            </span>
+          </div>
+          <div
+            className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] text-text-tertiary"
+            data-testid="film-look-provenance-fields"
+          >
+            <span>{t('adjustments.effects.filmLookBrowser.claimLevel')}</span>
+            <span className="text-right text-text-secondary">
+              {formatFilmLookToken(selectedLook.provenance.claimLevel)}
+            </span>
+            <span>{t('adjustments.effects.filmLookBrowser.measurementSource')}</span>
+            <span className="text-right text-text-secondary">
+              {formatFilmLookToken(selectedLook.provenance.measurementSource)}
+            </span>
+            <span>{t('adjustments.effects.filmLookBrowser.legalNamingStatus')}</span>
+            <span className="text-right text-text-secondary">
+              {formatFilmLookToken(selectedLook.provenance.legalNamingStatus)}
+            </span>
+          </div>
+          <UiText variant={TextVariants.small} className="text-text-tertiary">
+            {selectedLook.provenance.legalNote}
+          </UiText>
+          <div className="flex flex-wrap gap-1" data-testid="film-look-adjustment-summary">
+            {selectedLookAdjustmentSummaries.map((summary) => (
+              <span className="rounded bg-bg-primary px-1.5 py-0.5 text-xs text-text-secondary" key={summary.label}>
+                {summary.label} {formatFilmLookAdjustmentValue(summary.value)}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="space-y-3">
         {showFavoritesOnly && favoriteLookCount === 0 && (
