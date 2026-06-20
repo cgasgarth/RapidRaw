@@ -229,6 +229,10 @@ export default function FocusStackModal({
             value={t(`modals.focusStack.retouchPolicy.${settings.retouchLayerPolicy}.label`)}
           />
           <ComputationalSetupStatusLine
+            label={t('modals.focusStack.preflight.previewBudget')}
+            value={t('modals.focusStack.previewBudgetValue', { value: settings.maxPreviewDimensionPx })}
+          />
+          <ComputationalSetupStatusLine
             label={t('modals.focusStack.preflight.memory')}
             value={t('modals.focusStack.preflight.pending')}
           />
@@ -276,6 +280,10 @@ export default function FocusStackModal({
               {
                 label: t('modals.focusStack.qualityLabel'),
                 value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '',
+              },
+              {
+                label: t('modals.focusStack.preflight.previewBudget'),
+                value: t('modals.focusStack.previewBudgetValue', { value: settings.maxPreviewDimensionPx }),
               },
               {
                 label: t('modals.focusStack.preflight.blend'),

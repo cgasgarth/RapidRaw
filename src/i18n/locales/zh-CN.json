@@ -1527,6 +1527,7 @@
         "blend": "Blend",
         "memory": "Memory",
         "pending": "Not estimated",
+        "previewBudget": "Preview budget",
         "provenance": "Provenance",
         "required": "Required",
         "retouch": "Retouch",
