@@ -16,6 +16,8 @@ import {
   groupLayerWithNext,
   moveLayer,
   moveLayerGroup,
+  setLayerGroupName,
+  setLayerName,
   setLayerOpacity,
   setLayerVisibility,
   ungroupLayerGroup,
@@ -172,6 +174,16 @@ export default function LayerStackPanel({
   };
   const updateLayerOpacity = (layerId: string, opacity: number) => {
     applyLayerStack(setLayerOpacity(masks, layerId, opacity), layerId);
+  };
+  const updateActiveLayerName = (name: string) => {
+    if (!activeRow || activeRow.isBase) return;
+    const nextName = name.trim();
+    if (nextName.length === 0) return;
+    if (activeRow.isGroupHeader && activeRow.groupId) {
+      applyLayerStack(setLayerGroupName(masks, activeRow.groupId, nextName), activeRow.id);
+      return;
+    }
+    applyLayerStack(setLayerName(masks, activeRow.id, nextName), activeRow.id);
   };
   const createActiveAdjustmentLayer = () => {
     const layerId = crypto.randomUUID();
@@ -348,6 +360,27 @@ export default function LayerStackPanel({
 
       {activeRow && (
         <div className="border-t border-surface px-4 py-3 space-y-3">
+          <div className="grid grid-cols-[minmax(0,1fr)_160px] items-center gap-3">
+            <UiText variant={TextVariants.label} className="truncate">
+              {t('editor.layers.name')}
+            </UiText>
+            <input
+              aria-label={t('editor.layers.name')}
+              className="h-8 w-full rounded-md bg-surface px-2 text-sm text-text-primary outline-none disabled:opacity-60"
+              defaultValue={activeRow.name}
+              disabled={isBaseSelected}
+              key={activeRow.id}
+              onBlur={(event) => {
+                updateActiveLayerName(event.currentTarget.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.currentTarget.blur();
+                }
+              }}
+              type="text"
+            />
+          </div>
           <div className="grid grid-cols-[minmax(0,1fr)_96px] items-center gap-3">
             <UiText variant={TextVariants.label} className="truncate">
               {t('editor.layers.blend')}

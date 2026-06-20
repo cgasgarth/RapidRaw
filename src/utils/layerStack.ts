@@ -58,6 +58,26 @@ export function setLayerOpacity(layers: Array<MaskContainer>, layerId: string, o
   return layers.map((layer) => (layer.id === layerId ? { ...layer, opacity: clampLayerOpacity(opacity) } : layer));
 }
 
+export function setLayerName(layers: Array<MaskContainer>, layerId: string, name: string): Array<MaskContainer> {
+  findLayerIndex(layers, layerId);
+  const nextName = name.trim();
+  if (nextName.length === 0) {
+    throw new LayerStackOperationError('Layer name must not be empty.');
+  }
+
+  return layers.map((layer) => (layer.id === layerId ? { ...layer, name: nextName } : layer));
+}
+
+export function setLayerGroupName(layers: Array<MaskContainer>, groupId: string, name: string): Array<MaskContainer> {
+  findLayerGroupIndexes(layers, groupId);
+  const nextName = name.trim();
+  if (nextName.length === 0) {
+    throw new LayerStackOperationError('Layer group name must not be empty.');
+  }
+
+  return layers.map((layer) => (layer.layerGroupId === groupId ? { ...layer, layerGroupName: nextName } : layer));
+}
+
 export function createAdjustmentLayer(
   layers: Array<MaskContainer>,
   layer: MaskContainer,
