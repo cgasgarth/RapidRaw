@@ -1736,6 +1736,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               );
             })}
           </div>
+          <UiText
+            variant={TextVariants.small}
+            className="mb-3 block tabular-nums text-text-tertiary"
+            data-testid="negative-lab-profile-result-count"
+          >
+            {t('modals.negativeConversion.profileResultCount', {
+              totalCount: NEGATIVE_LAB_PROFILE_BROWSER_ROWS.length,
+              visibleCount: visibleProfileRows.length,
+            })}
+          </UiText>
           {visibleProfileRows.length === 0 && (
             <div
               className="rounded-md border border-dashed border-surface bg-bg-primary p-3 text-center"
