@@ -2798,6 +2798,22 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:c494324db51ec36d4f5f5248ba771ad1cef6a9fcb1c9acbc48e1672663552768",
+      "domain": "color",
+      "name": "check:selective-color-independent-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:749129c12558ed43f15ae97671f0dbe59430b9b52706be1b3938ce8be21739f3",
+      "domain": "color",
+      "name": "check:selective-color-independent-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:b3a22b1188d1a409357dfb13725bd367856a18f93fcd8eae6b21491a4bf090ba",
       "domain": "color",
       "name": "check:selective-color-mask",
@@ -3650,7 +3666,7 @@
   "summary": {
     "byDomain": {
       "agent-app-server": 13,
-      "color": 27,
+      "color": 29,
       "film-simulation": 22,
       "focus-stacking": 27,
       "frontend-build": 18,
@@ -3667,7 +3683,7 @@
     },
     "byTarget": {
       "cargo": 8,
-      "integration-check": 320,
+      "integration-check": 322,
       "other": 12,
       "repo-script": 50,
       "schema-script": 6,
@@ -3677,13 +3693,13 @@
     },
     "byUsage": {
       "build": 2,
-      "check": 393,
+      "check": 395,
       "prepare": 7,
       "release": 2,
       "run": 4,
       "utility": 44
     },
-    "totalScripts": 452,
+    "totalScripts": 454,
     "workflowReferencedScripts": 38
   }
 }
