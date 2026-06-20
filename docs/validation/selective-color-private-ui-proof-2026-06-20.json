@@ -16,6 +16,13 @@
       "sidecarReloadRevisionMatch": 1,
       "sourceHashUnchanged": 1
     },
+    "renderPaths": {
+      "exportAfterFormat": "tiff",
+      "exportAfterWriterId": "raw_open_edit_export_export_after",
+      "previewAfterFormat": "png",
+      "previewAfterWriterId": "raw_open_edit_export_preview_after",
+      "previewBeforeWriterId": "raw_open_edit_export_preview_before"
+    },
     "sourceRawSha256": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
     "workflowArtifactCount": 6,
     "workflowReportPath": "private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json"

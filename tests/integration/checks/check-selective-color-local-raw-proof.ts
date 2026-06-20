@@ -57,6 +57,15 @@ const workflowReportSchema = z
     metrics: z.array(workflowMetricSchema).length(4),
     previewAfter: z.object({ hash: hashSchema, path: z.string(), publicRepoAllowed: z.literal(false) }).strict(),
     previewBefore: z.object({ hash: hashSchema, path: z.string(), publicRepoAllowed: z.literal(false) }).strict(),
+    renderPaths: z
+      .object({
+        exportAfterFormat: z.literal('tiff'),
+        exportAfterWriterId: z.literal('raw_open_edit_export_export_after'),
+        previewAfterFormat: z.literal('png'),
+        previewAfterWriterId: z.literal('raw_open_edit_export_preview_after'),
+        previewBeforeWriterId: z.literal('raw_open_edit_export_preview_before'),
+      })
+      .strict(),
     reportId: z.literal('raw-open-edit-export-run.selective-color-orange.v1'),
     sidecarAfter: z.object({ hash: hashSchema, path: z.string(), publicRepoAllowed: z.literal(false) }).strict(),
     sourceRaw: z.object({ hash: hashSchema, path: z.string(), publicRepoAllowed: z.literal(false) }).strict(),
@@ -93,6 +102,7 @@ const summaryReportSchema = z
             sourceHashUnchanged: z.literal(1),
           })
           .strict(),
+        renderPaths: workflowReportSchema.shape.renderPaths,
         status: z.literal('passed'),
         workflowReportPath: z.literal(WORKFLOW_REPORT_PATH),
       })
@@ -135,6 +145,7 @@ if (UPDATE_REPORT) {
         'RAWENGINE_RUN_PRIVATE_RAW_SELECTIVE_COLOR_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_selective_color_report_when_enabled -- --nocapture',
       editCommandId: workflowReport.editCommandId,
       metrics: metricMap(workflowReport.metrics),
+      renderPaths: workflowReport.renderPaths,
       status: 'passed',
       workflowReportPath: WORKFLOW_REPORT_PATH,
     },
@@ -162,6 +173,18 @@ if (requireAssets && privateRoot !== undefined) {
   }
   if (workflowReport.editCommandId !== summary.localRawRuntime.editCommandId) {
     failures.push('workflow report edit command ID must match committed summary.');
+  }
+  if (JSON.stringify(workflowReport.renderPaths) !== JSON.stringify(summary.localRawRuntime.renderPaths)) {
+    failures.push('workflow report render paths must match committed summary.');
+  }
+  if (workflowReport.renderPaths.previewAfterWriterId === workflowReport.renderPaths.exportAfterWriterId) {
+    failures.push('preview and export render writer IDs must be distinct.');
+  }
+  if (
+    workflowReport.previewAfter.path ===
+    summary.workflowArtifacts.find((artifact) => artifact.kind === 'export_after_private')?.path
+  ) {
+    failures.push('preview and export artifact paths must be distinct.');
   }
 
   for (const artifact of summary.workflowArtifacts) {

@@ -231,6 +231,16 @@ pub struct RawOpenEditExportRuntimeEnvironment {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportRenderPathProof {
+    pub export_after_format: String,
+    pub export_after_writer_id: String,
+    pub preview_after_format: String,
+    pub preview_after_writer_id: String,
+    pub preview_before_writer_id: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportProofReport {
     pub artifacts: Vec<RawOpenEditExportProofArtifact>,
     pub color_management: RawOpenEditExportColorManagementProof,
@@ -241,6 +251,7 @@ pub struct RawOpenEditExportProofReport {
     pub metrics: Vec<RawOpenEditExportProofMetric>,
     pub preview_after: RawOpenEditExportProofHashedPath,
     pub preview_before: RawOpenEditExportProofHashedPath,
+    pub render_paths: RawOpenEditExportRenderPathProof,
     pub report_id: String,
     pub sidecar_after: RawOpenEditExportProofHashedPath,
     pub source_raw: RawOpenEditExportProofHashedPath,
@@ -434,6 +445,13 @@ fn run_raw_open_edit_export_proof_with_context(
         ],
         preview_after: preview_after_path,
         preview_before: preview_before_path,
+        render_paths: RawOpenEditExportRenderPathProof {
+            export_after_format: "tiff".to_string(),
+            export_after_writer_id: "raw_open_edit_export_export_after".to_string(),
+            preview_after_format: "png".to_string(),
+            preview_after_writer_id: "raw_open_edit_export_preview_after".to_string(),
+            preview_before_writer_id: "raw_open_edit_export_preview_before".to_string(),
+        },
         report_id,
         sidecar_after: sidecar_after_path,
         source_raw,
@@ -1006,6 +1024,13 @@ mod tests {
             metrics: Vec::new(),
             preview_after: asset.clone(),
             preview_before: asset.clone(),
+            render_paths: RawOpenEditExportRenderPathProof {
+                export_after_format: "tiff".to_string(),
+                export_after_writer_id: "raw_open_edit_export_export_after".to_string(),
+                preview_after_format: "png".to_string(),
+                preview_after_writer_id: "raw_open_edit_export_preview_after".to_string(),
+                preview_before_writer_id: "raw_open_edit_export_preview_before".to_string(),
+            },
             report_id: "raw-open-edit-export-run.sample.v1".to_string(),
             sidecar_after: asset.clone(),
             source_raw: asset,
