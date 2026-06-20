@@ -1931,6 +1931,7 @@
       "summaryPreviewBudget": "Preview",
       "summaryProjection": "Projection",
       "summaryQuality": "Quality",
+      "summarySources": "Sources",
       "title": "拼接全景图",
       "uiOnlyNotice": "These controls define the requested panorama artifact. Runtime projection and boundary support will be applied as engine capability checks land.",
       "workflowStatus": "Projection, blend, boundary, and preview controls are recorded for the panorama request.",
