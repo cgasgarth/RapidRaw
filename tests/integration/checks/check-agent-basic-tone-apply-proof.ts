@@ -11,6 +11,18 @@ import {
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
 } from '../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import {
+  cancelRawEngineAppServerSupervisor,
+  createRawEngineAppServerSupervisorState,
+  markRawEngineAppServerSupervisorReady,
+  startRawEngineAppServerSupervisor,
+  stopRawEngineAppServerSupervisor,
+} from '../../../src/utils/rawEngineAppServerHost.ts';
+import {
+  RawEngineAppServerSupervisorEventKind,
+  RawEngineAppServerSupervisorPhase,
+  rawEngineAppServerSupervisorStateSchema,
+} from '../../../src/schemas/agentRuntimeSchemas.ts';
 
 const failures: string[] = [];
 const fixture = rawEngineAgentReplayFixtureV1Schema.parse(sampleBasicToneAgentReplayFixtureV1);
@@ -30,6 +42,40 @@ if (!rawArtifactIds.has('artifact_tone_color_basic_raw_after'))
 if (fixture.target.imagePath?.endsWith('.CR3') !== true) failures.push('Replay target must preserve RAW source path.');
 if (applyStep?.auditLog.noOverwritePolicy !== 'never_overwrite_original') {
   failures.push('Apply audit must preserve never-overwrite-original policy.');
+}
+
+const supervisorCreated = createRawEngineAppServerSupervisorState({
+  command: ['codex', 'app-server', '--stdio', '--tool', applyStep?.toolName ?? 'tonecolor.apply_command'],
+  supervisorId: 'supervisor_basic_tone_apply_cancel_001',
+  timestampIso: '2026-06-20T12:00:00.000Z',
+});
+const supervisorStarting = startRawEngineAppServerSupervisor({
+  processId: 24501,
+  state: supervisorCreated,
+  timestampIso: '2026-06-20T12:00:01.000Z',
+});
+const supervisorRunning = markRawEngineAppServerSupervisorReady({
+  state: supervisorStarting,
+  timestampIso: '2026-06-20T12:00:02.000Z',
+});
+const supervisorCancelling = cancelRawEngineAppServerSupervisor({
+  state: supervisorRunning,
+  timestampIso: '2026-06-20T12:00:03.000Z',
+});
+const supervisorStopped = rawEngineAppServerSupervisorStateSchema.parse(
+  stopRawEngineAppServerSupervisor({
+    state: supervisorCancelling,
+    timestampIso: '2026-06-20T12:00:04.000Z',
+  }),
+);
+if (supervisorStopped.phase !== RawEngineAppServerSupervisorPhase.Stopped) {
+  failures.push('Agent edit app-server cancellation proof must finish stopped.');
+}
+if (supervisorStopped.cancellationRequestedAtIso === null) {
+  failures.push('Agent edit app-server cancellation proof must retain cancellation timestamp.');
+}
+if (!supervisorStopped.auditEvents.some((event) => event.kind === RawEngineAppServerSupervisorEventKind.Cancel)) {
+  failures.push('Agent edit app-server cancellation proof must include a cancel audit event.');
 }
 
 const bridge = createRawEngineLocalAppServerBridge();
@@ -66,4 +112,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('agent basic tone apply proof ok (bridge+audit+raw metadata)');
+console.log('agent basic tone apply proof ok (bridge+audit+raw metadata+cancellation)');
