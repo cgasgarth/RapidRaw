@@ -107,7 +107,7 @@ const rawEngineLocalAppServerAuditCommandProbeV1Schema = z.looseObject({
 });
 
 const rawEngineLocalAppServerAuditResultProbeV1Schema = z.looseObject({
-  mutates: z.boolean(),
+  mutates: z.boolean().optional(),
   warnings: z.array(z.string().trim().min(1)),
 });
 
@@ -398,7 +398,7 @@ export class RawEngineLocalAppServerBridge {
       ? rawEngineLocalAppServerAuditResultProbeV1Schema.safeParse(result.result)
       : ({ success: false } satisfies { success: false });
     const warnings = resultProbe.success ? resultProbe.data.warnings : [];
-    const mutates = resultProbe.success ? resultProbe.data.mutates : false;
+    const mutates = resultProbe.success ? (resultProbe.data.mutates ?? !commandProbe.data.dryRun) : false;
     const status = result.ok ? 'completed' : 'rejected';
     const timestampIso = (context?.now ?? (() => new Date()))().toISOString();
 

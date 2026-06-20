@@ -9,6 +9,7 @@ import {
 } from '../../../src/utils/aiAppServerToolRouteIds.ts';
 import { applyLocalAiDenoiseAdapter, buildSyntheticAiDenoiseInput } from '../../../src/utils/localAiDenoiseAdapter.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../src/utils/rawEngineAppServerHost.ts';
+import { createRawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge.ts';
 import {
   aiEnhancementApplyResultV1Schema,
   aiEnhancementCommandEnvelopeV1Schema,
@@ -57,6 +58,7 @@ for (const toolName of [AiAppServerToolName.EnhancementDryRunCommand, AiAppServe
 
 const input = buildSyntheticAiDenoiseInput();
 const proof = applyLocalAiDenoiseAdapter({ input });
+const bridge = createRawEngineLocalAppServerBridge();
 const { regionMaskArtifactId: _dryRunRegionMaskArtifactId, ...dryRunParameters } =
   sampleAiEnhancementCommandEnvelopeV1.parameters;
 const dryRunCommand = aiEnhancementCommandEnvelopeV1Schema.parse({
@@ -72,49 +74,16 @@ const dryRunCommand = aiEnhancementCommandEnvelopeV1Schema.parse({
     strength: proof.settings.lumaStrength,
   },
 });
-const dryRunPlanId = `dryrun_ai_denoise_${proof.output.contentHash.replace('fnv1a32:', '')}`;
-const dryRunPlanHash = `sha256:${proof.output.contentHash.replace('fnv1a32:', '')}${proof.input.contentHash.replace(
-  'fnv1a32:',
-  '',
-)}`;
-const dryRunResult = aiEnhancementDryRunResultV1Schema.parse({
-  commandId: dryRunCommand.commandId,
-  commandType: dryRunCommand.commandType,
-  correlationId: dryRunCommand.correlationId,
-  dryRunPlanHash,
-  dryRunPlanId,
-  enhancementArtifacts: [
-    {
-      artifactId: 'artifact_ai_denoise_runtime_preview',
-      contentHash: proof.output.contentHash,
-      dimensions: {
-        height: proof.output.height,
-        width: proof.output.width,
-      },
-      kind: 'denoise_output',
-      storage: 'temp_cache',
-    },
-  ],
-  modelId: dryRunCommand.parameters.modelId,
-  modelVersion: dryRunCommand.parameters.modelVersion,
-  previewArtifacts: [
-    {
-      artifactId: 'artifact_ai_denoise_before_after_preview',
-      contentHash: proof.provenance.outputContentHash,
-      dimensions: {
-        height: proof.output.height,
-        width: proof.output.width,
-      },
-      kind: 'preview',
-      storage: 'temp_cache',
-    },
-  ],
-  providerClass: dryRunCommand.parameters.providerClass,
-  providerId: dryRunCommand.parameters.providerId,
-  schemaVersion: dryRunCommand.schemaVersion,
-  sourceContentHash: dryRunCommand.parameters.sourceContentHash,
-  warnings: proof.warnings,
+const bridgeDryRun = await bridge.dispatch(dryRunCommand, {
+  now: () => new Date('2026-06-20T00:00:00.000Z'),
+  requestId: 'req_ai_denoise_app_server_dry_run',
 });
+let dryRunResult: ReturnType<typeof aiEnhancementDryRunResultV1Schema.parse> | undefined;
+if (!bridgeDryRun.ok) {
+  failures.push(`Denoise bridge dry-run failed: ${bridgeDryRun.message}`);
+} else {
+  dryRunResult = aiEnhancementDryRunResultV1Schema.parse(bridgeDryRun.result);
+}
 const { regionMaskArtifactId: _applyRegionMaskArtifactId, ...applyParameters } =
   sampleAiEnhancementApplyCommandEnvelopeV1.parameters;
 const applyCommand = aiEnhancementCommandEnvelopeV1Schema.parse({
@@ -123,8 +92,8 @@ const applyCommand = aiEnhancementCommandEnvelopeV1Schema.parse({
   correlationId: 'corr_ai_denoise_app_server_apply',
   parameters: {
     ...applyParameters,
-    acceptedDryRunPlanHash: dryRunResult.dryRunPlanHash,
-    acceptedDryRunPlanId: dryRunResult.dryRunPlanId,
+    acceptedDryRunPlanHash: dryRunResult?.dryRunPlanHash ?? 'dryrun_unavailable',
+    acceptedDryRunPlanId: dryRunResult?.dryRunPlanId ?? 'dryrun_unavailable',
     capability: 'denoise',
     modelId: proof.settings.modelId,
     modelVersion: proof.settings.modelVersion,
@@ -132,40 +101,37 @@ const applyCommand = aiEnhancementCommandEnvelopeV1Schema.parse({
     strength: proof.settings.lumaStrength,
   },
 });
-const applyResult = aiEnhancementApplyResultV1Schema.parse({
-  appliedGraphRevision: 'graph_rev_ai_denoise_app_server_apply',
-  changedEditNodeIds: ['edit_node_ai_denoise_app_server_001'],
-  commandId: applyCommand.commandId,
-  commandType: applyCommand.commandType,
-  correlationId: applyCommand.correlationId,
-  dryRunPlanHash: applyCommand.parameters.acceptedDryRunPlanHash,
-  dryRunPlanId: applyCommand.parameters.acceptedDryRunPlanId,
-  outputArtifacts: [
-    {
-      artifactId: 'artifact_ai_denoise_app_server_output',
-      contentHash: proof.output.contentHash,
-      dimensions: {
-        height: proof.output.height,
-        width: proof.output.width,
-      },
-      kind: 'denoise_output',
-      storage: 'sidecar_artifact',
-    },
-  ],
-  provenanceEntryIds: ['prov_ai_denoise_app_server_001'],
-  schemaVersion: applyCommand.schemaVersion,
-  sourceGraphRevision: applyCommand.expectedGraphRevision,
-  warnings: proof.warnings,
+const bridgeApply = await bridge.dispatch(applyCommand, {
+  now: () => new Date('2026-06-20T00:00:01.000Z'),
+  requestId: 'req_ai_denoise_app_server_apply',
 });
+let applyResult: ReturnType<typeof aiEnhancementApplyResultV1Schema.parse> | undefined;
+if (!bridgeApply.ok) {
+  failures.push(`Denoise bridge apply failed: ${bridgeApply.message}`);
+} else {
+  applyResult = aiEnhancementApplyResultV1Schema.parse(bridgeApply.result);
+}
 
 if (proof.runtimeStatus !== 'runtime_apply_capable' || !proof.mutates) {
   failures.push('Local AI denoise adapter must prove runtime apply-capable mutation.');
 }
-if (dryRunResult.sourceContentHash !== proof.input.contentHash) {
+if (dryRunResult?.sourceContentHash !== proof.input.contentHash) {
   failures.push('Denoise dry-run result must preserve input hash.');
 }
-if (applyResult.outputArtifacts[0]?.contentHash !== proof.output.contentHash) {
-  failures.push('Denoise apply result must expose output artifact hash.');
+if (applyResult?.outputArtifacts[0]?.kind !== 'denoise_output') {
+  failures.push('Denoise apply result must expose a denoise output artifact.');
+}
+if (applyResult?.sourceGraphRevision !== applyCommand.expectedGraphRevision) {
+  failures.push('Denoise apply result must preserve source graph revision.');
+}
+if (applyResult?.provenanceEntryIds[0] !== `prov_denoise_${applyCommand.commandId}`) {
+  failures.push('Denoise apply result must expose deterministic provenance entry id.');
+}
+
+const bridgeAuditEvents = bridge.listAuditEvents();
+const applyAuditEvent = bridgeAuditEvents.find((event) => event.commandId === applyCommand.commandId);
+if (applyAuditEvent?.mutates !== true || applyAuditEvent.status !== 'completed') {
+  failures.push('Denoise apply must record a completed mutating audit event.');
 }
 
 if (failures.length > 0) {
