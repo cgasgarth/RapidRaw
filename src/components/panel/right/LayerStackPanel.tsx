@@ -33,6 +33,7 @@ import {
   setLayerName,
   setLayerOpacity,
   setLayerVisibility,
+  showAllLayers,
   soloLayer,
   soloLayerGroup,
   ungroupLayerGroup,
@@ -172,6 +173,7 @@ export default function LayerStackPanel({
     !activeRow.isGroupHeader &&
     canGroupLayerWithNext(masks, activeRow.id);
   const canUngroupActiveLayer = activeGroupId !== null;
+  const canShowAllLayers = masks.some((mask) => !mask.visible);
 
   const selectRow = (row: LayerRowModel) => {
     setLocalSelectedLayerId(row.id);
@@ -268,6 +270,9 @@ export default function LayerStackPanel({
       return;
     }
     applyLayerStack(soloLayer(masks, activeRow.id), activeRow.id);
+  };
+  const showAllActiveLayers = () => {
+    applyLayerStack(showAllLayers(masks), selectedLayerId);
   };
   const duplicateActiveLayer = () => {
     if (!activeRow || activeRow.isBase) return;
@@ -536,6 +541,15 @@ export default function LayerStackPanel({
               type="button"
             >
               <Eye size={16} className="mx-auto" />
+            </button>
+            <button
+              className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"
+              data-tooltip={t('editor.layers.actions.showAll')}
+              disabled={!canShowAllLayers}
+              onClick={showAllActiveLayers}
+              type="button"
+            >
+              <EyeOff size={16} className="mx-auto" />
             </button>
             <button
               className="h-8 w-8 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary transition-colors disabled:opacity-40"

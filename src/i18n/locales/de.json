@@ -710,6 +710,7 @@
         "moveDown": "Move layer down",
         "moveUp": "Move layer up",
         "show": "Show layer",
+        "showAll": "Show all layers",
         "solo": "Solo layer",
         "ungroup": "Ungroup layers"
       },

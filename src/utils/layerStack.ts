@@ -99,6 +99,10 @@ export function soloLayerGroup(layers: Array<MaskContainer>, groupId: string): A
   return layers.map((layer) => ({ ...layer, visible: layer.layerGroupId === groupId }));
 }
 
+export function showAllLayers(layers: Array<MaskContainer>): Array<MaskContainer> {
+  return layers.map((layer) => ({ ...layer, visible: true }));
+}
+
 export function createAdjustmentLayer(
   layers: Array<MaskContainer>,
   layer: MaskContainer,

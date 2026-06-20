@@ -19,6 +19,7 @@ import {
   setLayerName,
   setLayerOpacity,
   setLayerVisibility,
+  showAllLayers,
   soloLayer,
   soloLayerGroup,
   ungroupLayerGroup,
@@ -101,6 +102,11 @@ const operationSchema = z.discriminatedUnion('type', [
     .object({
       groupId: z.string().trim().min(1),
       type: z.literal('soloGroup'),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('showAll'),
     })
     .strict(),
   z
@@ -243,6 +249,8 @@ function applyOperation(layers, operation) {
       return soloLayer(layers, operation.layerId);
     case 'soloGroup':
       return soloLayerGroup(layers, operation.groupId);
+    case 'showAll':
+      return showAllLayers(layers);
     case 'move':
       return moveLayer(layers, operation.layerId, operation.direction);
     case 'duplicate':
