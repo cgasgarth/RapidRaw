@@ -43,6 +43,7 @@ export const focusStackRuntimePlanRequestV1Schema = z
     lowConfidenceWeightFloor: z.number().min(0).max(1).default(0.12),
     outputArtifactId: z.string().trim().min(1),
     previewArtifactId: z.string().trim().min(1),
+    referenceSourceIndex: z.number().int().nonnegative().optional(),
     retouchLayerArtifactId: z.string().trim().min(1).optional(),
     sharpnessMapArtifactId: z.string().trim().min(1),
     weightPower: z.number().positive().default(5),
@@ -84,6 +85,13 @@ export const focusStackRuntimeProvenanceV1Schema = z
         retouchLayerRecommended: z.boolean(),
       })
       .strict(),
+    referenceSource: z
+      .object({
+        fallbackPolicy: z.literal('low_confidence_or_invalid_contributors'),
+        selectionReason: z.enum(['explicit_request', 'first_frame_default']),
+        sourceIndex: z.number().int().nonnegative(),
+      })
+      .strict(),
     referenceSourceIndex: z.number().int().nonnegative(),
     requestedAlignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
     resolvedAlignmentMode: z.enum(['auto', 'translation', 'homography', 'optical_flow', 'none']),
@@ -92,6 +100,8 @@ export const focusStackRuntimeProvenanceV1Schema = z
     sharpnessSettings: z
       .object({
         cellCount: z.number().int().positive(),
+        diagnosticCount: z.number().int().nonnegative(),
+        fallbackPixelCount: z.number().int().nonnegative(),
         lowConfidenceWeightFloor: z.number().min(0).max(1),
         lowConfidenceCellCount: z.number().int().nonnegative(),
         weightPower: z.number().positive(),
@@ -290,10 +300,7 @@ const parseFocusStackRuntimePlanRequest = (
 };
 
 const renderFocusStackRuntime = (request: ParsedFocusStackRuntimePlanRequestV1) => {
-  const referenceSourceIndex = request.frames[0]?.sourceIndex;
-  if (referenceSourceIndex === undefined) {
-    throw new Error('Focus stack runtime plan requires at least one frame.');
-  }
+  const referenceSource = resolveFocusReferenceSource(request);
 
   const blend = applyWeightedSharpnessFocusStackV1({
     cells: request.cells,
@@ -306,11 +313,15 @@ const renderFocusStackRuntime = (request: ParsedFocusStackRuntimePlanRequestV1) 
       width: frame.width,
     })),
     lowConfidenceWeightFloor: request.lowConfidenceWeightFloor,
-    referenceSourceIndex,
+    referenceSourceIndex: referenceSource.sourceIndex,
     weightPower: request.weightPower,
   });
   const focusCoverageRatio = calculateFocusCoverageRatio(request);
-  const warnings = deriveFocusWarnings(focusCoverageRatio, request.command.parameters.retouchLayerPolicy);
+  const warnings = deriveFocusWarnings(
+    focusCoverageRatio,
+    request.command.parameters.retouchLayerPolicy,
+    blend.diagnostics,
+  );
 
   return {
     height: blend.outputHeight,
@@ -323,7 +334,11 @@ const renderFocusStackRuntime = (request: ParsedFocusStackRuntimePlanRequestV1) 
       engineVersion: FOCUS_RUNTIME_ENGINE_VERSION,
       focusCoverageRatio,
       qualityMetrics: buildFocusQualityMetrics(request, blend.outputWidth, blend.outputHeight),
-      referenceSourceIndex,
+      referenceSource: {
+        ...blend.referenceSource,
+        selectionReason: referenceSource.selectionReason,
+      },
+      referenceSourceIndex: referenceSource.sourceIndex,
       requestedAlignmentMode: request.command.parameters.alignmentMode,
       resolvedAlignmentMode:
         request.command.parameters.alignmentMode === 'auto' ? 'translation' : request.command.parameters.alignmentMode,
@@ -331,6 +346,9 @@ const renderFocusStackRuntime = (request: ParsedFocusStackRuntimePlanRequestV1) 
       runtimeStatus: 'dry_run_rendered',
       sharpnessSettings: {
         cellCount: request.cells.length,
+        diagnosticCount: blend.diagnostics.reduce((total, diagnostic) => total + diagnostic.count, 0),
+        fallbackPixelCount:
+          blend.diagnostics.find((diagnostic) => diagnostic.code === 'reference_fallback')?.count ?? 0,
         lowConfidenceCellCount: request.cells.filter((cell) => cell.lowConfidence).length,
         lowConfidenceWeightFloor: request.lowConfidenceWeightFloor,
         weightPower: request.weightPower,
@@ -395,7 +413,9 @@ const buildFocusPreflightEstimate = (request: ParsedFocusStackRuntimePlanRequest
 
 const calculateFocusCoverageRatio = (request: ParsedFocusStackRuntimePlanRequestV1): number => {
   const coveredPixels = request.cells.reduce((total, cell) => total + cell.width * cell.height, 0);
-  const referenceFrame = request.frames[0];
+  const referenceFrame = request.frames.find(
+    (frame) => frame.sourceIndex === resolveFocusReferenceSource(request).sourceIndex,
+  );
   if (referenceFrame === undefined) {
     return 0;
   }
@@ -405,16 +425,22 @@ const calculateFocusCoverageRatio = (request: ParsedFocusStackRuntimePlanRequest
 const deriveFocusWarnings = (
   focusCoverageRatio: number,
   retouchLayerPolicy: FocusStackRuntimeProvenanceV1['retouchLayerPolicy'],
+  diagnostics: ReturnType<typeof applyWeightedSharpnessFocusStackV1>['diagnostics'],
 ): string[] => {
   const warnings = new Set<string>();
   if (focusCoverageRatio < 0.9) warnings.add('focus_coverage_low');
   if (retouchLayerPolicy === 'generate_retouch_layer') warnings.add('retouch_layer_required');
+  if (diagnostics.some((diagnostic) => diagnostic.code === 'reference_fallback')) {
+    warnings.add('weighted_sharpness_reference_fallback');
+  }
+  if (diagnostics.some((diagnostic) => diagnostic.code !== 'reference_fallback')) {
+    warnings.add('weighted_sharpness_contributor_diagnostics');
+  }
   return [...warnings].sort();
 };
 
 const buildFocusAlignmentTransforms = (request: ParsedFocusStackRuntimePlanRequestV1) => {
-  const referenceSourceIndex = request.frames[0]?.sourceIndex;
-  if (referenceSourceIndex === undefined) throw new Error('Focus stack runtime alignment requires a reference frame.');
+  const referenceSourceIndex = resolveFocusReferenceSource(request).sourceIndex;
 
   return request.frames.map((frame) => ({
     role: frame.sourceIndex === referenceSourceIndex ? ('reference' as const) : ('aligned' as const),
@@ -479,6 +505,23 @@ const findWinningFocusConfidence = (sourceScores: FocusStackRuntimePlanRequestV1
     winningConfidence = Math.max(winningConfidence, score.relativeConfidence);
   }
   return winningConfidence;
+};
+
+const resolveFocusReferenceSource = (
+  request: ParsedFocusStackRuntimePlanRequestV1,
+): { selectionReason: 'explicit_request' | 'first_frame_default'; sourceIndex: number } => {
+  const defaultReferenceSourceIndex = request.frames[0]?.sourceIndex;
+  if (defaultReferenceSourceIndex === undefined) {
+    throw new Error('Focus stack runtime plan requires at least one frame.');
+  }
+  const sourceIndex = request.referenceSourceIndex ?? defaultReferenceSourceIndex;
+  if (!request.frames.some((frame) => frame.sourceIndex === sourceIndex)) {
+    throw new Error(`Focus stack runtime reference source ${sourceIndex} does not match a frame.`);
+  }
+  return {
+    selectionReason: request.referenceSourceIndex === undefined ? 'first_frame_default' : 'explicit_request',
+    sourceIndex,
+  };
 };
 
 const stableFocusRuntimeHash = (input: string): string => {
