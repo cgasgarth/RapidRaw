@@ -26,6 +26,7 @@ const FIXTURE_ID = 'validation.computational-merge.panorama-overlap.v1';
 const SAMPLE_PATH = `${ARTIFACT_ROOT}/panorama-overlap-runtime-sample.json`;
 const PROOF_PATH = `${ARTIFACT_ROOT}/panorama-overlap-app-server-runtime-proof.json`;
 const REPORT_PATH = `${ARTIFACT_ROOT}/panorama-overlap-private-run-report.json`;
+const MAX_PRIVATE_PANORAMA_SYNTHETIC_SOURCE_PIXELS = 100_000;
 const REVIEW_ARTIFACTS = [
   ['modal_before_apply', `${ARTIFACT_ROOT}/panorama-overlap-modal-before.png`],
   ['modal_after_apply', `${ARTIFACT_ROOT}/panorama-overlap-modal-after.png`],
@@ -56,6 +57,9 @@ const runtimeSampleSchema = z
     graphRevisionHash: z.string().trim().min(1),
   })
   .strict();
+
+type PanoramaPrivateRuntimeSample = z.infer<typeof runtimeSampleSchema>;
+type PanoramaPrivateRuntimeFrame = PanoramaPrivateRuntimeSample['frames'][number];
 
 const rootValue = valueAfter('--root') ?? process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 if (rootValue === undefined || rootValue.trim().length === 0) {
@@ -159,7 +163,7 @@ function buildControls(sample: z.infer<typeof runtimeSampleSchema>) {
 }
 
 function buildRequest(
-  sample: z.infer<typeof runtimeSampleSchema>,
+  sample: PanoramaPrivateRuntimeSample,
   command: ReturnType<typeof buildPanoramaUiDryRunCommandV1>,
 ) {
   return {
@@ -168,15 +172,22 @@ function buildRequest(
     outputArtifactId: 'artifact_panorama_private_raw_output',
     previewArtifactId: 'artifact_panorama_private_raw_preview',
     seed: 'rawengine-panorama-private-raw-v1',
-    sourceFrames: sample.frames.map((frame) => ({
-      contentHash: frame.contentHash,
-      expectedOffsetX: frame.expectedOffsetX,
-      expectedOffsetY: frame.expectedOffsetY,
-      graphRevision: frame.graphRevision,
-      height: frame.height,
-      sourceIndex: frame.sourceIndex,
-      width: frame.width,
-    })),
+    sourceFrames: sample.frames.map(scaleFrameForSyntheticReplay),
+  };
+}
+
+function scaleFrameForSyntheticReplay(frame: PanoramaPrivateRuntimeFrame) {
+  const pixelCount = frame.width * frame.height;
+  const scale = Math.min(1, Math.sqrt(MAX_PRIVATE_PANORAMA_SYNTHETIC_SOURCE_PIXELS / pixelCount));
+
+  return {
+    contentHash: frame.contentHash,
+    expectedOffsetX: Math.max(0, Math.round(frame.expectedOffsetX * scale)),
+    expectedOffsetY: Math.round(frame.expectedOffsetY * scale),
+    graphRevision: frame.graphRevision,
+    height: Math.max(1, Math.round(frame.height * scale)),
+    sourceIndex: frame.sourceIndex,
+    width: Math.max(1, Math.round(frame.width * scale)),
   };
 }
 
@@ -215,7 +226,7 @@ async function upgradeReport(
             dryRun: proof.dryRunCommandId,
           },
           notes:
-            'Private RAW panorama preview/export artifacts replayed through the typed app-server dry-run/apply bus; full browser E2E review remains tracked separately.',
+            'Private RAW panorama preview/export artifacts replayed through the typed app-server dry-run/apply bus with downsampled synthetic geometry; full browser E2E review and full-resolution quality acceptance remain tracked separately.',
           previewExportParity,
           runtimeResultIds: {
             apply: proof.applyRuntimeId,
