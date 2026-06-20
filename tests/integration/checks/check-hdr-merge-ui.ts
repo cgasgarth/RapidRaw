@@ -33,6 +33,7 @@ const requiredLocaleKeys = [
   'summaryDeghosting',
   'summaryPreviewBudget',
   'summaryQuality',
+  'summarySources',
   'toneMapPreview',
   'uiOnlyNotice',
   'workflowStatus',
@@ -68,6 +69,8 @@ const source = readFileSync('src/components/modals/HdrModal.tsx', 'utf8');
 for (const marker of [
   'hdr-setup-summary',
   'hdr-setup-summary-chip',
+  'modals.hdr.summarySources',
+  'modals.hdr.strategyLabel',
   'modals.hdr.summaryAlignment',
   'settings.maxPreviewDimensionPx',
 ]) {

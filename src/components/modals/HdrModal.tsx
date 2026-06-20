@@ -196,13 +196,17 @@ export default function HdrModal({
             <ComputationalMergeAppServerBadge family="hdr" statusLabel={t('editor.ai.connection.ready')} />
           </div>
           <section
-            className="mb-5 grid grid-cols-2 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
+            className="mb-5 grid grid-cols-3 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
             data-testid="hdr-setup-summary"
           >
             {[
               {
+                label: t('modals.hdr.summarySources'),
+                value: String(imageCount ?? 0),
+              },
+              {
                 label: t('modals.hdr.summaryAlignment'),
-                value: alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label,
+                value: alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label ?? '',
               },
               {
                 label: t('modals.hdr.summaryDeghosting'),
@@ -210,7 +214,11 @@ export default function HdrModal({
               },
               {
                 label: t('modals.hdr.summaryQuality'),
-                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label,
+                value: qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '',
+              },
+              {
+                label: t('modals.hdr.strategyLabel'),
+                value: strategyOptions.find((option) => option.value === settings.mergeStrategy)?.label ?? '',
               },
               {
                 label: t('modals.hdr.summaryPreviewBudget'),

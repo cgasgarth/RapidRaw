@@ -1639,6 +1639,7 @@
       "summaryDeghosting": "Deghosting",
       "summaryPreviewBudget": "Preview",
       "summaryQuality": "Quality",
+      "summarySources": "Sources",
       "title": "Merge to HDR",
       "toneMapPreview": "Tone-map preview",
       "uiOnlyNotice": "These controls define the requested HDR merge artifact. Runtime merge quality remains validated by fixture, sidecar, and image-processing checks.",
