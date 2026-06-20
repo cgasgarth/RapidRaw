@@ -6,6 +6,194 @@
       "acceptanceStatus": "runtime_apply_capable",
       "artifacts": [
         {
+          "hash": "sha256:e760e462e52502bba7bf8c0a510edf7fe46411b330c61a354b65141e81ea6e6a",
+          "path": "private-fixtures/focus-stack/alaska-plane-v1",
+          "publicRepoAllowed": false,
+          "kind": "source_raw_sequence_private"
+        },
+        {
+          "hash": "sha256:8bd64710011fdc07e1fd7e432add0eb5d9f32c1a02794e008f45c72c220624c0",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-decode-report.json",
+          "publicRepoAllowed": false,
+          "kind": "decode_report_private"
+        },
+        {
+          "hash": "sha256:cd1cd07f7aa19c5fd170e6e2cfc5636477e205f22baeebc4b38b1539bedaa484",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-alignment.json",
+          "publicRepoAllowed": false,
+          "kind": "alignment_report_private"
+        },
+        {
+          "hash": "sha256:bf82f8ccdfd00983ae36b32ee576ff174ad6f9e831040f947aef65226c2038ae",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-merge.tiff",
+          "publicRepoAllowed": false,
+          "kind": "merge_output_private"
+        },
+        {
+          "hash": "sha256:146d4fd5bc3945cf42c3097f7fae052eb0978bc5f2949ecd7122759c26f8108b",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-preview.png",
+          "publicRepoAllowed": false,
+          "kind": "preview_after_private"
+        },
+        {
+          "hash": "sha256:bf82f8ccdfd00983ae36b32ee576ff174ad6f9e831040f947aef65226c2038ae",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-export.tiff",
+          "publicRepoAllowed": false,
+          "kind": "export_after_private"
+        },
+        {
+          "hash": "sha256:0365dab98bb2afc658a309ee8278eb4065d8531154786cd1bfbfe4fb35099d49",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-quality.json",
+          "publicRepoAllowed": false,
+          "kind": "quality_report_private"
+        },
+        {
+          "hash": "sha256:3868d8d4c47741e2760019b0c0de5f45d174b8f2cc2ab977c04c4e89e2314887",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-app-server-runtime-proof.json",
+          "publicRepoAllowed": false,
+          "kind": "app_server_runtime_report_private"
+        }
+      ],
+      "commandIds": {
+        "apply": "command_focus_private_raw_apply_v1",
+        "dryRun": "command_focus_private_raw_dry_run_v1"
+      },
+      "featureFamily": "focus_stack",
+      "fixtureId": "validation.computational-merge.focus-plane-transition.v1",
+      "generatedAt": "2026-06-20T22:41:29.064Z",
+      "graphRevisionHash": "sha256:85c590d159b82c6185feb9b0e67acba1f3fee01f83b6f91054053e22bb8f980e",
+      "implementationIssue": 1507,
+      "notes": "Private RAW focus-stack decoded samples replayed through the typed app-server dry-run/apply bus. This proves runtime apply capability and review artifact wiring, but does not claim preview/export parity or final UI E2E acceptance.",
+      "qualityMetrics": [
+        {
+          "name": "decodedSourceCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 3,
+          "value": 3
+        },
+        {
+          "name": "decodedFinitePixelRatio",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 1,
+          "value": 1
+        },
+        {
+          "name": "decodedNonzeroDimensionCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 3,
+          "value": 3
+        },
+        {
+          "name": "focusStackWinnerSourceCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 2,
+          "value": 3
+        },
+        {
+          "name": "focusStackSourceCoverageRatio",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0.67,
+          "value": 1
+        },
+        {
+          "name": "focusStackOutputPixelCount",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 1,
+          "value": 16000000
+        },
+        {
+          "name": "sharpnessGainRatio",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 1.15,
+          "value": 143.83513
+        },
+        {
+          "name": "focusTransitionArtifactScore",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0.9,
+          "value": 0.459152
+        },
+        {
+          "name": "focusStackLowConfidenceCellRatio",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0.5,
+          "value": 0.459152
+        },
+        {
+          "name": "previewExportMeanAbsDelta",
+          "passed": true,
+          "source": "private_raw_report",
+          "threshold": 0.015,
+          "value": 0
+        }
+      ],
+      "reportId": "computational-merge-run.focus-plane-transition.v1",
+      "runId": "private-run-alaska-focus-2026-06-20",
+      "runtimeResultIds": {
+        "apply": "derived_command_focus_private_raw_apply_v1",
+        "dryRun": "focus_stack_plan_command_focus_private_raw_dry_run_v1"
+      },
+      "screenshotArtifacts": [
+        {
+          "hash": "sha256:14cda033f264e54e528ee457ff9b2ffa206174f00fe25807c34ca3dd1174f583",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-modal-before.png",
+          "publicRepoAllowed": false,
+          "label": "modal_before_apply"
+        },
+        {
+          "hash": "sha256:a8e6df34256db09aab2d164709baff19e796a6c5d49151a2c4f1c2f684cdc265",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-modal-after.png",
+          "publicRepoAllowed": false,
+          "label": "modal_after_apply"
+        },
+        {
+          "hash": "sha256:a8e6df34256db09aab2d164709baff19e796a6c5d49151a2c4f1c2f684cdc265",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-result-review.png",
+          "publicRepoAllowed": false,
+          "label": "result_review"
+        },
+        {
+          "hash": "sha256:a8e6df34256db09aab2d164709baff19e796a6c5d49151a2c4f1c2f684cdc265",
+          "path": "private-artifacts/validation/computational-merge/focus-plane-export-review.png",
+          "publicRepoAllowed": false,
+          "label": "export_review"
+        }
+      ],
+      "sourceHashes": [
+        {
+          "hash": "sha256:4a7ec65a13923338ac05b6d7aeb41a8547ebf84c542548393ee90e4e57444d3d",
+          "path": "private-fixtures/focus-stack/alaska-plane-v1/_DSC7509.ARW",
+          "publicRepoAllowed": false,
+          "localRelativePath": "private-fixtures/focus-stack/alaska-plane-v1/_DSC7509.ARW"
+        },
+        {
+          "hash": "sha256:1cad16a3d7d814d4e656a226f619d3a26513c34ca0b292ce8ee3526d8df96b47",
+          "path": "private-fixtures/focus-stack/alaska-plane-v1/_DSC7510.ARW",
+          "publicRepoAllowed": false,
+          "localRelativePath": "private-fixtures/focus-stack/alaska-plane-v1/_DSC7510.ARW"
+        },
+        {
+          "hash": "sha256:4a2f56f2609dfb6521c1a43f74bd9d8ef13a710164dd4bf3b6ebebb9cc221be5",
+          "path": "private-fixtures/focus-stack/alaska-plane-v1/_DSC7511.ARW",
+          "publicRepoAllowed": false,
+          "localRelativePath": "private-fixtures/focus-stack/alaska-plane-v1/_DSC7511.ARW"
+        }
+      ],
+      "uiIssue": 1334
+    },
+    {
+      "acceptanceStatus": "runtime_apply_capable",
+      "artifacts": [
+        {
           "hash": "sha256:5618bb18a45b0800984300ec53adf6cff04ea77d051c28472a21c585ad85a59e",
           "path": "private-fixtures/super-resolution/alaska-burst-v1",
           "publicRepoAllowed": false,

@@ -18,9 +18,9 @@ const actionMetadataSchema = z
   .strict();
 
 const sourcePaths = [
-  '/private-fixtures/focus-stack/plane-transition-v1/frame-01.cr3',
-  '/private-fixtures/focus-stack/plane-transition-v1/frame-02.cr3',
-  '/private-fixtures/focus-stack/plane-transition-v1/frame-03.cr3',
+  '/private-fixtures/focus-stack/alaska-plane-v1/_DSC7509.ARW',
+  '/private-fixtures/focus-stack/alaska-plane-v1/_DSC7510.ARW',
+  '/private-fixtures/focus-stack/alaska-plane-v1/_DSC7511.ARW',
 ];
 const settings = {
   ...DEFAULT_FOCUS_STACK_UI_SETTINGS,

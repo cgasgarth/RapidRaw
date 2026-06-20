@@ -39,6 +39,7 @@ type ExiftoolRow = z.infer<typeof exiftoolRowSchema>;
 
 const DEFAULT_PRIVATE_ROOT = '/tmp/rawengine-private-root';
 const HDR_INGEST_REPORT_PATH = 'private-artifacts/validation/computational-merge/hdr-source-ingest.json';
+const FOCUS_INGEST_REPORT_PATH = 'private-artifacts/validation/computational-merge/focus-source-ingest.json';
 const PANORAMA_INGEST_REPORT_PATH = 'private-artifacts/validation/computational-merge/panorama-source-ingest.json';
 const SR_INGEST_REPORT_PATH = 'private-artifacts/validation/computational-merge/sr-source-ingest.json';
 const MAX_HDR_BRACKET_SPAN_SECONDS = 20;
@@ -174,11 +175,14 @@ async function ingestPrivateSources(
   materialize: 'copy' | 'symlink',
 ): Promise<PrepareResult> {
   if (
+    config.featureFamily !== 'focus_stack' &&
     config.featureFamily !== 'hdr_merge' &&
     config.featureFamily !== 'panorama_stitch' &&
     config.featureFamily !== 'super_resolution'
   ) {
-    return failure([`${config.featureLabel}: --source ingest currently supports HDR, panorama, and SR sources only.`]);
+    return failure([
+      `${config.featureLabel}: --source ingest currently supports focus, HDR, panorama, and SR sources only.`,
+    ]);
   }
 
   const failures: Array<string> = [];
@@ -328,6 +332,7 @@ async function runSelfTest(config: ComputationalPrivateRootPrepConfig): Promise<
 
 async function runSourceIngestSelfTest(config: ComputationalPrivateRootPrepConfig): Promise<void> {
   if (
+    config.featureFamily !== 'focus_stack' &&
     config.featureFamily !== 'hdr_merge' &&
     config.featureFamily !== 'panorama_stitch' &&
     config.featureFamily !== 'super_resolution'
@@ -423,7 +428,7 @@ async function readExifMetadata(paths: ReadonlyArray<string>): Promise<Array<Exi
     }
     rows.push(...exiftoolRowsSchema.parse(JSON.parse(result.stdout.toString())));
   }
-  return rows.filter(isHdrMetadataUsable);
+  return rows;
 }
 
 function chooseHdrBracketCandidate(rows: ReadonlyArray<ExiftoolRow>, sourceCount: number) {
@@ -486,14 +491,13 @@ function chooseCaptureSequenceCandidate(rows: ReadonlyArray<ExiftoolRow>, source
 function choosePreferredSourceCandidate(
   rows: ReadonlyArray<ExiftoolRow>,
   preferredFileNames: ReadonlyArray<string> | undefined,
-  featureFamily: 'hdr_merge' | 'panorama_stitch' | 'super_resolution',
+  featureFamily: 'focus_stack' | 'hdr_merge' | 'panorama_stitch' | 'super_resolution',
 ) {
   if (preferredFileNames === undefined || preferredFileNames.length === 0) return undefined;
 
+  const rowsForPreferred = featureFamily === 'focus_stack' ? rows : rows.filter(isHdrMetadataUsable);
   const usableRowsByName = new Map(
-    rows
-      .filter(isHdrMetadataUsable)
-      .map((row) => [(row.FileName ?? basename(row.SourceFile)).toLowerCase(), row] as const),
+    rowsForPreferred.map((row) => [(row.FileName ?? basename(row.SourceFile)).toLowerCase(), row] as const),
   );
   const preferredRows = preferredFileNames
     .map((fileName) => usableRowsByName.get(fileName.toLowerCase()))
@@ -608,9 +612,10 @@ async function writeSourceIngestReport(
   selectedRows: ReadonlyArray<ExiftoolRow>,
   score: number,
   materialize: 'copy' | 'symlink',
-  featureFamily: 'hdr_merge' | 'panorama_stitch' | 'super_resolution',
+  featureFamily: 'focus_stack' | 'hdr_merge' | 'panorama_stitch' | 'super_resolution',
 ): Promise<void> {
   const reportRelativePath = {
+    focus_stack: FOCUS_INGEST_REPORT_PATH,
     hdr_merge: HDR_INGEST_REPORT_PATH,
     panorama_stitch: PANORAMA_INGEST_REPORT_PATH,
     super_resolution: SR_INGEST_REPORT_PATH,
@@ -664,7 +669,9 @@ function sampleExifRow(
   });
 }
 
-function sourceCandidateRequirement(featureFamily: 'hdr_merge' | 'panorama_stitch' | 'super_resolution'): string {
+function sourceCandidateRequirement(
+  featureFamily: 'focus_stack' | 'hdr_merge' | 'panorama_stitch' | 'super_resolution',
+): string {
   if (featureFamily === 'hdr_merge') {
     return `need <=${MAX_HDR_BRACKET_SPAN_SECONDS}s, sequence gap <=${MAX_HDR_BRACKET_SEQUENCE_GAP}, >=${MIN_HDR_BRACKET_SPREAD_EV} EV spread`;
   }
