@@ -187,6 +187,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     (file) => file.startsWith('packages/rawengine-schema/src/focusStack'),
     ['check:focus-runtime-plan-smoke', 'check:focus-preview-blend-smoke'],
   );
+  addIf((file) => file === 'src/components/modals/FocusStackModal.tsx', ['check:focus-review-diagnostics']);
   addIf(
     (file) => file.startsWith('packages/rawengine-schema/src/superResolution'),
     ['check:super-resolution-app-server-runtime'],

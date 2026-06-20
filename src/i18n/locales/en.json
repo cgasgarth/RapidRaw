@@ -1561,10 +1561,12 @@
       "preflight": {
         "alignment": "Alignment",
         "blend": "Blend",
+        "blocked": "Blocked",
         "memory": "Memory",
         "pending": "Not estimated",
         "previewBudget": "Preview budget",
         "provenance": "Provenance",
+        "ready": "Ready",
         "required": "Required",
         "retouch": "Retouch",
         "sources": "Sources"
