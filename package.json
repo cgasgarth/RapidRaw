@@ -500,7 +500,9 @@
     "check:deblur-app-server-tool": "bun tests/integration/checks/check-deblur-app-server-tool.ts",
     "check:panorama-real-raw-private-app-server-proof": "bun tests/integration/checks/check-panorama-real-raw-private-app-server-proof.ts",
     "check:macos-colorsync-display-proof": "bun tests/integration/checks/check-macos-colorsync-display-proof.ts",
-    "check:macos-colorsync-display-proof:update": "bun tests/integration/checks/check-macos-colorsync-display-proof.ts --update"
+    "check:macos-colorsync-display-proof:update": "bun tests/integration/checks/check-macos-colorsync-display-proof.ts --update",
+    "check:selective-color-local-raw-proof": "bun tests/integration/checks/check-selective-color-local-raw-proof.ts",
+    "check:selective-color-local-raw-proof:update": "bun tests/integration/checks/check-selective-color-local-raw-proof.ts --update"
   },
   "dependencies": {
     "@clerk/react": "^6.9.1",

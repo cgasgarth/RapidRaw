@@ -1,0 +1,69 @@
+{
+  "doesNotProve": [
+    "capture_one_class_color_quality",
+    "full_macos_app_manual_session",
+    "gpu_cpu_parity",
+    "icc_colorimetric_accuracy",
+    "public_raw_fixture"
+  ],
+  "fixtureId": "validation.raw-open-edit-export.selective-color-orange.v1",
+  "generatedAt": "2026-06-20T09:38:46.453Z",
+  "issue": 2476,
+  "localRawRuntime": {
+    "command": "RAWENGINE_RUN_PRIVATE_RAW_SELECTIVE_COLOR_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_selective_color_report_when_enabled -- --nocapture",
+    "editCommandId": "command.raw-open-edit-export.selective-color-orange.v1",
+    "metrics": {
+      "changedPixelRatio": 0.38770479777954003,
+      "previewExportMeanAbsDelta": 0,
+      "sidecarReloadRevisionMatch": 1,
+      "sourceHashUnchanged": 1
+    },
+    "status": "passed",
+    "workflowReportPath": "private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json"
+  },
+  "schemaVersion": 1,
+  "sourceRaw": {
+    "fixtureStatus": "private_cc_raw_not_committed",
+    "localPath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+    "sha256": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879"
+  },
+  "validationMode": "private_raw_selective_color_preview_export_sidecar_proof",
+  "workflowArtifacts": [
+    {
+      "hash": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
+      "kind": "source_raw_private",
+      "path": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:c6e2f893ff0741e277a46068f085e62eb7610a7c276c1976a786e329f8c46002",
+      "kind": "preview_before_private",
+      "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-preview-before.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:953fb0de1f0e6fe9eea91f14a4402d024b9703834536f1923e9b78af0a2c41e1",
+      "kind": "preview_after_private",
+      "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-preview-after.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:e61a95ef4484231141fdb7a18a87af1fbb39373d55f39ee2239930c69c99b37d",
+      "kind": "export_after_private",
+      "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-export-after.tiff",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:33dfea9afddc74bf07b68e71256e26e4865c25c27e27d245d1974e5f77c1292d",
+      "kind": "sidecar_after_private",
+      "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-after.rrdata",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:ac1fde7379b978a486251f38094f75886f76a87ae4dc4fc4a260eb7ec09ba279",
+      "kind": "workflow_report_private",
+      "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json",
+      "publicRepoAllowed": false
+    }
+  ]
+}

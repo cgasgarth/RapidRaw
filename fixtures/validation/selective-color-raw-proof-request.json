@@ -1,0 +1,62 @@
+{
+  "$schema": "https://rawengine.dev/schemas/raw-open-edit-export-proof-request-v1.json",
+  "artifactDirRelative": "private-artifacts/validation/selective-color",
+  "editCommand": {
+    "actor": {
+      "id": "agent.selective-color-proof-wrapper",
+      "kind": "agent",
+      "sessionId": "selective-color-proof-wrapper"
+    },
+    "approval": {
+      "approvalClass": "edit_apply",
+      "reason": "Apply accepted orange selective color command for RAW preview/export parity proof.",
+      "state": "approved"
+    },
+    "colorPipeline": {
+      "chromaticAdaptation": {
+        "method": "bradford_v1",
+        "sourceWhitePoint": {
+          "x": 0.3457,
+          "y": 0.3585
+        },
+        "status": "math_validated",
+        "targetWhitePoint": {
+          "x": 0.32168,
+          "y": 0.33767
+        },
+        "warnings": []
+      },
+      "inputDomain": "camera_linear_rgb",
+      "operationDomain": "acescg_linear_v1",
+      "renderTarget": {
+        "bitDepth": 16,
+        "embedIcc": true,
+        "intent": "relative_colorimetric",
+        "outputProfile": "display_p3",
+        "viewTransform": "rawengine_agx_v1"
+      },
+      "sceneToDisplayTransform": "rawengine_agx_v1",
+      "workingSpace": "acescg_linear_v1"
+    },
+    "commandId": "command.raw-open-edit-export.selective-color-orange.v1",
+    "commandType": "toneColor.adjustHsl",
+    "correlationId": "corr.raw-open-edit-export.selective-color-orange.v1",
+    "dryRun": false,
+    "expectedGraphRevision": "graph-rev.raw-open-edit-export.selective-color-orange.v1",
+    "idempotencyKey": "idem.raw-open-edit-export.selective-color-orange.v1",
+    "parameters": {
+      "band": "orange",
+      "hueShiftDegrees": 12,
+      "luminance": -8,
+      "saturation": 28
+    },
+    "schemaVersion": 1,
+    "target": {
+      "imagePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw",
+      "kind": "image"
+    }
+  },
+  "fixtureId": "validation.raw-open-edit-export.selective-color-orange.v1",
+  "privateRootPath": "/tmp/rawengine-private-root",
+  "sourceRelativePath": "private-fixtures/detail/high-iso-skin-shadow-v1.arw"
+}
