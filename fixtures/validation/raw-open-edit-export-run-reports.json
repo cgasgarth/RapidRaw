@@ -191,37 +191,37 @@
     {
       "artifacts": [
         {
-          "hash": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
-          "path": "private-fixtures/color/professional-workflow-v1/rawengine-professional-color-v1.arw",
+          "hash": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+          "path": "private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw",
           "publicRepoAllowed": false,
           "kind": "source_raw_private"
         },
         {
-          "hash": "sha256:c2f7186bbccc78917e810e7ea3083576ef16513cfd68548c6acf1d86ecedf195",
+          "hash": "sha256:b7c68dd85b6e638a17ec1a38651e344b61d51618ac9614f74c7da990bd980dc1",
           "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-before.png",
           "publicRepoAllowed": false,
           "kind": "preview_before_private"
         },
         {
-          "hash": "sha256:bf3a3e4ac1a3dd5afd3d69a6bbc6dd008d4796a25bd192e8422a9ab9f519cd98",
+          "hash": "sha256:b16532fd7387855696deba488503977f5889dcb7b81d4ecff35668e26f3ac220",
           "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-after.png",
           "publicRepoAllowed": false,
           "kind": "preview_after_private"
         },
         {
-          "hash": "sha256:07e5c02f103d51909711b8a6546193a58ead1dfb59ffbaf49e51139a46d63431",
+          "hash": "sha256:42e4b344219ca2747ed175c43918360db869e1f374ecc25e8c817f63541e19dc",
           "path": "private-artifacts/validation/open-edit-export/professional-color-v1-export-after.tiff",
           "publicRepoAllowed": false,
           "kind": "export_after_private"
         },
         {
-          "hash": "sha256:2487f133517a1431c1c840fb6530c5e76587e7446f2ec4953425274e306ac5bf",
+          "hash": "sha256:21c758e37b586f5f18be742b5c8c8dd46b92a9d063041e4fa012a558039281a7",
           "path": "private-artifacts/validation/open-edit-export/professional-color-v1-after.rrdata",
           "publicRepoAllowed": false,
           "kind": "sidecar_after_private"
         },
         {
-          "hash": "sha256:a6d75793452be45c6c90623b75ad4abcb3985bc8728be03e2d6f4eb65ba88dae",
+          "hash": "sha256:58cd942f1d04c75e89d9b0bfa7f587c51011f20bf772cb742621f50afe5f92df",
           "path": "private-artifacts/validation/open-edit-export/professional-color-v1-workflow-report.json",
           "publicRepoAllowed": false,
           "kind": "workflow_report_private"
@@ -236,14 +236,14 @@
             "source": "raw_open_edit_export_validation_spine"
           },
           "cameraMake": "Sony",
-          "cameraModel": "DSLR-A100",
+          "cameraModel": "ILCE-7M3",
           "decodedDimensions": {
-            "height": 2600,
-            "width": 3880
+            "height": 4000,
+            "width": 6000
           },
           "privacySafeCameraId": "camera.raw-open-edit-export.professional-color.v1",
           "rawFormat": "arw",
-          "sourceHash": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
+          "sourceHash": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
           "whiteBalance": {
             "applied": "not_surfaced_by_current_decoder_trace",
             "presence": "not_surfaced_by_current_decoder_trace",
@@ -320,14 +320,14 @@
       "editCommandId": "command.raw-open-edit-export.professional-color.v1",
       "editGraphRevision": "graph-rev.raw-open-edit-export.professional-color.v1",
       "fixtureId": "validation.raw-open-edit-export.professional-color.v1",
-      "generatedAt": "2026-06-20T18:36:51.098Z",
+      "generatedAt": "2026-06-20T00:00:00.000Z",
       "metrics": [
         {
           "name": "changedPixelRatio",
           "passed": true,
           "source": "private_raw_report",
           "threshold": 0,
-          "value": 0.9999984139571768
+          "value": 0.9598651666666667
         },
         {
           "name": "previewExportMeanAbsDelta",
@@ -352,24 +352,31 @@
         }
       ],
       "previewAfter": {
-        "hash": "sha256:bf3a3e4ac1a3dd5afd3d69a6bbc6dd008d4796a25bd192e8422a9ab9f519cd98",
+        "hash": "sha256:b16532fd7387855696deba488503977f5889dcb7b81d4ecff35668e26f3ac220",
         "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-after.png",
         "publicRepoAllowed": false
       },
       "previewBefore": {
-        "hash": "sha256:c2f7186bbccc78917e810e7ea3083576ef16513cfd68548c6acf1d86ecedf195",
+        "hash": "sha256:b7c68dd85b6e638a17ec1a38651e344b61d51618ac9614f74c7da990bd980dc1",
         "path": "private-artifacts/validation/open-edit-export/professional-color-v1-preview-before.png",
         "publicRepoAllowed": false
       },
+      "renderPaths": {
+        "exportAfterFormat": "tiff",
+        "exportAfterWriterId": "raw_open_edit_export_export_after",
+        "previewAfterFormat": "png",
+        "previewAfterWriterId": "raw_open_edit_export_preview_after",
+        "previewBeforeWriterId": "raw_open_edit_export_preview_before"
+      },
       "reportId": "raw-open-edit-export-run.professional-color.v1",
       "sidecarAfter": {
-        "hash": "sha256:2487f133517a1431c1c840fb6530c5e76587e7446f2ec4953425274e306ac5bf",
+        "hash": "sha256:21c758e37b586f5f18be742b5c8c8dd46b92a9d063041e4fa012a558039281a7",
         "path": "private-artifacts/validation/open-edit-export/professional-color-v1-after.rrdata",
         "publicRepoAllowed": false
       },
       "sourceRaw": {
-        "hash": "sha256:40ac6d96421f62b37e19b7f3ee3ca2b42af189f1546985af31e49639c2f8d879",
-        "path": "private-fixtures/color/professional-workflow-v1/rawengine-professional-color-v1.arw",
+        "hash": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+        "path": "private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw",
         "publicRepoAllowed": false
       },
       "trackingIssue": 1376

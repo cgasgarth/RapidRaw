@@ -107,7 +107,7 @@
           "publicRepoAllowed": false
         },
         {
-          "hash": "sha256:47ef8376fb8efef16c368fabc95d2dcd0502f8168dd4120685eca4ad5860e1cd",
+          "hash": "sha256:58cd942f1d04c75e89d9b0bfa7f587c51011f20bf772cb742621f50afe5f92df",
           "kind": "workflow_report_private",
           "path": "private-artifacts/validation/open-edit-export/professional-color-v1-workflow-report.json",
           "publicRepoAllowed": false

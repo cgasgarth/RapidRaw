@@ -44,6 +44,16 @@ const metricSchema = z
   })
   .strict();
 
+const renderPathsSchema = z
+  .object({
+    exportAfterFormat: z.literal('tiff'),
+    exportAfterWriterId: z.string().trim().min(1),
+    previewAfterFormat: z.literal('png'),
+    previewAfterWriterId: z.string().trim().min(1),
+    previewBeforeWriterId: z.string().trim().min(1),
+  })
+  .strict();
+
 const reportSchema = z
   .object({
     colorManagement: z
@@ -79,6 +89,7 @@ const reportSchema = z
         editCommandId: z.literal(request.editCommand.commandId),
         metrics: metricSchema,
         rawRuntimeFixtureId: z.literal(request.fixtureId),
+        renderPaths: renderPathsSchema,
         status: z.literal('passed'),
         workflowReportPath: z.literal(WORKFLOW_REPORT_PATH),
       })
@@ -136,6 +147,7 @@ const workflowReportSchema = z
       .length(5),
     fixtureId: z.literal(request.fixtureId),
     metrics: z.array(workflowMetricSchema).length(4),
+    renderPaths: renderPathsSchema,
     sourceRaw: z.object({ hash: hashSchema, path: z.string(), publicRepoAllowed: z.literal(false) }).strict(),
   })
   .passthrough();
@@ -177,6 +189,7 @@ if (UPDATE_REPORT) {
       editCommandId: request.editCommand.commandId,
       metrics: metricMap(workflowReport.metrics),
       rawRuntimeFixtureId: workflowReport.fixtureId,
+      renderPaths: workflowReport.renderPaths,
       status: 'passed',
       workflowReportPath: WORKFLOW_REPORT_PATH,
     },
