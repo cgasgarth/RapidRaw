@@ -17,10 +17,31 @@
     "sidecarHash": "sha256:2a6d9fc1b6cfcd34839ff80fc987f6a4bdbc07ceb94572fc2407ce4f591a40ad"
   },
   "previewExportMaxDelta": 0,
+  "previewExportArtifactHashMatch": false,
   "previewExportPixelHashMatch": true,
   "proofEntrypoints": {
     "export": "renderSelectiveColorExportArtifact",
     "preview": "renderSelectiveColorPreviewArtifact"
+  },
+  "renderWriters": {
+    "export": {
+      "byteHash": "sha256:5ac79e1a2e1447f60f3a41057f727e661678af6eaa6613fafacfc9f0248bdf2c",
+      "byteLength": 50,
+      "encodedHeaderLabel": "export-render-path",
+      "path": "virtual://selective-color/export.ppm",
+      "pixelHash": "sha256:76b56eb28629fb68b6f050c69f77fc90492fcf63e39b674aa51a05564ca17e3f",
+      "traversal": "row_major_nested_loop",
+      "writerId": "selective_color_export_writer_v1"
+    },
+    "preview": {
+      "byteHash": "sha256:65d8fe7c0bf0152aeb1a16ee591b8a8969a4ee8ea3f22048fe36f38001d26146",
+      "byteLength": 51,
+      "encodedHeaderLabel": "preview-render-path",
+      "path": "virtual://selective-color/preview.ppm",
+      "pixelHash": "sha256:76b56eb28629fb68b6f050c69f77fc90492fcf63e39b674aa51a05564ca17e3f",
+      "traversal": "array_map_preview_loop",
+      "writerId": "selective_color_preview_writer_v1"
+    }
   },
   "runtimeStatus": "independent_artifact_writers_shared_pixel_core",
   "schemaVersion": 1,

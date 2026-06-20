@@ -36,11 +36,38 @@ const reportSchema = z
       })
       .strict(),
     previewExportMaxDelta: z.literal(0),
+    previewExportArtifactHashMatch: z.literal(false),
     previewExportPixelHashMatch: z.literal(true),
     proofEntrypoints: z
       .object({
         export: z.literal('renderSelectiveColorExportArtifact'),
         preview: z.literal('renderSelectiveColorPreviewArtifact'),
+      })
+      .strict(),
+    renderWriters: z
+      .object({
+        export: z
+          .object({
+            byteHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+            byteLength: z.number().int().positive(),
+            encodedHeaderLabel: z.literal('export-render-path'),
+            path: z.literal('virtual://selective-color/export.ppm'),
+            pixelHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+            traversal: z.literal('row_major_nested_loop'),
+            writerId: z.literal('selective_color_export_writer_v1'),
+          })
+          .strict(),
+        preview: z
+          .object({
+            byteHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+            byteLength: z.number().int().positive(),
+            encodedHeaderLabel: z.literal('preview-render-path'),
+            path: z.literal('virtual://selective-color/preview.ppm'),
+            pixelHash: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+            traversal: z.literal('array_map_preview_loop'),
+            writerId: z.literal('selective_color_preview_writer_v1'),
+          })
+          .strict(),
       })
       .strict(),
     runtimeStatus: z.literal('independent_artifact_writers_shared_pixel_core'),
@@ -120,10 +147,15 @@ const report = reportSchema.parse({
     sidecarHash: hashJson(sidecar),
   },
   previewExportMaxDelta: maxPixelDelta(previewArtifact.pixels, exportArtifact.pixels),
+  previewExportArtifactHashMatch: hashBytes(previewArtifact.bytes) === hashBytes(exportArtifact.bytes),
   previewExportPixelHashMatch: hashJson(previewArtifact.pixels) === hashJson(exportArtifact.pixels),
   proofEntrypoints: {
     export: 'renderSelectiveColorExportArtifact',
     preview: 'renderSelectiveColorPreviewArtifact',
+  },
+  renderWriters: {
+    export: exportArtifact.writer,
+    preview: previewArtifact.writer,
   },
   runtimeStatus: 'independent_artifact_writers_shared_pixel_core',
   schemaVersion: 1,
@@ -152,6 +184,15 @@ if (report.writtenArtifacts.previewHash === report.writtenArtifacts.exportHash) 
     'Preview/export artifacts should have distinct file hashes because they are written by distinct paths.',
   );
 }
+if (report.renderWriters.preview.path === report.renderWriters.export.path) {
+  throw new Error('Selective-color preview/export writers must not share the same artifact path.');
+}
+if (report.renderWriters.preview.writerId === report.renderWriters.export.writerId) {
+  throw new Error('Selective-color preview/export writers must have distinct writer identities.');
+}
+if (report.renderWriters.preview.pixelHash !== report.renderWriters.export.pixelHash) {
+  throw new Error('Selective-color independent writers must preserve identical output pixels.');
+}
 
 const reportText = `${JSON.stringify(report, null, 2)}\n`;
 if (UPDATE_REPORT) {
@@ -174,15 +215,37 @@ interface SyntheticImage {
 interface RenderedArtifact {
   readonly bytes: Uint8Array;
   readonly pixels: ReadonlyArray<RgbPixel>;
+  readonly writer: WriterIdentity;
+}
+
+interface WriterIdentity {
+  readonly byteHash: string;
+  readonly byteLength: number;
+  readonly encodedHeaderLabel: 'export-render-path' | 'preview-render-path';
+  readonly path: 'virtual://selective-color/export.ppm' | 'virtual://selective-color/preview.ppm';
+  readonly pixelHash: string;
+  readonly traversal: 'array_map_preview_loop' | 'row_major_nested_loop';
+  readonly writerId: 'selective_color_export_writer_v1' | 'selective_color_preview_writer_v1';
 }
 
 function renderSelectiveColorPreviewArtifact(image: SyntheticImage): RenderedArtifact {
   const pixels = image.pixels.map((pixel) =>
     roundRgb(applySelectiveColorToRgbPixel(pixel, 'oranges', adjustment).outputRgb),
   );
+  const encodedHeaderLabel = 'preview-render-path';
+  const bytes = encodePpm(encodedHeaderLabel, image.width, image.height, pixels);
   return {
-    bytes: encodePpm('preview-render-path', image.width, image.height, pixels),
+    bytes,
     pixels,
+    writer: {
+      byteHash: hashBytes(bytes),
+      byteLength: bytes.length,
+      encodedHeaderLabel,
+      path: 'virtual://selective-color/preview.ppm',
+      pixelHash: hashJson(pixels),
+      traversal: 'array_map_preview_loop',
+      writerId: 'selective_color_preview_writer_v1',
+    },
   };
 }
 
@@ -195,9 +258,20 @@ function renderSelectiveColorExportArtifact(image: SyntheticImage): RenderedArti
       pixels.push(roundRgb(applySelectiveColorToRgbPixel(pixel, 'oranges', adjustment).outputRgb));
     }
   }
+  const encodedHeaderLabel = 'export-render-path';
+  const bytes = encodePpm(encodedHeaderLabel, image.width, image.height, pixels);
   return {
-    bytes: encodePpm('export-render-path', image.width, image.height, pixels),
+    bytes,
     pixels,
+    writer: {
+      byteHash: hashBytes(bytes),
+      byteLength: bytes.length,
+      encodedHeaderLabel,
+      path: 'virtual://selective-color/export.ppm',
+      pixelHash: hashJson(pixels),
+      traversal: 'row_major_nested_loop',
+      writerId: 'selective_color_export_writer_v1',
+    },
   };
 }
 
