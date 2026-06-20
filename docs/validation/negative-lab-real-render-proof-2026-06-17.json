@@ -3,6 +3,12 @@
   "fixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001",
   "inputSha256": "sha256:f0913770ce2ec72f2261d6cc0948091e3224d11904049727a42beb864ef5673b",
   "meanAbsInputDelta": 0.4771733055555555,
+  "metrics": {
+    "changedPixelCount": 12,
+    "changedSampleRatio": 1,
+    "meanAbsInputDelta": 0.4771733055555555,
+    "warningCount": 4
+  },
   "outputIntent": "public_fixture_negative_conversion_smoke",
   "provenance": {
     "commandName": "negative.lab.public_fixture_render_smoke",
@@ -31,5 +37,7 @@
       [0.57728, 1, 0.94717]
     ]
   ],
+  "schemaVersion": 1,
+  "validationMode": "public_fixture_negative_conversion_smoke",
   "warningCodes": ["lossy_input", "low_bit_depth_input", "unknown_input_profile", "low_acquisition_confidence"]
 }
