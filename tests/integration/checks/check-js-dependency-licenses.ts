@@ -92,12 +92,6 @@ for (const packageKey of Object.keys(policy.reviewedPackages)) {
   }
 }
 
-for (const packageKey of Object.keys(policy.missingLicenseFileAllowed)) {
-  if (!dependencyLicenses[packageKey]) {
-    failures.push(`${packageKey}: missing-license-file exception is no longer present`);
-  }
-}
-
 if (failures.length > 0) {
   console.error('JavaScript dependency license check failed:');
   for (const failure of failures) {

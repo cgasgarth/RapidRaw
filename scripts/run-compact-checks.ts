@@ -89,6 +89,7 @@ const CHECK_GROUPS = {
     'check:camera-profile-lookup',
     'check:colorchecker-fixtures',
     'check:colorchecker-render-gate',
+    'check:macos-colorsync-display-proof',
     'check:color-style-presets',
     'check:selective-color-ranges',
     'check:selective-color-falloff',
