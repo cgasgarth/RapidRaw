@@ -75,11 +75,20 @@
       "colorGrading": "Gradacja kolorów",
       "colorMixer": "Mikser kolorów",
       "grading": {
+        "applyPreset": "Zastosuj preset gradacji {{name}}. Kategoria {{category}}, mieszanie {{blending}}, balans {{balance}}.",
         "balance": "Balans",
+        "balanceValue": "Bal. {{value}}",
         "blending": "Mieszanie",
+        "blendingValue": "Mix {{value}}",
         "global": "Globalnie",
         "highlights": "Światła",
         "midtones": "Półtony",
+        "presetCategories": {
+          "cinematic": "Filmowe",
+          "landscape": "Krajobraz",
+          "neutral": "Neutralne",
+          "portrait": "Portret"
+        },
         "shadows": "Cienie"
       },
       "hue": "Odcień",

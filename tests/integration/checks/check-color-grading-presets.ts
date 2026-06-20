@@ -9,6 +9,7 @@ import { COLOR_GRADING_PRESET_CATALOG } from '../../../src/utils/colorGradingPre
 import { applyColorGradingPresetToRgbPixel } from '../../../src/utils/colorGradingRuntime.ts';
 
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
+const readText = async (path) => readFile(path, 'utf8');
 const rgbPixelSchema = z
   .object({
     blue: z.number().min(0).max(1),
@@ -35,6 +36,7 @@ const fixture = fixtureSchema.parse(await readJson('fixtures/color/color-grading
 const catalog = parseColorGradingPresetCatalog({ presets: fixture.presets, version: fixture.version });
 const sourceCatalog = parseColorGradingPresetCatalog(COLOR_GRADING_PRESET_CATALOG);
 const invalidCases = await readJson('fixtures/color/invalid-color-grading-presets.json');
+const colorPanelSource = await readText('src/components/adjustments/Color.tsx');
 const failures = [];
 
 if (
@@ -72,6 +74,18 @@ for (const invalidCase of invalidCases) {
     failures.push(`${invalidCase.case}: expected invalid catalog to fail.`);
   } catch (_error) {
     // Expected invalid fixture.
+  }
+}
+
+for (const marker of [
+  'data-testid="color-grading-preset-card"',
+  'color-grading-preset-swatch-${key}',
+  'adjustments.color.grading.applyPreset',
+  'adjustments.color.grading.blendingValue',
+  'adjustments.color.grading.balanceValue',
+]) {
+  if (!colorPanelSource.includes(marker)) {
+    failures.push(`Color grading panel is missing UI marker: ${marker}.`);
   }
 }
 
