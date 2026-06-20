@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { createHash } from 'node:crypto';
+import { readFile, writeFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import { toneColorCommandEnvelopeV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
@@ -13,6 +14,8 @@ import {
 import { pushEditHistoryEntry } from '../src/utils/editHistory.ts';
 
 const pixelSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)]);
+const REPORT_PATH = 'docs/validation/command-replay-render-proof-2026-06-20.json';
+const UPDATE_REPORT = process.argv.includes('--update');
 const renderReportSchema = z
   .object({
     afterHash: z.string().length(16),
@@ -20,8 +23,11 @@ const renderReportSchema = z
     changedPixels: z.number().int().positive(),
     commandId: z.string().min(1),
     graphRevision: z.string().min(1),
+    issue: z.literal(2322),
     previewExportMaxDelta: z.literal(0),
+    schemaVersion: z.literal(1),
     runtimeStatus: z.literal('synthetic_headless_preview_export_parity'),
+    validationMode: z.literal('typed_command_replay_golden_render'),
   })
   .strict()
   .superRefine((report, context) => {
@@ -112,14 +118,27 @@ const changedPixels = preview.filter((pixel, pixelIndex) =>
   pixel.some((channel, channelIndex) => channel !== before[pixelIndex]?.[channelIndex]),
 ).length;
 
-renderReportSchema.parse({
+const report = renderReportSchema.parse({
   afterHash: hashPixels(preview),
   beforeHash: hashPixels(before),
   changedPixels,
   commandId: parsedCommand.commandId,
   graphRevision: parsedCommand.expectedGraphRevision,
+  issue: 2322,
   previewExportMaxDelta,
+  schemaVersion: 1,
   runtimeStatus: 'synthetic_headless_preview_export_parity',
+  validationMode: 'typed_command_replay_golden_render',
 });
+
+const reportText = `${JSON.stringify(report, null, 2)}\n`;
+if (UPDATE_REPORT) {
+  await writeFile(REPORT_PATH, reportText);
+} else {
+  const expected = renderReportSchema.parse(JSON.parse(await readFile(REPORT_PATH, 'utf8')));
+  if (JSON.stringify(expected) !== JSON.stringify(report)) {
+    throw new Error(`${REPORT_PATH} is stale; run bun scripts/check-command-replay-render-proof.ts --update`);
+  }
+}
 
 console.log(`command replay render proof ok (${changedPixels} changed pixels)`);
