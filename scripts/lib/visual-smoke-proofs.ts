@@ -340,6 +340,10 @@ export const commandPaletteWorkflowProofSchema = z.object({
   panoramaOpen: z.literal('true'),
   srOpen: z.literal('true'),
 });
+export const selectiveColorUiProofDatasetSchema = z.object({
+  activeRange: z.literal('oranges'),
+  commandType: z.literal('toneColor.adjustHsl'),
+});
 export const agentChatProofDatasetSchema = z.object({
   agentRuntimeStatus: z.literal('ui_only_demo'),
 });

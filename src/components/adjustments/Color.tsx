@@ -105,10 +105,11 @@ interface ColorSwatchProps<T extends string> {
   isActive: boolean;
   name: T;
   ariaLabel: string;
+  testId?: string;
   onClick: (name: T) => void;
 }
 
-const ColorSwatch = <T extends string>({ color, name, isActive, ariaLabel, onClick }: ColorSwatchProps<T>) => {
+const ColorSwatch = <T extends string>({ color, name, isActive, ariaLabel, testId, onClick }: ColorSwatchProps<T>) => {
   const [isPressed, setIsPressed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -144,6 +145,7 @@ const ColorSwatch = <T extends string>({ color, name, isActive, ariaLabel, onCli
     <button
       aria-label={ariaLabel}
       className="relative w-6 h-6 focus:outline-hidden group"
+      data-testid={testId}
       onClick={handleClick}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
@@ -1221,7 +1223,12 @@ export default function ColorPanel({
         />
       </div>
 
-      <div className="p-2 bg-bg-tertiary rounded-md">
+      <div
+        className="p-2 bg-bg-tertiary rounded-md"
+        data-active-range={activeColor}
+        data-command-type="toneColor.adjustHsl"
+        data-testid="selective-color-range-controls"
+      >
         <UiText variant={TextVariants.heading} className="mb-3">
           {t('adjustments.color.colorMixer')}
         </UiText>
@@ -1233,6 +1240,7 @@ export default function ColorPanel({
               key={name}
               name={name}
               onClick={setActiveColor}
+              testId={`selective-color-range-${name}`}
               ariaLabel={t('adjustments.color.ariaSelectColor', { name: label })}
             />
           ))}

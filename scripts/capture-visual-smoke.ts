@@ -4,6 +4,8 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { NegativeLabAppServerCommandName } from '../src/utils/negativeLabAppServerCommandNames.ts';
+import { sampleToneColorCommandEnvelopeV1 } from '../packages/rawengine-schema/src/samplePayloads.ts';
+import { toneColorCommandEnvelopeV1Schema } from '../packages/rawengine-schema/src/rawEngineSchemas.ts';
 import {
   VISUAL_SMOKE_PROOF_TEST_IDS,
   VISUAL_SMOKE_SCENARIOS,
@@ -33,6 +35,7 @@ import {
   negativeLabWorkspaceProofDatasetSchema,
   panoramaReviewWorkspaceProofSchema,
   panoramaUiSettingsProofSchema,
+  selectiveColorUiProofDatasetSchema,
   superResolutionPrivateRawReviewProofSchema,
   superResolutionReviewWorkspaceProofSchema,
   superResolutionUiSettingsProofSchema,
@@ -524,8 +527,28 @@ async function prepareScenario(page, mode) {
     });
     await colorPanel.getByLabel('Temperature').fill('12');
     await colorPanel.getByLabel('Saturation').first().fill('18');
+    const selectiveControls = colorPanel.getByTestId('selective-color-range-controls');
+    await selectiveControls.getByTestId('selective-color-range-oranges').click();
+    await selectiveControls.getByLabel('Hue').fill('8');
+    await selectiveControls.getByLabel('Saturation').fill('22');
+    await selectiveControls.getByLabel('Luminance').fill('-11');
     await colorPanel.getByTestId('color-balance-toggle').click();
     await colorPanel.getByTestId('channel-mixer-toggle').click();
+    selectiveColorUiProofDatasetSchema.parse(await selectiveControls.evaluate((element) => ({ ...element.dataset })));
+    toneColorCommandEnvelopeV1Schema.parse({
+      ...sampleToneColorCommandEnvelopeV1,
+      commandId: 'command_tone_color_selective_orange_visual_smoke',
+      commandType: 'toneColor.adjustHsl',
+      correlationId: 'corr_tone_color_selective_orange_visual_smoke',
+      dryRun: true,
+      idempotencyKey: 'idem_tone_color_selective_orange_visual_smoke',
+      parameters: {
+        band: 'orange',
+        hueShiftDegrees: 8,
+        luminance: -11,
+        saturation: 22,
+      },
+    });
     await page.getByTestId('color-workflow-adjustment-proof').getByText('Temp 12', { exact: true }).waitFor({
       timeout: 10_000,
     });
@@ -541,6 +564,11 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('skin-tone-uniformity-ui-proof').getByText('Skin 0.725', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('selective-color-ui-proof').getByText('Orange 8', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByText('Orange sat 22', { exact: true }).waitFor({ timeout: 10_000 });
+    await page.getByText('Orange lum -11', { exact: true }).waitFor({ timeout: 10_000 });
     return;
   }
 
