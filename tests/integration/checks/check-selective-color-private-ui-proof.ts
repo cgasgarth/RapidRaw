@@ -33,6 +33,15 @@ const rawProofReportSchema = z
             sourceHashUnchanged: z.literal(1),
           })
           .strict(),
+        renderPaths: z
+          .object({
+            exportAfterFormat: z.literal('tiff'),
+            exportAfterWriterId: z.literal('raw_open_edit_export_export_after'),
+            previewAfterFormat: z.literal('png'),
+            previewAfterWriterId: z.literal('raw_open_edit_export_preview_after'),
+            previewBeforeWriterId: z.literal('raw_open_edit_export_preview_before'),
+          })
+          .strict(),
         status: z.literal('passed'),
         workflowReportPath: z.literal(workflowReportPath),
       })
@@ -68,6 +77,7 @@ const uiProofReportSchema = z
       .object({
         editCommandId: z.literal('command.raw-open-edit-export.selective-color-orange.v1'),
         metrics: rawProofReportSchema.shape.localRawRuntime.shape.metrics,
+        renderPaths: rawProofReportSchema.shape.localRawRuntime.shape.renderPaths,
         sourceRawSha256: sha256Schema,
         workflowArtifactCount: z.number().int().min(6),
         workflowReportPath: z.literal(workflowReportPath),
@@ -143,6 +153,7 @@ const expectedReport = uiProofReportSchema.parse({
   rawRuntime: {
     editCommandId: rawProofReport.localRawRuntime.editCommandId,
     metrics: rawProofReport.localRawRuntime.metrics,
+    renderPaths: rawProofReport.localRawRuntime.renderPaths,
     sourceRawSha256: rawProofReport.sourceRaw.sha256,
     workflowArtifactCount: rawProofReport.workflowArtifacts.length,
     workflowReportPath: rawProofReport.localRawRuntime.workflowReportPath,

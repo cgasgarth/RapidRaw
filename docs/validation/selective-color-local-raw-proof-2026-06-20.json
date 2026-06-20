@@ -7,7 +7,7 @@
     "public_raw_fixture"
   ],
   "fixtureId": "validation.raw-open-edit-export.selective-color-orange.v1",
-  "generatedAt": "2026-06-20T21:33:44.442Z",
+  "generatedAt": "2026-06-20T22:24:54.517Z",
   "issue": 2476,
   "localRawRuntime": {
     "command": "RAWENGINE_RUN_PRIVATE_RAW_SELECTIVE_COLOR_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_selective_color_report_when_enabled -- --nocapture",
@@ -17,6 +17,13 @@
       "previewExportMeanAbsDelta": 0,
       "sidecarReloadRevisionMatch": 1,
       "sourceHashUnchanged": 1
+    },
+    "renderPaths": {
+      "exportAfterFormat": "tiff",
+      "exportAfterWriterId": "raw_open_edit_export_export_after",
+      "previewAfterFormat": "png",
+      "previewAfterWriterId": "raw_open_edit_export_preview_after",
+      "previewBeforeWriterId": "raw_open_edit_export_preview_before"
     },
     "status": "passed",
     "workflowReportPath": "private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json"
@@ -60,7 +67,7 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:9ef49cbddfeafdba48fe5bb0bcf2ce95a05b5c34b75547ad93cc92f13a4d7b8f",
+      "hash": "sha256:4b257a1a3b1b6aa9fa157a946bdf36f900f18a6e7f2bfb060e8448d8c3ff6765",
       "kind": "workflow_report_private",
       "path": "private-artifacts/validation/selective-color/selective-color-orange-v1-workflow-report.json",
       "publicRepoAllowed": false
