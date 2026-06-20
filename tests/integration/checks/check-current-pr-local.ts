@@ -168,6 +168,10 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:film-halation-runtime-proof'],
   );
   addIf(
+    (file) => file.includes('selectiveColor') || file.includes('selective-color'),
+    ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
+  );
+  addIf(
     (file) => file === 'src/components/adjustments/Effects.tsx' || file === 'src/utils/filmGrainControls.ts',
     ['check:film-grain-ui'],
   );
@@ -273,6 +277,10 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(
     ['packages/rawengine-schema/src/focusStackWeightedBlend.ts'],
     ['check:focus-preview-blend-smoke'],
+  );
+  assertSelfTestRoute(
+    ['src/utils/selectiveColorRuntime.ts'],
+    ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
   );
 
   console.log('current pr local self-test ok');
