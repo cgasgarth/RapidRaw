@@ -254,6 +254,10 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     new Set(['bun tests/integration/checks/check-raw-open-edit-export-run-reports.ts']),
   ],
   [
+    'check:raw-color-management-runtime-proof',
+    new Set(['bun tests/integration/checks/check-raw-color-management-runtime-proof.ts']),
+  ],
+  [
     'check:raw-open-edit-export-runtime-status',
     new Set(['bun tests/integration/checks/check-raw-open-edit-export-runtime-status.ts']),
   ],

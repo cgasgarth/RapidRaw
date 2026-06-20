@@ -124,6 +124,7 @@ function sampleReports(): unknown {
     reports: [
       {
         artifacts,
+        colorManagement: sampleColorManagementProof(),
         editCommandId: 'command.raw-open-edit-export.basic-tone.v1',
         editGraphRevision: 'graph-rev.raw-open-edit-export.sample.v1',
         fixtureId: 'validation.raw-open-edit-export.sample.v1',
@@ -171,5 +172,36 @@ function hashedPath(artifact: Record<string, unknown>): Record<string, unknown> 
     hash: artifact.hash,
     path: artifact.path,
     publicRepoAllowed: artifact.publicRepoAllowed,
+  };
+}
+
+function sampleColorManagementProof(): Record<string, unknown> {
+  return {
+    chromaticAdaptation: {
+      method: 'bradford_v1',
+      sourceWhitePoint: { x: 0.3457, y: 0.3585 },
+      status: 'math_validated',
+      targetWhitePoint: { x: 0.32168, y: 0.33767 },
+    },
+    displayTransform: {
+      bitDepth: 16,
+      embedIcc: true,
+      intent: 'relative_colorimetric',
+      outputProfile: 'display_p3',
+      sceneToDisplayTransform: 'rawengine_agx_v1',
+      viewTransform: 'rawengine_agx_v1',
+    },
+    doesNotProve: [
+      'camera_profile_quality',
+      'capture_one_class_quality',
+      'display_device_visual_match',
+      'gpu_color_parity',
+      'icc_colorimetric_accuracy',
+    ],
+    inputDomain: 'camera_linear_rgb',
+    operationDomain: 'acescg_linear_v1',
+    proofLevel: 'private_raw_runtime_color_management_metadata',
+    trackingIssue: 2308,
+    workingSpace: 'acescg_linear_v1',
   };
 }
