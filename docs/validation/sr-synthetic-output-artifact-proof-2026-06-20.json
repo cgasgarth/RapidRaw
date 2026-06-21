@@ -1,9 +1,21 @@
 {
   "artifacts": {
+    "baselineReviewCrop": {
+      "contentHash": "sha256:f48a4742d29104fc646f280656360cbd409abfc2b9ec74c684d064c9eed06fd4",
+      "format": "pgm_u8_preview",
+      "path": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm",
+      "publicRepoAllowed": false
+    },
     "reconstructionPreview": {
       "contentHash": "sha256:8ae4f09c9c12e8cccd3731f8a04a0fc75ec8ae0aab8bf999f79f2f3855053a74",
       "format": "pgm_u8_preview",
       "path": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-preview.pgm",
+      "publicRepoAllowed": false
+    },
+    "reconstructionReviewCrop": {
+      "contentHash": "sha256:a11fafd6b4dac601c7afa6903f6f04a01e720c988fd20ef2fc7087e08e8a5326",
+      "format": "pgm_u8_preview",
+      "path": "artifacts/validation/sr-synthetic-output-artifact/sr-x2-review-crop-center.pgm",
       "publicRepoAllowed": false
     }
   },
@@ -22,7 +34,8 @@
     "filledPixelRatio": 1,
     "finiteOutputRatio": 1,
     "meanAbsoluteErrorAgainstNearest": 0.086695,
-    "missingPixelCount": 0
+    "missingPixelCount": 0,
+    "reviewCropMeanAbsoluteDelta": 0.088079
   },
   "reconstructionDiagnostics": {
     "algorithmId": "integer_pixel_shift_interleave_x2_v1",

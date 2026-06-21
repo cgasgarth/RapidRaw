@@ -26,6 +26,7 @@ export const superResolutionOutputReviewWorkflowSchema = z
     proofLevel: z.literal('synthetic_runtime'),
     qualityPreference: superResolutionQualityPreferenceSchema,
     reviewCropCount: z.number().int().nonnegative(),
+    reviewPacketPath: z.string().min(1),
     sourceCount: z.number().int().min(2),
     warningCodes: z.array(superResolutionOutputReviewWarningSchema).min(1),
   })

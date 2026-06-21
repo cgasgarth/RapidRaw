@@ -18,6 +18,8 @@ const HEIGHT = 36;
 const SCALE = 2;
 const REPORT_PATH = 'docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json';
 const OUTPUT_PATH = 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-preview.pgm';
+const REVIEW_CROP_PATH = 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-review-crop-center.pgm';
+const BASELINE_CROP_PATH = 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm';
 const update = process.argv.includes('--update');
 
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
@@ -25,11 +27,27 @@ const reportSchema = z
   .object({
     artifacts: z
       .object({
+        baselineReviewCrop: z
+          .object({
+            contentHash: hashSchema,
+            format: z.literal('pgm_u8_preview'),
+            path: z.literal(BASELINE_CROP_PATH),
+            publicRepoAllowed: z.literal(false),
+          })
+          .strict(),
         reconstructionPreview: z
           .object({
             contentHash: hashSchema,
             format: z.literal('pgm_u8_preview'),
             path: z.literal(OUTPUT_PATH),
+            publicRepoAllowed: z.literal(false),
+          })
+          .strict(),
+        reconstructionReviewCrop: z
+          .object({
+            contentHash: hashSchema,
+            format: z.literal('pgm_u8_preview'),
+            path: z.literal(REVIEW_CROP_PATH),
             publicRepoAllowed: z.literal(false),
           })
           .strict(),
@@ -54,6 +72,7 @@ const reportSchema = z
         finiteOutputRatio: z.literal(1),
         meanAbsoluteErrorAgainstNearest: z.number().gt(0.01),
         missingPixelCount: z.literal(0),
+        reviewCropMeanAbsoluteDelta: z.number().gt(0.01),
       })
       .strict(),
     reconstructionDiagnostics: superResolutionReconstructionDiagnosticsV1Schema,
@@ -88,15 +107,31 @@ const result = applyPixelShiftSuperResolutionV1({
   width: WIDTH,
 });
 const nearest = createNearestNeighborBaselineV1(frames[0]?.pixels ?? source, WIDTH, HEIGHT, SCALE);
+const reviewCrop = cropCenter(result.outputPixels, result.outputWidth, result.outputHeight, 24, 18);
+const baselineCrop = cropCenter(nearest, result.outputWidth, result.outputHeight, 24, 18);
 await mkdir(dirname(OUTPUT_PATH), { recursive: true });
 await writeFile(OUTPUT_PATH, encodePgmPreview(result.outputPixels, result.outputWidth, result.outputHeight));
+await writeFile(REVIEW_CROP_PATH, encodePgmPreview(reviewCrop.pixels, reviewCrop.width, reviewCrop.height));
+await writeFile(BASELINE_CROP_PATH, encodePgmPreview(baselineCrop.pixels, baselineCrop.width, baselineCrop.height));
 
 const report = reportSchema.parse({
   artifacts: {
+    baselineReviewCrop: {
+      contentHash: await sha256File(BASELINE_CROP_PATH),
+      format: 'pgm_u8_preview',
+      path: BASELINE_CROP_PATH,
+      publicRepoAllowed: false,
+    },
     reconstructionPreview: {
       contentHash: await sha256File(OUTPUT_PATH),
       format: 'pgm_u8_preview',
       path: OUTPUT_PATH,
+      publicRepoAllowed: false,
+    },
+    reconstructionReviewCrop: {
+      contentHash: await sha256File(REVIEW_CROP_PATH),
+      format: 'pgm_u8_preview',
+      path: REVIEW_CROP_PATH,
       publicRepoAllowed: false,
     },
   },
@@ -116,6 +151,7 @@ const report = reportSchema.parse({
     finiteOutputRatio: result.reconstructionDiagnostics.finiteOutputRatio,
     meanAbsoluteErrorAgainstNearest: roundMetric(calculateMeanAbsoluteErrorV1(result.outputPixels, nearest)),
     missingPixelCount: result.reconstructionDiagnostics.missingPixelCount,
+    reviewCropMeanAbsoluteDelta: roundMetric(calculateMeanAbsoluteErrorV1(reviewCrop.pixels, baselineCrop.pixels)),
   },
   reconstructionDiagnostics: result.reconstructionDiagnostics,
   runtimeStatus: 'synthetic_sr_output_artifact_rendered',
@@ -185,6 +221,18 @@ function encodePgmPreview(values: Float32Array, width: number, height: number): 
   output.set(header, 0);
   output.set(pixels, header.length);
   return output;
+}
+
+function cropCenter(values: Float32Array, width: number, height: number, cropWidth: number, cropHeight: number) {
+  const x0 = Math.floor((width - cropWidth) / 2);
+  const y0 = Math.floor((height - cropHeight) / 2);
+  const pixels = new Float32Array(cropWidth * cropHeight);
+  for (let y = 0; y < cropHeight; y += 1) {
+    for (let x = 0; x < cropWidth; x += 1) {
+      pixels[y * cropWidth + x] = values[(y0 + y) * width + x0 + x] ?? 0;
+    }
+  }
+  return { height: cropHeight, pixels, width: cropWidth };
 }
 
 async function sha256File(path: string): Promise<string> {

@@ -415,6 +415,10 @@ export default function SuperResolutionModal({
                 value: t('modals.superResolution.review.reviewCropValue', { count: outputReview.reviewCropCount }),
               },
               {
+                label: t('modals.superResolution.review.reviewPacket'),
+                value: outputReview.reviewPacketPath,
+              },
+              {
                 label: t('modals.superResolution.review.provenance'),
                 value: outputReview.artifactPath,
               },

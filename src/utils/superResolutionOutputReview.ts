@@ -11,6 +11,7 @@ interface BuildSuperResolutionOutputReviewOptions {
 
 const syntheticDetailGainRatio = 1.21;
 const reviewCropCount = 4;
+const reviewPacketPath = 'docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json';
 
 export const buildSuperResolutionOutputReviewWorkflow = ({
   artifactPath,
@@ -33,6 +34,7 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     proofLevel: 'synthetic_runtime',
     qualityPreference: settings.qualityPreference,
     reviewCropCount,
+    reviewPacketPath,
     sourceCount,
     warningCodes,
   });
