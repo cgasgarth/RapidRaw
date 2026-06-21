@@ -6,6 +6,7 @@ const failures: string[] = [];
 const modalSource = readFileSync('src/components/modals/SuperResolutionModal.tsx', 'utf8');
 const panelSource = readFileSync('src/components/modals/ComputationalMergeReviewPanel.tsx', 'utf8');
 const contractSource = readFileSync('src/utils/computationalMergeReviewPanels.ts', 'utf8');
+const adapterSource = readFileSync('src/utils/superResolutionOutputReview.ts', 'utf8');
 
 for (const marker of [
   'sr-review-diagnostics',
@@ -30,13 +31,20 @@ for (const marker of [
   'modals.superResolution.review.acceptanceGate',
   'modals.superResolution.review.artifactWarnings',
   'modals.superResolution.review.decision',
+  'modals.superResolution.review.editableGate',
   'modals.superResolution.review.detailGain',
   'modals.superResolution.review.detailGainValue',
+  'modals.superResolution.review.coverage',
+  'modals.superResolution.review.humanReviewStatus',
+  'modals.superResolution.review.outputArtifact',
+  'modals.superResolution.review.outputHash',
   'modals.superResolution.review.reviewCrops',
   'modals.superResolution.review.reviewPacket',
   'modals.superResolution.review.provenance',
   'modals.superResolution.review.sourceSupport',
   'modals.superResolution.review.warning',
+  'hasRuntimeOutputReview',
+  'outputReviewEditableGateLabel',
   'buildSuperResolutionOutputReviewWorkflow',
 ]) {
   if (!modalSource.includes(marker)) {
@@ -58,6 +66,18 @@ for (const marker of [
 ]) {
   if (!contractSource.includes(marker)) {
     failures.push(`Review diagnostics contract missing ${marker}.`);
+  }
+}
+
+for (const marker of [
+  'buildSuperResolutionOutputReviewFromArtifact',
+  'outputArtifact.contentHash',
+  'editableGate',
+  'humanReviewStatus',
+  'overlapCoverageRatio',
+]) {
+  if (!adapterSource.includes(marker)) {
+    failures.push(`SR output review adapter missing ${marker}.`);
   }
 }
 

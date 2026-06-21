@@ -281,6 +281,7 @@ export default function AppModals(props: AppModalsProps) {
                 sources: superResolutionModalState.sourcePaths.length,
                 toolName: getComputationalMergeAppServerRoutePairSummary('super_resolution').dryRunToolName,
               },
+              outputReview: null,
             },
           });
         }}
@@ -288,10 +289,12 @@ export default function AppModals(props: AppModalsProps) {
           setUI((state) => ({
             superResolutionModalState: {
               ...state.superResolutionModalState,
+              outputReview: null,
               settings,
             },
           }));
         }}
+        outputReview={superResolutionModalState.outputReview}
         settings={superResolutionModalState.settings}
         sourceCount={superResolutionModalState.sourcePaths.length}
       />

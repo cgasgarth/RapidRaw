@@ -439,6 +439,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
           superResolutionModalState: {
             ...state.superResolutionModalState,
             isOpen: true,
+            outputReview: null,
             sourcePaths:
               selectedCommandPaths.length > 0 ? selectedCommandPaths : state.superResolutionModalState.sourcePaths,
           },

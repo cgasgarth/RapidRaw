@@ -16,6 +16,7 @@ import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
 
+import type { SuperResolutionOutputReviewWorkflow } from '../../schemas/superResolutionOutputReviewSchemas';
 import type {
   SuperResolutionAlignmentMode,
   SuperResolutionQualityPreference,
@@ -28,6 +29,7 @@ interface SuperResolutionModalProps {
   onClose: () => void;
   onPreviewPlan: () => void;
   onSettingsChange: (settings: SuperResolutionUiSettings) => void;
+  outputReview?: SuperResolutionOutputReviewWorkflow | null;
   settings: SuperResolutionUiSettings;
   sourceCount: number;
 }
@@ -42,6 +44,7 @@ export default function SuperResolutionModal({
   onClose,
   onPreviewPlan,
   onSettingsChange,
+  outputReview: runtimeOutputReview,
   settings,
   sourceCount,
 }: SuperResolutionModalProps) {
@@ -78,12 +81,32 @@ export default function SuperResolutionModal({
   const reconstructionReadinessLabel = isSourceCountValid
     ? t('modals.superResolution.preflight.ready')
     : t('modals.superResolution.preflight.blocked');
-  const outputReview = buildSuperResolutionOutputReviewWorkflow({
-    artifactPath: reviewArtifactPath,
-    settings,
-    sourceCount,
-  });
+  const outputReview =
+    runtimeOutputReview ??
+    buildSuperResolutionOutputReviewWorkflow({
+      artifactPath: reviewArtifactPath,
+      settings,
+      sourceCount,
+    });
+  const hasRuntimeOutputReview = runtimeOutputReview !== null && runtimeOutputReview !== undefined;
   const outputReviewDecisionLabel = t(`modals.superResolution.review.decision.${outputReview.decision}`);
+  const outputReviewEditableGateLabel = t(`modals.superResolution.review.editableGate.${outputReview.editableGate}`);
+  const detailGainLabel =
+    outputReview.detailGainRatio === null
+      ? t('modals.superResolution.review.notMeasured')
+      : t('modals.superResolution.review.detailGainValue', { ratio: outputReview.detailGainRatio });
+  const overlapCoverageLabel =
+    outputReview.overlapCoverageRatio === null
+      ? t('modals.superResolution.review.notMeasured')
+      : t('modals.superResolution.review.coverageValue', {
+          value: Math.round(outputReview.overlapCoverageRatio * 100),
+        });
+  const outputArtifactLabel = hasRuntimeOutputReview
+    ? `${outputReview.outputArtifactId} (${outputReview.outputWidth}x${outputReview.outputHeight})`
+    : t('modals.superResolution.review.notMeasured');
+  const outputHashLabel = hasRuntimeOutputReview
+    ? outputReview.outputArtifactHash
+    : t('modals.superResolution.review.notMeasured');
   const outputReviewWarningsLabel = outputReview.warningCodes
     .map((warningCode) => t(`modals.superResolution.review.warning.${warningCode}`))
     .join(', ');
@@ -337,13 +360,13 @@ export default function SuperResolutionModal({
         items={[
           {
             label: t('modals.superResolution.review.registration'),
-            status: 'ready',
-            value: t('modals.superResolution.review.runtimeBridge'),
+            status: hasRuntimeOutputReview ? 'ready' : 'pending',
+            value: hasRuntimeOutputReview ? overlapCoverageLabel : t('modals.superResolution.review.notMeasured'),
           },
           {
             label: t('modals.superResolution.review.acceptanceGate'),
             status: 'review',
-            value: outputReviewDecisionLabel,
+            value: `${outputReviewDecisionLabel} - ${outputReviewEditableGateLabel}`,
           },
           {
             label: t('modals.superResolution.review.sourceSupport'),
@@ -353,7 +376,7 @@ export default function SuperResolutionModal({
           {
             label: t('modals.superResolution.review.detailGain'),
             status: 'review',
-            value: t('modals.superResolution.review.detailGainValue', { ratio: outputReview.detailGainRatio }),
+            value: detailGainLabel,
           },
           {
             label: t('modals.superResolution.review.artifactWarnings'),
@@ -400,7 +423,11 @@ export default function SuperResolutionModal({
             rows: [
               {
                 label: t('modals.superResolution.review.acceptanceGate'),
-                value: outputReviewDecisionLabel,
+                value: `${outputReviewDecisionLabel} - ${outputReviewEditableGateLabel}`,
+              },
+              {
+                label: t('modals.superResolution.review.humanReviewStatus'),
+                value: t(`modals.superResolution.review.humanReviewStatusValue.${outputReview.humanReviewStatus}`),
               },
               {
                 label: t('modals.superResolution.preflight.detail'),
@@ -408,7 +435,19 @@ export default function SuperResolutionModal({
               },
               {
                 label: t('modals.superResolution.review.detailGain'),
-                value: t('modals.superResolution.review.detailGainValue', { ratio: outputReview.detailGainRatio }),
+                value: detailGainLabel,
+              },
+              {
+                label: t('modals.superResolution.review.coverage'),
+                value: overlapCoverageLabel,
+              },
+              {
+                label: t('modals.superResolution.review.outputArtifact'),
+                value: outputArtifactLabel,
+              },
+              {
+                label: t('modals.superResolution.review.outputHash'),
+                value: outputHashLabel,
               },
               {
                 label: t('modals.superResolution.review.reviewCrops'),

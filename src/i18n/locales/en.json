@@ -2280,6 +2280,8 @@
       "review": {
         "acceptanceGate": "Acceptance gate",
         "artifactWarnings": "Artifact warnings",
+        "coverage": "Overlap coverage",
+        "coverageValue": "{{value}}% source coverage",
         "decision": {
           "blocked": "Blocked",
           "human_review_required": "Human review required",
@@ -2287,7 +2289,22 @@
         },
         "detailGain": "Detail gain",
         "detailGainValue": "{{ratio}}x synthetic detail gain",
+        "editableGate": {
+          "blocked_review_required": "Editable handoff blocked until review passes",
+          "blocked_stale": "Editable handoff blocked by stale artifact",
+          "ready": "Editable handoff ready"
+        },
+        "humanReviewStatus": "Human review",
+        "humanReviewStatusValue": {
+          "failed": "Failed",
+          "not_required": "Not required",
+          "passed": "Passed",
+          "pending": "Pending"
+        },
         "limitation": "Runtime bridge proof only; private RAW decode, detail QA, and UI E2E remain open.",
+        "notMeasured": "Not measured",
+        "outputArtifact": "Output artifact",
+        "outputHash": "Output hash",
         "privateRawPending": "Private RAW review pending",
         "proofStatus": "App-server bridge ready",
         "provenance": "Provenance",
@@ -2307,6 +2324,7 @@
         "uiE2ePending": "UI E2E pending",
         "warning": {
           "aggressive_preview_only": "aggressive preview only",
+          "effective_scale_downgraded": "effective scale downgraded",
           "human_review_required": "human review required",
           "synthetic_runtime_only": "synthetic runtime only",
           "texture_risk": "texture risk"
