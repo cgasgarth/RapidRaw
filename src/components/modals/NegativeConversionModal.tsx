@@ -46,6 +46,11 @@ import {
   buildNegativeLabQcProofReport,
 } from '../../utils/negativeLabDustScratchReview';
 import {
+  buildNegativeLabFrameExposureOverridePayload,
+  getNegativeLabEffectiveFrameExposure,
+  snapNegativeLabFrameExposureOffset,
+} from '../../utils/negativeLabFrameExposureOverrides';
+import {
   buildNegativeLabBatchDryRunSummary,
   buildNegativeLabFrameHealthReport,
   getNegativeLabScanLabel,
@@ -452,6 +457,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [frameHealthFilter, setFrameHealthFilter] = useState<NegativeLabFrameHealthFilter>('all');
   const [frameHealthSort, setFrameHealthSort] = useState<NegativeLabFrameHealthSort>('roll_order');
   const [qcDecisionByFrameId, setQcDecisionByFrameId] = useState<Record<string, NegativeLabQcDecision>>({});
+  const [frameExposureOffsetByFrameId, setFrameExposureOffsetByFrameId] = useState<Record<string, number>>({});
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [isCompareActive, setIsCompareActive] = useState(false);
@@ -627,6 +633,31 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     return filteredRows;
   }, [frameHealthFilter, frameHealthReport.frames, frameHealthSort]);
   const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
+  const frameExposureOverridePayload = useMemo(
+    () =>
+      buildNegativeLabFrameExposureOverridePayload({
+        baselineExposure: params.exposure,
+        frameHealthRows: frameHealthReport.frames,
+        offsetsByFrameId: frameExposureOffsetByFrameId,
+      }),
+    [frameExposureOffsetByFrameId, frameHealthReport.frames, params.exposure],
+  );
+  const activeFrameExposureOffset = useMemo(
+    () =>
+      frameHealthReport.activeFrameId === null
+        ? 0
+        : snapNegativeLabFrameExposureOffset(frameExposureOffsetByFrameId[frameHealthReport.activeFrameId] ?? 0),
+    [frameExposureOffsetByFrameId, frameHealthReport.activeFrameId],
+  );
+  const effectiveActiveExposure = useMemo(
+    () =>
+      getNegativeLabEffectiveFrameExposure({
+        baselineExposure: params.exposure,
+        frameId: frameHealthReport.activeFrameId,
+        offsetsByFrameId: frameExposureOffsetByFrameId,
+      }),
+    [frameExposureOffsetByFrameId, frameHealthReport.activeFrameId, params.exposure],
+  );
   const approvedQcFrameIds = useMemo(
     () =>
       Object.entries(qcDecisionByFrameId)
@@ -696,6 +727,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         {
           batchScope: conversionScope,
           dryRunSummary: batchDryRunSummary,
+          frameExposureOverrides: frameExposureOverridePayload,
           omittedDispositionFrameIds,
           qcDecisions: qcDecisionByFrameId,
           selectedProfile: selectedProfileSnapshot,
@@ -703,7 +735,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         null,
         2,
       ),
-    [batchDryRunSummary, conversionScope, omittedDispositionFrameIds, qcDecisionByFrameId, selectedProfileSnapshot],
+    [
+      batchDryRunSummary,
+      conversionScope,
+      frameExposureOverridePayload,
+      omittedDispositionFrameIds,
+      qcDecisionByFrameId,
+      selectedProfileSnapshot,
+    ],
   );
   const acceptedBatchPlanIdentity = useMemo(() => {
     if (selectedProfileSnapshot === null) {
@@ -967,11 +1006,25 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setSaveOptions(DEFAULT_SAVE_OPTIONS);
       setConversionScope('all');
       setIncludedPathSet(getInitialIncludedPaths(targetPaths));
+      setFrameExposureOffsetByFrameId({});
     }, 300);
     return () => {
       window.clearTimeout(timer);
     };
   }, [isOpen, resetViewport, selectedImagePath, targetPaths, updatePreview]);
+
+  const buildParamsWithFrameExposure = (
+    baseParams: NegativeParams,
+    frameId: string | null = frameHealthReport.activeFrameId,
+    offsetsByFrameId: Readonly<Record<string, number>> = frameExposureOffsetByFrameId,
+  ): NegativeParams => ({
+    ...baseParams,
+    exposure: getNegativeLabEffectiveFrameExposure({
+      baselineExposure: baseParams.exposure,
+      frameId,
+      offsetsByFrameId,
+    }),
+  });
 
   const handleParamChange = (key: keyof NegativeParams, value: number) => {
     const newParams = { ...params, [key]: value };
@@ -983,7 +1036,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     }
     setParams(newParams);
     setAcceptedBatchPlanJson(null);
-    updatePreview(newParams);
+    updatePreview(buildParamsWithFrameExposure(newParams));
   };
 
   const handlePresetSelect = (preset: NegativeLabRuntimeProfileBrowserRow) => {
@@ -999,7 +1052,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogSampleUndoStack([]);
     setParams(preset.params);
     setAcceptedBatchPlanJson(null);
-    updatePreview(preset.params);
+    updatePreview(buildParamsWithFrameExposure(preset.params));
   };
 
   const pushBaseFogSampleUndoEntry = () => {
@@ -1030,7 +1083,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setSelectedPresetId(previous.selectedPresetId);
     setParams(previous.params);
     setAcceptedBatchPlanJson(null);
-    updatePreview(previous.params);
+    updatePreview(buildParamsWithFrameExposure(previous.params));
   };
 
   const handleAutoBaseFog = async () => {
@@ -1069,7 +1122,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
-      updatePreview(nextParams, false, proofContext);
+      updatePreview(buildParamsWithFrameExposure(nextParams), false, proofContext);
     } catch (e) {
       console.error('Negative base/fog estimate failed', e);
     } finally {
@@ -1113,7 +1166,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setActiveBaseFogSampleLabel(t(labelKey));
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
-      updatePreview(nextParams, false, proofContext);
+      updatePreview(buildParamsWithFrameExposure(nextParams), false, proofContext);
     } catch (e) {
       console.error('Base/fog sample failed', e);
     } finally {
@@ -1174,7 +1227,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setActiveBaseFogSampleLabel(t('modals.negativeConversion.customBaseSample'));
     setParams(nextParams);
     setAcceptedBatchPlanJson(null);
-    updatePreview(nextParams, false, proofContext);
+    updatePreview(buildParamsWithFrameExposure(nextParams), false, proofContext);
   };
 
   const handlePromoteBaseFogToRoll = () => {
@@ -1257,6 +1310,17 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     });
   };
 
+  const handleFrameExposureOffsetChange = (frameId: string, value: number) => {
+    const snappedOffset = snapNegativeLabFrameExposureOffset(value);
+    const nextOffsets =
+      snappedOffset === 0
+        ? Object.fromEntries(Object.entries(frameExposureOffsetByFrameId).filter(([key]) => key !== frameId))
+        : { ...frameExposureOffsetByFrameId, [frameId]: snappedOffset };
+    setFrameExposureOffsetByFrameId(nextOffsets);
+    setAcceptedBatchPlanJson(null);
+    updatePreview(buildParamsWithFrameExposure(params, frameId, nextOffsets));
+  };
+
   const handleSave = async () => {
     if (!canSave) return;
     setIsSaving(true);
@@ -1272,6 +1336,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             ...(requiresAcceptedBatchPlan ? acceptedBatchPlanIdentity : {}),
             batchDisposition: batchDryRunSummary.dispositionCounts,
             batchScope: conversionScope,
+            frameExposureOverrides: frameExposureOverridePayload,
             omittedDispositionFrameIds,
             qcApprovedFrameIds: approvedQcFrameIds,
             qcRejectedFrameIds: rejectedQcFrameIds,
@@ -1308,7 +1373,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   const handleSelectFrameIndex = (frameIndex: number) => {
     if (targetPaths[frameIndex] === undefined) return;
+    const nextFrameId = frameHealthReport.frames.find((frame) => frame.pathIndex === frameIndex)?.frameId ?? null;
     setActivePathIndex(frameIndex);
+    updatePreview(buildParamsWithFrameExposure(params, nextFrameId));
     resetViewport();
   };
 
@@ -1490,6 +1557,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       >
                         {t(BATCH_DISPOSITION_LABEL_KEYS[frame.batchDisposition])}
                       </span>
+                      {snapNegativeLabFrameExposureOffset(frameExposureOffsetByFrameId[frame.frameId] ?? 0) !== 0 && (
+                        <span
+                          className="rounded bg-blue-500/15 px-1.5 py-0.5 text-[11px] text-blue-100"
+                          data-testid={`negative-lab-roll-frame-exposure-override-${index}`}
+                        >
+                          {formatSignedRecipeValue(
+                            snapNegativeLabFrameExposureOffset(frameExposureOffsetByFrameId[frame.frameId] ?? 0),
+                          )}
+                        </span>
+                      )}
                     </span>
                   </button>
                 );
@@ -1756,7 +1833,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           <div className="grid gap-1">
             {visibleFrameHealthRows.map((row: NegativeLabFrameHealthEntry, index) => (
               <div
-                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
                 data-acquisition-source={row.acquisitionSourceFamily}
                 data-conversion-status={row.conversionStatus}
                 data-crop-status={row.cropStatus}
@@ -1839,7 +1916,23 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   {t(`modals.negativeConversion.frameQcStatus.${row.qcStatus}`)}
                 </span>
                 <span
-                  className="col-span-8 flex flex-wrap items-center gap-1 text-[11px]"
+                  className={cx(
+                    'rounded px-1.5 py-0.5 tabular-nums',
+                    snapNegativeLabFrameExposureOffset(frameExposureOffsetByFrameId[row.frameId] ?? 0) === 0
+                      ? 'bg-bg-primary text-text-tertiary'
+                      : 'bg-blue-500/15 text-blue-200',
+                  )}
+                  data-exposure-offset={snapNegativeLabFrameExposureOffset(
+                    frameExposureOffsetByFrameId[row.frameId] ?? 0,
+                  )}
+                  data-testid={`negative-lab-frame-exposure-override-${index}`}
+                >
+                  {formatSignedRecipeValue(
+                    snapNegativeLabFrameExposureOffset(frameExposureOffsetByFrameId[row.frameId] ?? 0),
+                  )}
+                </span>
+                <span
+                  className="col-span-9 flex flex-wrap items-center gap-1 text-[11px]"
                   data-qc-decision={qcDecisionByFrameId[row.frameId] ?? 'pending'}
                   data-testid={`negative-lab-frame-qc-decision-${index}`}
                 >
@@ -2070,6 +2163,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             setSelectedPresetId(DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId);
             setBaseFogConfidence(null);
             setActiveBaseFogSampleLabel(null);
+            setFrameExposureOffsetByFrameId({});
             updatePreview(DEFAULT_PARAMS);
           }}
           disabled={isSaving || isEstimatingBaseFog}
@@ -2836,6 +2930,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-recipe-exposure">
                 {formatSignedRecipeValue(params.exposure)}
               </span>
+              <span>{t('modals.negativeConversion.frameExposureOffset')}</span>
+              <span
+                className="text-right tabular-nums text-text-secondary"
+                data-effective-exposure={effectiveActiveExposure}
+                data-testid="negative-lab-recipe-frame-exposure-offset"
+              >
+                {formatSignedRecipeValue(activeFrameExposureOffset)}
+              </span>
               <span>{t('modals.negativeConversion.contrast')}</span>
               <span className="text-right tabular-nums text-text-secondary" data-testid="negative-lab-recipe-contrast">
                 {params.contrast.toFixed(2)}
@@ -3221,6 +3323,51 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 handleParamChange('exposure', Number(e.target.value));
               }}
             />
+            <div
+              className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+              data-active-frame-id={frameHealthReport.activeFrameId ?? ''}
+              data-effective-exposure={effectiveActiveExposure}
+              data-exposure-offset={activeFrameExposureOffset}
+              data-testid="negative-lab-frame-exposure-override-control"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <UiText variant={TextVariants.small} className="text-text-secondary">
+                  {t('modals.negativeConversion.frameExposureOffset')}
+                </UiText>
+                <button
+                  className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                  data-testid="negative-lab-reset-frame-exposure"
+                  disabled={frameHealthReport.activeFrameId === null || activeFrameExposureOffset === 0 || isSaving}
+                  onClick={() => {
+                    if (frameHealthReport.activeFrameId !== null) {
+                      handleFrameExposureOffsetChange(frameHealthReport.activeFrameId, 0);
+                    }
+                  }}
+                  type="button"
+                >
+                  {t('modals.negativeConversion.resetFrameExposure')}
+                </button>
+              </div>
+              <Slider
+                label={t('modals.negativeConversion.frameExposureOffset')}
+                value={activeFrameExposureOffset}
+                min={-2}
+                max={2}
+                step={0.05}
+                defaultValue={0}
+                disabled={frameHealthReport.activeFrameId === null || isSaving}
+                onChange={(event) => {
+                  if (frameHealthReport.activeFrameId !== null) {
+                    handleFrameExposureOffsetChange(frameHealthReport.activeFrameId, Number(event.target.value));
+                  }
+                }}
+              />
+              <UiText variant={TextVariants.small} className="text-text-tertiary">
+                {t('modals.negativeConversion.effectiveFrameExposure', {
+                  exposure: formatSignedRecipeValue(effectiveActiveExposure),
+                })}
+              </UiText>
+            </div>
             <Slider
               label={t('modals.negativeConversion.contrast')}
               value={params.contrast}

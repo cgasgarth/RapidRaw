@@ -2044,6 +2044,7 @@
         "retouch": "",
         "review": ""
       },
+      "effectiveFrameExposure": "Effective frame exposure {{exposure}} EV",
       "excludeScan": "Exclude",
       "exportOptions": "导出选项",
       "exposure": "曝光",
@@ -2058,6 +2059,7 @@
         "roll_default": "Roll crop",
         "skipped": "Skipped"
       },
+      "frameExposureOffset": "Frame exposure offset",
       "frameHealth": "Frame health",
       "frameHealthActive": "Active",
       "frameHealthFilter": {
@@ -2155,6 +2157,7 @@
       "queuedScans": "{{queuedCount}} queued",
       "readoutCopied": "Copied readout",
       "redWeight": "红色（青色）",
+      "resetFrameExposure": "Reset frame",
       "resetTooltip": "重置",
       "resetViewTooltip": "重置视图",
       "sampleCenterPatch": "Center patch",

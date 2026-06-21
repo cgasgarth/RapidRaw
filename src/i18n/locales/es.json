@@ -1503,7 +1503,10 @@
       "qcDecisionApproved": "Approved",
       "qcDecisionPending": "Pending",
       "qcDecisionRejected": "Rejected",
-      "qcRejectedCount": "Rejected {{rejectedCount}}"
+      "qcRejectedCount": "Rejected {{rejectedCount}}",
+      "effectiveFrameExposure": "Effective frame exposure {{exposure}} EV",
+      "frameExposureOffset": "Frame exposure offset",
+      "resetFrameExposure": "Reset frame"
     },
     "panorama": {
       "cancel": "Cancelar",

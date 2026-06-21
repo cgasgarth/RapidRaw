@@ -72,6 +72,17 @@ pub struct NegativeConversionSaveOptions {
     pub profile_provenance_hash: Option<String>,
     #[serde(default)]
     pub selected_profile: Option<NegativeLabSelectedProfileSnapshot>,
+    #[serde(default)]
+    pub frame_exposure_overrides: Vec<NegativeLabFrameExposureOverride>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabFrameExposureOverride {
+    pub effective_exposure: f32,
+    pub exposure_offset: f32,
+    pub frame_id: String,
+    pub source_path: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -135,6 +146,7 @@ impl Default for NegativeConversionSaveOptions {
             acquisition_source_families: Vec::new(),
             profile_provenance_hash: None,
             selected_profile: None,
+            frame_exposure_overrides: Vec::new(),
         }
     }
 }
@@ -152,6 +164,17 @@ impl NegativeConversionSaveOptions {
                     .map(|hash| hash == &profile.profile_provenance_hash)
                     .unwrap_or(true)
         });
+        let frame_exposure_overrides = self
+            .frame_exposure_overrides
+            .into_iter()
+            .filter(|override_entry| {
+                override_entry.effective_exposure.is_finite()
+                    && override_entry.exposure_offset.is_finite()
+                    && (MIN_EXPOSURE..=MAX_EXPOSURE).contains(&override_entry.exposure_offset)
+                    && !override_entry.frame_id.trim().is_empty()
+                    && !override_entry.source_path.trim().is_empty()
+            })
+            .collect();
 
         Self {
             output_format: self.output_format,
@@ -171,6 +194,7 @@ impl NegativeConversionSaveOptions {
                 .collect(),
             profile_provenance_hash,
             selected_profile,
+            frame_exposure_overrides,
         }
     }
 
@@ -201,6 +225,26 @@ impl NegativeConversionSaveOptions {
         }
 
         Ok(())
+    }
+
+    fn effective_params_for_path(
+        &self,
+        base_params: &NegativeConversionParams,
+        source_path: &str,
+    ) -> NegativeConversionParams {
+        if let Some(override_entry) = self
+            .frame_exposure_overrides
+            .iter()
+            .find(|candidate| candidate.source_path == source_path)
+        {
+            return NegativeConversionParams {
+                exposure: override_entry.effective_exposure,
+                ..*base_params
+            }
+            .sanitized();
+        }
+
+        *base_params
     }
 }
 
@@ -402,6 +446,7 @@ fn write_negative_lab_conversion_bundle(
         "conversion": {
             "acceptedDryRunPlanHash": save_options.accepted_dry_run_plan_hash,
             "acceptedDryRunPlanId": save_options.accepted_dry_run_plan_id,
+            "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
             "outputFormat": output_format,
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
@@ -458,6 +503,7 @@ fn write_negative_lab_output_sidecar(
         "conversion": {
             "acceptedDryRunPlanHash": save_options.accepted_dry_run_plan_hash,
             "acceptedDryRunPlanId": save_options.accepted_dry_run_plan_id,
+            "frameExposureOverrides": save_options.frame_exposure_overrides.clone(),
             "outputFormat": output_format,
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
@@ -969,14 +1015,16 @@ pub async fn convert_negatives(
                 .par_iter()
                 .map(|&v| -v.clamp(1e-6, 1.0).log10())
                 .collect();
+            let effective_params =
+                save_options.effective_params_for_path(&sanitized_params, &real_path);
             let bounds = analyze_bounds(
                 &log_pixels,
                 ref_w as usize,
                 ref_h as usize,
-                sanitized_params.base_fog_sample,
+                effective_params.base_fog_sample,
             );
 
-            let processed = run_pipeline(&img, &sanitized_params, Some(bounds));
+            let processed = run_pipeline(&img, &effective_params, Some(bounds));
 
             let out_path = build_negative_output_path(&real_path, &save_options);
             let filename = out_path
@@ -1010,7 +1058,7 @@ pub async fn convert_negatives(
             write_negative_lab_output_sidecar(
                 &out_path,
                 Path::new(&real_path),
-                &sanitized_params,
+                &effective_params,
                 &save_options,
                 processed.width(),
                 processed.height(),
@@ -1158,6 +1206,7 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
+            frame_exposure_overrides: Vec::new(),
             suffix: " Proof / Final:01 ".to_string(),
         }
         .sanitized();
@@ -1184,6 +1233,7 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
+            frame_exposure_overrides: Vec::new(),
             suffix: "///".to_string(),
         }
         .sanitized();
@@ -1203,6 +1253,7 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
+            frame_exposure_overrides: Vec::new(),
             suffix: "Web Proof".to_string(),
         }
         .sanitized();
@@ -1215,6 +1266,7 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
+            frame_exposure_overrides: Vec::new(),
             suffix: "".to_string(),
         }
         .sanitized();
@@ -1253,6 +1305,7 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
+            frame_exposure_overrides: Vec::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         assert!(accepted_plan.validate_accepted_batch_plan(2).is_ok());
@@ -1266,9 +1319,42 @@ mod tests {
             acquisition_warning_codes: Vec::new(),
             acquisition_source_families: Vec::new(),
             selected_profile: None,
+            frame_exposure_overrides: Vec::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         assert!(mismatched_plan.validate_accepted_batch_plan(2).is_err());
+    }
+
+    #[test]
+    fn negative_conversion_applies_path_scoped_frame_exposure_override() {
+        let base_params = NegativeConversionParams {
+            exposure: -0.05,
+            ..NegativeConversionParams::default()
+        }
+        .sanitized();
+        let save_options = NegativeConversionSaveOptions {
+            frame_exposure_overrides: vec![NegativeLabFrameExposureOverride {
+                effective_exposure: 0.45,
+                exposure_offset: 0.5,
+                frame_id: "negative-lab-frame-1".to_string(),
+                source_path: "/roll/frame-001.tif".to_string(),
+            }],
+            ..NegativeConversionSaveOptions::default()
+        }
+        .sanitized();
+
+        assert_eq!(
+            save_options
+                .effective_params_for_path(&base_params, "/roll/frame-001.tif")
+                .exposure,
+            0.45
+        );
+        assert_eq!(
+            save_options
+                .effective_params_for_path(&base_params, "/roll/frame-002.tif")
+                .exposure,
+            -0.05
+        );
     }
 
     #[test]
@@ -1315,6 +1401,7 @@ mod tests {
                 runtime_status: "runtime_parameter_applied".to_string(),
                 source_generic_preset_id: Some("negative_lab.generic.c41.neutral.v1".to_string()),
             }),
+            frame_exposure_overrides: Vec::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
 
@@ -1399,6 +1486,7 @@ mod tests {
             acquisition_source_families: vec!["jpeg_lossy".to_string()],
             profile_provenance_hash: Some("fnv1a32:468872b8".to_string()),
             selected_profile: None,
+            frame_exposure_overrides: Vec::new(),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         let bundle_path = negative_lab_conversion_bundle_path(&output_path);
@@ -1855,6 +1943,7 @@ mod tests {
                 runtime_status: "runtime_parameter_applied".to_string(),
                 source_generic_preset_id: None,
             }),
+            frame_exposure_overrides: Vec::new(),
             suffix: "Positive".to_string(),
         };
         write_negative_lab_output_sidecar(
