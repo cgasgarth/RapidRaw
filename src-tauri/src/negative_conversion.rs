@@ -64,6 +64,26 @@ pub struct NegativeConversionSaveOptions {
     pub accepted_dry_run_plan_id: Option<String>,
     #[serde(default)]
     pub profile_provenance_hash: Option<String>,
+    #[serde(default)]
+    pub selected_profile: Option<NegativeLabSelectedProfileSnapshot>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NegativeLabSelectedProfileSnapshot {
+    pub claim_level: String,
+    pub claim_policy: String,
+    pub display_name: String,
+    pub does_not_prove: Vec<String>,
+    pub evidence_fixture_count: u32,
+    pub measurement_profile_id: Option<String>,
+    pub params: NegativeConversionParams,
+    pub preset_id: String,
+    pub profile_provenance_hash: String,
+    pub profile_status: String,
+    pub provenance_summary: String,
+    pub runtime_status: String,
+    pub source_generic_preset_id: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone, Copy)]
@@ -100,6 +120,7 @@ impl Default for NegativeConversionSaveOptions {
             accepted_dry_run_plan_hash: None,
             accepted_dry_run_plan_id: None,
             profile_provenance_hash: None,
+            selected_profile: None,
         }
     }
 }
@@ -107,15 +128,24 @@ impl Default for NegativeConversionSaveOptions {
 impl NegativeConversionSaveOptions {
     fn sanitized(self) -> Self {
         let suffix = sanitize_output_suffix(&self.suffix);
+        let profile_provenance_hash = self
+            .profile_provenance_hash
+            .filter(|hash| is_valid_negative_lab_profile_provenance_hash(hash));
+        let selected_profile = self.selected_profile.filter(|profile| {
+            is_valid_negative_lab_profile_provenance_hash(&profile.profile_provenance_hash)
+                && profile_provenance_hash
+                    .as_ref()
+                    .map(|hash| hash == &profile.profile_provenance_hash)
+                    .unwrap_or(true)
+        });
 
         Self {
             output_format: self.output_format,
             suffix,
             accepted_dry_run_plan_hash: self.accepted_dry_run_plan_hash,
             accepted_dry_run_plan_id: self.accepted_dry_run_plan_id,
-            profile_provenance_hash: self
-                .profile_provenance_hash
-                .filter(|hash| is_valid_negative_lab_profile_provenance_hash(hash)),
+            profile_provenance_hash,
+            selected_profile,
         }
     }
 
@@ -260,6 +290,7 @@ fn write_negative_lab_output_sidecar(
             "outputFormat": output_format,
             "params": params,
             "profileProvenanceHash": save_options.profile_provenance_hash,
+            "selectedProfile": save_options.selected_profile.clone(),
         },
         "operationId": "negative_lab.convert",
         "operationVersion": 1,
@@ -276,6 +307,7 @@ fn write_negative_lab_output_sidecar(
         "provenance": {
             "commandId": "command_negative_lab_convert",
             "profileProvenanceHash": save_options.profile_provenance_hash,
+            "selectedProfile": save_options.selected_profile.clone(),
             "runtimeStatus": "rendered",
         },
         "schemaVersion": 1,
@@ -932,6 +964,7 @@ mod tests {
             accepted_dry_run_plan_id: None,
             profile_provenance_hash: Some("fnv1a32:2f4a91bc".to_string()),
             output_format: NegativeConversionOutputFormat::JpegProof,
+            selected_profile: None,
             suffix: " Proof / Final:01 ".to_string(),
         }
         .sanitized();
@@ -954,6 +987,7 @@ mod tests {
             accepted_dry_run_plan_id: None,
             profile_provenance_hash: Some("not-a-hash".to_string()),
             output_format: NegativeConversionOutputFormat::Tiff16,
+            selected_profile: None,
             suffix: "///".to_string(),
         }
         .sanitized();
@@ -969,6 +1003,7 @@ mod tests {
             accepted_dry_run_plan_id: None,
             profile_provenance_hash: None,
             output_format: NegativeConversionOutputFormat::JpegProof,
+            selected_profile: None,
             suffix: "Web Proof".to_string(),
         }
         .sanitized();
@@ -977,6 +1012,7 @@ mod tests {
             accepted_dry_run_plan_id: None,
             profile_provenance_hash: None,
             output_format: NegativeConversionOutputFormat::Tiff16,
+            selected_profile: None,
             suffix: "".to_string(),
         }
         .sanitized();
@@ -1011,6 +1047,7 @@ mod tests {
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
             profile_provenance_hash: Some("fnv1a32:aaaaaaaa".to_string()),
             output_format: NegativeConversionOutputFormat::Tiff16,
+            selected_profile: None,
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         assert!(accepted_plan.validate_accepted_batch_plan(2).is_ok());
@@ -1020,6 +1057,7 @@ mod tests {
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_deadbeef".to_string()),
             profile_provenance_hash: None,
             output_format: NegativeConversionOutputFormat::Tiff16,
+            selected_profile: None,
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
         assert!(mismatched_plan.validate_accepted_batch_plan(2).is_err());
@@ -1046,6 +1084,26 @@ mod tests {
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
             profile_provenance_hash: Some("fnv1a32:aaaaaaaa".to_string()),
             output_format: NegativeConversionOutputFormat::Tiff16,
+            selected_profile: Some(NegativeLabSelectedProfileSnapshot {
+                claim_level: "measured_profile".to_string(),
+                claim_policy: "process_family_profile_no_stock_claim".to_string(),
+                display_name: "Measured C-41 Process Family".to_string(),
+                does_not_prove: vec![
+                    "no_stock_emulation_claim".to_string(),
+                    "no_colorimetric_match_claim".to_string(),
+                ],
+                evidence_fixture_count: 1,
+                measurement_profile_id: Some(
+                    "negative_lab.measured.c41.process_family.v1".to_string(),
+                ),
+                params,
+                preset_id: "negative_lab.measured.c41.process_family.v1".to_string(),
+                profile_provenance_hash: "fnv1a32:aaaaaaaa".to_string(),
+                profile_status: "fixture_measured".to_string(),
+                provenance_summary: "Fixture-measured process-family profile.".to_string(),
+                runtime_status: "runtime_parameter_applied".to_string(),
+                source_generic_preset_id: Some("negative_lab.generic.c41.neutral.v1".to_string()),
+            }),
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
 
@@ -1071,6 +1129,14 @@ mod tests {
         assert_eq!(artifact["operationId"], "negative_lab.convert");
         assert_eq!(
             artifact["conversion"]["profileProvenanceHash"],
+            "fnv1a32:aaaaaaaa"
+        );
+        assert_eq!(
+            artifact["conversion"]["selectedProfile"]["presetId"],
+            "negative_lab.measured.c41.process_family.v1"
+        );
+        assert_eq!(
+            artifact["provenance"]["selectedProfile"]["profileProvenanceHash"],
             "fnv1a32:aaaaaaaa"
         );
         assert_eq!(
@@ -1488,6 +1554,7 @@ mod tests {
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
             output_format: NegativeConversionOutputFormat::JpegProof,
             profile_provenance_hash: Some("fnv1a32:9d4a13c8".to_string()),
+            selected_profile: None,
             suffix: "Positive".to_string(),
         };
         write_negative_lab_output_sidecar(

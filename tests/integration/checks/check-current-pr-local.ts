@@ -268,8 +268,9 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:panorama-review-diagnostics', 'check:panorama-runtime-preflight-ui'],
   );
   addIf(
-    (file) => file === 'src/components/modals/NegativeConversionModal.tsx',
-    ['check:negative-lab-workspace', 'check:negative-lab-roll-cockpit'],
+    (file) =>
+      file === 'src/components/modals/NegativeConversionModal.tsx' || file.includes('negativeLabProfileComparison'),
+    ['check:negative-lab-ui-presets', 'check:negative-lab-workspace', 'check:negative-lab-roll-cockpit'],
   );
   addIf((file) => file === 'src/components/panel/right/LayerStackPanel.tsx', ['check:layer-stack-panel-ui']);
   addIf((file) => file === 'src/components/panel/right/MetadataPanel.tsx', ['check:metadata-panel-ui']);

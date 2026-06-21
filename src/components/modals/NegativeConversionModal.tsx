@@ -50,12 +50,18 @@ import {
   NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS,
   type NegativeLabOutputFormatId as NegativeOutputFormat,
 } from '../../utils/negativeLabOutputFormatIds';
-import { buildNegativeLabAcceptedPlanIdentity, buildNegativeLabPlanHash } from '../../utils/negativeLabPlanIdentity';
+import { buildNegativeLabAcceptedPlanIdentity } from '../../utils/negativeLabPlanIdentity';
 import {
   DEFAULT_NEGATIVE_LAB_UI_PRESET,
   NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG,
 } from '../../utils/negativeLabPresetCatalog';
 import { buildNegativeLabProfileBrowserRows } from '../../utils/negativeLabProfileBrowserRows';
+import {
+  buildNegativeLabBrowserProfileProvenanceHash,
+  buildNegativeLabProfileBoundPlanIdentity,
+  buildNegativeLabProfileComparisonRows,
+  buildNegativeLabSelectedProfileSnapshot,
+} from '../../utils/negativeLabProfileComparison';
 import { buildNegativeLabQcContactSheetArtifact } from '../../utils/negativeLabQcContactSheetArtifact';
 import {
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
@@ -76,6 +82,7 @@ import type {
   NegativeLabAcquisitionWarningCode,
 } from '../../schemas/negativeLabFrameHealthSchemas';
 import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
+import type { NegativeLabSelectedProfileSnapshot } from '../../schemas/negativeLabProfileComparisonSchemas';
 import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspaceSchemas';
 
 type NegativeParams = NegativeLabPresetParams;
@@ -450,25 +457,25 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     () => NEGATIVE_LAB_PROFILE_BROWSER_ROWS.find((profile) => profile.presetId === selectedPresetId) ?? null,
     [selectedPresetId],
   );
+  const profileProvenanceHashById = useMemo(
+    () =>
+      new Map(
+        NEGATIVE_LAB_PROFILE_BROWSER_ROWS.map((profile) => [
+          profile.presetId,
+          buildNegativeLabBrowserProfileProvenanceHash(profile),
+        ]),
+      ),
+    [],
+  );
   const selectedProfileProvenanceHash = useMemo(() => {
     if (selectedProfile === null) return null;
 
-    return `fnv1a32:${buildNegativeLabPlanHash(
-      JSON.stringify({
-        claimLevel: selectedProfile.claimLevel,
-        claimPolicy: selectedProfile.claimPolicy,
-        displayName: selectedProfile.displayName,
-        doesNotProve: selectedProfile.doesNotProve,
-        evidenceFixtureCount: selectedProfile.evidenceFixtureCount,
-        measurementProfileId: selectedProfile.measurementProfileId,
-        params: selectedProfile.params,
-        presetId: selectedProfile.presetId,
-        profileStatus: selectedProfile.profileStatus,
-        runtimeStatus: selectedProfile.runtimeStatus,
-        sourceGenericPresetId: selectedProfile.sourceGenericPresetId,
-      }),
-    )}`;
-  }, [selectedProfile]);
+    return profileProvenanceHashById.get(selectedProfile.presetId) ?? null;
+  }, [profileProvenanceHashById, selectedProfile]);
+  const selectedProfileSnapshot = useMemo<NegativeLabSelectedProfileSnapshot | null>(() => {
+    if (selectedProfile === null || selectedProfileProvenanceHash === null) return null;
+    return buildNegativeLabSelectedProfileSnapshot(selectedProfile, selectedProfileProvenanceHash);
+  }, [selectedProfile, selectedProfileProvenanceHash]);
   const selectedPresetFilmClass =
     selectedProfile?.filmClass === 'black_and_white_silver' ? 'Black and white silver' : 'Color negative';
   const selectedPresetClaimLabel =
@@ -535,10 +542,47 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewUrl !== null),
     [frameHealthReport, previewUrl],
   );
-  const batchDryRunPlanJson = useMemo(() => JSON.stringify(batchDryRunSummary, null, 2), [batchDryRunSummary]);
-  const acceptedBatchPlanIdentity = useMemo(
-    () => buildNegativeLabAcceptedPlanIdentity(batchDryRunPlanJson),
-    [batchDryRunPlanJson],
+  const batchDryRunSummaryJson = useMemo(() => JSON.stringify(batchDryRunSummary), [batchDryRunSummary]);
+  const batchDryRunPlanJson = useMemo(
+    () =>
+      JSON.stringify(
+        {
+          dryRunSummary: batchDryRunSummary,
+          selectedProfile: selectedProfileSnapshot,
+        },
+        null,
+        2,
+      ),
+    [batchDryRunSummary, selectedProfileSnapshot],
+  );
+  const acceptedBatchPlanIdentity = useMemo(() => {
+    if (selectedProfileSnapshot === null) {
+      return buildNegativeLabAcceptedPlanIdentity(batchDryRunPlanJson);
+    }
+    return buildNegativeLabProfileBoundPlanIdentity(batchDryRunSummaryJson, selectedProfileSnapshot);
+  }, [batchDryRunPlanJson, batchDryRunSummaryJson, selectedProfileSnapshot]);
+  const profileComparisonRows = useMemo(
+    () =>
+      buildNegativeLabProfileComparisonRows({
+        activeFrameLabel: getNegativeLabScanLabel(
+          selectedImagePath ?? targetPaths[effectiveActivePathIndex] ?? '',
+          effectiveActivePathIndex,
+        ),
+        currentParams: params,
+        profiles: NEGATIVE_LAB_PROFILE_BROWSER_ROWS,
+        profileProvenanceHashById,
+        queuedCount: Math.max(1, frameHealthReport.queuedCount),
+        selectedPresetId,
+      }),
+    [
+      effectiveActivePathIndex,
+      frameHealthReport.queuedCount,
+      params,
+      profileProvenanceHashById,
+      selectedImagePath,
+      selectedPresetId,
+      targetPaths,
+    ],
   );
   const isBatchPlanCopied = copiedBatchPlanJson === batchDryRunPlanJson;
   const isBatchPlanAccepted = acceptedBatchPlanJson === batchDryRunPlanJson && !batchDryRunSummary.blocked;
@@ -781,6 +825,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setActiveBaseFogSampleLabel(null);
     setBaseFogSampleUndoStack([]);
     setParams(preset.params);
+    setAcceptedBatchPlanJson(null);
     updatePreview(preset.params);
   };
 
@@ -836,7 +881,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setBaseFogEstimate(estimate);
       setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
-      setSelectedPresetId('');
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
       updatePreview(nextParams);
@@ -872,7 +916,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setBaseFogEstimate(estimate);
       setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(t(labelKey));
-      setSelectedPresetId('');
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
       updatePreview(nextParams);
@@ -925,7 +968,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogEstimate(customBaseSampleEstimate);
     setBaseFogReadoutCopied(false);
     setActiveBaseFogSampleLabel(t('modals.negativeConversion.customBaseSample'));
-    setSelectedPresetId('');
     setParams(nextParams);
     setAcceptedBatchPlanJson(null);
     updatePreview(nextParams);
@@ -1006,6 +1048,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             ...saveOptions,
             ...(requiresAcceptedBatchPlan ? acceptedBatchPlanIdentity : {}),
             ...(selectedProfileProvenanceHash === null ? {} : { profileProvenanceHash: selectedProfileProvenanceHash }),
+            ...(selectedProfileSnapshot === null ? {} : { selectedProfile: selectedProfileSnapshot }),
           },
         },
         negativeConversionSavedPathsSchema,
@@ -1820,6 +1863,102 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               <UiText variant={TextVariants.small} className="text-text-tertiary">
                 {t('modals.negativeConversion.stockMetadataPolicyDetail')}
               </UiText>
+            </div>
+          </div>
+          <div
+            className="mb-3 rounded-md border border-surface bg-bg-primary p-3"
+            data-active-frame={profileComparisonRows[0]?.frameScope.activeFrameLabel ?? ''}
+            data-candidate-count={profileComparisonRows.length}
+            data-queued-count={profileComparisonRows[0]?.frameScope.queuedCount ?? 0}
+            data-selected-profile-id={selectedProfile?.presetId ?? ''}
+            data-selected-profile-provenance-hash={selectedProfileProvenanceHash ?? ''}
+            data-testid="negative-lab-profile-comparison-matrix"
+          >
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div>
+                <UiText variant={TextVariants.small} className="font-semibold text-text-primary">
+                  {t('modals.negativeConversion.workflowPreset')}
+                </UiText>
+                <UiText variant={TextVariants.small} className="text-text-tertiary">
+                  {t('modals.negativeConversion.profileResultCount', {
+                    totalCount: NEGATIVE_LAB_PROFILE_BROWSER_ROWS.length,
+                    visibleCount: profileComparisonRows.length,
+                  })}
+                </UiText>
+              </div>
+              <span
+                className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary"
+                data-testid="negative-lab-profile-comparison-active-frame"
+              >
+                {profileComparisonRows[0]?.frameScope.activeFrameLabel ?? ''}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {profileComparisonRows.map((candidate) => {
+                const profile = candidate.profile;
+                const isSelected = selectedPresetId === profile.presetId;
+
+                return (
+                  <button
+                    aria-pressed={isSelected}
+                    className={cx(
+                      'rounded-md border p-2 text-left transition-colors',
+                      isSelected
+                        ? 'border-accent bg-accent/10 text-text-primary'
+                        : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface',
+                    )}
+                    data-claim-policy={profile.claimPolicy}
+                    data-delta-summary={candidate.deltaSummary}
+                    data-evidence-fixture-count={profile.evidenceFixtureCount}
+                    data-profile-provenance-hash={candidate.selectedProfileSnapshot.profileProvenanceHash}
+                    data-profile-status={profile.profileStatus}
+                    data-runtime-status={profile.runtimeStatus}
+                    data-selected={String(isSelected)}
+                    data-testid={`negative-lab-profile-comparison-row-${profile.presetId}`}
+                    key={profile.presetId}
+                    onClick={() => {
+                      handlePresetSelect(profile);
+                    }}
+                    type="button"
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-xs font-semibold">{profile.displayName}</span>
+                      <span
+                        className="shrink-0 rounded border border-surface bg-bg-primary px-2 py-0.5 text-[10px]"
+                        data-testid={`negative-lab-profile-comparison-claim-${profile.presetId}`}
+                      >
+                        {profile.claimLevel === 'measured_profile'
+                          ? t('modals.negativeConversion.presetClaimMeasured')
+                          : t('modals.negativeConversion.presetClaimGeneric')}
+                      </span>
+                    </span>
+                    <span className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-text-tertiary">
+                      <span data-testid={`negative-lab-profile-comparison-runtime-${profile.presetId}`}>
+                        {profile.runtimeStatus === 'runtime_parameter_applied'
+                          ? t('modals.negativeConversion.presetRuntimeApplied')
+                          : t('modals.negativeConversion.presetRuntimeCatalogOnly')}
+                      </span>
+                      <span data-testid={`negative-lab-profile-comparison-evidence-${profile.presetId}`}>
+                        {t('modals.negativeConversion.profileEvidenceCount', {
+                          fixtureCount: profile.evidenceFixtureCount,
+                        })}
+                      </span>
+                    </span>
+                    <span
+                      className="mt-1 block truncate text-[10px] text-text-tertiary"
+                      data-testid={`negative-lab-profile-comparison-delta-${profile.presetId}`}
+                    >
+                      {candidate.deltaSummary}
+                    </span>
+                    <span
+                      className="mt-1 block truncate text-[10px] text-text-tertiary"
+                      data-testid={`negative-lab-profile-comparison-nonclaim-${profile.presetId}`}
+                    >
+                      {profile.doesNotProve.join(', ')}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="relative mb-3">
