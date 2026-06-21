@@ -1,5 +1,6 @@
 {
   "$schema": "https://rawengine.dev/schemas/private-raw-proof-summary-v1.json",
+  "e2eIssue": 2312,
   "featureFamily": "hdr_merge",
   "fixtureId": "validation.computational-merge.hdr-bracket-alignment.v1",
   "generatedDate": "2026-06-20",

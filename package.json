@@ -212,6 +212,7 @@
     "check:computational-private-root-prep": "bun scripts/run-compact-checks.ts --label computational-private-root-prep check:hdr-real-raw-private-root-prep check:focus-real-raw-private-root-prep check:sr-real-raw-private-root-prep check:panorama-real-raw-private-root-prep",
     "run:hdr-real-raw-private-proof": "bun scripts/run-hdr-real-raw-private-proof.ts",
     "check:hdr-real-raw-private-proof": "bun scripts/run-hdr-real-raw-private-proof.ts",
+    "check:hdr-real-raw-private-proof-summary": "bun tests/integration/checks/check-hdr-real-raw-private-proof-summary.ts",
     "check:hdr-real-raw-private-app-server-proof": "bun tests/integration/checks/check-hdr-real-raw-private-app-server-proof.ts",
     "prepare:focus-real-raw-private-root": "bun scripts/prepare-focus-real-raw-private-root.ts",
     "check:focus-real-raw-private-root-prep": "bun scripts/prepare-focus-real-raw-private-root.ts --self-test",
