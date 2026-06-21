@@ -232,6 +232,7 @@ export default function DenoiseModal({
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; path: string } | null>(null);
   const isBatch = targetPaths.length > 1;
+  const denoiseSourceCount = Math.max(1, targetPaths.length);
   const mouseDownTarget = useRef<EventTarget | null>(null);
 
   const methodOptions = useMemo<Array<{ label: string; value: 'ai' | 'bm3d' }>>(
@@ -444,6 +445,9 @@ export default function DenoiseModal({
         <UiText className="text-center max-w-md leading-relaxed">{t('modals.denoise.description')}</UiText>
         <section
           className="mt-6 grid w-full max-w-xl grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-xs"
+          data-denoise-method={method}
+          data-denoise-source-count={denoiseSourceCount}
+          data-is-batch={String(isBatch)}
           data-testid="denoise-setup-summary"
         >
           {[
@@ -461,11 +465,18 @@ export default function DenoiseModal({
             },
             {
               label: t('modals.denoise.summarySources'),
-              value: t('modals.denoise.summarySourceCount', { count: Math.max(1, targetPaths.length) }),
+              value: t('modals.denoise.summarySourceCount', { count: denoiseSourceCount }),
             },
             {
               label: t('modals.denoise.summarySourceFormat'),
               value: isRaw ? t('modals.denoise.summaryRaw') : t('modals.denoise.summaryRaster'),
+            },
+            {
+              label: t('modals.denoise.summaryWorkload'),
+              value: t('modals.denoise.summaryWorkloadValue', {
+                count: denoiseSourceCount,
+                method: selectedMethodLabel,
+              }),
             },
           ].map((item) => (
             <div className="rounded border border-border-color bg-bg-secondary px-2 py-1.5" key={item.label}>

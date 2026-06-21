@@ -1631,6 +1631,11 @@
       "summarySourceFormat": "Format",
       "summarySourceMode": "Mode",
       "summarySources": "Sources",
+      "summaryWorkload": "Workload",
+      "summaryWorkloadValue_one": "{{count}} source / {{method}}",
+      "summaryWorkloadValue_few": "",
+      "summaryWorkloadValue_many": "",
+      "summaryWorkloadValue_other": "{{count}} sources / {{method}}",
       "titleBatch": "Odszum obrazy",
       "titleSingle": "Odszum obraz"
     },
