@@ -1726,6 +1726,7 @@
       "title": "Selekcja obrazów"
     },
     "denoise": {
+      "batchProgressFile": "Processing {{fileName}}",
       "batchProgressText": "Odszumianie {{current}} z {{total}}...",
       "btnBatchDenoise": "Zbiorcze Odszumianie i Zapis",
       "btnRetry": "Spróbuj ponownie",

@@ -1622,6 +1622,7 @@
       "title": "Bilder aussortieren"
     },
     "denoise": {
+      "batchProgressFile": "Processing {{fileName}}",
       "batchProgressText": "Entrauschen von {{current}} aus {{total}}...",
       "btnBatchDenoise": "Stapel entrauschen & Speichern",
       "btnRetry": "Wiederholen",

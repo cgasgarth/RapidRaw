@@ -6,6 +6,7 @@ const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const denoiseLocale = locale.modals?.denoise;
 const requiredLocaleKeys = [
   'emptyTarget',
+  'batchProgressFile',
   'methodAiDescription',
   'methodBm3dDescription',
   'setupPreview',
@@ -53,6 +54,9 @@ for (const marker of [
   'modals.denoise.emptyTarget',
   'data-denoise-method={method}',
   'data-denoise-method-guidance={method}',
+  'batchProgressFileName',
+  'data-testid="denoise-batch-progress-file"',
+  'modals.denoise.batchProgressFile',
   'selectedMethodDescription',
   'modals.denoise.methodAiDescription',
   'modals.denoise.methodBm3dDescription',
