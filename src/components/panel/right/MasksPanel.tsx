@@ -1874,35 +1874,79 @@ export function MasksPanel() {
                   {t('editor.masks.maskAdjustmentsTitle')}
                 </UiText>
                 {activeContainer && (
-                  <div
-                    className="mb-3 grid grid-cols-4 gap-2 rounded-md border border-surface bg-bg-secondary p-2 text-[11px]"
-                    data-component-count={activeContainer.subMasks.length}
-                    data-has-brush={String(activeMaskHasBrush)}
-                    data-has-gradient={String(activeMaskHasGradient)}
-                    data-has-range={String(activeMaskHasRange)}
-                    data-testid="mask-readiness-summary"
-                  >
-                    <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-components">
-                      <span className="block truncate text-text-tertiary">{t('editor.masks.masksTitle')}</span>
-                      <span className="block truncate text-text-secondary">{activeContainer.subMasks.length}</span>
+                  <div className="mb-3 space-y-2">
+                    <div
+                      className="grid grid-cols-4 gap-2 rounded-md border border-surface bg-bg-secondary p-2 text-[11px]"
+                      data-component-count={activeContainer.subMasks.length}
+                      data-has-brush={String(activeMaskHasBrush)}
+                      data-has-gradient={String(activeMaskHasGradient)}
+                      data-has-range={String(activeMaskHasRange)}
+                      data-testid="mask-readiness-summary"
+                    >
+                      <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-components">
+                        <span className="block truncate text-text-tertiary">{t('editor.masks.masksTitle')}</span>
+                        <span className="block truncate text-text-secondary">{activeContainer.subMasks.length}</span>
+                      </div>
+                      <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-brush">
+                        <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Brush)}</span>
+                        <span className="block truncate text-text-secondary">
+                          {activeMaskHasBrush ? t('editor.masks.maskAdjustmentsTitle') : t('editor.masks.addNewMask')}
+                        </span>
+                      </div>
+                      <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-gradient">
+                        <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Linear)}</span>
+                        <span className="block truncate text-text-secondary">
+                          {activeMaskHasGradient
+                            ? t('editor.masks.maskAdjustmentsTitle')
+                            : t('editor.masks.addNewMask')}
+                        </span>
+                      </div>
+                      <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-range">
+                        <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Color)}</span>
+                        <span className="block truncate text-text-secondary">
+                          {activeMaskHasRange ? t('editor.masks.maskAdjustmentsTitle') : t('editor.masks.addNewMask')}
+                        </span>
+                      </div>
                     </div>
-                    <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-brush">
-                      <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Brush)}</span>
-                      <span className="block truncate text-text-secondary">
-                        {activeMaskHasBrush ? t('editor.masks.maskAdjustmentsTitle') : t('editor.masks.addNewMask')}
-                      </span>
-                    </div>
-                    <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-gradient">
-                      <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Linear)}</span>
-                      <span className="block truncate text-text-secondary">
-                        {activeMaskHasGradient ? t('editor.masks.maskAdjustmentsTitle') : t('editor.masks.addNewMask')}
-                      </span>
-                    </div>
-                    <div className="min-w-0 rounded bg-bg-primary px-2 py-1" data-testid="mask-readiness-range">
-                      <span className="block truncate text-text-tertiary">{formatMaskTypeName(Mask.Color)}</span>
-                      <span className="block truncate text-text-secondary">
-                        {activeMaskHasRange ? t('editor.masks.maskAdjustmentsTitle') : t('editor.masks.addNewMask')}
-                      </span>
+                    <div
+                      className="grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-secondary p-2"
+                      data-testid="mask-component-quick-add"
+                    >
+                      {[
+                        {
+                          disabled: activeMaskHasBrush,
+                          label: t('editor.masks.quickAddBrush'),
+                          testId: 'mask-quick-add-brush',
+                          type: Mask.Brush,
+                        },
+                        {
+                          disabled: activeMaskHasGradient,
+                          label: t('editor.masks.quickAddGradient'),
+                          testId: 'mask-quick-add-gradient',
+                          type: Mask.Linear,
+                        },
+                        {
+                          disabled: activeMaskHasRange,
+                          label: t('editor.masks.quickAddRange'),
+                          testId: 'mask-quick-add-range',
+                          type: Mask.Color,
+                        },
+                      ].map((action) => (
+                        <button
+                          className="min-w-0 rounded border border-surface bg-bg-primary px-2 py-1.5 text-xs text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                          data-testid={action.testId}
+                          disabled={action.disabled}
+                          key={action.testId}
+                          onClick={() => {
+                            handleAddSubMask(activeContainer.id, action.type);
+                          }}
+                          type="button"
+                        >
+                          <span className="block truncate">
+                            {action.disabled ? t('editor.masks.quickAddComplete') : action.label}
+                          </span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}

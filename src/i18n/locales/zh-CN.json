@@ -862,6 +862,10 @@
         "maskName_one": "蒙版 {{count}}",
         "maskName_other": "蒙版 {{count}}"
       },
+      "quickAddBrush": "Add brush",
+      "quickAddComplete": "Ready",
+      "quickAddGradient": "Add gradient",
+      "quickAddRange": "Add color range",
       "refinement": {
         "density": "Density",
         "edgeContrast": "Edge Contrast",
