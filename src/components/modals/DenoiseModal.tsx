@@ -8,6 +8,7 @@ import { useModalTransition } from '../../hooks/useModalTransition';
 import { usePreviewViewport } from '../../hooks/usePreviewViewport';
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { getDisplayFileName } from '../../utils/displayFilePath';
 import Button from '../ui/Button';
 import Dropdown from '../ui/Dropdown';
 import Slider from '../ui/Slider';
@@ -269,6 +270,7 @@ export default function DenoiseModal({
   const selectedMethodLabel = methodOptions.find((option) => option.value === method)?.label ?? '';
   const selectedMethodDescription =
     method === 'ai' ? t('modals.denoise.methodAiDescription') : t('modals.denoise.methodBm3dDescription');
+  const savedOutputName = savedPath ? getDisplayFileName(savedPath) : '';
 
   useEffect(() => {
     if (isOpen) {
@@ -372,8 +374,20 @@ export default function DenoiseModal({
                 color={TextColors.success}
                 className="flex items-center justify-center gap-2 mt-4"
               >
-                <CheckCircle className="w-5 h-5" />
+                <CheckCircle aria-hidden="true" className="w-5 h-5" />
                 <span>{t('modals.denoise.saveSuccess')}</span>
+              </UiText>
+              <UiText
+                as="div"
+                variant={TextVariants.small}
+                color={TextColors.secondary}
+                className="mx-auto mt-2 block max-w-full truncate text-center font-mono"
+                data-saved-output-name={savedOutputName}
+                data-testid="denoise-saved-output-detail"
+                title={savedPath}
+              >
+                {t('modals.common.savedOutputLabel', { name: savedOutputName })}
+                <span className="sr-only">{t('modals.common.savedOutputFullPath', { path: savedPath })}</span>
               </UiText>
             </motion.div>
           )}

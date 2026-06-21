@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const denoiseLocale = locale.modals?.denoise;
+const commonLocale = locale.modals?.common;
 const requiredLocaleKeys = [
   'emptyTarget',
   'batchProgressFile',
@@ -36,6 +37,14 @@ if (missingKeys.length > 0) {
   process.exit(1);
 }
 
+const missingCommonKeys = ['savedOutputFullPath', 'savedOutputLabel'].filter(
+  (key) => typeof commonLocale?.[key] !== 'string',
+);
+if (missingCommonKeys.length > 0) {
+  console.error(`Missing common saved output locale keys: ${missingCommonKeys.join(', ')}`);
+  process.exit(1);
+}
+
 const source = readFileSync('src/components/modals/DenoiseModal.tsx', 'utf8');
 for (const marker of [
   'data-testid="denoise-setup-summary"',
@@ -61,6 +70,14 @@ for (const marker of [
   'modals.denoise.methodAiDescription',
   'modals.denoise.methodBm3dDescription',
   'selectedMethodLabel',
+  'getDisplayFileName(savedPath)',
+  'data-testid="denoise-saved-output-detail"',
+  'data-saved-output-name={savedOutputName}',
+  'title={savedPath}',
+  'aria-hidden="true"',
+  'className="sr-only"',
+  'modals.common.savedOutputLabel',
+  'modals.common.savedOutputFullPath',
 ]) {
   if (!source.includes(marker)) {
     console.error(`Denoise modal missing setup summary marker: ${marker}`);
