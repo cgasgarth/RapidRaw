@@ -54,6 +54,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Proof scripts should live inside the actual feature PR they validate. Do not
   open PRs whose main value is only a probe, schema, inventory, or routing
   check.
+- Do not create proof-only PRs. Probes, schemas, route checks, screenshots, or
+  fixture reports are supporting evidence for a vertical feature PR, not the
+  product value of the PR by themselves.
 - When something starts looking like slop, clean it up proactively instead of
   building more work on top of it.
 
@@ -219,11 +222,10 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Remove validation inventory JSON from routine gates. Do not maintain broad
   validation inventory files as routine PR churn; prefer focused checks tied to
   changed product behavior.
-- Keep private RAW validation standardized around one reusable private-root and
-  report pattern. Prefer feature-specific runtime proofs that validate actual
-  image output over broad status ledgers.
-- Delete stale or low-value meta checks when they do not validate product
-  behavior.
+- Prefer feature-specific runtime proofs that validate actual image output over
+  broad status ledgers.
+- Audit existing validation helpers when touching nearby code. Delete stale,
+  duplicate, or low-value meta checks instead of carrying them forward.
 - Do not edit existing tests solely to reduce token output. Compact the
   commonly reused runner, package script, hook, or reporting layer instead.
 - Keep GitHub Actions current on supported major versions and maintain the
