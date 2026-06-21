@@ -15,3 +15,11 @@ export const buildNegativeLabStockMetadataCounts = (catalog: NegativeLabStockMet
   slideReversalCount: catalog.entries.filter((entry) => entry.stockClass === 'slide_reversal').length,
   totalCount: catalog.entries.length,
 });
+
+export const listNegativeLabStockMetadataReferencesForPreset = (
+  presetId: string | null,
+  catalog: NegativeLabStockMetadataCatalog = NEGATIVE_LAB_STOCK_METADATA_CATALOG,
+) => {
+  if (presetId === null) return [];
+  return catalog.entries.filter((entry) => entry.suggestedGenericPresetId === presetId);
+};

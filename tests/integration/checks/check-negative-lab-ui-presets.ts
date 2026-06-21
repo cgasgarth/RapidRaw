@@ -6,6 +6,7 @@ import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../../../src/utils/negativeLabOu
 import { negativeLabMeasuredProfileCatalogSchema } from '../../../src/schemas/negativeLabMeasuredProfileSchemas.ts';
 import { parseNegativeLabBuiltInUiPresetCatalog } from '../../../src/schemas/negativeLabPresetCatalogSchemas.ts';
 import { buildNegativeLabRuntimeProfileBrowserRows } from '../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
+import { listNegativeLabStockMetadataReferencesForPreset } from '../../../src/utils/negativeLabStockMetadataCatalog.ts';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { unsafeNegativeLabClaimPattern } from '../../../scripts/lib/negative-lab-validation.ts';
@@ -96,9 +97,17 @@ if (NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length < 12) {
 
 const genericRuntimeRows = runtimeProfileRows.filter((row) => row.profileStatus === 'generic_unmeasured');
 const measuredRuntimeRows = runtimeProfileRows.filter((row) => row.profileStatus === 'fixture_measured');
+const c41PortraitReferences = listNegativeLabStockMetadataReferencesForPreset('negative_lab.generic.c41.portrait.v1');
+const c41NeutralReferences = listNegativeLabStockMetadataReferencesForPreset('negative_lab.generic.c41.neutral.v1');
 
 if (genericRuntimeRows.length !== NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length) {
   failures.push('Negative Lab profile browser rows must expose every public generic preset');
+}
+if (!c41PortraitReferences.some((entry) => entry.displayName === 'Kodak Portra 400')) {
+  failures.push('C-41 portrait generic preset should expose Kodak Portra metadata as a reference, not an emulation.');
+}
+if (!c41NeutralReferences.some((entry) => entry.displayName === 'Fujifilm 400')) {
+  failures.push('C-41 neutral generic preset should expose Fujifilm metadata as a reference, not an emulation.');
 }
 
 for (const row of genericRuntimeRows) {
@@ -312,6 +321,9 @@ const stockMetadataLocaleKeys = [
   'stockMetadataOnly',
   'stockMetadataPolicy',
   'stockMetadataPolicyDetail',
+  'stockReferenceCoverage',
+  'stockReferenceCoverageEmpty',
+  'stockReferenceCoverageSummary',
   'stockMetadataSummary',
   'stockMetadataUseSuggestedPreset',
 ];
@@ -429,6 +441,10 @@ for (const marker of [
   'negative-lab-stock-metadata-list',
   'negative-lab-stock-metadata-policy',
   'negative-lab-stock-metadata-suggested-preset-',
+  'negative-lab-selected-stock-reference-count',
+  'negative-lab-selected-stock-reference-list',
+  'negative-lab-selected-stock-reference-',
+  'negative-lab-selected-stock-references',
   'negative-lab-stock-registry',
   'NEGATIVE_LAB_STOCK_METADATA_CATALOG',
   'NEGATIVE_LAB_STOCK_METADATA_COUNTS',
