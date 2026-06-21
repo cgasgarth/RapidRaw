@@ -266,6 +266,8 @@ export default function DenoiseModal({
         ? t('modals.denoise.downloadingText', { status: aiModelDownloadStatus })
         : progressMessage || t('modals.denoise.initializing');
   const selectedMethodLabel = methodOptions.find((option) => option.value === method)?.label ?? '';
+  const selectedMethodDescription =
+    method === 'ai' ? t('modals.denoise.methodAiDescription') : t('modals.denoise.methodBm3dDescription');
 
   useEffect(() => {
     if (isOpen) {
@@ -567,6 +569,14 @@ export default function DenoiseModal({
                 setIntensity(val === 'ai' ? 50 : 15);
               }}
             />
+            <UiText
+              variant={TextVariants.small}
+              color={TextColors.secondary}
+              className="leading-snug"
+              data-denoise-method-guidance={method}
+            >
+              {selectedMethodDescription}
+            </UiText>
           </div>
           <div className="flex-1 max-w-[280px]">
             <Slider
