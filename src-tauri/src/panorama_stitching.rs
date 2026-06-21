@@ -2254,7 +2254,21 @@ mod tests {
             artifact["outputArtifacts"][0]["storage"],
             "sidecar_artifact"
         );
+        assert_eq!(artifact["projection"], "rectilinear");
+        assert_eq!(
+            artifact["projectionSettings"]["requestedProjection"],
+            "rectilinear"
+        );
+        assert_eq!(
+            artifact["projectionSettings"]["effectiveProjection"],
+            "rectilinear"
+        );
+        assert_eq!(artifact["boundaryMode"], "auto_crop");
+        assert_eq!(artifact["boundarySettings"]["requestedMode"], "auto_crop");
+        assert_eq!(artifact["boundarySettings"]["effectiveMode"], "auto_crop");
         assert_eq!(artifact["sourceImageRefs"][0]["virtualCopyId"], "abc123");
+        assert_eq!(artifact["sourceImageRefs"][0]["sourceIndex"], 0);
+        assert_eq!(artifact["sourceImageRefs"][1]["sourceIndex"], 1);
         assert_eq!(artifact["validationMetrics"]["sourceCount"], 2);
         assert_eq!(artifact["validationMetrics"]["stitchedSourceCount"], 2);
         assert_eq!(

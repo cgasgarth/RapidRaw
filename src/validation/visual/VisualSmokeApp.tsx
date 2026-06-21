@@ -17,7 +17,11 @@ import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher'
 import { Panel } from '../../components/ui/AppProperties';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../../schemas/focusStackUiSchemas';
 import { DEFAULT_HDR_MERGE_UI_SETTINGS, type HdrMergeUiSettings } from '../../schemas/hdrMergeUiSchemas';
-import { DEFAULT_PANORAMA_UI_SETTINGS, type PanoramaUiSettings } from '../../schemas/panoramaUiSchemas';
+import {
+  DEFAULT_PANORAMA_UI_SETTINGS,
+  type PanoramaRuntimePlan,
+  type PanoramaUiSettings,
+} from '../../schemas/panoramaUiSchemas';
 import {
   DEFAULT_SUPER_RESOLUTION_UI_SETTINGS,
   type SuperResolutionUiSettings,
@@ -1105,6 +1109,51 @@ const panoramaPreviewSvg = encodeURIComponent(`
 </svg>`);
 
 const panoramaPreviewUrl = `data:image/svg+xml,${panoramaPreviewSvg}`;
+const panoramaRuntimePlanFixture: PanoramaRuntimePlan = {
+  dry_run: true,
+  family: 'panorama',
+  output_dimensions: { height: 3200, width: 9600 },
+  preflight: {
+    blocked_reasons: [],
+    engine_capabilities: {
+      full_frame_legacy: true,
+      max_preview_dimension_px: 8192,
+      plan_only: true,
+      tile_backed_render: false,
+    },
+    execution_mode: 'full_frame_legacy',
+    geometry_estimate: {
+      output_pixel_count: 30_720_000,
+      projected_bounds: { height: 3200, width: 9600, x: 0, y: 0 },
+      source_count: 5,
+      source_pixel_count: 22_500_000,
+    },
+    memory_budget_bytes: 6_442_450_944,
+    memory_budget_ratio: 0.42,
+    memory_components: {
+      low_detail_mask_bytes: 22_500_000,
+      output_canvas_bytes: 368_640_000,
+      output_mask_bytes: 30_720_000,
+      overhead_bytes: 63_864_000,
+      preview_bytes: 73_728_000,
+      seam_workspace_bytes: 122_880_000,
+      source_decode_bytes: 270_000_000,
+      total_estimated_peak_bytes: 952_332_000,
+    },
+    status: 'accepted',
+    tile_count: 1,
+    warning_codes: ['geometry_estimate_low_confidence', 'legacy_full_frame_render'],
+  },
+  source_image_refs: Array.from({ length: 5 }, (_, sourceIndex) => ({
+    height: 3000,
+    image_path: `/synthetic/panorama/source-${sourceIndex}.dng`,
+    raw_defaults_applied: true,
+    role: 'panorama_tile',
+    source_index: sourceIndex,
+    width: 4500,
+  })),
+  warnings: ['Panorama dry-run uses conservative source-dimension bounds before feature matching.'],
+};
 const hdrPreviewSvg = encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640">
   <defs>
@@ -1768,6 +1817,12 @@ function PanoramaVisualSmoke() {
           data-estimated-preview-megapixels={Math.round((5 * settings.maxPreviewDimensionPx ** 2) / 1_000_000)}
           data-exposure-mode={settings.exposureMode}
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
+          data-plan-memory-mb={Math.round(
+            panoramaRuntimePlanFixture.preflight.memory_components.total_estimated_peak_bytes / 1_000_000,
+          )}
+          data-plan-scope="geometry_memory_only"
+          data-plan-status={panoramaRuntimePlanFixture.preflight.status}
+          data-plan-width={panoramaRuntimePlanFixture.output_dimensions.width}
           data-projection={settings.projection}
           data-quality-preference={settings.qualityPreference}
           data-runtime-status="dry_run_preview"
@@ -1804,6 +1859,7 @@ function PanoramaVisualSmoke() {
           onSettingsChange={setSettings}
           onStitch={() => {}}
           progressMessage={null}
+          runtimePlan={panoramaRuntimePlanFixture}
           settings={settings}
         />
         <aside className="fixed right-4 top-14 z-50 w-80 rounded-md border border-white/10 bg-black/75 p-3 text-sm shadow-lg">
