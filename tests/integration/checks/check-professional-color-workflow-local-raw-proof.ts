@@ -85,7 +85,10 @@ const reportSchema = z
       .min(6),
     fixtureId: z.literal('validation.color.professional-workflow.local-cc-raw.v1'),
     generatedAt: z.iso.datetime({ offset: true }),
+    e2eIssue: z.literal(2309),
     issue: z.literal(2309),
+    proofBoundary: z.literal('private_raw_runtime_plus_visual_smoke_not_full_macos_manual_e2e'),
+    proofStatus: z.literal('private_raw_professional_color_runtime_with_visual_smoke'),
     localRawRuntime: z
       .object({
         artifactRoot: z.literal(request.artifactDirRelative),
@@ -190,7 +193,10 @@ if (UPDATE_REPORT) {
     ],
     fixtureId: 'validation.color.professional-workflow.local-cc-raw.v1',
     generatedAt: new Date().toISOString(),
+    e2eIssue: 2309,
     issue: 2309,
+    proofBoundary: 'private_raw_runtime_plus_visual_smoke_not_full_macos_manual_e2e',
+    proofStatus: 'private_raw_professional_color_runtime_with_visual_smoke',
     localRawRuntime: {
       artifactRoot: request.artifactDirRelative,
       command: PROFESSIONAL_RUNTIME_COMMAND,
