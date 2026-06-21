@@ -139,6 +139,9 @@ if (reviewedOutputReview.humanReviewStatus !== 'passed') {
 if (reviewedOutputReview.warningCodes.includes('human_review_required')) {
   throw new Error('Passed human review must clear the human-review-required warning.');
 }
+if (reviewedOutputReview.reviewArtifacts.length !== pendingReview.reviewArtifacts.length) {
+  throw new Error('Passed human review must preserve SR review artifact metadata.');
+}
 
 const staleArtifact = markSuperResolutionArtifactStaleState(
   reviewedArtifact,

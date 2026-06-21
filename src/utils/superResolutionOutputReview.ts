@@ -37,6 +37,26 @@ interface BuildSuperResolutionOutputReviewOptions {
 
 const reviewCropCount = 4;
 const reviewPacketPath = 'docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json';
+export const superResolutionSyntheticReviewArtifacts: SuperResolutionOutputReviewWorkflow['reviewArtifacts'] = [
+  {
+    contentHash: 'sha256:8ae4f09c9c12e8cccd3731f8a04a0fc75ec8ae0aab8bf999f79f2f3855053a74',
+    kind: 'reconstruction_preview',
+    path: 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-preview.pgm',
+    publicRepoAllowed: false,
+  },
+  {
+    contentHash: 'sha256:a11fafd6b4dac601c7afa6903f6f04a01e720c988fd20ef2fc7087e08e8a5326',
+    kind: 'reconstruction_review_crop',
+    path: 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-review-crop-center.pgm',
+    publicRepoAllowed: false,
+  },
+  {
+    contentHash: 'sha256:f48a4742d29104fc646f280656360cbd409abfc2b9ec74c684d064c9eed06fd4',
+    kind: 'baseline_review_crop',
+    path: 'artifacts/validation/sr-synthetic-output-artifact/sr-x2-baseline-crop-center.pgm',
+    publicRepoAllowed: false,
+  },
+];
 
 export const buildSuperResolutionOutputReviewFromArtifact = (
   artifactValue: SuperResolutionArtifactReviewInput,
@@ -66,6 +86,7 @@ export const buildSuperResolutionOutputReviewFromArtifact = (
     overlapCoverageRatio: artifactValue.validationSummary.overlapCoverageRatio ?? null,
     proofLevel: 'synthetic_runtime',
     qualityPreference: artifactValue.qualityPreference,
+    reviewArtifacts: superResolutionSyntheticReviewArtifacts,
     reviewCropCount,
     reviewPacketPath,
     sourceCount: artifactValue.validationSummary.sourceCount,
@@ -101,6 +122,7 @@ export const buildSuperResolutionOutputReviewWorkflow = ({
     overlapCoverageRatio: null,
     proofLevel: 'synthetic_runtime',
     qualityPreference: settings.qualityPreference,
+    reviewArtifacts: superResolutionSyntheticReviewArtifacts,
     reviewCropCount,
     reviewPacketPath,
     sourceCount,

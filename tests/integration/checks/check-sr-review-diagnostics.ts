@@ -29,6 +29,7 @@ for (const marker of [
   'modals.superResolution.preflight.alignment',
   'modals.superResolution.qualityLabel',
   'modals.superResolution.review.acceptanceGate',
+  'modals.superResolution.review.artifactKind',
   'modals.superResolution.review.artifactWarnings',
   'modals.superResolution.review.decision',
   'modals.superResolution.review.editableGate',
@@ -48,6 +49,9 @@ for (const marker of [
   'isEditableHandoffReady',
   'sr-editable-handoff-proof',
   'data-editable-handoff-ready={String(isEditableHandoffReady)}',
+  'data-review-artifact-count={outputReview.reviewArtifacts.length}',
+  "data-review-artifact-hashes={outputReview.reviewArtifacts.map((artifact) => artifact.contentHash).join(',')}",
+  "data-review-artifact-paths={outputReview.reviewArtifacts.map((artifact) => artifact.path).join(',')}",
   'outputReviewEditableGateLabel',
   'buildSuperResolutionOutputReviewWorkflow',
 ]) {
@@ -79,6 +83,7 @@ for (const marker of [
   'editableGate',
   'humanReviewStatus',
   'overlapCoverageRatio',
+  'reviewArtifacts',
 ]) {
   if (!adapterSource.includes(marker)) {
     failures.push(`SR output review adapter missing ${marker}.`);

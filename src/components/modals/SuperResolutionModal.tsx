@@ -104,6 +104,9 @@ export default function SuperResolutionModal({
   const outputArtifactLabel = hasRuntimeOutputReview
     ? `${outputReview.outputArtifactId} (${outputReview.outputWidth}x${outputReview.outputHeight})`
     : t('modals.superResolution.review.notMeasured');
+  const reviewArtifactSummary = outputReview.reviewArtifacts
+    .map((artifact) => t(`modals.superResolution.review.artifactKind.${artifact.kind}`))
+    .join(', ');
   const outputHashLabel = hasRuntimeOutputReview
     ? outputReview.outputArtifactHash
     : t('modals.superResolution.review.notMeasured');
@@ -454,7 +457,9 @@ export default function SuperResolutionModal({
               },
               {
                 label: t('modals.superResolution.review.reviewCrops'),
-                value: t('modals.superResolution.review.reviewCropValue', { count: outputReview.reviewCropCount }),
+                value: `${t('modals.superResolution.review.reviewCropValue', {
+                  count: outputReview.reviewCropCount,
+                })} - ${reviewArtifactSummary}`,
               },
               {
                 label: t('modals.superResolution.review.reviewPacket'),
@@ -479,6 +484,9 @@ export default function SuperResolutionModal({
         data-human-review-status={outputReview.humanReviewStatus}
         data-output-artifact-id={outputReview.outputArtifactId}
         data-output-artifact-hash={outputReview.outputArtifactHash}
+        data-review-artifact-count={outputReview.reviewArtifacts.length}
+        data-review-artifact-hashes={outputReview.reviewArtifacts.map((artifact) => artifact.contentHash).join(',')}
+        data-review-artifact-paths={outputReview.reviewArtifacts.map((artifact) => artifact.path).join(',')}
         data-stale-state={outputReview.staleState}
         data-testid="sr-editable-handoff-proof"
       />

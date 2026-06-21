@@ -2266,6 +2266,11 @@
       "qualityPreview": "Preview",
       "review": {
         "acceptanceGate": "",
+        "artifactKind": {
+          "baseline_review_crop": "Baseline crop",
+          "reconstruction_preview": "Reconstruction preview",
+          "reconstruction_review_crop": "Reconstruction crop"
+        },
         "artifactWarnings": "",
         "coverage": "",
         "coverageValue": "",
