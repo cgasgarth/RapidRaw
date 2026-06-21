@@ -177,6 +177,7 @@
     "check:import-presets": "bun tests/integration/checks/check-import-preset-fixtures.ts",
     "check:command-palette-coverage-ui": "bun tests/integration/checks/check-command-palette-coverage-ui.ts",
     "check:command-palette-denoise-ui": "bun tests/integration/checks/check-command-palette-denoise-ui.ts",
+    "check:command-palette-culling-ui": "bun tests/integration/checks/check-command-palette-culling-ui.ts",
     "check:library-sessions": "bun tests/integration/checks/check-library-session-fixtures.ts",
     "check:session-import-reload-proof": "bun tests/integration/checks/check-session-import-reload-proof.ts",
     "check:library-session-ui": "bun tests/integration/checks/check-library-session-ui.ts",

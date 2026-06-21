@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { ArrowLeft, Command, Images, PanelRight, Search, Sparkles, Wand2, Waves, X } from 'lucide-react';
+import { ArrowLeft, Command, Images, PanelRight, Search, Sparkles, ScanSearch, Wand2, Waves, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,6 +10,7 @@ import {
   type CommandPaletteCommandId,
 } from '../../schemas/commandPaletteSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
 import { TextColors, TextVariants } from '../../types/typography';
 import { Panel } from '../ui/AppProperties';
@@ -73,6 +74,11 @@ const commandPaletteCommands = commandPaletteCommandSchema.array().parse([
   },
   {
     category: 'workflow',
+    id: 'culling',
+    searchTokens: ['cull', 'culling', 'reject', 'duplicates', 'sharpness', 'select'],
+  },
+  {
+    category: 'workflow',
     id: 'denoise',
     requiresEditorImage: true,
     searchTokens: ['denoise', 'noise', 'detail', 'raw', 'bm3d', 'ai'],
@@ -112,6 +118,7 @@ const commandPaletteCommands = commandPaletteCommandSchema.array().parse([
 const commandLabelKeys = {
   backToLibrary: 'modals.commandPalette.commands.backToLibrary',
   copyPasteSettings: 'modals.commandPalette.commands.copyPasteSettings',
+  culling: 'modals.commandPalette.commands.culling',
   denoise: 'modals.commandPalette.commands.denoise',
   focusStack: 'modals.commandPalette.commands.focusStack',
   hdrMerge: 'modals.commandPalette.commands.hdrMerge',
@@ -148,6 +155,8 @@ const getCommandIcon = (command: CommandPaletteCommand) => {
     case 'copyPasteSettings':
     case 'importFiles':
       return Command;
+    case 'culling':
+      return ScanSearch;
     case 'denoise':
       return Waves;
     case 'focusStack':
@@ -185,8 +194,13 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const selectedImage = useEditorStore((state) => state.selectedImage);
+  const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
   const setUI = useUIStore((state) => state.setUI);
   const setRightPanel = useUIStore((state) => state.setRightPanel);
+  const selectedCommandPaths = useMemo(
+    () => (multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : []),
+    [multiSelectedPaths, selectedImage],
+  );
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -199,7 +213,10 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
 
   const visibleCommands = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const availableCommands = commandPaletteCommands.filter((command) => !command.requiresEditorImage || selectedImage);
+    const availableCommands = commandPaletteCommands.filter((command) => {
+      if (command.id === 'culling') return selectedCommandPaths.length > 0;
+      return !command.requiresEditorImage || selectedImage;
+    });
 
     if (!normalizedQuery) return availableCommands;
 
@@ -213,7 +230,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
         .toLowerCase();
       return haystack.includes(normalizedQuery);
     });
-  }, [query, selectedImage, t]);
+  }, [query, selectedCommandPaths.length, selectedImage, t]);
 
   const resolvedActiveIndex = Math.min(activeIndex, Math.max(visibleCommands.length - 1, 0));
   const coverageCategories = useMemo(
@@ -276,6 +293,22 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
             previewBase64: null,
             progressMessage: null,
             targetPaths: [selectedImage.path],
+          },
+        }));
+      });
+      return;
+    }
+
+    if (command.id === 'culling' && selectedCommandPaths.length > 0) {
+      closeAndRun(() => {
+        setUI((state) => ({
+          cullingModalState: {
+            ...state.cullingModalState,
+            error: null,
+            isOpen: true,
+            pathsToCull: selectedCommandPaths,
+            progress: null,
+            suggestions: null,
           },
         }));
       });

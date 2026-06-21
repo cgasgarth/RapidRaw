@@ -1546,6 +1546,7 @@
       "commands": {
         "backToLibrary": "Back to library",
         "copyPasteSettings": "Copy and paste settings",
+        "culling": "",
         "denoise": "",
         "focusStack": "Open focus stacking",
         "hdrMerge": "Open HDR merge",
