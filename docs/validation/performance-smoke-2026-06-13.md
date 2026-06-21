@@ -27,7 +27,6 @@ artifacts/performance-smoke/performance-smoke-report.json
 The smoke currently times these deterministic commands:
 
 - `bun run check:ci-paths`
-- `bun run check:generated-types`
 - `bun run check:film-fixtures`
 - `bun run schema:samples`
 - `bun run check:sr-performance-fixtures`

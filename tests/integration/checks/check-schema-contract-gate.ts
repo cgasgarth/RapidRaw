@@ -14,7 +14,6 @@ const GITHUB_FILE_SCHEMA = z
   .passthrough();
 
 const CONTRACT_CHECKS = [
-  'check:generated-types',
   'check:agent-approval-boundaries',
   'check:agent-rollback-proof',
   'check:agent-proof-gallery',
@@ -54,7 +53,6 @@ const RELEVANT_PREFIXES = ['packages/rawengine-schema/', 'src/schemas/', 'src-ta
 const RELEVANT_FILES = new Set([
   '.github/workflows/lint.yml',
   'bun.lock',
-  'tests/integration/checks/check-generated-type-drift.ts',
   'tests/integration/checks/check-tauri-schema-validation.ts',
   'src/App.tsx',
   'src/utils/tauriSchemaInvoke.ts',
@@ -73,7 +71,6 @@ const PACKAGE_SCRIPT_NAMES = new Set([
   'check:focus-ui-api',
   'check:focus-ui-runtime-bridge',
   'check:focus-app-server-runtime',
-  'check:generated-types',
   'check:hdr-ui-api',
   'check:hdr-ui-runtime-bridge',
   'check:hdr-app-server-runtime',

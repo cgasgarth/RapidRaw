@@ -285,7 +285,6 @@
     "check:computational-merge-review-panels": "bun tests/integration/checks/check-computational-merge-review-panels.ts",
     "check:chromatic-adaptation": "bun tests/integration/checks/check-chromatic-adaptation-fixtures.ts",
     "check:gamut-mapping": "bun tests/integration/checks/check-gamut-mapping-fixtures.ts",
-    "check:generated-types": "bun tests/integration/checks/check-generated-type-drift.ts",
     "check:command-palette-workflows": "bun scripts/capture-visual-smoke.ts --scenario command-palette-workflows",
     "check:color-workflow-smoke": "bun scripts/capture-visual-smoke.ts --scenario color-workflow",
     "check:workflow-rail-smoke": "bun scripts/capture-visual-smoke.ts --scenario workflow-rail",

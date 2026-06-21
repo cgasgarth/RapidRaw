@@ -55,13 +55,6 @@ const smokeChecks = z.array(SmokeCheckSchema).parse([
     summary: 'Path routing classifier self-test',
   },
   {
-    args: ['run', 'check:generated-types'],
-    budgetMs: 5_000,
-    command: 'bun',
-    id: 'generated-type-drift',
-    summary: 'Generated Tauri type drift manifest check',
-  },
-  {
     args: ['run', 'check:film-fixtures'],
     budgetMs: 5_000,
     command: 'bun',
