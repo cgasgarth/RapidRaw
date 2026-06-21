@@ -128,6 +128,8 @@
     "check:brush-mask-command": "bun tests/integration/checks/check-brush-mask-command.ts",
     "check:brush-mask-command-capture": "bun tests/integration/checks/check-brush-mask-command-capture.ts",
     "check:brush-mask-command-capture:update": "bun tests/integration/checks/check-brush-mask-command-capture.ts --update",
+    "check:brush-mask-refine-workflow-e2e": "bun tests/integration/checks/check-brush-mask-refine-workflow-e2e.ts",
+    "check:brush-mask-refine-workflow-e2e:update": "bun tests/integration/checks/check-brush-mask-refine-workflow-e2e.ts --update",
     "check:gradient-mask": "bun tests/integration/checks/check-gradient-mask-parameters.ts",
     "check:linear-gradient-mask-command": "bun tests/integration/checks/check-linear-gradient-mask-command.ts",
     "check:luminance-range-mask": "bun tests/integration/checks/check-luminance-range-mask-parameters.ts",

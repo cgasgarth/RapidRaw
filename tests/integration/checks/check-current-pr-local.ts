@@ -257,6 +257,14 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:brush-mask', 'check:brush-mask-command', 'check:brush-mask-command-capture'],
   );
   addIf(
+    (file) =>
+      file === 'src/validation/visual/VisualSmokeApp.tsx' ||
+      file === 'scripts/lib/visual-smoke-proofs.ts' ||
+      file === 'tests/integration/checks/check-brush-mask-refine-workflow-e2e.ts' ||
+      file === 'docs/validation/brush-mask-refine-workflow-e2e-2026-06-21.json',
+    ['check:brush-mask-refine-workflow-e2e', 'check:layer-mask-private-raw-ui-proof'],
+  );
+  addIf(
     (file) => file.includes('skinToneUniformity') || file.includes('skin-tone-uniformity'),
     ['check:skin-tone-uniformity', 'check:skin-tone-uniformity-local-raw-proof'],
   );

@@ -30,7 +30,7 @@
       "width": 1440
     },
     "scenario": "layer-mask-private-raw-ui",
-    "screenshotHash": "sha256:b3f25491f24468334ce8781625244af0c5db0ec38d46a6958d127dfb885871ef",
+    "screenshotHash": "sha256:523bdbd5bdd6b343d8aeb25421ab8ca11f08f3b5932913a3331e0d648322a381",
     "screenshotPath": "artifacts/visual-smoke/layer-mask-private-raw-ui.png",
     "workflowControlsExercised": true
   }
