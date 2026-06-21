@@ -76,6 +76,8 @@ const requirements = z.array(requirementSchema).parse([
       'Panorama private RAW asset prep',
       'manifest-only public schema',
       'Real RAW before/after proof',
+      'Expert agent handoff',
+      'agent-expert-edit-demo-workflow-2026-06-21.html',
       'negative-lab-qc-contact-sheet-proof-2026-06-16.svg',
       'Missing Artifacts',
     ],
