@@ -51,6 +51,38 @@
       "proofKind": "markdown_policy"
     }
   ],
+  "capabilityStatuses": [
+    {
+      "area": "Final review page",
+      "evidence": "docs/validation/goal-review-2026-06-11.html",
+      "issue": 2320,
+      "status": "plan-only"
+    },
+    {
+      "area": "RAW open/edit/export ledger",
+      "evidence": "docs/validation/raw-open-edit-export-runtime-status-2026-06-18.json",
+      "issue": 1376,
+      "status": "schema-only"
+    },
+    {
+      "area": "Computational app-server bridges",
+      "evidence": "docs/validation/computational-merge-runtime-status-2026-06-18.json",
+      "issue": 1809,
+      "status": "dry-run-only"
+    },
+    {
+      "area": "HDR/panorama/focus/SR synthetic outputs",
+      "evidence": "check:computational-merge-runtime-status source reports",
+      "issue": 1809,
+      "status": "runtime apply-capable"
+    },
+    {
+      "area": "Goal review screenshot",
+      "evidence": "docs/validation/goal-review-screenshot-2026-06-18.png",
+      "issue": 1856,
+      "status": "UI E2E-proven"
+    }
+  ],
   "commands": [
     "bun run check:goal-review-data",
     "bun run check:goal-review-page",
@@ -73,7 +105,7 @@
     "Private focus-stack CR3, super-resolution NEF, and panorama RAF source files.",
     "Real RAW panorama, focus stack, and super-resolution runtime reports after private source files exist."
   ],
-  "proofHash": "13d9274f69f70b0c77274373e0177e6b8642e65f13de45c9c7053ac3086930f7",
+  "proofHash": "953b8f007e3fdbb8b72d1ed6dfccf23cd10f11467488656caacd2314e8081eba",
   "schemaVersion": 1,
   "sourceReports": [
     {

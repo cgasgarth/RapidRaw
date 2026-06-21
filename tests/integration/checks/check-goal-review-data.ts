@@ -41,9 +41,19 @@ const featureSchema = z
   })
   .strict();
 
+const capabilityStatusSchema = z
+  .object({
+    area: z.string().trim().min(1),
+    evidence: z.string().trim().min(1),
+    issue: z.number().int().positive(),
+    status: z.enum(['plan-only', 'schema-only', 'dry-run-only', 'runtime apply-capable', 'UI E2E-proven']),
+  })
+  .strict();
+
 const reportSchema = z
   .object({
     artifacts: z.array(artifactSchema).min(8),
+    capabilityStatuses: z.array(capabilityStatusSchema).min(5),
     commands: z.array(z.string().trim().min(1)).min(4),
     generatedAt: z.iso.datetime({ offset: true }),
     issue: z.literal(1856),
@@ -109,8 +119,42 @@ const artifacts = [
   artifact('docs/validation/public-fixture-manifest.json', 'markdown_policy'),
 ];
 
+const capabilityStatuses = [
+  {
+    area: 'Final review page',
+    evidence: 'docs/validation/goal-review-2026-06-11.html',
+    issue: 2320,
+    status: 'plan-only',
+  },
+  {
+    area: 'RAW open/edit/export ledger',
+    evidence: 'docs/validation/raw-open-edit-export-runtime-status-2026-06-18.json',
+    issue: 1376,
+    status: 'schema-only',
+  },
+  {
+    area: 'Computational app-server bridges',
+    evidence: 'docs/validation/computational-merge-runtime-status-2026-06-18.json',
+    issue: 1809,
+    status: 'dry-run-only',
+  },
+  {
+    area: 'HDR/panorama/focus/SR synthetic outputs',
+    evidence: 'check:computational-merge-runtime-status source reports',
+    issue: 1809,
+    status: 'runtime apply-capable',
+  },
+  {
+    area: 'Goal review screenshot',
+    evidence: 'docs/validation/goal-review-screenshot-2026-06-18.png',
+    issue: 1856,
+    status: 'UI E2E-proven',
+  },
+] satisfies Array<z.infer<typeof capabilityStatusSchema>>;
+
 const report = reportSchema.parse({
   artifacts,
+  capabilityStatuses,
   commands: [
     'bun run check:goal-review-data',
     'bun run check:goal-review-page',
@@ -133,7 +177,7 @@ const report = reportSchema.parse({
     'Private focus-stack CR3, super-resolution NEF, and panorama RAF source files.',
     'Real RAW panorama, focus stack, and super-resolution runtime reports after private source files exist.',
   ],
-  proofHash: hashString(JSON.stringify({ artifacts, sourceReports })),
+  proofHash: hashString(JSON.stringify({ artifacts, capabilityStatuses, sourceReports })),
   schemaVersion: 1,
   sourceReports,
   status: 'review_page_data_generated',
