@@ -323,6 +323,7 @@ const runtimeDryRun = {
   baseFogConfidence: 0.9,
   includedPaths: ['/fixtures/negative-measured-a.tif', '/fixtures/negative-measured-b.tif'],
   previewReady: true,
+  presetId: validRuntimeAppliedMeasuredProfile.profileId,
   targetPaths: ['/fixtures/negative-measured-a.tif', '/fixtures/negative-measured-b.tif'],
 };
 const runtimeAcceptedPlan = buildNegativeLabAcceptedBatchPlanRouteResult(runtimeDryRun);
