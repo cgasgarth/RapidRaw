@@ -71,8 +71,11 @@ const rawProofReportSchema = z
 const uiProofReportSchema = z
   .object({
     doesNotProve: z.array(z.string().min(1)).min(1),
+    e2eIssue: z.literal(2476),
     fixtureId: z.literal('validation.raw-open-edit-export.selective-color-orange.v1'),
     issue: z.literal(2476),
+    proofBoundary: z.literal('private_raw_runtime_plus_visual_smoke_not_full_macos_e2e'),
+    proofStatus: z.literal('private_raw_preview_export_sidecar_with_ui_smoke'),
     rawRuntime: z
       .object({
         editCommandId: z.literal('command.raw-open-edit-export.selective-color-orange.v1'),
@@ -148,8 +151,11 @@ const expectedReport = uiProofReportSchema.parse({
     'icc_colorimetric_accuracy',
     'public_raw_fixture',
   ],
+  e2eIssue: 2476,
   fixtureId: rawProofReport.fixtureId,
   issue: 2476,
+  proofBoundary: 'private_raw_runtime_plus_visual_smoke_not_full_macos_e2e',
+  proofStatus: 'private_raw_preview_export_sidecar_with_ui_smoke',
   rawRuntime: {
     editCommandId: rawProofReport.localRawRuntime.editCommandId,
     metrics: rawProofReport.localRawRuntime.metrics,
