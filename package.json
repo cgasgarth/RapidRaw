@@ -173,6 +173,7 @@
     "check:export-batch-proof": "bun tests/integration/checks/check-export-batch-proof.ts",
     "check:export-batch-proof:update": "bun tests/integration/checks/check-export-batch-proof.ts --update",
     "check:delivery-review-manifest": "bun tests/integration/checks/check-delivery-review-manifest.ts",
+    "check:export-readiness-ui": "bun tests/integration/checks/check-export-readiness-ui.ts",
     "check:import-presets": "bun tests/integration/checks/check-import-preset-fixtures.ts",
     "check:library-sessions": "bun tests/integration/checks/check-library-session-fixtures.ts",
     "check:session-import-reload-proof": "bun tests/integration/checks/check-session-import-reload-proof.ts",
