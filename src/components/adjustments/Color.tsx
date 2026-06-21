@@ -1185,8 +1185,11 @@ export default function ColorPanel({
                   data-active={String(isApplied)}
                   data-active-range={recipe.activeColorRange}
                   data-camera-profile={recipe.cameraProfile}
+                  data-temperature={recipe.temperature}
                   data-testid={`professional-color-recipe-${recipe.id}`}
+                  data-tint={recipe.tint}
                   data-tone-curve={recipe.toneCurve}
+                  data-vibrance={recipe.vibrance}
                   key={recipe.id}
                   onClick={() => {
                     applyProfessionalColorRecipe(recipe);
@@ -1200,6 +1203,33 @@ export default function ColorPanel({
                     </span>
                   </span>
                   <span className="mt-1 block text-text-secondary">{t(recipe.descriptionKey)}</span>
+                  <span
+                    aria-hidden="true"
+                    className="mt-2 grid grid-cols-2 gap-1 text-[10px] font-medium text-text-secondary"
+                    data-testid="professional-color-recipe-summary"
+                  >
+                    <span className="rounded bg-bg-primary px-1.5 py-0.5">
+                      {t('adjustments.color.workflowRecipes.profileChip', {
+                        value: t(`adjustments.color.profileTone.cameraProfiles.${recipe.cameraProfile}`),
+                      })}
+                    </span>
+                    <span className="rounded bg-bg-primary px-1.5 py-0.5">
+                      {t('adjustments.color.workflowRecipes.toneChip', {
+                        value: t(`adjustments.color.profileTone.toneCurves.${recipe.toneCurve}`),
+                      })}
+                    </span>
+                    <span className="rounded bg-bg-primary px-1.5 py-0.5">
+                      {t('adjustments.color.workflowRecipes.whiteBalanceChip', {
+                        temperature: formatSignedInteger(recipe.temperature),
+                        tint: formatSignedInteger(recipe.tint),
+                      })}
+                    </span>
+                    <span className="rounded bg-bg-primary px-1.5 py-0.5">
+                      {t('adjustments.color.workflowRecipes.rangeChip', {
+                        value: t(getSelectiveColorRange(recipe.activeColorRange).labelKey),
+                      })}
+                    </span>
+                  </span>
                 </button>
               );
             })}
