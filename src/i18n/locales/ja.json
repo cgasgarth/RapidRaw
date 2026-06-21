@@ -1478,7 +1478,12 @@
       "batchDispositionReasonAcquisition": "Acquisition review required",
       "batchDispositionReasonExcluded": "Excluded from batch",
       "batchDispositionReasonPreview": "Preview required",
-      "batchDispositionReasonReady": "Ready to apply"
+      "batchDispositionReasonReady": "Ready to apply",
+      "convertAndSaveReady": "Convert & Save Ready ({{count}})",
+      "scopeReady": "Ready only",
+      "batchDispositionReasonBase": "Base estimate required",
+      "convertAndSaveReady_one": "Convert & Save Ready ({{count}})",
+      "convertAndSaveReady_other": "Convert & Save Ready ({{count}})"
     },
     "panorama": {
       "cancel": "キャンセル",

@@ -93,7 +93,7 @@ import type { NegativeLabSelectedProfileSnapshot } from '../../schemas/negativeL
 import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspaceSchemas';
 
 type NegativeParams = NegativeLabPresetParams;
-type NegativeConversionScope = 'active' | 'all';
+type NegativeConversionScope = 'active' | 'all' | 'ready';
 type NegativeLabProfileFilter = 'all' | 'black_and_white_silver' | 'color_negative' | 'measured';
 type NegativeLabProfileSort = 'catalog' | 'evidence_desc' | 'name_asc' | 'runtime_applied';
 type NegativeLabProfileFilterLabelKey =
@@ -162,9 +162,14 @@ type BatchDispositionLabelKey =
   | 'modals.negativeConversion.batchDispositionSkip';
 type BatchDispositionReasonLabelKey =
   | 'modals.negativeConversion.batchDispositionReasonAcquisition'
+  | 'modals.negativeConversion.batchDispositionReasonBase'
   | 'modals.negativeConversion.batchDispositionReasonExcluded'
   | 'modals.negativeConversion.batchDispositionReasonPreview'
   | 'modals.negativeConversion.batchDispositionReasonReady';
+type ConversionScopeLabelKey =
+  | 'modals.negativeConversion.scopeActive'
+  | 'modals.negativeConversion.scopeAll'
+  | 'modals.negativeConversion.scopeReady';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
@@ -323,10 +328,21 @@ const BATCH_DISPOSITION_LABEL_KEYS = {
 } satisfies Record<NegativeLabFrameHealthEntry['batchDisposition'], BatchDispositionLabelKey>;
 const BATCH_DISPOSITION_REASON_LABEL_KEYS = {
   acquisition_review_required: 'modals.negativeConversion.batchDispositionReasonAcquisition',
+  base_not_estimated: 'modals.negativeConversion.batchDispositionReasonBase',
   excluded_from_batch: 'modals.negativeConversion.batchDispositionReasonExcluded',
   preview_required: 'modals.negativeConversion.batchDispositionReasonPreview',
   ready_to_apply: 'modals.negativeConversion.batchDispositionReasonReady',
 } satisfies Record<NegativeLabFrameHealthEntry['batchDispositionReason'], BatchDispositionReasonLabelKey>;
+const CONVERSION_SCOPE_LABEL_KEYS = {
+  active: 'modals.negativeConversion.scopeActive',
+  all: 'modals.negativeConversion.scopeAll',
+  ready: 'modals.negativeConversion.scopeReady',
+} satisfies Record<NegativeConversionScope, ConversionScopeLabelKey>;
+const CONVERSION_SCOPE_TEST_IDS = {
+  active: 'negative-lab-scope-active',
+  all: 'negative-lab-scope-all',
+  ready: 'negative-lab-scope-ready',
+} satisfies Record<NegativeConversionScope, string>;
 const isNegativeLabFrameHealthFilter = (value: string): value is NegativeLabFrameHealthFilter =>
   NEGATIVE_LAB_FRAME_HEALTH_FILTERS.some((filter) => filter === value);
 const isNegativeLabFrameHealthSort = (value: string): value is NegativeLabFrameHealthSort =>
@@ -443,10 +459,6 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const effectiveActivePathIndex = targetPaths[activePathIndex] === undefined ? 0 : activePathIndex;
   const selectedImagePath = targetPaths[effectiveActivePathIndex] ?? null;
   const hasMultipleScans = targetPaths.length > 1;
-  const pathsToConvert = useMemo(() => {
-    if (conversionScope === 'active' && selectedImagePath !== null) return [selectedImagePath];
-    return targetPaths.filter((path) => includedPathSet.has(path));
-  }, [conversionScope, includedPathSet, selectedImagePath, targetPaths]);
   const baseFogSampleReadout = useMemo(() => {
     if (params.base_fog_sample === null || activeBaseFogSampleLabel === null) return null;
 
@@ -604,6 +616,23 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     return filteredRows;
   }, [frameHealthFilter, frameHealthReport.frames, frameHealthSort]);
   const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
+  const readyOnlyPathsToConvert = useMemo(
+    () =>
+      frameHealthReport.frames.filter((frame) => frame.batchDisposition === 'apply').map((frame) => frame.sourcePath),
+    [frameHealthReport.frames],
+  );
+  const pathsToConvert = useMemo(() => {
+    if (conversionScope === 'active' && selectedImagePath !== null) return [selectedImagePath];
+    if (conversionScope === 'ready') return readyOnlyPathsToConvert;
+    return targetPaths.filter((path) => includedPathSet.has(path));
+  }, [conversionScope, includedPathSet, readyOnlyPathsToConvert, selectedImagePath, targetPaths]);
+  const omittedDispositionFrameIds = useMemo(
+    () =>
+      conversionScope === 'ready'
+        ? frameHealthReport.frames.filter((frame) => frame.batchDisposition !== 'apply').map((frame) => frame.frameId)
+        : [],
+    [conversionScope, frameHealthReport.frames],
+  );
   const rollWarningCount = frameHealthReport.warningCodes.length + batchDryRunSummary.acquisitionReviewFrameIds.length;
   const dustScratchReviewReport = useMemo(
     () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewUrl !== null),
@@ -614,13 +643,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     () =>
       JSON.stringify(
         {
+          batchScope: conversionScope,
           dryRunSummary: batchDryRunSummary,
+          omittedDispositionFrameIds,
           selectedProfile: selectedProfileSnapshot,
         },
         null,
         2,
       ),
-    [batchDryRunSummary, selectedProfileSnapshot],
+    [batchDryRunSummary, conversionScope, omittedDispositionFrameIds, selectedProfileSnapshot],
   );
   const acceptedBatchPlanIdentity = useMemo(() => {
     if (selectedProfileSnapshot === null) {
@@ -666,7 +697,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const agentCommandSource = isBatchPlanAccepted
     ? NegativeLabAppServerCommandName.AcceptBatchPlan
     : NegativeLabAppServerCommandName.BatchSummary;
-  const requiresAcceptedBatchPlan = hasMultipleScans && conversionScope === 'all';
+  const requiresAcceptedBatchPlan = hasMultipleScans && conversionScope !== 'active';
   const canSave =
     !isSaving &&
     !isLoading &&
@@ -1176,6 +1207,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             ...saveOptions,
             ...(requiresAcceptedBatchPlan ? acceptedBatchPlanIdentity : {}),
             batchDisposition: batchDryRunSummary.dispositionCounts,
+            batchScope: conversionScope,
+            omittedDispositionFrameIds,
             reviewFrameIds: batchDryRunSummary.reviewFrameIds,
             acquisitionSourceFamilies: frameHealthReport.acquisitionHealth.sourceFamilies,
             acquisitionWarningCodes: frameHealthReport.acquisitionHealth.warningCodes,
@@ -2012,8 +2045,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               })}
             </div>
             {hasMultipleScans && (
-              <div className="grid grid-cols-2 gap-2" data-testid="negative-lab-conversion-scope">
-                {(['all', 'active'] satisfies Array<NegativeConversionScope>).map((scope) => (
+              <div className="grid grid-cols-3 gap-2" data-testid="negative-lab-conversion-scope">
+                {(['all', 'ready', 'active'] satisfies Array<NegativeConversionScope>).map((scope) => (
                   <button
                     aria-pressed={conversionScope === scope}
                     className={cx(
@@ -2022,16 +2055,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                         ? 'border-accent bg-accent/10 text-text-primary'
                         : 'border-surface bg-bg-secondary text-text-secondary hover:bg-surface',
                     )}
-                    data-testid={scope === 'all' ? 'negative-lab-scope-all' : 'negative-lab-scope-active'}
+                    data-testid={CONVERSION_SCOPE_TEST_IDS[scope]}
                     key={scope}
                     onClick={() => {
                       setConversionScope(scope);
                     }}
                     type="button"
                   >
-                    {t(
-                      scope === 'all' ? 'modals.negativeConversion.scopeAll' : 'modals.negativeConversion.scopeActive',
-                    )}
+                    {t(CONVERSION_SCOPE_LABEL_KEYS[scope])}
                   </button>
                 ))}
               </div>
@@ -3120,11 +3151,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 {saveOptions.suffix || '-'}
               </span>
               <span data-testid="negative-lab-export-summary-scope">
-                {t(
-                  conversionScope === 'all'
-                    ? 'modals.negativeConversion.scopeAll'
-                    : 'modals.negativeConversion.scopeActive',
-                )}
+                {t(CONVERSION_SCOPE_LABEL_KEYS[conversionScope])}
               </span>
               <span className="text-right text-text-secondary" data-testid="negative-lab-export-summary-count">
                 {t('modals.negativeConversion.queuedScans', { queuedCount: pathsToConvert.length })}
@@ -3538,9 +3565,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                     <Save className="mr-2" size={16} />
                     {hasMultipleScans && conversionScope === 'all'
                       ? t('modals.negativeConversion.convertAndSaveAll', { count: targetPaths.length })
-                      : hasMultipleScans
-                        ? t('modals.negativeConversion.convertAndSaveActive')
-                        : t('modals.negativeConversion.convertAndSave')}
+                      : hasMultipleScans && conversionScope === 'ready'
+                        ? t('modals.negativeConversion.convertAndSaveReady', { count: pathsToConvert.length })
+                        : hasMultipleScans
+                          ? t('modals.negativeConversion.convertAndSaveActive')
+                          : t('modals.negativeConversion.convertAndSave')}
                   </>
                 )}
               </Button>

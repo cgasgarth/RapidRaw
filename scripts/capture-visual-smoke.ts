@@ -1282,7 +1282,7 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-frame-disposition-1').getByText('Review', { exact: true }).waitFor({
     timeout: 10_000,
   });
-  await page.getByTestId('negative-lab-review-frame-count').getByText('Review 1', { exact: true }).waitFor({
+  await page.getByTestId('negative-lab-review-frame-count').getByText('Review 2', { exact: true }).waitFor({
     timeout: 10_000,
   });
   await page
@@ -1455,6 +1455,15 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 1', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-review-frame-count').getByText('Review 1', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-roll-frame-disposition-0').getByText('Apply', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-roll-frame-disposition-1').getByText('Review', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   const rollBaseScopeDataset = await page
     .getByTestId('negative-lab-roll-queue-summary')
     .evaluate((element) => ({ ...element.dataset }));
@@ -1532,6 +1541,18 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-skipped-frame-count').getByText('Skip 1', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-include-toggle-1').click();
+  await page.getByTestId('negative-lab-skipped-frame-count').getByText('Skip 0', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-scope-ready').click();
+  await page
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
+    .getByText('1 queued', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-export-summary-scope').getByText('Ready only', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId('negative-lab-copy-batch-plan').click();
   await page.getByTestId('negative-lab-copy-batch-plan').getByText('Copied plan', { exact: true }).waitFor({
     timeout: 10_000,
@@ -1541,7 +1562,9 @@ async function prepareScenario(page, mode) {
     !copiedBatchPlan.includes('"plannedApplyCount"') ||
     !copiedBatchPlan.includes('"skippedFrameIds"') ||
     !copiedBatchPlan.includes('"acquisitionReviewFrameIds"') ||
+    !copiedBatchPlan.includes('"batchScope": "ready"') ||
     !copiedBatchPlan.includes('"dispositionCounts"') ||
+    !copiedBatchPlan.includes('"omittedDispositionFrameIds"') ||
     !copiedBatchPlan.includes('"reviewFrameIds"')
   ) {
     throw new Error('Negative Lab batch plan copy did not include apply/skip/acquisition/disposition JSON.');
@@ -1555,17 +1578,9 @@ async function prepareScenario(page, mode) {
     .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
     .getByText('1 queued', { exact: true })
     .waitFor({ timeout: 10_000 });
-  await page.getByTestId('negative-lab-included-status').getByText('1 included', { exact: true }).waitFor({
-    timeout: 10_000,
-  });
-  await page.getByTestId('negative-lab-scope-active').click();
-  await page
-    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
-    .getByText('1 queued', { exact: true })
-    .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-export-tiff16').waitFor({ timeout: 10_000 });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabExportJpegProof).click();
-  await page.getByRole('button', { name: 'Convert & Save Active' }).click();
+  await page.getByRole('button', { name: 'Convert & Save Ready (1)' }).click();
   await page.waitForFunction(() =>
     (window.__RAWENGINE_VISUAL_SMOKE_INVOKES__ ?? []).some((call) => call.command === 'convert_negatives'),
   );
