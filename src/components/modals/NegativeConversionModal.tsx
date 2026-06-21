@@ -96,6 +96,7 @@ type NegativeParams = NegativeLabPresetParams;
 type NegativeConversionScope = 'active' | 'all' | 'ready';
 type NegativeLabProfileFilter = 'all' | 'black_and_white_silver' | 'color_negative' | 'measured';
 type NegativeLabProfileSort = 'catalog' | 'evidence_desc' | 'name_asc' | 'runtime_applied';
+type NegativeLabQcDecision = 'approved' | 'pending' | 'rejected';
 type NegativeLabProfileFilterLabelKey =
   | 'modals.negativeConversion.profileFilterAll'
   | 'modals.negativeConversion.profileFilterBlackAndWhite'
@@ -170,6 +171,10 @@ type ConversionScopeLabelKey =
   | 'modals.negativeConversion.scopeActive'
   | 'modals.negativeConversion.scopeAll'
   | 'modals.negativeConversion.scopeReady';
+type QcDecisionLabelKey =
+  | 'modals.negativeConversion.qcDecisionApproved'
+  | 'modals.negativeConversion.qcDecisionPending'
+  | 'modals.negativeConversion.qcDecisionRejected';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
@@ -343,6 +348,11 @@ const CONVERSION_SCOPE_TEST_IDS = {
   all: 'negative-lab-scope-all',
   ready: 'negative-lab-scope-ready',
 } satisfies Record<NegativeConversionScope, string>;
+const QC_DECISION_LABEL_KEYS = {
+  approved: 'modals.negativeConversion.qcDecisionApproved',
+  pending: 'modals.negativeConversion.qcDecisionPending',
+  rejected: 'modals.negativeConversion.qcDecisionRejected',
+} satisfies Record<NegativeLabQcDecision, QcDecisionLabelKey>;
 const isNegativeLabFrameHealthFilter = (value: string): value is NegativeLabFrameHealthFilter =>
   NEGATIVE_LAB_FRAME_HEALTH_FILTERS.some((filter) => filter === value);
 const isNegativeLabFrameHealthSort = (value: string): value is NegativeLabFrameHealthSort =>
@@ -441,6 +451,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [profileSort, setProfileSort] = useState<NegativeLabProfileSort>('catalog');
   const [frameHealthFilter, setFrameHealthFilter] = useState<NegativeLabFrameHealthFilter>('all');
   const [frameHealthSort, setFrameHealthSort] = useState<NegativeLabFrameHealthSort>('roll_order');
+  const [qcDecisionByFrameId, setQcDecisionByFrameId] = useState<Record<string, NegativeLabQcDecision>>({});
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [isCompareActive, setIsCompareActive] = useState(false);
@@ -616,22 +627,62 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     return filteredRows;
   }, [frameHealthFilter, frameHealthReport.frames, frameHealthSort]);
   const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
+  const approvedQcFrameIds = useMemo(
+    () =>
+      Object.entries(qcDecisionByFrameId)
+        .filter(([, decision]) => decision === 'approved')
+        .map(([frameId]) => frameId),
+    [qcDecisionByFrameId],
+  );
+  const rejectedQcFrameIds = useMemo(
+    () =>
+      Object.entries(qcDecisionByFrameId)
+        .filter(([, decision]) => decision === 'rejected')
+        .map(([frameId]) => frameId),
+    [qcDecisionByFrameId],
+  );
   const readyOnlyPathsToConvert = useMemo(
     () =>
-      frameHealthReport.frames.filter((frame) => frame.batchDisposition === 'apply').map((frame) => frame.sourcePath),
-    [frameHealthReport.frames],
+      frameHealthReport.frames
+        .filter(
+          (frame) =>
+            qcDecisionByFrameId[frame.frameId] !== 'rejected' &&
+            (frame.batchDisposition === 'apply' || qcDecisionByFrameId[frame.frameId] === 'approved'),
+        )
+        .map((frame) => frame.sourcePath),
+    [frameHealthReport.frames, qcDecisionByFrameId],
   );
   const pathsToConvert = useMemo(() => {
-    if (conversionScope === 'active' && selectedImagePath !== null) return [selectedImagePath];
+    if (conversionScope === 'active' && selectedImagePath !== null) {
+      const activeFrame = frameHealthReport.frames[effectiveActivePathIndex];
+      return activeFrame !== undefined && qcDecisionByFrameId[activeFrame.frameId] !== 'rejected'
+        ? [selectedImagePath]
+        : [];
+    }
     if (conversionScope === 'ready') return readyOnlyPathsToConvert;
-    return targetPaths.filter((path) => includedPathSet.has(path));
-  }, [conversionScope, includedPathSet, readyOnlyPathsToConvert, selectedImagePath, targetPaths]);
+    return frameHealthReport.frames
+      .filter((frame) => frame.included && qcDecisionByFrameId[frame.frameId] !== 'rejected')
+      .map((frame) => frame.sourcePath);
+  }, [
+    conversionScope,
+    effectiveActivePathIndex,
+    frameHealthReport.frames,
+    qcDecisionByFrameId,
+    readyOnlyPathsToConvert,
+    selectedImagePath,
+  ]);
   const omittedDispositionFrameIds = useMemo(
     () =>
       conversionScope === 'ready'
-        ? frameHealthReport.frames.filter((frame) => frame.batchDisposition !== 'apply').map((frame) => frame.frameId)
+        ? frameHealthReport.frames
+            .filter(
+              (frame) =>
+                qcDecisionByFrameId[frame.frameId] === 'rejected' ||
+                (frame.batchDisposition !== 'apply' && qcDecisionByFrameId[frame.frameId] !== 'approved'),
+            )
+            .map((frame) => frame.frameId)
         : [],
-    [conversionScope, frameHealthReport.frames],
+    [conversionScope, frameHealthReport.frames, qcDecisionByFrameId],
   );
   const rollWarningCount = frameHealthReport.warningCodes.length + batchDryRunSummary.acquisitionReviewFrameIds.length;
   const dustScratchReviewReport = useMemo(
@@ -646,12 +697,13 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           batchScope: conversionScope,
           dryRunSummary: batchDryRunSummary,
           omittedDispositionFrameIds,
+          qcDecisions: qcDecisionByFrameId,
           selectedProfile: selectedProfileSnapshot,
         },
         null,
         2,
       ),
-    [batchDryRunSummary, conversionScope, omittedDispositionFrameIds, selectedProfileSnapshot],
+    [batchDryRunSummary, conversionScope, omittedDispositionFrameIds, qcDecisionByFrameId, selectedProfileSnapshot],
   );
   const acceptedBatchPlanIdentity = useMemo(() => {
     if (selectedProfileSnapshot === null) {
@@ -1193,6 +1245,18 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setAcceptedBatchPlanJson(batchDryRunPlanJson);
   };
 
+  const handleSetQcDecision = (frameId: string, decision: NegativeLabQcDecision) => {
+    setQcDecisionByFrameId((currentDecisions) => {
+      if (decision === 'pending') {
+        const { [frameId]: _removedDecision, ...nextDecisions } = currentDecisions;
+        return nextDecisions;
+      }
+      const nextDecisions = { ...currentDecisions };
+      nextDecisions[frameId] = decision;
+      return nextDecisions;
+    });
+  };
+
   const handleSave = async () => {
     if (!canSave) return;
     setIsSaving(true);
@@ -1209,6 +1273,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             batchDisposition: batchDryRunSummary.dispositionCounts,
             batchScope: conversionScope,
             omittedDispositionFrameIds,
+            qcApprovedFrameIds: approvedQcFrameIds,
+            qcRejectedFrameIds: rejectedQcFrameIds,
             reviewFrameIds: batchDryRunSummary.reviewFrameIds,
             acquisitionSourceFamilies: frameHealthReport.acquisitionHealth.sourceFamilies,
             acquisitionWarningCodes: frameHealthReport.acquisitionHealth.warningCodes,
@@ -1587,6 +1653,16 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 reviewCount: batchDryRunSummary.reviewFrameIds.length,
               })}
             </span>
+            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-qc-approved-count">
+              {t('modals.negativeConversion.qcApprovedCount', {
+                approvedCount: approvedQcFrameIds.length,
+              })}
+            </span>
+            <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-qc-rejected-count">
+              {t('modals.negativeConversion.qcRejectedCount', {
+                rejectedCount: rejectedQcFrameIds.length,
+              })}
+            </span>
             <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-batch-workload-summary">
               {t('modals.negativeConversion.batchWorkloadSummary', {
                 applyCount: batchDryRunSummary.plannedApplyCount,
@@ -1761,6 +1837,33 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 </span>
                 <span className="text-text-tertiary" data-testid={`negative-lab-frame-qc-status-${index}`}>
                   {t(`modals.negativeConversion.frameQcStatus.${row.qcStatus}`)}
+                </span>
+                <span
+                  className="col-span-8 flex flex-wrap items-center gap-1 text-[11px]"
+                  data-qc-decision={qcDecisionByFrameId[row.frameId] ?? 'pending'}
+                  data-testid={`negative-lab-frame-qc-decision-${index}`}
+                >
+                  <span className="mr-1 text-text-tertiary">
+                    {t(QC_DECISION_LABEL_KEYS[qcDecisionByFrameId[row.frameId] ?? 'pending'])}
+                  </span>
+                  {(['approved', 'rejected', 'pending'] satisfies Array<NegativeLabQcDecision>).map((decision) => (
+                    <button
+                      className={cx(
+                        'rounded px-1.5 py-0.5 transition-colors',
+                        (qcDecisionByFrameId[row.frameId] ?? 'pending') === decision
+                          ? 'bg-accent/15 text-text-primary'
+                          : 'bg-bg-primary text-text-tertiary hover:bg-surface',
+                      )}
+                      data-testid={`negative-lab-frame-qc-${decision}-${row.frameId}`}
+                      key={decision}
+                      onClick={() => {
+                        handleSetQcDecision(row.frameId, decision);
+                      }}
+                      type="button"
+                    >
+                      {t(QC_DECISION_LABEL_KEYS[decision])}
+                    </button>
+                  ))}
                 </span>
                 {getNegativeLabFrameWarningCount(row) > 0 && (
                   <span

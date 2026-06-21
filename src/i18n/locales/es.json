@@ -1498,7 +1498,12 @@
       "scopeReady": "Ready only",
       "batchDispositionReasonBase": "Base estimate required",
       "convertAndSaveReady_one": "Convert & Save Ready ({{count}})",
-      "convertAndSaveReady_other": "Convert & Save Ready ({{count}})"
+      "convertAndSaveReady_other": "Convert & Save Ready ({{count}})",
+      "qcApprovedCount": "Approved {{approvedCount}}",
+      "qcDecisionApproved": "Approved",
+      "qcDecisionPending": "Pending",
+      "qcDecisionRejected": "Rejected",
+      "qcRejectedCount": "Rejected {{rejectedCount}}"
     },
     "panorama": {
       "cancel": "Cancelar",
