@@ -388,28 +388,56 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
 
     if (command.id === 'panorama') {
       closeAndRun(() => {
-        setUI((state) => ({ panoramaModalState: { ...state.panoramaModalState, isOpen: true } }));
+        setUI((state) => ({
+          panoramaModalState: {
+            ...state.panoramaModalState,
+            isOpen: true,
+            stitchingSourcePaths:
+              selectedCommandPaths.length > 0 ? selectedCommandPaths : state.panoramaModalState.stitchingSourcePaths,
+          },
+        }));
       });
       return;
     }
 
     if (command.id === 'hdrMerge') {
       closeAndRun(() => {
-        setUI((state) => ({ hdrModalState: { ...state.hdrModalState, isOpen: true } }));
+        setUI((state) => ({
+          hdrModalState: {
+            ...state.hdrModalState,
+            isOpen: true,
+            stitchingSourcePaths:
+              selectedCommandPaths.length > 0 ? selectedCommandPaths : state.hdrModalState.stitchingSourcePaths,
+          },
+        }));
       });
       return;
     }
 
     if (command.id === 'focusStack') {
       closeAndRun(() => {
-        setUI((state) => ({ focusStackModalState: { ...state.focusStackModalState, isOpen: true } }));
+        setUI((state) => ({
+          focusStackModalState: {
+            ...state.focusStackModalState,
+            isOpen: true,
+            sourcePaths:
+              selectedCommandPaths.length > 0 ? selectedCommandPaths : state.focusStackModalState.sourcePaths,
+          },
+        }));
       });
       return;
     }
 
     if (command.id === 'superResolution') {
       closeAndRun(() => {
-        setUI((state) => ({ superResolutionModalState: { ...state.superResolutionModalState, isOpen: true } }));
+        setUI((state) => ({
+          superResolutionModalState: {
+            ...state.superResolutionModalState,
+            isOpen: true,
+            sourcePaths:
+              selectedCommandPaths.length > 0 ? selectedCommandPaths : state.superResolutionModalState.sourcePaths,
+          },
+        }));
       });
       return;
     }

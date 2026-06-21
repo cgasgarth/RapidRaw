@@ -203,6 +203,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-denoise-ui']);
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-culling-ui']);
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-lens-ui']);
+  addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-merge-sources-ui']);
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-negative-lab-ui']);
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-transform-ui']);
   addIf((file) => file === 'src/components/panel/editor/EditorToolbar.tsx', ['check:editor-file-type-badge-ui']);
@@ -389,6 +390,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-denoise-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-culling-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-lens-ui']);
+  assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-merge-sources-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-negative-lab-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-transform-ui']);
   assertSelfTestRoute(['src/components/panel/editor/EditorToolbar.tsx'], ['check:editor-file-type-badge-ui']);
