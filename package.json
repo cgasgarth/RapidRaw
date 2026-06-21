@@ -426,6 +426,7 @@
     "check:negative-lab-qc-contact-sheet": "bun scripts/generate-negative-lab-qc-contact-sheet.ts",
     "check:negative-lab-qc-live-artifact": "bun tests/integration/checks/check-negative-lab-qc-live-artifact.ts",
     "check:negative-lab-batch-export-proof": "bun tests/integration/checks/check-negative-lab-batch-export-proof.ts",
+    "check:negative-lab-conversion-bundle": "bun tests/integration/checks/check-negative-lab-conversion-bundle.ts",
     "check:negative-lab-public-export-proof": "bun tests/integration/checks/check-negative-lab-public-export-proof.ts",
     "check:negative-lab-public-export-review-smoke": "bun run check:negative-lab-public-export-proof && bun scripts/capture-visual-smoke.ts --scenario negative-lab-public-export-review",
     "check:negative-lab-public-export-ui-proof": "bun tests/integration/checks/check-negative-lab-public-export-ui-proof.ts",

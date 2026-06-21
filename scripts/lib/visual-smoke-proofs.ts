@@ -160,6 +160,11 @@ const negativeLabConvertArgsSchema = z.object({
     .object({
       outputFormat: z.literal(NegativeLabOutputFormatId.JpegProof),
       profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      writeConversionBundle: z.literal(true),
+      acquisitionSourceFamilies: z.array(z.enum(['jpeg_lossy', 'raw_like', 'tiff_scan', 'unknown'])).min(1),
+      acquisitionWarningCodes: z.array(
+        z.enum(['lossy_source_for_negative_lab', 'mixed_source_families', 'unknown_acquisition_state']),
+      ),
       selectedProfile: z.object({
         claimLevel: z.literal('generic_starting_point_only'),
         claimPolicy: z.literal('generic_starting_point_no_stock_claim'),
@@ -190,6 +195,7 @@ const negativeLabBatchConvertArgsSchema = z.object({
       acceptedDryRunPlanHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
       acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
       outputFormat: z.literal(NegativeLabOutputFormatId.JpegProof),
+      writeConversionBundle: z.literal(true),
       suffix: z.literal('Positive'),
     })
     .refine(

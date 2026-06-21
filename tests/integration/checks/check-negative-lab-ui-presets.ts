@@ -512,6 +512,8 @@ for (const marker of [
   'estimate_negative_base_fog',
   'sanitize_output_suffix',
   'selectedProfile',
+  'write_conversion_bundle',
+  'negative_lab_conversion_bundle_path',
 ]) {
   if (!backendSource.includes(marker)) {
     failures.push(`negative conversion backend is missing export marker: ${marker}`);

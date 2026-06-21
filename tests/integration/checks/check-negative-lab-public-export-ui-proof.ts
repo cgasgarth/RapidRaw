@@ -52,6 +52,7 @@ const exportReportSchema = z
           .object({
             acceptedDryRunPlanHash: fnv32HashSchema,
             acceptedDryRunPlanId: z.literal('negative_lab_batch_plan_2f4a91bc'),
+            conversionBundle: z.literal(true),
             outputFormat: z.literal('jpeg_proof'),
             profileProvenanceHash: fnv32HashSchema,
             suffix: z.literal('Positive'),
