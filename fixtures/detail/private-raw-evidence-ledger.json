@@ -534,37 +534,39 @@
     {
       "artifactClass": "layer_mask_composite",
       "camera": {
-        "cameraMake": "Canon",
-        "cameraModel": "EOS R5",
-        "lens": "RF 85mm F2 Macro IS STM",
-        "rawFormat": "cr3"
+        "cameraMake": "Sony",
+        "cameraModel": "ILCE-7M3",
+        "lens": "FE 24-105mm F4 G OSS",
+        "rawFormat": "arw"
       },
       "crop": {
         "height": 1536,
         "unit": "source_pixels",
         "width": 1536,
-        "x": 960,
-        "y": 640
+        "x": 1200,
+        "y": 850
       },
-      "evidenceId": "raw-evidence.layers.mask-refinement-portrait.v1",
+      "evidenceId": "raw-evidence.layers.alaska-local-adjustment.v1",
       "expectedUse": ["layers_masks", "preview_export_parity"],
       "exposure": {
-        "aperture": 4,
+        "aperture": 7.1,
         "exposureBiasEv": 0,
-        "iso": 200,
-        "shutterSeconds": 0.004
+        "iso": 500,
+        "shutterSeconds": 0.0005
       },
       "featureFamily": "layers_masks",
-      "notes": "Reserved private portrait RAW for layer mask edge refinement, overlay, opacity, and preview/export parity proof.",
+      "fileSha256": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+      "localRelativePath": "private-fixtures/layers/alaska-layer-mask-v1.arw",
+      "notes": "Project-owned Alaska ARW reserved for layer mask edge refinement, overlay, opacity, and preview/export parity proof. The RAW payload is local-only and not committed.",
       "rights": {
         "allowedUse": "local_validation_only",
         "copyrightOwner": "RawEngine private fixture owner",
-        "evidence": "Private layer/mask portrait RAW must be project-owned or explicitly user-provided before status can become private_asset_available.",
+        "evidence": "User explicitly provided /Users/cgas/Pictures/Capture One/Alaska as project-owned RAW validation input for this repo.",
         "publicRepoAllowed": false,
         "rightsStatus": "project_owned"
       },
-      "status": "planned_private_capture",
-      "trackingIssue": 1896
+      "status": "private_asset_available",
+      "trackingIssue": 2310
     }
   ],
   "issue": 1149,

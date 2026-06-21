@@ -110,6 +110,8 @@
     "check:layer-overlay-soft-light-runtime": "bun tests/integration/checks/check-layer-overlay-soft-light-runtime.ts",
     "check:layer-stack-undo-redo": "bun tests/integration/checks/check-layer-stack-undo-redo.ts",
     "check:layer-opacity-order-runtime": "bun tests/integration/checks/check-layer-opacity-order-runtime.ts",
+    "prepare:layer-mask-real-raw-private-root": "bun scripts/prepare-layer-mask-real-raw-private-root.ts",
+    "check:layer-mask-real-raw-private-root-prep": "bun scripts/prepare-layer-mask-real-raw-private-root.ts",
     "check:layer-mask-real-raw-proof": "bun tests/integration/checks/check-layer-mask-real-raw-proof.ts",
     "check:layer-runtime-parent-status": "bun tests/integration/checks/check-layer-runtime-parent-status.ts",
     "check:layer-mask-audit": "bun tests/integration/checks/check-layer-mask-model-audit.ts",
