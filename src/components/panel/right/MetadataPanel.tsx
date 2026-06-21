@@ -367,6 +367,8 @@ export default function MetadataPanel() {
   const fileName = basePath.split(/[\\/]/).pop() || '';
   const fileExtension = fileName.split('.').pop()?.toUpperCase() || 'FILE';
   const megapixels = selectedImage ? ((selectedImage.width * selectedImage.height) / 1000000).toFixed(1) : null;
+  const populatedCameraFieldCount = cameraGridSettings.filter((setting) => setting.value !== '-').length;
+  const editableMetadataFieldCount = EDITABLE_FIELDS.length;
 
   const handleAddTag = async (tagToAdd: string) => {
     const newTagValue = tagToAdd.trim().toLowerCase();
@@ -414,6 +416,45 @@ export default function MetadataPanel() {
       <div className="grow overflow-y-auto p-4 custom-scrollbar">
         {selectedImage ? (
           <div className="flex flex-col gap-6">
+            <section
+              className="grid grid-cols-2 gap-2 rounded-md border border-surface bg-bg-secondary/70 p-2 text-xs"
+              data-camera-field-count={populatedCameraFieldCount}
+              data-editable-field-count={editableMetadataFieldCount}
+              data-gps-ready={String(gpsCoordinates !== null)}
+              data-selection-count={targetPaths.length}
+              data-testid="metadata-readiness-summary"
+            >
+              <UiText
+                as="span"
+                variant={TextVariants.small}
+                className="rounded bg-bg-primary px-2 py-1 text-text-secondary"
+              >
+                {t('editor.metadata.readiness.selectionCount', { count: targetPaths.length })}
+              </UiText>
+              <UiText
+                as="span"
+                variant={TextVariants.small}
+                className="rounded bg-bg-primary px-2 py-1 text-text-secondary"
+              >
+                {t('editor.metadata.readiness.cameraFields', { count: populatedCameraFieldCount })}
+              </UiText>
+              <UiText
+                as="span"
+                variant={TextVariants.small}
+                className="rounded bg-bg-primary px-2 py-1 text-text-secondary"
+              >
+                {gpsCoordinates === null
+                  ? t('editor.metadata.readiness.gpsMissing')
+                  : t('editor.metadata.readiness.gpsReady')}
+              </UiText>
+              <UiText
+                as="span"
+                variant={TextVariants.small}
+                className="rounded bg-bg-primary px-2 py-1 text-text-secondary"
+              >
+                {t('editor.metadata.readiness.editableFields', { count: editableMetadataFieldCount })}
+              </UiText>
+            </section>
             <div>
               <UiText variant={TextVariants.heading} className="mb-3">
                 {t('editor.metadata.fileInfo.title')}

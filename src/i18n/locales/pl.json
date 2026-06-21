@@ -1032,6 +1032,22 @@
         "tags": "Tagi",
         "title": "Organizacja"
       },
+      "readiness": {
+        "cameraFields_one": "{{count}} camera field",
+        "cameraFields_few": "{{count}} camera fields",
+        "cameraFields_many": "{{count}} camera fields",
+        "cameraFields_other": "{{count}} camera fields",
+        "editableFields_one": "{{count}} editable field",
+        "editableFields_few": "{{count}} editable fields",
+        "editableFields_many": "{{count}} editable fields",
+        "editableFields_other": "{{count}} editable fields",
+        "gpsMissing": "No GPS",
+        "gpsReady": "GPS ready",
+        "selectionCount_one": "{{count}} selected",
+        "selectionCount_few": "{{count}} selected",
+        "selectionCount_many": "{{count}} selected",
+        "selectionCount_other": "{{count}} selected"
+      },
       "title": "Metadane"
     },
     "presets": {
