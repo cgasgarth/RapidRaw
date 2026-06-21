@@ -176,6 +176,7 @@
     "check:export-readiness-ui": "bun tests/integration/checks/check-export-readiness-ui.ts",
     "check:import-presets": "bun tests/integration/checks/check-import-preset-fixtures.ts",
     "check:command-palette-coverage-ui": "bun tests/integration/checks/check-command-palette-coverage-ui.ts",
+    "check:command-palette-collage-ui": "bun tests/integration/checks/check-command-palette-collage-ui.ts",
     "check:command-palette-denoise-ui": "bun tests/integration/checks/check-command-palette-denoise-ui.ts",
     "check:command-palette-culling-ui": "bun tests/integration/checks/check-command-palette-culling-ui.ts",
     "check:command-palette-lens-ui": "bun tests/integration/checks/check-command-palette-lens-ui.ts",

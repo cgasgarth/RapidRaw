@@ -1445,6 +1445,7 @@
       "close": "Close command palette",
       "commands": {
         "backToLibrary": "Back to library",
+        "collage": "Open collage designer",
         "copyPasteSettings": "Copy and paste settings",
         "culling": "",
         "denoise": "",

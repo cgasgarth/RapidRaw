@@ -199,6 +199,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   addIf((file) => file === 'src/components/panel/editor/Waveform.tsx', ['check:histogram-clipping-ui']);
   addIf((file) => file === 'src/components/panel/editor/EditorToolbar.tsx', ['check:editor-history-toolbar-ui']);
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-coverage-ui']);
+  addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-collage-ui']);
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-denoise-ui']);
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-culling-ui']);
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-lens-ui']);
@@ -383,6 +384,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/components/panel/editor/Waveform.tsx'], ['check:histogram-clipping-ui']);
   assertSelfTestRoute(['src/components/panel/editor/EditorToolbar.tsx'], ['check:editor-history-toolbar-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-coverage-ui']);
+  assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-collage-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-denoise-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-culling-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-lens-ui']);
