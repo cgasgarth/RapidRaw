@@ -296,6 +296,8 @@ export const focusUiSettingsProofSchema = z.object({
   blendMethod: z.literal('depth_map'),
   maxPreviewDimensionPx: z.literal('8192'),
   qualityPreference: z.literal('preview'),
+  reviewOverlayMode: z.literal('halo_risk'),
+  reviewOverlayOpacityPercent: z.literal('100'),
   retouchLayerPolicy: z.literal('none'),
 });
 export const focusReviewWorkspaceProofSchema = z.object({
@@ -309,8 +311,11 @@ export const focusReviewWorkspaceProofSchema = z.object({
   haloPolicy: z.literal('flattened_preview'),
   lowConfidenceCellRatio: z.literal('0.08'),
   proofLevel: z.literal('synthetic_runtime'),
+  reviewOverlayMode: z.literal('halo_risk'),
+  reviewOverlayOpacityPercent: z.literal('100'),
   runtimeStatus: z.literal('dry_run_preview'),
   sharpnessCoverageRatio: z.literal('1'),
+  sourceContributionSummary: z.literal('S1 17% / S2 17% / S3 17% / S4 17% / S5 17% / S6 17%'),
   sourceCount: z.literal('6'),
   warningCodes: z.literal('human_review_required,synthetic_runtime_only,transition_halo_risk,depth_map_preview_only'),
 });

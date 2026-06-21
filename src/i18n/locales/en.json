@@ -1793,6 +1793,28 @@
         "haloRiskCells": "Halo-risk cells",
         "limitation": "Runtime bridge proof only; private RAW decode, visual QA, and UI E2E remain open.",
         "lowConfidenceCells": "Low-confidence cells",
+        "opacityValue": "{{value}}%",
+        "overlay": "Overlay",
+        "overlayMode": {
+          "halo_risk": {
+            "label": "Halo risk",
+            "status": "Transition guard"
+          },
+          "low_confidence": {
+            "label": "Low confidence",
+            "status": "Review weak regions"
+          },
+          "sharpness_map": {
+            "label": "Sharpness map",
+            "status": "Winner detail cells"
+          },
+          "source_contribution": {
+            "label": "Source contribution",
+            "status": "Winning source mix"
+          }
+        },
+        "overlayTitle": "Sharpness overlay review",
+        "overlayValue": "{{mode}} at {{value}}%",
         "percentValue": "{{value}}%",
         "privateRawPending": "Private RAW review pending",
         "proofStatus": "App-server bridge ready",
@@ -1801,6 +1823,8 @@
         "runtimeBridge": "Dry-run/apply bridge",
         "sharpnessCoverage": "Sharpness coverage",
         "sharpnessMap": "Sharpness map",
+        "sourceContribution": "Source contribution",
+        "sourceContributionValue": "S{{index}} {{value}}%",
         "title": "Quality review",
         "transitionRisk": "Transition risk",
         "transitions": "Focus transitions",

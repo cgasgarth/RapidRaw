@@ -1759,7 +1759,31 @@
         "uiE2ePending": "UI E2E pending",
         "sharpnessMap": "Sharpness map",
         "transitions": "Focus transitions",
-        "retouchLayer": "Retouch layer"
+        "retouchLayer": "Retouch layer",
+        "overlay": "Overlay",
+        "overlayTitle": "Sharpness overlay review",
+        "overlayValue": "{{mode}} at {{value}}%",
+        "opacityValue": "{{value}}%",
+        "sourceContribution": "Source contribution",
+        "sourceContributionValue": "S{{index}} {{value}}%",
+        "overlayMode": {
+          "sharpness_map": {
+            "label": "Sharpness map",
+            "status": "Winner detail cells"
+          },
+          "source_contribution": {
+            "label": "Source contribution",
+            "status": "Winning source mix"
+          },
+          "low_confidence": {
+            "label": "Low confidence",
+            "status": "Review weak regions"
+          },
+          "halo_risk": {
+            "label": "Halo risk",
+            "status": "Transition guard"
+          }
+        }
       }
     }
   },
