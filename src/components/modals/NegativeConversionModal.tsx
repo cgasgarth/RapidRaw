@@ -85,6 +85,8 @@ import type {
   NegativeLabAcquisitionHealthReport,
   NegativeLabAcquisitionSourceFamily,
   NegativeLabAcquisitionWarningCode,
+  NegativeLabFrameHealthEntry,
+  NegativeLabFrameWarningSeverity,
 } from '../../schemas/negativeLabFrameHealthSchemas';
 import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
 import type { NegativeLabSelectedProfileSnapshot } from '../../schemas/negativeLabProfileComparisonSchemas';
@@ -283,6 +285,15 @@ const DUST_SCRATCH_SEVERITY_LABEL_KEYS = {
   retouch: 'modals.negativeConversion.dustSeverity.retouch',
   review: 'modals.negativeConversion.dustSeverity.review',
 } as const;
+type NegativeLabFrameHealthFilter = 'all' | NegativeLabFrameWarningSeverity;
+type NegativeLabFrameHealthSort = 'roll_order' | 'warning_severity';
+const NEGATIVE_LAB_FRAME_HEALTH_FILTERS = ['all', 'review', 'info', 'ok'] satisfies Array<NegativeLabFrameHealthFilter>;
+const NEGATIVE_LAB_FRAME_HEALTH_SORTS = ['roll_order', 'warning_severity'] satisfies Array<NegativeLabFrameHealthSort>;
+const FRAME_WARNING_SEVERITY_SCORE = {
+  info: 1,
+  ok: 0,
+  review: 2,
+} satisfies Record<NegativeLabFrameWarningSeverity, number>;
 const ACQUISITION_SOURCE_FAMILY_LABEL_KEYS = {
   jpeg_lossy: 'modals.negativeConversion.acquisitionSourceJpeg',
   raw_like: 'modals.negativeConversion.acquisitionSourceRaw',
@@ -294,6 +305,10 @@ const ACQUISITION_WARNING_LABEL_KEYS = {
   mixed_source_families: 'modals.negativeConversion.acquisitionWarningMixed',
   unknown_acquisition_state: 'modals.negativeConversion.acquisitionWarningUnknown',
 } satisfies Record<NegativeLabAcquisitionWarningCode, AcquisitionWarningLabelKey>;
+const isNegativeLabFrameHealthFilter = (value: string): value is NegativeLabFrameHealthFilter =>
+  NEGATIVE_LAB_FRAME_HEALTH_FILTERS.some((filter) => filter === value);
+const isNegativeLabFrameHealthSort = (value: string): value is NegativeLabFrameHealthSort =>
+  NEGATIVE_LAB_FRAME_HEALTH_SORTS.some((sort) => sort === value);
 const BASE_FOG_SAMPLE_PRESETS = [
   {
     labelKey: 'modals.negativeConversion.sampleLeftEdge',
@@ -384,6 +399,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [profileSearchQuery, setProfileSearchQuery] = useState('');
   const [profileFilter, setProfileFilter] = useState<NegativeLabProfileFilter>('all');
   const [profileSort, setProfileSort] = useState<NegativeLabProfileSort>('catalog');
+  const [frameHealthFilter, setFrameHealthFilter] = useState<NegativeLabFrameHealthFilter>('all');
+  const [frameHealthSort, setFrameHealthSort] = useState<NegativeLabFrameHealthSort>('roll_order');
 
   const { isMounted, show } = useModalTransition(isOpen);
   const [isCompareActive, setIsCompareActive] = useState(false);
@@ -545,6 +562,22 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       }),
     [baseFogConfidence, effectiveActivePathIndex, includedPathSet, previewUrl, targetPaths],
   );
+  const visibleFrameHealthRows = useMemo(() => {
+    const filteredRows =
+      frameHealthFilter === 'all'
+        ? frameHealthReport.frames
+        : frameHealthReport.frames.filter((frame) => frame.warningSeverity === frameHealthFilter);
+
+    if (frameHealthSort === 'warning_severity') {
+      return [...filteredRows].toSorted(
+        (left, right) =>
+          FRAME_WARNING_SEVERITY_SCORE[right.warningSeverity] - FRAME_WARNING_SEVERITY_SCORE[left.warningSeverity] ||
+          left.pathIndex - right.pathIndex,
+      );
+    }
+
+    return filteredRows;
+  }, [frameHealthFilter, frameHealthReport.frames, frameHealthSort]);
   const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
   const dustScratchReviewReport = useMemo(
     () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewUrl !== null),
@@ -1418,10 +1451,67 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 : t('modals.negativeConversion.acceptBatchPlan')}
             </button>
           </div>
+          <div
+            className="grid grid-cols-2 gap-2 rounded-sm bg-bg-secondary p-2 text-[11px]"
+            data-filter={frameHealthFilter}
+            data-sort={frameHealthSort}
+            data-testid="negative-lab-frame-health-controls"
+          >
+            <label className="space-y-1">
+              <span className="block text-text-tertiary">
+                {t('modals.negativeConversion.frameHealthSeverityFilter')}
+              </span>
+              <select
+                className="w-full rounded border border-surface bg-bg-primary px-2 py-1 text-text-secondary"
+                data-testid="negative-lab-frame-health-filter"
+                onChange={(event) => {
+                  if (isNegativeLabFrameHealthFilter(event.target.value)) {
+                    setFrameHealthFilter(event.target.value);
+                  }
+                }}
+                value={frameHealthFilter}
+              >
+                {NEGATIVE_LAB_FRAME_HEALTH_FILTERS.map((filter) => (
+                  <option key={filter} value={filter}>
+                    {t(`modals.negativeConversion.frameHealthFilter.${filter}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-1">
+              <span className="block text-text-tertiary">{t('modals.negativeConversion.frameHealthSort')}</span>
+              <select
+                className="w-full rounded border border-surface bg-bg-primary px-2 py-1 text-text-secondary"
+                data-testid="negative-lab-frame-health-sort"
+                onChange={(event) => {
+                  if (isNegativeLabFrameHealthSort(event.target.value)) {
+                    setFrameHealthSort(event.target.value);
+                  }
+                }}
+                value={frameHealthSort}
+              >
+                {NEGATIVE_LAB_FRAME_HEALTH_SORTS.map((sort) => (
+                  <option key={sort} value={sort}>
+                    {t(`modals.negativeConversion.frameHealthSortModes.${sort}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="col-span-2 text-text-tertiary" data-testid="negative-lab-frame-health-visible-count">
+              {t('modals.negativeConversion.frameHealthVisibleCount', {
+                total: frameHealthReport.frames.length,
+                visibleCount: visibleFrameHealthRows.length,
+              })}
+            </span>
+          </div>
           <div className="grid gap-1">
-            {frameHealthReport.frames.map((row, index) => (
+            {visibleFrameHealthRows.map((row: NegativeLabFrameHealthEntry, index) => (
               <div
-                className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+                data-conversion-status={row.conversionStatus}
+                data-crop-status={row.cropStatus}
+                data-qc-status={row.qcStatus}
+                data-severity={row.warningSeverity}
                 data-warning-count={row.warningCodes.length}
                 data-testid={`negative-lab-frame-health-row-${index}`}
                 key={row.frameId}
@@ -1430,10 +1520,22 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 <span
                   className={cx(
                     'rounded px-1.5 py-0.5',
+                    row.warningSeverity === 'review' && 'bg-yellow-500/15 text-yellow-200',
+                    row.warningSeverity === 'info' && 'bg-blue-500/15 text-blue-200',
+                    row.warningSeverity === 'ok' && 'bg-surface text-text-secondary',
+                  )}
+                  data-testid={`negative-lab-frame-severity-${index}`}
+                >
+                  {t(`modals.negativeConversion.frameWarningSeverity.${row.warningSeverity}`)}
+                </span>
+                <span
+                  className={cx(
+                    'rounded px-1.5 py-0.5',
                     row.healthStatus === 'active' && 'bg-accent/15 text-text-primary',
                     row.healthStatus === 'queued' && 'bg-surface text-text-secondary',
                     row.healthStatus === 'skipped' && 'bg-bg-primary text-text-tertiary',
                   )}
+                  data-testid={`negative-lab-frame-health-status-${index}`}
                 >
                   {t(
                     row.healthStatus === 'skipped'
@@ -1448,9 +1550,18 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                     ? t('modals.negativeConversion.baseReady', { confidence: Math.round(row.baseConfidence * 100) })
                     : t('modals.negativeConversion.basePending')}
                 </span>
+                <span className="text-text-tertiary" data-testid={`negative-lab-frame-crop-status-${index}`}>
+                  {t(`modals.negativeConversion.frameCropStatus.${row.cropStatus}`)}
+                </span>
+                <span className="text-text-tertiary" data-testid={`negative-lab-frame-conversion-status-${index}`}>
+                  {t(`modals.negativeConversion.frameConversionStatus.${row.conversionStatus}`)}
+                </span>
+                <span className="text-text-tertiary" data-testid={`negative-lab-frame-qc-status-${index}`}>
+                  {t(`modals.negativeConversion.frameQcStatus.${row.qcStatus}`)}
+                </span>
                 {row.warningCodes.length > 0 && (
                   <span
-                    className="col-span-3 flex flex-wrap gap-1"
+                    className="col-span-6 flex flex-wrap gap-1"
                     data-testid={`negative-lab-frame-warning-row-${index}`}
                   >
                     {row.warningCodes.map((warningCode) => (

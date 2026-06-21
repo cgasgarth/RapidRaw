@@ -6,6 +6,7 @@ import {
   type NegativeLabBatchDryRunSummary,
   type NegativeLabFrameHealthReport,
   type NegativeLabFrameWarningCode,
+  type NegativeLabFrameWarningSeverity,
 } from '../schemas/negativeLabFrameHealthSchemas';
 
 export const getNegativeLabScanLabel = (path: string, index: number) => {
@@ -29,6 +30,16 @@ const classifyAcquisitionSourceFamily = (path: string) => {
   if (TIFF_SCAN_EXTENSIONS.has(extension)) return 'tiff_scan';
   if (JPEG_LOSSY_EXTENSIONS.has(extension)) return 'jpeg_lossy';
   return 'unknown';
+};
+
+const getNegativeLabWarningSeverity = (
+  warningCodes: ReadonlyArray<NegativeLabFrameWarningCode>,
+): NegativeLabFrameWarningSeverity => {
+  if (warningCodes.includes('excluded_from_batch') || warningCodes.includes('preview_not_ready')) {
+    return 'review';
+  }
+
+  return warningCodes.length === 0 ? 'ok' : 'info';
 };
 
 export const buildNegativeLabAcquisitionHealthReport = (
@@ -83,18 +94,29 @@ export const buildNegativeLabFrameHealthReport = ({
     if (!included) warningCodes.push('excluded_from_batch');
     if (!previewReady && active) warningCodes.push('preview_not_ready');
     if (baseFogConfidence !== null && !active) warningCodes.push('base_estimate_active_frame_only');
+    const warningSeverity = getNegativeLabWarningSeverity(warningCodes);
 
     return {
       active,
       baseConfidence: active ? baseFogConfidence : null,
       baseStatus: active && baseFogConfidence !== null ? 'estimated' : 'pending',
+      conversionStatus: !included
+        ? 'skipped'
+        : active
+          ? previewReady
+            ? 'preview_ready'
+            : 'preview_pending'
+          : 'queued',
+      cropStatus: !included ? 'skipped' : active ? 'active_frame_editable' : 'roll_default',
       frameId: `negative-lab-frame-${pathIndex + 1}`,
       healthStatus: !included ? 'skipped' : active ? 'active' : 'queued',
       included,
       pathIndex,
+      qcStatus: !included ? 'skipped' : warningSeverity === 'review' ? 'review' : 'ready',
       scanLabel: getNegativeLabScanLabel(sourcePath, pathIndex),
       sourcePath,
       warningCodes,
+      warningSeverity,
     };
   });
 

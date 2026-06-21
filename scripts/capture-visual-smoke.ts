@@ -1142,6 +1142,23 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 0', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-frame-health-controls').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-frame-health-sort').selectOption('warning_severity');
+  await page.getByTestId('negative-lab-frame-health-controls').evaluate((element) => {
+    if (element.dataset.sort !== 'warning_severity') {
+      throw new Error('Negative Lab frame health sort did not switch to warning severity.');
+    }
+  });
+  await page.getByTestId('negative-lab-frame-health-filter').selectOption('review');
+  await page
+    .getByTestId('negative-lab-frame-health-visible-count')
+    .getByText('0/2 visible', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-frame-health-filter').selectOption('all');
+  await page
+    .getByTestId('negative-lab-frame-health-visible-count')
+    .getByText('2/2 visible', { exact: true })
+    .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-planned-apply-count').getByText('Apply 2', { exact: true }).waitFor({
     timeout: 10_000,
   });
@@ -1168,10 +1185,10 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-frame-runtime-1').getByText('Preview ready', { exact: true }).waitFor({
     timeout: 10_000,
   });
-  await page.getByTestId('negative-lab-frame-health-row-1').getByText('Active', { exact: true }).waitFor({
+  await page.getByTestId('negative-lab-frame-health-status-1').getByText('Active', { exact: true }).waitFor({
     timeout: 10_000,
   });
-  await page.getByTestId('negative-lab-frame-health-row-0').getByText('Queued', { exact: true }).waitFor({
+  await page.getByTestId('negative-lab-frame-health-status-0').getByText('Queued', { exact: true }).waitFor({
     timeout: 10_000,
   });
   await page.getByTestId('negative-lab-active-scan-0').click();

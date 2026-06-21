@@ -2136,15 +2136,49 @@
       "excludeScan": "Exclude",
       "exportOptions": "Opcje eksportu",
       "exposure": "Ekspozycja",
+      "frameConversionStatus": {
+        "preview_pending": "Preview pending",
+        "preview_ready": "Preview ready",
+        "queued": "Queued",
+        "skipped": "Skipped"
+      },
+      "frameCropStatus": {
+        "active_frame_editable": "Editable",
+        "roll_default": "Roll crop",
+        "skipped": "Skipped"
+      },
       "frameHealth": "Frame health",
       "frameHealthActive": "Active",
+      "frameHealthFilter": {
+        "all": "All",
+        "info": "Info",
+        "ok": "OK",
+        "review": "Review"
+      },
       "frameHealthFrameCount": "Frames {{frameCount}}",
       "frameHealthQueued": "Queued",
+      "frameHealthSeverityFilter": "Severity",
       "frameHealthSkipped": "Skipped",
+      "frameHealthSort": "Sort",
+      "frameHealthSortModes": {
+        "roll_order": "Roll order",
+        "warning_severity": "Warning severity"
+      },
+      "frameHealthVisibleCount": "{{visibleCount}}/{{total}} visible",
       "frameHealthWarningCount": "Warnings {{warningCount}}",
+      "frameQcStatus": {
+        "ready": "Ready",
+        "review": "Review",
+        "skipped": "Skipped"
+      },
       "frameWarningBaseEstimateActiveOnly": "Active base only",
       "frameWarningExcluded": "Excluded",
       "frameWarningPreviewNotReady": "Preview pending",
+      "frameWarningSeverity": {
+        "info": "Info",
+        "ok": "OK",
+        "review": "Review"
+      },
       "genericPresets": "Presety generyczne",
       "greenWeight": "Zielony (Magenta)",
       "includedScans": "{{includedCount}} included",
