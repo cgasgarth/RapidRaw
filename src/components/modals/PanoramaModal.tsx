@@ -82,6 +82,7 @@ export default function PanoramaModal({
   const selectedProjectionLabel = projectionOptions.find((option) => option.value === settings.projection)?.label ?? '';
   const selectedQualityLabel =
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
+  const estimatedPreviewMegapixels = Math.round(((imageCount ?? 0) * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
   const sourceReadinessLabel = `${t('modals.panorama.summarySourceCount', { count: imageCount ?? 0 })} - ${
     isSourceCountValid ? t('modals.panorama.summaryReady') : t('modals.panorama.summaryBlocked')
   }`;
@@ -208,6 +209,8 @@ export default function PanoramaModal({
           </div>
           <section
             className="mb-5 grid grid-cols-3 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
+            data-estimated-preview-megapixels={estimatedPreviewMegapixels}
+            data-preview-source-count={imageCount ?? 0}
             data-testid="panorama-setup-summary"
           >
             {[
@@ -238,6 +241,10 @@ export default function PanoramaModal({
               {
                 label: t('modals.panorama.summaryPreviewBudget'),
                 value: t('modals.panorama.previewPixels', { value: settings.maxPreviewDimensionPx }),
+              },
+              {
+                label: t('modals.panorama.summaryWorkload'),
+                value: t('modals.panorama.previewWorkload', { value: estimatedPreviewMegapixels }),
               },
             ].map((item) => (
               <div

@@ -1751,6 +1751,7 @@
       "openInEditor": "Otwórz w edytorze",
       "previewBudgetLabel": "Preview budget",
       "previewPixels": "{{value}} px",
+      "previewWorkload": "{{count}} MP",
       "quality": {
         "balanced": "Balanced",
         "best": "Best",
@@ -2049,6 +2050,7 @@
       "openInEditor": "Otwórz w edytorze",
       "previewBudgetLabel": "Preview budget",
       "previewPixels": "{{value}} px",
+      "previewWorkload": "{{value}} MP",
       "projection": {
         "cylindrical": "Cylindrical",
         "rectilinear": "Rectilinear",
@@ -2093,6 +2095,7 @@
       "summarySourceCount_many": "{{count}} sources",
       "summarySourceCount_other": "{{count}} sources",
       "summarySources": "Sources",
+      "summaryWorkload": "Workload",
       "title": "Złóż panoramę",
       "uiOnlyNotice": "These controls define the requested panorama artifact. Runtime projection and boundary support will be applied as engine capability checks land.",
       "workflowStatus": "Projection, blend, boundary, and preview controls are recorded for the panorama request.",

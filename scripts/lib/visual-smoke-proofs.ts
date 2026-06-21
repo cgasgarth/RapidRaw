@@ -229,6 +229,7 @@ export const panoramaReviewWorkspaceProofSchema = z.object({
   applyCommand: z.literal(panoramaRoutePair.applyToolName),
   artifactPath: z.literal('/tmp/panorama.tif'),
   command: z.literal(panoramaRoutePair.dryRunToolName),
+  estimatedPreviewMegapixels: z.literal('336'),
   projection: z.literal('spherical'),
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('5'),
