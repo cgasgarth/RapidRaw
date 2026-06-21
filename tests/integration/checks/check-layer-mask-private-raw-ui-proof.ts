@@ -36,7 +36,10 @@ const runtimeReportSchema = z
 const proofReportSchema = z
   .object({
     doesNotProve: z.array(z.string().min(1)).min(1),
+    e2eIssue: z.literal(2310),
     issue: z.literal(2310),
+    proofBoundary: z.literal('private_raw_tauri_runtime_plus_visual_smoke_not_manual_layer_panel_e2e'),
+    proofStatus: z.literal('private_raw_layer_mask_runtime_with_ui_smoke'),
     privateRawRuntime: z
       .object({
         artifactCount: z.number().int().min(6),
@@ -113,7 +116,10 @@ if (privateRoot === undefined) {
 const runtimeReport = runtimeReportSchema.parse(JSON.parse(await readFile(RUNTIME_REPORT_PATH, 'utf8')));
 const expectedReport = proofReportSchema.parse({
   doesNotProve: ['full_macos_app_manual_session', 'manual_layer_panel_interaction'],
+  e2eIssue: 2310,
   issue: 2310,
+  proofBoundary: 'private_raw_tauri_runtime_plus_visual_smoke_not_manual_layer_panel_e2e',
+  proofStatus: 'private_raw_layer_mask_runtime_with_ui_smoke',
   privateRawRuntime: {
     artifactCount: runtimeReport.artifacts.length,
     fixtureId: runtimeReport.fixtureId,

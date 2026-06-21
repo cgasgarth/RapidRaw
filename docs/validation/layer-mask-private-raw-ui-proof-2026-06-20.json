@@ -1,6 +1,9 @@
 {
   "doesNotProve": ["full_macos_app_manual_session", "manual_layer_panel_interaction"],
+  "e2eIssue": 2310,
   "issue": 2310,
+  "proofBoundary": "private_raw_tauri_runtime_plus_visual_smoke_not_manual_layer_panel_e2e",
+  "proofStatus": "private_raw_layer_mask_runtime_with_ui_smoke",
   "privateRawRuntime": {
     "artifactCount": 6,
     "fixtureId": "validation.layer-mask-real-raw.alaska-local-adjustment.v1",
