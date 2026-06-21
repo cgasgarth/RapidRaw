@@ -25,8 +25,24 @@ if (report.activeFrameId !== 'negative-lab-frame-2') failures.push('expected fra
 if (report.frames[1]?.baseStatus !== 'estimated' || report.frames[1]?.baseConfidence !== 0.82) {
   failures.push('active frame should carry base confidence');
 }
+if (report.frames[1]?.warningSeverity !== 'review' || report.frames[1]?.conversionStatus !== 'preview_pending') {
+  failures.push('active frame should be review severity while preview is pending');
+}
+if (report.frames[1]?.cropStatus !== 'active_frame_editable') {
+  failures.push('active frame should expose editable crop status');
+}
+if (report.frames[0]?.warningSeverity !== 'info' || report.frames[0]?.conversionStatus !== 'queued') {
+  failures.push('included inactive frame should be info severity and queued for conversion');
+}
 if (!report.frames[2]?.warningCodes.includes('excluded_from_batch')) {
   failures.push('excluded frame should carry excluded_from_batch warning');
+}
+if (
+  report.frames[2]?.warningSeverity !== 'review' ||
+  report.frames[2]?.cropStatus !== 'skipped' ||
+  report.frames[2]?.qcStatus !== 'skipped'
+) {
+  failures.push('excluded frame should expose review severity with skipped crop/QC state');
 }
 if (!report.frames[0]?.warningCodes.includes('base_estimate_active_frame_only')) {
   failures.push('non-active included frame should disclose active-frame-only base estimate');

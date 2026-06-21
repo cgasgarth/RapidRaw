@@ -20,7 +20,16 @@ for (const marker of [
   'buildNegativeLabFrameHealthReport',
   'buildNegativeLabBatchDryRunSummary',
   'negative-lab-frame-health-grid',
+  'negative-lab-frame-health-controls',
+  'negative-lab-frame-health-filter',
+  'negative-lab-frame-health-sort',
+  'negative-lab-frame-health-visible-count',
   'negative-lab-frame-health-row-',
+  'negative-lab-frame-health-status-',
+  'negative-lab-frame-severity-',
+  'negative-lab-frame-crop-status-',
+  'negative-lab-frame-conversion-status-',
+  'negative-lab-frame-qc-status-',
   'negative-lab-roll-frame-navigator',
   'negative-lab-roll-frame-navigator-proof',
   'negative-lab-roll-frame-strip',
@@ -37,12 +46,19 @@ for (const marker of [
   'negative-lab-copy-batch-plan',
   'negative-lab-accept-batch-plan',
   'acceptedBatchPlanIdentity',
+  'visibleFrameHealthRows',
+  'frameHealthFilter',
+  'frameHealthSort',
 ]) {
   requireMarker(files.modal, marker, 'modal');
 }
 
 for (const marker of [
   'frameHealthReport.frames',
+  'warningSeverity',
+  'conversionStatus',
+  'cropStatus',
+  'qcStatus',
   'warningCodes',
   'excluded_from_batch',
   'base_estimate_active_frame_only',

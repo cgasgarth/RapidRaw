@@ -4,6 +4,10 @@ export const NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION = 1;
 
 export const negativeLabFrameHealthStatusSchema = z.enum(['active', 'queued', 'skipped']);
 export const negativeLabFrameBaseStatusSchema = z.enum(['pending', 'estimated']);
+export const negativeLabFrameConversionStatusSchema = z.enum(['preview_pending', 'preview_ready', 'queued', 'skipped']);
+export const negativeLabFrameCropStatusSchema = z.enum(['active_frame_editable', 'roll_default', 'skipped']);
+export const negativeLabFrameQcStatusSchema = z.enum(['ready', 'review', 'skipped']);
+export const negativeLabFrameWarningSeveritySchema = z.enum(['ok', 'info', 'review']);
 export const negativeLabFrameWarningCodeSchema = z.enum([
   'base_estimate_active_frame_only',
   'excluded_from_batch',
@@ -49,13 +53,17 @@ export const negativeLabFrameHealthEntrySchema = z
     active: z.boolean(),
     baseConfidence: z.number().min(0).max(1).nullable(),
     baseStatus: negativeLabFrameBaseStatusSchema,
+    conversionStatus: negativeLabFrameConversionStatusSchema,
+    cropStatus: negativeLabFrameCropStatusSchema,
     frameId: z.string().trim().min(1),
     healthStatus: negativeLabFrameHealthStatusSchema,
     included: z.boolean(),
     pathIndex: z.number().int().nonnegative(),
+    qcStatus: negativeLabFrameQcStatusSchema,
     scanLabel: z.string().trim().min(1),
     sourcePath: z.string().trim().min(1),
     warningCodes: z.array(negativeLabFrameWarningCodeSchema),
+    warningSeverity: negativeLabFrameWarningSeveritySchema,
   })
   .strict()
   .superRefine((frame, context) => {
@@ -152,6 +160,7 @@ export const negativeLabBatchDryRunSummarySchema = z
   });
 
 export type NegativeLabFrameHealthStatus = z.infer<typeof negativeLabFrameHealthStatusSchema>;
+export type NegativeLabFrameWarningSeverity = z.infer<typeof negativeLabFrameWarningSeveritySchema>;
 export type NegativeLabFrameWarningCode = z.infer<typeof negativeLabFrameWarningCodeSchema>;
 export type NegativeLabAcquisitionSourceFamily = z.infer<typeof negativeLabAcquisitionSourceFamilySchema>;
 export type NegativeLabAcquisitionWarningCode = z.infer<typeof negativeLabAcquisitionWarningCodeSchema>;
