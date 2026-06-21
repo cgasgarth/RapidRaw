@@ -40,4 +40,5 @@ export * from './superResolutionReconstructionDiagnostics.js';
 export * from './superResolutionRuntimePlan.js';
 export * from './superResolutionSidecarProvenance.js';
 export * from './superResolutionSourceValidation.js';
+export * from './toneColorSchemas.js';
 export * from './toolRegistry.js';
