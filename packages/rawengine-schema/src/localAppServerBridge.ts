@@ -9,7 +9,6 @@ import {
   aiToolApplyResultV1Schema,
   aiToolCommandEnvelopeV1Schema,
   aiToolDryRunResultV1Schema,
-  rawEngineToolRegistryV1Schema,
   toneColorCommandEnvelopeV1Schema,
   toneColorDryRunResultV1Schema,
   toneColorMutationResultV1Schema,
@@ -19,7 +18,7 @@ import {
   type ToneColorDryRunResultV1,
   type ToneColorMutationResultV1,
 } from './rawEngineSchemas.js';
-import { sampleToolRegistryV1 } from './samplePayloads.js';
+import { rawEngineDefaultToolRegistryV1 } from './toolRegistry.js';
 
 export const RawEngineLocalAppServerCommandType = {
   ToolRegistryQuery: 'rawengine.local.toolRegistry.query',
@@ -557,7 +556,7 @@ export class RawEngineLocalAppServerBridge {
 
   constructor(options: { commandBus?: EditCommandBus; toolRegistry?: RawEngineToolRegistryV1 } = {}) {
     this.#commandBus = options.commandBus ?? new EditCommandBus();
-    this.#toolRegistry = rawEngineToolRegistryV1Schema.parse(options.toolRegistry ?? sampleToolRegistryV1);
+    this.#toolRegistry = options.toolRegistry ?? rawEngineDefaultToolRegistryV1;
     this.#registerHandlers();
   }
 
