@@ -16,8 +16,9 @@ import {
 import {
   agentArtifactReviewProofDatasetSchema,
   agentAuditTranscriptViewerProofDatasetSchema,
-  agentDryRunReviewProofDatasetSchema,
   agentChatProofDatasetSchema,
+  agentDryRunReviewProofDatasetSchema,
+  agentReviewHandoffProofDatasetSchema,
   assertFilmLookExportProof,
   assertNegativeLabBaseFogPreviewExportProof,
   assertNegativeLabBatchColorInvokeProof,
@@ -485,6 +486,8 @@ async function prepareScenario(page, mode) {
     );
     const artifacts = page.getByTestId('agent-artifact-review');
     agentArtifactReviewProofDatasetSchema.parse(await artifacts.evaluate((element) => ({ ...element.dataset })));
+    const handoff = page.getByTestId('agent-review-handoff');
+    agentReviewHandoffProofDatasetSchema.parse(await handoff.evaluate((element) => ({ ...element.dataset })));
     const review = page.getByTestId('agent-dry-run-review');
     agentDryRunReviewProofDatasetSchema.parse(await review.evaluate((element) => ({ ...element.dataset })));
     await page.getByTestId('agent-chat-messages').getByText('Runtime demo apply complete.', { exact: false }).waitFor({
@@ -541,6 +544,14 @@ async function prepareScenario(page, mode) {
       .waitFor({
         timeout: 10_000,
       });
+    await handoff
+      .getByText('artifact_agent_expert_edit_demo_before_raw_2844', { exact: true })
+      .waitFor({ timeout: 10_000 });
+    await handoff
+      .getByText('artifact_agent_expert_edit_demo_after_virtual_copy_2844', { exact: true })
+      .waitFor({ timeout: 10_000 });
+    await handoff.getByText('Runtime proof gallery', { exact: true }).waitFor({ timeout: 10_000 });
+    await handoff.getByText('Rollback virtual copy', { exact: true }).waitFor({ timeout: 10_000 });
     const readyPreviewCount = await page
       .getByTestId('agent-preview-artifacts')
       .getByText('ready', { exact: true })
