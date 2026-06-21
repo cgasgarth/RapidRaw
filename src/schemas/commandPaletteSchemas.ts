@@ -19,6 +19,7 @@ export const commandPaletteCommandIdSchema = z.enum([
   'panelMetadata',
   'panelPresets',
   'superResolution',
+  'transformTools',
 ]);
 
 export type CommandPaletteCommandId = z.infer<typeof commandPaletteCommandIdSchema>;

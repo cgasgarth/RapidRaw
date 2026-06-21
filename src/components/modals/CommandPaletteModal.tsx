@@ -5,6 +5,7 @@ import {
   Command,
   Images,
   PanelRight,
+  Scan,
   Search,
   Sparkles,
   ScanSearch,
@@ -107,6 +108,12 @@ const commandPaletteCommands = commandPaletteCommandSchema.array().parse([
     searchTokens: ['lens', 'correction', 'profile', 'vignette', 'distortion', 'chromatic'],
   },
   {
+    category: 'workflow',
+    id: 'transformTools',
+    requiresEditorImage: true,
+    searchTokens: ['transform', 'geometry', 'rotate', 'perspective', 'keystone', 'distortion'],
+  },
+  {
     category: 'merge',
     id: 'panorama',
     searchTokens: ['panorama', 'stitch', 'merge'],
@@ -152,6 +159,7 @@ const commandLabelKeys = {
   panelMetadata: 'modals.commandPalette.commands.panelMetadata',
   panelPresets: 'modals.commandPalette.commands.panelPresets',
   superResolution: 'modals.commandPalette.commands.superResolution',
+  transformTools: 'modals.commandPalette.commands.transformTools',
 } as const satisfies Record<CommandPaletteCommandId, string>;
 
 const commandCategoryKeys = {
@@ -176,6 +184,8 @@ const getCommandIcon = (command: CommandPaletteCommand) => {
       return Command;
     case 'lensCorrection':
       return Aperture;
+    case 'transformTools':
+      return Scan;
     case 'culling':
       return ScanSearch;
     case 'denoise':
@@ -340,6 +350,14 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
       closeAndRun(() => {
         setRightPanel(Panel.Crop);
         setUI({ isLensCorrectionModalOpen: true });
+      });
+      return;
+    }
+
+    if (command.id === 'transformTools' && selectedImage) {
+      closeAndRun(() => {
+        setRightPanel(Panel.Crop);
+        setUI({ isTransformModalOpen: true });
       });
       return;
     }

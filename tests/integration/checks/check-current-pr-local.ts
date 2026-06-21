@@ -202,6 +202,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-denoise-ui']);
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-culling-ui']);
   addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-lens-ui']);
+  addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-transform-ui']);
   addIf((file) => file === 'src/components/panel/editor/EditorToolbar.tsx', ['check:editor-file-type-badge-ui']);
   addIf((file) => file === 'src/components/panel/right/MasksPanel.tsx', ['check:mask-readiness-ui']);
   addIf((file) => file === 'src/components/panel/right/ExportPanel.tsx', ['check:export-readiness-ui']);
@@ -385,6 +386,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-denoise-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-culling-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-lens-ui']);
+  assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-transform-ui']);
   assertSelfTestRoute(['src/components/panel/editor/EditorToolbar.tsx'], ['check:editor-file-type-badge-ui']);
   assertSelfTestRoute(['src/components/panel/right/MasksPanel.tsx'], ['check:mask-readiness-ui']);
   assertSelfTestRoute(['src/components/panel/right/ExportPanel.tsx'], ['check:export-readiness-ui']);
