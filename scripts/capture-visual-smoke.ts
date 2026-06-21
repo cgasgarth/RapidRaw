@@ -826,6 +826,17 @@ async function prepareScenario(page, mode) {
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.HdrSavedOutputEditorPath) {
     await page.getByRole('button', { name: 'Save' }).click();
     await page.getByTestId('merge-saved-output-detail').waitFor({ timeout: 10_000 });
+    const provenance = await page
+      .getByTestId('hdr-editable-handoff-provenance')
+      .evaluate((element) => ({ ...element.dataset }));
+    if (
+      provenance.capabilityLevel !== 'runtime_apply_capable' ||
+      provenance.outputColorSpace !== 'srgb_display_referred_v1' ||
+      provenance.sourceCount !== '3' ||
+      provenance.warningCodes !== 'tone_mapped_preview_only'
+    ) {
+      throw new Error(`HDR editable provenance proof failed: ${JSON.stringify(provenance)}`);
+    }
     await page.getByTestId('merge-open-saved-output').click();
     const proof = await page
       .getByTestId('hdr-saved-output-editor-path-proof')

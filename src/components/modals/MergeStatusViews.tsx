@@ -8,6 +8,7 @@ import Button from '../ui/Button';
 import UiText from '../ui/Text';
 
 import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 interface MergeErrorStateProps {
   error: string;
@@ -30,12 +31,19 @@ export function MergeErrorState({ error, title }: MergeErrorStateProps) {
 
 interface MergeResultPreviewProps {
   alt: string;
+  children?: ReactNode;
   imageBase64: string;
   savedPath: string | null;
   savedSuccessLabel: string;
 }
 
-export function MergeResultPreview({ alt, imageBase64, savedPath, savedSuccessLabel }: MergeResultPreviewProps) {
+export function MergeResultPreview({
+  alt,
+  children,
+  imageBase64,
+  savedPath,
+  savedSuccessLabel,
+}: MergeResultPreviewProps) {
   const { t } = useTranslation();
   const savedOutputName = savedPath ? getDisplayFileName(savedPath) : '';
 
@@ -67,6 +75,7 @@ export function MergeResultPreview({ alt, imageBase64, savedPath, savedSuccessLa
             {t('modals.common.savedOutputLabel', { name: savedOutputName })}
             <span className="sr-only">{t('modals.common.savedOutputFullPath', { path: savedPath })}</span>
           </UiText>
+          {children}
         </motion.div>
       )}
     </div>

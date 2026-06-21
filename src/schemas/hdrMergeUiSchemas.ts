@@ -19,12 +19,38 @@ export const hdrMergeUiSettingsSchema = z
   })
   .strict();
 
+export const hdrEditableSourceRefSchema = z
+  .object({
+    contentState: z.string().min(1),
+    displayName: z.string().min(1),
+    graphRevision: z.literal('hdr_legacy_runtime_v1'),
+    sourceIndex: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const hdrEditableHandoffSummarySchema = z
+  .object({
+    capabilityLevel: z.literal('runtime_apply_capable'),
+    editableDerivedAssetId: z.string().min(1),
+    mergeStrategy: hdrMergeStrategySchema,
+    outputColorSpace: z.literal('srgb_display_referred_v1'),
+    outputEncoding: z.literal('display_referred_preview'),
+    outputPath: z.string().min(1),
+    previewToneMapped: z.boolean(),
+    sourceCount: z.number().int().nonnegative(),
+    sourceRefs: z.array(hdrEditableSourceRefSchema),
+    warningCodes: z.array(z.literal('tone_mapped_preview_only')),
+    workingColorSpace: z.literal('srgb_display_referred_v1'),
+  })
+  .strict();
+
 export type HdrMergeUiSettings = z.infer<typeof hdrMergeUiSettingsSchema>;
 export type HdrMergeAlignmentMode = z.infer<typeof hdrMergeAlignmentModeSchema>;
 export type HdrMergeBracketValidation = z.infer<typeof hdrMergeBracketValidationSchema>;
 export type HdrMergeDeghosting = z.infer<typeof hdrMergeDeghostingSchema>;
 export type HdrMergeStrategy = z.infer<typeof hdrMergeStrategySchema>;
 export type HdrMergeQualityPreference = z.infer<typeof hdrMergeQualityPreferenceSchema>;
+export type HdrEditableHandoffSummary = z.infer<typeof hdrEditableHandoffSummarySchema>;
 
 export const DEFAULT_HDR_MERGE_UI_SETTINGS = hdrMergeUiSettingsSchema.parse({
   alignmentMode: 'auto',
