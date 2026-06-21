@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { createAppServerCommandSchemasV1 } from './appServerCommandSchemas.js';
 import { artifactHandleV1Schema } from './artifactSchemas.js';
 import { panoramaHomographyDltDiagnosticsV1Schema } from './panoramaHomographyDiagnostics.js';
 import { createToneColorSchemasV1 } from './toneColorSchemas.js';
@@ -8281,10 +8282,6 @@ export const aiToolApplyResultV1Schema = z
   })
   .strict();
 
-export const rawEngineAppServerTransportV1Schema = z.enum(['stdio', 'websocket', 'unix_socket']);
-
-export const rawEngineAppServerProtocolV1Schema = z.literal('codex_app_server_json_rpc');
-
 const rawEngineAppServerKnownInputSchemas = {
   AiEnhancementCommandEnvelopeV1: aiEnhancementCommandEnvelopeV1Schema,
   AiToolCommandEnvelopeV1: aiToolCommandEnvelopeV1Schema,
@@ -8305,125 +8302,18 @@ const rawEngineAppServerKnownInputSchemas = {
   ToneColorCommandEnvelopeV1: toneColorCommandEnvelopeV1Schema,
 } as const;
 
-export const rawEngineAppServerToolCallV1Schema = z
-  .object({
-    approval: approvalRequirementSchema,
-    arguments: z.unknown(),
-    dryRun: z.boolean(),
-    inputSchemaName: z.enum([
-      'AiEnhancementCommandEnvelopeV1',
-      'AiToolCommandEnvelopeV1',
-      'CommandEnvelopeV1',
-      'ComputationalMergeCommandEnvelopeV1',
-      'DetailDeblurCommandEnvelopeV1',
-      'DetailDenoiseCommandEnvelopeV1',
-      'EditGraphCommandEnvelopeV1',
-      'EditGraphSnapshotQueryV1',
-      'ExportCommandEnvelopeV1',
-      'LayerMaskCommandEnvelopeV1',
-      'NegativeLabApplyPlanRequestV1',
-      'NegativeLabCommandEnvelopeV1',
-      'PreviewScopeQueryV1',
-      'ProjectLibraryCommandEnvelopeV1',
-      'ProjectLibrarySnapshotQueryV1',
-      'QueryEnvelopeV1',
-      'ToneColorCommandEnvelopeV1',
-    ]),
-    itemId: z.string().trim().min(1).optional(),
-    jsonRpcRequestId: z.union([z.string().trim().min(1), z.number().int().nonnegative()]),
-    protocol: rawEngineAppServerProtocolV1Schema,
-    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
-    threadId: z.string().trim().min(1),
-    toolKind: rawEngineToolKindSchema,
-    toolName: z
-      .string()
-      .trim()
-      .regex(/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_]*)+$/u),
-    transport: rawEngineAppServerTransportV1Schema,
-    turnId: z.string().trim().min(1),
-  })
-  .strict()
-  .superRefine((toolCall, context) => {
-    const inputSchema = rawEngineAppServerKnownInputSchemas[toolCall.inputSchemaName];
-    const parsedArguments = inputSchema.safeParse(toolCall.arguments);
-
-    if (!parsedArguments.success) {
-      context.addIssue({
-        code: 'custom',
-        message: `Tool call arguments must match ${toolCall.inputSchemaName}.`,
-        path: ['arguments'],
-      });
-      return;
-    }
-
-    if ('dryRun' in parsedArguments.data && parsedArguments.data.dryRun !== toolCall.dryRun) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Tool call dryRun flag must match the wrapped command envelope.',
-        path: ['dryRun'],
-      });
-    }
-  });
-
-export const rawEngineAppServerToolCallValidationV1Schema = z
-  .object({
-    registry: rawEngineToolRegistryV1Schema,
-    schemaVersion: z.literal(RAW_ENGINE_SCHEMA_VERSION),
-    toolCall: rawEngineAppServerToolCallV1Schema,
-  })
-  .strict()
-  .superRefine((validation, context) => {
-    const toolDefinition = validation.registry.tools.find((tool) => tool.toolName === validation.toolCall.toolName);
-
-    if (toolDefinition === undefined) {
-      context.addIssue({
-        code: 'custom',
-        message: 'App-server tool call must reference a registered RawEngine tool.',
-        path: ['toolCall', 'toolName'],
-      });
-      return;
-    }
-
-    if (toolDefinition.toolKind !== validation.toolCall.toolKind) {
-      context.addIssue({
-        code: 'custom',
-        message: 'App-server tool call kind must match the registered tool definition.',
-        path: ['toolCall', 'toolKind'],
-      });
-    }
-
-    if (toolDefinition.inputSchemaName !== validation.toolCall.inputSchemaName) {
-      context.addIssue({
-        code: 'custom',
-        message: 'App-server tool call input schema must match the registered tool definition.',
-        path: ['toolCall', 'inputSchemaName'],
-      });
-    }
-
-    if (toolDefinition.requiresDryRun && !validation.toolCall.dryRun) {
-      context.addIssue({
-        code: 'custom',
-        message: 'App-server tool call must be a dry run when the registered tool requires dry-run execution.',
-        path: ['toolCall', 'dryRun'],
-      });
-    }
-
-    if (toolDefinition.approvalClass !== validation.toolCall.approval.approvalClass) {
-      context.addIssue({
-        code: 'custom',
-        message: 'App-server tool call approval class must match the registered tool definition.',
-        path: ['toolCall', 'approval', 'approvalClass'],
-      });
-    }
-
-    if (toolDefinition.mutates && validation.toolCall.approval.state !== 'approved') {
-      context.addIssue({
-        code: 'custom',
-        message: 'Mutating app-server tool calls require approved user approval before execution.',
-        path: ['toolCall', 'approval', 'state'],
-      });
-    }
-  });
+export const {
+  rawEngineAppServerProtocolV1Schema,
+  rawEngineAppServerToolCallV1Schema,
+  rawEngineAppServerToolCallValidationV1Schema,
+  rawEngineAppServerTransportV1Schema,
+} = createAppServerCommandSchemasV1({
+  approvalRequirementSchema,
+  knownInputSchemas: rawEngineAppServerKnownInputSchemas,
+  rawEngineToolKindSchema,
+  rawEngineToolRegistryV1Schema,
+  schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
+});
 
 export const rawEngineAgentReplayNoOverwritePolicyV1Schema = z.literal('never_overwrite_original');
 
