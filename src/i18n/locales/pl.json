@@ -2772,6 +2772,10 @@
       "reset": "Resetuj"
     },
     "waveform": {
+      "clippingReadouts": {
+        "highlights": "",
+        "shadows": ""
+      },
       "tooltips": {
         "hideClipping": "Ukryj ostrzeżenia przed przycięciem",
         "histogram": "Histogram",

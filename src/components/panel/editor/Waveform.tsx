@@ -52,6 +52,11 @@ interface HistogramChannel {
   key: 'red' | 'green' | 'blue';
 }
 
+interface HistogramClippingSummary {
+  highlightPercent: number;
+  shadowPercent: number;
+}
+
 const modeButtons: ReadonlyArray<ModeButton> = [
   {
     mode: DisplayMode.Luma,
@@ -99,7 +104,30 @@ const getHistogramChannelData = (channel: unknown): Array<number> => {
   return [];
 };
 
+const getHistogramClippingSummary = (channels: ReadonlyArray<HistogramChannel>): HistogramClippingSummary => {
+  let highlightPercent = 0;
+  let shadowPercent = 0;
+
+  for (const channel of channels) {
+    const total = channel.data.reduce((sum, value) => sum + Math.max(value, 0), 0);
+    if (total <= 0) continue;
+
+    const shadowBin = Math.max(channel.data[0] ?? 0, 0);
+    const highlightBin = Math.max(channel.data.at(-1) ?? 0, 0);
+    shadowPercent = Math.max(shadowPercent, (shadowBin / total) * 100);
+    highlightPercent = Math.max(highlightPercent, (highlightBin / total) * 100);
+  }
+
+  return { highlightPercent, shadowPercent };
+};
+
+const formatClipPercent = (value: number): string => {
+  if (value > 0 && value < 0.1) return '<0.1%';
+  return `${value.toFixed(1)}%`;
+};
+
 const HistogramView = ({ histogram }: { histogram: ChannelConfig | null | undefined }) => {
+  const { t } = useTranslation();
   const redData = getHistogramChannelData(histogram?.red);
   const greenData = getHistogramChannelData(histogram?.green);
   const blueData = getHistogramChannelData(histogram?.blue);
@@ -125,31 +153,50 @@ const HistogramView = ({ histogram }: { histogram: ChannelConfig | null | undefi
     { key: 'green', color: '#6BCB77', data: greenData },
     { key: 'blue', color: '#4D96FF', data: blueData },
   ];
+  const clippingSummary = getHistogramClippingSummary(channels);
+  const shadowClipLabel = formatClipPercent(clippingSummary.shadowPercent);
+  const highlightClipLabel = formatClipPercent(clippingSummary.highlightPercent);
 
   return (
-    <svg
-      viewBox="0 0 255 255"
-      className="w-full h-full overflow-visible pointer-events-none"
-      preserveAspectRatio="none"
-    >
-      {channels.map((ch) => {
-        if (ch.data.length === 0) return null;
-        return (
-          <g key={ch.key} style={{ mixBlendMode: 'lighten' }}>
-            <path d={getFill(ch.data)} fill={ch.color} fillOpacity={0.4} />
-            <path
-              d={getLine(ch.data)}
-              fill="none"
-              stroke={ch.color}
-              strokeWidth={1.5}
-              strokeOpacity={1.8}
-              vectorEffect="non-scaling-stroke"
-              strokeLinejoin="round"
-            />
-          </g>
-        );
-      })}
-    </svg>
+    <div className="relative h-full w-full" data-testid="histogram-clipping-readouts">
+      <svg
+        viewBox="0 0 255 255"
+        className="w-full h-full overflow-visible pointer-events-none"
+        preserveAspectRatio="none"
+      >
+        {channels.map((ch) => {
+          if (ch.data.length === 0) return null;
+          return (
+            <g key={ch.key} style={{ mixBlendMode: 'lighten' }}>
+              <path d={getFill(ch.data)} fill={ch.color} fillOpacity={0.4} />
+              <path
+                d={getLine(ch.data)}
+                fill="none"
+                stroke={ch.color}
+                strokeWidth={1.5}
+                strokeOpacity={1.8}
+                vectorEffect="non-scaling-stroke"
+                strokeLinejoin="round"
+              />
+            </g>
+          );
+        })}
+      </svg>
+      <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
+        <span
+          className="rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
+          data-shadow-clipping={shadowClipLabel}
+        >
+          {t('ui.waveform.clippingReadouts.shadows', { value: shadowClipLabel })}
+        </span>
+        <span
+          className="rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur-sm"
+          data-highlight-clipping={highlightClipLabel}
+        >
+          {t('ui.waveform.clippingReadouts.highlights', { value: highlightClipLabel })}
+        </span>
+      </div>
+    </div>
   );
 };
 

@@ -2652,6 +2652,10 @@
       "reset": "Zurücksetzen"
     },
     "waveform": {
+      "clippingReadouts": {
+        "highlights": "",
+        "shadows": ""
+      },
       "tooltips": {
         "hideClipping": "Clipping-Warnungen ausblenden",
         "histogram": "Histogramm",

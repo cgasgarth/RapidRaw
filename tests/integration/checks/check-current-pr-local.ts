@@ -196,6 +196,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   );
   addIf((file) => file === 'src/components/adjustments/FilmLookBrowser.tsx', ['check:film-look-browser-ui']);
   addIf((file) => file === 'src/components/panel/MainLibrary.tsx', ['check:library-header-ui']);
+  addIf((file) => file === 'src/components/panel/editor/Waveform.tsx', ['check:histogram-clipping-ui']);
   addIf((file) => file === 'src/components/panel/right/MasksPanel.tsx', ['check:mask-readiness-ui']);
   addIf(
     (file) => file.includes('selectiveColor') || file.includes('selective-color'),
@@ -370,6 +371,7 @@ if (process.argv.includes('--self-test')) {
   );
   assertSelfTestRoute(['src/components/adjustments/FilmLookBrowser.tsx'], ['check:film-look-browser-ui']);
   assertSelfTestRoute(['src/components/panel/MainLibrary.tsx'], ['check:library-header-ui']);
+  assertSelfTestRoute(['src/components/panel/editor/Waveform.tsx'], ['check:histogram-clipping-ui']);
   assertSelfTestRoute(['src/components/panel/right/MasksPanel.tsx'], ['check:mask-readiness-ui']);
   assertSelfTestRoute(['src/components/ui/ExportPresetsList.tsx'], ['check:export-recipes-ui']);
   assertSelfTestRoute(['src/components/adjustments/Color.tsx'], ['check:professional-color-workflow-ui']);
