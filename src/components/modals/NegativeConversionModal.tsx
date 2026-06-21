@@ -69,6 +69,11 @@ import Button from '../ui/Button';
 import Slider from '../ui/Slider';
 import UiText from '../ui/Text';
 
+import type {
+  NegativeLabAcquisitionHealthReport,
+  NegativeLabAcquisitionSourceFamily,
+  NegativeLabAcquisitionWarningCode,
+} from '../../schemas/negativeLabFrameHealthSchemas';
 import type { NegativeLabRuntimeProfileBrowserRow } from '../../schemas/negativeLabMeasuredProfileSchemas';
 import type { NegativeLabWorkspaceProof } from '../../schemas/negativeLabWorkspaceSchemas';
 
@@ -127,6 +132,15 @@ type DensitometerPatchLabelKey =
   | BaseFogSampleLabelKey
   | 'modals.negativeConversion.sampleHighlightPatch'
   | 'modals.negativeConversion.sampleShadowPatch';
+type AcquisitionSourceFamilyLabelKey =
+  | 'modals.negativeConversion.acquisitionSourceJpeg'
+  | 'modals.negativeConversion.acquisitionSourceRaw'
+  | 'modals.negativeConversion.acquisitionSourceTiff'
+  | 'modals.negativeConversion.acquisitionSourceUnknown';
+type AcquisitionWarningLabelKey =
+  | 'modals.negativeConversion.acquisitionWarningLossy'
+  | 'modals.negativeConversion.acquisitionWarningMixed'
+  | 'modals.negativeConversion.acquisitionWarningUnknown';
 
 const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
@@ -255,6 +269,17 @@ const DUST_SCRATCH_SEVERITY_LABEL_KEYS = {
   retouch: 'modals.negativeConversion.dustSeverity.retouch',
   review: 'modals.negativeConversion.dustSeverity.review',
 } as const;
+const ACQUISITION_SOURCE_FAMILY_LABEL_KEYS = {
+  jpeg_lossy: 'modals.negativeConversion.acquisitionSourceJpeg',
+  raw_like: 'modals.negativeConversion.acquisitionSourceRaw',
+  tiff_scan: 'modals.negativeConversion.acquisitionSourceTiff',
+  unknown: 'modals.negativeConversion.acquisitionSourceUnknown',
+} satisfies Record<NegativeLabAcquisitionSourceFamily, AcquisitionSourceFamilyLabelKey>;
+const ACQUISITION_WARNING_LABEL_KEYS = {
+  lossy_source_for_negative_lab: 'modals.negativeConversion.acquisitionWarningLossy',
+  mixed_source_families: 'modals.negativeConversion.acquisitionWarningMixed',
+  unknown_acquisition_state: 'modals.negativeConversion.acquisitionWarningUnknown',
+} satisfies Record<NegativeLabAcquisitionWarningCode, AcquisitionWarningLabelKey>;
 const BASE_FOG_SAMPLE_PRESETS = [
   {
     labelKey: 'modals.negativeConversion.sampleLeftEdge',
@@ -1110,6 +1135,72 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     </div>
   );
 
+  const renderAcquisitionHealth = () => {
+    const acquisitionHealth: NegativeLabAcquisitionHealthReport = frameHealthReport.acquisitionHealth;
+
+    return (
+      <div
+        className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
+        data-acquisition-severity={acquisitionHealth.severity}
+        data-lossy-count={acquisitionHealth.lossyCount}
+        data-raw-like-count={acquisitionHealth.rawLikeCount}
+        data-tiff-scan-count={acquisitionHealth.tiffScanCount}
+        data-unknown-count={acquisitionHealth.unknownCount}
+        data-warning-count={acquisitionHealth.warningCodes.length}
+        data-testid="negative-lab-acquisition-health"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <UiText variant={TextVariants.small} className="font-medium text-text-primary">
+            {t('modals.negativeConversion.acquisitionHealth')}
+          </UiText>
+          <span
+            className={cx(
+              'rounded px-1.5 py-0.5 text-[11px]',
+              acquisitionHealth.severity === 'ok' ? 'bg-accent/15 text-text-primary' : 'bg-surface text-text-secondary',
+            )}
+            data-testid="negative-lab-acquisition-severity"
+          >
+            {t(
+              acquisitionHealth.severity === 'ok'
+                ? 'modals.negativeConversion.acquisitionSeverityOk'
+                : 'modals.negativeConversion.acquisitionSeverityReview',
+            )}
+          </span>
+        </div>
+        <UiText variant={TextVariants.small} className="text-text-tertiary">
+          {t('modals.negativeConversion.acquisitionHealthHint')}
+        </UiText>
+        <div className="flex flex-wrap gap-1 text-[11px] text-text-tertiary">
+          <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-acquisition-total">
+            {t('modals.negativeConversion.acquisitionTotal', { totalCount: acquisitionHealth.totalCount })}
+          </span>
+          {acquisitionHealth.sourceFamilies.map((sourceFamily) => (
+            <span
+              className="rounded bg-bg-secondary px-1.5 py-0.5"
+              data-testid={`negative-lab-acquisition-source-${sourceFamily}`}
+              key={sourceFamily}
+            >
+              {t(ACQUISITION_SOURCE_FAMILY_LABEL_KEYS[sourceFamily])}
+            </span>
+          ))}
+        </div>
+        {acquisitionHealth.warningCodes.length > 0 && (
+          <div className="flex flex-wrap gap-1 text-[11px] text-text-tertiary">
+            {acquisitionHealth.warningCodes.map((warningCode) => (
+              <span
+                className="rounded bg-bg-secondary px-1.5 py-0.5"
+                data-testid={`negative-lab-acquisition-warning-${warningCode}`}
+                key={warningCode}
+              >
+                {t(ACQUISITION_WARNING_LABEL_KEYS[warningCode])}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderBatchReadiness = () => (
     <div
       className="space-y-2 rounded-md border border-surface bg-bg-primary p-2"
@@ -1516,6 +1607,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 ))}
               </div>
             )}
+            {renderAcquisitionHealth()}
             {renderBatchReadiness()}
             {renderAgentActivityPanel()}
           </div>

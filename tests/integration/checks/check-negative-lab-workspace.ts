@@ -22,6 +22,13 @@ const frameHealthReport = buildNegativeLabFrameHealthReport({
   previewReady: true,
   targetPaths,
 });
+const mixedAcquisitionReport = buildNegativeLabFrameHealthReport({
+  activePathIndex: 0,
+  baseFogConfidence: null,
+  includedPathSet: new Set(['/roll/001.CR3', '/roll/proof.jpg', '/roll/source.unknown']),
+  previewReady: false,
+  targetPaths: ['/roll/001.CR3', '/roll/proof.jpg', '/roll/source.unknown'],
+}).acquisitionHealth;
 const reviewReport = buildNegativeLabDustScratchReviewReport(frameHealthReport, true);
 const qcProofReport = buildNegativeLabQcProofReport(reviewReport, true, true);
 const proof = negativeLabWorkspaceProofSchema.parse({
@@ -37,6 +44,24 @@ const modalSource = readFileSync('src/components/modals/NegativeConversionModal.
 
 if (proof.reviewReport.frames.length !== targetPaths.length) {
   throw new Error('Negative Lab workspace review did not cover every frame.');
+}
+
+if (
+  frameHealthReport.acquisitionHealth.severity !== 'ok' ||
+  frameHealthReport.acquisitionHealth.tiffScanCount !== targetPaths.length ||
+  frameHealthReport.acquisitionHealth.warningCodes.length !== 0
+) {
+  throw new Error('Negative Lab acquisition health did not classify TIFF scan workspace as ready.');
+}
+
+for (const warningCode of [
+  'lossy_source_for_negative_lab',
+  'mixed_source_families',
+  'unknown_acquisition_state',
+] as const) {
+  if (!mixedAcquisitionReport.warningCodes.includes(warningCode)) {
+    throw new Error(`Negative Lab acquisition health missing mixed-input warning: ${warningCode}`);
+  }
 }
 
 if (!proof.reviewReport.frames.some((frame) => frame.findingCodes.includes('base_fog_only_review'))) {
@@ -65,6 +90,11 @@ for (const marker of [
   'negative-lab-stock-readiness-preview',
   'negative-lab-stock-readiness-export',
   'negative-lab-batch-workload-summary',
+  'negative-lab-acquisition-health',
+  'data-acquisition-severity={acquisitionHealth.severity}',
+  'negative-lab-acquisition-severity',
+  'negative-lab-acquisition-source-${sourceFamily}',
+  'negative-lab-acquisition-warning-${warningCode}',
   'data-planned-apply-count={batchDryRunSummary.plannedApplyCount}',
   'data-review-count={dustScratchReviewReport.reviewCount}',
   'data-skipped-frame-count={batchDryRunSummary.skippedFrameIds.length}',

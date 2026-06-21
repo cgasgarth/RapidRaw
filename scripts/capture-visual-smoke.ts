@@ -981,6 +981,12 @@ async function prepareScenario(page, mode) {
 
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.NegativeLabBatchColorWorkspace) {
     await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkspace).waitFor({ timeout: 10_000 });
+    await page.getByTestId('negative-lab-acquisition-health').waitFor({ timeout: 10_000 });
+    await page
+      .getByTestId('negative-lab-acquisition-severity')
+      .getByText('Ready', { exact: true })
+      .waitFor({ timeout: 10_000 });
+    await page.getByTestId('negative-lab-acquisition-source-tiff_scan').waitFor({ timeout: 10_000 });
     await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
     await page
       .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
@@ -1045,6 +1051,12 @@ async function prepareScenario(page, mode) {
       .evaluate((element) => ({ ...element.dataset })),
   );
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabWorkflowRail).waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-acquisition-health').waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-acquisition-severity')
+    .getByText('Ready', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-acquisition-source-tiff_scan').waitFor({ timeout: 10_000 });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentActivity).waitFor({ timeout: 10_000 });
   await page

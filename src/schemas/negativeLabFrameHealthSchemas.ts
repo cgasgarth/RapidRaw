@@ -9,6 +9,40 @@ export const negativeLabFrameWarningCodeSchema = z.enum([
   'excluded_from_batch',
   'preview_not_ready',
 ]);
+export const negativeLabAcquisitionWarningCodeSchema = z.enum([
+  'lossy_source_for_negative_lab',
+  'mixed_source_families',
+  'unknown_acquisition_state',
+]);
+export const negativeLabAcquisitionSourceFamilySchema = z.enum(['jpeg_lossy', 'raw_like', 'tiff_scan', 'unknown']);
+export const negativeLabAcquisitionSeveritySchema = z.enum(['ok', 'review']);
+
+export const negativeLabAcquisitionHealthReportSchema = z
+  .object({
+    lossyCount: z.number().int().nonnegative(),
+    rawLikeCount: z.number().int().nonnegative(),
+    schemaVersion: z.literal(NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION),
+    severity: negativeLabAcquisitionSeveritySchema,
+    sourceFamilies: z.array(negativeLabAcquisitionSourceFamilySchema).min(1),
+    tiffScanCount: z.number().int().nonnegative(),
+    totalCount: z.number().int().nonnegative(),
+    unknownCount: z.number().int().nonnegative(),
+    warningCodes: z.array(negativeLabAcquisitionWarningCodeSchema),
+  })
+  .strict()
+  .superRefine((report, context) => {
+    if (report.lossyCount + report.rawLikeCount + report.tiffScanCount + report.unknownCount !== report.totalCount) {
+      context.addIssue({ code: 'custom', message: 'Negative Lab acquisition source counts are stale.' });
+    }
+
+    if (report.severity === 'ok' && report.warningCodes.length > 0) {
+      context.addIssue({ code: 'custom', message: 'OK Negative Lab acquisition health cannot include warnings.' });
+    }
+
+    if (report.severity === 'review' && report.warningCodes.length === 0) {
+      context.addIssue({ code: 'custom', message: 'Review Negative Lab acquisition health requires warnings.' });
+    }
+  });
 
 export const negativeLabFrameHealthEntrySchema = z
   .object({
@@ -53,6 +87,7 @@ export const negativeLabFrameHealthEntrySchema = z
 export const negativeLabFrameHealthReportSchema = z
   .object({
     activeFrameId: z.string().trim().min(1).nullable(),
+    acquisitionHealth: negativeLabAcquisitionHealthReportSchema,
     frames: z.array(negativeLabFrameHealthEntrySchema),
     includedCount: z.number().int().nonnegative(),
     queuedCount: z.number().int().nonnegative(),
@@ -118,6 +153,9 @@ export const negativeLabBatchDryRunSummarySchema = z
 
 export type NegativeLabFrameHealthStatus = z.infer<typeof negativeLabFrameHealthStatusSchema>;
 export type NegativeLabFrameWarningCode = z.infer<typeof negativeLabFrameWarningCodeSchema>;
+export type NegativeLabAcquisitionSourceFamily = z.infer<typeof negativeLabAcquisitionSourceFamilySchema>;
+export type NegativeLabAcquisitionWarningCode = z.infer<typeof negativeLabAcquisitionWarningCodeSchema>;
+export type NegativeLabAcquisitionHealthReport = z.infer<typeof negativeLabAcquisitionHealthReportSchema>;
 export type NegativeLabFrameHealthEntry = z.infer<typeof negativeLabFrameHealthEntrySchema>;
 export type NegativeLabFrameHealthReport = z.infer<typeof negativeLabFrameHealthReportSchema>;
 export type NegativeLabBatchDryRunSummary = z.infer<typeof negativeLabBatchDryRunSummarySchema>;

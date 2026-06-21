@@ -2,6 +2,7 @@ import {
   NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION,
   parseNegativeLabBatchDryRunSummary,
   parseNegativeLabFrameHealthReport,
+  type NegativeLabAcquisitionHealthReport,
   type NegativeLabBatchDryRunSummary,
   type NegativeLabFrameHealthReport,
   type NegativeLabFrameWarningCode,
@@ -10,6 +11,52 @@ import {
 export const getNegativeLabScanLabel = (path: string, index: number) => {
   const pathParts = path.split(/[\\/]/u).filter(Boolean);
   return pathParts.at(-1) ?? String(index + 1);
+};
+
+const RAW_LIKE_EXTENSIONS = new Set(['.arw', '.cr2', '.cr3', '.dng', '.nef', '.orf', '.raf', '.raw', '.rw2']);
+const TIFF_SCAN_EXTENSIONS = new Set(['.tif', '.tiff']);
+const JPEG_LOSSY_EXTENSIONS = new Set(['.jpg', '.jpeg']);
+
+const getPathExtension = (path: string) => {
+  const name = getNegativeLabScanLabel(path, 0);
+  const dotIndex = name.lastIndexOf('.');
+  return dotIndex === -1 ? '' : name.slice(dotIndex).toLocaleLowerCase('en-US');
+};
+
+const classifyAcquisitionSourceFamily = (path: string) => {
+  const extension = getPathExtension(path);
+  if (RAW_LIKE_EXTENSIONS.has(extension)) return 'raw_like';
+  if (TIFF_SCAN_EXTENSIONS.has(extension)) return 'tiff_scan';
+  if (JPEG_LOSSY_EXTENSIONS.has(extension)) return 'jpeg_lossy';
+  return 'unknown';
+};
+
+export const buildNegativeLabAcquisitionHealthReport = (
+  targetPaths: readonly string[],
+): NegativeLabAcquisitionHealthReport => {
+  const sourceFamilies = targetPaths.map(classifyAcquisitionSourceFamily);
+  const uniqueSourceFamilies = [...new Set(sourceFamilies)].toSorted();
+  const lossyCount = sourceFamilies.filter((family) => family === 'jpeg_lossy').length;
+  const rawLikeCount = sourceFamilies.filter((family) => family === 'raw_like').length;
+  const tiffScanCount = sourceFamilies.filter((family) => family === 'tiff_scan').length;
+  const unknownCount = sourceFamilies.filter((family) => family === 'unknown').length;
+  const warningCodes: NegativeLabAcquisitionHealthReport['warningCodes'] = [];
+
+  if (lossyCount > 0) warningCodes.push('lossy_source_for_negative_lab');
+  if (unknownCount > 0) warningCodes.push('unknown_acquisition_state');
+  if (uniqueSourceFamilies.length > 1) warningCodes.push('mixed_source_families');
+
+  return {
+    lossyCount,
+    rawLikeCount,
+    schemaVersion: NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION,
+    severity: warningCodes.length === 0 ? 'ok' : 'review',
+    sourceFamilies: uniqueSourceFamilies.length === 0 ? ['unknown'] : uniqueSourceFamilies,
+    tiffScanCount,
+    totalCount: targetPaths.length,
+    unknownCount,
+    warningCodes,
+  };
 };
 
 interface BuildNegativeLabFrameHealthReportParams {
@@ -53,6 +100,7 @@ export const buildNegativeLabFrameHealthReport = ({
 
   return parseNegativeLabFrameHealthReport({
     activeFrameId: frames.find((frame) => frame.active)?.frameId ?? null,
+    acquisitionHealth: buildNegativeLabAcquisitionHealthReport(targetPaths),
     frames,
     includedCount: frames.filter((frame) => frame.included).length,
     queuedCount: frames.filter((frame) => frame.healthStatus !== 'skipped').length,
