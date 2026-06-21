@@ -20,6 +20,7 @@
     "color": {
       "activeRangeAdjustedHue": "Adjusted hue",
       "activeRangeDeltas": "HSL deltas",
+      "adjustedPreviewEnabled": "",
       "ariaSelectColor": "选择 {{name}} 颜色",
       "blackWhiteMixer": {
         "ariaSelectChannel": "选择 {{name}} 黑白通道",
@@ -110,6 +111,8 @@
         }
       },
       "luminance": "亮度",
+      "maskPreview": "",
+      "maskPreviewEnabled": "",
       "mixerColors": {
         "aquas": "青色",
         "blues": "蓝色",
@@ -121,6 +124,7 @@
         "yellows": "黄色"
       },
       "presence": "质感",
+      "previewMode": "",
       "profileTone": {
         "cameraProfile": "相机配置",
         "cameraProfiles": {
