@@ -259,7 +259,14 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:sr-reconstruction-proof'],
   );
   addIf((file) => file.startsWith('packages/rawengine-schema/src/panorama'), ['check:panorama-runtime-plan-smoke']);
-  addIf((file) => file === 'src/components/modals/PanoramaModal.tsx', ['check:panorama-review-diagnostics']);
+  addIf(
+    (file) =>
+      file === 'src/components/modals/PanoramaModal.tsx' ||
+      file === 'src/hooks/useProductivityActions.ts' ||
+      file === 'src/schemas/panoramaUiSchemas.ts' ||
+      file === 'src/validation/visual/VisualSmokeApp.tsx',
+    ['check:panorama-review-diagnostics', 'check:panorama-runtime-preflight-ui'],
+  );
   addIf(
     (file) => file === 'src/components/modals/NegativeConversionModal.tsx',
     ['check:negative-lab-workspace', 'check:negative-lab-roll-cockpit'],

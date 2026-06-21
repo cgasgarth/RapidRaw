@@ -656,6 +656,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                     isProcessing: false,
                     lastDryRunCommand: null,
                     progressMessage: null,
+                    runtimePlan: null,
                     settings: DEFAULT_PANORAMA_UI_SETTINGS,
                     stitchingSourcePaths: finalSelection,
                   },

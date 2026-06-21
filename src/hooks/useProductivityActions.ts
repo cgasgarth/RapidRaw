@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useCallback } from 'react';
 
 import { Invokes } from '../components/ui/AppProperties';
+import { panoramaRuntimePlanSchema } from '../schemas/panoramaUiSchemas';
 import { useUIStore } from '../store/useUIStore';
 import { getComputationalMergeAppServerRoutePairSummary } from '../utils/computationalMergeAppServerRoutePairs';
 
@@ -9,7 +10,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
   const setUI = useUIStore((state) => state.setUI);
 
   const handleStartPanorama = useCallback(
-    (paths: string[]) => {
+    async (paths: string[]) => {
       const { panoramaModalState } = useUIStore.getState();
       const { settings } = panoramaModalState;
       const dryRunCommand = {
@@ -29,21 +30,47 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           error: null,
           finalImageBase64: null,
           progressMessage: 'Starting panorama...',
+          runtimePlan: null,
         },
       }));
-      invoke(Invokes.StitchPanorama, {
-        options: {
-          boundaryMode: settings.boundaryMode,
-          maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
-          projection: settings.projection,
-          qualityPreference: settings.qualityPreference,
-        },
-        paths,
-      }).catch((err: unknown) => {
+      try {
+        const runtimePlan = panoramaRuntimePlanSchema.parse(
+          await invoke(Invokes.PlanPanorama, {
+            maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
+            paths,
+          }),
+        );
+        setUI((state) => ({
+          panoramaModalState: {
+            ...state.panoramaModalState,
+            progressMessage: 'Panorama preflight complete.',
+            runtimePlan,
+          },
+        }));
+        if (runtimePlan.preflight.status === 'blocked_plan_only') {
+          setUI((state) => ({
+            panoramaModalState: {
+              ...state.panoramaModalState,
+              error: runtimePlan.preflight.blocked_reasons.join('\n'),
+              isProcessing: false,
+            },
+          }));
+          return;
+        }
+        await invoke(Invokes.StitchPanorama, {
+          options: {
+            boundaryMode: settings.boundaryMode,
+            maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
+            projection: settings.projection,
+            qualityPreference: settings.qualityPreference,
+          },
+          paths,
+        });
+      } catch (err: unknown) {
         setUI((state) => ({
           panoramaModalState: { ...state.panoramaModalState, isProcessing: false, error: String(err) },
         }));
-      });
+      }
     },
     [setUI],
   );
