@@ -77,6 +77,10 @@ export default function HdrModal({
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
   const selectedStrategyLabel = strategyOptions.find((option) => option.value === settings.mergeStrategy)?.label ?? '';
   const estimatedPreviewMegapixels = Math.round(((imageCount ?? 0) * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
+  const estimatedPreviewMemoryMb = Math.max(
+    0,
+    Math.round(((imageCount ?? 0) * settings.maxPreviewDimensionPx ** 2 * 4) / 1_000_000),
+  );
 
   const setSetting = useCallback(
     (patch: Partial<HdrMergeUiSettings>) => {
@@ -204,6 +208,7 @@ export default function HdrModal({
           </div>
           <section
             className="mb-5 grid grid-cols-3 gap-2 rounded-md border border-border-color bg-surface p-3 text-xs"
+            data-estimated-preview-memory-mb={estimatedPreviewMemoryMb}
             data-estimated-preview-megapixels={estimatedPreviewMegapixels}
             data-preview-source-count={imageCount ?? 0}
             data-testid="hdr-setup-summary"
@@ -238,6 +243,10 @@ export default function HdrModal({
               {
                 label: t('modals.hdr.summaryWorkload'),
                 value: t('modals.hdr.previewWorkload', { value: estimatedPreviewMegapixels }),
+              },
+              {
+                label: t('modals.hdr.summaryMemory'),
+                value: t('modals.hdr.previewMemory', { value: estimatedPreviewMemoryMb }),
               },
               {
                 label: t('modals.hdr.summaryToneMapPreview'),

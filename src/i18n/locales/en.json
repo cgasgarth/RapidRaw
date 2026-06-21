@@ -1794,6 +1794,7 @@
       "merging": "Merging HDR",
       "openInEditor": "Open in Editor",
       "previewBudgetLabel": "Preview budget",
+      "previewMemory": "{{value}} MB estimated",
       "previewPixels": "{{value}} px",
       "previewWorkload": "{{value}} MP",
       "quality": {
@@ -1816,6 +1817,7 @@
       "summaryAlignment": "Alignment",
       "summaryBlocked": "Blocked",
       "summaryDeghosting": "Deghosting",
+      "summaryMemory": "Memory",
       "summaryOff": "Off",
       "summaryOn": "On",
       "summaryPreviewBudget": "Preview",
