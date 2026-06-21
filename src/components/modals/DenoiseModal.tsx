@@ -231,6 +231,7 @@ export default function DenoiseModal({
   const [method, setMethod] = useState<'ai' | 'bm3d'>('ai');
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
+  const [batchSavedPaths, setBatchSavedPaths] = useState<string[] | null>(null);
   const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; path: string } | null>(null);
   const hasDenoiseTargets = targetPaths.length > 0;
   const isBatch = targetPaths.length > 1;
@@ -271,6 +272,9 @@ export default function DenoiseModal({
   const selectedMethodDescription =
     method === 'ai' ? t('modals.denoise.methodAiDescription') : t('modals.denoise.methodBm3dDescription');
   const savedOutputName = savedPath ? getDisplayFileName(savedPath) : '';
+  const batchSavedCount = batchSavedPaths?.length ?? 0;
+  const firstBatchSavedPath = batchSavedPaths?.[0] ?? null;
+  const firstBatchSavedOutputName = firstBatchSavedPath ? getDisplayFileName(firstBatchSavedPath) : '';
 
   useEffect(() => {
     if (isOpen) {
@@ -285,6 +289,7 @@ export default function DenoiseModal({
 
     const timer = window.setTimeout(() => {
       setSavedPath(null);
+      setBatchSavedPaths(null);
       setIsSaving(false);
       setBatchProgress(null);
     }, 300);
@@ -312,11 +317,13 @@ export default function DenoiseModal({
   const handleRunDenoise = async () => {
     if (!hasDenoiseTargets) return;
     setSavedPath(null);
+    setBatchSavedPaths(null);
+    setBatchProgress(null);
     if (isBatch) {
       setIsSaving(true);
       try {
-        await onBatchDenoise(intensity / 100, method, targetPaths);
-        onClose();
+        const paths = await onBatchDenoise(intensity / 100, method, targetPaths);
+        setBatchSavedPaths(paths);
       } catch (e) {
         console.error('Batch denoise failed:', e);
       } finally {
@@ -358,6 +365,38 @@ export default function DenoiseModal({
             {t('modals.denoise.processingFailed')}
           </UiText>
           <UiText className="text-center p-4 rounded-lg bg-bg-primary max-w-md mt-2 leading-relaxed">{error}</UiText>
+        </div>
+      );
+    }
+
+    if (isBatch && batchSavedPaths) {
+      return (
+        <div className="flex h-[460px] flex-col items-center justify-center rounded-lg border border-surface bg-bg-primary px-10 text-center">
+          <CheckCircle aria-hidden="true" className="mb-4 h-12 w-12 text-green-500" />
+          <UiText variant={TextVariants.title} className="mb-2 text-center">
+            {t('modals.denoise.batchCompleteTitle')}
+          </UiText>
+          <UiText
+            className="text-center"
+            data-saved-output-count={batchSavedCount}
+            data-testid="denoise-batch-completion-summary"
+          >
+            {t('modals.denoise.batchCompleteSummary', { count: batchSavedCount })}
+          </UiText>
+          {firstBatchSavedPath && (
+            <UiText
+              as="div"
+              variant={TextVariants.small}
+              color={TextColors.secondary}
+              className="mt-3 max-w-full truncate font-mono"
+              data-saved-output-name={firstBatchSavedOutputName}
+              data-testid="denoise-batch-first-output"
+              title={firstBatchSavedPath}
+            >
+              {t('modals.common.savedOutputLabel', { name: firstBatchSavedOutputName })}
+              <span className="sr-only">{t('modals.common.savedOutputFullPath', { path: firstBatchSavedPath })}</span>
+            </UiText>
+          )}
         </div>
       );
     }
@@ -562,6 +601,14 @@ export default function DenoiseModal({
       );
     }
 
+    if (batchSavedPaths) {
+      return (
+        <div className="w-full flex justify-end" data-testid="denoise-batch-completion-actions">
+          <Button onClick={handleClose}>{t('modals.denoise.close')}</Button>
+        </div>
+      );
+    }
+
     if (savedPath) {
       return (
         <>
@@ -685,7 +732,9 @@ export default function DenoiseModal({
       >
         <div className="flex flex-col">
           {renderContent()}
-          <div className={`mt-4 flex justify-end gap-3 ${savedPath ? '' : 'pt-4 border-t border-surface/50'}`}>
+          <div
+            className={`mt-4 flex justify-end gap-3 ${savedPath || batchSavedPaths ? '' : 'pt-4 border-t border-surface/50'}`}
+          >
             {renderButtons()}
           </div>
         </div>

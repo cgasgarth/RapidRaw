@@ -1613,6 +1613,9 @@
       "title": "筛选图像"
     },
     "denoise": {
+      "batchCompleteSummary_one": "已保存 {{count}} 个输出",
+      "batchCompleteSummary_other": "已保存 {{count}} 个输出",
+      "batchCompleteTitle": "批量降噪完成",
       "batchProgressFile": "Processing {{fileName}}",
       "batchProgressText": "降噪中 {{current}} / {{total}}...",
       "btnBatchDenoise": "批量降噪并保存",

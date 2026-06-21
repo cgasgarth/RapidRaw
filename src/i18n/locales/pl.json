@@ -1732,6 +1732,11 @@
       "title": "Selekcja obrazów"
     },
     "denoise": {
+      "batchCompleteSummary_one": "Zapisano {{count}} wynik",
+      "batchCompleteSummary_few": "Zapisano {{count}} wyniki",
+      "batchCompleteSummary_many": "Zapisano {{count}} wyników",
+      "batchCompleteSummary_other": "Zapisano {{count}} wyniku",
+      "batchCompleteTitle": "Wsadowe odszumianie zakończone",
       "batchProgressFile": "Processing {{fileName}}",
       "batchProgressText": "Odszumianie {{current}} z {{total}}...",
       "btnBatchDenoise": "Zbiorcze Odszumianie i Zapis",

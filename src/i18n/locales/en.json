@@ -1627,6 +1627,9 @@
       "title": "Cull Images"
     },
     "denoise": {
+      "batchCompleteSummary_one": "{{count}} output saved",
+      "batchCompleteSummary_other": "{{count}} outputs saved",
+      "batchCompleteTitle": "Batch denoise complete",
       "batchProgressFile": "Processing {{fileName}}",
       "batchProgressText": "Denoising {{current}} of {{total}}...",
       "btnBatchDenoise": "Batch Denoise & Save",
