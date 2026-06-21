@@ -1,0 +1,46 @@
+{
+  "basePixels": [
+    { "r": 32, "g": 48, "b": 64 },
+    { "r": 64, "g": 80, "b": 96 },
+    { "r": 96, "g": 112, "b": 128 },
+    { "r": 128, "g": 144, "b": 160 }
+  ],
+  "height": 2,
+  "id": "layer-visibility-opacity-proof-v1",
+  "layers": [
+    {
+      "blendMode": "normal",
+      "id": "color-lift",
+      "name": "Color lift",
+      "opacity": 1,
+      "pixels": [
+        { "r": 180, "g": 60, "b": 80 },
+        { "r": 190, "g": 70, "b": 90 },
+        { "r": 200, "g": 80, "b": 100 },
+        { "r": 210, "g": 90, "b": 110 }
+      ],
+      "visible": true
+    }
+  ],
+  "proofSteps": [
+    {
+      "expectedCoverageCount": 1,
+      "expectedTouchedPixels": 4,
+      "id": "visible-full-opacity",
+      "operations": []
+    },
+    {
+      "expectedCoverageCount": 1,
+      "expectedTouchedPixels": 4,
+      "id": "visible-half-opacity",
+      "operations": [{ "layerId": "color-lift", "opacity": 0.5, "type": "setOpacity" }]
+    },
+    {
+      "expectedCoverageCount": 0,
+      "expectedTouchedPixels": 0,
+      "id": "hidden-noop",
+      "operations": [{ "layerId": "color-lift", "type": "setVisibility", "visible": false }]
+    }
+  ],
+  "width": 2
+}

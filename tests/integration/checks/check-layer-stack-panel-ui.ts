@@ -24,6 +24,7 @@ const requiredOperationReadinessLocaleKeys = [
   'ungroupReady',
 ];
 const requiredActionLocaleKeys = ['showAllHidden', 'soloActive'];
+const requiredActiveRenderStateKeys = ['hidden', 'summary', 'title', 'visible'];
 
 const missingKeys = requiredLocaleKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
 if (missingKeys.length > 0) {
@@ -34,6 +35,14 @@ if (missingKeys.length > 0) {
 const missingActionKeys = requiredActionLocaleKeys.filter((key) => typeof layerLocale?.actions?.[key] !== 'string');
 if (missingActionKeys.length > 0) {
   console.error(`Missing layer stack panel action locale keys: ${missingActionKeys.join(', ')}`);
+  process.exit(1);
+}
+
+const missingActiveRenderStateKeys = requiredActiveRenderStateKeys.filter(
+  (key) => typeof layerLocale?.activeRenderState?.[key] !== 'string',
+);
+if (missingActiveRenderStateKeys.length > 0) {
+  console.error(`Missing layer active render-state locale keys: ${missingActiveRenderStateKeys.join(', ')}`);
   process.exit(1);
 }
 
@@ -59,6 +68,10 @@ for (const marker of [
   'data-testid="layer-stack-count-summary"',
   'data-testid="layer-hidden-count"',
   'data-testid="layer-active-action-strip"',
+  'data-testid="layer-active-render-state"',
+  'data-active-layer-id={activeRow.id}',
+  'data-active-layer-opacity={activeRow.opacity}',
+  'data-active-layer-visible={String(activeRow.visible)}',
   'data-testid="layer-export-readiness-summary"',
   'data-testid="layer-operation-readiness-summary"',
   'data-testid="layer-operation-move-ready"',
@@ -83,6 +96,10 @@ for (const marker of [
   'editor.layers.groupSummaryCount',
   'editor.layers.actions.soloActive',
   'editor.layers.actions.showAllHidden',
+  'editor.layers.activeRenderState.title',
+  'editor.layers.activeRenderState.summary',
+  'editor.layers.activeRenderState.visible',
+  'editor.layers.activeRenderState.hidden',
   'editor.layers.operationReadiness.moveReady',
   'editor.layers.operationReadiness.groupReady',
   'editor.layers.operationReadiness.ungroupReady',

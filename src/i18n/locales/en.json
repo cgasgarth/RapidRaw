@@ -780,6 +780,12 @@
         "soloActive": "Solo active",
         "ungroup": "Ungroup layers"
       },
+      "activeRenderState": {
+        "hidden": "Hidden",
+        "summary": "{{opacity}}% - {{visibility}}",
+        "title": "Render state",
+        "visible": "Visible"
+      },
       "blend": "Blend",
       "blendModes": {
         "color": "Color",
