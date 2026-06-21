@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { useUIStore } from '../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import LensCorrectionModal from '../../modals/LensCorrectionModal';
@@ -59,11 +60,12 @@ export default function CropPanel() {
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
   const activeOverlay = useEditorStore((s) => s.overlayMode);
   const setEditor = useEditorStore((s) => s.setEditor);
+  const isLensModalOpen = useUIStore((s) => s.isLensCorrectionModalOpen);
+  const setUI = useUIStore((s) => s.setUI);
   const { setAdjustments } = useEditorActions();
   const [customW, setCustomW] = useState('');
   const [customH, setCustomH] = useState('');
   const [isTransformModalOpen, setIsTransformModalOpen] = useState(false);
-  const [isLensModalOpen, setIsLensModalOpen] = useState(false);
   const [isRotationActive, setIsRotationActive] = useState(false);
   const [preferPortrait, setPreferPortrait] = useState(false);
   const [isEditingCustom, setIsEditingCustom] = useState(false);
@@ -756,7 +758,7 @@ export default function CropPanel() {
                 <motion.div
                   className="flex flex-col items-center justify-center p-3  cursor-pointer rounded-lg transition-colors bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary group"
                   onClick={() => {
-                    setIsLensModalOpen(true);
+                    setUI({ isLensCorrectionModalOpen: true });
                   }}
                   data-tooltip={t('editor.crop.tooltips.lens')}
                   whileTap={{ scale: 0.98 }}
@@ -804,7 +806,7 @@ export default function CropPanel() {
       <LensCorrectionModal
         isOpen={isLensModalOpen}
         onClose={() => {
-          setIsLensModalOpen(false);
+          setUI({ isLensCorrectionModalOpen: false });
         }}
         onApply={(newParams) => {
           setAdjustments((prev: Adjustments) => ({

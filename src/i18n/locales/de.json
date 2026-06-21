@@ -1463,6 +1463,7 @@
         "focusStack": "Open focus stacking",
         "hdrMerge": "Open HDR merge",
         "importFiles": "Open import settings",
+        "lensCorrection": "Open lens correction",
         "negativeLab": "Open negative lab",
         "panelAdjustments": "Show adjustments",
         "panelAi": "Show AI tools",
