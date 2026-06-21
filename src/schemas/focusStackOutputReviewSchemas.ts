@@ -18,6 +18,7 @@ export const focusStackOutputReviewWarningSchema = z.enum([
   'unsupported_blend_method_preview_only',
   'retouch_layer_deferred',
 ]);
+export const focusStackSourceContributionWarningStateSchema = z.enum(['artifact_review_required', 'clear']);
 
 export const focusStackOutputReviewWorkflowSchema = z
   .object({
@@ -41,6 +42,19 @@ export const focusStackOutputReviewWorkflowSchema = z
               .object({
                 sourceIndex: z.number().int().nonnegative(),
                 winnerCellRatio: z.number().min(0).max(1),
+              })
+              .strict(),
+          )
+          .min(2),
+        sourceContributionDetails: z
+          .array(
+            z
+              .object({
+                artifactId: z.string().min(1),
+                contributionRatio: z.number().min(0).max(1),
+                sourceId: z.string().min(1),
+                sourceIndex: z.number().int().nonnegative(),
+                warningState: focusStackSourceContributionWarningStateSchema,
               })
               .strict(),
           )

@@ -653,6 +653,20 @@ async function prepareScenario(page, mode) {
     focusReviewWorkspaceProofSchema.parse(
       await page.getByTestId('focus-review-workspace-proof').evaluate((element) => ({ ...element.dataset })),
     );
+    const sourceDetails = page.getByTestId('focus-source-contribution-details');
+    const sourceOneDetail = page.getByTestId('focus-source-contribution-S1');
+    await sourceOneDetail.getByText('S1', { exact: true }).waitFor({ timeout: 10_000 });
+    await sourceOneDetail.getByText('17%', { exact: true }).waitFor({ timeout: 10_000 });
+    await sourceOneDetail.getByText('artifact_focus_source_1_contribution', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await sourceDetails.getByText('artifact_focus_source_6_contribution', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    const sourceDetailCount = await sourceDetails.locator('[data-source-id]').count();
+    if (sourceDetailCount !== 6) {
+      throw new Error(`Expected 6 focus source contribution detail cards, found ${sourceDetailCount}.`);
+    }
     await page
       .getByTestId('focus-artifact-handoff')
       .getByText('/tmp/rawengine-focus-stack-smoke.tif', { exact: true })

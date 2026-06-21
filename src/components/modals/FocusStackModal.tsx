@@ -102,6 +102,12 @@ export default function FocusStackModal({
       }),
     )
     .join(' / ');
+  const getSourceContributionWarningLabel = (
+    warningState: (typeof outputReview.reviewOverlay.sourceContributionDetails)[number]['warningState'],
+  ) => {
+    if (warningState === 'artifact_review_required') return outputReviewWarningsLabel;
+    return t('modals.focusStack.preflight.ready');
+  };
 
   const setSetting = useCallback(
     (patch: Partial<FocusStackUiSettings>) => {
@@ -356,6 +362,40 @@ export default function FocusStackModal({
                 </button>
               ))}
             </div>
+          </div>
+          <div
+            className="grid gap-2 rounded-md border border-border-color bg-bg-primary p-3 sm:grid-cols-2 lg:grid-cols-3"
+            data-focus-source-detail-count={outputReview.reviewOverlay.sourceContributionDetails.length}
+            data-testid="focus-source-contribution-details"
+          >
+            {outputReview.reviewOverlay.sourceContributionDetails.map((source) => (
+              <div
+                className="rounded-md border border-border-color bg-bg-secondary/70 p-2 text-sm"
+                data-artifact-id={source.artifactId}
+                data-contribution-percent={Math.round(source.contributionRatio * 100)}
+                data-source-id={source.sourceId}
+                data-warning-state={source.warningState}
+                data-testid={`focus-source-contribution-${source.sourceId}`}
+                key={source.sourceId}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <UiText as="span" variant={TextVariants.label}>
+                    {source.sourceId}
+                  </UiText>
+                  <UiText as="span" variant={TextVariants.small} color={TextColors.secondary}>
+                    {t('modals.focusStack.review.percentValue', {
+                      value: Math.round(source.contributionRatio * 100),
+                    })}
+                  </UiText>
+                </div>
+                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1">
+                  {getSourceContributionWarningLabel(source.warningState)}
+                </UiText>
+                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 truncate font-mono">
+                  {source.artifactId}
+                </UiText>
+              </div>
+            ))}
           </div>
         </div>
       </ComputationalSetupOptionSection>

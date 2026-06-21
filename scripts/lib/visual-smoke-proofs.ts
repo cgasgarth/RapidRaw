@@ -313,6 +313,7 @@ export const focusReviewWorkspaceProofSchema = z.object({
   proofLevel: z.literal('synthetic_runtime'),
   reviewOverlayMode: z.literal('halo_risk'),
   reviewOverlayOpacityPercent: z.literal('100'),
+  sourceDetailCount: z.literal('6'),
   runtimeStatus: z.literal('dry_run_preview'),
   sharpnessCoverageRatio: z.literal('1'),
   sourceContributionSummary: z.literal('S1 17% / S2 17% / S3 17% / S4 17% / S5 17% / S6 17%'),

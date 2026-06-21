@@ -1338,6 +1338,7 @@ function FocusStackVisualSmoke() {
           data-sharpness-coverage-ratio="1"
           data-source-contribution-summary="S1 17% / S2 17% / S3 17% / S4 17% / S5 17% / S6 17%"
           data-source-count="6"
+          data-source-detail-count="6"
           data-warning-codes={
             settings.blendMethod === 'depth_map'
               ? 'human_review_required,synthetic_runtime_only,transition_halo_risk,depth_map_preview_only'
