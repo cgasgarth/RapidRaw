@@ -41,8 +41,27 @@ export const buildFocusStackOutputReviewWorkflow = ({
     proofLevel: 'synthetic_runtime',
     qualityPreference: settings.qualityPreference,
     retouchLayerPolicy: settings.retouchLayerPolicy,
+    reviewOverlay: {
+      confidenceMarginThreshold: 0.12,
+      mode: settings.reviewOverlayMode,
+      opacityPercent: settings.reviewOverlayOpacityPercent,
+      sourceContributionSummary: buildSourceContributionSummary(sourceCount),
+    },
     sharpnessCoverageRatio,
     sourceCount,
     warningCodes,
   });
 };
+
+const buildSourceContributionSummary = (
+  sourceCount: number,
+): FocusStackOutputReviewWorkflow['reviewOverlay']['sourceContributionSummary'] => {
+  const baseRatio = 1 / sourceCount;
+  return Array.from({ length: sourceCount }, (_value, sourceIndex) => ({
+    sourceIndex,
+    winnerCellRatio:
+      sourceIndex === sourceCount - 1 ? roundRatio(1 - baseRatio * (sourceCount - 1)) : roundRatio(baseRatio),
+  }));
+};
+
+const roundRatio = (value: number): number => Number(value.toFixed(6));

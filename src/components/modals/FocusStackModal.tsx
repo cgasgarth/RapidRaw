@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { AlertTriangle, Aperture, CheckCircle2, Layers3, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Aperture, CheckCircle2, Eye, Layers3, ShieldCheck } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,6 +19,7 @@ import UiText from '../ui/Text';
 import type {
   FocusStackAlignmentMode,
   FocusStackQualityPreference,
+  FocusStackReviewOverlayMode,
   FocusStackUiSettings,
 } from '../../schemas/focusStackUiSchemas';
 
@@ -33,6 +34,7 @@ interface FocusStackModalProps {
 }
 
 const previewDimensionOptions = [2400, 4096, 8192] as const;
+const reviewOverlayOpacityOptions = [40, 70, 100] as const;
 const reviewArtifactPath = '/tmp/rawengine-focus-stack-smoke.tif';
 
 export default function FocusStackModal({
@@ -61,6 +63,12 @@ export default function FocusStackModal({
     { label: t('modals.focusStack.qualityBalanced'), value: 'balanced' },
     { label: t('modals.focusStack.qualityBest'), value: 'best' },
   ];
+  const reviewOverlayModes: FocusStackReviewOverlayMode[] = [
+    'sharpness_map',
+    'source_contribution',
+    'low_confidence',
+    'halo_risk',
+  ];
   const selectedAlignmentLabel =
     alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label ?? '';
   const selectedQualityLabel =
@@ -85,6 +93,15 @@ export default function FocusStackModal({
   const outputReviewWarningsLabel = outputReview.warningCodes
     .map((warningCode) => t(`modals.focusStack.review.warning.${warningCode}`))
     .join(', ');
+  const reviewOverlayLabel = t(`modals.focusStack.review.overlayMode.${outputReview.reviewOverlay.mode}.label`);
+  const sourceContributionLabel = outputReview.reviewOverlay.sourceContributionSummary
+    .map((source) =>
+      t('modals.focusStack.review.sourceContributionValue', {
+        index: source.sourceIndex + 1,
+        value: Math.round(source.winnerCellRatio * 100),
+      }),
+    )
+    .join(' / ');
 
   const setSetting = useCallback(
     (patch: Partial<FocusStackUiSettings>) => {
@@ -280,6 +297,69 @@ export default function FocusStackModal({
         </div>
       </ComputationalSetupOptionSection>
 
+      <ComputationalSetupOptionSection title={t('modals.focusStack.review.overlayTitle')}>
+        <div
+          className="space-y-3"
+          data-focus-overlay-mode={settings.reviewOverlayMode}
+          data-focus-overlay-opacity-percent={settings.reviewOverlayOpacityPercent}
+          data-focus-overlay-source-count={outputReview.reviewOverlay.sourceContributionSummary.length}
+          data-testid="focus-sharpness-overlay-controls"
+        >
+          <div className="grid grid-cols-4 gap-2">
+            {reviewOverlayModes.map((reviewOverlayMode) => (
+              <button
+                key={reviewOverlayMode}
+                className={`min-h-16 rounded-md border px-3 py-2 text-left transition-colors ${
+                  settings.reviewOverlayMode === reviewOverlayMode
+                    ? 'border-accent bg-accent/15'
+                    : 'border-border-color bg-bg-primary hover:bg-card-active'
+                }`}
+                onClick={() => {
+                  setSetting({ reviewOverlayMode });
+                }}
+                type="button"
+              >
+                <UiText as="span" variant={TextVariants.label}>
+                  {t(`modals.focusStack.review.overlayMode.${reviewOverlayMode}.label`)}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block mt-1">
+                  {t(`modals.focusStack.review.overlayMode.${reviewOverlayMode}.status`)}
+                </UiText>
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-[1fr_auto] gap-3 rounded-md border border-border-color bg-bg-primary p-3">
+            <div className="flex items-start gap-2">
+              <Eye className="mt-0.5 h-4 w-4 text-accent" />
+              <div>
+                <UiText variant={TextVariants.label}>{reviewOverlayLabel}</UiText>
+                <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1">
+                  {sourceContributionLabel}
+                </UiText>
+              </div>
+            </div>
+            <div className="flex gap-1">
+              {reviewOverlayOpacityOptions.map((reviewOverlayOpacityPercent) => (
+                <button
+                  key={reviewOverlayOpacityPercent}
+                  className={`h-8 rounded-md border px-2 text-xs transition-colors ${
+                    settings.reviewOverlayOpacityPercent === reviewOverlayOpacityPercent
+                      ? 'border-accent bg-accent/15 text-text-primary'
+                      : 'border-border-color bg-bg-secondary text-text-secondary hover:bg-card-active'
+                  }`}
+                  onClick={() => {
+                    setSetting({ reviewOverlayOpacityPercent });
+                  }}
+                  type="button"
+                >
+                  {t('modals.focusStack.review.opacityValue', { value: reviewOverlayOpacityPercent })}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </ComputationalSetupOptionSection>
+
       <motion.section
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -351,6 +431,19 @@ export default function FocusStackModal({
             status: 'pending',
             value: outputReviewWarningsLabel,
           },
+          {
+            label: t('modals.focusStack.review.overlay'),
+            status: 'review',
+            value: t('modals.focusStack.review.overlayValue', {
+              mode: reviewOverlayLabel,
+              value: outputReview.reviewOverlay.opacityPercent,
+            }),
+          },
+          {
+            label: t('modals.focusStack.review.sourceContribution'),
+            status: 'ready',
+            value: sourceContributionLabel,
+          },
         ]}
         sections={[
           {
@@ -416,6 +509,17 @@ export default function FocusStackModal({
               {
                 label: t('modals.focusStack.review.transitionRisk'),
                 value: outputReviewWarningsLabel,
+              },
+              {
+                label: t('modals.focusStack.review.overlay'),
+                value: t('modals.focusStack.review.overlayValue', {
+                  mode: reviewOverlayLabel,
+                  value: outputReview.reviewOverlay.opacityPercent,
+                }),
+              },
+              {
+                label: t('modals.focusStack.review.sourceContribution'),
+                value: sourceContributionLabel,
               },
             ],
           },

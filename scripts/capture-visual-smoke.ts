@@ -615,6 +615,9 @@ async function prepareScenario(page, mode) {
     await page.getByRole('button', { name: /Depth map/u }).click();
     await page.getByRole('button', { name: /None\s+Flattened preview/u }).click();
     await page.getByRole('button', { name: '8192 px' }).click();
+    const overlayControls = page.getByTestId('focus-sharpness-overlay-controls');
+    await overlayControls.getByRole('button', { name: /Halo risk\s+Transition guard/u }).click();
+    await overlayControls.getByRole('button', { name: '100%' }).click();
     focusUiSettingsProofSchema.parse(
       await page.getByTestId('focus-ui-settings-proof').evaluate((element) => ({ ...element.dataset })),
     );

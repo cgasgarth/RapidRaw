@@ -4,6 +4,7 @@ import {
   focusStackAlignmentModeSchema,
   focusStackBlendMethodSchema,
   focusStackQualityPreferenceSchema,
+  focusStackReviewOverlayModeSchema,
   focusStackRetouchLayerPolicySchema,
 } from './focusStackUiSchemas';
 
@@ -29,6 +30,23 @@ export const focusStackOutputReviewWorkflowSchema = z
     proofLevel: z.literal('synthetic_runtime'),
     qualityPreference: focusStackQualityPreferenceSchema,
     retouchLayerPolicy: focusStackRetouchLayerPolicySchema,
+    reviewOverlay: z
+      .object({
+        confidenceMarginThreshold: z.number().min(0).max(1),
+        mode: focusStackReviewOverlayModeSchema,
+        opacityPercent: z.number().int().min(25).max(100),
+        sourceContributionSummary: z
+          .array(
+            z
+              .object({
+                sourceIndex: z.number().int().nonnegative(),
+                winnerCellRatio: z.number().min(0).max(1),
+              })
+              .strict(),
+          )
+          .min(2),
+      })
+      .strict(),
     sharpnessCoverageRatio: z.number().min(0).max(1),
     sourceCount: z.number().int().min(2),
     warningCodes: z.array(focusStackOutputReviewWarningSchema).min(1),

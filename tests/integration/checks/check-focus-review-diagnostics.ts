@@ -29,12 +29,19 @@ for (const marker of [
   'modals.focusStack.review.editableArtifact',
   'modals.focusStack.review.haloRiskCells',
   'modals.focusStack.review.lowConfidenceCells',
+  'modals.focusStack.review.overlay',
+  'modals.focusStack.review.overlayMode',
+  'modals.focusStack.review.overlayTitle',
+  'modals.focusStack.review.sourceContribution',
   'modals.focusStack.review.percentValue',
   'modals.focusStack.review.provenance',
   'modals.focusStack.review.sharpnessCoverage',
   'modals.focusStack.review.transitionRisk',
   'modals.focusStack.review.warning',
   'buildFocusStackOutputReviewWorkflow',
+  'focus-sharpness-overlay-controls',
+  'settings.reviewOverlayMode',
+  'settings.reviewOverlayOpacityPercent',
 ]) {
   if (!modalSource.includes(marker)) {
     failures.push(`Focus review diagnostics missing ${marker}.`);
