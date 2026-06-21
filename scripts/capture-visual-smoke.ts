@@ -1,4 +1,4 @@
-import { chromium } from '@playwright/test';
+import { chromium, type Locator } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -19,6 +19,7 @@ import {
   agentChatProofDatasetSchema,
   agentDryRunReviewProofDatasetSchema,
   agentReviewHandoffProofDatasetSchema,
+  colorBalanceCompareProofDatasetSchema,
   assertFilmLookExportProof,
   assertNegativeLabBaseFogPreviewExportProof,
   assertNegativeLabBatchColorInvokeProof,
@@ -924,6 +925,25 @@ async function prepareScenario(page, mode) {
 
   if (mode === 'color-workflow') {
     const colorPanel = page.locator('[data-visual-smoke-section="color-workflow-panel"]');
+    const setRangeInput = async (scope: Locator, label: string, value: number, index = 0) => {
+      const sliders = scope.locator(`input[type="range"][aria-label="${label}"]`);
+      const sliderCount = await sliders.count();
+      if (sliderCount <= index) {
+        throw new Error(`Expected ${label} range input at ${index}, found ${sliderCount}.`);
+      }
+      const slider = sliders.nth(index);
+      const selectedSliderCount = await slider.count();
+      if (selectedSliderCount !== 1) {
+        throw new Error(`Expected one ${label} range input, found ${selectedSliderCount}.`);
+      }
+      await slider.evaluate((element, nextValue) => {
+        const input = element as HTMLInputElement;
+        const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+        valueSetter?.call(input, String(nextValue));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }, value);
+    };
     await colorPanel.getByTestId('color-runtime-status-rail').getByText('Preview/export', { exact: true }).waitFor({
       timeout: 10_000,
     });
@@ -950,13 +970,13 @@ async function prepareScenario(page, mode) {
       timeout: 10_000,
     });
     await recipe.getByText('WB +6 / +3').waitFor({ timeout: 10_000 });
-    await colorPanel.getByLabel('Temperature').fill('12');
-    await colorPanel.getByLabel('Saturation').first().fill('18');
+    await setRangeInput(colorPanel, 'Temperature', 12);
+    await setRangeInput(colorPanel, 'Saturation', 18);
     const selectiveControls = colorPanel.getByTestId('selective-color-range-controls');
     await selectiveControls.getByTestId('selective-color-range-oranges').click();
-    await selectiveControls.getByLabel('Hue').fill('8');
-    await selectiveControls.getByLabel('Saturation').fill('22');
-    await selectiveControls.getByLabel('Luminance').fill('-11');
+    await setRangeInput(selectiveControls, 'Hue', 8);
+    await setRangeInput(selectiveControls, 'Saturation', 22);
+    await setRangeInput(selectiveControls, 'Luminance', -11);
     selectiveColorUiProofDatasetSchema.parse(await selectiveControls.evaluate((element) => ({ ...element.dataset })));
     await selectiveControls.getByTestId('selective-color-reset-active-range').click();
     await page.getByTestId('selective-color-ui-proof').getByText('Orange 0', { exact: true }).waitFor({
@@ -992,6 +1012,18 @@ async function prepareScenario(page, mode) {
       timeout: 10_000,
     });
     await page.getByTestId('color-workflow-adjustment-proof').getByText('CM on', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    colorBalanceCompareProofDatasetSchema.parse(
+      await page.getByTestId('color-balance-compare-strip').evaluate((element) => ({ ...element.dataset })),
+    );
+    await page.getByTestId('color-balance-before').getByText('R 173', { exact: false }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('color-balance-after').getByText('R 175 / G 122 / B 85', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByTestId('color-balance-gamut-warning').getByText('No gamut clipping', { exact: true }).waitFor({
       timeout: 10_000,
     });
     await page.getByTestId('skin-tone-uniformity-ui-proof').getByText('Skin 0.725', { exact: true }).waitFor({

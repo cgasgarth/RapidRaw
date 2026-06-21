@@ -463,6 +463,19 @@ export const selectiveColorUiProofDatasetSchema = z.object({
   activeRange: z.literal('oranges'),
   commandType: z.literal('toneColor.adjustHsl'),
 });
+export const colorBalanceCompareProofDatasetSchema = z
+  .object({
+    afterRgb: z.string().regex(/^R [0-9]+ \/ G [0-9]+ \/ B [0-9]+$/u),
+    beforeRgb: z.string().regex(/^R [0-9]+ \/ G [0-9]+ \/ B [0-9]+$/u),
+    clipChannelCount: z.literal('0'),
+    commandSummary: z.literal('toneColor.colorBalanceRgb'),
+    compareChanged: z.literal('true'),
+  })
+  .superRefine((proof, context) => {
+    if (proof.beforeRgb === proof.afterRgb) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Color balance comparison must change RGB output.' });
+    }
+  });
 export const agentChatProofDatasetSchema = z.object({
   agentRuntimeStatus: z.literal('runtime_apply_demo'),
 });

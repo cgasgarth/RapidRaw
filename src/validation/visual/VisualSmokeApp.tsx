@@ -29,6 +29,7 @@ import {
 import { useUIStore } from '../../store/useUIStore';
 import { INITIAL_ADJUSTMENTS, type Adjustments } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agentChatTranscriptFixture';
+import { applyColorBalanceRgbToPixel } from '../../utils/colorBalanceRgbRuntime';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computationalMergeAppServerRoutePairs';
 import { applySkinToneUniformityToRgbPixel } from '../../utils/skinToneUniformity';
 
@@ -542,6 +543,12 @@ const copy = {
   missingPrivateRawProofArtifacts: 'Missing private RAW proof artifacts',
   privateRawFrameCount: (count: string) => `${count} RAW frames`,
   colorWorkflow: 'Color Workflow',
+  colorBalanceCompare: 'Color balance compare',
+  colorBalanceCommandSummary: 'Midtone red/blue balance, preserve luminance',
+  colorBefore: 'Before',
+  colorAfter: 'After',
+  colorGamutWarning: 'No gamut clipping',
+  colorCompareReset: 'Reset available',
   layerWorkflowTitle: 'Local Adjustment Stack',
   layerMoveDown: 'Move down',
   layerToggle: 'Toggle',
@@ -1221,6 +1228,8 @@ const filmSmokeMetricLabels = {
   temperature: 'Temp',
 } as const;
 const formatSmokeMetric = (label: string, value: number | string) => `${label} ${value}`;
+const formatRgbTriplet = ({ blue, green, red }: { blue: number; green: number; red: number }) =>
+  `R ${Math.round(red * 255)} / G ${Math.round(green * 255)} / B ${Math.round(blue * 255)}`;
 const colorSmokeMetricLabels = {
   channelMixer: 'CM',
   colorBalance: 'CB',
@@ -2450,6 +2459,12 @@ function ColorWorkflowVisualSmoke() {
   const handleAdjustmentsChange = (update: Partial<Adjustments> | ((current: Adjustments) => Adjustments)) => {
     setAdjustments((current) => (typeof update === 'function' ? update(current) : { ...current, ...update }));
   };
+  const colorBalanceSourcePixel = { blue: 0.34, green: 0.48, red: 0.68 };
+  const colorBalanceResult = applyColorBalanceRgbToPixel(colorBalanceSourcePixel, adjustments.colorBalanceRgb);
+  const clipChannelCount = Object.values(colorBalanceResult.outputRgb).filter(
+    (channel) => channel <= 0 || channel >= 1,
+  ).length;
+  const compareChanged = formatRgbTriplet(colorBalanceSourcePixel) !== formatRgbTriplet(colorBalanceResult.outputRgb);
 
   return (
     <main
@@ -2462,6 +2477,39 @@ function ColorWorkflowVisualSmoke() {
           <div className="mx-auto flex h-full max-w-4xl flex-col justify-center gap-5">
             <div className="aspect-[4/3] overflow-hidden rounded-md border border-white/10 bg-[linear-gradient(135deg,#182629,#435b5a_42%,#c79c63_72%,#f4d6a1)] shadow-2xl">
               <div className="h-full w-full bg-[radial-gradient(circle_at_38%_32%,rgba(255,246,219,0.48),transparent_20%),linear-gradient(170deg,transparent_45%,rgba(24,43,50,0.72)_46%)]" />
+            </div>
+            <div
+              className="grid gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-xs text-[#dce4ea]"
+              data-after-rgb={formatRgbTriplet(colorBalanceResult.outputRgb)}
+              data-before-rgb={formatRgbTriplet(colorBalanceSourcePixel)}
+              data-clip-channel-count={clipChannelCount}
+              data-command-summary="toneColor.colorBalanceRgb"
+              data-compare-changed={String(compareChanged)}
+              data-testid="color-balance-compare-strip"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-semibold text-white">{copy.colorBalanceCompare}</span>
+                <span className="rounded bg-white/10 px-2 py-1 text-[#aab5bd]">{copy.colorCompareReset}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded border border-white/10 bg-white/5 p-2" data-testid="color-balance-before">
+                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.colorBefore}</div>
+                  <div className="font-mono">{formatRgbTriplet(colorBalanceSourcePixel)}</div>
+                </div>
+                <div
+                  className="rounded border border-emerald-500/25 bg-emerald-500/10 p-2"
+                  data-testid="color-balance-after"
+                >
+                  <div className="mb-1 text-[11px] uppercase text-[#9ba6b2]">{copy.colorAfter}</div>
+                  <div className="font-mono">{formatRgbTriplet(colorBalanceResult.outputRgb)}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-[#aab5bd]">
+                <span className="rounded bg-white/5 px-2 py-1">{copy.colorBalanceCommandSummary}</span>
+                <span className="rounded bg-white/5 px-2 py-1" data-testid="color-balance-gamut-warning">
+                  {copy.colorGamutWarning}
+                </span>
+              </div>
             </div>
             <div
               className="grid grid-cols-4 gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-sm"
