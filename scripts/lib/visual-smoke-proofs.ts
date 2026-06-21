@@ -132,7 +132,7 @@ const negativeLabPreviewParamsSchema = z
   .passthrough();
 const negativeLabFixturePathSchema = z.union([
   z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
-  z.literal('/fixtures/negative-lab/synthetic-gray-ramp-negative-002.tif'),
+  z.literal('/fixtures/negative-lab/synthetic-gray-ramp-negative-002.jpg'),
 ]);
 const negativeLabPreviewInvokeSchema = z.object({
   args: z.object({
@@ -209,7 +209,7 @@ const negativeLabBatchConvertArgsSchema = z.object({
     .array(
       z.union([
         z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif'),
-        z.literal('/fixtures/negative-lab/synthetic-gray-ramp-negative-002.tif'),
+        z.literal('/fixtures/negative-lab/synthetic-gray-ramp-negative-002.jpg'),
       ]),
     )
     .length(2),

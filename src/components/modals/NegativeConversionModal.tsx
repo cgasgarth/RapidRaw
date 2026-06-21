@@ -294,6 +294,8 @@ const FRAME_WARNING_SEVERITY_SCORE = {
   ok: 0,
   review: 2,
 } satisfies Record<NegativeLabFrameWarningSeverity, number>;
+const getNegativeLabFrameWarningCount = (frame: NegativeLabFrameHealthEntry) =>
+  frame.warningCodes.length + frame.acquisitionWarningCodes.length;
 const ACQUISITION_SOURCE_FAMILY_LABEL_KEYS = {
   jpeg_lossy: 'modals.negativeConversion.acquisitionSourceJpeg',
   raw_like: 'modals.negativeConversion.acquisitionSourceRaw',
@@ -582,6 +584,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     return filteredRows;
   }, [frameHealthFilter, frameHealthReport.frames, frameHealthSort]);
   const batchDryRunSummary = useMemo(() => buildNegativeLabBatchDryRunSummary(frameHealthReport), [frameHealthReport]);
+  const rollWarningCount = frameHealthReport.warningCodes.length + batchDryRunSummary.acquisitionReviewFrameIds.length;
   const dustScratchReviewReport = useMemo(
     () => buildNegativeLabDustScratchReviewReport(frameHealthReport, previewUrl !== null),
     [frameHealthReport, previewUrl],
@@ -1231,7 +1234,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             data-planned-apply-count={batchDryRunSummary.plannedApplyCount}
             data-profile-id={selectedProfile?.presetId ?? 'custom'}
             data-testid="negative-lab-roll-queue-summary"
-            data-warning-count={activeFrame?.warningCodes.length ?? 0}
+            data-warning-count={activeFrame === null ? 0 : getNegativeLabFrameWarningCount(activeFrame)}
           >
             <span className="truncate rounded bg-white/5 px-2 py-1" data-testid="negative-lab-roll-selected-frame">
               {activeFrame?.scanLabel ?? t('modals.negativeConversion.frameHealth')}
@@ -1262,7 +1265,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               data-testid="negative-lab-roll-selected-warnings"
             >
               {t('modals.negativeConversion.frameHealthWarningCount', {
-                warningCount: activeFrame?.warningCodes.length ?? 0,
+                warningCount: activeFrame === null ? 0 : getNegativeLabFrameWarningCount(activeFrame),
               })}
             </span>
           </div>
@@ -1294,10 +1297,11 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                         : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10',
                       !frame.included && 'opacity-60',
                     )}
+                    data-acquisition-source={frame.acquisitionSourceFamily}
                     data-base-status={frame.baseStatus}
                     data-base-scope={frame.baseScope}
                     data-frame-id={frame.frameId}
-                    data-warning-count={frame.warningCodes.length}
+                    data-warning-count={getNegativeLabFrameWarningCount(frame)}
                     data-testid={`negative-lab-roll-frame-${index}`}
                     disabled={isSaving || isEstimatingBaseFog}
                     key={frame.frameId}
@@ -1321,6 +1325,21 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                               : 'modals.negativeConversion.frameHealthQueued',
                         )}
                       </span>
+                      <span
+                        className="rounded bg-black/30 px-1.5 py-0.5 text-[11px]"
+                        data-testid={`negative-lab-roll-frame-source-${index}`}
+                      >
+                        {t(ACQUISITION_SOURCE_FAMILY_LABEL_KEYS[frame.acquisitionSourceFamily])}
+                      </span>
+                      {frame.acquisitionWarningCodes.map((warningCode) => (
+                        <span
+                          className="rounded bg-yellow-500/15 px-1.5 py-0.5 text-[11px] text-yellow-100"
+                          data-testid={`negative-lab-roll-frame-acquisition-warning-${warningCode}`}
+                          key={warningCode}
+                        >
+                          {t(ACQUISITION_WARNING_LABEL_KEYS[warningCode])}
+                        </span>
+                      ))}
                       <span
                         className="rounded bg-black/30 px-1.5 py-0.5 text-[11px]"
                         data-testid={`negative-lab-roll-frame-runtime-${index}`}
@@ -1471,7 +1490,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               </span>
               <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-roll-warning-count">
                 {t('modals.negativeConversion.frameHealthWarningCount', {
-                  warningCount: frameHealthReport.warningCodes.length,
+                  warningCount: rollWarningCount,
                 })}
               </span>
             </div>
@@ -1580,16 +1599,28 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           <div className="grid gap-1">
             {visibleFrameHealthRows.map((row: NegativeLabFrameHealthEntry, index) => (
               <div
-                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+                className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] items-center gap-2 rounded-sm bg-bg-secondary px-2 py-1 text-xs"
+                data-acquisition-source={row.acquisitionSourceFamily}
                 data-conversion-status={row.conversionStatus}
                 data-crop-status={row.cropStatus}
                 data-qc-status={row.qcStatus}
                 data-severity={row.warningSeverity}
-                data-warning-count={row.warningCodes.length}
+                data-warning-count={getNegativeLabFrameWarningCount(row)}
                 data-testid={`negative-lab-frame-health-row-${index}`}
                 key={row.frameId}
               >
                 <span className="truncate text-text-secondary">{row.scanLabel}</span>
+                <span
+                  className={cx(
+                    'rounded px-1.5 py-0.5',
+                    row.acquisitionWarningCodes.length > 0
+                      ? 'bg-yellow-500/15 text-yellow-200'
+                      : 'bg-surface text-text-secondary',
+                  )}
+                  data-testid={`negative-lab-frame-source-${index}`}
+                >
+                  {t(ACQUISITION_SOURCE_FAMILY_LABEL_KEYS[row.acquisitionSourceFamily])}
+                </span>
                 <span
                   className={cx(
                     'rounded px-1.5 py-0.5',
@@ -1637,9 +1668,9 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 <span className="text-text-tertiary" data-testid={`negative-lab-frame-qc-status-${index}`}>
                   {t(`modals.negativeConversion.frameQcStatus.${row.qcStatus}`)}
                 </span>
-                {row.warningCodes.length > 0 && (
+                {getNegativeLabFrameWarningCount(row) > 0 && (
                   <span
-                    className="col-span-6 flex flex-wrap gap-1"
+                    className="col-span-7 flex flex-wrap gap-1"
                     data-testid={`negative-lab-frame-warning-row-${index}`}
                   >
                     {row.warningCodes.map((warningCode) => (
@@ -1653,6 +1684,15 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                           : warningCode === 'excluded_from_batch'
                             ? t('modals.negativeConversion.frameWarningExcluded')
                             : t('modals.negativeConversion.frameWarningPreviewNotReady')}
+                      </span>
+                    ))}
+                    {row.acquisitionWarningCodes.map((warningCode) => (
+                      <span
+                        className="rounded bg-yellow-500/15 px-1.5 py-0.5 text-[11px] text-yellow-200"
+                        data-testid={`negative-lab-frame-acquisition-warning-chip-${warningCode}`}
+                        key={warningCode}
+                      >
+                        {t(ACQUISITION_WARNING_LABEL_KEYS[warningCode])}
                       </span>
                     ))}
                   </span>
@@ -1690,7 +1730,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         </span>
         <span className="rounded bg-bg-secondary px-1.5 py-0.5" data-testid="negative-lab-agent-warning-count">
           {t('modals.negativeConversion.frameHealthWarningCount', {
-            warningCount: frameHealthReport.warningCodes.length,
+            warningCount: rollWarningCount,
           })}
         </span>
       </div>

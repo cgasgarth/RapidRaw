@@ -2270,7 +2270,7 @@ function NegativeLabVisualSmoke() {
         onSave={setSavedPaths}
         targetPaths={[
           '/fixtures/negative-lab/synthetic-color-negative-001.tif',
-          '/fixtures/negative-lab/synthetic-gray-ramp-negative-002.tif',
+          '/fixtures/negative-lab/synthetic-gray-ramp-negative-002.jpg',
         ]}
       />
       <div

@@ -1210,9 +1210,13 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-acquisition-health').waitFor({ timeout: 10_000 });
   await page
     .getByTestId('negative-lab-acquisition-severity')
-    .getByText('Ready', { exact: true })
+    .getByText('Review', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-acquisition-source-tiff_scan').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-acquisition-source-jpeg_lossy').waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-acquisition-warning-lossy_source_for_negative_lab').waitFor({
+    timeout: 10_000,
+  });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabBatchReadiness).waitFor({ timeout: 10_000 });
   await page.getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentActivity).waitFor({ timeout: 10_000 });
   await page
@@ -1254,7 +1258,7 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-frame-count').getByText('Frames 2', { exact: true }).waitFor({
     timeout: 10_000,
   });
-  await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 0', { exact: true }).waitFor({
+  await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 1', { exact: true }).waitFor({
     timeout: 10_000,
   });
   await page.getByTestId('negative-lab-frame-health-controls').waitFor({ timeout: 10_000 });
@@ -1267,7 +1271,14 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-frame-health-filter').selectOption('review');
   await page
     .getByTestId('negative-lab-frame-health-visible-count')
-    .getByText('0/2 visible', { exact: true })
+    .getByText('1/2 visible', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-frame-source-0').getByText('JPEG/lossy', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page
+    .getByTestId('negative-lab-frame-acquisition-warning-chip-lossy_source_for_negative_lab')
+    .getByText('Lossy input', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-frame-health-filter').selectOption('all');
   await page
@@ -1293,6 +1304,7 @@ async function prepareScenario(page, mode) {
     .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabAgentCommandSource)
     .getByText(NegativeLabAppServerCommandName.AcceptBatchPlan, { exact: true })
     .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-frame-health-sort').selectOption('roll_order');
   await page.getByTestId('negative-lab-active-scan-1').click();
   await page.getByTestId('negative-lab-roll-frame-status-1').getByText('Active', { exact: true }).waitFor({
     timeout: 10_000,
@@ -1415,7 +1427,7 @@ async function prepareScenario(page, mode) {
     timeout: 10_000,
   });
   await page.getByTestId('negative-lab-sample-left-edge').click();
-  await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 1', { exact: true }).waitFor({
+  await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 2', { exact: true }).waitFor({
     timeout: 10_000,
   });
   await page
@@ -1431,7 +1443,7 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-selected-base').getByText('Roll base 91%', { exact: true }).waitFor({
     timeout: 10_000,
   });
-  await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 0', { exact: true }).waitFor({
+  await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 1', { exact: true }).waitFor({
     timeout: 10_000,
   });
   const rollBaseScopeDataset = await page
@@ -1516,8 +1528,12 @@ async function prepareScenario(page, mode) {
     timeout: 10_000,
   });
   const copiedBatchPlan = await page.evaluate(() => window.__RAWENGINE_NEGATIVE_LAB_CLIPBOARD_WRITES__?.at(-1) ?? '');
-  if (!copiedBatchPlan.includes('"plannedApplyCount"') || !copiedBatchPlan.includes('"skippedFrameIds"')) {
-    throw new Error('Negative Lab batch plan copy did not include apply/skip JSON.');
+  if (
+    !copiedBatchPlan.includes('"plannedApplyCount"') ||
+    !copiedBatchPlan.includes('"skippedFrameIds"') ||
+    !copiedBatchPlan.includes('"acquisitionReviewFrameIds"')
+  ) {
+    throw new Error('Negative Lab batch plan copy did not include apply/skip/acquisition JSON.');
   }
   await page.getByTestId('negative-lab-accept-batch-plan').click();
   await page

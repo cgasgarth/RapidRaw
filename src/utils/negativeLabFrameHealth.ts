@@ -2,8 +2,10 @@ import {
   NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION,
   parseNegativeLabBatchDryRunSummary,
   parseNegativeLabFrameHealthReport,
+  negativeLabFrameAcquisitionHealthSchema,
   type NegativeLabAcquisitionHealthReport,
   type NegativeLabBatchDryRunSummary,
+  type NegativeLabFrameAcquisitionHealth,
   type NegativeLabFrameBaseScope,
   type NegativeLabFrameHealthReport,
   type NegativeLabFrameWarningCode,
@@ -33,6 +35,20 @@ const classifyAcquisitionSourceFamily = (path: string) => {
   return 'unknown';
 };
 
+export const buildNegativeLabFrameAcquisitionHealth = (path: string): NegativeLabFrameAcquisitionHealth => {
+  const sourceFamily = classifyAcquisitionSourceFamily(path);
+  const warningCodes: NegativeLabFrameAcquisitionHealth['warningCodes'] = [];
+
+  if (sourceFamily === 'jpeg_lossy') warningCodes.push('lossy_source_for_negative_lab');
+  if (sourceFamily === 'unknown') warningCodes.push('unknown_acquisition_state');
+
+  return negativeLabFrameAcquisitionHealthSchema.parse({
+    severity: warningCodes.length === 0 ? 'ok' : 'review',
+    sourceFamily,
+    warningCodes,
+  });
+};
+
 const getNegativeLabWarningSeverity = (
   warningCodes: ReadonlyArray<NegativeLabFrameWarningCode>,
 ): NegativeLabFrameWarningSeverity => {
@@ -46,7 +62,7 @@ const getNegativeLabWarningSeverity = (
 export const buildNegativeLabAcquisitionHealthReport = (
   targetPaths: readonly string[],
 ): NegativeLabAcquisitionHealthReport => {
-  const sourceFamilies = targetPaths.map(classifyAcquisitionSourceFamily);
+  const sourceFamilies = targetPaths.map((path) => buildNegativeLabFrameAcquisitionHealth(path).sourceFamily);
   const uniqueSourceFamilies = [...new Set(sourceFamilies)].toSorted();
   const lossyCount = sourceFamilies.filter((family) => family === 'jpeg_lossy').length;
   const rawLikeCount = sourceFamilies.filter((family) => family === 'raw_like').length;
@@ -92,6 +108,7 @@ export const buildNegativeLabFrameHealthReport = ({
   const frames = targetPaths.map((sourcePath, pathIndex) => {
     const active = pathIndex === effectiveActivePathIndex;
     const included = includedPathSet.has(sourcePath);
+    const acquisitionHealth = buildNegativeLabFrameAcquisitionHealth(sourcePath);
     const hasRollBaseEstimate = baseScope === 'roll' && included && baseFogConfidence !== null;
     const hasFrameBaseEstimate = active && baseFogConfidence !== null;
     const hasBaseEstimate = hasRollBaseEstimate || hasFrameBaseEstimate;
@@ -102,10 +119,13 @@ export const buildNegativeLabFrameHealthReport = ({
     if (baseScope === 'frame' && baseFogConfidence !== null && !active) {
       warningCodes.push('base_estimate_active_frame_only');
     }
-    const warningSeverity = getNegativeLabWarningSeverity(warningCodes);
+    const warningSeverity =
+      acquisitionHealth.severity === 'review' ? 'review' : getNegativeLabWarningSeverity(warningCodes);
 
     return {
       active,
+      acquisitionSourceFamily: acquisitionHealth.sourceFamily,
+      acquisitionWarningCodes: acquisitionHealth.warningCodes,
       baseConfidence: hasBaseEstimate ? baseFogConfidence : null,
       baseScope: hasRollBaseEstimate ? 'roll' : 'frame',
       baseStatus: hasBaseEstimate ? 'estimated' : 'pending',
@@ -152,6 +172,9 @@ export const buildNegativeLabBatchDryRunSummary = (
 
   return parseNegativeLabBatchDryRunSummary({
     affectedFrameIds,
+    acquisitionReviewFrameIds: frameHealthReport.frames
+      .filter((frame) => frame.acquisitionWarningCodes.length > 0)
+      .map((frame) => frame.frameId),
     blocked: affectedFrameIds.length === 0,
     frameHealthReport,
     plannedApplyCount: affectedFrameIds.length,
