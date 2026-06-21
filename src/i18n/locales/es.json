@@ -918,6 +918,12 @@
       }
     },
     "header": {
+      "compare": {
+        "original": "Original",
+        "ready": "Listo para comparar",
+        "title": "Comparación A/B",
+        "virtualCopy": "Copia virtual {{id}}"
+      },
       "search": {
         "addFilterOrSearch": "Añadir filtro o buscar...",
         "indexingImages": "Indexando imágenes...",

@@ -915,6 +915,12 @@
       }
     },
     "header": {
+      "compare": {
+        "original": "オリジナル",
+        "ready": "比較準備完了",
+        "title": "A/B 比較",
+        "virtualCopy": "仮想コピー {{id}}"
+      },
       "search": {
         "addFilterOrSearch": "フィルターまたは検索を追加...",
         "indexingImages": "画像をインデックス中...",

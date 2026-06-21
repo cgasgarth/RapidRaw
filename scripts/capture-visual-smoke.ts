@@ -796,12 +796,14 @@ async function prepareScenario(page, mode) {
     await page.getByRole('button', { name: 'Keepers' }).click();
     await page.getByRole('button', { name: 'Survey' }).click();
     await page.getByRole('button', { name: 'Create B&W proof copy' }).click();
+    await page.getByRole('button', { name: 'Compare virtual copy' }).click();
     libraryWorkflowProofSchema.parse(
       await page.getByTestId('library-workflow-proof').evaluate((element) => ({ ...element.dataset })),
     );
     await page.getByTestId('library-virtual-copy').getByText('vc-dsc-0002-bw-proof', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('library-virtual-copy-compare-proof').waitFor({ timeout: 10_000 });
     return;
   }
 

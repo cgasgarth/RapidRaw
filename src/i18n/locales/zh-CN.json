@@ -1291,6 +1291,12 @@
       }
     },
     "header": {
+      "compare": {
+        "original": "原始",
+        "ready": "准备对比",
+        "title": "A/B 对比",
+        "virtualCopy": "虚拟副本 {{id}}"
+      },
       "search": {
         "addFilterOrSearch": "添加过滤或搜索...",
         "indexingImages": "索引图像中...",

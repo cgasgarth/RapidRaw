@@ -1302,6 +1302,12 @@
       }
     },
     "header": {
+      "compare": {
+        "original": "Original",
+        "ready": "Ready to compare",
+        "title": "A/B Compare",
+        "virtualCopy": "Virtual copy {{id}}"
+      },
       "search": {
         "addFilterOrSearch": "Add filter or search...",
         "indexingImages": "Indexing Images...",

@@ -573,6 +573,14 @@ const copy = {
   libraryKeepersCriteria: '4+ / green',
   librarySurvey: 'Survey',
   createBwProofCopy: 'Create B&W proof copy',
+  compareReady: 'A/B compare ready',
+  compareSource: 'Source',
+  compareSourceFile: 'DSC_0002.NEF',
+  compareSourceProof: 'Exposure +0.15 / color sidecar',
+  compareVariant: 'Virtual copy',
+  compareVariantFile: 'DSC_0002.NEF / VC',
+  compareVariantProof: 'Exposure -0.30 / B&W sidecar',
+  compareVirtualCopy: 'Compare virtual copy',
   virtualCopyShort: 'VC',
   hdrReview: 'HDR review',
   hdrSavedOutputEditorPath: 'HDR saved output editor path',
@@ -758,6 +766,7 @@ function LibraryWorkflowVisualSmoke() {
   const [filterMode, setFilterMode] = useState<'all' | 'keepers'>('all');
   const [viewMode, setViewMode] = useState<'compare' | 'survey'>('compare');
   const [virtualCopyId, setVirtualCopyId] = useState('pending');
+  const [isCompareReady, setIsCompareReady] = useState(false);
   const visibleAssets =
     filterMode === 'keepers' ? libraryWorkflowAssets.filter((asset) => asset.rating >= 4) : libraryWorkflowAssets;
   const activeAsset = libraryWorkflowAssets[1];
@@ -785,9 +794,13 @@ function LibraryWorkflowVisualSmoke() {
             data-filter-mode={filterMode}
             data-minimum-rating={filterMode === 'keepers' ? '4' : '0'}
             data-selected-count={String(selectedCount)}
+            data-sidecar-separation={isCompareReady ? 'independent' : 'pending'}
             data-testid="library-workflow-proof"
             data-view-mode={viewMode}
+            data-virtual-compare-ready={isCompareReady ? 'true' : 'false'}
             data-virtual-copy-id={virtualCopyId}
+            data-virtual-copy-source-path="/proof-roll/DSC_0002.NEF"
+            data-virtual-copy-variant-path="/proof-roll/DSC_0002.NEF?vc=vc-dsc-0002-bw-proof"
           >
             <button
               className="flex w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10"
@@ -819,6 +832,17 @@ function LibraryWorkflowVisualSmoke() {
               <span>{copy.createBwProofCopy}</span>
               <span className="text-xs text-[#e0c985]">{copy.virtualCopyShort}</span>
             </button>
+            <button
+              className="flex w-full items-center justify-between rounded-md border border-[#6cbf84]/40 bg-[#213427] px-3 py-2 text-left text-sm hover:bg-[#294331]"
+              onClick={() => {
+                setIsCompareReady(true);
+                setViewMode('compare');
+              }}
+              type="button"
+            >
+              <span>{copy.compareVirtualCopy}</span>
+              <span className="text-xs text-[#95d7a7]">{copy.compareReady}</span>
+            </button>
           </div>
         </aside>
         <section className="min-w-0 bg-[#0f1114] p-6" data-visual-smoke-section="library-survey">
@@ -849,6 +873,23 @@ function LibraryWorkflowVisualSmoke() {
               </div>
             ))}
           </div>
+          {isCompareReady && (
+            <div
+              className="mt-4 grid grid-cols-2 gap-3 rounded-md border border-white/10 bg-white/5 p-3"
+              data-testid="library-virtual-copy-compare-proof"
+            >
+              <div className="rounded bg-gradient-to-br from-[#4f86c6] to-[#c7d8ff] p-3 text-[#111316]">
+                <p className="text-xs font-semibold uppercase">{copy.compareSource}</p>
+                <p className="text-sm font-semibold">{copy.compareSourceFile}</p>
+                <p className="text-xs">{copy.compareSourceProof}</p>
+              </div>
+              <div className="rounded bg-gradient-to-br from-[#d7d7d7] to-[#2f3338] p-3 text-[#111316]">
+                <p className="text-xs font-semibold uppercase">{copy.compareVariant}</p>
+                <p className="text-sm font-semibold">{copy.compareVariantFile}</p>
+                <p className="text-xs">{copy.compareVariantProof}</p>
+              </div>
+            </div>
+          )}
         </section>
         <aside className="border-l border-white/10 bg-[#181b20] p-4" data-visual-smoke-section="library-sidecar">
           <div className="mb-4 flex items-center justify-between">
