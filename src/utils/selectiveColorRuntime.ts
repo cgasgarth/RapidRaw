@@ -16,11 +16,15 @@ export interface SelectiveColorAdjustment {
 export interface SelectiveColorRuntimeResult {
   hueDegrees: number;
   influence: number;
+  maskWeight: number;
+  neutralWeight: number;
   outputRgb: RgbPixel;
 }
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const wrapHue = (value: number) => ((value % 360) + 360) % 360;
+const MIN_SELECTIVE_COLOR_SATURATION = 0.04;
+const FULL_SELECTIVE_COLOR_SATURATION = 0.12;
 
 const rgbToHsl = ({ blue, green, red }: RgbPixel) => {
   const max = Math.max(red, green, blue);
@@ -69,17 +73,45 @@ export function applySelectiveColorToRgbPixel(
   adjustment: SelectiveColorAdjustment,
 ): SelectiveColorRuntimeResult {
   const hsl = rgbToHsl(pixel);
-  const range = getSelectiveColorRange(rangeKey);
-  const influence = calculateDefaultSelectiveColorInfluence({
-    centerHueDegrees: range.centerHueDegrees,
-    hueDegrees: hsl.hue,
-    widthDegrees: range.widthDegrees,
-  });
+  const maskWeight = calculateSelectiveColorMaskWeight(pixel, rangeKey);
+  const influence = maskWeight;
   const outputRgb = hslToRgb({
     hue: wrapHue(hsl.hue + adjustment.hue * influence),
     luminance: clamp01(hsl.luminance + (adjustment.luminance / 100) * influence),
     saturation: clamp01(hsl.saturation * (1 + (adjustment.saturation / 100) * influence)),
   });
 
-  return { hueDegrees: hsl.hue, influence, outputRgb };
+  return {
+    hueDegrees: hsl.hue,
+    influence,
+    maskWeight,
+    neutralWeight: calculateNeutralSelectiveColorWeight(hsl.saturation),
+    outputRgb,
+  };
+}
+
+export function calculateSelectiveColorMaskWeight(pixel: RgbPixel, rangeKey: SelectiveColorRangeKey): number {
+  const hsl = rgbToHsl(pixel);
+  const range = getSelectiveColorRange(rangeKey);
+  const hueInfluence = calculateDefaultSelectiveColorInfluence({
+    centerHueDegrees: range.centerHueDegrees,
+    hueDegrees: hsl.hue,
+    widthDegrees: range.widthDegrees,
+  });
+
+  return hueInfluence * calculateNeutralSelectiveColorWeight(hsl.saturation);
+}
+
+export function renderSelectiveColorMaskPreviewPixel(pixel: RgbPixel, rangeKey: SelectiveColorRangeKey): RgbPixel {
+  const maskWeight = calculateSelectiveColorMaskWeight(pixel, rangeKey);
+  return { blue: maskWeight, green: maskWeight, red: maskWeight };
+}
+
+function calculateNeutralSelectiveColorWeight(saturation: number): number {
+  if (saturation <= MIN_SELECTIVE_COLOR_SATURATION) return 0;
+  if (saturation >= FULL_SELECTIVE_COLOR_SATURATION) return 1;
+
+  const normalized =
+    (saturation - MIN_SELECTIVE_COLOR_SATURATION) / (FULL_SELECTIVE_COLOR_SATURATION - MIN_SELECTIVE_COLOR_SATURATION);
+  return normalized * normalized * (3 - 2 * normalized);
 }
