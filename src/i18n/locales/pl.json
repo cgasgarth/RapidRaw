@@ -920,6 +920,10 @@
         "maskName_many": "Masek {{count}}",
         "maskName_other": "Maska {{count}}"
       },
+      "quickAddBrush": "Add brush",
+      "quickAddComplete": "Ready",
+      "quickAddGradient": "Add gradient",
+      "quickAddRange": "Add color range",
       "refinement": {
         "density": "Density",
         "edgeContrast": "Edge Contrast",

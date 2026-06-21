@@ -864,6 +864,10 @@
         "maskName_one": "Mask {{count}}",
         "maskName_other": "Mask {{count}}"
       },
+      "quickAddBrush": "Add brush",
+      "quickAddComplete": "Ready",
+      "quickAddGradient": "Add gradient",
+      "quickAddRange": "Add color range",
       "refinement": {
         "density": "Density",
         "edgeContrast": "Edge Contrast",
