@@ -64,6 +64,10 @@ export default function FocusStackModal({
   const selectedQualityLabel =
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
   const estimatedPreviewMegapixels = Math.round((sourceCount * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
+  const estimatedPreviewMemoryMb = Math.max(
+    0,
+    Math.round((sourceCount * settings.maxPreviewDimensionPx ** 2 * 4) / 1_000_000),
+  );
   const sourceReadinessLabel = `${t('modals.focusStack.sourceSummary', { count: sourceCount })} - ${
     isSourceCountValid ? t('modals.focusStack.preflight.ready') : t('modals.focusStack.preflight.blocked')
   }`;
@@ -118,6 +122,7 @@ export default function FocusStackModal({
 
       <section
         className="grid grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-sm lg:grid-cols-5"
+        data-estimated-preview-memory-mb={estimatedPreviewMemoryMb}
         data-estimated-preview-megapixels={estimatedPreviewMegapixels}
         data-preview-source-count={sourceCount}
         data-testid="focus-stack-setup-summary"
@@ -127,6 +132,10 @@ export default function FocusStackModal({
         <ComputationalSetupStatusLine
           label={t('modals.focusStack.preflight.workload')}
           value={t('modals.focusStack.previewWorkloadValue', { value: estimatedPreviewMegapixels })}
+        />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.memory')}
+          value={t('modals.focusStack.previewMemoryValue', { value: estimatedPreviewMemoryMb })}
         />
         <ComputationalSetupStatusLine
           label={t('modals.focusStack.preflight.blend')}
@@ -293,6 +302,10 @@ export default function FocusStackModal({
             value={t('modals.focusStack.previewWorkloadValue', { value: estimatedPreviewMegapixels })}
           />
           <ComputationalSetupStatusLine
+            label={t('modals.focusStack.preflight.memory')}
+            value={t('modals.focusStack.previewMemoryValue', { value: estimatedPreviewMemoryMb })}
+          />
+          <ComputationalSetupStatusLine
             label={t('modals.focusStack.preflight.provenance')}
             value={t('modals.focusStack.preflight.required')}
           />
@@ -344,6 +357,10 @@ export default function FocusStackModal({
               {
                 label: t('modals.focusStack.preflight.workload'),
                 value: t('modals.focusStack.previewWorkloadValue', { value: estimatedPreviewMegapixels }),
+              },
+              {
+                label: t('modals.focusStack.preflight.memory'),
+                value: t('modals.focusStack.previewMemoryValue', { value: estimatedPreviewMemoryMb }),
               },
               {
                 label: t('modals.focusStack.preflight.blend'),
