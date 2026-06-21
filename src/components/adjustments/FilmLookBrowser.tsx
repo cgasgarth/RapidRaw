@@ -158,6 +158,8 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
   const selectedLookAdjustmentSummaries =
     selectedLook === undefined ? [] : getFilmLookAdjustmentSummaries(selectedLook);
   const selectedLookRuntimeReady = selectedLook?.runtimeSupport === 'adjustment_patch_preview_export';
+  const comparisonReadyCount = FILM_LOOK_COMPARE_SLOTS.filter((slot) => comparisonSelection[slot] !== null).length;
+  const isComparisonReady = comparisonReadyCount === FILM_LOOK_COMPARE_SLOTS.length;
 
   useEffect(() => {
     window.localStorage.setItem(FILM_LOOK_FAVORITES_STORAGE_KEY, JSON.stringify([...favoriteLookIds].toSorted()));
@@ -391,6 +393,25 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
               {t('adjustments.effects.filmLookBrowser.compareSwap')}
             </button>
           </div>
+        </div>
+        <div
+          className="grid grid-cols-2 gap-2 rounded-md border border-surface bg-bg-secondary p-2 text-xs"
+          data-compare-ready-count={comparisonReadyCount}
+          data-compare-slot-count={FILM_LOOK_COMPARE_SLOTS.length}
+          data-comparison-ready={String(isComparisonReady)}
+          data-testid="film-look-compare-readiness"
+        >
+          <span className="rounded bg-surface px-2 py-1 text-text-secondary" data-testid="film-look-compare-count">
+            {t('adjustments.effects.filmLookBrowser.compareReadyCount', {
+              count: comparisonReadyCount,
+              total: FILM_LOOK_COMPARE_SLOTS.length,
+            })}
+          </span>
+          <span className="rounded bg-surface px-2 py-1 text-text-secondary" data-testid="film-look-compare-status">
+            {isComparisonReady
+              ? t('adjustments.effects.filmLookBrowser.compareReady')
+              : t('adjustments.effects.filmLookBrowser.compareIncomplete')}
+          </span>
         </div>
         <div className="grid grid-cols-2 gap-2">
           {FILM_LOOK_COMPARE_SLOTS.map((slot) => {

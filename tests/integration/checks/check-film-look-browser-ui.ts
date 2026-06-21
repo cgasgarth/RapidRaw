@@ -8,6 +8,9 @@ const requiredLocaleKeys = [
   'favoriteCount_one',
   'favoriteCount_other',
   'favorites',
+  'compareIncomplete',
+  'compareReady',
+  'compareReadyCount',
   'lookCount_one',
   'lookCount_other',
 ];
@@ -25,10 +28,14 @@ for (const marker of [
   'data-testid="film-look-readiness-family"',
   'data-testid="film-look-readiness-claim"',
   'data-testid="film-look-readiness-runtime"',
+  'data-testid="film-look-compare-readiness"',
+  'data-compare-ready-count={comparisonReadyCount}',
+  'data-comparison-ready={String(isComparisonReady)}',
   'data-preview-export-ready={String(selectedLookRuntimeReady)}',
   'data-claim-level={selectedLook.provenance.claimLevel}',
   'adjustments.effects.filmLookBrowser.favoriteCount',
   'favoriteLookCount',
+  'comparisonReadyCount',
   'selectedLookRuntimeReady',
 ]) {
   if (!source.includes(marker)) {
