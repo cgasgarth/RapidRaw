@@ -2,10 +2,9 @@
 
 import { readFile } from 'node:fs/promises';
 
-const [modalSource, packageJson, currentPrLocal] = await Promise.all([
+const [modalSource, packageJson] = await Promise.all([
   readFile('src/components/modals/CommandPaletteModal.tsx', 'utf8'),
   readFile('package.json', 'utf8'),
-  readFile('tests/integration/checks/check-current-pr-local.ts', 'utf8'),
 ]);
 
 const requiredModalSnippets = [
@@ -27,9 +26,6 @@ const failures = requiredModalSnippets
 
 if (!packageJson.includes('"check:command-palette-merge-sources-ui"')) {
   failures.push('missing package script: check:command-palette-merge-sources-ui');
-}
-if (!currentPrLocal.includes("'check:command-palette-merge-sources-ui'")) {
-  failures.push('missing current-pr-local route: check:command-palette-merge-sources-ui');
 }
 
 if (failures.length > 0) {

@@ -1,0 +1,23 @@
+{
+  "appliedGraphRevision": "graph_rev_linear_gradient_apply_slice:apply:linear_gradient_mask_linear_gradient_apply_2877_apply",
+  "artifactHash": "sha256:213c3df889c6c25e068df170b962afa7eda70a5a380f90bca13ef75ac443d412",
+  "artifactPath": "artifacts/validation/linear-gradient-mask-apply-slice.svg",
+  "commandType": "layerMask.createGradientMask",
+  "coordinateSpace": "normalized_image",
+  "dryRunMaskHash": "fnv1a32:bafb1885",
+  "issue": 2877,
+  "localAdjustment": {
+    "bottomMeanDelta": 0.22,
+    "provesGradientWeightedEdit": true,
+    "topMeanDelta": 0.009613
+  },
+  "schemaVersion": 1,
+  "uiMarkers": [
+    "data-testid=\"linear-gradient-mask-controls\"",
+    "data-gradient-command-type=\"layerMask.createGradientMask\"",
+    "parameters['startY'] = imgH * 0.12",
+    "parameters['endY'] = imgH * 0.72",
+    "buildLinearGradientMaskCommandFromParameters"
+  ],
+  "validationMode": "linear_gradient_mask_apply_ui_runtime_render_slice"
+}

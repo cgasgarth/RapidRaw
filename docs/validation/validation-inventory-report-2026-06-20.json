@@ -110,6 +110,38 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:737d6d05bc300523ec346c672b6db1c27550dd6b65a9ad4e81d683a1f0b91d5b",
+      "domain": "agent-app-server",
+      "name": "check:agent-app-server-private-raw-artifacts",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:429eec40f96546e96e6f260ae90f7ef7f2898caaf01a06177d8abf8667b5dca3",
+      "domain": "agent-app-server",
+      "name": "check:agent-app-server-private-raw-artifacts:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:568d8c4f11f94d8fa252781fe54f49581f1e40b8f5aad9f19636069f40952865",
+      "domain": "agent-app-server",
+      "name": "check:agent-app-server-raw-edit-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:9f58d5469ab87aa5e196a978cb3179c05789cd6301ce00416881d6aaf7380ca5",
+      "domain": "agent-app-server",
+      "name": "check:agent-app-server-raw-edit-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:4a695fb7cfa2f1b0fbf6fabed5e27c70e59ef1d1c81c88f9c30ba92d45d31380",
       "domain": "agent-app-server",
       "name": "check:agent-approval-boundaries",
@@ -130,6 +162,22 @@
       "domain": "agent-app-server",
       "name": "check:agent-chat-ui",
       "target": "visual-smoke",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:cb4ef9f62d6a46aeb72d97f5404ddc582f8aab2b58c82fb54acad28a9bd1e6fb",
+      "domain": "agent-app-server",
+      "name": "check:agent-expert-edit-demo-workflow",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:da4bc48e50caa21ad4e16c7b995252c4fdcc06224783a1d8647728cdeab64baf",
+      "domain": "agent-app-server",
+      "name": "check:agent-expert-edit-demo-workflow:update",
+      "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
     },
@@ -161,6 +209,22 @@
       "commandHash": "sha256:effa8808f94137ce530abe8d9812b7a8b3c946a950bd03b5b3e60df320d76b6b",
       "domain": "agent-app-server",
       "name": "check:agent-rollback-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:176a40b5733a787ed599f4f9f438626770425bb26f8a6050422ad46f50cf5c8e",
+      "domain": "agent-app-server",
+      "name": "check:agent-tool-readiness-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:4c34b80571adf16823c9060eab342f0f8c5d8f2489f2150997132145c7bbdc15",
+      "domain": "agent-app-server",
+      "name": "check:agent-unavailable-provider-workflow",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -217,6 +281,14 @@
       "commandHash": "sha256:0f0829826e2ef365a6477de7303e8ae55468f9ffe1676a7f7ae9f5731bde5c6d",
       "domain": "general",
       "name": "check:ai-fallbacks",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:5d433690b928db9b295c4fb1ea67d6b46ddd7a235f39e64824e003dab1923822",
+      "domain": "agent-app-server",
+      "name": "check:ai-mask-app-server-tool",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -297,6 +369,38 @@
       "commandHash": "sha256:bbd58e933777a093e5deec8b74dbfddf2f49cd1429e216d2c28b01d701570eb0",
       "domain": "general",
       "name": "check:brush-mask-command",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:5352b1325be63b7d6ef3bf47b6cf6b774de28d0aab4d2875ca2e0372ba55e183",
+      "domain": "general",
+      "name": "check:brush-mask-command-capture",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:f068c441fc3e7d698362b5481176d0bfec559bc7b2f3e528f937fa3402761569",
+      "domain": "general",
+      "name": "check:brush-mask-command-capture:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:3eaa771f276f40e4a21622a2bc3f096c2c5ed6aff2c1657050c88ab5959265b1",
+      "domain": "general",
+      "name": "check:brush-mask-refine-workflow-e2e",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:dc4bc1aad36dd737bd48594807e8406b6ef30f57dcb0ddbdfd715a4a695c9606",
+      "domain": "general",
+      "name": "check:brush-mask-refine-workflow-e2e:update",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -422,6 +526,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:f085f83f13d390fa1f11ff240f94f9bf1c2e99b1565958ff1ed99011ed8b4e80",
+      "domain": "general",
+      "name": "check:collage-saved-output-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:36c4593de51706322766959cef6e382c410678390a10b7f64df9ae531f0f71e9",
       "domain": "color",
       "name": "check:color-abi",
@@ -462,6 +574,22 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:f1582981ab34a4b1131627ab162446d5804fb47c1a086e185c7b6967916f0d6c",
+      "domain": "color",
+      "name": "check:color-gpu-readback-probe",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:6c11d8b5e7f25931e3b33501aea6530c6913988fdb253a8e371186affbd6714d",
+      "domain": "color",
+      "name": "check:color-gpu-readback-runtime-smoke",
+      "target": "cargo",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:02dee408bf3daf0e714e3ca9ec704c95b966444633ff11b41e2710ca2f160d82",
       "domain": "color",
       "name": "check:color-grading-presets",
@@ -494,6 +622,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:8797d6e248afc466ef21fa1362e84bb32bca5f3074d7ffa9bfd6e906cc61b242",
+      "domain": "color",
+      "name": "check:color-style-ui-coverage",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:cfc378a78756bee03dc4825147f984929cd714b2699656194604fa6edec983c8",
       "domain": "color",
       "name": "check:color-workflow-smoke",
@@ -521,6 +657,70 @@
       "commandHash": "sha256:b16f39b3065594079c4690bff3c55a885a6388304586dca30557b270fa5365b9",
       "domain": "color",
       "name": "check:colorchecker-render-gate:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:4c6f867b936e9a26a630847f2c5ca6daad78ba719a0d228d22d97168ffee0a4a",
+      "domain": "general",
+      "name": "check:command-palette-collage-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:9625823045af9e49638fb632d1ccf7d2956949e4f2bf0e9ca2b7b86f490669a8",
+      "domain": "general",
+      "name": "check:command-palette-coverage-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:9f00308576b9a621d0ac774252e57d58c839024b1cc414a96748840627f20f81",
+      "domain": "general",
+      "name": "check:command-palette-culling-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:30ab7b2634dd9e55dd27a191a98af7b4e23e3c944f7e705d81677113ad53d544",
+      "domain": "general",
+      "name": "check:command-palette-denoise-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:625ff90257574b5cb8251159c55920495c1a05ede7ac49b52d1fcb17e11006c7",
+      "domain": "general",
+      "name": "check:command-palette-lens-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:cfc02d7f3c00f4f57061b77778da58bc08521bbf266d9c440855eccbcb8c0090",
+      "domain": "general",
+      "name": "check:command-palette-merge-sources-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:b61d4cc41aac3733cbe1e545137089be51b9bc9663742c52131e68a2925b9433",
+      "domain": "negative-lab",
+      "name": "check:command-palette-negative-lab-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:5a6994da0bdc954a0ec301ff4c2e024af095c5425582472a766556dc7a6e8f8e",
+      "domain": "general",
+      "name": "check:command-palette-transform-ui",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -702,17 +902,9 @@
       "workflowReferences": []
     },
     {
-      "commandHash": "sha256:a9d4285a255ee308d270b14efc043fcad3465297e5dc03ffba604002f3710705",
+      "commandHash": "sha256:43e2fbc6f5adfc08bee98b7ad91db268d5971eb492f52e266821bb39a29aaa91",
       "domain": "general",
-      "name": "check:current-pr-local",
-      "target": "integration-check",
-      "usage": "check",
-      "workflowReferences": []
-    },
-    {
-      "commandHash": "sha256:abf7ea48b514eb4015c5e3353828e11ccdfb5c2770c29b90ab71d727d78fb6f3",
-      "domain": "general",
-      "name": "check:current-pr-local:self-test",
+      "name": "check:culling-ui-summary",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -745,6 +937,22 @@
       "commandHash": "sha256:30b0bf3551a0342c885dececdd63e458c8dbd55af97210c117ea363930b11386",
       "domain": "general",
       "name": "check:deblur-fixtures",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:5f8a4f8011439e100275e154d9c755e12a8d0693b12a8ca8596c9af71d595958",
+      "domain": "general",
+      "name": "check:deblur-real-raw-private-proof",
+      "target": "repo-script",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:ac79a8ac64fcd96bc243aa74e4624157a584e5610fc0372353e6d66692b88391",
+      "domain": "general",
+      "name": "check:deblur-real-raw-private-proof-summary",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -830,9 +1038,33 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:cd6e15991def885a2a390873b040a427f5f9fafdb94ab6c9a7907cbe7d9047cf",
+      "domain": "general",
+      "name": "check:denoise-real-raw-private-proof",
+      "target": "repo-script",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:86a3ea5f3e7f23a14728eddc3c8fd38e43ae79b8e9ba63d9d4fb0f7b490ad43b",
+      "domain": "general",
+      "name": "check:denoise-real-raw-private-proof-summary",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:3ccb49eddf23b9196628784d5c3a27ed9f5eb99bab87196cb6a08d6f7f45998a",
       "domain": "general",
       "name": "check:denoise-ui-api",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:393f7a22f2e45b06efa61a5e9fee260d877870f86e63b072d090551e5fe1bcf1",
+      "domain": "general",
+      "name": "check:denoise-ui-summary",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -926,6 +1158,22 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:816a673d4c657384ff83849b27c9d1b56d0ca393e83f9fd841c3500d1e32ae97",
+      "domain": "general",
+      "name": "check:editor-file-type-badge-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:9f72d0bf1f2f07b41b9a6d8b7a91feafac7f42b537eb967ab0d5a130c2d80d8b",
+      "domain": "general",
+      "name": "check:editor-history-toolbar-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:3b7751b0386fcf9b44b2b9167a8bb33fb88a0827ad7c1f080846476cdc029c77",
       "domain": "general",
       "name": "check:export-batch-proof",
@@ -945,6 +1193,14 @@
       "commandHash": "sha256:7250f5e6e995160ce8ce76e19cbe663f5b9af7e5983db55a296a9e7054d029b0",
       "domain": "general",
       "name": "check:export-queue",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:3a04171b00de2dd431724271ca735e6915aad7bd1c182ba491911a67c1042de3",
+      "domain": "general",
+      "name": "check:export-readiness-ui",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1070,6 +1326,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:9d0dead3ebe6b3821558e19707f5a6cbf090cb9112861f85f034dcfb97184a49",
+      "domain": "film-simulation",
+      "name": "check:film-look-browser-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:85a43f7abf4c3f4dff435825e8f56c624bf9ff0d888b61a8d903002761dc7819",
       "domain": "film-simulation",
       "name": "check:film-look-measured-fixtures",
@@ -1121,6 +1385,22 @@
       "commandHash": "sha256:6ce79f30b723b4e5800f50936667b4c501140ad472263e8eff53cf567ab11bd7",
       "domain": "film-simulation",
       "name": "check:film-look-render-apply-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:87ce2d434b5fc998c7a7e7392cc327f93eb36d3b8e17a92633b3ad0edfe87391",
+      "domain": "film-simulation",
+      "name": "check:film-look-sort",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:f814f69159aed9175d078b8092c09a986ef3472f5e2d9f23bcb41f4b17b3b9bc",
+      "domain": "film-simulation",
+      "name": "check:film-look-strength-presets",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1185,6 +1465,22 @@
       "commandHash": "sha256:cc77ed2f90c31bd56ea909e45cd41b1934fc72f4518f59d9e187f1441198375f",
       "domain": "focus-stacking",
       "name": "check:focus-blend-halo-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:ccc374b8245c2cb8c6dbb9925e25dd3e8da9475f6b6e388780ceae569db0c274",
+      "domain": "focus-stacking",
+      "name": "check:focus-blend-runtime-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:286da6f79eb68013725727979062983d7dc0966d9617a0294d8f3156f6647995",
+      "domain": "focus-stacking",
+      "name": "check:focus-blend-runtime-proof:update",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1270,6 +1566,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:72c57a273c98fd55d44799fc5fb8982d7712d9bf9b2a95682f8e51b798d3a102",
+      "domain": "focus-stacking",
+      "name": "check:focus-real-raw-public-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:e0f6a2e39160056cefb1f990f5f89c665cd52cb4ad27380565c3925f449af37e",
       "domain": "focus-stacking",
       "name": "check:focus-review-diagnostics",
@@ -1302,6 +1606,22 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:d63008bf4bc04d36beb5d9b96dd55159fe387e7e6d8c37c889eceecb4945d505",
+      "domain": "focus-stacking",
+      "name": "check:focus-synthetic-output-artifact",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:648c4925957f691438210ef639a7360a7b0d2c210d36c3ccc442dc451ac96b30",
+      "domain": "focus-stacking",
+      "name": "check:focus-synthetic-output-artifact:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:5343c080e83e91f672d0dde22ebe1837119aa7f9752f598e6f7da13b560a1261",
       "domain": "focus-stacking",
       "name": "check:focus-ui-action-command",
@@ -1313,6 +1633,14 @@
       "commandHash": "sha256:a4fd7f81f67d17188b73dd3b6c7bc81c964990e080321bdf954b1f92570d2de5",
       "domain": "focus-stacking",
       "name": "check:focus-ui-api",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:dee9a42a83a940643085f77709e1fff497440536fba9d866a3e28e16f7c15d99",
+      "domain": "focus-stacking",
+      "name": "check:focus-ui-preflight",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1362,6 +1690,22 @@
       "domain": "general",
       "name": "check:gh-repo-resolution",
       "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:c7ab474a2c93cbd0e83e8bf5c5d42aac3241612c62d0418813e9b44accfd75ce",
+      "domain": "general",
+      "name": "check:goal-progress-report",
+      "target": "repo-script",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:bb6492c6c82f038dc75a5f682f8dac567511c443666ba908a6ae294b28ee57d8",
+      "domain": "general",
+      "name": "check:goal-progress-report:update",
+      "target": "repo-script",
       "usage": "check",
       "workflowReferences": []
     },
@@ -1430,6 +1774,22 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:9d8df8d2c0c3daa95feb086f1176caed068152eeb6a4520b3d59604729ec890f",
+      "domain": "hdr",
+      "name": "check:hdr-alignment-runtime-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:034c72763ef181f1bc9d6093aa69ad38e8a8b3e832a4ecc05b2f4d8f33847765",
+      "domain": "hdr",
+      "name": "check:hdr-alignment-runtime-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:fbb4a068f2a44fc360c1d4e740e6949b44dfe2597a37eb72cf5955d65a6743d7",
       "domain": "hdr",
       "name": "check:hdr-alignment-smoke",
@@ -1441,6 +1801,22 @@
       "commandHash": "sha256:d309f334cf3ce9030383a1375f09fb6f4370cd99839e91f0e978a05125568296",
       "domain": "hdr",
       "name": "check:hdr-app-server-runtime",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:227ec44b8079180a5b282e0a1be7bc728dda804bb5ff39b775967e98cb3d0a27",
+      "domain": "hdr",
+      "name": "check:hdr-deghost-confidence-map",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:ccafb1fae7d324c2c530146e0e88dcdc262412a922a87dcbeed9d3da92776707",
+      "domain": "hdr",
+      "name": "check:hdr-deghost-confidence-map:update",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1465,6 +1841,14 @@
       "commandHash": "sha256:6d792f83e5fb9e7a5a08e0b25944a84fabe10e1d0226a257b6cb92dcd16de5df",
       "domain": "hdr",
       "name": "check:hdr-deghosting-smoke",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:a5a2808f99d871381edcbdf317f223c78f0cfc1beafd38c50d83bc77cf710c40",
+      "domain": "hdr",
+      "name": "check:hdr-editable-handoff",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1510,6 +1894,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:16484e50c9a75e0c32484a23404bcb33d85633cb2d328978325031ab29520ac9",
+      "domain": "hdr",
+      "name": "check:hdr-private-raw-ui-smoke",
+      "target": "visual-smoke",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:8c705dc4459cfbfeaf572994959197a3ff2a7ceaab52509fc3abf46fb1c01ac6",
       "domain": "hdr",
       "name": "check:hdr-real-raw-private-app-server-proof",
@@ -1522,6 +1914,14 @@
       "domain": "hdr",
       "name": "check:hdr-real-raw-private-proof",
       "target": "repo-script",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:a6f682080e62060ad76a76ea5f5858154d60b011b31f3191e9d12f21c7f6fcda",
+      "domain": "hdr",
+      "name": "check:hdr-real-raw-private-proof-summary",
+      "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
     },
@@ -1550,9 +1950,33 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:feb328ca2fb196aae9584e1b47b5359fead798bfbecf782efa5a1f91cd8ecf36",
+      "domain": "hdr",
+      "name": "check:hdr-saved-output-editor-path-smoke",
+      "target": "visual-smoke",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:cb7fbdf72f4b585424e2c3764031581cdb400ae77c12a85754b60f62b3d23105",
       "domain": "hdr",
       "name": "check:hdr-source-validation",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:d5bd10506e419a05d1fa8e39a5cfe49c47c9c91e271c6d9aca0ba9e04618274c",
+      "domain": "hdr",
+      "name": "check:hdr-synthetic-output-artifact",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:0265e845759fcae62754ecbeb5359dc6ba628c20ab888625267781881a307dc2",
+      "domain": "hdr",
+      "name": "check:hdr-synthetic-output-artifact:update",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1593,6 +2017,14 @@
       "commandHash": "sha256:63577095d401b964f3f127412ee6e3ee11f82ee5d59aae0248df7057dceb37d2",
       "domain": "general",
       "name": "check:headless-render-command",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:d7e4d88e394c10434aee904bed4d84a89de98d772f06cd5eb0076a9aabc08a58",
+      "domain": "general",
+      "name": "check:histogram-clipping-ui",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1662,6 +2094,30 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:e3a1833f283ec79eca60d794d45ca8e540d3acd20143c5d0ac67e182ba35c72b",
+      "domain": "general",
+      "name": "check:layer-mask-private-raw-ui-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:320355e58df7db6f5fbe02d7351dc0813f86d224428581a057adc50fe3a8b8dd",
+      "domain": "general",
+      "name": "check:layer-mask-private-raw-ui-smoke",
+      "target": "visual-smoke",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:408b827804dd3b586d324f10cb3866c34757eee59cbac52b34a07b2f159118e2",
+      "domain": "general",
+      "name": "check:layer-mask-real-raw-private-root-prep",
+      "target": "repo-script",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:f60dda98a8b132f96f9407e89ea59113923f0055cf99f60a79829c799039d65b",
       "domain": "general",
       "name": "check:layer-mask-real-raw-proof",
@@ -1689,6 +2145,14 @@
       "commandHash": "sha256:0bdfc5335f18ddbb754887bcb93097e04c0f08afc1e4edad0cee32732874acbc",
       "domain": "general",
       "name": "check:layer-opacity-order-runtime",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:6c3bfbf6af45afb4bfe79145e3187b9a9471842d2a13db879d737ae6707ec912",
+      "domain": "general",
+      "name": "check:layer-opacity-presets",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1734,9 +2198,33 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:8124f66270bc274ed8ce54314f1a50d40588d2ee1a36b43345e0bfc2d23bcff9",
+      "domain": "general",
+      "name": "check:layer-stack-panel-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:efffaba34c7efad23fe19853acf5fed6ce95ab304629cd2ce28f5f45414b2dd4",
+      "domain": "general",
+      "name": "check:layer-stack-ui-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:28f7de7bcc1974808d1707116f4cbd2d2730d731601f548632b3522a5247a2b9",
       "domain": "general",
       "name": "check:layer-stack-undo-redo",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:687b3a715e8d4b761b5a63873521a715cf12a1e25c450ebb6c7f87f91bfc7292",
+      "domain": "general",
+      "name": "check:layer-visibility-opacity-proof",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1753,6 +2241,14 @@
       "commandHash": "sha256:d895506c22f9a772020b6d2580acf847a06c01b9900f415c5b69e42ddef44899",
       "domain": "general",
       "name": "check:levels-runtime",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:b6ebb7fd43921e5315bd5429019833e1120f25fc7fc92555be9d8b33ca88a9eb",
+      "domain": "general",
+      "name": "check:library-header-ui",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -1806,10 +2302,34 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:43816ce3964660c3dcfc201ede8c578ba88364d1d932cd2b1c737d4c80bb6cc5",
+      "domain": "general",
+      "name": "check:linear-gradient-mask-apply-slice",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:630f7ba7e066371620397a7666c3f2a51bdb3f29cb747df563d26f6fe2956611",
+      "domain": "general",
+      "name": "check:linear-gradient-mask-apply-slice:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:e6b470988e81bad8d3ab99bb78a6c82f68c937c4c24ea1622965be50af760d94",
       "domain": "general",
       "name": "check:linear-gradient-mask-command",
       "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:2b6f8a20d51fc6e047826aee13075323ca1fde074600e41fb44a47b40ecf3418",
+      "domain": "rust",
+      "name": "check:linear-gradient-mask-real-raw-proof",
+      "target": "cargo",
       "usage": "check",
       "workflowReferences": []
     },
@@ -1926,6 +2446,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:8c2607f74b39c54aa8be22162243ef56559ba3f38a5eae6a28f28f123121301c",
+      "domain": "general",
+      "name": "check:mask-readiness-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:e0073f169c4d3376db1b81f7216d15a835c7f8e924749fcc20b7e2b25b422d75",
       "domain": "general",
       "name": "check:mask-refine",
@@ -1961,6 +2489,22 @@
       "commandHash": "sha256:278a2daa38074d00311f37795c1fbaff99f74734eb40424ff7a8f059b9166c8d",
       "domain": "general",
       "name": "check:math-invariants",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:a1cf8b16f1e0deacb7b946d9a89d0a57758ba0c1fcdf8eeb2bf221e4e9c57871",
+      "domain": "general",
+      "name": "check:merge-saved-output-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:46c594f475b34427acba6aa0aa59449feaf5fba454c33dbd4fcc899900f929e9",
+      "domain": "general",
+      "name": "check:metadata-panel-ui",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -2022,6 +2566,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:74c81f29be0f21ee040fde1007e8b984be73dfcedb1846d591122386b21bdb8b",
+      "domain": "negative-lab",
+      "name": "check:negative-lab-conversion-bundle",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:8c76f33a1175433d852f34fd7479ce6a1bc0ce5a81afd4e05c9c5fac7b457284",
       "domain": "negative-lab",
       "name": "check:negative-lab-density-cpu",
@@ -2054,6 +2606,22 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:63ff3bf50d49097463d5da7b0a786bfe2be34c1aa85f316a0b2d33ad99f86259",
+      "domain": "negative-lab",
+      "name": "check:negative-lab-live-preview-sample",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:b2422b722c2cf176c9a2a2e097bc4e942386f1240026924747b9963e34577276",
+      "domain": "negative-lab",
+      "name": "check:negative-lab-live-preview-sample:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:f79c72a4244727dfda4664930eee1156cd800e40a0a746676f903e357aed0df7",
       "domain": "negative-lab",
       "name": "check:negative-lab-measured-profiles",
@@ -2070,10 +2638,42 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:27daeeb4c21022e7fb48963d878b96bed9d81bd47d4ee71c5a55bcfc161785d8",
+      "domain": "negative-lab",
+      "name": "check:negative-lab-public-export-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:76a281d545896614c3d3c5de756ae3a35f8e83353d80295c081601e2f577983a",
+      "domain": "negative-lab",
+      "name": "check:negative-lab-public-export-review-smoke",
+      "target": "visual-smoke",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:0063cb34d1faac9302920e48f514ed6496a1658708c347a3361e43511296a595",
+      "domain": "negative-lab",
+      "name": "check:negative-lab-public-export-ui-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:4846276d8c8a79df0c7ae037a1f9b8b487211dbcd71b674f951c7bea941e9e49",
       "domain": "negative-lab",
       "name": "check:negative-lab-qc-contact-sheet",
       "target": "repo-script",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:ab5694c90fffb2eee4e0afcda5cfa9ed2885aca960f2edb7ef833b6e7208fed1",
+      "domain": "negative-lab",
+      "name": "check:negative-lab-qc-live-artifact",
+      "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
     },
@@ -2198,6 +2798,54 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:e79aaf01f79a72da6ec91d4e5ace059cfa5cd2b0fe2ef06744247babe6400eea",
+      "domain": "panorama",
+      "name": "check:panorama-cycle-consistency-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:67888e76973921d3144d6565535dd539e6113202ab17f6e774e00d432d3b609e",
+      "domain": "panorama",
+      "name": "check:panorama-cycle-consistency-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:8fa9237ae8ba33b147cdae45a40cc44e79700d5a8a4199dc23cdc57956d46ffa",
+      "domain": "panorama",
+      "name": "check:panorama-distributed-inlier-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:50828bb8ddd4c88c19865e0952b42245352ab65de4336d1245c0295c86dc90f7",
+      "domain": "panorama",
+      "name": "check:panorama-distributed-inlier-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:fd38bdd1e9421b04edfa35d75074bed8f81cc8d8874a3d350150e839ca67a0fa",
+      "domain": "panorama",
+      "name": "check:panorama-exposure-runtime-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:18f14fe703dc6c93ad1389732474b3d5045b4ee6fc14506a4aee7b2d737cffa9",
+      "domain": "panorama",
+      "name": "check:panorama-exposure-runtime-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:f2be2f6a0d3551198d72899d7437c9282cac22ac9c55471c94f12ae0e4ab2f85",
       "domain": "panorama",
       "name": "check:panorama-feature-transform",
@@ -2209,6 +2857,54 @@
       "commandHash": "sha256:eb4958f724bf17517a698538fbd5a4a3fd50893c91b59cb2722fb792cd6dd3c2",
       "domain": "panorama",
       "name": "check:panorama-fixtures",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:60e6d22f132f64354b28c99d696da48c5cfe4cc414e86df1798ade1207ebefec",
+      "domain": "panorama",
+      "name": "check:panorama-graph-reference-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:635b60a78f3e6752caad2aa695f4e763c024ddcab643da114c3664667e2d0798",
+      "domain": "panorama",
+      "name": "check:panorama-graph-reference-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:5bba039f484c2fb1de71e24ebae45b5875483a1b82f9a3e11b4f4a1b4daac263",
+      "domain": "panorama",
+      "name": "check:panorama-homography-diagnostics",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:39dd17c6a6a4c1166ba08b64840eccabc9dcbacacc40ed2bf0ace60063a175e6",
+      "domain": "panorama",
+      "name": "check:panorama-homography-diagnostics:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:4966329ccb5367a3846d49384d7c1b5d45c2c9a37bd838baf9f6c8343989bf63",
+      "domain": "panorama",
+      "name": "check:panorama-lo-ransac-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:f195b327677e7f818adb57cf68850ab6c417bffc2868af9487c2d2b6d94736cd",
+      "domain": "panorama",
+      "name": "check:panorama-lo-ransac-proof:update",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -2226,6 +2922,14 @@
       "domain": "panorama",
       "name": "check:panorama-performance-fixtures",
       "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:4f6c094c7a8260393599e334afff95517362532b2362a104de4ecd829f3195c4",
+      "domain": "panorama",
+      "name": "check:panorama-private-raw-ui-smoke",
+      "target": "visual-smoke",
       "usage": "check",
       "workflowReferences": []
     },
@@ -2270,6 +2974,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:0d760252065df1e35c7458a3eda5a7eac06f39893f35b9d0af7e4f1b5f4c897c",
+      "domain": "panorama",
+      "name": "check:panorama-real-raw-private-proof-summary",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:9b41b699d3dccb0f9c07d532e50d93bb37b6f8d07ae360045e0462f4a125a014",
       "domain": "panorama",
       "name": "check:panorama-real-raw-private-root-assets",
@@ -2297,6 +3009,14 @@
       "commandHash": "sha256:37e477a3e329b2068743b168dd8e39ef64ba1b9445a3a9327ffaad45cbffe5dd",
       "domain": "panorama",
       "name": "check:panorama-runtime-plan-smoke",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:c4e5022b3c769e8ebb11167e1b99c9140ec629bc2c9046c5a3ded4e4fc7b3428",
+      "domain": "panorama",
+      "name": "check:panorama-runtime-preflight-ui",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -2374,6 +3094,14 @@
       "workflowReferences": [".github/workflows/performance.yml"]
     },
     {
+      "commandHash": "sha256:30b6e9776fed8a3937056ac6903de3808e453b6232fab82a16e5e84a0cce56cf",
+      "domain": "general",
+      "name": "check:presets-composition-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:e463f72e1f7ab5d3cdec5eb5d94fc98ba96e956736e2d450ba2634095d0e8433",
       "domain": "general",
       "name": "check:preview-scopes",
@@ -2401,6 +3129,30 @@
       "commandHash": "sha256:175703df63c090236cc8bd9c73d1c3662654043dcca0779267cbcc9bb79e6497",
       "domain": "frontend-build",
       "name": "check:production-payload:self-test",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:81fc6815bda42aeef2983492258bff0cd49fa1da832a33b8a554e512fee0b32b",
+      "domain": "color",
+      "name": "check:professional-color-workflow-local-raw-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:93cfc4728bdb9e7a7716d1f96c7f5d8bb05b404f701a316a01804bb2ecf81b5d",
+      "domain": "color",
+      "name": "check:professional-color-workflow-private-proof",
+      "target": "repo-script",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:509061c03cb9b73cb2fa310fe693e190bfe401676fac787804439c72aa1f5b60",
+      "domain": "color",
+      "name": "check:professional-color-workflow-ui",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -2522,6 +3274,14 @@
       "domain": "general",
       "name": "check:quick:tiers",
       "target": "script-group",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:5ec5b858d95cf003b228954d9bef8a1e4c1a128457e4ce14094fd7f6340d62fc",
+      "domain": "color",
+      "name": "check:raw-color-management-runtime-proof",
+      "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
     },
@@ -2718,6 +3478,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:009054b91d76ac34f7726ff0fe7acf9ef1a3438b414fb6bf21c53216317fc9b5",
+      "domain": "schema",
+      "name": "check:schema-production-boundary",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:1dfaffdc985b0e06e8f3b386e0674e37a23ffefbd2479f6c23283e531f3a8fc1",
       "domain": "general",
       "name": "check:script-extension-policy",
@@ -2814,6 +3582,30 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:24fd8508943058e76ea88b2dd540abea358d87df1b2e8c2e823c808adb47e66e",
+      "domain": "color",
+      "name": "check:selective-color-local-raw-private-proof",
+      "target": "repo-script",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:87a7d223f9d04838201f6c868d7f9ec1a0123ca5472b3940589e4cd02ef72d1f",
+      "domain": "color",
+      "name": "check:selective-color-local-raw-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:4607f7651e0ef6bf84514bc4713596d4d5ebca506f54c8f2496b3a5670842965",
+      "domain": "color",
+      "name": "check:selective-color-local-raw-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:b3a22b1188d1a409357dfb13725bd367856a18f93fcd8eae6b21491a4bf090ba",
       "domain": "color",
       "name": "check:selective-color-mask",
@@ -2822,9 +3614,41 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:703ec3b09aaf0e2d713830fbb4c7ed6d3954b8710ddf06ce3da2cf3aebe5cd6c",
+      "domain": "color",
+      "name": "check:selective-color-private-ui-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:216afa058ec55c84c8f2b8e519df0d5d9722d47d2d5d4ebb907434b4faa91c29",
+      "domain": "color",
+      "name": "check:selective-color-range-preview-apply",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:551be5c54d550aecf62dfa9696f26e59bbafbd661296d0f092ab3e1f9194b9dc",
+      "domain": "color",
+      "name": "check:selective-color-range-preview-apply:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:103e5eb67ed705d4e832cbfc8b0b75bbd52aef9152eec72a416e3c6b405a102e",
       "domain": "color",
       "name": "check:selective-color-ranges",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:715f820ee7925dfa42519912aafa4732d8fdd8aab232c175c1342a86fbd419dd",
+      "domain": "color",
+      "name": "check:selective-color-ui",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -2849,6 +3673,22 @@
       "commandHash": "sha256:5620f44baa607fdc839cec677f77b4fa5c933eeff7f606f02fda80170b3706f0",
       "domain": "color",
       "name": "check:skin-tone-uniformity",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:1856c00dbf51bbb1735b81d6745af336e3662e2af173eed294feb931d2b9cc74",
+      "domain": "color",
+      "name": "check:skin-tone-uniformity-local-raw-private-proof",
+      "target": "repo-script",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:206658c180ec7eee901bcfb9e9bdbb0075c742e7ad324f3fac9ff03809703c0c",
+      "domain": "color",
+      "name": "check:skin-tone-uniformity-local-raw-proof",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -2902,6 +3742,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:1665af76ea1a49ac8b131eb9288e2cd56bc0809298bb70c12a3424323538ca89",
+      "domain": "super-resolution",
+      "name": "check:sr-human-review-editable-handoff",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:51869317e1db2f65fd79b435ff04b566f62e3de41160d26ce40073d051590b47",
       "domain": "super-resolution",
       "name": "check:sr-performance-fixtures",
@@ -2950,6 +3798,22 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:3b43eb9da43f2ad8590af05b076b7036e3d11db25b6321a2ccd4f500e04f606d",
+      "domain": "super-resolution",
+      "name": "check:sr-reconstruction-proof",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:7607764213906747f0f043306f4605f1dae3c2eb958b595ce53f531c864f7c65",
+      "domain": "super-resolution",
+      "name": "check:sr-reconstruction-proof:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:a612c29bd3442011dc2b21c403367b8e9165d25f51e65dfa902a85d38a0740c7",
       "domain": "super-resolution",
       "name": "check:sr-review-diagnostics",
@@ -2966,9 +3830,41 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:6e7389e765b2bcb3ba31e836f60e69945ec8126ca0928deda532968167ec2ea4",
+      "domain": "super-resolution",
+      "name": "check:sr-sidecar-provenance",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:6909ba3945d29f8b73d8aeef97bebd91c591e94542c8ff880266d24e4486cf06",
+      "domain": "super-resolution",
+      "name": "check:sr-sidecar-provenance:update",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:8333cb66818ee25d377572717f6280429fb1bcd2dc4c3fb30b79edf2b95829ed",
       "domain": "super-resolution",
       "name": "check:sr-source-validation",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:fdd37575fea398a753e56e9e5b889131decaebf68a4231a6ddb86e987aa41d05",
+      "domain": "super-resolution",
+      "name": "check:sr-synthetic-output-artifact",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:df99c94f22d5d5f4ee7c404d28f53bc6358a6bb5fc1340ed7fef995dcb13075b",
+      "domain": "super-resolution",
+      "name": "check:sr-synthetic-output-artifact:update",
       "target": "integration-check",
       "usage": "check",
       "workflowReferences": []
@@ -2998,6 +3894,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:cd13c698305625d20fcb027e1122171da8846fabde19e4a5188bdd781e54c4dc",
+      "domain": "super-resolution",
+      "name": "check:sr-ui-preflight",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:9f978285b4ab3c73ee135d9e821f04834430b7dfc832f44feee41938d9281934",
       "domain": "super-resolution",
       "name": "check:sr-ui-runtime-bridge",
@@ -3010,6 +3914,14 @@
       "domain": "super-resolution",
       "name": "check:sr-ui-smoke",
       "target": "visual-smoke",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:829339bc7132716b7b01217e722a67a79ca57d0f2ff96ddbb6c85a398af06958",
+      "domain": "super-resolution",
+      "name": "check:super-resolution-app-server-runtime",
+      "target": "other",
       "usage": "check",
       "workflowReferences": []
     },
@@ -3214,6 +4126,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:a1e3c38ffaf1639271efb1c88cbbc07cc0b35a3a854e9de6d2e633ed47d7e289",
+      "domain": "general",
+      "name": "check:workflow-rail-smoke",
+      "target": "visual-smoke",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:eabd84b1e96caffd27c98b9b0ffe9fd384b3a66694f7dda31e31213bd84adf93",
       "domain": "general",
       "name": "check:working-space-contract",
@@ -3410,9 +4330,25 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:68283a41e8602962f62bc3dad7f0f6cc7d19fe7e0ca9b70e02b0fde42f279575",
+      "domain": "focus-stacking",
+      "name": "prepare:focus-real-raw-public-proof",
+      "target": "integration-check",
+      "usage": "prepare",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:f6a4ee2734e90256f7428a6d68456dca200e13559b69fc6d2a67bae1356baed0",
       "domain": "hdr",
       "name": "prepare:hdr-real-raw-private-root",
+      "target": "repo-script",
+      "usage": "prepare",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:408b827804dd3b586d324f10cb3866c34757eee59cbac52b34a07b2f159118e2",
+      "domain": "general",
+      "name": "prepare:layer-mask-real-raw-private-root",
       "target": "repo-script",
       "usage": "prepare",
       "workflowReferences": []
@@ -3482,6 +4418,22 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:5f8a4f8011439e100275e154d9c755e12a8d0693b12a8ca8596c9af71d595958",
+      "domain": "general",
+      "name": "run:deblur-real-raw-private-proof",
+      "target": "repo-script",
+      "usage": "run",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:cd6e15991def885a2a390873b040a427f5f9fafdb94ab6c9a7907cbe7d9047cf",
+      "domain": "general",
+      "name": "run:denoise-real-raw-private-proof",
+      "target": "repo-script",
+      "usage": "run",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:8b775590bc8c414738ee5a19f3bdc9a602dcb21d7333f613d88cb2d1c92a0c57",
       "domain": "focus-stacking",
       "name": "run:focus-real-raw-private-proof",
@@ -3506,6 +4458,38 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:93cfc4728bdb9e7a7716d1f96c7f5d8bb05b404f701a316a01804bb2ecf81b5d",
+      "domain": "color",
+      "name": "run:professional-color-workflow-private-proof",
+      "target": "repo-script",
+      "usage": "run",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:c18da4472c7eccbd2e3961a22e8f1212e5c7967e9b41d0b533d588f4505520be",
+      "domain": "color",
+      "name": "run:raw-color-management-private-proof",
+      "target": "repo-script",
+      "usage": "run",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:24fd8508943058e76ea88b2dd540abea358d87df1b2e8c2e823c808adb47e66e",
+      "domain": "color",
+      "name": "run:selective-color-local-raw-private-proof",
+      "target": "repo-script",
+      "usage": "run",
+      "workflowReferences": []
+    },
+    {
+      "commandHash": "sha256:1856c00dbf51bbb1735b81d6745af336e3662e2af173eed294feb931d2b9cc74",
+      "domain": "color",
+      "name": "run:skin-tone-uniformity-local-raw-private-proof",
+      "target": "repo-script",
+      "usage": "run",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:a4fb478b43dffaddd1cf2f5c04ac9ecc808fb274024bf0a7054849f7a18a5f8b",
       "domain": "super-resolution",
       "name": "run:sr-real-raw-private-proof",
@@ -3514,7 +4498,7 @@
       "workflowReferences": []
     },
     {
-      "commandHash": "sha256:1847f61573975a6e6d94e9cf8bb732159af024f4067320b5007633cf2a3f64ba",
+      "commandHash": "sha256:e92ad70e0aba7632f08e68767ee803daa97d9d54a3819e16df3fd5bbcd016181",
       "domain": "schema",
       "name": "schema:check",
       "target": "script-group",
@@ -3665,41 +4649,41 @@
   ],
   "summary": {
     "byDomain": {
-      "agent-app-server": 13,
-      "color": 29,
-      "film-simulation": 22,
-      "focus-stacking": 27,
+      "agent-app-server": 22,
+      "color": 49,
+      "film-simulation": 25,
+      "focus-stacking": 34,
       "frontend-build": 18,
-      "general": 200,
-      "hdr": 26,
+      "general": 240,
+      "hdr": 36,
       "i18n": 4,
-      "negative-lab": 22,
-      "panorama": 30,
+      "negative-lab": 30,
+      "panorama": 45,
       "raw-open-edit-export": 9,
-      "rust": 16,
-      "schema": 10,
-      "super-resolution": 22,
+      "rust": 17,
+      "schema": 11,
+      "super-resolution": 31,
       "supply-chain": 6
     },
     "byTarget": {
-      "cargo": 8,
-      "integration-check": 322,
-      "other": 12,
-      "repo-script": 50,
+      "cargo": 10,
+      "integration-check": 421,
+      "other": 13,
+      "repo-script": 65,
       "schema-script": 6,
       "script-group": 12,
-      "visual-smoke": 19,
+      "visual-smoke": 25,
       "wrapped-command": 25
     },
     "byUsage": {
       "build": 2,
-      "check": 395,
-      "prepare": 7,
+      "check": 510,
+      "prepare": 9,
       "release": 2,
-      "run": 4,
+      "run": 10,
       "utility": 44
     },
-    "totalScripts": 454,
+    "totalScripts": 577,
     "workflowReferencedScripts": 38
   }
 }

@@ -2,11 +2,10 @@
 
 import { readFile } from 'node:fs/promises';
 
-const [source, locale, packageJson, currentPrLocal] = await Promise.all([
+const [source, locale, packageJson] = await Promise.all([
   readFile('src/components/panel/editor/Waveform.tsx', 'utf8'),
   readFile('src/i18n/locales/en.json', 'utf8'),
   readFile('package.json', 'utf8'),
-  readFile('tests/integration/checks/check-current-pr-local.ts', 'utf8'),
 ]);
 
 const localeJson = JSON.parse(locale) as {
@@ -34,10 +33,6 @@ const failures = [
 
 if (!packageJson.includes('"check:histogram-clipping-ui"')) {
   failures.push('missing package script: check:histogram-clipping-ui');
-}
-
-if (!currentPrLocal.includes("'check:histogram-clipping-ui'")) {
-  failures.push('missing current-pr-local route: check:histogram-clipping-ui');
 }
 
 if (failures.length > 0) {

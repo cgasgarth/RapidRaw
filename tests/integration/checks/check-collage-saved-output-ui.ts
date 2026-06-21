@@ -5,7 +5,6 @@ import { readFileSync } from 'node:fs';
 import { getDisplayFileName } from '../../../src/utils/displayFilePath.ts';
 
 const source = readFileSync('src/components/modals/CollageModal.tsx', 'utf8');
-const currentPrLocal = readFileSync('tests/integration/checks/check-current-pr-local.ts', 'utf8');
 const packageJson = readFileSync('package.json', 'utf8');
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 
@@ -44,10 +43,6 @@ if (typeof locale.modals?.collage?.saved !== 'string') failures.push('missing co
 
 if (!packageJson.includes('"check:collage-saved-output-ui"')) {
   failures.push('missing package script: check:collage-saved-output-ui');
-}
-
-if (!currentPrLocal.includes("'check:collage-saved-output-ui'")) {
-  failures.push('missing current-pr-local route: check:collage-saved-output-ui');
 }
 
 if (failures.length > 0) {
