@@ -41,7 +41,6 @@ const failures = [
 if (!packageJson.includes('"check:export-readiness-ui"')) {
   failures.push('missing package script: check:export-readiness-ui');
 }
-
 if (failures.length > 0) {
   console.error('export readiness UI check failed');
   for (const failure of failures.slice(0, 12)) console.error(`- ${failure}`);

@@ -56,12 +56,6 @@
     },
     {
       "exists": true,
-      "label": "Validation inventory",
-      "path": "docs/validation/validation-inventory-report-2026-06-20.json",
-      "status": "review"
-    },
-    {
-      "exists": true,
       "label": "Public fixture manifest",
       "path": "docs/validation/public-fixture-manifest.json",
       "status": "review"
@@ -71,12 +65,10 @@
   "issue": 2365,
   "openRuntimeIssues": [1508, 2148, 2308, 2309, 2310, 2311, 2312, 2313, 2314, 2315, 2476],
   "schemaVersion": 1,
-  "summary": { "totalValidationScripts": 454, "workflowReferencedScripts": 38 },
   "validationCommands": [
     "bun run check:goal-progress-report",
     "bun run check:goal-review-data",
     "bun run check:goal-review-page",
-    "bun run check:goal-review-screenshot",
-    "bun run check:validation-inventory"
+    "bun run check:goal-review-screenshot"
   ]
 }

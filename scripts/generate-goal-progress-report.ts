@@ -11,18 +11,6 @@ const HTML_REPORT_PATH = 'docs/validation/goal-progress-report-2026-06-20.html';
 const GENERATED_AT = '2026-06-20T00:00:00.000Z';
 const UPDATE = process.argv.includes('--update');
 
-const inventorySchema = z
-  .object({
-    summary: z
-      .object({
-        byDomain: z.record(z.string(), z.number().int().nonnegative()),
-        totalScripts: z.number().int().positive(),
-        workflowReferencedScripts: z.number().int().nonnegative(),
-      })
-      .passthrough(),
-  })
-  .passthrough();
-
 const artifactSchema = z
   .object({
     exists: z.boolean(),
@@ -39,19 +27,9 @@ const reportSchema = z
     issue: z.literal(2365),
     openRuntimeIssues: z.array(z.number().int().positive()).min(1),
     schemaVersion: z.literal(1),
-    summary: z
-      .object({
-        totalValidationScripts: z.number().int().positive(),
-        workflowReferencedScripts: z.number().int().nonnegative(),
-      })
-      .strict(),
     validationCommands: z.array(z.string().trim().min(1)).min(4),
   })
   .strict();
-
-const inventory = inventorySchema.parse(
-  JSON.parse(await readFile('docs/validation/validation-inventory-report-2026-06-20.json', 'utf8')),
-);
 
 const artifacts = [
   artifact('Goal review page', 'docs/validation/goal-review-2026-06-11.html', 'review'),
@@ -87,7 +65,6 @@ const artifacts = [
     'docs/validation/selective-color-private-ui-proof-2026-06-20.json',
     'private-gated',
   ),
-  artifact('Validation inventory', 'docs/validation/validation-inventory-report-2026-06-20.json', 'review'),
   artifact('Public fixture manifest', 'docs/validation/public-fixture-manifest.json', 'review'),
 ] satisfies Array<z.infer<typeof artifactSchema>>;
 
@@ -97,16 +74,11 @@ const report = reportSchema.parse({
   issue: 2365,
   openRuntimeIssues: [1508, 2148, 2308, 2309, 2310, 2311, 2312, 2313, 2314, 2315, 2476],
   schemaVersion: 1,
-  summary: {
-    totalValidationScripts: inventory.summary.totalScripts,
-    workflowReferencedScripts: inventory.summary.workflowReferencedScripts,
-  },
   validationCommands: [
     'bun run check:goal-progress-report',
     'bun run check:goal-review-data',
     'bun run check:goal-review-page',
     'bun run check:goal-review-screenshot',
-    'bun run check:validation-inventory',
   ],
 });
 
@@ -166,7 +138,7 @@ function renderHtml(data: z.infer<typeof reportSchema>): string {
       main { max-width: 1080px; margin: 0 auto; padding: 32px 24px 48px; }
       h1 { margin: 0 0 8px; font-size: 32px; }
       h2 { margin: 28px 0 12px; font-size: 21px; }
-      .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+      .summary { display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
       .metric, table { border: 1px solid #d8dee8; background: #fff; border-radius: 8px; }
       .metric { padding: 14px; }
       .metric strong { display: block; font-size: 24px; }
@@ -182,8 +154,6 @@ function renderHtml(data: z.infer<typeof reportSchema>): string {
       <h1>RawEngine Goal Progress Report</h1>
       <p>Generated ${escapeHtml(data.generatedAt)}. This report is a local review index, not runtime feature completion proof.</p>
       <section class="summary">
-        <div class="metric"><span>Validation scripts</span><strong>${data.summary.totalValidationScripts}</strong></div>
-        <div class="metric"><span>Workflow referenced</span><strong>${data.summary.workflowReferencedScripts}</strong></div>
         <div class="metric"><span>Tracked artifacts</span><strong>${data.artifacts.length}</strong></div>
       </section>
       <h2>Artifacts</h2>
