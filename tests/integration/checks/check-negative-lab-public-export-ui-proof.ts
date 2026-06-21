@@ -118,8 +118,11 @@ const uiProofReportSchema = z
       })
       .strict(),
     controlSurface: exportReportSchema.shape.controlSurface,
+    e2eIssue: z.literal(2311),
     fixtureId: z.literal('negative_lab.real.public.cc0_110_ericht_negative_001'),
     issue: z.literal(2311),
+    proofBoundary: z.literal('public_jpeg_scan_ui_smoke_not_raw_scan_e2e'),
+    proofStatus: z.literal('public_scan_positive_export_ui_smoke'),
     schemaVersion: z.literal(1),
     sourcePath: z.literal('fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg'),
     validationCommands: z
@@ -198,8 +201,11 @@ const expectedReport = uiProofReportSchema.parse({
     sidecarPath: exportReport.sidecar.path,
   },
   controlSurface: exportReport.controlSurface,
+  e2eIssue: 2311,
   fixtureId: exportReport.fixtureId,
   issue: 2311,
+  proofBoundary: 'public_jpeg_scan_ui_smoke_not_raw_scan_e2e',
+  proofStatus: 'public_scan_positive_export_ui_smoke',
   schemaVersion: 1,
   sourcePath: exportReport.source.path,
   validationCommands: [

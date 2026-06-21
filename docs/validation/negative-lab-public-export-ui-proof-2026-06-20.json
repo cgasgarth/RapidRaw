@@ -56,8 +56,11 @@
       "processFamily": "c41_color_negative"
     }
   },
+  "e2eIssue": 2311,
   "fixtureId": "negative_lab.real.public.cc0_110_ericht_negative_001",
   "issue": 2311,
+  "proofBoundary": "public_jpeg_scan_ui_smoke_not_raw_scan_e2e",
+  "proofStatus": "public_scan_positive_export_ui_smoke",
   "schemaVersion": 1,
   "sourcePath": "fixtures/negative-lab/public/110-format-ericht-negative-cc0-320.jpg",
   "validationCommands": [
