@@ -17,7 +17,7 @@
     "icc_colorimetric_accuracy"
   ],
   "fixtureId": "validation.color.professional-workflow.local-cc-raw.v1",
-  "generatedAt": "2026-06-20T23:13:25.650Z",
+  "generatedAt": "2026-06-21T00:15:21.505Z",
   "issue": 2309,
   "localRawRuntime": {
     "artifactRoot": "private-artifacts/validation/open-edit-export",
@@ -44,8 +44,13 @@
     "licenseEvidence": "User explicitly provided /Users/cgas/Pictures/Capture One/Alaska as project-owned RAW validation input for this repo.",
     "licenseSummary": "Project-owned local RAW sample for software development validation.",
     "localPath": "private-fixtures/color/professional-workflow-v1/alaska-dsc7853.arw",
-    "sha256": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b"
+    "sha256": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+    "sourceFolder": "/Users/cgas/Pictures/Capture One/Alaska"
   },
+  "validationCommands": [
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-professional-color-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:professional-color-workflow-private-proof -- --require-assets",
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-professional-color-alaska-proof bun run check:professional-color-workflow-local-raw-proof -- --require-assets"
+  ],
   "validationMode": "local_cc_raw_runtime_plus_visual_smoke",
   "workflowArtifacts": [
     {
@@ -79,7 +84,7 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:c52cab57aec5b91f96b5914b73b7e97672f172ac8e55b4e026ae07810c69e1cd",
+      "hash": "sha256:e843621da4604a6b88f2bc2bf06595dd17e9afe3198a5f9d7d8d366a8d5f47af",
       "kind": "visual_smoke_screenshot",
       "path": "artifacts/visual-smoke/color-workflow.png",
       "publicRepoAllowed": false

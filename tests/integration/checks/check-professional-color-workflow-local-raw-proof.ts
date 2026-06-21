@@ -16,8 +16,12 @@ const privateRoot = process.env.RAWENGINE_PRIVATE_RAW_ROOT;
 const request = rawOpenEditExportProofRequestSchema.parse(JSON.parse(await readFile(REQUEST_PATH, 'utf8')));
 const WORKFLOW_REPORT_PATH = `${request.artifactDirRelative}/professional-color-v1-workflow-report.json`;
 const VISUAL_SMOKE_SCREENSHOT_PATH = 'artifacts/visual-smoke/color-workflow.png';
+const PRIVATE_ROOT = '/tmp/rawengine-professional-color-alaska-proof';
+const PRIVATE_SOURCE = '/Users/cgas/Pictures/Capture One/Alaska';
 const PROFESSIONAL_RUNTIME_COMMAND =
   'RAWENGINE_RUN_PRIVATE_RAW_PROFESSIONAL_COLOR_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_professional_color_report_when_enabled -- --nocapture';
+const PROFESSIONAL_SOURCE_FOLDER_PROOF_COMMAND = `RAWENGINE_PRIVATE_RAW_ROOT=${PRIVATE_ROOT} RAWENGINE_PRIVATE_RAW_SOURCE="${PRIVATE_SOURCE}" bun run check:professional-color-workflow-private-proof -- --require-assets`;
+const PROFESSIONAL_ASSET_PROOF_COMMAND = `RAWENGINE_PRIVATE_RAW_ROOT=${PRIVATE_ROOT} bun run check:professional-color-workflow-local-raw-proof -- --require-assets`;
 
 const hashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
 const artifactSchema = z
@@ -103,8 +107,12 @@ const reportSchema = z
         licenseSummary: z.literal('Project-owned local RAW sample for software development validation.'),
         localPath: z.literal(request.sourceRelativePath),
         sha256: hashSchema,
+        sourceFolder: z.literal(PRIVATE_SOURCE),
       })
       .strict(),
+    validationCommands: z
+      .array(z.enum([PROFESSIONAL_SOURCE_FOLDER_PROOF_COMMAND, PROFESSIONAL_ASSET_PROOF_COMMAND]))
+      .length(2),
     validationMode: z.literal('local_cc_raw_runtime_plus_visual_smoke'),
     workflowArtifacts: z.array(artifactSchema).length(6),
   })
@@ -200,7 +208,9 @@ if (UPDATE_REPORT) {
       licenseSummary: 'Project-owned local RAW sample for software development validation.',
       localPath: workflowReport.sourceRaw.path,
       sha256: workflowReport.sourceRaw.hash,
+      sourceFolder: PRIVATE_SOURCE,
     },
+    validationCommands: [PROFESSIONAL_SOURCE_FOLDER_PROOF_COMMAND, PROFESSIONAL_ASSET_PROOF_COMMAND],
     validationMode: 'local_cc_raw_runtime_plus_visual_smoke',
     workflowArtifacts: [...workflowReport.artifacts, visualSmokeScreenshot],
   });
