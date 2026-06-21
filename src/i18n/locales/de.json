@@ -2586,13 +2586,19 @@
     },
     "exportPresets": {
       "builtIn": "Built-in",
+      "builtInRecipeCount_one": "{{count}} built-in",
+      "builtInRecipeCount_other": "{{count}} built-in",
       "deleteTooltip": "Vorgabe löschen",
       "heading": "Export-Vorgaben",
       "overwriteTooltip": "Ausgewählte Vorgabe überschreiben",
       "placeholder": "Vorgabe auswählen...",
       "presetNamePlaceholder": "Vorgaben-Name",
+      "recipeCount_one": "{{count}} recipe",
+      "recipeCount_other": "{{count}} recipes",
       "saveAsNewTooltip": "Aktuelle Einstellungen als neue Vorgabe speichern",
-      "savedTooltip": "Gespeichert!"
+      "savedTooltip": "Gespeichert!",
+      "validRecipeCount_one": "{{count}} valid",
+      "validRecipeCount_other": "{{count}} valid"
     },
     "filmstrip": {
       "tooltips": {

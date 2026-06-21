@@ -2579,13 +2579,19 @@
     },
     "exportPresets": {
       "builtIn": "Built-in",
+      "builtInRecipeCount_one": "{{count}} built-in",
+      "builtInRecipeCount_other": "{{count}} built-in",
       "deleteTooltip": "删除预设",
       "heading": "导出预设",
       "overwriteTooltip": "覆盖所选预设",
       "placeholder": "选择一个预设...",
       "presetNamePlaceholder": "预设名称",
+      "recipeCount_one": "{{count}} recipe",
+      "recipeCount_other": "{{count}} recipes",
       "saveAsNewTooltip": "将当前设置保存为新预设",
-      "savedTooltip": "已保存！"
+      "savedTooltip": "已保存！",
+      "validRecipeCount_one": "{{count}} valid",
+      "validRecipeCount_other": "{{count}} valid"
     },
     "filmstrip": {
       "tooltips": {

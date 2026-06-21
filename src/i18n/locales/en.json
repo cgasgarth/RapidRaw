@@ -2586,13 +2586,19 @@
     },
     "exportPresets": {
       "builtIn": "Built-in",
+      "builtInRecipeCount_one": "{{count}} built-in",
+      "builtInRecipeCount_other": "{{count}} built-in",
       "deleteTooltip": "Delete preset",
       "heading": "Export Presets",
       "overwriteTooltip": "Overwrite selected preset",
       "placeholder": "Select a preset...",
       "presetNamePlaceholder": "Preset Name",
+      "recipeCount_one": "{{count}} recipe",
+      "recipeCount_other": "{{count}} recipes",
       "saveAsNewTooltip": "Save current settings as new preset",
-      "savedTooltip": "Saved!"
+      "savedTooltip": "Saved!",
+      "validRecipeCount_one": "{{count}} valid",
+      "validRecipeCount_other": "{{count}} valid"
     },
     "filmstrip": {
       "tooltips": {
