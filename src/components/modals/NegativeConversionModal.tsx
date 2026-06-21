@@ -59,6 +59,7 @@ import { buildNegativeLabProfileBrowserRows } from '../../utils/negativeLabProfi
 import {
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
   buildNegativeLabStockMetadataCounts,
+  listNegativeLabStockMetadataReferencesForPreset,
 } from '../../utils/negativeLabStockMetadataCatalog';
 import { NEGATIVE_LAB_STOCK_REGISTRY, buildNegativeLabStockRegistryCounts } from '../../utils/negativeLabStockRegistry';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
@@ -486,6 +487,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
     return sortNegativeLabProfiles(filteredProfiles, profileSort);
   }, [normalizedProfileSearchQuery, profileFilter, profileSort]);
+  const selectedProfileStockReferences = useMemo(() => {
+    if (selectedProfile === null) return [];
+    return listNegativeLabStockMetadataReferencesForPreset(
+      selectedProfile.sourceGenericPresetId ?? selectedProfile.presetId,
+    );
+  }, [selectedProfile]);
   const frameHealthReport = useMemo(
     () =>
       buildNegativeLabFrameHealthReport({
@@ -1931,6 +1938,43 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                     selectedProfile.measurementProfileId ??
                     t('modals.negativeConversion.presetRuntimeCatalogOnly')}
                 </span>
+              </div>
+              <div
+                className="mb-2 rounded-md border border-surface bg-bg-secondary p-2 text-[11px]"
+                data-reference-count={selectedProfileStockReferences.length}
+                data-testid="negative-lab-selected-stock-references"
+              >
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="font-medium text-text-secondary">
+                    {t('modals.negativeConversion.stockReferenceCoverage')}
+                  </span>
+                  <span
+                    className="rounded bg-bg-primary px-1.5 py-0.5 text-[10px] tabular-nums text-text-tertiary"
+                    data-testid="negative-lab-selected-stock-reference-count"
+                  >
+                    {selectedProfileStockReferences.length}
+                  </span>
+                </div>
+                <UiText variant={TextVariants.small} className="text-text-tertiary">
+                  {selectedProfileStockReferences.length > 0
+                    ? t('modals.negativeConversion.stockReferenceCoverageSummary', {
+                        referenceCount: selectedProfileStockReferences.length,
+                      })
+                    : t('modals.negativeConversion.stockReferenceCoverageEmpty')}
+                </UiText>
+                {selectedProfileStockReferences.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5" data-testid="negative-lab-selected-stock-reference-list">
+                    {selectedProfileStockReferences.map((entry) => (
+                      <span
+                        className="rounded border border-surface bg-bg-primary px-2 py-1 text-[10px] text-text-secondary"
+                        data-testid={`negative-lab-selected-stock-reference-${entry.entryId}`}
+                        key={entry.entryId}
+                      >
+                        {entry.displayName} - {formatStockMetadataIso(entry.nominalIso)}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               {selectedPreset !== null && (
                 <UiText

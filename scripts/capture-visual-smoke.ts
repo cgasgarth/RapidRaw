@@ -1100,6 +1100,18 @@ async function prepareScenario(page, mode) {
     .getByText('C-41 family / Soft portrait color negative', { exact: true })
     .waitFor({ timeout: 10_000 });
   await page
+    .getByTestId('negative-lab-selected-stock-references')
+    .getByText('Reference coverage', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-selected-stock-reference-count')
+    .getByText('2', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
+    .getByTestId('negative-lab-selected-stock-reference-negative_lab.stock_metadata.kodak_portra_400.v1')
+    .getByText('Kodak Portra 400 - ISO 400', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page
     .getByTestId('negative-lab-stock-family-negative_lab.stock_family.ecn2_cinema_negative.v1')
     .getByText('legal review required', { exact: true })
     .waitFor({ timeout: 10_000 });
