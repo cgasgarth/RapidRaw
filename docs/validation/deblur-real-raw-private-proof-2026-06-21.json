@@ -1,0 +1,77 @@
+{
+  "doesNotProve": [
+    "capture_one_class_deblur_quality",
+    "gpu_deblur_parity",
+    "macos_app_ui_e2e_session",
+    "public_raw_fixture_distribution"
+  ],
+  "fixtureId": "validation.detail.deblur-real-raw.alaska.v1",
+  "generatedAt": "2026-06-21T15:02:09.163Z",
+  "issue": 2891,
+  "localRawRuntime": {
+    "artifactRoot": "private-artifacts/validation/detail-deblur-real-raw",
+    "command": "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-deblur-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:deblur-real-raw-private-proof -- --require-assets",
+    "metrics": {
+      "edgeEnergyRatio": 1.032566560875583,
+      "inputToPreviewMeanAbsDelta": 0.0001767607373610303,
+      "previewExportMeanAbsDelta": 0,
+      "previewExportP99AbsDelta": 0,
+      "sourceHashUnchanged": 1
+    },
+    "privateWorkflowReportPath": "private-artifacts/validation/detail-deblur-real-raw/alaska-deblur-v1-report.json",
+    "status": "passed"
+  },
+  "proofBoundary": "private_raw_runtime_not_final_deblur_quality",
+  "proofStatus": "private_raw_deblur_preview_export_parity",
+  "schemaVersion": 1,
+  "sourceRaw": {
+    "licenseEvidence": "User explicitly provided /Users/cgas/Pictures/Capture One/Alaska as project-owned RAW validation input for this repo.",
+    "licenseSummary": "Project-owned local RAW sample for software development validation.",
+    "localPath": "private-fixtures/detail/alaska-deblur-v1.arw",
+    "sha256": "sha256:f9eb82844d578f7019bd8c386382fd2b8fe575df10eb8c2fe44e7ffe8f4d78ab",
+    "sourceFolder": "/Users/cgas/Pictures/Capture One/Alaska"
+  },
+  "validationCommands": [
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-deblur-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun run check:deblur-real-raw-private-proof -- --require-assets",
+    "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-deblur-alaska-proof bun run check:deblur-real-raw-private-proof -- --require-assets"
+  ],
+  "validationMode": "local_alaska_raw_deblur_runtime",
+  "workflowArtifacts": [
+    {
+      "hash": "sha256:f9eb82844d578f7019bd8c386382fd2b8fe575df10eb8c2fe44e7ffe8f4d78ab",
+      "kind": "source_raw_private",
+      "path": "private-fixtures/detail/alaska-deblur-v1.arw",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:04033f8a414eb8cca1719b03236f80c2046f46ac58595c99c8c20631d850de8a",
+      "kind": "preview_before_private",
+      "path": "private-artifacts/validation/detail-deblur-real-raw/alaska-deblur-v1-preview-before.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:c326fca666c8eac1b6b3ef7089c08c25ff0704ae7333307965692ba5e6b90103",
+      "kind": "preview_after_private",
+      "path": "private-artifacts/validation/detail-deblur-real-raw/alaska-deblur-v1-preview-after.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:590679fe4d78dc6dc573401bbb7db7b4b8c7c1e37ea2c08f59c84ad35211c377",
+      "kind": "export_after_private",
+      "path": "private-artifacts/validation/detail-deblur-real-raw/alaska-deblur-v1-export-after.tiff",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:30fe6e3644c7db14bdf6e9232a05e197a965c2ba8b7edd2ed2849f1c8bfce39e",
+      "kind": "preview_export_diff_private",
+      "path": "private-artifacts/validation/detail-deblur-real-raw/alaska-deblur-v1-preview-export-diff.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:9d84a7cfedc858b9c672c365de0209e1a1a33117c3f8b83c0e86a26c715ebd6d",
+      "kind": "workflow_report_private",
+      "path": "private-artifacts/validation/detail-deblur-real-raw/alaska-deblur-v1-report.json",
+      "publicRepoAllowed": false
+    }
+  ]
+}

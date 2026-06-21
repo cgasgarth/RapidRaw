@@ -19,6 +19,8 @@ mod color_gpu_readback_probe;
 mod culling;
 mod deblur_api;
 pub mod deblur_cpu_reference;
+#[cfg(all(test, feature = "tauri-test"))]
+mod deblur_real_raw_proof;
 mod deblur_render;
 mod denoise_api;
 pub mod denoise_cpu_reference;
