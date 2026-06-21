@@ -35,6 +35,11 @@ import {
 import { parsePathProgressPayload } from '../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants } from '../../types/typography';
 import { NegativeLabAppServerCommandName } from '../../utils/negativeLabAppServerCommandNames';
+import {
+  buildNegativeLabBaseSamplePreviewProof,
+  type NegativeLabBaseSamplePreviewProof,
+  type NegativeLabBaseSamplePreviewProofContext,
+} from '../../utils/negativeLabBaseSampleCommandBridge';
 import { buildNegativeBaseFogDensitometerReadout } from '../../utils/negativeLabDensitometer';
 import {
   buildNegativeLabDustScratchReviewReport,
@@ -342,6 +347,7 @@ interface BaseFogSampleUndoEntry {
   activeBaseFogSampleLabel: string | null;
   baseFogConfidence: number | null;
   baseFogEstimate: NegativeBaseFogEstimate | null;
+  baseFogPreviewProof: NegativeLabBaseSamplePreviewProof | null;
   params: NegativeParams;
   selectedPresetId: string;
 }
@@ -356,6 +362,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [isEstimatingBaseFog, setIsEstimatingBaseFog] = useState(false);
   const [baseFogConfidence, setBaseFogConfidence] = useState<number | null>(null);
   const [baseFogEstimate, setBaseFogEstimate] = useState<NegativeBaseFogEstimate | null>(null);
+  const [baseFogPreviewProof, setBaseFogPreviewProof] = useState<NegativeLabBaseSamplePreviewProof | null>(null);
   const [baseFogReadoutCopied, setBaseFogReadoutCopied] = useState(false);
   const [patchProbeEstimate, setPatchProbeEstimate] = useState<NegativeBaseFogEstimate | null>(null);
   const [patchProbeRect, setPatchProbeRect] = useState<NegativeLabBaseFogSampleRect | null>(null);
@@ -735,24 +742,42 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
 
   const updatePreview = useMemo(
     () =>
-      throttle(async (currentParams: NegativeParams, isInitialLoad: boolean = false) => {
-        if (!selectedImagePath) return;
-        try {
-          const result: string = await invoke(Invokes.PreviewNegativeConversion, {
-            path: selectedImagePath,
-            params: currentParams,
-          });
-          setPreviewUrl(result);
-          if (isInitialLoad) {
-            setIsLoading(false);
+      throttle(
+        async (
+          currentParams: NegativeParams,
+          isInitialLoad: boolean = false,
+          baseSampleProofContext: NegativeLabBaseSamplePreviewProofContext | null = null,
+        ) => {
+          if (!selectedImagePath) return;
+          const previewRevision = 1;
+          try {
+            const result: string = await invoke(Invokes.PreviewNegativeConversion, {
+              path: selectedImagePath,
+              params: currentParams,
+            });
+            setPreviewUrl(result);
+            if (baseSampleProofContext !== null) {
+              setBaseFogPreviewProof(
+                buildNegativeLabBaseSamplePreviewProof(
+                  baseSampleProofContext,
+                  result,
+                  buildNegativeBaseFogDensitometerReadout(baseSampleProofContext.estimate),
+                  previewRevision,
+                ),
+              );
+            }
+            if (isInitialLoad) {
+              setIsLoading(false);
+            }
+          } catch (e) {
+            console.error('Negative preview failed', e);
+            if (isInitialLoad) {
+              setIsLoading(false);
+            }
           }
-        } catch (e) {
-          console.error('Negative preview failed', e);
-          if (isInitialLoad) {
-            setIsLoading(false);
-          }
-        }
-      }, 100),
+        },
+        100,
+      ),
     [selectedImagePath],
   );
 
@@ -787,6 +812,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       resetViewport();
       setBaseFogConfidence(null);
       setBaseFogEstimate(null);
+      setBaseFogPreviewProof(null);
       setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(null);
       setBaseFogSampleUndoStack([]);
@@ -809,6 +835,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setSelectedPresetId('');
     if (key !== 'base_fog_strength') {
       setBaseFogConfidence(null);
+      setBaseFogPreviewProof(null);
       setActiveBaseFogSampleLabel(null);
     }
     setParams(newParams);
@@ -822,6 +849,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setSelectedPresetId(preset.presetId);
     setBaseFogConfidence(null);
     setBaseFogEstimate(null);
+    setBaseFogPreviewProof(null);
     setBaseFogReadoutCopied(false);
     setActiveBaseFogSampleLabel(null);
     setBaseFogSampleUndoStack([]);
@@ -837,6 +865,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         activeBaseFogSampleLabel,
         baseFogConfidence,
         baseFogEstimate,
+        baseFogPreviewProof,
         params,
         selectedPresetId,
       },
@@ -849,6 +878,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogSampleUndoStack((stack) => stack.slice(0, -1));
     setBaseFogConfidence(previous.baseFogConfidence);
     setBaseFogEstimate(previous.baseFogEstimate);
+    setBaseFogPreviewProof(previous.baseFogPreviewProof);
     setBaseFogReadoutCopied(false);
     setActiveBaseFogSampleLabel(previous.activeBaseFogSampleLabel);
     setSelectedPresetId(previous.selectedPresetId);
@@ -877,6 +907,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         green_weight: estimate.greenWeight,
         red_weight: estimate.redWeight,
       };
+      const proofContext: NegativeLabBaseSamplePreviewProofContext = {
+        estimate,
+        frameId: `frame_${effectiveActivePathIndex + 1}`,
+        imagePath: selectedImagePath,
+        previewBeforeUrl: previewUrl,
+        sampleRect: null,
+        source: 'auto_full_frame',
+      };
       pushBaseFogSampleUndoEntry();
       setBaseFogConfidence(estimate.confidence);
       setBaseFogEstimate(estimate);
@@ -884,7 +922,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
-      updatePreview(nextParams);
+      updatePreview(nextParams, false, proofContext);
     } catch (e) {
       console.error('Negative base/fog estimate failed', e);
     } finally {
@@ -912,6 +950,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         green_weight: estimate.greenWeight,
         red_weight: estimate.redWeight,
       };
+      const proofContext: NegativeLabBaseSamplePreviewProofContext = {
+        estimate,
+        frameId: `frame_${effectiveActivePathIndex + 1}`,
+        imagePath: selectedImagePath,
+        previewBeforeUrl: previewUrl,
+        sampleRect,
+        source: 'preset_rect',
+      };
       pushBaseFogSampleUndoEntry();
       setBaseFogConfidence(estimate.confidence);
       setBaseFogEstimate(estimate);
@@ -919,7 +965,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       setActiveBaseFogSampleLabel(t(labelKey));
       setParams(nextParams);
       setAcceptedBatchPlanJson(null);
-      updatePreview(nextParams);
+      updatePreview(nextParams, false, proofContext);
     } catch (e) {
       console.error('Base/fog sample failed', e);
     } finally {
@@ -955,7 +1001,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   };
 
   const handleApplyCustomBaseSample = () => {
-    if (customBaseSampleEstimate === null) return;
+    if (customBaseSampleEstimate === null || selectedImagePath === null) return;
     const nextParams = {
       ...params,
       base_fog_strength: 1,
@@ -964,6 +1010,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       green_weight: customBaseSampleEstimate.greenWeight,
       red_weight: customBaseSampleEstimate.redWeight,
     };
+    const proofContext: NegativeLabBaseSamplePreviewProofContext = {
+      estimate: customBaseSampleEstimate,
+      frameId: `frame_${effectiveActivePathIndex + 1}`,
+      imagePath: selectedImagePath,
+      previewBeforeUrl: previewUrl,
+      sampleRect: customBaseSampleRect,
+      source: 'custom_rect',
+    };
     pushBaseFogSampleUndoEntry();
     setBaseFogConfidence(customBaseSampleEstimate.confidence);
     setBaseFogEstimate(customBaseSampleEstimate);
@@ -971,7 +1025,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setActiveBaseFogSampleLabel(t('modals.negativeConversion.customBaseSample'));
     setParams(nextParams);
     setAcceptedBatchPlanJson(null);
-    updatePreview(nextParams);
+    updatePreview(nextParams, false, proofContext);
   };
 
   const handleSamplePatchProbe = async (
@@ -2424,6 +2478,27 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                   confidence: Math.round(baseFogConfidence * 100),
                 })}
               </UiText>
+            )}
+            {baseFogPreviewProof !== null && (
+              <div
+                className="grid grid-cols-2 gap-1 rounded-md border border-surface bg-bg-primary p-2 text-xs text-text-tertiary"
+                data-after-preview-hash={baseFogPreviewProof.previewAfterHash}
+                data-before-preview-hash={baseFogPreviewProof.previewBeforeHash ?? ''}
+                data-command-type={baseFogPreviewProof.command.commandType}
+                data-confidence={baseFogPreviewProof.confidence}
+                data-preview-changed={String(baseFogPreviewProof.previewChanged)}
+                data-preview-revision={baseFogPreviewProof.previewRevision}
+                data-sample-edit-mode={baseFogPreviewProof.command.parameters.sampleEditMode}
+                data-sample-id={baseFogPreviewProof.command.parameters.sampleRecords[0]?.sampleId ?? ''}
+                data-sample-source={baseFogPreviewProof.sampleSource}
+                data-testid="negative-lab-base-preview-proof"
+                data-warning-codes={baseFogPreviewProof.warningCodes.join(',')}
+              >
+                <span className="text-text-secondary">{t('modals.negativeConversion.baseFogSample')}</span>
+                <span className="text-right">{activeBaseFogSampleLabel}</span>
+                <span className="text-text-secondary">{t('modals.negativeConversion.previewReady')}</span>
+                <span className="text-right tabular-nums">{baseFogPreviewProof.previewChanged ? 'yes' : 'no'}</span>
+              </div>
             )}
             {baseFogSampleReadout !== null && (
               <div

@@ -1332,6 +1332,10 @@ async function prepareScenario(page, mode) {
         JSON.stringify(call.args ?? {}).includes('"base_fog_sample":{"height":0.18,"width":0.18,"x":0.25,"y":0.25}'),
     ),
   );
+  await page.waitForFunction(() => {
+    const proof = document.querySelector('[data-testid="negative-lab-base-preview-proof"]');
+    return proof?.getAttribute('data-sample-source') === 'custom_rect';
+  });
   await page.getByTestId('negative-lab-undo-base-sample').click();
   await page.getByTestId('negative-lab-base-sample-readout').getByText('Left edge', { exact: true }).waitFor({
     timeout: 10_000,
