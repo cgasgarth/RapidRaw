@@ -198,6 +198,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   addIf((file) => file === 'src/components/panel/MainLibrary.tsx', ['check:library-header-ui']);
   addIf((file) => file === 'src/components/panel/editor/Waveform.tsx', ['check:histogram-clipping-ui']);
   addIf((file) => file === 'src/components/panel/editor/EditorToolbar.tsx', ['check:editor-history-toolbar-ui']);
+  addIf((file) => file === 'src/components/modals/CommandPaletteModal.tsx', ['check:command-palette-coverage-ui']);
   addIf((file) => file === 'src/components/panel/right/MasksPanel.tsx', ['check:mask-readiness-ui']);
   addIf((file) => file === 'src/components/panel/right/ExportPanel.tsx', ['check:export-readiness-ui']);
   addIf(
@@ -375,6 +376,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/components/panel/MainLibrary.tsx'], ['check:library-header-ui']);
   assertSelfTestRoute(['src/components/panel/editor/Waveform.tsx'], ['check:histogram-clipping-ui']);
   assertSelfTestRoute(['src/components/panel/editor/EditorToolbar.tsx'], ['check:editor-history-toolbar-ui']);
+  assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-coverage-ui']);
   assertSelfTestRoute(['src/components/panel/right/MasksPanel.tsx'], ['check:mask-readiness-ui']);
   assertSelfTestRoute(['src/components/panel/right/ExportPanel.tsx'], ['check:export-readiness-ui']);
   assertSelfTestRoute(['src/components/ui/ExportPresetsList.tsx'], ['check:export-recipes-ui']);

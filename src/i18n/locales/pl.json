@@ -1540,6 +1540,12 @@
         "panorama": "Open panorama stitching",
         "superResolution": "Open super resolution"
       },
+      "coverage": {
+        "resultCount_one": "",
+        "resultCount_few": "",
+        "resultCount_many": "",
+        "resultCount_other": ""
+      },
       "noResults": "No commands found",
       "searchLabel": "Search commands",
       "searchPlaceholder": "Search commands...",

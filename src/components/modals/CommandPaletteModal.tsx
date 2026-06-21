@@ -207,6 +207,13 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
   }, [query, selectedImage, t]);
 
   const resolvedActiveIndex = Math.min(activeIndex, Math.max(visibleCommands.length - 1, 0));
+  const coverageCategories = useMemo(
+    () =>
+      Array.from(new Set(visibleCommands.map((command) => command.category))).map((category) =>
+        t(commandCategoryKeys[category]),
+      ),
+    [t, visibleCommands],
+  );
 
   if (!isOpen) return null;
 
@@ -354,6 +361,29 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
           >
             {t('modals.commandPalette.title')}
           </UiText>
+          <div className="mb-2 flex flex-wrap items-center gap-1.5 px-2" data-testid="command-palette-coverage-summary">
+            <UiText
+              as="span"
+              className="rounded bg-surface px-2 py-1"
+              color={TextColors.secondary}
+              data-command-palette-result-count={visibleCommands.length}
+              variant={TextVariants.small}
+            >
+              {t('modals.commandPalette.coverage.resultCount', { count: visibleCommands.length })}
+            </UiText>
+            {coverageCategories.map((category) => (
+              <UiText
+                as="span"
+                className="rounded bg-surface px-2 py-1"
+                color={TextColors.secondary}
+                data-command-palette-category={category}
+                key={category}
+                variant={TextVariants.small}
+              >
+                {category}
+              </UiText>
+            ))}
+          </div>
           {visibleCommands.length === 0 ? (
             <UiText className="px-2 py-8 text-center" color={TextColors.secondary}>
               {t('modals.commandPalette.noResults')}
