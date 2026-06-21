@@ -28,6 +28,8 @@ interface CullingModalProps {
 type CullAction = 'reject' | 'rate_zero' | 'delete';
 type CullingStage = 'settings' | 'progress' | 'results';
 
+const RAW_SOURCE_EXTENSIONS = new Set(['arw', 'cr2', 'cr3', 'dng', 'nef', 'orf', 'pef', 'raf', 'rw2', 'srw']);
+
 interface ImageThumbnailProps {
   children?: ReactNode;
   isSelected: boolean;
@@ -69,6 +71,12 @@ function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: Im
       )}
     </button>
   );
+}
+
+function getFileExtension(path: string): string {
+  const fileName = path.split(/[\\/]/).pop() ?? '';
+  const dotIndex = fileName.lastIndexOf('.');
+  return dotIndex > -1 ? fileName.slice(dotIndex + 1).toLowerCase() : '';
 }
 
 export default function CullingModal({
@@ -113,6 +121,20 @@ export default function CullingModal({
     if (progress) return 'progress';
     return 'settings';
   }, [error, progress, suggestions]);
+
+  const sourceMix = useMemo(
+    () =>
+      imagePaths.reduce(
+        (counts, path) => {
+          if (RAW_SOURCE_EXTENSIONS.has(getFileExtension(path))) {
+            return { ...counts, raw: counts.raw + 1 };
+          }
+          return { ...counts, raster: counts.raster + 1 };
+        },
+        { raster: 0, raw: 0 },
+      ),
+    [imagePaths],
+  );
 
   useEffect(() => {
     if (isOpen) return;
@@ -186,6 +208,8 @@ export default function CullingModal({
         data-blur-threshold={settings.blurThreshold}
         data-group-similar-enabled={String(settings.groupSimilar)}
         data-image-count={imagePaths.length}
+        data-raster-source-count={sourceMix.raster}
+        data-raw-source-count={sourceMix.raw}
         data-similarity-threshold={settings.similarityThreshold}
         data-testid="culling-setup-summary"
       >
@@ -193,6 +217,10 @@ export default function CullingModal({
           {
             label: t('modals.culling.summarySources'),
             value: t('modals.culling.summarySourceCount', { count: imagePaths.length }),
+          },
+          {
+            label: t('modals.culling.summarySourceMix'),
+            value: t('modals.culling.summarySourceMixValue', { raster: sourceMix.raster, raw: sourceMix.raw }),
           },
           {
             label: t('modals.culling.summarySimilar'),
