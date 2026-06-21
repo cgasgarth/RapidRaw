@@ -1626,6 +1626,9 @@
       "title": "Bilder aussortieren"
     },
     "denoise": {
+      "batchCompleteSummary_one": "{{count}} Ausgabe gespeichert",
+      "batchCompleteSummary_other": "{{count}} Ausgaben gespeichert",
+      "batchCompleteTitle": "Batch-Denoise abgeschlossen",
       "batchProgressFile": "Processing {{fileName}}",
       "batchProgressText": "Entrauschen von {{current}} aus {{total}}...",
       "btnBatchDenoise": "Stapel entrauschen & Speichern",
