@@ -289,8 +289,14 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   );
   addIf(
     (file) =>
-      file === 'src/components/panel/right/AgentChatShell.tsx' || file === 'src/utils/agentAppServerToolReadiness.ts',
-    ['check:agent-tool-readiness-ui'],
+      file === 'src/components/panel/right/AgentChatShell.tsx' ||
+      file === 'src/utils/agentAppServerToolReadiness.ts' ||
+      file === 'src/utils/agentChatTranscriptFixture.ts' ||
+      file === 'src/schemas/agentChatTranscriptSchemas.ts' ||
+      file === 'src/schemas/agentExpertEditDemoWorkflowSchemas.ts' ||
+      file === 'tests/integration/checks/check-agent-expert-edit-demo-workflow.ts' ||
+      file.startsWith('docs/validation/agent-expert-edit-demo-workflow-'),
+    ['check:agent-tool-readiness-ui', 'check:agent-chat-ui', 'check:agent-expert-edit-demo-workflow'],
   );
   addIf(
     (file) => file.includes('panoramaSyntheticStitch') || file.includes('panorama-exposure-runtime-proof'),

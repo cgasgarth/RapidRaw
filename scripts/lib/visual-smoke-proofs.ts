@@ -415,28 +415,28 @@ export const selectiveColorUiProofDatasetSchema = z.object({
   commandType: z.literal('toneColor.adjustHsl'),
 });
 export const agentChatProofDatasetSchema = z.object({
-  agentRuntimeStatus: z.literal('ui_only_demo'),
+  agentRuntimeStatus: z.literal('runtime_apply_demo'),
 });
 export const agentArtifactReviewProofDatasetSchema = z.object({
   artifactCount: z.literal('3'),
   auditCount: z.literal('3'),
-  beforeRevision: z.literal('graph_rev_44'),
+  beforeRevision: z.literal('graph_rev_agent_expert_edit_demo_initial_2844'),
 });
 export const agentAuditTranscriptViewerProofDatasetSchema = z.object({
   applyRecordCount: z.literal('1'),
   artifactLinkCount: z.literal('3'),
-  evidenceTier: z.literal('schema_only'),
+  evidenceTier: z.literal('runtime_apply_demo'),
   recordCount: z.literal('3'),
-  replayRoot: z.string().endsWith('agent-replay-proof-gallery-2026-06-16.html'),
+  replayRoot: z.string().endsWith('agent-expert-edit-demo-workflow-2026-06-21.html'),
   schemaVersion: z.literal('1'),
-  warningCount: z.literal('2'),
+  warningCount: z.literal('1'),
 });
 export const agentDryRunReviewProofDatasetSchema = z.object({
   actionCount: z.literal('3'),
   affectedTargetCount: z.literal('3'),
-  applyAvailability: z.literal('unavailable'),
+  applyAvailability: z.literal('runtime_apply_demo'),
   approvalStates: z.string().superRefine((states, context) => {
-    for (const expectedState of ['available', 'unavailable']) {
+    for (const expectedState of ['available']) {
       if (!states.split(',').includes(expectedState)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,

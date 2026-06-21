@@ -58,6 +58,15 @@ type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
 
 const formatRouteFamily = (family: string): string => family.replaceAll('_', ' ');
 
+const agentRuntimeBadge = {
+  runtime_apply_demo: {
+    className: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-100',
+  },
+  ui_only_demo: {
+    className: 'border-amber-500/25 bg-amber-500/10 text-amber-100',
+  },
+} satisfies Record<AgentChatTranscript['runtimeStatus'], { className: string }>;
+
 function MessageBubble({ message }: { message: AgentChatMessage }) {
   const isUser = message.role === 'user';
 
@@ -273,22 +282,35 @@ function AuditTranscriptViewer({ auditTranscript }: { auditTranscript: AgentAudi
   );
 }
 
-function DryRunReviewPanel({ review }: { review: AgentChatDryRunReview }) {
+function DryRunReviewPanel({
+  review,
+  runtimeStatus,
+}: {
+  review: AgentChatDryRunReview;
+  runtimeStatus: AgentChatTranscript['runtimeStatus'];
+}) {
   const { t } = useTranslation();
   const [localDecision, setLocalDecision] = useState<LocalReviewDecision>('pending');
   const applyUnavailableReason =
-    localDecision === 'approved'
-      ? t('editor.ai.agent.review.noReplayApply')
-      : localDecision === 'rejected'
-        ? t('editor.ai.agent.review.rejectedApply')
-        : t('editor.ai.agent.review.pendingApply');
+    runtimeStatus === 'runtime_apply_demo'
+      ? t('editor.ai.agent.review.runtimeReplayApply')
+      : localDecision === 'approved'
+        ? t('editor.ai.agent.review.noReplayApply')
+        : localDecision === 'rejected'
+          ? t('editor.ai.agent.review.rejectedApply')
+          : t('editor.ai.agent.review.pendingApply');
+  const applyAvailability = runtimeStatus === 'runtime_apply_demo' ? 'runtime_apply_demo' : 'unavailable';
+  const applyLabel =
+    runtimeStatus === 'runtime_apply_demo'
+      ? t('editor.ai.agent.runtimeApplyProof')
+      : t('editor.ai.agent.review.applyUnavailable');
 
   return (
     <div
       className="space-y-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3"
       data-action-count={review.actions.length}
       data-affected-target-count={review.affectedTargets.length}
-      data-apply-availability="unavailable"
+      data-apply-availability={applyAvailability}
       data-approval-states={review.actions.map((action) => action.state).join(',')}
       data-local-review-decision={localDecision}
       data-parameter-diff-count={review.parameterDiffs.length}
@@ -375,7 +397,7 @@ function DryRunReviewPanel({ review }: { review: AgentChatDryRunReview }) {
           disabled
           type="button"
         >
-          <span className="block font-semibold text-text-primary">{t('editor.ai.agent.review.applyUnavailable')}</span>
+          <span className="block font-semibold text-text-primary">{applyLabel}</span>
           <span className="mt-1 block leading-4">{applyUnavailableReason}</span>
         </button>
       </div>
@@ -510,6 +532,7 @@ function AppServerToolReadinessSummary() {
 
 export default function AgentChatShell({ transcript }: AgentChatShellProps) {
   const { t } = useTranslation();
+  const runtimeBadge = agentRuntimeBadge[transcript.runtimeStatus];
 
   return (
     <section
@@ -525,8 +548,10 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
           </div>
           <p className="mt-1 text-xs text-text-secondary">{transcript.sessionTitle}</p>
         </div>
-        <span className="rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-100">
-          {t('editor.ai.agent.uiOnly')}
+        <span className={`rounded border px-2 py-1 text-[11px] ${runtimeBadge.className}`}>
+          {transcript.runtimeStatus === 'runtime_apply_demo'
+            ? t('editor.ai.agent.runtimeApplyDemo')
+            : t('editor.ai.agent.uiOnly')}
         </span>
       </div>
 
@@ -541,7 +566,11 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       <div className="space-y-2" data-testid="agent-tool-transcript">
         <div className="flex items-center justify-between text-xs">
           <span className="font-semibold text-text-primary">{t('editor.ai.agent.transcript')}</span>
-          <span className="text-text-secondary">{t('editor.ai.agent.noAppliedEdits')}</span>
+          <span className="text-text-secondary">
+            {transcript.runtimeStatus === 'runtime_apply_demo'
+              ? t('editor.ai.agent.runtimeApplyProof')
+              : t('editor.ai.agent.noAppliedEdits')}
+          </span>
         </div>
         {transcript.toolCalls.map((toolCall) => (
           <ToolCallRow key={toolCall.id} toolCall={toolCall} />
@@ -552,7 +581,9 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
 
       {transcript.auditTranscript ? <AuditTranscriptViewer auditTranscript={transcript.auditTranscript} /> : null}
 
-      {transcript.dryRunReview ? <DryRunReviewPanel review={transcript.dryRunReview} /> : null}
+      {transcript.dryRunReview ? (
+        <DryRunReviewPanel review={transcript.dryRunReview} runtimeStatus={transcript.runtimeStatus} />
+      ) : null}
     </section>
   );
 }

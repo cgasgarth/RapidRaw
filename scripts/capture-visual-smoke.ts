@@ -486,7 +486,7 @@ async function prepareScenario(page, mode) {
     agentArtifactReviewProofDatasetSchema.parse(await artifacts.evaluate((element) => ({ ...element.dataset })));
     const review = page.getByTestId('agent-dry-run-review');
     agentDryRunReviewProofDatasetSchema.parse(await review.evaluate((element) => ({ ...element.dataset })));
-    await page.getByTestId('agent-chat-messages').getByText('Dry-run only.', { exact: false }).waitFor({
+    await page.getByTestId('agent-chat-messages').getByText('Runtime demo apply complete.', { exact: false }).waitFor({
       timeout: 10_000,
     });
     await page
@@ -496,44 +496,48 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('agent-tool-status-tool-2').getByText('warning', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await page.getByTestId('agent-tool-status-tool-3').getByText('blocked', { exact: true }).waitFor({
+    await page.getByTestId('agent-tool-status-tool-3').getByText('succeeded', { exact: true }).waitFor({
       timeout: 10_000,
     });
     await auditViewer.getByText('Audit transcript', { exact: true }).waitFor({ timeout: 10_000 });
-    await page.getByTestId('agent-audit-summary').getByText('schema_only', { exact: true }).waitFor({
+    await page.getByTestId('agent-audit-summary').getByText('runtime_apply_demo', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await page.getByTestId('agent-audit-summary').getByText('graph_rev_45_preview', { exact: true }).waitFor({
+    await page
+      .getByTestId('agent-audit-summary')
+      .getByText('graph_rev_agent_expert_edit_demo_initial_2844', { exact: true })
+      .waitFor({
+        timeout: 10_000,
+      });
+    await page.getByTestId('agent-audit-record-audit-record-tool-3').getByText('success', { exact: true }).waitFor({
       timeout: 10_000,
     });
     await page.getByTestId('agent-audit-record-audit-record-tool-2').getByText('warning', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await page.getByTestId('agent-audit-record-audit-record-tool-3').getByText('blocked', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
     const auditArtifactLinkCount = await page
       .getByTestId('agent-audit-transcript-records')
-      .locator('a[href*="agent-replay-proof-gallery-2026-06-16.html"]')
+      .locator('a[href*="agent-expert-edit-demo-workflow-2026-06-21.html"]')
       .count();
     if (auditArtifactLinkCount !== 3) {
       throw new Error(`Expected 3 visible audit transcript artifact links, found ${auditArtifactLinkCount}.`);
     }
-    await page.getByTestId('agent-before-after-preview').getByText('graph_rev_45_preview', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
     await page
       .getByTestId('agent-preview-artifacts')
-      .getByText('artifact_edit_graph_patch_preview', { exact: true })
+      .getByText('artifact_agent_expert_edit_demo_preview_dry_run_2844', { exact: true })
       .waitFor({
         timeout: 10_000,
       });
-    await page.getByTestId('agent-preview-artifacts').getByText('review_required', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
+    const readyPreviewCount = await page
+      .getByTestId('agent-preview-artifacts')
+      .getByText('ready', { exact: true })
+      .count();
+    if (readyPreviewCount !== 3) {
+      throw new Error(`Expected 3 ready preview artifacts, found ${readyPreviewCount}.`);
+    }
     const replayLinkCount = await page
       .getByTestId('agent-audit-entries')
-      .locator('a[href*="agent-replay-proof-gallery-2026-06-16.html"]')
+      .locator('a[href*="agent-expert-edit-demo-workflow-2026-06-21.html"]')
       .count();
     if (replayLinkCount !== 3) {
       throw new Error(`Expected 3 visible agent replay links, found ${replayLinkCount}.`);
@@ -544,7 +548,7 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('agent-approval-states').getByText('Reject plan', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await page.getByTestId('agent-approval-states').getByText('unavailable', { exact: true }).waitFor({
+    await page.getByTestId('agent-approval-states').getByText('Apply approved', { exact: true }).waitFor({
       timeout: 10_000,
     });
     const approveButton = page.getByTestId('agent-approval-action-approve-dry-run');
@@ -557,11 +561,11 @@ async function prepareScenario(page, mode) {
     }
     const applyButton = page.getByTestId('agent-review-apply-unavailable');
     if (await applyButton.isEnabled()) {
-      throw new Error('Agent dry-run apply control must stay disabled after local approval.');
+      throw new Error('Agent demo apply control remains a non-clickable transcript marker.');
     }
     await page
       .getByTestId('agent-review-apply-state')
-      .getByText('No app-server replay evidence', { exact: false })
+      .getByText('Matching dry-run was accepted', { exact: false })
       .waitFor({ timeout: 10_000 });
     const rejectButton = page.getByTestId('agent-approval-action-reject-plan');
     await rejectButton.click();
@@ -572,15 +576,15 @@ async function prepareScenario(page, mode) {
       throw new Error(`Expected rejected local review decision, got ${rejectedDataset.localReviewDecision}.`);
     }
     if (await applyButton.isEnabled()) {
-      throw new Error('Agent dry-run apply control must stay disabled after local rejection.');
+      throw new Error('Agent demo apply control remains a non-clickable transcript marker after local rejection.');
     }
     await page.getByTestId('agent-parameter-diffs').getByText('Temperature', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await page.getByTestId('agent-affected-targets').getByText('DSC_1042.ARW', { exact: true }).waitFor({
+    await page.getByTestId('agent-affected-targets').getByText('DSC_2844.NEF', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await page.getByTestId('agent-review-warnings').getByText('runtime apply', { exact: false }).waitFor({
+    await page.getByTestId('agent-review-warnings').getByText('Original RAW', { exact: false }).waitFor({
       timeout: 10_000,
     });
     const removedApplyActionCount = await page.getByText('Approve apply', { exact: true }).count();

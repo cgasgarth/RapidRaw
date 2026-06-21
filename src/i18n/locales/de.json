@@ -555,9 +555,12 @@
           "parameterDiffs": "",
           "pendingApply": "",
           "rejectedApply": "",
+          "runtimeReplayApply": "",
           "title": "",
           "uiOnly": ""
         },
+        "runtimeApplyDemo": "",
+        "runtimeApplyProof": "",
         "title": "",
         "transcript": "",
         "uiOnly": ""
