@@ -6,13 +6,13 @@
   ],
   "generatedAt": "2026-06-18T00:00:00.000Z",
   "issue": 1376,
-  "proofHash": "59762ff19b736c6927c8d970c4af60fabb4a1f1c10301fd3be5b2b6b048b2d0f",
+  "proofHash": "910b3b3ce4af94494cefb7333249a7abd4946922417fcd0ce57bc3068884bac1",
   "schemaVersion": 1,
   "status": "private_reports_present",
   "summary": {
     "commandWrapperTyped": true,
-    "manifestProofCases": 1,
-    "privateRunReports": 1,
+    "manifestProofCases": 4,
+    "privateRunReports": 2,
     "runtimeStatusForHtmlReview": "Private RAW run reports are present; HTML review can summarize runtime proof artifacts."
   }
 }

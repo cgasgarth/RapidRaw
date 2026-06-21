@@ -6,6 +6,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use chrono::{SecondsFormat, Utc};
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, imageops};
 use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
@@ -33,6 +34,23 @@ use crate::mask_generation::{MaskDefinition, generate_mask_bitmap};
 
 use crate::cache_utils::{calculate_full_job_hash, calculate_transform_hash};
 use crate::deblur_render::apply_deblur_stage;
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportReceiptOutput {
+    byte_size: u64,
+    format: String,
+    output_path: String,
+    source_path: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportReceipt {
+    completed_at: String,
+    outputs: Vec<ExportReceiptOutput>,
+    total: usize,
+}
 use crate::denoise_render::apply_denoise_stage;
 use crate::wavelet_render::apply_wavelet_detail_stage;
 use crate::{
@@ -904,7 +922,7 @@ pub async fn export_images(
 
                 let extension = output_format.to_lowercase();
 
-                let result: Result<(), String> = (|| {
+                let result: Result<ExportReceiptOutput, String> = (|| {
                     if extension == "cube" {
                         let cube_bytes = export_adjustments_as_lut(
                             &js_adjustments,
@@ -927,7 +945,7 @@ pub async fn export_images(
                         }
                         #[cfg(not(target_os = "android"))]
                         fs::write(&output_path, cube_bytes).map_err(|e| e.to_string())?;
-                        return Ok(());
+                        return export_receipt_output(&output_path, &source_path_str, &extension);
                     }
 
                     let base_image = if is_current_edit {
@@ -1019,7 +1037,7 @@ pub async fn export_images(
                         )?;
                     }
 
-                    Ok(())
+                    export_receipt_output(&output_path, &source_path_str, &extension)
                 })();
 
                 let current_progress = progress_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
@@ -1050,12 +1068,16 @@ pub async fn export_images(
         tokio::time::sleep(std::time::Duration::from_millis(150)).await;
 
         let mut error_count = 0;
+        let mut outputs = Vec::new();
         for result in results {
-            if let Err(e) = result {
-                error_count += 1;
-                log::error!("Export error: {}", e);
-                if total_paths == 1 {
-                    let _ = app_handle.emit(crate::events::EXPORT_ERROR, e);
+            match result {
+                Ok(output) => outputs.push(output),
+                Err(e) => {
+                    error_count += 1;
+                    log::error!("Export error: {}", e);
+                    if total_paths == 1 {
+                        let _ = app_handle.emit(crate::events::EXPORT_ERROR, e);
+                    }
                 }
             }
         }
@@ -1070,7 +1092,14 @@ pub async fn export_images(
                 crate::events::BATCH_EXPORT_PROGRESS,
                 serde_json::json!({ "current": total_paths, "total": total_paths, "path": "" }),
             );
-            let _ = app_handle.emit(crate::events::EXPORT_COMPLETE, ());
+            let _ = app_handle.emit(
+                crate::events::EXPORT_COMPLETE,
+                ExportReceipt {
+                    completed_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+                    outputs,
+                    total: total_paths,
+                },
+            );
         }
 
         *app_handle
@@ -1082,6 +1111,23 @@ pub async fn export_images(
 
     *state.export_task_handle.lock().unwrap() = Some(task);
     Ok(())
+}
+
+fn export_receipt_output(
+    output_path: &Path,
+    source_path: &str,
+    format: &str,
+) -> Result<ExportReceiptOutput, String> {
+    let byte_size = fs::metadata(output_path)
+        .map_err(|error| error.to_string())?
+        .len();
+
+    Ok(ExportReceiptOutput {
+        byte_size,
+        format: format.to_string(),
+        output_path: output_path.to_string_lossy().to_string(),
+        source_path: source_path.to_string(),
+    })
 }
 
 #[tauri::command]

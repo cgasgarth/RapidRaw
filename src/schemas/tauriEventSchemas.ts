@@ -69,6 +69,23 @@ export const aiConnectorStatusPayloadSchema = z
   })
   .loose();
 
+export const exportReceiptPayloadSchema = z
+  .object({
+    completedAt: z.iso.datetime({ offset: true }),
+    outputs: z.array(
+      z
+        .object({
+          byteSize: z.number().int().nonnegative(),
+          format: z.string().trim().min(1),
+          outputPath: z.string().trim().min(1),
+          sourcePath: z.string().trim().min(1),
+        })
+        .strict(),
+    ),
+    total: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const cullingProgressPayloadSchema = progressPayloadSchema
   .extend({
     stage: z.string(),
@@ -129,6 +146,7 @@ export const parseDenoiseCompletePayload = (value: unknown) => denoiseCompletePa
 export const parseRenderPathPayload = (value: unknown) => renderPathPayloadSchema.parse(value);
 export const parseBase64Payload = (value: unknown) => base64PayloadSchema.parse(value);
 export const parseAiConnectorStatusPayload = (value: unknown) => aiConnectorStatusPayloadSchema.parse(value);
+export const parseExportReceiptPayload = (value: unknown) => exportReceiptPayloadSchema.parse(value);
 export const parseCullingProgressPayload = (value: unknown): CullingProgressPayload => {
   const payload = cullingProgressPayloadSchema.parse(value);
   const progress = toProgress(payload);

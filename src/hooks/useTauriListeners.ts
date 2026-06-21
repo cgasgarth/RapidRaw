@@ -8,6 +8,7 @@ import {
   parseCullingProgressPayload,
   parseCullingSuggestionsPayload,
   parseDenoiseCompletePayload,
+  parseExportReceiptPayload,
   parseImportProgressPayload,
   parseImportStartPayload,
   parseProgressPayload,
@@ -207,8 +208,12 @@ export function useTauriListeners({
         if (isEffectActive)
           useProcessStore.getState().setExportState({ progress: parseProgressPayload(event.payload) });
       }),
-      listen(EXPORT_COMPLETE_EVENT, () => {
-        if (isEffectActive) useProcessStore.getState().setExportState({ status: Status.Success });
+      listen<unknown>(EXPORT_COMPLETE_EVENT, (event) => {
+        if (isEffectActive)
+          useProcessStore.getState().setExportState({
+            lastReceipt: parseExportReceiptPayload(event.payload),
+            status: Status.Success,
+          });
       }),
       listen<unknown>(EXPORT_ERROR_EVENT, (event) => {
         if (isEffectActive)

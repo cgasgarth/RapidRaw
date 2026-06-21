@@ -270,6 +270,7 @@
     "check:raw-open-edit-export-command-wrapper": "bun tests/integration/checks/check-raw-open-edit-export-command-wrapper.ts",
     "check:raw-open-edit-export-private-report-collector": "bun scripts/collect-raw-open-edit-export-private-run-reports.ts --self-test",
     "check:raw-open-edit-export-private-proof-acceptance": "bun scripts/accept-raw-open-edit-export-private-proof.ts --self-test",
+    "check:raw-open-edit-export-receipt-ui": "bun tests/integration/checks/check-raw-open-edit-export-receipt-ui.ts",
     "check:raw-open-edit-export-run-reports": "bun tests/integration/checks/check-raw-open-edit-export-run-reports.ts",
     "check:raw-color-management-runtime-proof": "bun tests/integration/checks/check-raw-color-management-runtime-proof.ts",
     "run:raw-color-management-private-proof": "bun scripts/run-raw-color-management-private-proof.ts",

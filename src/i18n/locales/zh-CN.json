@@ -1181,6 +1181,7 @@
       "estimatedSize": "预计文件大小：约 {{size}}",
       "estimatedTotalSize": "预计总大小：约 {{size}}",
       "estimatingSize": "正在估算大小...",
+      "exportedFile": "已导出 {{filename}}",
       "exporting": "导出中…",
       "exportingProgress": "导出中…（{{current}}/{{total}}）",
       "exportMultiple": "导出 {{count}} {{label}}",
@@ -1190,6 +1191,7 @@
       "failed": "导出失败",
       "noImageSelected": "未选择要导出的图像。",
       "noImagesSelected": "未选择图像。",
+      "showInFinder": "在 Finder 中显示",
       "success": "导出成功！"
     },
     "title": "导出",

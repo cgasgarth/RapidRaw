@@ -3318,6 +3318,14 @@
       "workflowReferences": []
     },
     {
+      "commandHash": "sha256:3b8dfa36e811a16c03dba6138427bd7879affd92d7f57f8f6709f799601e425a",
+      "domain": "raw-open-edit-export",
+      "name": "check:raw-open-edit-export-receipt-ui",
+      "target": "integration-check",
+      "usage": "check",
+      "workflowReferences": []
+    },
+    {
       "commandHash": "sha256:c3ceee35be865da66baa9af68abfcb4d155aba9792e321df60d4950044dcbe50",
       "domain": "raw-open-edit-export",
       "name": "check:raw-open-edit-export-run-reports",
@@ -4659,7 +4667,7 @@
       "i18n": 4,
       "negative-lab": 30,
       "panorama": 45,
-      "raw-open-edit-export": 9,
+      "raw-open-edit-export": 10,
       "rust": 17,
       "schema": 11,
       "super-resolution": 31,
@@ -4667,7 +4675,7 @@
     },
     "byTarget": {
       "cargo": 10,
-      "integration-check": 421,
+      "integration-check": 422,
       "other": 13,
       "repo-script": 65,
       "schema-script": 6,
@@ -4677,13 +4685,13 @@
     },
     "byUsage": {
       "build": 2,
-      "check": 510,
+      "check": 511,
       "prepare": 9,
       "release": 2,
       "run": 10,
       "utility": 44
     },
-    "totalScripts": 577,
+    "totalScripts": 578,
     "workflowReferencedScripts": 38
   }
 }
