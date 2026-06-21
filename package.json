@@ -406,6 +406,7 @@
     "check:sr-artifact-performance-proof:update": "bun tests/integration/checks/check-super-resolution-artifact-performance-proof.ts --update",
     "check:sr-sidecar-provenance": "bun tests/integration/checks/check-super-resolution-sidecar-provenance.ts",
     "check:sr-sidecar-provenance:update": "bun tests/integration/checks/check-super-resolution-sidecar-provenance.ts --update",
+    "check:sr-human-review-editable-handoff": "bun tests/integration/checks/check-sr-human-review-editable-handoff.ts",
     "check:sr-ui-api": "bun tests/integration/checks/check-sr-ui-api.ts",
     "check:sr-ui-runtime-bridge": "bun tests/integration/checks/check-sr-ui-runtime-bridge.ts",
     "check:sr-review-diagnostics": "bun tests/integration/checks/check-sr-review-diagnostics.ts",

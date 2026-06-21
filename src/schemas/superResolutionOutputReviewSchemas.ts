@@ -45,7 +45,7 @@ export const superResolutionOutputReviewWorkflowSchema = z
     reviewPacketPath: z.string().min(1),
     sourceCount: z.number().int().min(2),
     staleState: superResolutionOutputReviewStaleStateSchema,
-    warningCodes: z.array(superResolutionOutputReviewWarningSchema).min(1),
+    warningCodes: z.array(superResolutionOutputReviewWarningSchema),
   })
   .strict();
 
