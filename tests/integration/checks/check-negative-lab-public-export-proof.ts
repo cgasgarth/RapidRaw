@@ -101,6 +101,7 @@ const reportSchema = z
           .object({
             acceptedDryRunPlanHash: z.literal('fnv1a32:2f4a91bc'),
             acceptedDryRunPlanId: z.literal('negative_lab_batch_plan_2f4a91bc'),
+            conversionBundle: z.literal(true),
             outputFormat: z.literal('jpeg_proof'),
             profileProvenanceHash: fnv32HashSchema,
             suffix: z.literal('Positive'),
@@ -136,6 +137,15 @@ const reportSchema = z
       .strict(),
     runtimeStatus: z.literal('public_negative_scan_positive_export_rendered'),
     schemaVersion: z.literal(1),
+    conversionBundle: z
+      .object({
+        contentHash: fnvHashSchema,
+        path: z.literal(
+          'src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.conversion-bundle.json',
+        ),
+        schemaVersion: z.literal(1),
+      })
+      .strict(),
     sidecar: z
       .object({
         containsNegativeLabArtifact: z.literal(true),

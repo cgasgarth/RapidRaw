@@ -58,10 +58,16 @@ pub enum NegativeConversionOutputFormat {
 pub struct NegativeConversionSaveOptions {
     pub output_format: NegativeConversionOutputFormat,
     pub suffix: String,
+    #[serde(default = "default_write_conversion_bundle")]
+    pub write_conversion_bundle: bool,
     #[serde(default)]
     pub accepted_dry_run_plan_hash: Option<String>,
     #[serde(default)]
     pub accepted_dry_run_plan_id: Option<String>,
+    #[serde(default)]
+    pub acquisition_warning_codes: Vec<String>,
+    #[serde(default)]
+    pub acquisition_source_families: Vec<String>,
     #[serde(default)]
     pub profile_provenance_hash: Option<String>,
     #[serde(default)]
@@ -107,9 +113,14 @@ const MIN_CONTRAST: f32 = 0.5;
 const MAX_CONTRAST: f32 = 2.5;
 const DEFAULT_OUTPUT_SUFFIX: &str = "Positive";
 const JPEG_PROOF_QUALITY: u8 = 92;
+const NEGATIVE_LAB_CONVERSION_BUNDLE_SCHEMA_VERSION: u8 = 1;
 
 fn default_base_fog_strength() -> f32 {
     1.0
+}
+
+fn default_write_conversion_bundle() -> bool {
+    true
 }
 
 impl Default for NegativeConversionSaveOptions {
@@ -117,8 +128,11 @@ impl Default for NegativeConversionSaveOptions {
         Self {
             output_format: NegativeConversionOutputFormat::Tiff16,
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
+            write_conversion_bundle: default_write_conversion_bundle(),
             accepted_dry_run_plan_hash: None,
             accepted_dry_run_plan_id: None,
+            acquisition_warning_codes: Vec::new(),
+            acquisition_source_families: Vec::new(),
             profile_provenance_hash: None,
             selected_profile: None,
         }
@@ -142,8 +156,19 @@ impl NegativeConversionSaveOptions {
         Self {
             output_format: self.output_format,
             suffix,
+            write_conversion_bundle: self.write_conversion_bundle,
             accepted_dry_run_plan_hash: self.accepted_dry_run_plan_hash,
             accepted_dry_run_plan_id: self.accepted_dry_run_plan_id,
+            acquisition_warning_codes: self
+                .acquisition_warning_codes
+                .into_iter()
+                .filter(|code| is_valid_negative_lab_acquisition_warning_code(code))
+                .collect(),
+            acquisition_source_families: self
+                .acquisition_source_families
+                .into_iter()
+                .filter(|family| is_valid_negative_lab_acquisition_source_family(family))
+                .collect(),
             profile_provenance_hash,
             selected_profile,
         }
@@ -227,6 +252,29 @@ fn is_valid_negative_lab_profile_provenance_hash(profile_hash: &str) -> bool {
     is_valid_negative_lab_plan_hash(profile_hash)
 }
 
+fn build_negative_lab_plan_hash(value: &str) -> String {
+    let mut hash = 0x811c9dc5_u32;
+    for byte in value.bytes() {
+        hash ^= u32::from(byte);
+        hash = hash.wrapping_mul(0x01000193);
+    }
+    format!("{hash:08x}")
+}
+
+fn is_valid_negative_lab_acquisition_warning_code(warning_code: &str) -> bool {
+    matches!(
+        warning_code,
+        "lossy_source_for_negative_lab" | "mixed_source_families" | "unknown_acquisition_state"
+    )
+}
+
+fn is_valid_negative_lab_acquisition_source_family(source_family: &str) -> bool {
+    matches!(
+        source_family,
+        "jpeg_lossy" | "raw_like" | "tiff_scan" | "unknown"
+    )
+}
+
 fn build_negative_output_path(
     real_path: &str,
     save_options: &NegativeConversionSaveOptions,
@@ -252,15 +300,138 @@ fn negative_lab_output_sidecar_path(output_path: &Path) -> PathBuf {
     ))
 }
 
-fn hash_negative_lab_output_file(output_path: &Path) -> Result<String, String> {
+fn negative_lab_conversion_bundle_path(first_output_path: &Path) -> PathBuf {
+    first_output_path.with_file_name(format!(
+        "{}.conversion-bundle.json",
+        first_output_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+    ))
+}
+
+fn hash_negative_lab_file(output_path: &Path, label: &str) -> Result<String, String> {
     let bytes = fs::read(output_path)
-        .map_err(|e| format!("Failed to read Negative Lab output for sidecar hash: {}", e))?;
+        .map_err(|e| format!("Failed to read Negative Lab {label} for hash: {}", e))?;
     let mut hash = 0xcbf29ce484222325_u64;
     for byte in bytes {
         hash ^= u64::from(byte);
         hash = hash.wrapping_mul(0x100000001b3);
     }
     Ok(format!("fnv1a64:{hash:016x}"))
+}
+
+fn hash_negative_lab_output_file(output_path: &Path) -> Result<String, String> {
+    hash_negative_lab_file(output_path, "output")
+}
+
+#[derive(Debug, Clone)]
+struct NegativeLabConversionBundleOutputRef {
+    source_path: PathBuf,
+    output_path: PathBuf,
+    sidecar_path: PathBuf,
+    output_width: u32,
+    output_height: u32,
+}
+
+fn negative_lab_path_filename(path: &Path) -> String {
+    path.file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string()
+}
+
+fn negative_lab_output_format_id(output_format: NegativeConversionOutputFormat) -> &'static str {
+    match output_format {
+        NegativeConversionOutputFormat::JpegProof => "jpeg_proof",
+        NegativeConversionOutputFormat::Tiff16 => "tiff16",
+    }
+}
+
+fn write_negative_lab_conversion_bundle(
+    bundle_path: &Path,
+    params: &NegativeConversionParams,
+    save_options: &NegativeConversionSaveOptions,
+    outputs: &[NegativeLabConversionBundleOutputRef],
+) -> Result<(), String> {
+    let output_format = negative_lab_output_format_id(save_options.output_format);
+    let output_refs: Result<Vec<_>, String> = outputs
+        .iter()
+        .map(|output| {
+            Ok(serde_json::json!({
+                "contentHash": hash_negative_lab_output_file(&output.output_path)?,
+                "dimensions": {
+                    "height": output.output_height,
+                    "width": output.output_width,
+                },
+                "format": output_format,
+                "filename": negative_lab_path_filename(&output.output_path),
+                "path": output.output_path.to_string_lossy(),
+                "sidecarFilename": negative_lab_path_filename(&output.sidecar_path),
+                "sidecarPath": output.sidecar_path.to_string_lossy(),
+                "source": {
+                    "contentHash": hash_negative_lab_file(&output.source_path, "source")?,
+                    "filename": negative_lab_path_filename(&output.source_path),
+                    "path": output.source_path.to_string_lossy(),
+                }
+            }))
+        })
+        .collect();
+    let profile_hash = save_options
+        .selected_profile
+        .as_ref()
+        .map(|profile| profile.profile_provenance_hash.clone())
+        .or_else(|| save_options.profile_provenance_hash.clone());
+    let replay_seed = serde_json::json!({
+        "outputFormat": output_format,
+        "params": params,
+        "paths": outputs
+            .iter()
+            .map(|output| output.source_path.to_string_lossy().to_string())
+            .collect::<Vec<_>>(),
+        "profileProvenanceHash": profile_hash,
+        "suffix": save_options.suffix,
+    })
+    .to_string();
+    let replay_plan_hash = format!("fnv1a32:{}", build_negative_lab_plan_hash(&replay_seed));
+    let bundle = serde_json::json!({
+        "acquisition": {
+            "sourceFamilies": save_options.acquisition_source_families,
+            "warningCodes": save_options.acquisition_warning_codes,
+        },
+        "conversion": {
+            "acceptedDryRunPlanHash": save_options.accepted_dry_run_plan_hash,
+            "acceptedDryRunPlanId": save_options.accepted_dry_run_plan_id,
+            "outputFormat": output_format,
+            "params": params,
+            "profileProvenanceHash": save_options.profile_provenance_hash,
+            "selectedProfile": save_options.selected_profile,
+            "suffix": save_options.suffix,
+        },
+        "doesNotProve": [
+            "cryptographic_authenticity",
+            "embedded_source_pixels",
+            "external_source_relinking",
+            "named_stock_colorimetric_match",
+            "zip_archive_packaging"
+        ],
+        "outputs": output_refs?,
+        "replay": {
+            "appServerCommand": "negative.lab.conversion_plan",
+            "identityHash": replay_plan_hash,
+            "requiresSourceFiles": true,
+        },
+        "schemaVersion": NEGATIVE_LAB_CONVERSION_BUNDLE_SCHEMA_VERSION,
+    });
+    let json = serde_json::to_string_pretty(&bundle)
+        .map_err(|e| format!("Failed to serialize Negative Lab conversion bundle: {}", e))?;
+    fs::write(bundle_path, json).map_err(|e| {
+        format!(
+            "Failed to write Negative Lab conversion bundle {}: {}",
+            bundle_path.display(),
+            e
+        )
+    })
 }
 
 fn write_negative_lab_output_sidecar(
@@ -761,8 +932,10 @@ pub async fn convert_negatives(
 ) -> Result<Vec<String>, String> {
     tokio::task::spawn_blocking(move || {
         let mut results = Vec::new();
+        let mut bundle_outputs = Vec::new();
         let save_options = options.unwrap_or_default().sanitized();
         save_options.validate_accepted_batch_plan(paths.len())?;
+        let sanitized_params = params.sanitized();
 
         for (i, path_str) in paths.iter().enumerate() {
             let _ = app_handle.emit(
@@ -776,7 +949,6 @@ pub async fn convert_negatives(
 
             let (source_path, _) = parse_virtual_path(path_str);
             let real_path = source_path.to_string_lossy().to_string();
-            let sanitized_params = params.sanitized();
 
             let settings = load_settings_or_default(&app_handle);
 
@@ -843,7 +1015,25 @@ pub async fn convert_negatives(
                 processed.width(),
                 processed.height(),
             )?;
+            bundle_outputs.push(NegativeLabConversionBundleOutputRef {
+                output_height: processed.height(),
+                output_path: out_path.clone(),
+                output_width: processed.width(),
+                sidecar_path: negative_lab_output_sidecar_path(&out_path),
+                source_path: PathBuf::from(&real_path),
+            });
             results.push(out_path.to_string_lossy().to_string());
+        }
+
+        if save_options.write_conversion_bundle
+            && let Some(first_output) = bundle_outputs.first()
+        {
+            write_negative_lab_conversion_bundle(
+                &negative_lab_conversion_bundle_path(&first_output.output_path),
+                &sanitized_params,
+                &save_options,
+                &bundle_outputs,
+            )?;
         }
 
         Ok(results)
@@ -964,6 +1154,9 @@ mod tests {
             accepted_dry_run_plan_id: None,
             profile_provenance_hash: Some("fnv1a32:2f4a91bc".to_string()),
             output_format: NegativeConversionOutputFormat::JpegProof,
+            write_conversion_bundle: default_write_conversion_bundle(),
+            acquisition_warning_codes: Vec::new(),
+            acquisition_source_families: Vec::new(),
             selected_profile: None,
             suffix: " Proof / Final:01 ".to_string(),
         }
@@ -987,6 +1180,9 @@ mod tests {
             accepted_dry_run_plan_id: None,
             profile_provenance_hash: Some("not-a-hash".to_string()),
             output_format: NegativeConversionOutputFormat::Tiff16,
+            write_conversion_bundle: default_write_conversion_bundle(),
+            acquisition_warning_codes: Vec::new(),
+            acquisition_source_families: Vec::new(),
             selected_profile: None,
             suffix: "///".to_string(),
         }
@@ -1003,6 +1199,9 @@ mod tests {
             accepted_dry_run_plan_id: None,
             profile_provenance_hash: None,
             output_format: NegativeConversionOutputFormat::JpegProof,
+            write_conversion_bundle: default_write_conversion_bundle(),
+            acquisition_warning_codes: Vec::new(),
+            acquisition_source_families: Vec::new(),
             selected_profile: None,
             suffix: "Web Proof".to_string(),
         }
@@ -1012,6 +1211,9 @@ mod tests {
             accepted_dry_run_plan_id: None,
             profile_provenance_hash: None,
             output_format: NegativeConversionOutputFormat::Tiff16,
+            write_conversion_bundle: default_write_conversion_bundle(),
+            acquisition_warning_codes: Vec::new(),
+            acquisition_source_families: Vec::new(),
             selected_profile: None,
             suffix: "".to_string(),
         }
@@ -1047,6 +1249,9 @@ mod tests {
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
             profile_provenance_hash: Some("fnv1a32:aaaaaaaa".to_string()),
             output_format: NegativeConversionOutputFormat::Tiff16,
+            write_conversion_bundle: default_write_conversion_bundle(),
+            acquisition_warning_codes: Vec::new(),
+            acquisition_source_families: Vec::new(),
             selected_profile: None,
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
@@ -1057,6 +1262,9 @@ mod tests {
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_deadbeef".to_string()),
             profile_provenance_hash: None,
             output_format: NegativeConversionOutputFormat::Tiff16,
+            write_conversion_bundle: default_write_conversion_bundle(),
+            acquisition_warning_codes: Vec::new(),
+            acquisition_source_families: Vec::new(),
             selected_profile: None,
             suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
         };
@@ -1084,6 +1292,9 @@ mod tests {
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
             profile_provenance_hash: Some("fnv1a32:aaaaaaaa".to_string()),
             output_format: NegativeConversionOutputFormat::Tiff16,
+            write_conversion_bundle: default_write_conversion_bundle(),
+            acquisition_warning_codes: Vec::new(),
+            acquisition_source_families: Vec::new(),
             selected_profile: Some(NegativeLabSelectedProfileSnapshot {
                 claim_level: "measured_profile".to_string(),
                 claim_policy: "process_family_profile_no_stock_claim".to_string(),
@@ -1158,6 +1369,75 @@ mod tests {
                 .as_str()
                 .unwrap_or_default()
                 .starts_with("fnv1a64:")
+        );
+    }
+
+    #[test]
+    fn negative_lab_conversion_bundle_records_runtime_outputs() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let source_path = temp_dir.path().join("frame_001.tif");
+        let output_path = temp_dir.path().join("frame_001_Positive.jpg");
+        let sidecar_path = negative_lab_output_sidecar_path(&output_path);
+        fs::write(&source_path, b"negative-source").expect("source should be written");
+        fs::write(&output_path, b"positive-output").expect("output should be written");
+        fs::write(&sidecar_path, b"{}").expect("sidecar should be written");
+        let params = NegativeConversionParams {
+            red_weight: 1.03,
+            green_weight: 1.0,
+            blue_weight: 0.98,
+            base_fog_strength: 1.0,
+            base_fog_sample: None,
+            exposure: 0.05,
+            contrast: 0.95,
+        };
+        let save_options = NegativeConversionSaveOptions {
+            accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
+            accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
+            output_format: NegativeConversionOutputFormat::JpegProof,
+            write_conversion_bundle: true,
+            acquisition_warning_codes: vec!["lossy_source_for_negative_lab".to_string()],
+            acquisition_source_families: vec!["jpeg_lossy".to_string()],
+            profile_provenance_hash: Some("fnv1a32:468872b8".to_string()),
+            selected_profile: None,
+            suffix: DEFAULT_OUTPUT_SUFFIX.to_string(),
+        };
+        let bundle_path = negative_lab_conversion_bundle_path(&output_path);
+
+        write_negative_lab_conversion_bundle(
+            &bundle_path,
+            &params,
+            &save_options,
+            &[NegativeLabConversionBundleOutputRef {
+                output_height: 8,
+                output_path,
+                output_width: 12,
+                sidecar_path,
+                source_path,
+            }],
+        )
+        .expect("conversion bundle should be written");
+
+        let bundle: serde_json::Value =
+            serde_json::from_slice(&fs::read(&bundle_path).expect("read conversion bundle"))
+                .expect("parse conversion bundle");
+        assert_eq!(bundle["schemaVersion"], 1);
+        assert_eq!(bundle["conversion"]["outputFormat"], "jpeg_proof");
+        assert_eq!(
+            bundle["conversion"]["profileProvenanceHash"],
+            "fnv1a32:468872b8"
+        );
+        assert_eq!(
+            bundle["acquisition"]["warningCodes"][0],
+            "lossy_source_for_negative_lab"
+        );
+        assert_eq!(bundle["outputs"][0]["filename"], "frame_001_Positive.jpg");
+        assert_eq!(
+            bundle["outputs"][0]["sidecarFilename"],
+            "frame_001_Positive.jpg.rrdata"
+        );
+        assert_eq!(
+            bundle["replay"]["appServerCommand"],
+            "negative.lab.conversion_plan"
         );
     }
 
@@ -1553,8 +1833,28 @@ mod tests {
             accepted_dry_run_plan_hash: Some("fnv1a32:2f4a91bc".to_string()),
             accepted_dry_run_plan_id: Some("negative_lab_batch_plan_2f4a91bc".to_string()),
             output_format: NegativeConversionOutputFormat::JpegProof,
-            profile_provenance_hash: Some("fnv1a32:9d4a13c8".to_string()),
-            selected_profile: None,
+            write_conversion_bundle: true,
+            acquisition_warning_codes: vec!["lossy_source_for_negative_lab".to_string()],
+            acquisition_source_families: vec!["jpeg_lossy".to_string()],
+            profile_provenance_hash: Some("fnv1a32:468872b8".to_string()),
+            selected_profile: Some(NegativeLabSelectedProfileSnapshot {
+                claim_level: "generic_starting_point_only".to_string(),
+                claim_policy: applied_profile_claim_policy.to_string(),
+                display_name: applied_profile_display_name.to_string(),
+                does_not_prove: vec![
+                    "no_stock_emulation_claim".to_string(),
+                    "no_colorimetric_match_claim".to_string(),
+                ],
+                evidence_fixture_count: 0,
+                measurement_profile_id: None,
+                params,
+                preset_id: applied_profile_id.to_string(),
+                profile_provenance_hash: "fnv1a32:468872b8".to_string(),
+                profile_status: "generic_unmeasured".to_string(),
+                provenance_summary: "Generic engineered C-41 portrait starting point.".to_string(),
+                runtime_status: "runtime_parameter_applied".to_string(),
+                source_generic_preset_id: None,
+            }),
             suffix: "Positive".to_string(),
         };
         write_negative_lab_output_sidecar(
@@ -1593,6 +1893,24 @@ mod tests {
             sidecar_path.exists(),
             "Negative Lab public export proof must write a sidecar"
         );
+        let bundle_path = negative_lab_conversion_bundle_path(&output_path);
+        write_negative_lab_conversion_bundle(
+            &bundle_path,
+            &params,
+            &save_options,
+            &[NegativeLabConversionBundleOutputRef {
+                output_height: rendered.height(),
+                output_path: output_path.clone(),
+                output_width: rendered.width(),
+                sidecar_path,
+                source_path: source_path.to_path_buf(),
+            }],
+        )
+        .expect("write public negative conversion bundle");
+        assert!(
+            bundle_path.exists(),
+            "Negative Lab public export proof must write a conversion bundle"
+        );
         let report = json!({
             "algorithm": "density_rgb_v1",
             "appliedProfile": {
@@ -1616,7 +1934,7 @@ mod tests {
                 },
                 "presetId": applied_profile_id,
                 "processFamily": "c41_color_negative",
-                "profileProvenanceHash": "fnv1a32:9d4a13c8",
+                "profileProvenanceHash": "fnv1a32:468872b8",
                 "runtimeStatus": "runtime_parameter_applied",
                 "stockFamilyDescriptor": "Soft portrait color negative"
             },
@@ -1650,6 +1968,7 @@ mod tests {
                 "export": {
                     "acceptedDryRunPlanHash": save_options.accepted_dry_run_plan_hash,
                     "acceptedDryRunPlanId": save_options.accepted_dry_run_plan_id,
+                    "conversionBundle": true,
                     "outputFormat": "jpeg_proof",
                     "profileProvenanceHash": save_options.profile_provenance_hash,
                     "suffix": save_options.suffix
@@ -1678,6 +1997,11 @@ mod tests {
             },
             "runtimeStatus": "public_negative_scan_positive_export_rendered",
             "schemaVersion": 1,
+            "conversionBundle": {
+                "contentHash": hash_negative_lab_output_file(&bundle_path).expect("hash bundle"),
+                "path": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.conversion-bundle.json",
+                "schemaVersion": NEGATIVE_LAB_CONVERSION_BUNDLE_SCHEMA_VERSION
+            },
             "sidecar": {
                 "containsNegativeLabArtifact": true,
                 "path": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.rrdata",

@@ -154,6 +154,7 @@ const DEFAULT_PARAMS: NegativeParams = DEFAULT_NEGATIVE_LAB_UI_PRESET.params;
 const DEFAULT_SAVE_OPTIONS = {
   outputFormat: NegativeLabOutputFormatId.Tiff16 as NegativeOutputFormat,
   suffix: 'Positive',
+  writeConversionBundle: true,
 };
 const CUSTOM_BASE_SAMPLE_DEFAULT = {
   height: 0.18,
@@ -1047,6 +1048,8 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           options: {
             ...saveOptions,
             ...(requiresAcceptedBatchPlan ? acceptedBatchPlanIdentity : {}),
+            acquisitionSourceFamilies: frameHealthReport.acquisitionHealth.sourceFamilies,
+            acquisitionWarningCodes: frameHealthReport.acquisitionHealth.warningCodes,
             ...(selectedProfileProvenanceHash === null ? {} : { profileProvenanceHash: selectedProfileProvenanceHash }),
             ...(selectedProfileSnapshot === null ? {} : { selectedProfile: selectedProfileSnapshot }),
           },
@@ -2721,6 +2724,14 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               <span className="text-right text-text-secondary" data-testid="negative-lab-export-summary-count">
                 {t('modals.negativeConversion.queuedScans', { queuedCount: pathsToConvert.length })}
               </span>
+              <span>{t('modals.negativeConversion.conversionBundle')}</span>
+              <span className="text-right text-text-secondary" data-testid="negative-lab-export-summary-bundle">
+                {t(
+                  saveOptions.writeConversionBundle
+                    ? 'modals.negativeConversion.conversionBundleEnabled'
+                    : 'modals.negativeConversion.conversionBundleDisabled',
+                )}
+              </span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {NEGATIVE_LAB_OUTPUT_FORMAT_SELECTOR_IDS.map((format) => (
@@ -2760,6 +2771,29 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 value={saveOptions.suffix}
               />
             </label>
+            <div className="flex items-start gap-3 rounded-md border border-surface bg-bg-primary p-3">
+              <input
+                checked={saveOptions.writeConversionBundle}
+                className="mt-1"
+                data-testid="negative-lab-export-conversion-bundle"
+                id="negative-lab-export-conversion-bundle"
+                onChange={(event) => {
+                  setSaveOptions((current) => ({ ...current, writeConversionBundle: event.target.checked }));
+                }}
+                type="checkbox"
+              />
+              <span className="min-w-0">
+                <label
+                  htmlFor="negative-lab-export-conversion-bundle"
+                  className="block text-sm font-medium text-text-secondary"
+                >
+                  {t('modals.negativeConversion.conversionBundle')}
+                </label>
+                <span className="block text-xs leading-tight text-text-tertiary">
+                  {t('modals.negativeConversion.conversionBundleHint')}
+                </span>
+              </span>
+            </div>
           </div>
         </div>
 

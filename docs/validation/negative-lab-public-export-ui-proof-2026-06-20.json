@@ -14,7 +14,7 @@
       "displayName": "C-41 Portrait",
       "presetId": "negative_lab.generic.c41.portrait.v1",
       "processFamily": "c41_color_negative",
-      "profileProvenanceHash": "fnv1a32:9d4a13c8",
+      "profileProvenanceHash": "fnv1a32:468872b8",
       "runtimeStatus": "runtime_parameter_applied",
       "stockFamilyDescriptor": "Soft portrait color negative"
     },
@@ -45,8 +45,9 @@
     "export": {
       "acceptedDryRunPlanHash": "fnv1a32:2f4a91bc",
       "acceptedDryRunPlanId": "negative_lab_batch_plan_2f4a91bc",
+      "conversionBundle": true,
       "outputFormat": "jpeg_proof",
-      "profileProvenanceHash": "fnv1a32:9d4a13c8",
+      "profileProvenanceHash": "fnv1a32:468872b8",
       "suffix": "Positive"
     },
     "preset": {

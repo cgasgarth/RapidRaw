@@ -269,8 +269,15 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   );
   addIf(
     (file) =>
-      file === 'src/components/modals/NegativeConversionModal.tsx' || file.includes('negativeLabProfileComparison'),
-    ['check:negative-lab-ui-presets', 'check:negative-lab-workspace', 'check:negative-lab-roll-cockpit'],
+      file === 'src/components/modals/NegativeConversionModal.tsx' ||
+      file.includes('negativeLabProfileComparison') ||
+      file.includes('negativeLabConversionBundle'),
+    [
+      'check:negative-lab-ui-presets',
+      'check:negative-lab-workspace',
+      'check:negative-lab-roll-cockpit',
+      'check:negative-lab-conversion-bundle',
+    ],
   );
   addIf((file) => file === 'src/components/panel/right/LayerStackPanel.tsx', ['check:layer-stack-panel-ui']);
   addIf((file) => file === 'src/components/panel/right/MetadataPanel.tsx', ['check:metadata-panel-ui']);
