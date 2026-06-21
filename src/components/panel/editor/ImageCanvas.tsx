@@ -5,6 +5,10 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { Stage, Layer, Ellipse, Line, Transformer, Group, Circle, Rect } from 'react-konva';
 
 import CompositionOverlays from './overlays/CompositionOverlays';
+import {
+  BRUSH_MASK_COMMAND_COORDINATE_SPACE,
+  buildBrushMaskCommandFromParameters,
+} from '../../../utils/brushMaskCommandBridge';
 import { calculateWhiteBalancePickerAdjustment } from '../../../utils/whiteBalancePicker';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../right/Masks';
 
@@ -36,6 +40,13 @@ interface DrawnLine {
   flow?: number;
   points: Array<Coord>;
   tool: ToolType;
+}
+
+interface BrushMaskCommandCaptureSummary {
+  commandId: string;
+  commandType: 'layerMask.createBrushMask';
+  coordinateSpace: typeof BRUSH_MASK_COMMAND_COORDINATE_SPACE;
+  strokeCount: number;
 }
 
 interface MaskParameters {
@@ -1123,6 +1134,7 @@ const ImageCanvas = memo(
 
     const [baseTool, setBaseTool] = useState<ToolType>(brushSettings?.tool ?? ToolType.Brush);
     const [isAltPressed, setIsAltPressed] = useState(false);
+    const [lastBrushCommandCapture, setLastBrushCommandCapture] = useState<BrushMaskCommandCaptureSummary | null>(null);
     const retainedPatchRef = useRef<typeof interactivePatch>(null);
 
     const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage.isReady && hasRenderedFirstFrame;
@@ -1302,6 +1314,38 @@ const ImageCanvas = memo(
       [activeSubMask],
     );
     const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMaskParameters?.flow ?? 10) : undefined;
+    const recordBrushMaskCommandCapture = useCallback(
+      (subMaskId: string | null, subMask: SubMask | null, parameters: MaskParameters) => {
+        if (!subMaskId || !subMask || (subMask.type !== Mask.Brush && subMask.type !== Mask.Flow)) return;
+        const strokeCount = parameters.lines?.length ?? 0;
+        if (strokeCount === 0) return;
+
+        const command = buildBrushMaskCommandFromParameters(
+          parameters,
+          {
+            expectedGraphRevision: 'ui_brush_capture_preview',
+            imagePath: selectedImage.path,
+            imageSize: {
+              height: effectiveImageDimensions.height,
+              width: effectiveImageDimensions.width,
+            },
+            maskId: subMaskId,
+            maskName: subMask.name?.trim() || subMask.type,
+            operationId: `${subMaskId}_${String(strokeCount)}`,
+            sessionId: 'brush-mask-canvas-capture',
+          },
+          { dryRun: true },
+        );
+
+        setLastBrushCommandCapture({
+          commandId: command.commandId,
+          commandType: command.commandType,
+          coordinateSpace: BRUSH_MASK_COMMAND_COORDINATE_SPACE,
+          strokeCount: command.parameters.strokes.length,
+        });
+      },
+      [effectiveImageDimensions.height, effectiveImageDimensions.width, selectedImage.path],
+    );
     const brushCursorPreview = useMemo(() => {
       const radius = Math.max(0.1, brushStageSize / 2);
       const feather = Math.max(0, Math.min(1, (brushSettings?.feather ?? 0) / 100));
@@ -1668,14 +1712,17 @@ const ImageCanvas = memo(
             };
 
             const activeId = isMasking ? activeMaskId : activeAiSubMaskId;
-            const existingLines = activeSubMaskParameters?.lines || [];
+            if (!activeSubMaskParameters) return;
+            const existingLines = activeSubMaskParameters.lines || [];
+            const nextParameters: MaskParameters = {
+              ...activeSubMaskParameters,
+              lines: [...existingLines, imageSpaceLine],
+            };
 
             updateSubMask(activeId, {
-              parameters: {
-                ...activeSubMaskParameters,
-                lines: [...existingLines, imageSpaceLine],
-              },
+              parameters: nextParameters,
             });
+            recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters);
 
             lastBrushPoint.current = endImageSpace;
             isDrawing.current = false;
@@ -1722,6 +1769,7 @@ const ImageCanvas = memo(
         activeAiSubMaskId,
         activeSubMask,
         activeSubMaskParameters,
+        recordBrushMaskCommandCapture,
         updateSubMask,
         effectiveImageDimensions,
         isToolActive,
@@ -2054,14 +2102,17 @@ const ImageCanvas = memo(
           ...(activeLineFlow !== undefined ? { flow: activeLineFlow } : {}),
         };
 
-        const existingLines = activeSubMaskParameters?.lines || [];
+        if (!activeSubMaskParameters) return;
+        const existingLines = activeSubMaskParameters.lines || [];
+        const nextParameters: MaskParameters = {
+          ...activeSubMaskParameters,
+          lines: [...existingLines, imageSpaceLine],
+        };
 
         updateSubMask(activeId, {
-          parameters: {
-            ...activeSubMaskParameters,
-            lines: [...existingLines, imageSpaceLine],
-          },
+          parameters: nextParameters,
         });
+        recordBrushMaskCommandCapture(activeId, activeSubMask, nextParameters);
 
         const lastPoint = line.points[line.points.length - 1];
         if (lastPoint) {
@@ -2085,6 +2136,7 @@ const ImageCanvas = memo(
       onGenerateAiMask,
       onQuickErase,
       updateSubMask,
+      recordBrushMaskCommandCapture,
       effectiveImageDimensions,
       localInitialDrawParams,
       brushImageSpaceSize,
@@ -2471,6 +2523,11 @@ const ImageCanvas = memo(
 
           {(isMasking || isAiEditing || isWbPickerActive) && (
             <div
+              data-brush-command-coordinate-space={lastBrushCommandCapture?.coordinateSpace ?? ''}
+              data-brush-command-id={lastBrushCommandCapture?.commandId ?? ''}
+              data-brush-command-stroke-count={lastBrushCommandCapture?.strokeCount ?? 0}
+              data-brush-command-type={lastBrushCommandCapture?.commandType ?? ''}
+              data-testid="image-canvas-brush-command-capture"
               style={{
                 position: 'absolute',
                 top: stageTop,

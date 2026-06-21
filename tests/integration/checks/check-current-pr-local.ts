@@ -249,6 +249,14 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ],
   );
   addIf(
+    (file) =>
+      file.includes('brushMask') ||
+      file.includes('brush-mask') ||
+      file === 'src/components/panel/editor/ImageCanvas.tsx' ||
+      file === 'src/components/panel/right/MasksPanel.tsx',
+    ['check:brush-mask', 'check:brush-mask-command', 'check:brush-mask-command-capture'],
+  );
+  addIf(
     (file) => file.includes('skinToneUniformity') || file.includes('skin-tone-uniformity'),
     ['check:skin-tone-uniformity', 'check:skin-tone-uniformity-local-raw-proof'],
   );
@@ -452,6 +460,14 @@ if (process.argv.includes('--self-test')) {
       'check:selective-color-independent-proof',
       'check:selective-color-range-preview-apply',
     ],
+  );
+  assertSelfTestRoute(
+    ['src/utils/brushMaskCommandBridge.ts'],
+    ['check:brush-mask', 'check:brush-mask-command', 'check:brush-mask-command-capture'],
+  );
+  assertSelfTestRoute(
+    ['src/components/panel/editor/ImageCanvas.tsx'],
+    ['check:brush-mask', 'check:brush-mask-command', 'check:brush-mask-command-capture'],
   );
   assertSelfTestRoute(['src/components/adjustments/FilmLookBrowser.tsx'], ['check:film-look-browser-ui']);
   assertSelfTestRoute(['src/components/panel/MainLibrary.tsx'], ['check:library-header-ui']);
