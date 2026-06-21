@@ -37,6 +37,8 @@ interface SuperResolutionModalProps {
 const scaleOptions = [1.5, 2, 3, 4] as const;
 const previewDimensionOptions = [2400, 4096, 8192] as const;
 const reviewArtifactPath = '/tmp/rawengine-super-resolution-smoke.tif';
+const getArtifactFileName = (path: string): string => path.split('/').at(-1) ?? path;
+const getShortHash = (hash: string): string => `${hash.slice(0, 18)}...`;
 
 export default function SuperResolutionModal({
   isOpen,
@@ -107,6 +109,15 @@ export default function SuperResolutionModal({
   const reviewArtifactSummary = outputReview.reviewArtifacts
     .map((artifact) => t(`modals.superResolution.review.artifactKind.${artifact.kind}`))
     .join(', ');
+  const reviewArtifactCards = outputReview.reviewArtifacts.map((artifact) => ({
+    ...artifact,
+    fileName: getArtifactFileName(artifact.path),
+    kindLabel: t(`modals.superResolution.review.artifactKind.${artifact.kind}`),
+    shortHash: getShortHash(artifact.contentHash),
+    storageLabel: artifact.publicRepoAllowed
+      ? t('modals.superResolution.review.artifactStorage.public')
+      : t('modals.superResolution.review.artifactStorage.private'),
+  }));
   const outputHashLabel = hasRuntimeOutputReview
     ? outputReview.outputArtifactHash
     : t('modals.superResolution.review.notMeasured');
@@ -477,6 +488,61 @@ export default function SuperResolutionModal({
           },
         ]}
       />
+
+      <section
+        className="rounded-md border border-border-color bg-bg-primary p-4"
+        data-artifact-count={reviewArtifactCards.length}
+        data-testid="sr-review-artifact-comparator"
+      >
+        <div className="mb-3 flex items-start justify-between gap-4">
+          <UiText variant={TextVariants.heading}>{t('modals.superResolution.review.artifactComparatorTitle')}</UiText>
+          <UiText variant={TextVariants.small} color={TextColors.secondary} className="shrink-0">
+            {t('modals.superResolution.review.proofStatus')}
+          </UiText>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3">
+          {reviewArtifactCards.map((artifact) => (
+            <div
+              key={artifact.kind}
+              className="min-w-0 rounded-md border border-border-color bg-bg-secondary/70 p-3"
+              data-review-artifact-hash={artifact.contentHash}
+              data-review-artifact-kind={artifact.kind}
+              data-review-artifact-path={artifact.path}
+              data-review-artifact-public={String(artifact.publicRepoAllowed)}
+            >
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <UiText as="span" variant={TextVariants.label} className="min-w-0">
+                  {artifact.kindLabel}
+                </UiText>
+                <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="shrink-0">
+                  {artifact.storageLabel}
+                </UiText>
+              </div>
+              <div className="grid gap-1 text-sm">
+                <div className="min-w-0">
+                  <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block">
+                    {t('modals.superResolution.review.artifactFile')}
+                  </UiText>
+                  <UiText as="span" variant={TextVariants.small} className="block truncate">
+                    {artifact.fileName}
+                  </UiText>
+                </div>
+                <div className="min-w-0">
+                  <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block">
+                    {t('modals.superResolution.review.artifactHash')}
+                  </UiText>
+                  <UiText as="span" variant={TextVariants.small} className="block font-mono">
+                    {artifact.shortHash}
+                  </UiText>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-3 block leading-relaxed">
+          {t('modals.superResolution.review.artifactComparatorLimitation')}
+        </UiText>
+      </section>
 
       <div
         className="sr-only"
