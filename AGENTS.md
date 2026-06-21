@@ -51,6 +51,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   meta-tooling PRs.
 - Avoid repo meta-tooling PRs unless they clearly improve product quality or
   prevent a recurring real failure.
+- Product-facing implementation should be the default. Planning, schema-only,
+  proof-only, probe-only, inventory-only, routing-only, and meta-tooling work is
+  supporting work, not a substitute for vertical product slices.
 - Proof scripts should live inside the actual feature PR they validate. Do not
   open PRs whose main value is only a probe, schema, inventory, or routing
   check.
@@ -222,6 +225,9 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 - Remove validation inventory JSON from routine gates. Do not maintain broad
   validation inventory files as routine PR churn; prefer focused checks tied to
   changed product behavior.
+- Do not keep committed generated validation reports just to prove scripts are
+  wired. Keep private RAW validation standardized around reusable private-root
+  setup plus per-feature run reports that prove real output behavior.
 - Prefer feature-specific runtime proofs that validate actual image output over
   broad status ledgers.
 - Audit existing validation helpers when touching nearby code. Delete stale,
