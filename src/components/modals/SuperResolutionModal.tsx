@@ -49,6 +49,10 @@ export default function SuperResolutionModal({
   const isAggressivePreviewOnly = settings.detailPolicy === 'aggressive_preview_only';
   const outputPixelMultiplier = Number((settings.outputScale * settings.outputScale).toFixed(2));
   const estimatedPreviewMegapixels = Math.round((sourceCount * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
+  const estimatedPreviewMemoryMb = Math.max(
+    0,
+    Math.round((sourceCount * settings.maxPreviewDimensionPx ** 2 * 4 * outputPixelMultiplier) / 1_000_000),
+  );
 
   const alignmentOptions: Array<OptionItem<SuperResolutionAlignmentMode>> = [
     { label: t('modals.superResolution.alignmentAuto'), value: 'auto' },
@@ -123,6 +127,7 @@ export default function SuperResolutionModal({
       <ComputationalSetupOptionSection title={t('modals.superResolution.scaleLabel')}>
         <div
           className="mb-3 grid grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-sm lg:grid-cols-4"
+          data-estimated-preview-memory-mb={estimatedPreviewMemoryMb}
           data-estimated-preview-megapixels={estimatedPreviewMegapixels}
           data-testid="sr-output-scale-summary"
         >
@@ -141,6 +146,10 @@ export default function SuperResolutionModal({
           <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.workload')}
             value={t('modals.superResolution.previewWorkloadValue', { value: estimatedPreviewMegapixels })}
+          />
+          <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.memory')}
+            value={t('modals.superResolution.previewMemoryValue', { value: estimatedPreviewMemoryMb })}
           />
         </div>
         <div className="grid grid-cols-4 gap-2">
@@ -299,6 +308,10 @@ export default function SuperResolutionModal({
             value={t('modals.superResolution.previewWorkloadValue', { value: estimatedPreviewMegapixels })}
           />
           <ComputationalSetupStatusLine
+            label={t('modals.superResolution.preflight.memory')}
+            value={t('modals.superResolution.previewMemoryValue', { value: estimatedPreviewMemoryMb })}
+          />
+          <ComputationalSetupStatusLine
             label={t('modals.superResolution.preflight.provenance')}
             value={t('modals.superResolution.preflight.required')}
           />
@@ -346,6 +359,10 @@ export default function SuperResolutionModal({
               {
                 label: t('modals.superResolution.preflight.workload'),
                 value: t('modals.superResolution.previewWorkloadValue', { value: estimatedPreviewMegapixels }),
+              },
+              {
+                label: t('modals.superResolution.preflight.memory'),
+                value: t('modals.superResolution.previewMemoryValue', { value: estimatedPreviewMemoryMb }),
               },
               {
                 label: t('modals.superResolution.preflight.alignment'),
