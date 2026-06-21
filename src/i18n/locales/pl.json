@@ -2225,6 +2225,9 @@
       "descCount_many": "Połącz {{count}} nakładających się obrazów w płynną panoramę.",
       "descCount_other": "Połącz {{count}} nakładających się obrazów w płynną panoramę.",
       "descGeneric": "Połącz swoje nakładające się obrazy w płynną panoramę.",
+      "engineCapabilityBlocked": "",
+      "engineSupported": "",
+      "engineUnsupported": "",
       "exposure": {
         "gainCompensation": "Gain compensation",
         "none": "None"
@@ -2252,10 +2255,12 @@
       "retry": "Spróbuj ponownie",
       "review": {
         "alignment": "Alignment",
+        "engineCapabilityBlocked": "",
         "limitation": "Runtime bridge proof only; private RAW decode, visual seam QA, and UI E2E remain open.",
         "privateRawPending": "Private RAW review pending",
         "projectionCrop": "Projection/crop",
         "proofStatus": "App-server bridge ready",
+        "runtimeAutoCrop": "",
         "runtimeBridge": "Dry-run/apply bridge",
         "seams": "Seams",
         "title": "Quality review",

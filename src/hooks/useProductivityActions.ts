@@ -10,10 +10,15 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
 
   const handleStartPanorama = useCallback(
     (paths: string[]) => {
+      const { panoramaModalState } = useUIStore.getState();
+      const { settings } = panoramaModalState;
       const dryRunCommand = {
         appServerToolName: getComputationalMergeAppServerRoutePairSummary('panorama').dryRunToolName,
+        boundaryMode: settings.boundaryMode,
         commandType: 'computationalMerge.createPanorama' as const,
         dryRun: true as const,
+        maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
+        projection: settings.projection,
         sourceCount: paths.length,
       };
       setUI((state) => ({
@@ -26,7 +31,15 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           progressMessage: 'Starting panorama...',
         },
       }));
-      invoke(Invokes.StitchPanorama, { paths }).catch((err: unknown) => {
+      invoke(Invokes.StitchPanorama, {
+        options: {
+          boundaryMode: settings.boundaryMode,
+          maxPreviewDimensionPx: settings.maxPreviewDimensionPx,
+          projection: settings.projection,
+          qualityPreference: settings.qualityPreference,
+        },
+        paths,
+      }).catch((err: unknown) => {
         setUI((state) => ({
           panoramaModalState: { ...state.panoramaModalState, isProcessing: false, error: String(err) },
         }));

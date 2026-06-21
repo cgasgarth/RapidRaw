@@ -220,10 +220,10 @@ export const hdrReviewWorkspaceProofSchema = z.object({
 });
 export const panoramaUiSettingsProofSchema = z.object({
   blendMode: z.literal('feather'),
-  boundaryMode: z.literal('transparent'),
+  boundaryMode: z.literal('auto_crop'),
   exposureMode: z.literal('none'),
   maxPreviewDimensionPx: z.literal('8192'),
-  projection: z.literal('spherical'),
+  projection: z.literal('rectilinear'),
   qualityPreference: z.literal('preview'),
 });
 export const panoramaReviewWorkspaceProofSchema = z.object({
@@ -231,7 +231,7 @@ export const panoramaReviewWorkspaceProofSchema = z.object({
   artifactPath: z.literal('/tmp/panorama.tif'),
   command: z.literal(panoramaRoutePair.dryRunToolName),
   estimatedPreviewMegapixels: z.literal('336'),
-  projection: z.literal('spherical'),
+  projection: z.literal('rectilinear'),
   runtimeStatus: z.literal('dry_run_preview'),
   sourceCount: z.literal('5'),
   sourceOrder: z.literal('left,center,right,detail,sky'),

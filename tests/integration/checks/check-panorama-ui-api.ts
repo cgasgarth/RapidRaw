@@ -17,7 +17,7 @@ runComputationalUiApiSmoke({
       exposureMode: 'gain_compensation',
       maxPreviewDimensionPx: 4096,
       outputName: 'Ridge Overlook Panorama',
-      projection: 'cylindrical',
+      projection: 'rectilinear',
       qualityPreference: 'best',
       sources: [
         { exposureEv: 0, imagePath: '/photos/pano/PANO_0001.CR3', sourceIndex: 0 },
@@ -50,10 +50,10 @@ runComputationalUiApiSmoke({
   validApplyArgs: [
     {
       blendMode: 'feather',
-      boundaryMode: 'transparent',
+      boundaryMode: 'auto_crop',
       exposureMode: 'none',
       outputName: 'Ridge Overlook Panorama',
-      projection: 'spherical',
+      projection: 'rectilinear',
       sources: [
         { exposureEv: 0, imagePath: '/photos/pano/PANO_0001.CR3', sourceIndex: 0 },
         { exposureEv: 0, imagePath: '/photos/pano/PANO_0002.CR3', sourceIndex: 1 },
@@ -88,7 +88,7 @@ runComputationalUiApiSmoke({
           {
             boundaryMode: 'auto_crop',
             outputName: 'Invalid Panorama Apply',
-            projection: 'cylindrical',
+            projection: 'rectilinear',
             sources: [
               { imagePath: '/photos/pano/PANO_0001.CR3', sourceIndex: 0 },
               { imagePath: '/photos/pano/PANO_0002.CR3', sourceIndex: 1 },
@@ -110,7 +110,7 @@ runComputationalUiApiSmoke({
           {
             boundaryMode: 'auto_crop',
             outputName: 'Invalid Panorama',
-            projection: 'cylindrical',
+            projection: 'rectilinear',
             sources: [{ imagePath: '/photos/pano/PANO_0001.CR3', sourceIndex: 0 }],
           },
           {

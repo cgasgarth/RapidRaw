@@ -816,7 +816,10 @@ fn render_private_panorama_paths(image_paths: Vec<String>) -> Result<PanoramaRen
         .build(tauri::test::mock_context(tauri::test::noop_assets()))
         .map_err(|error| error.to_string())?;
     render_with_legacy_homography_engine_with_settings(
-        PanoramaRenderRequest { image_paths },
+        PanoramaRenderRequest {
+            image_paths,
+            options: Default::default(),
+        },
         app.handle().clone(),
         AppSettings::default(),
     )

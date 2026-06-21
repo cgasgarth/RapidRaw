@@ -1,4 +1,4 @@
-import { Layers, ShieldCheck, XCircle } from 'lucide-react';
+import { Info, Layers, ShieldCheck, XCircle } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -59,9 +59,9 @@ export default function PanoramaModal({
   const isSourceCountValid = (imageCount ?? 0) >= 2;
 
   const projectionOptions: Array<OptionItem<PanoramaUiProjection>> = [
+    { label: t('modals.panorama.projection.rectilinear'), value: 'rectilinear' },
     { label: t('modals.panorama.projection.cylindrical'), value: 'cylindrical' },
     { label: t('modals.panorama.projection.spherical'), value: 'spherical' },
-    { label: t('modals.panorama.projection.rectilinear'), value: 'rectilinear' },
   ];
   const qualityOptions: Array<OptionItem<PanoramaUiQualityPreference>> = [
     { label: t('modals.panorama.quality.preview'), value: 'preview' },
@@ -73,6 +73,9 @@ export default function PanoramaModal({
     { label: t('modals.panorama.boundary.transparent'), value: 'transparent' },
     { label: t('modals.panorama.boundary.manualCrop'), value: 'manual_crop' },
   ];
+  const supportedProjection = settings.projection === 'rectilinear';
+  const supportedBoundary = settings.boundaryMode === 'auto_crop';
+  const isEngineApplyReady = isSourceCountValid && supportedProjection && supportedBoundary;
   const exposureOptions: Array<OptionItem<PanoramaUiExposureMode>> = [
     { label: t('modals.panorama.exposure.gainCompensation'), value: 'gain_compensation' },
     { label: t('modals.panorama.exposure.none'), value: 'none' },
@@ -90,7 +93,7 @@ export default function PanoramaModal({
   const sourceReadinessLabel = `${t('modals.panorama.summarySourceCount', { count: imageCount ?? 0 })} - ${
     isSourceCountValid ? t('modals.panorama.summaryReady') : t('modals.panorama.summaryBlocked')
   }`;
-  const stitchReadinessLabel = isSourceCountValid
+  const stitchReadinessLabel = isEngineApplyReady
     ? t('modals.panorama.summaryReady')
     : t('modals.panorama.summaryBlocked');
 
@@ -276,7 +279,8 @@ export default function PanoramaModal({
             data-exposure-mode={settings.exposureMode}
             data-projection={settings.projection}
             data-source-count={imageCount ?? 0}
-            data-stitch-ready={String(isSourceCountValid)}
+            data-engine-apply-ready={String(isEngineApplyReady)}
+            data-stitch-ready={String(isEngineApplyReady)}
             data-testid="panorama-stitch-readiness-summary"
           >
             {[
@@ -322,19 +326,50 @@ export default function PanoramaModal({
               <UiText className="leading-relaxed">{t('modals.panorama.sourceCountBlocked')}</UiText>
             </div>
           )}
+          {isSourceCountValid && !isEngineApplyReady && (
+            <div
+              className="mb-5 flex gap-3 rounded-md border border-yellow-500/40 bg-yellow-500/10 px-4 py-3"
+              data-testid="panorama-engine-capability-blocker"
+            >
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-yellow-300" />
+              <UiText className="leading-relaxed">{t('modals.panorama.engineCapabilityBlocked')}</UiText>
+            </div>
+          )}
 
           <section className="grid grid-cols-2 gap-4">
             <div>
               <UiText variant={TextVariants.heading} className="mb-2">
                 {t('modals.panorama.projectionLabel')}
               </UiText>
-              <Dropdown
-                options={projectionOptions}
-                value={settings.projection}
-                onChange={(projection) => {
-                  setSetting({ projection });
-                }}
-              />
+              <div className="grid gap-2" data-testid="panorama-projection-options">
+                {projectionOptions.map((option) => {
+                  const isSupported = option.value === 'rectilinear';
+                  const isSelected = settings.projection === option.value;
+                  return (
+                    <button
+                      aria-pressed={isSelected}
+                      className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                        isSelected
+                          ? 'border-accent bg-accent/15 text-text-primary'
+                          : 'border-border-color bg-surface text-text-secondary hover:bg-card-active'
+                      } disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-surface`}
+                      data-engine-supported={String(isSupported)}
+                      data-testid={`panorama-projection-option-${option.value}`}
+                      disabled={!isSupported}
+                      key={option.value}
+                      onClick={() => {
+                        setSetting({ projection: option.value });
+                      }}
+                      type="button"
+                    >
+                      <span className="block font-medium">{option.label}</span>
+                      <span className="mt-0.5 block text-xs text-text-tertiary">
+                        {isSupported ? t('modals.panorama.engineSupported') : t('modals.panorama.engineUnsupported')}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div>
               <UiText variant={TextVariants.heading} className="mb-2">
@@ -384,13 +419,35 @@ export default function PanoramaModal({
               <UiText variant={TextVariants.heading} className="mb-2">
                 {t('modals.panorama.boundaryLabel')}
               </UiText>
-              <Dropdown
-                options={boundaryOptions}
-                value={settings.boundaryMode}
-                onChange={(boundaryMode) => {
-                  setSetting({ boundaryMode });
-                }}
-              />
+              <div className="grid gap-2" data-testid="panorama-boundary-options">
+                {boundaryOptions.map((option) => {
+                  const isSupported = option.value === 'auto_crop';
+                  const isSelected = settings.boundaryMode === option.value;
+                  return (
+                    <button
+                      aria-pressed={isSelected}
+                      className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                        isSelected
+                          ? 'border-accent bg-accent/15 text-text-primary'
+                          : 'border-border-color bg-surface text-text-secondary hover:bg-card-active'
+                      } disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-surface`}
+                      data-engine-supported={String(isSupported)}
+                      data-testid={`panorama-boundary-option-${option.value}`}
+                      disabled={!isSupported}
+                      key={option.value}
+                      onClick={() => {
+                        setSetting({ boundaryMode: option.value });
+                      }}
+                      type="button"
+                    >
+                      <span className="block font-medium">{option.label}</span>
+                      <span className="mt-0.5 block text-xs text-text-tertiary">
+                        {isSupported ? t('modals.panorama.engineSupported') : t('modals.panorama.engineUnsupported')}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div>
               <UiText variant={TextVariants.heading} className="mb-2">
@@ -449,8 +506,10 @@ export default function PanoramaModal({
                 },
                 {
                   label: t('modals.panorama.review.projectionCrop'),
-                  status: 'pending',
-                  value: t('modals.panorama.review.uiE2ePending'),
+                  status: isEngineApplyReady ? 'ready' : 'review',
+                  value: isEngineApplyReady
+                    ? t('modals.panorama.review.runtimeAutoCrop')
+                    : t('modals.panorama.review.engineCapabilityBlocked'),
                 },
               ]}
               sections={[
@@ -488,7 +547,9 @@ export default function PanoramaModal({
                     },
                     {
                       label: t('modals.panorama.review.projectionCrop'),
-                      value: t('modals.panorama.review.uiE2ePending'),
+                      value: isEngineApplyReady
+                        ? t('modals.panorama.review.runtimeAutoCrop')
+                        : t('modals.panorama.review.engineCapabilityBlocked'),
                     },
                   ],
                 },
@@ -514,7 +575,7 @@ export default function PanoramaModal({
         finalImageBase64={finalImageBase64}
         isProcessing={isProcessing}
         isSaving={isSaving}
-        isSourceCountValid={isSourceCountValid}
+        isSourceCountValid={isEngineApplyReady}
         labels={{
           cancel: t('modals.panorama.cancel'),
           close: t('modals.panorama.close'),

@@ -39,8 +39,11 @@ export interface PanoramaModalState {
   isProcessing: boolean;
   lastDryRunCommand: {
     appServerToolName: string;
+    boundaryMode: PanoramaUiSettings['boundaryMode'];
     commandType: 'computationalMerge.createPanorama';
     dryRun: true;
+    maxPreviewDimensionPx: number;
+    projection: PanoramaUiSettings['projection'];
     sourceCount: number;
   } | null;
   progressMessage: string | null;

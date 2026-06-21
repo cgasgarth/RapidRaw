@@ -7,7 +7,7 @@ use image::ImageFormat;
 use image::{DynamicImage, GenericImageView, GrayImage, Rgb32FImage};
 use nalgebra::Matrix3;
 use rayon::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
@@ -86,7 +86,79 @@ impl MatchInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PanoramaRenderRequest {
+    pub options: PanoramaStitchOptions,
     pub image_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PanoramaProjectionOption {
+    Cylindrical,
+    #[default]
+    Rectilinear,
+    Spherical,
+}
+
+impl PanoramaProjectionOption {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Cylindrical => "cylindrical",
+            Self::Rectilinear => "rectilinear",
+            Self::Spherical => "spherical",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PanoramaBoundaryModeOption {
+    #[default]
+    AutoCrop,
+    ManualCrop,
+    Transparent,
+}
+
+impl PanoramaBoundaryModeOption {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::AutoCrop => "auto_crop",
+            Self::ManualCrop => "manual_crop",
+            Self::Transparent => "transparent",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PanoramaQualityPreferenceOption {
+    Balanced,
+    #[default]
+    Best,
+    Preview,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanoramaStitchOptions {
+    #[serde(default)]
+    pub boundary_mode: PanoramaBoundaryModeOption,
+    #[serde(default)]
+    pub max_preview_dimension_px: Option<u32>,
+    #[serde(default)]
+    pub projection: PanoramaProjectionOption,
+    #[serde(default)]
+    pub quality_preference: PanoramaQualityPreferenceOption,
+}
+
+impl Default for PanoramaStitchOptions {
+    fn default() -> Self {
+        Self {
+            boundary_mode: PanoramaBoundaryModeOption::AutoCrop,
+            max_preview_dimension_px: Some(DEFAULT_PANORAMA_MAX_PREVIEW_DIMENSION_PX),
+            projection: PanoramaProjectionOption::Rectilinear,
+            quality_preference: PanoramaQualityPreferenceOption::Best,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -129,16 +201,32 @@ pub struct PanoramaSelectedMatchEdgeMetadata {
 pub struct PanoramaRenderMetadata {
     pub blend_diagnostics: stitching::StitchBlendDiagnostics,
     pub connected_source_indices: Vec<usize>,
+    pub crop: PanoramaCropMetadata,
+    pub effective_boundary_mode: PanoramaBoundaryModeOption,
+    pub effective_projection: PanoramaProjectionOption,
     pub estimated_peak_memory_bytes: u64,
     pub excluded_source_indices: Vec<usize>,
     pub output_height: u32,
     pub output_width: u32,
     pub pairwise_matches: Vec<PanoramaPairwiseMatchMetadata>,
     pub reference_source_index: Option<usize>,
+    pub requested_boundary_mode: PanoramaBoundaryModeOption,
+    pub requested_projection: PanoramaProjectionOption,
     pub selected_match_edges: Vec<PanoramaSelectedMatchEdgeMetadata>,
     pub max_transform_chain_length: usize,
     pub sources: Vec<PanoramaSourceMetadata>,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PanoramaCropMetadata {
+    pub height: u32,
+    pub mode: String,
+    pub pre_crop_height: u32,
+    pub pre_crop_width: u32,
+    pub width: u32,
+    pub x: u32,
+    pub y: u32,
 }
 
 pub struct PanoramaRenderResult {
@@ -270,6 +358,27 @@ const DEFAULT_PANORAMA_MEMORY_BUDGET_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const DEFAULT_PANORAMA_MAX_PREVIEW_DIMENSION_PX: u32 = 800;
 const HIGH_MEMORY_BUDGET_RATIO: f64 = 0.8;
 
+fn validate_panorama_stitch_options(options: &PanoramaStitchOptions) -> Result<(), String> {
+    if options.projection != PanoramaProjectionOption::Rectilinear {
+        return Err(
+            "Panorama engine currently supports rectilinear projection only; cylindrical and spherical projection are blocked until runtime support lands."
+                .to_string(),
+        );
+    }
+    if options.boundary_mode != PanoramaBoundaryModeOption::AutoCrop {
+        return Err(
+            "Panorama engine currently supports auto-crop boundary handling only; transparent and manual crop are blocked until runtime support lands."
+                .to_string(),
+        );
+    }
+    if let Some(max_preview_dimension_px) = options.max_preview_dimension_px
+        && max_preview_dimension_px == 0
+    {
+        return Err("Panorama preview dimension must be greater than zero.".to_string());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn plan_panorama(
     paths: Vec<String>,
@@ -313,6 +422,7 @@ pub async fn plan_panorama(
 
 #[tauri::command]
 pub async fn stitch_panorama(
+    options: Option<PanoramaStitchOptions>,
     paths: Vec<String>,
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
@@ -326,6 +436,8 @@ pub async fn stitch_panorama(
         .iter()
         .map(|p| parse_virtual_path(p).0.to_string_lossy().into_owned())
         .collect();
+    let stitch_options = options.unwrap_or_default();
+    validate_panorama_stitch_options(&stitch_options)?;
 
     let panorama_result_handle = state.panorama_result.clone();
 
@@ -334,6 +446,7 @@ pub async fn stitch_panorama(
         let panorama_result = engine.render(
             PanoramaRenderRequest {
                 image_paths: source_paths,
+                options: stitch_options,
             },
             app_handle.clone(),
         );
@@ -522,6 +635,7 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     settings: AppSettings,
 ) -> Result<PanoramaRenderResult, String> {
     let image_paths = request.image_paths;
+    let options = request.options;
     if image_paths.len() < 2 {
         return Err("At least two images are required for a panorama.".to_string());
     }
@@ -811,7 +925,8 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
         &stitching_order.global_homographies,
         app_handle.clone(),
     )?;
-    let panorama = stitch_result.image;
+    let (panorama, crop) =
+        apply_panorama_boundary_mode(stitch_result.image, &stitch_result.mask, &options)?;
 
     println!("Stitching completed in {:.2?}\n", start_time.elapsed());
 
@@ -829,12 +944,17 @@ pub(crate) fn render_with_legacy_homography_engine_with_settings<R: Runtime>(
     let metadata = PanoramaRenderMetadata {
         blend_diagnostics: stitch_result.blend_diagnostics,
         connected_source_indices,
+        crop,
+        effective_boundary_mode: PanoramaBoundaryModeOption::AutoCrop,
+        effective_projection: PanoramaProjectionOption::Rectilinear,
         estimated_peak_memory_bytes,
         excluded_source_indices,
         output_height,
         output_width,
         pairwise_matches: pairwise_match_metadata,
         reference_source_index: stitching_order.reference_source_index,
+        requested_boundary_mode: options.boundary_mode,
+        requested_projection: options.projection,
         selected_match_edges: stitching_order.selected_match_edges,
         max_transform_chain_length: stitching_order.max_transform_chain_length,
         sources: source_metadata,
@@ -873,6 +993,87 @@ fn collect_pairwise_match_metadata(
 
     metadata.sort_by_key(|match_info| (match_info.source_index, match_info.target_index));
     metadata
+}
+
+fn apply_panorama_boundary_mode(
+    image: Rgb32FImage,
+    mask: &GrayImage,
+    options: &PanoramaStitchOptions,
+) -> Result<(Rgb32FImage, PanoramaCropMetadata), String> {
+    validate_panorama_stitch_options(options)?;
+    let pre_crop_width = image.width();
+    let pre_crop_height = image.height();
+    let Some((x, y, width, height)) = valid_pixel_bounds(mask) else {
+        return Ok((
+            image,
+            PanoramaCropMetadata {
+                height: pre_crop_height,
+                mode: "auto".to_string(),
+                pre_crop_height,
+                pre_crop_width,
+                width: pre_crop_width,
+                x: 0,
+                y: 0,
+            },
+        ));
+    };
+
+    if x == 0 && y == 0 && width == pre_crop_width && height == pre_crop_height {
+        return Ok((
+            image,
+            PanoramaCropMetadata {
+                height,
+                mode: "auto".to_string(),
+                pre_crop_height,
+                pre_crop_width,
+                width,
+                x,
+                y,
+            },
+        ));
+    }
+
+    let mut cropped = Rgb32FImage::new(width, height);
+    for crop_y in 0..height {
+        for crop_x in 0..width {
+            let pixel = *image.get_pixel(x + crop_x, y + crop_y);
+            cropped.put_pixel(crop_x, crop_y, pixel);
+        }
+    }
+
+    Ok((
+        cropped,
+        PanoramaCropMetadata {
+            height,
+            mode: "auto".to_string(),
+            pre_crop_height,
+            pre_crop_width,
+            width,
+            x,
+            y,
+        },
+    ))
+}
+
+fn valid_pixel_bounds(mask: &GrayImage) -> Option<(u32, u32, u32, u32)> {
+    let mut min_x = u32::MAX;
+    let mut min_y = u32::MAX;
+    let mut max_x = 0_u32;
+    let mut max_y = 0_u32;
+    let mut found = false;
+
+    for (x, y, pixel) in mask.enumerate_pixels() {
+        if pixel[0] == 0 {
+            continue;
+        }
+        found = true;
+        min_x = min_x.min(x);
+        min_y = min_y.min(y);
+        max_x = max_x.max(x);
+        max_y = max_y.max(y);
+    }
+
+    found.then_some((min_x, min_y, max_x - min_x + 1, max_y - min_y + 1))
 }
 
 fn homography_condition_number(homography: &Matrix3<f64>) -> Option<f64> {
@@ -991,11 +1192,13 @@ fn upsert_panorama_artifact_metadata(
     let output_artifact_id = format!("{}_output", artifact_id);
     let preview_artifact_id = format!("{}_preview", artifact_id);
     let crop = json!({
-        "height": metadata.output_height,
-        "mode": "auto",
-        "width": metadata.output_width,
-        "x": 0,
-        "y": 0,
+        "height": metadata.crop.height,
+        "mode": metadata.crop.mode,
+        "preCropHeight": metadata.crop.pre_crop_height,
+        "preCropWidth": metadata.crop.pre_crop_width,
+        "width": metadata.crop.width,
+        "x": metadata.crop.x,
+        "y": metadata.crop.y,
     });
     let warnings = panorama_warning_codes(metadata);
     let excluded_sources: Vec<_> = metadata
@@ -1053,11 +1256,11 @@ fn upsert_panorama_artifact_metadata(
             "ransacIterations": processing::RANSAC_ITERATIONS,
         },
         "artifactId": artifact_id,
-        "boundaryMode": "auto_crop",
+        "boundaryMode": metadata.effective_boundary_mode.as_str(),
         "boundarySettings": {
             "crop": crop,
-            "effectiveMode": "auto_crop",
-            "requestedMode": "auto_crop",
+            "effectiveMode": metadata.effective_boundary_mode.as_str(),
+            "requestedMode": metadata.requested_boundary_mode.as_str(),
             "support": "implemented_current_engine",
         },
         "createdAt": Utc::now().to_rfc3339(),
@@ -1100,10 +1303,10 @@ fn upsert_panorama_artifact_metadata(
             "kind": "preview",
             "storage": "temp_cache",
         }],
-        "projection": "rectilinear",
+        "projection": metadata.effective_projection.as_str(),
         "projectionSettings": {
-            "effectiveProjection": "rectilinear",
-            "requestedProjection": "rectilinear",
+            "effectiveProjection": metadata.effective_projection.as_str(),
+            "requestedProjection": metadata.requested_projection.as_str(),
             "support": "implemented_current_engine",
         },
         "provenance": {
@@ -1792,6 +1995,7 @@ fn tree_reference_score(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{Luma, Rgb};
 
     #[test]
     fn collect_pairwise_match_metadata_sorts_by_source_pair() {
@@ -1862,6 +2066,51 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn panorama_boundary_auto_crop_reduces_canvas_to_valid_pixels() {
+        let mut image = Rgb32FImage::new(5, 4);
+        let mut mask = GrayImage::new(5, 4);
+        for y in 1..3 {
+            for x in 2..5 {
+                image.put_pixel(x, y, Rgb([x as f32, y as f32, 1.0]));
+                mask.put_pixel(x, y, Luma([255]));
+            }
+        }
+
+        let (cropped, crop) =
+            apply_panorama_boundary_mode(image, &mask, &PanoramaStitchOptions::default())
+                .expect("auto-crop should succeed");
+
+        assert_eq!(cropped.dimensions(), (3, 2));
+        assert_eq!(
+            crop,
+            PanoramaCropMetadata {
+                height: 2,
+                mode: "auto".to_string(),
+                pre_crop_height: 4,
+                pre_crop_width: 5,
+                width: 3,
+                x: 2,
+                y: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn panorama_boundary_blocks_unsupported_projection_and_boundary_modes() {
+        let unsupported_projection = PanoramaStitchOptions {
+            projection: PanoramaProjectionOption::Cylindrical,
+            ..PanoramaStitchOptions::default()
+        };
+        assert!(validate_panorama_stitch_options(&unsupported_projection).is_err());
+
+        let unsupported_boundary = PanoramaStitchOptions {
+            boundary_mode: PanoramaBoundaryModeOption::Transparent,
+            ..PanoramaStitchOptions::default()
+        };
+        assert!(validate_panorama_stitch_options(&unsupported_boundary).is_err());
     }
 
     #[test]
@@ -2284,10 +2533,21 @@ mod tests {
                 }],
             },
             connected_source_indices: vec![0, 1],
+            crop: PanoramaCropMetadata {
+                height: 90,
+                mode: "auto".to_string(),
+                pre_crop_height: 100,
+                pre_crop_width: 220,
+                width: 200,
+                x: 10,
+                y: 5,
+            },
+            effective_boundary_mode: PanoramaBoundaryModeOption::AutoCrop,
+            effective_projection: PanoramaProjectionOption::Rectilinear,
             estimated_peak_memory_bytes: 128_000,
             excluded_source_indices: Vec::new(),
-            output_height: 100,
-            output_width: 220,
+            output_height: 90,
+            output_width: 200,
             pairwise_matches: vec![PanoramaPairwiseMatchMetadata {
                 brief_match_diagnostics: brief_match_diagnostics_fixture(),
                 homography3x3: [1.0, 0.0, 12.0, 0.0, 1.0, 1.5, 0.0, 0.0, 1.0],
@@ -2304,6 +2564,8 @@ mod tests {
                 target_index: 1,
             }],
             reference_source_index: Some(0),
+            requested_boundary_mode: PanoramaBoundaryModeOption::AutoCrop,
+            requested_projection: PanoramaProjectionOption::Rectilinear,
             selected_match_edges: vec![PanoramaSelectedMatchEdgeMetadata {
                 child_source_index: 1,
                 edge_rank: 1,

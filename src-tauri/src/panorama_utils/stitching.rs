@@ -66,6 +66,7 @@ pub struct StitchBlendDiagnostics {
 pub struct ProgressiveStitchResult {
     pub blend_diagnostics: StitchBlendDiagnostics,
     pub image: Rgb32FImage,
+    pub mask: GrayImage,
 }
 
 pub fn progressive_seam_stitcher<R: Runtime>(
@@ -77,6 +78,7 @@ pub fn progressive_seam_stitcher<R: Runtime>(
         return Ok(ProgressiveStitchResult {
             blend_diagnostics: StitchBlendDiagnostics::default(),
             image: Rgb32FImage::new(0, 0),
+            mask: GrayImage::new(0, 0),
         });
     }
 
@@ -437,6 +439,7 @@ pub fn progressive_seam_stitcher<R: Runtime>(
     Ok(ProgressiveStitchResult {
         blend_diagnostics,
         image: panorama,
+        mask: panorama_mask,
     })
 }
 
