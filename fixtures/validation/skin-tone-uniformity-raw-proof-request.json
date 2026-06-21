@@ -1,0 +1,71 @@
+{
+  "$schema": "https://rawengine.dev/schemas/raw-open-edit-export-proof-request-v1.json",
+  "artifactDirRelative": "private-artifacts/validation/skin-tone-uniformity",
+  "editCommand": {
+    "actor": {
+      "id": "agent.skin-tone-uniformity-proof",
+      "kind": "agent",
+      "sessionId": "skin-tone-uniformity-proof"
+    },
+    "approval": {
+      "approvalClass": "edit_apply",
+      "reason": "Apply accepted skin-tone uniformity command for RAW preview/export proof.",
+      "state": "approved"
+    },
+    "colorPipeline": {
+      "chromaticAdaptation": {
+        "method": "bradford_v1",
+        "sourceWhitePoint": {
+          "x": 0.3457,
+          "y": 0.3585
+        },
+        "status": "math_validated",
+        "targetWhitePoint": {
+          "x": 0.32168,
+          "y": 0.33767
+        },
+        "warnings": []
+      },
+      "inputDomain": "camera_linear_rgb",
+      "operationDomain": "acescg_linear_v1",
+      "renderTarget": {
+        "bitDepth": 16,
+        "embedIcc": true,
+        "intent": "relative_colorimetric",
+        "outputProfile": "display_p3",
+        "viewTransform": "rawengine_agx_v1"
+      },
+      "sceneToDisplayTransform": "rawengine_agx_v1",
+      "workingSpace": "acescg_linear_v1"
+    },
+    "commandId": "command.raw-open-edit-export.skin-tone-uniformity.v1",
+    "commandType": "toneColor.adjustSkinToneUniformity",
+    "correlationId": "corr.raw-open-edit-export.skin-tone-uniformity.v1",
+    "dryRun": false,
+    "expectedGraphRevision": "graph-rev.raw-open-edit-export.skin-tone-uniformity.v1",
+    "idempotencyKey": "idem.raw-open-edit-export.skin-tone-uniformity.v1",
+    "parameters": {
+      "hueUniformity": 0.42,
+      "luminanceUniformity": 0.18,
+      "maxHueShiftDegrees": 16,
+      "saturationUniformity": 0.31,
+      "targetHueDegrees": 24,
+      "targetLuminance": 0.56,
+      "targetSaturation": 0.38
+    },
+    "schemaVersion": 1,
+    "target": {
+      "imagePath": "private-fixtures/color/skin-tone-uniformity-v1/alaska-dsc7853.arw",
+      "kind": "image"
+    }
+  },
+  "fixtureId": "validation.raw-open-edit-export.skin-tone-uniformity.v1",
+  "privateRootPath": "/tmp/rawengine-private-root",
+  "sourceMetadata": {
+    "cameraMake": "Sony",
+    "cameraModel": "ILCE-7M3",
+    "privacySafeCameraId": "camera.raw-open-edit-export.skin-tone-uniformity.v1",
+    "rawFormat": "arw"
+  },
+  "sourceRelativePath": "private-fixtures/color/skin-tone-uniformity-v1/alaska-dsc7853.arw"
+}

@@ -133,6 +133,19 @@ pub struct RawOpenEditExportSelectiveColorParameters {
     pub saturation: f64,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
+pub struct RawOpenEditExportSkinToneUniformityParameters {
+    pub hue_uniformity: f64,
+    pub luminance_uniformity: f64,
+    pub max_hue_shift_degrees: f64,
+    pub saturation_uniformity: f64,
+    pub target_hue_degrees: f64,
+    pub target_luminance: f64,
+    pub target_saturation: f64,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawOpenEditExportProofArtifact {
@@ -486,9 +499,11 @@ fn edit_command_adjustments(command: &RawOpenEditExportCommand) -> Result<Value,
     match command.command_type.as_str() {
         "toneColor.setBasicTone" => basic_tone_adjustments(&command.parameters),
         "toneColor.adjustHsl" => selective_color_adjustments(&command.parameters),
+        "toneColor.adjustSkinToneUniformity" => {
+            skin_tone_uniformity_adjustments(&command.parameters)
+        }
         _ => Err(
-            "editCommand.commandType must be toneColor.setBasicTone or toneColor.adjustHsl."
-                .to_string(),
+            "editCommand.commandType must be toneColor.setBasicTone, toneColor.adjustHsl, or toneColor.adjustSkinToneUniformity.".to_string(),
         ),
     }
 }
@@ -531,6 +546,38 @@ fn selective_color_adjustments(parameters: &Value) -> Result<Value, String> {
                 "luminance": parameters.luminance,
                 "saturation": parameters.saturation,
             }
+        }
+    }))
+}
+
+fn skin_tone_uniformity_adjustments(parameters: &Value) -> Result<Value, String> {
+    let parameters: RawOpenEditExportSkinToneUniformityParameters =
+        serde_json::from_value(parameters.clone()).map_err(|error| error.to_string())?;
+    let preview_hue_shift = (parameters.target_hue_degrees - 18.0).clamp(
+        -parameters.max_hue_shift_degrees,
+        parameters.max_hue_shift_degrees,
+    ) * parameters.hue_uniformity;
+    let preview_saturation =
+        (parameters.target_saturation - 0.45) * 100.0 * parameters.saturation_uniformity;
+    let preview_luminance =
+        (parameters.target_luminance - 0.5) * 100.0 * parameters.luminance_uniformity;
+
+    Ok(json!({
+        "hsl": {
+            "oranges": {
+                "hue": preview_hue_shift,
+                "luminance": preview_luminance,
+                "saturation": preview_saturation,
+            }
+        },
+        "skinToneUniformity": {
+            "hueUniformity": parameters.hue_uniformity,
+            "luminanceUniformity": parameters.luminance_uniformity,
+            "maxHueShiftDegrees": parameters.max_hue_shift_degrees,
+            "saturationUniformity": parameters.saturation_uniformity,
+            "targetHueDegrees": parameters.target_hue_degrees,
+            "targetLuminance": parameters.target_luminance,
+            "targetSaturation": parameters.target_saturation,
         }
     }))
 }
@@ -871,6 +918,44 @@ mod tests {
         }
     }
 
+    fn sample_skin_tone_uniformity_command() -> RawOpenEditExportCommand {
+        RawOpenEditExportCommand {
+            actor: json!({
+                "id": "agent.skin-tone-proof-wrapper",
+                "kind": "agent",
+                "sessionId": "skin-tone-proof-wrapper"
+            }),
+            approval: RawOpenEditExportBasicToneApproval {
+                approval_class: "edit_apply".to_string(),
+                reason: "Apply accepted skin-tone uniformity command for RAW preview/export proof."
+                    .to_string(),
+                state: "approved".to_string(),
+            },
+            color_pipeline: sample_color_pipeline(),
+            command_id: "command.raw-open-edit-export.skin-tone-uniformity.v1".to_string(),
+            command_type: "toneColor.adjustSkinToneUniformity".to_string(),
+            correlation_id: "corr.raw-open-edit-export.skin-tone-uniformity.v1".to_string(),
+            dry_run: false,
+            expected_graph_revision: "graph-rev.raw-open-edit-export.skin-tone-uniformity.v1"
+                .to_string(),
+            idempotency_key: Some("idem.raw-open-edit-export.skin-tone-uniformity.v1".to_string()),
+            parameters: json!({
+                "hueUniformity": 0.42,
+                "luminanceUniformity": 0.18,
+                "maxHueShiftDegrees": 16.0,
+                "saturationUniformity": 0.31,
+                "targetHueDegrees": 24.0,
+                "targetLuminance": 0.56,
+                "targetSaturation": 0.38,
+            }),
+            schema_version: 1,
+            target: json!({
+                "imagePath": "private-fixtures/color/skin-tone-uniformity-v1/alaska-dsc7853.arw",
+                "kind": "image"
+            }),
+        }
+    }
+
     fn sample_color_pipeline() -> RawOpenEditExportColorPipeline {
         RawOpenEditExportColorPipeline {
             chromatic_adaptation: RawOpenEditExportChromaticAdaptation {
@@ -1001,6 +1086,30 @@ mod tests {
 
         let mut invalid = sample_selective_color_command();
         invalid.parameters["band"] = json!("teal");
+        assert!(edit_command_adjustments(&invalid).is_err());
+    }
+
+    #[test]
+    fn skin_tone_uniformity_command_maps_to_adjustment_state() {
+        let valid = sample_skin_tone_uniformity_command();
+        let adjustments = edit_command_adjustments(&valid).expect("skin-tone uniformity maps");
+
+        assert_eq!(
+            adjustments["skinToneUniformity"]["targetHueDegrees"],
+            json!(24.0)
+        );
+        assert_eq!(
+            adjustments["skinToneUniformity"]["hueUniformity"],
+            json!(0.42)
+        );
+        assert_eq!(
+            adjustments["skinToneUniformity"]["maxHueShiftDegrees"],
+            json!(16.0)
+        );
+        assert!(adjustments["hsl"]["oranges"]["hue"].as_f64().unwrap_or(0.0) > 0.0);
+
+        let mut invalid = sample_skin_tone_uniformity_command();
+        invalid.parameters["unexpected"] = json!(true);
         assert!(edit_command_adjustments(&invalid).is_err());
     }
 
@@ -1230,6 +1339,71 @@ mod tests {
         assert_eq!(
             report.fixture_id,
             "validation.raw-open-edit-export.professional-color.v1"
+        );
+        assert!(
+            report
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.kind == "workflow_report_private")
+        );
+        assert!(
+            report
+                .metrics
+                .iter()
+                .any(|metric| metric.name == "changedPixelRatio"
+                    && metric.passed
+                    && metric.value > 0.0)
+        );
+        assert!(
+            report
+                .metrics
+                .iter()
+                .any(|metric| metric.name == "previewExportMeanAbsDelta" && metric.passed)
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn private_runtime_smoke_generates_skin_tone_uniformity_report_when_enabled() {
+        if std::env::var("RAWENGINE_RUN_PRIVATE_RAW_SKIN_TONE_UNIFORMITY_PROOF")
+            .ok()
+            .as_deref()
+            != Some("1")
+        {
+            eprintln!("skipping private RAW skin-tone uniformity proof smoke");
+            return;
+        }
+
+        let mut request: RawOpenEditExportProofRequest = serde_json::from_str(
+            &fs::read_to_string(
+                "../fixtures/validation/skin-tone-uniformity-raw-proof-request.json",
+            )
+            .expect("skin-tone uniformity proof request fixture reads"),
+        )
+        .expect("skin-tone uniformity proof request fixture parses");
+        if let Ok(private_root) = std::env::var("RAWENGINE_PRIVATE_RAW_ROOT") {
+            request.private_root_path = private_root;
+        }
+
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock tauri app builds");
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let settings = AppSettings::default();
+        let report =
+            run_raw_open_edit_export_proof_with_context(request, &state, &settings, &context)
+                .expect("private RAW skin-tone uniformity proof command runs");
+
+        assert_eq!(
+            report.edit_command_id,
+            "command.raw-open-edit-export.skin-tone-uniformity.v1"
+        );
+        assert_eq!(
+            report.fixture_id,
+            "validation.raw-open-edit-export.skin-tone-uniformity.v1"
         );
         assert!(
             report

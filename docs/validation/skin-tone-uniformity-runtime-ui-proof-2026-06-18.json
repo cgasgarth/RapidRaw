@@ -62,7 +62,7 @@
     "maxHueShiftDegrees": 18,
     "runtimeStatus": "experimental_runtime_slice",
     "warnings": [
-      "Experimental skin-tone uniformity command: synthetic/runtime proof only; no real RAW e2e or preview/export parity claim."
+      "Experimental skin-tone uniformity command: bounded runtime proof with private RAW preview/export coverage; no Capture One equivalence or measured portrait accuracy claim."
     ]
   },
   "fixturePath": "fixtures/color/skin-tone-uniformity-fixtures.json",

@@ -226,9 +226,43 @@ export const rawOpenEditExportAdjustHslCommandSchema = z
   })
   .strict();
 
+export const rawOpenEditExportSkinToneUniformityCommandSchema = z
+  .object({
+    actor: jsonObjectSchema,
+    approval: z
+      .object({
+        approvalClass: z.literal('edit_apply'),
+        reason: z.string().trim().min(1),
+        state: z.literal('approved'),
+      })
+      .strict(),
+    colorPipeline: colorPipelineSchema,
+    commandId: z.string().trim().min(1),
+    commandType: z.literal('toneColor.adjustSkinToneUniformity'),
+    correlationId: z.string().trim().min(1),
+    dryRun: z.literal(false),
+    expectedGraphRevision: z.string().regex(/^graph-rev\.[a-z0-9.-]+\.v[0-9]+$/u),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    parameters: z
+      .object({
+        hueUniformity: z.number().min(0).max(1),
+        luminanceUniformity: z.number().min(0).max(1),
+        maxHueShiftDegrees: z.number().min(0).max(30),
+        saturationUniformity: z.number().min(0).max(1),
+        targetHueDegrees: z.number().min(0).lt(360),
+        targetLuminance: z.number().min(0).max(1),
+        targetSaturation: z.number().min(0).max(1),
+      })
+      .strict(),
+    schemaVersion: z.literal(1),
+    target: targetJsonObjectSchema,
+  })
+  .strict();
+
 export const rawOpenEditExportCommandSchema = z.discriminatedUnion('commandType', [
   rawOpenEditExportBasicToneCommandSchema,
   rawOpenEditExportAdjustHslCommandSchema,
+  rawOpenEditExportSkinToneUniformityCommandSchema,
 ]);
 
 export const rawOpenEditExportProofRequestSchema = z

@@ -54,6 +54,7 @@ export enum ColorAdjustment {
   Levels = 'levels',
   Luminance = 'luminance',
   Saturation = 'saturation',
+  SkinToneUniformity = 'skinToneUniformity',
   Temperature = 'temperature',
   Tint = 'tint',
   ToneCurve = 'toneCurve',
@@ -246,6 +247,7 @@ export interface Adjustments {
   sharpness: number;
   sharpnessThreshold: number;
   showClipping: boolean;
+  skinToneUniformity: SkinToneUniformitySettings;
   structure: number;
   temperature: number;
   tint: number;
@@ -265,6 +267,17 @@ export interface Adjustments {
   vignetteMidpoint: number;
   vignetteRoundness: number;
   whites: number;
+}
+
+export interface SkinToneUniformitySettings {
+  enabled: boolean;
+  hueUniformity: number;
+  luminanceUniformity: number;
+  maxHueShiftDegrees: number;
+  saturationUniformity: number;
+  targetHueDegrees: number;
+  targetLuminance: number;
+  targetSaturation: number;
 }
 
 export interface AiPatch {
@@ -698,6 +711,16 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   sharpness: 0,
   sharpnessThreshold: 15,
   showClipping: false,
+  skinToneUniformity: {
+    enabled: false,
+    hueUniformity: 0.42,
+    luminanceUniformity: 0.18,
+    maxHueShiftDegrees: 16,
+    saturationUniformity: 0.31,
+    targetHueDegrees: 24,
+    targetLuminance: 0.56,
+    targetSaturation: 0.38,
+  },
   structure: 0,
   temperature: 0,
   tint: 0,
@@ -870,6 +893,10 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Partial<Adjustment
     colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
     colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
     hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
+    skinToneUniformity: {
+      ...INITIAL_ADJUSTMENTS.skinToneUniformity,
+      ...(loadedAdjustments.skinToneUniformity || {}),
+    },
     levels: { ...INITIAL_ADJUSTMENTS.levels, ...(loadedAdjustments.levels || {}) },
     curves: loadedAdjustments.curves ? deepCloneCurves(loadedAdjustments.curves) : getDefaultCurves(),
     pointCurves: loadedAdjustments.pointCurves ? deepCloneCurves(loadedAdjustments.pointCurves) : getDefaultCurves(),

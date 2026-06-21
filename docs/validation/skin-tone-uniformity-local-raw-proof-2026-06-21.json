@@ -1,0 +1,78 @@
+{
+  "doesNotProve": [
+    "capture_one_skin_tool_equivalence",
+    "face_detection_or_skin_segmentation",
+    "full_macos_app_manual_session",
+    "gpu_cpu_parity",
+    "icc_colorimetric_accuracy",
+    "portrait_or_film_stock_accuracy",
+    "public_raw_fixture"
+  ],
+  "fixtureId": "validation.raw-open-edit-export.skin-tone-uniformity.v1",
+  "generatedAt": "2026-06-21T14:12:41.888Z",
+  "issue": 2874,
+  "localRawRuntime": {
+    "command": "RAWENGINE_RUN_PRIVATE_RAW_SKIN_TONE_UNIFORMITY_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_skin_tone_uniformity_report_when_enabled -- --nocapture",
+    "editCommandId": "command.raw-open-edit-export.skin-tone-uniformity.v1",
+    "metrics": {
+      "changedPixelRatio": 0.07280204166666666,
+      "previewExportMeanAbsDelta": 0,
+      "sidecarReloadRevisionMatch": 1,
+      "sourceHashUnchanged": 1
+    },
+    "renderPaths": {
+      "exportAfterFormat": "tiff",
+      "exportAfterWriterId": "raw_open_edit_export_export_after",
+      "previewAfterFormat": "png",
+      "previewAfterWriterId": "raw_open_edit_export_preview_after",
+      "previewBeforeWriterId": "raw_open_edit_export_preview_before"
+    },
+    "status": "passed",
+    "workflowReportPath": "private-artifacts/validation/skin-tone-uniformity/skin-tone-uniformity-v1-workflow-report.json"
+  },
+  "schemaVersion": 1,
+  "sourceRaw": {
+    "fixtureStatus": "private_project_owned_raw_not_committed",
+    "localPath": "private-fixtures/color/skin-tone-uniformity-v1/alaska-dsc7853.arw",
+    "sha256": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b"
+  },
+  "validationMode": "private_raw_skin_tone_uniformity_preview_export_sidecar_proof",
+  "workflowArtifacts": [
+    {
+      "hash": "sha256:2ada128405c6e1b55734bb69c842259b9e1d1882abbc8f0a50461f456a93e18b",
+      "kind": "source_raw_private",
+      "path": "private-fixtures/color/skin-tone-uniformity-v1/alaska-dsc7853.arw",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:b7c68dd85b6e638a17ec1a38651e344b61d51618ac9614f74c7da990bd980dc1",
+      "kind": "preview_before_private",
+      "path": "private-artifacts/validation/skin-tone-uniformity/skin-tone-uniformity-v1-preview-before.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:5163d2370f6bbecfdaad9358696d115a1a3cb11e1edc4f0362c314dbf9c83375",
+      "kind": "preview_after_private",
+      "path": "private-artifacts/validation/skin-tone-uniformity/skin-tone-uniformity-v1-preview-after.png",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:d020ef702cb03cfb743c912b485c019120e0ce20583fab11e96650e3fbe331ff",
+      "kind": "export_after_private",
+      "path": "private-artifacts/validation/skin-tone-uniformity/skin-tone-uniformity-v1-export-after.tiff",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:afde0a5fb4edcc9aa6c5cfa6b37b742963026ef40220d4144ac3f77eb441b24b",
+      "kind": "sidecar_after_private",
+      "path": "private-artifacts/validation/skin-tone-uniformity/skin-tone-uniformity-v1-after.rrdata",
+      "publicRepoAllowed": false
+    },
+    {
+      "hash": "sha256:e448aa20826d83a09ceb93370e34fa947e56dd93f32a1a42e839c2eae93300b8",
+      "kind": "workflow_report_private",
+      "path": "private-artifacts/validation/skin-tone-uniformity/skin-tone-uniformity-v1-workflow-report.json",
+      "publicRepoAllowed": false
+    }
+  ]
+}
