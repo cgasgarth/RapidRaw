@@ -197,6 +197,7 @@ export default function CullingModal({
   const setupPreviewPaths = imagePaths.slice(0, SETUP_PREVIEW_LIMIT);
   const setupPreviewOverflowCount = Math.max(0, imagePaths.length - setupPreviewPaths.length);
   const hasCullingAnalysisMode = settings.groupSimilar || settings.filterBlurry;
+  const cullingAnalysisModeCount = Number(settings.groupSimilar) + Number(settings.filterBlurry);
   const canStartCulling = imagePaths.length > 0 && hasCullingAnalysisMode;
 
   const renderSettings = () => (
@@ -211,6 +212,7 @@ export default function CullingModal({
         className="mb-6 grid grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-xs"
         data-blur-filter-enabled={String(settings.filterBlurry)}
         data-blur-threshold={settings.blurThreshold}
+        data-culling-analysis-mode-count={cullingAnalysisModeCount}
         data-group-similar-enabled={String(settings.groupSimilar)}
         data-image-count={imagePaths.length}
         data-raster-source-count={sourceMix.raster}
@@ -226,6 +228,10 @@ export default function CullingModal({
           {
             label: t('modals.culling.summarySourceMix'),
             value: t('modals.culling.summarySourceMixValue', { raster: sourceMix.raster, raw: sourceMix.raw }),
+          },
+          {
+            label: t('modals.culling.summaryAnalysisModes'),
+            value: t('modals.culling.summaryAnalysisModeCount', { count: cullingAnalysisModeCount }),
           },
           {
             label: t('modals.culling.summarySimilar'),
