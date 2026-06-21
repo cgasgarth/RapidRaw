@@ -453,6 +453,45 @@ export default function LayerStackPanel({
         </UiText>
       </div>
 
+      <div
+        className="mx-3 mb-3 grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-secondary/70 p-2"
+        data-can-group-active-layer={String(canGroupActiveLayer)}
+        data-can-move-active-layer={String(canMoveActiveLayerUp || canMoveActiveLayerDown)}
+        data-can-ungroup-active-layer={String(canUngroupActiveLayer)}
+        data-testid="layer-operation-readiness-summary"
+      >
+        <UiText
+          variant={TextVariants.small}
+          weight={TextWeights.medium}
+          className="truncate rounded bg-bg-primary px-2 py-1 text-center text-text-secondary"
+          data-testid="layer-operation-move-ready"
+        >
+          {canMoveActiveLayerUp || canMoveActiveLayerDown
+            ? t('editor.layers.operationReadiness.moveReady')
+            : t('editor.layers.operationReadiness.moveBlocked')}
+        </UiText>
+        <UiText
+          variant={TextVariants.small}
+          weight={TextWeights.medium}
+          className="truncate rounded bg-bg-primary px-2 py-1 text-center text-text-secondary"
+          data-testid="layer-operation-group-ready"
+        >
+          {canGroupActiveLayer
+            ? t('editor.layers.operationReadiness.groupReady')
+            : t('editor.layers.operationReadiness.groupBlocked')}
+        </UiText>
+        <UiText
+          variant={TextVariants.small}
+          weight={TextWeights.medium}
+          className="truncate rounded bg-bg-primary px-2 py-1 text-center text-text-secondary"
+          data-testid="layer-operation-ungroup-ready"
+        >
+          {canUngroupActiveLayer
+            ? t('editor.layers.operationReadiness.ungroupReady')
+            : t('editor.layers.operationReadiness.ungroupBlocked')}
+        </UiText>
+      </div>
+
       <div className="px-3 pb-3 space-y-1">
         {rows.map((row) => {
           const isSelected = selectedLayerId === row.id;

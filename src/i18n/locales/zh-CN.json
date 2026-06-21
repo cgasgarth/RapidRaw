@@ -803,6 +803,14 @@
       "newAdjustmentLayerName": "Adjustment Layer {{count}}",
       "newAdjustmentLayerName_other": "Adjustment Layer {{count}}",
       "opacityPreset": "Set opacity to {{opacity}}",
+      "operationReadiness": {
+        "groupBlocked": "Group blocked",
+        "groupReady": "Group ready",
+        "moveBlocked": "Move blocked",
+        "moveReady": "Move ready",
+        "ungroupBlocked": "Ungroup blocked",
+        "ungroupReady": "Ungroup ready"
+      },
       "rowSummary": "{{blendMode}} - {{opacity}}% - {{maskCount}}",
       "title": "Layers",
       "visibleLayerCount": "{{count}} visible",
