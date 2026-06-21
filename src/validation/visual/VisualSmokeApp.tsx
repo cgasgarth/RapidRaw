@@ -12,7 +12,7 @@ import { NegativeConversionModal } from '../../components/modals/NegativeConvers
 import PanoramaModal from '../../components/modals/PanoramaModal';
 import SuperResolutionModal from '../../components/modals/SuperResolutionModal';
 import AgentChatShell from '../../components/panel/right/AgentChatShell';
-import { MaskOverlayReviewControls } from '../../components/panel/right/MasksPanel';
+import { MaskOverlayReviewControls } from '../../components/panel/right/MaskOverlayReviewControls';
 import RightPanelSwitcher from '../../components/panel/right/RightPanelSwitcher';
 import { Panel } from '../../components/ui/AppProperties';
 import { DEFAULT_FOCUS_STACK_UI_SETTINGS, type FocusStackUiSettings } from '../../schemas/focusStackUiSchemas';
