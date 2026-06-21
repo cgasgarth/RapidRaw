@@ -4,7 +4,15 @@
   "fixtureId": "validation.computational-merge.panorama-overlap.v1",
   "generatedDate": "2026-06-20",
   "implementationIssue": 1508,
+  "e2eIssue": 1508,
   "proofStatus": "runtime_apply_capable",
+  "proofBoundary": "private_raw_runtime_app_server_apply_and_ui_smoke_not_final_panorama_quality_acceptance",
+  "doesNotProve": [
+    "full_macos_manual_panorama_session",
+    "final_panorama_quality_acceptance",
+    "full_resolution_app_server_apply",
+    "commercial_stitcher_parity"
+  ],
   "sourceSet": {
     "localSourceRoot": "/Users/cgas/Pictures/Capture One/Alaska",
     "localSourceFiles": ["_DSC7853.ARW", "_DSC7854.ARW", "_DSC7855.ARW"],

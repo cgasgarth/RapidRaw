@@ -233,6 +233,7 @@
     "check:panorama-real-raw-private-root-assets": "bun scripts/prepare-panorama-real-raw-private-root.ts --require-assets",
     "run:panorama-real-raw-private-proof": "bun scripts/run-panorama-real-raw-private-proof.ts",
     "check:panorama-real-raw-private-proof": "bun scripts/run-panorama-real-raw-private-proof.ts",
+    "check:panorama-real-raw-private-proof-summary": "bun tests/integration/checks/check-panorama-real-raw-private-proof-summary.ts",
     "prepare:computational-private-root": "bun scripts/run-compact-checks.ts --label computational-private-root prepare:hdr-real-raw-private-root prepare:focus-real-raw-private-root prepare:sr-real-raw-private-root prepare:panorama-real-raw-private-root",
     "check:computational-private-root-assets": "bun scripts/run-compact-checks.ts --label computational-private-root-assets check:hdr-real-raw-private-root-assets check:focus-real-raw-private-root-assets check:sr-real-raw-private-root-assets check:panorama-real-raw-private-root-assets",
     "check:computational-private-proof-runners": "bun scripts/run-compact-checks.ts --label computational-private-proof-runners check:hdr-real-raw-private-proof check:panorama-real-raw-private-proof check:focus-real-raw-private-proof check:sr-real-raw-private-proof",
