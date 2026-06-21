@@ -1466,7 +1466,12 @@
       "stockMetadataSummary": "",
       "stockMetadataUseSuggestedPreset": "Use generic preset: {{presetName}}",
       "agentActivity": "Agent activity",
-      "agentAffectedFrames": "Affected {{frameCount}}"
+      "agentAffectedFrames": "Affected {{frameCount}}",
+      "baseReadyFrame": "Frame base {{confidence}}%",
+      "baseReadyRoll": "Roll base {{confidence}}%",
+      "baseScopeFrame": "Base applies to active frame",
+      "baseScopeRoll": "Base applies to roll",
+      "promoteBaseToRoll": "Use base for roll"
     },
     "panorama": {
       "cancel": "Annulla",

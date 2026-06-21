@@ -1419,6 +1419,28 @@ async function prepareScenario(page, mode) {
     timeout: 10_000,
   });
   await page
+    .getByTestId('negative-lab-base-scope-label')
+    .getByText('Base applies to active frame', { exact: true })
+    .waitFor({
+      timeout: 10_000,
+    });
+  await page.getByTestId('negative-lab-promote-base-roll').click();
+  await page.getByTestId('negative-lab-base-scope-label').getByText('Base applies to roll', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-roll-selected-base').getByText('Roll base 91%', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-roll-warning-count').getByText('Warnings 0', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  const rollBaseScopeDataset = await page
+    .getByTestId('negative-lab-roll-queue-summary')
+    .evaluate((element) => ({ ...element.dataset }));
+  if (rollBaseScopeDataset.baseScope !== 'roll') {
+    throw new Error('Negative Lab roll queue summary did not switch to roll base scope.');
+  }
+  await page
     .getByTestId('negative-lab-base-rgb-readout')
     .getByText('183 / 147 / 112', { exact: true })
     .waitFor({ timeout: 10_000 });
