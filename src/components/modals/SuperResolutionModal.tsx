@@ -110,6 +110,9 @@ export default function SuperResolutionModal({
   const outputReviewWarningsLabel = outputReview.warningCodes
     .map((warningCode) => t(`modals.superResolution.review.warning.${warningCode}`))
     .join(', ');
+  const isEditableHandoffReady = outputReview.editableGate === 'ready';
+  const acceptanceGateStatus = isEditableHandoffReady ? 'ready' : 'review';
+  const artifactWarningsStatus = outputReview.warningCodes.length === 0 ? 'ready' : 'pending';
 
   const setSetting = useCallback(
     (patch: Partial<SuperResolutionUiSettings>) => {
@@ -365,7 +368,7 @@ export default function SuperResolutionModal({
           },
           {
             label: t('modals.superResolution.review.acceptanceGate'),
-            status: 'review',
+            status: acceptanceGateStatus,
             value: `${outputReviewDecisionLabel} - ${outputReviewEditableGateLabel}`,
           },
           {
@@ -380,8 +383,8 @@ export default function SuperResolutionModal({
           },
           {
             label: t('modals.superResolution.review.artifactWarnings'),
-            status: 'pending',
-            value: outputReviewWarningsLabel,
+            status: artifactWarningsStatus,
+            value: outputReviewWarningsLabel || t('modals.superResolution.review.noArtifactWarnings'),
           },
         ]}
         sections={[
@@ -468,6 +471,16 @@ export default function SuperResolutionModal({
             ],
           },
         ]}
+      />
+
+      <div
+        className="sr-only"
+        data-editable-handoff-ready={String(isEditableHandoffReady)}
+        data-human-review-status={outputReview.humanReviewStatus}
+        data-output-artifact-id={outputReview.outputArtifactId}
+        data-output-artifact-hash={outputReview.outputArtifactHash}
+        data-stale-state={outputReview.staleState}
+        data-testid="sr-editable-handoff-proof"
       />
 
       {isAggressivePreviewOnly && (

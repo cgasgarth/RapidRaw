@@ -218,6 +218,31 @@ export const markSuperResolutionArtifactStaleState = (
   });
 };
 
+export const markSuperResolutionArtifactHumanReviewPassed = (
+  artifact: SuperResolutionArtifactV1,
+  reviewedAt: string,
+): SuperResolutionArtifactV1 => {
+  const parsedArtifact = superResolutionArtifactV1Schema.parse(artifact);
+  if (parsedArtifact.staleState.state !== 'current') {
+    throw new Error('SR artifact human review cannot pass a stale artifact.');
+  }
+
+  return superResolutionArtifactV1Schema.parse({
+    ...parsedArtifact,
+    staleState: {
+      ...parsedArtifact.staleState,
+      checkedAt: reviewedAt,
+    },
+    validationSummary: {
+      ...parsedArtifact.validationSummary,
+      humanReviewStatus: 'passed',
+    },
+    warningCodes: normalizeSuperResolutionWarningCodes(
+      parsedArtifact.warningCodes.filter((warningCode) => warningCode !== 'human_review_required'),
+    ),
+  });
+};
+
 const readSuperResolutionArtifactsFromRawEngine = (rawEngine: Record<string, unknown>): SuperResolutionArtifactV1[] => {
   const artifacts = rawEngine['superResolutionArtifacts'];
   if (artifacts === undefined) return [];

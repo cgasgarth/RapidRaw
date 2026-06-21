@@ -32,6 +32,7 @@ for (const marker of [
   'modals.superResolution.review.artifactWarnings',
   'modals.superResolution.review.decision',
   'modals.superResolution.review.editableGate',
+  'modals.superResolution.review.noArtifactWarnings',
   'modals.superResolution.review.detailGain',
   'modals.superResolution.review.detailGainValue',
   'modals.superResolution.review.coverage',
@@ -44,6 +45,9 @@ for (const marker of [
   'modals.superResolution.review.sourceSupport',
   'modals.superResolution.review.warning',
   'hasRuntimeOutputReview',
+  'isEditableHandoffReady',
+  'sr-editable-handoff-proof',
+  'data-editable-handoff-ready={String(isEditableHandoffReady)}',
   'outputReviewEditableGateLabel',
   'buildSuperResolutionOutputReviewWorkflow',
 ]) {
