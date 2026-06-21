@@ -11,6 +11,8 @@ const requiredLocaleKeys = [
   'summarySimilar',
   'summarySourceCount_one',
   'summarySourceCount_other',
+  'summarySourceMix',
+  'summarySourceMixValue',
   'summarySources',
   'summaryWorkload',
   'summaryWorkloadValue_one',
@@ -27,8 +29,12 @@ const source = readFileSync('src/components/modals/CullingModal.tsx', 'utf8');
 for (const marker of [
   'data-testid="culling-setup-summary"',
   'data-image-count={imagePaths.length}',
+  'data-raw-source-count={sourceMix.raw}',
+  'data-raster-source-count={sourceMix.raster}',
   'data-group-similar-enabled={String(settings.groupSimilar)}',
   'data-blur-filter-enabled={String(settings.filterBlurry)}',
+  'modals.culling.summarySourceMix',
+  'modals.culling.summarySourceMixValue',
   'modals.culling.summaryWorkload',
   'modals.culling.summaryWorkloadValue',
 ]) {

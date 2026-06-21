@@ -1594,6 +1594,8 @@
       "summarySimilar": "Similar groups",
       "summarySourceCount_one": "{{count}} image",
       "summarySourceCount_other": "{{count}} images",
+      "summarySourceMix": "Source mix",
+      "summarySourceMixValue": "{{raw}} RAW / {{raster}} raster",
       "summarySources": "Sources",
       "summaryWorkload": "Workload",
       "summaryWorkloadValue_one": "{{count}} image to analyze",

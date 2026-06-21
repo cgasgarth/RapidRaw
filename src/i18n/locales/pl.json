@@ -1689,6 +1689,8 @@
       "summarySourceCount_few": "{{count}} images",
       "summarySourceCount_many": "{{count}} images",
       "summarySourceCount_other": "{{count}} images",
+      "summarySourceMix": "Source mix",
+      "summarySourceMixValue": "{{raw}} RAW / {{raster}} raster",
       "summarySources": "Sources",
       "summaryWorkload": "Workload",
       "summaryWorkloadValue_one": "{{count}} image to analyze",
