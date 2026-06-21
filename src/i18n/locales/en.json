@@ -1258,6 +1258,21 @@
         "tooltipClearSearch": "Clear search",
         "tooltipSearchFilter": "Search or Filter"
       },
+      "status": {
+        "ascending": "Ascending",
+        "descending": "Descending",
+        "filterActive_one": "{{count}} active",
+        "filterActive_other": "{{count}} active",
+        "filterLabel": "Filters",
+        "filterReady": "All",
+        "searchActive_one": "{{count}} term",
+        "searchActive_other": "{{count}} terms",
+        "searchLabel": "Search",
+        "searchReady": "Ready",
+        "sortLabel": "Sort",
+        "sortValue": "{{sort}} · {{direction}}",
+        "viewLabel": "View"
+      },
       "title": "Library",
       "viewOptions": {
         "currentFolder": "Current Folder",
