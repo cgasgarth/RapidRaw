@@ -499,6 +499,9 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('agent-tool-status-tool-3').getByText('succeeded', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('agent-tool-status-tool-4').getByText('blocked', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
     await auditViewer.getByText('Audit transcript', { exact: true }).waitFor({ timeout: 10_000 });
     await page.getByTestId('agent-audit-summary').getByText('runtime_apply_demo', { exact: true }).waitFor({
       timeout: 10_000,
@@ -515,6 +518,15 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('agent-audit-record-audit-record-tool-2').getByText('warning', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    await page.getByTestId('agent-audit-record-audit-record-tool-4').getByText('blocked', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page
+      .getByTestId('agent-audit-warnings-audit-record-tool-4')
+      .getByText('no pixels were sent', { exact: false })
+      .waitFor({
+        timeout: 10_000,
+      });
     const auditArtifactLinkCount = await page
       .getByTestId('agent-audit-transcript-records')
       .locator('a[href*="agent-expert-edit-demo-workflow-2026-06-21.html"]')

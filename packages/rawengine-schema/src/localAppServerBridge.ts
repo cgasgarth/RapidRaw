@@ -121,10 +121,21 @@ export type RawEngineLocalAppServerAiEnhancementCommandV1 = z.infer<
 >;
 
 const rawEngineLocalAppServerAuditCommandProbeV1Schema = z.looseObject({
+  approval: z
+    .looseObject({
+      state: z.string().trim().min(1),
+    })
+    .optional(),
   commandId: z.string().trim().min(1),
   commandType: z.string().trim().min(1),
   correlationId: z.string().trim().min(1),
   dryRun: z.boolean(),
+  parameters: z
+    .looseObject({
+      providerClass: z.enum(['local_model', 'self_hosted_connector', 'cloud_service']).optional(),
+      providerId: z.string().trim().min(1).optional(),
+    })
+    .optional(),
 });
 
 const rawEngineLocalAppServerAuditResultProbeV1Schema = z.looseObject({
@@ -134,6 +145,7 @@ const rawEngineLocalAppServerAuditResultProbeV1Schema = z.looseObject({
 
 export const rawEngineLocalAppServerAuditEventV1Schema = z
   .object({
+    approvalState: z.string().trim().min(1).optional(),
     commandId: z.string().trim().min(1),
     commandType: z.string().trim().min(1),
     correlationId: z.string().trim().min(1),
@@ -144,6 +156,15 @@ export const rawEngineLocalAppServerAuditEventV1Schema = z
     status: z.enum(['completed', 'rejected']),
     timestampIso: z.iso.datetime(),
     warnings: z.array(z.string().trim().min(1)),
+    providerFallback: z
+      .object({
+        fallbackReason: z.enum(['provider_unavailable']),
+        requestedProviderClass: z.enum(['local_model', 'self_hosted_connector', 'cloud_service']),
+        requestedProviderId: z.string().trim().min(1),
+        userVisibleMessage: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -551,10 +572,18 @@ export class RawEngineLocalAppServerBridge {
   readonly #acceptedHslDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #acceptedSkinToneUniformityDryRunPlanKeys: Set<string> = new Set<string>();
   readonly #auditEvents: Array<RawEngineLocalAppServerAuditEventV1> = [];
+  readonly #availableAiProviderIds: ReadonlySet<string>;
   readonly #commandBus: EditCommandBus;
   readonly #toolRegistry: RawEngineToolRegistryV1;
 
-  constructor(options: { commandBus?: EditCommandBus; toolRegistry?: RawEngineToolRegistryV1 } = {}) {
+  constructor(
+    options: {
+      availableAiProviderIds?: readonly string[];
+      commandBus?: EditCommandBus;
+      toolRegistry?: RawEngineToolRegistryV1;
+    } = {},
+  ) {
+    this.#availableAiProviderIds = new Set(options.availableAiProviderIds ?? ['rawengine-local-ai']);
     this.#commandBus = options.commandBus ?? new EditCommandBus();
     this.#toolRegistry = options.toolRegistry ?? rawEngineDefaultToolRegistryV1;
     this.#registerHandlers();
@@ -589,21 +618,53 @@ export class RawEngineLocalAppServerBridge {
     const mutates = resultProbe.success ? (resultProbe.data.mutates ?? !commandProbe.data.dryRun) : false;
     const status = result.ok ? 'completed' : 'rejected';
     const timestampIso = (context?.now ?? (() => new Date()))().toISOString();
+    const providerFallback = this.#buildProviderFallback(commandProbe.data);
 
     this.#auditEvents.push(
       rawEngineLocalAppServerAuditEventV1Schema.parse({
+        ...(commandProbe.data.approval?.state === undefined ? {} : { approvalState: commandProbe.data.approval.state }),
         commandId: commandProbe.data.commandId,
         commandType: commandProbe.data.commandType,
         correlationId: commandProbe.data.correlationId,
         dryRun: commandProbe.data.dryRun,
         eventId: `audit_${this.#auditEvents.length + 1}_${commandProbe.data.commandId}`,
         mutates,
+        ...(providerFallback === undefined || result.ok ? {} : { providerFallback }),
         ...(context?.requestId === undefined ? {} : { requestId: context.requestId }),
         status,
         timestampIso,
-        warnings,
+        warnings:
+          providerFallback === undefined || result.ok ? warnings : [...warnings, providerFallback.userVisibleMessage],
       }),
     );
+  }
+
+  #buildProviderFallback(
+    command: z.infer<typeof rawEngineLocalAppServerAuditCommandProbeV1Schema>,
+  ): RawEngineLocalAppServerAuditEventV1['providerFallback'] {
+    if (
+      command.parameters?.providerClass === undefined ||
+      command.parameters.providerId === undefined ||
+      this.#availableAiProviderIds.has(command.parameters.providerId)
+    ) {
+      return undefined;
+    }
+
+    return {
+      fallbackReason: 'provider_unavailable',
+      requestedProviderClass: command.parameters.providerClass,
+      requestedProviderId: command.parameters.providerId,
+      userVisibleMessage: `AI provider ${command.parameters.providerId} is unavailable; no pixels were sent and no edit was applied.`,
+    };
+  }
+
+  #assertAiProviderAvailable(
+    command: RawEngineLocalAppServerAiToolCommandV1 | RawEngineLocalAppServerAiEnhancementCommandV1,
+  ): void {
+    const providerFallback = this.#buildProviderFallback(command);
+    if (providerFallback === undefined) return;
+
+    throw new Error(providerFallback.userVisibleMessage);
   }
 
   #registerHandlers(): void {
@@ -689,6 +750,7 @@ export class RawEngineLocalAppServerBridge {
         if (parsedCommand.commandType !== 'ai.mask.generateSubject') {
           throw new Error('Local app-server bridge expected an AI mask dry-run command.');
         }
+        this.#assertAiProviderAvailable(parsedCommand);
 
         const dryRunResult = buildAiToolDryRunResult(parsedCommand);
         this.#acceptedAiToolDryRunPlanKeys.set(buildAiToolPlanKey(parsedCommand), {
@@ -707,6 +769,7 @@ export class RawEngineLocalAppServerBridge {
         if (parsedCommand.commandType !== 'ai.mask.applySubject') {
           throw new Error('Local app-server bridge expected an AI mask apply command.');
         }
+        this.#assertAiProviderAvailable(parsedCommand);
 
         const plan = this.#acceptedAiToolDryRunPlanKeys.get(buildAiToolPlanKey(parsedCommand));
         if (
@@ -729,6 +792,7 @@ export class RawEngineLocalAppServerBridge {
         if (parsedCommand.commandType !== 'ai.enhancement.dryRun') {
           throw new Error('Local app-server bridge expected an AI enhancement dry-run command.');
         }
+        this.#assertAiProviderAvailable(parsedCommand);
 
         const dryRunResult = buildAiEnhancementDryRunResult(parsedCommand);
         this.#acceptedAiEnhancementDryRunPlanKeys.set(buildAiEnhancementPlanKey(parsedCommand), {
@@ -747,6 +811,7 @@ export class RawEngineLocalAppServerBridge {
         if (parsedCommand.commandType !== 'ai.enhancement.apply') {
           throw new Error('Local app-server bridge expected an AI enhancement apply command.');
         }
+        this.#assertAiProviderAvailable(parsedCommand);
 
         const plan = this.#acceptedAiEnhancementDryRunPlanKeys.get(buildAiEnhancementPlanKey(parsedCommand));
         if (
@@ -764,8 +829,9 @@ export class RawEngineLocalAppServerBridge {
   }
 }
 
-export const createRawEngineLocalAppServerBridge = (): RawEngineLocalAppServerBridge =>
-  new RawEngineLocalAppServerBridge();
+export const createRawEngineLocalAppServerBridge = (
+  options: { availableAiProviderIds?: readonly string[] } = {},
+): RawEngineLocalAppServerBridge => new RawEngineLocalAppServerBridge(options);
 
 export const buildRawEngineLocalAppServerBridgeCapabilities = (
   bridge = createRawEngineLocalAppServerBridge(),

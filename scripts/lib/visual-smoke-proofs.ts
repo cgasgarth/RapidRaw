@@ -438,10 +438,10 @@ export const agentAuditTranscriptViewerProofDatasetSchema = z.object({
   applyRecordCount: z.literal('1'),
   artifactLinkCount: z.literal('3'),
   evidenceTier: z.literal('runtime_apply_demo'),
-  recordCount: z.literal('3'),
+  recordCount: z.literal('4'),
   replayRoot: z.string().endsWith('agent-expert-edit-demo-workflow-2026-06-21.html'),
   schemaVersion: z.literal('1'),
-  warningCount: z.literal('1'),
+  warningCount: z.literal('2'),
 });
 export const agentDryRunReviewProofDatasetSchema = z.object({
   actionCount: z.literal('3'),
