@@ -165,6 +165,8 @@ const negativeLabConvertArgsSchema = z.object({
       acquisitionWarningCodes: z.array(
         z.enum(['lossy_source_for_negative_lab', 'mixed_source_families', 'unknown_acquisition_state']),
       ),
+      batchScope: z.literal('ready'),
+      omittedDispositionFrameIds: z.array(z.literal('negative-lab-frame-2')).length(1),
       selectedProfile: z.object({
         claimLevel: z.literal('generic_starting_point_only'),
         claimPolicy: z.literal('generic_starting_point_no_stock_claim'),

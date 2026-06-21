@@ -11,6 +11,7 @@ export const negativeLabFrameQcStatusSchema = z.enum(['ready', 'review', 'skippe
 export const negativeLabFrameBatchDispositionSchema = z.enum(['apply', 'review', 'skip']);
 export const negativeLabFrameBatchDispositionReasonSchema = z.enum([
   'acquisition_review_required',
+  'base_not_estimated',
   'excluded_from_batch',
   'preview_required',
   'ready_to_apply',

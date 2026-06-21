@@ -385,6 +385,7 @@ const workflowStageKeys = [
   'readoutCopied',
   'scopeActive',
   'scopeAll',
+  'scopeReady',
   'stockRegistry',
   'stockRegistrySummary',
   'stockRegistryVersion',

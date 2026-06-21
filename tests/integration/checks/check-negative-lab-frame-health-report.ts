@@ -27,7 +27,8 @@ const rollScopedReport = buildNegativeLabFrameHealthReport({
 });
 const acquisitionReport = buildNegativeLabFrameHealthReport({
   activePathIndex: 0,
-  baseFogConfidence: null,
+  baseFogConfidence: 0.82,
+  baseScope: 'roll',
   includedPathSet: new Set(['/roll/001.tif', '/roll/002.jpg']),
   previewReady: true,
   targetPaths: ['/roll/001.tif', '/roll/002.jpg'],

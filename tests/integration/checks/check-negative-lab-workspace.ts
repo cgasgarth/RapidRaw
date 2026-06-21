@@ -24,7 +24,8 @@ const frameHealthReport = buildNegativeLabFrameHealthReport({
 });
 const mixedAcquisitionReport = buildNegativeLabFrameHealthReport({
   activePathIndex: 0,
-  baseFogConfidence: null,
+  baseFogConfidence: 0.91,
+  baseScope: 'roll',
   includedPathSet: new Set(['/roll/001.CR3', '/roll/proof.jpg', '/roll/source.unknown']),
   previewReady: true,
   targetPaths: ['/roll/001.CR3', '/roll/proof.jpg', '/roll/source.unknown'],
@@ -128,6 +129,9 @@ for (const marker of [
   'negative-lab-roll-frame-disposition-',
   'negative-lab-roll-selected-disposition',
   'batchDisposition: batchDryRunSummary.dispositionCounts',
+  'batchScope: conversionScope',
+  'negative-lab-scope-ready',
+  'omittedDispositionFrameIds',
   'reviewFrameIds: batchDryRunSummary.reviewFrameIds',
   'data-preview-ready={String(workspaceProof.previewReady)}',
   'data-export-ready={String(workspaceProof.exportReady)}',

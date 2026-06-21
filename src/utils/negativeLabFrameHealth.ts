@@ -63,10 +63,12 @@ const getNegativeLabWarningSeverity = (
 
 const buildNegativeLabFrameBatchDisposition = ({
   acquisitionHealth,
+  hasBaseEstimate,
   included,
   previewReady,
 }: {
   acquisitionHealth: NegativeLabFrameAcquisitionHealth;
+  hasBaseEstimate: boolean;
   included: boolean;
   previewReady: boolean;
 }): {
@@ -79,6 +81,10 @@ const buildNegativeLabFrameBatchDisposition = ({
 
   if (!previewReady) {
     return { batchDisposition: 'review', batchDispositionReason: 'preview_required' };
+  }
+
+  if (!hasBaseEstimate) {
+    return { batchDisposition: 'review', batchDispositionReason: 'base_not_estimated' };
   }
 
   if (acquisitionHealth.severity === 'review') {
@@ -144,6 +150,7 @@ export const buildNegativeLabFrameHealthReport = ({
     const warningCodes: NegativeLabFrameWarningCode[] = [];
     const batchDisposition = buildNegativeLabFrameBatchDisposition({
       acquisitionHealth,
+      hasBaseEstimate,
       included,
       previewReady,
     });
