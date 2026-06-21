@@ -1746,6 +1746,7 @@ function PanoramaVisualSmoke() {
           data-blend-mode={settings.blendMode}
           data-boundary-mode={settings.boundaryMode}
           data-command={copy.panoramaDryRunTool}
+          data-estimated-preview-megapixels={Math.round((5 * settings.maxPreviewDimensionPx ** 2) / 1_000_000)}
           data-exposure-mode={settings.exposureMode}
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-projection={settings.projection}
