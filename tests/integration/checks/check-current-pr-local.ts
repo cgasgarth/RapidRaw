@@ -292,6 +292,14 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ],
   );
   addIf((file) => file === 'src/components/panel/right/LayerStackPanel.tsx', ['check:layer-stack-panel-ui']);
+  addIf(
+    (file) =>
+      file === 'src/components/panel/right/LayerStackPanel.tsx' ||
+      file === 'fixtures/layers/layer-visibility-opacity-proof.json' ||
+      file === 'tests/integration/checks/check-layer-visibility-opacity-proof.ts' ||
+      file === 'docs/validation/layer-visibility-opacity-proof-2026-06-21.json',
+    ['check:layer-visibility-opacity-proof'],
+  );
   addIf((file) => file === 'src/components/panel/right/MetadataPanel.tsx', ['check:metadata-panel-ui']);
   addIf(
     (file) =>

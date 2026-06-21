@@ -662,6 +662,25 @@ export default function LayerStackPanel({
             step={1}
             value={activeRow.opacity}
           />
+          <div
+            className="rounded-md border border-surface bg-bg-secondary p-2"
+            data-active-layer-id={activeRow.id}
+            data-active-layer-opacity={activeRow.opacity}
+            data-active-layer-visible={String(activeRow.visible)}
+            data-testid="layer-active-render-state"
+          >
+            <UiText variant={TextVariants.small} weight={TextWeights.medium} className="block text-text-primary">
+              {t('editor.layers.activeRenderState.title')}
+            </UiText>
+            <UiText variant={TextVariants.small} className="block text-text-tertiary">
+              {t('editor.layers.activeRenderState.summary', {
+                opacity: activeRow.opacity,
+                visibility: activeRow.visible
+                  ? t('editor.layers.activeRenderState.visible')
+                  : t('editor.layers.activeRenderState.hidden'),
+              })}
+            </UiText>
+          </div>
           <div className="grid grid-cols-5 gap-1" data-testid="layer-opacity-presets">
             {LAYER_OPACITY_PRESETS.map((presetOpacity) => {
               const isActiveOpacity = activeRow.opacity === presetOpacity;
