@@ -1185,6 +1185,21 @@
       "removeGps": "Usuń dane GPS",
       "saveWithMetadata": "Zapisz z metadanymi"
     },
+    "readiness": {
+      "colorProfile": "",
+      "format_one": "",
+      "format_few": "",
+      "format_many": "",
+      "format_other": "",
+      "lutProfile": "",
+      "metadataOff": "",
+      "metadataOn": "",
+      "metadataWithoutGps": "",
+      "resizeEnabled": "",
+      "resizeOff": "",
+      "watermarkOff": "",
+      "watermarkOn": ""
+    },
     "resize": {
       "dontEnlarge": "Nie powiększaj",
       "modes": {

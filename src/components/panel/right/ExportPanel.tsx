@@ -615,6 +615,29 @@ export default function ExportPanel({
   const isLut = fileFormat === FileFormats.Cube;
   const itemLabel = isLut ? t('export.labels.lut') : t('export.labels.image');
   const itemLabelPlural = isLut ? t('export.labels.lut_plural') : t('export.labels.image_plural');
+  const selectedFileFormat = FILE_FORMATS.find((format) => format.id === fileFormat);
+  const selectedColorProfileLabel =
+    colorProfileOptions.find((option) => option.value === colorProfile)?.label ?? t('export.colorProfiles.srgb');
+  const selectedResizeModeLabel =
+    resizeModeOptions.find((option) => option.value === resizeMode)?.label ?? t('export.resize.modes.longEdge');
+  const exportReadinessItems = [
+    t('export.readiness.format', {
+      count: numImages,
+      format: selectedFileFormat?.name ?? fileFormat.toUpperCase(),
+    }),
+    fileFormat === FileFormats.Cube
+      ? t('export.readiness.lutProfile')
+      : t('export.readiness.colorProfile', { profile: selectedColorProfileLabel }),
+    enableResize
+      ? t('export.readiness.resizeEnabled', { mode: selectedResizeModeLabel, value: resizeValue })
+      : t('export.readiness.resizeOff'),
+    enableWatermark && watermarkPath ? t('export.readiness.watermarkOn') : t('export.readiness.watermarkOff'),
+    keepMetadata
+      ? stripGps
+        ? t('export.readiness.metadataWithoutGps')
+        : t('export.readiness.metadataOn')
+      : t('export.readiness.metadataOff'),
+  ];
 
   return (
     <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
@@ -947,6 +970,22 @@ export default function ExportPanel({
       </div>
 
       <div className="p-4 border-t border-surface shrink-0 space-y-2">
+        {canExport && (
+          <div className="flex flex-wrap justify-center gap-1.5" data-testid="export-readiness-summary">
+            {exportReadinessItems.map((item) => (
+              <UiText
+                as="span"
+                className="rounded bg-surface px-2 py-1"
+                color={TextColors.secondary}
+                data-export-readiness-item={item}
+                key={item}
+                variant={TextVariants.small}
+              >
+                {item}
+              </UiText>
+            ))}
+          </div>
+        )}
         <UiText as="div" variant={TextVariants.small} color={TextColors.primary} className="text-center">
           {isEstimating ? (
             <span className="italic">{t('export.status.estimatingSize')}</span>

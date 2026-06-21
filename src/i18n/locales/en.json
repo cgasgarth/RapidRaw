@@ -1115,6 +1115,20 @@
       "removeGps": "Remove GPS Data",
       "saveWithMetadata": "Save with Metadata"
     },
+    "readiness": {
+      "colorProfile": "{{profile}}",
+      "format": "{{count}} × {{format}}",
+      "format_one": "",
+      "format_other": "",
+      "lutProfile": "LUT export",
+      "metadataOff": "Metadata off",
+      "metadataOn": "Metadata kept",
+      "metadataWithoutGps": "GPS removed",
+      "resizeEnabled": "{{mode}} {{value}}px",
+      "resizeOff": "Full size",
+      "watermarkOff": "No watermark",
+      "watermarkOn": "Watermark"
+    },
     "resize": {
       "dontEnlarge": "Don't Enlarge",
       "modes": {

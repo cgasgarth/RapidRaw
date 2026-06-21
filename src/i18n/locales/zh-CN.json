@@ -1110,6 +1110,18 @@
       "removeGps": "移除 GPS 数据",
       "saveWithMetadata": "保存时包含元数据"
     },
+    "readiness": {
+      "colorProfile": "",
+      "format_other": "",
+      "lutProfile": "",
+      "metadataOff": "",
+      "metadataOn": "",
+      "metadataWithoutGps": "",
+      "resizeEnabled": "",
+      "resizeOff": "",
+      "watermarkOff": "",
+      "watermarkOn": ""
+    },
     "resize": {
       "dontEnlarge": "不放大",
       "modes": {
