@@ -219,6 +219,24 @@ const professionalColorRecipes = [
   },
 ] satisfies Array<ProfessionalColorRecipe>;
 
+const areHueSatLumValuesEqual = (left: HueSatLum | undefined, right: HueSatLum) =>
+  left?.hue === right.hue && left.saturation === right.saturation && left.luminance === right.luminance;
+
+const isProfessionalColorRecipeApplied = (adjustments: Adjustments, recipe: ProfessionalColorRecipe) =>
+  adjustments.cameraProfile === recipe.cameraProfile &&
+  adjustments.toneCurve === recipe.toneCurve &&
+  adjustments.temperature === recipe.temperature &&
+  adjustments.tint === recipe.tint &&
+  adjustments.vibrance === recipe.vibrance &&
+  adjustments.saturation === recipe.saturation &&
+  adjustments.levels.enabled === recipe.levels.enabled &&
+  adjustments.levels.gamma === recipe.levels.gamma &&
+  adjustments.levels.inputBlack === recipe.levels.inputBlack &&
+  adjustments.levels.inputWhite === recipe.levels.inputWhite &&
+  adjustments.levels.outputBlack === recipe.levels.outputBlack &&
+  adjustments.levels.outputWhite === recipe.levels.outputWhite &&
+  Object.entries(recipe.hsl).every(([range, value]) => areHueSatLumValuesEqual(adjustments.hsl[range], value));
+
 const ColorRuntimeStatusRail = () => {
   const { t } = useTranslation();
 
@@ -1141,28 +1159,36 @@ export default function ColorPanel({
             </UiText>
           </div>
           <div className="grid gap-2">
-            {professionalColorRecipes.map((recipe) => (
-              <button
-                className="rounded-md border border-surface bg-bg-secondary px-2.5 py-2 text-left text-xs transition-colors hover:border-accent hover:bg-surface"
-                data-active-range={recipe.activeColorRange}
-                data-camera-profile={recipe.cameraProfile}
-                data-testid={`professional-color-recipe-${recipe.id}`}
-                data-tone-curve={recipe.toneCurve}
-                key={recipe.id}
-                onClick={() => {
-                  applyProfessionalColorRecipe(recipe);
-                }}
-                type="button"
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <span className="truncate font-semibold text-text-primary">{t(recipe.labelKey)}</span>
-                  <span className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
-                    {t('adjustments.color.workflowRecipes.apply')}
+            {professionalColorRecipes.map((recipe) => {
+              const isApplied = isProfessionalColorRecipeApplied(adjustments, recipe);
+
+              return (
+                <button
+                  aria-pressed={isApplied}
+                  className={`rounded-md border px-2.5 py-2 text-left text-xs transition-colors hover:border-accent hover:bg-surface ${
+                    isApplied ? 'border-accent bg-accent/10 ring-1 ring-accent/40' : 'border-surface bg-bg-secondary'
+                  }`}
+                  data-active={String(isApplied)}
+                  data-active-range={recipe.activeColorRange}
+                  data-camera-profile={recipe.cameraProfile}
+                  data-testid={`professional-color-recipe-${recipe.id}`}
+                  data-tone-curve={recipe.toneCurve}
+                  key={recipe.id}
+                  onClick={() => {
+                    applyProfessionalColorRecipe(recipe);
+                  }}
+                  type="button"
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate font-semibold text-text-primary">{t(recipe.labelKey)}</span>
+                    <span className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
+                      {t('adjustments.color.workflowRecipes.apply')}
+                    </span>
                   </span>
-                </span>
-                <span className="mt-1 block text-text-secondary">{t(recipe.descriptionKey)}</span>
-              </button>
-            ))}
+                  <span className="mt-1 block text-text-secondary">{t(recipe.descriptionKey)}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

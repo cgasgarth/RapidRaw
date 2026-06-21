@@ -835,8 +835,18 @@ async function prepareScenario(page, mode) {
     });
     const recipe = colorPanel.getByTestId('professional-color-recipe-cleanPortrait');
     await recipe.click();
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="professional-color-recipe-cleanPortrait"]')
+          ?.getAttribute('data-active') === 'true',
+    );
     const recipeDataset = await recipe.evaluate((element) => ({ ...element.dataset }));
-    if (recipeDataset.cameraProfile !== 'camera_portrait' || recipeDataset.toneCurve !== 'soft_contrast') {
+    if (
+      recipeDataset.active !== 'true' ||
+      recipeDataset.cameraProfile !== 'camera_portrait' ||
+      recipeDataset.toneCurve !== 'soft_contrast'
+    ) {
       throw new Error('Professional color recipe did not expose expected profile/tone metadata.');
     }
     await colorPanel.getByLabel('Temperature').fill('12');
