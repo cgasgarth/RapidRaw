@@ -260,6 +260,7 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
     const normalizedQuery = query.trim().toLowerCase();
     const availableCommands = commandPaletteCommands.filter((command) => {
       if (command.id === 'culling') return selectedCommandPaths.length > 0;
+      if (command.id === 'negativeLab') return selectedCommandPaths.length > 0;
       if (command.id === 'collage') return selectedCommandImages.length > 0;
       return !command.requiresEditorImage || selectedImage;
     });
@@ -412,9 +413,11 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
       return;
     }
 
-    if (command.id === 'negativeLab') {
+    if (command.id === 'negativeLab' && selectedCommandPaths.length > 0) {
       closeAndRun(() => {
-        setUI((state) => ({ negativeModalState: { ...state.negativeModalState, isOpen: true } }));
+        setUI((state) => ({
+          negativeModalState: { ...state.negativeModalState, isOpen: true, targetPaths: selectedCommandPaths },
+        }));
       });
     }
   };
