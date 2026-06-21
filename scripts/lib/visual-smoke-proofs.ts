@@ -278,11 +278,17 @@ export const focusReviewWorkspaceProofSchema = z.object({
   applyCommand: z.literal(focusStackRoutePair.applyToolName),
   artifactPath: z.literal('/tmp/rawengine-focus-stack-smoke.tif'),
   command: z.literal(focusStackRoutePair.dryRunToolName),
+  decision: z.literal('preview_only'),
   depthMode: z.literal('depth_map'),
   estimatedPreviewMegapixels: z.literal('403'),
+  haloRiskCellRatio: z.literal('0.14'),
   haloPolicy: z.literal('flattened_preview'),
+  lowConfidenceCellRatio: z.literal('0.08'),
+  proofLevel: z.literal('synthetic_runtime'),
   runtimeStatus: z.literal('dry_run_preview'),
+  sharpnessCoverageRatio: z.literal('1'),
   sourceCount: z.literal('6'),
+  warningCodes: z.literal('human_review_required,synthetic_runtime_only,transition_halo_risk,depth_map_preview_only'),
 });
 export const focusPrivateRawReviewProofSchema = z.object({
   applyCommand: z.literal(focusStackRoutePair.applyToolName),

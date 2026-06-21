@@ -1752,13 +1752,20 @@
         }
       },
       "review": {
+        "editableArtifact": "",
+        "haloRiskCells": "",
         "limitation": "Runtime bridge proof only; private RAW decode, visual QA, and UI E2E remain open.",
+        "lowConfidenceCells": "",
+        "percentValue": "",
         "privateRawPending": "Private RAW review pending",
         "proofStatus": "App-server bridge ready",
+        "provenance": "",
         "retouchLayer": "Retouch layer",
         "runtimeBridge": "Dry-run/apply bridge",
+        "sharpnessCoverage": "",
         "sharpnessMap": "Sharpness map",
         "title": "Quality review",
+        "transitionRisk": "",
         "transitions": "Focus transitions",
         "uiE2ePending": "UI E2E pending"
       },

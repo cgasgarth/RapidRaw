@@ -11,6 +11,7 @@ import {
   ComputationalSetupStatusLine,
 } from './ComputationalSetupModalShell';
 import { TextColors, TextVariants } from '../../types/typography';
+import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import Button from '../ui/Button';
 import Dropdown, { type OptionItem } from '../ui/Dropdown';
 import UiText from '../ui/Text';
@@ -32,6 +33,7 @@ interface FocusStackModalProps {
 }
 
 const previewDimensionOptions = [2400, 4096, 8192] as const;
+const reviewArtifactPath = '/tmp/rawengine-focus-stack-smoke.tif';
 
 export default function FocusStackModal({
   isOpen,
@@ -74,6 +76,15 @@ export default function FocusStackModal({
   const stackReadinessLabel = isSourceCountValid
     ? t('modals.focusStack.preflight.ready')
     : t('modals.focusStack.preflight.blocked');
+  const outputReview = buildFocusStackOutputReviewWorkflow({
+    artifactPath: reviewArtifactPath,
+    settings,
+    sourceCount,
+  });
+  const outputReviewDecisionLabel = t(`modals.focusStack.review.decision.${outputReview.decision}`);
+  const outputReviewWarningsLabel = outputReview.warningCodes
+    .map((warningCode) => t(`modals.focusStack.review.warning.${warningCode}`))
+    .join(', ');
 
   const setSetting = useCallback(
     (patch: Partial<FocusStackUiSettings>) => {
@@ -324,14 +335,21 @@ export default function FocusStackModal({
             value: t('modals.focusStack.review.runtimeBridge'),
           },
           {
-            label: t('modals.focusStack.review.transitions'),
+            label: t('modals.focusStack.review.editableArtifact'),
             status: 'review',
-            value: t('modals.focusStack.review.privateRawPending'),
+            value: outputReviewDecisionLabel,
           },
           {
-            label: t('modals.focusStack.review.retouchLayer'),
+            label: t('modals.focusStack.review.sharpnessCoverage'),
+            status: 'ready',
+            value: t('modals.focusStack.review.percentValue', {
+              value: Math.round(outputReview.sharpnessCoverageRatio * 100),
+            }),
+          },
+          {
+            label: t('modals.focusStack.review.transitionRisk'),
             status: 'pending',
-            value: t('modals.focusStack.review.uiE2ePending'),
+            value: outputReviewWarningsLabel,
           },
         ]}
         sections={[
@@ -372,12 +390,32 @@ export default function FocusStackModal({
             title: t('modals.focusStack.review.title'),
             rows: [
               {
+                label: t('modals.focusStack.review.editableArtifact'),
+                value: outputReviewDecisionLabel,
+              },
+              {
                 label: t('modals.focusStack.preflight.retouch'),
                 value: t(`modals.focusStack.retouchPolicy.${settings.retouchLayerPolicy}.label`),
               },
               {
-                label: t('modals.focusStack.review.transitions'),
-                value: t('modals.focusStack.review.privateRawPending'),
+                label: t('modals.focusStack.review.lowConfidenceCells'),
+                value: t('modals.focusStack.review.percentValue', {
+                  value: Math.round(outputReview.lowConfidenceCellRatio * 100),
+                }),
+              },
+              {
+                label: t('modals.focusStack.review.haloRiskCells'),
+                value: t('modals.focusStack.review.percentValue', {
+                  value: Math.round(outputReview.haloRiskCellRatio * 100),
+                }),
+              },
+              {
+                label: t('modals.focusStack.review.provenance'),
+                value: outputReview.artifactPath,
+              },
+              {
+                label: t('modals.focusStack.review.transitionRisk'),
+                value: outputReviewWarningsLabel,
               },
             ],
           },
