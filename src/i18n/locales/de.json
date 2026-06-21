@@ -2090,6 +2090,7 @@
       "initializing": "Wird initialisiert...",
       "openInEditor": "Im Editor öffnen",
       "previewBudgetLabel": "Preview budget",
+      "previewMemory": "{{value}} MB estimated",
       "previewPixels": "{{value}} px",
       "previewWorkload": "{{value}} MP",
       "projection": {
@@ -2127,6 +2128,7 @@
       "summaryBlocked": "Blocked",
       "summaryBoundary": "Boundary",
       "summaryExposure": "Exposure",
+      "summaryMemory": "Memory",
       "summaryPreviewBudget": "Preview",
       "summaryProjection": "Projection",
       "summaryQuality": "Quality",
