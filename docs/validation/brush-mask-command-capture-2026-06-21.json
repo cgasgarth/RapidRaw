@@ -1,0 +1,18 @@
+{
+  "appliedGraphRevision": "graph_rev_brush_capture_source:apply:brush_mask_capture_001_apply",
+  "commandHash": "sha256:4d66e12447d88e49848565f3509aa660cc7d3e4572a2148142a680898b1244c7",
+  "commandType": "layerMask.createBrushMask",
+  "consultApplied": [
+    "captured points normalize into image-relative command coordinates",
+    "paint/erase mode, feather-derived hardness, radius, flow, and pressure are command fields",
+    "dry-run must precede apply"
+  ],
+  "coordinateSpace": "normalized_image",
+  "dryRunMaskHash": "fnv1a32:bd37eba8",
+  "issue": 2888,
+  "renderMaskHash": "fnv1a32:bd37eba8",
+  "schemaVersion": 1,
+  "strokeCount": 1,
+  "uiMarkers": ["brush-mask-command-capture-status", "brush-mask-capture-stroke-command", "layerMask.createBrushMask"],
+  "validationMode": "brush_mask_ui_capture_to_typed_command_runtime_proof"
+}

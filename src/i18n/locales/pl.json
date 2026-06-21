@@ -927,10 +927,12 @@
       "addNewMask": "Dodaj nową maskę",
       "brush": {
         "brush": "Pędzel",
+        "captureStroke": "",
         "eraser": "Gumka",
         "feather": "Wtapianie pędzla",
         "flow": "Przepływ",
-        "size": "Rozmiar pędzla"
+        "size": "Rozmiar pędzla",
+        "typedCommand": ""
       },
       "comingSoon": "Wkrótce",
       "createNewTitle": "Utwórz nową maskę",

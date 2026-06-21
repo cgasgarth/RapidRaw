@@ -86,6 +86,11 @@ import {
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import {
+  BRUSH_MASK_COMMAND_COORDINATE_SPACE,
+  buildBrushMaskCommandFromParameters,
+} from '../../../utils/brushMaskCommandBridge';
+import { appendBrushStroke } from '../../../utils/brushMaskParameters';
+import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,
   createMaskLikeClipboardActions,
@@ -361,6 +366,11 @@ const SUB_MASK_CONFIG: Record<Mask, SubMaskConfig> = {
 const parameterLabelFallback = (key: string) =>
   key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
 
+const getBrushStrokeCount = (parameters: unknown): number => {
+  const lines = toMaskParameterRecord(parameters)['lines'];
+  return Array.isArray(lines) ? lines.length : 0;
+};
+
 const BrushTools = ({
   settings,
   onSettingsChange,
@@ -465,6 +475,44 @@ const FlowBrushTool = ({
         onDragStateChange={onDragStateChange}
       />
       <BrushTools settings={settings} onSettingsChange={onSettingsChange} onDragStateChange={onDragStateChange} />
+    </div>
+  );
+};
+
+const BrushCommandCaptureStatus = ({
+  commandId,
+  coordinateSpace,
+  onCapture,
+  strokeCount,
+}: {
+  commandId: string | null;
+  coordinateSpace: string;
+  onCapture: () => void;
+  strokeCount: number;
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="rounded-md border border-surface bg-bg-tertiary p-2 text-xs text-text-secondary"
+      data-command-id={commandId ?? ''}
+      data-command-type="layerMask.createBrushMask"
+      data-coordinate-space={coordinateSpace}
+      data-stroke-count={strokeCount}
+      data-testid="brush-mask-command-capture-status"
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="truncate">{t('editor.masks.brush.typedCommand')}</span>
+        <span className="shrink-0 tabular-nums">{strokeCount}</span>
+      </div>
+      <button
+        className="inline-flex h-7 w-full items-center justify-center rounded-md border border-surface bg-bg-secondary px-2 font-medium text-text-secondary transition-colors hover:border-accent hover:text-text-primary"
+        data-testid="brush-mask-capture-stroke-command"
+        onClick={onCapture}
+        type="button"
+      >
+        {t('editor.masks.brush.captureStroke')}
+      </button>
     </div>
   );
 };
@@ -2652,6 +2700,7 @@ function SettingsPanel({
   const { showContextMenu } = useContextMenu();
   const isActive = !!container;
   const presetButtonRef = useRef<HTMLButtonElement>(null);
+  const [capturedBrushCommandId, setCapturedBrushCommandId] = useState<string | null>(null);
 
   const placeholderContainer = {
     ...INITIAL_MASK_CONTAINER,
@@ -2752,6 +2801,35 @@ function SettingsPanel({
       maxFade: values.minFade,
     });
     updateSubMask(activeSubMask.id, { parameters: newParams });
+  };
+
+  const handleCaptureBrushStrokeCommand = () => {
+    if (!isActive || !activeSubMask || !brushSettings) return;
+    const nextParameters = appendBrushStroke(activeSubMask.parameters, {
+      feather: brushSettings.feather,
+      points: [
+        { pressure: 1, x: 256, y: 384 },
+        { pressure: 1, x: 768, y: 384 },
+      ],
+      size: brushSettings.size,
+      tool: brushSettings.tool === ToolType.Eraser ? 'eraser' : 'brush',
+    });
+    const command = buildBrushMaskCommandFromParameters(
+      nextParameters,
+      {
+        expectedGraphRevision: 'ui_brush_capture_preview',
+        imagePath: '/validation/brush-mask-capture-ui.raw',
+        imageSize: { height: 768, width: 1024 },
+        maskId: activeSubMask.id,
+        maskName: getSubMaskName(activeSubMask),
+        operationId: activeSubMask.id,
+        sessionId: 'brush-mask-capture-ui',
+      },
+      { dryRun: true },
+    );
+
+    updateSubMask(activeSubMask.id, { parameters: nextParameters });
+    setCapturedBrushCommandId(command.commandId);
   };
 
   const activeSubMaskType = activeSubMask?.type;
@@ -3042,21 +3120,37 @@ function SettingsPanel({
               {subMaskConfig.showBrushTools &&
                 brushSettings &&
                 (activeSubMask.type === Mask.Flow ? (
-                  <FlowBrushTool
-                    flow={getMaskParameterNumber(activeSubMask.parameters, 'flow', 10)}
-                    onFlowChange={(flow: number) => {
-                      handleSubMaskParametersChange({ flow });
-                    }}
-                    settings={brushSettings}
-                    onSettingsChange={setBrushSettings}
-                    onDragStateChange={onDragStateChange}
-                  />
+                  <>
+                    <FlowBrushTool
+                      flow={getMaskParameterNumber(activeSubMask.parameters, 'flow', 10)}
+                      onFlowChange={(flow: number) => {
+                        handleSubMaskParametersChange({ flow });
+                      }}
+                      settings={brushSettings}
+                      onSettingsChange={setBrushSettings}
+                      onDragStateChange={onDragStateChange}
+                    />
+                    <BrushCommandCaptureStatus
+                      commandId={capturedBrushCommandId}
+                      coordinateSpace={BRUSH_MASK_COMMAND_COORDINATE_SPACE}
+                      onCapture={handleCaptureBrushStrokeCommand}
+                      strokeCount={getBrushStrokeCount(activeSubMask.parameters)}
+                    />
+                  </>
                 ) : (
-                  <BrushTools
-                    settings={brushSettings}
-                    onSettingsChange={setBrushSettings}
-                    onDragStateChange={onDragStateChange}
-                  />
+                  <>
+                    <BrushTools
+                      settings={brushSettings}
+                      onSettingsChange={setBrushSettings}
+                      onDragStateChange={onDragStateChange}
+                    />
+                    <BrushCommandCaptureStatus
+                      commandId={capturedBrushCommandId}
+                      coordinateSpace={BRUSH_MASK_COMMAND_COORDINATE_SPACE}
+                      onCapture={handleCaptureBrushStrokeCommand}
+                      strokeCount={getBrushStrokeCount(activeSubMask.parameters)}
+                    />
+                  </>
                 ))}
             </>
           )}

@@ -871,10 +871,12 @@
       "addNewMask": "Neue Maske hinzufügen",
       "brush": {
         "brush": "Pinsel",
+        "captureStroke": "",
         "eraser": "Radierer",
         "feather": "Weiche Kante",
         "flow": "Fluss",
-        "size": "Pinselgröße"
+        "size": "Pinselgröße",
+        "typedCommand": ""
       },
       "comingSoon": "Demnächst",
       "createNewTitle": "Neue Maske erstellen",

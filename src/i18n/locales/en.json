@@ -871,10 +871,12 @@
       "addNewMask": "Add New Mask",
       "brush": {
         "brush": "Brush",
+        "captureStroke": "Capture stroke",
         "eraser": "Eraser",
         "feather": "Brush Feather",
         "flow": "Flow",
-        "size": "Brush Size"
+        "size": "Brush Size",
+        "typedCommand": "Typed command"
       },
       "comingSoon": "Coming Soon",
       "createNewTitle": "Create New Mask",

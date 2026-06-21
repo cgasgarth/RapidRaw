@@ -245,6 +245,11 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
   );
   addIf(
+    (file) =>
+      file.includes('brushMask') || file.includes('brush-mask') || file === 'src/components/panel/right/MasksPanel.tsx',
+    ['check:brush-mask', 'check:brush-mask-command', 'check:brush-mask-command-capture'],
+  );
+  addIf(
     (file) => file.includes('skinToneUniformity') || file.includes('skin-tone-uniformity'),
     ['check:skin-tone-uniformity', 'check:skin-tone-uniformity-local-raw-proof'],
   );
@@ -444,6 +449,10 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(
     ['src/utils/selectiveColorRuntime.ts'],
     ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
+  );
+  assertSelfTestRoute(
+    ['src/utils/brushMaskCommandBridge.ts'],
+    ['check:brush-mask', 'check:brush-mask-command', 'check:brush-mask-command-capture'],
   );
   assertSelfTestRoute(['src/components/adjustments/FilmLookBrowser.tsx'], ['check:film-look-browser-ui']);
   assertSelfTestRoute(['src/components/panel/MainLibrary.tsx'], ['check:library-header-ui']);
