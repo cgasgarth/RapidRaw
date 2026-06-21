@@ -108,6 +108,15 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
 
 ## Consult And Research
 
+- All feature PRs require consult before implementation is claimed or a PR is
+  opened. Treat a feature as any user-visible product behavior, image-processing
+  behavior, API/app-server editing capability, or workflow surface. If a feature
+  is urgent and consult is still running, do independent prep only; do not claim
+  the consult-backed decision until a usable response is available.
+- Use consult for PRs that require decision making, including architecture,
+  tradeoffs, scope boundaries, validation strategy, UI direction, science/math,
+  color/image quality, or whether a slice should close or only reference an
+  issue.
 - Use the consult skill heavily for design decisions, color science, negative
   processing, film simulations, deblur, denoise, sharpening/detail math,
   panorama stitching, HDR, focus stacking, super-resolution, app-server/agent
