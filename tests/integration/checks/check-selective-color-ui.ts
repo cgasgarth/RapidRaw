@@ -11,6 +11,7 @@ const requiredLocaleKeys = [
   'colorMixer',
   'hue',
   'luminance',
+  'resetActiveRange',
   'saturation',
 ];
 
@@ -25,8 +26,12 @@ for (const marker of [
   'data-testid="selective-color-range-summary"',
   'data-testid="selective-color-adjusted-hue"',
   'data-testid="selective-color-hsl-deltas"',
+  'data-testid="selective-color-reset-active-range"',
+  'data-dirty={String(isActiveSelectiveColorAdjusted)}',
+  'resetActiveSelectiveColorRange',
   'adjustments.color.activeRangeAdjustedHue',
   'adjustments.color.activeRangeDeltas',
+  'adjustments.color.resetActiveRange',
 ]) {
   if (!source.includes(marker)) {
     console.error(`Selective color UI missing active range marker: ${marker}`);

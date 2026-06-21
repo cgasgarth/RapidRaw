@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Pipette, Sliders } from 'lucide-react';
+import { Pipette, RotateCcw, Sliders } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -887,6 +887,10 @@ export default function ColorPanel({
     `S ${formatSignedInteger(currentHsl.saturation)}`,
     `L ${formatSignedInteger(currentHsl.luminance)}`,
   ].join(' / ');
+  const isActiveSelectiveColorAdjusted =
+    currentHsl.hue !== INITIAL_ADJUSTMENTS.hsl[activeColor].hue ||
+    currentHsl.saturation !== INITIAL_ADJUSTMENTS.hsl[activeColor].saturation ||
+    currentHsl.luminance !== INITIAL_ADJUSTMENTS.hsl[activeColor].luminance;
   const levels = adjustments.levels;
   const inputBlackMax = Math.max(0, Math.min(99, Math.round(levels.inputWhite * 100) - 1));
   const inputWhiteMin = Math.min(100, Math.max(1, Math.round(levels.inputBlack * 100) + 1));
@@ -919,6 +923,16 @@ export default function ColorPanel({
           ...prev.hsl[activeColor],
           [key]: value,
         },
+      },
+    }));
+  };
+
+  const resetActiveSelectiveColorRange = () => {
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      hsl: {
+        ...prev.hsl,
+        [activeColor]: { ...INITIAL_ADJUSTMENTS.hsl[activeColor] },
       },
     }));
   };
@@ -1596,6 +1610,7 @@ export default function ColorPanel({
         className="p-2 bg-bg-tertiary rounded-md"
         data-active-range={activeColor}
         data-command-type="toneColor.adjustHsl"
+        data-dirty={String(isActiveSelectiveColorAdjusted)}
         data-testid="selective-color-range-controls"
       >
         <UiText variant={TextVariants.heading} className="mb-3">
@@ -1625,6 +1640,17 @@ export default function ColorPanel({
           <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-hsl-deltas">
             {activeSelectiveColorDeltaSummary}
           </span>
+          <button
+            aria-label={t('adjustments.color.resetActiveRange')}
+            className="col-span-2 inline-flex h-7 items-center justify-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 text-xs font-medium text-text-secondary transition-colors hover:border-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+            data-testid="selective-color-reset-active-range"
+            disabled={!isActiveSelectiveColorAdjusted}
+            onClick={resetActiveSelectiveColorRange}
+            type="button"
+          >
+            <RotateCcw size={13} />
+            <span>{t('adjustments.color.resetActiveRange')}</span>
+          </button>
         </div>
         <div className="flex justify-between mb-4 px-1">
           {HSL_COLORS.map(({ name, color, label }) => (
