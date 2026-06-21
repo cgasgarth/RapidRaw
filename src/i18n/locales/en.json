@@ -140,6 +140,7 @@
           "soft_contrast": "Soft Contrast"
         }
       },
+      "resetActiveRange": "Reset active range",
       "runtimeStatus": {
         "apiLabel": "API",
         "ariaLabel": "Color editor runtime status",

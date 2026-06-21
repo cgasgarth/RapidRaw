@@ -140,6 +140,7 @@
           "soft_contrast": "柔和对比"
         }
       },
+      "resetActiveRange": "Reset active range",
       "runtimeStatus": {
         "apiLabel": "API",
         "ariaLabel": "颜色编辑器运行状态",

@@ -857,6 +857,16 @@ async function prepareScenario(page, mode) {
     await selectiveControls.getByLabel('Saturation').fill('22');
     await selectiveControls.getByLabel('Luminance').fill('-11');
     selectiveColorUiProofDatasetSchema.parse(await selectiveControls.evaluate((element) => ({ ...element.dataset })));
+    await selectiveControls.getByTestId('selective-color-reset-active-range').click();
+    await page.getByTestId('selective-color-ui-proof').getByText('Orange 0', { exact: true }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByText('Orange sat 0', { exact: true }).waitFor({ timeout: 10_000 });
+    await page.getByText('Orange lum 0', { exact: true }).waitFor({ timeout: 10_000 });
+    const resetDataset = await selectiveControls.evaluate((element) => ({ ...element.dataset }));
+    if (resetDataset.dirty !== 'false') {
+      throw new Error('Selective color reset did not clear active range dirty state.');
+    }
     toneColorCommandEnvelopeV1Schema.parse({
       ...sampleToneColorCommandEnvelopeV1,
       commandId: 'command_tone_color_selective_orange_visual_smoke',
@@ -886,11 +896,6 @@ async function prepareScenario(page, mode) {
     await page.getByTestId('skin-tone-uniformity-ui-proof').getByText('Skin 0.725', { exact: true }).waitFor({
       timeout: 10_000,
     });
-    await page.getByTestId('selective-color-ui-proof').getByText('Orange 8', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByText('Orange sat 22', { exact: true }).waitFor({ timeout: 10_000 });
-    await page.getByText('Orange lum -11', { exact: true }).waitFor({ timeout: 10_000 });
     return;
   }
 

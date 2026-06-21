@@ -140,6 +140,7 @@
           "soft_contrast": "Weicher Kontrast"
         }
       },
+      "resetActiveRange": "Reset active range",
       "runtimeStatus": {
         "apiLabel": "API",
         "ariaLabel": "Laufzeitstatus des Farbeditors",
