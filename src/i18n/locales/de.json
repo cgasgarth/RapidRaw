@@ -1559,6 +1559,9 @@
       "summarySourceFormat": "Format",
       "summarySourceMode": "Mode",
       "summarySources": "Sources",
+      "summaryWorkload": "Workload",
+      "summaryWorkloadValue_one": "{{count}} source / {{method}}",
+      "summaryWorkloadValue_other": "{{count}} sources / {{method}}",
       "titleBatch": "Bilder entrauschen",
       "titleSingle": "Bild entrauschen"
     },

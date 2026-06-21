@@ -1555,6 +1555,9 @@
       "summarySourceFormat": "Format",
       "summarySourceMode": "Mode",
       "summarySources": "Sources",
+      "summaryWorkload": "Workload",
+      "summaryWorkloadValue_one": "{{count}} source / {{method}}",
+      "summaryWorkloadValue_other": "{{count}} sources / {{method}}",
       "titleBatch": "降噪图像",
       "titleSingle": "降噪图像"
     },

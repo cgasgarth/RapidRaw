@@ -17,6 +17,9 @@ const requiredLocaleKeys = [
   'summarySourceFormat',
   'summarySourceMode',
   'summarySources',
+  'summaryWorkload',
+  'summaryWorkloadValue_one',
+  'summaryWorkloadValue_other',
 ];
 
 const missingKeys = requiredLocaleKeys.filter((key) => typeof denoiseLocale?.[key] !== 'string');
@@ -31,6 +34,9 @@ for (const marker of [
   'modals.denoise.summaryMethod',
   'modals.denoise.summaryIntensity',
   'modals.denoise.summarySourceFormat',
+  'modals.denoise.summaryWorkload',
+  'data-denoise-source-count={denoiseSourceCount}',
+  'data-denoise-method={method}',
   'selectedMethodLabel',
 ]) {
   if (!source.includes(marker)) {
