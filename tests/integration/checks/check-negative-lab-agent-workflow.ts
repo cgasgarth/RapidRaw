@@ -46,16 +46,20 @@ const target = {
   kind: 'image',
 };
 const sampleRect = { height: 0.6, width: 0.12, x: 0.02, y: 0.2 };
-const dryRunCommand = {
+const frameHealthCommand = {
   activePathIndex: 1,
   baseFogConfidence: 0.82,
   includedPaths: ['/roll/001.CR3', '/roll/002.CR3'],
   previewReady: true,
   targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
 };
+const dryRunCommand = {
+  ...frameHealthCommand,
+  presetId: 'negative_lab.generic.c41.neutral.v1',
+};
 const conversionCommand = {
   outputFormat: NegativeLabOutputFormatId.JpegProof,
-  paths: dryRunCommand.targetPaths,
+  paths: frameHealthCommand.targetPaths,
   presetId: 'negative_lab.generic.c41.neutral.v1',
   sampleRect,
   scope: 'all',
@@ -129,9 +133,9 @@ const densitometerReadout = buildNegativeLabDensitometerRouteResult({
     redWeight: 1.18,
   },
 });
-const frameHealthReport = buildNegativeLabFrameHealthRouteResult(dryRunCommand);
-const qcProofReport = buildNegativeLabQcProofRouteResult(dryRunCommand);
-const batchSummary = buildNegativeLabBatchSummaryRouteResult(dryRunCommand);
+const frameHealthReport = buildNegativeLabFrameHealthRouteResult(frameHealthCommand);
+const qcProofReport = buildNegativeLabQcProofRouteResult(frameHealthCommand);
+const batchSummary = buildNegativeLabBatchSummaryRouteResult(frameHealthCommand);
 const acceptedPlan = buildNegativeLabAcceptedBatchPlanRouteResult(dryRunCommand);
 const acceptedApplyPlan = buildNegativeLabAcceptedBatchApplyRouteResult({
   acceptedPlan,
@@ -141,7 +145,7 @@ const acceptedApplyPlan = buildNegativeLabAcceptedBatchApplyRouteResult({
 const conversionPlan = buildNegativeLabConversionPlanResult(conversionCommand);
 const stockFamilyConversionPlan = buildNegativeLabStockFamilyConversionRouteResult({
   outputFormat: NegativeLabOutputFormatId.JpegProof,
-  paths: dryRunCommand.targetPaths,
+  paths: frameHealthCommand.targetPaths,
   sampleRect,
   scope: 'all',
   stockFamilyRegistryId: 'negative_lab.stock_family.c41_portrait_color_negative.v1',
@@ -157,8 +161,8 @@ if (frameHealthReport.activeFrameId !== 'negative-lab-frame-2' || batchSummary.p
 }
 
 if (
-  qcProofReport.totalFrameCount !== dryRunCommand.targetPaths.length ||
-  qcProofReport.includedFrameCount !== dryRunCommand.includedPaths.length ||
+  qcProofReport.totalFrameCount !== frameHealthCommand.targetPaths.length ||
+  qcProofReport.includedFrameCount !== frameHealthCommand.includedPaths.length ||
   qcProofReport.frames[2]?.exportBlockedReason !== 'Frame excluded from batch.'
 ) {
   throw new Error('Negative Lab agent QC route did not expose proof/report evidence.');

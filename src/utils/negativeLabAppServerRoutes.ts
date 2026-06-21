@@ -6,10 +6,11 @@ import { buildNegativeLabBatchDryRunSummary, buildNegativeLabFrameHealthReport }
 import {
   NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
   buildNegativeLabRuntimeProfileProvenanceHash,
+  buildNegativeLabRuntimeSelectedProfileSnapshot,
   type NegativeLabRuntimeProfileCatalog,
   resolveNegativeLabRuntimeProfile,
 } from './negativeLabMeasuredProfileRuntime';
-import { buildNegativeLabAcceptedPlanIdentity } from './negativeLabPlanIdentity';
+import { buildNegativeLabPlanHash } from './negativeLabPlanIdentity';
 import {
   NEGATIVE_LAB_STOCK_METADATA_CATALOG,
   buildNegativeLabStockMetadataCounts,
@@ -141,19 +142,31 @@ export const buildNegativeLabQcProofRouteResult = (
 
 export const buildNegativeLabAcceptedBatchPlanRouteResult = (
   command: NegativeLabAcceptBatchPlanAppServerCommand,
+  runtimeCatalog: NegativeLabRuntimeProfileCatalog = NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
 ): NegativeLabAcceptBatchPlanAppServerResult => {
   const parsedCommand = negativeLabAcceptBatchPlanAppServerCommandSchema.parse(command);
-  const dryRunSummary = buildNegativeLabBatchSummaryRouteResult(parsedCommand);
-  const planIdentity = buildNegativeLabAcceptedPlanIdentity(JSON.stringify(dryRunSummary));
+  const { presetId: _presetId, ...frameHealthCommand } = parsedCommand;
+  const dryRunSummary = buildNegativeLabBatchSummaryRouteResult(frameHealthCommand);
+  const profile = resolveNegativeLabRuntimeProfile(parsedCommand.presetId, runtimeCatalog);
+  const selectedProfileSnapshot = buildNegativeLabRuntimeSelectedProfileSnapshot(profile);
+  const acceptedDryRunPlanHash = `fnv1a32:${buildNegativeLabPlanHash(
+    JSON.stringify({
+      dryRunSummaryJson: JSON.stringify(dryRunSummary),
+      selectedProfile: selectedProfileSnapshot,
+    }),
+  )}`;
 
   return negativeLabAcceptBatchPlanAppServerResultSchema.parse({
-    ...planIdentity,
+    acceptedDryRunPlanHash,
+    acceptedDryRunPlanId: `negative_lab_batch_plan_${acceptedDryRunPlanHash.slice('fnv1a32:'.length)}`,
     commandName: NegativeLabAppServerCommandName.AcceptBatchPlan,
     dryRunSummary,
     proof: {
       deterministic: true,
-      generatedFrom: 'src/utils/negativeLabFrameHealth.ts',
+      generatedFrom: 'src/utils/negativeLabAppServerRoutes.ts',
+      selectedProfileBound: true,
     },
+    selectedProfileSnapshot,
   });
 };
 
@@ -162,7 +175,7 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
   runtimeCatalog: NegativeLabRuntimeProfileCatalog = NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG,
 ): NegativeLabAcceptedBatchApplyAppServerResult => {
   const parsedCommand = negativeLabAcceptedBatchApplyAppServerCommandSchema.parse(command);
-  const expectedAcceptedPlan = buildNegativeLabAcceptedBatchPlanRouteResult(parsedCommand.dryRun);
+  const expectedAcceptedPlan = buildNegativeLabAcceptedBatchPlanRouteResult(parsedCommand.dryRun, runtimeCatalog);
   const expectedSummaryJson = JSON.stringify(expectedAcceptedPlan.dryRunSummary);
   const acceptedSummaryJson = JSON.stringify(parsedCommand.acceptedPlan.dryRunSummary);
 
@@ -185,8 +198,21 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
     runtimeCatalog,
   );
   const selectedProfileSnapshot = parsedCommand.selectedProfileSnapshot;
-  if (selectedProfileSnapshot !== undefined && selectedProfileSnapshot.presetId !== conversionPlan.presetId) {
+  const acceptedSelectedProfileSnapshot = expectedAcceptedPlan.selectedProfileSnapshot;
+  const acceptedProfileJson = JSON.stringify(acceptedSelectedProfileSnapshot);
+  if (JSON.stringify(parsedCommand.acceptedPlan.selectedProfileSnapshot) !== acceptedProfileJson) {
+    throw new Error('Accepted Negative Lab apply plan does not match the selected profile snapshot.');
+  }
+
+  if (
+    conversionPlan.presetId !== acceptedSelectedProfileSnapshot.presetId ||
+    conversionPlan.profileProvenanceHash !== acceptedSelectedProfileSnapshot.profileProvenanceHash
+  ) {
     throw new Error('Selected Negative Lab profile snapshot does not match the accepted apply conversion profile.');
+  }
+
+  if (selectedProfileSnapshot !== undefined && JSON.stringify(selectedProfileSnapshot) !== acceptedProfileJson) {
+    throw new Error('Caller supplied Negative Lab profile snapshot does not match the accepted plan.');
   }
 
   return negativeLabAcceptedBatchApplyAppServerResultSchema.parse({
@@ -198,6 +224,7 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
         acceptedDryRunPlanId: expectedAcceptedPlan.acceptedDryRunPlanId,
         outputFormat: parsedCommand.conversion.outputFormat,
         profileProvenanceHash: conversionPlan.profileProvenanceHash,
+        selectedProfile: acceptedSelectedProfileSnapshot,
         suffix: parsedCommand.conversion.suffix,
       },
       params: conversionPlan.params,
@@ -210,9 +237,9 @@ export const buildNegativeLabAcceptedBatchApplyRouteResult = (
       dryRunRequired: true,
       generatedFrom: 'src/utils/negativeLabAppServerRoutes.ts',
       identityMatched: true,
-      selectedProfileBound: selectedProfileSnapshot !== undefined,
+      selectedProfileBound: true,
     },
-    ...(selectedProfileSnapshot === undefined ? {} : { selectedProfileSnapshot }),
+    selectedProfileSnapshot: acceptedSelectedProfileSnapshot,
   });
 };
 

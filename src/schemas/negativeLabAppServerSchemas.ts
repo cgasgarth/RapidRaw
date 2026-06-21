@@ -104,7 +104,11 @@ export const negativeLabFrameHealthAppServerCommandSchema = z
   .strict();
 
 export const negativeLabBatchSummaryAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema;
-export const negativeLabAcceptBatchPlanAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema;
+export const negativeLabAcceptBatchPlanAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema
+  .extend({
+    presetId: negativeLabRuntimePresetIdSchema,
+  })
+  .strict();
 export const negativeLabQcProofAppServerCommandSchema = negativeLabFrameHealthAppServerCommandSchema;
 export const negativeLabAcceptedBatchApplyAppServerCommandSchema = z
   .object({
@@ -294,9 +298,11 @@ export const negativeLabAcceptedBatchPlanSchema = z
     proof: z
       .object({
         deterministic: z.literal(true),
-        generatedFrom: z.literal('src/utils/negativeLabFrameHealth.ts'),
+        generatedFrom: z.literal('src/utils/negativeLabAppServerRoutes.ts'),
+        selectedProfileBound: z.literal(true),
       })
       .strict(),
+    selectedProfileSnapshot: negativeLabSelectedProfileSnapshotAppServerSchema,
   })
   .strict()
   .superRefine((plan, context) => {
@@ -317,6 +323,7 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
             acceptedDryRunPlanId: z.string().regex(/^negative_lab_batch_plan_[a-f0-9]{8}$/u),
             outputFormat: negativeLabAppServerOutputFormatSchema,
             profileProvenanceHash: negativeLabProfileProvenanceHashSchema,
+            selectedProfile: negativeLabSelectedProfileSnapshotAppServerSchema,
             suffix: z.string().trim().min(1).max(40),
           })
           .strict(),
@@ -332,10 +339,10 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
         dryRunRequired: z.literal(true),
         generatedFrom: z.literal('src/utils/negativeLabAppServerRoutes.ts'),
         identityMatched: z.literal(true),
-        selectedProfileBound: z.boolean(),
+        selectedProfileBound: z.literal(true),
       })
       .strict(),
-    selectedProfileSnapshot: negativeLabSelectedProfileSnapshotAppServerSchema.optional(),
+    selectedProfileSnapshot: negativeLabSelectedProfileSnapshotAppServerSchema,
   })
   .strict()
   .superRefine((plan, context) => {
@@ -351,10 +358,19 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
       context.addIssue({ code: 'custom', message: 'Apply options must preserve selected profile provenance hash.' });
     }
 
-    if (plan.selectedProfileSnapshot !== undefined) {
-      if (plan.selectedProfileSnapshot.presetId !== plan.conversionPlan.presetId) {
-        context.addIssue({ code: 'custom', message: 'Selected profile snapshot must match conversion preset.' });
-      }
+    if (JSON.stringify(plan.apply.options.selectedProfile) !== JSON.stringify(plan.selectedProfileSnapshot)) {
+      context.addIssue({ code: 'custom', message: 'Apply options must preserve selected profile snapshot.' });
+    }
+
+    if (plan.selectedProfileSnapshot.presetId !== plan.conversionPlan.presetId) {
+      context.addIssue({ code: 'custom', message: 'Selected profile snapshot must match conversion preset.' });
+    }
+
+    if (plan.selectedProfileSnapshot.profileProvenanceHash !== plan.conversionPlan.profileProvenanceHash) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Selected profile snapshot must match conversion profile provenance hash.',
+      });
     }
   });
 
@@ -466,6 +482,9 @@ export type NegativeLabFrameHealthAppServerResult = z.infer<typeof negativeLabFr
 export type NegativeLabQcProofAppServerCommand = z.infer<typeof negativeLabQcProofAppServerCommandSchema>;
 export type NegativeLabQcProofAppServerResult = z.infer<typeof negativeLabQcProofAppServerResultSchema>;
 export type NegativeLabProfileProvenanceHash = z.infer<typeof negativeLabProfileProvenanceHashSchema>;
+export type NegativeLabSelectedProfileSnapshotAppServer = z.infer<
+  typeof negativeLabSelectedProfileSnapshotAppServerSchema
+>;
 export type NegativeLabStockMetadataAppServerCommand = z.infer<typeof negativeLabStockMetadataAppServerCommandSchema>;
 export type NegativeLabStockMetadataAppServerResult = z.infer<typeof negativeLabStockMetadataAppServerResultSchema>;
 export type NegativeLabStockRegistryAppServerCommand = z.infer<typeof negativeLabStockRegistryAppServerCommandSchema>;
