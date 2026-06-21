@@ -1575,6 +1575,7 @@ function SuperResolutionVisualSmoke() {
           data-artifact-path={copy.superResolutionArtifactPath}
           data-command={copy.superResolutionDryRunTool}
           data-detail-policy={settings.detailPolicy}
+          data-estimated-preview-megapixels={Math.round((5 * settings.maxPreviewDimensionPx ** 2) / 1_000_000)}
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-output-scale={settings.outputScale}
           data-quality-preference={settings.qualityPreference}
