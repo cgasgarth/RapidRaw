@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { ArrowLeft, Command, Images, PanelRight, Search, Sparkles, Wand2, X } from 'lucide-react';
+import { ArrowLeft, Command, Images, PanelRight, Search, Sparkles, Wand2, Waves, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -73,6 +73,12 @@ const commandPaletteCommands = commandPaletteCommandSchema.array().parse([
   },
   {
     category: 'workflow',
+    id: 'denoise',
+    requiresEditorImage: true,
+    searchTokens: ['denoise', 'noise', 'detail', 'raw', 'bm3d', 'ai'],
+  },
+  {
+    category: 'workflow',
     id: 'importFiles',
     searchTokens: ['import', 'ingest', 'files'],
   },
@@ -106,6 +112,7 @@ const commandPaletteCommands = commandPaletteCommandSchema.array().parse([
 const commandLabelKeys = {
   backToLibrary: 'modals.commandPalette.commands.backToLibrary',
   copyPasteSettings: 'modals.commandPalette.commands.copyPasteSettings',
+  denoise: 'modals.commandPalette.commands.denoise',
   focusStack: 'modals.commandPalette.commands.focusStack',
   hdrMerge: 'modals.commandPalette.commands.hdrMerge',
   importFiles: 'modals.commandPalette.commands.importFiles',
@@ -141,6 +148,8 @@ const getCommandIcon = (command: CommandPaletteCommand) => {
     case 'copyPasteSettings':
     case 'importFiles':
       return Command;
+    case 'denoise':
+      return Waves;
     case 'focusStack':
     case 'hdrMerge':
     case 'panorama':
@@ -252,6 +261,23 @@ export default function CommandPaletteModal({ isOpen, onBackToLibrary, onClose }
     if (command.id === 'importFiles') {
       closeAndRun(() => {
         setUI({ isImportModalOpen: true });
+      });
+      return;
+    }
+
+    if (command.id === 'denoise' && selectedImage) {
+      closeAndRun(() => {
+        setUI((state) => ({
+          denoiseModalState: {
+            ...state.denoiseModalState,
+            error: null,
+            isOpen: true,
+            isRaw: selectedImage.isRaw,
+            previewBase64: null,
+            progressMessage: null,
+            targetPaths: [selectedImage.path],
+          },
+        }));
       });
       return;
     }

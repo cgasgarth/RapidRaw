@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const commandPaletteCommandIdSchema = z.enum([
   'backToLibrary',
   'copyPasteSettings',
+  'denoise',
   'focusStack',
   'hdrMerge',
   'importFiles',
