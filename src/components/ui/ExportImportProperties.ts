@@ -83,8 +83,22 @@ export interface WatermarkSettings {
 
 export interface ExportState {
   errorMessage: string;
+  lastReceipt?: ExportReceipt | undefined;
   progress: Progress;
   status: Status;
+}
+
+export interface ExportReceipt {
+  completedAt: string;
+  outputs: Array<ExportReceiptOutput>;
+  total: number;
+}
+
+export interface ExportReceiptOutput {
+  byteSize: number;
+  format: string;
+  outputPath: string;
+  sourcePath: string;
 }
 
 export interface FileFormat {

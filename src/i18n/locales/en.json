@@ -1192,6 +1192,7 @@
       "estimatedSize": "Estimated file size: ~{{size}}",
       "estimatedTotalSize": "Estimated total size: ~{{size}}",
       "estimatingSize": "Estimating size...",
+      "exportedFile": "Exported {{filename}}",
       "exporting": "Exporting…",
       "exportingProgress": "Exporting… ({{current}}/{{total}})",
       "exportMultiple": "Export {{count}} {{label}}",
@@ -1201,6 +1202,7 @@
       "failed": "Export failed",
       "noImageSelected": "No image selected for export.",
       "noImagesSelected": "No images selected.",
+      "showInFinder": "Show in Finder",
       "success": "Export successful!"
     },
     "title": "Export",

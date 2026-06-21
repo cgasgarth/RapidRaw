@@ -302,7 +302,9 @@ export default function ExportPanel({
   const osPlatform = useOsPlatform();
   const isAndroid = osPlatform === 'android';
 
-  const { status, progress, errorMessage } = exportState;
+  const { status, progress, errorMessage, lastReceipt } = exportState;
+  const firstReceiptOutput = lastReceipt?.outputs[0];
+  const firstReceiptFileName = firstReceiptOutput?.outputPath.split(/[\\/]/).pop() ?? '';
   const isExporting = status === Status.Exporting;
   const isLibraryContext = !!onClose;
 
@@ -582,7 +584,12 @@ export default function ExportPanel({
           if (dir) saveLastUsedPreset(dir);
         }
 
-        setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
+        setExportState({
+          errorMessage: '',
+          lastReceipt: undefined,
+          progress: { current: 0, total: numImages },
+          status: Status.Exporting,
+        });
         await invoke(Invokes.ExportImages, {
           paths: pathsToExport,
           outputFolderOrFile: outputFolderOrFile,
@@ -999,6 +1006,37 @@ export default function ExportPanel({
             </span>
           ) : null}
         </UiText>
+        {firstReceiptOutput && (
+          <div
+            className="rounded-md border border-surface bg-surface/60 p-2"
+            data-export-receipt-format={firstReceiptOutput.format}
+            data-export-receipt-output-path={firstReceiptOutput.outputPath}
+            data-export-receipt-total={lastReceipt.total}
+            data-testid="export-success-receipt"
+          >
+            <UiText as="p" color={TextColors.primary} variant={TextVariants.small} weight={TextWeights.semibold}>
+              {t('export.status.exportedFile', { filename: firstReceiptFileName })}
+            </UiText>
+            <UiText as="p" className="break-all" color={TextColors.secondary} variant={TextVariants.small}>
+              {firstReceiptOutput.outputPath}
+            </UiText>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <UiText color={TextColors.secondary} variant={TextVariants.small}>
+                {formatBytes(firstReceiptOutput.byteSize, t)} · {firstReceiptOutput.format.toUpperCase()}
+              </UiText>
+              <button
+                className="rounded border border-surface px-2 py-1 text-xs text-text-secondary hover:bg-card-active hover:text-text-primary"
+                data-testid="export-success-show-in-finder"
+                onClick={() => {
+                  void invoke(Invokes.ShowInFinder, { path: firstReceiptOutput.outputPath });
+                }}
+                type="button"
+              >
+                {t('export.status.showInFinder')}
+              </button>
+            </div>
+          </div>
+        )}
         <Button
           className={`group rounded-md h-11 w-full flex items-center text-md font-bold! justify-center ${
             status === Status.Exporting

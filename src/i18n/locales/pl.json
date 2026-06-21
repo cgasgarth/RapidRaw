@@ -1271,6 +1271,7 @@
       "estimatedSize": "Szacowany rozmiar pliku: ~{{size}}",
       "estimatedTotalSize": "Szacowany rozmiar całkowity: ~{{size}}",
       "estimatingSize": "Szacowanie rozmiaru...",
+      "exportedFile": "Wyeksportowano {{filename}}",
       "exporting": "Eksportowanie…",
       "exportingProgress": "Eksportowanie… ({{current}}/{{total}})",
       "exportMultiple": "Eksportuj {{count}} {{label}}",
@@ -1282,6 +1283,7 @@
       "failed": "Eksport nie powiódł się",
       "noImageSelected": "Brak wybranego obrazu do eksportu.",
       "noImagesSelected": "Nie wybrano obrazów.",
+      "showInFinder": "Pokaż w Finderze",
       "success": "Eksport zakończony sukcesem!"
     },
     "title": "Eksport",

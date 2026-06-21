@@ -806,10 +806,12 @@
       "exportMultiple": "Exporter {{count}} {{label}}",
       "exportMultiple_one": "Exporter {{count}} {{label}}",
       "exportMultiple_other": "Exporter {{count}} {{label}}",
+      "exportedFile": "{{filename}} exporté",
       "exportSingle": "Exporter {{label}}",
       "failed": "Échec de l'exportation",
       "noImageSelected": "Aucune image sélectionnée pour l'exportation.",
       "noImagesSelected": "Aucune image sélectionnée.",
+      "showInFinder": "Afficher dans le Finder",
       "success": "Exportation réussie !"
     },
     "title": "Exporter",
