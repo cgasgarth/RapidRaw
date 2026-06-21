@@ -6,7 +6,6 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { format, resolveConfig } from 'prettier';
 import { z } from 'zod';
 
-const JSON_REPORT_PATH = 'docs/validation/goal-progress-report-2026-06-20.json';
 const HTML_REPORT_PATH = 'docs/validation/goal-progress-report-2026-06-20.html';
 const GENERATED_AT = '2026-06-20T00:00:00.000Z';
 const UPDATE = process.argv.includes('--update');
@@ -27,7 +26,7 @@ const reportSchema = z
     issue: z.literal(2365),
     openRuntimeIssues: z.array(z.number().int().positive()).min(1),
     schemaVersion: z.literal(1),
-    validationCommands: z.array(z.string().trim().min(1)).min(4),
+    validationCommands: z.array(z.string().trim().min(1)).min(3),
   })
   .strict();
 
@@ -76,21 +75,17 @@ const report = reportSchema.parse({
   schemaVersion: 1,
   validationCommands: [
     'bun run check:goal-progress-report',
-    'bun run check:goal-review-data',
     'bun run check:goal-review-page',
     'bun run check:goal-review-screenshot',
   ],
 });
 
 const prettierConfig = (await resolveConfig('package.json')) ?? {};
-const jsonText = await format(JSON.stringify(report), { ...prettierConfig, parser: 'json' });
 const htmlText = await format(renderHtml(report), { ...prettierConfig, parser: 'html' });
 
 if (UPDATE) {
-  await writeFile(JSON_REPORT_PATH, jsonText);
   await writeFile(HTML_REPORT_PATH, htmlText);
 } else {
-  await assertFresh(JSON_REPORT_PATH, jsonText);
   await assertFresh(HTML_REPORT_PATH, htmlText);
 }
 

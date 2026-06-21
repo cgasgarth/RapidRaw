@@ -281,7 +281,6 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
     'check:workflow-policy:self-test',
     new Set(['bun tests/integration/checks/check-github-workflow-policy.ts --self-test']),
   ],
-  ['check:validation-gates', new Set(['bun run check:compact-commands && bun run check:compact-commands:self-test'])],
   ['check:compact-commands', new Set(['bun tests/integration/checks/check-compact-quality-commands.ts'])],
   [
     'check:compact-commands:self-test',

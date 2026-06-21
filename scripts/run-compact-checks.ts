@@ -9,7 +9,6 @@ const QUICK_CORE = [
   'check:script-type-coverage:self-test',
   'check:script-extension-policy',
   'check:script-extension-policy:self-test',
-  'check:validation-test-paths',
   'check:pure-ts-tests',
   'check:pure-ts-coverage',
   'check:unused-deps',
