@@ -45,6 +45,9 @@ const unavailableProviderCommand = {
 const unavailableProviderResult = await unavailableProviderBridge.dispatch(unavailableProviderCommand, context);
 if (unavailableProviderResult.ok) failures.push('Unavailable AI provider dry-run must be rejected.');
 const [unavailableProviderAudit] = unavailableProviderBridge.listAuditEvents();
+if (unavailableProviderAudit?.status !== 'blocked') {
+  failures.push('Unavailable provider rejection must record a blocked audit status.');
+}
 if (unavailableProviderAudit?.providerFallback?.fallbackReason !== 'provider_unavailable') {
   failures.push('Unavailable provider rejection must record provider fallback metadata.');
 }

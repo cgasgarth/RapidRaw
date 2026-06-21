@@ -138,6 +138,17 @@ const rawEngineLocalAppServerAuditCommandProbeV1Schema = z.looseObject({
     .optional(),
 });
 
+const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME = {
+  'ai.enhancement.apply': 'ai.enhancement.apply_command',
+  'ai.enhancement.dryRun': 'ai.enhancement.dry_run_command',
+  'ai.mask.applySubject': 'ai.mask.apply_subject',
+  'ai.mask.generateSubject': 'ai.mask.dry_run_subject',
+} as const satisfies Partial<Record<string, string>>;
+
+const AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME_LOOKUP = new Map<string, string>(
+  Object.entries(AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME),
+);
+
 const rawEngineLocalAppServerAuditResultProbeV1Schema = z.looseObject({
   mutates: z.boolean().optional(),
   warnings: z.array(z.string().trim().min(1)),
@@ -153,14 +164,20 @@ export const rawEngineLocalAppServerAuditEventV1Schema = z
     eventId: z.string().trim().min(1),
     mutates: z.boolean(),
     requestId: z.string().trim().min(1).optional(),
-    status: z.enum(['completed', 'rejected']),
+    status: z.enum(['blocked', 'completed', 'rejected']),
     timestampIso: z.iso.datetime(),
+    toolName: z.string().trim().min(1).optional(),
     warnings: z.array(z.string().trim().min(1)),
     providerFallback: z
       .object({
+        effectiveProviderClass: z.literal('local_model'),
+        effectiveProviderId: z.literal('cpu'),
+        executionDisposition: z.literal('blocked'),
         fallbackReason: z.enum(['provider_unavailable']),
+        reasonCode: z.enum(['connector_unavailable', 'cloud_unavailable', 'provider_unavailable']),
         requestedProviderClass: z.enum(['local_model', 'self_hosted_connector', 'cloud_service']),
         requestedProviderId: z.string().trim().min(1),
+        routingFallbackApplied: z.boolean(),
         userVisibleMessage: z.string().trim().min(1),
       })
       .strict()
@@ -616,9 +633,10 @@ export class RawEngineLocalAppServerBridge {
       : ({ success: false } satisfies { success: false });
     const warnings = resultProbe.success ? resultProbe.data.warnings : [];
     const mutates = resultProbe.success ? (resultProbe.data.mutates ?? !commandProbe.data.dryRun) : false;
-    const status = result.ok ? 'completed' : 'rejected';
     const timestampIso = (context?.now ?? (() => new Date()))().toISOString();
     const providerFallback = this.#buildProviderFallback(commandProbe.data);
+    const appServerToolName = AI_COMMAND_TYPE_TO_APP_SERVER_TOOL_NAME_LOOKUP.get(commandProbe.data.commandType);
+    const status = result.ok ? 'completed' : providerFallback === undefined ? 'rejected' : 'blocked';
 
     this.#auditEvents.push(
       rawEngineLocalAppServerAuditEventV1Schema.parse({
@@ -633,6 +651,7 @@ export class RawEngineLocalAppServerBridge {
         ...(context?.requestId === undefined ? {} : { requestId: context.requestId }),
         status,
         timestampIso,
+        ...(appServerToolName === undefined ? {} : { toolName: appServerToolName }),
         warnings:
           providerFallback === undefined || result.ok ? warnings : [...warnings, providerFallback.userVisibleMessage],
       }),
@@ -650,10 +669,22 @@ export class RawEngineLocalAppServerBridge {
       return undefined;
     }
 
+    const reasonCode =
+      command.parameters.providerClass === 'self_hosted_connector'
+        ? 'connector_unavailable'
+        : command.parameters.providerClass === 'cloud_service'
+          ? 'cloud_unavailable'
+          : 'provider_unavailable';
+
     return {
+      effectiveProviderClass: 'local_model',
+      effectiveProviderId: 'cpu',
+      executionDisposition: 'blocked',
       fallbackReason: 'provider_unavailable',
+      reasonCode,
       requestedProviderClass: command.parameters.providerClass,
       requestedProviderId: command.parameters.providerId,
+      routingFallbackApplied: true,
       userVisibleMessage: `AI provider ${command.parameters.providerId} is unavailable; no pixels were sent and no edit was applied.`,
     };
   }
