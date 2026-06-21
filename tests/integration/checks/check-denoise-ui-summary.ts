@@ -6,6 +6,8 @@ const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const denoiseLocale = locale.modals?.denoise;
 const requiredLocaleKeys = [
   'emptyTarget',
+  'methodAiDescription',
+  'methodBm3dDescription',
   'setupPreview',
   'setupPreviewAlt',
   'setupPreviewCount_one',
@@ -50,6 +52,10 @@ for (const marker of [
   'disabled={!canRunDenoise}',
   'modals.denoise.emptyTarget',
   'data-denoise-method={method}',
+  'data-denoise-method-guidance={method}',
+  'selectedMethodDescription',
+  'modals.denoise.methodAiDescription',
+  'modals.denoise.methodBm3dDescription',
   'selectedMethodLabel',
 ]) {
   if (!source.includes(marker)) {
