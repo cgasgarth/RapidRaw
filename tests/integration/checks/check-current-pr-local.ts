@@ -229,6 +229,10 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
   );
   addIf(
+    (file) => file.includes('skinToneUniformity') || file.includes('skin-tone-uniformity'),
+    ['check:skin-tone-uniformity', 'check:skin-tone-uniformity-local-raw-proof'],
+  );
+  addIf(
     (file) => file.includes('colorStylePreset') || file.includes('color-style') || file.includes('PresetsPanel'),
     ['check:color-style-presets', 'check:color-style-ui-coverage'],
   );

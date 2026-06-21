@@ -1082,6 +1082,54 @@ export default function ColorPanel({
     });
   };
 
+  const skinTonePreviewHsl = (settings: Adjustments['skinToneUniformity']) => {
+    const hueDelta = Math.min(
+      settings.maxHueShiftDegrees,
+      Math.max(-settings.maxHueShiftDegrees, settings.targetHueDegrees - 18),
+    );
+
+    return {
+      hue: (hueDelta * settings.hueUniformity).toFixed(1),
+      luminance: ((settings.targetLuminance - 0.5) * 100 * settings.luminanceUniformity).toFixed(1),
+      saturation: ((settings.targetSaturation - 0.45) * 100 * settings.saturationUniformity).toFixed(1),
+    };
+  };
+  const skinTonePreview = skinTonePreviewHsl(adjustments.skinToneUniformity);
+
+  const syncSkinToneUniformity = (nextSettings: Adjustments['skinToneUniformity']) => {
+    const nextPreview = skinTonePreviewHsl(nextSettings);
+    setAdjustments((prev: Adjustments) => ({
+      ...prev,
+      hsl: {
+        ...prev.hsl,
+        oranges: {
+          ...prev.hsl.oranges,
+          hue: nextSettings.enabled ? Number(nextPreview.hue) : 0,
+          luminance: nextSettings.enabled ? Number(nextPreview.luminance) : 0,
+          saturation: nextSettings.enabled ? Number(nextPreview.saturation) : 0,
+        },
+      },
+      skinToneUniformity: nextSettings,
+    }));
+  };
+
+  const handleSkinToneUniformityToggle = () => {
+    syncSkinToneUniformity({
+      ...adjustments.skinToneUniformity,
+      enabled: !adjustments.skinToneUniformity.enabled,
+    });
+  };
+
+  const handleSkinToneUniformityChange = (
+    key: keyof Omit<Adjustments['skinToneUniformity'], 'enabled'>,
+    value: number,
+  ) => {
+    syncSkinToneUniformity({
+      ...adjustments.skinToneUniformity,
+      [key]: value,
+    });
+  };
+
   const applyProfessionalColorRecipe = (recipe: ProfessionalColorRecipe) => {
     setActiveColor(recipe.activeColorRange);
     setActiveColorBalanceRange('midtones');
@@ -1164,6 +1212,98 @@ export default function ColorPanel({
     <div className="space-y-4">
       {!isForMask && <ColorRuntimeStatusRail />}
       {!isForMask && <ColorWorkflowReadinessRail />}
+      {!isForMask && (
+        <div
+          className="rounded-md border border-border bg-bg-tertiary p-2"
+          data-hsl-preview-hue={skinTonePreview.hue}
+          data-hsl-preview-luminance={skinTonePreview.luminance}
+          data-hsl-preview-saturation={skinTonePreview.saturation}
+          data-skin-tone-runtime-proof="private-raw-preview-export"
+          data-testid="skin-tone-uniformity-controls"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <UiText variant={TextVariants.heading}>{t('adjustments.color.skinToneUniformity.title')}</UiText>
+              <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+                {t('adjustments.color.skinToneUniformity.description')}
+              </UiText>
+            </div>
+            <button
+              aria-pressed={adjustments.skinToneUniformity.enabled}
+              className={`shrink-0 rounded px-2 py-1 text-xs transition-colors ${
+                adjustments.skinToneUniformity.enabled
+                  ? 'bg-accent text-button-text'
+                  : 'bg-bg-secondary text-text-secondary hover:bg-surface'
+              }`}
+              data-testid="skin-tone-uniformity-toggle"
+              onClick={handleSkinToneUniformityToggle}
+              type="button"
+            >
+              {adjustments.skinToneUniformity.enabled
+                ? t('adjustments.color.skinToneUniformity.enabled')
+                : t('adjustments.color.skinToneUniformity.disabled')}
+            </button>
+          </div>
+          <div className="grid gap-1 rounded bg-bg-secondary p-2 text-[11px] text-text-secondary">
+            <span>{t('adjustments.color.skinToneUniformity.warning')}</span>
+            <span>
+              {t('adjustments.color.skinToneUniformity.preview', {
+                hue: skinTonePreview.hue,
+                lightness: skinTonePreview.luminance,
+                saturation: skinTonePreview.saturation,
+              })}
+            </span>
+          </div>
+          <AdjustmentSlider
+            defaultValue={0.42}
+            label={t('adjustments.color.skinToneUniformity.hue')}
+            max={1}
+            min={0}
+            onValueChange={(value) => {
+              handleSkinToneUniformityChange('hueUniformity', value);
+            }}
+            step={0.01}
+            value={adjustments.skinToneUniformity.hueUniformity}
+            onDragStateChange={onDragStateChange}
+          />
+          <AdjustmentSlider
+            defaultValue={0.31}
+            label={t('adjustments.color.skinToneUniformity.saturation')}
+            max={1}
+            min={0}
+            onValueChange={(value) => {
+              handleSkinToneUniformityChange('saturationUniformity', value);
+            }}
+            step={0.01}
+            value={adjustments.skinToneUniformity.saturationUniformity}
+            onDragStateChange={onDragStateChange}
+          />
+          <AdjustmentSlider
+            defaultValue={0.18}
+            label={t('adjustments.color.skinToneUniformity.lightness')}
+            max={1}
+            min={0}
+            onValueChange={(value) => {
+              handleSkinToneUniformityChange('luminanceUniformity', value);
+            }}
+            step={0.01}
+            value={adjustments.skinToneUniformity.luminanceUniformity}
+            onDragStateChange={onDragStateChange}
+          />
+          <AdjustmentSlider
+            defaultValue={16}
+            label={t('adjustments.color.skinToneUniformity.hueCap')}
+            max={30}
+            min={0}
+            onValueChange={(value) => {
+              handleSkinToneUniformityChange('maxHueShiftDegrees', value);
+            }}
+            step={1}
+            value={adjustments.skinToneUniformity.maxHueShiftDegrees}
+            onDragStateChange={onDragStateChange}
+          />
+        </div>
+      )}
       {!isForMask && (
         <div className="rounded-md border border-border bg-bg-tertiary p-2" data-testid="professional-color-recipes">
           <div className="mb-2">

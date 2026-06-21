@@ -151,6 +151,18 @@
         "uiLabel": "UI"
       },
       "saturation": "Saturation",
+      "skinToneUniformity": {
+        "description": "Sampled HSL-range convergence routed through the typed color workflow.",
+        "disabled": "Off",
+        "enabled": "On",
+        "hue": "Hue uniformity",
+        "hueCap": "Hue cap",
+        "lightness": "Lightness uniformity",
+        "preview": "Render bridge: H {{hue}}, S {{saturation}}, L {{lightness}}",
+        "saturation": "Saturation uniformity",
+        "title": "Skin tone - sampled uniformity (Experimental)",
+        "warning": "May affect other orange-range colors; not skin detection or Capture One equivalence."
+      },
       "temperature": "Temperature",
       "tint": "Tint",
       "toggleSliders": "Toggle Sliders",

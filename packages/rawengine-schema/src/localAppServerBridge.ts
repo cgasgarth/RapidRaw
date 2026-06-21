@@ -325,7 +325,7 @@ const SKIN_TONE_UNIFORMITY_PARAMETER_DIFF_PATHS = [
 >;
 
 const SKIN_TONE_UNIFORMITY_WARNINGS = [
-  'Experimental skin-tone uniformity command: synthetic/runtime proof only; no real RAW e2e or preview/export parity claim.',
+  'Experimental skin-tone uniformity command: bounded runtime proof with private RAW preview/export coverage; no Capture One equivalence or measured portrait accuracy claim.',
 ] as const;
 
 const buildSkinToneUniformityDryRunResult = (
