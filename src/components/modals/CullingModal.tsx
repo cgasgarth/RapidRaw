@@ -180,6 +180,47 @@ export default function CullingModal({
       <UiText variant={TextVariants.title} className="mb-6 text-center">
         {t('modals.culling.title')}
       </UiText>
+      <section
+        className="mb-6 grid grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-xs"
+        data-blur-filter-enabled={String(settings.filterBlurry)}
+        data-blur-threshold={settings.blurThreshold}
+        data-group-similar-enabled={String(settings.groupSimilar)}
+        data-image-count={imagePaths.length}
+        data-similarity-threshold={settings.similarityThreshold}
+        data-testid="culling-setup-summary"
+      >
+        {[
+          {
+            label: t('modals.culling.summarySources'),
+            value: t('modals.culling.summarySourceCount', { count: imagePaths.length }),
+          },
+          {
+            label: t('modals.culling.summarySimilar'),
+            value: settings.groupSimilar
+              ? t('modals.culling.summaryEnabledThreshold', { threshold: settings.similarityThreshold })
+              : t('modals.culling.summaryDisabled'),
+          },
+          {
+            label: t('modals.culling.summaryBlur'),
+            value: settings.filterBlurry
+              ? t('modals.culling.summaryEnabledThreshold', { threshold: settings.blurThreshold })
+              : t('modals.culling.summaryDisabled'),
+          },
+          {
+            label: t('modals.culling.summaryWorkload'),
+            value: t('modals.culling.summaryWorkloadValue', { count: imagePaths.length }),
+          },
+        ].map((item) => (
+          <div className="rounded border border-border-color bg-bg-secondary px-2 py-1.5" key={item.label}>
+            <UiText as="span" variant={TextVariants.small} className="block text-text-tertiary">
+              {item.label}
+            </UiText>
+            <UiText as="span" variant={TextVariants.small} className="block truncate text-text-primary">
+              {item.value}
+            </UiText>
+          </div>
+        ))}
+      </section>
       <div className="space-y-6 text-sm">
         <div>
           <Switch
