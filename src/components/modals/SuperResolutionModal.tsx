@@ -28,6 +28,9 @@ interface SuperResolutionModalProps {
   loadingImageUrl?: string | null;
   onClose: () => void;
   onPreviewPlan: () => void;
+  reviewArtifactPreviewUrls?: Partial<
+    Record<SuperResolutionOutputReviewWorkflow['reviewArtifacts'][number]['kind'], string>
+  >;
   onSettingsChange: (settings: SuperResolutionUiSettings) => void;
   outputReview?: SuperResolutionOutputReviewWorkflow | null;
   settings: SuperResolutionUiSettings;
@@ -45,6 +48,7 @@ export default function SuperResolutionModal({
   loadingImageUrl,
   onClose,
   onPreviewPlan,
+  reviewArtifactPreviewUrls = {},
   onSettingsChange,
   outputReview: runtimeOutputReview,
   settings,
@@ -117,6 +121,7 @@ export default function SuperResolutionModal({
     storageLabel: artifact.publicRepoAllowed
       ? t('modals.superResolution.review.artifactStorage.public')
       : t('modals.superResolution.review.artifactStorage.private'),
+    previewUrl: reviewArtifactPreviewUrls[artifact.kind] ?? null,
   }));
   const outputHashLabel = hasRuntimeOutputReview
     ? outputReview.outputArtifactHash
@@ -519,6 +524,22 @@ export default function SuperResolutionModal({
                 </UiText>
               </div>
               <div className="grid gap-1 text-sm">
+                <div
+                  className="grid aspect-[4/3] place-items-center overflow-hidden rounded border border-border-color bg-bg-primary"
+                  data-preview-ready={String(artifact.previewUrl !== null)}
+                >
+                  {artifact.previewUrl === null ? (
+                    <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                      {t('modals.superResolution.review.artifactPreviewUnavailable')}
+                    </UiText>
+                  ) : (
+                    <img
+                      alt={t('modals.superResolution.review.artifactPreviewAlt', { artifact: artifact.kindLabel })}
+                      className="h-full w-full object-contain"
+                      src={artifact.previewUrl}
+                    />
+                  )}
+                </div>
                 <div className="min-w-0">
                   <UiText as="span" variant={TextVariants.small} color={TextColors.secondary} className="block">
                     {t('modals.superResolution.review.artifactFile')}
