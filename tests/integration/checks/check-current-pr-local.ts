@@ -197,6 +197,13 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   addIf((file) => file === 'src/components/modals/DenoiseModal.tsx', ['check:denoise-ui-summary']);
   addIf(
     (file) =>
+      file === 'src/components/modals/CollageModal.tsx' ||
+      file === 'src/utils/displayFilePath.ts' ||
+      file === 'tests/integration/checks/check-collage-saved-output-ui.ts',
+    ['check:collage-saved-output-ui'],
+  );
+  addIf(
+    (file) =>
       file === 'src/components/modals/MergeStatusViews.tsx' ||
       file === 'src/utils/displayFilePath.ts' ||
       file === 'tests/integration/checks/check-merge-saved-output-ui.ts',
@@ -394,6 +401,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/components/panel/editor/Waveform.tsx'], ['check:histogram-clipping-ui']);
   assertSelfTestRoute(['src/components/panel/editor/EditorToolbar.tsx'], ['check:editor-history-toolbar-ui']);
   assertSelfTestRoute(['src/components/modals/DenoiseModal.tsx'], ['check:denoise-ui-summary']);
+  assertSelfTestRoute(['src/components/modals/CollageModal.tsx'], ['check:collage-saved-output-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-coverage-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-collage-ui']);
   assertSelfTestRoute(['src/components/modals/CommandPaletteModal.tsx'], ['check:command-palette-denoise-ui']);

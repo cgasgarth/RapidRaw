@@ -155,6 +155,7 @@
     "check:denoise-workflow-smoke": "bun tests/integration/checks/check-denoise-workflow-smoke.ts",
     "check:denoise-ui-summary": "bun tests/integration/checks/check-denoise-ui-summary.ts",
     "check:culling-ui-summary": "bun tests/integration/checks/check-culling-ui-summary.ts",
+    "check:collage-saved-output-ui": "bun tests/integration/checks/check-collage-saved-output-ui.ts",
     "check:merge-saved-output-ui": "bun tests/integration/checks/check-merge-saved-output-ui.ts",
     "check:denoise-ui-api": "bun tests/integration/checks/check-denoise-ui-api.ts",
     "check:ai-denoise-source-fixture": "bun tests/integration/checks/check-ai-denoise-source-fixture.ts",

@@ -18,9 +18,10 @@ import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } fr
 import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../hooks/useModalTransition';
-import { TextVariants } from '../../types/typography';
+import { TextColors, TextVariants } from '../../types/typography';
 import { createBlobFromUint8Array } from '../../utils/blobUtils';
 import { LAYOUTS, type Layout, type LayoutDefinition } from '../../utils/CollageVariants';
+import { getDisplayFileName } from '../../utils/displayFilePath';
 import { type ImageFile, Invokes } from '../ui/AppProperties';
 import Button from '../ui/Button';
 import Slider from '../ui/Slider';
@@ -99,6 +100,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
+  const savedOutputName = savedPath ? getDisplayFileName(savedPath) : '';
 
   const [activeLayout, setActiveLayout] = useState<Layout | null>(null);
   const [activeAspectRatio, setActiveAspectRatio] = useState<AspectRatioPreset>(DEFAULT_ASPECT_RATIO_PRESET);
@@ -824,10 +826,22 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   const renderContent = () => {
     if (savedPath) {
       return (
-        <div className="flex flex-col items-center justify-center h-full text-center">
-          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+        <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+          <CheckCircle aria-hidden="true" className="mx-auto mb-4 h-16 w-16 text-green-500" />
           <UiText variant={TextVariants.heading} className="mb-2">
             {t('modals.collage.saved')}
+          </UiText>
+          <UiText
+            as="div"
+            variant={TextVariants.small}
+            color={TextColors.secondary}
+            className="mx-auto mt-2 block max-w-md truncate text-center font-mono"
+            data-saved-output-name={savedOutputName}
+            data-testid="collage-saved-output-detail"
+            title={savedPath}
+          >
+            {t('modals.common.savedOutputLabel', { name: savedOutputName })}
+            <span className="sr-only">{t('modals.common.savedOutputFullPath', { path: savedPath })}</span>
           </UiText>
         </div>
       );
