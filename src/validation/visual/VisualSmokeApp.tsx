@@ -150,6 +150,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabPublicExportReview]: NegativeLabPublicExportReviewSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NegativeLabWorkspace]: NegativeLabVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaPrivateRawUi]: PanoramaPrivateRawVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview]: PanoramaSavedReviewVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.PanoramaUi]: PanoramaVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrPrivateRawUi]: SuperResolutionPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.SrUi]: SuperResolutionVisualSmoke,
@@ -512,6 +513,7 @@ const copy = {
   hdrPrivateRawPreview: 'Tone-mapped preview',
   panoramaSmoke: 'Panorama UI Smoke',
   panoramaReview: 'Panorama review',
+  panoramaSavedReview: 'Panorama saved review',
   panoramaDryRunPreview: 'Dry-run preview',
   panoramaArtifactHandoff: 'Artifact handoff',
   panoramaPrivateRawMissing: 'Missing panorama private RAW proof payload',
@@ -1935,6 +1937,7 @@ function PanoramaVisualSmoke() {
           onSettingsChange={setSettings}
           onStitch={() => {}}
           progressMessage={null}
+          renderedReview={null}
           runtimePlan={panoramaRuntimePlanFixture}
           settings={settings}
         />
@@ -1959,6 +1962,65 @@ function PanoramaVisualSmoke() {
           </div>
         </aside>
       </div>
+    </main>
+  );
+}
+
+function PanoramaSavedReviewVisualSmoke() {
+  const [openedPath, setOpenedPath] = useState<string | null>(null);
+  const outputPath = '/tmp/panorama.tif';
+
+  return (
+    <main
+      className="h-full min-h-screen bg-[#111316] text-[#f3f4f1] font-sans"
+      data-visual-smoke-ready="true"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.PanoramaSavedReview}
+    >
+      <div className="absolute inset-0 bg-[#0f1114]" data-visual-smoke-section="panorama-saved-review" />
+      <div className="fixed left-4 top-4 z-50 rounded-md border border-white/10 bg-black/75 px-3 py-2 text-sm font-semibold">
+        {copy.panoramaSavedReview}
+      </div>
+      <div className="sr-only" data-opened-path={openedPath ?? ''} data-testid="panorama-saved-review-open-proof" />
+      <PanoramaModal
+        error={null}
+        finalImageBase64={panoramaPreviewUrl}
+        imageCount={5}
+        isOpen
+        isProcessing={false}
+        loadingImageUrl={panoramaPreviewUrl}
+        onClose={() => {}}
+        onOpenFile={setOpenedPath}
+        onSave={() => Promise.resolve(outputPath)}
+        onSettingsChange={() => {}}
+        onStitch={() => {}}
+        progressMessage={null}
+        renderedReview={{
+          boundary: {
+            crop: {
+              height: 3200,
+              mode: 'coverage_bounds',
+              preCropHeight: 3400,
+              preCropWidth: 9800,
+              width: 9600,
+              x: 100,
+              y: 80,
+            },
+            effective: 'auto_crop',
+            requested: 'auto_crop',
+          },
+          capabilityLevel: 'runtime_apply_capable',
+          outputDimensions: { height: 3200, width: 9600 },
+          projection: { effective: 'rectilinear', requested: 'rectilinear' },
+          sources: {
+            excludedSourceIndices: [],
+            stitchedSourceIndices: [0, 1, 2, 3, 4],
+            totalCount: 5,
+          },
+          warningCodes: ['geometry_estimate_low_confidence', 'legacy_full_frame_render'],
+        }}
+        runtimePlan={panoramaRuntimePlanFixture}
+        settings={DEFAULT_PANORAMA_UI_SETTINGS}
+      />
     </main>
   );
 }

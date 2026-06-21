@@ -270,6 +270,16 @@ export const panoramaReviewWorkspaceProofSchema = z.object({
   sourceCount: z.literal('5'),
   sourceOrder: z.literal('left,center,right,detail,sky'),
 });
+export const panoramaSavedReviewProofSchema = z.object({
+  boundaryMode: z.literal('auto_crop'),
+  capabilityLevel: z.literal('runtime_apply_capable'),
+  cropRectangle: z.literal('100,80,9600,3200'),
+  outputDimensions: z.literal('9600 x 3200'),
+  outputPath: z.literal('/tmp/panorama.tif'),
+  projection: z.literal('rectilinear'),
+  sourceCount: z.literal('5'),
+  warningCodes: z.literal('geometry_estimate_low_confidence,legacy_full_frame_render'),
+});
 export const panoramaPrivateRawReviewProofSchema = z.object({
   applyCommand: z.literal(panoramaRoutePair.applyToolName),
   artifactPath: z.string().endsWith('/panorama-overlap-merge.tiff'),

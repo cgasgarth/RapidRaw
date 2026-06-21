@@ -351,6 +351,7 @@
     "check:panorama-review-diagnostics": "bun tests/integration/checks/check-panorama-review-diagnostics.ts",
     "check:panorama-stress-candidate-diagnostic": "bun scripts/run-panorama-stress-candidate-diagnostic.ts",
     "check:panorama-ui-smoke": "bun scripts/capture-visual-smoke.ts --scenario panorama-ui",
+    "check:panorama-saved-review-smoke": "bun scripts/capture-visual-smoke.ts --scenario panorama-saved-review",
     "check:hdr-alignment-smoke": "bun tests/integration/checks/check-hdr-alignment-smoke.ts",
     "check:hdr-alignment-bracket-proof": "bun tests/integration/checks/check-hdr-alignment-bracket-proof.ts",
     "check:hdr-alignment-bracket-proof:update": "bun tests/integration/checks/check-hdr-alignment-bracket-proof.ts --update",

@@ -220,6 +220,7 @@ export default function AppModals(props: AppModalsProps) {
           setUI((state) => ({ panoramaModalState: { ...state.panoramaModalState, runtimePlan: null, settings } }));
         }}
         progressMessage={panoramaModalState.progressMessage}
+        renderedReview={panoramaModalState.renderedReview}
         runtimePlan={panoramaModalState.runtimePlan}
         settings={panoramaModalState.settings}
       />

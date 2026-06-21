@@ -30,6 +30,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           error: null,
           finalImageBase64: null,
           progressMessage: 'Starting panorama...',
+          renderedReview: null,
           runtimePlan: null,
         },
       }));
@@ -53,6 +54,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
               ...state.panoramaModalState,
               error: runtimePlan.preflight.blocked_reasons.join('\n'),
               isProcessing: false,
+              renderedReview: null,
             },
           }));
           return;

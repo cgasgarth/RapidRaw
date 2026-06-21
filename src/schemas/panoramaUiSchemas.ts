@@ -70,6 +70,65 @@ export const panoramaRuntimePlanSchema = z
 
 export type PanoramaRuntimePlan = z.infer<typeof panoramaRuntimePlanSchema>;
 
+const panoramaRenderedReviewCropSchema = z
+  .object({
+    height: z.number().int().positive(),
+    mode: z.string().min(1),
+    preCropHeight: z.number().int().positive(),
+    preCropWidth: z.number().int().positive(),
+    width: z.number().int().positive(),
+    x: z.number().int().nonnegative(),
+    y: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const panoramaRenderedReviewSourcesSchema = z
+  .object({
+    excludedSourceIndices: z.array(z.number().int().nonnegative()),
+    stitchedSourceIndices: z.array(z.number().int().nonnegative()),
+    totalCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export const panoramaRenderedReviewSchema = z
+  .object({
+    boundary: z
+      .object({
+        crop: panoramaRenderedReviewCropSchema,
+        effective: panoramaUiBoundaryModeSchema,
+        requested: panoramaUiBoundaryModeSchema,
+      })
+      .strict(),
+    capabilityLevel: z.literal('runtime_apply_capable'),
+    outputDimensions: panoramaPlanDimensionsSchema,
+    projection: z
+      .object({
+        effective: panoramaUiProjectionSchema,
+        requested: panoramaUiProjectionSchema,
+      })
+      .strict(),
+    sources: panoramaRenderedReviewSourcesSchema,
+    warningCodes: z.array(z.string()),
+  })
+  .strict();
+
+export type PanoramaRenderedReview = z.infer<typeof panoramaRenderedReviewSchema>;
+
+export const panoramaSavedReviewSummarySchema = z
+  .object({
+    boundaryMode: panoramaUiBoundaryModeSchema,
+    capabilityLevel: z.literal('runtime_apply_capable'),
+    crop: panoramaRenderedReviewCropSchema,
+    outputDimensions: panoramaPlanDimensionsSchema,
+    outputPath: z.string().min(1),
+    projection: panoramaUiProjectionSchema,
+    sourceCount: z.number().int().nonnegative(),
+    warningCodes: z.array(z.string()),
+  })
+  .strict();
+
+export type PanoramaSavedReviewSummary = z.infer<typeof panoramaSavedReviewSummarySchema>;
+
 export const DEFAULT_PANORAMA_UI_SETTINGS = panoramaUiSettingsSchema.parse({
   blendMode: 'multi_band',
   boundaryMode: 'auto_crop',
