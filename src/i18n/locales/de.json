@@ -998,6 +998,17 @@
         "defaultBadge": "Standard",
         "title": "Farbstile"
       },
+      "composition": {
+        "colorStyles_one": "",
+        "colorStyles_other": "",
+        "folders_one": "",
+        "folders_other": "",
+        "previewsGenerating": "",
+        "previewsReady_one": "",
+        "previewsReady_other": "",
+        "userPresets_one": "",
+        "userPresets_other": ""
+      },
       "dialog": {
         "allPresetFiles": "Alle Vorgabendateien",
         "exportAllTitle": "Alle Vorgaben exportieren",

@@ -179,6 +179,7 @@
     "check:library-sessions": "bun tests/integration/checks/check-library-session-fixtures.ts",
     "check:session-import-reload-proof": "bun tests/integration/checks/check-session-import-reload-proof.ts",
     "check:library-session-ui": "bun tests/integration/checks/check-library-session-ui.ts",
+    "check:presets-composition-ui": "bun tests/integration/checks/check-presets-composition-ui.ts",
     "check:library-header-ui": "bun tests/integration/checks/check-library-header-ui.ts",
     "check:histogram-clipping-ui": "bun tests/integration/checks/check-histogram-clipping-ui.ts",
     "check:editor-history-toolbar-ui": "bun tests/integration/checks/check-editor-history-toolbar-ui.ts",

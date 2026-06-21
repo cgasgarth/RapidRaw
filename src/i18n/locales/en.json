@@ -998,6 +998,17 @@
         "defaultBadge": "Default",
         "title": "Color Styles"
       },
+      "composition": {
+        "colorStyles_one": "{{count}} style",
+        "colorStyles_other": "{{count}} styles",
+        "folders_one": "{{count}} folder",
+        "folders_other": "{{count}} folders",
+        "previewsGenerating": "Previews building",
+        "previewsReady_one": "{{count}} preview",
+        "previewsReady_other": "{{count}} previews",
+        "userPresets_one": "{{count}} user preset",
+        "userPresets_other": "{{count}} user presets"
+      },
       "dialog": {
         "allPresetFiles": "All Preset Files",
         "exportAllTitle": "Export All Presets",

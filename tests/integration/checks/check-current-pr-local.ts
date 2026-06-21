@@ -210,6 +210,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     (file) => file.includes('colorStylePreset') || file.includes('color-style') || file.includes('PresetsPanel'),
     ['check:color-style-presets', 'check:color-style-ui-coverage'],
   );
+  addIf((file) => file === 'src/components/panel/right/PresetsPanel.tsx', ['check:presets-composition-ui']);
   addIf((file) => file === 'src/components/ui/ExportPresetsList.tsx', ['check:export-recipes-ui']);
   addIf((file) => file === 'src/components/adjustments/Color.tsx', ['check:professional-color-workflow-ui']);
   addIf(
@@ -382,6 +383,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/components/panel/right/MasksPanel.tsx'], ['check:mask-readiness-ui']);
   assertSelfTestRoute(['src/components/panel/right/ExportPanel.tsx'], ['check:export-readiness-ui']);
   assertSelfTestRoute(['src/components/ui/ExportPresetsList.tsx'], ['check:export-recipes-ui']);
+  assertSelfTestRoute(['src/components/panel/right/PresetsPanel.tsx'], ['check:presets-composition-ui']);
   assertSelfTestRoute(['src/components/adjustments/Color.tsx'], ['check:professional-color-workflow-ui']);
   assertSelfTestRoute(['src/components/modals/CullingModal.tsx'], ['check:culling-ui-summary']);
   assertSelfTestRoute(['src/components/panel/right/LayerStackPanel.tsx'], ['check:layer-stack-panel-ui']);
