@@ -47,6 +47,7 @@ type LevelsNumericKey = Exclude<keyof Adjustments['levels'], 'enabled'>;
 
 const colorGradingSwatchKeys = ['shadows', 'midtones', 'highlights', 'global'] as const;
 type ColorGradingPreset = (typeof COLOR_GRADING_PRESETS)[number];
+type SelectiveColorPreviewMode = 'adjusted' | 'mask';
 
 const getColorGradingSwatchColor = (value: HueSatLum) => {
   const saturation = Math.round(Math.min(88, Math.max(8, 30 + value.saturation * 0.55)));
@@ -796,6 +797,7 @@ export default function ColorPanel({
   const [activeColor, setActiveColor] = useState<BlackWhiteMixerChannel>('reds');
   const [activeColorBalanceRange, setActiveColorBalanceRange] = useState<ColorBalanceRgbRange>('midtones');
   const [activeChannelMixerOutput, setActiveChannelMixerOutput] = useState<ChannelMixerOutput>('red');
+  const [selectiveColorPreviewMode, setSelectiveColorPreviewMode] = useState<SelectiveColorPreviewMode>('adjusted');
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
 
@@ -887,6 +889,10 @@ export default function ColorPanel({
     `S ${formatSignedInteger(currentHsl.saturation)}`,
     `L ${formatSignedInteger(currentHsl.luminance)}`,
   ].join(' / ');
+  const selectiveColorPreviewSummary =
+    selectiveColorPreviewMode === 'mask'
+      ? t('adjustments.color.maskPreviewEnabled')
+      : t('adjustments.color.adjustedPreviewEnabled');
   const isActiveSelectiveColorAdjusted =
     currentHsl.hue !== INITIAL_ADJUSTMENTS.hsl[activeColor].hue ||
     currentHsl.saturation !== INITIAL_ADJUSTMENTS.hsl[activeColor].saturation ||
@@ -935,6 +941,10 @@ export default function ColorPanel({
         [activeColor]: { ...INITIAL_ADJUSTMENTS.hsl[activeColor] },
       },
     }));
+  };
+
+  const toggleSelectiveColorPreviewMode = () => {
+    setSelectiveColorPreviewMode((currentMode) => (currentMode === 'mask' ? 'adjusted' : 'mask'));
   };
 
   const handleBlackWhiteToggle = () => {
@@ -1781,6 +1791,9 @@ export default function ColorPanel({
         data-active-range={activeColor}
         data-command-type="toneColor.adjustHsl"
         data-dirty={String(isActiveSelectiveColorAdjusted)}
+        data-preview-mode={selectiveColorPreviewMode}
+        data-preview-mutates-adjustments="false"
+        data-preview-source="selectiveColorRuntime.renderSelectiveColorMaskPreviewPixel"
         data-testid="selective-color-range-controls"
       >
         <UiText variant={TextVariants.heading} className="mb-3">
@@ -1810,6 +1823,23 @@ export default function ColorPanel({
           <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-hsl-deltas">
             {activeSelectiveColorDeltaSummary}
           </span>
+          <span className="text-text-tertiary">{t('adjustments.color.previewMode')}</span>
+          <span className="text-right tabular-nums text-text-secondary" data-testid="selective-color-preview-mode">
+            {selectiveColorPreviewSummary}
+          </span>
+          <button
+            aria-pressed={selectiveColorPreviewMode === 'mask'}
+            className={`col-span-2 inline-flex h-7 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors ${
+              selectiveColorPreviewMode === 'mask'
+                ? 'border-accent bg-accent/10 text-text-primary'
+                : 'border-surface bg-bg-secondary text-text-secondary hover:border-accent hover:text-text-primary'
+            }`}
+            data-testid="selective-color-mask-preview-toggle"
+            onClick={toggleSelectiveColorPreviewMode}
+            type="button"
+          >
+            {t('adjustments.color.maskPreview')}
+          </button>
           <button
             aria-label={t('adjustments.color.resetActiveRange')}
             className="col-span-2 inline-flex h-7 items-center justify-center gap-1 rounded-md border border-surface bg-bg-secondary px-2 text-xs font-medium text-text-secondary transition-colors hover:border-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"

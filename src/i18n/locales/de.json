@@ -20,6 +20,7 @@
     "color": {
       "activeRangeAdjustedHue": "Adjusted hue",
       "activeRangeDeltas": "HSL deltas",
+      "adjustedPreviewEnabled": "",
       "ariaSelectColor": "{{name}}-Farbe auswählen",
       "blackWhiteMixer": {
         "ariaSelectChannel": "{{name}} Schwarzweißkanal auswählen",
@@ -110,6 +111,8 @@
         }
       },
       "luminance": "Luminanz",
+      "maskPreview": "",
+      "maskPreviewEnabled": "",
       "mixerColors": {
         "aquas": "Aquamarin",
         "blues": "Blau",
@@ -121,6 +124,7 @@
         "yellows": "Gelb"
       },
       "presence": "Präsenz",
+      "previewMode": "",
       "profileTone": {
         "cameraProfile": "Kameraprofil",
         "cameraProfiles": {

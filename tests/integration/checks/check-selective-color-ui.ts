@@ -11,6 +11,10 @@ const requiredLocaleKeys = [
   'colorMixer',
   'hue',
   'luminance',
+  'adjustedPreviewEnabled',
+  'maskPreview',
+  'maskPreviewEnabled',
+  'previewMode',
   'resetActiveRange',
   'saturation',
 ];
@@ -27,10 +31,17 @@ for (const marker of [
   'data-testid="selective-color-adjusted-hue"',
   'data-testid="selective-color-hsl-deltas"',
   'data-testid="selective-color-reset-active-range"',
+  'data-testid="selective-color-mask-preview-toggle"',
+  'data-testid="selective-color-preview-mode"',
   'data-dirty={String(isActiveSelectiveColorAdjusted)}',
+  'data-preview-mutates-adjustments="false"',
+  'data-preview-source="selectiveColorRuntime.renderSelectiveColorMaskPreviewPixel"',
   'resetActiveSelectiveColorRange',
+  'toggleSelectiveColorPreviewMode',
   'adjustments.color.activeRangeAdjustedHue',
   'adjustments.color.activeRangeDeltas',
+  'adjustments.color.maskPreview',
+  'adjustments.color.previewMode',
   'adjustments.color.resetActiveRange',
 ]) {
   if (!source.includes(marker)) {

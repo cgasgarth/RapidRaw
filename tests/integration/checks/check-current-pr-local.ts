@@ -242,7 +242,11 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   addIf((file) => file === 'src/components/panel/right/ExportPanel.tsx', ['check:export-readiness-ui']);
   addIf(
     (file) => file.includes('selectiveColor') || file.includes('selective-color'),
-    ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
+    [
+      'check:selective-color-command-proof',
+      'check:selective-color-independent-proof',
+      'check:selective-color-range-preview-apply',
+    ],
   );
   addIf(
     (file) => file.includes('skinToneUniformity') || file.includes('skin-tone-uniformity'),
@@ -443,7 +447,11 @@ if (process.argv.includes('--self-test')) {
   );
   assertSelfTestRoute(
     ['src/utils/selectiveColorRuntime.ts'],
-    ['check:selective-color-command-proof', 'check:selective-color-independent-proof'],
+    [
+      'check:selective-color-command-proof',
+      'check:selective-color-independent-proof',
+      'check:selective-color-range-preview-apply',
+    ],
   );
   assertSelfTestRoute(['src/components/adjustments/FilmLookBrowser.tsx'], ['check:film-look-browser-ui']);
   assertSelfTestRoute(['src/components/panel/MainLibrary.tsx'], ['check:library-header-ui']);
