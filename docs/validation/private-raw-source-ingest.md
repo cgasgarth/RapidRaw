@@ -2,6 +2,14 @@
 
 Project-owned RAW folders can be used as local validation input without committing RAW payloads.
 
+For selective-color RAW preview/export proof, point the open/edit/export preparer
+at a project-owned source folder. The preparer hashes RAW candidates in that
+folder and links the file that matches the private evidence ledger entry:
+
+```sh
+RAWENGINE_PRIVATE_RAW_ROOT="$(pwd)" RAWENGINE_PRIVATE_RAW_SOURCE="/absolute/path/to/raw-folder" bun run prepare:raw-open-edit-export-private-root -- --request fixtures/validation/selective-color-raw-proof-request.json --require-assets
+```
+
 For HDR fixture prep, point the existing private root preparer at a local source folder:
 
 ```sh
@@ -37,6 +45,8 @@ The SR selector uses the same ordered burst requirements as panorama and writes 
 Validation rules:
 
 - RAW payloads stay local and ignored.
+- Selective-color open/edit/export source selection must match the ledger hash;
+  source folder names are not trusted as proof.
 - The selected trio must be same camera/lens metadata, close in capture time, close in sequence number, and at least 4 EV apart.
 - Panorama selections must preserve a consistent exposure/capture setup and ordered frame sequence.
 - Super-resolution selections must preserve a consistent exposure/capture setup and ordered burst sequence.
