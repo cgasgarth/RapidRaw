@@ -1640,13 +1640,22 @@ function SuperResolutionVisualSmoke() {
           data-apply-command={copy.superResolutionApplyTool}
           data-artifact-path={copy.superResolutionArtifactPath}
           data-command={copy.superResolutionDryRunTool}
+          data-decision={settings.detailPolicy === 'aggressive_preview_only' ? 'preview_only' : 'human_review_required'}
           data-detail-policy={settings.detailPolicy}
+          data-detail-gain-ratio="1.21"
           data-estimated-preview-megapixels={Math.round((5 * settings.maxPreviewDimensionPx ** 2) / 1_000_000)}
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-output-scale={settings.outputScale}
+          data-proof-level="synthetic_runtime"
           data-quality-preference={settings.qualityPreference}
+          data-review-crop-count="4"
           data-runtime-status="dry_run_preview"
           data-source-count="5"
+          data-warning-codes={
+            settings.detailPolicy === 'aggressive_preview_only'
+              ? 'human_review_required,synthetic_runtime_only,texture_risk,aggressive_preview_only'
+              : 'human_review_required,synthetic_runtime_only,texture_risk'
+          }
           data-testid="sr-review-workspace-proof"
         />
         <div
