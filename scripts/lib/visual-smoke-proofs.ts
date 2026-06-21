@@ -516,6 +516,14 @@ export const negativeLabWorkspaceProofDatasetSchema = z.object({
   schemaVersion: z.literal('1'),
   targetCount: z.string().regex(/^[1-9][0-9]*$/u),
 });
+export const negativeLabRollQueueSummaryProofSchema = z.object({
+  activeFrameId: z.literal('negative-lab-frame-1'),
+  baseStatus: z.enum(['estimated', 'pending']),
+  exportReady: z.enum(['false', 'true']),
+  plannedApplyCount: z.literal('2'),
+  profileId: z.string().min(1),
+  warningCount: z.string().regex(/^[0-9]+$/u),
+});
 
 export async function assertFilmLookExportProof(page) {
   const rawInvokeLog = visualSmokeInvokeLogSchema.parse(

@@ -1175,110 +1175,159 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     handleSelectFrameIndex(effectiveActivePathIndex + step);
   };
 
-  const renderRollFrameNavigator = () => (
-    <div className="absolute bottom-24 left-4 right-4 z-20 pointer-events-none">
-      <div
-        className="pointer-events-auto rounded-md border border-white/10 bg-black/70 p-2 shadow-xl backdrop-blur-md"
-        data-active-frame-id={frameHealthReport.activeFrameId ?? ''}
-        data-preview-ready={String(previewUrl !== null)}
-        data-testid="negative-lab-roll-frame-navigator"
-      >
-        <div
-          className="sr-only"
-          data-active-frame-id={frameHealthReport.activeFrameId ?? ''}
-          data-frame-count={frameHealthReport.frames.length}
-          data-preview-ready={String(previewUrl !== null)}
-          data-runtime-status="runtime_state_backed"
-          data-testid="negative-lab-roll-frame-navigator-proof"
-        />
-        <div className="mb-2 flex items-center justify-between gap-2 text-xs text-white/75">
-          <span className="font-semibold text-white">{t('modals.negativeConversion.frameHealth')}</span>
-          <span data-testid="negative-lab-roll-frame-count">
-            {t('modals.negativeConversion.frameHealthFrameCount', { frameCount: frameHealthReport.frames.length })}
-          </span>
-        </div>
-        <div className="flex items-stretch gap-2">
-          <button
-            aria-label={t('modals.negativeConversion.previousFrameTooltip')}
-            className="rounded bg-white/10 px-2 text-white/70 transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
-            data-testid="negative-lab-roll-frame-prev"
-            data-tooltip={t('modals.negativeConversion.previousFrameTooltip')}
-            disabled={effectiveActivePathIndex <= 0 || isSaving || isEstimatingBaseFog}
-            onClick={() => {
-              handleStepFrame(-1);
-            }}
-            type="button"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto" data-testid="negative-lab-roll-frame-strip">
-            {frameHealthReport.frames.map((frame, index) => {
-              const framePreviewReady = frame.active && previewUrl !== null;
+  const renderRollFrameNavigator = () => {
+    const activeFrame = frameHealthReport.frames.find((frame) => frame.active) ?? null;
+    const outputFormatLabel = t(
+      saveOptions.outputFormat === NegativeLabOutputFormatId.Tiff16
+        ? 'modals.negativeConversion.outputFormats.tiff16'
+        : 'modals.negativeConversion.outputFormats.jpeg_proof',
+    );
 
-              return (
-                <button
-                  aria-current={frame.active ? 'true' : undefined}
-                  className={cx(
-                    'min-w-32 rounded border px-2 py-1.5 text-left text-xs transition-colors',
-                    frame.active
-                      ? 'border-accent bg-accent/20 text-white'
-                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10',
-                    !frame.included && 'opacity-60',
-                  )}
-                  data-frame-id={frame.frameId}
-                  data-testid={`negative-lab-roll-frame-${index}`}
-                  disabled={isSaving || isEstimatingBaseFog}
-                  key={frame.frameId}
-                  onClick={() => {
-                    handleSelectFrameIndex(frame.pathIndex);
-                  }}
-                  title={frame.sourcePath}
-                  type="button"
-                >
-                  <span className="block truncate font-medium">{frame.scanLabel}</span>
-                  <span className="mt-1 flex flex-wrap gap-1">
-                    <span
-                      className="rounded bg-black/30 px-1.5 py-0.5 text-[11px]"
-                      data-testid={`negative-lab-roll-frame-status-${index}`}
-                    >
-                      {t(
-                        frame.healthStatus === 'skipped'
-                          ? 'modals.negativeConversion.frameHealthSkipped'
-                          : frame.healthStatus === 'active'
-                            ? 'modals.negativeConversion.frameHealthActive'
-                            : 'modals.negativeConversion.frameHealthQueued',
-                      )}
-                    </span>
-                    <span
-                      className="rounded bg-black/30 px-1.5 py-0.5 text-[11px]"
-                      data-testid={`negative-lab-roll-frame-runtime-${index}`}
-                    >
-                      {framePreviewReady
-                        ? t('modals.negativeConversion.previewReady')
-                        : t('modals.negativeConversion.previewPending')}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
+    return (
+      <div className="absolute bottom-24 left-4 right-4 z-20 pointer-events-none">
+        <div
+          className="pointer-events-auto rounded-md border border-white/10 bg-black/70 p-2 shadow-xl backdrop-blur-md"
+          data-active-frame-id={frameHealthReport.activeFrameId ?? ''}
+          data-preview-ready={String(previewUrl !== null)}
+          data-testid="negative-lab-roll-frame-navigator"
+        >
+          <div
+            className="sr-only"
+            data-active-frame-id={frameHealthReport.activeFrameId ?? ''}
+            data-frame-count={frameHealthReport.frames.length}
+            data-preview-ready={String(previewUrl !== null)}
+            data-runtime-status="runtime_state_backed"
+            data-testid="negative-lab-roll-frame-navigator-proof"
+          />
+          <div className="mb-2 flex items-center justify-between gap-2 text-xs text-white/75">
+            <span className="font-semibold text-white">{t('modals.negativeConversion.frameHealth')}</span>
+            <span data-testid="negative-lab-roll-frame-count">
+              {t('modals.negativeConversion.frameHealthFrameCount', { frameCount: frameHealthReport.frames.length })}
+            </span>
           </div>
-          <button
-            aria-label={t('modals.negativeConversion.nextFrameTooltip')}
-            className="rounded bg-white/10 px-2 text-white/70 transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
-            data-testid="negative-lab-roll-frame-next"
-            data-tooltip={t('modals.negativeConversion.nextFrameTooltip')}
-            disabled={effectiveActivePathIndex >= targetPaths.length - 1 || isSaving || isEstimatingBaseFog}
-            onClick={() => {
-              handleStepFrame(1);
-            }}
-            type="button"
+          <div
+            className="mb-2 grid grid-cols-4 gap-1 text-[11px] text-white/70"
+            data-active-frame-id={activeFrame?.frameId ?? ''}
+            data-base-status={activeFrame?.baseStatus ?? 'pending'}
+            data-export-ready={String(workspaceProof.exportReady)}
+            data-planned-apply-count={batchDryRunSummary.plannedApplyCount}
+            data-profile-id={selectedProfile?.presetId ?? 'custom'}
+            data-testid="negative-lab-roll-queue-summary"
+            data-warning-count={activeFrame?.warningCodes.length ?? 0}
           >
-            <ChevronRight size={16} />
-          </button>
+            <span className="truncate rounded bg-white/5 px-2 py-1" data-testid="negative-lab-roll-selected-frame">
+              {activeFrame?.scanLabel ?? t('modals.negativeConversion.frameHealth')}
+            </span>
+            <span className="truncate rounded bg-white/5 px-2 py-1" data-testid="negative-lab-roll-selected-preset">
+              {selectedProfile?.displayName ?? t('modals.negativeConversion.workflowCustomPresetDetail')}
+            </span>
+            <span className="truncate rounded bg-white/5 px-2 py-1" data-testid="negative-lab-roll-selected-base">
+              {baseFogConfidence === null
+                ? t('modals.negativeConversion.basePending')
+                : t('modals.negativeConversion.baseReady', { confidence: Math.round(baseFogConfidence * 100) })}
+            </span>
+            <span className="truncate rounded bg-white/5 px-2 py-1" data-testid="negative-lab-roll-selected-export">
+              {workspaceProof.exportReady
+                ? t('modals.negativeConversion.workflowExportReadyCount', {
+                    format: outputFormatLabel,
+                    queuedCount: workspaceProof.queuedCount,
+                  })
+                : t('modals.negativeConversion.workflowExportBlocked')}
+            </span>
+            <span
+              className="col-span-4 truncate rounded bg-white/5 px-2 py-1"
+              data-testid="negative-lab-roll-selected-warnings"
+            >
+              {t('modals.negativeConversion.frameHealthWarningCount', {
+                warningCount: activeFrame?.warningCodes.length ?? 0,
+              })}
+            </span>
+          </div>
+          <div className="flex items-stretch gap-2">
+            <button
+              aria-label={t('modals.negativeConversion.previousFrameTooltip')}
+              className="rounded bg-white/10 px-2 text-white/70 transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+              data-testid="negative-lab-roll-frame-prev"
+              data-tooltip={t('modals.negativeConversion.previousFrameTooltip')}
+              disabled={effectiveActivePathIndex <= 0 || isSaving || isEstimatingBaseFog}
+              onClick={() => {
+                handleStepFrame(-1);
+              }}
+              type="button"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto" data-testid="negative-lab-roll-frame-strip">
+              {frameHealthReport.frames.map((frame, index) => {
+                const framePreviewReady = frame.active && previewUrl !== null;
+
+                return (
+                  <button
+                    aria-current={frame.active ? 'true' : undefined}
+                    className={cx(
+                      'min-w-32 rounded border px-2 py-1.5 text-left text-xs transition-colors',
+                      frame.active
+                        ? 'border-accent bg-accent/20 text-white'
+                        : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10',
+                      !frame.included && 'opacity-60',
+                    )}
+                    data-base-status={frame.baseStatus}
+                    data-frame-id={frame.frameId}
+                    data-warning-count={frame.warningCodes.length}
+                    data-testid={`negative-lab-roll-frame-${index}`}
+                    disabled={isSaving || isEstimatingBaseFog}
+                    key={frame.frameId}
+                    onClick={() => {
+                      handleSelectFrameIndex(frame.pathIndex);
+                    }}
+                    title={frame.sourcePath}
+                    type="button"
+                  >
+                    <span className="block truncate font-medium">{frame.scanLabel}</span>
+                    <span className="mt-1 flex flex-wrap gap-1">
+                      <span
+                        className="rounded bg-black/30 px-1.5 py-0.5 text-[11px]"
+                        data-testid={`negative-lab-roll-frame-status-${index}`}
+                      >
+                        {t(
+                          frame.healthStatus === 'skipped'
+                            ? 'modals.negativeConversion.frameHealthSkipped'
+                            : frame.healthStatus === 'active'
+                              ? 'modals.negativeConversion.frameHealthActive'
+                              : 'modals.negativeConversion.frameHealthQueued',
+                        )}
+                      </span>
+                      <span
+                        className="rounded bg-black/30 px-1.5 py-0.5 text-[11px]"
+                        data-testid={`negative-lab-roll-frame-runtime-${index}`}
+                      >
+                        {framePreviewReady
+                          ? t('modals.negativeConversion.previewReady')
+                          : t('modals.negativeConversion.previewPending')}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              aria-label={t('modals.negativeConversion.nextFrameTooltip')}
+              className="rounded bg-white/10 px-2 text-white/70 transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+              data-testid="negative-lab-roll-frame-next"
+              data-tooltip={t('modals.negativeConversion.nextFrameTooltip')}
+              disabled={effectiveActivePathIndex >= targetPaths.length - 1 || isSaving || isEstimatingBaseFog}
+              onClick={() => {
+                handleStepFrame(1);
+              }}
+              type="button"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderAcquisitionHealth = () => {
     const acquisitionHealth: NegativeLabAcquisitionHealthReport = frameHealthReport.acquisitionHealth;

@@ -41,6 +41,7 @@ import {
   panoramaSavedReviewProofSchema,
   negativeLabWorkspaceProofDatasetSchema,
   negativeLabPublicExportReviewProofSchema,
+  negativeLabRollQueueSummaryProofSchema,
   panoramaReviewWorkspaceProofSchema,
   panoramaUiSettingsProofSchema,
   selectiveColorUiProofDatasetSchema,
@@ -1168,6 +1169,16 @@ async function prepareScenario(page, mode) {
     timeout: 10_000,
   });
   await page.getByTestId('negative-lab-roll-frame-navigator').waitFor({ timeout: 10_000 });
+  negativeLabRollQueueSummaryProofSchema.parse(
+    await page.getByTestId('negative-lab-roll-queue-summary').evaluate((element) => ({ ...element.dataset })),
+  );
+  await page
+    .getByTestId('negative-lab-roll-selected-frame')
+    .getByText('synthetic-color-negative-001.tif', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-roll-selected-export').getByText('Export blocked', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
   await page
     .getByTestId('negative-lab-roll-frame-count')
     .getByText('Frames 2', { exact: true })
