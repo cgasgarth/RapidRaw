@@ -7,6 +7,7 @@ import {
   negativeLabMeasuredProfileRuntimeStatusSchema,
   negativeLabRuntimeProfileBrowserRowSchema,
   negativeLabRuntimePresetIdSchema,
+  negativeLabUserProfileIdSchema,
 } from './negativeLabMeasuredProfileSchemas';
 import { negativeLabPresetIdSchema, negativeLabPresetParamsSchema } from './negativeLabPresetCatalogSchemas';
 
@@ -19,21 +20,22 @@ export const negativeLabProfileComparisonDeltaSchema = z
 
 export const negativeLabSelectedProfileSnapshotSchema = z
   .object({
-    claimLevel: z.enum(['generic_starting_point_only', 'measured_profile']),
+    claimLevel: z.enum(['generic_starting_point_only', 'measured_profile', 'user_profile']),
     claimPolicy: z.enum([
       'generic_starting_point_no_stock_claim',
       'measured_profile_required_before_stock_claim',
       'process_family_profile_no_stock_claim',
       'named_stock_profile_requires_license_review',
+      'user_profile_no_stock_claim',
     ]),
     displayName: z.string().trim().min(1).max(80),
     doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
     evidenceFixtureCount: z.number().int().nonnegative(),
-    measurementProfileId: negativeLabMeasuredProfileIdSchema.nullable(),
+    measurementProfileId: negativeLabMeasuredProfileIdSchema.or(negativeLabUserProfileIdSchema).nullable(),
     params: negativeLabPresetParamsSchema,
     presetId: negativeLabRuntimePresetIdSchema,
     profileProvenanceHash: negativeLabProfileProvenanceHashSchema,
-    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured']),
+    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured', 'user_supplied']),
     provenanceSummary: z.string().trim().min(1).max(220),
     runtimeStatus: negativeLabMeasuredProfileRuntimeStatusSchema,
     sourceGenericPresetId: negativeLabPresetIdSchema.nullable(),

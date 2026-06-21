@@ -24,6 +24,7 @@ import {
 export interface NegativeLabRuntimeProfileCatalog {
   genericCatalog: NegativeLabBuiltInUiPresetCatalog;
   measuredCatalog: NegativeLabMeasuredProfileCatalog;
+  userProfiles?: NegativeLabRuntimeProfileBrowserRow[];
 }
 
 export const NEGATIVE_LAB_EMPTY_MEASURED_PROFILE_CATALOG = {
@@ -40,6 +41,35 @@ export const NEGATIVE_LAB_MEASURED_PROFILE_CATALOG = parseNegativeLabMeasuredPro
 export const NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG = {
   genericCatalog: parseNegativeLabBuiltInUiPresetCatalog(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG),
   measuredCatalog: NEGATIVE_LAB_MEASURED_PROFILE_CATALOG,
+  userProfiles: [
+    negativeLabRuntimeProfileBrowserRowSchema.parse({
+      claimLevel: 'user_profile',
+      claimPolicy: 'user_profile_no_stock_claim',
+      disabledReason: null,
+      displayName: 'User profile: Local C-41 warm proof',
+      doesNotProve: ['user_profile_unmeasured', 'no_stock_emulation_claim', 'no_colorimetric_match_claim'],
+      evidenceFixtureCount: 0,
+      filmClass: 'color_negative',
+      isSelectable: true,
+      measurementProfileId: 'negative_lab.user.c41.local_warm_proof.v1',
+      params: {
+        base_fog_sample: null,
+        base_fog_strength: 1.04,
+        blue_weight: 0.97,
+        contrast: 1.03,
+        exposure: 0.08,
+        green_weight: 1,
+        red_weight: 1.06,
+      },
+      presetId: 'negative_lab.user.c41.local_warm_proof.v1',
+      processFamily: 'c41_color_negative',
+      profileStatus: 'user_supplied',
+      provenanceSummary:
+        'User-owned local adjustment profile based on a generic C-41 starting point; unmeasured and no stock-emulation claim.',
+      runtimeStatus: 'runtime_parameter_applied',
+      sourceGenericPresetId: 'negative_lab.generic.c41.portrait.v1',
+    }),
+  ],
 } satisfies NegativeLabRuntimeProfileCatalog;
 
 const getMeasuredProfileDisabledReason = (profile: NegativeLabMeasuredProfile) => {
@@ -98,7 +128,7 @@ export const buildNegativeLabRuntimeProfileBrowserRows = (
     });
   });
 
-  return [...genericRows, ...measuredRows];
+  return [...genericRows, ...measuredRows, ...(catalog.userProfiles ?? [])];
 };
 
 export const resolveNegativeLabRuntimeProfile = (
@@ -125,6 +155,25 @@ export const resolveNegativeLabRuntimeProfile = (
   }
 
   const measuredProfile = catalog.measuredCatalog.profiles.find((profile) => profile.profileId === presetId);
+  const userProfile = catalog.userProfiles?.find((profile) => profile.presetId === presetId);
+  if (userProfile !== undefined) {
+    return negativeLabResolvedRuntimeProfileSchema.parse({
+      claimLevel: userProfile.claimLevel,
+      claimPolicy: userProfile.claimPolicy,
+      displayName: userProfile.displayName,
+      doesNotProve: userProfile.doesNotProve,
+      evidenceDigest: null,
+      evidenceFixtureIds: [],
+      measurementProfileId: userProfile.measurementProfileId,
+      params: userProfile.params,
+      presetId: userProfile.presetId,
+      profileStatus: userProfile.profileStatus,
+      provenanceSummary: userProfile.provenanceSummary,
+      runtimeStatus: userProfile.runtimeStatus,
+      sourceGenericPresetId: userProfile.sourceGenericPresetId,
+    });
+  }
+
   if (measuredProfile === undefined) {
     throw new Error(`Unknown Negative Lab runtime profile id: ${presetId}`);
   }

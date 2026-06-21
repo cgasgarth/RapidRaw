@@ -102,6 +102,7 @@ if (NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length < 12) {
 
 const genericRuntimeRows = runtimeProfileRows.filter((row) => row.profileStatus === 'generic_unmeasured');
 const measuredRuntimeRows = runtimeProfileRows.filter((row) => row.profileStatus === 'fixture_measured');
+const userRuntimeRows = runtimeProfileRows.filter((row) => row.profileStatus === 'user_supplied');
 const profileProvenanceHashById = new Map(
   runtimeProfileRows.map((row) => [row.presetId, buildNegativeLabBrowserProfileProvenanceHash(row)]),
 );
@@ -122,9 +123,10 @@ if (genericRuntimeRows.length !== NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.preset
 if (
   comparisonRows.length < 2 ||
   !comparisonRows.some((row) => row.profile.profileStatus === 'generic_unmeasured') ||
-  !comparisonRows.some((row) => row.profile.profileStatus === 'fixture_measured')
+  !comparisonRows.some((row) => row.profile.profileStatus === 'fixture_measured') ||
+  !comparisonRows.some((row) => row.profile.profileStatus === 'user_supplied')
 ) {
-  failures.push('Negative Lab profile comparison matrix must include generic and measured selectable candidates.');
+  failures.push('Negative Lab profile comparison matrix must include generic, measured, and user-owned candidates.');
 }
 if (
   comparisonRows.some(
@@ -165,6 +167,26 @@ for (const row of measuredRuntimeRows) {
     row.evidenceFixtureCount < 1
   ) {
     failures.push(`${row.presetId}: public measured profile row must stay evidence-backed and claim-limited`);
+  }
+}
+
+if (userRuntimeRows.length < 1) {
+  failures.push('Negative Lab profile browser rows must expose at least one user-owned profile candidate.');
+}
+
+for (const row of userRuntimeRows) {
+  if (
+    row.claimLevel !== 'user_profile' ||
+    row.claimPolicy !== 'user_profile_no_stock_claim' ||
+    row.profileStatus !== 'user_supplied' ||
+    !row.isSelectable ||
+    row.disabledReason !== null ||
+    row.sourceGenericPresetId === null ||
+    !row.doesNotProve.includes('user_profile_unmeasured') ||
+    !row.doesNotProve.includes('no_stock_emulation_claim') ||
+    !row.doesNotProve.includes('no_colorimetric_match_claim')
+  ) {
+    failures.push(`${row.presetId}: user-owned profile row must stay selectable, generic-based, and claim-limited`);
   }
 }
 
