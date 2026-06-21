@@ -52,6 +52,25 @@ export const negativeLabProfileComparisonRowSchema = z
         queuedCount: z.number().int().positive(),
       })
       .strict(),
+    previewSwatch: z
+      .object({
+        candidateCss: z
+          .string()
+          .trim()
+          .regex(/^rgb\(\d{1,3} \d{1,3} \d{1,3}\)$/u),
+        currentCss: z
+          .string()
+          .trim()
+          .regex(/^rgb\(\d{1,3} \d{1,3} \d{1,3}\)$/u),
+        deltaCss: z
+          .string()
+          .trim()
+          .regex(
+            /^linear-gradient\(90deg, rgb\(\d{1,3} \d{1,3} \d{1,3}\) 0 50%, rgb\(\d{1,3} \d{1,3} \d{1,3}\) 50% 100%\)$/u,
+          ),
+        toneBias: z.enum(['cooler', 'neutral', 'warmer']),
+      })
+      .strict(),
     profile: negativeLabRuntimeProfileBrowserRowSchema,
     selectedProfileSnapshot: negativeLabSelectedProfileSnapshotSchema,
   })

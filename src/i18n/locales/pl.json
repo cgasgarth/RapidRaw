@@ -2132,6 +2132,7 @@
       "patchSamplerHint": "Probe shadows, highlights, and base strips without changing the active conversion.",
       "presetClaimGeneric": "Generic starting point",
       "presetClaimMeasured": "Measured profile",
+      "presetClaimUser": "User profile",
       "presetColorResponse": "Color response",
       "presetContrastCurve": "Contrast curve",
       "presetGrainModel": "Grain model",

@@ -136,6 +136,18 @@ if (
   failures.push('Negative Lab profile comparison snapshots must preserve profile provenance hashes.');
 }
 if (
+  comparisonRows.some(
+    (row) =>
+      !row.previewSwatch.deltaCss.includes(row.previewSwatch.currentCss) ||
+      !row.previewSwatch.deltaCss.includes(row.previewSwatch.candidateCss),
+  )
+) {
+  failures.push('Negative Lab profile comparison preview swatches must include current and candidate colors.');
+}
+if (new Set(comparisonRows.map((row) => row.previewSwatch.deltaCss)).size < 2) {
+  failures.push('Negative Lab profile comparison preview swatches must vary by candidate profile parameters.');
+}
+if (
   new Set(
     comparisonRows.map(
       (row) =>

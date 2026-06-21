@@ -20,6 +20,30 @@ const PROFILE_DELTA_KEYS = [
 
 const roundProfileDelta = (value: number) => Math.round(value * 100) / 100;
 const formatProfileDelta = (value: number) => (value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2));
+const clampRgbChannel = (value: number) => Math.max(0, Math.min(255, Math.round(value)));
+const profileParamsToCssRgb = (params: NegativeLabPresetParams): `rgb(${number} ${number} ${number})` => {
+  const densityLift = params.base_fog_strength * 18;
+  const exposureLift = params.exposure * 22;
+  const contrastLift = (params.contrast - 1) * 28;
+
+  return `rgb(${clampRgbChannel(118 + densityLift + exposureLift + contrastLift + params.red_weight * 22)} ${clampRgbChannel(116 + densityLift + exposureLift + params.green_weight * 18)} ${clampRgbChannel(112 + densityLift + exposureLift - contrastLift + params.blue_weight * 24)})`;
+};
+
+const buildNegativeLabProfilePreviewSwatch = (
+  currentParams: NegativeLabPresetParams,
+  candidateParams: NegativeLabPresetParams,
+) => {
+  const currentCss = profileParamsToCssRgb(currentParams);
+  const candidateCss = profileParamsToCssRgb(candidateParams);
+  const warmthDelta = candidateParams.red_weight - candidateParams.blue_weight;
+
+  return {
+    candidateCss,
+    currentCss,
+    deltaCss: `linear-gradient(90deg, ${currentCss} 0 50%, ${candidateCss} 50% 100%)`,
+    toneBias: warmthDelta > 0.03 ? 'warmer' : warmthDelta < -0.03 ? 'cooler' : 'neutral',
+  };
+};
 
 export const buildNegativeLabBrowserProfileProvenanceHash = (
   profile: NegativeLabRuntimeProfileBrowserRow,
@@ -114,6 +138,7 @@ export const buildNegativeLabProfileComparisonRows = ({
           activeFrameLabel,
           queuedCount,
         },
+        previewSwatch: buildNegativeLabProfilePreviewSwatch(currentParams, profile.params),
         profile,
         selectedProfileSnapshot: buildNegativeLabSelectedProfileSnapshot(profile, profileProvenanceHash),
       };
