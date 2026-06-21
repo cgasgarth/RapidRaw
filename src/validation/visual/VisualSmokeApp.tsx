@@ -1203,6 +1203,7 @@ function FocusStackVisualSmoke() {
           data-blend-method={settings.blendMethod}
           data-command={copy.focusDryRunTool}
           data-depth-mode={settings.blendMethod}
+          data-estimated-preview-megapixels={Math.round((6 * settings.maxPreviewDimensionPx ** 2) / 1_000_000)}
           data-halo-policy="flattened_preview"
           data-max-preview-dimension-px={settings.maxPreviewDimensionPx}
           data-quality-preference={settings.qualityPreference}

@@ -1676,12 +1676,14 @@
         "ready": "Ready",
         "required": "Required",
         "retouch": "Retouch",
-        "sources": "Sources"
+        "sources": "Sources",
+        "workload": "Workload"
       },
       "preflightTitle": "Preflight",
       "previewBudgetLabel": "Preview budget",
       "previewBudgetValue": "{{value}} px",
       "previewPlan": "Preview plan",
+      "previewWorkloadValue": "{{value}} MP",
       "qualityBalanced": "Balanced",
       "qualityBest": "Best",
       "qualityLabel": "Quality",

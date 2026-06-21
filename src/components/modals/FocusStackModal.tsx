@@ -63,6 +63,7 @@ export default function FocusStackModal({
     alignmentOptions.find((option) => option.value === settings.alignmentMode)?.label ?? '';
   const selectedQualityLabel =
     qualityOptions.find((option) => option.value === settings.qualityPreference)?.label ?? '';
+  const estimatedPreviewMegapixels = Math.round((sourceCount * settings.maxPreviewDimensionPx ** 2) / 1_000_000);
   const sourceReadinessLabel = `${t('modals.focusStack.sourceSummary', { count: sourceCount })} - ${
     isSourceCountValid ? t('modals.focusStack.preflight.ready') : t('modals.focusStack.preflight.blocked')
   }`;
@@ -116,11 +117,17 @@ export default function FocusStackModal({
       )}
 
       <section
-        className="grid grid-cols-4 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-sm"
+        className="grid grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-sm lg:grid-cols-5"
+        data-estimated-preview-megapixels={estimatedPreviewMegapixels}
+        data-preview-source-count={sourceCount}
         data-testid="focus-stack-setup-summary"
       >
         <ComputationalSetupStatusLine label={t('modals.focusStack.preflight.sources')} value={sourceReadinessLabel} />
         <ComputationalSetupStatusLine label={t('modals.focusStack.qualityLabel')} value={selectedQualityLabel} />
+        <ComputationalSetupStatusLine
+          label={t('modals.focusStack.preflight.workload')}
+          value={t('modals.focusStack.previewWorkloadValue', { value: estimatedPreviewMegapixels })}
+        />
         <ComputationalSetupStatusLine
           label={t('modals.focusStack.preflight.blend')}
           value={t(`modals.focusStack.blendMethod.${settings.blendMethod}.label`)}
@@ -282,8 +289,8 @@ export default function FocusStackModal({
             value={t('modals.focusStack.previewBudgetValue', { value: settings.maxPreviewDimensionPx })}
           />
           <ComputationalSetupStatusLine
-            label={t('modals.focusStack.preflight.memory')}
-            value={t('modals.focusStack.preflight.pending')}
+            label={t('modals.focusStack.preflight.workload')}
+            value={t('modals.focusStack.previewWorkloadValue', { value: estimatedPreviewMegapixels })}
           />
           <ComputationalSetupStatusLine
             label={t('modals.focusStack.preflight.provenance')}
@@ -333,6 +340,10 @@ export default function FocusStackModal({
               {
                 label: t('modals.focusStack.preflight.previewBudget'),
                 value: t('modals.focusStack.previewBudgetValue', { value: settings.maxPreviewDimensionPx }),
+              },
+              {
+                label: t('modals.focusStack.preflight.workload'),
+                value: t('modals.focusStack.previewWorkloadValue', { value: estimatedPreviewMegapixels }),
               },
               {
                 label: t('modals.focusStack.preflight.blend'),
