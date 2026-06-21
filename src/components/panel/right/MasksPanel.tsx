@@ -856,6 +856,72 @@ function MaskRefinementControls({
   );
 }
 
+function LinearGradientMaskControls({
+  parameters,
+  onChange,
+  onDragStateChange,
+}: {
+  onChange: (changes: Record<string, number>) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
+  parameters: unknown;
+}) {
+  const imageHeight = Math.max(1, getMaskParameterNumber(parameters, 'imageHeight', 1000));
+  const startYPercent = Math.round((getMaskParameterNumber(parameters, 'startY') / imageHeight) * 100);
+  const endYPercent = Math.round((getMaskParameterNumber(parameters, 'endY') / imageHeight) * 100);
+  const range = getMaskParameterNumber(parameters, 'range', 120);
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-surface p-3"
+      data-end-y-percent={endYPercent}
+      data-gradient-command-type="layerMask.createGradientMask"
+      data-range={range}
+      data-start-y-percent={startYPercent}
+      data-testid="linear-gradient-mask-controls"
+    >
+      <AdjustmentSlider
+        defaultValue={12}
+        fillOrigin="min"
+        label={parameterLabelFallback('startY')}
+        max={100}
+        min={0}
+        onDragStateChange={onDragStateChange}
+        onValueChange={(value) => {
+          onChange({ startY: value * 0.01 * imageHeight });
+        }}
+        step={1}
+        value={startYPercent}
+      />
+      <AdjustmentSlider
+        defaultValue={72}
+        fillOrigin="min"
+        label={parameterLabelFallback('endY')}
+        max={100}
+        min={0}
+        onDragStateChange={onDragStateChange}
+        onValueChange={(value) => {
+          onChange({ endY: value * 0.01 * imageHeight });
+        }}
+        step={1}
+        value={endYPercent}
+      />
+      <AdjustmentSlider
+        defaultValue={120}
+        fillOrigin="min"
+        label={parameterLabelFallback('range')}
+        max={1000}
+        min={0}
+        onDragStateChange={onDragStateChange}
+        onValueChange={(value) => {
+          onChange({ range: value });
+        }}
+        step={1}
+        value={range}
+      />
+    </div>
+  );
+}
+
 export function MasksPanel() {
   const { t } = useTranslation();
   const { setAdjustments, handleLutSelect } = useEditorActions();
@@ -1100,12 +1166,18 @@ export function MasksPanel() {
     const parameters = toMaskParameterRecord(subMask.parameters);
 
     if (type === Mask.Linear) {
-      parameters['range'] = Math.min(imgW, imgH) * 0.1;
+      parameters['imageHeight'] = imgH;
+      parameters['imageWidth'] = imgW;
+      parameters['range'] = Math.min(imgW, imgH) * 0.12;
+      parameters['startX'] = imgW * 0.5;
+      parameters['startY'] = imgH * 0.12;
+      parameters['endX'] = imgW * 0.5;
+      parameters['endY'] = imgH * 0.72;
     }
 
     if (type === Mask.Linear || type === Mask.Radial || type === Mask.Color || type === Mask.Luminance) {
       parameters['isInitialDraw'] = true;
-      if (type === Mask.Linear || type === Mask.Radial) {
+      if (type === Mask.Radial) {
         parameters['startX'] = -10000;
         parameters['startY'] = -10000;
         parameters['endX'] = -10000;
@@ -3005,6 +3077,14 @@ function SettingsPanel({
                   minFade={getMaskParameterNumber(activeSubMask.parameters, 'maxFade', 15)}
                   maxFade={getMaskParameterNumber(activeSubMask.parameters, 'minFade', 15)}
                   onChange={handleDepthRangeChange}
+                  onDragStateChange={onDragStateChange}
+                />
+              )}
+
+              {activeSubMask.type === Mask.Linear && (
+                <LinearGradientMaskControls
+                  parameters={toMaskParameterRecord(activeSubMask.parameters)}
+                  onChange={handleSubMaskParametersChange}
                   onDragStateChange={onDragStateChange}
                 />
               )}

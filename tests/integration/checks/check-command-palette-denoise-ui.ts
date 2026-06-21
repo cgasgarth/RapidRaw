@@ -2,12 +2,11 @@
 
 import { readFile } from 'node:fs/promises';
 
-const [modalSource, schemaSource, locale, packageJson, currentPrLocal] = await Promise.all([
+const [modalSource, schemaSource, locale, packageJson] = await Promise.all([
   readFile('src/components/modals/CommandPaletteModal.tsx', 'utf8'),
   readFile('src/schemas/commandPaletteSchemas.ts', 'utf8'),
   readFile('src/i18n/locales/en.json', 'utf8'),
   readFile('package.json', 'utf8'),
-  readFile('tests/integration/checks/check-current-pr-local.ts', 'utf8'),
 ]);
 
 const localeJson = JSON.parse(locale) as {
@@ -36,9 +35,6 @@ if (localeJson.modals?.commandPalette?.commands?.denoise === undefined) {
 }
 if (!packageJson.includes('"check:command-palette-denoise-ui"')) {
   failures.push('missing package script: check:command-palette-denoise-ui');
-}
-if (!currentPrLocal.includes("'check:command-palette-denoise-ui'")) {
-  failures.push('missing current-pr-local route: check:command-palette-denoise-ui');
 }
 
 if (failures.length > 0) {

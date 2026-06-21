@@ -66,10 +66,12 @@ packaging shape, not release shippability.
    bun install --frozen-lockfile
    ```
 
-2. Run the standard local PR lane for any packaging-doc or workflow change:
+2. Run focused local validation for any packaging-doc or workflow change:
 
    ```sh
-   bun run check:current-pr-local
+   bun run check:agent-preflight
+   bun run check:types
+   bun run check:compact-commands
    ```
 
 3. Prove the production frontend artifact contract:

@@ -18,4 +18,4 @@ The first private focus-stack RAW slice is `private_decode_smoke` only. It prove
 
 - `bun run check:focus-real-raw-private-proof`
 - `bun run check:computational-private-report-checker-negative-cases`
-- `bun run check:current-pr-local`
+- `bun run check:types`

@@ -20,11 +20,11 @@
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,
     "resolveJsonModule": true,
-    "rootDir": "./src",
+    "rootDir": ".",
     "skipLibCheck": true,
     "strict": true,
     "target": "es2025"
   },
-  "include": ["src"],
+  "include": ["src", "packages/*/src"],
   "exclude": ["node_modules"]
 }

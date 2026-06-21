@@ -66,7 +66,7 @@ tracked by #2442, DnD Kit by #2443, and Clerk by #2444.
 - Create one-PR issues only for changes with clear size benefit and bounded
   behavior risk.
 - Prove dependency removals with `bun install --frozen-lockfile`,
-  `bun run check:current-pr-local`, and `bun run check:bundle`.
+  focused type/lint checks for touched files, and `bun run check:bundle`.
 - For size-focused changes, include `bun run bundle:report` output or a
   `bun run bundle:diff` artifact when a baseline report is available.
 - Do not count a source-map-only audit as runtime feature completion.

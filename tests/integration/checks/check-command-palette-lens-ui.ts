@@ -2,16 +2,14 @@
 
 import { readFile } from 'node:fs/promises';
 
-const [modalSource, schemaSource, cropPanelSource, uiStoreSource, locale, packageJson, currentPrLocal] =
-  await Promise.all([
-    readFile('src/components/modals/CommandPaletteModal.tsx', 'utf8'),
-    readFile('src/schemas/commandPaletteSchemas.ts', 'utf8'),
-    readFile('src/components/panel/right/CropPanel.tsx', 'utf8'),
-    readFile('src/store/useUIStore.ts', 'utf8'),
-    readFile('src/i18n/locales/en.json', 'utf8'),
-    readFile('package.json', 'utf8'),
-    readFile('tests/integration/checks/check-current-pr-local.ts', 'utf8'),
-  ]);
+const [modalSource, schemaSource, cropPanelSource, uiStoreSource, locale, packageJson] = await Promise.all([
+  readFile('src/components/modals/CommandPaletteModal.tsx', 'utf8'),
+  readFile('src/schemas/commandPaletteSchemas.ts', 'utf8'),
+  readFile('src/components/panel/right/CropPanel.tsx', 'utf8'),
+  readFile('src/store/useUIStore.ts', 'utf8'),
+  readFile('src/i18n/locales/en.json', 'utf8'),
+  readFile('package.json', 'utf8'),
+]);
 
 const localeJson = JSON.parse(locale) as {
   modals?: { commandPalette?: { commands?: Record<string, string> } };
@@ -39,9 +37,6 @@ if (localeJson.modals?.commandPalette?.commands?.lensCorrection === undefined) {
 }
 if (!packageJson.includes('"check:command-palette-lens-ui"')) {
   failures.push('missing package script: check:command-palette-lens-ui');
-}
-if (!currentPrLocal.includes("'check:command-palette-lens-ui'")) {
-  failures.push('missing current-pr-local route: check:command-palette-lens-ui');
 }
 
 if (failures.length > 0) {

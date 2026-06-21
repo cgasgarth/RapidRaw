@@ -18,4 +18,4 @@ The first private super-resolution RAW slice is `private_decode_smoke` only. It 
 
 - `bun run check:sr-real-raw-private-proof`
 - `bun run check:computational-private-report-checker-negative-cases`
-- `bun run check:current-pr-local`
+- `bun run check:types`

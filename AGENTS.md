@@ -147,8 +147,7 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   `as unknown as`.
 - Use Zod for TypeScript-facing runtime schemas and structured config validation.
 - Run focused local validation before opening PRs and record evidence in the PR.
-- Before push or PR creation, run `bun run check:current-pr-local` or the same
-  standard local PR lane manually:
+- Before push or PR creation, run the standard local PR lane manually:
   touched-file format/lint where applicable; typecheck/schema checks when
   TypeScript or schema files changed; i18n check/lint when UI strings changed;
   focused feature scripts; bundle budget when frontend bundle-impacting code
