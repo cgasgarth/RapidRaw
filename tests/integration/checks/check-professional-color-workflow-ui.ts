@@ -12,6 +12,15 @@ const requiredLocaleKeys = [
   'colorGrading',
   'colorMixer',
   'profileTone.title',
+  'workflowRecipes.apply',
+  'workflowRecipes.cleanPortrait',
+  'workflowRecipes.cleanPortraitDescription',
+  'workflowRecipes.description',
+  'workflowRecipes.landscapeDepth',
+  'workflowRecipes.landscapeDepthDescription',
+  'workflowRecipes.neutralProduct',
+  'workflowRecipes.neutralProductDescription',
+  'workflowRecipes.title',
 ];
 const getValue = (root: unknown, path: string): unknown =>
   path.split('.').reduce<unknown>((value, segment) => {
@@ -36,6 +45,12 @@ for (const marker of [
   'data-selective-color-ready="true"',
   'data-channel-mixer-ready="true"',
   'data-grading-ready="true"',
+  'data-testid="professional-color-recipes"',
+  'data-testid={`professional-color-recipe-${recipe.id}`}',
+  'applyProfessionalColorRecipe',
+  'professionalColorRecipes',
+  "t('adjustments.color.workflowRecipes.title')",
+  "t('adjustments.color.workflowRecipes.description')",
   "t('adjustments.color.profileTone.title')",
   "t('adjustments.color.colorBalanceRgb.title')",
   "t('adjustments.color.channelMixer.title')",

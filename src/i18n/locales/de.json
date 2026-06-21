@@ -156,7 +156,18 @@
       "vibrance": "Dynamik",
       "wbPickerTooltip": "Weißabgleich-Pipette",
       "wbPickerWgpuDisabled": "WA-Pipette: WGPU in den Einstellungen deaktivieren.",
-      "whiteBalance": "Weißabgleich"
+      "whiteBalance": "Weißabgleich",
+      "workflowRecipes": {
+        "apply": "Apply",
+        "cleanPortrait": "Clean Portrait",
+        "cleanPortraitDescription": "Gentle warmth, skin-focused selective color, and soft contrast.",
+        "description": "Apply coordinated profile, tone, balance, mixer, selective color, and grading settings.",
+        "landscapeDepth": "Landscape Depth",
+        "landscapeDepthDescription": "Cooler shadows, richer blues and greens, and stronger scene contrast.",
+        "neutralProduct": "Neutral Product",
+        "neutralProductDescription": "Controlled contrast and neutral balance for product or catalog work.",
+        "title": "Workflow Recipes"
+      }
     },
     "curves": {
       "channels": {

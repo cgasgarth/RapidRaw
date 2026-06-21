@@ -156,7 +156,18 @@
       "vibrance": "Vibrance",
       "wbPickerTooltip": "White Balance Picker",
       "wbPickerWgpuDisabled": "WB Picker: Disable WGPU in Settings.",
-      "whiteBalance": "White Balance"
+      "whiteBalance": "White Balance",
+      "workflowRecipes": {
+        "apply": "Apply",
+        "cleanPortrait": "Clean Portrait",
+        "cleanPortraitDescription": "Gentle warmth, skin-focused selective color, and soft contrast.",
+        "description": "Apply coordinated profile, tone, balance, mixer, selective color, and grading settings.",
+        "landscapeDepth": "Landscape Depth",
+        "landscapeDepthDescription": "Cooler shadows, richer blues and greens, and stronger scene contrast.",
+        "neutralProduct": "Neutral Product",
+        "neutralProductDescription": "Controlled contrast and neutral balance for product or catalog work.",
+        "title": "Workflow Recipes"
+      }
     },
     "curves": {
       "channels": {

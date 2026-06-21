@@ -833,6 +833,12 @@ async function prepareScenario(page, mode) {
     await colorPanel.getByTestId('color-runtime-status-rail').getByText('Preview/export', { exact: true }).waitFor({
       timeout: 10_000,
     });
+    const recipe = colorPanel.getByTestId('professional-color-recipe-cleanPortrait');
+    await recipe.click();
+    const recipeDataset = await recipe.evaluate((element) => ({ ...element.dataset }));
+    if (recipeDataset.cameraProfile !== 'camera_portrait' || recipeDataset.toneCurve !== 'soft_contrast') {
+      throw new Error('Professional color recipe did not expose expected profile/tone metadata.');
+    }
     await colorPanel.getByLabel('Temperature').fill('12');
     await colorPanel.getByLabel('Saturation').first().fill('18');
     const selectiveControls = colorPanel.getByTestId('selective-color-range-controls');
@@ -840,8 +846,6 @@ async function prepareScenario(page, mode) {
     await selectiveControls.getByLabel('Hue').fill('8');
     await selectiveControls.getByLabel('Saturation').fill('22');
     await selectiveControls.getByLabel('Luminance').fill('-11');
-    await colorPanel.getByTestId('color-balance-toggle').click();
-    await colorPanel.getByTestId('channel-mixer-toggle').click();
     selectiveColorUiProofDatasetSchema.parse(await selectiveControls.evaluate((element) => ({ ...element.dataset })));
     toneColorCommandEnvelopeV1Schema.parse({
       ...sampleToneColorCommandEnvelopeV1,
