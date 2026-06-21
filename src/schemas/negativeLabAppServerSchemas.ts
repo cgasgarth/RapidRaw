@@ -316,6 +316,10 @@ export const negativeLabAcceptedBatchApplyPlanSchema = z
     if (plan.acceptedDryRunPlanId !== plan.apply.options.acceptedDryRunPlanId) {
       context.addIssue({ code: 'custom', message: 'Apply options must preserve accepted dry-run id.' });
     }
+
+    if (plan.apply.options.profileProvenanceHash !== plan.conversionPlan.profileProvenanceHash) {
+      context.addIssue({ code: 'custom', message: 'Apply options must preserve selected profile provenance hash.' });
+    }
   });
 
 export const negativeLabFrameHealthAppServerResultSchema = negativeLabFrameHealthReportSchema;

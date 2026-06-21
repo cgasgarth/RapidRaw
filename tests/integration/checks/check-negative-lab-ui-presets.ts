@@ -6,6 +6,11 @@ import { NEGATIVE_LAB_OUTPUT_FORMAT_IDS } from '../../../src/utils/negativeLabOu
 import { negativeLabMeasuredProfileCatalogSchema } from '../../../src/schemas/negativeLabMeasuredProfileSchemas.ts';
 import { parseNegativeLabBuiltInUiPresetCatalog } from '../../../src/schemas/negativeLabPresetCatalogSchemas.ts';
 import { buildNegativeLabRuntimeProfileBrowserRows } from '../../../src/utils/negativeLabMeasuredProfileRuntime.ts';
+import {
+  buildNegativeLabBrowserProfileProvenanceHash,
+  buildNegativeLabProfileBoundPlanIdentity,
+  buildNegativeLabProfileComparisonRows,
+} from '../../../src/utils/negativeLabProfileComparison.ts';
 import { listNegativeLabStockMetadataReferencesForPreset } from '../../../src/utils/negativeLabStockMetadataCatalog.ts';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -97,11 +102,47 @@ if (NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length < 12) {
 
 const genericRuntimeRows = runtimeProfileRows.filter((row) => row.profileStatus === 'generic_unmeasured');
 const measuredRuntimeRows = runtimeProfileRows.filter((row) => row.profileStatus === 'fixture_measured');
+const profileProvenanceHashById = new Map(
+  runtimeProfileRows.map((row) => [row.presetId, buildNegativeLabBrowserProfileProvenanceHash(row)]),
+);
+const comparisonRows = buildNegativeLabProfileComparisonRows({
+  activeFrameLabel: 'synthetic-color-negative-001.tif',
+  currentParams: NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets[0].params,
+  profiles: runtimeProfileRows,
+  profileProvenanceHashById,
+  queuedCount: 2,
+  selectedPresetId: NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.defaultPresetId,
+});
 const c41PortraitReferences = listNegativeLabStockMetadataReferencesForPreset('negative_lab.generic.c41.portrait.v1');
 const c41NeutralReferences = listNegativeLabStockMetadataReferencesForPreset('negative_lab.generic.c41.neutral.v1');
 
 if (genericRuntimeRows.length !== NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.length) {
   failures.push('Negative Lab profile browser rows must expose every public generic preset');
+}
+if (
+  comparisonRows.length < 2 ||
+  !comparisonRows.some((row) => row.profile.profileStatus === 'generic_unmeasured') ||
+  !comparisonRows.some((row) => row.profile.profileStatus === 'fixture_measured')
+) {
+  failures.push('Negative Lab profile comparison matrix must include generic and measured selectable candidates.');
+}
+if (
+  comparisonRows.some(
+    (row) => row.selectedProfileSnapshot.profileProvenanceHash !== profileProvenanceHashById.get(row.profile.presetId),
+  )
+) {
+  failures.push('Negative Lab profile comparison snapshots must preserve profile provenance hashes.');
+}
+if (
+  new Set(
+    comparisonRows.map(
+      (row) =>
+        buildNegativeLabProfileBoundPlanIdentity('{"plannedApplyCount":2}', row.selectedProfileSnapshot)
+          .acceptedDryRunPlanHash,
+    ),
+  ).size < 2
+) {
+  failures.push('Negative Lab accepted plan identity must vary by selected profile.');
 }
 if (!c41PortraitReferences.some((entry) => entry.displayName === 'Kodak Portra 400')) {
   failures.push('C-41 portrait generic preset should expose Kodak Portra metadata as a reference, not an emulation.');
@@ -416,6 +457,14 @@ for (const marker of [
   'negative-lab-preset-runtime-status',
   'negative-lab-preset-speed-class',
   'negative-lab-profile-disabled-reason',
+  'negative-lab-profile-comparison-active-frame',
+  'negative-lab-profile-comparison-claim-',
+  'negative-lab-profile-comparison-delta-',
+  'negative-lab-profile-comparison-evidence-',
+  'negative-lab-profile-comparison-matrix',
+  'negative-lab-profile-comparison-nonclaim-',
+  'negative-lab-profile-comparison-row-',
+  'negative-lab-profile-comparison-runtime-',
   'negative-lab-profile-evidence-count',
   'negative-lab-profile-filter-all',
   'negative-lab-profile-filter-black_and_white_silver',
@@ -458,9 +507,11 @@ for (const marker of [
 for (const marker of [
   'NegativeConversionSaveOptions',
   'NegativeConversionOutputFormat',
+  'NegativeLabSelectedProfileSnapshot',
   'NegativeBaseFogEstimate',
   'estimate_negative_base_fog',
   'sanitize_output_suffix',
+  'selectedProfile',
 ]) {
   if (!backendSource.includes(marker)) {
     failures.push(`negative conversion backend is missing export marker: ${marker}`);

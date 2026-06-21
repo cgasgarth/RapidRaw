@@ -156,10 +156,20 @@ const negativeLabBaseFogEstimateInvokeSchema = z.object({
   options: z.unknown().optional(),
 });
 const negativeLabConvertArgsSchema = z.object({
-  options: z.object({
-    outputFormat: z.literal(NegativeLabOutputFormatId.JpegProof),
-    suffix: z.literal('Positive'),
-  }),
+  options: z
+    .object({
+      outputFormat: z.literal(NegativeLabOutputFormatId.JpegProof),
+      profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+      selectedProfile: z.object({
+        claimLevel: z.literal('generic_starting_point_only'),
+        claimPolicy: z.literal('generic_starting_point_no_stock_claim'),
+        presetId: z.literal('negative_lab.generic.bw.ortho.v1'),
+        profileProvenanceHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+        runtimeStatus: z.literal('runtime_parameter_applied'),
+      }),
+      suffix: z.literal('Positive'),
+    })
+    .refine((options) => options.profileProvenanceHash === options.selectedProfile.profileProvenanceHash),
   params: negativeLabOrthoPresetParamsSchema,
   paths: z.array(z.literal('/fixtures/negative-lab/synthetic-color-negative-001.tif')).length(1),
 });

@@ -86,6 +86,12 @@ if (qcProofReport.frames.some((frame) => frame.exportBlockedReason !== null)) {
 for (const marker of [
   'negative-lab-workflow-readiness-strip',
   'negative-lab-selected-stock-readiness',
+  'negative-lab-profile-comparison-matrix',
+  "data-selected-profile-provenance-hash={selectedProfileProvenanceHash ?? ''}",
+  'data-profile-provenance-hash={candidate.selectedProfileSnapshot.profileProvenanceHash}',
+  'data-delta-summary={candidate.deltaSummary}',
+  'setAcceptedBatchPlanJson(null);',
+  'selectedProfile: selectedProfileSnapshot',
   'negative-lab-stock-readiness-profile',
   'negative-lab-stock-readiness-preview',
   'negative-lab-stock-readiness-export',
