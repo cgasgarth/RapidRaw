@@ -363,6 +363,7 @@ interface BaseFogSampleUndoEntry {
   baseFogConfidence: number | null;
   baseFogEstimate: NegativeBaseFogEstimate | null;
   baseFogPreviewProof: NegativeLabBaseSamplePreviewProof | null;
+  baseFogScope: 'frame' | 'roll';
   params: NegativeParams;
   selectedPresetId: string;
 }
@@ -390,6 +391,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
   const [copiedBatchPlanJson, setCopiedBatchPlanJson] = useState<string | null>(null);
   const [acceptedBatchPlanJson, setAcceptedBatchPlanJson] = useState<string | null>(null);
   const [activeBaseFogSampleLabel, setActiveBaseFogSampleLabel] = useState<string | null>(null);
+  const [baseFogScope, setBaseFogScope] = useState<'frame' | 'roll'>('frame');
   const [baseFogSampleUndoStack, setBaseFogSampleUndoStack] = useState<BaseFogSampleUndoEntry[]>([]);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [saveOptions, setSaveOptions] = useState(DEFAULT_SAVE_OPTIONS);
@@ -556,11 +558,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       buildNegativeLabFrameHealthReport({
         activePathIndex: effectiveActivePathIndex,
         baseFogConfidence,
+        baseScope: baseFogScope,
         includedPathSet,
         previewReady: previewUrl !== null,
         targetPaths,
       }),
-    [baseFogConfidence, effectiveActivePathIndex, includedPathSet, previewUrl, targetPaths],
+    [baseFogConfidence, baseFogScope, effectiveActivePathIndex, includedPathSet, previewUrl, targetPaths],
   );
   const visibleFrameHealthRows = useMemo(() => {
     const filteredRows =
@@ -845,6 +848,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       resetViewport();
       setBaseFogConfidence(null);
       setBaseFogEstimate(null);
+      setBaseFogScope('frame');
       setBaseFogPreviewProof(null);
       setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(null);
@@ -882,6 +886,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setSelectedPresetId(preset.presetId);
     setBaseFogConfidence(null);
     setBaseFogEstimate(null);
+    setBaseFogScope('frame');
     setBaseFogPreviewProof(null);
     setBaseFogReadoutCopied(false);
     setActiveBaseFogSampleLabel(null);
@@ -899,6 +904,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
         baseFogConfidence,
         baseFogEstimate,
         baseFogPreviewProof,
+        baseFogScope,
         params,
         selectedPresetId,
       },
@@ -911,6 +917,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     setBaseFogSampleUndoStack((stack) => stack.slice(0, -1));
     setBaseFogConfidence(previous.baseFogConfidence);
     setBaseFogEstimate(previous.baseFogEstimate);
+    setBaseFogScope(previous.baseFogScope);
     setBaseFogPreviewProof(previous.baseFogPreviewProof);
     setBaseFogReadoutCopied(false);
     setActiveBaseFogSampleLabel(previous.activeBaseFogSampleLabel);
@@ -951,6 +958,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       pushBaseFogSampleUndoEntry();
       setBaseFogConfidence(estimate.confidence);
       setBaseFogEstimate(estimate);
+      setBaseFogScope('frame');
       setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(t('modals.negativeConversion.sampleFullFrame'));
       setParams(nextParams);
@@ -994,6 +1002,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
       pushBaseFogSampleUndoEntry();
       setBaseFogConfidence(estimate.confidence);
       setBaseFogEstimate(estimate);
+      setBaseFogScope('frame');
       setBaseFogReadoutCopied(false);
       setActiveBaseFogSampleLabel(t(labelKey));
       setParams(nextParams);
@@ -1054,11 +1063,19 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
     pushBaseFogSampleUndoEntry();
     setBaseFogConfidence(customBaseSampleEstimate.confidence);
     setBaseFogEstimate(customBaseSampleEstimate);
+    setBaseFogScope('frame');
     setBaseFogReadoutCopied(false);
     setActiveBaseFogSampleLabel(t('modals.negativeConversion.customBaseSample'));
     setParams(nextParams);
     setAcceptedBatchPlanJson(null);
     updatePreview(nextParams, false, proofContext);
+  };
+
+  const handlePromoteBaseFogToRoll = () => {
+    if (baseFogConfidence === null || baseFogScope === 'roll') return;
+    pushBaseFogSampleUndoEntry();
+    setBaseFogScope('roll');
+    setAcceptedBatchPlanJson(null);
   };
 
   const handleSamplePatchProbe = async (
@@ -1208,6 +1225,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
           <div
             className="mb-2 grid grid-cols-4 gap-1 text-[11px] text-white/70"
             data-active-frame-id={activeFrame?.frameId ?? ''}
+            data-base-scope={baseFogScope}
             data-base-status={activeFrame?.baseStatus ?? 'pending'}
             data-export-ready={String(workspaceProof.exportReady)}
             data-planned-apply-count={batchDryRunSummary.plannedApplyCount}
@@ -1224,7 +1242,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
             <span className="truncate rounded bg-white/5 px-2 py-1" data-testid="negative-lab-roll-selected-base">
               {baseFogConfidence === null
                 ? t('modals.negativeConversion.basePending')
-                : t('modals.negativeConversion.baseReady', { confidence: Math.round(baseFogConfidence * 100) })}
+                : t(
+                    baseFogScope === 'roll'
+                      ? 'modals.negativeConversion.baseReadyRoll'
+                      : 'modals.negativeConversion.baseReadyFrame',
+                    { confidence: Math.round(baseFogConfidence * 100) },
+                  )}
             </span>
             <span className="truncate rounded bg-white/5 px-2 py-1" data-testid="negative-lab-roll-selected-export">
               {workspaceProof.exportReady
@@ -1272,6 +1295,7 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                       !frame.included && 'opacity-60',
                     )}
                     data-base-status={frame.baseStatus}
+                    data-base-scope={frame.baseScope}
                     data-frame-id={frame.frameId}
                     data-warning-count={frame.warningCodes.length}
                     data-testid={`negative-lab-roll-frame-${index}`}
@@ -1596,7 +1620,12 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
                 </span>
                 <span className="text-text-tertiary">
                   {row.baseStatus === 'estimated' && row.baseConfidence !== null
-                    ? t('modals.negativeConversion.baseReady', { confidence: Math.round(row.baseConfidence * 100) })
+                    ? t(
+                        row.baseScope === 'roll'
+                          ? 'modals.negativeConversion.baseReadyRoll'
+                          : 'modals.negativeConversion.baseReadyFrame',
+                        { confidence: Math.round(row.baseConfidence * 100) },
+                      )
                     : t('modals.negativeConversion.basePending')}
                 </span>
                 <span className="text-text-tertiary" data-testid={`negative-lab-frame-crop-status-${index}`}>
@@ -2633,11 +2662,39 @@ export function NegativeConversionModal({ isOpen, onClose, targetPaths, onSave }
               </button>
             </div>
             {baseFogConfidence !== null && (
-              <UiText data-testid="negative-lab-confidence" variant={TextVariants.small} className="text-text-tertiary">
-                {t('modals.negativeConversion.baseFogConfidence', {
-                  confidence: Math.round(baseFogConfidence * 100),
-                })}
-              </UiText>
+              <div
+                className="grid gap-2 rounded-md border border-surface bg-bg-primary p-2"
+                data-base-scope={baseFogScope}
+                data-testid="negative-lab-base-scope"
+              >
+                <UiText
+                  data-testid="negative-lab-confidence"
+                  variant={TextVariants.small}
+                  className="text-text-tertiary"
+                >
+                  {t('modals.negativeConversion.baseFogConfidence', {
+                    confidence: Math.round(baseFogConfidence * 100),
+                  })}
+                </UiText>
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="text-text-secondary" data-testid="negative-lab-base-scope-label">
+                    {t(
+                      baseFogScope === 'roll'
+                        ? 'modals.negativeConversion.baseScopeRoll'
+                        : 'modals.negativeConversion.baseScopeFrame',
+                    )}
+                  </span>
+                  <button
+                    className="rounded border border-surface bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
+                    data-testid="negative-lab-promote-base-roll"
+                    disabled={baseFogScope === 'roll' || isSaving || isEstimatingBaseFog}
+                    onClick={handlePromoteBaseFogToRoll}
+                    type="button"
+                  >
+                    {t('modals.negativeConversion.promoteBaseToRoll')}
+                  </button>
+                </div>
+              </div>
             )}
             {baseFogPreviewProof !== null && (
               <div

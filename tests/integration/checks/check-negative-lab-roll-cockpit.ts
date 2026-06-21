@@ -35,6 +35,9 @@ for (const marker of [
   'negative-lab-roll-frame-strip',
   'negative-lab-roll-frame-status-',
   'negative-lab-roll-frame-runtime-',
+  'negative-lab-base-scope',
+  'negative-lab-base-scope-label',
+  'negative-lab-promote-base-roll',
   'negative-lab-workflow-readiness-strip',
   'negative-lab-workflow-queued',
   'negative-lab-workflow-preview',
@@ -62,6 +65,7 @@ for (const marker of [
   'warningCodes',
   'excluded_from_batch',
   'base_estimate_active_frame_only',
+  'baseScope',
   'preview_not_ready',
 ]) {
   requireMarker(files.util, marker, 'frame health');

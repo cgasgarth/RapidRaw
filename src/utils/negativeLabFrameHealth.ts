@@ -4,6 +4,7 @@ import {
   parseNegativeLabFrameHealthReport,
   type NegativeLabAcquisitionHealthReport,
   type NegativeLabBatchDryRunSummary,
+  type NegativeLabFrameBaseScope,
   type NegativeLabFrameHealthReport,
   type NegativeLabFrameWarningCode,
   type NegativeLabFrameWarningSeverity,
@@ -73,6 +74,7 @@ export const buildNegativeLabAcquisitionHealthReport = (
 interface BuildNegativeLabFrameHealthReportParams {
   activePathIndex: number;
   baseFogConfidence: number | null;
+  baseScope?: NegativeLabFrameBaseScope;
   includedPathSet: ReadonlySet<string>;
   previewReady: boolean;
   targetPaths: string[];
@@ -81,6 +83,7 @@ interface BuildNegativeLabFrameHealthReportParams {
 export const buildNegativeLabFrameHealthReport = ({
   activePathIndex,
   baseFogConfidence,
+  baseScope = 'frame',
   includedPathSet,
   previewReady,
   targetPaths,
@@ -89,17 +92,23 @@ export const buildNegativeLabFrameHealthReport = ({
   const frames = targetPaths.map((sourcePath, pathIndex) => {
     const active = pathIndex === effectiveActivePathIndex;
     const included = includedPathSet.has(sourcePath);
+    const hasRollBaseEstimate = baseScope === 'roll' && included && baseFogConfidence !== null;
+    const hasFrameBaseEstimate = active && baseFogConfidence !== null;
+    const hasBaseEstimate = hasRollBaseEstimate || hasFrameBaseEstimate;
     const warningCodes: NegativeLabFrameWarningCode[] = [];
 
     if (!included) warningCodes.push('excluded_from_batch');
     if (!previewReady && active) warningCodes.push('preview_not_ready');
-    if (baseFogConfidence !== null && !active) warningCodes.push('base_estimate_active_frame_only');
+    if (baseScope === 'frame' && baseFogConfidence !== null && !active) {
+      warningCodes.push('base_estimate_active_frame_only');
+    }
     const warningSeverity = getNegativeLabWarningSeverity(warningCodes);
 
     return {
       active,
-      baseConfidence: active ? baseFogConfidence : null,
-      baseStatus: active && baseFogConfidence !== null ? 'estimated' : 'pending',
+      baseConfidence: hasBaseEstimate ? baseFogConfidence : null,
+      baseScope: hasRollBaseEstimate ? 'roll' : 'frame',
+      baseStatus: hasBaseEstimate ? 'estimated' : 'pending',
       conversionStatus: !included
         ? 'skipped'
         : active

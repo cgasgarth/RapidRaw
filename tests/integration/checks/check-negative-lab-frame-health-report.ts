@@ -17,6 +17,14 @@ const report = buildNegativeLabFrameHealthReport({
 
 const failures = [];
 const dryRunSummary = buildNegativeLabBatchDryRunSummary(report);
+const rollScopedReport = buildNegativeLabFrameHealthReport({
+  activePathIndex: 1,
+  baseFogConfidence: 0.82,
+  baseScope: 'roll',
+  includedPathSet,
+  previewReady: true,
+  targetPaths: paths,
+});
 
 if (report.frames.length !== 3) failures.push('expected 3 frame health entries');
 if (report.includedCount !== 2) failures.push('expected 2 included frames');
@@ -52,6 +60,15 @@ if (dryRunSummary.plannedApplyCount !== 2) failures.push('dry-run summary should
 if (dryRunSummary.skippedFrameIds[0] !== 'negative-lab-frame-3') failures.push('dry-run summary should skip frame 3');
 if (!dryRunSummary.rollWarningCodes.includes('excluded_from_batch')) {
   failures.push('dry-run summary should roll up excluded frame warning');
+}
+if (rollScopedReport.frames[0]?.baseScope !== 'roll' || rollScopedReport.frames[0]?.baseConfidence !== 0.82) {
+  failures.push('roll-scoped base estimate should apply to included inactive frames');
+}
+if (rollScopedReport.frames[0]?.warningCodes.includes('base_estimate_active_frame_only')) {
+  failures.push('roll-scoped base estimate should clear active-frame-only warning');
+}
+if (rollScopedReport.frames[2]?.baseScope !== 'frame' || rollScopedReport.frames[2]?.baseConfidence !== null) {
+  failures.push('roll-scoped base estimate must not apply to excluded frames');
 }
 
 if (failures.length > 0) {

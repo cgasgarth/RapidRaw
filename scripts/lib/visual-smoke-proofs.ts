@@ -542,6 +542,7 @@ export const negativeLabWorkspaceProofDatasetSchema = z.object({
 });
 export const negativeLabRollQueueSummaryProofSchema = z.object({
   activeFrameId: z.literal('negative-lab-frame-1'),
+  baseScope: z.enum(['frame', 'roll']),
   baseStatus: z.enum(['estimated', 'pending']),
   exportReady: z.enum(['false', 'true']),
   plannedApplyCount: z.literal('2'),

@@ -4,6 +4,7 @@ export const NEGATIVE_LAB_FRAME_HEALTH_SCHEMA_VERSION = 1;
 
 export const negativeLabFrameHealthStatusSchema = z.enum(['active', 'queued', 'skipped']);
 export const negativeLabFrameBaseStatusSchema = z.enum(['pending', 'estimated']);
+export const negativeLabFrameBaseScopeSchema = z.enum(['frame', 'roll']);
 export const negativeLabFrameConversionStatusSchema = z.enum(['preview_pending', 'preview_ready', 'queued', 'skipped']);
 export const negativeLabFrameCropStatusSchema = z.enum(['active_frame_editable', 'roll_default', 'skipped']);
 export const negativeLabFrameQcStatusSchema = z.enum(['ready', 'review', 'skipped']);
@@ -52,6 +53,7 @@ export const negativeLabFrameHealthEntrySchema = z
   .object({
     active: z.boolean(),
     baseConfidence: z.number().min(0).max(1).nullable(),
+    baseScope: negativeLabFrameBaseScopeSchema,
     baseStatus: negativeLabFrameBaseStatusSchema,
     conversionStatus: negativeLabFrameConversionStatusSchema,
     cropStatus: negativeLabFrameCropStatusSchema,
@@ -88,6 +90,14 @@ export const negativeLabFrameHealthEntrySchema = z
         code: 'custom',
         message: 'Pending Negative Lab frame base status must not include confidence.',
         path: ['baseConfidence'],
+      });
+    }
+
+    if (frame.baseScope === 'roll' && frame.baseStatus !== 'estimated') {
+      context.addIssue({
+        code: 'custom',
+        message: 'Roll-scoped Negative Lab base frames must carry an estimate.',
+        path: ['baseScope'],
       });
     }
   });
@@ -160,6 +170,7 @@ export const negativeLabBatchDryRunSummarySchema = z
   });
 
 export type NegativeLabFrameHealthStatus = z.infer<typeof negativeLabFrameHealthStatusSchema>;
+export type NegativeLabFrameBaseScope = z.infer<typeof negativeLabFrameBaseScopeSchema>;
 export type NegativeLabFrameWarningSeverity = z.infer<typeof negativeLabFrameWarningSeveritySchema>;
 export type NegativeLabFrameWarningCode = z.infer<typeof negativeLabFrameWarningCodeSchema>;
 export type NegativeLabAcquisitionSourceFamily = z.infer<typeof negativeLabAcquisitionSourceFamilySchema>;
