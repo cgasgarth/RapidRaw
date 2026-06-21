@@ -9,6 +9,8 @@ const requiredLocaleKeys = [
   'preflight.alignment',
   'preflight.blend',
   'preflight.retouch',
+  'preflight.workload',
+  'previewWorkloadValue',
   'qualityBalanced',
   'qualityBest',
   'qualityLabel',
@@ -30,6 +32,10 @@ for (const marker of [
   'settings.qualityPreference',
   'qualityOptions.find',
   'ComputationalSetupStatusLine',
+  'data-estimated-preview-megapixels={estimatedPreviewMegapixels}',
+  'data-preview-source-count={sourceCount}',
+  'modals.focusStack.preflight.workload',
+  'modals.focusStack.previewWorkloadValue',
 ]) {
   if (!source.includes(marker)) {
     console.error(`Focus preflight missing marker: ${marker}`);

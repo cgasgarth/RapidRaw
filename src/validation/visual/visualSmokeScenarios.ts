@@ -73,7 +73,7 @@ export const VISUAL_SMOKE_SCENARIOS = [
     sectionMinimum: 1,
   },
   {
-    marker: 'Focus-stack plan',
+    marker: 'Focus Stack Smoke',
     mode: VISUAL_SMOKE_SCENARIO_IDS.FocusUi,
     outputFile: 'focus-ui.png',
     sectionMinimum: 1,
