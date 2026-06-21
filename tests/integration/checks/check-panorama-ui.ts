@@ -19,6 +19,7 @@ const requiredLocaleKeys = [
   'exposure.none',
   'exposureLabel',
   'previewBudgetLabel',
+  'previewMemory',
   'previewPixels',
   'previewWorkload',
   'projection.cylindrical',
@@ -36,6 +37,7 @@ const requiredLocaleKeys = [
   'summaryPreviewBudget',
   'summaryProjection',
   'summaryQuality',
+  'summaryMemory',
   'summarySources',
   'summaryWorkload',
   'uiOnlyNotice',
@@ -76,12 +78,16 @@ const source = readFileSync('src/components/modals/PanoramaModal.tsx', 'utf8');
 for (const marker of [
   'panorama-setup-summary',
   'panorama-setup-summary-chip',
+  'estimatedPreviewMemoryMb',
+  'data-estimated-preview-memory-mb={estimatedPreviewMemoryMb}',
   'data-estimated-preview-megapixels={estimatedPreviewMegapixels}',
   'data-preview-source-count={imageCount ?? 0}',
   'modals.panorama.previewWorkload',
   'modals.panorama.summaryProjection',
   'modals.panorama.summarySources',
   'modals.panorama.summaryWorkload',
+  'modals.panorama.summaryMemory',
+  'modals.panorama.previewMemory',
   'settings.maxPreviewDimensionPx',
 ]) {
   if (!source.includes(marker)) {

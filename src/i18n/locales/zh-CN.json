@@ -2076,6 +2076,7 @@
       "initializing": "初始化中...",
       "openInEditor": "在编辑器中打开",
       "previewBudgetLabel": "Preview budget",
+      "previewMemory": "{{value}} MB estimated",
       "previewPixels": "{{value}} px",
       "previewWorkload": "{{value}} MP",
       "projection": {
@@ -2113,6 +2114,7 @@
       "summaryBlocked": "Blocked",
       "summaryBoundary": "Boundary",
       "summaryExposure": "Exposure",
+      "summaryMemory": "Memory",
       "summaryPreviewBudget": "Preview",
       "summaryProjection": "Projection",
       "summaryQuality": "Quality",
