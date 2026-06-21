@@ -215,6 +215,20 @@ const negativeLabBatchConvertArgsSchema = z.object({
     .length(2),
 });
 const negativeLabPreviewReturnProofSchema = z.array(z.string().startsWith('data:image/svg+xml,')).min(3);
+const negativeLabBasePreviewProofDatasetSchema = z
+  .object({
+    afterPreviewHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    beforePreviewHash: z.string().regex(/^fnv1a32:[a-f0-9]{8}$/u),
+    commandType: z.literal('negativeLab.updateBaseSamples'),
+    confidence: z.enum(['high', 'medium', 'low', 'blocked']),
+    previewChanged: z.literal('true'),
+    previewRevision: z.string().regex(/^[1-9][0-9]*$/u),
+    sampleEditMode: z.literal('replace'),
+    sampleId: z.string().regex(/^base_sample_[a-f0-9]{8}$/u),
+    sampleSource: z.enum(['auto_full_frame', 'custom_rect', 'preset_rect']),
+    warningCodes: z.string(),
+  })
+  .passthrough();
 const hdrRoutePair = getComputationalMergeAppServerRoutePairSummary('hdr');
 const panoramaRoutePair = getComputationalMergeAppServerRoutePairSummary('panorama');
 const focusStackRoutePair = getComputationalMergeAppServerRoutePairSummary('focus_stack');
@@ -554,6 +568,13 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
 
   if (new Set(previewReturns).size < 2) {
     throw new Error('Negative Lab sampled preview proof did not produce distinct preview render payloads.');
+  }
+
+  const basePreviewProof = negativeLabBasePreviewProofDatasetSchema.parse(
+    await page.getByTestId('negative-lab-base-preview-proof').evaluate((element) => ({ ...element.dataset })),
+  );
+  if (!['custom_rect', 'preset_rect'].includes(basePreviewProof.sampleSource)) {
+    throw new Error(`Negative Lab base preview proof used unexpected source: ${basePreviewProof.sampleSource}`);
   }
 }
 

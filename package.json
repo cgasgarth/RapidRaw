@@ -443,6 +443,8 @@
     "check:negative-lab-measured-profiles": "bun tests/integration/checks/check-negative-lab-measured-profiles.ts",
     "check:negative-lab-measured-render-proof": "bun tests/integration/checks/check-negative-lab-measured-render-proof.ts",
     "check:negative-lab-density-cpu": "bun tests/integration/checks/check-negative-lab-density-cpu.ts",
+    "check:negative-lab-live-preview-sample": "bun tests/integration/checks/check-negative-lab-live-preview-sample.ts",
+    "check:negative-lab-live-preview-sample:update": "bun tests/integration/checks/check-negative-lab-live-preview-sample.ts --update",
     "check:negative-lab-workspace-smoke": "bun scripts/capture-visual-smoke.ts --scenario negative-lab-workspace",
     "check:negative-lab-batch-color-smoke": "bun scripts/capture-visual-smoke.ts --scenario negative-lab-batch-color-workspace",
     "check:negative-lab-ui-presets": "bun tests/integration/checks/check-negative-lab-ui-presets.ts",

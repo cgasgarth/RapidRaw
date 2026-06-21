@@ -1,0 +1,14 @@
+{
+  "commandType": "negativeLab.updateBaseSamples",
+  "decodedPreviewChanged": true,
+  "issue": 2889,
+  "previewAfterHash": "fnv1a32:c9d95ca6",
+  "previewBeforeHash": "fnv1a32:645b3866",
+  "previewChanged": true,
+  "previewRevision": 7,
+  "sampleEditMode": "replace",
+  "sampleSource": "custom_rect",
+  "schemaVersion": 1,
+  "validationBoundary": "deterministic_svg_preview_and_typed_command_not_full_color_science",
+  "warningCodes": ["uneven_illumination"]
+}

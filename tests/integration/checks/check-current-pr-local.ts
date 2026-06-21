@@ -309,7 +309,16 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
       'check:negative-lab-workspace',
       'check:negative-lab-roll-cockpit',
       'check:negative-lab-conversion-bundle',
+      'check:negative-lab-live-preview-sample',
     ],
+  );
+  addIf(
+    (file) =>
+      file === 'src/utils/negativeLabBaseSampleCommandBridge.ts' ||
+      file === 'tests/integration/checks/check-negative-lab-live-preview-sample.ts' ||
+      file === 'docs/validation/negative-lab-live-preview-sample-2026-06-21.json' ||
+      file === 'scripts/lib/visual-smoke-proofs.ts',
+    ['check:negative-lab-live-preview-sample'],
   );
   addIf((file) => file === 'src/components/panel/right/LayerStackPanel.tsx', ['check:layer-stack-panel-ui']);
   addIf(
