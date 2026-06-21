@@ -156,7 +156,18 @@
       "vibrance": "鲜艳度",
       "wbPickerTooltip": "白平衡选取器",
       "wbPickerWgpuDisabled": "白平衡选取器：请在设置中禁用 WGPU。",
-      "whiteBalance": "白平衡"
+      "whiteBalance": "白平衡",
+      "workflowRecipes": {
+        "apply": "Apply",
+        "cleanPortrait": "Clean Portrait",
+        "cleanPortraitDescription": "Gentle warmth, skin-focused selective color, and soft contrast.",
+        "description": "Apply coordinated profile, tone, balance, mixer, selective color, and grading settings.",
+        "landscapeDepth": "Landscape Depth",
+        "landscapeDepthDescription": "Cooler shadows, richer blues and greens, and stronger scene contrast.",
+        "neutralProduct": "Neutral Product",
+        "neutralProductDescription": "Controlled contrast and neutral balance for product or catalog work.",
+        "title": "Workflow Recipes"
+      }
     },
     "curves": {
       "channels": {

@@ -70,6 +70,154 @@ const colorRuntimeStatusItems = [
 ] as const;
 type RuntimeStatusKey = (typeof colorRuntimeStatusItems)[number][number] | 'ariaLabel';
 const runtimeStatusKey = (key: RuntimeStatusKey) => `adjustments.color.runtimeStatus.${key}` as const;
+type ProfessionalColorRecipeLabelKey =
+  | 'adjustments.color.workflowRecipes.cleanPortrait'
+  | 'adjustments.color.workflowRecipes.landscapeDepth'
+  | 'adjustments.color.workflowRecipes.neutralProduct';
+type ProfessionalColorRecipeDescriptionKey =
+  | 'adjustments.color.workflowRecipes.cleanPortraitDescription'
+  | 'adjustments.color.workflowRecipes.landscapeDepthDescription'
+  | 'adjustments.color.workflowRecipes.neutralProductDescription';
+
+interface ProfessionalColorRecipe {
+  activeColorRange: BlackWhiteMixerChannel;
+  cameraProfile: CameraProfileId;
+  channelMixer: Adjustments['channelMixer'];
+  colorBalanceRgb: Adjustments['colorBalanceRgb'];
+  colorGrading: Adjustments['colorGrading'];
+  descriptionKey: ProfessionalColorRecipeDescriptionKey;
+  hsl: Partial<Record<BlackWhiteMixerChannel, HueSatLum>>;
+  id: 'cleanPortrait' | 'landscapeDepth' | 'neutralProduct';
+  labelKey: ProfessionalColorRecipeLabelKey;
+  levels: Adjustments['levels'];
+  saturation: number;
+  temperature: number;
+  tint: number;
+  toneCurve: ToneCurveId;
+  vibrance: number;
+}
+
+const professionalColorRecipes = [
+  {
+    activeColorRange: 'oranges',
+    cameraProfile: 'camera_portrait',
+    channelMixer: {
+      blue: { blue: 96, constant: 0, green: 4, red: 0 },
+      enabled: true,
+      green: { blue: 0, constant: 0, green: 102, red: -2 },
+      preserveLuminance: true,
+      red: { blue: 0, constant: 0, green: -2, red: 102 },
+    },
+    colorBalanceRgb: {
+      enabled: true,
+      highlights: { blue: -5, green: 1, red: 4 },
+      midtones: { blue: -3, green: 0, red: 3 },
+      preserveLuminance: true,
+      shadows: { blue: 2, green: 0, red: -1 },
+    },
+    colorGrading: {
+      balance: 18,
+      blending: 62,
+      global: { hue: 35, saturation: 2, luminance: 0 },
+      highlights: { hue: 45, saturation: 5, luminance: 0 },
+      midtones: { hue: 32, saturation: 7, luminance: 1 },
+      shadows: { hue: 225, saturation: 2, luminance: 0 },
+    },
+    descriptionKey: 'adjustments.color.workflowRecipes.cleanPortraitDescription',
+    hsl: {
+      oranges: { hue: -2, luminance: 4, saturation: 8 },
+      reds: { hue: 0, luminance: 2, saturation: -4 },
+      yellows: { hue: -4, luminance: 1, saturation: -5 },
+    },
+    id: 'cleanPortrait',
+    labelKey: 'adjustments.color.workflowRecipes.cleanPortrait',
+    levels: { enabled: true, gamma: 1.02, inputBlack: 0.005, inputWhite: 0.995, outputBlack: 0, outputWhite: 1 },
+    saturation: -2,
+    temperature: 6,
+    tint: 3,
+    toneCurve: 'soft_contrast',
+    vibrance: 12,
+  },
+  {
+    activeColorRange: 'blues',
+    cameraProfile: 'camera_landscape',
+    channelMixer: {
+      blue: { blue: 103, constant: 0, green: 3, red: 0 },
+      enabled: true,
+      green: { blue: 0, constant: 0, green: 100, red: 0 },
+      preserveLuminance: true,
+      red: { blue: 0, constant: 0, green: -3, red: 105 },
+    },
+    colorBalanceRgb: {
+      enabled: true,
+      highlights: { blue: -2, green: 1, red: 2 },
+      midtones: { blue: 0, green: 0, red: 0 },
+      preserveLuminance: true,
+      shadows: { blue: 6, green: 0, red: -3 },
+    },
+    colorGrading: {
+      balance: -12,
+      blending: 48,
+      global: { hue: 210, saturation: 1, luminance: 0 },
+      highlights: { hue: 55, saturation: 4, luminance: 1 },
+      midtones: { hue: 185, saturation: 3, luminance: 0 },
+      shadows: { hue: 218, saturation: 8, luminance: -3 },
+    },
+    descriptionKey: 'adjustments.color.workflowRecipes.landscapeDepthDescription',
+    hsl: {
+      aquas: { hue: -4, luminance: 0, saturation: 10 },
+      blues: { hue: -2, luminance: -3, saturation: 12 },
+      greens: { hue: 3, luminance: -2, saturation: 8 },
+    },
+    id: 'landscapeDepth',
+    labelKey: 'adjustments.color.workflowRecipes.landscapeDepth',
+    levels: { enabled: true, gamma: 0.95, inputBlack: 0.01, inputWhite: 0.99, outputBlack: 0, outputWhite: 1 },
+    saturation: 4,
+    temperature: -2,
+    tint: -1,
+    toneCurve: 'high_contrast',
+    vibrance: 18,
+  },
+  {
+    activeColorRange: 'reds',
+    cameraProfile: 'camera_neutral',
+    channelMixer: {
+      blue: { blue: 100, constant: 0, green: 0, red: 0 },
+      enabled: false,
+      green: { blue: 0, constant: 0, green: 100, red: 0 },
+      preserveLuminance: true,
+      red: { blue: 0, constant: 0, green: 0, red: 100 },
+    },
+    colorBalanceRgb: {
+      enabled: true,
+      highlights: { blue: 0, green: 0, red: 0 },
+      midtones: { blue: -1, green: 0, red: 1 },
+      preserveLuminance: true,
+      shadows: { blue: 1, green: 0, red: -1 },
+    },
+    colorGrading: {
+      balance: 0,
+      blending: 35,
+      global: { hue: 0, saturation: 0, luminance: 0 },
+      highlights: { hue: 45, saturation: 1, luminance: 0 },
+      midtones: { hue: 0, saturation: 0, luminance: 0 },
+      shadows: { hue: 220, saturation: 1, luminance: 0 },
+    },
+    descriptionKey: 'adjustments.color.workflowRecipes.neutralProductDescription',
+    hsl: {
+      reds: { hue: 0, luminance: 0, saturation: -2 },
+      yellows: { hue: 0, luminance: 0, saturation: -2 },
+    },
+    id: 'neutralProduct',
+    labelKey: 'adjustments.color.workflowRecipes.neutralProduct',
+    levels: { enabled: true, gamma: 1.03, inputBlack: 0, inputWhite: 1, outputBlack: 0.01, outputWhite: 0.99 },
+    saturation: 0,
+    temperature: 0,
+    tint: 0,
+    toneCurve: 'soft_contrast',
+    vibrance: 4,
+  },
+] satisfies Array<ProfessionalColorRecipe>;
 
 const ColorRuntimeStatusRail = () => {
   const { t } = useTranslation();
@@ -902,6 +1050,60 @@ export default function ColorPanel({
     });
   };
 
+  const applyProfessionalColorRecipe = (recipe: ProfessionalColorRecipe) => {
+    setActiveColor(recipe.activeColorRange);
+    setActiveColorBalanceRange('midtones');
+    setActiveChannelMixerOutput('red');
+    setAdjustments((prev: Adjustments) => {
+      const currentParametricCurve =
+        prev.parametricCurve || INITIAL_ADJUSTMENTS.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
+
+      return {
+        ...prev,
+        cameraProfile: recipe.cameraProfile,
+        channelMixer: {
+          blue: { ...recipe.channelMixer.blue },
+          enabled: recipe.channelMixer.enabled,
+          green: { ...recipe.channelMixer.green },
+          preserveLuminance: recipe.channelMixer.preserveLuminance,
+          red: { ...recipe.channelMixer.red },
+        },
+        colorBalanceRgb: {
+          enabled: recipe.colorBalanceRgb.enabled,
+          highlights: { ...recipe.colorBalanceRgb.highlights },
+          midtones: { ...recipe.colorBalanceRgb.midtones },
+          preserveLuminance: recipe.colorBalanceRgb.preserveLuminance,
+          shadows: { ...recipe.colorBalanceRgb.shadows },
+        },
+        colorGrading: {
+          balance: recipe.colorGrading.balance,
+          blending: recipe.colorGrading.blending,
+          global: { ...recipe.colorGrading.global },
+          highlights: { ...recipe.colorGrading.highlights },
+          midtones: { ...recipe.colorGrading.midtones },
+          shadows: { ...recipe.colorGrading.shadows },
+        },
+        curveMode: 'parametric',
+        hsl: {
+          ...prev.hsl,
+          ...recipe.hsl,
+        },
+        levels: {
+          ...recipe.levels,
+        },
+        parametricCurve: {
+          ...currentParametricCurve,
+          luma: { ...TONE_CURVE_PARAMETRIC_PRESETS[recipe.toneCurve] },
+        },
+        saturation: recipe.saturation,
+        temperature: recipe.temperature,
+        tint: recipe.tint,
+        toneCurve: recipe.toneCurve,
+        vibrance: recipe.vibrance,
+      };
+    });
+  };
+
   const handleLevelsToggle = () => {
     setAdjustments((prev: Adjustments) => ({
       ...prev,
@@ -930,6 +1132,40 @@ export default function ColorPanel({
     <div className="space-y-4">
       {!isForMask && <ColorRuntimeStatusRail />}
       {!isForMask && <ColorWorkflowReadinessRail />}
+      {!isForMask && (
+        <div className="rounded-md border border-border bg-bg-tertiary p-2" data-testid="professional-color-recipes">
+          <div className="mb-2">
+            <UiText variant={TextVariants.heading}>{t('adjustments.color.workflowRecipes.title')}</UiText>
+            <UiText variant={TextVariants.small} color={TextColors.secondary} className="mt-1 block">
+              {t('adjustments.color.workflowRecipes.description')}
+            </UiText>
+          </div>
+          <div className="grid gap-2">
+            {professionalColorRecipes.map((recipe) => (
+              <button
+                className="rounded-md border border-surface bg-bg-secondary px-2.5 py-2 text-left text-xs transition-colors hover:border-accent hover:bg-surface"
+                data-active-range={recipe.activeColorRange}
+                data-camera-profile={recipe.cameraProfile}
+                data-testid={`professional-color-recipe-${recipe.id}`}
+                data-tone-curve={recipe.toneCurve}
+                key={recipe.id}
+                onClick={() => {
+                  applyProfessionalColorRecipe(recipe);
+                }}
+                type="button"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="truncate font-semibold text-text-primary">{t(recipe.labelKey)}</span>
+                  <span className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-text-secondary">
+                    {t('adjustments.color.workflowRecipes.apply')}
+                  </span>
+                </span>
+                <span className="mt-1 block text-text-secondary">{t(recipe.descriptionKey)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {!isForMask &&
         (adjustmentVisibility[ColorAdjustment.CameraProfile] !== false ||
           adjustmentVisibility[ColorAdjustment.ToneCurve] !== false) && (
