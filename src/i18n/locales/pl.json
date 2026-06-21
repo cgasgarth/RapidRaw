@@ -1585,6 +1585,8 @@
       }
     },
     "common": {
+      "savedOutputFullPath": "Pelna sciezka zapisanych danych wyjsciowych: {{path}}",
+      "savedOutputLabel": "Zapisane dane wyjsciowe: {{name}}",
       "sourcePreviewAlt": "Podglad zrodla"
     },
     "configurePreset": {

@@ -195,6 +195,13 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:film-halation-runtime-proof'],
   );
   addIf((file) => file === 'src/components/modals/DenoiseModal.tsx', ['check:denoise-ui-summary']);
+  addIf(
+    (file) =>
+      file === 'src/components/modals/MergeStatusViews.tsx' ||
+      file === 'src/utils/displayFilePath.ts' ||
+      file === 'tests/integration/checks/check-merge-saved-output-ui.ts',
+    ['check:merge-saved-output-ui'],
+  );
   addIf((file) => file === 'src/components/adjustments/FilmLookBrowser.tsx', ['check:film-look-browser-ui']);
   addIf((file) => file === 'src/components/panel/MainLibrary.tsx', ['check:library-header-ui']);
   addIf((file) => file === 'src/components/panel/editor/Waveform.tsx', ['check:histogram-clipping-ui']);
