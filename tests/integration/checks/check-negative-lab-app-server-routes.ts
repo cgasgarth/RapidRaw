@@ -44,6 +44,9 @@ const failures = [];
 const selectedProfileSnapshot = buildNegativeLabRuntimeSelectedProfileSnapshot(
   resolveNegativeLabRuntimeProfile('negative_lab.generic.c41.neutral.v1'),
 );
+const userProfileSnapshot = buildNegativeLabRuntimeSelectedProfileSnapshot(
+  resolveNegativeLabRuntimeProfile('negative_lab.user.c41.local_warm_proof.v1'),
+);
 const acceptBatchPlanRoute = NEGATIVE_LAB_APP_SERVER_ROUTE_MANIFEST.routes.find(
   (candidate) => candidate.commandName === expectedAcceptBatchPlanCommandName,
 );
@@ -211,6 +214,34 @@ const acceptedBatchApplyResult = buildNegativeLabAcceptedBatchApplyRouteResult({
   },
   selectedProfileSnapshot,
 });
+const acceptedUserProfilePlanResult = buildNegativeLabAcceptedBatchPlanRouteResult({
+  activePathIndex: 1,
+  baseFogConfidence: 0.82,
+  includedPaths: ['/roll/001.CR3', '/roll/002.CR3'],
+  previewReady: false,
+  presetId: 'negative_lab.user.c41.local_warm_proof.v1',
+  targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
+});
+const acceptedUserProfileApplyResult = buildNegativeLabAcceptedBatchApplyRouteResult({
+  acceptedPlan: acceptedUserProfilePlanResult,
+  conversion: {
+    outputFormat: NegativeLabOutputFormatId.JpegProof,
+    paths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
+    presetId: 'negative_lab.user.c41.local_warm_proof.v1',
+    sampleRect,
+    scope: 'all',
+    suffix: 'Positive',
+  },
+  dryRun: {
+    activePathIndex: 1,
+    baseFogConfidence: 0.82,
+    includedPaths: ['/roll/001.CR3', '/roll/002.CR3'],
+    previewReady: false,
+    presetId: 'negative_lab.user.c41.local_warm_proof.v1',
+    targetPaths: ['/roll/001.CR3', '/roll/002.CR3', '/roll/003.CR3'],
+  },
+  selectedProfileSnapshot: userProfileSnapshot,
+});
 const densitometerResult = densitometerReadoutSchema.parse(
   buildNegativeLabDensitometerRouteResult({
     baseFogEstimate: {
@@ -282,6 +313,17 @@ if (
   acceptedBatchApplyResult.dryRunSummary.skippedFrameIds[0] !== 'negative-lab-frame-3'
 ) {
   throw new Error('Negative Lab app-server accepted apply route did not replay profile-bound dry-run evidence.');
+}
+if (
+  acceptedUserProfileApplyResult.selectedProfileSnapshot.presetId !== 'negative_lab.user.c41.local_warm_proof.v1' ||
+  acceptedUserProfileApplyResult.selectedProfileSnapshot.profileStatus !== 'user_supplied' ||
+  acceptedUserProfileApplyResult.selectedProfileSnapshot.claimPolicy !== 'user_profile_no_stock_claim' ||
+  acceptedUserProfileApplyResult.apply.options.selectedProfile.profileProvenanceHash !==
+    userProfileSnapshot.profileProvenanceHash ||
+  !acceptedUserProfileApplyResult.selectedProfileSnapshot.doesNotProve.includes('user_profile_unmeasured') ||
+  !acceptedUserProfileApplyResult.selectedProfileSnapshot.doesNotProve.includes('no_stock_emulation_claim')
+) {
+  throw new Error('Negative Lab app-server accepted apply route did not preserve user-owned profile evidence.');
 }
 if (
   densitometerResult.dominantChannel !== 'blue' ||

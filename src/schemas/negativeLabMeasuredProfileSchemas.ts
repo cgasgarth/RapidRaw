@@ -10,6 +10,9 @@ import {
 export const negativeLabMeasuredProfileIdSchema = z
   .string()
   .regex(/^negative_lab\.measured\.(?:c41|bw)\.[a-z0-9_]+\.v[0-9]+$/u);
+export const negativeLabUserProfileIdSchema = z
+  .string()
+  .regex(/^negative_lab\.user\.(?:c41|bw)\.[a-z0-9_]+\.v[0-9]+$/u);
 
 export const negativeLabMeasuredProfileClaimPolicySchema = z.enum([
   'process_family_profile_no_stock_claim',
@@ -21,6 +24,7 @@ export const negativeLabMeasuredProfileRuntimeLimitationSchema = z.enum([
   'no_runtime_profile_resolver',
   'no_stock_emulation_claim',
   'no_colorimetric_match_claim',
+  'user_profile_unmeasured',
 ]);
 
 export const negativeLabMeasuredProfileRuntimeStatusSchema = z.enum(['ui_catalog_only', 'runtime_parameter_applied']);
@@ -110,6 +114,7 @@ export const negativeLabMeasurementReportSchema = z
 export const negativeLabRuntimePresetIdSchema = z.union([
   negativeLabPresetIdSchema,
   negativeLabMeasuredProfileIdSchema,
+  negativeLabUserProfileIdSchema,
 ]);
 
 export const negativeLabMeasuredProfileSchema = z
@@ -268,12 +273,13 @@ export const parseNegativeLabMeasurementReport = (value: unknown): NegativeLabMe
 
 export const negativeLabRuntimeProfileBrowserRowSchema = z
   .object({
-    claimLevel: z.enum(['generic_starting_point_only', 'measured_profile']),
+    claimLevel: z.enum(['generic_starting_point_only', 'measured_profile', 'user_profile']),
     claimPolicy: z.enum([
       'generic_starting_point_no_stock_claim',
       'measured_profile_required_before_stock_claim',
       'process_family_profile_no_stock_claim',
       'named_stock_profile_requires_license_review',
+      'user_profile_no_stock_claim',
     ]),
     disabledReason: z.enum(['catalog_only', 'license_review_required']).nullable(),
     displayName: z.string().trim().min(1).max(80),
@@ -281,11 +287,11 @@ export const negativeLabRuntimeProfileBrowserRowSchema = z
     evidenceFixtureCount: z.number().int().nonnegative(),
     filmClass: negativeLabUiPresetFilmClassSchema,
     isSelectable: z.boolean(),
-    measurementProfileId: negativeLabMeasuredProfileIdSchema.nullable(),
+    measurementProfileId: negativeLabMeasuredProfileIdSchema.or(negativeLabUserProfileIdSchema).nullable(),
     params: negativeLabPresetParamsSchema,
     presetId: negativeLabRuntimePresetIdSchema,
     processFamily: negativeLabUiPresetProcessFamilySchema,
-    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured']),
+    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured', 'user_supplied']),
     provenanceSummary: z.string().trim().min(1).max(220),
     runtimeStatus: negativeLabMeasuredProfileRuntimeStatusSchema,
     sourceGenericPresetId: negativeLabPresetIdSchema.nullable(),
@@ -315,27 +321,44 @@ export const negativeLabRuntimeProfileBrowserRowSchema = z
         path: ['evidenceFixtureCount'],
       });
     }
+
+    if (
+      row.profileStatus === 'user_supplied' &&
+      (row.claimLevel !== 'user_profile' ||
+        row.claimPolicy !== 'user_profile_no_stock_claim' ||
+        row.measurementProfileId !== row.presetId ||
+        row.sourceGenericPresetId === null ||
+        !row.doesNotProve.includes('user_profile_unmeasured') ||
+        !row.doesNotProve.includes('no_stock_emulation_claim') ||
+        !row.doesNotProve.includes('no_colorimetric_match_claim'))
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'User-owned Negative Lab profile rows must stay claim-limited and tied to a generic base.',
+      });
+    }
   });
 
 export type NegativeLabRuntimeProfileBrowserRow = z.infer<typeof negativeLabRuntimeProfileBrowserRowSchema>;
 
 export const negativeLabResolvedRuntimeProfileSchema = z
   .object({
-    claimLevel: z.enum(['generic_starting_point_only', 'measured_profile']),
+    claimLevel: z.enum(['generic_starting_point_only', 'measured_profile', 'user_profile']),
     claimPolicy: z.enum([
       'generic_starting_point_no_stock_claim',
       'measured_profile_required_before_stock_claim',
       'process_family_profile_no_stock_claim',
       'named_stock_profile_requires_license_review',
+      'user_profile_no_stock_claim',
     ]),
     displayName: z.string().trim().min(1).max(80),
     doesNotProve: z.array(negativeLabMeasuredProfileRuntimeLimitationSchema),
     evidenceDigest: negativeLabMeasuredProfileEvidenceDigestSchema.nullable(),
     evidenceFixtureIds: z.array(z.string().trim().min(1)),
-    measurementProfileId: negativeLabMeasuredProfileIdSchema.nullable(),
+    measurementProfileId: negativeLabMeasuredProfileIdSchema.or(negativeLabUserProfileIdSchema).nullable(),
     params: negativeLabPresetParamsSchema,
     presetId: negativeLabRuntimePresetIdSchema,
-    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured']),
+    profileStatus: z.enum(['generic_unmeasured', 'fixture_measured', 'user_supplied']),
     provenanceSummary: z.string().trim().min(1).max(220),
     runtimeStatus: negativeLabMeasuredProfileRuntimeStatusSchema,
     sourceGenericPresetId: negativeLabPresetIdSchema.nullable(),
@@ -370,6 +393,26 @@ export const negativeLabResolvedRuntimeProfileSchema = z
         context.addIssue({
           code: 'custom',
           message: 'Fixture-measured runtime profiles must carry applied measured provenance.',
+        });
+      }
+    }
+
+    if (profile.profileStatus === 'user_supplied') {
+      if (
+        profile.claimLevel !== 'user_profile' ||
+        profile.claimPolicy !== 'user_profile_no_stock_claim' ||
+        profile.evidenceDigest !== null ||
+        profile.measurementProfileId !== profile.presetId ||
+        profile.runtimeStatus !== 'runtime_parameter_applied' ||
+        profile.sourceGenericPresetId === null ||
+        profile.evidenceFixtureIds.length !== 0 ||
+        !profile.doesNotProve.includes('user_profile_unmeasured') ||
+        !profile.doesNotProve.includes('no_stock_emulation_claim') ||
+        !profile.doesNotProve.includes('no_colorimetric_match_claim')
+      ) {
+        context.addIssue({
+          code: 'custom',
+          message: 'User-owned runtime profiles must remain unmeasured and claim-limited.',
         });
       }
     }

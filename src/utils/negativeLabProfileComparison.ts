@@ -77,11 +77,13 @@ export const buildNegativeLabProfileComparisonRows = ({
 }): NegativeLabProfileComparisonRow[] => {
   const selectableProfiles = profiles.filter((profile) => profile.isSelectable);
   const selectedProfile = selectableProfiles.find((profile) => profile.presetId === selectedPresetId);
+  const userProfile = selectableProfiles.find((profile) => profile.profileStatus === 'user_supplied');
   const measuredProfile = selectableProfiles.find((profile) => profile.profileStatus === 'fixture_measured');
   const colorProfile = selectableProfiles.find((profile) => profile.filmClass === 'color_negative');
   const blackAndWhiteProfile = selectableProfiles.find((profile) => profile.filmClass === 'black_and_white_silver');
   const candidateProfiles = [
     selectedProfile,
+    userProfile,
     measuredProfile,
     colorProfile,
     blackAndWhiteProfile,
