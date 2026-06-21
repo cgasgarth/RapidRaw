@@ -17,8 +17,11 @@
     "icc_colorimetric_accuracy"
   ],
   "fixtureId": "validation.color.professional-workflow.local-cc-raw.v1",
-  "generatedAt": "2026-06-21T00:15:21.505Z",
+  "generatedAt": "2026-06-21T00:41:03.440Z",
+  "e2eIssue": 2309,
   "issue": 2309,
+  "proofBoundary": "private_raw_runtime_plus_visual_smoke_not_full_macos_manual_e2e",
+  "proofStatus": "private_raw_professional_color_runtime_with_visual_smoke",
   "localRawRuntime": {
     "artifactRoot": "private-artifacts/validation/open-edit-export",
     "command": "RAWENGINE_RUN_PRIVATE_RAW_PROFESSIONAL_COLOR_PROOF=1 RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-private-root cargo +1.95.0 test --manifest-path src-tauri/Cargo.toml --locked --no-default-features --features required-ci,validation-harness,tauri-test raw_open_edit_export_proof::tests::private_runtime_smoke_generates_professional_color_report_when_enabled -- --nocapture",
@@ -84,7 +87,7 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:e843621da4604a6b88f2bc2bf06595dd17e9afe3198a5f9d7d8d366a8d5f47af",
+      "hash": "sha256:5f3a8cc38da23e79888293830e9795899dd9b8c7b3691b0e47b61f4f973a4e07",
       "kind": "visual_smoke_screenshot",
       "path": "artifacts/visual-smoke/color-workflow.png",
       "publicRepoAllowed": false
