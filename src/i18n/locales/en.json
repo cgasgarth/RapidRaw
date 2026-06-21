@@ -1480,7 +1480,9 @@
       },
       "coverage": {
         "resultCount_one": "{{count}} command",
-        "resultCount_other": "{{count}} commands"
+        "resultCount_other": "{{count}} commands",
+        "selectedSourceCount_one": "{{count}} selected",
+        "selectedSourceCount_other": "{{count}} selected"
       },
       "noResults": "No commands found",
       "searchLabel": "Search commands",

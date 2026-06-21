@@ -1569,7 +1569,11 @@
         "resultCount_one": "",
         "resultCount_few": "",
         "resultCount_many": "",
-        "resultCount_other": ""
+        "resultCount_other": "",
+        "selectedSourceCount_one": "",
+        "selectedSourceCount_few": "",
+        "selectedSourceCount_many": "",
+        "selectedSourceCount_other": ""
       },
       "noResults": "No commands found",
       "searchLabel": "Search commands",
