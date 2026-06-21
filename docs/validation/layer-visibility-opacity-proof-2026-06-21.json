@@ -1,0 +1,34 @@
+{
+  "artifactRoot": "artifacts/layers/visibility-opacity-proof",
+  "doesNotProve": ["full_macos_app_manual_session", "private_raw_decode", "group_opacity_rendering"],
+  "issue": 2876,
+  "schemaVersion": 1,
+  "steps": [
+    {
+      "coverageCount": 1,
+      "exportHash": "sha256:c2421fdc4e8f8c406794f4d1d2f5aa057eaff2aca73912387eeb3dffe6e5eaca",
+      "id": "visible-full-opacity",
+      "previewHash": "sha256:c2421fdc4e8f8c406794f4d1d2f5aa057eaff2aca73912387eeb3dffe6e5eaca",
+      "touchedPixels": 4
+    },
+    {
+      "coverageCount": 1,
+      "exportHash": "sha256:055fae63d799b5ce6ebc580d3a9b9f78b36ac0b83e35db255af4a58a4c9baefc",
+      "id": "visible-half-opacity",
+      "previewHash": "sha256:055fae63d799b5ce6ebc580d3a9b9f78b36ac0b83e35db255af4a58a4c9baefc",
+      "touchedPixels": 4
+    },
+    {
+      "coverageCount": 0,
+      "exportHash": "sha256:ae0e4e712d71d7f7abf0518bfb4db308678b220135a242f0b7dbe141c4f0486c",
+      "id": "hidden-noop",
+      "previewHash": "sha256:ae0e4e712d71d7f7abf0518bfb4db308678b220135a242f0b7dbe141c4f0486c",
+      "touchedPixels": 0
+    }
+  ],
+  "validationCommands": [
+    "bun run check:layer-visibility-opacity-proof",
+    "bun run check:layer-opacity-order-runtime",
+    "bun run check:layer-stack-panel-ui"
+  ]
+}
