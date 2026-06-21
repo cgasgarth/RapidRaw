@@ -218,6 +218,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:focus-runtime-plan-smoke', 'check:focus-preview-blend-smoke'],
   );
   addIf((file) => file === 'src/components/modals/FocusStackModal.tsx', ['check:focus-review-diagnostics']);
+  addIf((file) => file === 'src/components/modals/CullingModal.tsx', ['check:culling-ui-summary']);
   addIf(
     (file) => file.startsWith('packages/rawengine-schema/src/superResolution'),
     ['check:super-resolution-app-server-runtime'],
@@ -367,6 +368,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/components/adjustments/FilmLookBrowser.tsx'], ['check:film-look-browser-ui']);
   assertSelfTestRoute(['src/components/panel/right/MasksPanel.tsx'], ['check:mask-readiness-ui']);
   assertSelfTestRoute(['src/components/adjustments/Color.tsx'], ['check:professional-color-workflow-ui']);
+  assertSelfTestRoute(['src/components/modals/CullingModal.tsx'], ['check:culling-ui-summary']);
   assertSelfTestRoute(['src/components/panel/right/LayerStackPanel.tsx'], ['check:layer-stack-panel-ui']);
   assertSelfTestRoute(['src/components/panel/right/AgentChatShell.tsx'], ['check:agent-tool-readiness-ui']);
 
