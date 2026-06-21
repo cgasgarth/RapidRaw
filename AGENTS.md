@@ -164,9 +164,11 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   before manual review.
 - Stop adding repo meta-tooling unless it clearly improves product quality or
   prevents a recurring real failure.
-- Prefer vertical feature delivery over planning, schema-only, proof-only, or
-  meta-tooling work. Proof scripts should be part of the feature PR they
-  validate, not standalone PR value.
+- Prefer vertical feature delivery over planning, schema-only, proof-only,
+  inventory-only, report-only, routing-only, or meta-tooling work.
+- Proof scripts should live inside the actual feature PR they validate. Do not
+  open PRs whose main value is only a probe, schema, inventory, report, or
+  routing check.
 - Delete stale or low-value meta checks when they do not validate product
   behavior.
 - If a helper script primarily exists to manage agent workflow rather than
@@ -233,9 +235,6 @@ These instructions apply to the RapidRaw fork used for RawEngine work.
   broad status ledgers.
 - Audit existing validation helpers when touching nearby code. Delete stale,
   duplicate, or low-value meta checks instead of carrying them forward.
-- Keep private RAW validation standardized around one reusable private-root and
-  report pattern. Shift new effort toward actual E2E feature slices with UI,
-  runtime, and output proof.
 - Do not edit existing tests solely to reduce token output. Compact the
   commonly reused runner, package script, hook, or reporting layer instead.
 - Keep GitHub Actions current on supported major versions and maintain the

@@ -119,7 +119,6 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:detail-workspace-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario detail-workspace'])],
   ['check:dust-spot-visualization', new Set(['bun tests/integration/checks/check-dust-spot-visualization.ts'])],
   ['check:dust-spot-visualization-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario detail-dust-spot'])],
-  ['check:delivery-review-manifest', new Set(['bun tests/integration/checks/check-delivery-review-manifest.ts'])],
   ['check:export-batch-proof', new Set(['bun tests/integration/checks/check-export-batch-proof.ts'])],
   ['check:export-batch-proof:update', new Set(['bun tests/integration/checks/check-export-batch-proof.ts --update'])],
   ['check:export-recipes-ui', new Set(['bun tests/integration/checks/check-export-recipes-ui.ts'])],
@@ -163,14 +162,6 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:session-import-reload-proof', new Set(['bun tests/integration/checks/check-session-import-reload-proof.ts'])],
   ['check:library-session-ui', new Set(['bun tests/integration/checks/check-library-session-ui.ts'])],
   ['check:library-workflow-smoke', new Set(['bun scripts/capture-visual-smoke.ts --scenario library-workflow'])],
-  [
-    'check:professional-workflow-status',
-    new Set(['bun tests/integration/checks/check-professional-workflow-status.ts']),
-  ],
-  [
-    'check:professional-workflow-status:update',
-    new Set(['bun tests/integration/checks/check-professional-workflow-status.ts --update']),
-  ],
   ['check:panorama-ui-api', new Set(['bun tests/integration/checks/check-panorama-ui-api.ts'])],
   ['check:panorama-feature-transform', new Set(['bun tests/integration/checks/check-panorama-feature-transform.ts'])],
   ['check:panorama-blend-exposure', new Set(['bun tests/integration/checks/check-panorama-blend-exposure.ts'])],
@@ -234,7 +225,6 @@ const SAFE_PACKAGE_JSON_SCRIPT_VALUES = new Map([
   ['check:mask-refine-controls', new Set(['bun tests/integration/checks/check-mask-refinement-controls.ts'])],
   ['check:mask-compose-command', new Set(['bun tests/integration/checks/check-mask-compose-command.ts'])],
   ['check:metadata-templates', new Set(['bun tests/integration/checks/check-metadata-template-fixtures.ts'])],
-  ['check:private-raw-evidence', new Set(['bun tests/integration/checks/check-private-raw-evidence-ledger.ts'])],
   ['check:public-fixture-manifest', new Set(['bun tests/integration/checks/check-public-fixture-manifest.ts'])],
   ['check:raw-open-edit-export-proof', new Set(['bun tests/integration/checks/check-raw-open-edit-export-proof.ts'])],
   [
@@ -919,11 +909,6 @@ function runSelfTest() {
   assertClassification(
     'validation proof request fixtures can skip smoke',
     ['fixtures/validation/raw-open-edit-export-proof-request.json'],
-    SMOKE_MODES.NONE,
-  );
-  assertClassification(
-    'workflow delivery review fixtures can skip smoke',
-    ['fixtures/workflow/delivery-review-manifest.json'],
     SMOKE_MODES.NONE,
   );
   assertClassification(

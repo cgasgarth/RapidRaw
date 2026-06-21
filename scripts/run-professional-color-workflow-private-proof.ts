@@ -35,7 +35,6 @@ const args = argsSchema.parse({
   requireAssets: process.argv.includes('--require-assets'),
 });
 
-await runRequired('professional workflow status', ['bun', 'run', 'check:professional-workflow-status']);
 await runRequired('professional color committed proof summary', [
   'bun',
   'run',

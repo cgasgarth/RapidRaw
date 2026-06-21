@@ -126,7 +126,6 @@ const QUICK_ROUTED = [
 ] as const;
 
 const QUICK_SLOW_PROOF = [
-  'check:private-raw-evidence',
   'check:raw-open-edit-export-proof',
   'check:raw-open-edit-export-command-wrapper',
   'check:raw-open-edit-export-private-report-collector',
