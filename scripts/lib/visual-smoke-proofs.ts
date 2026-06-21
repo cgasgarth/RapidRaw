@@ -341,7 +341,7 @@ export const maskOverlayRawProofSchema = z.object({
   opacity: z.literal('0.70'),
   overlaySource: z.literal('live_mask_overlay_generator'),
   sourceKind: z.literal('source_raw_private'),
-  sourcePath: z.literal('private-fixtures/layers/alaska-layer-mask-v1.arw'),
+  sourcePath: z.literal('private-fixtures/detail/high-iso-skin-shadow-v1.arw'),
   validationMode: z.literal('visual_smoke_raw_overlay_control_proof'),
 });
 export const libraryWorkflowProofSchema = z.object({
