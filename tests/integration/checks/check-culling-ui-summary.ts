@@ -5,6 +5,10 @@ import { readFileSync } from 'node:fs';
 const locale = JSON.parse(readFileSync('src/i18n/locales/en.json', 'utf8'));
 const cullingLocale = locale.modals?.culling;
 const requiredLocaleKeys = [
+  'batchPreview',
+  'batchPreviewAlt',
+  'batchPreviewMore_one',
+  'batchPreviewMore_other',
   'summaryBlur',
   'summaryDisabled',
   'summaryEnabledThreshold',
@@ -28,6 +32,12 @@ if (missingKeys.length > 0) {
 const source = readFileSync('src/components/modals/CullingModal.tsx', 'utf8');
 for (const marker of [
   'data-testid="culling-setup-summary"',
+  'data-testid="culling-setup-batch-preview"',
+  'data-preview-count={setupPreviewPaths.length}',
+  'data-preview-overflow-count={setupPreviewOverflowCount}',
+  'SETUP_PREVIEW_LIMIT = 6',
+  'modals.culling.batchPreview',
+  'modals.culling.batchPreviewMore',
   'data-image-count={imagePaths.length}',
   'data-raw-source-count={sourceMix.raw}',
   'data-raster-source-count={sourceMix.raster}',

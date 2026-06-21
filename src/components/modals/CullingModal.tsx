@@ -29,6 +29,7 @@ type CullAction = 'reject' | 'rate_zero' | 'delete';
 type CullingStage = 'settings' | 'progress' | 'results';
 
 const RAW_SOURCE_EXTENSIONS = new Set(['arw', 'cr2', 'cr3', 'dng', 'nef', 'orf', 'pef', 'raf', 'rw2', 'srw']);
+const SETUP_PREVIEW_LIMIT = 6;
 
 interface ImageThumbnailProps {
   children?: ReactNode;
@@ -193,6 +194,8 @@ export default function CullingModal({
 
   const numSimilar = suggestions?.similarGroups.reduce((acc, group) => acc + group.duplicates.length, 0) || 0;
   const numBlurry = suggestions?.blurryImages.length || 0;
+  const setupPreviewPaths = imagePaths.slice(0, SETUP_PREVIEW_LIMIT);
+  const setupPreviewOverflowCount = Math.max(0, imagePaths.length - setupPreviewPaths.length);
 
   const renderSettings = () => (
     <>
@@ -249,6 +252,45 @@ export default function CullingModal({
           </div>
         ))}
       </section>
+      {setupPreviewPaths.length > 0 && (
+        <section
+          className="mb-6 rounded-md border border-border-color bg-bg-primary p-3"
+          data-preview-count={setupPreviewPaths.length}
+          data-preview-overflow-count={setupPreviewOverflowCount}
+          data-testid="culling-setup-batch-preview"
+        >
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <UiText variant={TextVariants.label}>{t('modals.culling.batchPreview')}</UiText>
+            {setupPreviewOverflowCount > 0 && (
+              <UiText variant={TextVariants.small} color={TextColors.secondary}>
+                {t('modals.culling.batchPreviewMore', { count: setupPreviewOverflowCount })}
+              </UiText>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            {setupPreviewPaths.map((path) => (
+              <div
+                className="aspect-square overflow-hidden rounded border border-border-color bg-bg-secondary"
+                key={path}
+              >
+                {thumbnails[path] ? (
+                  <img
+                    src={thumbnails[path]}
+                    alt={t('modals.culling.batchPreviewAlt')}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center px-2 text-center">
+                    <UiText variant={TextVariants.small} color={TextColors.secondary} className="truncate">
+                      {path.split(/[\\/]/).pop()}
+                    </UiText>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="space-y-6 text-sm">
         <div>
           <Switch
