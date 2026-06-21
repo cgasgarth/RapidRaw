@@ -1056,11 +1056,13 @@
       }
     },
     "toolbar": {
+      "historyDepth": "{{current}}/{{total}}",
       "tooltips": {
         "aperture": "Aperture",
         "backToLibrary": "Back to Library",
         "focalLength": "Focal Length",
         "fullscreen": "Toggle Fullscreen (F)",
+        "history": "Show History Stack",
         "iso": "ISO",
         "redo": "Redo (Ctrl+Y) or History (Right-click)",
         "showEdited": "Show Edited (B)",

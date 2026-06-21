@@ -1051,11 +1051,13 @@
       }
     },
     "toolbar": {
+      "historyDepth": "",
       "tooltips": {
         "aperture": "光圈",
         "backToLibrary": "返回图库",
         "focalLength": "焦距",
         "fullscreen": "切换全屏（F）",
+        "history": "",
         "iso": "ISO",
         "redo": "重做（Ctrl+Y）或历史记录（右键单击）",
         "showEdited": "显示编辑后（B）",
