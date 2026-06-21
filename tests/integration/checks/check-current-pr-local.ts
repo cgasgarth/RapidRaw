@@ -205,6 +205,14 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
   );
   addIf(
     (file) =>
+      file === 'src-tauri/src/deblur_real_raw_proof.rs' ||
+      file === 'scripts/run-deblur-real-raw-private-proof.ts' ||
+      file === 'tests/integration/checks/check-deblur-real-raw-private-proof-summary.ts' ||
+      file === 'docs/validation/deblur-real-raw-private-proof-2026-06-21.json',
+    ['check:deblur-real-raw-private-proof-summary', 'check:deblur-real-raw-private-proof'],
+  );
+  addIf(
+    (file) =>
       file === 'src/components/modals/CollageModal.tsx' ||
       file === 'src/utils/displayFilePath.ts' ||
       file === 'tests/integration/checks/check-collage-saved-output-ui.ts',
