@@ -45,6 +45,7 @@ export const buildFocusStackOutputReviewWorkflow = ({
       confidenceMarginThreshold: 0.12,
       mode: settings.reviewOverlayMode,
       opacityPercent: settings.reviewOverlayOpacityPercent,
+      sourceContributionDetails: buildSourceContributionDetails(sourceCount),
       sourceContributionSummary: buildSourceContributionSummary(sourceCount),
     },
     sharpnessCoverageRatio,
@@ -63,5 +64,16 @@ const buildSourceContributionSummary = (
       sourceIndex === sourceCount - 1 ? roundRatio(1 - baseRatio * (sourceCount - 1)) : roundRatio(baseRatio),
   }));
 };
+
+const buildSourceContributionDetails = (
+  sourceCount: number,
+): FocusStackOutputReviewWorkflow['reviewOverlay']['sourceContributionDetails'] =>
+  buildSourceContributionSummary(sourceCount).map((source) => ({
+    artifactId: `artifact_focus_source_${source.sourceIndex + 1}_contribution`,
+    contributionRatio: source.winnerCellRatio,
+    sourceId: `S${source.sourceIndex + 1}`,
+    sourceIndex: source.sourceIndex,
+    warningState: 'artifact_review_required',
+  }));
 
 const roundRatio = (value: number): number => Number(value.toFixed(6));
