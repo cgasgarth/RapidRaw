@@ -1677,6 +1677,7 @@
       "duplicatesHeader_few": "Duplikaty ({{count}})",
       "duplicatesHeader_many": "Duplikaty ({{count}})",
       "duplicatesHeader_other": "Duplikaty ({{count}})",
+      "emptyBatch": "Select one or more images before starting culling.",
       "filterBlurry": "Filtruj rozmyte obrazy",
       "groupHeader": "Grupa {{index}}",
       "groupSimilar": "Grupuj podobne obrazy",
