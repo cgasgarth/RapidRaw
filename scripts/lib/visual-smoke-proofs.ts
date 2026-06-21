@@ -328,6 +328,7 @@ export const superResolutionReviewWorkspaceProofSchema = z.object({
   estimatedPreviewMegapixels: z.literal('336'),
   outputScale: z.literal('4'),
   proofLevel: z.literal('synthetic_runtime'),
+  reviewPacketPath: z.literal('docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json'),
   runtimeStatus: z.literal('dry_run_preview'),
   reviewCropCount: z.literal('4'),
   sourceCount: z.literal('5'),

@@ -2296,6 +2296,7 @@
         "reviewCropValue": "{{count}} required crops",
         "reviewCropValue_one": "",
         "reviewCropValue_other": "",
+        "reviewPacket": "Review packet",
         "ringing": "Ringing/zipper artifacts",
         "runtimeBridge": "Dry-run/apply bridge",
         "sourceSupport": "Source support",

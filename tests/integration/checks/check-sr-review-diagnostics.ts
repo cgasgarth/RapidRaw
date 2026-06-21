@@ -33,6 +33,7 @@ for (const marker of [
   'modals.superResolution.review.detailGain',
   'modals.superResolution.review.detailGainValue',
   'modals.superResolution.review.reviewCrops',
+  'modals.superResolution.review.reviewPacket',
   'modals.superResolution.review.provenance',
   'modals.superResolution.review.sourceSupport',
   'modals.superResolution.review.warning',

@@ -1659,6 +1659,7 @@ function SuperResolutionVisualSmoke() {
           data-proof-level="synthetic_runtime"
           data-quality-preference={settings.qualityPreference}
           data-review-crop-count="4"
+          data-review-packet-path="docs/validation/sr-synthetic-output-artifact-proof-2026-06-20.json"
           data-runtime-status="dry_run_preview"
           data-source-count="5"
           data-warning-codes={
