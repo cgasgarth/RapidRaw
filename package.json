@@ -186,6 +186,7 @@
     "check:export-queue": "bun tests/integration/checks/check-export-queue-fixtures.ts",
     "check:smart-albums": "bun tests/integration/checks/check-smart-album-fixtures.ts",
     "check:metadata-templates": "bun tests/integration/checks/check-metadata-template-fixtures.ts",
+    "check:metadata-panel-ui": "bun tests/integration/checks/check-metadata-panel-ui.ts",
     "check:metadata-sidecar-workflow": "bun tests/integration/checks/check-metadata-sidecar-workflow-proof.ts",
     "check:workspace-layouts": "bun tests/integration/checks/check-workspace-layout-fixtures.ts",
     "check:compare-survey": "bun tests/integration/checks/check-compare-survey-fixtures.ts",

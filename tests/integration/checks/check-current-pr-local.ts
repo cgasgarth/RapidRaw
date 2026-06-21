@@ -236,6 +236,7 @@ function routeFeatureChecks(changedFiles: ReadonlyArray<string>): Array<string> 
     ['check:negative-lab-workspace', 'check:negative-lab-roll-cockpit'],
   );
   addIf((file) => file === 'src/components/panel/right/LayerStackPanel.tsx', ['check:layer-stack-panel-ui']);
+  addIf((file) => file === 'src/components/panel/right/MetadataPanel.tsx', ['check:metadata-panel-ui']);
   addIf(
     (file) =>
       file === 'tests/integration/checks/check-layer-mask-private-raw-ui-proof.ts' ||
@@ -372,6 +373,7 @@ if (process.argv.includes('--self-test')) {
   assertSelfTestRoute(['src/components/adjustments/Color.tsx'], ['check:professional-color-workflow-ui']);
   assertSelfTestRoute(['src/components/modals/CullingModal.tsx'], ['check:culling-ui-summary']);
   assertSelfTestRoute(['src/components/panel/right/LayerStackPanel.tsx'], ['check:layer-stack-panel-ui']);
+  assertSelfTestRoute(['src/components/panel/right/MetadataPanel.tsx'], ['check:metadata-panel-ui']);
   assertSelfTestRoute(['src/components/panel/right/AgentChatShell.tsx'], ['check:agent-tool-readiness-ui']);
 
   console.log('current pr local self-test ok');

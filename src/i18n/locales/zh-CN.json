@@ -971,6 +971,16 @@
         "tags": "标签",
         "title": "组织"
       },
+      "readiness": {
+        "cameraFields_one": "{{count}} camera field",
+        "cameraFields_other": "{{count}} camera fields",
+        "editableFields_one": "{{count}} editable field",
+        "editableFields_other": "{{count}} editable fields",
+        "gpsMissing": "No GPS",
+        "gpsReady": "GPS ready",
+        "selectionCount_one": "{{count}} selected",
+        "selectionCount_other": "{{count}} selected"
+      },
       "title": "元数据"
     },
     "presets": {
