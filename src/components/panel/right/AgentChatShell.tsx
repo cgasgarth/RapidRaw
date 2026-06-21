@@ -11,6 +11,7 @@ import type {
   AgentChatMessage,
   AgentChatToolCall,
   AgentChatTranscript,
+  AgentReviewHandoff,
 } from '../../../schemas/agentChatTranscriptSchemas';
 
 interface AgentChatShellProps {
@@ -53,6 +54,19 @@ const auditOutcomeStyles = {
   success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
   warning: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
 } satisfies Record<AgentAuditTranscript['records'][number]['outcome'], string>;
+
+const handoffApprovalStyles = {
+  approved: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
+  not_required: 'border-white/10 bg-white/5 text-text-secondary',
+  rejected: 'border-red-500/30 bg-red-500/10 text-red-100',
+  required: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
+} satisfies Record<AgentReviewHandoff['approvalState'], string>;
+
+const rollbackStatusStyles = {
+  available: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
+  blocked: 'border-red-500/30 bg-red-500/10 text-red-100',
+  not_required: 'border-white/10 bg-white/5 text-text-secondary',
+} satisfies Record<AgentReviewHandoff['rollback']['status'], string>;
 
 type LocalReviewDecision = 'approved' | 'pending' | 'rejected';
 
@@ -163,6 +177,74 @@ function ArtifactReviewPanel({ review }: { review: AgentArtifactReview }) {
             <p className="mt-1 leading-4 text-text-secondary">{entry.summary}</p>
           </a>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function ReviewHandoffPanel({ handoff }: { handoff: AgentReviewHandoff }) {
+  return (
+    <div
+      className="space-y-3 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3"
+      data-after-artifact-id={handoff.afterArtifactId}
+      data-approval-state={handoff.approvalState}
+      data-before-artifact-id={handoff.beforeArtifactId}
+      data-output-proof-status={handoff.outputProof.status}
+      data-rollback-status={handoff.rollback.status}
+      data-testid="agent-review-handoff"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold text-text-primary">{handoff.title}</div>
+          <p className="mt-1 text-[11px] leading-4 text-text-secondary">{handoff.commandSummary}</p>
+        </div>
+        <span
+          className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${handoffApprovalStyles[handoff.approvalState]}`}
+        >
+          {handoff.approvalLabel}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 text-[11px]" data-testid="agent-review-handoff-artifacts">
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{handoff.beforeLabel}</div>
+          <div className="mt-1 truncate font-mono text-text-primary">{handoff.beforeArtifactId}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{handoff.afterLabel}</div>
+          <div className="mt-1 truncate font-mono text-text-primary">{handoff.afterArtifactId}</div>
+        </div>
+        <div className="rounded border border-white/10 bg-black/15 p-2">
+          <div className="text-[10px] uppercase text-text-secondary">{handoff.auditLabel}</div>
+          <div className="mt-1 truncate font-mono text-text-primary">{handoff.auditArtifactId}</div>
+        </div>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-[1fr_1fr]" data-testid="agent-review-handoff-next">
+        <a
+          className="rounded border border-sky-500/25 bg-sky-500/10 p-2 text-[11px] text-sky-100 hover:border-sky-300/70"
+          href={handoff.outputProof.href}
+        >
+          <span className="block font-semibold text-text-primary">{handoff.outputProof.label}</span>
+          <span className="mt-1 block font-mono text-[10px] text-text-secondary">
+            {handoff.outputProof.contentHash}
+          </span>
+          <span className="mt-1 block uppercase">{handoff.outputProof.status}</span>
+        </a>
+        <div className="rounded border border-white/10 bg-black/15 p-2 text-[11px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-text-primary">{handoff.rollback.label}</span>
+            <span className={`rounded border px-1.5 py-0.5 ${rollbackStatusStyles[handoff.rollback.status]}`}>
+              {handoff.rollback.status}
+            </span>
+          </div>
+          <div className="mt-1 truncate font-mono text-text-secondary">{handoff.rollback.targetRevision}</div>
+          <p className="mt-1 leading-4 text-text-secondary">{handoff.rollback.summary}</p>
+        </div>
+      </div>
+
+      <div className="rounded border border-white/10 bg-black/15 px-2 py-1.5 text-[11px] leading-4 text-text-secondary">
+        {handoff.nextAction}
       </div>
     </div>
   );
@@ -578,6 +660,8 @@ export default function AgentChatShell({ transcript }: AgentChatShellProps) {
       </div>
 
       {transcript.artifactReview ? <ArtifactReviewPanel review={transcript.artifactReview} /> : null}
+
+      {transcript.reviewHandoff ? <ReviewHandoffPanel handoff={transcript.reviewHandoff} /> : null}
 
       {transcript.auditTranscript ? <AuditTranscriptViewer auditTranscript={transcript.auditTranscript} /> : null}
 

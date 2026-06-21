@@ -471,6 +471,13 @@ export const agentArtifactReviewProofDatasetSchema = z.object({
   auditCount: z.literal('3'),
   beforeRevision: z.literal('graph_rev_agent_expert_edit_demo_initial_2844'),
 });
+export const agentReviewHandoffProofDatasetSchema = z.object({
+  afterArtifactId: z.literal('artifact_agent_expert_edit_demo_after_virtual_copy_2844'),
+  approvalState: z.literal('approved'),
+  beforeArtifactId: z.literal('artifact_agent_expert_edit_demo_before_raw_2844'),
+  outputProofStatus: z.literal('runtime_apply_verified'),
+  rollbackStatus: z.literal('available'),
+});
 export const agentAuditTranscriptViewerProofDatasetSchema = z.object({
   applyRecordCount: z.literal('1'),
   artifactLinkCount: z.literal('3'),
