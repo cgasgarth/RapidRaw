@@ -1581,6 +1581,7 @@
       "duplicatesHeader": "Duplikate ({{count}})",
       "duplicatesHeader_one": "Duplikate ({{count}})",
       "duplicatesHeader_other": "Duplikate ({{count}})",
+      "emptyBatch": "Select one or more images before starting culling.",
       "filterBlurry": "Unscharfe Bilder filtern",
       "groupHeader": "Gruppe {{index}}",
       "groupSimilar": "Ähnliche Bilder gruppieren",

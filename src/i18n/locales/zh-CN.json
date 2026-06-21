@@ -1568,6 +1568,7 @@
       "duplicatesHeader": "重复项（{{count}}）",
       "duplicatesHeader_one": "重复项（{{count}}）",
       "duplicatesHeader_other": "重复项（{{count}}）",
+      "emptyBatch": "Select one or more images before starting culling.",
       "filterBlurry": "过滤模糊图像",
       "groupHeader": "第 {{index}} 组",
       "groupSimilar": "分组相似图像",
