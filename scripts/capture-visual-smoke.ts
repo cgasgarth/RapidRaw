@@ -1464,6 +1464,23 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-roll-frame-disposition-1').getByText('Review', { exact: true }).waitFor({
     timeout: 10_000,
   });
+  await page.getByTestId('negative-lab-frame-qc-approved-negative-lab-frame-2').click();
+  await page.getByTestId('negative-lab-qc-approved-count').getByText('Approved 1', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page.getByTestId('negative-lab-scope-ready').click();
+  await page
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
+    .getByText('2 queued', { exact: true })
+    .waitFor({ timeout: 10_000 });
+  await page.getByTestId('negative-lab-frame-qc-rejected-negative-lab-frame-2').click();
+  await page.getByTestId('negative-lab-qc-rejected-count').getByText('Rejected 1', { exact: true }).waitFor({
+    timeout: 10_000,
+  });
+  await page
+    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
+    .getByText('1 queued', { exact: true })
+    .waitFor({ timeout: 10_000 });
   const rollBaseScopeDataset = await page
     .getByTestId('negative-lab-roll-queue-summary')
     .evaluate((element) => ({ ...element.dataset }));
@@ -1545,11 +1562,6 @@ async function prepareScenario(page, mode) {
   await page.getByTestId('negative-lab-skipped-frame-count').getByText('Skip 0', { exact: true }).waitFor({
     timeout: 10_000,
   });
-  await page.getByTestId('negative-lab-scope-ready').click();
-  await page
-    .getByTestId(VISUAL_SMOKE_PROOF_TEST_IDS.NegativeLabQueuedCount)
-    .getByText('1 queued', { exact: true })
-    .waitFor({ timeout: 10_000 });
   await page.getByTestId('negative-lab-export-summary-scope').getByText('Ready only', { exact: true }).waitFor({
     timeout: 10_000,
   });
@@ -1565,6 +1577,7 @@ async function prepareScenario(page, mode) {
     !copiedBatchPlan.includes('"batchScope": "ready"') ||
     !copiedBatchPlan.includes('"dispositionCounts"') ||
     !copiedBatchPlan.includes('"omittedDispositionFrameIds"') ||
+    !copiedBatchPlan.includes('"negative-lab-frame-2": "rejected"') ||
     !copiedBatchPlan.includes('"reviewFrameIds"')
   ) {
     throw new Error('Negative Lab batch plan copy did not include apply/skip/acquisition/disposition JSON.');

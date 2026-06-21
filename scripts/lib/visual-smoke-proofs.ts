@@ -167,6 +167,8 @@ const negativeLabConvertArgsSchema = z.object({
       ),
       batchScope: z.literal('ready'),
       omittedDispositionFrameIds: z.array(z.literal('negative-lab-frame-2')).length(1),
+      qcApprovedFrameIds: z.array(z.string()).length(0),
+      qcRejectedFrameIds: z.array(z.literal('negative-lab-frame-2')).length(1),
       selectedProfile: z.object({
         claimLevel: z.literal('generic_starting_point_only'),
         claimPolicy: z.literal('generic_starting_point_no_stock_claim'),
