@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import {
+  buildLayerExportReadinessSummary,
   buildLayerRenderPlan,
   createAdjustmentLayer,
   deleteLayer,
@@ -47,6 +48,16 @@ const renderPlanItemSchema = z
     opacity: z.number().int().min(0).max(100),
     opacityFraction: z.number().min(0).max(1),
     subMaskCount: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const exportReadinessSchema = z
+  .object({
+    exportableLayerCount: z.number().int().nonnegative(),
+    groupCount: z.number().int().nonnegative(),
+    hiddenLayerCount: z.number().int().nonnegative(),
+    maskedLayerCount: z.number().int().nonnegative(),
+    totalLayerCount: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -190,6 +201,7 @@ const operationSchema = z.discriminatedUnion('type', [
 const fixtureSchema = z
   .object({
     expectedError: z.string().trim().min(1).optional(),
+    expectedExportReadiness: exportReadinessSchema.optional(),
     expectedLayers: z.array(layerFixtureSchema).min(1),
     expectedRenderPlan: z.array(renderPlanItemSchema).optional(),
     id: z.string().trim().min(1),
@@ -329,6 +341,16 @@ for (const fixture of fixtures) {
       console.error(`${fixture.id}: layer render plan mismatch`);
       console.error('Expected:', JSON.stringify(fixture.expectedRenderPlan, null, 2));
       console.error('Actual:', JSON.stringify(actualRenderPlan, null, 2));
+      process.exit(1);
+    }
+  }
+
+  if (fixture.expectedExportReadiness !== undefined) {
+    const actualExportReadiness = buildLayerExportReadinessSummary(result);
+    if (JSON.stringify(actualExportReadiness) !== JSON.stringify(fixture.expectedExportReadiness)) {
+      console.error(`${fixture.id}: layer export readiness mismatch`);
+      console.error('Expected:', JSON.stringify(fixture.expectedExportReadiness, null, 2));
+      console.error('Actual:', JSON.stringify(actualExportReadiness, null, 2));
       process.exit(1);
     }
   }

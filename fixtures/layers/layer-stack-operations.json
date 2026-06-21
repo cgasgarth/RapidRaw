@@ -210,7 +210,14 @@
         "opacityFraction": 0.8,
         "subMaskCount": 0
       }
-    ]
+    ],
+    "expectedExportReadiness": {
+      "exportableLayerCount": 2,
+      "groupCount": 0,
+      "hiddenLayerCount": 1,
+      "maskedLayerCount": 0,
+      "totalLayerCount": 3
+    }
   },
   {
     "id": "solo-layer-and-group",

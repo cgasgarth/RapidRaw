@@ -19,6 +19,14 @@ export interface LayerRenderPlanItem {
   subMaskCount: number;
 }
 
+export interface LayerExportReadinessSummary {
+  exportableLayerCount: number;
+  groupCount: number;
+  hiddenLayerCount: number;
+  maskedLayerCount: number;
+  totalLayerCount: number;
+}
+
 export interface DuplicateLayerGroupLayerInput {
   duplicateName: string;
   layerId: string;
@@ -358,6 +366,36 @@ export function buildLayerRenderPlan(layers: Array<MaskContainer>): Array<LayerR
         subMaskCount: layer.subMasks.length,
       };
     });
+}
+
+export function buildLayerExportReadinessSummary(layers: Array<MaskContainer>): LayerExportReadinessSummary {
+  const groupIds = new Set<string>();
+  let exportableLayerCount = 0;
+  let hiddenLayerCount = 0;
+  let maskedLayerCount = 0;
+
+  for (const layer of layers) {
+    if (typeof layer.layerGroupId === 'string') {
+      groupIds.add(layer.layerGroupId);
+    }
+    if (!layer.visible) {
+      hiddenLayerCount += 1;
+    }
+    if (layer.subMasks.length > 0) {
+      maskedLayerCount += 1;
+    }
+    if (layer.visible && clampLayerOpacity(layer.opacity) > 0) {
+      exportableLayerCount += 1;
+    }
+  }
+
+  return {
+    exportableLayerCount,
+    groupCount: groupIds.size,
+    hiddenLayerCount,
+    maskedLayerCount,
+    totalLayerCount: layers.length,
+  };
 }
 
 function groupFields(layerGroupId: string | undefined, layerGroupName: string | undefined) {

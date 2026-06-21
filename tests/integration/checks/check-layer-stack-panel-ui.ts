@@ -14,6 +14,7 @@ const requiredLocaleKeys = [
   'layerCount',
   'visibleLayerCount',
 ];
+const requiredExportReadinessLocaleKeys = ['summary', 'title'];
 const requiredActionLocaleKeys = ['showAllHidden', 'soloActive'];
 
 const missingKeys = requiredLocaleKeys.filter((key) => typeof layerLocale?.[key] !== 'string');
@@ -28,19 +29,33 @@ if (missingActionKeys.length > 0) {
   process.exit(1);
 }
 
+const missingExportReadinessKeys = requiredExportReadinessLocaleKeys.filter(
+  (key) => typeof layerLocale?.exportReadiness?.[key] !== 'string',
+);
+if (missingExportReadinessKeys.length > 0) {
+  console.error(`Missing layer export readiness locale keys: ${missingExportReadinessKeys.join(', ')}`);
+  process.exit(1);
+}
+
 const source = readFileSync('src/components/panel/right/LayerStackPanel.tsx', 'utf8');
 for (const marker of [
   'data-testid="layer-stack-composition-summary"',
   'data-testid="layer-stack-count-summary"',
   'data-testid="layer-hidden-count"',
   'data-testid="layer-active-action-strip"',
+  'data-testid="layer-export-readiness-summary"',
   'data-testid="layer-active-solo"',
   'data-testid="layer-show-all-hidden"',
   'data-testid="layer-icon-action-row"',
+  'data-exportable-layer-count={exportReadiness.exportableLayerCount}',
+  'data-masked-layer-count={exportReadiness.maskedLayerCount}',
+  'buildLayerExportReadinessSummary(masks)',
   'data-visible-layer-count={visibleLayerCount}',
   'data-hidden-layer-count={hiddenLayerCount}',
   'data-solo-active={String(isActiveLayerSoloed)}',
   'data-group-count={groupCount}',
+  'editor.layers.exportReadiness.title',
+  'editor.layers.exportReadiness.summary',
   'editor.layers.hiddenLayerCount',
   'editor.layers.groupSummaryCount',
   'editor.layers.actions.soloActive',
