@@ -83,6 +83,8 @@ export default function EffectsPanel({
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       ...buildFilmLookAppliedAdjustmentPatch(look, strength),
+      filmLookId: look.id,
+      filmLookStrength: strength,
     }));
   };
 
@@ -187,6 +189,8 @@ export default function EffectsPanel({
           <div className="p-2 bg-bg-tertiary rounded-md">
             <Suspense fallback={null}>
               <FilmLookBrowser
+                activeLookId={adjustments.filmLookId}
+                activeStrength={adjustments.filmLookStrength}
                 onApplyLook={handleFilmLookApply}
                 onSaveLook={handleFilmLookSave}
                 onShareLook={handleFilmLookShare}

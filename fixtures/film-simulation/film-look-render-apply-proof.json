@@ -8,7 +8,7 @@
     "kind": "synthetic-film-look-render-apply-proof",
     "scene": "shadow-neutral-highlight-ramp"
   },
-  "generatedFrom": "scripts/check-film-look-render-apply-proof.ts",
+  "generatedFrom": "tests/integration/checks/check-film-look-render-apply-proof.ts",
   "lookId": "film_look.generic.warm_print.v1",
   "outputPixels": [
     {

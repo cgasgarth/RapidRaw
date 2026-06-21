@@ -1,9 +1,10 @@
 import { ArrowLeftRight, Check, Film, Save, Share2, Star, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { TextVariants } from '../../types/typography';
 import {
+  buildFilmLookAppliedAdjustmentPatch,
   clampFilmLookStrength,
   getFilmLookAdjustmentSummaries,
   sortFilmLookBrowserItems,
@@ -15,6 +16,8 @@ import { getFilmLookBrowserGroups } from '../../utils/filmLookRegistry';
 import UiText from '../ui/Text';
 
 interface FilmLookBrowserProps {
+  activeLookId: string | null;
+  activeStrength: number;
   onApplyLook: (look: FilmLookBrowserItem, strength: number) => void;
   onSaveLook: (look: FilmLookBrowserItem, strength: number) => void;
   onShareLook: (look: FilmLookBrowserItem, strength: number) => void;
@@ -70,6 +73,28 @@ const getFilmLookSwatchStyle = (look: FilmLookBrowserItem) => {
     background: `linear-gradient(135deg, hsl(${hue} ${chroma}% ${lift - 16}%), hsl(${secondaryHue} ${chroma + 8}% ${lift + 6}%) 54%, hsl(${hue + 54} ${Math.max(20, chroma - 8)}% ${lift + 22}%))`,
   };
 };
+const getFilmLookComparePreviewStyle = (look: FilmLookBrowserItem, strength: number): CSSProperties => {
+  const patch = buildFilmLookAppliedAdjustmentPatch(look, strength);
+  const temperature = patch.temperature ?? 0;
+  const saturation = patch.saturation ?? 0;
+  const contrast = patch.contrast ?? 0;
+  const highlights = patch.highlights ?? 0;
+  const blacks = patch.blacks ?? 0;
+  const hue = temperature >= 0 ? 34 : 210;
+  const warmthOverlay = Math.min(0.42, Math.abs(temperature) / 180);
+  const highlightStop = Math.max(18, Math.min(44, 32 - highlights / 4));
+  const shadowStop = Math.max(42, Math.min(72, 56 + blacks / 4));
+  const contrastScale = Math.max(0.72, Math.min(1.44, 1 + contrast / 160));
+  const saturationScale = Math.max(0, Math.min(1.8, 1 + saturation / 140));
+
+  return {
+    background: [
+      `radial-gradient(circle at 38% ${highlightStop}%, hsl(${hue} 82% 86% / ${warmthOverlay}), transparent 28%)`,
+      `linear-gradient(145deg, hsl(${hue} 30% 20%), hsl(${hue + 36} 38% ${shadowStop}%) 52%, hsl(${hue + 78} 28% 78%))`,
+    ].join(', '),
+    filter: `contrast(${contrastScale}) saturate(${saturationScale})`,
+  };
+};
 const isStringArray = (value: unknown): value is Array<string> =>
   Array.isArray(value) && value.every((item) => typeof item === 'string');
 const isFilmLookSortMode = (value: string): value is FilmLookSortMode =>
@@ -89,20 +114,26 @@ const readFavoriteLookIds = (): Set<string> => {
   return isStringArray(parsedFavorites) ? new Set(parsedFavorites) : new Set();
 };
 
-export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLookBrowserProps) {
+export function FilmLookBrowser({
+  activeLookId,
+  activeStrength,
+  onApplyLook,
+  onSaveLook,
+  onShareLook,
+}: FilmLookBrowserProps) {
   const { t } = useTranslation();
   const groups = useMemo(() => getFilmLookBrowserGroups(), []);
   const looksById = useMemo(
     () => new Map(groups.flatMap((group) => group.looks.map((look): [string, FilmLookBrowserItem] => [look.id, look]))),
     [groups],
   );
-  const [selectedLookId, setSelectedLookId] = useState<string | null>(null);
+  const [selectedLookId, setSelectedLookId] = useState<string | null>(activeLookId);
   const [comparisonSelection, setComparisonSelection] = useState<FilmLookComparisonSelection>({
     a: null,
     b: null,
   });
   const [favoriteLookIds, setFavoriteLookIds] = useState<Set<string>>(readFavoriteLookIds);
-  const [strengthPercent, setStrengthPercent] = useState<number>(70);
+  const [strengthPercent, setStrengthPercent] = useState<number>(clampFilmLookStrength(activeStrength));
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [activeCategory, setActiveCategory] = useState<FilmLookCategoryFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -155,6 +186,7 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
   );
   const visibleLookCount = visibleGroups.reduce((total, group) => total + group.looks.length, 0);
   const selectedLook = selectedLookId === null ? undefined : looksById.get(selectedLookId);
+  const activeLook = activeLookId === null ? undefined : looksById.get(activeLookId);
   const selectedLookAdjustmentSummaries =
     selectedLook === undefined ? [] : getFilmLookAdjustmentSummaries(selectedLook);
   const selectedLookRuntimeReady = selectedLook?.runtimeSupport === 'adjustment_patch_preview_export';
@@ -332,6 +364,32 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
         </button>
       </div>
 
+      {activeLook !== undefined && (
+        <section
+          className="grid grid-cols-[72px_1fr] gap-3 rounded-md border border-accent/40 bg-accent/10 p-2"
+          data-active-look-id={activeLook.id}
+          data-active-look-strength={clampFilmLookStrength(activeStrength)}
+          data-testid="film-look-active-state"
+        >
+          <div
+            className="h-16 rounded-md border border-surface"
+            data-testid="film-look-active-render-preview"
+            style={getFilmLookComparePreviewStyle(activeLook, activeStrength)}
+          />
+          <div className="min-w-0 self-center">
+            <UiText variant={TextVariants.small} className="text-text-secondary">
+              {t('adjustments.effects.filmLookBrowser.activeLook')}
+            </UiText>
+            <UiText variant={TextVariants.body} className="block truncate text-text-primary">
+              {activeLook.displayName}
+            </UiText>
+            <UiText variant={TextVariants.small} className="text-text-secondary">
+              {formatFilmLookStrength(activeStrength)}
+            </UiText>
+          </div>
+        </section>
+      )}
+
       <section className="space-y-2" aria-label={t('adjustments.effects.filmLookBrowser.categoryFilter')}>
         <UiText variant={TextVariants.small} className="uppercase tracking-normal text-text-secondary">
           {t('adjustments.effects.filmLookBrowser.categoryFilter')}
@@ -450,7 +508,24 @@ export function FilmLookBrowser({ onApplyLook, onSaveLook, onShareLook }: FilmLo
                     <UiText className="block truncate" variant={TextVariants.body}>
                       {look.displayName}
                     </UiText>
-                    <div className="h-5 rounded-sm border border-surface" style={getFilmLookSwatchStyle(look)} />
+                    <div
+                      className="h-20 overflow-hidden rounded-md border border-surface"
+                      data-look-id={look.id}
+                      data-preview-strength={look.id === selectedLookId ? strengthPercent : look.strengthDefault}
+                      data-preview-support={look.runtimeSupport}
+                      data-testid="film-look-compare-render-preview"
+                      style={getFilmLookComparePreviewStyle(
+                        look,
+                        look.id === selectedLookId ? strengthPercent : look.strengthDefault,
+                      )}
+                    >
+                      <div className="flex h-full items-end justify-between bg-black/10 p-2 text-[11px] text-white/90">
+                        <span className="rounded bg-black/40 px-1.5 py-0.5">{slotLabel}</span>
+                        <span className="rounded bg-black/40 px-1.5 py-0.5">
+                          {formatFilmLookStrength(look.id === selectedLookId ? strengthPercent : look.strengthDefault)}
+                        </span>
+                      </div>
+                    </div>
                     <div className="flex flex-wrap gap-1">
                       {adjustmentSummaries.map((summary) => (
                         <span

@@ -254,6 +254,7 @@
       "creative": "Kreativ",
       "feather": "Weiche Kante",
       "filmLookBrowser": {
+        "activeLook": "Active look",
         "allFamilies": "All families",
         "allLooks": "All looks",
         "categoryFilter": "Look family",
