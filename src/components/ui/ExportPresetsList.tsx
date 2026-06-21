@@ -33,6 +33,8 @@ export default function ExportPresetsList({
   const newPresetInputRef = useRef<HTMLInputElement>(null);
   const presets = useMemo(() => appSettings?.exportPresets ?? [], [appSettings?.exportPresets]);
   const recipeRows = useMemo(() => buildExportRecipeUiRows(presets), [presets]);
+  const validRecipeCount = recipeRows.filter((row) => row.isValidRecipe).length;
+  const builtInRecipeCount = recipeRows.filter((row) => row.isBuiltIn).length;
 
   useManagedFocus(newPresetInputRef, isCreating);
 
@@ -189,6 +191,23 @@ export default function ExportPresetsList({
 
       {recipeRows.length > 0 && (
         <div className="mt-3 grid gap-2">
+          <div
+            className="grid grid-cols-3 gap-2 rounded-md border border-surface bg-bg-primary p-2 text-xs"
+            data-built-in-recipe-count={builtInRecipeCount}
+            data-recipe-count={recipeRows.length}
+            data-testid="export-recipe-readiness-summary"
+            data-valid-recipe-count={validRecipeCount}
+          >
+            <UiText as="span" variant={TextVariants.small} className="rounded bg-surface px-2 py-1 text-text-secondary">
+              {t('ui.exportPresets.recipeCount', { count: recipeRows.length })}
+            </UiText>
+            <UiText as="span" variant={TextVariants.small} className="rounded bg-surface px-2 py-1 text-text-secondary">
+              {t('ui.exportPresets.validRecipeCount', { count: validRecipeCount })}
+            </UiText>
+            <UiText as="span" variant={TextVariants.small} className="rounded bg-surface px-2 py-1 text-text-secondary">
+              {t('ui.exportPresets.builtInRecipeCount', { count: builtInRecipeCount })}
+            </UiText>
+          </div>
           {recipeRows.map((row) => (
             <button
               className={`rounded-md border p-3 text-left transition-colors ${
